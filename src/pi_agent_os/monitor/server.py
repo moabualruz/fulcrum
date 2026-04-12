@@ -17,6 +17,11 @@ app = FastAPI(
     version="0.1.0",
 )
 
+
+def create_app() -> FastAPI:
+    """Return the monitor FastAPI application instance."""
+    return app
+
 _metrics = MetricsService()
 
 

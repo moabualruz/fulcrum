@@ -10,6 +10,7 @@ from .commands import agent as agent_cmd
 from .commands import board as board_cmd
 from .commands import memory as memory_cmd
 from .commands import workflow as workflow_cmd
+from .commands import monitor as monitor_cmd
 
 app = typer.Typer(
     name="pi",
@@ -28,6 +29,7 @@ app.add_typer(agent_cmd.app, name="agent", help="Agent status and control")
 app.add_typer(board_cmd.app, name="board", help="Board views")
 app.add_typer(memory_cmd.app, name="memory", help="Memory search and ingestion")
 app.add_typer(workflow_cmd.app, name="workflow", help="Workflow management")
+app.add_typer(monitor_cmd.app, name="monitor", help="Monitor server")
 
 
 @app.callback(invoke_without_command=True)
