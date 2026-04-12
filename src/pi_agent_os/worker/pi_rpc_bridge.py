@@ -140,16 +140,13 @@ def get_pi_enabled_models() -> Optional[set[str]]:
     return None
 
 
-def get_enabled_providers() -> list[str]:
+def get_active_providers() -> list[str]:
     """
-    Return provider names that have valid (non-expired) credentials in PI's auth.json.
+    Return provider names that have credentials in PI's auth.json.
 
-    Rules:
-    - api_key providers: always valid as long as the entry exists
-    - oauth providers: valid only if the 'expires' timestamp (ms epoch) is in the future
-
-    This is stricter than PI's own `hasAuth()` which only checks for presence.
-    Use this to filter out providers with expired OAuth tokens.
+    A provider is active if it has any entry in auth.json — PI manages
+    token refresh and validity at request time.  Providers the user has
+    logged out of are simply absent from auth.json.
     """
     auth_path = _pi_auth_path()
     if not auth_path.exists():
@@ -160,32 +157,17 @@ def get_enabled_providers() -> list[str]:
     except Exception as exc:
         log.warning("Failed to read PI auth.json: %s", exc)
         return []
-
-    now_ms = time.time() * 1000
-    enabled: list[str] = []
-    for provider, cred in auth.items():
-        if not isinstance(cred, dict):
-            continue
-        cred_type = cred.get("type", "")
-        if cred_type == "api_key":
-            if cred.get("key"):
-                enabled.append(provider)
-        elif cred_type == "oauth":
-            expires = cred.get("expires", 0)
-            if isinstance(expires, (int, float)) and expires > now_ms:
-                enabled.append(provider)
-        # unknown type: skip (conservative)
-    return enabled
+    return [p for p, cred in auth.items() if isinstance(cred, dict)]
 
 
 def query_pi_models(pi_cmd: Optional[str] = None) -> list[dict]:
     """
-    Return the models the user has scoped in PI.
+    Return the models the user has active and scoped in PI.
 
-    Two-step filter (mirrors PI's own logic):
-    1. `pi --list-models` — providers with auth configured (PI's getAvailable())
-    2. settings.json `enabledModels` — the explicit allowlist set via `pi config`
-       If enabledModels is absent, all available models are returned.
+    Explicit two-step filter:
+    1. Active providers — from auth.json (logged-in providers only)
+    2. Enabled models  — from settings.json enabledModels allowlist (set via
+       `pi config`); if the list is absent, all models for active providers pass
 
     Each entry: {provider, model, context_k, max_out_k, thinking, images}
 
@@ -207,7 +189,10 @@ def query_pi_models(pi_cmd: Optional[str] = None) -> list[dict]:
         log.warning("query_pi_models() failed: %s", exc)
         return []
 
-    # None = no allowlist, all models pass; set = only these "provider/model" specs
+    # Step 1: active providers from auth.json
+    active_providers = set(get_active_providers())
+
+    # Step 2: user-scoped model allowlist from settings.json (None = no restriction)
     enabled_set = get_pi_enabled_models()
 
     models: list[dict] = []
@@ -216,6 +201,10 @@ def query_pi_models(pi_cmd: Optional[str] = None) -> list[dict]:
         if len(parts) < 2 or parts[0] == "provider":
             continue
         provider, model_id = parts[0], parts[1]
+        # Filter 1: provider must be logged in
+        if active_providers and provider not in active_providers:
+            continue
+        # Filter 2: model must be in the enabledModels scope (if set)
         if enabled_set is not None and f"{provider}/{model_id}" not in enabled_set:
             continue
         models.append({
@@ -534,7 +523,11 @@ class PIRPCBridge(PIRuntimeAdapter):
         return [m for m in self.query_models() if m["provider"] == provider]
 
     def providers(self) -> list[str]:
-        """Return the deduplicated list of providers available in PI."""
+        """Return active providers (logged-in, from auth.json)."""
+        return get_active_providers()
+
+    def scoped_providers(self) -> list[str]:
+        """Return providers that have at least one model in the active+scoped set."""
         seen: list[str] = []
         for m in self.query_models():
             if m["provider"] not in seen:
