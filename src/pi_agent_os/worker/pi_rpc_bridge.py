@@ -278,6 +278,14 @@ class _RunState:
     done_event: threading.Event = field(default_factory=threading.Event)
     error: Optional[str] = None
     final_messages: list[dict] = field(default_factory=list)
+    # Failover support
+    model_list: list[str] = field(default_factory=list)   # full ordered list incl. fallbacks
+    model_index: int = 0                                   # currently active index
+    config: Optional["PIAgentConfig"] = None               # stored for retry
+    pi_cmd: str = "pi"                                     # stored for retry
+    system_prompt: Optional[str] = None                    # stored for retry
+    session_dir: Optional[str] = None                      # stored for retry
+    tried_models: list[str] = field(default_factory=list)  # audit trail
 
 
 # ---------------------------------------------------------------------------
@@ -318,86 +326,47 @@ class PIRPCBridge(PIRuntimeAdapter):
         """
         Spawn a new PI agent subprocess for the given config.
 
-        Returns a run_id that can be passed to get_run_status / wait_for_run.
-        The subprocess runs asynchronously; use wait_for_run() to collect results.
+        Reads `models:` from the agent definition frontmatter as a
+        comma-separated or YAML list of "provider/model" specs in priority
+        order (primary first, then fallbacks).  Falls back to the `model:`
+        field for single-model definitions.
+
+        Returns a run_id immediately.  If the primary model returns an error
+        the reader thread transparently retries with the next model in the list.
+        Use wait_for_run() to block for the final result.
         """
         run_id = f"run_{uuid.uuid4().hex[:16]}"
 
-        # Build CLI args — omit --provider and --model if not specified,
-        # letting PI use whatever the user has configured interactively.
         pi_cmd = (
             self._pi_command
             if self._pi_command != "pi"
             else (find_pi_command() or "pi")
         )
-        cmd = [pi_cmd, "--mode", "rpc"]
 
-        # Model + system prompt: profile frontmatter → caller override → PI default
-        # Supports two formats:
-        #   "provider/model_id"  → passed as --model provider/model_id (PI resolves provider)
-        #   "model_id"           → passed as --model model_id with optional --provider
-        # Frontmatter can also set `provider:` separately (lower precedence than inline prefix).
-        model: Optional[str] = self._default_model
-        provider: Optional[str] = self._provider
+        # Resolve agent definition and frontmatter
         agent_def = _agent_definition_path(config.profile_id)
-        system_prompt: Optional[str] = None
+        fm = _read_frontmatter(agent_def) if agent_def else {}
+        system_prompt: Optional[str] = str(fm["system"]) if fm.get("system") else None
 
-        if agent_def:
-            fm = _read_frontmatter(agent_def)
-            if fm.get("model") and not model:
-                model = str(fm["model"])
-            if fm.get("provider") and not provider:
-                provider = str(fm["provider"])
-            if fm.get("system"):
-                system_prompt = str(fm["system"])
+        # Build ordered model list from frontmatter
+        model_list = self._parse_model_list(fm, config)
+        if not model_list:
+            model_list = [""]  # let PI use its configured default
 
-        if model:
-            if "/" in model:
-                # "provider/model_id" — PI handles both in one --model flag
-                cmd += ["--model", model]
-            else:
-                if provider:
-                    cmd += ["--provider", provider]
-                cmd += ["--model", model]
-        elif provider:
-            cmd += ["--provider", provider]
+        # Start with the first model
+        proc = self._start_proc(pi_cmd, model_list[0], system_prompt, config)
 
-        if system_prompt:
-            cmd += ["--system-prompt", system_prompt]
-
-        # No session persistence for spawned agents
-        cmd += ["--no-session"]
-        if self._session_dir:
-            cmd += ["--session-dir", self._session_dir]
-
-        cwd = config.worktree_path or os.getcwd()
-
-        log.info(
-            "Spawning PI agent: run_id=%s profile=%s model=%s",
-            run_id, config.profile_id, model,
-        )
-
-        try:
-            proc = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=cwd,
-                text=True,
-                bufsize=1,  # line-buffered
-            )
-        except FileNotFoundError:
-            raise RuntimeError(
-                f"PI CLI not found: {self._pi_command!r}. "
-                "Install with: npm install -g @mariozechner/pi-coding-agent"
-            )
-
-        # Build state first so reader thread can reference it
         state = _RunState(
             run_id=run_id,
             proc=proc,
-            reader_thread=threading.Thread(target=lambda: None),  # placeholder
+            reader_thread=threading.Thread(target=lambda: None),
+            model_list=model_list,
+            model_index=0,
+            config=config,
+            pi_cmd=pi_cmd,
+            system_prompt=system_prompt,
+            session_dir=self._session_dir,
+            tried_models=[model_list[0]],
         )
         state.reader_thread = threading.Thread(
             target=self._reader_loop,
@@ -410,27 +379,28 @@ class PIRPCBridge(PIRuntimeAdapter):
             self._runs[run_id] = state
 
         state.reader_thread.start()
-
-        # Send the task as the first prompt
         self._send_prompt(state, self._format_task(config))
+
+        log.info(
+            "Spawning PI agent: run_id=%s profile=%s model=%s fallbacks=%d",
+            run_id, config.profile_id, model_list[0], len(model_list) - 1,
+        )
         return run_id
 
     def get_run_status(self, run_id: str) -> dict:
         """Return a status snapshot for a run (no LLM call needed)."""
         state = self._get_state(run_id)
-        if state.error:
-            return {"run_id": run_id, "status": "failed", "error": state.error}
-        if state.done:
-            return {
-                "run_id": run_id,
-                "status": "completed",
-                "message_count": len(state.final_messages),
-            }
-        return {
+        base = {
             "run_id": run_id,
-            "status": "running",
-            "event_count": len(state.events),
+            "active_model": state.model_list[state.model_index] if state.model_list else None,
+            "tried_models": list(state.tried_models),
+            "fallbacks_remaining": len(state.model_list) - state.model_index - 1,
         }
+        if state.error:
+            return {**base, "status": "failed", "error": state.error}
+        if state.done:
+            return {**base, "status": "completed", "message_count": len(state.final_messages)}
+        return {**base, "status": "running", "event_count": len(state.events)}
 
     def wait_for_run(self, run_id: str, timeout: float | None = None) -> PIRunResult:
         """Block until the PI agent run completes or times out."""
@@ -603,18 +573,27 @@ class PIRPCBridge(PIRuntimeAdapter):
                     state.done = True
                     state.done_event.set()
                     log.info(
-                        "PI run %s completed (%d messages)",
+                        "PI run %s completed (%d messages) via %s",
                         run_id[:8], len(state.final_messages),
+                        state.model_list[state.model_index] if state.model_list else "?",
                     )
 
                 elif evt_type == "error":
                     reason = event.get("reason", "error")
-                    state.error = (
-                        f"PI error ({reason}): {event.get('error', 'unknown')}"
-                    )
+                    # User-initiated abort: don't failover, surface immediately
+                    if reason == "aborted":
+                        state.error = "aborted"
+                        state.done = True
+                        state.done_event.set()
+                        return
+                    # Model/provider error: try next model in failover list
+                    err_msg = f"PI error ({reason}): {event.get('error', 'unknown')}"
+                    log.warning("PI run %s model error: %s", run_id[:8], err_msg)
+                    if self._try_failover(state, err_msg):
+                        return  # new reader thread takes over
+                    state.error = err_msg
                     state.done = True
                     state.done_event.set()
-                    log.warning("PI run %s error: %s", run_id[:8], state.error)
 
                 elif evt_type == "message_update":
                     ae = event.get("assistantMessageEvent", {})
@@ -624,6 +603,8 @@ class PIRPCBridge(PIRuntimeAdapter):
         except Exception as exc:
             log.warning("PI reader loop exception for %s: %s", run_id[:8], exc)
             if not state.done:
+                if self._try_failover(state, str(exc)):
+                    return
                 state.error = str(exc)
                 state.done = True
                 state.done_event.set()
@@ -633,6 +614,158 @@ class PIRPCBridge(PIRuntimeAdapter):
                 state.proc.stderr.read()
             except Exception:
                 pass
+
+    # ------------------------------------------------------------------
+    # Failover helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _parse_model_list(fm: dict, config: "PIAgentConfig") -> list[str]:
+        """
+        Build an ordered model list from agent frontmatter.
+
+        Frontmatter field `models:` (preferred) accepts:
+          - CSV string:  "opencode/claude-sonnet-4-6, openai-codex/gpt-5.4"
+          - YAML list:   ["opencode/claude-sonnet-4-6", "openai-codex/gpt-5.4"]
+
+        If `models:` is absent, falls back to `model:` as a single entry.
+        Task packet `_models` list may also provide overrides (highest priority).
+        """
+        # Caller override via task packet (highest priority)
+        tp_models = config.task_packet.get("_models") if isinstance(config.task_packet, dict) else None
+        if tp_models:
+            if isinstance(tp_models, str):
+                return [m.strip() for m in tp_models.split(",") if m.strip()]
+            if isinstance(tp_models, list):
+                return [str(m).strip() for m in tp_models if str(m).strip()]
+
+        # Frontmatter `models:` field
+        raw = fm.get("models")
+        if raw:
+            if isinstance(raw, str):
+                return [m.strip() for m in raw.split(",") if m.strip()]
+            if isinstance(raw, list):
+                return [str(m).strip() for m in raw if str(m).strip()]
+
+        # Frontmatter `model:` single field
+        single = fm.get("model")
+        if single:
+            return [str(single).strip()]
+
+        return []
+
+    def _start_proc(
+        self,
+        pi_cmd: str,
+        model_spec: str,
+        system_prompt: Optional[str],
+        config: "PIAgentConfig",
+    ) -> "subprocess.Popen[str]":
+        """Start a PI subprocess with the given model spec."""
+        cmd = [pi_cmd, "--mode", "rpc"]
+
+        if model_spec:
+            if "/" in model_spec:
+                cmd += ["--model", model_spec]
+            else:
+                if self._provider:
+                    cmd += ["--provider", self._provider]
+                cmd += ["--model", model_spec]
+        elif self._provider:
+            cmd += ["--provider", self._provider]
+
+        if system_prompt:
+            cmd += ["--system-prompt", system_prompt]
+
+        cmd += ["--no-session"]
+        if self._session_dir:
+            cmd += ["--session-dir", self._session_dir]
+
+        cwd = config.worktree_path or os.getcwd()
+        try:
+            return subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=cwd,
+                text=True,
+                bufsize=1,
+            )
+        except FileNotFoundError:
+            raise RuntimeError(
+                f"PI CLI not found: {pi_cmd!r}. "
+                "Install with: npm install -g @mariozechner/pi-coding-agent"
+            )
+
+    def _try_failover(self, state: _RunState, prev_error: str) -> bool:
+        """
+        Attempt to continue a failed run with the next model in the fallback list.
+
+        Kills the current subprocess, starts a new one with the next model,
+        records the attempt in state.tried_models, and spawns a new reader thread.
+        Returns True if a retry was started; False if all models are exhausted.
+        """
+        next_idx = state.model_index + 1
+        if next_idx >= len(state.model_list):
+            all_tried = ", ".join(state.tried_models)
+            log.warning(
+                "PI run %s: all %d models exhausted (%s). Last error: %s",
+                state.run_id[:8], len(state.model_list), all_tried, prev_error,
+            )
+            return False
+
+        state.model_index = next_idx
+        next_model = state.model_list[next_idx]
+        state.tried_models.append(next_model)
+
+        log.info(
+            "PI run %s failover → %s (attempt %d/%d)",
+            state.run_id[:8], next_model, next_idx + 1, len(state.model_list),
+        )
+
+        # Drain and terminate old process
+        try:
+            state.proc.stdin.close()  # type: ignore[union-attr]
+        except Exception:
+            pass
+        try:
+            state.proc.terminate()
+            state.proc.wait(timeout=3)
+        except Exception:
+            pass
+
+        # Start new subprocess
+        assert state.config is not None
+        try:
+            new_proc = self._start_proc(
+                state.pi_cmd, next_model, state.system_prompt, state.config
+            )
+        except Exception as exc:
+            log.warning("PI failover spawn failed for %s: %s", next_model, exc)
+            return False
+
+        state.proc = new_proc
+        state.events.append({
+            "type": "failover",
+            "from": state.model_list[next_idx - 1],
+            "to": next_model,
+            "reason": prev_error,
+        })
+
+        # Start new reader thread
+        new_thread = threading.Thread(
+            target=self._reader_loop,
+            args=(state.run_id,),
+            daemon=True,
+            name=f"pi-reader-{state.run_id[:8]}-try{next_idx}",
+        )
+        state.reader_thread = new_thread
+        new_thread.start()
+
+        # Re-send the original task to the new process
+        self._send_prompt(state, self._format_task(state.config))
+        return True
 
     @staticmethod
     def _format_task(config: PIAgentConfig) -> str:
