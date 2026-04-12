@@ -1,7 +1,7 @@
 # Blockers
 
-## B-001: PI Runtime — Bridge Scaffolded, Activation Requires Node.js
-**Status:** Scaffolded — ready to activate  
+## B-001: PI Runtime — Bridge Active
+**Status:** Resolved — PIRPCBridge activates automatically when `pi` is in PATH  
 **Spec sections affected:** §3.1, §3.2, §4.x, §16.x, §17.x  
 **Description:** PI (`@mariozechner/pi-coding-agent`) is a TypeScript/Node.js terminal coding
 agent — not a Python package. Communication is via JSON-RPC over stdio (`pi --rpc`).  
@@ -20,8 +20,9 @@ from pi_agent_os.worker.pi_adapter import auto_configure_pi_runtime
 auto_configure_pi_runtime()
 ```
 See `PI_INTEGRATION.md` for the full guide.  
-**Remaining gap:** No tests for PIRPCBridge (requires live `pi` process). All control-plane
+**Remaining gap:** Live LLM end-to-end test requires `ANTHROPIC_API_KEY`. All control-plane
 features (tasks, memory, monitoring, policy, workflows) work without PI.
+`find_pi_command()` handles `.venv/bin/pi` shadowing — uses fnm/nvm glob paths first.
 
 ---
 

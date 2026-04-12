@@ -131,7 +131,9 @@ Each entry: Phase / Component / Test / Result / Date
 | PIRPCBridge importable | `from pi_agent_os.worker.pi_rpc_bridge import check_pi_available` | VERIFIED ✓ | 2026-04-12 |
 | auto_configure_pi_runtime | Falls back to stub when pi not in PATH | VERIFIED ✓ | 2026-04-12 |
 | PI agent definition stubs | 7 role .md files in pi_agents/ | VERIFIED ✓ | 2026-04-12 |
-| Live PI execution | Requires `npm install -g @mariozechner/pi-coding-agent` | MANUAL | - |
+| find_pi_command() | Returns fnm pi path, skips .venv/bin/pi shadow | VERIFIED ✓ | 2026-04-12 |
+| auto_configure_pi_runtime | Activates real bridge with resolved pi path | VERIFIED ✓ | 2026-04-12 |
+| Live PI execution | Requires `ANTHROPIC_API_KEY` + npm packages installed | MANUAL | - |
 
 ## Golden Scenarios
 
