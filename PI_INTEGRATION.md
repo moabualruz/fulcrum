@@ -2,27 +2,23 @@
 
 ## What is PI?
 
-PI (`@mariozechner/pi-coding-agent`) is a TypeScript/Node.js terminal coding agent developed by Mario Zechner ([@badlogic](https://github.com/badlogic), github.com/badlogic/pi-mono). It is a standalone CLI tool, not a Python package. PI owns the agent execution layer: it manages native agent definitions (Markdown files with YAML frontmatter), model and provider assignment, extension registration, skill loading, and subagent/team orchestration. PI is the authoritative execution host as defined in spec §3.1.
+PI (`@mariozechner/pi-coding-agent`) is a TypeScript/Node.js terminal coding agent developed
+by Mario Zechner ([@badlogic](https://github.com/badlogic/pi-mono)). It is a standalone CLI
+tool — not a Python package. PI owns the agent execution layer: it manages native agent
+definitions, model and provider assignment, extension registration, skill loading, and
+subagent/team orchestration via the `@tintinweb/pi-subagents` extension.
 
-PI communicates with external systems through an RPC mode (`pi --rpc`) that exposes a JSON-RPC 2.0 interface over stdio. This Python codebase acts as a control plane that talks to PI through that interface — it issues task packets, polls run status, and routes results back into the agent OS workflow engine. All LLM calls, tool invocations, and model-level decisions are delegated entirely to PI.
+PI is the authoritative execution host as defined in spec §3.1. This Python codebase is the
+control plane — it issues task packets, tracks run status, and routes results into the
+workflow engine. All LLM calls and tool invocations are delegated to PI.
 
 ## Current state
 
-The Python codebase uses `StubPIRuntimeAdapter` by default (blocker B-001 in BLOCKERS.md).
-All control-plane features (tasks, memory, monitoring, policy, workflows) work without PI.
-
-What requires PI:
-- Actual LLM agent execution (spawning real agents)
-- Model and provider assignment
-- Team orchestration (parallel agent invocation)
-- PI-native skill and extension loading
-
-What works without PI (stub mode):
-- Task management, issue decomposition, workflow definitions
-- Memory indexing and retrieval
-- Policy enforcement
-- Worktree allocation and merge queue
-- Analytics and monitoring infrastructure
+| Layer | Status |
+|---|---|
+| Control plane (tasks, memory, policy, monitor) | Works without PI — stub active |
+| `PIRPCBridge` | Implemented and tested — activates when `pi` is in PATH |
+| Real LLM agent execution | Requires PI + Anthropic API key |
 
 ## Prerequisites
 
@@ -33,195 +29,169 @@ node --version
 # Install PI
 npm install -g @mariozechner/pi-coding-agent
 
+# Install subagent extension (enables Agent tool for team/parallel execution)
+npm install -g @tintinweb/pi-subagents
+
 # Verify
 pi --version
-
-# Install subagent extension (for team/subagent support)
-npm install -g @tintinweb/pi-subagents
+which pi
 ```
 
-## Enabling the real PI runtime
+## Activating the real PI runtime
 
 ```python
 from pi_agent_os.worker.pi_adapter import auto_configure_pi_runtime
 
-# Auto-detects PI CLI on PATH or falls back to stub
-configured = auto_configure_pi_runtime()
-if configured:
-    print("Using real PI runtime")
-else:
-    print("PI not found — using stub (development mode)")
+# Auto-detects pi in PATH. Returns True if real bridge activated, False = stub.
+real = auto_configure_pi_runtime()
+print("PI bridge:", real)
 ```
 
-Or configure explicitly:
+Or explicitly:
 
 ```python
 from pi_agent_os.worker.pi_rpc_bridge import PIRPCBridge
 from pi_agent_os.worker.pi_adapter import configure_pi_runtime
 
-bridge = PIRPCBridge(pi_command="pi", timeout=60.0)
-configure_pi_runtime(bridge)
+configure_pi_runtime(PIRPCBridge(
+    provider="anthropic",          # or "google", "openai"
+    default_model="claude-sonnet-4-6",
+    timeout=300.0,
+))
+```
 
-# Use as context manager for clean shutdown:
-with PIRPCBridge() as bridge:
-    configure_pi_runtime(bridge)
-    # ... run your workload ...
+Set your API key before spawning agents:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ## PI RPC protocol
 
-PI in `--rpc` mode reads JSON-RPC 2.0 request objects from stdin (one per line) and writes JSON-RPC 2.0 response objects to stdout (one per line).
+PI is started in RPC mode: `pi --mode rpc --provider anthropic --no-session`
 
-### Request format
+Communication is **event-streaming JSONL** over stdio — not method-based JSON-RPC.
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "unique-request-id",
-  "method": "agent.spawn",
-  "params": { ... }
-}
-```
+### Commands (Python → PI stdin, one JSON line each)
 
-### Response format (success)
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "unique-request-id",
-  "result": { ... }
-}
-```
-
-### Response format (error)
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "unique-request-id",
-  "error": { "code": -32000, "message": "description" }
-}
-```
-
-### Methods used by this codebase
-
-| Method | Params | Result |
+| Command | JSON | Notes |
 |---|---|---|
-| `agent.spawn` | `profile_id`, `task`, `worktree`, `timeout` | `{ "run_id": "..." }` |
-| `agent.status` | `run_id` | `{ "run_id", "status", "output", "artifacts", "error" }` |
-| `team.invoke` | `template_id`, `task` | `{ "instance_id": "..." }` |
-| `profiles.list` | _(none)_ | array of profile objects |
-| `profiles.get` | `profile_id` | profile object or null |
+| Send prompt | `{"id": "r1", "type": "prompt", "message": "..."}` | Starts agent; returns immediately |
+| Abort run | `{"type": "abort"}` | Stops current agent turn |
+| Set model | `{"type": "set_model", "provider": "anthropic", "modelId": "..."}` | Switch model mid-session |
+| New session | `{"type": "new_session"}` | Reset conversation |
 
-`agent.status` returns `status` values: `"running"`, `"completed"`, `"failed"`, `"blocked"`.
+### Events (PI stdout → Python)
+
+| Event type | Meaning |
+|---|---|
+| `agent_start` | Agent begins processing |
+| `message_update` | Streaming text/tool delta (`assistantMessageEvent.type = "text_delta"`) |
+| `tool_execution_start` | Tool call begins |
+| `tool_execution_end` | Tool call completes |
+| `agent_end` | Agent finished — includes all `messages` in the payload |
+| `error` | Error (`reason`: `"aborted"` or `"error"`) |
+| `response` | Acknowledgement of a command (`{"type": "response", "command": "prompt", "success": true}`) |
+
+### How `PIRPCBridge.spawn_agent()` works
+
+1. Starts `pi --mode rpc --provider anthropic --model <model> --no-session` subprocess
+2. Reads agent definition from `.pi/agents/<profile_id>.md` for model + system prompt
+3. Sends task as `{"type": "prompt", "message": "<task markdown>"}`
+4. Background reader thread collects events until `agent_end` or `error`
+5. Returns `run_id` immediately — use `wait_for_run(run_id)` to block for result
 
 ## Agent definition files
 
-PI agent definitions live in `.pi/agents/<name>.md` in your project root, using YAML frontmatter:
+PI agent types are defined in `.pi/agents/<name>.md` with YAML frontmatter.
+Bundled stubs live in `src/pi_agent_os/pi_agents/`. Copy them to `.pi/agents/`
+to use project-local definitions (takes precedence over bundled stubs).
 
-```yaml
----
-model: claude-opus-4-5
-system: |
-  You are a backend implementer responsible for writing clean,
-  tested, well-documented Python code.
-tools:
-  - read_file
-  - write_file
-  - run_tests
-memory_scope: project
-handoff_mode: artifact_first_brief
----
+```bash
+mkdir -p .pi/agents
+cp src/pi_agent_os/pi_agents/*.md .pi/agents/
 ```
 
-The body of the Markdown file can contain additional instructions, examples, or context for the agent.
+Example — `chief_of_staff.md`:
 
-### Role → PI profile mapping
-
-`routing/roles.py` defines the canonical role vocabulary and `DEFAULT_ROLE_MAPPINGS`. Each `RoleMapping` has a `primary_profile` field that holds the PI profile ID. At runtime, the router resolves a role to a profile ID and passes it to `PIRuntimeAdapter.spawn_agent()` via `PIAgentConfig.profile_id`.
-
-The profile ID corresponds to the filename of the agent definition file (without `.md`), e.g. role `implementer_backend` → profile `pi_profile_implementer_backend` → `.pi/agents/pi_profile_implementer_backend.md`.
-
-In production, the mapping table is loaded from `agent-home/config/role_mappings.yaml`.
-
-## Creating PI agent definitions for each role
-
-Templates are provided in `src/pi_agent_os/pi_agents/`. Copy them to `.pi/agents/` in your project and customise the system prompt and tool list for your codebase.
-
-### chief_of_staff
-
-```yaml
+```markdown
 ---
 model: claude-opus-4-6
 system: |
-  You are the Chief of Staff AI agent. You orchestrate teams of specialist
-  agents to accomplish complex engineering tasks. You plan, delegate, and
-  coordinate — you never write code directly.
+  You are the Chief of Staff agent for this project.
+  Your role is to understand user requests, plan execution, and orchestrate
+  specialized agents via the Agent tool. You never write code directly.
 tools:
   - read_file
-  - invoke_team
-  - list_profiles
+  - bash
+  - Agent
 memory_scope: project
-handoff_mode: artifact_first_brief
 ---
 ```
 
-### implementer_backend
+### Role → Profile mapping
 
-```yaml
----
-model: claude-sonnet-4-6
-system: |
-  You are a backend implementer. Write clean, well-tested Python/Go/Rust code.
-  Follow existing patterns. Always run tests before marking work done.
-tools:
-  - read_file
-  - write_file
-  - run_command
-  - run_tests
-memory_scope: project
-handoff_mode: artifact_first_brief
----
+```
+chief_of_staff      → claude-opus-4-6   (.pi/agents/chief_of_staff.md)
+implementer_backend → claude-sonnet-4-6 (.pi/agents/implementer_backend.md)
+implementer_frontend→ claude-sonnet-4-6 (.pi/agents/implementer_frontend.md)
+tester              → claude-sonnet-4-6 (.pi/agents/tester.md)
+reviewer            → claude-sonnet-4-6 (.pi/agents/reviewer.md)
+research_worker     → claude-sonnet-4-6 (.pi/agents/research_worker.md)
+integration_worker  → claude-sonnet-4-6 (.pi/agents/integration_worker.md)
 ```
 
-### tester / reviewer / research_worker / integration_worker
-
-See the template files in `src/pi_agent_os/pi_agents/` for complete frontmatter.
-
-## Team support
-
-`invoke_team` maps to the `pi-subagents` extension (`npm install -g @tintinweb/pi-subagents`). It spawns multiple PI agents in parallel according to a team template definition. Only L1 agents (chief_of_staff, per spec §4.1) may call `invoke_team`.
+To list available profiles at runtime:
 
 ```python
 from pi_agent_os.worker.pi_adapter import get_pi_runtime
+profiles = get_pi_runtime().list_profiles()
+```
 
-runtime = get_pi_runtime()
-instance_id = runtime.invoke_team(
-    template_id="implementation_team",
-    task_packet={"goal": "implement feature X", "issue_id": "iss_..."},
-)
+## Team support via pi-subagents
+
+The `@tintinweb/pi-subagents` extension adds an `Agent` tool to PI that the LLM
+can call to spawn parallel sub-agents. When `invoke_team()` is called:
+
+1. A Chief of Staff agent is spawned
+2. Its system prompt instructs it to use the `Agent` tool to spawn specialists
+3. The `Agent` tool runs sub-agents in isolated sessions
+
+```python
+rt = get_pi_runtime()
+instance_id = rt.invoke_team("feature-build-team", {
+    "title": "Add OAuth login",
+    "description": "Implement GitHub OAuth...",
+})
+result = rt.wait_for_run(instance_id, timeout=600)
+```
+
+**Note:** Subagents run as child `pi` processes. Concurrency is controlled by the
+pi-subagents extension (default limit: 4 parallel agents).
+
+## Using worktrees with agents
+
+Pass `worktree_path` in `PIAgentConfig` to run an agent in an isolated git worktree
+(see `WorktreeAllocator`):
+
+```python
+from pi_agent_os.worker.pi_adapter import get_pi_runtime, PIAgentConfig
+
+run_id = get_pi_runtime().spawn_agent(PIAgentConfig(
+    profile_id="implementer_backend",
+    task_packet={"title": "Fix auth bug", "description": "..."},
+    worktree_path="/path/to/worktree",
+))
 ```
 
 ## Troubleshooting
 
-**`pi` not found in PATH**
-Run `npm install -g @mariozechner/pi-coding-agent` and ensure your npm global bin directory is on PATH. Check with `which pi`.
-
-**RPC timeout**
-Increase the timeout: `PIRPCBridge(timeout=120.0)`. Also check that `pi --rpc` works interactively in your terminal.
-
-**`team.invoke` returns error "extension not found"**
-Install the subagent extension: `npm install -g @tintinweb/pi-subagents`.
-
-**Import error on `pi_rpc_bridge`**
-The module has no external Python dependencies beyond the standard library. Ensure your virtual environment is active (`uv run python -c "import pi_agent_os.worker.pi_rpc_bridge"`).
-
-**Process exits unexpectedly**
-Check stderr output from the PI process. The reader thread logs warnings to the `pi_agent_os.worker.pi_rpc_bridge` logger — enable DEBUG logging to see them:
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
-
-**Tests fail after enabling real PI runtime**
-The test suite uses `StubPIRuntimeAdapter`. Do not call `auto_configure_pi_runtime()` in test setup. The stub is restored automatically between tests if you use the `pi_runtime` fixture (if provided) or reset with `configure_pi_runtime(StubPIRuntimeAdapter())`.
+| Problem | Fix |
+|---|---|
+| `PI CLI not found` | `npm install -g @mariozechner/pi-coding-agent` + check PATH |
+| `Bridge activated: False` | `which pi` — ensure npm global bin is in shell PATH |
+| Agent times out | Increase `timeout` in `PIRPCBridge(timeout=600)` |
+| No `Agent` tool in pi | `npm install -g @tintinweb/pi-subagents` |
+| Auth error | Set `ANTHROPIC_API_KEY` or use `pi --api-key <key>` |
+| Wrong model | Check `.pi/agents/<profile>.md` frontmatter `model:` field |
+| `pi --mode rpc` hangs | PI waits for stdin — the bridge sends the prompt after startup |

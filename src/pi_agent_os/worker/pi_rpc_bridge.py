@@ -2,276 +2,445 @@
 Real PIRuntimeAdapter implementation via PI RPC subprocess bridge.
 
 Spec §3.1: PI is the authoritative execution host.
-B-001 unblock: spawn `pi --rpc`, send JSON-RPC over stdio.
+B-001 unblock: each spawn_agent() starts a `pi --mode rpc` subprocess,
+communicates via JSONL over stdio, and streams events asynchronously.
+
+PI RPC protocol (pi --mode rpc):
+  Commands (stdin):  {"id": "req-1", "type": "prompt", "message": "..."}
+  Events (stdout):   {"type": "agent_start"} / {"type": "agent_end", ...} / ...
+  Responses:         {"type": "response", "command": "prompt", "success": true}
+
+Each spawned agent runs as a separate subprocess.  The run_id returned by
+spawn_agent() is a local UUID that maps to the subprocess handle and its
+accumulated events.
 
 Prerequisites:
     npm install -g @mariozechner/pi-coding-agent
-    npm install -g @tintinweb/pi-subagents  # for subagent/team support
+    npm install -g @tintinweb/pi-subagents   # optional: for team/subagent support
 
 Usage:
     from pi_agent_os.worker.pi_rpc_bridge import PIRPCBridge
     from pi_agent_os.worker.pi_adapter import configure_pi_runtime
     configure_pi_runtime(PIRPCBridge())
+
+    # Or let auto-detection handle it:
+    from pi_agent_os.worker.pi_adapter import auto_configure_pi_runtime
+    auto_configure_pi_runtime()
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import subprocess
 import threading
 import time
 import uuid
-from queue import Empty, Queue
-from typing import Any, Optional
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
 
 from .pi_adapter import PIAgentConfig, PIRunResult, PIRuntimeAdapter
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def check_pi_available() -> bool:
-    """Return True if the `pi` CLI is available on PATH."""
+    """Return True if the `pi` CLI is on PATH."""
     return shutil.which("pi") is not None
 
 
+def _agent_definition_path(profile_id: str) -> Optional[Path]:
+    """
+    Resolve a PI agent definition file for a profile_id.
+
+    Checks (in order):
+      .pi/agents/<profile_id>.md              (project-local)
+      ~/.pi/agent/agents/<profile_id>.md      (global user)
+      src/pi_agent_os/pi_agents/<profile_id>.md (bundled stubs)
+    """
+    candidates = [
+        Path(".pi/agents") / f"{profile_id}.md",
+        Path.home() / ".pi" / "agent" / "agents" / f"{profile_id}.md",
+        Path(__file__).parent.parent / "pi_agents" / f"{profile_id}.md",
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    return None
+
+
+def _read_frontmatter(md_path: Path) -> dict:
+    """Parse YAML frontmatter from a .md agent definition file."""
+    try:
+        import yaml  # pyyaml is in deps
+        text = md_path.read_text(encoding="utf-8")
+        if text.startswith("---"):
+            end = text.index("---", 3)
+            return yaml.safe_load(text[3:end]) or {}
+    except Exception:
+        pass
+    return {}
+
+
+def _extract_text(messages: list[dict]) -> str:
+    """Extract plain text from PI message objects (spec §3.1 output)."""
+    parts = []
+    for msg in messages:
+        if msg.get("role") == "assistant":
+            for block in msg.get("content", []):
+                if isinstance(block, dict) and block.get("type") == "text":
+                    parts.append(block["text"])
+                elif isinstance(block, str):
+                    parts.append(block)
+    return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Per-run state
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _RunState:
+    run_id: str
+    proc: "subprocess.Popen[str]"
+    reader_thread: threading.Thread
+    events: list[dict] = field(default_factory=list)
+    done: bool = False
+    done_event: threading.Event = field(default_factory=threading.Event)
+    error: Optional[str] = None
+    final_messages: list[dict] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Bridge
+# ---------------------------------------------------------------------------
+
 class PIRPCBridge(PIRuntimeAdapter):
     """
-    Real PIRuntimeAdapter that bridges to the PI process via stdio JSON-RPC.
+    Real PIRuntimeAdapter — bridges to the PI CLI via `pi --mode rpc`.
 
-    Lazily spawns `pi --rpc` on first use. Communicates using JSON-RPC 2.0
-    messages written to the process stdin and read from stdout.
-
-    Thread-safe: a background reader thread dispatches responses to per-request
-    queues stored in ``self._pending``.
+    Each spawn_agent() call starts a dedicated subprocess.
+    The protocol is event-streaming JSONL (not method-based JSON-RPC):
+      stdin  → {"type": "prompt", "message": "..."}
+      stdout ← {"type": "agent_start"} ... {"type": "agent_end", "messages": [...]}
     """
 
-    def __init__(self, pi_command: str = "pi", timeout: float = 60.0) -> None:
+    def __init__(
+        self,
+        pi_command: str = "pi",
+        provider: str = "anthropic",
+        default_model: str = "claude-sonnet-4-6",
+        session_dir: Optional[str] = None,
+        timeout: float = 300.0,
+    ):
         self._pi_command = pi_command
+        self._provider = provider
+        self._default_model = default_model
+        self._session_dir = session_dir
         self._timeout = timeout
-        self._process: Optional[subprocess.Popen] = None
-        self._pending: dict[str, Queue] = {}
-        self._pending_lock = threading.Lock()
-        self._reader: Optional[threading.Thread] = None
-        self._start_lock = threading.Lock()
+        self._runs: dict[str, _RunState] = {}
+        self._lock = threading.Lock()
 
     # ------------------------------------------------------------------
-    # Process management
-    # ------------------------------------------------------------------
-
-    def _start_process(self) -> None:
-        """Lazy-start: spawn `pi --rpc` if not already running."""
-        with self._start_lock:
-            if self._process is not None and self._process.poll() is None:
-                return  # already running
-
-            logger.debug("Spawning PI RPC process: %s --rpc", self._pi_command)
-            self._process = subprocess.Popen(
-                [self._pi_command, "--rpc"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,  # line-buffered
-            )
-
-            self._reader = threading.Thread(
-                target=self._reader_thread,
-                name="pi-rpc-reader",
-                daemon=True,
-            )
-            self._reader.start()
-            logger.debug("PI RPC process started (pid=%d)", self._process.pid)
-
-    def _reader_thread(self) -> None:
-        """Background thread: read stdout line by line and dispatch responses."""
-        assert self._process is not None
-        assert self._process.stdout is not None
-
-        try:
-            for line in self._process.stdout:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    msg = json.loads(line)
-                except json.JSONDecodeError:
-                    logger.warning("PI RPC: could not parse line: %r", line)
-                    continue
-
-                req_id = msg.get("id")
-                if req_id is None:
-                    # Notification or malformed — log and skip
-                    logger.debug("PI RPC notification: %s", msg)
-                    continue
-
-                with self._pending_lock:
-                    queue = self._pending.get(str(req_id))
-
-                if queue is not None:
-                    queue.put(msg)
-                else:
-                    logger.warning("PI RPC: unexpected response id=%r", req_id)
-        except Exception as exc:
-            logger.error("PI RPC reader thread error: %s", exc)
-        finally:
-            # Wake up any waiting callers with an error
-            with self._pending_lock:
-                for queue in self._pending.values():
-                    queue.put({"error": {"code": -32000, "message": "PI process exited"}})
-
-    # ------------------------------------------------------------------
-    # RPC call
-    # ------------------------------------------------------------------
-
-    def _send_rpc(self, method: str, params: dict) -> Any:
-        """
-        Send a JSON-RPC 2.0 request and wait for the response.
-
-        Returns the ``result`` field of the response on success.
-        Raises ``RuntimeError`` on timeout or if the response contains an error.
-        """
-        self._start_process()
-
-        req_id = str(uuid.uuid4())
-        queue: Queue = Queue()
-
-        with self._pending_lock:
-            self._pending[req_id] = queue
-
-        request = json.dumps({
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "method": method,
-            "params": params,
-        })
-
-        try:
-            assert self._process is not None
-            assert self._process.stdin is not None
-            self._process.stdin.write(request + "\n")
-            self._process.stdin.flush()
-        except Exception as exc:
-            with self._pending_lock:
-                self._pending.pop(req_id, None)
-            raise RuntimeError(f"Failed to write to PI process stdin: {exc}") from exc
-
-        try:
-            response = queue.get(timeout=self._timeout)
-        except Empty:
-            with self._pending_lock:
-                self._pending.pop(req_id, None)
-            raise RuntimeError(
-                f"PI RPC timeout after {self._timeout}s waiting for method={method!r}"
-            )
-        finally:
-            with self._pending_lock:
-                self._pending.pop(req_id, None)
-
-        if "error" in response:
-            err = response["error"]
-            raise RuntimeError(
-                f"PI RPC error from method={method!r}: "
-                f"[{err.get('code')}] {err.get('message')}"
-            )
-
-        return response.get("result")
-
-    # ------------------------------------------------------------------
-    # PIRuntimeAdapter implementation
+    # PIRuntimeAdapter interface
     # ------------------------------------------------------------------
 
     def spawn_agent(self, config: PIAgentConfig) -> str:
-        """Spawn a PI-native agent. Returns a run_id."""
-        result = self._send_rpc("agent.spawn", {
-            "profile_id": config.profile_id,
-            "task": config.task_packet,
-            "worktree": config.worktree_path,
-            "timeout": config.timeout_seconds,
-        })
-        return result["run_id"]
+        """
+        Spawn a new PI agent subprocess for the given config.
+
+        Returns a run_id that can be passed to get_run_status / wait_for_run.
+        The subprocess runs asynchronously; use wait_for_run() to collect results.
+        """
+        run_id = f"run_{uuid.uuid4().hex[:16]}"
+
+        # Build CLI args
+        cmd = [self._pi_command, "--mode", "rpc", "--provider", self._provider]
+
+        # Model + system prompt from agent definition file
+        model = self._default_model
+        agent_def = _agent_definition_path(config.profile_id)
+        system_prompt: Optional[str] = None
+
+        if agent_def:
+            fm = _read_frontmatter(agent_def)
+            if fm.get("model"):
+                model = fm["model"]
+            if fm.get("system"):
+                system_prompt = str(fm["system"])
+
+        cmd += ["--model", model]
+        if system_prompt:
+            cmd += ["--system-prompt", system_prompt]
+
+        # No session persistence for spawned agents
+        cmd += ["--no-session"]
+        if self._session_dir:
+            cmd += ["--session-dir", self._session_dir]
+
+        cwd = config.worktree_path or os.getcwd()
+
+        log.info(
+            "Spawning PI agent: run_id=%s profile=%s model=%s",
+            run_id, config.profile_id, model,
+        )
+
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=cwd,
+                text=True,
+                bufsize=1,  # line-buffered
+            )
+        except FileNotFoundError:
+            raise RuntimeError(
+                f"PI CLI not found: {self._pi_command!r}. "
+                "Install with: npm install -g @mariozechner/pi-coding-agent"
+            )
+
+        # Build state first so reader thread can reference it
+        state = _RunState(
+            run_id=run_id,
+            proc=proc,
+            reader_thread=threading.Thread(target=lambda: None),  # placeholder
+        )
+        state.reader_thread = threading.Thread(
+            target=self._reader_loop,
+            args=(run_id,),
+            daemon=True,
+            name=f"pi-reader-{run_id[:8]}",
+        )
+
+        with self._lock:
+            self._runs[run_id] = state
+
+        state.reader_thread.start()
+
+        # Send the task as the first prompt
+        self._send_prompt(state, self._format_task(config))
+        return run_id
 
     def get_run_status(self, run_id: str) -> dict:
-        """Get live status of a PI agent run."""
-        return self._send_rpc("agent.status", {"run_id": run_id})
+        """Return a status snapshot for a run (no LLM call needed)."""
+        state = self._get_state(run_id)
+        if state.error:
+            return {"run_id": run_id, "status": "failed", "error": state.error}
+        if state.done:
+            return {
+                "run_id": run_id,
+                "status": "completed",
+                "message_count": len(state.final_messages),
+            }
+        return {
+            "run_id": run_id,
+            "status": "running",
+            "event_count": len(state.events),
+        }
 
     def wait_for_run(self, run_id: str, timeout: float | None = None) -> PIRunResult:
-        """
-        Poll ``get_run_status`` every 2 seconds until the run reaches a terminal
-        state (completed, failed, blocked) or the timeout is exceeded.
-        """
-        terminal_states = {"completed", "failed", "blocked"}
-        deadline = (time.monotonic() + timeout) if timeout is not None else None
-        poll_interval = 2.0
+        """Block until the PI agent run completes or times out."""
+        state = self._get_state(run_id)
+        deadline = timeout if timeout is not None else self._timeout
+        completed = state.done_event.wait(timeout=deadline)
 
-        while True:
-            status_dict = self.get_run_status(run_id)
-            status = status_dict.get("status", "")
+        if not completed:
+            try:
+                self._send_command(state, {"type": "abort"})
+                time.sleep(1)
+                state.proc.terminate()
+            except Exception:
+                pass
+            return PIRunResult(
+                run_id=run_id,
+                status="failed",
+                output={},
+                error=f"Timeout after {deadline}s",
+            )
 
-            if status in terminal_states:
-                return PIRunResult(
-                    run_id=run_id,
-                    status=status,
-                    output=status_dict.get("output", {}),
-                    artifacts=status_dict.get("artifacts"),
-                    error=status_dict.get("error"),
-                )
+        if state.error:
+            return PIRunResult(
+                run_id=run_id, status="failed", output={}, error=state.error,
+            )
 
-            if deadline is not None and time.monotonic() >= deadline:
-                raise RuntimeError(
-                    f"wait_for_run timed out after {timeout}s for run_id={run_id!r}"
-                )
-
-            sleep_duration = poll_interval
-            if deadline is not None:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise RuntimeError(
-                        f"wait_for_run timed out after {timeout}s for run_id={run_id!r}"
-                    )
-                sleep_duration = min(poll_interval, remaining)
-
-            time.sleep(sleep_duration)
+        output_text = _extract_text(state.final_messages)
+        return PIRunResult(
+            run_id=run_id,
+            status="completed",
+            output={"text": output_text, "messages": state.final_messages},
+        )
 
     def list_profiles(self) -> list[dict]:
-        """List available PI-native profiles."""
-        return self._send_rpc("profiles.list", {})
+        """List available PI agent profiles from .md definition files."""
+        profiles: list[dict] = []
+        seen: set[str] = set()
+        search_dirs = [
+            Path(".pi/agents"),
+            Path.home() / ".pi" / "agent" / "agents",
+            Path(__file__).parent.parent / "pi_agents",
+        ]
+        for d in search_dirs:
+            if d.is_dir():
+                for md in sorted(d.glob("*.md")):
+                    name = md.stem
+                    if name in seen or name in ("README",):
+                        continue
+                    seen.add(name)
+                    fm = _read_frontmatter(md)
+                    profiles.append({
+                        "profile_id": name,
+                        "model": fm.get("model", self._default_model),
+                        "source": str(md),
+                    })
+        return profiles
 
     def get_profile(self, profile_id: str) -> Optional[dict]:
-        """Get a PI-native profile by ID."""
-        return self._send_rpc("profiles.get", {"profile_id": profile_id})
+        for p in self.list_profiles():
+            if p["profile_id"] == profile_id:
+                return p
+        return None
 
     def invoke_team(self, template_id: str, task_packet: dict) -> str:
-        """Invoke a PI-native team. Returns team instance ID."""
-        result = self._send_rpc("team.invoke", {
-            "template_id": template_id,
-            "task": task_packet,
-        })
-        return result["instance_id"]
+        """
+        Invoke a team by spawning a Chief of Staff agent.
+
+        The pi-subagents extension (@tintinweb/pi-subagents) must be installed
+        for the COS agent to itself use the Agent tool to spawn specialists.
+        """
+        config = PIAgentConfig(
+            profile_id="chief_of_staff",
+            task_packet={
+                **task_packet,
+                "_team_template": template_id,
+                "_instruction": (
+                    f"You are orchestrating a team using template '{template_id}'. "
+                    "Use the Agent tool (from pi-subagents) to spawn specialist "
+                    f"sub-agents as needed. Task context: {json.dumps(task_packet)}"
+                ),
+            },
+        )
+        return self.spawn_agent(config)
 
     # ------------------------------------------------------------------
-    # Lifecycle
+    # Internal helpers
     # ------------------------------------------------------------------
+
+    def _get_state(self, run_id: str) -> _RunState:
+        with self._lock:
+            state = self._runs.get(run_id)
+        if state is None:
+            raise KeyError(f"Unknown run_id: {run_id!r}")
+        return state
+
+    def _send_command(self, state: _RunState, cmd: dict) -> None:
+        """Write a JSONL command to the subprocess stdin."""
+        line = json.dumps(cmd) + "\n"
+        try:
+            assert state.proc.stdin is not None
+            state.proc.stdin.write(line)
+            state.proc.stdin.flush()
+        except (BrokenPipeError, OSError) as exc:
+            log.warning("Failed to send command to run %s: %s", state.run_id[:8], exc)
+
+    def _send_prompt(self, state: _RunState, message: str) -> None:
+        req_id = uuid.uuid4().hex[:8]
+        self._send_command(state, {"id": req_id, "type": "prompt", "message": message})
+
+    def _reader_loop(self, run_id: str) -> None:
+        """Background daemon thread: read JSONL events from the PI subprocess."""
+        state = self._get_state(run_id)
+        try:
+            assert state.proc.stdout is not None
+            for raw_line in state.proc.stdout:
+                line = raw_line.rstrip("\r\n")
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    log.debug("PI non-JSON stdout [%s]: %s", run_id[:8], line[:120])
+                    continue
+
+                state.events.append(event)
+                evt_type = event.get("type", "")
+
+                if evt_type == "agent_end":
+                    state.final_messages = event.get("messages", [])
+                    state.done = True
+                    state.done_event.set()
+                    log.info(
+                        "PI run %s completed (%d messages)",
+                        run_id[:8], len(state.final_messages),
+                    )
+
+                elif evt_type == "error":
+                    reason = event.get("reason", "error")
+                    state.error = (
+                        f"PI error ({reason}): {event.get('error', 'unknown')}"
+                    )
+                    state.done = True
+                    state.done_event.set()
+                    log.warning("PI run %s error: %s", run_id[:8], state.error)
+
+                elif evt_type == "message_update":
+                    ae = event.get("assistantMessageEvent", {})
+                    if ae.get("type") == "text_delta":
+                        log.debug("PI[%s] %s", run_id[:8], ae.get("delta", ""))
+
+        except Exception as exc:
+            log.warning("PI reader loop exception for %s: %s", run_id[:8], exc)
+            if not state.done:
+                state.error = str(exc)
+                state.done = True
+                state.done_event.set()
+        finally:
+            try:
+                assert state.proc.stderr is not None
+                state.proc.stderr.read()
+            except Exception:
+                pass
+
+    @staticmethod
+    def _format_task(config: PIAgentConfig) -> str:
+        """Convert a PIAgentConfig task_packet into a markdown prompt."""
+        tp = config.task_packet
+        if isinstance(tp, str):
+            return tp
+        if tp.get("_instruction"):
+            return str(tp["_instruction"])
+        parts: list[str] = []
+        if tp.get("title"):
+            parts.append(f"## Task: {tp['title']}")
+        if tp.get("description"):
+            parts.append(str(tp["description"]))
+        if tp.get("acceptance_criteria"):
+            parts.append(f"\n**Acceptance criteria:** {tp['acceptance_criteria']}")
+        if not parts:
+            parts.append(json.dumps(tp, indent=2))
+        return "\n\n".join(parts)
 
     def close(self) -> None:
-        """Terminate the PI subprocess and join the reader thread."""
-        if self._process is not None:
+        """Terminate all running subprocesses."""
+        with self._lock:
+            run_ids = list(self._runs.keys())
+        for rid in run_ids:
             try:
-                self._process.terminate()
-                self._process.wait(timeout=5)
+                state = self._runs[rid]
+                if not state.done:
+                    state.proc.terminate()
             except Exception:
-                try:
-                    self._process.kill()
-                except Exception:
-                    pass
-            self._process = None
-
-        if self._reader is not None:
-            self._reader.join(timeout=5)
-            self._reader = None
+                pass
 
     def __enter__(self) -> "PIRPCBridge":
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, *_: object) -> None:
         self.close()
