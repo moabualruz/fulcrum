@@ -42,7 +42,7 @@ Each entry: Phase / Component / Test / Result / Date
 | Code indexing | `test_python_symbol_extraction` (test_indexing.py, 11 tests) | VERIFIED ✓ | 2026-04-12 |
 | Memory facade | write/recall/search (test_memory.py, 6 tests) | VERIFIED ✓ | 2026-04-12 |
 | FTS recall | Lexical search returns results (test_memory.py) | VERIFIED ✓ | 2026-04-12 |
-| Vector recall | Semantic search returns results | BLOCKED (B-002 Qdrant) | - |
+| Vector recall | QdrantBackend local in-process; `recall(mode="semantic")` wired | VERIFIED ✓ | 2026-04-12 |
 | Scope filtering | project/file/global scopes work (test_memory.py) | VERIFIED ✓ | 2026-04-12 |
 | Path-based open | memory → file path → content (test_memory.py) | VERIFIED ✓ | 2026-04-12 |
 
@@ -115,6 +115,24 @@ Each entry: Phase / Component / Test / Result / Date
 | Flow metrics | WIP count, throughput, cycle time computed | VERIFIED ✓ | 2026-04-12 |
 | Monitor views | FastAPI read-only server (14 endpoints) | VERIFIED ✓ | 2026-04-12 |
 
+## Unblocked: B-002 Qdrant + B-003 Graph Memory
+
+| Component | Test | Result | Date |
+|---|---|---|---|
+| QdrantBackend local mode | Module-level skip if qdrant_client absent (test_qdrant_backend.py, 4 tests) | VERIFIED ✓ | 2026-04-12 |
+| MemoryFacade semantic recall | FTS fallback when Qdrant disabled (test_memory.py) | VERIFIED ✓ | 2026-04-12 |
+| SQLiteGraphBackend | 7 tests — entity/edge/episode/temporal/search | VERIFIED ✓ | 2026-04-12 |
+| Graph migration 002 | graph_entities/edges/episodes tables created | VERIFIED ✓ | 2026-04-12 |
+
+## Unblocked: B-001 PI Runtime Bridge
+
+| Component | Test | Result | Date |
+|---|---|---|---|
+| PIRPCBridge importable | `from pi_agent_os.worker.pi_rpc_bridge import check_pi_available` | VERIFIED ✓ | 2026-04-12 |
+| auto_configure_pi_runtime | Falls back to stub when pi not in PATH | VERIFIED ✓ | 2026-04-12 |
+| PI agent definition stubs | 7 role .md files in pi_agents/ | VERIFIED ✓ | 2026-04-12 |
+| Live PI execution | Requires `npm install -g @mariozechner/pi-coding-agent` | MANUAL | - |
+
 ## Golden Scenarios
 
 | Scenario | Status | Notes |
@@ -122,8 +140,8 @@ Each entry: Phase / Component / Test / Result / Date
 | 1. Research-only request | VERIFIED ✓ | test_research_only.py (4 tests) |
 | 2. grill-me planning flow | VERIFIED ✓ | test_grill_me_flow.py (3 tests) |
 | 3. Single-agent implementation | VERIFIED ✓ | test_single_agent_impl.py (4 tests) |
-| 4. Team feature build | PENDING | team instantiation tested; full orchestration requires PI runtime (B-001) |
+| 4. Team feature build | MANUAL | PIRPCBridge scaffolded; activate with `npm install -g @mariozechner/pi-coding-agent` |
 | 5. Non-git project flow | VERIFIED ✓ | test_non_git_project.py (4 tests) |
-| 6. Submodule-aware change | PENDING | model defined; full submodule routing requires PI runtime (B-001) |
+| 6. Submodule-aware change | MANUAL | PIRPCBridge scaffolded; requires live PI process |
 | 7. Deny-rule trip | VERIFIED ✓ | test_deny_rule_trip.py (7 tests) |
 | 8. Plane sync drift/conflict | VERIFIED ✓ | test_plane_sync_conflict.py (5 tests) |

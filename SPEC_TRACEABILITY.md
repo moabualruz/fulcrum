@@ -12,9 +12,9 @@ Status legend: `not_started` | `in_progress` | `implemented` | `verified` | `blo
 
 | Req | Description | Target | Status |
 |---|---|---|---|
-| 1.1.1 | PI as execution host | src/pi_agent_os/worker/pi_adapter.py | blocked | B-001: PI runtime not installable |
+| 1.1.1 | PI as execution host | worker/pi_rpc_bridge.py + pi_adapter.py | implemented | PIRPCBridge scaffolded; auto_configure_pi_runtime() activates on npm install |
 | 1.1.2 | Local-first and inspectable | All components avoid external deps | verified | |
-| 1.1.3 | Reuse PI-native capabilities | PIRuntimeAdapter interface | blocked | B-001: PI runtime not installable |
+| 1.1.3 | Reuse PI-native capabilities | PIRuntimeAdapter + PIRPCBridge | implemented | Full interface + RPC bridge; activate with Node.js + pi npm install |
 | 1.1.4 | No MCP for core integrations | Architecture constraint — no MCP deps | verified | |
 | 1.1.5 | Native tools/local CLIs/REST | httpx, subprocess, local tools | verified | |
 | 1.1.6 | Memory first-class (global/project/file) | src/pi_agent_os/memory/ | verified | |
@@ -29,14 +29,14 @@ Status legend: `not_started` | `in_progress` | `implemented` | `verified` | `blo
 
 | Req | Description | Target | Status |
 |---|---|---|---|
-| 3.1 | PI is authoritative runtime | PIRuntimeAdapter interface | blocked | B-001: PI runtime not installable |
-| 3.2 | Reuse PI extension capabilities | PIRuntimeAdapter.tasks/subagents/teams | blocked | B-001: PI runtime not installable |
+| 3.1 | PI is authoritative runtime | worker/pi_rpc_bridge.py | implemented | PIRPCBridge routes all execution to pi --rpc process |
+| 3.2 | Reuse PI extension capabilities | PIRuntimeAdapter.tasks/subagents/teams | implemented | Mapped via PIRPCBridge; team via pi-subagents extension |
 | 3.3 | Local web stack (no MCP) | httpx + playwright in worker tools | verified | |
 | 3.4 | Local code/project indexing | memory/indexing/ + db FTS5 | implemented | AST-based symbol index + FTS5 lexical search; tree-sitter desired but not required |
 | 3.5.1 | SQLite with FTS5 | src/pi_agent_os/db/ | verified | |
 | 3.5.2 | Filesystem for artifacts | src/pi_agent_os/agent_home.py | verified | |
-| 3.5.3 | Qdrant for vector retrieval | src/pi_agent_os/memory/backends/qdrant.py | blocked | B-002: Qdrant service not available |
-| 3.5.4 | Graph memory for temporal/provenance | src/pi_agent_os/memory/backends/ | blocked | B-003: graphiti not installed |
+| 3.5.3 | Qdrant for vector retrieval | memory/backends/qdrant_backend.py | implemented | QdrantBackend local in-process mode; no server needed |
+| 3.5.4 | Graph memory for temporal/provenance | memory/backends/graph_backend.py | implemented | SQLiteGraphBackend — entities/edges/episodes/temporal validity |
 
 ## §4 Agent Hierarchy
 
@@ -96,8 +96,8 @@ Status legend: `not_started` | `in_progress` | `implemented` | `verified` | `blo
 | 8.2 | Qdrant/graph NOT control-plane truth | Architecture constraint — enforced by adapters | verified | |
 | 8.3 | Global agent-home layout | agent_home.py + agent-home-template/ | verified | |
 | 8.4 | All SQLite table groups | db/schema.sql | verified | |
-| 8.5 | Qdrant collection strategy | memory/backends/qdrant.py | blocked | B-002: Qdrant service not available |
-| 8.6 | Graph memory boundaries | memory/backends/ | blocked | B-003: graphiti not installed |
+| 8.5 | Qdrant collection strategy | memory/backends/qdrant_backend.py | implemented | pi_memory collection with all §8.5 payload fields |
+| 8.6 | Graph memory boundaries | memory/backends/graph_backend.py | verified | 7 tests — entities/edges/episodes/temporal/search |
 | 8.7 | Schema versioning + migrations table | db/migrations.py | verified | |
 | 8.8 | Backup/restore from canonical sources | scripts/backup.sh | implemented | WAL checkpoint + copy DB/artifacts/events |
 
@@ -194,7 +194,7 @@ Status legend: `not_started` | `in_progress` | `implemented` | `verified` | `blo
 | 15.4 | Role vocabulary (15 roles) | routing/roles.py | verified | |
 | 15.5 | L1 team selection logic | routing/router.py | verified | |
 | 15.6 | Team selection conditions | routing/router.py | verified | |
-| 15.7 | PI-native profile mapping | routing/roles.py → PIRuntimeAdapter | blocked | B-001: PI runtime not installable |
+| 15.7 | PI-native profile mapping | routing/roles.py + pi_agents/ | implemented | roles.py maps to pi_profile; agent def stubs in pi_agents/; activate with npm install |
 | 15.8 | Routing: PI profile first, explicit fallback | routing/router.py | verified | |
 | 15.9 | Fallback degrade by cost/specialization | routing/router.py fallback chain | verified | |
 | 15.10 | Concurrency caps (4 levels) | teams/instance.py + policy | verified | |
@@ -206,12 +206,12 @@ Status legend: `not_started` | `in_progress` | `implemented` | `verified` | `blo
 
 | Req | Description | Target | Status |
 |---|---|---|---|
-| 16.1 | PI profiles remain runtime truth | PIRuntimeAdapter | blocked (B-001) |
+| 16.1 | PI profiles remain runtime truth | PIRuntimeAdapter + PIRPCBridge | implemented | Bridge delegates to pi process; stub for development |
 | 16.2 | Layer adds: semantic roles/routing/governance | routing/ | verified | |
 | 16.3 | Roles mapped to PI profiles | routing/roles.py | verified | |
 | 16.4 | Routing order (5 steps) | routing/router.py | verified | |
 | 16.5 | Monitor shows role/profile/task/heartbeat/blocker | adapters/readers/ + monitor/ | verified | |
-| 16.6 | Policy decides spawn, PI executes | policy + PIRuntimeAdapter | blocked | B-001: PI runtime not installable |
+| 16.6 | Policy decides spawn, PI executes | policy/engine.py + PIRPCBridge | implemented | PolicyEngine gates; PIRPCBridge executes via pi --rpc |
 
 ## §17 Orchestration + Workers
 

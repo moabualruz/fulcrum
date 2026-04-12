@@ -7,6 +7,7 @@ from ..ids import generate_id, MEM_PREFIX
 from ..db import connection as db
 from ..events.store import emit
 from ..models.events import EventType
+from .backends.qdrant_backend import QdrantBackend
 
 
 class MemoryFacade:
@@ -18,6 +19,15 @@ class MemoryFacade:
     Spec §10.4: path-based full reads for detail.
     Spec §9.5: canonical write → event → FTS/vector indexes.
     """
+
+    def __init__(
+        self,
+        qdrant_path: str | None = None,
+        enable_qdrant: bool = False,
+    ) -> None:
+        self._qdrant: QdrantBackend | None = (
+            QdrantBackend(qdrant_path) if enable_qdrant else None
+        )
 
     def write(
         self,
@@ -82,6 +92,28 @@ class MemoryFacade:
             payload={"kind": kind, "scope": scope, "title": title},
         )
 
+        # 4. Vector index upsert (spec §9.5 step 4 — non-blocking)
+        if self._qdrant and self._qdrant.available:
+            try:
+                self._qdrant.upsert(
+                    memory_id=mem_id,
+                    text=f"{title} {summary} {canonical_text or ''}",
+                    payload={
+                        "object_id": mem_id,
+                        "object_type": "memory",
+                        "workspace_id": workspace_id,
+                        "project_id": project_id or "",
+                        "scope": scope,
+                        "memory_kind": kind,
+                        "path": file_path or "",
+                        "symbol": symbol_path or "",
+                        "title": title,
+                        "summary": summary,
+                    },
+                )
+            except Exception:
+                pass
+
         return mem_id
 
     def recall(
@@ -125,6 +157,22 @@ class MemoryFacade:
             return sorted(results, key=lambda x: x.get("event_time") or x["created_at"])
         elif mode == "total_sourcemap":
             return [_sourcemap(r) for r in rows]
+        elif mode == "semantic":
+            if self._qdrant and self._qdrant.available:
+                vector_results = self._qdrant.search(query, workspace_id, project_id, limit)
+                enriched = []
+                for r in vector_results:
+                    row = db.fetchone(
+                        "SELECT * FROM memories WHERE id=?", (r["memory_id"],)
+                    )
+                    if row:
+                        d = _compact(row)
+                        d["score"] = r["score"]
+                        d["why_matched"] = "vector_cosine"
+                        enriched.append(d)
+                return enriched
+            # fallback to FTS if Qdrant not available
+            return self.recall(query, workspace_id, project_id, scope, kind, limit, mode="compact")
         return [_compact(r) for r in rows]
 
     def open_path(self, memory_id: str) -> Optional[dict]:

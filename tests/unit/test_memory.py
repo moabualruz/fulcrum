@@ -127,3 +127,19 @@ def test_memory_write_emits_event(env, ws_id, proj_id):
 
     events = tail(workspace_id=ws_id, limit=10)
     assert any(e["evt_type"] == "memory_written" for e in events)
+
+
+def test_facade_semantic_recall_falls_back_to_fts_when_no_qdrant(env, ws_id, proj_id):
+    """Semantic recall without Qdrant enabled should fall back to FTS."""
+    facade = MemoryFacade(enable_qdrant=False)
+    facade.write(
+        workspace_id=ws_id,
+        title="Fallback test memory",
+        summary="Should be found via FTS fallback",
+        kind="fact",
+        scope="project",
+        project_id=proj_id,
+    )
+
+    results = facade.recall("fallback", workspace_id=ws_id, mode="semantic")
+    assert isinstance(results, list)

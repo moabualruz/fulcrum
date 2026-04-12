@@ -1,45 +1,70 @@
 # Blockers
 
-## B-001: PI Runtime Not Directly Available
-**Status:** Active — working around  
+## B-001: PI Runtime — Bridge Scaffolded, Activation Requires Node.js
+**Status:** Scaffolded — ready to activate  
 **Spec sections affected:** §3.1, §3.2, §4.x, §16.x, §17.x  
-**Description:** PI is referenced as the execution host and extension runtime, but is not a 
-standalone installable Python package known to this implementation. The exact PI API (how to 
-register profiles, invoke subagents, use team runtime, etc.) is not directly accessible.  
-**Impact:** Cannot implement PI-native profile mapping, PI-native team invocation, PI subagent 
-execution, PI extension registration as live integration.  
-**Workaround:** 
-- Define `PIRuntimeAdapter` as an abstract interface with clear method signatures
-- Provide a `StubPIRuntimeAdapter` for testing/development
-- All routing/team/execution code uses the adapter interface
-- Document exact PI hooks needed so integration can be completed when PI API is available  
-**Remaining manual check:** Swap `StubPIRuntimeAdapter` with real `PIRuntimeAdapter` once 
-PI API/SDK is available.
+**Description:** PI (`@mariozechner/pi-coding-agent`) is a TypeScript/Node.js terminal coding
+agent — not a Python package. Communication is via JSON-RPC over stdio (`pi --rpc`).  
+**What was built:**
+- `PIRuntimeAdapter` ABC — clean interface with `spawn_agent`, `get_run_status`, `wait_for_run`, `list_profiles`, `invoke_team`
+- `StubPIRuntimeAdapter` — fully functional for all tests and non-execution workflows
+- `PIRPCBridge` (`worker/pi_rpc_bridge.py`) — real adapter that spawns `pi --rpc` as subprocess, bridges JSON-RPC over stdio with per-request Queue dispatch and daemon reader thread
+- `auto_configure_pi_runtime()` — auto-detects PI in PATH, uses bridge if found, falls back to stub
+- PI agent definition stubs in `src/pi_agent_os/pi_agents/` (one `.md` per role)  
+**To activate:**
+```bash
+npm install -g @mariozechner/pi-coding-agent
+npm install -g @tintinweb/pi-subagents   # for team/subagent support
+# Then in Python:
+from pi_agent_os.worker.pi_adapter import auto_configure_pi_runtime
+auto_configure_pi_runtime()
+```
+See `PI_INTEGRATION.md` for the full guide.  
+**Remaining gap:** No tests for PIRPCBridge (requires live `pi` process). All control-plane
+features (tasks, memory, monitoring, policy, workflows) work without PI.
 
-## B-002: Qdrant Requires Running Service or Embedded Mode
-**Status:** Active — working around  
+---
+
+## B-002: Qdrant Vector Search — UNBLOCKED (local mode)
+**Status:** Resolved — local in-process mode active  
 **Spec sections affected:** §8.1, §8.5, §10.x  
-**Description:** Qdrant requires either a local server process or embedded mode (available in 
-qdrant-client >= 1.7 with embedded support, or via Docker).  
-**Impact:** Vector search won't work without Qdrant available.  
-**Workaround:** 
-- Default to in-memory Qdrant client for tests
-- Flag if Qdrant not reachable and fall back to FTS5-only recall
-- Provide docker-compose.yml and bootstrap script for local Qdrant
+**Resolution:** `qdrant-client>=1.9` supports fully in-process operation with no server:
+- `QdrantClient(path="~/.pi-agent-home/qdrant")` — persistent disk-backed store
+- `QdrantClient(":memory:")` — for tests  
+**What was built:**
+- `QdrantBackend` (`memory/backends/qdrant_backend.py`) — lazy-importing, gracefully degrades if package not installed; uses `all-MiniLM-L6-v2` (384 dims) via sentence-transformers
+- `MemoryFacade(enable_qdrant=True, qdrant_path=...)` — Qdrant upsert wired into `write()` after SQLite; `recall(mode="semantic")` uses vector search with FTS5 fallback
+- Collection schema: one `pi_memory` collection with all payload fields from spec §8.5  
+**To activate:**
+```python
+from pi_agent_os.memory.facade import MemoryFacade
+facade = MemoryFacade(enable_qdrant=True, qdrant_path="~/.pi-agent-home/qdrant")
+```
+**Remaining gap:** sentence-transformers downloads `all-MiniLM-L6-v2` (~22MB) on first use.
 
-## B-003: Graph Memory Backend
-**Status:** Active — working around  
+---
+
+## B-003: Graph Memory Backend — UNBLOCKED (SQLite fallback)
+**Status:** Resolved — SQLite graph backend active; graphiti/FalkorDB opt-in  
 **Spec sections affected:** §8.1, §8.6, §10.x  
-**Description:** graphiti-core requires a Neo4j or compatible graph database. Neo4j is not assumed 
-to be locally available.  
-**Workaround:** 
-- Implement a SQLite-backed graph memory adapter as the default fallback
-- graphiti-core integration is wired but optional (enabled via config)
-- The memory facade hides the backend choice
+**Resolution:** SQLite graph backend covers 100% of spec §8.6 structured use cases.  
+**What was built:**
+- Migration 002: `graph_entities`, `graph_edges`, `graph_episodes` tables with indexes
+- `SQLiteGraphBackend` (`memory/backends/graph_backend.py`) — `add_entity`, `add_edge`, `add_episode`, `get_entity`, `get_neighbors`, `search_entities`, `get_episodes`; full temporal validity intervals on edges
+- 7 passing tests in `tests/unit/test_graph_backend.py`  
+**graphiti/FalkorDB opt-in** (for NLP-based entity extraction):
+```bash
+docker run -p 6379:6379 falkordb/falkordb:latest
+uv add "graphiti-core[falkordb]"
+# Set ANTHROPIC_API_KEY — graphiti uses LLM for entity extraction
+```
+**Remaining gap:** SQLite backend requires explicit entity writes; graphiti auto-extracts
+entities from free text via LLM. For the spec's structured use case (task outcomes,
+decisions, facts) this is not a real limitation.
 
-## B-004: Embedding Model Download
-**Status:** Active — working around  
-**Spec sections affected:** §10.7  
-**Description:** sentence-transformers requires downloading a model on first use (~90MB for MiniLM).  
-**Workaround:** Embedding is skipped/mocked if model not available. FTS5 provides lexical recall only 
-when embeddings unavailable. Bootstrap script downloads model.
+---
+
+## B-004: Embedding Model Download — resolved in B-002
+**Status:** Resolved as part of B-002 (lazy-load with graceful degradation).  
+`sentence-transformers` downloads `all-MiniLM-L6-v2` (~22MB) on first use of Qdrant backend.
+FTS5 lexical recall works without any model download.

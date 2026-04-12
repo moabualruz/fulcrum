@@ -136,3 +136,23 @@ def get_pi_runtime() -> PIRuntimeAdapter:
 def configure_pi_runtime(adapter: PIRuntimeAdapter) -> None:
     global _pi_runtime
     _pi_runtime = adapter
+
+
+def auto_configure_pi_runtime() -> bool:
+    """
+    Auto-detect and configure the best available PI runtime.
+
+    1. If PI CLI is available (npm install -g @mariozechner/pi-coding-agent),
+       use PIRPCBridge (real execution).
+    2. Otherwise fall back to StubPIRuntimeAdapter (development mode).
+
+    Returns True if real PI runtime was configured.
+    """
+    try:
+        from .pi_rpc_bridge import PIRPCBridge, check_pi_available
+        if check_pi_available():
+            configure_pi_runtime(PIRPCBridge())
+            return True
+    except Exception:
+        pass
+    return False
