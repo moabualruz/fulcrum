@@ -75,6 +75,49 @@ def blockers(workspace_id: str = typer.Option(..., "--workspace", "-w")) -> None
     console.print(table)
 
 
+@app.command("session")
+def session(run_id: str = typer.Argument(..., help="Agent run ID")) -> None:
+    """Show structured live state for a run (§24.2 level 2)."""
+    import json
+    bootstrap()
+    data = AgentStatusReadAdapter().session(run_id)
+    if not data:
+        console.print(f"[red]Run not found:[/red] {run_id}")
+        raise typer.Exit(1)
+    console.print(json.dumps(data, indent=2, default=str))
+
+
+@app.command("artifacts")
+def artifacts(run_id: str = typer.Argument(..., help="Agent run ID")) -> None:
+    """List artifacts produced by a run (§24.4)."""
+    bootstrap()
+    arts = AgentStatusReadAdapter().artifacts_for_run(run_id)
+    if not arts:
+        console.print("[dim]No artifacts.[/dim]")
+        return
+    table = Table("Artifact ID", "Type", "Title", "Path")
+    for a in arts:
+        table.add_row(str(a.get("display_id") or a["id"]), str(a["artifact_type"]), str(a["title"]), str(a["path"] or "—"))
+    console.print(table)
+
+
+@app.command("heartbeats")
+def heartbeats_cmd(
+    workspace_id: str = typer.Option(..., "--workspace", "-w"),
+    limit: int = typer.Option(20, "--limit", "-n"),
+) -> None:
+    """Show recent agent heartbeats."""
+    bootstrap()
+    hbs = AgentStatusReadAdapter().heartbeats(workspace_id, limit)
+    if not hbs:
+        console.print("[dim]No heartbeats.[/dim]")
+        return
+    table = Table("Run ID", "Role", "Status", "Step", "Last Heartbeat")
+    for h in hbs:
+        table.add_row(str(h["id"]), str(h["agent_role"]), str(h["status"]), str(h["current_step"] or "—"), str(h["heartbeat_at"] or "—"))
+    console.print(table)
+
+
 @app.command("tail")
 def tail(
     run_id: str = typer.Argument(...),

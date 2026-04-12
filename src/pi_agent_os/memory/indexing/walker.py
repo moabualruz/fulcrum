@@ -1,5 +1,6 @@
 """Project directory walker and ingester for memory indexing. Spec §10."""
 from __future__ import annotations
+import fnmatch
 import os
 from pathlib import Path
 from typing import Optional
@@ -9,6 +10,41 @@ from .symbol_extractor import extract_python_symbols
 
 # Directories to skip during traversal
 _SKIP_DIRS = frozenset({".git", "__pycache__", "node_modules", ".venv", ".mypy_cache", ".pytest_cache"})
+
+
+def _load_ignore_patterns(project_path: Path) -> tuple[list[str], list[str]]:
+    """Load deny (.gitignore + .piignore) and allow (.piinclude) patterns. §10.10.
+
+    Returns (deny_patterns, allow_patterns). allow_patterns override deny.
+    """
+    deny: list[str] = []
+    allow: list[str] = []
+    for fname in (".gitignore", ".piignore"):
+        p = project_path / fname
+        if p.exists():
+            for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    deny.append(line)
+    piinclude = project_path / ".piinclude"
+    if piinclude.exists():
+        for line in piinclude.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                allow.append(line)
+    return deny, allow
+
+
+def _is_ignored(rel_path: str, deny_patterns: list[str], allow_patterns: list[str]) -> bool:
+    """Return True if rel_path should be skipped based on ignore rules."""
+    # Allow patterns take precedence
+    for pat in allow_patterns:
+        if fnmatch.fnmatch(rel_path, pat) or fnmatch.fnmatch(Path(rel_path).name, pat):
+            return False
+    for pat in deny_patterns:
+        if fnmatch.fnmatch(rel_path, pat) or fnmatch.fnmatch(Path(rel_path).name, pat):
+            return True
+    return False
 
 # Text file extensions to summarize
 _TEXT_EXTENSIONS = frozenset({".md", ".yaml", ".yml", ".txt", ".json", ".toml", ".rst"})
@@ -41,9 +77,11 @@ class ProjectIngester:
         """
         Ingest a directory recursively.
 
+        Respects .gitignore, .piignore, and .piinclude files (§10.10).
         Returns count of memories written.
         """
         project_path = Path(project_path)
+        deny_patterns, allow_patterns = _load_ignore_patterns(project_path)
         count = 0
 
         for dirpath, dirnames, filenames in os.walk(project_path):
@@ -53,6 +91,10 @@ class ProjectIngester:
             for filename in filenames:
                 abs_path = Path(dirpath) / filename
                 rel_path = abs_path.relative_to(project_path)
+                rel_str = str(rel_path)
+
+                if _is_ignored(rel_str, deny_patterns, allow_patterns):
+                    continue
 
                 try:
                     written = self._ingest_file(

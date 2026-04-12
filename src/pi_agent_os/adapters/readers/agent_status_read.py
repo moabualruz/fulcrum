@@ -45,10 +45,34 @@ class AgentStatusReadAdapter(ReadAdapter[AgentRun]):
 
     def active_runs(self, workspace_id: str) -> list[AgentRun]:
         rows = db.fetchall(
-            "SELECT * FROM agent_run WHERE workspace_id=? AND status IN ('running','starting','waiting') ORDER BY updated_at DESC",
+            "SELECT * FROM agent_runs WHERE workspace_id=? AND status IN ('running','starting','waiting') ORDER BY updated_at DESC",
             (workspace_id,),
         )
         return [_row_to_run(r) for r in rows]
+
+    def artifacts_for_run(self, run_id: str) -> list[dict]:
+        """Return artifacts produced by a run (§24.4)."""
+        rows = db.fetchall(
+            "SELECT id, display_id, artifact_type, title, path, created_at FROM artifacts WHERE run_id=? ORDER BY created_at",
+            (run_id,),
+        )
+        return [dict(r) for r in rows]
+
+    def session(self, run_id: str) -> dict:
+        """Return structured live state for a run (§24.2 level 2)."""
+        run = self.get(run_id)
+        if run is None:
+            return {}
+        artifacts = self.artifacts_for_run(run_id)
+        events = db.fetchall(
+            "SELECT id, evt_type, payload, created_at FROM events WHERE object_id=? ORDER BY created_at DESC LIMIT 20",
+            (run_id,),
+        )
+        return {
+            "run": run.model_dump(),
+            "artifacts": artifacts,
+            "recent_events": [dict(e) for e in events],
+        }
 
     def blockers(self, workspace_id: str) -> list[dict]:
         """Return all blocked runs with their blocker reason."""
