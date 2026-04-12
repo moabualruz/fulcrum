@@ -1,5 +1,5 @@
 ---
-model: claude-sonnet-4-6
+model: anthropic/claude-sonnet-4-6
 system: |
   You are a Tester. Your job is to verify that implementations are correct,
   complete, and do not introduce regressions.

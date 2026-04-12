@@ -104,6 +104,49 @@ def check_pi_available() -> bool:
     return find_pi_command() is not None
 
 
+def query_pi_models(pi_cmd: Optional[str] = None) -> list[dict]:
+    """
+    Return all models available in the local PI installation.
+
+    Each entry: {provider, model, context_k, max_out_k, thinking, images}
+    context_k / max_out_k are strings like "200K" or "1.0M".
+
+    Runs `pi --list-models` and parses the tabular output.
+    Returns [] if PI is not installed or the command fails.
+    """
+    cmd = pi_cmd or find_pi_command()
+    if not cmd:
+        return []
+    try:
+        # PI writes --list-models output to stderr (it's a TUI-style render)
+        result = subprocess.run(
+            [cmd, "--list-models"],
+            timeout=10,
+            capture_output=True,
+            text=True,
+        )
+        out = result.stderr or result.stdout
+    except Exception as exc:
+        log.warning("query_pi_models() failed: %s", exc)
+        return []
+
+    models: list[dict] = []
+    for line in out.splitlines():
+        parts = line.split()
+        # Skip header line and any short/blank lines
+        if len(parts) < 2 or parts[0] == "provider":
+            continue
+        models.append({
+            "provider": parts[0],
+            "model": parts[1],
+            "context_k": parts[2] if len(parts) > 2 else None,
+            "max_out_k": parts[3] if len(parts) > 3 else None,
+            "thinking": parts[4] == "yes" if len(parts) > 4 else False,
+            "images": parts[5] == "yes" if len(parts) > 5 else False,
+        })
+    return models
+
+
 def _agent_definition_path(profile_id: str) -> Optional[Path]:
     """
     Resolve a PI agent definition file for a profile_id.
@@ -218,23 +261,36 @@ class PIRPCBridge(PIRuntimeAdapter):
         )
         cmd = [pi_cmd, "--mode", "rpc"]
 
-        if self._provider:
-            cmd += ["--provider", self._provider]
-
         # Model + system prompt: profile frontmatter → caller override → PI default
+        # Supports two formats:
+        #   "provider/model_id"  → passed as --model provider/model_id (PI resolves provider)
+        #   "model_id"           → passed as --model model_id with optional --provider
+        # Frontmatter can also set `provider:` separately (lower precedence than inline prefix).
         model: Optional[str] = self._default_model
+        provider: Optional[str] = self._provider
         agent_def = _agent_definition_path(config.profile_id)
         system_prompt: Optional[str] = None
 
         if agent_def:
             fm = _read_frontmatter(agent_def)
             if fm.get("model") and not model:
-                model = fm["model"]
+                model = str(fm["model"])
+            if fm.get("provider") and not provider:
+                provider = str(fm["provider"])
             if fm.get("system"):
                 system_prompt = str(fm["system"])
 
         if model:
-            cmd += ["--model", model]
+            if "/" in model:
+                # "provider/model_id" — PI handles both in one --model flag
+                cmd += ["--model", model]
+            else:
+                if provider:
+                    cmd += ["--provider", provider]
+                cmd += ["--model", model]
+        elif provider:
+            cmd += ["--provider", provider]
+
         if system_prompt:
             cmd += ["--system-prompt", system_prompt]
 
@@ -354,9 +410,18 @@ class PIRPCBridge(PIRuntimeAdapter):
                         continue
                     seen.add(name)
                     fm = _read_frontmatter(md)
+                    raw_model = fm.get("model") or self._default_model or "pi-default"
+                    raw_provider = fm.get("provider") or self._provider
+                    # Parse inline provider/model format
+                    if "/" in str(raw_model):
+                        inline_provider, inline_model = str(raw_model).split("/", 1)
+                    else:
+                        inline_provider, inline_model = raw_provider, raw_model
                     profiles.append({
                         "profile_id": name,
-                        "model": fm.get("model") or self._default_model or "pi-default",
+                        "provider": inline_provider or "pi-default",
+                        "model": inline_model,
+                        "model_spec": str(raw_model),  # full "provider/model" or just "model"
                         "source": str(md),
                     })
         return profiles
@@ -366,6 +431,33 @@ class PIRPCBridge(PIRuntimeAdapter):
             if p["profile_id"] == profile_id:
                 return p
         return None
+
+    def query_models(self) -> list[dict]:
+        """
+        Return all models available in the local PI installation.
+
+        Dynamically queries `pi --list-models` — reflects whatever providers
+        and models the user has configured (API keys, extensions, etc.).
+        Each entry: {provider, model, context_k, max_out_k, thinking, images}
+        """
+        pi_cmd = (
+            self._pi_command
+            if self._pi_command != "pi"
+            else (find_pi_command() or "pi")
+        )
+        return query_pi_models(pi_cmd)
+
+    def models_for_provider(self, provider: str) -> list[dict]:
+        """Return all models for a specific provider."""
+        return [m for m in self.query_models() if m["provider"] == provider]
+
+    def providers(self) -> list[str]:
+        """Return the deduplicated list of providers available in PI."""
+        seen: list[str] = []
+        for m in self.query_models():
+            if m["provider"] not in seen:
+                seen.append(m["provider"])
+        return seen
 
     def invoke_team(self, template_id: str, task_packet: dict) -> str:
         """

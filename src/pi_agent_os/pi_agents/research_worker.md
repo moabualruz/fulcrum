@@ -1,5 +1,5 @@
 ---
-model: claude-sonnet-4-6
+model: anthropic/claude-sonnet-4-6
 system: |
   You are a Research Worker. You gather information, analyse options, and
   produce structured research reports to inform implementation decisions.
