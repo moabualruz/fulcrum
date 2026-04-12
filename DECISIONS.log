@@ -1,0 +1,125 @@
+# Decisions Log
+
+## D-001: Implementation Language — Python
+Date: 2026-04-12
+Status: Decided
+
+**Decision:** Use Python 3.12+ as the primary implementation language.
+
+**Rationale:**
+- Best-in-class SQLite support (stdlib sqlite3, aiosqlite)
+- Official Qdrant Python client
+- Official Tree-sitter Python bindings
+- Pydantic v2 for typed data models
+- FastAPI for SSE-based monitor
+- Typer/Click for CLI
+- Mature ecosystem for all required tooling
+
+**Alternatives considered:**
+- TypeScript: good for CLI, but inferior for data/ML tooling and sqlite FTS integration
+- Go: fast but weaker data/ML ecosystem
+
+---
+
+## D-002: Package Manager — uv
+Date: 2026-04-12
+Status: Decided
+
+**Decision:** Use uv for package management with pyproject.toml.
+
+**Rationale:**
+- Fast, reproducible installs
+- Modern Python packaging standard (PEP 517/518/621)
+- Lock file support for reproducibility
+
+---
+
+## D-003: SQLite Driver — sqlite3 (stdlib) + aiosqlite for async paths
+Date: 2026-04-12
+Status: Decided
+
+**Decision:** Use Python stdlib sqlite3 for synchronous code and aiosqlite for async paths.
+
+**Rationale:** Built-in, no extra install for sync path. FTS5 available on all modern Python distros.
+
+---
+
+## D-004: CLI Framework — Typer
+Date: 2026-04-12
+Status: Decided
+
+**Decision:** Use Typer for CLI construction.
+
+**Rationale:** Type-annotated, auto-docs, built on Click, clean subcommand support.
+
+---
+
+## D-005: Web Monitor — FastAPI + SSE
+Date: 2026-04-12
+Status: Decided
+
+**Decision:** Use FastAPI with SSE (Server-Sent Events) for the read-only web monitor.
+
+**Rationale:** Spec §19.3 requires SSE transport. FastAPI has native SSE support and is read-only here.
+
+---
+
+## D-006: Vector Store — Qdrant (local mode)
+Date: 2026-04-12
+Status: Decided
+
+**Decision:** Use Qdrant in local/embedded mode where possible, with option to connect to local Qdrant server.
+
+**Rationale:** Spec §8.1 specifies Qdrant. Local mode avoids external service dependency for development.
+
+---
+
+## D-007: Graph Memory — graphiti / mem0 abstraction behind facade
+Date: 2026-04-12
+Status: Decided
+
+**Decision:** Use graphiti-core as the graph memory backend behind the memory facade, with SQLite fallback if graphiti not available.
+
+**Rationale:** Spec §8.6 requires temporal entities/relationships/episodes/provenance. graphiti-core provides this. The memory facade hides the backend.
+
+---
+
+## D-008: Code Parsing — Tree-sitter
+Date: 2026-04-12
+Status: Decided
+
+**Decision:** Use tree-sitter with tree-sitter-languages for multi-language symbol extraction.
+
+**Rationale:** Spec §10.11 requires incremental syntax parsing and symbol extraction. tree-sitter is the best cross-language option.
+
+---
+
+## D-009: Typed IDs — ulid + typed prefix
+Date: 2026-04-12
+Status: Decided
+
+**Decision:** Use ULID (Universally Unique Lexicographically Sortable Identifier) as the raw ID component, with typed prefixes as specified.
+
+**Rationale:** ULIDs are sortable by time, URL-safe, and collision-resistant. They satisfy the spec §6 ID strategy.
+
+---
+
+## D-010: Agent-Home Location — ~/.pi-agent-home
+Date: 2026-04-12
+Status: Decided
+
+**Decision:** Default agent-home is ~/.pi-agent-home, overridable via PI_AGENT_HOME env var.
+
+**Rationale:** Spec §8.3 defines global agent-home structure. A hidden dotdir in home is standard for CLI tools.
+
+---
+
+## D-011: PI Runtime Integration — Stub interfaces
+Date: 2026-04-12
+Status: Decided (with blocker)
+
+**Decision:** PI runtime integration points are implemented as abstract interfaces/stubs. The control/memory/workflow plane is fully functional without PI. PI hooks are clearly marked.
+
+**Rationale:** PI is referenced as the execution host but is not a locally installable standalone package from this context. The implementation builds everything that can be built, with PI integration points clearly defined.
+
+**Related blocker:** See BLOCKERS.md B-001.

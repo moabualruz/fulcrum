@@ -1,0 +1,95 @@
+name: grill-me
+version: "1.0"
+description: "Structured discovery and requirements-clarification workflow"
+inputs:
+  - name: initial_request
+    required: true
+  - name: workspace_id
+    required: true
+  - name: project_id
+    required: true
+
+steps:
+  - id: read_context
+    name: "Read existing project context"
+    type: read_project
+    inputs:
+      project_id: "{{project_id}}"
+
+  - id: read_memory
+    name: "Read relevant memory"
+    type: read_memory
+    depends_on: [read_context]
+    inputs:
+      query: "{{initial_request}}"
+      scope: "project"
+
+  - id: clarify_scope
+    name: "Clarify scope with user"
+    type: prompt_user
+    depends_on: [read_memory]
+    inputs:
+      prompt: |
+        I've reviewed the project context. Let me ask a few clarifying questions about:
+        {{initial_request}}
+
+        1. What is the primary goal/outcome you want to achieve?
+        2. Who are the main users/stakeholders affected?
+        3. What are the key constraints (time, technology, scope)?
+        4. What does success look like?
+        5. Are there any explicit non-goals or out-of-scope items?
+      artifact_declarations:
+        - type: context_gathering_report
+
+  - id: clarify_requirements
+    name: "Clarify technical requirements"
+    type: prompt_user
+    depends_on: [clarify_scope]
+    inputs:
+      prompt: |
+        Based on your answers, let me dig deeper:
+
+        1. What existing systems or components does this interact with?
+        2. What are the performance, security, or reliability requirements?
+        3. Are there any architectural preferences or constraints?
+        4. What is the rough priority order of requirements?
+
+  - id: write_grill_artifact
+    name: "Write grill-me artifact"
+    type: write_artifact
+    depends_on: [clarify_requirements]
+    inputs:
+      artifact_type: context_gathering_report
+      title: "Grill-Me Discovery: {{initial_request}}"
+      content: |
+        # Grill-Me Discovery Report
+
+        **Request:** {{initial_request}}
+        **Date:** {{ts}}
+
+        ## Scope Answers
+        {{clarify_scope_output}}
+
+        ## Requirements Answers
+        {{clarify_requirements_output}}
+
+        ## Summary
+        Requirements discovery complete. Ready for PRD drafting.
+    artifact_declarations:
+      - type: context_gathering_report
+
+  - id: write_task_memory
+    name: "Write task context memory"
+    type: write_memory
+    depends_on: [write_grill_artifact]
+    inputs:
+      scope: "project"
+      kind: "task_goal"
+      title: "Grill-Me: {{initial_request}}"
+      summary: "Discovery session for: {{initial_request}}"
+      importance: 0.8
+
+  - id: complete
+    name: "Complete workflow"
+    type: complete
+    depends_on: [write_task_memory]
