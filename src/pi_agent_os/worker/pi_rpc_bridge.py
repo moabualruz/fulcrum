@@ -36,6 +36,8 @@ import shutil
 import subprocess
 import threading
 import time
+import urllib.error
+import urllib.request
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -160,33 +162,141 @@ def get_active_providers() -> list[str]:
     return [p for p, cred in auth.items() if isinstance(cred, dict)]
 
 
+def _get_provider_base_urls(pi_cmd: Optional[str] = None) -> dict[str, str]:
+    """
+    Read base URLs for all active providers from PI's model registry via Node.js.
+
+    Returns {provider_name: base_url} for providers that have a baseUrl defined.
+    Falls back to a hardcoded map of known providers if the Node.js call fails.
+    """
+    KNOWN_BASE_URLS: dict[str, str] = {
+        "opencode":           "https://opencode.ai/zen",
+        "opencode-go":        "https://opencode.ai/zen/go/v1",
+        "openrouter":         "https://openrouter.ai/api/v1",
+        "google-gemini-cli":  "https://generativelanguage.googleapis.com/v1beta/openai",
+        "google-antigravity": "https://aiplatform.googleapis.com/v1",
+    }
+
+    cmd = pi_cmd or find_pi_command()
+    if not cmd:
+        return KNOWN_BASE_URLS
+
+    # Ask Node.js to extract base URLs directly from PI's model registry
+    node_script = r"""
+const path = require('path');
+const piDir = path.dirname(require.resolve('@mariozechner/pi-coding-agent/package.json'));
+const { getProviders, getModels } = require(path.join(piDir, 'node_modules/@mariozechner/pi-ai/dist/models.generated.js'));
+const result = {};
+for (const p of getProviders()) {
+    const models = getModels(p);
+    if (models.length > 0 && models[0].baseUrl) {
+        result[p] = models[0].baseUrl;
+    }
+}
+console.log(JSON.stringify(result));
+"""
+    try:
+        # Find node binary next to pi
+        node_cmd = os.path.join(os.path.dirname(cmd), "node")
+        if not os.path.isfile(node_cmd):
+            node_cmd = "node"
+        out = subprocess.check_output(
+            [node_cmd, "-e", node_script],
+            timeout=5, text=True, stderr=subprocess.DEVNULL,
+        )
+        parsed = json.loads(out.strip())
+        if parsed:
+            return {**KNOWN_BASE_URLS, **parsed}
+    except Exception as exc:
+        log.debug("_get_provider_base_urls() Node.js call failed: %s", exc)
+
+    return KNOWN_BASE_URLS
+
+
+def fetch_live_provider_models(
+    provider: str,
+    base_url: str,
+    api_key: str,
+    timeout: float = 8.0,
+) -> Optional[list[dict]]:
+    """
+    Query a provider's OpenAI-compatible /v1/models endpoint.
+
+    Returns a list of model dicts {provider, model} on success,
+    or None if the endpoint is unavailable / returns an error.
+    """
+    # Normalise: strip trailing /v1 so we can append /v1/models cleanly
+    url_base = base_url.rstrip("/")
+    if url_base.endswith("/v1"):
+        url_base = url_base[:-3]
+    url = f"{url_base}/v1/models"
+
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "pi-coding-agent/0.66.1",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        log.debug("fetch_live_provider_models(%s) HTTP %s: %s", provider, exc.code, url)
+        return None
+    except Exception as exc:
+        log.debug("fetch_live_provider_models(%s) failed: %s", provider, exc)
+        return None
+
+    raw = data.get("data", data) if isinstance(data, dict) else data
+    if not isinstance(raw, list):
+        return None
+
+    models = []
+    for entry in raw:
+        model_id = entry.get("id") if isinstance(entry, dict) else str(entry)
+        if model_id:
+            models.append({"provider": provider, "model": model_id})
+    return models
+
+
+def _get_api_key_for_provider(provider: str) -> Optional[str]:
+    """Read the API key for a provider from PI's auth.json."""
+    auth_path = _pi_auth_path()
+    if not auth_path.exists():
+        return None
+    try:
+        auth = json.loads(auth_path.read_text(encoding="utf-8"))
+        cred = auth.get(provider, {})
+        return cred.get("key") or cred.get("access")
+    except Exception:
+        return None
+
+
 def query_pi_models(pi_cmd: Optional[str] = None) -> list[dict]:
     """
     Return the models the user has active and scoped in PI.
 
-    Explicit two-step filter:
-    1. Active providers — from auth.json (logged-in providers only)
-    2. Enabled models  — from settings.json enabledModels allowlist (set via
-       `pi config`); if the list is absent, all models for active providers pass
+    For each active provider:
+      1. Query the provider's live /v1/models endpoint (OpenAI-compatible).
+         This reflects the provider's actual catalogue — new models appear
+         automatically without waiting for PI to update its static registry.
+      2. Fall back to `pi --list-models` (PI's baked-in model list) for
+         providers that don't expose /v1/models (OAuth providers, etc.).
 
-    Each entry: {provider, model, context_k, max_out_k, thinking, images}
+    Then apply:
+      - Filter by active providers (auth.json presence)
+      - Filter by settings.json enabledModels allowlist (if present)
+
+    Each entry: {provider, model}
+    Live-sourced entries carry only provider + model; PI static entries also
+    carry context_k / max_out_k / thinking / images metadata.
 
     Returns [] if PI is not installed or the command fails.
     """
     cmd = pi_cmd or find_pi_command()
     if not cmd:
-        return []
-    try:
-        # PI writes --list-models output to stderr (it's a TUI-style render)
-        result = subprocess.run(
-            [cmd, "--list-models"],
-            timeout=10,
-            capture_output=True,
-            text=True,
-        )
-        out = result.stderr or result.stdout
-    except Exception as exc:
-        log.warning("query_pi_models() failed: %s", exc)
         return []
 
     # Step 1: active providers from auth.json
@@ -195,26 +305,64 @@ def query_pi_models(pi_cmd: Optional[str] = None) -> list[dict]:
     # Step 2: user-scoped model allowlist from settings.json (None = no restriction)
     enabled_set = get_pi_enabled_models()
 
+    # Step 3: collect models per provider — live API first, PI static as fallback
+    base_urls = _get_provider_base_urls(cmd)
+    collected: list[dict] = []
+    providers_covered_by_live: set[str] = set()
+
+    for provider in active_providers:
+        base_url = base_urls.get(provider)
+        api_key = _get_api_key_for_provider(provider)
+        if base_url and api_key:
+            live = fetch_live_provider_models(provider, base_url, api_key)
+            if live is not None:
+                log.debug("Live models for %s: %d", provider, len(live))
+                collected.extend(live)
+                providers_covered_by_live.add(provider)
+                continue
+        log.debug("No live endpoint for %s — will use PI static list", provider)
+
+    # Supplement with PI static list for providers not covered by live query
+    providers_needing_static = active_providers - providers_covered_by_live
+    if providers_needing_static:
+        try:
+            result = subprocess.run(
+                [cmd, "--list-models"],
+                timeout=10, capture_output=True, text=True,
+            )
+            for line in (result.stderr or result.stdout).splitlines():
+                parts = line.split()
+                if len(parts) < 2 or parts[0] == "provider":
+                    continue
+                if parts[0] not in providers_needing_static:
+                    continue
+                collected.append({
+                    "provider": parts[0],
+                    "model": parts[1],
+                    "context_k": parts[2] if len(parts) > 2 else None,
+                    "max_out_k": parts[3] if len(parts) > 3 else None,
+                    "thinking": parts[4] == "yes" if len(parts) > 4 else False,
+                    "images": parts[5] == "yes" if len(parts) > 5 else False,
+                })
+        except Exception as exc:
+            log.warning("PI --list-models fallback failed: %s", exc)
+
+    # Step 4: apply enabledModels filter
+    if enabled_set is not None:
+        collected = [
+            m for m in collected
+            if f"{m['provider']}/{m['model']}" in enabled_set
+        ]
+
+    # Deduplicate (same provider/model from both sources)
+    seen: set[str] = set()
     models: list[dict] = []
-    for line in out.splitlines():
-        parts = line.split()
-        if len(parts) < 2 or parts[0] == "provider":
-            continue
-        provider, model_id = parts[0], parts[1]
-        # Filter 1: provider must be logged in
-        if active_providers and provider not in active_providers:
-            continue
-        # Filter 2: model must be in the enabledModels scope (if set)
-        if enabled_set is not None and f"{provider}/{model_id}" not in enabled_set:
-            continue
-        models.append({
-            "provider": provider,
-            "model": model_id,
-            "context_k": parts[2] if len(parts) > 2 else None,
-            "max_out_k": parts[3] if len(parts) > 3 else None,
-            "thinking": parts[4] == "yes" if len(parts) > 4 else False,
-            "images": parts[5] == "yes" if len(parts) > 5 else False,
-        })
+    for m in collected:
+        key = f"{m['provider']}/{m['model']}"
+        if key not in seen:
+            seen.add(key)
+            models.append(m)
+
     return models
 
 
