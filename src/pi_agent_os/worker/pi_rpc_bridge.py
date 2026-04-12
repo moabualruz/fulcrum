@@ -50,9 +50,58 @@ log = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
+def find_pi_command() -> Optional[str]:
+    """
+    Find the pi coding agent CLI, avoiding any Python virtualenv 'pi' shim.
+
+    Checks in order:
+    1. PI_COMMAND env var (explicit override)
+    2. Each PATH entry that is NOT inside a Python venv (.venv / site-packages)
+    3. Common fnm/nvm global bin directories
+    """
+    # Explicit override
+    if os.environ.get("PI_COMMAND"):
+        cmd = os.environ["PI_COMMAND"]
+        return cmd if os.path.isfile(cmd) and os.access(cmd, os.X_OK) else None
+
+    # Common non-venv locations first
+    fnm_glob_patterns = [
+        os.path.expanduser("~/.local/share/fnm/node-versions/*/installation/bin/pi"),
+        os.path.expanduser("~/.nvm/versions/node/*/bin/pi"),
+        "/usr/local/bin/pi",
+    ]
+    import glob as _glob
+    for pattern in fnm_glob_patterns:
+        for p in sorted(_glob.glob(pattern), reverse=True):  # newest version first
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                return p
+
+    # Fallback: walk PATH, skip venv dirs
+    path_dirs = os.environ.get("PATH", "").split(os.pathsep)
+    venv_dir = os.environ.get("VIRTUAL_ENV", "")
+    for d in path_dirs:
+        if venv_dir and d.startswith(venv_dir):
+            continue
+        if ".venv" in d or "site-packages" in d:
+            continue
+        candidate = os.path.join(d, "pi")
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            # Verify it's the pi coding agent (not a system utility)
+            try:
+                out = subprocess.check_output(
+                    [candidate, "--version"], timeout=3, stderr=subprocess.STDOUT, text=True
+                )
+                # pi coding agent prints a semver like "0.66.1"
+                if out.strip() and out.strip()[0].isdigit():
+                    return candidate
+            except Exception:
+                pass
+    return None
+
+
 def check_pi_available() -> bool:
-    """Return True if the `pi` CLI is on PATH."""
-    return shutil.which("pi") is not None
+    """Return True if the pi coding agent CLI is available."""
+    return find_pi_command() is not None
 
 
 def _agent_definition_path(profile_id: str) -> Optional[Path]:
@@ -134,14 +183,14 @@ class PIRPCBridge(PIRuntimeAdapter):
     def __init__(
         self,
         pi_command: str = "pi",
-        provider: str = "anthropic",
-        default_model: str = "claude-sonnet-4-6",
+        provider: Optional[str] = None,
+        default_model: Optional[str] = None,
         session_dir: Optional[str] = None,
         timeout: float = 300.0,
     ):
         self._pi_command = pi_command
-        self._provider = provider
-        self._default_model = default_model
+        self._provider = provider          # None = use PI's configured default
+        self._default_model = default_model  # None = use profile frontmatter or PI default
         self._session_dir = session_dir
         self._timeout = timeout
         self._runs: dict[str, _RunState] = {}
@@ -160,22 +209,32 @@ class PIRPCBridge(PIRuntimeAdapter):
         """
         run_id = f"run_{uuid.uuid4().hex[:16]}"
 
-        # Build CLI args
-        cmd = [self._pi_command, "--mode", "rpc", "--provider", self._provider]
+        # Build CLI args — omit --provider and --model if not specified,
+        # letting PI use whatever the user has configured interactively.
+        pi_cmd = (
+            self._pi_command
+            if self._pi_command != "pi"
+            else (find_pi_command() or "pi")
+        )
+        cmd = [pi_cmd, "--mode", "rpc"]
 
-        # Model + system prompt from agent definition file
-        model = self._default_model
+        if self._provider:
+            cmd += ["--provider", self._provider]
+
+        # Model + system prompt: profile frontmatter → caller override → PI default
+        model: Optional[str] = self._default_model
         agent_def = _agent_definition_path(config.profile_id)
         system_prompt: Optional[str] = None
 
         if agent_def:
             fm = _read_frontmatter(agent_def)
-            if fm.get("model"):
+            if fm.get("model") and not model:
                 model = fm["model"]
             if fm.get("system"):
                 system_prompt = str(fm["system"])
 
-        cmd += ["--model", model]
+        if model:
+            cmd += ["--model", model]
         if system_prompt:
             cmd += ["--system-prompt", system_prompt]
 
@@ -297,7 +356,7 @@ class PIRPCBridge(PIRuntimeAdapter):
                     fm = _read_frontmatter(md)
                     profiles.append({
                         "profile_id": name,
-                        "model": fm.get("model", self._default_model),
+                        "model": fm.get("model") or self._default_model or "pi-default",
                         "source": str(md),
                     })
         return profiles

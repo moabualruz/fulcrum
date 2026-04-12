@@ -149,9 +149,10 @@ def auto_configure_pi_runtime() -> bool:
     Returns True if real PI runtime was configured.
     """
     try:
-        from .pi_rpc_bridge import PIRPCBridge, check_pi_available
-        if check_pi_available():
-            configure_pi_runtime(PIRPCBridge())
+        from .pi_rpc_bridge import PIRPCBridge, find_pi_command
+        pi_path = find_pi_command()
+        if pi_path:
+            configure_pi_runtime(PIRPCBridge(pi_command=pi_path))
             return True
     except Exception:
         pass
