@@ -150,14 +150,15 @@ def get_enabled_providers() -> list[str]:
 
 def query_pi_models(pi_cmd: Optional[str] = None) -> list[dict]:
     """
-    Return models available in the local PI installation with valid credentials.
+    Return all models that PI considers available (`pi --list-models`).
+
+    PI's getAvailable() is the authoritative filter: it checks that each
+    provider has auth configured in auth.json. PI handles OAuth token refresh
+    at request time, so tokens that appear "expired" in auth.json may still
+    be refreshed by PI — do not apply additional expiry filtering here.
 
     Each entry: {provider, model, context_k, max_out_k, thinking, images}
     context_k / max_out_k are strings like "200K" or "1.0M".
-
-    Two-step filter:
-    1. Runs `pi --list-models` — PI's own auth-presence filter (hasAuth check)
-    2. Applies get_enabled_providers() — drops providers with expired OAuth tokens
 
     Returns [] if PI is not installed or the command fails.
     """
@@ -177,20 +178,14 @@ def query_pi_models(pi_cmd: Optional[str] = None) -> list[dict]:
         log.warning("query_pi_models() failed: %s", exc)
         return []
 
-    enabled = set(get_enabled_providers())
-
     models: list[dict] = []
     for line in out.splitlines():
         parts = line.split()
         # Skip header line and any short/blank lines
         if len(parts) < 2 or parts[0] == "provider":
             continue
-        provider = parts[0]
-        # Skip providers with expired or missing credentials
-        if enabled and provider not in enabled:
-            continue
         models.append({
-            "provider": provider,
+            "provider": parts[0],
             "model": parts[1],
             "context_k": parts[2] if len(parts) > 2 else None,
             "max_out_k": parts[3] if len(parts) > 3 else None,
