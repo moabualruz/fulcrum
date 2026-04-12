@@ -104,10 +104,40 @@ def check_pi_available() -> bool:
     return find_pi_command() is not None
 
 
+def _pi_agent_dir() -> Path:
+    """Return PI's agent directory, respecting PI_CODING_AGENT_DIR env var."""
+    return Path(os.environ.get("PI_CODING_AGENT_DIR") or os.path.expanduser("~/.pi/agent"))
+
+
 def _pi_auth_path() -> Path:
-    """Return the path to PI's auth.json, respecting PI_CODING_AGENT_DIR."""
-    agent_dir = os.environ.get("PI_CODING_AGENT_DIR") or os.path.expanduser("~/.pi/agent")
-    return Path(agent_dir) / "auth.json"
+    """Return the path to PI's auth.json."""
+    return _pi_agent_dir() / "auth.json"
+
+
+def _pi_settings_path() -> Path:
+    """Return the path to PI's settings.json."""
+    return _pi_agent_dir() / "settings.json"
+
+
+def get_pi_enabled_models() -> Optional[set[str]]:
+    """
+    Return the set of enabled model specs from PI's settings.json, or None if
+    no enabledModels list is configured (meaning all available models are allowed).
+
+    Each entry is "provider/model_id" as written by `pi config`.
+    """
+    settings_path = _pi_settings_path()
+    if not settings_path.exists():
+        return None
+    try:
+        import json as _json
+        settings = _json.loads(settings_path.read_text(encoding="utf-8"))
+        enabled = settings.get("enabledModels")
+        if isinstance(enabled, list) and enabled:
+            return set(enabled)
+    except Exception as exc:
+        log.warning("Failed to read PI settings.json: %s", exc)
+    return None
 
 
 def get_enabled_providers() -> list[str]:
@@ -150,15 +180,14 @@ def get_enabled_providers() -> list[str]:
 
 def query_pi_models(pi_cmd: Optional[str] = None) -> list[dict]:
     """
-    Return all models that PI considers available (`pi --list-models`).
+    Return the models the user has scoped in PI.
 
-    PI's getAvailable() is the authoritative filter: it checks that each
-    provider has auth configured in auth.json. PI handles OAuth token refresh
-    at request time, so tokens that appear "expired" in auth.json may still
-    be refreshed by PI — do not apply additional expiry filtering here.
+    Two-step filter (mirrors PI's own logic):
+    1. `pi --list-models` — providers with auth configured (PI's getAvailable())
+    2. settings.json `enabledModels` — the explicit allowlist set via `pi config`
+       If enabledModels is absent, all available models are returned.
 
     Each entry: {provider, model, context_k, max_out_k, thinking, images}
-    context_k / max_out_k are strings like "200K" or "1.0M".
 
     Returns [] if PI is not installed or the command fails.
     """
@@ -178,15 +207,20 @@ def query_pi_models(pi_cmd: Optional[str] = None) -> list[dict]:
         log.warning("query_pi_models() failed: %s", exc)
         return []
 
+    # None = no allowlist, all models pass; set = only these "provider/model" specs
+    enabled_set = get_pi_enabled_models()
+
     models: list[dict] = []
     for line in out.splitlines():
         parts = line.split()
-        # Skip header line and any short/blank lines
         if len(parts) < 2 or parts[0] == "provider":
             continue
+        provider, model_id = parts[0], parts[1]
+        if enabled_set is not None and f"{provider}/{model_id}" not in enabled_set:
+            continue
         models.append({
-            "provider": parts[0],
-            "model": parts[1],
+            "provider": provider,
+            "model": model_id,
             "context_k": parts[2] if len(parts) > 2 else None,
             "max_out_k": parts[3] if len(parts) > 3 else None,
             "thinking": parts[4] == "yes" if len(parts) > 4 else False,
