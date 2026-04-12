@@ -104,14 +104,61 @@ def check_pi_available() -> bool:
     return find_pi_command() is not None
 
 
+def _pi_auth_path() -> Path:
+    """Return the path to PI's auth.json, respecting PI_CODING_AGENT_DIR."""
+    agent_dir = os.environ.get("PI_CODING_AGENT_DIR") or os.path.expanduser("~/.pi/agent")
+    return Path(agent_dir) / "auth.json"
+
+
+def get_enabled_providers() -> list[str]:
+    """
+    Return provider names that have valid (non-expired) credentials in PI's auth.json.
+
+    Rules:
+    - api_key providers: always valid as long as the entry exists
+    - oauth providers: valid only if the 'expires' timestamp (ms epoch) is in the future
+
+    This is stricter than PI's own `hasAuth()` which only checks for presence.
+    Use this to filter out providers with expired OAuth tokens.
+    """
+    auth_path = _pi_auth_path()
+    if not auth_path.exists():
+        return []
+    try:
+        import json as _json
+        auth = _json.loads(auth_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        log.warning("Failed to read PI auth.json: %s", exc)
+        return []
+
+    now_ms = time.time() * 1000
+    enabled: list[str] = []
+    for provider, cred in auth.items():
+        if not isinstance(cred, dict):
+            continue
+        cred_type = cred.get("type", "")
+        if cred_type == "api_key":
+            if cred.get("key"):
+                enabled.append(provider)
+        elif cred_type == "oauth":
+            expires = cred.get("expires", 0)
+            if isinstance(expires, (int, float)) and expires > now_ms:
+                enabled.append(provider)
+        # unknown type: skip (conservative)
+    return enabled
+
+
 def query_pi_models(pi_cmd: Optional[str] = None) -> list[dict]:
     """
-    Return all models available in the local PI installation.
+    Return models available in the local PI installation with valid credentials.
 
     Each entry: {provider, model, context_k, max_out_k, thinking, images}
     context_k / max_out_k are strings like "200K" or "1.0M".
 
-    Runs `pi --list-models` and parses the tabular output.
+    Two-step filter:
+    1. Runs `pi --list-models` — PI's own auth-presence filter (hasAuth check)
+    2. Applies get_enabled_providers() — drops providers with expired OAuth tokens
+
     Returns [] if PI is not installed or the command fails.
     """
     cmd = pi_cmd or find_pi_command()
@@ -130,14 +177,20 @@ def query_pi_models(pi_cmd: Optional[str] = None) -> list[dict]:
         log.warning("query_pi_models() failed: %s", exc)
         return []
 
+    enabled = set(get_enabled_providers())
+
     models: list[dict] = []
     for line in out.splitlines():
         parts = line.split()
         # Skip header line and any short/blank lines
         if len(parts) < 2 or parts[0] == "provider":
             continue
+        provider = parts[0]
+        # Skip providers with expired or missing credentials
+        if enabled and provider not in enabled:
+            continue
         models.append({
-            "provider": parts[0],
+            "provider": provider,
             "model": parts[1],
             "context_k": parts[2] if len(parts) > 2 else None,
             "max_out_k": parts[3] if len(parts) > 3 else None,
