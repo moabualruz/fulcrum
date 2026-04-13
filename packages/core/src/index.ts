@@ -43,3 +43,6 @@ export { initEmbedding, getTextEmbedder, getCodeEmbedder, getReranker, resetProv
 
 // Status
 export { getWorkspaceStatus, buildCosContext, listAgentProfiles } from './status.js'
+
+// IDs
+export { newId, nextDisplayId } from './ids.js'
