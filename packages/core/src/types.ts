@@ -1,26 +1,82 @@
-export type TaskStatus = 'queued' | 'in_progress' | 'completed' | 'blocked'
-export type RunStatus = 'running' | 'completed' | 'blocked' | 'stale' | 'escalated'
+export type TaskStatus =
+  | 'queued' | 'ready' | 'claimed' | 'running'
+  | 'blocked' | 'failed' | 'completed' | 'cancelled'
+
+export type AgentRunStatus =
+  | 'created' | 'starting' | 'running' | 'waiting'
+  | 'blocked' | 'failed' | 'finished' | 'aborted'
+
+export type StatusCategory = 'backlog' | 'active' | 'blocked' | 'done'
+
+export type WorkspaceStatus = 'active' | 'archived'
+export type ProjectStatus = 'active' | 'archived' | 'paused'
+export type ProjectType = 'git' | 'non_git' | 'submodule' | 'logical'
+export type WriteMode = 'sequential' | 'worktree'
+
 export type AgentRole =
-  | 'chief_of_staff'
-  | 'implementer'
-  | 'tester'
-  | 'reviewer'
-  | 'researcher'
-  | 'planner'
+  | 'chief_of_staff' | 'context_gatherer' | 'prd_planner' | 'implementation_planner'
+  | 'issue_decomposer' | 'architecture_reviewer' | 'research_worker'
+  | 'implementer_backend' | 'implementer_frontend' | 'implementer'
+  | 'refactor_worker' | 'browser_worker' | 'tester' | 'reviewer'
+  | 'security_reviewer' | 'performance_reviewer' | 'integration_worker'
+  | 'planner' | 'researcher'
+
+export type TaskRelationType =
+  | 'blocks' | 'blocked_by' | 'follows' | 'preceded_by'
+  | 'relates' | 'duplicates' | 'requires_context_from'
+  | 'must_merge_before' | 'conflicts_with' | 'reviewed_by' | 'verifies'
+
+export type MemoryScope = 'global' | 'project' | 'file'
+
+export type MemoryKind =
+  | 'fact' | 'summary' | 'symbol' | 'decision' | 'procedure'
+  | 'error' | 'diff' | 'doc' | 'code' | 'task_goal'
+  | 'task_decision' | 'task_failure' | 'task_outcome'
+
+export type ArtifactType =
+  | 'prd' | 'plan' | 'issue_breakdown' | 'context_gathering_report'
+  | 'patch' | 'changed_files_manifest' | 'command_log' | 'test_report'
+  | 'benchmark_report' | 'review_report' | 'integration_report'
+  | 'merge_conflict_report' | 'risk_report' | 'research_note'
+  | 'source_digest' | 'comparison_matrix' | 'memory_promotion_summary'
+  | 'task_outcome_summary'
+
+export type EventType =
+  | 'project_registered' | 'epic_created' | 'issue_created' | 'task_created'
+  | 'task_status_changed' | 'team_created' | 'team_invoked'
+  | 'agent_run_created' | 'agent_run_started' | 'agent_run_progress'
+  | 'agent_run_blocked' | 'agent_run_failed' | 'agent_run_finished'
+  | 'handoff_created' | 'handoff_consumed' | 'artifact_written'
+  | 'artifact_validated' | 'memory_written' | 'memory_recalled'
+  | 'worktree_allocated' | 'merge_queued' | 'merge_started'
+  | 'merge_conflicted' | 'merge_completed' | 'review_created'
+  | 'validation_started' | 'validation_finished' | 'policy_denied'
+  | 'hook_executed' | 'workflow_step_completed'
+
+// Keep RunStatus as alias for backward compat with existing code
+export type RunStatus = AgentRunStatus
 
 export interface Task {
   task_id: string
   workspace_id: string
   project_id: string
+  issue_id: string | null
+  display_id: string
   title: string
   description: string | null
   status: TaskStatus
-  depends_on: string[]
+  status_category: StatusCategory
+  priority: 'critical' | 'high' | 'medium' | 'low' | 'none'
+  estimate_type: 'story_points' | 'hours' | null
+  estimate_value: number | null
   assigned_to: string | null
   note: string | null
+  done_criteria: string | null
   version: number
   created_at: string
   updated_at: string
+  claimed_at: string | null
+  completed_at: string | null
 }
 
 export interface RunArtifacts {
@@ -35,31 +91,78 @@ export interface AgentRun {
   run_id: string
   task_id: string
   workspace_id: string
+  project_id: string
+  display_id: string
+  agent_id: string
   role: AgentRole
-  status: RunStatus
+  pi_profile: string | null
+  status: AgentRunStatus
+  status_category: StatusCategory
   current_step: string | null
+  current_path: string | null
   progress_pct: number
   output_summary: string | null
   artifacts: RunArtifacts | null
   git_branch: string | null
   git_commit: string | null
+  heartbeat_at: string | null
+  blocker: string | null
+  worktree_id: string | null
   version: number
   started_at: string
   updated_at: string
-  completed_at: string | null
+  finished_at: string | null
 }
 
 export interface Memory {
   memory_id: string
+  scope: MemoryScope
+  kind: MemoryKind
   workspace_id: string
-  project_id: string
-  content: string
+  project_id: string | null
+  file_path: string | null
+  symbol_path: string | null
+  title: string
+  summary: string
+  canonical_text: string | null
   tags: string[]
+  entities: string[]
   confidence: number
+  access_count: number
+  event_time: string | null
+  content_hash: string | null
+  task_id: string | null
+  issue_id: string | null
+  artifact_id: string | null
+  provenance_refs: string[]
+  embedding: Buffer | null
   created_at: string
   updated_at: string
   last_accessed_at: string
-  access_count: number
+}
+
+export interface FulcrumEvent {
+  evt_id: string
+  workspace_id: string
+  project_id: string | null
+  evt_type: EventType
+  ts: string
+  object_type: string | null
+  object_id: string | null
+  actor_type: string
+  actor_id: string
+  payload: Record<string, unknown>
+  severity: 'debug' | 'info' | 'warn' | 'error'
+  trace_id: string | null
+  span_id: string | null
+  correlation_id: string | null
+}
+
+export interface TaskRelation {
+  task_id: string
+  target_task_id: string
+  relation_type: TaskRelationType
+  created_at: string
 }
 
 export interface AgentProfile {
@@ -69,7 +172,7 @@ export interface AgentProfile {
   can_dispatch_agents: boolean
 }
 
-export interface WorkspaceStatus {
+export interface WorkspaceStatusResult {
   workspace_id: string
   running_runs: AgentRun[]
   blocked_runs: AgentRun[]
@@ -120,7 +223,7 @@ export class FulcrumError extends Error {
     public readonly code:
       | 'not_found'
       | 'version_conflict'
-      | 'policy_blocked'  // reserved for transport-level policy enforcement
+      | 'policy_blocked'
       | 'invalid_input'
   ) {
     super(message)

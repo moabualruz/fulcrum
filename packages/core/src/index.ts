@@ -1,7 +1,10 @@
 // Types
 export type {
-  Task, TaskStatus, AgentRun, RunStatus, RunArtifacts, AgentRole,
-  Memory, AgentProfile, WorkspaceStatus, PolicyConfig,
+  Task, TaskStatus, AgentRun, AgentRunStatus, RunStatus, RunArtifacts, AgentRole,
+  Memory, AgentProfile, WorkspaceStatus, WorkspaceStatusResult, PolicyConfig,
+  StatusCategory, ProjectStatus, ProjectType, WriteMode,
+  TaskRelationType, MemoryScope, MemoryKind, ArtifactType, EventType,
+  FulcrumEvent, TaskRelation,
   EmbeddingProviderConfig, FulcrumConfig, PolicyCheckResult,
 } from './types.js'
 export { FulcrumError } from './types.js'

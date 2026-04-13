@@ -1,6 +1,6 @@
 import { getDb } from './db/client.js'
 import { rowToRun } from './runs.js'
-import type { AgentProfile, WorkspaceStatus } from './types.js'
+import type { AgentProfile, WorkspaceStatusResult } from './types.js'
 
 interface GetWorkspaceStatusInput { workspace_id: string }
 interface BuildCosContextInput { workspace_id: string; project_id: string; max_tokens?: number }
@@ -14,7 +14,7 @@ const AGENT_PROFILES: AgentProfile[] = [
   { role: 'planner', description: 'Breaks down epics into tasks and defines acceptance criteria', can_create_teams: false, can_dispatch_agents: false },
 ]
 
-export async function getWorkspaceStatus(input: GetWorkspaceStatusInput): Promise<WorkspaceStatus> {
+export async function getWorkspaceStatus(input: GetWorkspaceStatusInput): Promise<WorkspaceStatusResult> {
   const db = getDb()
 
   const running = db.prepare(
