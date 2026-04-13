@@ -1,0 +1,18 @@
+{
+  "name": "pi-stack-plan",
+  "version": "1.0.0",
+  "description": "PI Agent OS — local-first agent control plane with cockpit extensions for PI, Claude Code, and Gemini CLI",
+  "keywords": ["pi-package", "pi-os", "agent-os", "cockpit", "multi-agent", "control-plane"],
+  "author": "PI Agent OS",
+  "license": "MIT",
+  "type": "module",
+  "pi": {
+    "extensions": ["./agent-integration/pi/cockpit/index.ts"]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "*"
+  }
+}

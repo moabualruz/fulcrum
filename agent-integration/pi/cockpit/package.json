@@ -1,8 +1,8 @@
 {
   "name": "pi-os-cockpit",
   "version": "1.0.0",
-  "description": "PI Agent OS Cockpit — control plane dashboard, task management, memory, and lifecycle tools for the PI coding agent",
-  "keywords": ["pi-package", "pi-os", "agent-os", "task-management", "cockpit"],
+  "description": "PI Agent OS Cockpit — control-plane dashboard, task management, memory, lifecycle tools, and policy hook for the PI coding agent",
+  "keywords": ["pi-package", "pi-os", "agent-os", "task-management", "cockpit", "multi-agent"],
   "author": "PI Agent OS",
   "license": "MIT",
   "type": "module",
@@ -11,7 +11,11 @@
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-ai": "*",
     "@mariozechner/pi-tui": "*",
     "@sinclair/typebox": "*"
+  },
+  "devDependencies": {
+    "@sinclair/typebox": "^0.32.0"
   }
 }

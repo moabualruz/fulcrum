@@ -1,34 +1,42 @@
 /**
  * PI Agent OS Cockpit Extension
  *
- * Full control-plane dashboard for the PI coding agent:
- *   - Live workspace status widget (runs, blockers, WIP, queue depth)
- *   - Footer with quick-glance counters and monitor URL
- *   - /pi-* slash commands for task, run, memory, and CoS operations
- *   - LLM-callable tools for all control-plane operations
- *   - tool_call hook for policy enforcement
- *   - Auto-starts the pi-os monitor + control API server
+ * Control-plane dashboard for the PI coding agent — and a shared backend
+ * for Claude Code and Gemini CLI via the same monitor server.
  *
- * Install:
+ *   Dashboard widget  — live runs, blockers, WIP, server status
+ *   Footer status     — quick-glance counters at all times
+ *   Setup wizard      — first-run prompt: workspace, project, Python env
+ *   Slash commands    — task / run / memory / CoS operations
+ *   LLM tools         — 11 native pi_os_* tools (no MCP overhead)
+ *   Policy hook       — every tool_call checked against pi-os policy engine
+ *
+ * Install (local):
  *   pi install ./agent-integration/pi/cockpit
- *   # or from npm:
+ *
+ * Install (git, whole repo):
+ *   pi install git:github.com/<you>/pi-stack-plan
+ *
+ * Install (npm, once published):
  *   pi install npm:pi-os-cockpit
  *
- * Config — create .pi-os.json in your project root:
+ * Config — .pi-os.json in project root (wizard creates it on first run):
  *   { "workspace_id": "ws_...", "project_id": "proj_...", "monitor_port": 4721 }
  *
- * Or set env vars: PI_OS_WORKSPACE_ID, PI_OS_PROJECT_ID, PI_OS_PORT
+ * Env-var overrides: PI_OS_WORKSPACE_ID  PI_OS_PROJECT_ID  PI_OS_PORT
+ *
+ * Other agents sharing this backend:
+ *   Claude Code  → agent-integration/claude/  (.mcp.json, CLAUDE.md)
+ *   Gemini CLI   → agent-integration/gemini/  (gemini-extension.json, GEMINI.md)
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Container, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-const { spawn } = require("child_process") as typeof import("child_process");
+const { spawn, execSync } = require("child_process") as typeof import("child_process");
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 interface CockpitConfig {
   workspace_id: string;
@@ -56,7 +64,19 @@ interface WorkspaceSnapshot {
   ts: string;
 }
 
-// ── Config discovery ──────────────────────────────────────────────────────────
+// ── Config discovery ───────────────────────────────────────────────────────────
+
+function findConfigFile(cwd: string): string | null {
+  let dir = cwd;
+  for (let i = 0; i < 6; i++) {
+    const p = path.join(dir, ".pi-os.json");
+    if (fs.existsSync(p)) return p;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
 
 function loadConfig(cwd: string): CockpitConfig {
   const defaults: CockpitConfig = {
@@ -64,31 +84,28 @@ function loadConfig(cwd: string): CockpitConfig {
     project_id: process.env["PI_OS_PROJECT_ID"] ?? "",
     monitor_port: parseInt(process.env["PI_OS_PORT"] ?? "4721", 10),
   };
-  // Walk up directory tree looking for .pi-os.json
-  let dir = cwd;
-  for (let i = 0; i < 6; i++) {
-    const cfg = path.join(dir, ".pi-os.json");
-    if (fs.existsSync(cfg)) {
-      try {
-        return { ...defaults, ...JSON.parse(fs.readFileSync(cfg, "utf-8")) };
-      } catch {
-        /* ignore malformed config */
-      }
+  const cfgPath = findConfigFile(cwd);
+  if (cfgPath) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
+      return { ...defaults, ...parsed };
+    } catch {
+      /* ignore malformed config */
     }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
   }
   return defaults;
 }
 
-// ── HTTP helpers ──────────────────────────────────────────────────────────────
+function writeConfigFile(cwd: string, cfg: CockpitConfig): void {
+  const p = path.join(cwd, ".pi-os.json");
+  fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + "\n", "utf-8");
+}
 
-async function apiGet<T>(baseUrl: string, path: string): Promise<T | null> {
+// ── HTTP helpers ───────────────────────────────────────────────────────────────
+
+async function apiGet<T>(baseUrl: string, urlPath: string): Promise<T | null> {
   try {
-    const res = await fetch(`${baseUrl}${path}`, {
-      signal: AbortSignal.timeout(3000),
-    });
+    const res = await fetch(`${baseUrl}${urlPath}`, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) return null;
     return await res.json() as T;
   } catch {
@@ -96,9 +113,9 @@ async function apiGet<T>(baseUrl: string, path: string): Promise<T | null> {
   }
 }
 
-async function apiPost<T>(baseUrl: string, path: string, body: unknown): Promise<T | null> {
+async function apiPost<T>(baseUrl: string, urlPath: string, body: unknown): Promise<T | null> {
   try {
-    const res = await fetch(`${baseUrl}${path}`, {
+    const res = await fetch(`${baseUrl}${urlPath}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -114,9 +131,9 @@ async function apiPost<T>(baseUrl: string, path: string, body: unknown): Promise
   }
 }
 
-async function apiPatch<T>(baseUrl: string, path: string, body: unknown): Promise<T | null> {
+async function apiPatch<T>(baseUrl: string, urlPath: string, body: unknown): Promise<T | null> {
   try {
-    const res = await fetch(`${baseUrl}${path}`, {
+    const res = await fetch(`${baseUrl}${urlPath}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -140,104 +157,210 @@ async function isServerUp(port: number): Promise<boolean> {
   }
 }
 
-// ── Colour helpers (ANSI) ─────────────────────────────────────────────────────
+// ── ANSI helpers ───────────────────────────────────────────────────────────────
 
 const RESET = "\x1b[0m";
-const DIM = "\x1b[2m";
-const BOLD = "\x1b[1m";
+const DIM   = "\x1b[2m";
+const BOLD  = "\x1b[1m";
 
-function fg(r: number, g: number, b: number, s: string): string {
+function rgb(r: number, g: number, b: number, s: string): string {
   return `\x1b[38;2;${r};${g};${b}m${s}${RESET}`;
 }
 
-const GREEN  = (s: string) => fg(100, 220, 120, s);
-const YELLOW = (s: string) => fg(255, 210, 60, s);
-const RED    = (s: string) => fg(255, 80, 80, s);
-const CYAN   = (s: string) => fg(80, 200, 220, s);
-const BLUE   = (s: string) => fg(100, 150, 255, s);
+const GREEN  = (s: string) => rgb(100, 220, 120, s);
+const YELLOW = (s: string) => rgb(255, 210, 60, s);
+const RED    = (s: string) => rgb(255, 80, 80, s);
+const CYAN   = (s: string) => rgb(80, 200, 220, s);
 const MUTED  = (s: string) => `${DIM}${s}${RESET}`;
+const BOLD_S = (s: string) => `${BOLD}${s}${RESET}`;
 
-// Truncate a string (ignoring ANSI codes) to maxLen visible chars
-function trunc(s: string, maxLen: number): string {
-  const plain = s.replace(/\x1b\[[0-9;]*m/g, "");
-  if (plain.length <= maxLen) return s;
-  return s.slice(0, maxLen - 1) + "…";
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
-// ── Main extension ────────────────────────────────────────────────────────────
+// ── Python environment check ───────────────────────────────────────────────────
+
+function isPiAgentOsInstalled(): boolean {
+  try {
+    execSync("python -c \"import pi_agent_os\"", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function findRepoRoot(cwd: string): string | null {
+  let dir = cwd;
+  for (let i = 0; i < 8; i++) {
+    if (fs.existsSync(path.join(dir, "pyproject.toml")) &&
+        fs.existsSync(path.join(dir, "src", "pi_agent_os"))) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+
+// ── Main extension ─────────────────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
-  let cfg: CockpitConfig;
-  let baseUrl: string;
+  let cfg: CockpitConfig = { workspace_id: "", project_id: "", monitor_port: 4721 };
+  let baseUrl = "http://127.0.0.1:4721";
+  let cwd = process.cwd();
+
   let serverProc: ReturnType<typeof spawn> | null = null;
   let serverState: "stopped" | "starting" | "up" | "error" = "stopped";
   let snapshot: WorkspaceSnapshot | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
-  let widgetCtx: Parameters<Parameters<typeof pi.on>[1]>[1] | null = null;
+  let uiRef: { setStatus: (id: string, s?: string) => void; notify: (msg: string, level: string) => void } | null = null;
 
-  // ── Server management ───────────────────────────────────────────────────────
+  // ── Setup wizard ─────────────────────────────────────────────────────────────
 
-  async function startServer(ctx: typeof widgetCtx): Promise<void> {
+  async function runSetupWizard(ctx: { ui: typeof uiRef & { input: (title: string, initial?: string) => Promise<string | null>; confirm: (title: string, msg: string) => Promise<boolean>; } }): Promise<CockpitConfig | null> {
+    const ui = ctx.ui;
+
+    ui.notify(
+      "PI Agent OS Cockpit — first-run setup\n" +
+      "This wizard creates .pi-os.json in your project root.",
+      "info",
+    );
+
+    // 1. Check Python environment
+    if (!isPiAgentOsInstalled()) {
+      const repoRoot = findRepoRoot(cwd);
+      const hint = repoRoot
+        ? `Run: cd ${repoRoot} && uv sync`
+        : "Run: uv sync in the pi-stack-plan repo root";
+      ui.notify(
+        `⚠ pi_agent_os is not installed.\n${hint}\nThen reload with /reload`,
+        "error",
+      );
+      return null;
+    }
+
+    // 2. workspace_id
+    const wsInput = await ui.input(
+      "PI-OS Workspace ID (leave blank to create new)",
+      process.env["PI_OS_WORKSPACE_ID"] ?? "",
+    );
+    if (wsInput === null) return null; // user cancelled
+
+    let workspace_id = wsInput.trim();
+    if (!workspace_id) {
+      // Create a new workspace via CLI
+      try {
+        const out = execSync("python -m pi_agent_os.cli.main workspace create --name \"default\"", {
+          encoding: "utf-8",
+        });
+        const match = out.match(/ws_\w+/);
+        workspace_id = match ? match[0] : "";
+        if (workspace_id) {
+          ui.notify(`Created workspace: ${workspace_id}`, "success");
+        }
+      } catch {
+        ui.notify("Could not auto-create workspace — enter an ID manually", "warning");
+        workspace_id = "";
+      }
+    }
+
+    if (!workspace_id) {
+      const retry = await ui.input("Workspace ID (required)", "ws_...");
+      if (!retry) return null;
+      workspace_id = retry.trim();
+    }
+
+    // 3. project_id (optional)
+    const projInput = await ui.input(
+      "PI-OS Project ID (optional, leave blank for all projects)",
+      process.env["PI_OS_PROJECT_ID"] ?? "",
+    );
+    if (projInput === null) return null;
+    const project_id = projInput.trim();
+
+    // 4. port
+    const portInput = await ui.input("Monitor port", "4721");
+    if (portInput === null) return null;
+    const monitor_port = parseInt(portInput.trim() || "4721", 10);
+
+    const newCfg: CockpitConfig = { workspace_id, project_id, monitor_port };
+
+    // 5. Write .pi-os.json
+    try {
+      writeConfigFile(cwd, newCfg);
+      ui.notify(`Wrote .pi-os.json — workspace: ${workspace_id}`, "success");
+    } catch (e) {
+      ui.notify(`Could not write .pi-os.json: ${String(e)}`, "error");
+    }
+
+    return newCfg;
+  }
+
+  // ── Server management ─────────────────────────────────────────────────────────
+
+  async function startServer(): Promise<void> {
     if (await isServerUp(cfg.monitor_port)) {
       serverState = "up";
+      updateStatus();
       return;
     }
     serverState = "starting";
-    ctx?.ui.notify(`Starting PI Agent OS server on port ${cfg.monitor_port}…`, "info");
+    updateStatus();
+    uiRef?.notify(`Starting PI Agent OS server on :${cfg.monitor_port}…`, "info");
 
     const proc = spawn(
       "python",
       ["-m", "pi_agent_os.monitor", "--port", String(cfg.monitor_port)],
-      {
-        stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env },
-        detached: false,
-      },
+      { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env }, detached: false },
     );
-
     serverProc = proc;
 
     proc.stderr?.setEncoding("utf-8");
     proc.stderr?.on("data", (chunk: string) => {
       if (chunk.includes("Application startup complete") || chunk.includes("Uvicorn running")) {
         serverState = "up";
-        ctx?.ui.notify(`PI Agent OS server up at http://127.0.0.1:${cfg.monitor_port}`, "success");
+        updateStatus();
+        uiRef?.notify(`PI Agent OS ready — http://127.0.0.1:${cfg.monitor_port}`, "success");
         refreshStatus();
       }
     });
 
     proc.on("error", () => {
       serverState = "error";
-      ctx?.ui.notify("Failed to start pi-os server — is pi_agent_os installed?", "error");
+      updateStatus();
+      uiRef?.notify("Failed to start pi-os monitor — is pi_agent_os installed? (uv sync)", "error");
     });
 
-    proc.on("close", (code: number) => {
-      if (serverState !== "stopped") serverState = code === 0 ? "stopped" : "error";
+    proc.on("close", (code: number | null) => {
+      if (serverState !== "stopped") serverState = (code === 0 ? "stopped" : "error");
       serverProc = null;
+      updateStatus();
     });
 
-    // Fallback: poll until up (max 15s)
+    // Poll up to 15 s for readiness
     let attempts = 0;
     const check = setInterval(async () => {
       attempts++;
       if (await isServerUp(cfg.monitor_port)) {
         serverState = "up";
-        ctx?.ui.notify(`PI Agent OS server ready at http://127.0.0.1:${cfg.monitor_port}`, "success");
+        updateStatus();
+        uiRef?.notify(`PI Agent OS ready — http://127.0.0.1:${cfg.monitor_port}`, "success");
         refreshStatus();
         clearInterval(check);
       } else if (attempts >= 15) {
         clearInterval(check);
         if (serverState === "starting") {
           serverState = "error";
-          ctx?.ui.notify("PI Agent OS server did not start within 15s", "error");
+          updateStatus();
+          uiRef?.notify("PI Agent OS server did not start within 15 s", "error");
         }
       }
     }, 1000);
   }
 
   function stopServer(): void {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = null;
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
     if (serverProc) {
       serverState = "stopped";
       serverProc.kill("SIGTERM");
@@ -245,7 +368,7 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  // ── Status polling ──────────────────────────────────────────────────────────
+  // ── Status polling ────────────────────────────────────────────────────────────
 
   async function refreshStatus(): Promise<void> {
     if (!cfg.workspace_id || serverState !== "up") return;
@@ -255,306 +378,271 @@ export default function (pi: ExtensionAPI) {
     );
     if (data && !("error" in (data as object))) {
       snapshot = data;
+      updateStatus();
     }
   }
 
-  // ── Widget rendering ────────────────────────────────────────────────────────
+  // ── Footer status line ────────────────────────────────────────────────────────
 
-  function registerWidgets(ctx: NonNullable<typeof widgetCtx>): void {
-    // ─ Dashboard widget (above editor) ─────────────────────────────────────
-    ctx.ui.setWidget("pi-os-cockpit", (_tui: unknown, _theme: unknown) => {
-      const headerText = new Text("", 1, 0);
-      const bodyText = new Text("", 1, 0);
-      const container = new Container();
-      container.addChild(headerText);
-      container.addChild(bodyText);
+  function updateStatus(): void {
+    if (!uiRef) return;
+    const dot =
+      serverState === "up"       ? GREEN("●") :
+      serverState === "starting" ? YELLOW("◐") :
+      serverState === "error"    ? RED("✗")   : MUTED("○");
 
-      return {
-        render(width: number): string[] {
-          const sep = MUTED("─".repeat(Math.min(width - 4, 60)));
+    const r = snapshot?.running_agents?.length ?? 0;
+    const b = snapshot?.blocked_agents?.length ?? 0;
+    const w = snapshot?.wip_count ?? 0;
 
-          // Header
-          const serverDot =
-            serverState === "up"      ? GREEN("●") :
-            serverState === "starting"? YELLOW("◐") :
-            serverState === "error"   ? RED("✗")   : MUTED("○");
-          headerText.setText(
-            `${BOLD}${CYAN("PI Agent OS")}${RESET}  ${serverDot}  ` +
-            MUTED(`http://127.0.0.1:${cfg.monitor_port}`)
-          );
+    const text =
+      `${dot} ${BOLD_S(CYAN("PI-OS"))}  ` +
+      GREEN(`${r} run`) + "  " +
+      (b > 0 ? RED(`${b} blocked`) + "  " : "") +
+      MUTED(`WIP:${w}  :${cfg.monitor_port}`);
 
-          if (!snapshot) {
-            const msg = !cfg.workspace_id
-              ? YELLOW("⚠ No workspace_id — create .pi-os.json in project root")
-              : serverState === "starting"
-              ? MUTED("Starting server…")
-              : MUTED("Polling…");
-            bodyText.setText(msg);
-            return container.render(width);
-          }
+    uiRef.setStatus("pi-os", text);
+  }
 
-          const running = snapshot.running_agents ?? [];
-          const blocked = snapshot.blocked_agents ?? [];
-          const wip = snapshot.wip_count ?? 0;
+  // ── Dashboard widget ──────────────────────────────────────────────────────────
 
-          // Summary row
-          const rCount = GREEN(`● ${running.length} running`);
-          const bCount = blocked.length > 0 ? RED(`  ⚠ ${blocked.length} blocked`) : MUTED("  0 blocked");
-          const wCount = MUTED(`  WIP: ${wip}`);
-
-          const lines: string[] = [sep, rCount + bCount + wCount, sep];
-
-          // Running agents
-          for (const run of running.slice(0, 5)) {
-            const pct = run.progress_pct ? `  ${Math.round(run.progress_pct)}%` : "";
-            const step = run.current_step ? MUTED(`  ${run.current_step.slice(0, 28)}`) : "";
-            lines.push(
-              `  ${GREEN("●")} ${CYAN(run.agent_role.slice(0, 20).padEnd(20))}` +
-              `${MUTED(run.id.slice(-8))}${pct}${step}`
-            );
-          }
-
-          // Blocked agents
-          for (const run of blocked.slice(0, 3)) {
-            const reason = run.blocker ? run.blocker.slice(0, 35) : "unknown";
-            lines.push(
-              `  ${RED("⚠")} ${YELLOW(run.agent_role.slice(0, 20).padEnd(20))}` +
-              `${MUTED(run.id.slice(-8))}  ${RED(reason)}`
-            );
-          }
-
-          if (running.length === 0 && blocked.length === 0) {
-            lines.push(MUTED("  No active agent runs"));
-          }
-
-          if (!cfg.workspace_id) {
-            lines.push(sep, YELLOW("⚠ Set workspace_id in .pi-os.json or PI_OS_WORKSPACE_ID env"));
-          } else {
-            lines.push(sep, MUTED(`  ws: ${cfg.workspace_id.slice(-12)}  proj: ${cfg.project_id.slice(-12) || "(any)"}`));
-          }
-
-          bodyText.setText(lines.join("\n"));
-          return container.render(width);
-        },
-        invalidate() {
-          headerText.invalidate();
-          bodyText.invalidate();
-          container.invalidate();
-        },
-      };
-    });
-
-    // ─ Footer ───────────────────────────────────────────────────────────────
-    ctx.ui.setFooter((_tui: unknown, _theme: unknown) => ({
-      dispose: () => {},
-      invalidate() {},
+  function registerWidget(ctx: { ui: { setWidget: (id: string, factory?: unknown) => void } }): void {
+    ctx.ui.setWidget("pi-os-cockpit", (_tui: unknown, _theme: unknown) => ({
       render(width: number): string[] {
+        const maxW = Math.min(width - 2, 72);
+        const sep = MUTED("─".repeat(maxW));
+
         const dot =
-          serverState === "up"      ? GREEN("●") :
-          serverState === "starting"? YELLOW("◐") :
-          serverState === "error"   ? RED("✗")   : MUTED("○");
+          serverState === "up"       ? GREEN("●") :
+          serverState === "starting" ? YELLOW("◐") :
+          serverState === "error"    ? RED("✗")   : MUTED("○");
 
-        const r = snapshot?.running_agents?.length ?? 0;
-        const b = snapshot?.blocked_agents?.length ?? 0;
-        const w = snapshot?.wip_count ?? 0;
+        const header =
+          `${BOLD_S(CYAN("PI Agent OS"))}  ${dot}  ` +
+          MUTED(`http://127.0.0.1:${cfg.monitor_port}/docs`);
 
-        const left = ` ${dot} ${CYAN("PI-OS")}  ${GREEN(String(r) + " run")}  ` +
-          (b > 0 ? RED(`${b} blocked  `) : "") +
-          MUTED(`WIP:${w}`);
-        const right = MUTED(` :${cfg.monitor_port} `);
+        const lines: string[] = [header, sep];
 
-        // Pad between left and right
-        const plainLeft = left.replace(/\x1b\[[0-9;]*m/g, "");
-        const plainRight = right.replace(/\x1b\[[0-9;]*m/g, "");
-        const pad = Math.max(1, width - plainLeft.length - plainRight.length);
-        return [left + " ".repeat(pad) + right];
+        if (!snapshot) {
+          const msg =
+            !cfg.workspace_id
+              ? YELLOW("⚠  No workspace configured — type /pi-setup")
+              : serverState === "starting"
+              ? MUTED("  Starting server…")
+              : serverState === "error"
+              ? RED("  Server failed — type /pi-start to retry")
+              : MUTED("  Polling…");
+          lines.push(msg, sep);
+          return lines;
+        }
+
+        const running = snapshot.running_agents ?? [];
+        const blocked = snapshot.blocked_agents ?? [];
+        const wip     = snapshot.wip_count ?? 0;
+
+        // Summary row
+        lines.push(
+          GREEN(`● ${running.length} running`) +
+          (blocked.length > 0 ? RED(`   ⚠ ${blocked.length} blocked`) : MUTED("   0 blocked")) +
+          MUTED(`   WIP: ${wip}`)
+        );
+        lines.push(sep);
+
+        // Running agents
+        for (const run of running.slice(0, 5)) {
+          const pct  = run.progress_pct != null ? MUTED(` ${Math.round(run.progress_pct)}%`) : "";
+          const step = run.current_step ? MUTED(`  ${run.current_step.slice(0, 30)}`) : "";
+          const role = run.agent_role.slice(0, 18).padEnd(18);
+          lines.push(`  ${GREEN("●")} ${CYAN(role)} ${MUTED(run.id.slice(-8))}${pct}${step}`);
+        }
+
+        // Blocked agents
+        for (const run of blocked.slice(0, 3)) {
+          const reason = (run.blocker ?? "unknown").slice(0, 35);
+          const role   = run.agent_role.slice(0, 18).padEnd(18);
+          lines.push(`  ${RED("⚠")} ${YELLOW(role)} ${MUTED(run.id.slice(-8))}  ${RED(reason)}`);
+        }
+
+        if (running.length === 0 && blocked.length === 0) {
+          lines.push(MUTED("  No active agent runs"));
+        }
+
+        lines.push(sep);
+        const wsTag   = cfg.workspace_id ? MUTED(`ws:${cfg.workspace_id.slice(-8)}`) : YELLOW("no workspace");
+        const projTag = cfg.project_id   ? MUTED(`  proj:${cfg.project_id.slice(-8)}`) : "";
+        lines.push("  " + wsTag + projTag);
+
+        return lines;
       },
     }));
   }
 
-  // ── Slash commands ──────────────────────────────────────────────────────────
+  // ── Slash commands ────────────────────────────────────────────────────────────
 
   function registerCommands(): void {
-    // /pi-status — print full workspace status
+
+    // /pi-setup — (re-)run config wizard
+    pi.registerCommand("pi-setup", {
+      description: "Configure PI Agent OS workspace (creates .pi-os.json)",
+      handler: async (_args, ctx) => {
+        const newCfg = await runSetupWizard(ctx as Parameters<typeof runSetupWizard>[0]);
+        if (newCfg) {
+          cfg = newCfg;
+          baseUrl = `http://127.0.0.1:${cfg.monitor_port}`;
+          updateStatus();
+          await startServer();
+        }
+      },
+    });
+
+    // /pi-status
     pi.registerCommand("pi-status", {
       description: "Show PI Agent OS workspace status",
       handler: async (_args, ctx) => {
         await refreshStatus();
         if (!snapshot) {
-          ctx.ui.notify("No status available — is the server running? Use /pi-start", "warning");
+          ctx.ui.notify("No status — is the server running? Try /pi-start", "warning");
           return;
         }
         const r = snapshot.running_agents ?? [];
         const b = snapshot.blocked_agents ?? [];
-        const lines = [
-          `PI Agent OS — workspace: ${snapshot.workspace_id}`,
-          `Running: ${r.length}  Blocked: ${b.length}  WIP: ${snapshot.wip_count}`,
-          ...r.map(a => `  ● ${a.agent_role} [${a.status}] ${a.current_step ?? ""}`),
-          ...b.map(a => `  ⚠ ${a.agent_role} blocked: ${a.blocker ?? "?"}`),
-        ];
-        ctx.ui.notify(lines.join("\n"), "info");
+        ctx.ui.notify(
+          `PI Agent OS — ${snapshot.workspace_id}\n` +
+          `Running: ${r.length}  Blocked: ${b.length}  WIP: ${snapshot.wip_count}\n` +
+          r.map(a => `  ● ${a.agent_role} [${a.status}] ${a.current_step ?? ""}`).join("\n") +
+          (b.length ? "\n" + b.map(a => `  ⚠ ${a.agent_role}: ${a.blocker ?? "?"}`).join("\n") : ""),
+          "info",
+        );
       },
     });
 
-    // /pi-start — start the server manually
+    // /pi-start
     pi.registerCommand("pi-start", {
       description: "Start the PI Agent OS monitor server",
       handler: async (_args, ctx) => {
         if (serverState === "up") {
-          ctx.ui.notify(`Server already up at http://127.0.0.1:${cfg.monitor_port}`, "info");
+          ctx.ui.notify(`Server already running at http://127.0.0.1:${cfg.monitor_port}`, "info");
           return;
         }
-        await startServer(ctx);
+        await startServer();
       },
     });
 
-    // /pi-monitor — open monitor in browser
+    // /pi-monitor
     pi.registerCommand("pi-monitor", {
       description: "Open the PI Agent OS monitor in your browser",
       handler: async (_args, ctx) => {
-        const url = `http://127.0.0.1:${cfg.monitor_port}`;
+        const url = `http://127.0.0.1:${cfg.monitor_port}/docs`;
         const opener = process.platform === "darwin" ? "open"
           : process.platform === "win32" ? "start"
           : "xdg-open";
         spawn(opener, [url], { detached: true, stdio: "ignore" }).unref();
-        ctx.ui.notify(`Opening ${url}`, "info");
+        ctx.ui.notify(`Opened ${url}`, "info");
       },
     });
 
-    // /pi-tasks [status] — list tasks
+    // /pi-tasks [status]
     pi.registerCommand("pi-tasks", {
-      description: "List tasks: /pi-tasks [queued|in_progress|completed|blocked]",
+      description: "List tasks: /pi-tasks [queued|running|blocked|completed]",
       handler: async (args, ctx) => {
         const status = args?.trim() ?? "";
         const qs = new URLSearchParams({ workspace_id: cfg.workspace_id });
         if (cfg.project_id) qs.set("project_id", cfg.project_id);
         if (status) qs.set("status", status);
         const data = await apiGet<{ tasks: unknown[] }>(baseUrl, `/api/v1/control/tasks?${qs}`);
-        if (!data) {
-          ctx.ui.notify("Could not fetch tasks — server running?", "error");
-          return;
-        }
+        if (!data) { ctx.ui.notify("Could not fetch tasks", "error"); return; }
         const tasks = data.tasks ?? [];
         if (tasks.length === 0) {
           ctx.ui.notify(`No tasks${status ? ` with status "${status}"` : ""}`, "info");
           return;
         }
-        const lines = tasks.slice(0, 15).map((t: unknown) => {
+        const lines = tasks.slice(0, 20).map((t: unknown) => {
           const task = t as Record<string, unknown>;
-          return `  [${String(task["status"] ?? "?").padEnd(11)}] ${String(task["title"] ?? "").slice(0, 50)}`;
+          return `  [${String(task["status"] ?? "?").padEnd(10)}] ${String(task["title"] ?? "").slice(0, 52)}`;
         });
         ctx.ui.notify(`Tasks (${tasks.length}):\n${lines.join("\n")}`, "info");
       },
     });
 
-    // /pi-create <title> — create a task
+    // /pi-create <title>
     pi.registerCommand("pi-create", {
       description: "Create a task: /pi-create <title>",
       handler: async (args, ctx) => {
         const title = args?.trim();
-        if (!title) {
-          ctx.ui.notify("Usage: /pi-create <title>", "error");
-          return;
-        }
-        const result = await apiPost(baseUrl, "/api/v1/control/tasks", {
-          title,
-          workspace_id: cfg.workspace_id,
-          project_id: cfg.project_id,
+        if (!title) { ctx.ui.notify("Usage: /pi-create <title>", "error"); return; }
+        const result = await apiPost<Record<string, unknown>>(baseUrl, "/api/v1/control/tasks", {
+          title, workspace_id: cfg.workspace_id, project_id: cfg.project_id,
         });
-        if (!result || (result as Record<string, unknown>)["error"]) {
-          ctx.ui.notify(`Failed to create task: ${(result as Record<string, unknown>)?.["error"] ?? "unknown"}`, "error");
+        if (!result || result["error"]) {
+          ctx.ui.notify(`Failed: ${result?.["error"] ?? "unknown"}`, "error");
           return;
         }
-        const r = result as Record<string, unknown>;
-        ctx.ui.notify(`Task created: ${r["task_id"]} — "${title}"`, "success");
+        ctx.ui.notify(`Created: ${result["task_id"]} — "${title}"`, "success");
       },
     });
 
-    // /pi-run <task_id> <role> — start an agent run
+    // /pi-run <task_id> <role>
     pi.registerCommand("pi-run", {
       description: "Start an agent run: /pi-run <task_id> <role>",
       handler: async (args, ctx) => {
         const parts = (args ?? "").trim().split(/\s+/);
-        if (parts.length < 2) {
-          ctx.ui.notify("Usage: /pi-run <task_id> <role>", "error");
-          return;
-        }
+        if (parts.length < 2) { ctx.ui.notify("Usage: /pi-run <task_id> <role>", "error"); return; }
         const [task_id, agent_role] = parts;
-        const result = await apiPost(baseUrl, "/api/v1/control/runs", {
-          task_id, agent_role,
-          workspace_id: cfg.workspace_id,
-          project_id: cfg.project_id,
-        }) as Record<string, unknown>;
-        if (result?.["error"]) {
-          ctx.ui.notify(`Error: ${result["error"]}`, "error");
-          return;
-        }
+        const result = await apiPost<Record<string, unknown>>(baseUrl, "/api/v1/control/runs", {
+          task_id, agent_role, workspace_id: cfg.workspace_id, project_id: cfg.project_id,
+        });
+        if (result?.["error"]) { ctx.ui.notify(`Error: ${result["error"]}`, "error"); return; }
         ctx.ui.notify(`Run started: ${result?.["run_id"]} (${agent_role})`, "success");
         refreshStatus();
       },
     });
 
-    // /pi-complete <run_id> [summary] — complete a run
+    // /pi-complete <run_id> [summary]
     pi.registerCommand("pi-complete", {
       description: "Complete a run: /pi-complete <run_id> [output summary]",
       handler: async (args, ctx) => {
         const str = (args ?? "").trim();
-        const spaceIdx = str.indexOf(" ");
-        const run_id = spaceIdx === -1 ? str : str.slice(0, spaceIdx);
-        const output_summary = spaceIdx === -1 ? "" : str.slice(spaceIdx + 1);
-        if (!run_id) {
-          ctx.ui.notify("Usage: /pi-complete <run_id> [summary]", "error");
-          return;
-        }
+        const sp = str.indexOf(" ");
+        const run_id = sp === -1 ? str : str.slice(0, sp);
+        const output_summary = sp === -1 ? "" : str.slice(sp + 1);
+        if (!run_id) { ctx.ui.notify("Usage: /pi-complete <run_id> [summary]", "error"); return; }
         await apiPost(baseUrl, `/api/v1/control/runs/${run_id}/complete`, {
-          workspace_id: cfg.workspace_id,
-          output_summary,
+          workspace_id: cfg.workspace_id, output_summary,
         });
-        ctx.ui.notify(`Run ${run_id.slice(-8)} marked completed`, "success");
+        ctx.ui.notify(`Run ${run_id.slice(-8)} completed`, "success");
         refreshStatus();
       },
     });
 
-    // /pi-block <run_id> <reason> — block a run
+    // /pi-block <run_id> <reason>
     pi.registerCommand("pi-block", {
       description: "Block a run: /pi-block <run_id> <reason>",
       handler: async (args, ctx) => {
         const str = (args ?? "").trim();
-        const spaceIdx = str.indexOf(" ");
-        if (spaceIdx === -1) {
-          ctx.ui.notify("Usage: /pi-block <run_id> <reason>", "error");
-          return;
-        }
-        const run_id = str.slice(0, spaceIdx);
-        const reason = str.slice(spaceIdx + 1);
+        const sp = str.indexOf(" ");
+        if (sp === -1) { ctx.ui.notify("Usage: /pi-block <run_id> <reason>", "error"); return; }
+        const run_id = str.slice(0, sp);
+        const reason = str.slice(sp + 1);
         await apiPost(baseUrl, `/api/v1/control/runs/${run_id}/block`, {
-          workspace_id: cfg.workspace_id,
-          reason,
+          workspace_id: cfg.workspace_id, reason,
         });
         ctx.ui.notify(`Run ${run_id.slice(-8)} blocked: ${reason}`, "warning");
         refreshStatus();
       },
     });
 
-    // /pi-recall <query> — recall memories
+    // /pi-recall <query>
     pi.registerCommand("pi-recall", {
       description: "Recall project memories: /pi-recall <query>",
       handler: async (args, ctx) => {
         const query = (args ?? "").trim();
-        if (!query) {
-          ctx.ui.notify("Usage: /pi-recall <query>", "error");
-          return;
-        }
+        if (!query) { ctx.ui.notify("Usage: /pi-recall <query>", "error"); return; }
         const data = await apiPost<{ memories: unknown[] }>(
-          baseUrl,
-          "/api/v1/control/memory/recall",
+          baseUrl, "/api/v1/control/memory/recall",
           { query, workspace_id: cfg.workspace_id, project_id: cfg.project_id, limit: 5 },
         );
         const mems = data?.memories ?? [];
-        if (mems.length === 0) {
-          ctx.ui.notify("No memories found", "info");
-          return;
-        }
+        if (mems.length === 0) { ctx.ui.notify("No memories found", "info"); return; }
         const lines = mems.map((m: unknown) => {
           const mem = m as Record<string, unknown>;
           const score = typeof mem["score"] === "number" ? ` (${(mem["score"] as number).toFixed(2)})` : "";
@@ -564,109 +652,108 @@ export default function (pi: ExtensionAPI) {
       },
     });
 
-    // /cos <goal> — dispatch Chief of Staff
-    pi.registerCommand("cos", {
-      description: "Dispatch Chief of Staff: /cos <goal>",
-      handler: async (args, ctx) => {
-        const goal = (args ?? "").trim();
-        if (!goal) {
-          ctx.ui.notify("Usage: /cos <goal>", "error");
-          return;
-        }
-        const data = await apiPost<{ context_markdown: string }>(
-          baseUrl,
-          "/api/v1/control/cos-context",
-          { goal, project_id: cfg.project_id, workspace_id: cfg.workspace_id },
-        );
-        const md = data?.context_markdown ?? "";
-        if (!md) {
-          ctx.ui.notify("Could not build CoS context", "error");
-          return;
-        }
-        // Inject world-state as a follow-up message that primes the CoS agent
-        pi.sendMessage(
-          {
-            customType: "cos-context",
-            content: `Chief of Staff context for goal: "${goal}"\n\n${md}`,
-            display: true,
-          },
-          { deliverAs: "followUp", triggerTurn: true },
-        );
-        ctx.ui.notify(`CoS context injected for: "${goal}"`, "success");
-      },
-    });
-
-    // /pi-workspaces — list workspaces
+    // /pi-workspaces
     pi.registerCommand("pi-workspaces", {
       description: "List all PI Agent OS workspaces",
       handler: async (_args, ctx) => {
         const data = await apiGet<{ workspaces: unknown[] }>(baseUrl, "/api/v1/control/workspaces");
         const ws = data?.workspaces ?? [];
         if (ws.length === 0) {
-          ctx.ui.notify("No workspaces found — have you run pi-os workspace create?", "info");
+          ctx.ui.notify("No workspaces found — run: pi-os workspace create", "info");
           return;
         }
         const lines = ws.map((w: unknown) => {
           const item = w as Record<string, unknown>;
-          const active = item["workspace_id"] === cfg.workspace_id ? " ← active" : "";
+          const active = item["workspace_id"] === cfg.workspace_id ? "  ← active" : "";
           return `  ${item["workspace_id"]}  ${item["name"]}${active}`;
         });
         ctx.ui.notify(`Workspaces:\n${lines.join("\n")}`, "info");
       },
     });
+
+    // /cos <goal> — inject CoS world-state context
+    pi.registerCommand("cos", {
+      description: "Inject Chief of Staff world-state context: /cos <goal>",
+      handler: async (args, ctx) => {
+        const goal = (args ?? "").trim();
+        if (!goal) { ctx.ui.notify("Usage: /cos <goal>", "error"); return; }
+        const data = await apiPost<{ context_markdown: string }>(
+          baseUrl, "/api/v1/control/cos-context",
+          { goal, project_id: cfg.project_id, workspace_id: cfg.workspace_id },
+        );
+        const md = data?.context_markdown ?? "";
+        if (!md) { ctx.ui.notify("Could not build CoS context", "error"); return; }
+        // Inject as a user message that primes the CoS agent
+        pi.sendUserMessage(
+          `<pi-os-world-state goal="${goal}">\n${md}\n</pi-os-world-state>\n\n` +
+          `You are acting as Chief of Staff. Review the above world state and plan for: ${goal}`
+        );
+        ctx.ui.notify(`CoS world-state injected for: "${goal}"`, "success");
+      },
+    });
   }
 
-  // ── LLM-callable tools ──────────────────────────────────────────────────────
+  // ── LLM tools ─────────────────────────────────────────────────────────────────
 
   function registerTools(): void {
+
     // List tasks
     pi.registerTool({
       name: "pi_os_list_tasks",
-      description: "List PI Agent OS tasks for the current workspace/project.",
+      label: "List PI-OS Tasks",
+      description: "List tasks in the PI Agent OS control plane for the current workspace.",
+      promptSnippet: "Check task backlog, find what needs doing, or look up task status.",
+      promptGuidelines: [
+        "Use this before starting work to find the relevant task_id.",
+        "Filter by status=queued to find unstarted work.",
+      ],
       parameters: Type.Object({
-        status: Type.Optional(Type.String({ description: "Filter: queued|in_progress|completed|blocked" })),
-        limit: Type.Optional(Type.Number({ description: "Max results (default 20)" })),
+        status: Type.Optional(Type.String({ description: "Filter: queued|running|blocked|completed" })),
+        limit:  Type.Optional(Type.Number({ description: "Max results (default 20)" })),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
         const qs = new URLSearchParams({ workspace_id: cfg.workspace_id });
         if (cfg.project_id) qs.set("project_id", cfg.project_id);
         if (args.status) qs.set("status", args.status);
-        if (args.limit) qs.set("limit", String(args.limit));
+        if (args.limit)  qs.set("limit", String(args.limit));
         const data = await apiGet<{ tasks: unknown[] }>(baseUrl, `/api/v1/control/tasks?${qs}`);
-        return { content: [{ type: "text", text: JSON.stringify(data?.tasks ?? [], null, 2) }] };
+        const tasks = data?.tasks ?? [];
+        return { content: [{ type: "text", text: JSON.stringify(tasks, null, 2) }], details: { count: tasks.length } };
       },
     });
 
     // Create task
     pi.registerTool({
       name: "pi_os_create_task",
+      label: "Create PI-OS Task",
       description: "Create a new task in the PI Agent OS control plane.",
+      promptSnippet: "Use this to register new work items before starting an agent run.",
       parameters: Type.Object({
-        title: Type.String({ description: "Task title" }),
-        description: Type.Optional(Type.String({ description: "Task description" })),
-        priority: Type.Optional(Type.String({ description: "low|medium|high|critical" })),
-        assigned_to: Type.Optional(Type.String({ description: "Agent role to assign" })),
-        done_criteria: Type.Optional(Type.String({ description: "Definition of done" })),
+        title:        Type.String({ description: "Task title" }),
+        description:  Type.Optional(Type.String({ description: "Task description" })),
+        priority:     Type.Optional(Type.String({ description: "low|medium|high|critical" })),
+        assigned_to:  Type.Optional(Type.String({ description: "Agent role to assign" })),
+        done_criteria:Type.Optional(Type.String({ description: "Definition of done" })),
       }),
-      execute: async (_id, args, _sig, _upd, ctx) => {
-        const result = await apiPost(baseUrl, "/api/v1/control/tasks", {
-          ...args,
-          workspace_id: cfg.workspace_id,
-          project_id: cfg.project_id,
+      execute: async (_id, args, _sig, _upd, _ctx) => {
+        const result = await apiPost<Record<string, unknown>>(baseUrl, "/api/v1/control/tasks", {
+          ...args, workspace_id: cfg.workspace_id, project_id: cfg.project_id,
         });
         refreshStatus();
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result ?? {} };
       },
     });
 
     // Update task
     pi.registerTool({
       name: "pi_os_update_task",
-      description: "Update a task's status, add a blocker note, or reassign it.",
+      label: "Update PI-OS Task",
+      description: "Update a task status, add a blocker note, or reassign it.",
+      promptSnippet: "Use this to mark tasks as running, blocked, or completed.",
       parameters: Type.Object({
-        task_id: Type.String({ description: "Task ID (tsk_...)" }),
-        status: Type.Optional(Type.String({ description: "New status" })),
-        note: Type.Optional(Type.String({ description: "Blocker note to append" })),
+        task_id:     Type.String({ description: "Task ID (tsk_...)" }),
+        status:      Type.Optional(Type.String({ description: "queued|running|blocked|completed" })),
+        note:        Type.Optional(Type.String({ description: "Progress note or blocker description" })),
         assigned_to: Type.Optional(Type.String({ description: "New agent role" })),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
@@ -679,35 +766,37 @@ export default function (pi: ExtensionAPI) {
     // Recall memory
     pi.registerTool({
       name: "pi_os_recall_memory",
-      description: "Recall relevant memories from the PI Agent OS memory store.",
+      label: "Recall PI-OS Memory",
+      description: "Recall relevant project memories from the PI Agent OS memory store.",
+      promptSnippet: "Search project knowledge base before making architectural decisions.",
       parameters: Type.Object({
-        query: Type.String({ description: "Search query" }),
-        limit: Type.Optional(Type.Number({ description: "Max results" })),
+        query: Type.String({ description: "Natural-language search query" }),
+        limit: Type.Optional(Type.Number({ description: "Max results (default 10)" })),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
         const result = await apiPost<{ memories: unknown[] }>(
-          baseUrl,
-          "/api/v1/control/memory/recall",
+          baseUrl, "/api/v1/control/memory/recall",
           { query: args.query, workspace_id: cfg.workspace_id, project_id: cfg.project_id, limit: args.limit ?? 10 },
         );
-        return { content: [{ type: "text", text: JSON.stringify(result?.memories ?? [], null, 2) }] };
+        const mems = result?.memories ?? [];
+        return { content: [{ type: "text", text: JSON.stringify(mems, null, 2) }], details: { count: mems.length } };
       },
     });
 
     // Write memory
     pi.registerTool({
       name: "pi_os_write_memory",
-      description: "Persist a note to the PI Agent OS project memory store.",
+      label: "Write PI-OS Memory",
+      description: "Persist a note to the PI Agent OS project memory store for future recall.",
+      promptSnippet: "Save important decisions, findings, or architectural notes.",
       parameters: Type.Object({
-        content: Type.String({ description: "Memory content to store" }),
-        title: Type.Optional(Type.String({ description: "Memory title" })),
-        tags: Type.Optional(Type.String({ description: "Comma-separated tags" })),
+        content: Type.String({ description: "Memory content" }),
+        title:   Type.Optional(Type.String({ description: "Memory title" })),
+        tags:    Type.Optional(Type.String({ description: "Comma-separated tags" })),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
         const result = await apiPost(baseUrl, "/api/v1/control/memory/write", {
-          ...args,
-          workspace_id: cfg.workspace_id,
-          project_id: cfg.project_id,
+          ...args, workspace_id: cfg.workspace_id, project_id: cfg.project_id,
         });
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       },
@@ -716,32 +805,38 @@ export default function (pi: ExtensionAPI) {
     // Start run
     pi.registerTool({
       name: "pi_os_start_run",
-      description: "Register a new PI agent run in the control plane.",
+      label: "Start PI-OS Agent Run",
+      description: "Register a new agent run in the PI Agent OS control plane. Call this at the start of every task.",
+      promptSnippet: "Register yourself before starting any task. Returns run_id for subsequent heartbeat/complete/block calls.",
+      promptGuidelines: [
+        "Call at the very start of your task, before doing any work.",
+        "Use the returned run_id for heartbeat, complete, and block calls.",
+      ],
       parameters: Type.Object({
-        task_id: Type.String({ description: "Task being worked on" }),
-        agent_role: Type.String({ description: "Agent role (implementer, tester, reviewer, etc.)" }),
-        worktree_path: Type.Optional(Type.String({ description: "Git worktree path" })),
-        pi_run_id: Type.Optional(Type.String({ description: "Use a specific run ID" })),
+        task_id:      Type.String({ description: "Task ID being worked on (tsk_...)" }),
+        agent_role:   Type.String({ description: "Your role (implementer|tester|reviewer|researcher|planner)" }),
+        worktree_path:Type.Optional(Type.String({ description: "Git worktree path if using worktrees" })),
+        pi_run_id:    Type.Optional(Type.String({ description: "Use a specific run ID" })),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
-        const result = await apiPost(baseUrl, "/api/v1/control/runs", {
-          ...args,
-          workspace_id: cfg.workspace_id,
-          project_id: cfg.project_id,
+        const result = await apiPost<Record<string, unknown>>(baseUrl, "/api/v1/control/runs", {
+          ...args, workspace_id: cfg.workspace_id, project_id: cfg.project_id,
         });
         refreshStatus();
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result ?? {} };
       },
     });
 
     // Heartbeat
     pi.registerTool({
       name: "pi_os_heartbeat",
-      description: "Send a heartbeat for an active PI agent run (call every ~30s).",
+      label: "PI-OS Agent Heartbeat",
+      description: "Send a heartbeat for an active agent run (call every ~30 s of active work).",
+      promptSnippet: "Send periodically during long operations so the dashboard shows live progress.",
       parameters: Type.Object({
-        run_id: Type.String({ description: "Run ID" }),
-        current_step: Type.Optional(Type.String({ description: "What the agent is doing now" })),
-        progress_pct: Type.Optional(Type.Number({ description: "Progress 0–100" })),
+        run_id:       Type.String({ description: "Run ID (from pi_os_start_run)" }),
+        current_step: Type.Optional(Type.String({ description: "What you are doing right now" })),
+        progress_pct: Type.Optional(Type.Number({ description: "Estimated completion 0–100" })),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
         const { run_id, ...body } = args;
@@ -755,11 +850,13 @@ export default function (pi: ExtensionAPI) {
     // Complete run
     pi.registerTool({
       name: "pi_os_complete_run",
-      description: "Mark a PI agent run as completed.",
+      label: "Complete PI-OS Agent Run",
+      description: "Mark an agent run as completed. Call this when your task is done.",
+      promptSnippet: "Call when task is complete to update the dashboard and task status.",
       parameters: Type.Object({
-        run_id: Type.String({ description: "Run ID" }),
-        output_summary: Type.Optional(Type.String({ description: "Summary of what was done" })),
-        artifact_paths: Type.Optional(Type.String({ description: "Comma-separated artifact paths" })),
+        run_id:          Type.String({ description: "Run ID (from pi_os_start_run)" }),
+        output_summary:  Type.Optional(Type.String({ description: "One-paragraph summary of what was done" })),
+        artifact_paths:  Type.Optional(Type.String({ description: "Comma-separated paths to created/modified files" })),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
         const { run_id, ...body } = args;
@@ -774,10 +871,12 @@ export default function (pi: ExtensionAPI) {
     // Block run
     pi.registerTool({
       name: "pi_os_block_run",
-      description: "Mark a PI agent run as blocked with a reason.",
+      label: "Block PI-OS Agent Run",
+      description: "Mark an agent run as blocked. Use when you need human input or a dependency is unmet.",
+      promptSnippet: "Call when you cannot proceed without external input. Describe what you need.",
       parameters: Type.Object({
-        run_id: Type.String({ description: "Run ID" }),
-        reason: Type.String({ description: "Why the agent is blocked" }),
+        run_id: Type.String({ description: "Run ID (from pi_os_start_run)" }),
+        reason: Type.String({ description: "Why you are blocked — what is needed to unblock" }),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
         const result = await apiPost(baseUrl, `/api/v1/control/runs/${args.run_id}/block`, {
@@ -791,30 +890,31 @@ export default function (pi: ExtensionAPI) {
     // Workspace status
     pi.registerTool({
       name: "pi_os_workspace_status",
-      description: "Get a full workspace status snapshot: active runs, blockers, WIP, queue depth.",
+      label: "PI-OS Workspace Status",
+      description: "Get a full workspace status snapshot: active runs, blockers, WIP count, queue depth.",
+      promptSnippet: "Call to get an overview of what other agents are doing before planning.",
       parameters: Type.Object({}),
       execute: async (_id, _args, _sig, _upd, _ctx) => {
         await refreshStatus();
         return {
-          content: [{
-            type: "text",
-            text: snapshot ? JSON.stringify(snapshot, null, 2) : "No status available",
-          }],
+          content: [{ type: "text", text: snapshot ? JSON.stringify(snapshot, null, 2) : "No status available — is the server running?" }],
+          details: snapshot ?? {},
         };
       },
     });
 
-    // CoS context
+    // Build CoS context
     pi.registerTool({
       name: "pi_os_build_cos_context",
-      description: "Build a world-state snapshot for the Chief of Staff agent.",
+      label: "Build CoS World-State",
+      description: "Build a world-state snapshot for the Chief of Staff agent, including task board, active runs, and recent events.",
+      promptSnippet: "Use before dispatching a Chief of Staff planning pass.",
       parameters: Type.Object({
-        goal: Type.String({ description: "The goal to plan for" }),
+        goal: Type.String({ description: "The planning goal for this CoS invocation" }),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
         const result = await apiPost<{ context_markdown: string }>(
-          baseUrl,
-          "/api/v1/control/cos-context",
+          baseUrl, "/api/v1/control/cos-context",
           { goal: args.goal, project_id: cfg.project_id, workspace_id: cfg.workspace_id },
         );
         return {
@@ -824,27 +924,19 @@ export default function (pi: ExtensionAPI) {
     });
   }
 
-  // ── Policy hook ─────────────────────────────────────────────────────────────
+  // ── Policy hook ───────────────────────────────────────────────────────────────
 
   function registerPolicyHook(): void {
     pi.on("tool_call", async (event, _ctx) => {
       if (serverState !== "up") return;
-      // Only enforce policy for non-pi-os tools (avoid infinite loops)
-      const toolName: string = (event as unknown as { toolName?: string }).toolName ?? "";
-      if (toolName.startsWith("pi_os_") || toolName.startsWith("mcp__pi-os__")) return;
+      const toolName: string = (event as Record<string, unknown>)["toolName"] as string ?? "";
+      // Skip our own tools to avoid infinite recursion
+      if (!toolName || toolName.startsWith("pi_os_") || toolName.startsWith("mcp__pi-os__")) return;
 
-      const input: unknown = (event as unknown as { input?: unknown }).input ?? {};
+      const input = (event as Record<string, unknown>)["input"] ?? {};
       const check = await apiPost<{ allowed: boolean; reason: string }>(
-        baseUrl,
-        "/api/v1/control/policy/check",
-        {
-          action: `tool_use:${toolName}`,
-          resource: toolName,
-          actor_id: "pi",
-          workspace_id: cfg.workspace_id,
-          actor_type: "agent",
-          extra: input as Record<string, unknown>,
-        },
+        baseUrl, "/api/v1/control/policy/check",
+        { action: `tool_use:${toolName}`, resource: toolName, actor_id: "pi", workspace_id: cfg.workspace_id, actor_type: "agent", extra: input },
       );
       if (check && !check.allowed) {
         return { block: true, reason: `[pi-os policy] ${check.reason}` };
@@ -852,33 +944,40 @@ export default function (pi: ExtensionAPI) {
     });
   }
 
-  // ── Session lifecycle ────────────────────────────────────────────────────────
+  // ── Session lifecycle ─────────────────────────────────────────────────────────
 
-  pi.on("session_start", async (_event, ctx) => {
-    widgetCtx = ctx;
-    cfg = loadConfig(ctx.cwd ?? process.cwd());
+  pi.on("session_start", async (event, ctx) => {
+    cwd = (ctx as Record<string, unknown>)["cwd"] as string ?? process.cwd();
+    uiRef = ctx.ui as typeof uiRef;
+
+    cfg = loadConfig(cwd);
     baseUrl = `http://127.0.0.1:${cfg.monitor_port}`;
 
-    registerWidgets(ctx);
+    // Register UI before anything else so widget appears immediately
+    registerWidget(ctx as Parameters<typeof registerWidget>[0]);
+    updateStatus();
+
+    // Register commands and tools (idempotent across reloads)
     registerCommands();
     registerTools();
     registerPolicyHook();
 
-    // Start server (non-blocking)
-    startServer(ctx);
-
-    // Poll every 5s
-    pollTimer = setInterval(() => {
-      if (serverState === "up") refreshStatus();
-    }, 5000);
-
-    if (!cfg.workspace_id) {
-      ctx.ui.notify(
-        "PI Agent OS: no workspace_id configured.\n" +
-        "Create .pi-os.json in your project root:\n" +
-        '  { "workspace_id": "ws_...", "project_id": "proj_..." }',
-        "warning",
-      );
+    // First-run setup wizard: show on startup if no config file found
+    const reason = (event as Record<string, unknown>)["reason"] as string ?? "";
+    if (reason === "startup" && !findConfigFile(cwd)) {
+      // Small delay so widget renders first
+      setTimeout(async () => {
+        const newCfg = await runSetupWizard(ctx as Parameters<typeof runSetupWizard>[0]);
+        if (newCfg) {
+          cfg = newCfg;
+          baseUrl = `http://127.0.0.1:${cfg.monitor_port}`;
+        }
+        await startServer();
+        pollTimer = setInterval(() => { if (serverState === "up") refreshStatus(); }, 5000);
+      }, 500);
+    } else {
+      await startServer();
+      pollTimer = setInterval(() => { if (serverState === "up") refreshStatus(); }, 5000);
     }
   });
 

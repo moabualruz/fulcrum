@@ -1,30 +1,44 @@
 # PI Agent OS Cockpit
 
-Full control-plane dashboard for the [PI coding agent](https://shittycodingagent.ai).
+Full control-plane dashboard for the [PI coding agent](https://shittycodingagent.ai),
+with a shared backend for Claude Code and Gemini CLI.
 
 ## What it does
 
 - **Live dashboard widget** — active runs (role, progress %, step), blocked agents, WIP count, server status
-- **Footer** — quick-glance run count, blocked count, monitor port
-- **Monitoring link** — always-visible `http://127.0.0.1:4721` link in widget header
+- **Footer status** — quick-glance `● PI-OS  N run  N blocked  WIP:N  :PORT`
+- **Monitor link** — always-visible `http://127.0.0.1:4721/docs` in widget header
+- **Setup wizard** — first-run prompts: workspace ID, project ID, port → writes `.pi-os.json`
 - **Auto-starts** the PI Agent OS monitor + control API server on session start
 - **Slash commands** — task management, run lifecycle, memory, CoS dispatch
-- **LLM tools** — all control-plane operations as native PI tools (no MCP overhead)
+- **LLM tools** — all 11 control-plane operations as native `pi_os_*` tools
 - **Policy hook** — every tool call passes through the pi-os policy engine
 
 ## Install
 
 ```bash
-# From the pi-stack-plan repo:
+# From the repo root (local):
 pi install ./agent-integration/pi/cockpit
+
+# From git (whole repo, includes Claude + Gemini integrations):
+pi install git:github.com/<you>/pi-stack-plan
 
 # From npm (once published):
 pi install npm:pi-os-cockpit
 ```
 
+On first start the setup wizard runs automatically and creates `.pi-os.json`.
+Re-run anytime with `/pi-setup`.
+
+## Requirements
+
+- Python 3.12+ with `pi_agent_os` installed
+- From the repo root: `uv sync`
+- The wizard checks this and guides you if it is missing
+
 ## Config
 
-Create `.pi-os.json` in your project root:
+`.pi-os.json` in your project root (the wizard creates it):
 
 ```json
 {
@@ -34,23 +48,26 @@ Create `.pi-os.json` in your project root:
 }
 ```
 
-Or use env vars: `PI_OS_WORKSPACE_ID`, `PI_OS_PROJECT_ID`, `PI_OS_PORT`
+Env-var overrides: `PI_OS_WORKSPACE_ID`, `PI_OS_PROJECT_ID`, `PI_OS_PORT`
 
-To find your workspace/project IDs after running `pi-os workspace create`:
-```bash
-pi-os workspace list
-pi-os project list --workspace-id ws_...
-```
+## Multi-agent cockpit
 
-## Requirements
+All three CLI agents share the same Python backend:
 
-- Python 3.12+ with `pi_agent_os` installed (`uv sync` in pi-stack-plan repo)
-- `python` in PATH
+| Agent | Integration | Cockpit access |
+|---|---|---|
+| PI | `cockpit/index.ts` — TUI widget, tools, commands | Full TUI dashboard |
+| Claude Code | `agent-integration/claude/` — CLAUDE.md, .mcp.json | 13 MCP tools (`mcp__pi-os__*`) |
+| Gemini CLI | `agent-integration/gemini/` — GEMINI.md, hook | 13 MCP tools (`mcp_pi-os_*`) |
+
+When PI's cockpit is open and Claude Code or Gemini is running in another window,
+all three write to the same monitor server — their runs appear in the PI dashboard.
 
 ## Slash commands
 
 | Command | Description |
 |---|---|
+| `/pi-setup` | (Re-)run the setup wizard |
 | `/pi-status` | Full workspace status |
 | `/pi-start` | Start the monitor server manually |
 | `/pi-monitor` | Open monitor in browser |
@@ -65,19 +82,19 @@ pi-os project list --workspace-id ws_...
 
 ## LLM tools
 
-The following tools are available to the LLM:
-
-- `pi_os_list_tasks` — list tasks
-- `pi_os_create_task` — create a task
-- `pi_os_update_task` — update status/note/assignment
-- `pi_os_recall_memory` — semantic memory recall
-- `pi_os_write_memory` — persist a memory note
-- `pi_os_start_run` — register an agent run
-- `pi_os_heartbeat` — send heartbeat
-- `pi_os_complete_run` — mark run done
-- `pi_os_block_run` — mark run blocked
-- `pi_os_workspace_status` — full status snapshot
-- `pi_os_build_cos_context` — CoS world-state markdown
+| Tool | Purpose |
+|---|---|
+| `pi_os_list_tasks` | List tasks |
+| `pi_os_create_task` | Create a task |
+| `pi_os_update_task` | Update status/note/assignment |
+| `pi_os_recall_memory` | Semantic memory recall |
+| `pi_os_write_memory` | Persist a memory note |
+| `pi_os_start_run` | Register an agent run (returns run_id) |
+| `pi_os_heartbeat` | Send heartbeat (current_step, progress_pct) |
+| `pi_os_complete_run` | Mark run done |
+| `pi_os_block_run` | Mark run blocked |
+| `pi_os_workspace_status` | Full status snapshot |
+| `pi_os_build_cos_context` | CoS world-state markdown |
 
 ## Monitor URLs
 
