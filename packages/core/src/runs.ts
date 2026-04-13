@@ -26,10 +26,9 @@ interface EscalateRunInput { run_id: string; escalation_reason: string }
 
 function captureGitContext(): { git_branch: string | null; git_commit: string | null } {
   try {
-    const branch = execSync('git rev-parse --abbrev-ref HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
-      .toString().trim()
-    const commit = execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
-      .toString().trim()
+    const opts = { stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 } as const
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', opts).toString().trim()
+    const commit = execSync('git rev-parse HEAD', opts).toString().trim()
     return { git_branch: branch === 'HEAD' ? null : branch, git_commit: commit }
   } catch {
     return { git_branch: null, git_commit: null }
@@ -78,11 +77,13 @@ export async function startAgentRun(input: StartRunInput): Promise<AgentRun> {
 
 export async function heartbeatAgentRun(input: HeartbeatInput): Promise<void> {
   const db = getDb()
-  db.prepare(`
+  const result = db.prepare(`
     UPDATE agent_runs
     SET current_step = ?, progress_pct = ?, updated_at = ?, version = version + 1
     WHERE run_id = ?
   `).run(input.current_step, input.progress_pct, new Date().toISOString(), input.run_id)
+
+  if (result.changes === 0) throw new FulcrumError(`Run ${input.run_id} not found`, 'not_found')
 }
 
 export async function getAgentRunStatus(input: GetStatusInput): Promise<AgentRun> {
@@ -90,6 +91,7 @@ export async function getAgentRunStatus(input: GetStatusInput): Promise<AgentRun
 }
 
 export async function completeAgentRun(input: CompleteRunInput): Promise<AgentRun> {
+  getRun(input.run_id) // throws not_found before any mutation
   const db = getDb()
   const now = new Date().toISOString()
   db.prepare(`
@@ -106,6 +108,7 @@ export async function completeAgentRun(input: CompleteRunInput): Promise<AgentRu
 }
 
 export async function blockAgentRun(input: BlockRunInput): Promise<AgentRun> {
+  getRun(input.run_id) // throws not_found before any mutation
   const db = getDb()
   db.prepare(`
     UPDATE agent_runs

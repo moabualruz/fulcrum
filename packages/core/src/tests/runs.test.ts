@@ -94,3 +94,12 @@ describe('escalateRun', () => {
     expect(escalated.status).toBe('escalated')
   })
 })
+
+describe('not_found errors', () => {
+  it('heartbeatAgentRun throws not_found for unknown run_id', async () => {
+    await seedTask()
+    await expect(
+      heartbeatAgentRun({ run_id: 'NONEXISTENT', current_step: 'step', progress_pct: 0 })
+    ).rejects.toMatchObject({ code: 'not_found' })
+  })
+})
