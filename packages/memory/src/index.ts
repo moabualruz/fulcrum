@@ -5,3 +5,5 @@ export type {
   MemoryEntity, LinkMemoryToEntityInput,
   CodeChunk, IngestFileInput, IngestResult, IngestProjectInput,
 } from './types.js'
+
+export { computeImportance, computeFreshness, rrfScore } from './scoring.js'
