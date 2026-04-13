@@ -86,6 +86,7 @@ describe('stepWorkflow', () => {
     // Step 'ask' is current — advance it
     const updated = await stepWorkflow({
       wf_id: run.wf_id,
+      workspace_id,
       step_id: 'ask',
       result: { answers: ['use TypeScript', 'prefer ESM'] },
     })
@@ -107,9 +108,9 @@ describe('stepWorkflow', () => {
     // To test waiting_input, start 'write-a-prd' which has prompt_user after recall
     const prdRun = await startWorkflow({ workflow_name: 'write-a-prd', workspace_id })
     // Step 'recall' first (read_memory, no waiting)
-    const afterRecall = await stepWorkflow({ wf_id: prdRun.wf_id, step_id: 'recall', result: {} })
+    const afterRecall = await stepWorkflow({ wf_id: prdRun.wf_id, workspace_id, step_id: 'recall', result: {} })
     // Now 'prompt' step (prompt_user) is ready — stepping it should pause at waiting_input
-    const afterPrompt = await stepWorkflow({ wf_id: afterRecall.wf_id, step_id: 'prompt' })
+    const afterPrompt = await stepWorkflow({ wf_id: afterRecall.wf_id, workspace_id, step_id: 'prompt' })
     expect(afterPrompt.status).toBe('waiting_input')
   })
 
@@ -117,6 +118,7 @@ describe('stepWorkflow', () => {
     const run = await startWorkflow({ workflow_name: 'grill-me', workspace_id })
     const updated = await stepWorkflow({
       wf_id: run.wf_id,
+      workspace_id,
       step_id: 'ask',
       error: 'Agent timeout after 30s',
     })
@@ -133,10 +135,10 @@ describe('stepWorkflow', () => {
 
     // Step through all non-final steps
     let current = run
-    current = await stepWorkflow({ wf_id: current.wf_id, step_id: 'recall', result: {} })
-    current = await stepWorkflow({ wf_id: current.wf_id, step_id: 'agent', result: {} })
-    current = await stepWorkflow({ wf_id: current.wf_id, step_id: 'issues', result: {} })
-    current = await stepWorkflow({ wf_id: current.wf_id, step_id: 'done', result: {} })
+    current = await stepWorkflow({ wf_id: current.wf_id, workspace_id, step_id: 'recall', result: {} })
+    current = await stepWorkflow({ wf_id: current.wf_id, workspace_id, step_id: 'agent', result: {} })
+    current = await stepWorkflow({ wf_id: current.wf_id, workspace_id, step_id: 'issues', result: {} })
+    current = await stepWorkflow({ wf_id: current.wf_id, workspace_id, step_id: 'done', result: {} })
 
     expect(current.status).toBe('completed')
     expect(current.status_category).toBe('done')
@@ -147,12 +149,13 @@ describe('stepWorkflow', () => {
 describe('resumeWorkflow', () => {
   it('moves from waiting_input back to running', async () => {
     const prdRun = await startWorkflow({ workflow_name: 'write-a-prd', workspace_id })
-    let current = await stepWorkflow({ wf_id: prdRun.wf_id, step_id: 'recall', result: {} })
-    current = await stepWorkflow({ wf_id: current.wf_id, step_id: 'prompt' })
+    let current = await stepWorkflow({ wf_id: prdRun.wf_id, workspace_id, step_id: 'recall', result: {} })
+    current = await stepWorkflow({ wf_id: current.wf_id, workspace_id, step_id: 'prompt' })
     expect(current.status).toBe('waiting_input')
 
     const resumed = await resumeWorkflow({
       wf_id: current.wf_id,
+      workspace_id,
       resume_data: { user_input: 'Build a REST API' },
     })
 
@@ -167,7 +170,7 @@ describe('resumeWorkflow', () => {
 describe('cancelWorkflow', () => {
   it('sets status cancelled and status_category done', async () => {
     const run = await startWorkflow({ workflow_name: 'grill-me', workspace_id })
-    const cancelled = await cancelWorkflow({ wf_id: run.wf_id, reason: 'User aborted' })
+    const cancelled = await cancelWorkflow({ wf_id: run.wf_id, workspace_id, reason: 'User aborted' })
 
     expect(cancelled.status).toBe('cancelled')
     expect(cancelled.status_category).toBe('done')
@@ -176,7 +179,7 @@ describe('cancelWorkflow', () => {
 
   it('sets status cancelled with no reason when reason is omitted', async () => {
     const run = await startWorkflow({ workflow_name: 'grill-me', workspace_id })
-    const cancelled = await cancelWorkflow({ wf_id: run.wf_id })
+    const cancelled = await cancelWorkflow({ wf_id: run.wf_id, workspace_id })
 
     expect(cancelled.status).toBe('cancelled')
     expect(cancelled.status_category).toBe('done')
@@ -186,7 +189,7 @@ describe('cancelWorkflow', () => {
 describe('getWorkflowRun', () => {
   it('retrieves a persisted run by wf_id', async () => {
     const run = await startWorkflow({ workflow_name: 'grill-me', workspace_id })
-    const fetched = await getWorkflowRun({ wf_id: run.wf_id })
+    const fetched = await getWorkflowRun({ wf_id: run.wf_id, workspace_id })
 
     expect(fetched.wf_id).toBe(run.wf_id)
     expect(fetched.workflow_name).toBe('grill-me')
@@ -194,7 +197,7 @@ describe('getWorkflowRun', () => {
   })
 
   it('throws when wf_id is not found', async () => {
-    await expect(getWorkflowRun({ wf_id: 'wf_nonexistent' })).rejects.toThrow(
+    await expect(getWorkflowRun({ wf_id: 'wf_nonexistent', workspace_id })).rejects.toThrow(
       'workflow run not found: wf_nonexistent'
     )
   })
@@ -207,22 +210,22 @@ describe('full grill-me happy path', () => {
     expect(run.current_step_id).toBe('ask')
 
     // ask is prompt_user — stepping it pauses at waiting_input
-    let current = await stepWorkflow({ wf_id: run.wf_id, step_id: 'ask' })
+    let current = await stepWorkflow({ wf_id: run.wf_id, workspace_id, step_id: 'ask' })
     expect(current.status).toBe('waiting_input')
 
     // resume from user input
-    current = await resumeWorkflow({ wf_id: current.wf_id, resume_data: { answers: ['TypeScript'] } })
+    current = await resumeWorkflow({ wf_id: current.wf_id, workspace_id, resume_data: { answers: ['TypeScript'] } })
     expect(current.status).toBe('running')
 
     // search and recall are now both ready — step them in any order
-    current = await stepWorkflow({ wf_id: current.wf_id, step_id: 'search', result: { results: [] } })
-    current = await stepWorkflow({ wf_id: current.wf_id, step_id: 'recall', result: { memories: [] } })
+    current = await stepWorkflow({ wf_id: current.wf_id, workspace_id, step_id: 'search', result: { results: [] } })
+    current = await stepWorkflow({ wf_id: current.wf_id, workspace_id, step_id: 'recall', result: { memories: [] } })
 
     // save is now ready
-    current = await stepWorkflow({ wf_id: current.wf_id, step_id: 'save', result: {} })
+    current = await stepWorkflow({ wf_id: current.wf_id, workspace_id, step_id: 'save', result: {} })
 
     // done step completes the run
-    current = await stepWorkflow({ wf_id: current.wf_id, step_id: 'done', result: {} })
+    current = await stepWorkflow({ wf_id: current.wf_id, workspace_id, step_id: 'done', result: {} })
 
     expect(current.status).toBe('completed')
     expect(current.status_category).toBe('done')

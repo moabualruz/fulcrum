@@ -67,6 +67,7 @@ export interface StartWorkflowInput {
 
 export interface StepWorkflowInput {
   wf_id: string
+  workspace_id: string
   step_id: string
   result?: unknown
   error?: string
@@ -74,14 +75,17 @@ export interface StepWorkflowInput {
 
 export interface ResumeWorkflowInput {
   wf_id: string
+  workspace_id: string
   resume_data?: unknown
 }
 
 export interface CancelWorkflowInput {
   wf_id: string
+  workspace_id: string
   reason?: string
 }
 
 export interface GetWorkflowRunInput {
   wf_id: string
+  workspace_id: string
 }

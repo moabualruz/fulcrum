@@ -41,9 +41,9 @@ function rowToRun(row: Record<string, unknown>): WorkflowRun {
   }
 }
 
-function fetchRun(wf_id: string): WorkflowRun {
+function fetchRun(wf_id: string, workspace_id: string): WorkflowRun {
   const db = getDb()
-  const row = db.prepare(`SELECT * FROM workflow_runs WHERE wf_id = ?`).get(wf_id) as Record<string, unknown> | undefined
+  const row = db.prepare(`SELECT * FROM workflow_runs WHERE wf_id = ? AND workspace_id = ?`).get(wf_id, workspace_id) as Record<string, unknown> | undefined
   if (!row) throw new Error(`workflow run not found: ${wf_id}`)
   return rowToRun(row)
 }
@@ -122,12 +122,12 @@ export async function startWorkflow(input: StartWorkflowInput): Promise<Workflow
     now
   )
 
-  return fetchRun(wf_id)
+  return fetchRun(wf_id, input.workspace_id)
 }
 
 export async function stepWorkflow(input: StepWorkflowInput): Promise<WorkflowRun> {
   const db = getDb()
-  const run = fetchRun(input.wf_id)
+  const run = fetchRun(input.wf_id, input.workspace_id)
   const def = registry.getDefinition(run.workflow_name)
   if (!def) throw new Error(`workflow definition not found: ${run.workflow_name}`)
 
@@ -194,12 +194,12 @@ export async function stepWorkflow(input: StepWorkflowInput): Promise<WorkflowRu
     input.wf_id
   )
 
-  return fetchRun(input.wf_id)
+  return fetchRun(input.wf_id, input.workspace_id)
 }
 
 export async function resumeWorkflow(input: ResumeWorkflowInput): Promise<WorkflowRun> {
   const db = getDb()
-  const run = fetchRun(input.wf_id)
+  const run = fetchRun(input.wf_id, input.workspace_id)
   const def = registry.getDefinition(run.workflow_name)
   if (!def) throw new Error(`workflow definition not found: ${run.workflow_name}`)
 
@@ -225,14 +225,21 @@ export async function resumeWorkflow(input: ResumeWorkflowInput): Promise<Workfl
   }
   const current_step_id = readyIds[0] ?? run.current_step_id
 
+  const derivedStatus = deriveWorkflowStatus(steps, def, current_step_id)
+  const statusCat: WorkflowRun['status_category'] =
+    derivedStatus === 'completed' || derivedStatus === 'cancelled' ? 'done'
+    : derivedStatus === 'failed' ? 'blocked'
+    : 'active'
+  const completed_at = derivedStatus === 'completed' ? now : null
+
   db.prepare(
     `UPDATE workflow_runs
-     SET steps = ?, current_step_id = ?, status = 'running', status_category = 'active',
-         version = version + 1, updated_at = ?
+     SET steps = ?, current_step_id = ?, status = ?, status_category = ?,
+         completed_at = COALESCE(completed_at, ?), version = version + 1, updated_at = ?
      WHERE wf_id = ?`
-  ).run(JSON.stringify(steps), current_step_id ?? null, now, input.wf_id)
+  ).run(JSON.stringify(steps), current_step_id ?? null, derivedStatus, statusCat, completed_at, now, input.wf_id)
 
-  return fetchRun(input.wf_id)
+  return fetchRun(input.wf_id, input.workspace_id)
 }
 
 export async function cancelWorkflow(input: CancelWorkflowInput): Promise<WorkflowRun> {
@@ -246,7 +253,7 @@ export async function cancelWorkflow(input: CancelWorkflowInput): Promise<Workfl
      WHERE wf_id = ?`
   ).run(input.reason ?? null, now, now, input.wf_id)
 
-  return fetchRun(input.wf_id)
+  return fetchRun(input.wf_id, input.workspace_id)
 }
 
 export async function listWorkflows(): Promise<WorkflowDefinition[]> {
@@ -254,5 +261,5 @@ export async function listWorkflows(): Promise<WorkflowDefinition[]> {
 }
 
 export async function getWorkflowRun(input: GetWorkflowRunInput): Promise<WorkflowRun> {
-  return fetchRun(input.wf_id)
+  return fetchRun(input.wf_id, input.workspace_id)
 }
