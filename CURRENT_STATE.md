@@ -1,17 +1,17 @@
 # Current State
 
-Last updated: 2026-04-13 (session 4)
+Last updated: 2026-04-13 (session 5)
 
 ## Repository Summary
 
 | Field | Value |
 |---|---|
 | Repo path | /home/mkh/workspace/pi-stack-plan |
-| Branch | feat/agent-integration-full-control |
+| Branch | main |
 | Language | Python 3.12+ |
 | Package manager | uv |
 | Framework | FastAPI (monitor), Typer (CLI), Pydantic v2 (models) |
-| Tests | 228 passing, 1 skipped |
+| Tests | 251 passing, 1 skipped |
 | CI/CD | None (local-only) |
 
 ## Implementation Status
@@ -33,6 +33,7 @@ Last updated: 2026-04-13 (session 4)
 | 8 | Plane Adapter | ✅ Complete | test_plane_adapter, test_plane_sync_conflict |
 | 9 | Analytics + Monitor | ✅ Complete | test_analytics |
 | 10 | External CLI Agent Integration | ✅ Complete | test_mcp_server (21), test_claude_hook, test_pi_hook (6), test_telemetry, test_cos_wiring, test_cli_serve |
+| 10+ | PI Cockpit Extension | ✅ Complete | test_control_api (12), agent-integration/pi/cockpit/ |
 
 ### Golden Scenarios
 
@@ -100,6 +101,11 @@ Last updated: 2026-04-13 (session 4)
 - `agent-integration/claude/` + `agent-integration/gemini/` + `agent-integration/pi/` install packages
 - PI-native extension: `pi-os.extension.json`, `PI.md`, `pi_hook.py`
 - Lifecycle tools: `start_agent_run`, `heartbeat_agent_run`, `complete_agent_run`, `block_agent_run`, `build_cos_context`, `get_workspace_status`
+- **PI Cockpit** (`agent-integration/pi/cockpit/`): publishable npm package (`pi-os-cockpit`)
+  - TypeScript extension with live dashboard widget, footer, monitoring link, auto-server management
+  - 11 slash commands, 11 LLM tools, policy hook (`pi.on("tool_call")`)
+  - REST control API: 13 endpoints at `/api/v1/control/` (tasks, runs, memory, policy, CoS)
+  - `python -m pi_agent_os.monitor` entry point
 
 ## PI Runtime
 

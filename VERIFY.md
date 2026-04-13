@@ -169,6 +169,32 @@ Each entry: Phase / Component / Test / Result / Date
 | build_cos_context | returns context_markdown | VERIFIED ✓ | 2026-04-13 |
 | get_workspace_status | returns active/blocked/wip counts | VERIFIED ✓ | 2026-04-13 |
 
+## Session 5: PI Cockpit Extension (2026-04-13)
+
+| Component | Test | Result | Date |
+|---|---|---|---|
+| Control API — list workspaces | `GET /api/v1/control/workspaces` returns workspace_id | VERIFIED ✓ | 2026-04-13 |
+| Control API — list projects | `GET /api/v1/control/projects?workspace_id=...` | VERIFIED ✓ | 2026-04-13 |
+| Control API — list tasks | `GET /api/v1/control/tasks?workspace_id=...` | VERIFIED ✓ | 2026-04-13 |
+| Control API — create task | `POST /api/v1/control/tasks` returns task_id | VERIFIED ✓ | 2026-04-13 |
+| Control API — update task | `PATCH /api/v1/control/tasks/{task_id}` | VERIFIED ✓ | 2026-04-13 |
+| Control API — start run | `POST /api/v1/control/runs` returns run_id + status=running | VERIFIED ✓ | 2026-04-13 |
+| Control API — heartbeat | `POST /api/v1/control/runs/{run_id}/heartbeat` ok=true | VERIFIED ✓ | 2026-04-13 |
+| Control API — complete run | `POST /api/v1/control/runs/{run_id}/complete` status=completed | VERIFIED ✓ | 2026-04-13 |
+| Control API — block run | `POST /api/v1/control/runs/{run_id}/block` status=blocked | VERIFIED ✓ | 2026-04-13 |
+| Control API — policy check | `POST /api/v1/control/policy/check` allowed=true | VERIFIED ✓ | 2026-04-13 |
+| Control API — recall memory | `POST /api/v1/control/memory/recall` returns memories[] | VERIFIED ✓ | 2026-04-13 |
+| Control API — write memory | `POST /api/v1/control/memory/write` saved=true | VERIFIED ✓ | 2026-04-13 |
+| SQL column aliasing | `workspaces.id as workspace_id` / `projects.id as project_id` | VERIFIED ✓ | 2026-04-13 |
+| `python -m pi_agent_os.monitor` | Entry point starts server without PI binary conflict | VERIFIED ✓ | 2026-04-13 |
+| Cockpit package.json | `keywords: ["pi-package"]`, `pi.extensions: ["./index.ts"]` | VERIFIED ✓ | 2026-04-13 |
+
+## Full Test Run (2026-04-13, Session 5)
+
+```
+251 passed, 1 skipped in 11.32s
+```
+
 ## Full Test Run (2026-04-13, Session 4)
 
 ```

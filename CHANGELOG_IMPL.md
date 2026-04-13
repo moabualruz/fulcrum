@@ -1,5 +1,54 @@
 # Implementation Changelog
 
+## [0.5.0] — 2026-04-13 (Session 5: PI Agent OS Cockpit)
+
+### Added
+
+- **`agent-integration/pi/cockpit/index.ts`**: Full TypeScript cockpit extension (~550 lines)
+  - Config discovery: walks up to 6 parent dirs for `.pi-os.json`; falls back to `PI_OS_WORKSPACE_ID` / `PI_OS_PROJECT_ID` / `PI_OS_PORT` env vars
+  - `startServer()`: spawns `python -m pi_agent_os.monitor --port PORT`; polls readiness for up to 15 s; notifies on up
+  - `refreshStatus()`: polls `/api/v1/status?workspace_id=...` every 5 s
+  - **Dashboard widget** (`ctx.ui.setWidget()`): header with server health dot + clickable monitor URL, summary row (running/blocked/WIP), per-agent lines with role/run_id/progress%/step, blocked agents with reason, workspace/project tail
+  - **Footer** (`ctx.ui.setFooter()`): `● PI-OS  N run  N blocked  WIP:N  :PORT`
+  - **ANSI helpers**: GREEN / YELLOW / RED / CYAN / BLUE / MUTED
+  - **11 slash commands**: `/pi-status`, `/pi-start`, `/pi-monitor`, `/pi-tasks [status]`, `/pi-create <title>`, `/pi-run <task_id> <role>`, `/pi-complete <run_id> [summary]`, `/pi-block <run_id> <reason>`, `/pi-recall <query>`, `/pi-workspaces`, `/cos <goal>`
+  - **11 LLM tools** (`pi.registerTool()`): `pi_os_list_tasks`, `pi_os_create_task`, `pi_os_update_task`, `pi_os_recall_memory`, `pi_os_write_memory`, `pi_os_start_run`, `pi_os_heartbeat`, `pi_os_complete_run`, `pi_os_block_run`, `pi_os_workspace_status`, `pi_os_build_cos_context`
+  - **Policy hook**: `pi.on("tool_call")` → calls `/api/v1/control/policy/check` for all non-`pi_os_*` tools; blocks on deny
+  - `pi.on("session_start")` auto-starts server + registers everything; `pi.on("session_shutdown")` stops server + interval
+
+- **`agent-integration/pi/cockpit/package.json`**: npm-publishable manifest
+  - `name: "pi-os-cockpit"`, `"keywords": ["pi-package", "pi-os", "agent-os"]`
+  - `"pi": { "extensions": ["./index.ts"] }` for PI discovery
+  - `peerDependencies`: `@mariozechner/pi-coding-agent`, `@mariozechner/pi-tui`, `@sinclair/typebox`
+
+- **`src/pi_agent_os/monitor/control.py`**: FastAPI control plane REST API (13 endpoints)
+  - `APIRouter(prefix="/api/v1/control")` mounted on existing monitor app
+  - Read: `GET /workspaces`, `GET /projects`, `GET /tasks`
+  - Write: `POST /tasks`, `PATCH /tasks/{task_id}`
+  - Run lifecycle: `POST /runs`, `POST /runs/{run_id}/heartbeat`, `POST /runs/{run_id}/complete`, `POST /runs/{run_id}/block`
+  - Memory: `POST /memory/recall`, `POST /memory/write`
+  - CoS: `POST /cos-context`
+  - Policy: `POST /policy/check`
+  - All write operations delegate to `mcp.server` functions (single source of truth)
+  - SQLite column aliasing: `SELECT id as workspace_id FROM workspaces`
+
+- **`src/pi_agent_os/monitor/server.py`**: Control router mounted; version bumped to 0.2.0
+- **`src/pi_agent_os/monitor/__main__.py`**: `python -m pi_agent_os.monitor` entry point (avoids `pi` binary naming conflict)
+- **`pyproject.toml`**: Added `pi-os` as secondary script alias for the Python CLI
+- **`agent-integration/pi/cockpit/README.md`**: Full install/config/usage documentation
+- **`agent-integration/pi/pi-os.extension.json`**: Updated note — real extension is `./cockpit/index.ts`
+
+- **`tests/unit/test_control_api.py`**: 12 tests covering all control plane endpoints
+
+### Fixed (bugs found during cockpit work)
+
+- **`monitor/control.py`**: `workspaces.id` column aliased as `workspace_id` in SQL (`SELECT id as workspace_id`)
+- **`monitor/control.py`**: `projects.id` column aliased as `project_id` in SQL (`SELECT id as project_id`)
+
+### Total tests: 251 passing, 1 skipped
+
+---
+
 ## [0.4.0] — 2026-04-13 (Session 4: PI Native Extension)
 
 ### Added
