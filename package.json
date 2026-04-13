@@ -19,5 +19,8 @@
     "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-ai": "*",
     "@mariozechner/pi-tui": "*"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3", "esbuild", "onnxruntime-node", "koffi", "protobufjs"]
   }
 }
