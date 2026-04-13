@@ -127,33 +127,52 @@ export async function getMetrics(input: GetMetricsInput): Promise<Metrics> {
 export async function getBurndown(input: GetBurndownInput): Promise<BurndownData> {
   const db = getDb()
 
-  // Total tasks created at or before end_date for this project
-  const totalRow = db.prepare(`
-    SELECT COUNT(*) AS cnt FROM tasks
+  // One query: completions per day within the range
+  const completions = db.prepare(`
+    SELECT date(updated_at) AS d, COUNT(*) AS cnt
+    FROM tasks
+    WHERE workspace_id = ? AND project_id = ?
+      AND (status = 'completed' OR status = 'finished')
+      AND date(updated_at) BETWEEN ? AND ?
+    GROUP BY d
+    ORDER BY d ASC
+  `).all(input.workspace_id, input.project_id ?? null, input.start_date, input.end_date) as { d: string; cnt: number }[]
+
+  // One query: task creation per day (for computing running total per day)
+  const creations = db.prepare(`
+    SELECT date(created_at) AS d, COUNT(*) AS cnt
+    FROM tasks
     WHERE workspace_id = ? AND project_id = ?
       AND date(created_at) <= ?
-  `).get(input.workspace_id, input.project_id, input.end_date) as { cnt: number }
+    GROUP BY d
+    ORDER BY d ASC
+  `).all(input.workspace_id, input.project_id ?? null, input.end_date) as { d: string; cnt: number }[]
 
-  const total = totalRow.cnt
+  // Build cumulative maps
+  const completionMap = new Map<string, number>()
+  for (const row of completions) {
+    completionMap.set(row.d, row.cnt)
+  }
 
-  // Build one point per day in [start_date, end_date]
+  const creationMap = new Map<string, number>()
+  for (const row of creations) {
+    creationMap.set(row.d, row.cnt)
+  }
+
+  // Iterate over the date range and accumulate running totals
   const points: BurndownPoint[] = []
   const startMs = new Date(input.start_date).getTime()
   const endMs = new Date(input.end_date).getTime()
   const dayMs = 86_400_000
 
+  let runningTotal = 0
+  let runningCompleted = 0
+
   for (let ms = startMs; ms <= endMs; ms += dayMs) {
     const date = new Date(ms).toISOString().slice(0, 10)
-
-    const completedRow = db.prepare(`
-      SELECT COUNT(*) AS cnt FROM tasks
-      WHERE workspace_id = ? AND project_id = ?
-        AND status = 'completed'
-        AND date(updated_at) <= ?
-    `).get(input.workspace_id, input.project_id, date) as { cnt: number }
-
-    const completed = completedRow.cnt
-    points.push({ date, total, completed, remaining: total - completed })
+    runningTotal += creationMap.get(date) ?? 0
+    runningCompleted += completionMap.get(date) ?? 0
+    points.push({ date, total: runningTotal, completed: runningCompleted, remaining: runningTotal - runningCompleted })
   }
 
   return {

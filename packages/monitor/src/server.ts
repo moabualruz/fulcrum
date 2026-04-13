@@ -51,17 +51,17 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
     const stream = new ReadableStream({
       start(controller) {
-        let lastId = ''
+        let lastId = c.req.header('Last-Event-ID') ?? ''
 
         const poll = () => {
           try {
             const db = getDb()
-            let query = `SELECT * FROM events WHERE ts > ? ORDER BY ts ASC LIMIT 100`
-            const params: unknown[] = [lastId || '1970-01-01T00:00:00.000Z']
+            let query = `SELECT * FROM events WHERE workspace_id = ? AND event_id > ? ORDER BY event_id ASC LIMIT 100`
+            const params: unknown[] = [ws ?? '', lastId]
 
-            if (ws) {
-              query = `SELECT * FROM events WHERE workspace_id = ? AND ts > ? ORDER BY ts ASC LIMIT 100`
-              params.unshift(ws)
+            if (!ws) {
+              query = `SELECT * FROM events WHERE event_id > ? ORDER BY event_id ASC LIMIT 100`
+              params.splice(0, 1) // remove ws placeholder, keep only lastId
             }
 
             const rows = db.prepare(query).all(...params) as Array<{
@@ -78,8 +78,8 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
                 payload: JSON.parse(row.payload) as unknown,
                 ts: row.ts,
               })
-              controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`))
-              lastId = row.ts
+              controller.enqueue(new TextEncoder().encode(`id: ${row.event_id}\ndata: ${data}\n\n`))
+              lastId = row.event_id
             }
           } catch {
             // DB not yet available — skip this tick
