@@ -26,7 +26,7 @@ const PATTERNS: PatternDef[] = [
   },
   {
     name: 'credential_url',
-    regex: /[a-zA-Z][^:]*:[^@]{3,}@/g,
+    regex: /[a-zA-Z][a-zA-Z0-9+\-.]+:\/\/[^:@\s]+:[^@\s]{3,}@/g,
   },
 ]
 

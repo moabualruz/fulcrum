@@ -315,6 +315,45 @@ describe('evaluatePolicy — workspace rules', () => {
   })
 })
 
+describe('evaluatePolicy — path matcher', () => {
+  it('path matcher matches against resource_id', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-secrets-path',
+      action: 'deny',
+      matchers: [{ matcher_type: 'path', pattern: '/secrets/*' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'read_file',
+      resource_id: '/secrets/api-key',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toBe('no-secrets-path')
+  })
+
+  it('path matcher does not match when resource_id is outside the pattern', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-secrets-path',
+      action: 'deny',
+      matchers: [{ matcher_type: 'path', pattern: '/secrets/*' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'read_file',
+      resource_id: '/public/readme.md',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+})
+
 describe('evaluatePolicy — regex matcher', () => {
   it('denies when action matches regex pattern', async () => {
     await createPolicyRule({

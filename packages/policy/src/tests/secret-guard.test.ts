@@ -128,6 +128,12 @@ describe('checkSecrets — credential URL pattern', () => {
     // No user:pass@ pattern
     expect(result.matches.filter(m => m.pattern_name === 'credential_url')).toHaveLength(0)
   })
+
+  it('does not flag email addresses as credentials', () => {
+    const result = checkSecrets('Contact: support@company.com for help')
+    const credMatch = result.matches.find(m => m.pattern_name === 'credential_url')
+    expect(credMatch).toBeUndefined()
+  })
 })
 
 describe('checkSecrets — clean text', () => {

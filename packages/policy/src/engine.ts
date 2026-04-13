@@ -69,12 +69,14 @@ function matcherMatches(matcher: PolicyMatcher, input: EvaluatePolicyInput): boo
     case 'artifact':
       // Exact match on action
       return input.action === pattern
-    case 'path':
-      // Glob-style: support trailing * wildcard only
+    case 'path': {
+      // Glob-style: support trailing * wildcard only — matches against resource_id
+      const target = input.resource_id ?? ''
       if (pattern.endsWith('*')) {
-        return input.action.startsWith(pattern.slice(0, -1))
+        return target.startsWith(pattern.slice(0, -1))
       }
-      return input.action === pattern
+      return target === pattern
+    }
     case 'regex':
       try {
         return new RegExp(pattern).test(input.action)
@@ -85,8 +87,10 @@ function matcherMatches(matcher: PolicyMatcher, input: EvaluatePolicyInput): boo
       // Match against resource_id or action
       return (input.resource_id ?? '') === pattern || input.action === pattern
     case 'secret_content':
-      // SecretGuard integration — match if context.content contains secrets
-      // This matcher type is evaluated externally; return false here (engine does not scan content)
+      // secret_content rules cannot be auto-evaluated by the engine.
+      // Callers must invoke checkSecrets() separately and handle denial
+      // before calling evaluatePolicy(). This matcher type exists only
+      // for documentation/audit purposes in the policy rule record.
       return false
     default:
       return false

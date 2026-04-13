@@ -544,6 +544,9 @@ export function runMigrations(db: Database.Database): void {
     // sqlite-vec not available
   }
 
-  db.exec(MIGRATION_004)
-  db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('004_policy')`).run()
+  const already004 = db.prepare("SELECT id FROM schema_migrations WHERE name = '004_policy'").get()
+  if (!already004) {
+    db.exec(MIGRATION_004)
+    db.prepare(`INSERT INTO schema_migrations(name) VALUES ('004_policy')`).run()
+  }
 }
