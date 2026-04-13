@@ -19,7 +19,6 @@
     "extensions": ["./packages/extension/index.ts"]
   },
   "scripts": {
-    "postinstall": "node scripts/postinstall.js",
     "test": "pnpm -r test",
     "build": "pnpm -r build"
   },
