@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { writeFileSync, mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { loadConfig, defaultConfig } from '../config.js'
@@ -6,7 +6,10 @@ import { loadConfig, defaultConfig } from '../config.js'
 const TMP = '/tmp/fulcrum-test-config'
 
 beforeEach(() => mkdirSync(TMP, { recursive: true }))
-afterEach(() => rmSync(TMP, { recursive: true, force: true }))
+afterEach(() => {
+  rmSync(TMP, { recursive: true, force: true })
+  vi.unstubAllEnvs()
+})
 
 describe('loadConfig', () => {
   it('returns defaults when no file exists', () => {
@@ -32,13 +35,11 @@ describe('loadConfig', () => {
       join(TMP, '.fulcrum.json'),
       JSON.stringify({ workspace_id: 'ws_file', project_id: 'proj_file', port: 4721 })
     )
-    process.env.FULCRUM_WORKSPACE_ID = 'ws_env'
-    process.env.FULCRUM_PORT = '5000'
+    vi.stubEnv('FULCRUM_WORKSPACE_ID', 'ws_env')
+    vi.stubEnv('FULCRUM_PORT', '5000')
     const cfg = loadConfig(TMP)
     expect(cfg.workspace_id).toBe('ws_env')
     expect(cfg.port).toBe(5000)
-    delete process.env.FULCRUM_WORKSPACE_ID
-    delete process.env.FULCRUM_PORT
   })
 
   it('merges partial policy config with defaults', () => {
@@ -49,5 +50,12 @@ describe('loadConfig', () => {
     const cfg = loadConfig(TMP)
     expect(cfg.policy.wip_limit).toBe(10)
     expect(cfg.policy.heartbeat_timeout_minutes).toBe(10) // default preserved
+  })
+
+  it('ignores non-numeric FULCRUM_PORT', () => {
+    vi.stubEnv('FULCRUM_PORT', 'abc')
+    const cfg = loadConfig(join(TMP, 'nonexistent'))
+    expect(cfg.port).toBe(4721) // default preserved
+    expect(Number.isNaN(cfg.port)).toBe(false)
   })
 })

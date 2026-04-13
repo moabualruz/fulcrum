@@ -36,9 +36,12 @@ export function loadConfig(projectRoot?: string): FulcrumConfig {
   let fileConfig: Partial<FulcrumConfig> = {}
   if (existsSync(configPath)) {
     try {
-      fileConfig = JSON.parse(readFileSync(configPath, 'utf-8')) as Partial<FulcrumConfig>
+      const raw: unknown = JSON.parse(readFileSync(configPath, 'utf-8'))
+      if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
+        fileConfig = raw as Partial<FulcrumConfig>
+      }
     } catch {
-      // Malformed config — proceed with defaults
+      process.stderr.write(`[fulcrum] Warning: malformed .fulcrum.json at ${configPath}, using defaults\n`)
     }
   }
 
@@ -59,7 +62,10 @@ export function loadConfig(projectRoot?: string): FulcrumConfig {
   // Env-var overrides
   if (process.env.FULCRUM_WORKSPACE_ID) merged.workspace_id = process.env.FULCRUM_WORKSPACE_ID
   if (process.env.FULCRUM_PROJECT_ID) merged.project_id = process.env.FULCRUM_PROJECT_ID
-  if (process.env.FULCRUM_PORT) merged.port = parseInt(process.env.FULCRUM_PORT, 10)
+  if (process.env.FULCRUM_PORT) {
+    const n = parseInt(process.env.FULCRUM_PORT, 10)
+    if (!Number.isNaN(n)) merged.port = n
+  }
 
   return merged
 }
