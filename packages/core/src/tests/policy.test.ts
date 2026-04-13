@@ -67,6 +67,8 @@ describe('checkPolicy — WIP limits', () => {
     })
     expect(result.allowed).toBe(false)
     expect(result.reason).toBe('wip_limit_exceeded')
+    expect(result.current_wip).toBe(1)  // one implementer running
+    expect(result.limit).toBe(1)         // per-role limit is 1
   })
 })
 

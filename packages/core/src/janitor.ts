@@ -11,6 +11,13 @@ export async function runJanitorCycle(input: JanitorCycleInput): Promise<void> {
   const db = getDb()
   const { heartbeat_timeout_minutes, escalation_timeout_minutes } = input.policy
 
+  if (!Number.isFinite(heartbeat_timeout_minutes) || heartbeat_timeout_minutes < 0) {
+    throw new Error(`Invalid heartbeat_timeout_minutes: ${heartbeat_timeout_minutes}`)
+  }
+  if (!Number.isFinite(escalation_timeout_minutes) || escalation_timeout_minutes < 0) {
+    throw new Error(`Invalid escalation_timeout_minutes: ${escalation_timeout_minutes}`)
+  }
+
   // Mark running runs stale when no heartbeat received within timeout
   db.prepare(`
     UPDATE agent_runs
@@ -29,10 +36,14 @@ export async function runJanitorCycle(input: JanitorCycleInput): Promise<void> {
   `).all(input.workspace_id, `-${escalation_timeout_minutes}`) as { run_id: string }[]
 
   for (const { run_id } of overdueBlocked) {
-    await escalateRun({
-      run_id,
-      escalation_reason: `Auto-escalated by janitor: blocked for more than ${escalation_timeout_minutes} minutes`,
-    })
+    try {
+      await escalateRun({
+        run_id,
+        escalation_reason: `Auto-escalated by janitor: blocked for more than ${escalation_timeout_minutes} minutes`,
+      })
+    } catch (err) {
+      process.stderr.write(`[janitor] Failed to escalate run ${run_id}: ${String(err)}\n`)
+    }
   }
 }
 
