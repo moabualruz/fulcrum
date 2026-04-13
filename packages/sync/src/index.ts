@@ -1,2 +1,6 @@
 export * from './types.js'
 export * from './schema.js'
+export * from './plane/client.js'
+export * from './plane/adapter.js'
+export * from './sync-manager.js'
+export * from './sync.js'
