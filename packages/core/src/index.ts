@@ -49,3 +49,7 @@ export { newId, nextDisplayId } from './ids.js'
 
 // Status Category
 export { statusCategory } from './status-category.js'
+
+// Events
+export { emitEvent } from './events.js'
+export type { EmitEventInput } from './events.js'
