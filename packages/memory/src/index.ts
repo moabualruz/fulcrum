@@ -9,3 +9,5 @@ export type {
 export { computeImportance, computeFreshness, rrfScore } from './scoring.js'
 
 export { contentHash, isDuplicate } from './dedup.js'
+
+export { writeMemory } from './write.js'

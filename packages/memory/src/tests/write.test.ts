@@ -1,0 +1,153 @@
+// packages/memory/src/tests/write.test.ts
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
+import { getDb } from '@fulcrum/core'
+import { writeMemory } from '../write.js'
+import { contentHash } from '../dedup.js'
+
+beforeEach(() => { createTestDb() })
+afterEach(() => resetTestDb())
+
+describe('writeMemory — input validation', () => {
+  it('throws invalid_input for empty title', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    await expect(writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: '', summary: 'summary', content: 'content',
+    })).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+
+  it('throws invalid_input for empty content', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    await expect(writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 'title', summary: 'summary', content: '',
+    })).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+
+  it('throws invalid_input for confidence out of range', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    await expect(writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 't', summary: 's', content: 'c', confidence: 1.5,
+    })).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+})
+
+describe('writeMemory — insert', () => {
+  it('persists all fields and returns FullMemory', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    const m = await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'decision',
+      title: 'Use SQLite', summary: 'Local-first storage decision',
+      content: 'We chose SQLite because it is local-first and has zero config.',
+      tags: ['architecture'], confidence: 0.9,
+    })
+    expect(m.memory_id).toMatch(/^[0-9A-Z]{26}$/)
+    expect(m.scope).toBe('project')
+    expect(m.kind).toBe('decision')
+    expect(m.title).toBe('Use SQLite')
+    expect(m.summary).toBe('Local-first storage decision')
+    expect(m.canonical_text).toBe('We chose SQLite because it is local-first and has zero config.')
+    expect(m.tags).toEqual(['architecture'])
+    expect(m.confidence).toBeCloseTo(0.9)
+    expect(m.access_count).toBe(0)
+    expect(m.content_hash).toBe(contentHash('We chose SQLite because it is local-first and has zero config.'))
+  })
+
+  it('stores content_hash on insert', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 't', summary: 's', content: 'hello world',
+    })
+    const row = db.prepare('SELECT content_hash FROM memories LIMIT 1').get() as { content_hash: string }
+    expect(row.content_hash).toBe(contentHash('hello world'))
+  })
+})
+
+describe('writeMemory — deduplication', () => {
+  it('increments access_count instead of inserting a duplicate (same content_hash)', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 'Original', summary: 's', content: 'duplicate test content',
+    })
+    const result = await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 'Duplicate', summary: 's2', content: 'duplicate test content',
+    })
+    const count = (db.prepare('SELECT COUNT(*) as c FROM memories').get() as { c: number }).c
+    expect(count).toBe(1)
+    expect(result.access_count).toBe(1)
+  })
+
+  it('preserves original title/summary on dedup hit', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 'Original Title', summary: 'Original Summary', content: 'same',
+    })
+    const result = await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 'New Title', summary: 'New Summary', content: 'same',
+    })
+    expect(result.title).toBe('Original Title')
+    expect(result.summary).toBe('Original Summary')
+  })
+
+  it('does not dedup across different projects', async () => {
+    const db = getDb()
+    db.prepare("INSERT OR IGNORE INTO workspaces(workspace_id,name) VALUES ('ws_1','ws1')").run()
+    db.prepare("INSERT OR IGNORE INTO projects(project_id,workspace_id,name) VALUES ('proj_1','ws_1','p1')").run()
+    db.prepare("INSERT OR IGNORE INTO projects(project_id,workspace_id,name) VALUES ('proj_2','ws_1','p2')").run()
+    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', scope: 'project', kind: 'fact', title: 't', summary: 's', content: 'same' })
+    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_2', scope: 'project', kind: 'fact', title: 't', summary: 's', content: 'same' })
+    const count = (db.prepare('SELECT COUNT(*) as c FROM memories').get() as { c: number }).c
+    expect(count).toBe(2)
+  })
+})
+
+describe('writeMemory — optional fields', () => {
+  it('stores file_path and symbol_path', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    const m = await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'file', kind: 'symbol',
+      title: 'MyClass.myMethod', summary: 'method summary',
+      content: 'function implementation',
+      file_path: 'src/my-class.ts', symbol_path: 'MyClass.myMethod',
+    })
+    expect(m.file_path).toBe('src/my-class.ts')
+    expect(m.symbol_path).toBe('MyClass.myMethod')
+  })
+
+  it('stores task_id link', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    const m = await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'task_goal',
+      title: 'Goal', summary: 'goal summary', content: 'task content',
+      task_id: 'task_abc123',
+    })
+    expect(m.task_id).toBe('task_abc123')
+  })
+})
