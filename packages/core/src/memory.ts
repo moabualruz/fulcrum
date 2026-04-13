@@ -1,6 +1,7 @@
 import { ulid } from 'ulid'
 import { getDb } from './db/client.js'
 import type { Memory } from './types.js'
+import { getTextEmbedder, getReranker } from './embedding/registry.js'
 
 interface WriteMemoryInput {
   workspace_id: string
@@ -109,15 +110,15 @@ export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
 export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> {
   const db = getDb()
   const limit = input.limit ?? 5
+  const candidates = new Map<string, { memory: Memory; score: number }>()
 
-  // FTS5 search — fetch all matches, workspace/project filter applied after
+  // --- FTS5 lexical search ---
   let ftsRows: { rowid: number; rank: number }[] = []
   try {
     ftsRows = db.prepare(
       'SELECT rowid, rank FROM memories_fts WHERE content MATCH ? ORDER BY rank'
     ).all(input.query) as { rowid: number; rank: number }[]
   } catch (err) {
-    // Only fall back to LIKE for FTS5 syntax errors, not engine errors
     const msg = err instanceof Error ? err.message : String(err)
     if (!msg.includes('fts5') && !msg.includes('syntax')) throw err
     const likeRows = db.prepare(
@@ -126,25 +127,76 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
     ftsRows = likeRows.map(r => ({ rowid: r.rowid, rank: 0 }))
   }
 
-  if (ftsRows.length === 0) return []
+  if (ftsRows.length > 0) {
+    const rowids = ftsRows.map(r => r.rowid)
+    const placeholders = rowids.map(() => '?').join(',')
+    const rows = db.prepare(
+      `SELECT * FROM memories WHERE rowid IN (${placeholders}) AND workspace_id = ? AND project_id = ?`
+    ).all(...rowids, input.workspace_id, input.project_id) as Record<string, unknown>[]
+    for (const row of rows) {
+      const fts = ftsRows.find(f => f.rowid === (row as Record<string, unknown> & { rowid: number }).rowid)
+      candidates.set(row.memory_id as string, { memory: rowToMemory(row), score: fts ? Math.abs(fts.rank) : 0 })
+    }
+  }
 
-  const rowids = ftsRows.map(r => r.rowid)
-  const placeholders = rowids.map(() => '?').join(',')
-  const allRows = db.prepare(
-    `SELECT * FROM memories WHERE rowid IN (${placeholders}) AND workspace_id = ? AND project_id = ?`
-  ).all(...rowids, input.workspace_id, input.project_id) as Record<string, unknown>[]
+  // --- Vector ANN search (when embedding provider is available) ---
+  const embedder = getTextEmbedder()
+  if (embedder) {
+    try {
+      const queryVec = await embedder.embed(input.query)
+      const vecRows = db.prepare(
+        'SELECT rowid, distance FROM vec_memories WHERE embedding MATCH ? ORDER BY distance LIMIT ?'
+      ).all(Buffer.from(queryVec.buffer), limit * 3) as { rowid: number; distance: number }[]
 
-  if (allRows.length === 0) return []
+      if (vecRows.length > 0) {
+        const rowids = vecRows.map(r => r.rowid)
+        const placeholders = rowids.map(() => '?').join(',')
+        const rows = db.prepare(
+          `SELECT * FROM memories WHERE rowid IN (${placeholders}) AND workspace_id = ? AND project_id = ?`
+        ).all(...rowids, input.workspace_id, input.project_id) as Record<string, unknown>[]
+        for (const row of rows) {
+          const vec = vecRows.find(v => v.rowid === (row as Record<string, unknown> & { rowid: number }).rowid)
+          const vecScore = vec ? 1 / (1 + vec.distance) : 0
+          const existing = candidates.get(row.memory_id as string)
+          if (existing) {
+            existing.score = (existing.score + vecScore) / 2
+          } else {
+            candidates.set(row.memory_id as string, { memory: rowToMemory(row), score: vecScore })
+          }
+        }
+      }
+    } catch {
+      // vec_memories table not available — FTS5 results only
+    }
+  }
 
-  // Apply limit AFTER workspace/project scope filter
-  const returned = allRows.slice(0, limit)
+  if (candidates.size === 0) return []
 
-  // Update access tracking ONLY for returned rows
+  // Sort by merged score, take top limit * 2 for reranking
+  let sorted = [...candidates.values()].sort((a, b) => b.score - a.score).slice(0, limit * 2)
+
+  // --- Reranker (optional) ---
+  const reranker = getReranker()
+  if (reranker && sorted.length > 1) {
+    try {
+      const passages = sorted.map(c => c.memory.content)
+      const scores = await reranker.rerank(input.query, passages)
+      sorted = sorted.map((c, i) => ({ ...c, score: scores[i] ?? c.score }))
+        .sort((a, b) => b.score - a.score)
+    } catch {
+      // Reranker unavailable — use merged FTS5+vector scores
+    }
+  }
+
+  const top = sorted.slice(0, limit).map(c => c.memory)
+
+  // Update access tracking (only for returned rows)
   const now = new Date().toISOString()
-  const idPlaceholders = returned.map(() => '?').join(',')
+  const ids = top.map(m => m.memory_id)
+  const idPlaceholders = ids.map(() => '?').join(',')
   db.prepare(
     `UPDATE memories SET access_count = access_count + 1, last_accessed_at = ? WHERE memory_id IN (${idPlaceholders})`
-  ).run(now, ...returned.map(r => r.memory_id))
+  ).run(now, ...ids)
 
-  return returned.map(rowToMemory)
+  return top
 }
