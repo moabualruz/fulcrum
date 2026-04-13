@@ -5,7 +5,7 @@ import { loadConfig, defaultConfig } from '../config.js'
 
 const TMP = '/tmp/fulcrum-test-config'
 
-beforeEach(() => mkdirSync(TMP, { recursive: true }))
+beforeEach(() => { mkdirSync(TMP, { recursive: true }) })
 afterEach(() => {
   rmSync(TMP, { recursive: true, force: true })
   vi.unstubAllEnvs()

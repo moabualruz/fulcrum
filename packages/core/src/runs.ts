@@ -26,7 +26,7 @@ interface EscalateRunInput { run_id: string; escalation_reason: string }
 
 function captureGitContext(): { git_branch: string | null; git_commit: string | null } {
   try {
-    const opts = { stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 } as const
+    const opts = { stdio: ['ignore', 'pipe', 'ignore'] as ['ignore', 'pipe', 'ignore'], timeout: 3000 }
     const branch = execSync('git rev-parse --abbrev-ref HEAD', opts).toString().trim()
     const commit = execSync('git rev-parse HEAD', opts).toString().trim()
     return { git_branch: branch === 'HEAD' ? null : branch, git_commit: commit }

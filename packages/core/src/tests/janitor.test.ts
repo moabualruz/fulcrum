@@ -6,7 +6,7 @@ import { startAgentRun, blockAgentRun } from '../runs.js'
 import { runJanitorCycle } from '../janitor.js'
 import type { PolicyConfig } from '../types.js'
 
-beforeEach(() => createTestDb())
+beforeEach(() => { createTestDb() })
 afterEach(() => resetTestDb())
 
 const policy: PolicyConfig = {

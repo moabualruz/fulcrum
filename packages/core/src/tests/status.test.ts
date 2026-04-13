@@ -5,7 +5,7 @@ import { createTask } from '../tasks.js'
 import { startAgentRun, blockAgentRun } from '../runs.js'
 import { getWorkspaceStatus, buildCosContext, listAgentProfiles } from '../status.js'
 
-beforeEach(() => createTestDb())
+beforeEach(() => { createTestDb() })
 afterEach(() => resetTestDb())
 
 function seed() {

@@ -11,7 +11,7 @@ import {
   escalateRun,
 } from '../runs.js'
 
-beforeEach(() => createTestDb())
+beforeEach(() => { createTestDb() })
 afterEach(() => resetTestDb())
 
 function seed() {

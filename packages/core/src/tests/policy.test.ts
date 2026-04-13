@@ -6,7 +6,7 @@ import { startAgentRun } from '../runs.js'
 import { checkPolicy } from '../policy.js'
 import type { PolicyConfig } from '../types.js'
 
-beforeEach(() => createTestDb())
+beforeEach(() => { createTestDb() })
 afterEach(() => resetTestDb())
 
 function seed() {

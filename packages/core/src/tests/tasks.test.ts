@@ -3,7 +3,7 @@ import { createTestDb, resetTestDb } from './helpers.js'
 import { getDb } from '../db/client.js'
 import { listTasks, createTask, updateTask } from '../tasks.js'
 
-beforeEach(() => createTestDb())
+beforeEach(() => { createTestDb() })
 afterEach(() => resetTestDb())
 
 function seed() {
