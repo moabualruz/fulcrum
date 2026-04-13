@@ -22,6 +22,8 @@ log = logging.getLogger(__name__)
 # imported without a live database (important for tests).
 _task_reader = None
 _task_writer = None
+_memory_facade = None
+_pi_runtime_ref = None
 
 
 def _get_task_reader():
@@ -38,6 +40,22 @@ def _get_task_writer():
         from ..adapters.readers.task_read import TaskWriter
         _task_writer = TaskWriter()
     return _task_writer
+
+
+def _get_memory_facade():
+    global _memory_facade
+    if _memory_facade is None:
+        from ..memory.facade import MemoryFacade
+        _memory_facade = MemoryFacade()
+    return _memory_facade
+
+
+def _get_pi_runtime():
+    global _pi_runtime_ref
+    if _pi_runtime_ref is None:
+        from ..worker.pi_adapter import get_pi_runtime
+        _pi_runtime_ref = get_pi_runtime()
+    return _pi_runtime_ref
 
 
 # ---------------------------------------------------------------------------
@@ -162,4 +180,91 @@ def update_task(
         return {"task_id": task_id, "updated": True, "changes": list(updates.keys())}
     except Exception as exc:
         log.error("mcp__pi-os__update_task error: %s", exc, exc_info=True)
+        return {"error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# Memory tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def recall_memory(
+    query: str,
+    workspace_id: str,
+    project_id: str = "",
+    limit: int = 10,
+) -> list[dict]:
+    """Recall relevant memories from the project memory store by semantic query."""
+    try:
+        facade = _get_memory_facade()
+        memories = facade.recall(
+            query,
+            workspace_id=workspace_id,
+            project_id=project_id or None,
+            limit=limit,
+        )
+        results = []
+        for m in memories:
+            if isinstance(m, dict):
+                results.append({
+                    "content": str(m.get("summary", m.get("content", m)))[:500],
+                    "score": float(m.get("score", 0.0)),
+                    "tags": m.get("tags", []),
+                })
+            else:
+                results.append({"content": str(m)[:500], "score": 0.0, "tags": []})
+        return results
+    except Exception as exc:
+        log.error("recall_memory failed: %s", exc, exc_info=True)
+        return [{"error": str(exc)}]
+
+
+@mcp.tool()
+def write_memory(
+    content: str,
+    workspace_id: str,
+    project_id: str,
+    title: str = "agent memory",
+    tags: str = "",
+) -> dict:
+    """Write a memory note to the project memory store."""
+    try:
+        facade = _get_memory_facade()
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+        mem_id = facade.write(
+            workspace_id=workspace_id,
+            title=title,
+            summary=content,
+            scope="project",
+            project_id=project_id,
+            tags=tag_list,
+        )
+        log.info("mcp__pi-os__write_memory: project=%s len=%d", project_id, len(content))
+        return {"saved": True, "memory_id": mem_id, "project_id": project_id, "tags": tag_list}
+    except Exception as exc:
+        log.error("write_memory failed: %s", exc, exc_info=True)
+        return {"error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# Agent runtime tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def list_agent_profiles() -> list[dict]:
+    """List available PI agent profiles (roles that can be assigned work)."""
+    try:
+        return _get_pi_runtime().list_profiles()
+    except Exception as exc:
+        log.error("list_agent_profiles failed: %s", exc, exc_info=True)
+        return [{"error": str(exc)}]
+
+
+@mcp.tool()
+def get_agent_run_status(run_id: str) -> dict:
+    """Get the live status of a running PI agent."""
+    try:
+        return _get_pi_runtime().get_run_status(run_id)
+    except Exception as exc:
+        log.error("get_agent_run_status failed: %s", exc, exc_info=True)
         return {"error": str(exc)}
