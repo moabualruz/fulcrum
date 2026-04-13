@@ -69,3 +69,26 @@ def test_empty_stdin_exits_zero(capsys):
         from pi_agent_os.hooks.claude_hook import main
         main()
     mock_exit.assert_called_once_with(0)
+
+
+def test_gemini_hook_normalises_event():
+    """Gemini event shape gets normalised before hitting handle_hook."""
+    from unittest.mock import patch, MagicMock
+    gemini_event = {
+        "conversationId": "conv-123",
+        "toolName": "read_file",
+        "toolInput": {"path": "/etc/passwd"},
+    }
+    with patch("pi_agent_os.hooks.gemini_hook.handle_hook") as mock_handle:
+        mock_handle.return_value = (0, "")
+        import sys
+        from io import StringIO
+        import json
+        with patch("sys.stdin", StringIO(json.dumps(gemini_event))), \
+             patch("sys.exit"):
+            from pi_agent_os.hooks.gemini_hook import main
+            main()
+    call_args = mock_handle.call_args[0][0]
+    assert call_args["session_id"] == "conv-123"
+    assert call_args["tool_name"] == "read_file"
+    assert call_args["tool_input"] == {"path": "/etc/passwd"}
