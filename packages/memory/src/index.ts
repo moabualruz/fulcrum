@@ -13,3 +13,5 @@ export { contentHash, isDuplicate } from './dedup.js'
 export { writeMemory } from './write.js'
 
 export { linkMemoryToEntity, getMemoryEntities } from './entities.js'
+
+export { recallMemory } from './recall.js'
