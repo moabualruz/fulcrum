@@ -10,3 +10,4 @@ dist/
 *.db
 *.db-shm
 *.db-wal
+node_modules/

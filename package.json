@@ -1,18 +1,23 @@
 {
-  "name": "pi-stack-plan",
-  "version": "1.0.0",
-  "description": "PI Agent OS — local-first agent control plane with cockpit extensions for PI, Claude Code, and Gemini CLI",
-  "keywords": ["pi-package", "pi-os", "agent-os", "cockpit", "multi-agent", "control-plane"],
-  "author": "PI Agent OS",
+  "name": "fulcrum",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Fulcrum — local-first agent control plane",
+  "keywords": ["pi-package", "fulcrum", "agent-os", "multi-agent"],
+  "author": "Fulcrum",
   "license": "MIT",
   "type": "module",
   "pi": {
-    "extensions": ["./agent-integration/pi/cockpit/index.ts"]
+    "extensions": ["./packages/extension/index.ts"]
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build"
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-ai": "*",
-    "@mariozechner/pi-tui": "*",
-    "@sinclair/typebox": "*"
+    "@mariozechner/pi-tui": "*"
   }
 }
