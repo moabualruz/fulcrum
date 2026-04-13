@@ -337,3 +337,47 @@ pi-stack-plan/
 - [ ] All 8 monitor views
 - [ ] Forecasting advisory stubs
 - [ ] tests/unit/test_analytics.py
+
+---
+
+## Phase 10: External CLI Agent Integration (Spec §3.6) ✅ COMPLETE
+
+**Goal:** Wire Claude CLI and Gemini CLI as first-class chat providers alongside PI, with
+MCP-namespaced control plane tools, pre-execution hook interception, OTel observability,
+and CoS world-state coherence.
+
+### Deliverables
+- [x] `mcp>=1.0` + `opentelemetry-*` dependencies added (`pyproject.toml`)
+- [x] `src/pi_agent_os/mcp/server.py` — FastMCP server `pi-os` with 7 tools:
+  `list_tasks`, `create_task`, `update_task`, `recall_memory`, `write_memory`,
+  `list_agent_profiles`, `get_agent_run_status`
+- [x] `src/pi_agent_os/mcp/__main__.py` — `python -m pi_agent_os.mcp.server` entry point
+- [x] `src/pi_agent_os/hooks/claude_hook.py` — Claude `PreToolUse` command hook
+- [x] `src/pi_agent_os/hooks/gemini_hook.py` — Gemini `BeforeTool` command hook
+- [x] `src/pi_agent_os/telemetry/spans.py` — `agent_span()` OTel context manager (GenAI conventions)
+- [x] OTel instrumentation on `PIRPCBridge`, `ClaudeCLIAdapter`, `GeminiCLIAdapter`
+- [x] `CoSContextBuilder` world-state injection wired into `WorkerLifecycle.start()` for `chief_of_staff`
+- [x] `agent-integration/claude/` — `CLAUDE.md`, `.mcp.json`, hook settings snippet, `install.sh`
+- [x] `agent-integration/gemini/` — `GEMINI.md`, `gemini-extension.json`, `install.sh`
+- [x] `src/pi_agent_os/cli/commands/serve.py` — `pi serve mcp|hooks|all` commands
+- [x] Tests: `test_mcp_server.py`, `test_claude_hook.py`, `test_telemetry.py`, `test_cos_wiring.py`, `test_cli_serve.py`
+
+### Install
+```bash
+bash agent-integration/claude/install.sh   # Claude Code integration
+bash agent-integration/gemini/install.sh   # Gemini CLI integration
+pi serve mcp                               # Start MCP server (stdio, default)
+pi serve hooks                             # Start HTTP hook server (port 7100)
+```
+
+### Agent model spec examples
+```yaml
+# Use Claude CLI for this agent (Claude Code OAuth, no API billing)
+models: claude-cli/claude-sonnet-4-6
+
+# Use Gemini CLI for this agent
+models: gemini-cli/gemini-2.5-pro
+
+# Use PI native (default)
+models: opencode/big-pickle
+```

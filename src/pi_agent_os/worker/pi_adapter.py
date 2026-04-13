@@ -140,20 +140,42 @@ def configure_pi_runtime(adapter: PIRuntimeAdapter) -> None:
 
 def auto_configure_pi_runtime() -> bool:
     """
-    Auto-detect and configure the best available PI runtime.
+    Auto-detect and configure the best available runtime.
 
-    1. If PI CLI is available (npm install -g @mariozechner/pi-coding-agent),
-       use PIRPCBridge (real execution).
+    1. If PI CLI is available, wrap it in a RoutingAdapter so that agent
+       .md files can freely mix PI models and CLI chat providers:
+         - claude-cli/<model>  →  ClaudeCLIAdapter (Claude Code OAuth)
+         - gemini-cli/<model>  →  GeminiCLIAdapter (Gemini CLI OAuth)
+         - anything else       →  PIRPCBridge (PI native execution)
     2. Otherwise fall back to StubPIRuntimeAdapter (development mode).
 
-    Returns True if real PI runtime was configured.
+    Returns True if a real runtime was configured.
     """
     try:
         from .pi_rpc_bridge import PIRPCBridge, find_pi_command
+        from .cli_chat_adapter import (
+            ClaudeCLIAdapter, GeminiCLIAdapter, RoutingAdapter,
+            find_claude_command, find_gemini_command,
+        )
         pi_path = find_pi_command()
-        if pi_path:
-            configure_pi_runtime(PIRPCBridge(pi_command=pi_path))
+        pi_bridge = PIRPCBridge(pi_command=pi_path) if pi_path else StubPIRuntimeAdapter()
+
+        claude = ClaudeCLIAdapter() if find_claude_command() else None
+        gemini = GeminiCLIAdapter() if find_gemini_command() else None
+
+        if claude or gemini:
+            routing = RoutingAdapter(
+                fallback=pi_bridge,
+                claude_adapter=claude,
+                gemini_adapter=gemini,
+            )
+            configure_pi_runtime(routing)
             return True
+
+        if pi_path:
+            configure_pi_runtime(pi_bridge)
+            return True
+
     except Exception:
         pass
     return False

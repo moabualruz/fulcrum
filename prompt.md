@@ -17,7 +17,7 @@ Then:
 
 NON-NEGOTIABLE RULES
 - Read the spec completely before doing anything else.
-- Use the spec as authoritative.
+- Use the spec as authoritative. When spec conflicts with this prompt, the spec wins.
 - Do not only describe what should be done. Actually do it.
 - Prefer reuse of existing PI-native capabilities and existing extensions before building custom replacements.
 - Do not invent architecture that conflicts with the spec.
@@ -29,6 +29,11 @@ NON-NEGOTIABLE RULES
 - Do not delete user code or unrelated files unless strictly necessary and justified.
 - Keep changes incremental and reversible.
 - When blocked, document the blocker, try reasonable alternatives, then continue on unblocked work.
+
+MCP CLARIFICATION
+- “Avoid MCP for core browser/tool integrations” means: do not use MCP for web search, fetch, crawl, Playwright, or other browser/web tools. Use native libraries and REST APIs for those.
+- MCP IS used as the interoperability bridge exposing PI control plane tools (tasks, memory, agent status) to external CLI agents (Claude CLI, Gemini CLI). This is spec §3.6 and is not a contradiction.
+- The pi-os MCP server (`src/pi_agent_os/mcp/server.py`) is the approved interface. It runs on demand via `pi serve mcp`.
 
 OPERATING MODE
 Work in this order:
