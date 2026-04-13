@@ -17,6 +17,7 @@ For MCP tool access, run `pi serve mcp` and install the integration package:
 ```bash
 bash agent-integration/claude/install.sh   # Claude Code
 bash agent-integration/gemini/install.sh   # Gemini CLI
+bash agent-integration/pi/install.sh       # PI native extension
 ```
 
 ---
@@ -269,6 +270,92 @@ export OTEL_SERVICE_NAME=pi-agent-os
 ```
 
 Configure the SDK in your entrypoint before calling `auto_configure_pi_runtime()`.
+
+---
+
+---
+
+## PI Native Extension (when you are building PI)
+
+If you are writing PI itself, use the native extension instead of the external CLI adapters.
+The extension connects PI to pi-agent-os via MCP stdio and gives PI's runtime code direct
+access to all 13 control plane tools without any subprocess bridging overhead.
+
+### Install
+
+```bash
+bash agent-integration/pi/install.sh
+# Copies pi-os.extension.json to ~/.pi/extensions/ (or $PI_EXTENSIONS_DIR)
+# Copies PI.md to the project root for context injection
+```
+
+### How it works
+
+PI starts `python -m pi_agent_os.mcp.server` as a subprocess and communicates over MCP
+stdio. The extension manifest (`pi-os.extension.json`) declares:
+- The MCP server subprocess
+- The BeforeTool hook (`python -m pi_agent_os.hooks.pi_hook`)
+- A `lifecycleTools` map for PI's runtime code
+
+### Lifecycle integration
+
+PI's runtime code (not the LLM) should call these MCP tools:
+
+```typescript
+// On task start:
+const { run_id } = await mcp.call("mcp__pi-os__start_agent_run", {
+  task_id: "tsk-...",
+  agent_role: "implementer",
+  workspace_id: "ws-...",
+  project_id: "proj-...",   // optional
+  worktree_path: "/path",   // optional
+  pi_run_id: "my-id",       // optional, PI can supply its own run ID
+});
+
+// Every ~30s while running:
+await mcp.call("mcp__pi-os__heartbeat_agent_run", {
+  run_id, workspace_id: "ws-...",
+  current_step: "running tests",
+  progress_pct: 60.0,
+});
+
+// On success:
+await mcp.call("mcp__pi-os__complete_agent_run", {
+  run_id, workspace_id: "ws-...",
+  output_summary: "Implemented login page, all tests pass",
+  artifact_paths: "src/auth.py,tests/test_auth.py",
+});
+
+// On blocker:
+await mcp.call("mcp__pi-os__block_agent_run", {
+  run_id, workspace_id: "ws-...",
+  reason: "Cannot proceed: missing database credentials",
+});
+```
+
+### Chief of Staff dispatch
+
+Before spawning a `chief_of_staff` agent, inject world-state context:
+
+```typescript
+const { context_markdown } = await mcp.call("mcp__pi-os__build_cos_context", {
+  goal: "implement user authentication",
+  project_id: "proj-...",
+  workspace_id: "ws-...",
+});
+// Prepend context_markdown to the CoS agent's system prompt
+```
+
+### Workspace status
+
+Single-call snapshot for dashboards or routing decisions:
+
+```typescript
+const status = await mcp.call("mcp__pi-os__get_workspace_status", {
+  workspace_id: "ws-...",
+});
+// Returns: active_runs, blocked_runs, merge_queue_depth, wip_count, runs[], blockers[]
+```
 
 ---
 

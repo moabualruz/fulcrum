@@ -28,7 +28,7 @@ echo "    Wrote $REPO_ROOT/PI.md"
 
 # 3. Verify the MCP server is importable
 echo "    Verifying MCP server..."
-if python -c "from pi_agent_os.mcp.server import mcp; print('    MCP server OK:', len(mcp._tool_manager._tools), 'tools')" 2>/dev/null; then
+if python -c "from pi_agent_os.mcp.server import mcp; assert mcp is not None; print('    MCP server OK (pi-os)')" 2>/dev/null; then
     :
 else
     echo "    WARNING: MCP server not importable — run 'uv sync' in $REPO_ROOT first"
