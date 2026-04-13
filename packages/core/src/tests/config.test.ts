@@ -58,4 +58,11 @@ describe('loadConfig', () => {
     expect(cfg.port).toBe(4721) // default preserved
     expect(Number.isNaN(cfg.port)).toBe(false)
   })
+
+  it('falls back to defaults when .fulcrum.json is malformed JSON', () => {
+    writeFileSync(join(TMP, '.fulcrum.json'), '{ this is not valid json }')
+    const cfg = loadConfig(TMP)
+    expect(cfg.port).toBe(4721)
+    expect(cfg.policy.wip_limit).toBe(5)
+  })
 })

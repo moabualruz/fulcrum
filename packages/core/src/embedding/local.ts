@@ -6,6 +6,7 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
   private model: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private pipeline: any = null
+  private _warmingUp: Promise<void> | null = null
 
   constructor(config: EmbeddingProviderConfig) {
     this.model = config.model
@@ -14,9 +15,14 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
 
   async warmUp(): Promise<void> {
     if (this.pipeline) return
-    const { pipeline, env } = await import('@huggingface/transformers')
-    env.cacheDir = './.fulcrum/models'
-    this.pipeline = await pipeline('feature-extraction', this.model, { dtype: 'q8' })
+    if (!this._warmingUp) {
+      this._warmingUp = (async () => {
+        const { pipeline, env } = await import('@huggingface/transformers')
+        env.cacheDir = './.fulcrum/models'
+        this.pipeline = await pipeline('feature-extraction', this.model, { dtype: 'q8' })
+      })()
+    }
+    return this._warmingUp
   }
 
   async embed(text: string): Promise<Float32Array> {

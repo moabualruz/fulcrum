@@ -49,6 +49,17 @@ describe('listTasks', () => {
     expect(tasks).toHaveLength(2)
   })
 
+  it('returns tasks in creation order (oldest first)', async () => {
+    seed()
+    await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'First' })
+    await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Second' })
+    await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Third' })
+    const tasks = await listTasks({ workspace_id: 'ws_1' })
+    expect(tasks[0].title).toBe('First')
+    expect(tasks[1].title).toBe('Second')
+    expect(tasks[2].title).toBe('Third')
+  })
+
   it('filters by status', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
@@ -71,6 +82,36 @@ describe('listTasks', () => {
   })
 })
 
+describe('listTasks — cross-workspace isolation', () => {
+  it('does not return tasks from a different workspace', async () => {
+    seed()
+    const db = getDb()
+    db.prepare("INSERT INTO workspaces VALUES ('ws_2','ws2', datetime('now'))").run()
+    db.prepare("INSERT INTO projects VALUES ('proj_2','ws_2','p2', datetime('now'))").run()
+    await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'In ws_1' })
+    await createTask({ workspace_id: 'ws_2', project_id: 'proj_2', title: 'In ws_2' })
+    const tasks = await listTasks({ workspace_id: 'ws_1' })
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0].title).toBe('In ws_1')
+  })
+})
+
+describe('createTask — input validation', () => {
+  it('throws invalid_input for empty title', async () => {
+    seed()
+    await expect(
+      createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: '' })
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+
+  it('throws invalid_input for whitespace-only title', async () => {
+    seed()
+    await expect(
+      createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: '   ' })
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+})
+
 describe('updateTask', () => {
   it('increments version on update', async () => {
     seed()
@@ -88,6 +129,15 @@ describe('updateTask', () => {
     await expect(
       updateTask({ task_id: t.task_id, note: 'conflict', expected_version: 0 })
     ).rejects.toMatchObject({ code: 'version_conflict' })
+  })
+
+  it('succeeds when expected_version matches current version', async () => {
+    seed()
+    const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
+    expect(t.version).toBe(0)
+    const updated = await updateTask({ task_id: t.task_id, note: 'hello', expected_version: 0 })
+    expect(updated.version).toBe(1)
+    expect(updated.note).toBe('hello')
   })
 
   it('throws not_found for unknown task_id', async () => {

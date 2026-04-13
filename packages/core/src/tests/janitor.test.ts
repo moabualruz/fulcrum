@@ -22,6 +22,28 @@ function seed() {
   db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','test',datetime('now'))").run()
 }
 
+describe('runJanitorCycle — invalid policy', () => {
+  it('throws invalid_input for negative heartbeat_timeout_minutes', async () => {
+    seed()
+    await expect(
+      runJanitorCycle({
+        workspace_id: 'ws_1',
+        policy: { ...policy, heartbeat_timeout_minutes: -1 },
+      })
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+
+  it('throws invalid_input for negative escalation_timeout_minutes', async () => {
+    seed()
+    await expect(
+      runJanitorCycle({
+        workspace_id: 'ws_1',
+        policy: { ...policy, escalation_timeout_minutes: -1 },
+      })
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+})
+
 describe('runJanitorCycle', () => {
   it('marks running runs stale when heartbeat timeout exceeded', async () => {
     seed()

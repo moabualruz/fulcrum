@@ -108,7 +108,7 @@ export interface FulcrumConfig {
 
 export interface PolicyCheckResult {
   allowed: boolean
-  reason?: string
+  reason?: 'wip_limit_exceeded' | 'dependencies_incomplete'
   current_wip?: number
   limit?: number
   blocking_tasks?: string[]
@@ -120,7 +120,7 @@ export class FulcrumError extends Error {
     public readonly code:
       | 'not_found'
       | 'version_conflict'
-      | 'policy_blocked'
+      | 'policy_blocked'  // reserved for transport-level policy enforcement
       | 'invalid_input'
   ) {
     super(message)

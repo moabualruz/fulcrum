@@ -12,6 +12,45 @@ function seed() {
   db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','test',datetime('now'))").run()
 }
 
+describe('writeMemory — input validation', () => {
+  it('throws invalid_input for empty content', async () => {
+    seed()
+    await expect(
+      writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: '' })
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+
+  it('throws invalid_input for whitespace-only content', async () => {
+    seed()
+    await expect(
+      writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: '   ' })
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+
+  it('throws invalid_input for confidence > 1', async () => {
+    seed()
+    await expect(
+      writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'test', confidence: 1.5 })
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+
+  it('throws invalid_input for confidence < 0', async () => {
+    seed()
+    await expect(
+      writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'test', confidence: -0.1 })
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+})
+
+describe('recallMemory — input validation', () => {
+  it('throws invalid_input for empty query', async () => {
+    seed()
+    await expect(
+      recallMemory({ workspace_id: 'ws_1', project_id: 'proj_1', query: '' })
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+})
+
 describe('writeMemory', () => {
   it('persists a memory and returns it', async () => {
     seed()
@@ -46,6 +85,20 @@ describe('writeMemory', () => {
   })
 })
 
+describe('recallMemory — cross-workspace isolation', () => {
+  it('does not return memories from a different workspace', async () => {
+    const db = getDb()
+    db.prepare("INSERT INTO workspaces VALUES ('ws_1','ws1',datetime('now'))").run()
+    db.prepare("INSERT INTO workspaces VALUES ('ws_2','ws2',datetime('now'))").run()
+    db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','p1',datetime('now'))").run()
+    db.prepare("INSERT INTO projects VALUES ('proj_2','ws_2','p2',datetime('now'))").run()
+
+    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'secret for ws_1 only' })
+    const results = await recallMemory({ workspace_id: 'ws_2', project_id: 'proj_2', query: 'secret', limit: 5 })
+    expect(results).toHaveLength(0)
+  })
+})
+
 describe('recallMemory', () => {
   it('returns memories matching a query via FTS5', async () => {
     seed()
@@ -69,5 +122,55 @@ describe('recallMemory', () => {
     seed()
     const results = await recallMemory({ workspace_id: 'ws_1', project_id: 'proj_1', query: 'zzznomatch', limit: 5 })
     expect(results).toEqual([])
+  })
+
+  it('defaults to limit 5 when not specified', async () => {
+    seed()
+    for (let i = 1; i <= 7; i++) {
+      await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: `SQLite fact number ${i}` })
+    }
+    const results = await recallMemory({ workspace_id: 'ws_1', project_id: 'proj_1', query: 'SQLite' })
+    expect(results.length).toBeLessThanOrEqual(5)
+    expect(results.length).toBeGreaterThan(0)
+  })
+
+  it('respects limit — returns at most N results', async () => {
+    seed()
+    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'SQLite is the database engine' })
+    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'SQLite uses WAL mode' })
+    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'SQLite supports FTS5 full-text search' })
+    const results = await recallMemory({ workspace_id: 'ws_1', project_id: 'proj_1', query: 'SQLite', limit: 2 })
+    expect(results.length).toBeLessThanOrEqual(2)
+  })
+
+  it('returns empty array for limit 0', async () => {
+    seed()
+    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'SQLite is the database' })
+    const results = await recallMemory({ workspace_id: 'ws_1', project_id: 'proj_1', query: 'SQLite', limit: 0 })
+    expect(results).toEqual([])
+  })
+})
+
+describe('recallMemory — FTS5 fallback', () => {
+  it('does not throw when query contains FTS5 special characters, returns results via LIKE fallback', async () => {
+    seed()
+    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'SQLite full text search' })
+    // Unclosed quote is a valid FTS5 syntax error trigger
+    const results = await recallMemory({ workspace_id: 'ws_1', project_id: 'proj_1', query: '"SQLite', limit: 5 })
+    expect(Array.isArray(results)).toBe(true)
+  })
+})
+
+describe('writeMemory — deduplication behaviour', () => {
+  it('exact dedup updates confidence but preserves original tags', async () => {
+    seed()
+    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'same content', tags: ['original'] })
+    const updated = await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1', content: 'same content',
+      tags: ['ignored'], confidence: 0.8,
+    })
+    // Tags are NOT updated on exact dedup — confidence is
+    expect(updated.confidence).toBe(0.8)
+    expect(updated.tags).toEqual(['original'])
   })
 })

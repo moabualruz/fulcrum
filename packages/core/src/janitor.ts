@@ -1,5 +1,6 @@
 import { getDb } from './db/client.js'
 import { escalateRun } from './runs.js'
+import { FulcrumError } from './types.js'
 import type { PolicyConfig } from './types.js'
 
 interface JanitorCycleInput {
@@ -12,10 +13,10 @@ export async function runJanitorCycle(input: JanitorCycleInput): Promise<void> {
   const { heartbeat_timeout_minutes, escalation_timeout_minutes } = input.policy
 
   if (!Number.isFinite(heartbeat_timeout_minutes) || heartbeat_timeout_minutes < 0) {
-    throw new Error(`Invalid heartbeat_timeout_minutes: ${heartbeat_timeout_minutes}`)
+    throw new FulcrumError(`Invalid heartbeat_timeout_minutes: ${heartbeat_timeout_minutes}`, 'invalid_input')
   }
   if (!Number.isFinite(escalation_timeout_minutes) || escalation_timeout_minutes < 0) {
-    throw new Error(`Invalid escalation_timeout_minutes: ${escalation_timeout_minutes}`)
+    throw new FulcrumError(`Invalid escalation_timeout_minutes: ${escalation_timeout_minutes}`, 'invalid_input')
   }
 
   // Mark running runs stale when no heartbeat received within timeout
@@ -49,8 +50,13 @@ export async function runJanitorCycle(input: JanitorCycleInput): Promise<void> {
 
 /** Start a background janitor loop. Returns a stop function. */
 export function startJanitor(workspace_id: string, policy: PolicyConfig, intervalMs = 60_000): () => void {
+  let running = false
   const timer = setInterval(() => {
-    void runJanitorCycle({ workspace_id, policy }).catch(console.error)
+    if (running) return // skip if previous cycle hasn't finished
+    running = true
+    void runJanitorCycle({ workspace_id, policy })
+      .catch(console.error)
+      .finally(() => { running = false })
   }, intervalMs)
   return () => clearInterval(timer)
 }

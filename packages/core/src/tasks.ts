@@ -59,6 +59,7 @@ export async function listTasks(input: ListTasksInput): Promise<Task[]> {
 }
 
 export async function createTask(input: CreateTaskInput): Promise<Task> {
+  if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
   const db = getDb()
   const task_id = ulid()
   const now = new Date().toISOString()
@@ -102,5 +103,7 @@ export async function updateTask(input: UpdateTaskInput): Promise<Task> {
   values.push(input.task_id)
 
   db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE task_id = ?`).run(...values)
-  return rowToTask(db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(input.task_id) as Record<string, unknown>)
+  const updated = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(input.task_id) as Record<string, unknown> | undefined
+  if (!updated) throw new FulcrumError(`Task ${input.task_id} not found after update`, 'not_found')
+  return rowToTask(updated)
 }

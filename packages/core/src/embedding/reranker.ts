@@ -7,6 +7,7 @@ export class LocalRerankerProvider implements RerankerProvider {
   private tokenizer: any = null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private rankerModel: any = null
+  private _warmingUp: Promise<void> | null = null
 
   constructor(config: EmbeddingProviderConfig) {
     this.model = config.model
@@ -14,10 +15,15 @@ export class LocalRerankerProvider implements RerankerProvider {
 
   async warmUp(): Promise<void> {
     if (this.tokenizer) return
-    const { AutoTokenizer, AutoModelForSequenceClassification, env } = await import('@huggingface/transformers')
-    env.cacheDir = './.fulcrum/models'
-    this.tokenizer = await AutoTokenizer.from_pretrained(this.model)
-    this.rankerModel = await AutoModelForSequenceClassification.from_pretrained(this.model, { dtype: 'q8' })
+    if (!this._warmingUp) {
+      this._warmingUp = (async () => {
+        const { AutoTokenizer, AutoModelForSequenceClassification, env } = await import('@huggingface/transformers')
+        env.cacheDir = './.fulcrum/models'
+        this.tokenizer = await AutoTokenizer.from_pretrained(this.model)
+        this.rankerModel = await AutoModelForSequenceClassification.from_pretrained(this.model, { dtype: 'q8' })
+      })()
+    }
+    return this._warmingUp
   }
 
   async rerank(query: string, passages: string[]): Promise<number[]> {

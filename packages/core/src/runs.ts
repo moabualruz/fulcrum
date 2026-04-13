@@ -35,7 +35,7 @@ function captureGitContext(): { git_branch: string | null; git_commit: string | 
   }
 }
 
-function rowToRun(row: Record<string, unknown>): AgentRun {
+export function rowToRun(row: Record<string, unknown>): AgentRun {
   return {
     run_id: row.run_id as string,
     task_id: row.task_id as string,
@@ -62,8 +62,22 @@ function getRun(run_id: string): AgentRun {
   return rowToRun(row)
 }
 
+/**
+ * Creates a new agent run for the given task.
+ * NOTE: WIP limit and dependency enforcement is the caller's responsibility —
+ * callers should call `checkPolicy` first and only proceed if `allowed: true`.
+ */
 export async function startAgentRun(input: StartRunInput): Promise<AgentRun> {
   const db = getDb()
+  const taskRow = db.prepare('SELECT workspace_id FROM tasks WHERE task_id = ?')
+    .get(input.task_id) as { workspace_id: string } | undefined
+  if (!taskRow) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
+  if (taskRow.workspace_id !== input.workspace_id) {
+    throw new FulcrumError(
+      `Task ${input.task_id} belongs to workspace ${taskRow.workspace_id}, not ${input.workspace_id}`,
+      'invalid_input'
+    )
+  }
   const run_id = ulid()
   const now = new Date().toISOString()
   const { git_branch, git_commit } = captureGitContext()
@@ -76,6 +90,9 @@ export async function startAgentRun(input: StartRunInput): Promise<AgentRun> {
 }
 
 export async function heartbeatAgentRun(input: HeartbeatInput): Promise<void> {
+  if (input.progress_pct < 0 || input.progress_pct > 100) {
+    throw new FulcrumError('progress_pct must be between 0 and 100', 'invalid_input')
+  }
   const db = getDb()
   const result = db.prepare(`
     UPDATE agent_runs
@@ -113,6 +130,7 @@ export async function completeAgentRun(input: CompleteRunInput): Promise<AgentRu
 }
 
 export async function blockAgentRun(input: BlockRunInput): Promise<AgentRun> {
+  if (!input.reason.trim()) throw new FulcrumError('reason must not be empty', 'invalid_input')
   getRun(input.run_id) // throws not_found before any mutation
   const db = getDb()
   db.prepare(`
@@ -124,6 +142,7 @@ export async function blockAgentRun(input: BlockRunInput): Promise<AgentRun> {
 }
 
 export async function escalateRun(input: EscalateRunInput): Promise<Task> {
+  if (!input.escalation_reason.trim()) throw new FulcrumError('escalation_reason must not be empty', 'invalid_input')
   const db = getDb()
   const run = getRun(input.run_id)
 

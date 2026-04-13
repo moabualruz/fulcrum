@@ -1,5 +1,6 @@
 import { getDb } from './db/client.js'
-import type { AgentProfile, AgentRole, WorkspaceStatus } from './types.js'
+import { rowToRun } from './runs.js'
+import type { AgentProfile, WorkspaceStatus } from './types.js'
 
 interface GetWorkspaceStatusInput { workspace_id: string }
 interface BuildCosContextInput { workspace_id: string; project_id: string; max_tokens?: number }
@@ -37,17 +38,11 @@ export async function getWorkspaceStatus(input: GetWorkspaceStatusInput): Promis
     "SELECT COUNT(*) as c FROM agent_runs WHERE workspace_id = ? AND status = 'completed' AND date(completed_at) = ?"
   ).get(input.workspace_id, today) as { c: number }).c
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const toRun = (row: any) => ({
-    ...row,
-    artifacts: row.artifacts ? ((): unknown => { try { return JSON.parse(row.artifacts as string) } catch { return null } })() : null,
-  })
-
   return {
     workspace_id: input.workspace_id,
-    running_runs: (running as object[]).map(toRun),
-    blocked_runs: (blocked as object[]).map(toRun),
-    stale_runs: (stale as object[]).map(toRun),
+    running_runs: (running as Record<string, unknown>[]).map(rowToRun),
+    blocked_runs: (blocked as Record<string, unknown>[]).map(rowToRun),
+    stale_runs: (stale as Record<string, unknown>[]).map(rowToRun),
     wip_count: running.length,
     queued_tasks: queued,
     completed_tasks_today: completedToday,
@@ -61,19 +56,38 @@ export async function buildCosContext(input: BuildCosContextInput): Promise<stri
 
   const status = await getWorkspaceStatus({ workspace_id: input.workspace_id })
 
-  parts.push(`# Workspace Status — ${input.workspace_id}\n`)
-  parts.push(`**WIP:** ${status.wip_count}  **Queued:** ${status.queued_tasks}  **Completed today:** ${status.completed_tasks_today}\n`)
+  const projectQueued = (db.prepare(
+    "SELECT COUNT(*) as c FROM tasks WHERE workspace_id = ? AND project_id = ? AND status = 'queued'"
+  ).get(input.workspace_id, input.project_id) as { c: number }).c
 
-  if (status.running_runs.length > 0) {
+  // Project-scoped run views for CoS context
+  const projectRunning = (db.prepare(`
+    SELECT r.* FROM agent_runs r
+    JOIN tasks t ON t.task_id = r.task_id
+    WHERE r.workspace_id = ? AND t.project_id = ? AND r.status = 'running'
+    ORDER BY r.started_at DESC
+  `).all(input.workspace_id, input.project_id) as Record<string, unknown>[]).map(rowToRun)
+
+  const projectBlocked = (db.prepare(`
+    SELECT r.* FROM agent_runs r
+    JOIN tasks t ON t.task_id = r.task_id
+    WHERE r.workspace_id = ? AND t.project_id = ? AND r.status = 'blocked'
+    ORDER BY r.updated_at ASC
+  `).all(input.workspace_id, input.project_id) as Record<string, unknown>[]).map(rowToRun)
+
+  parts.push(`# Workspace Status — ${input.workspace_id}\n`)
+  parts.push(`**WIP:** ${status.wip_count}  **Queued (project):** ${projectQueued}  **Completed today:** ${status.completed_tasks_today}\n`)
+
+  if (projectRunning.length > 0) {
     parts.push('\n## Running\n')
-    for (const r of status.running_runs) {
+    for (const r of projectRunning) {
       parts.push(`- **${r.role}** (${r.run_id}) — ${r.current_step ?? 'in progress'} (${r.progress_pct}%)\n`)
     }
   }
 
-  if (status.blocked_runs.length > 0) {
+  if (projectBlocked.length > 0) {
     parts.push('\n## Blocked\n')
-    for (const r of status.blocked_runs) {
+    for (const r of projectBlocked) {
       parts.push(`- **${r.role}** (${r.run_id}) — ${r.output_summary ?? 'no reason given'}\n`)
     }
   }

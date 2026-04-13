@@ -72,6 +72,66 @@ describe('checkPolicy — WIP limits', () => {
   })
 })
 
+describe('checkPolicy — wip_limit edge cases', () => {
+  it('always blocks when wip_limit is 0 (regardless of current WIP)', async () => {
+    seed()
+    const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
+    const result = await checkPolicy({
+      workspace_id: 'ws_1',
+      task_id: t.task_id,
+      role: 'implementer',
+      policy: { ...defaultPolicy, wip_limit: 0 },
+    })
+    expect(result.allowed).toBe(false)
+    expect(result.reason).toBe('wip_limit_exceeded')
+    expect(result.limit).toBe(0)
+  })
+})
+
+describe('checkPolicy — invalid policy config', () => {
+  it('throws invalid_input for negative wip_limit', async () => {
+    seed()
+    const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
+    await expect(
+      checkPolicy({ workspace_id: 'ws_1', task_id: t.task_id, role: 'implementer', policy: { ...defaultPolicy, wip_limit: -1 } })
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+
+  it('throws invalid_input for negative per-role wip limit', async () => {
+    seed()
+    const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
+    await expect(
+      checkPolicy({
+        workspace_id: 'ws_1',
+        task_id: t.task_id,
+        role: 'implementer',
+        policy: { ...defaultPolicy, wip_limit_per_role: { implementer: -1 } },
+      })
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+})
+
+describe('checkPolicy — unknown task', () => {
+  it('throws not_found when task_id does not exist', async () => {
+    seed()
+    await expect(
+      checkPolicy({ workspace_id: 'ws_1', task_id: 'NONEXISTENT', role: 'implementer', policy: defaultPolicy })
+    ).rejects.toMatchObject({ code: 'not_found' })
+  })
+
+  it('throws not_found when task belongs to a different workspace', async () => {
+    const db = getDb()
+    seed()
+    db.prepare("INSERT INTO workspaces VALUES ('ws_2','other',datetime('now'))").run()
+    db.prepare("INSERT INTO projects VALUES ('proj_2','ws_2','p2',datetime('now'))").run()
+    const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
+    // Task is in ws_1 but we query for ws_2 — should not find it
+    await expect(
+      checkPolicy({ workspace_id: 'ws_2', task_id: t.task_id, role: 'implementer', policy: defaultPolicy })
+    ).rejects.toMatchObject({ code: 'not_found' })
+  })
+})
+
 describe('checkPolicy — task dependencies', () => {
   it('blocks when a dependency is not completed', async () => {
     seed()

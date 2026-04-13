@@ -1,5 +1,6 @@
 import { ulid } from 'ulid'
 import { getDb } from './db/client.js'
+import { FulcrumError } from './types.js'
 import type { Memory } from './types.js'
 import { getTextEmbedder, getReranker } from './embedding/registry.js'
 
@@ -34,8 +35,9 @@ function rowToMemory(row: Record<string, unknown>): Memory {
   }
 }
 
-/** Cosine similarity between two Float32Arrays */
+/** Cosine similarity between two Float32Arrays (mismatched lengths → 0) */
 function cosineSimilarity(a: Float32Array, b: Float32Array): number {
+  if (a.length !== b.length) return 0
   let dot = 0, normA = 0, normB = 0
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i]
@@ -47,6 +49,10 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
 }
 
 export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
+  if (!input.content.trim()) throw new FulcrumError('content must not be empty', 'invalid_input')
+  if (input.confidence !== undefined && (input.confidence < 0 || input.confidence > 1)) {
+    throw new FulcrumError('confidence must be between 0 and 1', 'invalid_input')
+  }
   const db = getDb()
   const now = new Date().toISOString()
 
@@ -103,13 +109,15 @@ export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
     now, now, now
   )
   const row = db.prepare('SELECT * FROM memories WHERE memory_id = ?').get(memory_id) as Record<string, unknown> | undefined
-  if (!row) throw new Error(`Memory ${memory_id} not found after insert`)
+  if (!row) throw new FulcrumError(`Memory ${memory_id} not found after insert`, 'not_found')
   return rowToMemory(row)
 }
 
 export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> {
-  const db = getDb()
+  if (!input.query.trim()) throw new FulcrumError('query must not be empty', 'invalid_input')
   const limit = input.limit ?? 5
+  if (limit <= 0) return []
+  const db = getDb()
   const candidates = new Map<string, { memory: Memory; score: number }>()
 
   // --- FTS5 lexical search ---
@@ -125,8 +133,9 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
       ORDER BY f.rank
     `).all(input.query, input.workspace_id, input.project_id) as { rowid: number; rank: number }[]
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    if (!msg.includes('fts5') && !msg.includes('syntax')) throw err
+    // Fall back to LIKE on any SQLite error (FTS5 syntax errors, unavailable extension, etc.)
+    // Re-throw non-SQLite errors (e.g. OOM, programming bugs outside this query)
+    if ((err as { code?: string }).code !== 'SQLITE_ERROR') throw err
     const likeRows = db.prepare(
       'SELECT rowid FROM memories WHERE workspace_id = ? AND project_id = ? AND content LIKE ? LIMIT ?'
     ).all(input.workspace_id, input.project_id, `%${input.query}%`, limit) as { rowid: number }[]
@@ -141,6 +150,7 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
     ).all(...rowids, input.workspace_id, input.project_id) as Record<string, unknown>[]
     for (const row of rows) {
       const fts = ftsRows.find(f => f.rowid === (row as Record<string, unknown> & { rowid: number }).rowid)
+      // FTS5 rank is negative (lower = better match); negate to get a positive score
       candidates.set(row.memory_id as string, { memory: rowToMemory(row), score: fts ? Math.abs(fts.rank) : 0 })
     }
   }
@@ -197,12 +207,14 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
   const top = sorted.slice(0, limit).map(c => c.memory)
 
   // Update access tracking (only for returned rows)
-  const now = new Date().toISOString()
-  const ids = top.map(m => m.memory_id)
-  const idPlaceholders = ids.map(() => '?').join(',')
-  db.prepare(
-    `UPDATE memories SET access_count = access_count + 1, last_accessed_at = ? WHERE memory_id IN (${idPlaceholders})`
-  ).run(now, ...ids)
+  if (top.length > 0) {
+    const now = new Date().toISOString()
+    const ids = top.map(m => m.memory_id)
+    const idPlaceholders = ids.map(() => '?').join(',')
+    db.prepare(
+      `UPDATE memories SET access_count = access_count + 1, last_accessed_at = ? WHERE memory_id IN (${idPlaceholders})`
+    ).run(now, ...ids)
+  }
 
   return top
 }
