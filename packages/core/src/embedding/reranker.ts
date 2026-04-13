@@ -28,9 +28,14 @@ export class LocalRerankerProvider implements RerankerProvider {
 
   async rerank(query: string, passages: string[]): Promise<number[]> {
     await this.warmUp()
-    const pairs = passages.map(p => [query, p])
+    const queries = passages.map(() => query)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    const inputs = await this.tokenizer(pairs, { padding: true, truncation: true, return_tensors: 'pt' })
+    const inputs = await this.tokenizer(queries, {
+      text_pair: passages,
+      padding: true,
+      truncation: true,
+      return_tensors: 'pt',
+    })
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     const { logits } = await this.rankerModel(inputs) as { logits: { data: Float32Array } }
     return Array.from(logits.data)
