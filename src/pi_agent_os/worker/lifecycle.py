@@ -12,6 +12,7 @@ from ..adapters.readers.task_read import TaskWriter
 from ..routing.router import Router
 from ..policy.engine import check as policy_check, PolicyDeniedError
 from .pi_adapter import get_pi_runtime, PIAgentConfig
+from .cos_context import CoSContextBuilder
 
 
 class WorkerLifecycle:
@@ -87,6 +88,19 @@ class WorkerLifecycle:
             "artifact_contract_id": handoff.artifact_contract_id,
             "handoff_mode": str(handoff.handoff_mode),
         }
+
+        # Inject world-state for the Chief of Staff so it stays coherent across
+        # stateless invocations.
+        resolved_role = decision.resolved_profile or agent_role
+        if resolved_role == "chief_of_staff" and project_id:
+            builder = CoSContextBuilder(
+                project_id=project_id,
+                workspace_id=workspace_id,
+            )
+            world_state = builder.build(handoff.goal)
+            task_packet["_instruction"] = (
+                f"You are the Chief of Staff for this project.\n\n{world_state}"
+            )
 
         # Spawn via PI runtime adapter
         pi_run_id = self._pi.spawn_agent(PIAgentConfig(
