@@ -46,3 +46,6 @@ export { getWorkspaceStatus, buildCosContext, listAgentProfiles } from './status
 
 // IDs
 export { newId, nextDisplayId } from './ids.js'
+
+// Status Category
+export { statusCategory } from './status-category.js'
