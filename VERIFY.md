@@ -155,7 +155,27 @@ Each entry: Phase / Component / Test / Result / Date
 | CoS JSON parser brace-depth scanner | test_cos_wiring.py passes | 2026-04-13 |
 | OTel gen_ai.provider.name emitted | test_telemetry.py passes | 2026-04-13 |
 
-## Full Test Run (2026-04-13)
+## Phase 10 Extension: PI Native Extension (Session 4)
+
+| Component | Test | Result | Date |
+|---|---|---|---|
+| PI BeforeTool hook | camelCase normalisation, allow/deny (6 tests) | VERIFIED ✓ | 2026-04-13 |
+| PI hook snake_case fallback | snake_case fields accepted | VERIFIED ✓ | 2026-04-13 |
+| start_agent_run | creates AgentRun, returns run_id | VERIFIED ✓ | 2026-04-13 |
+| start_agent_run pi_run_id | custom run_id preserved | VERIFIED ✓ | 2026-04-13 |
+| heartbeat_agent_run | calls AgentRunWriter.heartbeat | VERIFIED ✓ | 2026-04-13 |
+| complete_agent_run | sets status=finished | VERIFIED ✓ | 2026-04-13 |
+| block_agent_run | sets status=blocked + blocker | VERIFIED ✓ | 2026-04-13 |
+| build_cos_context | returns context_markdown | VERIFIED ✓ | 2026-04-13 |
+| get_workspace_status | returns active/blocked/wip counts | VERIFIED ✓ | 2026-04-13 |
+
+## Full Test Run (2026-04-13, Session 4)
+
+```
+228 passed, 1 skipped, 1 warning in 2.24s
+```
+
+## Full Test Run (2026-04-13, Session 3)
 
 ```
 215 passed, 1 skipped, 1 warning in 2.97s

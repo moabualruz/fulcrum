@@ -1,5 +1,41 @@
 # Implementation Changelog
 
+## [0.4.0] — 2026-04-13 (Session 4: PI Native Extension)
+
+### Added
+
+- **`agent-integration/pi/`**: PI native extension package
+  - `pi-os.extension.json`: PI extension manifest — MCP server subprocess, BeforeTool hook, `lifecycleTools` map pointing to the 6 runtime tools
+  - `PI.md`: Context rules for PI agents — tool namespace, role boundaries, lifecycle call sequence, CoS JSON format
+  - `install.sh`: Installs to `~/.pi/extensions/` (or `$PI_EXTENSIONS_DIR`)
+
+- **`src/pi_agent_os/hooks/pi_hook.py`**: PI BeforeTool hook
+  - Normalises PI camelCase event shape (`sessionId`, `toolName`, `toolInput`, `runId`) to canonical hook shape
+  - Falls back to snake_case fields when PI sends those instead
+  - Passes `role` and `run_id` through for richer policy context
+  - Delegates to `handle_hook()` from `claude_hook` (shared logic)
+
+- **`src/pi_agent_os/mcp/server.py`**: 6 new lifecycle/status MCP tools (total: 13)
+  - `start_agent_run(task_id, agent_role, workspace_id, project_id, worktree_path, pi_run_id)` — creates AgentRun + emits `agent_run_started`
+  - `heartbeat_agent_run(run_id, workspace_id, current_step, progress_pct)` — calls `AgentRunWriter.heartbeat()`
+  - `complete_agent_run(run_id, workspace_id, output_summary, artifact_paths)` — updates status to `finished`
+  - `block_agent_run(run_id, workspace_id, reason)` — updates status to `blocked` + stores blocker
+  - `build_cos_context(goal, project_id, workspace_id, max_tasks, max_events)` — returns world-state markdown for CoS injection
+  - `get_workspace_status(workspace_id)` — single-call snapshot: active runs, blockers, queue depth, WIP
+
+- **`tests/unit/test_pi_hook.py`**: 6 tests for PI hook (camelCase normalisation, allow/deny, empty/invalid stdin, snake_case fallback)
+- **`tests/unit/test_mcp_server.py`**: 13 tests added for lifecycle tools (8 new lifecycle + 5 original → 21 total in file)
+
+### Fixed (bugs found during PI extension work)
+
+- **`mcp/server.py`**: `EventType.agent_started/heartbeat/completed/blocked` → correct names `agent_run_started/progress/finished/blocked`
+- **`mcp/server.py`**: `AgentRunWriter.complete()` / `AgentRunWriter.block()` don't exist — replaced with `AgentRunWriter.update()` using `AgentRunStatus.finished` / `AgentRunStatus.blocked`
+- **`mcp/server.py`**: `project_id=project_id or None` in `AgentRun()` constructor fails Pydantic validation (`project_id: str` is non-optional) — changed to `project_id or ""`
+
+### Total tests: 228 passing, 1 skipped
+
+---
+
 ## [0.3.0] — 2026-04-13 (Session 3: Hardening + Research)
 
 ### Fixed (Critical Bugs)

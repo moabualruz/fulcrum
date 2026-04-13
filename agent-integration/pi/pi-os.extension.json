@@ -1,0 +1,28 @@
+{
+  "name": "pi-os",
+  "version": "1.0.0",
+  "description": "PI Agent OS control plane integration — tasks, memory, lifecycle, and policy for PI agents.",
+  "contextFileName": "PI.md",
+  "mcpServers": [
+    {
+      "name": "pi-os",
+      "command": "python",
+      "args": ["-m", "pi_agent_os.mcp.server"],
+      "trust": true
+    }
+  ],
+  "hooks": {
+    "BeforeTool": {
+      "command": "python -m pi_agent_os.hooks.pi_hook"
+    }
+  },
+  "lifecycleTools": {
+    "description": "PI runtime should call these MCP tools directly (not via the LLM) to drive the control plane.",
+    "onRunStart": "mcp__pi-os__start_agent_run",
+    "onHeartbeat": "mcp__pi-os__heartbeat_agent_run",
+    "onRunComplete": "mcp__pi-os__complete_agent_run",
+    "onRunBlocked": "mcp__pi-os__block_agent_run",
+    "onCoSDispatch": "mcp__pi-os__build_cos_context",
+    "onStatusQuery": "mcp__pi-os__get_workspace_status"
+  }
+}

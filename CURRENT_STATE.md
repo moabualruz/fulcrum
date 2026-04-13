@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-04-13 (session 3)
+Last updated: 2026-04-13 (session 4)
 
 ## Repository Summary
 
@@ -11,7 +11,7 @@ Last updated: 2026-04-13 (session 3)
 | Language | Python 3.12+ |
 | Package manager | uv |
 | Framework | FastAPI (monitor), Typer (CLI), Pydantic v2 (models) |
-| Tests | 215 passing, 1 skipped |
+| Tests | 228 passing, 1 skipped |
 | CI/CD | None (local-only) |
 
 ## Implementation Status
@@ -32,7 +32,7 @@ Last updated: 2026-04-13 (session 3)
 | 7 | Security + Policy | ✅ Complete | test_policy, test_deny_rule_trip |
 | 8 | Plane Adapter | ✅ Complete | test_plane_adapter, test_plane_sync_conflict |
 | 9 | Analytics + Monitor | ✅ Complete | test_analytics |
-| 10 | External CLI Agent Integration | ✅ Complete | test_mcp_server, test_claude_hook, test_telemetry, test_cos_wiring, test_cli_serve |
+| 10 | External CLI Agent Integration | ✅ Complete | test_mcp_server (21), test_claude_hook, test_pi_hook (6), test_telemetry, test_cos_wiring, test_cli_serve |
 
 ### Golden Scenarios
 
@@ -82,7 +82,7 @@ Last updated: 2026-04-13 (session 3)
 ### Security + Policy
 - PolicyEngine (deny rules, SYSTEM_INVARIANTS, default-allow)
 - SecretGuard (pattern detection + redaction)
-- Claude PreToolUse hook / Gemini BeforeTool hook
+- Claude PreToolUse hook / Gemini BeforeTool hook / PI BeforeTool hook
 
 ### Sync
 - PlaneAdapter (local-wins conflict, secret guard, async queue)
@@ -94,10 +94,12 @@ Last updated: 2026-04-13 (session 3)
 - FastAPI monitor server (17+ read-only endpoints, SSE)
 
 ### External CLI Integration
-- MCP server (`pi-os`, 7 tools)
+- MCP server (`pi-os`, 13 tools: 7 original + 6 lifecycle/status)
 - `pi serve mcp|hooks|all` CLI
 - OTel spans (GenAI semconv v1.37.0: gen_ai.provider.name)
-- `agent-integration/claude/` + `agent-integration/gemini/` install packages
+- `agent-integration/claude/` + `agent-integration/gemini/` + `agent-integration/pi/` install packages
+- PI-native extension: `pi-os.extension.json`, `PI.md`, `pi_hook.py`
+- Lifecycle tools: `start_agent_run`, `heartbeat_agent_run`, `complete_agent_run`, `block_agent_run`, `build_cos_context`, `get_workspace_status`
 
 ## PI Runtime
 

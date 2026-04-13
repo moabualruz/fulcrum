@@ -268,3 +268,213 @@ def get_agent_run_status(run_id: str) -> dict:
     except Exception as exc:
         log.error("get_agent_run_status failed: %s", exc, exc_info=True)
         return {"error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle tools — called by the PI extension to drive the control plane
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def start_agent_run(
+    task_id: str,
+    agent_role: str,
+    workspace_id: str,
+    project_id: str = "",
+    worktree_path: str = "",
+    pi_run_id: str = "",
+) -> dict:
+    """
+    Register a PI agent run starting. Call this when PI begins executing a task.
+
+    Returns the internal run_id that subsequent heartbeat/complete/block calls need.
+    """
+    try:
+        from ..ids import generate_id, RUN_PREFIX
+        from ..models.agent_run import AgentRun, AgentRunStatus
+        from ..adapters.writers.agent_run_writer import AgentRunWriter
+        from ..events.store import emit
+        from ..models.events import EventType
+
+        run_id = pi_run_id or generate_id(RUN_PREFIX)
+        now = datetime.now(timezone.utc).isoformat()
+        run = AgentRun(
+            run_id=run_id,
+            workspace_id=workspace_id,
+            project_id=project_id or "",
+            task_id=task_id or None,
+            display_id=f"RUN-{run_id[-6:].upper()}",
+            agent_id=f"pi/{agent_role}",
+            agent_role=agent_role,
+            pi_profile=agent_role,
+            status=AgentRunStatus.running,
+            worktree_path=worktree_path or None,
+            started_at=now,
+        )
+        AgentRunWriter().create(run)
+        emit(
+            EventType.agent_run_started,
+            workspace_id=workspace_id,
+            actor_type="agent",
+            actor_id=f"pi/{agent_role}",
+            object_type="agent_run",
+            object_id=run_id,
+            project_id=project_id or None,
+            payload={"role": agent_role, "task_id": task_id, "worktree_path": worktree_path},
+        )
+        log.info("pi-os start_agent_run: %s role=%s task=%s", run_id, agent_role, task_id)
+        return {"run_id": run_id, "status": "running"}
+    except Exception as exc:
+        log.error("start_agent_run failed: %s", exc, exc_info=True)
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def heartbeat_agent_run(
+    run_id: str,
+    workspace_id: str,
+    current_step: str = "",
+    progress_pct: float = 0.0,
+) -> dict:
+    """
+    Send a heartbeat for a running agent. PI should call this every ~30s.
+    Keeps the run visible as 'alive' in the monitor.
+    """
+    try:
+        from ..adapters.writers.agent_run_writer import AgentRunWriter
+
+        AgentRunWriter().heartbeat(run_id, current_step=current_step, progress_pct=progress_pct)
+        return {"run_id": run_id, "ok": True}
+    except Exception as exc:
+        log.error("heartbeat_agent_run failed: %s", exc, exc_info=True)
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def complete_agent_run(
+    run_id: str,
+    workspace_id: str,
+    output_summary: str = "",
+    artifact_paths: str = "",
+) -> dict:
+    """
+    Mark a PI agent run as completed. Call this when PI finishes executing a task.
+    artifact_paths: comma-separated list of artifact file paths produced.
+    """
+    try:
+        from ..adapters.writers.agent_run_writer import AgentRunWriter
+        from ..models.agent_run import AgentRunStatus
+
+        paths = [p.strip() for p in artifact_paths.split(",") if p.strip()]
+        now = datetime.now(timezone.utc).isoformat()
+        AgentRunWriter().update(run_id, {
+            "status": AgentRunStatus.finished,
+            "current_step": output_summary[:200] if output_summary else "done",
+            "finished_at": now,
+        })
+        log.info("pi-os complete_agent_run: %s artifacts=%s", run_id, paths)
+        return {"run_id": run_id, "status": "completed"}
+    except Exception as exc:
+        log.error("complete_agent_run failed: %s", exc, exc_info=True)
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def block_agent_run(
+    run_id: str,
+    workspace_id: str,
+    reason: str,
+) -> dict:
+    """
+    Mark a PI agent run as blocked. Call this when the agent cannot proceed.
+    The reason is stored as a blocker on the task for the Chief of Staff to resolve.
+    """
+    try:
+        from ..adapters.writers.agent_run_writer import AgentRunWriter
+        from ..models.agent_run import AgentRunStatus
+
+        AgentRunWriter().update(run_id, {
+            "status": AgentRunStatus.blocked,
+            "blocker": reason[:500],
+        })
+        log.info("pi-os block_agent_run: %s reason=%s", run_id, reason[:120])
+        return {"run_id": run_id, "status": "blocked", "reason": reason}
+    except Exception as exc:
+        log.error("block_agent_run failed: %s", exc, exc_info=True)
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def build_cos_context(
+    goal: str,
+    project_id: str,
+    workspace_id: str,
+    max_tasks: int = 40,
+    max_events: int = 30,
+) -> dict:
+    """
+    Build a world-state snapshot for the Chief of Staff.
+
+    Returns a markdown string ready to inject into the CoS system prompt.
+    Call this before spawning a chief_of_staff agent so it has full context
+    without relying on chat history.
+    """
+    try:
+        from ..worker.cos_context import build_cos_task_packet
+        packet = build_cos_task_packet(
+            goal=goal,
+            project_id=project_id,
+            workspace_id=workspace_id,
+            max_tasks=max_tasks,
+            max_events=max_events,
+        )
+        return {
+            "context_markdown": packet.get("_instruction", ""),
+            "project_id": project_id,
+            "workspace_id": workspace_id,
+        }
+    except Exception as exc:
+        log.error("build_cos_context failed: %s", exc, exc_info=True)
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def get_workspace_status(workspace_id: str) -> dict:
+    """
+    Get a full workspace status snapshot: running agents, queue depth,
+    recent blockers, WIP count. Replaces the need to call multiple tools.
+    """
+    try:
+        from ..adapters.readers.agent_status_read import AgentStatusReadAdapter
+        from ..worktrees.merge_queue import MergeQueue
+        from ..analytics.metrics import MetricsService
+
+        reader = AgentStatusReadAdapter()
+        active = reader.active_runs(workspace_id)
+        blockers = reader.blockers(workspace_id)
+        queue = MergeQueue().list_queued(workspace_id)
+        metrics = MetricsService()
+        wip = metrics.wip_count(workspace_id)
+
+        return {
+            "workspace_id": workspace_id,
+            "active_runs": len(active),
+            "blocked_runs": len(blockers),
+            "merge_queue_depth": len(queue),
+            "wip_count": wip,
+            "runs": [
+                {
+                    "run_id": r.run_id,
+                    "role": r.agent_role,
+                    "status": r.status.value if hasattr(r.status, "value") else str(r.status),
+                    "task_id": r.task_id,
+                }
+                for r in active[:10]
+            ],
+            "blockers": [
+                {"run_id": b.run_id, "reason": (b.blockers or ["?"])[0]}
+                for b in blockers[:5]
+            ],
+        }
+    except Exception as exc:
+        log.error("get_workspace_status failed: %s", exc, exc_info=True)
+        return {"error": str(exc)}
