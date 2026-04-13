@@ -28,7 +28,7 @@ export async function createEpic(input: CreateEpicInput): Promise<Epic> {
   const now = new Date().toISOString()
   const priority = input.priority ?? 'medium'
   const status: EpicStatus = 'backlog'
-  const status_cat = statusCategory(status, 'epic')
+  const status_cat = statusCategory(status)
   const display_id = nextDisplayId('epic', input.project_id, db)
 
   db.prepare(`
@@ -74,13 +74,29 @@ export async function updateEpic(input: UpdateEpicInput): Promise<Epic> {
   if (input.title !== undefined) { fields.push('title = ?'); values.push(input.title) }
   if (input.description !== undefined) { fields.push('description = ?'); values.push(input.description) }
   if (input.priority !== undefined) { fields.push('priority = ?'); values.push(input.priority) }
+
+  const statusChanging = input.status !== undefined && input.status !== (existing.status as string)
+
   if (input.status !== undefined) {
     fields.push('status = ?'); values.push(input.status)
-    fields.push('status_category = ?'); values.push(statusCategory(input.status, 'epic'))
+    fields.push('status_category = ?'); values.push(statusCategory(input.status))
   }
   values.push(input.epic_id)
 
   db.prepare(`UPDATE epics SET ${fields.join(', ')} WHERE epic_id = ?`).run(...values)
+
+  if (statusChanging) {
+    emitEvent({
+      workspace_id: existing.workspace_id as string,
+      project_id: existing.project_id as string,
+      evt_type: 'task_status_changed',
+      object_type: 'epic',
+      object_id: input.epic_id,
+      actor_type: 'system',
+      actor_id: 'planning',
+      payload: { from_status: existing.status as string, to_status: input.status as string },
+    })
+  }
 
   const updated = db.prepare('SELECT * FROM epics WHERE epic_id = ?').get(input.epic_id) as Record<string, unknown>
   return rowToEpic(updated)

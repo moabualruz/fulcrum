@@ -79,6 +79,9 @@ export async function updatePRD(input: UpdatePRDInput): Promise<PRD> {
   if (input.description !== undefined) { fields.push('description = ?'); values.push(input.description) }
   if (input.file_path !== undefined) { fields.push('file_path = ?'); values.push(input.file_path) }
   if (input.linked_epic_id !== undefined) { fields.push('linked_epic_id = ?'); values.push(input.linked_epic_id) }
+
+  const statusChanging = input.status !== undefined && input.status !== (existing.status as string)
+
   if (input.status !== undefined) {
     fields.push('status = ?'); values.push(input.status)
     fields.push('status_category = ?'); values.push(prdStatusCategory(input.status))
@@ -86,6 +89,20 @@ export async function updatePRD(input: UpdatePRDInput): Promise<PRD> {
   values.push(input.prd_id)
 
   db.prepare(`UPDATE prds SET ${fields.join(', ')} WHERE prd_id = ?`).run(...values)
+
+  if (statusChanging) {
+    emitEvent({
+      workspace_id: existing.workspace_id as string,
+      project_id: existing.project_id as string,
+      evt_type: 'task_status_changed',
+      object_type: 'prd',
+      object_id: input.prd_id,
+      actor_type: 'system',
+      actor_id: 'planning',
+      payload: { from_status: existing.status as string, to_status: input.status as string },
+    })
+  }
+
   const updated = db.prepare('SELECT * FROM prds WHERE prd_id = ?').get(input.prd_id) as Record<string, unknown>
   return rowToPRD(updated)
 }

@@ -79,6 +79,9 @@ export async function updatePlan(input: UpdatePlanInput): Promise<Plan> {
   if (input.description !== undefined) { fields.push('description = ?'); values.push(input.description) }
   if (input.file_path !== undefined) { fields.push('file_path = ?'); values.push(input.file_path) }
   if (input.prd_id !== undefined) { fields.push('prd_id = ?'); values.push(input.prd_id) }
+
+  const statusChanging = input.status !== undefined && input.status !== (existing.status as string)
+
   if (input.status !== undefined) {
     fields.push('status = ?'); values.push(input.status)
     fields.push('status_category = ?'); values.push(planStatusCategory(input.status))
@@ -86,6 +89,20 @@ export async function updatePlan(input: UpdatePlanInput): Promise<Plan> {
   values.push(input.plan_id)
 
   db.prepare(`UPDATE plans SET ${fields.join(', ')} WHERE plan_id = ?`).run(...values)
+
+  if (statusChanging) {
+    emitEvent({
+      workspace_id: existing.workspace_id as string,
+      project_id: existing.project_id as string,
+      evt_type: 'task_status_changed',
+      object_type: 'plan',
+      object_id: input.plan_id,
+      actor_type: 'system',
+      actor_id: 'planning',
+      payload: { from_status: existing.status as string, to_status: input.status as string },
+    })
+  }
+
   const updated = db.prepare('SELECT * FROM plans WHERE plan_id = ?').get(input.plan_id) as Record<string, unknown>
   return rowToPlan(updated)
 }
@@ -108,8 +125,8 @@ export async function linkIssueToPlan(input: LinkIssueToPlanInput): Promise<void
     .get(input.plan_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!plan) throw new FulcrumError(`Plan ${input.plan_id} not found`, 'not_found')
 
-  const issue = db.prepare('SELECT issue_id FROM issues WHERE issue_id = ?')
-    .get(input.issue_id) as Record<string, unknown> | undefined
+  const issue = db.prepare('SELECT issue_id FROM issues WHERE issue_id = ? AND workspace_id = ?')
+    .get(input.issue_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!issue) throw new FulcrumError(`Issue ${input.issue_id} not found`, 'not_found')
 
   db.prepare(`

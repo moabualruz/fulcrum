@@ -39,7 +39,7 @@ export async function createIssue(input: CreateIssueInput): Promise<Issue> {
   const now = new Date().toISOString()
   const priority = input.priority ?? 'medium'
   const status: IssueStatus = 'backlog'
-  const status_cat = statusCategory(status, 'issue')
+  const status_cat = statusCategory(status)
   const display_id = nextDisplayId('issue', input.project_id, db)
 
   db.prepare(`
@@ -93,9 +93,12 @@ export async function updateIssue(input: UpdateIssueInput): Promise<Issue> {
   if (input.assignee_agent_id !== undefined) { fields.push('assignee_agent_id = ?'); values.push(input.assignee_agent_id) }
   if (input.estimate_type !== undefined) { fields.push('estimate_type = ?'); values.push(input.estimate_type) }
   if (input.estimate_value !== undefined) { fields.push('estimate_value = ?'); values.push(input.estimate_value) }
+
+  const statusChanging = input.status !== undefined && input.status !== (existing.status as string)
+
   if (input.status !== undefined) {
     fields.push('status = ?'); values.push(input.status)
-    fields.push('status_category = ?'); values.push(statusCategory(input.status, 'issue'))
+    fields.push('status_category = ?'); values.push(statusCategory(input.status))
   }
   values.push(input.issue_id)
 
@@ -108,6 +111,19 @@ export async function updateIssue(input: UpdateIssueInput): Promise<Issue> {
     for (const label of input.labels) {
       insertLabel.run(input.issue_id, label)
     }
+  }
+
+  if (statusChanging) {
+    emitEvent({
+      workspace_id: existing.workspace_id as string,
+      project_id: existing.project_id as string,
+      evt_type: 'task_status_changed',
+      object_type: 'issue',
+      object_id: input.issue_id,
+      actor_type: 'system',
+      actor_id: 'planning',
+      payload: { from_status: existing.status as string, to_status: input.status as string },
+    })
   }
 
   const updated = db.prepare('SELECT * FROM issues WHERE issue_id = ?').get(input.issue_id) as Record<string, unknown>
