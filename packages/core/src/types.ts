@@ -227,6 +227,7 @@ export class FulcrumError extends Error {
       | 'version_conflict'
       | 'policy_blocked'
       | 'invalid_input'
+      | 'invalid_state'
   ) {
     super(message)
     this.name = 'FulcrumError'

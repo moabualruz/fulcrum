@@ -123,6 +123,27 @@ describe('markDirty', () => {
     expect(updated.status).toBe('dirty')
     expect(updated.updated_at).toBeDefined()
   })
+
+  it('rejects if status is not allocated (e.g. already dirty)', async () => {
+    const wt = await allocateWorktree({
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      branch_name: 'feature/dirty-guard',
+      path: '/tmp/worktrees/dirty-guard',
+    })
+    await markDirty({ worktree_id: wt.worktree_id })
+
+    await expect(markDirty({ worktree_id: wt.worktree_id })).rejects.toMatchObject({
+      code: 'invalid_state',
+      message: expect.stringContaining("expected 'allocated'"),
+    })
+  })
+
+  it('rejects if worktree does not exist', async () => {
+    await expect(markDirty({ worktree_id: 'wt_nonexistent' })).rejects.toMatchObject({
+      code: 'not_found',
+    })
+  })
 })
 
 describe('markReadyForMerge', () => {
@@ -137,6 +158,26 @@ describe('markReadyForMerge', () => {
     const updated = await markReadyForMerge({ worktree_id: wt.worktree_id })
 
     expect(updated.status).toBe('ready_for_merge')
+  })
+
+  it('rejects if status is not dirty (e.g. still allocated)', async () => {
+    const wt = await allocateWorktree({
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      branch_name: 'feature/ready-guard',
+      path: '/tmp/worktrees/ready-guard',
+    })
+
+    await expect(markReadyForMerge({ worktree_id: wt.worktree_id })).rejects.toMatchObject({
+      code: 'invalid_state',
+      message: expect.stringContaining("expected 'dirty'"),
+    })
+  })
+
+  it('rejects if worktree does not exist', async () => {
+    await expect(markReadyForMerge({ worktree_id: 'wt_nonexistent' })).rejects.toMatchObject({
+      code: 'not_found',
+    })
   })
 })
 
@@ -208,6 +249,44 @@ describe('discardWorktree', () => {
 
     expect(row.status).toBe('discarded')
     expect(row.discarded_at).not.toBeNull()
+  })
+
+  it('rejects if status is already discarded', async () => {
+    const wt = await allocateWorktree({
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      branch_name: 'feature/discard-guard',
+      path: '/tmp/worktrees/discard-guard',
+    })
+    await discardWorktree({ worktree_id: wt.worktree_id })
+
+    await expect(discardWorktree({ worktree_id: wt.worktree_id })).rejects.toMatchObject({
+      code: 'invalid_state',
+      message: expect.stringContaining("already 'discarded'"),
+    })
+  })
+
+  it('rejects if status is already merged', async () => {
+    const wt = await allocateWorktree({
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      branch_name: 'feature/discard-merged-guard',
+      path: '/tmp/worktrees/discard-merged-guard',
+    })
+    await markDirty({ worktree_id: wt.worktree_id })
+    await markReadyForMerge({ worktree_id: wt.worktree_id })
+    await processMergeQueue('proj_test', 'integration_worker')
+
+    await expect(discardWorktree({ worktree_id: wt.worktree_id })).rejects.toMatchObject({
+      code: 'invalid_state',
+      message: expect.stringContaining("already 'merged'"),
+    })
+  })
+
+  it('rejects if worktree does not exist', async () => {
+    await expect(discardWorktree({ worktree_id: 'wt_nonexistent' })).rejects.toMatchObject({
+      code: 'not_found',
+    })
   })
 })
 

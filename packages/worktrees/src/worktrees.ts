@@ -1,6 +1,6 @@
 // packages/worktrees/src/worktrees.ts
 import { ulid } from 'ulidx'
-import { getDb } from '@fulcrum/core'
+import { getDb, FulcrumError } from '@fulcrum/core'
 import type {
   Worktree,
   MergeResult,
@@ -61,6 +61,18 @@ export async function markDirty(input: MarkDirtyInput): Promise<Worktree> {
   const db = getDb()
   const now = new Date().toISOString()
 
+  const current = db
+    .prepare('SELECT status FROM worktrees WHERE worktree_id = ?')
+    .get(input.worktree_id) as { status: string } | undefined
+
+  if (!current) throw new FulcrumError(`Worktree not found: ${input.worktree_id}`, 'not_found')
+  if (current.status !== 'allocated') {
+    throw new FulcrumError(
+      `Cannot mark worktree ${input.worktree_id} as dirty: status is '${current.status}', expected 'allocated'`,
+      'invalid_state'
+    )
+  }
+
   db.prepare(`
     UPDATE worktrees SET status = 'dirty', updated_at = ? WHERE worktree_id = ?
   `).run(now, input.worktree_id)
@@ -69,13 +81,24 @@ export async function markDirty(input: MarkDirtyInput): Promise<Worktree> {
     .prepare('SELECT * FROM worktrees WHERE worktree_id = ?')
     .get(input.worktree_id) as Record<string, unknown>
 
-  if (!row) throw new Error(`Worktree not found: ${input.worktree_id}`)
   return rowToWorktree(row)
 }
 
 export async function markReadyForMerge(input: MarkReadyInput): Promise<Worktree> {
   const db = getDb()
   const now = new Date().toISOString()
+
+  const current = db
+    .prepare('SELECT status FROM worktrees WHERE worktree_id = ?')
+    .get(input.worktree_id) as { status: string } | undefined
+
+  if (!current) throw new FulcrumError(`Worktree not found: ${input.worktree_id}`, 'not_found')
+  if (current.status !== 'dirty') {
+    throw new FulcrumError(
+      `Cannot mark worktree ${input.worktree_id} as ready_for_merge: status is '${current.status}', expected 'dirty'`,
+      'invalid_state'
+    )
+  }
 
   db.prepare(`
     UPDATE worktrees SET status = 'ready_for_merge', updated_at = ? WHERE worktree_id = ?
@@ -85,7 +108,6 @@ export async function markReadyForMerge(input: MarkReadyInput): Promise<Worktree
     .prepare('SELECT * FROM worktrees WHERE worktree_id = ?')
     .get(input.worktree_id) as Record<string, unknown>
 
-  if (!row) throw new Error(`Worktree not found: ${input.worktree_id}`)
   return rowToWorktree(row)
 }
 
@@ -155,6 +177,18 @@ export async function processMergeQueue(
 export async function discardWorktree(input: DiscardWorktreeInput): Promise<void> {
   const db = getDb()
   const now = new Date().toISOString()
+
+  const current = db
+    .prepare('SELECT status FROM worktrees WHERE worktree_id = ?')
+    .get(input.worktree_id) as { status: string } | undefined
+
+  if (!current) throw new FulcrumError(`Worktree not found: ${input.worktree_id}`, 'not_found')
+  if (current.status === 'merged' || current.status === 'discarded') {
+    throw new FulcrumError(
+      `Cannot discard worktree ${input.worktree_id}: status is already '${current.status}'`,
+      'invalid_state'
+    )
+  }
 
   db.prepare(`
     UPDATE worktrees
