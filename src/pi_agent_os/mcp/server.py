@@ -65,24 +65,28 @@ def list_tasks(
     limit: int = 40,
 ) -> list[dict]:
     """List tasks for a project, optionally filtered by status."""
-    reader = _get_task_reader()
-    filters: dict = {"project_id": project_id, "workspace_id": workspace_id}
-    if status:
-        filters["status"] = status
-    tasks = reader.list(filters, limit=limit)
-    return [
-        {
-            "task_id": t.task_id,
-            "title": t.title,
-            "description": t.description or "",
-            "status": t.status.value if hasattr(t.status, "value") else str(t.status),
-            "priority": t.priority or "medium",
-            "assigned_to": t.assigned_agent_id or "",
-            "blockers": t.blockers or [],
-            "done_criteria": t.done_criteria or "",
-        }
-        for t in tasks
-    ]
+    try:
+        reader = _get_task_reader()
+        filters: dict = {"project_id": project_id, "workspace_id": workspace_id}
+        if status:
+            filters["status"] = status
+        tasks = reader.list(filters, limit=limit)
+        return [
+            {
+                "task_id": t.task_id,
+                "title": t.title,
+                "description": t.description or "",
+                "status": t.status.value if hasattr(t.status, "value") else str(t.status),
+                "priority": t.priority or "medium",
+                "assigned_to": t.assigned_agent_id or "",
+                "blockers": t.blockers or [],
+                "done_criteria": t.done_criteria or "",
+            }
+            for t in tasks
+        ]
+    except Exception as exc:
+        log.error("mcp__pi-os__list_tasks error: %s", exc, exc_info=True)
+        return [{"error": str(exc)}]
 
 
 @mcp.tool()
@@ -96,31 +100,35 @@ def create_task(
     done_criteria: str = "",
 ) -> dict:
     """Create a new task in the project. Returns the created task."""
-    from ..models.task import Task, TaskStatus
-    from ..ids import generate_id, TASK_PREFIX
+    try:
+        from ..models.task import Task, TaskStatus
+        from ..ids import generate_id, TASK_PREFIX
 
-    writer = _get_task_writer()
-    task = Task(
-        task_id=generate_id(TASK_PREFIX),
-        workspace_id=workspace_id,
-        project_id=project_id,
-        display_id=f"T-{datetime.now(timezone.utc).strftime('%H%M%S')}",
-        title=title,
-        description=description,
-        status=TaskStatus.queued,
-        priority=priority,
-        assigned_agent_id=assigned_to or None,
-        done_criteria=done_criteria or None,
-    )
-    writer.create(task)
-    log.info("mcp__pi-os__create_task: %s %s", task.task_id, title)
-    return {
-        "task_id": task.task_id,
-        "title": task.title,
-        "status": task.status.value if hasattr(task.status, "value") else str(task.status),
-        "priority": task.priority,
-        "assigned_to": task.assigned_agent_id or "",
-    }
+        writer = _get_task_writer()
+        task = Task(
+            task_id=generate_id(TASK_PREFIX),
+            workspace_id=workspace_id,
+            project_id=project_id,
+            display_id=f"T-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}",
+            title=title,
+            description=description,
+            status=TaskStatus.queued,
+            priority=priority,
+            assigned_agent_id=assigned_to or None,
+            done_criteria=done_criteria or None,
+        )
+        writer.create(task)
+        log.info("mcp__pi-os__create_task: %s %s", task.task_id, title)
+        return {
+            "task_id": task.task_id,
+            "title": task.title,
+            "status": task.status.value if hasattr(task.status, "value") else str(task.status),
+            "priority": task.priority,
+            "assigned_to": task.assigned_agent_id or "",
+        }
+    except Exception as exc:
+        log.error("mcp__pi-os__create_task error: %s", exc, exc_info=True)
+        return {"error": str(exc)}
 
 
 @mcp.tool()
@@ -131,15 +139,27 @@ def update_task(
     assigned_to: str = "",
 ) -> dict:
     """Update a task's status, note/blocker, or assignment."""
-    writer = _get_task_writer()
-    updates: dict = {}
-    if status:
-        updates["status"] = status
-    if note:
-        updates["blockers"] = [note]
-    if assigned_to:
-        updates["assigned_agent_id"] = assigned_to
-    if updates:
+    try:
+        writer = _get_task_writer()
+        updates: dict = {}
+        if status:
+            updates["status"] = status
+        if note:
+            existing_blockers: list = []
+            try:
+                results = _get_task_reader().list({"task_id": task_id}, limit=1)
+                if results:
+                    existing_blockers = results[0].blockers or []
+            except Exception:
+                pass
+            updates["blockers"] = existing_blockers + [note]
+        if assigned_to:
+            updates["assigned_agent_id"] = assigned_to
+        if not updates:
+            return {"task_id": task_id, "updated": False, "changes": []}
         writer.update(task_id, updates)
         log.info("mcp__pi-os__update_task: %s %s", task_id, updates)
-    return {"task_id": task_id, "updated": True, "changes": list(updates.keys())}
+        return {"task_id": task_id, "updated": True, "changes": list(updates.keys())}
+    except Exception as exc:
+        log.error("mcp__pi-os__update_task error: %s", exc, exc_info=True)
+        return {"error": str(exc)}

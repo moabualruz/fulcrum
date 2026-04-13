@@ -50,12 +50,29 @@ def test_create_task_returns_task_id():
 
 
 def test_update_task_calls_writer():
-    with patch("pi_agent_os.mcp.server._get_task_writer") as m:
+    with patch("pi_agent_os.mcp.server._get_task_writer") as mw, \
+         patch("pi_agent_os.mcp.server._get_task_reader") as mr:
         writer = MagicMock()
-        m.return_value = writer
+        mw.return_value = writer
+        reader = MagicMock()
+        existing_task = _make_mock_task(task_id="tsk-001")
+        existing_task.blockers = []
+        reader.list.return_value = [existing_task]
+        mr.return_value = reader
         from pi_agent_os.mcp.server import update_task
         result = update_task(task_id="tsk-001", status="in_progress", note="Starting work")
     writer.update.assert_called_once_with(
         "tsk-001", {"status": "in_progress", "blockers": ["Starting work"]}
     )
     assert result["updated"] is True
+
+
+def test_update_task_no_op_returns_not_updated():
+    with patch("pi_agent_os.mcp.server._get_task_writer") as mw:
+        writer = MagicMock()
+        mw.return_value = writer
+        from pi_agent_os.mcp.server import update_task
+        result = update_task(task_id="tsk-001")
+    writer.update.assert_not_called()
+    assert result["updated"] is False
+    assert result["changes"] == []
