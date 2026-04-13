@@ -15,6 +15,6 @@ export function resetTestDb(): void {
 }
 
 export function seed(db: Database.Database): void {
-  db.prepare("INSERT INTO workspaces VALUES ('ws_1','test ws', datetime('now'))").run()
-  db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','test proj', datetime('now'))").run()
+  db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test ws')").run()
+  db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','test proj')").run()
 }
