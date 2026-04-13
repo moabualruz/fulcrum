@@ -131,3 +131,74 @@ def test_issue_burndown_returns_data(ws_proj):
     burndown = svc.issue_burndown(ws.workspace_id, project_id=proj.project_id)
     # May be empty if date filter doesn't cover today — check it doesn't error
     assert isinstance(burndown, list)
+
+
+def test_per_role_metrics_empty(ws_proj):
+    ws, _ = ws_proj
+    result = MetricsService().per_role_metrics(ws.workspace_id)
+    assert isinstance(result, list)
+
+
+def test_per_role_metrics_with_runs(ws_proj):
+    from datetime import datetime, timezone
+    ws, proj = ws_proj
+    writer = AgentRunWriter()
+    for role in ("implementer_backend", "implementer_backend", "tester"):
+        writer.create(AgentRun(
+            run_id=generate_id(RUN_PREFIX),
+            workspace_id=ws.workspace_id,
+            project_id=proj.project_id,
+            display_id=f"RUN-{role[:4].upper()}",
+            agent_id=f"agent_{role}",
+            agent_role=role,
+            status=AgentRunStatus.finished,
+        ))
+
+    result = MetricsService().per_role_metrics(ws.workspace_id)
+    roles = [r["agent_role"] for r in result]
+    assert "implementer_backend" in roles
+    assert "tester" in roles
+    backend = next(r for r in result if r["agent_role"] == "implementer_backend")
+    assert backend["total_runs"] == 2
+    assert "fail_rate" in backend
+    assert "block_rate" in backend
+
+
+def test_memory_effectiveness(ws_proj):
+    ws, proj = ws_proj
+    from pi_agent_os.memory.facade import MemoryFacade
+    facade = MemoryFacade()
+    facade.write(workspace_id=ws.workspace_id, title="T1", summary="S1",
+                 kind="fact", scope="project", project_id=proj.project_id)
+    facade.write(workspace_id=ws.workspace_id, title="T2", summary="S2",
+                 kind="decision", scope="global")
+
+    eff = MetricsService().memory_effectiveness(ws.workspace_id)
+    assert eff["total_memories"] == 2
+    assert "by_scope" in eff
+    assert "by_kind" in eff
+    assert isinstance(eff["memories_per_recall"], float)
+
+
+def test_forecasting_advisory_no_data(ws_proj):
+    ws, proj = ws_proj
+    forecast = MetricsService().forecasting_advisory(ws.workspace_id, project_id=proj.project_id)
+    assert forecast["confidence"] == "insufficient_data"
+    assert forecast["open_issues"] == 0
+    assert "note" in forecast
+
+
+def test_forecasting_advisory_with_open_issues(ws_proj):
+    ws, proj = ws_proj
+    for i in range(3):
+        IssueWriter().create(Issue(
+            issue_id=generate_id(ISS_PREFIX),
+            workspace_id=ws.workspace_id,
+            project_id=proj.project_id,
+            display_id=f"ISS-F{i}",
+            title=f"Open issue {i}",
+            status=IssueStatus.in_progress,
+        ))
+    forecast = MetricsService().forecasting_advisory(ws.workspace_id, project_id=proj.project_id)
+    assert forecast["open_issues"] == 3
+    assert isinstance(forecast["avg_daily_velocity"], float)

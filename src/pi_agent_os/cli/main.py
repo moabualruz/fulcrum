@@ -12,6 +12,7 @@ from .commands import board as board_cmd
 from .commands import memory as memory_cmd
 from .commands import workflow as workflow_cmd
 from .commands import queue as queue_cmd
+from .commands import sync as sync_cmd
 from .commands import monitor as monitor_cmd
 from .commands import serve as serve_cmd
 
@@ -34,6 +35,7 @@ app.add_typer(board_cmd.app, name="board", help="Board views")
 app.add_typer(memory_cmd.app, name="memory", help="Memory search and ingestion")
 app.add_typer(workflow_cmd.app, name="workflow", help="Workflow management")
 app.add_typer(queue_cmd.app, name="queue", help="Merge queue management")
+app.add_typer(sync_cmd.app, name="sync", help="Plane sync management")
 app.add_typer(monitor_cmd.app, name="monitor", help="Monitor server")
 app.add_typer(serve_cmd.app, name="serve", help="Start PI Agent OS servers")
 

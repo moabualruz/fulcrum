@@ -210,3 +210,100 @@ class MetricsService:
              metrics["tasks_created"], metrics["tasks_completed"],
              metrics["runs_started"], metrics["memory_writes"]),
         )
+
+    # ── Per-role orchestration metrics ────────────────────────────────────────
+
+    def per_role_metrics(self, workspace_id: str) -> list[dict]:
+        """
+        Per-role agent latency, retry rate, and blocked rate. Spec §20.5.
+
+        Returns a list sorted by total runs descending.
+        """
+        rows = db.fetchall(
+            """SELECT
+                agent_role,
+                COUNT(*) as total_runs,
+                COUNT(*) FILTER (WHERE status='finished') as completed,
+                COUNT(*) FILTER (WHERE status IN ('failed','aborted')) as failed,
+                COUNT(*) FILTER (WHERE status='blocked') as blocked,
+                AVG(
+                    (julianday(finished_at) - julianday(started_at)) * 60
+                ) FILTER (WHERE started_at IS NOT NULL AND finished_at IS NOT NULL) as avg_duration_minutes
+            FROM agent_runs WHERE workspace_id=?
+            GROUP BY agent_role
+            ORDER BY total_runs DESC""",
+            (workspace_id,),
+        )
+        result = []
+        for r in rows:
+            total = r["total_runs"] or 1  # avoid division by zero
+            result.append({
+                "agent_role": r["agent_role"],
+                "total_runs": r["total_runs"] or 0,
+                "completed": r["completed"] or 0,
+                "failed": r["failed"] or 0,
+                "blocked": r["blocked"] or 0,
+                "fail_rate": round((r["failed"] or 0) / total, 3),
+                "block_rate": round((r["blocked"] or 0) / total, 3),
+                "avg_duration_minutes": round(r["avg_duration_minutes"], 1) if r["avg_duration_minutes"] else None,
+            })
+        return result
+
+    def memory_effectiveness(self, workspace_id: str) -> dict:
+        """
+        Memory effectiveness indicators. Spec §20.6.
+
+        Returns counts by scope, kind, and recent recall activity.
+        """
+        by_scope = self.memory_scope_distribution(workspace_id)
+        by_kind_rows = db.fetchall(
+            "SELECT kind, COUNT(*) as count FROM memories WHERE workspace_id=? GROUP BY kind",
+            (workspace_id,),
+        )
+        recent_recalls = self.memory_recall_count(workspace_id)
+        total_memories = sum(by_scope.values()) if by_scope else 0
+        return {
+            "total_memories": total_memories,
+            "by_scope": by_scope,
+            "by_kind": {r["kind"]: r["count"] for r in by_kind_rows},
+            "recall_events": recent_recalls,
+            "memories_per_recall": round(total_memories / max(recent_recalls, 1), 1),
+        }
+
+    def forecasting_advisory(self, workspace_id: str, project_id: Optional[str] = None) -> dict:
+        """
+        Velocity-based delivery forecast stub. Spec §20.7.
+
+        Uses recent throughput to estimate remaining work duration.
+        Returns advisory data — treat as a rough signal, not a commitment.
+        """
+        # Open issues
+        clauses = ["workspace_id=?", "status NOT IN ('done', 'cancelled')"]
+        params: list = [workspace_id]
+        if project_id:
+            clauses.append("project_id=?")
+            params.append(project_id)
+        open_row = db.fetchone(
+            f"SELECT COUNT(*) as n FROM issues WHERE {' AND '.join(clauses)}", tuple(params)
+        )
+        open_issues = open_row["n"] if open_row else 0
+
+        # Recent velocity (tasks completed per day over last 7 days)
+        avg_daily = self.throughput_daily(workspace_id, days=7, project_id=project_id)
+
+        if avg_daily > 0:
+            est_days = round(open_issues / avg_daily, 1)
+            confidence = "low" if avg_daily < 0.5 else "medium" if avg_daily < 2 else "high"
+        else:
+            est_days = None
+            confidence = "insufficient_data"
+
+        return {
+            "workspace_id": workspace_id,
+            "project_id": project_id,
+            "open_issues": open_issues,
+            "avg_daily_velocity": round(avg_daily, 2),
+            "estimated_days_remaining": est_days,
+            "confidence": confidence,
+            "note": "Forecast is advisory only — based on recent throughput, not commitment.",
+        }
