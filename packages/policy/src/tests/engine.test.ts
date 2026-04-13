@@ -1,0 +1,353 @@
+// packages/policy/src/tests/engine.test.ts
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { createTestDb, resetTestDb, seed } from './helpers.js'
+import { getDb } from '@fulcrum/core'
+import {
+  createPolicyRule,
+  listPolicyRules,
+  evaluatePolicy,
+  SYSTEM_INVARIANTS,
+} from '../engine.js'
+import type { EvaluatePolicyInput } from '../types.js'
+
+beforeEach(() => { const db = createTestDb(); seed(db) })
+afterEach(() => resetTestDb())
+
+// --- SYSTEM_INVARIANTS ---
+
+describe('SYSTEM_INVARIANTS', () => {
+  it('exports 3 invariants', () => {
+    expect(SYSTEM_INVARIANTS).toHaveLength(3)
+  })
+
+  it('all invariants have priority 1000', () => {
+    for (const inv of SYSTEM_INVARIANTS) {
+      expect(inv.priority).toBe(1000)
+    }
+  })
+
+  it('all invariants have action deny', () => {
+    for (const inv of SYSTEM_INVARIANTS) {
+      expect(inv.action).toBe('deny')
+    }
+  })
+
+  it('invariant named only_l1_invokes_teams exists', () => {
+    const inv = SYSTEM_INVARIANTS.find(i => i.name === 'only_l1_invokes_teams')
+    expect(inv).toBeDefined()
+  })
+
+  it('invariant named only_integration_worker_merges exists', () => {
+    const inv = SYSTEM_INVARIANTS.find(i => i.name === 'only_integration_worker_merges')
+    expect(inv).toBeDefined()
+  })
+
+  it('invariant named no_task_bypass exists', () => {
+    const inv = SYSTEM_INVARIANTS.find(i => i.name === 'no_task_bypass')
+    expect(inv).toBeDefined()
+  })
+})
+
+// --- createPolicyRule ---
+
+describe('createPolicyRule', () => {
+  it('creates a rule and returns it with defaults', async () => {
+    const rule = await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'block-file-write',
+      action: 'deny',
+      matchers: [{ matcher_type: 'path', pattern: '/etc/*' }],
+    })
+    expect(rule.rule_id).toMatch(/^pol_[0-9A-Z]{26}$/)
+    expect(rule.scope).toBe('workspace')
+    expect(rule.action).toBe('deny')
+    expect(rule.enabled).toBe(true)
+    expect(rule.priority).toBe(100)
+    expect(rule.matchers).toHaveLength(1)
+    expect(rule.matchers[0].matcher_type).toBe('path')
+  })
+
+  it('accepts custom priority and enabled=false', async () => {
+    const rule = await createPolicyRule({
+      scope: 'project',
+      scope_id: 'proj_1',
+      name: 'my-rule',
+      action: 'allow',
+      matchers: [],
+      priority: 200,
+      enabled: false,
+    })
+    expect(rule.priority).toBe(200)
+    expect(rule.enabled).toBe(false)
+  })
+
+  it('throws invalid_input for empty name', async () => {
+    await expect(
+      createPolicyRule({ scope: 'workspace', scope_id: 'ws_1', name: '', action: 'deny', matchers: [] })
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+})
+
+// --- listPolicyRules ---
+
+describe('listPolicyRules', () => {
+  it('returns all rules when no filter given', async () => {
+    await createPolicyRule({ scope: 'workspace', scope_id: 'ws_1', name: 'r1', action: 'deny', matchers: [] })
+    await createPolicyRule({ scope: 'project', scope_id: 'proj_1', name: 'r2', action: 'allow', matchers: [] })
+    const rules = await listPolicyRules({})
+    expect(rules.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('filters by scope', async () => {
+    await createPolicyRule({ scope: 'workspace', scope_id: 'ws_1', name: 'ws-rule', action: 'deny', matchers: [] })
+    await createPolicyRule({ scope: 'project', scope_id: 'proj_1', name: 'proj-rule', action: 'allow', matchers: [] })
+    const wsRules = await listPolicyRules({ scope: 'workspace' })
+    expect(wsRules.every(r => r.scope === 'workspace')).toBe(true)
+  })
+
+  it('filters by scope_id', async () => {
+    await createPolicyRule({ scope: 'workspace', scope_id: 'ws_1', name: 'r1', action: 'deny', matchers: [] })
+    await createPolicyRule({ scope: 'workspace', scope_id: 'ws_2', name: 'r2', action: 'deny', matchers: [] })
+    const rules = await listPolicyRules({ scope: 'workspace', scope_id: 'ws_1' })
+    expect(rules.every(r => r.scope_id === 'ws_1')).toBe(true)
+  })
+
+  it('returns only enabled rules when enabled_only=true', async () => {
+    await createPolicyRule({ scope: 'workspace', scope_id: 'ws_1', name: 'enabled-rule', action: 'deny', matchers: [], enabled: true })
+    await createPolicyRule({ scope: 'workspace', scope_id: 'ws_1', name: 'disabled-rule', action: 'deny', matchers: [], enabled: false })
+    const rules = await listPolicyRules({ enabled_only: true })
+    expect(rules.every(r => r.enabled === true)).toBe(true)
+  })
+})
+
+// --- evaluatePolicy — SYSTEM_INVARIANTS ---
+
+describe('evaluatePolicy — SYSTEM_INVARIANTS: invoke_team', () => {
+  it('denies invoke_team for non-chief_of_staff role', async () => {
+    const input: EvaluatePolicyInput = {
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'invoke_team',
+    }
+    const decision = await evaluatePolicy(input)
+    expect(decision.allowed).toBe(false)
+    expect(decision.action).toBe('deny')
+    expect(decision.rule_id).toBe('SYSTEM:only_l1_invokes_teams')
+  })
+
+  it('allows invoke_team for chief_of_staff', async () => {
+    const input: EvaluatePolicyInput = {
+      workspace_id: 'ws_1',
+      actor_role: 'chief_of_staff',
+      actor_id: 'agent_cos',
+      action: 'invoke_team',
+    }
+    const decision = await evaluatePolicy(input)
+    expect(decision.allowed).toBe(true)
+    expect(decision.action).toBe('allow')
+  })
+})
+
+describe('evaluatePolicy — SYSTEM_INVARIANTS: merge_worktree', () => {
+  it('denies merge_worktree for non-integration_worker role', async () => {
+    const input: EvaluatePolicyInput = {
+      workspace_id: 'ws_1',
+      actor_role: 'reviewer',
+      actor_id: 'agent_1',
+      action: 'merge_worktree',
+    }
+    const decision = await evaluatePolicy(input)
+    expect(decision.allowed).toBe(false)
+    expect(decision.action).toBe('deny')
+    expect(decision.rule_id).toBe('SYSTEM:only_integration_worker_merges')
+  })
+
+  it('allows merge_worktree for integration_worker', async () => {
+    const input: EvaluatePolicyInput = {
+      workspace_id: 'ws_1',
+      actor_role: 'integration_worker',
+      actor_id: 'agent_iw',
+      action: 'merge_worktree',
+    }
+    const decision = await evaluatePolicy(input)
+    expect(decision.allowed).toBe(true)
+    expect(decision.action).toBe('allow')
+  })
+})
+
+describe('evaluatePolicy — SYSTEM_INVARIANTS: start_run_without_task', () => {
+  it('always denies start_run_without_task regardless of role', async () => {
+    const roles: Array<EvaluatePolicyInput['actor_role']> = ['chief_of_staff', 'implementer', 'integration_worker']
+    for (const role of roles) {
+      const decision = await evaluatePolicy({
+        workspace_id: 'ws_1',
+        actor_role: role,
+        actor_id: 'agent_1',
+        action: 'start_run_without_task',
+      })
+      expect(decision.allowed).toBe(false)
+      expect(decision.rule_id).toBe('SYSTEM:no_task_bypass')
+    }
+  })
+})
+
+// --- evaluatePolicy — workspace/project rules ---
+
+describe('evaluatePolicy — workspace rules', () => {
+  it('allows by default when no rules match', async () => {
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'write_file',
+      resource_type: 'file',
+      resource_id: '/src/main.ts',
+    })
+    expect(decision.allowed).toBe(true)
+    expect(decision.action).toBe('allow')
+  })
+
+  it('denies when a deny rule matches the action via tool matcher', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-bash',
+      action: 'deny',
+      matchers: [{ matcher_type: 'tool', pattern: 'bash' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'bash',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toBe('no-bash')
+  })
+
+  it('uses first matching rule (highest priority wins)', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'low-priority-deny',
+      action: 'deny',
+      matchers: [{ matcher_type: 'tool', pattern: 'read_file' }],
+      priority: 50,
+    })
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'high-priority-allow',
+      action: 'allow',
+      matchers: [{ matcher_type: 'tool', pattern: 'read_file' }],
+      priority: 200,
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'read_file',
+    })
+    // Higher priority rule wins (allow at 200 > deny at 50)
+    expect(decision.allowed).toBe(true)
+    expect(decision.reason).toBe('high-priority-allow')
+  })
+
+  it('skips disabled rules', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'disabled-deny',
+      action: 'deny',
+      matchers: [{ matcher_type: 'tool', pattern: 'write_file' }],
+      enabled: false,
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'write_file',
+    })
+    // Disabled rule should not match → default allow
+    expect(decision.allowed).toBe(true)
+  })
+
+  it('returns audit_only decision when matching rule has action=audit_only', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'audit-bash',
+      action: 'audit_only',
+      matchers: [{ matcher_type: 'tool', pattern: 'bash' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'bash',
+    })
+    // audit_only → allowed is true (not blocked), action is audit_only
+    expect(decision.allowed).toBe(true)
+    expect(decision.action).toBe('audit_only')
+  })
+
+  it('SYSTEM_INVARIANTS take priority over workspace rules even at priority 999', async () => {
+    // Even a workspace rule at priority 999 cannot override a SYSTEM_INVARIANT at 1000
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'allow-merge',
+      action: 'allow',
+      matchers: [{ matcher_type: 'agent_team', pattern: 'merge_worktree' }],
+      priority: 999,
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'tester',
+      actor_id: 'agent_1',
+      action: 'merge_worktree',
+    })
+    // SYSTEM_INVARIANT still wins → denied
+    expect(decision.allowed).toBe(false)
+    expect(decision.rule_id).toBe('SYSTEM:only_integration_worker_merges')
+  })
+})
+
+describe('evaluatePolicy — regex matcher', () => {
+  it('denies when action matches regex pattern', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-delete-commands',
+      action: 'deny',
+      matchers: [{ matcher_type: 'regex', pattern: '^delete_.*' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'delete_file',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toBe('no-delete-commands')
+  })
+
+  it('does not match when regex pattern does not match action', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-delete-commands',
+      action: 'deny',
+      matchers: [{ matcher_type: 'regex', pattern: '^delete_.*' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'read_file',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+})
