@@ -7,3 +7,5 @@ export type {
 } from './types.js'
 
 export { computeImportance, computeFreshness, rrfScore } from './scoring.js'
+
+export { contentHash, isDuplicate } from './dedup.js'
