@@ -122,9 +122,9 @@ describe('getWorkspaceStatus — cross-workspace isolation', () => {
 })
 
 describe('listAgentProfiles', () => {
-  it('returns all 6 roles', async () => {
+  it('returns all 19 roles', async () => {
     const profiles = await listAgentProfiles()
-    expect(profiles).toHaveLength(6)
+    expect(profiles).toHaveLength(19)
     const roles = profiles.map(p => p.role)
     expect(roles).toContain('chief_of_staff')
     expect(roles).toContain('implementer')
@@ -137,5 +137,44 @@ describe('listAgentProfiles', () => {
     const impl = profiles.find(p => p.role === 'implementer')!
     expect(cos.can_create_teams).toBe(true)
     expect(impl.can_create_teams).toBe(false)
+  })
+})
+
+describe('listAgentProfiles — all 19 roles', () => {
+  it('returns exactly 19 agent profiles', async () => {
+    const profiles = await listAgentProfiles()
+    expect(profiles).toHaveLength(19)
+  })
+
+  it('includes all 19 expected roles', async () => {
+    const profiles = await listAgentProfiles()
+    const roles = profiles.map(p => p.role)
+    const expected = [
+      'chief_of_staff', 'context_gatherer', 'prd_planner', 'implementation_planner',
+      'issue_decomposer', 'architecture_reviewer', 'research_worker',
+      'implementer_backend', 'implementer_frontend', 'implementer',
+      'refactor_worker', 'browser_worker', 'tester', 'reviewer',
+      'security_reviewer', 'performance_reviewer', 'integration_worker',
+      'planner', 'researcher',
+    ]
+    for (const role of expected) {
+      expect(roles, `missing role: ${role}`).toContain(role)
+    }
+  })
+
+  it('chief_of_staff can create teams and dispatch agents', async () => {
+    const profiles = await listAgentProfiles()
+    const cos = profiles.find(p => p.role === 'chief_of_staff')
+    expect(cos?.can_create_teams).toBe(true)
+    expect(cos?.can_dispatch_agents).toBe(true)
+  })
+
+  it('all non-CoS roles have can_create_teams false', async () => {
+    const profiles = await listAgentProfiles()
+    for (const p of profiles) {
+      if (p.role !== 'chief_of_staff') {
+        expect(p.can_create_teams, `${p.role} should not create teams`).toBe(false)
+      }
+    }
   })
 })

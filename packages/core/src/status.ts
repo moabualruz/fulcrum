@@ -6,12 +6,25 @@ interface GetWorkspaceStatusInput { workspace_id: string }
 interface BuildCosContextInput { workspace_id: string; project_id: string; max_tokens?: number }
 
 const AGENT_PROFILES: AgentProfile[] = [
-  { role: 'chief_of_staff', description: 'Plans work, creates teams, dispatches agents, reviews CoS context', can_create_teams: true, can_dispatch_agents: true },
-  { role: 'implementer', description: 'Writes code and implements features', can_create_teams: false, can_dispatch_agents: false },
-  { role: 'tester', description: 'Writes and runs tests, validates implementations', can_create_teams: false, can_dispatch_agents: false },
-  { role: 'reviewer', description: 'Reviews code and provides feedback', can_create_teams: false, can_dispatch_agents: false },
-  { role: 'researcher', description: 'Investigates unknowns, gathers information', can_create_teams: false, can_dispatch_agents: false },
-  { role: 'planner', description: 'Breaks down epics into tasks and defines acceptance criteria', can_create_teams: false, can_dispatch_agents: false },
+  { role: 'chief_of_staff',        description: 'Plans work, creates teams, dispatches agents, reviews CoS context', can_create_teams: true,  can_dispatch_agents: true  },
+  { role: 'context_gatherer',      description: 'Gathers context about codebase, requirements, and environment',     can_create_teams: false, can_dispatch_agents: false },
+  { role: 'prd_planner',           description: 'Writes Product Requirements Documents from high-level specs',       can_create_teams: false, can_dispatch_agents: false },
+  { role: 'implementation_planner',description: 'Breaks PRDs into detailed implementation plans',                    can_create_teams: false, can_dispatch_agents: false },
+  { role: 'issue_decomposer',      description: 'Decomposes issues into atomic tasks with acceptance criteria',      can_create_teams: false, can_dispatch_agents: false },
+  { role: 'architecture_reviewer', description: 'Reviews architectural decisions and system design',                 can_create_teams: false, can_dispatch_agents: false },
+  { role: 'research_worker',       description: 'Investigates unknowns, evaluates libraries and approaches',        can_create_teams: false, can_dispatch_agents: false },
+  { role: 'implementer_backend',   description: 'Implements backend features, APIs, and data layers',               can_create_teams: false, can_dispatch_agents: false },
+  { role: 'implementer_frontend',  description: 'Implements frontend features, UI components, and styles',          can_create_teams: false, can_dispatch_agents: false },
+  { role: 'implementer',           description: 'Writes code and implements features across the stack',             can_create_teams: false, can_dispatch_agents: false },
+  { role: 'refactor_worker',       description: 'Improves code quality, reduces duplication, applies patterns',     can_create_teams: false, can_dispatch_agents: false },
+  { role: 'browser_worker',        description: 'Performs browser automation, web scraping, and UI testing',        can_create_teams: false, can_dispatch_agents: false },
+  { role: 'tester',                description: 'Writes and runs tests, validates implementations',                  can_create_teams: false, can_dispatch_agents: false },
+  { role: 'reviewer',              description: 'Reviews code and provides structured feedback',                     can_create_teams: false, can_dispatch_agents: false },
+  { role: 'security_reviewer',     description: 'Audits code for security vulnerabilities and policy violations',    can_create_teams: false, can_dispatch_agents: false },
+  { role: 'performance_reviewer',  description: 'Profiles performance and identifies bottlenecks',                  can_create_teams: false, can_dispatch_agents: false },
+  { role: 'integration_worker',    description: 'Integrates components, resolves merge conflicts, coordinates deps', can_create_teams: false, can_dispatch_agents: false },
+  { role: 'planner',               description: 'Breaks down epics into tasks and defines acceptance criteria',      can_create_teams: false, can_dispatch_agents: false },
+  { role: 'researcher',            description: 'Investigates unknowns, gathers information for the team',          can_create_teams: false, can_dispatch_agents: false },
 ]
 
 export async function getWorkspaceStatus(input: GetWorkspaceStatusInput): Promise<WorkspaceStatusResult> {
