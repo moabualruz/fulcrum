@@ -47,7 +47,7 @@ describe('type exports — compile-time shape checks', () => {
       issue_id: null, display_id: 'TASK-1', title: 'Test task',
       description: null, status: 'queued', status_category: 'backlog',
       priority: 'medium', estimate_type: null, estimate_value: null,
-      assigned_to: null, note: null, done_criteria: null,
+      depends_on: [], assigned_to: null, note: null, done_criteria: null,
       version: 0, created_at: '', updated_at: '',
       claimed_at: null, completed_at: null,
     }
@@ -78,7 +78,8 @@ describe('type exports — compile-time shape checks', () => {
       memory_id: 'mem_01', scope: 'project', kind: 'fact',
       workspace_id: 'ws_01', project_id: 'proj_01', file_path: null,
       symbol_path: null, title: 'A fact', summary: 'Short summary',
-      canonical_text: null, tags: [], entities: [], confidence: 1.0,
+      content: 'A fact about the project', canonical_text: null,
+      tags: [], entities: [], confidence: 1.0,
       access_count: 0, event_time: null, content_hash: null,
       task_id: null, issue_id: null, artifact_id: null,
       provenance_refs: [], embedding: null,
