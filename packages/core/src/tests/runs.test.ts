@@ -98,7 +98,7 @@ describe('blockAgentRun', () => {
     const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'reviewer' })
     const blocked = await blockAgentRun({ run_id: run.run_id, reason: 'waiting for upstream merge' })
     expect(blocked.status).toBe('blocked')
-    expect(blocked.output_summary).toBe('waiting for upstream merge')
+    expect(blocked.blocker).toBe('waiting for upstream merge')
   })
 })
 

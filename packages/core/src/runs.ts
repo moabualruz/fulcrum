@@ -178,13 +178,13 @@ export async function completeAgentRun(input: CompleteRunInput): Promise<AgentRu
   db.prepare(`
     UPDATE agent_runs
     SET status = 'finished', status_category = ?, output_summary = ?, artifacts = ?,
-        finished_at = ?, completed_at = ?, updated_at = ?, version = version + 1
+        finished_at = ?, updated_at = ?, version = version + 1
     WHERE run_id = ?
   `).run(
     doneCategory,
     input.output_summary,
     input.artifacts ? JSON.stringify(input.artifacts) : null,
-    now, now, now, input.run_id
+    now, now, input.run_id
   )
 
   emitEvent({
@@ -208,10 +208,10 @@ export async function blockAgentRun(input: BlockRunInput): Promise<AgentRun> {
   const blockedCategory = statusCategory('blocked')
   db.prepare(`
     UPDATE agent_runs
-    SET status = 'blocked', status_category = ?, blocker = ?, output_summary = ?,
+    SET status = 'blocked', status_category = ?, blocker = ?,
         updated_at = ?, version = version + 1
     WHERE run_id = ?
-  `).run(blockedCategory, input.reason, input.reason, new Date().toISOString(), input.run_id)
+  `).run(blockedCategory, input.reason, new Date().toISOString(), input.run_id)
 
   emitEvent({
     workspace_id: run.workspace_id,

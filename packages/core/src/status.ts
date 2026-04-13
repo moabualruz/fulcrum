@@ -101,7 +101,7 @@ export async function buildCosContext(input: BuildCosContextInput): Promise<stri
   if (projectBlocked.length > 0) {
     parts.push('\n## Blocked\n')
     for (const r of projectBlocked) {
-      parts.push(`- **${r.role}** (${r.run_id}) — ${r.output_summary ?? 'no reason given'}\n`)
+      parts.push(`- **${r.role}** (${r.run_id}) — ${r.blocker ?? 'no reason given'}\n`)
     }
   }
 

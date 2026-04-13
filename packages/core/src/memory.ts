@@ -86,10 +86,10 @@ export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
   const title = input.title ?? input.content.slice(0, 80)
   const summary = input.summary ?? title
 
-  // Always check exact content match first (fast path)
+  // Always check exact content match first (fast path), scoped by scope+kind
   const existing = db.prepare(
-    'SELECT * FROM memories WHERE workspace_id = ? AND project_id = ? AND content = ?'
-  ).get(input.workspace_id, input.project_id, input.content) as Record<string, unknown> | undefined
+    'SELECT * FROM memories WHERE workspace_id = ? AND project_id = ? AND content = ? AND scope = ? AND kind = ?'
+  ).get(input.workspace_id, input.project_id, input.content, scope, kind) as Record<string, unknown> | undefined
 
   if (existing) {
     db.prepare(
@@ -170,7 +170,7 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
       SELECT f.rowid, f.rank
       FROM memories_fts f
       JOIN memories m ON m.rowid = f.rowid
-      WHERE f.content MATCH ?
+      WHERE memories_fts MATCH ?
         AND m.workspace_id = ?
         AND m.project_id = ?
       ORDER BY f.rank
