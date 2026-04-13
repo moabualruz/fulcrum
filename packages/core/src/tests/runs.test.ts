@@ -31,7 +31,7 @@ describe('startAgentRun', () => {
     const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'implementer' })
     expect(run.status).toBe('running')
     expect(run.role).toBe('implementer')
-    expect(run.run_id).toMatch(/^[0-9A-Z]{26}$/)
+    expect(run.run_id).toMatch(/^run_[0-9A-Z]{26}$|^[0-9A-Z]{26}$/)
     expect(run.progress_pct).toBe(0)
   })
 
@@ -68,7 +68,7 @@ describe('heartbeatAgentRun', () => {
 })
 
 describe('completeAgentRun', () => {
-  it('sets status to completed with summary and artifacts', async () => {
+  it('sets status to finished with summary and artifacts', async () => {
     const task = await seedTask()
     const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'implementer' })
     const completed = await completeAgentRun({
@@ -76,11 +76,11 @@ describe('completeAgentRun', () => {
       output_summary: 'Done!',
       artifacts: { files_changed: ['src/foo.ts'], tests_passed: 10 },
     })
-    expect(completed.status).toBe('completed')
+    expect(completed.status).toBe('finished')
     expect(completed.output_summary).toBe('Done!')
     expect(completed.artifacts?.files_changed).toEqual(['src/foo.ts'])
     expect(completed.artifacts?.tests_passed).toBe(10)
-    expect(completed.completed_at).toBeTruthy()
+    expect(completed.finished_at).toBeTruthy()
   })
 
   it('increments version on completion', async () => {
@@ -112,7 +112,7 @@ describe('escalateRun', () => {
     expect(cosTask.assigned_to).toBe('chief_of_staff')
     expect(cosTask.description).toContain('blocked for too long')
     const escalated = await getAgentRunStatus({ run_id: run.run_id })
-    expect(escalated.status).toBe('escalated')
+    expect(escalated.status).toBe('aborted')
   })
 
   it('creates CoS task in the same project as the original task', async () => {
@@ -226,5 +226,95 @@ describe('input validation', () => {
     await expect(
       escalateRun({ run_id: run.run_id, escalation_reason: '   ' })
     ).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+})
+
+describe('startAgentRun — display_id, agent_id, status_category, events', () => {
+  it('generates a RUN- display_id', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'implementer', agent_id: 'agent-abc' })
+    expect(run.display_id).toMatch(/^RUN-\d+$/)
+  })
+
+  it('stores agent_id from input', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'implementer', agent_id: 'agent-xyz' })
+    expect(run.agent_id).toBe('agent-xyz')
+  })
+
+  it('sets status_category to active', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'implementer', agent_id: 'a1' })
+    expect(run.status_category).toBe('active')
+  })
+
+  it('emits agent_run_created and agent_run_started events', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'implementer', agent_id: 'a1' })
+    const db = getDb()
+    const created = db.prepare("SELECT * FROM events WHERE evt_type = 'agent_run_created' AND object_id = ?").get(run.run_id)
+    const started = db.prepare("SELECT * FROM events WHERE evt_type = 'agent_run_started' AND object_id = ?").get(run.run_id)
+    expect(created).toBeTruthy()
+    expect(started).toBeTruthy()
+  })
+})
+
+describe('heartbeatAgentRun — heartbeat_at', () => {
+  it('updates heartbeat_at on each call', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'implementer', agent_id: 'a1' })
+    await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step', progress_pct: 10 })
+    const updated = await getAgentRunStatus({ run_id: run.run_id })
+    expect(updated.heartbeat_at).toBeTruthy()
+  })
+})
+
+describe('completeAgentRun — finished_at, status_category, event', () => {
+  it('sets finished_at on completion', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'implementer', agent_id: 'a1' })
+    const completed = await completeAgentRun({ run_id: run.run_id, output_summary: 'done' })
+    expect(completed.finished_at).toBeTruthy()
+  })
+
+  it('sets status_category to done on completion', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'implementer', agent_id: 'a1' })
+    const completed = await completeAgentRun({ run_id: run.run_id, output_summary: 'done' })
+    expect(completed.status_category).toBe('done')
+  })
+
+  it('emits agent_run_finished event', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'implementer', agent_id: 'a1' })
+    const completed = await completeAgentRun({ run_id: run.run_id, output_summary: 'done' })
+    const db = getDb()
+    const evt = db.prepare("SELECT * FROM events WHERE evt_type = 'agent_run_finished' AND object_id = ?").get(completed.run_id)
+    expect(evt).toBeTruthy()
+  })
+})
+
+describe('blockAgentRun — blocker field, status_category, event', () => {
+  it('sets blocker field with the reason', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'reviewer', agent_id: 'a1' })
+    const blocked = await blockAgentRun({ run_id: run.run_id, reason: 'waiting for review' })
+    expect(blocked.blocker).toBe('waiting for review')
+  })
+
+  it('sets status_category to blocked', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'reviewer', agent_id: 'a1' })
+    const blocked = await blockAgentRun({ run_id: run.run_id, reason: 'reason' })
+    expect(blocked.status_category).toBe('blocked')
+  })
+
+  it('emits agent_run_blocked event', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'reviewer', agent_id: 'a1' })
+    const blocked = await blockAgentRun({ run_id: run.run_id, reason: 'reason' })
+    const db = getDb()
+    const evt = db.prepare("SELECT * FROM events WHERE evt_type = 'agent_run_blocked' AND object_id = ?").get(blocked.run_id)
+    expect(evt).toBeTruthy()
   })
 })

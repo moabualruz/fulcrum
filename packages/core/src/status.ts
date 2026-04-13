@@ -35,7 +35,7 @@ export async function getWorkspaceStatus(input: GetWorkspaceStatusInput): Promis
 
   const today = new Date().toISOString().slice(0, 10)
   const completedToday = (db.prepare(
-    "SELECT COUNT(*) as c FROM agent_runs WHERE workspace_id = ? AND status = 'completed' AND date(completed_at) = ?"
+    "SELECT COUNT(*) as c FROM agent_runs WHERE workspace_id = ? AND status = 'finished' AND date(finished_at) = ?"
   ).get(input.workspace_id, today) as { c: number }).c
 
   return {
