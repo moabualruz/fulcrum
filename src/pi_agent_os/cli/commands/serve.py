@@ -62,30 +62,39 @@ def serve_all(
 ) -> None:
     """Start both MCP (SSE) and hook servers concurrently."""
     import threading
+    errors: list[str] = []
 
     def _run_mcp() -> None:
-        from ...mcp.server import mcp
-        mcp.run(transport="sse", host="127.0.0.1", port=mcp_port)
+        try:
+            from ...mcp.server import mcp
+            mcp.run(transport="sse", host="127.0.0.1", port=mcp_port)
+        except Exception as exc:
+            errors.append(f"MCP server: {exc}")
 
     def _run_hooks() -> None:
-        import uvicorn
-        from fastapi import FastAPI, Request
-        from fastapi.responses import JSONResponse
+        try:
+            import uvicorn
+            from fastapi import FastAPI, Request
+            from fastapi.responses import JSONResponse
 
-        hook_app = FastAPI(title="pi-os hooks")
+            hook_app = FastAPI(title="pi-os hooks")
 
-        @hook_app.post("/hooks/pre-tool")
-        async def pre_tool(request: Request) -> JSONResponse:
-            event = await request.json()
-            from ...hooks.claude_hook import handle_hook
-            code, msg = handle_hook(event)
-            return JSONResponse({"continue": code == 0, "stopReason": msg or None})
+            @hook_app.post("/hooks/pre-tool")
+            async def pre_tool(request: Request) -> JSONResponse:
+                event = await request.json()
+                from ...hooks.claude_hook import handle_hook
+                code, msg = handle_hook(event)
+                if code == 0:
+                    return JSONResponse({"continue": True})
+                return JSONResponse({"continue": False, "stopReason": msg})
 
-        @hook_app.get("/health")
-        def health():
-            return {"status": "ok"}
+            @hook_app.get("/health")
+            def health():
+                return {"status": "ok"}
 
-        uvicorn.run(hook_app, host="127.0.0.1", port=hooks_port)
+            uvicorn.run(hook_app, host="127.0.0.1", port=hooks_port)
+        except Exception as exc:
+            errors.append(f"Hook server: {exc}")
 
     typer.echo(f"Starting MCP server on :{mcp_port} and hook server on :{hooks_port}")
 
@@ -96,6 +105,12 @@ def serve_all(
 
     try:
         mcp_t.join()
+        if errors:
+            typer.echo(f"[error] {errors[-1]}", err=True)
+            raise typer.Exit(1)
         hooks_t.join()
+        if errors:
+            typer.echo(f"[error] {errors[-1]}", err=True)
+            raise typer.Exit(1)
     except KeyboardInterrupt:
         typer.echo("Shutting down.")
