@@ -1,9 +1,9 @@
 
 # PI Local-First Agent Operating System Spec
-Version: 0.1  
-Status: Draft frozen from reviewed decisions  
+Version: 0.2  
+Status: Active — updated to reflect CLI agent integration  
 Audience: Local CLI agents, maintainers, reviewers  
-Date: 2026-04-12
+Date: 2026-04-13
 
 ---
 
@@ -23,7 +23,8 @@ This document is authoritative over prior conversational fragments unless explic
 - Use PI as the execution host and extension runtime.
 - Keep the system local-first and inspectable.
 - Reuse PI-native capabilities and existing PI extensions whenever feasible.
-- Avoid MCP for core browser/tool integrations.
+- Avoid MCP for core browser/tool integrations (web search, fetch, Playwright).
+- Use MCP only as an interoperability interface exposing PI-unique control plane tools to external CLI agents (Claude CLI, Gemini CLI). This is not a core architecture dependency — it is an optional bridge for external agent integration.
 - Prefer native tools, local CLIs, native libraries, and REST APIs.
 - Make memory first-class across project, file, and global scopes.
 - Make project/code memory ingestion first-class.
@@ -111,7 +112,48 @@ Preferred local architecture:
 - search via a local/self-hosted search layer
 - fetch/crawl/extract via a local crawl/extract layer
 - browser automation via native Playwright library
-- no MCP dependency in the core architecture
+- no MCP dependency in the core architecture for browser/web integrations
+
+### 3.6 External CLI agent integration
+
+Claude CLI (`claude`) and Gemini CLI (`gemini`) may be used as chat providers alongside PI.
+This enables OAuth-based execution without API key billing for those providers.
+
+**Model spec prefix routing** (in agent `.md` frontmatter):
+- `claude-cli/<model>` → `ClaudeCLIAdapter` (Claude Code OAuth session)
+- `gemini-cli/<model>` → `GeminiCLIAdapter` (Gemini CLI OAuth session)
+- anything else → `PIRPCBridge` (PI native execution, default)
+
+The `RoutingAdapter` selects the correct backend at spawn time based on the first `models:` entry
+in the agent definition file. `auto_configure_pi_runtime()` wires this automatically.
+
+**MCP control plane bridge** (`pi-os` MCP server):
+Exposes PI-unique tools (`create_task`, `update_task`, `list_tasks`, `recall_memory`,
+`write_memory`, `list_agent_profiles`, `get_agent_run_status`) to Claude and Gemini under
+the `mcp__pi-os__*` namespace (Claude) or `mcp_pi-os_*` namespace (Gemini).
+This avoids tool name conflicts with built-in CLI tools and gives agents access to the
+control plane without requiring PI.
+
+**Pre-execution interception**:
+- Claude: `PreToolUse` command hook (`python -m pi_agent_os.hooks.claude_hook`) — runs before
+  every tool call, logs to event store, runs policy check, exits 0 (allow) or 2 (deny).
+- Gemini: `BeforeTool` extension hook (`python -m pi_agent_os.hooks.gemini_hook`) — same logic.
+- PI: observe-only (PI RPC has no pre-execution gate in its protocol).
+
+**Integration packages**:
+- `agent-integration/claude/` — `CLAUDE.md`, `.mcp.json`, hook settings snippet, `install.sh`
+- `agent-integration/gemini/` — `GEMINI.md`, `gemini-extension.json`, `install.sh`
+
+**CoS coherence**:
+The Chief of Staff is stateless per invocation. `WorkerLifecycle` injects a full world-state
+snapshot (tasks, recent events, recalled memories) into every `chief_of_staff` task packet via
+`CoSContextBuilder`. The CoS produces a structured JSON response that `CoSResponseParser` applies
+back to the control plane (create/update tasks, write memories, emit events).
+
+**Observability**:
+All adapter invocations (PIRPCBridge, ClaudeCLIAdapter, GeminiCLIAdapter) emit OTel spans using
+GenAI semantic conventions (`gen_ai.system`, `gen_ai.request.model`, `gen_ai.agent.name`,
+`gen_ai.usage.input_tokens/output_tokens`). Configure OTLP export via standard env vars.
 
 ### 3.4 Local code/project indexing
 Preferred stack:

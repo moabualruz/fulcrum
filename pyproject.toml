@@ -40,6 +40,12 @@ dependencies = [
     "blake3>=0.3",
     # Date/time
     "python-dateutil>=2.9",
+    # MCP tool server
+    "mcp>=1.0",
+    # OpenTelemetry observability
+    "opentelemetry-api>=1.25",
+    "opentelemetry-sdk>=1.25",
+    "opentelemetry-semantic-conventions>=0.46b0",
 ]
 
 [project.optional-dependencies]

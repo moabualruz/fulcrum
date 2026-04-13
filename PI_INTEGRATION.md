@@ -1,5 +1,26 @@
 # PI Runtime Integration Guide
 
+## Multi-runtime support
+
+This system supports three agent execution backends, selectable per agent role:
+
+| Backend | Model prefix | Auth | Notes |
+|---|---|---|---|
+| PI native | (none / any) | API key or PI config | Full PI features, team support |
+| Claude CLI | `claude-cli/` | Claude Code OAuth | No API billing, stateless |
+| Gemini CLI | `gemini-cli/` | Gemini CLI OAuth | No API billing, stateless |
+
+`auto_configure_pi_runtime()` wires a `RoutingAdapter` that dispatches based on the first
+`models:` entry in each agent's `.md` frontmatter. Set the prefix in the agent definition file.
+
+For MCP tool access, run `pi serve mcp` and install the integration package:
+```bash
+bash agent-integration/claude/install.sh   # Claude Code
+bash agent-integration/gemini/install.sh   # Gemini CLI
+```
+
+---
+
 ## What is PI?
 
 PI (`@mariozechner/pi-coding-agent`) is a TypeScript/Node.js terminal coding agent developed
@@ -183,6 +204,73 @@ run_id = get_pi_runtime().spawn_agent(PIAgentConfig(
     worktree_path="/path/to/worktree",
 ))
 ```
+
+## Using Claude CLI or Gemini CLI as providers
+
+Set the `models:` frontmatter in any agent `.md` file:
+
+```markdown
+---
+models: claude-cli/claude-sonnet-4-6
+system: |
+  You are the Chief of Staff for this project.
+  ...
+---
+```
+
+The `RoutingAdapter` (wired by `auto_configure_pi_runtime()`) routes `claude-cli/*` to
+`ClaudeCLIAdapter` and `gemini-cli/*` to `GeminiCLIAdapter`. No PI required for these agents.
+
+### Pre-requisites for Claude CLI
+```bash
+# Claude Code CLI must be installed and authenticated
+claude --version
+# Logged in? (uses existing Claude Code OAuth session)
+```
+
+### Pre-requisites for Gemini CLI
+```bash
+npm install -g @google/gemini-cli
+gemini   # run once interactively to complete OAuth
+```
+
+### Installing the MCP integration
+
+The MCP server exposes control plane tools (`create_task`, `update_task`, etc.) to Claude and
+Gemini under a namespaced prefix, avoiding conflicts with built-in tools.
+
+```bash
+# Install Claude integration (CLAUDE.md, .mcp.json, PreToolUse hooks)
+bash agent-integration/claude/install.sh
+
+# Install Gemini integration (GEMINI.md, gemini-extension.json, BeforeTool hooks)
+bash agent-integration/gemini/install.sh
+
+# Start MCP server for Claude (stdio transport, used by .mcp.json automatically)
+pi serve mcp
+
+# Or start as HTTP SSE server
+pi serve mcp --transport sse --port 7200
+
+# Start HTTP hook server (for Claude http-type hooks)
+pi serve hooks --port 7100
+
+# Start both
+pi serve all
+```
+
+### OTel observability
+
+All three adapters emit OTel spans. To export to a collector:
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+export OTEL_SERVICE_NAME=pi-agent-os
+```
+
+Configure the SDK in your entrypoint before calling `auto_configure_pi_runtime()`.
+
+---
 
 ## Troubleshooting
 

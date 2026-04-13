@@ -1,0 +1,19 @@
+{
+  "name": "pi-os",
+  "version": "1.0.0",
+  "description": "PI Agent OS control plane integration for Gemini CLI",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": [
+    {
+      "name": "pi-os",
+      "command": "python",
+      "args": ["-m", "pi_agent_os.mcp.server"],
+      "trust": true
+    }
+  ],
+  "hooks": {
+    "BeforeTool": {
+      "command": "python -m pi_agent_os.hooks.gemini_hook"
+    }
+  }
+}
