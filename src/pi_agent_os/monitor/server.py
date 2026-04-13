@@ -235,8 +235,30 @@ def policy_events(workspace_id: str = Query(...), limit: int = Query(50)):
 
 @app.get("/api/v1/sync/state")
 def sync_state(workspace_id: str = Query(...)):
-    rows = db.fetchall(
-        "SELECT * FROM sync_projection WHERE workspace_id=? ORDER BY updated_at DESC",
-        (workspace_id,),
-    )
-    return {"sync_states": [dict(r) for r in rows]}
+    from ..adapters.readers.sync_read import SyncStateReadAdapter, SyncConflictReadAdapter
+    reader = SyncStateReadAdapter()
+    conflict_reader = SyncConflictReadAdapter()
+    return {
+        "sync_states": reader.for_workspace(workspace_id),
+        "pending_queue": reader.pending(workspace_id),
+        "unresolved_conflicts": conflict_reader.unresolved_count(workspace_id),
+        "drift_summary": reader.drift_summary(workspace_id),
+    }
+
+
+@app.get("/api/v1/analytics/per-role")
+def analytics_per_role(workspace_id: str = Query(...)):
+    """Per-role agent metrics view. Spec §20.5."""
+    return {"metrics": _metrics.per_role_metrics(workspace_id)}
+
+
+@app.get("/api/v1/analytics/memory")
+def analytics_memory(workspace_id: str = Query(...)):
+    """Memory effectiveness analytics. Spec §20.6."""
+    return _metrics.memory_effectiveness(workspace_id)
+
+
+@app.get("/api/v1/analytics/forecast")
+def analytics_forecast(workspace_id: str = Query(...), project_id: Optional[str] = Query(None)):
+    """Velocity-based delivery forecast. Spec §20.7."""
+    return _metrics.forecasting_advisory(workspace_id, project_id=project_id)
