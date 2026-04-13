@@ -15,3 +15,5 @@ export { writeMemory } from './write.js'
 export { linkMemoryToEntity, getMemoryEntities } from './entities.js'
 
 export { recallMemory } from './recall.js'
+
+export { ingestFile, ingestProject } from './ingest.js'
