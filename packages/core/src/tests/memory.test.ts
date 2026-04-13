@@ -60,7 +60,7 @@ describe('writeMemory', () => {
       content: 'We chose SQLite over Postgres because local-first is the priority',
       tags: ['architecture', 'database'],
     })
-    expect(m.memory_id).toMatch(/^[0-9A-Z]{26}$/)
+    expect(m.memory_id).toMatch(/^mem_[0-9A-Z]{26}$|^[0-9A-Z]{26}$/)
     expect(m.content).toBe('We chose SQLite over Postgres because local-first is the priority')
     expect(m.tags).toEqual(['architecture', 'database'])
     expect(m.confidence).toBe(1.0)
@@ -172,5 +172,46 @@ describe('writeMemory — deduplication behaviour', () => {
     // Tags are NOT updated on exact dedup — confidence is
     expect(updated.confidence).toBe(0.8)
     expect(updated.tags).toEqual(['original'])
+  })
+})
+
+describe('writeMemory — scope, kind, title, summary', () => {
+  it('defaults scope to project', async () => {
+    seed()
+    const m = await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'A fact about the project' })
+    expect(m.scope).toBe('project')
+  })
+
+  it('defaults kind to fact', async () => {
+    seed()
+    const m = await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'Some content here' })
+    expect(m.kind).toBe('fact')
+  })
+
+  it('defaults title to first 80 chars of content', async () => {
+    seed()
+    const content = 'This is a memory with some content that is more than 80 characters in total length for testing'
+    const m = await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content })
+    expect(m.title).toBe(content.slice(0, 80))
+  })
+
+  it('defaults summary to title', async () => {
+    seed()
+    const m = await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'Short content' })
+    expect(m.summary).toBe(m.title)
+  })
+
+  it('accepts explicit scope, kind, title, summary', async () => {
+    seed()
+    const m = await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      content: 'Detailed content here',
+      scope: 'global', kind: 'decision',
+      title: 'Custom title', summary: 'Custom summary',
+    })
+    expect(m.scope).toBe('global')
+    expect(m.kind).toBe('decision')
+    expect(m.title).toBe('Custom title')
+    expect(m.summary).toBe('Custom summary')
   })
 })

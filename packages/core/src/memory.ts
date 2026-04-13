@@ -1,7 +1,7 @@
-import { ulid } from 'ulid'
 import { getDb } from './db/client.js'
+import { newId } from './ids.js'
 import { FulcrumError } from './types.js'
-import type { Memory } from './types.js'
+import type { Memory, MemoryScope, MemoryKind } from './types.js'
 import { getTextEmbedder, getReranker } from './embedding/registry.js'
 
 interface WriteMemoryInput {
@@ -11,6 +11,16 @@ interface WriteMemoryInput {
   tags?: string[]
   confidence?: number
   embedding?: Float32Array
+  scope?: MemoryScope
+  kind?: MemoryKind
+  title?: string
+  summary?: string
+  canonical_text?: string
+  entities?: string[]
+  task_id?: string
+  issue_id?: string
+  artifact_id?: string
+  provenance_refs?: string[]
 }
 
 interface RecallMemoryInput {
@@ -24,14 +34,29 @@ function rowToMemory(row: Record<string, unknown>): Memory {
   return {
     memory_id: row.memory_id as string,
     workspace_id: row.workspace_id as string,
-    project_id: row.project_id as string,
+    project_id: row.project_id as string | null,
+    scope: ((row.scope as string) || 'project') as MemoryScope,
+    kind: ((row.kind as string) || 'fact') as MemoryKind,
+    file_path: (row.file_path as string | null) ?? null,
+    symbol_path: (row.symbol_path as string | null) ?? null,
+    title: (row.title as string) || '',
+    summary: (row.summary as string) || '',
     content: row.content as string,
+    canonical_text: (row.canonical_text as string | null) ?? null,
     tags: (() => { try { return JSON.parse(row.tags as string) as string[] } catch { return [] } })(),
+    entities: (() => { try { return JSON.parse(row.entities as string) as string[] } catch { return [] } })(),
     confidence: row.confidence as number,
+    access_count: row.access_count as number,
+    event_time: (row.event_time as string | null) ?? null,
+    content_hash: (row.content_hash as string | null) ?? null,
+    task_id: (row.task_id as string | null) ?? null,
+    issue_id: (row.issue_id as string | null) ?? null,
+    artifact_id: (row.artifact_id as string | null) ?? null,
+    provenance_refs: (() => { try { return JSON.parse(row.provenance_refs as string) as string[] } catch { return [] } })(),
+    embedding: (row.embedding as Buffer | null) ?? null,
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
     last_accessed_at: row.last_accessed_at as string,
-    access_count: row.access_count as number,
   }
 }
 
@@ -55,6 +80,11 @@ export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
   }
   const db = getDb()
   const now = new Date().toISOString()
+
+  const scope = input.scope ?? 'project'
+  const kind = input.kind ?? 'fact'
+  const title = input.title ?? input.content.slice(0, 80)
+  const summary = input.summary ?? title
 
   // Always check exact content match first (fast path)
   const existing = db.prepare(
@@ -92,20 +122,33 @@ export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
   }
 
   // Insert new memory
-  const memory_id = ulid()
+  const memory_id = newId('memory')
   const embeddingBuffer = input.embedding ? Buffer.from(input.embedding.buffer) : null
   db.prepare(`
     INSERT INTO memories
-      (memory_id, workspace_id, project_id, content, tags, confidence, embedding, created_at, updated_at, last_accessed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (memory_id, workspace_id, project_id, scope, kind, title, summary, content,
+       canonical_text, tags, entities, confidence, embedding,
+       task_id, issue_id, artifact_id, provenance_refs,
+       created_at, updated_at, last_accessed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     memory_id,
     input.workspace_id,
     input.project_id,
+    scope,
+    kind,
+    title,
+    summary,
     input.content,
+    input.canonical_text ?? null,
     JSON.stringify(input.tags ?? []),
+    JSON.stringify(input.entities ?? []),
     input.confidence ?? 1.0,
     embeddingBuffer,
+    input.task_id ?? null,
+    input.issue_id ?? null,
+    input.artifact_id ?? null,
+    JSON.stringify(input.provenance_refs ?? []),
     now, now, now
   )
   const row = db.prepare('SELECT * FROM memories WHERE memory_id = ?').get(memory_id) as Record<string, unknown> | undefined

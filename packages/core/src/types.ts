@@ -125,6 +125,7 @@ export interface Memory {
   symbol_path: string | null
   title: string
   summary: string
+  content: string
   canonical_text: string | null
   tags: string[]
   entities: string[]
