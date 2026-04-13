@@ -66,6 +66,7 @@ dev = [
 
 [project.scripts]
 pi = "pi_agent_os.cli.main:app"
+pi-os = "pi_agent_os.cli.main:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pi_agent_os"]

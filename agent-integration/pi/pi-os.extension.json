@@ -1,28 +1,25 @@
 {
+  "_note": "This file documents the PI Agent OS extension. The real extension is the TypeScript cockpit in ./cockpit/. Install with: pi install ./cockpit",
   "name": "pi-os",
   "version": "1.0.0",
-  "description": "PI Agent OS control plane integration — tasks, memory, lifecycle, and policy for PI agents.",
+  "description": "PI Agent OS control plane integration for PI — dashboard widget, task management, memory, lifecycle, and policy.",
+  "cockpit": "./cockpit/index.ts",
   "contextFileName": "PI.md",
-  "mcpServers": [
-    {
-      "name": "pi-os",
-      "command": "python",
-      "args": ["-m", "pi_agent_os.mcp.server"],
-      "trust": true
-    }
-  ],
   "hooks": {
     "BeforeTool": {
-      "command": "python -m pi_agent_os.hooks.pi_hook"
+      "command": "python -m pi_agent_os.hooks.pi_hook",
+      "_note": "Standalone hook for environments without the TypeScript cockpit"
     }
   },
   "lifecycleTools": {
-    "description": "PI runtime should call these MCP tools directly (not via the LLM) to drive the control plane.",
-    "onRunStart": "mcp__pi-os__start_agent_run",
-    "onHeartbeat": "mcp__pi-os__heartbeat_agent_run",
-    "onRunComplete": "mcp__pi-os__complete_agent_run",
-    "onRunBlocked": "mcp__pi-os__block_agent_run",
-    "onCoSDispatch": "mcp__pi-os__build_cos_context",
-    "onStatusQuery": "mcp__pi-os__get_workspace_status"
-  }
+    "_note": "When using the cockpit extension, these are native PI tools (pi_os_*). When using MCP-only, they are mcp__pi-os__* tools.",
+    "onRunStart": "pi_os_start_run",
+    "onHeartbeat": "pi_os_heartbeat",
+    "onRunComplete": "pi_os_complete_run",
+    "onRunBlocked": "pi_os_block_run",
+    "onCoSDispatch": "pi_os_build_cos_context",
+    "onStatusQuery": "pi_os_workspace_status"
+  },
+  "monitorPort": 4721,
+  "controlApiBase": "http://127.0.0.1:4721/api/v1/control"
 }

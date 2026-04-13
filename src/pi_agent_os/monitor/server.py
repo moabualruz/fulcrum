@@ -13,9 +13,13 @@ from ..analytics.metrics import MetricsService
 
 app = FastAPI(
     title="PI Agent OS Monitor",
-    description="Read-only mission control — spec §19.11",
-    version="0.1.0",
+    description="Read-only mission control + control plane API — spec §19.11",
+    version="0.2.0",
 )
+
+# Mount control (write) endpoints alongside the read-only monitor
+from .control import router as _control_router  # noqa: E402
+app.include_router(_control_router)
 
 
 def create_app() -> FastAPI:
