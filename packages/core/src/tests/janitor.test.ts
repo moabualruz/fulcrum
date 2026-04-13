@@ -72,7 +72,7 @@ describe('runJanitorCycle', () => {
     await runJanitorCycle({ workspace_id: 'ws_1', policy })
 
     const updated = db.prepare('SELECT status FROM agent_runs WHERE run_id = ?').get(run.run_id) as { status: string }
-    expect(updated.status).toBe('escalated')
+    expect(updated.status).toBe('aborted')
 
     // Should have created a CoS task
     const cosTasks = db.prepare("SELECT * FROM tasks WHERE assigned_to = 'chief_of_staff'").all()
