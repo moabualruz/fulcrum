@@ -2,10 +2,18 @@
   "name": "fulcrum",
   "version": "0.0.1",
   "private": true,
-  "description": "Fulcrum — local-first agent control plane",
-  "keywords": ["pi-package", "fulcrum", "agent-os", "multi-agent"],
-  "author": "Fulcrum",
+  "description": "Local-first agent control plane — task tracking, WIP enforcement, hybrid memory recall, and CoS context for multi-agent TypeScript systems",
+  "keywords": ["agent-os", "multi-agent", "sqlite", "local-first", "llm", "ai-agents", "task-management", "typescript"],
+  "author": "Mo Abualruz <moabualruz@github>",
   "license": "MIT",
+  "homepage": "https://github.com/moabualruz/fulcrum#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moabualruz/fulcrum.git"
+  },
+  "bugs": {
+    "url": "https://github.com/moabualruz/fulcrum/issues"
+  },
   "type": "module",
   "pi": {
     "extensions": ["./packages/extension/index.ts"]
