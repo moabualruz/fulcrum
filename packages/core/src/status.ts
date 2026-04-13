@@ -66,15 +66,15 @@ export async function buildCosContext(input: BuildCosContextInput): Promise<stri
 
   if (status.running_runs.length > 0) {
     parts.push('\n## Running\n')
-    for (const r of status.running_runs as Record<string, unknown>[]) {
-      parts.push(`- **${r.role as AgentRole}** (${r.run_id as string}) — ${(r.current_step as string | null) ?? 'in progress'} (${r.progress_pct as number}%)\n`)
+    for (const r of status.running_runs) {
+      parts.push(`- **${r.role}** (${r.run_id}) — ${r.current_step ?? 'in progress'} (${r.progress_pct}%)\n`)
     }
   }
 
   if (status.blocked_runs.length > 0) {
     parts.push('\n## Blocked\n')
-    for (const r of status.blocked_runs as Record<string, unknown>[]) {
-      parts.push(`- **${r.role as AgentRole}** (${r.run_id as string}) — ${(r.output_summary as string | null) ?? 'no reason given'}\n`)
+    for (const r of status.blocked_runs) {
+      parts.push(`- **${r.role}** (${r.run_id}) — ${r.output_summary ?? 'no reason given'}\n`)
     }
   }
 

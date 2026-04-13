@@ -1,0 +1,42 @@
+// Types
+export type {
+  Task, TaskStatus, AgentRun, RunStatus, RunArtifacts, AgentRole,
+  Memory, AgentProfile, WorkspaceStatus, PolicyConfig,
+  EmbeddingProviderConfig, FulcrumConfig, PolicyCheckResult,
+} from './types.js'
+export { FulcrumError } from './types.js'
+
+// Config
+export { loadConfig, defaultConfig } from './config.js'
+
+// DB
+export { getDb, setDb, closeDb, _configureDb } from './db/client.js'
+export { runMigrations } from './db/migrations.js'
+
+// Tasks
+export { listTasks, createTask, updateTask } from './tasks.js'
+
+// Runs
+export {
+  startAgentRun,
+  heartbeatAgentRun,
+  getAgentRunStatus,
+  completeAgentRun,
+  blockAgentRun,
+  escalateRun,
+} from './runs.js'
+
+// Policy
+export { checkPolicy } from './policy.js'
+
+// Janitor
+export { runJanitorCycle, startJanitor } from './janitor.js'
+
+// Memory
+export { writeMemory, recallMemory } from './memory.js'
+
+// Embedding
+export { initEmbedding, getTextEmbedder, getCodeEmbedder, getReranker, resetProviders } from './embedding/registry.js'
+
+// Status
+export { getWorkspaceStatus, buildCosContext, listAgentProfiles } from './status.js'
