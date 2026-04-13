@@ -507,7 +507,7 @@ CREATE INDEX IF NOT EXISTS idx_policy_rules_enabled  ON policy_rules(enabled);
 
 CREATE TABLE IF NOT EXISTS policy_events (
   evt_id        TEXT PRIMARY KEY,
-  rule_id       TEXT REFERENCES policy_rules(rule_id),
+  rule_id       TEXT,  -- no FK: rule_id may be a synthetic SYSTEM:* invariant ID
   workspace_id  TEXT NOT NULL,
   action        TEXT NOT NULL,
   matched       INTEGER NOT NULL DEFAULT 0,
