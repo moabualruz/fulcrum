@@ -101,4 +101,5 @@ export interface ListTeamInstancesInput {
 
 export interface GetTeamStatusInput {
   instance_id: string
+  workspace_id: string
 }

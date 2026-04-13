@@ -1,6 +1,6 @@
 // packages/teams/src/teams.ts
 import { ulid } from 'ulidx'
-import { getDb, nextDisplayId } from '@fulcrum/core'
+import { getDb, nextDisplayId, FulcrumError } from '@fulcrum/core'
 import type {
   TeamTemplate,
   TeamInstance,
@@ -104,18 +104,25 @@ export async function heartbeatTeam(input: HeartbeatTeamInput): Promise<TeamInst
   const db = getDb()
   const now = new Date().toISOString()
 
+  let changes: number
   if (input.resolved_slots !== undefined) {
-    db.prepare(
+    const result = db.prepare(
       `UPDATE team_instances
        SET status = ?, resolved_slots = ?, version = version + 1, updated_at = ?
        WHERE instance_id = ?`
     ).run(input.status, JSON.stringify(input.resolved_slots), now, input.instance_id)
+    changes = result.changes
   } else {
-    db.prepare(
+    const result = db.prepare(
       `UPDATE team_instances
        SET status = ?, version = version + 1, updated_at = ?
        WHERE instance_id = ?`
     ).run(input.status, now, input.instance_id)
+    changes = result.changes
+  }
+
+  if (changes === 0) {
+    throw new FulcrumError(`Team instance not found: ${input.instance_id}`, 'not_found')
   }
 
   const row = db.prepare(`SELECT * FROM team_instances WHERE instance_id = ?`).get(input.instance_id) as Record<string, unknown>
@@ -129,11 +136,15 @@ export async function completeTeam(input: CompleteTeamInput): Promise<TeamInstan
   // failed → blocked; completed and cancelled → done
   const status_category = input.final_status === 'failed' ? 'blocked' : 'done'
 
-  db.prepare(
+  const result = db.prepare(
     `UPDATE team_instances
      SET status = ?, status_category = ?, version = version + 1, updated_at = ?
      WHERE instance_id = ?`
   ).run(input.final_status, status_category, now, input.instance_id)
+
+  if (result.changes === 0) {
+    throw new FulcrumError(`Team instance not found: ${input.instance_id}`, 'not_found')
+  }
 
   const row = db.prepare(`SELECT * FROM team_instances WHERE instance_id = ?`).get(input.instance_id) as Record<string, unknown>
   return rowToInstance(row)
@@ -173,11 +184,11 @@ export async function getTeamStatus(input: GetTeamStatusInput): Promise<TeamStat
   const db = getDb()
 
   const instanceRow = db
-    .prepare(`SELECT * FROM team_instances WHERE instance_id = ?`)
-    .get(input.instance_id) as Record<string, unknown> | undefined
+    .prepare(`SELECT * FROM team_instances WHERE instance_id = ? AND workspace_id = ?`)
+    .get(input.instance_id, input.workspace_id) as Record<string, unknown> | undefined
 
   if (!instanceRow) {
-    throw new Error(`team instance not found: ${input.instance_id}`)
+    throw new FulcrumError(`Team instance not found: ${input.instance_id}`, 'not_found')
   }
 
   const instance = rowToInstance(instanceRow)

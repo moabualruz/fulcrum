@@ -323,7 +323,7 @@ describe('getTeamStatus', () => {
        VALUES (?, 'slot_eng', 'agent_eng_11', 'software_engineer', datetime('now'))`
     ).run(instance.instance_id)
 
-    const status = await getTeamStatus({ instance_id: instance.instance_id })
+    const status = await getTeamStatus({ instance_id: instance.instance_id, workspace_id })
 
     expect(status.instance_id).toBe(instance.instance_id)
     expect(status.status).toBe('created')
@@ -370,7 +370,7 @@ describe('getTeamStatus', () => {
        VALUES (?, 'slot_capped', 'agent_b', 'software_engineer', datetime('now'))`
     ).run(instance.instance_id)
 
-    const status = await getTeamStatus({ instance_id: instance.instance_id })
+    const status = await getTeamStatus({ instance_id: instance.instance_id, workspace_id })
     expect(status.concurrency_cap_violations).toContain('slot_capped')
   })
 })
