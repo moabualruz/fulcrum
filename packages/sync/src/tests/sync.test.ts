@@ -38,6 +38,8 @@ function createTestDb(): DB {
 class StubAdapter implements SyncAdapter {
   pushCalls: Array<Record<string, unknown>> = []
   pullCalls: string[] = []
+  /** Override per test to simulate a remote hash (null = object not on remote) */
+  remoteHash: string | null = null
 
   async push(obj: Record<string, unknown>): Promise<string> {
     this.pushCalls.push(obj)
@@ -47,6 +49,10 @@ class StubAdapter implements SyncAdapter {
   async pull(externalId: string): Promise<unknown> {
     this.pullCalls.push(externalId)
     return { name: 'Remote Title', state: 'In Progress' }
+  }
+
+  async getHash(_objectType: string, _externalId: string): Promise<string | null> {
+    return this.remoteHash
   }
 
   map(local: Record<string, unknown>): ExternalPayload {
@@ -333,5 +339,109 @@ describe('@fulcrum/sync — SyncManager', () => {
     if (qRow) {
       expect(qRow.attempts).toBeGreaterThanOrEqual(1)
     }
+  })
+
+  // -----------------------------------------------------------------------
+  // Test 8: syncAll actually pushes via adapter and marks synced
+  // -----------------------------------------------------------------------
+
+  it('syncAll calls adapter.push and marks items synced', async () => {
+    delete process.env['PLANE_API_KEY'] // force queue mode for enqueuing
+    const { manager, adapter } = makeManager(db)
+
+    // Enqueue an item (stores local_data in queue row)
+    await manager.syncObject({
+      object_type: 'Issue' as const,
+      object_id: 'issue-batch',
+      workspace_id: 'ws-test',
+      local_data: { title: 'Batch push issue', status: 'open' },
+    })
+
+    expect(adapter.pushCalls).toHaveLength(0) // not pushed yet
+
+    // Now restore API key so live-push path runs inside syncAll
+    process.env['PLANE_API_KEY'] = 'test-key'
+    const result = await manager.syncAll({ workspace_id: 'ws-test', batch_size: 10 })
+
+    expect(result.synced).toBe(1)
+    expect(result.failed).toBe(0)
+    expect(adapter.pushCalls).toHaveLength(1)
+
+    // Verify state is synced and external_id persisted
+    const state = manager.getSyncState({ object_id: 'issue-batch' })
+    expect(state?.sync_status).toBe('synced')
+    expect(state?.external_id).toBe('ext-1')
+    expect(state?.last_sync_hash).toBeTruthy()
+
+    // Queue row should be deleted after successful sync
+    const qRow = db
+      .prepare(`SELECT * FROM sync_queue WHERE sync_id = ?`)
+      .get(state!.sync_id)
+    expect(qRow).toBeUndefined()
+  })
+
+  // -----------------------------------------------------------------------
+  // Test 9: conflict detection uses remote hash, not local-change diff
+  // -----------------------------------------------------------------------
+
+  it('does NOT conflict when only local data changed (no remote change)', async () => {
+    const { manager, adapter } = makeManager(db)
+
+    // First sync — establishes last_sync_hash
+    const first = await manager.syncObject({
+      object_type: 'Issue' as const,
+      object_id: 'issue-noconflict',
+      workspace_id: 'ws-test',
+      local_data: { title: 'Version 1', status: 'open' },
+    })
+    expect(first.sync_status).toBe('synced')
+
+    // Remote hash returns null (same as last_sync_hash scenario: no remote change)
+    adapter.remoteHash = null
+
+    // Update local data — should push cleanly, no conflict
+    const second = await manager.syncObject({
+      object_type: 'Issue' as const,
+      object_id: 'issue-noconflict',
+      workspace_id: 'ws-test',
+      local_data: { title: 'Version 2', status: 'in_progress' },
+    })
+    expect(second.sync_status).toBe('synced')
+    expect(adapter.pushCalls).toHaveLength(2) // both pushes happened
+  })
+
+  it('detects conflict when remote hash differs from last_sync_hash', async () => {
+    const { manager, adapter } = makeManager(db)
+
+    // First sync
+    const first = await manager.syncObject({
+      object_type: 'Issue' as const,
+      object_id: 'issue-conflict-remote',
+      workspace_id: 'ws-test',
+      local_data: { title: 'Original', status: 'open' },
+    })
+    expect(first.sync_status).toBe('synced')
+    const storedHash = first.last_sync_hash!
+
+    // Simulate remote independently changed: getHash returns a different hash
+    adapter.remoteHash = 'deadbeef0000000000000000000000000000000000000000000000000000cafe'
+    expect(adapter.remoteHash).not.toBe(storedHash) // sanity check
+
+    // Local also changed — should be detected as conflict
+    const second = await manager.syncObject({
+      object_type: 'Issue' as const,
+      object_id: 'issue-conflict-remote',
+      workspace_id: 'ws-test',
+      local_data: { title: 'Local change', status: 'done' },
+    })
+    expect(second.sync_status).toBe('conflicted')
+    expect(second.conflict_state).toBeTruthy()
+
+    // A conflict record should exist (auto-resolved to local_wins but still recorded)
+    const conflicts = manager.listConflicts({ workspace_id: 'ws-test', unresolved_only: false })
+    const found = conflicts.find((c) => c.sync_id === second.sync_id)
+    expect(found).toBeDefined()
+    expect(found?.remote_hash).toBe(adapter.remoteHash)
+    expect(found?.resolution).toBe('local_wins')
   })
 })

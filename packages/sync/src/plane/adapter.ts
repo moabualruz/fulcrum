@@ -1,4 +1,5 @@
 // packages/sync/src/plane/adapter.ts
+import { createHash } from 'node:crypto'
 import type { ExternalPayload, SyncAdapter } from '../types.js'
 import { PlaneAPIClient } from './client.js'
 
@@ -37,6 +38,21 @@ export class PlaneSyncAdapter implements SyncAdapter {
 
   async pull(externalId: string): Promise<unknown> {
     return this.client.getIssue(externalId)
+  }
+
+  async getHash(_objectType: string, externalId: string): Promise<string | null> {
+    try {
+      const remote = await this.client.getIssue(externalId)
+      const obj = remote as Record<string, unknown>
+      const sorted = Object.fromEntries(
+        Object.keys(obj)
+          .sort()
+          .map((k) => [k, obj[k]]),
+      )
+      return createHash('sha256').update(JSON.stringify(sorted)).digest('hex')
+    } catch {
+      return null
+    }
   }
 
   map(local: Record<string, unknown>): ExternalPayload {

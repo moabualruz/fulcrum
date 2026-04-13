@@ -43,6 +43,7 @@ export function runMigration010(db: Database): void {
       scheduled_at TEXT NOT NULL DEFAULT (datetime('now')),
       attempts     INTEGER NOT NULL DEFAULT 0,
       last_error   TEXT,
+      local_data   TEXT,
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
 

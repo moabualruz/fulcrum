@@ -75,6 +75,11 @@ export interface ExternalPayload {
 export interface SyncAdapter {
   push(obj: Record<string, unknown>): Promise<string>  // returns external_id
   pull(externalId: string): Promise<unknown>
+  /**
+   * Return the current canonical hash of the remote object, or null if the
+   * object does not exist remotely yet.  Used for conflict detection.
+   */
+  getHash(objectType: string, externalId: string): Promise<string | null>
   map(local: Record<string, unknown>): ExternalPayload
   unmap(external: unknown): Record<string, unknown>
 }

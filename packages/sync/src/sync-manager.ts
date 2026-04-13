@@ -106,6 +106,8 @@ export class SyncManager {
   constructor(
     private db: Database,
     private adapter: SyncAdapter,
+    /** Optional hook called with serialised local_data before each push.  Throw to abort. */
+    private beforePush?: (serialisedData: string) => void,
   ) {}
 
   // ------------------------------------------------------------------ //
@@ -161,10 +163,10 @@ export class SyncManager {
       const queueId = ulid()
       this.db
         .prepare(
-          `INSERT INTO sync_queue (queue_id, sync_id, operation, priority)
-           VALUES (?, ?, 'upsert', 100)`,
+          `INSERT INTO sync_queue (queue_id, sync_id, operation, priority, local_data)
+           VALUES (?, ?, 'upsert', 100, ?)`,
         )
-        .run(queueId, sync_id)
+        .run(queueId, sync_id, JSON.stringify(local_data))
 
       const updated = this.db
         .prepare(`SELECT * FROM sync_states WHERE sync_id = ?`)
@@ -186,42 +188,51 @@ export class SyncManager {
         .prepare(`SELECT * FROM sync_states WHERE sync_id = ?`)
         .get(sync_id) as SyncStateRow
 
-      // Detect remote conflict: existing hash on remote differs from what we last stored
-      if (currentRow.external_id && currentRow.last_sync_hash && currentRow.last_sync_hash !== hash) {
-        // Record conflict
-        const conflictId = ulid()
-        this.db
-          .prepare(
-            `INSERT INTO sync_conflicts
-               (conflict_id, sync_id, local_hash, remote_hash)
-             VALUES (?, ?, ?, ?)`,
-          )
-          .run(conflictId, sync_id, hash, currentRow.last_sync_hash)
+      // Detect remote conflict: fetch the current remote hash and compare to what
+      // we last saw (last_sync_hash).  If they differ the remote was changed
+      // independently — that is a true conflict.  A local-only change is NOT a
+      // conflict; it just means we need to push.
+      if (currentRow.external_id && currentRow.last_sync_hash) {
+        const remoteHash = await this.adapter.getHash(object_type, currentRow.external_id)
+        const isConflict = remoteHash !== null && remoteHash !== currentRow.last_sync_hash
 
-        // Default resolution: local_wins — update conflict record immediately
-        this.db
-          .prepare(
-            `UPDATE sync_conflicts
-                SET resolution = 'local_wins', resolved_at = datetime('now')
-              WHERE conflict_id = ?`,
-          )
-          .run(conflictId)
+        if (isConflict) {
+          // Record conflict
+          const conflictId = ulid()
+          this.db
+            .prepare(
+              `INSERT INTO sync_conflicts
+                 (conflict_id, sync_id, local_hash, remote_hash)
+               VALUES (?, ?, ?, ?)`,
+            )
+            .run(conflictId, sync_id, hash, remoteHash)
 
-        this.db
-          .prepare(
-            `UPDATE sync_states
-                SET sync_status = 'conflicted', conflict_state = ?, updated_at = datetime('now')
-              WHERE sync_id = ?`,
-          )
-          .run(conflictId, sync_id)
+          // Default resolution: local_wins — update conflict record immediately
+          this.db
+            .prepare(
+              `UPDATE sync_conflicts
+                  SET resolution = 'local_wins', resolved_at = datetime('now')
+                WHERE conflict_id = ?`,
+            )
+            .run(conflictId)
 
-        const conflictedRow = this.db
-          .prepare(`SELECT * FROM sync_states WHERE sync_id = ?`)
-          .get(sync_id) as SyncStateRow
-        return rowToSyncState(conflictedRow)
+          this.db
+            .prepare(
+              `UPDATE sync_states
+                  SET sync_status = 'conflicted', conflict_state = ?, updated_at = datetime('now')
+                WHERE sync_id = ?`,
+            )
+            .run(conflictId, sync_id)
+
+          const conflictedRow = this.db
+            .prepare(`SELECT * FROM sync_states WHERE sync_id = ?`)
+            .get(sync_id) as SyncStateRow
+          return rowToSyncState(conflictedRow)
+        }
       }
 
-      // Push to remote adapter
+      // Push to remote adapter (no conflict — local change wins by default)
+      this.beforePush?.(JSON.stringify(local_data))
       const objForPush: Record<string, unknown> = {
         ...local_data,
         external_id: currentRow.external_id ?? undefined,
@@ -270,6 +281,7 @@ export class SyncManager {
     // Build a query that fetches queued items ordered by priority DESC, then scheduled_at ASC
     let sql = `
       SELECT sq.queue_id, sq.sync_id, sq.operation, sq.priority, sq.attempts, sq.last_error,
+             sq.local_data,
              ss.object_type, ss.object_id, ss.workspace_id, ss.sync_target,
              ss.external_id, ss.last_sync_hash
         FROM sync_queue sq
@@ -297,6 +309,7 @@ export class SyncManager {
       priority: number
       attempts: number
       last_error: string | null
+      local_data: string | null
       object_type: string
       object_id: string
       workspace_id: string
@@ -328,28 +341,11 @@ export class SyncManager {
           continue
         }
 
-        // upsert: we need the current local_data — for queue processing we re-use
-        // last_sync_hash as a sentinel; actual data must come from the calling layer.
-        // Here we push with the data available in the queue row (object metadata only).
-        // In a full implementation the calling code would supply local_data; for the
-        // queue processor we mark as synced if external_id already present, otherwise skip.
-        if (item.external_id) {
+        // upsert: deserialise local_data stored when the item was enqueued
+        if (!item.local_data) {
+          const errMsg = 'local_data missing in queue row; re-enqueue via syncObject'
           this.db
-            .prepare(
-              `UPDATE sync_states
-                  SET sync_status = 'synced', last_synced_at = datetime('now'), updated_at = datetime('now')
-                WHERE sync_id = ?`,
-            )
-            .run(item.sync_id)
-          this.db.prepare(`DELETE FROM sync_queue WHERE queue_id = ?`).run(item.queue_id)
-          result.synced++
-        } else {
-          // No external_id yet — mark failed for this cycle
-          const errMsg = 'local_data not available in queue context; call syncObject directly'
-          this.db
-            .prepare(
-              `UPDATE sync_queue SET last_error = ? WHERE queue_id = ?`,
-            )
+            .prepare(`UPDATE sync_queue SET last_error = ? WHERE queue_id = ?`)
             .run(errMsg, item.queue_id)
           this.db
             .prepare(
@@ -360,7 +356,38 @@ export class SyncManager {
             .run(errMsg, item.sync_id)
           result.failed++
           result.errors.push(`${item.object_id}: ${errMsg}`)
+          continue
         }
+
+        const localData = JSON.parse(item.local_data) as Record<string, unknown>
+
+        // Secret guard — mirrors the single-object path
+        this.beforePush?.(item.local_data)
+
+        const hash = canonicalHash(localData)
+
+        // Push to remote adapter
+        const objForPush: Record<string, unknown> = {
+          ...localData,
+          external_id: item.external_id ?? undefined,
+        }
+        const externalId = await this.adapter.push(objForPush)
+
+        this.db
+          .prepare(
+            `UPDATE sync_states
+                SET sync_status = 'synced',
+                    external_id = ?,
+                    last_sync_hash = ?,
+                    last_synced_at = datetime('now'),
+                    last_sync_error = NULL,
+                    updated_at = datetime('now')
+              WHERE sync_id = ?`,
+          )
+          .run(externalId, hash, item.sync_id)
+
+        this.db.prepare(`DELETE FROM sync_queue WHERE queue_id = ?`).run(item.queue_id)
+        result.synced++
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         this.db

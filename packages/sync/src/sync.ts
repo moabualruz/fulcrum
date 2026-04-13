@@ -28,7 +28,16 @@ function buildManager(): SyncManager {
 
   const client = new PlaneAPIClient(config)
   const adapter = new PlaneSyncAdapter(client)
-  return new SyncManager(db, adapter)
+
+  // Secret guard runs before every push (single-object and queue-batch paths)
+  const beforePush = (serialisedData: string) => {
+    const scanResult = checkSecrets(serialisedData)
+    if (scanResult.found) {
+      throw new Error(`Secret detected in sync payload: ${scanResult.matches.join(', ')}`)
+    }
+  }
+
+  return new SyncManager(db, adapter, beforePush)
 }
 
 /**
@@ -43,12 +52,6 @@ function buildManager(): SyncManager {
  *  6. On detected remote conflict: record sync_conflict, set status='conflicted'.
  */
 export async function syncObject(input: SyncObjectInput): Promise<SyncState> {
-  // Secret redaction before transmission
-  const scanResult = checkSecrets(JSON.stringify(input.local_data))
-  if (scanResult.found) {
-    throw new Error(`Secret detected in sync payload: ${scanResult.matches.join(', ')}`)
-  }
-
   const manager = buildManager()
   return manager.syncObject(input)
 }
