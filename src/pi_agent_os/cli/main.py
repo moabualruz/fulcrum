@@ -4,6 +4,7 @@ import typer
 from rich.console import Console
 from .commands import workspace as workspace_cmd
 from .commands import project as project_cmd
+from .commands import epic as epic_cmd
 from .commands import issue as issue_cmd
 from .commands import task as task_cmd
 from .commands import agent as agent_cmd
@@ -24,6 +25,7 @@ console = Console()
 
 app.add_typer(workspace_cmd.app, name="workspace", help="Manage workspaces")
 app.add_typer(project_cmd.app, name="project", help="Manage projects")
+app.add_typer(epic_cmd.app, name="epic", help="Manage epics")
 app.add_typer(issue_cmd.app, name="issue", help="Manage issues")
 app.add_typer(task_cmd.app, name="task", help="Manage tasks")
 app.add_typer(agent_cmd.app, name="agent", help="Agent status and control")

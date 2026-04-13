@@ -90,6 +90,13 @@ class WorkflowRunner:
         )
         return run
 
+    def load_run(self, run_id: str) -> Optional[WorkflowRun]:
+        """Load a persisted WorkflowRun from the database (for resumability)."""
+        try:
+            return _reload_run(run_id)
+        except RuntimeError:
+            return None
+
     def execute(
         self,
         run: WorkflowRun,
