@@ -1,35 +1,8 @@
 // packages/memory/src/recall.ts
 import { getDb, FulcrumError, getTextEmbedder } from '@fulcrum/core'
 import { rrfScore } from './scoring.js'
+import { rowToFullMemory } from './mappers.js'
 import type { RecallMemoryInput, CompactMemory, FullMemory, RecallMode } from './types.js'
-
-function rowToFullMemory(row: Record<string, unknown>): FullMemory {
-  return {
-    memory_id: row.memory_id as string,
-    scope: row.scope as FullMemory['scope'],
-    kind: row.kind as FullMemory['kind'],
-    workspace_id: row.workspace_id as string,
-    project_id: row.project_id as string | null,
-    file_path: row.file_path as string | null,
-    symbol_path: row.symbol_path as string | null,
-    title: row.title as string,
-    summary: row.summary as string,
-    canonical_text: row.canonical_text as string | null,
-    tags: (() => { try { return JSON.parse(row.tags as string) as string[] } catch { return [] } })(),
-    entities: (() => { try { return JSON.parse(row.entities as string) as string[] } catch { return [] } })(),
-    confidence: row.confidence as number,
-    access_count: row.access_count as number,
-    event_time: row.event_time as string | null,
-    content_hash: row.content_hash as string | null,
-    task_id: row.task_id as string | null,
-    issue_id: row.issue_id as string | null,
-    artifact_id: row.artifact_id as string | null,
-    provenance_refs: (() => { try { return JSON.parse(row.provenance_refs as string) as string[] } catch { return [] } })(),
-    created_at: row.created_at as string,
-    updated_at: row.updated_at as string,
-    last_accessed_at: row.last_accessed_at as string,
-  }
-}
 
 function rowToCompact(row: Record<string, unknown>): CompactMemory {
   return {
@@ -155,7 +128,10 @@ export async function recallMemory(
   }
 
   // ── compact / total_ranked: RRF hybrid search ─────────────────────────────
-  const ftsRows = ftsSearch(db, input.query, whereClause, params, limit)
+  // Wrap query in double-quotes to treat it as an FTS5 phrase literal;
+  // escape any inner double-quotes per FTS5 quoting rules.
+  const ftsQuery = `"${input.query.replace(/"/g, '""')}"`
+  const ftsRows = ftsSearch(db, ftsQuery, whereClause, params, limit)
 
   // Vector search (optional — skip if embedder unavailable or vec_memories missing)
   let vecRows: { rowid: number; vecRank: number }[] = []

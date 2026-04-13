@@ -196,11 +196,12 @@ function walkDir(dir: string, extensions: Set<string>): string[] {
 
 const INGEST_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.py', '.md'])
 
-export async function ingestProject(input: IngestProjectInput): Promise<IngestResult> {
+export async function ingestProject(input: IngestProjectInput): Promise<IngestResult & { errors: string[] }> {
   const { workspace_id, project_id, root_path } = input
   const files = walkDir(root_path, INGEST_EXTENSIONS)
   let total_chunks = 0
   let total_memories = 0
+  const errors: string[] = []
 
   for (const filePath of files) {
     try {
@@ -216,10 +217,12 @@ export async function ingestProject(input: IngestProjectInput): Promise<IngestRe
       })
       total_chunks += result.chunks_created
       total_memories += result.memories_created
-    } catch {
-      // Skip unreadable files
+    } catch (err) {
+      const msg = `${filePath}: ${err instanceof Error ? err.message : String(err)}`
+      errors.push(msg)
+      console.warn(`[ingestProject] skipped file — ${msg}`)
     }
   }
 
-  return { chunks_created: total_chunks, memories_created: total_memories }
+  return { chunks_created: total_chunks, memories_created: total_memories, errors }
 }

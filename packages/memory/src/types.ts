@@ -16,7 +16,8 @@ export interface WriteMemoryInput {
   kind: MemoryKind
   title: string
   summary: string
-  content: string                     // stored as canonical_text
+  content: string                     // raw content; also used as canonical_text unless overridden
+  canonical_text?: string             // optional structured canonical form; defaults to content if omitted
   tags?: string[]
   confidence?: number                 // 0–1, default 1.0
   file_path?: string | null
