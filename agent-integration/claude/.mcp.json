@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "pi-os": {
+      "command": "python",
+      "args": ["-m", "pi_agent_os.mcp.server"],
+      "env": {}
+    }
+  }
+}
