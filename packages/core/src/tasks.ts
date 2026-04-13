@@ -35,7 +35,10 @@ function rowToTask(row: Record<string, unknown>): Task {
     title: row.title as string,
     description: row.description as string | null,
     status: row.status as TaskStatus,
-    depends_on: JSON.parse(row.depends_on as string) as string[],
+    depends_on: (() => {
+      try { return JSON.parse(row.depends_on as string) as string[] }
+      catch { return [] }
+    })(),
     assigned_to: row.assigned_to as string | null,
     note: row.note as string | null,
     version: row.version as number,
@@ -73,7 +76,9 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
     now,
     now
   )
-  return rowToTask(db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(task_id) as Record<string, unknown>)
+  const row = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(task_id) as Record<string, unknown> | undefined
+  if (!row) throw new FulcrumError(`Task ${task_id} not found after insert`, 'not_found')
+  return rowToTask(row)
 }
 
 export async function updateTask(input: UpdateTaskInput): Promise<Task> {

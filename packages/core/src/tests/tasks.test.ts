@@ -58,6 +58,17 @@ describe('listTasks', () => {
     expect(queued).toHaveLength(0)
     expect(completed).toHaveLength(1)
   })
+
+  it('filters by project_id', async () => {
+    seed()
+    const db = getDb()
+    db.prepare("INSERT INTO projects VALUES ('proj_2','ws_1','other proj', datetime('now'))").run()
+    await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'In proj 1' })
+    await createTask({ workspace_id: 'ws_1', project_id: 'proj_2', title: 'In proj 2' })
+    const tasks = await listTasks({ workspace_id: 'ws_1', project_id: 'proj_1' })
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0].title).toBe('In proj 1')
+  })
 })
 
 describe('updateTask', () => {
