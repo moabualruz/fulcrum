@@ -1,1 +1,3 @@
-// exports added as each module is implemented
+// packages/policy/src/index.ts
+export * from './types.js'
+export { checkSecrets, redactSecrets } from './secret-guard.js'
