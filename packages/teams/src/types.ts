@@ -1,0 +1,104 @@
+// packages/teams/src/types.ts
+
+export type AgentRole =
+  | 'chief_of_staff' | 'product_manager' | 'tech_lead' | 'software_engineer'
+  | 'qa_engineer' | 'security_reviewer' | 'devops_engineer' | 'data_engineer'
+  | 'ml_engineer' | 'documentation_writer' | 'code_reviewer' | 'issue_decomposer'
+  | 'prd_planner' | 'implementation_planner' | 'integration_worker'
+  | 'memory_curator' | 'orchestrator' | 'analyst' | 'custom'
+
+export interface TeamSlot {
+  slot_id: string
+  role: AgentRole
+  min_count: number
+  max_count: number
+  concurrency_cap: number
+  required: boolean
+  description?: string
+}
+
+export interface TeamTemplate {
+  template_id: string
+  name: string
+  description?: string
+  slots: TeamSlot[]
+  policy: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface TeamInstance {
+  instance_id: string
+  template_id: string
+  workspace_id: string
+  project_id?: string
+  display_id: string
+  status: 'created' | 'ready' | 'spawning' | 'running' | 'waiting' | 'blocked' | 'completed' | 'failed' | 'cancelled'
+  status_category: 'backlog' | 'active' | 'blocked' | 'done'
+  purpose: string
+  task_id?: string
+  created_by_agent_id: string
+  resolved_slots: Record<string, string[]>
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export interface TeamMember {
+  instance_id: string
+  slot_id: string
+  agent_id: string
+  role: AgentRole
+  joined_at: string
+}
+
+export interface TeamStatus {
+  instance_id: string
+  display_id: string
+  status: string
+  status_category: string
+  slot_occupancy: Record<string, { current: number; max: number; agents: string[] }>
+  active_member_count: number
+  concurrency_cap_violations: string[]
+}
+
+export interface CreateTeamTemplateInput {
+  name: string
+  description?: string
+  slots: TeamSlot[]
+  policy?: Record<string, unknown>
+}
+
+export interface InvokeTeamInput {
+  template_id: string
+  workspace_id: string
+  project_id?: string
+  purpose: string
+  task_id?: string
+  caller_agent_id: string
+  caller_role: AgentRole
+  initial_slots?: Record<string, string[]>
+}
+
+export interface HeartbeatTeamInput {
+  instance_id: string
+  status: 'ready' | 'spawning' | 'running' | 'waiting' | 'blocked'
+  resolved_slots?: Record<string, string[]>
+}
+
+export interface CompleteTeamInput {
+  instance_id: string
+  final_status: 'completed' | 'failed' | 'cancelled'
+}
+
+export interface ListTeamInstancesInput {
+  workspace_id: string
+  project_id?: string
+  status_category?: 'backlog' | 'active' | 'blocked' | 'done'
+  limit?: number
+  offset?: number
+}
+
+export interface GetTeamStatusInput {
+  instance_id: string
+}
