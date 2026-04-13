@@ -8,8 +8,8 @@ afterEach(() => resetTestDb())
 
 function seed() {
   const db = getDb()
-  db.prepare("INSERT INTO workspaces VALUES ('ws_1','test ws', datetime('now'))").run()
-  db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','test proj', datetime('now'))").run()
+  db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test ws')").run()
+  db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','test proj')").run()
 }
 
 describe('createTask', () => {
@@ -73,7 +73,7 @@ describe('listTasks', () => {
   it('filters by project_id', async () => {
     seed()
     const db = getDb()
-    db.prepare("INSERT INTO projects VALUES ('proj_2','ws_1','other proj', datetime('now'))").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2','ws_1','other proj')").run()
     await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'In proj 1' })
     await createTask({ workspace_id: 'ws_1', project_id: 'proj_2', title: 'In proj 2' })
     const tasks = await listTasks({ workspace_id: 'ws_1', project_id: 'proj_1' })
@@ -86,8 +86,8 @@ describe('listTasks — cross-workspace isolation', () => {
   it('does not return tasks from a different workspace', async () => {
     seed()
     const db = getDb()
-    db.prepare("INSERT INTO workspaces VALUES ('ws_2','ws2', datetime('now'))").run()
-    db.prepare("INSERT INTO projects VALUES ('proj_2','ws_2','p2', datetime('now'))").run()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_2','ws2')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2','ws_2','p2')").run()
     await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'In ws_1' })
     await createTask({ workspace_id: 'ws_2', project_id: 'proj_2', title: 'In ws_2' })
     const tasks = await listTasks({ workspace_id: 'ws_1' })

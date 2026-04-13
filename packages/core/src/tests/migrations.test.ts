@@ -1,6 +1,6 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { closeDb, _configureDb } from '../db/client.js'
+import { closeDb, _configureDb, getDb, setDb } from '../db/client.js'
 import { runMigrations } from '../db/migrations.js'
 
 function freshDb() {
@@ -79,5 +79,141 @@ describe('runMigrations', () => {
     if (names.includes('vec_memories')) {
       expect(names).toContain('vec_memories')
     }
+  })
+})
+
+// MIGRATION_002 tests — use a shared db set up via createTestDb() pattern
+function freshDb2() {
+  const db = new Database(':memory:')
+  _configureDb(db)
+  runMigrations(db)
+  setDb(db)
+  return db
+}
+
+describe('MIGRATION_002 — new columns on workspaces', () => {
+  beforeEach(() => freshDb2())
+  afterEach(() => closeDb())
+
+  it('workspaces has status column defaulting to active', () => {
+    const db = getDb()
+    const cols = (db.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[]).map(r => r.name)
+    expect(cols).toContain('status')
+    const ws = db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_m2','m2') RETURNING *").get() as Record<string, unknown>
+    expect(ws.status).toBe('active')
+  })
+})
+
+describe('MIGRATION_002 — new columns on projects', () => {
+  beforeEach(() => freshDb2())
+  afterEach(() => closeDb())
+
+  it('projects has project_type, root_path, default_branch, parent_project_id, write_mode, status', () => {
+    const db = getDb()
+    const cols = (db.prepare("PRAGMA table_info(projects)").all() as { name: string }[]).map(r => r.name)
+    expect(cols).toContain('project_type')
+    expect(cols).toContain('root_path')
+    expect(cols).toContain('default_branch')
+    expect(cols).toContain('parent_project_id')
+    expect(cols).toContain('write_mode')
+    expect(cols).toContain('status')
+  })
+})
+
+describe('MIGRATION_002 — new columns on tasks', () => {
+  beforeEach(() => freshDb2())
+  afterEach(() => closeDb())
+
+  it('tasks has display_id, issue_id, priority, estimate_type, estimate_value, done_criteria, status_category, claimed_at, completed_at', () => {
+    const db = getDb()
+    const cols = (db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[]).map(r => r.name)
+    for (const col of ['display_id','issue_id','priority','estimate_type','estimate_value','done_criteria','status_category','claimed_at','completed_at']) {
+      expect(cols, `missing column: ${col}`).toContain(col)
+    }
+  })
+
+  it('existing task status values remain valid after migration', () => {
+    const db = getDb()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_m2','m2')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_m2','ws_m2','pm2')").run()
+    for (const status of ['queued', 'completed', 'blocked']) {
+      expect(() =>
+        db.prepare("INSERT INTO tasks (task_id, workspace_id, project_id, title, status, display_id, priority, status_category) VALUES (?,?,?,?,?,?,?,?)")
+          .run(`t_${status}`, 'ws_m2', 'proj_m2', `task ${status}`, status, `TASK-x`, 'medium', 'backlog')
+      ).not.toThrow()
+    }
+  })
+})
+
+describe('MIGRATION_002 — new columns on agent_runs', () => {
+  beforeEach(() => freshDb2())
+  afterEach(() => closeDb())
+
+  it('agent_runs has display_id, project_id, agent_id, pi_profile, status_category, current_path, heartbeat_at, blocker, worktree_id, finished_at', () => {
+    const db = getDb()
+    const cols = (db.prepare("PRAGMA table_info(agent_runs)").all() as { name: string }[]).map(r => r.name)
+    for (const col of ['display_id','project_id','agent_id','pi_profile','status_category','current_path','heartbeat_at','blocker','worktree_id','finished_at']) {
+      expect(cols, `missing column: ${col}`).toContain(col)
+    }
+  })
+})
+
+describe('MIGRATION_002 — new columns on memories', () => {
+  beforeEach(() => freshDb2())
+  afterEach(() => closeDb())
+
+  it('memories has scope, kind, title, summary, canonical_text, entities, event_time, content_hash, symbol_path, task_id, issue_id, artifact_id, provenance_refs', () => {
+    const db = getDb()
+    const cols = (db.prepare("PRAGMA table_info(memories)").all() as { name: string }[]).map(r => r.name)
+    for (const col of ['scope','kind','title','summary','canonical_text','entities','event_time','content_hash','symbol_path','task_id','issue_id','artifact_id','provenance_refs']) {
+      expect(cols, `missing column: ${col}`).toContain(col)
+    }
+  })
+})
+
+describe('MIGRATION_002 — new tables', () => {
+  beforeEach(() => freshDb2())
+  afterEach(() => closeDb())
+
+  it('display_id_sequences table exists with correct columns', () => {
+    const db = getDb()
+    const cols = (db.prepare("PRAGMA table_info(display_id_sequences)").all() as { name: string }[]).map(r => r.name)
+    expect(cols).toContain('entity_type')
+    expect(cols).toContain('project_id')
+    expect(cols).toContain('last_value')
+  })
+
+  it('events table exists with all 14 columns', () => {
+    const db = getDb()
+    const cols = (db.prepare("PRAGMA table_info(events)").all() as { name: string }[]).map(r => r.name)
+    for (const col of ['evt_id','workspace_id','project_id','evt_type','ts','object_type','object_id','actor_type','actor_id','payload','severity','trace_id','span_id','correlation_id']) {
+      expect(cols, `missing column: ${col}`).toContain(col)
+    }
+  })
+
+  it('task_relations table exists', () => {
+    const db = getDb()
+    const cols = (db.prepare("PRAGMA table_info(task_relations)").all() as { name: string }[]).map(r => r.name)
+    expect(cols).toContain('task_id')
+    expect(cols).toContain('target_task_id')
+    expect(cols).toContain('relation_type')
+    expect(cols).toContain('created_at')
+  })
+
+  it('task_labels table exists', () => {
+    const db = getDb()
+    const cols = (db.prepare("PRAGMA table_info(task_labels)").all() as { name: string }[]).map(r => r.name)
+    expect(cols).toContain('task_id')
+    expect(cols).toContain('label')
+  })
+})
+
+describe('MIGRATION_002 — idempotent', () => {
+  beforeEach(() => freshDb2())
+  afterEach(() => closeDb())
+
+  it('running runMigrations twice does not throw', () => {
+    const db = getDb()
+    expect(() => runMigrations(db)).not.toThrow()
   })
 })

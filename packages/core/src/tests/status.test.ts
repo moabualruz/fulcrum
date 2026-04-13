@@ -10,8 +10,8 @@ afterEach(() => resetTestDb())
 
 function seed() {
   const db = getDb()
-  db.prepare("INSERT INTO workspaces VALUES ('ws_1','test',datetime('now'))").run()
-  db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','test',datetime('now'))").run()
+  db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test')").run()
+  db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','test')").run()
 }
 
 describe('getWorkspaceStatus', () => {
@@ -91,9 +91,9 @@ describe('buildCosContext', () => {
 
   it('only shows runs belonging to the given project', async () => {
     const db = getDb()
-    db.prepare("INSERT INTO workspaces VALUES ('ws_1','test',datetime('now'))").run()
-    db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','p1',datetime('now'))").run()
-    db.prepare("INSERT INTO projects VALUES ('proj_2','ws_1','p2',datetime('now'))").run()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','p1')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2','ws_1','p2')").run()
 
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Task in P1' })
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_2', title: 'Task in P2' })
@@ -109,10 +109,10 @@ describe('buildCosContext', () => {
 describe('getWorkspaceStatus — cross-workspace isolation', () => {
   it('does not return runs from a different workspace', async () => {
     const db = getDb()
-    db.prepare("INSERT INTO workspaces VALUES ('ws_1','test',datetime('now'))").run()
-    db.prepare("INSERT INTO workspaces VALUES ('ws_2','other',datetime('now'))").run()
-    db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','p1',datetime('now'))").run()
-    db.prepare("INSERT INTO projects VALUES ('proj_2','ws_2','p2',datetime('now'))").run()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test')").run()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_2','other')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','p1')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2','ws_2','p2')").run()
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
     await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'tester' })
     const status = await getWorkspaceStatus({ workspace_id: 'ws_2' })

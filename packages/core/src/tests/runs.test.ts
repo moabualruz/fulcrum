@@ -16,8 +16,8 @@ afterEach(() => resetTestDb())
 
 function seed() {
   const db = getDb()
-  db.prepare("INSERT INTO workspaces VALUES ('ws_1','test ws',datetime('now'))").run()
-  db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','test proj',datetime('now'))").run()
+  db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test ws')").run()
+  db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','test proj')").run()
 }
 
 async function seedTask() {
@@ -135,7 +135,7 @@ describe('not_found errors', () => {
   it('startAgentRun throws invalid_input when workspace_id does not match the task', async () => {
     const db = getDb()
     seed()
-    db.prepare("INSERT INTO workspaces VALUES ('ws_2','other ws',datetime('now'))").run()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_2','other ws')").run()
     const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
     await expect(
       startAgentRun({ task_id: task.task_id, workspace_id: 'ws_2', role: 'implementer' })

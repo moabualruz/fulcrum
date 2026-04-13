@@ -18,8 +18,8 @@ const policy: PolicyConfig = {
 
 function seed() {
   const db = getDb()
-  db.prepare("INSERT INTO workspaces VALUES ('ws_1','test',datetime('now'))").run()
-  db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','test',datetime('now'))").run()
+  db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test')").run()
+  db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','test')").run()
 }
 
 describe('runJanitorCycle — invalid policy', () => {

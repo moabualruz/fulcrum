@@ -25,7 +25,7 @@ beforeEach(() => {
       correlation_id TEXT
     )
   `)
-  db.prepare("INSERT INTO workspaces VALUES ('ws_1','test ws',datetime('now'))").run()
+  db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test ws')").run()
 })
 afterEach(() => resetTestDb())
 

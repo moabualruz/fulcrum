@@ -8,8 +8,8 @@ afterEach(() => resetTestDb())
 
 function seed() {
   const db = getDb()
-  db.prepare("INSERT INTO workspaces VALUES ('ws_1','test',datetime('now'))").run()
-  db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','test',datetime('now'))").run()
+  db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test')").run()
+  db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','test')").run()
 }
 
 describe('writeMemory — input validation', () => {
@@ -88,10 +88,10 @@ describe('writeMemory', () => {
 describe('recallMemory — cross-workspace isolation', () => {
   it('does not return memories from a different workspace', async () => {
     const db = getDb()
-    db.prepare("INSERT INTO workspaces VALUES ('ws_1','ws1',datetime('now'))").run()
-    db.prepare("INSERT INTO workspaces VALUES ('ws_2','ws2',datetime('now'))").run()
-    db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','p1',datetime('now'))").run()
-    db.prepare("INSERT INTO projects VALUES ('proj_2','ws_2','p2',datetime('now'))").run()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','ws1')").run()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_2','ws2')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','p1')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2','ws_2','p2')").run()
 
     await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'secret for ws_1 only' })
     const results = await recallMemory({ workspace_id: 'ws_2', project_id: 'proj_2', query: 'secret', limit: 5 })

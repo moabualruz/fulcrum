@@ -11,8 +11,8 @@ afterEach(() => resetTestDb())
 
 function seed() {
   const db = getDb()
-  db.prepare("INSERT INTO workspaces VALUES ('ws_1','test',datetime('now'))").run()
-  db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','test',datetime('now'))").run()
+  db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test')").run()
+  db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','test')").run()
 }
 
 const defaultPolicy: PolicyConfig = {
@@ -122,8 +122,8 @@ describe('checkPolicy — unknown task', () => {
   it('throws not_found when task belongs to a different workspace', async () => {
     const db = getDb()
     seed()
-    db.prepare("INSERT INTO workspaces VALUES ('ws_2','other',datetime('now'))").run()
-    db.prepare("INSERT INTO projects VALUES ('proj_2','ws_2','p2',datetime('now'))").run()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_2','other')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2','ws_2','p2')").run()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
     // Task is in ws_1 but we query for ws_2 — should not find it
     await expect(

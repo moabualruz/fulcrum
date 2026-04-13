@@ -20,8 +20,8 @@ afterEach(() => resetTestDb())
 
 function seed() {
   const db = getDb()
-  db.prepare("INSERT INTO workspaces VALUES ('ws_1','test ws',datetime('now'))").run()
-  db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','test proj',datetime('now'))").run()
+  db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test ws')").run()
+  db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','test proj')").run()
 }
 
 describe('newId', () => {
@@ -89,7 +89,7 @@ describe('nextDisplayId', () => {
   it('sequences are independent per project', () => {
     seed()
     const db = getDb()
-    db.prepare("INSERT INTO projects VALUES ('proj_2','ws_1','p2',datetime('now'))").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2','ws_1','p2')").run()
     expect(nextDisplayId('task', 'proj_1', db)).toBe('TASK-1')
     expect(nextDisplayId('task', 'proj_2', db)).toBe('TASK-1')
     expect(nextDisplayId('task', 'proj_1', db)).toBe('TASK-2')
