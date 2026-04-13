@@ -25,10 +25,6 @@ from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
 
-def _get_tracer():
-    return trace.get_tracer("pi_agent_os", "0.1.0")
-
-
 class _AgentSpanContext:
     """Thin wrapper around an OTel span with helper methods."""
 
@@ -52,20 +48,23 @@ def agent_span(
     model: str,
     profile: str,
     operation: str = "invoke_agent",
+    tracer_provider=None,
 ):
     """
     Context manager that wraps an agent invocation in an OTel span.
 
-    provider:  "anthropic" | "google_gemini" | "pi" | "openai" | ...
-    model:     model name (e.g. "claude-sonnet-4-6")
-    profile:   agent role / profile_id (e.g. "chief_of_staff")
-    operation: "invoke_agent" (default) or "chat"
+    provider:         "anthropic" | "google_gemini" | "pi" | "openai" | ...
+    model:            model name (e.g. "claude-sonnet-4-6")
+    profile:          agent role / profile_id (e.g. "chief_of_staff")
+    operation:        "invoke_agent" (default) or "chat"
+    tracer_provider:  optional TracerProvider; pass in tests for isolation
 
     Yields an _AgentSpanContext for setting token usage / run_id.
     Automatically records exceptions and sets ERROR status.
     """
+    tracer = trace.get_tracer("pi_agent_os", "0.1.0", tracer_provider=tracer_provider)
     span_name = f"{operation} {profile}"
-    with _get_tracer().start_as_current_span(span_name) as span:
+    with tracer.start_as_current_span(span_name) as span:
         span.set_attribute("gen_ai.system", provider)
         span.set_attribute("gen_ai.request.model", model)
         span.set_attribute("gen_ai.agent.name", profile)
