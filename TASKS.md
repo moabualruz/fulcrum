@@ -1,6 +1,6 @@
 # Tasks
 
-Last updated: 2026-04-13
+Last updated: 2026-04-13 (session 2)
 
 Status legend: ✅ Done | 🔄 In progress | ❌ Blocked | ⬜ Not started
 
@@ -84,8 +84,8 @@ Status legend: ✅ Done | 🔄 In progress | ❌ Blocked | ⬜ Not started
 - [x] T-064 — L1-only invocation gate (PolicyDeniedError if not chief_of_staff)
 - [x] T-065 — team_templates and team_instances DB tables + projections
 - [x] T-066 — tests/unit/test_teams.py (5 tests: template CRUD, L1 gate, all non-L1 roles)
-- [ ] T-067 — ⬜ Cross-team scheduler (concurrency caps beyond policy checks)
-- [ ] T-068 — ⬜ Team monitor view (pi board show --type team_instance)
+- [x] T-067 — teams/scheduler.py: TeamScheduler with global/per-project/per-template caps
+- [x] T-068 — monitor /api/v1/teams endpoint + pi team instances/concurrency CLI
 
 ---
 
@@ -97,8 +97,8 @@ Status legend: ✅ Done | 🔄 In progress | ❌ Blocked | ⬜ Not started
 - [x] T-072 — Non-git sequential fallback (write_mode=sequential in ProjectWriter)
 - [x] T-073 — tests/unit/test_worktrees.py
 - [x] T-074 — tests/scenarios/test_team_feature_build.py
-- [ ] T-075 — ⬜ pi queue show/drain CLI commands
-- [ ] T-076 — ⬜ Integration worker test coverage (test_integration_worker.py)
+- [x] T-075 — pi queue show/drain CLI commands (cli/commands/queue.py)
+- [x] T-076 — tests/unit/test_integration_worker.py (8 tests)
 
 ---
 
@@ -122,7 +122,7 @@ Status legend: ✅ Done | 🔄 In progress | ❌ Blocked | ⬜ Not started
 - [x] T-087 — Secret guard in sync payloads
 - [x] T-088 — tests/unit/test_plane_adapter.py (unit level)
 - [x] T-089 — tests/scenarios/test_plane_sync_conflict.py
-- [ ] T-090 — ⬜ SyncStateReadAdapter (queryable sync state per object)
+- [x] T-090 — adapters/readers/sync_read.py: SyncStateReadAdapter + SyncConflictReadAdapter
 
 ---
 
@@ -131,9 +131,9 @@ Status legend: ✅ Done | 🔄 In progress | ❌ Blocked | ⬜ Not started
 - [x] T-091 — analytics/metrics.py (burndown, flow metrics, WIP, cycle time)
 - [x] T-092 — monitor/server.py (FastAPI + SSE, 8 views, 242L)
 - [x] T-093 — tests/unit/test_analytics.py
-- [ ] T-094 — ⬜ Forecasting advisory stubs
-- [ ] T-095 — ⬜ Agent/orchestration metrics (per-role latency, retry rate)
-- [ ] T-096 — ⬜ Memory effectiveness analytics
+- [x] T-094 — forecasting_advisory() in MetricsService
+- [x] T-095 — per_role_metrics() in MetricsService
+- [x] T-096 — memory_effectiveness() in MetricsService
 
 ---
 
@@ -159,27 +159,15 @@ Status legend: ✅ Done | 🔄 In progress | ❌ Blocked | ⬜ Not started
 - [x] T-112 — Scenario: team feature build (test_team_feature_build.py)
 - [x] T-113 — Scenario: deny-rule trip (test_deny_rule_trip.py)
 - [x] T-114 — Scenario: Plane sync drift/conflict (test_plane_sync_conflict.py)
-- [ ] T-115 — ⬜ Scenario: research-only request (manual verification)
-- [ ] T-116 — ⬜ Scenario: non-git project flow (write_mode=sequential)
-- [ ] T-117 — ⬜ Scenario: submodule-aware change (project_type=submodule)
+- [x] T-115 — test_research_only.py (3 tests: observable run, memory write, no team)
+- [x] T-116 — test_non_git_project.py (5 tests: sequential mode, no worktrees, lifecycle)
+- [x] T-117 — test_submodule_project.py (10 tests: type, parent link, board isolation)
 
 ---
 
-## Open Items (Not Blocked)
+## Open Items
 
-| ID | Item | Phase | Priority |
-|----|------|-------|----------|
-| T-067 | Cross-team scheduler (concurrency caps) | 5 | Low |
-| T-068 | Team monitor view in CLI | 5 | Low |
-| T-075 | pi queue show/drain CLI commands | 6 | Medium |
-| T-076 | test_integration_worker.py | 6 | Medium |
-| T-090 | SyncStateReadAdapter | 8 | Low |
-| T-094 | Forecasting advisory | 9 | Low |
-| T-095 | Agent/orchestration metrics | 9 | Low |
-| T-115 | Non-git project scenario test | Scenarios | Low |
-| T-116 | Submodule-aware scenario test | Scenarios | Low |
-
-Total open: 9 items — all are enhancements, none are blockers.
+All originally tracked items are now implemented. No open items remain.
 
 ---
 
@@ -199,4 +187,4 @@ Total open: 9 items — all are enhancements, none are blockers.
 | 9 Analytics | test_analytics | ✅ |
 | 10 CLI Integration | test_mcp_server, test_claude_hook, test_telemetry, test_cos_wiring, test_cli_serve | ✅ |
 
-**Total: 181 tests, 181 passing.**
+**Total: 219 tests, 219 passing.**

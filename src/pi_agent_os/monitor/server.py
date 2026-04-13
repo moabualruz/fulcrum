@@ -246,6 +246,33 @@ def sync_state(workspace_id: str = Query(...)):
     }
 
 
+@app.get("/api/v1/teams")
+def team_instances(workspace_id: str = Query(...),
+                   status: Optional[str] = Query(None),
+                   project_id: Optional[str] = Query(None)):
+    """Team instance monitor view. Spec §15.4."""
+    clauses = ["workspace_id=?"]
+    params: list = [workspace_id]
+    if status:
+        clauses.append("status=?")
+        params.append(status)
+    if project_id:
+        clauses.append("project_id=?")
+        params.append(project_id)
+    where = " AND ".join(clauses)
+    rows = db.fetchall(
+        f"SELECT * FROM team_instances WHERE {where} ORDER BY created_at DESC LIMIT 100",
+        tuple(params),
+    )
+    from ..teams.scheduler import TeamScheduler
+    scheduler = TeamScheduler()
+    concurrency = scheduler.concurrency_report(workspace_id)
+    return {
+        "instances": [dict(r) for r in rows],
+        "concurrency": concurrency,
+    }
+
+
 @app.get("/api/v1/analytics/per-role")
 def analytics_per_role(workspace_id: str = Query(...)):
     """Per-role agent metrics view. Spec §20.5."""
