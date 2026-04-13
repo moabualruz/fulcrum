@@ -1,5 +1,7 @@
-import { ulid } from 'ulid'
 import { getDb } from './db/client.js'
+import { newId, nextDisplayId } from './ids.js'
+import { statusCategory } from './status-category.js'
+import { emitEvent } from './events.js'
 import { FulcrumError } from './types.js'
 import type { Task, TaskStatus } from './types.js'
 
@@ -16,6 +18,9 @@ interface CreateTaskInput {
   description?: string
   depends_on?: string[]
   assigned_to?: string
+  priority?: 'critical' | 'high' | 'medium' | 'low' | 'none'
+  done_criteria?: string
+  issue_id?: string
 }
 
 interface UpdateTaskInput {
@@ -25,6 +30,10 @@ interface UpdateTaskInput {
   assigned_to?: string
   description?: string
   expected_version?: number
+  priority?: 'critical' | 'high' | 'medium' | 'low' | 'none'
+  done_criteria?: string
+  claimed_at?: string | null
+  completed_at?: string | null
 }
 
 function rowToTask(row: Record<string, unknown>): Task {
@@ -32,18 +41,24 @@ function rowToTask(row: Record<string, unknown>): Task {
     task_id: row.task_id as string,
     workspace_id: row.workspace_id as string,
     project_id: row.project_id as string,
+    issue_id: (row.issue_id as string | null) ?? null,
+    display_id: (row.display_id as string) || '',
     title: row.title as string,
     description: row.description as string | null,
     status: row.status as TaskStatus,
-    depends_on: (() => {
-      try { return JSON.parse(row.depends_on as string) as string[] }
-      catch { return [] }
-    })(),
+    status_category: ((row.status_category as string) || statusCategory(row.status as string)) as Task['status_category'],
+    priority: ((row.priority as string) || 'medium') as Task['priority'],
+    estimate_type: (row.estimate_type as Task['estimate_type']) ?? null,
+    estimate_value: (row.estimate_value as number | null) ?? null,
+    depends_on: (() => { try { return JSON.parse(row.depends_on as string) as string[] } catch { return [] } })(),
     assigned_to: row.assigned_to as string | null,
     note: row.note as string | null,
+    done_criteria: (row.done_criteria as string | null) ?? null,
     version: row.version as number,
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
+    claimed_at: (row.claimed_at as string | null) ?? null,
+    completed_at: (row.completed_at as string | null) ?? null,
   }
 }
 
@@ -61,22 +76,49 @@ export async function listTasks(input: ListTasksInput): Promise<Task[]> {
 export async function createTask(input: CreateTaskInput): Promise<Task> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
   const db = getDb()
-  const task_id = ulid()
+  const task_id = newId('task')
   const now = new Date().toISOString()
+  const display_id = nextDisplayId('task', input.project_id, db)
+  const initialStatus = 'queued'
+  const sc = statusCategory(initialStatus)
+  const priority = input.priority ?? 'medium'
+
   db.prepare(`
-    INSERT INTO tasks (task_id, workspace_id, project_id, title, description, depends_on, assigned_to, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tasks
+      (task_id, workspace_id, project_id, display_id, issue_id, title, description,
+       status, status_category, priority, depends_on, assigned_to, note, done_criteria,
+       created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     task_id,
     input.workspace_id,
     input.project_id,
+    display_id,
+    input.issue_id ?? null,
     input.title,
     input.description ?? null,
+    initialStatus,
+    sc,
+    priority,
     JSON.stringify(input.depends_on ?? []),
     input.assigned_to ?? null,
+    null,
+    input.done_criteria ?? null,
     now,
     now
   )
+
+  emitEvent({
+    workspace_id: input.workspace_id,
+    project_id: input.project_id,
+    evt_type: 'task_created',
+    object_type: 'task',
+    object_id: task_id,
+    actor_type: 'system',
+    actor_id: 'core',
+    payload: { display_id, title: input.title, status: initialStatus },
+  })
+
   const row = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(task_id) as Record<string, unknown> | undefined
   if (!row) throw new FulcrumError(`Task ${task_id} not found after insert`, 'not_found')
   return rowToTask(row)
@@ -94,15 +136,43 @@ export async function updateTask(input: UpdateTaskInput): Promise<Task> {
     )
   }
 
-  const fields: string[] = ['version = version + 1', "updated_at = ?"]
+  const fields: string[] = ['version = version + 1', 'updated_at = ?']
   const values: unknown[] = [new Date().toISOString()]
-  if (input.status !== undefined) { fields.push('status = ?'); values.push(input.status) }
+
+  const statusChanging = input.status !== undefined && input.status !== (existing.status as string)
+
+  if (input.status !== undefined) {
+    fields.push('status = ?'); values.push(input.status)
+    fields.push('status_category = ?'); values.push(statusCategory(input.status))
+  }
   if (input.note !== undefined) { fields.push('note = ?'); values.push(input.note) }
   if (input.assigned_to !== undefined) { fields.push('assigned_to = ?'); values.push(input.assigned_to) }
   if (input.description !== undefined) { fields.push('description = ?'); values.push(input.description) }
-  values.push(input.task_id)
+  if (input.priority !== undefined) { fields.push('priority = ?'); values.push(input.priority) }
+  if (input.done_criteria !== undefined) { fields.push('done_criteria = ?'); values.push(input.done_criteria) }
+  if (input.claimed_at !== undefined) { fields.push('claimed_at = ?'); values.push(input.claimed_at) }
+  if (input.completed_at !== undefined) { fields.push('completed_at = ?'); values.push(input.completed_at) }
 
+  values.push(input.task_id)
   db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE task_id = ?`).run(...values)
+
+  if (statusChanging) {
+    emitEvent({
+      workspace_id: existing.workspace_id as string,
+      project_id: existing.project_id as string,
+      evt_type: 'task_status_changed',
+      object_type: 'task',
+      object_id: input.task_id,
+      actor_type: 'system',
+      actor_id: 'core',
+      payload: {
+        from_status: existing.status as string,
+        to_status: input.status as string,
+        to_category: statusCategory(input.status as string),
+      },
+    })
+  }
+
   const updated = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(input.task_id) as Record<string, unknown> | undefined
   if (!updated) throw new FulcrumError(`Task ${input.task_id} not found after update`, 'not_found')
   return rowToTask(updated)

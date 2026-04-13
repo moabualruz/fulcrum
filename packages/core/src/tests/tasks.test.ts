@@ -24,7 +24,7 @@ describe('createTask', () => {
     expect(task.title).toBe('Write tests')
     expect(task.version).toBe(0)
     expect(task.depends_on).toEqual([])
-    expect(task.task_id).toMatch(/^[0-9A-Z]{26}$/) // ULID
+    expect(task.task_id).toMatch(/^task_[0-9A-Z]{26}$|^[0-9A-Z]{26}$/) // prefixed ULID or plain ULID
   })
 
   it('creates a task with dependencies', async () => {
@@ -145,5 +145,76 @@ describe('updateTask', () => {
     await expect(
       updateTask({ task_id: 'NONEXISTENT', status: 'completed' })
     ).rejects.toMatchObject({ code: 'not_found' })
+  })
+})
+
+describe('createTask — display_id and status_category', () => {
+  it('generates a display_id with TASK- prefix', async () => {
+    seed()
+    const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
+    expect(task.display_id).toMatch(/^TASK-\d+$/)
+  })
+
+  it('auto-increments display_id within the same project', async () => {
+    seed()
+    const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
+    const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T2' })
+    expect(t1.display_id).toBe('TASK-1')
+    expect(t2.display_id).toBe('TASK-2')
+  })
+
+  it('sets status_category to backlog for queued tasks', async () => {
+    seed()
+    const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
+    expect(task.status_category).toBe('backlog')
+  })
+
+  it('emits a task_created event', async () => {
+    seed()
+    const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Event test' })
+    const db = getDb()
+    const evt = db.prepare("SELECT * FROM events WHERE evt_type = 'task_created' AND object_id = ?").get(task.task_id) as Record<string, unknown> | undefined
+    expect(evt).toBeTruthy()
+    expect(evt!.object_type).toBe('task')
+  })
+
+  it('sets priority to medium by default', async () => {
+    seed()
+    const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
+    expect(task.priority).toBe('medium')
+  })
+})
+
+describe('updateTask — status_category and events', () => {
+  it('updates status_category when status changes to completed', async () => {
+    seed()
+    const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
+    const updated = await updateTask({ task_id: t.task_id, status: 'completed' })
+    expect(updated.status_category).toBe('done')
+  })
+
+  it('updates status_category when status changes to blocked', async () => {
+    seed()
+    const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
+    const updated = await updateTask({ task_id: t.task_id, status: 'blocked' })
+    expect(updated.status_category).toBe('blocked')
+  })
+
+  it('emits task_status_changed event when status changes', async () => {
+    seed()
+    const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
+    await updateTask({ task_id: t.task_id, status: 'running' })
+    const db = getDb()
+    const evt = db.prepare("SELECT * FROM events WHERE evt_type = 'task_status_changed' AND object_id = ?").get(t.task_id) as Record<string, unknown> | undefined
+    expect(evt).toBeTruthy()
+  })
+
+  it('does not emit task_status_changed when only note changes', async () => {
+    seed()
+    const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
+    await updateTask({ task_id: t.task_id, note: 'just a note' })
+    const db = getDb()
+    const evt = db.prepare("SELECT * FROM events WHERE evt_type = 'task_status_changed' AND object_id = ?").get(t.task_id) as Record<string, unknown> | undefined
+    expect(evt).toBeUndefined()
   })
 })
