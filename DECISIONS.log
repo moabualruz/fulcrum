@@ -123,3 +123,43 @@ Status: Decided (with blocker)
 **Rationale:** PI is referenced as the execution host but is not a locally installable standalone package from this context. The implementation builds everything that can be built, with PI integration points clearly defined.
 
 **Related blocker:** See BLOCKERS.md B-001.
+
+---
+
+## D-012: IntegrationWorker Role Enforcement — Hard Code, Not Policy
+Date: 2026-04-13
+Status: Decided
+
+**Decision:** The `integration_worker` role restriction in `IntegrationWorker.process_next()` is enforced via a direct role string check, not via the PolicyEngine.
+
+**Rationale:** The PolicyEngine defaults to allow. The role restriction is a hard architectural invariant (spec §21.10), not a configurable deny rule. Encoding it directly in the worker makes the constraint explicit, testable without policy DB setup, and immune to misconfiguration. The PolicyEngine SYSTEM_INVARIANTS are evaluated for `invoke_team` actions.
+
+---
+
+## D-013: OTel Dual Attribute Emission — Backwards Compat
+Date: 2026-04-13
+Status: Decided
+
+**Decision:** `telemetry/spans.py` emits both `gen_ai.provider.name` (new semconv v1.37.0) and `gen_ai.system` (deprecated) in every agent span.
+
+**Rationale:** OTel semconv v1.37.0 (Aug 2025) renamed `gen_ai.system` to `gen_ai.provider.name`, but many OTLP collectors and dashboards still use the old attribute. Emitting both ensures the system works with both old and new collectors during the migration window without a breaking deployment change.
+
+---
+
+## D-014: CoS World-State via Injection, Not Chat History
+Date: 2026-04-13
+Status: Decided
+
+**Decision:** The Chief of Staff receives world-state (tasks/events/memories) injected into every task_packet by `CoSContextBuilder`, rather than via chat transcript forwarding.
+
+**Rationale:** Spec §3.6 explicitly prohibits "chat transcript forwarding as the main handoff mechanism". The CoS is stateless per invocation — coherence comes from the control plane, not session memory. `CoSContextBuilder.build()` assembles a structured markdown snapshot; `CoSResponseParser.apply()` writes decisions back to the control plane.
+
+---
+
+## D-015: SQLite Thread-Local Connections
+Date: 2026-04-13
+Status: Decided
+
+**Decision:** Each thread gets its own SQLite connection via `threading.local()`. Connections are never shared between threads. `_db_path` is protected by a lock.
+
+**Rationale:** SQLite WAL mode supports concurrent reads from multiple connections. Thread-local connections avoid the need for per-operation locking, and WAL mode allows concurrent readers + one writer safely. `check_same_thread=False` is set on each connection only as a precaution (actually each connection is used by its owning thread only).

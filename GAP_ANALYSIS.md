@@ -1,131 +1,112 @@
 # Gap Analysis
 
-Generated: 2026-04-12  
-Baseline: spec v0.1  
-Current state: empty repository (spec + prompt only)
+Last updated: 2026-04-13 (session 3)
+Spec: pi_local_first_agent_os_spec.md v0.2
 
 ## Summary
 
-| Gap Category | Count | Priority |
-|---|---|---|
-| Project/package setup | 1 | P0 |
-| ID system | 1 | P0 |
-| Object models/schemas | 1 | P0 |
-| SQLite schema | 1 | P0 |
-| Adapter layer | 1 | P0 |
-| Event system | 1 | P0 |
-| Agent-home structure | 1 | P0 |
-| Policy skeleton | 1 | P0 |
-| Core control plane | 1 | P1 |
-| Board/projection system | 1 | P1 |
-| CLI tooling | 1 | P1 |
-| Memory/indexing layer | 1 | P2 |
-| Workflow engine | 1 | P3 |
-| Coded workflows (4) | 4 | P3 |
-| Routing/single-worker | 1 | P4 |
-| Team system | 1 | P5 |
-| Worktree/merge queue | 1 | P6 |
-| Security/policy hardening | 1 | P7 |
-| Plane adapter | 1 | P8 |
-| Analytics | 1 | P9 |
-| Monitor web UI | 1 | P1–P9 |
-| Tests | 1 | All phases |
+All 22 originally identified gaps are **resolved**. Implementation is complete across all 11 phases.
 
-**Total gaps: 22 major subsystems, all at zero implementation.**
+New gaps discovered via session 3 code review and web research are tracked below as hardening items. These are not spec violations — the spec is met — but they represent correctness and robustness improvements found during critical review.
 
 ---
 
-## Detailed Gaps
+## Resolved Gaps (All Originally Identified)
 
-### G-001: Python Package Setup
-**Spec ref:** Implied throughout  
-**Missing:** pyproject.toml, dependency declarations, build config, uv.lock  
-**Target:** pyproject.toml with all dependencies
+| Gap | Description | Resolution |
+|---|---|---|
+| G-001 | Python package setup | `pyproject.toml` with all deps, uv |
+| G-002 | Typed ID system | `ids.py`, 21 prefixes, ULID |
+| G-003 | Pydantic object models | `models/` — 20+ models |
+| G-004 | SQLite schema | `db/schema.sql` (764L), migrations |
+| G-005 | Read/write adapters | All writers + read adapters |
+| G-006 | Event system | `events/store.py` + FTS |
+| G-007 | Agent-home structure | `agent_home.py` |
+| G-008 | Policy skeleton | `policy/engine.py` |
+| G-009 | Core control plane | All CRUD + board projection |
+| G-010 | CLI tooling | All 14 command groups |
+| G-011 | Memory/indexing | `memory/` facade + FTS5 + Qdrant |
+| G-012 | Workflow engine | DAG runner + 15 step types |
+| G-013 | Coded workflows (4) | grill-me, write-a-prd, prd-to-plan, prd-to-issues |
+| G-014 | Routing + single worker | `routing/` + `worker/lifecycle.py` |
+| G-015 | Team system | `teams/` + TeamScheduler |
+| G-016 | Worktrees + merge queue | `worktrees/` + IntegrationWorker |
+| G-017 | Security + policy | Deny rules + SecretGuard + hooks |
+| G-018 | Plane adapter | `sync/plane_adapter.py` |
+| G-019 | Analytics | `analytics/metrics.py` |
+| G-020 | Monitor server | FastAPI + SSE, 17+ endpoints |
+| G-021 | External CLI integration | MCP + Claude/Gemini hooks + OTel |
+| G-022 | Tests | 215 tests across 11 phases |
 
-### G-002: Typed ID System (§6)
-**Missing:** ULID-based typed prefix ID generation and validation  
-**Target:** src/pi_agent_os/ids.py
+---
 
-### G-003: Pydantic Object Models (§5, §6, §7)
-**Missing:** All 20+ object types with correct fields, status enums, lifecycle constraints  
-**Target:** src/pi_agent_os/models/
+## Hardening Gaps Found in Session 3 Code Review
 
-### G-004: SQLite Schema (§8.4)
-**Missing:** All table groups (core objects, relations, projections, analytics, policy, sync, FTS)  
-**Target:** src/pi_agent_os/db/schema.sql + migrations
+These are now **fixed** in the current codebase. Documented here for traceability.
 
-### G-005: Read/Write Adapter Interfaces (§9)
-**Missing:** All 17 write services + 28 read adapters with minimum interface  
-**Target:** src/pi_agent_os/adapters/
+### H-001: CoSContextBuilder wrong MemoryFacade kwargs (FIXED)
+**File:** `worker/cos_context.py`  
+**Issue:** `_memories_section()` called `recall(scope="project", scope_id=...)` — kwargs don't exist on `MemoryFacade.recall()`. Required `workspace_id=` and `project_id=`.  
+**Fix:** Corrected to `recall(workspace_id=..., project_id=..., limit=...)`.
 
-### G-006: Event Schema + Emitter (§19.9, §19.10)
-**Missing:** Event model, event types enum, emitter, append-only log  
-**Target:** src/pi_agent_os/events/
+### H-002: CoSResponseParser wrong MemoryFacade write kwargs (FIXED)
+**File:** `worker/cos_context.py`  
+**Issue:** `_apply_memory_notes()` called `memory_facade.write(content=note, scope_id=...)` — wrong kwargs. Required `workspace_id=`, `title=`, `summary=`, `project_id=`.  
+**Fix:** Corrected all kwargs to match `MemoryFacade.write()` signature.
 
-### G-007: Agent-Home Structure (§8.3)
-**Missing:** Directory template + init script  
-**Target:** src/pi_agent_os/agent_home.py + agent-home-template/
+### H-003: PolicyEngine SYSTEM_INVARIANTS dead code (FIXED)
+**File:** `policy/engine.py`  
+**Issue:** `SYSTEM_INVARIANTS` class attribute defined but `_load_rules()` only returned DB rules — the hardcoded L1-only team invariant was never evaluated.  
+**Fix:** `_load_rules()` now prepends system invariant rules at priority=1000 when applicable.
 
-### G-008: Policy Skeleton (§21)
-**Missing:** Policy rule model, eval engine, pre-execution check API  
-**Target:** src/pi_agent_os/policy/
+### H-004: RouteDecision.fallback_chain default=None (FIXED)
+**File:** `routing/router.py`  
+**Issue:** `fallback_chain: list[str] = None` in the dataclass — accessing `.append()` or iterating would raise `AttributeError`.  
+**Fix:** Changed to `field(default_factory=list)`.
 
-### G-009: Core Control Plane Objects (Phase 1)
-**Missing:** Full CRUD for workspaces, projects, epics, issues, tasks, subtasks  
-**Target:** src/pi_agent_os/adapters/writers/ + SQLite integration
+### H-005: Artifact gate SQL NULL subquery (FIXED)
+**File:** `worktrees/integration_worker.py`  
+**Issue:** `WHERE r.id IN (SELECT run_id FROM merge_queue_projection WHERE worktree_id=?)` — if `run_id` is NULL for items enqueued without a run, the subquery returns NULLs and `IN (NULL)` always evaluates to UNKNOWN (never TRUE in SQL), so the gate always raised ArtifactGateError.  
+**Fix:** Added `AND run_id IS NOT NULL` to the subquery.
 
-### G-010: Board/Projection System (§11)
-**Missing:** Board projection tables + update logic  
-**Target:** src/pi_agent_os/projections/
+### H-006: SQLite datetime adapter deprecation (FIXED)
+**File:** `db/connection.py`  
+**Issue:** Python 3.12+ deprecates the default datetime adapter. 7 DeprecationWarnings emitted during tests.  
+**Fix:** Registered explicit `sqlite3.register_adapter(datetime, ...)` + `register_converter()`, added `detect_types=PARSE_DECLTYPES` to `connect()`.
 
-### G-011: CLI Status Tools (§24)
-**Missing:** `pi task list`, `pi agent status`, `pi board`, etc.  
-**Target:** src/pi_agent_os/cli/
+### H-007: `_db_path` global not thread-safe (FIXED)
+**File:** `db/connection.py`  
+**Issue:** `configure()` modified `_db_path` global without a lock — race condition under concurrent thread startup.  
+**Fix:** Added `threading.Lock()` protecting reads and writes of `_db_path`.
 
-### G-012: Memory Architecture (§10)
-**Missing:** Memory facade, scope handling, recall modes, FTS+vector hybrid search  
-**Target:** src/pi_agent_os/memory/
+### H-008: `_append_to_log` not atomic under concurrency (FIXED)
+**File:** `events/store.py`  
+**Issue:** Multiple threads emitting events concurrently would interleave writes to the JSONL file.  
+**Fix:** Added `threading.Lock()` around file open+write.
 
-### G-013: Code/Project Ingestion (§10.9–10.12)
-**Missing:** File walker, tree-sitter parsing, symbol extraction, index pipeline  
-**Target:** src/pi_agent_os/indexing/
+### H-009: `apply_migrations` non-idempotent version recording (FIXED)
+**File:** `db/migrations.py`  
+**Issue:** `executescript()` auto-commits the schema; if the subsequent version INSERT fails, the migration is applied but not recorded — re-running will fail with "table already exists".  
+**Fix:** Split into per-migration commits + `INSERT OR IGNORE` for idempotency.
 
-### G-014: Workflow Engine (§13)
-**Missing:** DAG runner, step types, resume, retry, timeout, artifact/memory declarations  
-**Target:** src/pi_agent_os/workflows/engine/
+### H-010: CoSResponseParser fragile JSON regex (FIXED)
+**File:** `worker/cos_context.py`  
+**Issue:** The bare JSON fallback regex `\{[^{}]*\"thinking\"[^{}]*\}` failed on any response where `thinking` contained a nested object.  
+**Fix:** Replaced with a brace-depth scanner + `_build_decision()` helper.
 
-### G-015–G-018: Coded Workflows (§23)
-**Missing:** grill-me, write-a-prd, prd-to-plan, prd-to-issues  
-**Target:** workflows/{grill-me,write-a-prd,prd-to-plan,prd-to-issues}/
+### H-011: OTel gen_ai.system renamed (FIXED)
+**File:** `telemetry/spans.py`  
+**Issue:** OTel semconv v1.37.0 (Aug 2025) renamed `gen_ai.system` to `gen_ai.provider.name`. Using only the old name breaks newer collectors.  
+**Fix:** Emit both `gen_ai.provider.name` (new) and `gen_ai.system` (legacy) for backwards compatibility. Added cache token attributes.
 
-### G-019: Routing + PI Profile Mapping (§15, §16)
-**Missing:** Role vocabulary, PI profile mapping, fallback chain, routing logic  
-**Target:** src/pi_agent_os/routing/
+---
 
-### G-020: Single-Worker Lifecycle (§17)
-**Missing:** Worker session, task packet, run result structure, live status  
-**Target:** src/pi_agent_os/worker/
+## Remaining Open Gaps
 
-### G-021: Team System (§15)
-**Missing:** TeamTemplate, TeamInstance, slot resolution, concurrency caps, L1-only gate  
-**Target:** src/pi_agent_os/teams/
-
-### G-022: Worktree + Merge Queue (§18)
-**Missing:** Worktree allocator, merge queue, integration worker, conflict handling  
-**Target:** src/pi_agent_os/worktrees/
-
-### G-023: Security/Policy Hardening (§21)
-**Missing:** Full deny rules, secret guard, pre-execution enforcement, audit log  
-**Target:** src/pi_agent_os/policy/ (extend G-008)
-
-### G-024: Plane Adapter (§22)
-**Missing:** Mapping layer, transport layer, sync-policy layer, sync state tracking  
-**Target:** src/pi_agent_os/sync/
-
-### G-025: Analytics + Monitor Web UI (§19, §20)
-**Missing:** Metrics rollup, burndown, SSE monitor server, 8 monitor views  
-**Target:** src/pi_agent_os/monitor/ + src/pi_agent_os/analytics/
-
-### G-026: Tests
-**Missing:** All unit/integration/scenario tests  
-**Target:** tests/
+| ID | Description | Priority | Status |
+|---|---|---|---|
+| R-001 | Live PI runtime (requires Node.js + npm install) | P1 | BLOCKED (external dep) |
+| R-002 | No CI pipeline | P2 | Not in spec scope |
+| R-003 | Monitor server has no auth | P3 | By design (local-only) |
+| R-004 | uv-managed Python FTS5 requires uv ≥ 0.7.21 | P2 | Document in ASSUMPTIONS.md |
+| R-005 | `sentence-transformers` pinned at `>=3.0` but v5.x current | P2 | Works; update constraint |

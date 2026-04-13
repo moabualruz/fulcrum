@@ -9,6 +9,16 @@ from ..db import connection as db
 from ..ids import generate_id
 import json
 
+# Avoid circular import: routing.roles → (nothing) → safe to import at use time
+_L1_ROLES: set[str] | None = None
+
+def _get_l1_roles() -> set[str]:
+    global _L1_ROLES
+    if _L1_ROLES is None:
+        from ..routing.roles import L1_ROLES
+        _L1_ROLES = set(L1_ROLES)
+    return _L1_ROLES
+
 
 @dataclass
 class PolicyCheckRequest:
@@ -85,11 +95,11 @@ class PolicyEngine:
         )
 
     def _load_rules(self, req: PolicyCheckRequest) -> list[dict]:
-        """Load active policy rules from DB."""
+        """Load active policy rules: DB rules + hardcoded system invariants."""
         rows = db.fetchall(
             "SELECT * FROM policy_rules WHERE enabled=1 ORDER BY priority DESC",
         )
-        return [
+        db_rules = [
             {
                 "id": r["id"],
                 "name": r["name"],
@@ -101,6 +111,24 @@ class PolicyEngine:
             }
             for r in rows
         ]
+        # System invariants run at the highest priority (1000) and cannot be
+        # overridden by DB rules. They encode spec §21.10 hard prohibitions.
+        system_rules = []
+        actor_role = (req.extra or {}).get("actor_role", "")
+        for inv in self.SYSTEM_INVARIANTS:
+            # The L1-only team invariant: deny if action=invoke_team AND role≠chief_of_staff
+            if inv["id"] == "sys_l1_team_only":
+                if req.action in ("invoke_team", "team_invoke") and actor_role not in _get_l1_roles():
+                    system_rules.append({
+                        "id": inv["id"],
+                        "name": inv["name"],
+                        "action": PolicyAction.deny,
+                        "matchers": inv["matchers"],
+                        "scope": inv["scope"],
+                        "scope_id": None,
+                        "priority": 1000,
+                    })
+        return system_rules + db_rules
 
     def _matches(self, rule: dict, req: PolicyCheckRequest) -> bool:
         """Check if a rule matches the request."""

@@ -1,8 +1,8 @@
 # Spec Traceability Matrix
 
-Version: 0.1  
-Generated: 2026-04-12  
-Spec: pi_local_first_agent_os_spec.md v0.1
+Version: 0.3 (session 3 update)
+Generated: 2026-04-13  
+Spec: pi_local_first_agent_os_spec.md v0.2
 
 Status legend: `not_started` | `in_progress` | `implemented` | `verified` | `blocked`
 
@@ -37,6 +37,15 @@ Status legend: `not_started` | `in_progress` | `implemented` | `verified` | `blo
 | 3.5.2 | Filesystem for artifacts | src/pi_agent_os/agent_home.py | verified | |
 | 3.5.3 | Qdrant for vector retrieval | memory/backends/qdrant_backend.py | implemented | QdrantBackend local in-process mode; no server needed |
 | 3.5.4 | Graph memory for temporal/provenance | memory/backends/graph_backend.py | implemented | SQLiteGraphBackend — entities/edges/episodes/temporal validity |
+| 3.6.1 | claude-cli/* → ClaudeCLIAdapter | worker/cli_chat_adapter.py | verified | |
+| 3.6.2 | gemini-cli/* → GeminiCLIAdapter | worker/cli_chat_adapter.py | verified | |
+| 3.6.3 | else → PIRPCBridge | worker/cli_chat_adapter.py RoutingAdapter | verified | |
+| 3.6.4 | MCP control plane bridge (pi-os, 7 tools) | mcp/server.py | verified | mcp SDK v1.23.3 |
+| 3.6.5 | Claude PreToolUse hook | hooks/claude_hook.py | verified | test_claude_hook.py |
+| 3.6.6 | Gemini BeforeTool hook | hooks/gemini_hook.py | verified | test_gemini_hook.py |
+| 3.6.7 | Install packages | agent-integration/claude/ + gemini/ | verified | CLAUDE.md, GEMINI.md, install.sh |
+| 3.6.8 | CoS stateless coherence via world-state injection | worker/cos_context.py | verified | test_cos_wiring.py |
+| 3.6.9 | OTel GenAI spans (gen_ai.provider.name) | telemetry/spans.py | verified | semconv v1.37.0 applied |
 
 ## §4 Agent Hierarchy
 
@@ -61,7 +70,7 @@ Status legend: `not_started` | `in_progress` | `implemented` | `verified` | `blo
 | 5.5 | Workspace = top-level grouping | WorkspaceWriter + model | verified | |
 | 5.6 | Epics first-class | EpicWriter + model | verified | |
 | 5.7 | Non-git folders supported | ProjectWriter + sequential write mode | verified | |
-| 5.8 | Submodules as nested projects | project_submodules relation table | implemented | implemented but not formally tested |
+| 5.8 | Submodules as nested projects | project_submodules relation table | verified | test_submodule_project.py — 10 tests: type/parent_link/board_isolation/lifecycle |
 
 ## §6 ID Strategy
 
@@ -329,9 +338,9 @@ Status legend: `not_started` | `in_progress` | `implemented` | `verified` | `blo
 
 | Req | Description | Target | Status |
 |---|---|---|---|
-| 25.1 | Layered tests + scenario evals | tests/ | verified | 125 tests: unit/integration/scenario layers |
+| 25.1 | Layered tests + scenario evals | tests/ | verified | 215 tests: unit/integration/scenario layers |
 | 25.2 | Done = impl + read path + observability + tests | All phases | verified | Each phase has code + read adapter + CLI + tests |
-| 25.3 | 8 golden scenarios | tests/scenarios/ | verified | 6/8 verified; 2 pending PI runtime (B-001) |
+| 25.3 | 8 golden scenarios | tests/scenarios/ | verified | 8/8 automated; live PI execution needs npm install |
 | 25.4 | Acceptance tests by subsystem (10) | tests/integration/test_control_plane.py | verified | 10 integration tests |
 
 ## §26–29 Implementation Plan + Invariants

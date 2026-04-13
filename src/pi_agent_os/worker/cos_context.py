@@ -158,8 +158,8 @@ class CoSContextBuilder:
         try:
             memories = self.memory_facade.recall(
                 goal,
-                scope="project",
-                scope_id=self.project_id,
+                workspace_id=self.workspace_id or "",
+                project_id=self.project_id,
                 limit=self.max_memories,
             )
         except Exception as exc:
@@ -258,12 +258,32 @@ class CoSResponseParser:
     # ------------------------------------------------------------------
 
     def _parse(self, text: str) -> "CoSDecision":
-        # Extract JSON from fenced code block
+        # 1. Prefer fenced ```json ... ``` block (most reliable)
         match = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
         if not match:
-            # Try bare JSON object
-            match = re.search(r"(\{[^{}]*\"thinking\"[^{}]*\})", text, re.DOTALL)
+            # 2. Try any fenced ``` block containing a JSON object
+            match = re.search(r"```[^\n]*\n(\{.*?\})\s*```", text, re.DOTALL)
         if not match:
+            # 3. Scan for the last outermost { ... } that contains "thinking"
+            #    Use a brace-depth scanner so nested objects don't confuse the match.
+            start = None
+            depth = 0
+            for i, ch in enumerate(text):
+                if ch == '{':
+                    if depth == 0:
+                        start = i
+                    depth += 1
+                elif ch == '}':
+                    depth -= 1
+                    if depth == 0 and start is not None:
+                        candidate = text[start:i + 1]
+                        if '"thinking"' in candidate:
+                            try:
+                                data = json.loads(candidate)
+                                return self._build_decision(text, data)
+                            except json.JSONDecodeError:
+                                pass
+                        start = None
             return CoSDecision(raw=text, parse_error="No JSON block found in CoS response")
 
         try:
@@ -271,8 +291,11 @@ class CoSResponseParser:
         except json.JSONDecodeError as exc:
             return CoSDecision(raw=text, parse_error=f"JSON parse error: {exc}")
 
+        return self._build_decision(text, data)
+
+    def _build_decision(self, raw: str, data: dict) -> "CoSDecision":
         return CoSDecision(
-            raw=text,
+            raw=raw,
             thinking=data.get("thinking", ""),
             decisions=data.get("decisions", []),
             create_tasks=data.get("create_tasks", []),
@@ -348,9 +371,11 @@ class CoSResponseParser:
         for note in decision.memory_notes:
             try:
                 self.memory_facade.write(
-                    content=note,
+                    workspace_id=self.workspace_id,
+                    title="cos_decision",
+                    summary=note,
                     scope="project",
-                    scope_id=self.project_id,
+                    project_id=self.project_id,
                     tags=["cos_decision"],
                 )
             except Exception as exc:

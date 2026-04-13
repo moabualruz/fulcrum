@@ -1,12 +1,15 @@
 """Event append-only storage."""
 from __future__ import annotations
 import json
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from ..models.events import Event, EventType
 from ..ids import generate_id, EVT_PREFIX
 from ..db import connection as db
+
+_log_lock = threading.Lock()
 
 
 def emit(
@@ -61,7 +64,7 @@ def emit(
 
 
 def _append_to_log(evt: Event) -> None:
-    """Append event to the filesystem append-only log."""
+    """Append event to the filesystem append-only log (thread-safe)."""
     from ..agent_home import get_events_dir
     events_dir = get_events_dir()
     if events_dir is None:
@@ -76,8 +79,9 @@ def _append_to_log(evt: Event) -> None:
         "actor": f"{evt.actor_type}:{evt.actor_id}",
         "payload": evt.payload,
     })
-    with open(log_file, "a") as f:
-        f.write(line + "\n")
+    with _log_lock:
+        with open(log_file, "a") as f:
+            f.write(line + "\n")
 
 
 def tail(workspace_id: str, limit: int = 50, project_id: Optional[str] = None) -> list[dict]:

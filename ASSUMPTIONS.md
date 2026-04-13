@@ -39,3 +39,26 @@ more than one atomic step or produces a durable artifact.
 ## A-010: Spec "Underspecified" Items
 Items listed in spec §29 (open implementation details) will be resolved with the smallest correct 
 implementation and documented in DECISIONS.log.
+
+## A-011: SQLite FTS5 in uv-managed Python
+FTS5 was disabled in earlier uv-managed Python builds due to a regression in python-build-standalone.
+This was fixed in python-build-standalone release 20250712, picked up in uv 0.7.21 (July 2025).
+Assumption: uv >= 0.7.21 is used. If using an older uv, `CREATE VIRTUAL TABLE ... USING fts5` will
+silently fail and all memory searches will fall back to LIKE queries.
+Run `uv self update && uv python upgrade` to get the fixed build.
+
+## A-012: sentence-transformers Version
+The package is pinned at `>=3.0`. The current published version is v5.x. The core `encode()` API
+is stable across v3→v5. The deprecated `Asym` module (removed in v5) is not used anywhere in this
+codebase. The `start_multi_process_pool()` / `encode_multi_process()` flow is also not used.
+
+## A-013: OTel GenAI Semantic Conventions Stability
+All `gen_ai.*` attributes in OTel semconv remain in Development stability (not Stable) as of
+semconv v1.37.0 (Aug 2025). The attribute rename gen_ai.system → gen_ai.provider.name from
+v1.37.0 is applied, and both attributes are emitted for backwards compatibility.
+The spec (§3.6) only requires GenAI observability — not stable/finalized convention compliance.
+
+## A-014: MCP SDK vs FastMCP
+The codebase uses the official Anthropic `mcp` Python SDK (v1.x) and its `mcp.server.fastmcp.FastMCP`
+class. This is NOT the separate PrefectHQ `fastmcp` package. The import `from mcp.server.fastmcp
+import FastMCP` is stable in mcp SDK v1.x.

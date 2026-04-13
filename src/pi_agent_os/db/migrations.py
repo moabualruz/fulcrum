@@ -26,19 +26,21 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
 
     if current < 1:
         _migration_001_initial_schema(conn)
+        # executescript() auto-commits; record the version in a separate commit.
+        # Use INSERT OR IGNORE so re-runs after a partial failure don't error.
         conn.execute(
-            "INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)",
+            "INSERT OR IGNORE INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)",
             (1, "initial_schema", datetime.now(timezone.utc).isoformat()),
         )
+        conn.commit()
 
     if current < 2:
         _migration_002_graph_tables(conn)
         conn.execute(
-            "INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)",
+            "INSERT OR IGNORE INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)",
             (2, "graph_tables", datetime.now(timezone.utc).isoformat()),
         )
-
-    conn.commit()
+        conn.commit()
 
 
 def _migration_001_initial_schema(conn: sqlite3.Connection) -> None:

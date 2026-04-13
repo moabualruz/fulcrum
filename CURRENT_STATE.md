@@ -1,56 +1,118 @@
 # Current State
 
-Generated: 2026-04-12
+Last updated: 2026-04-13 (session 3)
 
 ## Repository Summary
 
 | Field | Value |
 |---|---|
 | Repo path | /home/mkh/workspace/pi-stack-plan |
-| Branch | main |
-| Language(s) detected | None — spec and docs only |
-| Package manager | None |
-| Framework | None |
-| Tests | None |
-| CI/CD | None |
+| Branch | feat/agent-integration-full-control |
+| Language | Python 3.12+ |
+| Package manager | uv |
+| Framework | FastAPI (monitor), Typer (CLI), Pydantic v2 (models) |
+| Tests | 215 passing, 1 skipped |
+| CI/CD | None (local-only) |
 
-## Files Present
+## Implementation Status
 
-| File | Type | Notes |
-|---|---|---|
-| pi_local_first_agent_os_spec.md | Spec | Full authoritative spec v0.1, 2026-04-12 |
-| prompt.md | Instructions | Implementation lead prompt |
+**All 11 phases fully implemented.** The system is a complete local-first agent OS control plane.
 
-## Existing Implementation
+### Phase Completion
 
-**None.** The repository contains only the spec and implementation prompt. There is no code, no schema, no config, no tests, no agent-home structure, no workflows.
+| Phase | Description | Status | Tests |
+|---|---|---|---|
+| 0 | Skeleton + Contracts | ✅ Complete | test_ids, test_models, test_schema |
+| 1 | Core Control Plane | ✅ Complete | test_cli_commands (17) |
+| 2 | Memory + Indexing | ✅ Complete | test_memory, test_indexing, test_graph_backend, test_qdrant_backend |
+| 3 | Workflows | ✅ Complete | test_workflow_engine, test_grill_me |
+| 4 | Routing + Single Worker | ✅ Complete | test_routing, test_single_agent_impl |
+| 5 | Teams | ✅ Complete | test_teams, test_team_scheduler |
+| 6 | Worktrees + Integration | ✅ Complete | test_worktrees, test_integration_worker, test_team_feature_build |
+| 7 | Security + Policy | ✅ Complete | test_policy, test_deny_rule_trip |
+| 8 | Plane Adapter | ✅ Complete | test_plane_adapter, test_plane_sync_conflict |
+| 9 | Analytics + Monitor | ✅ Complete | test_analytics |
+| 10 | External CLI Agent Integration | ✅ Complete | test_mcp_server, test_claude_hook, test_telemetry, test_cos_wiring, test_cli_serve |
 
-## PI Runtime Availability
+### Golden Scenarios
 
-PI is referenced as the execution host and extension runtime. Its specific CLI/API surface is not directly installable as a standalone package from this context. The implementation will:
-- Build the control/memory/workflow/monitor plane assuming PI-native capabilities are callable
-- Define the adapter interfaces PI hooks would call into
-- Document all PI integration points as stubs/interfaces where PI is not locally available
-- Flag PI dependency points in BLOCKERS.md
+| Scenario | Status |
+|---|---|
+| Research-only request | ✅ Automated (test_research_only.py) |
+| grill-me planning flow | ✅ Automated (test_grill_me_flow.py) |
+| Single-agent implementation | ✅ Automated (test_single_agent_impl.py) |
+| Team feature build | ✅ Automated (test_team_feature_build.py) |
+| Non-git project flow | ✅ Automated (test_non_git_project.py) |
+| Submodule-aware change | ✅ Automated (test_submodule_project.py, 10 tests) |
+| Deny-rule trip | ✅ Automated (test_deny_rule_trip.py) |
+| Plane sync drift/conflict | ✅ Automated (test_plane_sync_conflict.py) |
 
-## Key Missing Infrastructure
+## Core Subsystems
 
-- No Python package / package manager setup
-- No SQLite schema
-- No agent-home directory structure  
-- No typed ID system
-- No object models
-- No adapter layer
-- No event system
-- No memory/indexing layer
-- No workflow engine
-- No team system
-- No policy/security engine
-- No monitor/observability layer
-- No Plane adapter
-- No CLI tooling
-- No tests
+### Control Plane
+- Workspace / Project / Epic / Issue / Task — full CRUD + read adapters
+- Board projection (never canonical truth)
+- Event log (append-only, SQLite + JSONL)
+- Agent run lifecycle (start/heartbeat/block/complete)
 
-## Assessment
+### Memory Plane
+- `MemoryFacade` — global/project/file/task-linked memory
+- FTS5 lexical search
+- Qdrant vector retrieval (optional, graceful fallback)
+- SQLiteGraphBackend (temporal/provenance graph)
+- ProjectIngester + tree-sitter symbol extractor
 
-Starting from a clean slate. Full implementation required per spec phases 0–9.
+### Workflow Plane
+- DAG runner with resumability
+- 15 step types
+- 4 coded workflows: grill-me, write-a-prd, prd-to-plan, prd-to-issues
+
+### Orchestration
+- Router (role → PI profile, fallback chain)
+- WorkerLifecycle (single worker start/heartbeat/block/complete)
+- TeamTemplateWriter + TeamInstanceWriter (L1-only gate enforced)
+- TeamScheduler (global/per-project/per-template concurrency caps)
+- CoSContextBuilder + CoSResponseParser (stateless CoS coherence)
+
+### Integration + Worktrees
+- WorktreeAllocator (git worktree create/cleanup/validate)
+- MergeQueue (enqueue/merge/list_queued)
+- IntegrationWorker (artifact gates, role-enforced drain)
+
+### Security + Policy
+- PolicyEngine (deny rules, SYSTEM_INVARIANTS, default-allow)
+- SecretGuard (pattern detection + redaction)
+- Claude PreToolUse hook / Gemini BeforeTool hook
+
+### Sync
+- PlaneAdapter (local-wins conflict, secret guard, async queue)
+- SyncManager (state tracking)
+- SyncStateReadAdapter + SyncConflictReadAdapter
+
+### Analytics + Monitor
+- MetricsService (burndown, cycle time, WIP, throughput, per-role, memory effectiveness, forecast)
+- FastAPI monitor server (17+ read-only endpoints, SSE)
+
+### External CLI Integration
+- MCP server (`pi-os`, 7 tools)
+- `pi serve mcp|hooks|all` CLI
+- OTel spans (GenAI semconv v1.37.0: gen_ai.provider.name)
+- `agent-integration/claude/` + `agent-integration/gemini/` install packages
+
+## PI Runtime
+
+PI CLI is not locally installed. The system uses:
+- `PIRPCBridge` for native PI execution when `pi` is in PATH
+- `ClaudeCLIAdapter` when `claude` CLI is in PATH
+- `GeminiCLIAdapter` when `gemini` CLI is in PATH
+- `StubPIRuntimeAdapter` (tests and development)
+
+`auto_configure_pi_runtime()` detects and wires the best available adapter.
+
+## Known Limitations / Remaining Work
+
+1. **PI runtime not locally available** — `StubPIRuntimeAdapter` is used for all tests. Live PI execution requires `npm install -g @mariozechner/pi-coding-agent` + API keys.
+2. **No CI pipeline** — tests are run manually with `pytest`.
+3. **Qdrant disabled by default** — `enable_qdrant=False` in `MemoryFacade.__init__`. Enable explicitly when needed.
+4. **No WebSocket/realtime** — Monitor SSE is one-way push; no bidirectional control channel.
+5. **No authentication** on monitor server — designed for local use only.

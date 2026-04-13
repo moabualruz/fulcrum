@@ -2,35 +2,60 @@
 from __future__ import annotations
 import sqlite3
 import threading
+from datetime import datetime, date, timezone
 from pathlib import Path
 from typing import Optional
 from contextlib import contextmanager
 from .migrations import apply_migrations
 
+# Suppress Python 3.12+ deprecation: register explicit adapters/converters
+# instead of relying on the default detect_types behavior.
+def _adapt_datetime(val: datetime) -> str:
+    return val.isoformat()
+
+def _convert_datetime(val: bytes) -> datetime:
+    s = val.decode()
+    try:
+        return datetime.fromisoformat(s)
+    except ValueError:
+        return datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+sqlite3.register_adapter(datetime, _adapt_datetime)
+sqlite3.register_converter("DATETIME", _convert_datetime)
+sqlite3.register_converter("TIMESTAMP", _convert_datetime)
+
 _local = threading.local()
 _db_path: Optional[Path] = None
+_db_path_lock = threading.Lock()
 
 
 def configure(db_path: Path) -> None:
     """Configure the database path. Resets thread-local connection if path changed."""
     global _db_path
-    if _db_path != db_path:
-        # Path changed — close and drop the stale connection so next use opens fresh
-        if hasattr(_local, "conn") and _local.conn is not None:
-            try:
-                _local.conn.close()
-            except Exception:
-                pass
-            _local.conn = None
-    _db_path = db_path
+    with _db_path_lock:
+        if _db_path != db_path:
+            # Path changed — close and drop the stale connection so next use opens fresh
+            if hasattr(_local, "conn") and _local.conn is not None:
+                try:
+                    _local.conn.close()
+                except Exception:
+                    pass
+                _local.conn = None
+        _db_path = db_path
 
 
 def _get_raw_connection() -> sqlite3.Connection:
     """Get a thread-local raw SQLite connection."""
     if not hasattr(_local, "conn") or _local.conn is None:
-        if _db_path is None:
+        with _db_path_lock:
+            current_path = _db_path
+        if current_path is None:
             raise RuntimeError("Database not configured. Call configure(db_path) first.")
-        conn = sqlite3.connect(str(_db_path), check_same_thread=False)
+        conn = sqlite3.connect(
+            str(current_path),
+            check_same_thread=False,
+            detect_types=sqlite3.PARSE_DECLTYPES,
+        )
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")

@@ -1,6 +1,6 @@
 """Routing logic: role → PI profile resolution with fallback chains. Spec §16.4."""
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 from .roles import RoleMapping, load_role_mappings, can_invoke_team, L1_ROLES
 
@@ -13,7 +13,7 @@ class RouteDecision:
     resolved_model: Optional[str]
     resolved_provider: Optional[str]
     fallback_used: bool = False
-    fallback_chain: list[str] = None      # profiles tried
+    fallback_chain: list[str] = field(default_factory=list)  # profiles tried
     note: str = ""
 
 

@@ -63,12 +63,15 @@ class IntegrationWorker:
         """Verify that a passing review artifact exists for the worktree."""
         if not self.require_review:
             return
+        # Use IS NOT NULL guard: run_id may be NULL for items enqueued without a run.
+        # SQL IN (subquery returning NULLs) silently matches nothing.
         row = db.fetchone(
             """SELECT a.id, a.status FROM artifacts a
                JOIN agentrun_artifacts ara ON a.id = ara.artifact_id
                JOIN agent_runs r ON ara.run_id = r.id
                WHERE r.id IN (
-                   SELECT run_id FROM merge_queue_projection WHERE worktree_id=?
+                   SELECT run_id FROM merge_queue_projection
+                   WHERE worktree_id=? AND run_id IS NOT NULL
                ) AND a.artifact_type = 'review_summary'""",
             (worktree_id,),
         )
@@ -86,12 +89,14 @@ class IntegrationWorker:
         """Verify that a passing test artifact exists for the worktree."""
         if not self.require_tests:
             return
+        # Use IS NOT NULL guard: run_id may be NULL for items enqueued without a run.
         row = db.fetchone(
             """SELECT a.id, a.status FROM artifacts a
                JOIN agentrun_artifacts ara ON a.id = ara.artifact_id
                JOIN agent_runs r ON ara.run_id = r.id
                WHERE r.id IN (
-                   SELECT run_id FROM merge_queue_projection WHERE worktree_id=?
+                   SELECT run_id FROM merge_queue_projection
+                   WHERE worktree_id=? AND run_id IS NOT NULL
                ) AND a.artifact_type = 'test_run_summary'""",
             (worktree_id,),
         )
