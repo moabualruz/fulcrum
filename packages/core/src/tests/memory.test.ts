@@ -58,11 +58,11 @@ describe('recallMemory', () => {
 
   it('increments access_count on recall', async () => {
     seed()
-    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'important decision' })
+    const m = await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'important decision' })
     await recallMemory({ workspace_id: 'ws_1', project_id: 'proj_1', query: 'important', limit: 5 })
     const db = getDb()
-    const m = db.prepare('SELECT access_count FROM memories').get() as { access_count: number }
-    expect(m.access_count).toBe(1)
+    const row = db.prepare('SELECT access_count FROM memories WHERE memory_id = ?').get(m.memory_id) as { access_count: number }
+    expect(row.access_count).toBe(1)
   })
 
   it('returns empty array for no matches', async () => {

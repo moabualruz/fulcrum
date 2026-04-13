@@ -49,19 +49,17 @@ export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
   const db = getDb()
   const now = new Date().toISOString()
 
-  // Deduplication: check exact content match first (fast path, no embedding needed)
-  if (!input.embedding) {
-    const existing = db.prepare(
-      'SELECT * FROM memories WHERE workspace_id = ? AND project_id = ? AND content = ?'
-    ).get(input.workspace_id, input.project_id, input.content) as Record<string, unknown> | undefined
+  // Always check exact content match first (fast path)
+  const existing = db.prepare(
+    'SELECT * FROM memories WHERE workspace_id = ? AND project_id = ? AND content = ?'
+  ).get(input.workspace_id, input.project_id, input.content) as Record<string, unknown> | undefined
 
-    if (existing) {
-      db.prepare(
-        'UPDATE memories SET confidence = ?, updated_at = ? WHERE memory_id = ?'
-      ).run(input.confidence ?? (existing.confidence as number), now, existing.memory_id)
-      const updated = db.prepare('SELECT * FROM memories WHERE memory_id = ?').get(existing.memory_id) as Record<string, unknown>
-      return rowToMemory(updated)
-    }
+  if (existing) {
+    db.prepare(
+      'UPDATE memories SET confidence = ?, updated_at = ? WHERE memory_id = ?'
+    ).run(input.confidence ?? (existing.confidence as number), now, existing.memory_id)
+    const updated = db.prepare('SELECT * FROM memories WHERE memory_id = ?').get(existing.memory_id) as Record<string, unknown>
+    return rowToMemory(updated)
   }
 
   // Embedding-based deduplication (when embedding provided)
@@ -112,14 +110,16 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
   const db = getDb()
   const limit = input.limit ?? 5
 
-  // FTS5 search
+  // FTS5 search — fetch all matches, workspace/project filter applied after
   let ftsRows: { rowid: number; rank: number }[] = []
   try {
     ftsRows = db.prepare(
-      'SELECT rowid, rank FROM memories_fts WHERE content MATCH ? ORDER BY rank LIMIT ?'
-    ).all(input.query, limit * 3) as { rowid: number; rank: number }[]
-  } catch {
-    // FTS5 query syntax error — fall back to LIKE
+      'SELECT rowid, rank FROM memories_fts WHERE content MATCH ? ORDER BY rank'
+    ).all(input.query) as { rowid: number; rank: number }[]
+  } catch (err) {
+    // Only fall back to LIKE for FTS5 syntax errors, not engine errors
+    const msg = err instanceof Error ? err.message : String(err)
+    if (!msg.includes('fts5') && !msg.includes('syntax')) throw err
     const likeRows = db.prepare(
       'SELECT rowid FROM memories WHERE workspace_id = ? AND project_id = ? AND content LIKE ? LIMIT ?'
     ).all(input.workspace_id, input.project_id, `%${input.query}%`, limit) as { rowid: number }[]
@@ -130,18 +130,21 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
 
   const rowids = ftsRows.map(r => r.rowid)
   const placeholders = rowids.map(() => '?').join(',')
-  const rows = db.prepare(
+  const allRows = db.prepare(
     `SELECT * FROM memories WHERE rowid IN (${placeholders}) AND workspace_id = ? AND project_id = ?`
   ).all(...rowids, input.workspace_id, input.project_id) as Record<string, unknown>[]
 
-  if (rows.length === 0) return []
+  if (allRows.length === 0) return []
 
-  // Update access tracking
+  // Apply limit AFTER workspace/project scope filter
+  const returned = allRows.slice(0, limit)
+
+  // Update access tracking ONLY for returned rows
   const now = new Date().toISOString()
-  const idPlaceholders = rows.map(() => '?').join(',')
+  const idPlaceholders = returned.map(() => '?').join(',')
   db.prepare(
     `UPDATE memories SET access_count = access_count + 1, last_accessed_at = ? WHERE memory_id IN (${idPlaceholders})`
-  ).run(now, ...rows.map(r => r.memory_id))
+  ).run(now, ...returned.map(r => r.memory_id))
 
-  return rows.slice(0, limit).map(rowToMemory)
+  return returned.map(rowToMemory)
 }
