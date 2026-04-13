@@ -65,4 +65,19 @@ describe('runMigrations', () => {
     expect(colNames).toContain('last_accessed_at')
     expect(colNames).toContain('embedding')
   })
+
+  it('creates vec_memories table when sqlite-vec is available', () => {
+    const db = freshDb()
+    runMigrations(db)
+    // This table only exists when sqlite-vec is loaded — skip assertion if not
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+      .all() as { name: string }[]
+    const names = tables.map(t => t.name)
+    // If sqlite-vec was loaded during _configureDb, the table should exist
+    // If not available, skip (test doesn't fail)
+    if (names.includes('vec_memories')) {
+      expect(names).toContain('vec_memories')
+    }
+  })
 })

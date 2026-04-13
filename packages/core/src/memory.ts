@@ -115,9 +115,15 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
   // --- FTS5 lexical search ---
   let ftsRows: { rowid: number; rank: number }[] = []
   try {
-    ftsRows = db.prepare(
-      'SELECT rowid, rank FROM memories_fts WHERE content MATCH ? ORDER BY rank'
-    ).all(input.query) as { rowid: number; rank: number }[]
+    ftsRows = db.prepare(`
+      SELECT f.rowid, f.rank
+      FROM memories_fts f
+      JOIN memories m ON m.rowid = f.rowid
+      WHERE f.content MATCH ?
+        AND m.workspace_id = ?
+        AND m.project_id = ?
+      ORDER BY f.rank
+    `).all(input.query, input.workspace_id, input.project_id) as { rowid: number; rank: number }[]
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     if (!msg.includes('fts5') && !msg.includes('syntax')) throw err

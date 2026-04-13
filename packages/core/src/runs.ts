@@ -90,6 +90,11 @@ export async function getAgentRunStatus(input: GetStatusInput): Promise<AgentRun
   return getRun(input.run_id)
 }
 
+/**
+ * Marks an agent run as completed. Does NOT automatically advance the task status —
+ * callers (typically the CoS or CLI) are responsible for calling `updateTask`
+ * to move the task to 'completed' when all runs for it are done.
+ */
 export async function completeAgentRun(input: CompleteRunInput): Promise<AgentRun> {
   getRun(input.run_id) // throws not_found before any mutation
   const db = getDb()

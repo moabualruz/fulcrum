@@ -128,4 +128,12 @@ export function runMigrations(db: Database.Database): void {
   db.prepare(`
     INSERT OR IGNORE INTO schema_migrations(name) VALUES ('001_initial')
   `).run()
+
+  // Optional: create sqlite-vec virtual table for vector ANN search
+  // Silently skipped if sqlite-vec extension is not loaded
+  try {
+    db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS vec_memories USING vec0(embedding float[1024])`)
+  } catch {
+    // sqlite-vec not available — vector recall degrades to FTS5 only
+  }
 }
