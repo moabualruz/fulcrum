@@ -65,6 +65,20 @@ npx tsc --noEmit
 
 ---
 
+## Native Module Dependencies
+
+The `@fulcrum/memory` package uses [Kuzu](https://kuzudb.com/) — an embedded graph database compiled as a Rust native addon. pnpm 10 restricts install scripts by default.
+
+The root `.npmrc` already handles this:
+
+```
+onlyBuiltDependencies[]=kuzu
+```
+
+If you add kuzu to a new package or see errors like `kuzu: Cannot find module '...kuzu.node'` during install, ensure your package's build entry is listed in `.npmrc`. No manual steps needed for existing contributors — `pnpm install` from the root handles it.
+
+---
+
 ## Running Tests
 
 Tests use Vitest with `pool: 'forks'` (required because `better-sqlite3` is not thread-safe). Each test file gets a fresh in-memory SQLite instance via `createTestDb()` / `resetTestDb()`.
