@@ -340,6 +340,113 @@ describe('getTeamStatus', () => {
     expect(status.slot_occupancy['slot_eng'].agents).toContain('agent_eng_11')
   })
 
+  it('returns not_found error for missing instance_id', async () => {
+    await expect(
+      getTeamStatus({ instance_id: 'ti_nonexistent', workspace_id })
+    ).rejects.toThrow('not found')
+  })
+})
+
+describe('TeamPolicy round-trip', () => {
+  it('stores and retrieves full TeamPolicy fields', async () => {
+    const policy = {
+      communication_mode: 'hub_and_spoke' as const,
+      memory_policy: 'shared-project',
+      worktree_policy: 'per_slot' as const,
+      review_policy: 'require-2-approvals',
+      budget_class: 'large' as const,
+      latency_class: 'fast' as const,
+      quality_class: 'high' as const,
+    }
+    const tmpl = await createTeamTemplate({
+      name: 'policy-full-squad',
+      slots: SAMPLE_SLOTS,
+      policy,
+    })
+
+    expect(tmpl.policy).toEqual(policy)
+    expect(tmpl.policy.communication_mode).toBe('hub_and_spoke')
+    expect(tmpl.policy.budget_class).toBe('large')
+    expect(tmpl.policy.latency_class).toBe('fast')
+    expect(tmpl.policy.quality_class).toBe('high')
+    expect(tmpl.policy.worktree_policy).toBe('per_slot')
+    expect(tmpl.policy.memory_policy).toBe('shared-project')
+    expect(tmpl.policy.review_policy).toBe('require-2-approvals')
+  })
+
+  it('defaults policy to empty object when not provided', async () => {
+    const tmpl = await createTeamTemplate({
+      name: 'no-policy-squad',
+      slots: SAMPLE_SLOTS,
+    })
+
+    expect(tmpl.policy).toEqual({})
+  })
+
+  it('partial policy fields round-trip correctly', async () => {
+    const tmpl = await createTeamTemplate({
+      name: 'partial-policy-squad',
+      slots: SAMPLE_SLOTS,
+      policy: { budget_class: 'small', communication_mode: 'broadcast' },
+    })
+
+    expect(tmpl.policy.budget_class).toBe('small')
+    expect(tmpl.policy.communication_mode).toBe('broadcast')
+    expect(tmpl.policy.latency_class).toBeUndefined()
+  })
+})
+
+describe('TeamSlot governance fields round-trip', () => {
+  it('stores and retrieves all governance fields on slots', async () => {
+    const governedSlots = [
+      {
+        slot_id: 'slot_governed',
+        role: 'software_engineer' as const,
+        min_count: 1,
+        max_count: 2,
+        concurrency_cap: 1,
+        required: true,
+        description: 'Governed engineer slot',
+        agent_profile: 'senior-typescript',
+        spawn_mode: 'manual' as const,
+        allowed_tools: ['read_file', 'write_file', 'run_tests'],
+        write_level: 'write' as const,
+        team_permissions: ['push:branch', 'comment:pr'],
+        fallbacks: ['tech_lead', 'integration_worker'],
+      },
+    ]
+    const tmpl = await createTeamTemplate({
+      name: 'governed-squad',
+      slots: governedSlots,
+    })
+
+    expect(tmpl.slots).toHaveLength(1)
+    const slot = tmpl.slots[0]
+    expect(slot.agent_profile).toBe('senior-typescript')
+    expect(slot.spawn_mode).toBe('manual')
+    expect(slot.allowed_tools).toEqual(['read_file', 'write_file', 'run_tests'])
+    expect(slot.write_level).toBe('write')
+    expect(slot.team_permissions).toEqual(['push:branch', 'comment:pr'])
+    expect(slot.fallbacks).toEqual(['tech_lead', 'integration_worker'])
+  })
+
+  it('slots without governance fields have undefined for optional fields', async () => {
+    const tmpl = await createTeamTemplate({
+      name: 'plain-slot-squad',
+      slots: SAMPLE_SLOTS,
+    })
+
+    const slot = tmpl.slots[0]
+    expect(slot.agent_profile).toBeUndefined()
+    expect(slot.spawn_mode).toBeUndefined()
+    expect(slot.allowed_tools).toBeUndefined()
+    expect(slot.write_level).toBeUndefined()
+    expect(slot.team_permissions).toBeUndefined()
+    expect(slot.fallbacks).toBeUndefined()
+  })
+})
+
+describe('getTeamStatus (continued)', () => {
   it('flags concurrency_cap_violations when agents exceed cap', async () => {
     const cappedSlots = [
       {

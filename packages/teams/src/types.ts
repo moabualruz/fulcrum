@@ -15,6 +15,28 @@ export interface TeamSlot {
   concurrency_cap: number
   required: boolean
   description?: string
+  agent_profile?: string
+  spawn_mode?: 'auto' | 'manual'
+  allowed_tools?: string[]
+  write_level?: 'read_only' | 'comment' | 'write' | 'admin'
+  team_permissions?: string[]
+  fallbacks?: string[]
+}
+
+export type CommunicationMode = 'broadcast' | 'direct' | 'hub_and_spoke'
+export type WorktreePolicy = 'per_slot' | 'shared' | 'none'
+export type BudgetClass = 'small' | 'medium' | 'large'
+export type LatencyClass = 'fast' | 'normal' | 'slow'
+export type QualityClass = 'draft' | 'standard' | 'high'
+
+export interface TeamPolicy {
+  communication_mode?: CommunicationMode
+  memory_policy?: string
+  worktree_policy?: WorktreePolicy
+  review_policy?: string
+  budget_class?: BudgetClass
+  latency_class?: LatencyClass
+  quality_class?: QualityClass
 }
 
 export interface TeamTemplate {
@@ -22,7 +44,7 @@ export interface TeamTemplate {
   name: string
   description?: string
   slots: TeamSlot[]
-  policy: Record<string, unknown>
+  policy: TeamPolicy
   created_at: string
   updated_at: string
 }
@@ -66,7 +88,7 @@ export interface CreateTeamTemplateInput {
   name: string
   description?: string
   slots: TeamSlot[]
-  policy?: Record<string, unknown>
+  policy?: TeamPolicy
 }
 
 export interface InvokeTeamInput {
