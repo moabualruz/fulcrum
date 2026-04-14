@@ -4,7 +4,10 @@
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { SetLevelRequestSchema } from '@modelcontextprotocol/sdk/types.js'
+import { createServer, type IncomingMessage, type ServerResponse } from 'http'
+import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { TOOL_SCHEMAS } from './mcp-tools.js'
 
@@ -330,4 +333,69 @@ export async function runFulcrumMcpServer(options: McpServerOptions): Promise<vo
     process.stdin.on('close', () => resolve())
     process.stdin.on('end', () => resolve())
   })
+}
+
+// ---------- StreamableHTTP transport ----------
+
+export interface McpHttpServerOptions extends McpServerOptions {
+  port?: number
+  host?: string
+}
+
+/**
+ * Serve the Fulcrum MCP server over HTTP using the StreamableHTTP transport.
+ * Each request creates a new stateless transport instance — no session state.
+ * Listens on /mcp for POST (tool calls) and GET (SSE notifications).
+ */
+export async function runFulcrumMcpHttpServer(options: McpHttpServerOptions): Promise<void> {
+  const port = options.port ?? 4722
+  const host = options.host ?? '127.0.0.1'
+
+  const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    const url = new URL(req.url ?? '/', `http://${host}`)
+
+    if (url.pathname !== '/mcp') {
+      res.writeHead(404, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Not found. Use POST /mcp for MCP requests.' }))
+      return
+    }
+
+    const mcpServer = createFulcrumMcpServer(options)
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+    })
+
+    // Clean up the per-request server when transport closes
+    transport.onclose = () => {
+      mcpServer.close().catch(() => {})
+    }
+
+    try {
+      await mcpServer.connect(transport)
+      await transport.handleRequest(req, res)
+    } catch (err) {
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: (err as Error).message }))
+      }
+    }
+  })
+
+  const shutdown = async () => {
+    process.stderr.write('[fulcrum mcp-http] shutting down\n')
+    await new Promise<void>((resolve, reject) => httpServer.close(err => err ? reject(err) : resolve()))
+    process.exit(0)
+  }
+  process.on('SIGTERM', shutdown)
+  process.on('SIGINT', shutdown)
+
+  await new Promise<void>((resolve, reject) => {
+    httpServer.listen(port, host, () => resolve())
+    httpServer.once('error', reject)
+  })
+
+  process.stderr.write(`[fulcrum mcp-http] MCP StreamableHTTP server started on http://${host}:${port}/mcp\n`)
+
+  // Keep alive
+  await new Promise<void>(() => {})
 }

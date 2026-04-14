@@ -20,6 +20,33 @@ import {
 } from './metrics.js'
 import type { MonitorServer, MonitorServerConfig } from './types.js'
 
+// ---------- Pagination helper ----------
+
+interface PaginatedResult<T> {
+  data: T[]
+  pagination: {
+    total: number
+    limit: number
+    offset: number
+    next_cursor: string | null
+  }
+}
+
+/**
+ * Wrap a list query result with standard pagination metadata.
+ * `next_cursor` is the next offset as a string, or null when on the last page.
+ */
+function paginate<T>(
+  data: T[],
+  total: number,
+  limit: number,
+  offset: number,
+): PaginatedResult<T> {
+  const nextOffset = offset + data.length
+  const next_cursor = nextOffset < total ? String(nextOffset) : null
+  return { data, pagination: { total, limit, offset, next_cursor } }
+}
+
 export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   const app = new Hono()
   // Use config port (default 4721) unless explicitly overridden
@@ -148,16 +175,15 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/agents', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-
     const db = getDb()
-    const rows = db.prepare(`
-      SELECT * FROM agent_runs
-      WHERE workspace_id = ?
-      ORDER BY started_at DESC
-      LIMIT 50
-    `).all(ws)
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
+    const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
 
-    return c.json({ data: rows })
+    const total = (db.prepare('SELECT COUNT(*) AS n FROM agent_runs WHERE workspace_id = ?').get(ws) as { n: number }).n
+    const rows = db.prepare(
+      'SELECT * FROM agent_runs WHERE workspace_id = ? ORDER BY started_at DESC LIMIT ? OFFSET ?'
+    ).all(ws, limit, offset)
+    return c.json(paginate(rows, total, limit, offset))
   })
 
   app.get('/agents/:id', (c) => {
@@ -204,31 +230,29 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/artifacts', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-
     const db = getDb()
-    const rows = db.prepare(`
-      SELECT * FROM artifacts
-      WHERE workspace_id = ?
-      ORDER BY created_at DESC
-      LIMIT 50
-    `).all(ws)
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
+    const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
 
-    return c.json({ data: rows })
+    const total = (db.prepare('SELECT COUNT(*) AS n FROM artifacts WHERE workspace_id = ?').get(ws) as { n: number }).n
+    const rows = db.prepare(
+      'SELECT * FROM artifacts WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
+    ).all(ws, limit, offset)
+    return c.json(paginate(rows, total, limit, offset))
   })
 
   app.get('/memory-trace', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-
     const db = getDb()
-    const rows = db.prepare(`
-      SELECT * FROM memories
-      WHERE workspace_id = ?
-      ORDER BY created_at DESC
-      LIMIT 50
-    `).all(ws)
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
+    const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
 
-    return c.json({ data: rows })
+    const total = (db.prepare('SELECT COUNT(*) AS n FROM memories WHERE workspace_id = ?').get(ws) as { n: number }).n
+    const rows = db.prepare(
+      'SELECT * FROM memories WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
+    ).all(ws, limit, offset)
+    return c.json(paginate(rows, total, limit, offset))
   })
 
   app.get('/analytics/summary', (c) => {
@@ -301,15 +325,15 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/teams', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-
     const db = getDb()
-    const rows = db.prepare(`
-      SELECT * FROM team_instances
-      WHERE workspace_id = ?
-      ORDER BY created_at DESC
-    `).all(ws)
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
+    const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
 
-    return c.json({ data: rows })
+    const total = (db.prepare('SELECT COUNT(*) AS n FROM team_instances WHERE workspace_id = ?').get(ws) as { n: number }).n
+    const rows = db.prepare(
+      'SELECT * FROM team_instances WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
+    ).all(ws, limit, offset)
+    return c.json(paginate(rows, total, limit, offset))
   })
 
   app.get('/analytics/per-role', (c) => {
@@ -386,15 +410,18 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const db = getDb()
     const proj = c.req.query('project_id')
     const status = c.req.query('status')
-    const limit = parseInt(c.req.query('limit') ?? '50', 10)
-    let sql = 'SELECT * FROM tasks WHERE workspace_id = ?'
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
+    const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
+
+    const whereParts = ['workspace_id = ?']
     const params: unknown[] = [ws]
-    if (proj) { sql += ' AND project_id = ?'; params.push(proj) }
-    if (status) { sql += ' AND status = ?'; params.push(status) }
-    sql += ' ORDER BY created_at DESC LIMIT ?'
-    params.push(limit)
-    const rows = db.prepare(sql).all(...params)
-    return c.json({ tasks: rows })
+    if (proj) { whereParts.push('project_id = ?'); params.push(proj) }
+    if (status) { whereParts.push('status = ?'); params.push(status) }
+    const where = whereParts.join(' AND ')
+
+    const total = (db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE ${where}`).get(...params) as { n: number }).n
+    const rows = db.prepare(`SELECT * FROM tasks WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset)
+    return c.json(paginate(rows, total, limit, offset))
   })
 
   app.get('/workspaces', (c) => {

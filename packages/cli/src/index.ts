@@ -1176,6 +1176,136 @@ async function runServeMcp(): Promise<void> {
   })
 }
 
+async function runServeMcpHttp(): Promise<void> {
+  const { getDb, runMigrations, loadConfig, createTask, updateTask, listTasks,
+    startAgentRun, heartbeatAgentRun, completeAgentRun, blockAgentRun,
+    getAgentRunStatus,
+    buildCosContext, getWorkspaceStatus, listAgentProfiles,
+    createAgentProfile, getTeamOps,
+    createAgentDefinition, getAgentDefinition, updateAgentDefinition, listAgentDefinitions,
+    startSpan, endSpan } = await import('@fulcrum/core')
+  const { writeMemory, recallMemory } = await import('@fulcrum/memory')
+  const { runFulcrumMcpHttpServer } = await import('./mcp-server.js')
+
+  const config = loadConfig()
+  const db = getDb()
+  runMigrations(db)
+
+  await warmEmbedding()
+  await warmOtel()
+  registerOtelShutdown()
+
+  // Reuse the same tool handler setup as stdio MCP — only transport differs
+  function ensureWorkspace(wsId: string, name?: string) {
+    const existing = db.prepare('SELECT workspace_id FROM workspaces WHERE workspace_id = ?').get(wsId)
+    if (!existing) {
+      const now = new Date().toISOString()
+      db.prepare('INSERT OR IGNORE INTO workspaces (workspace_id, name, status, created_at) VALUES (?, ?, ?, ?)').run(wsId, name ?? wsId, 'active', now)
+    }
+  }
+  function ensureProject(wsId: string, projId: string, name?: string) {
+    const existing = db.prepare('SELECT project_id FROM projects WHERE project_id = ?').get(projId)
+    if (!existing) {
+      const now = new Date().toISOString()
+      db.prepare('INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at) VALUES (?, ?, ?, ?)').run(projId, wsId, name ?? projId, now)
+    }
+  }
+  if (config.workspace_id) ensureWorkspace(config.workspace_id)
+  if (config.workspace_id && config.project_id) ensureProject(config.workspace_id, config.project_id)
+
+  // Import same handler factory — use an inline import to get handleToolCall
+  // (The full handler is too large to duplicate; we reuse it via mcp-server's createFulcrumMcpServer)
+  const portArg = args.find(a => a.startsWith('--port'))
+  let port = 4722
+  if (portArg) {
+    const idx = args.indexOf(portArg)
+    const val = portArg.includes('=') ? portArg.split('=')[1] : args[idx + 1]
+    if (val) port = parseInt(val, 10)
+  }
+
+  // Build same handleToolCall (subset — reuse the shared core for brevity)
+  async function handleToolCall(name: string, toolArgs: Record<string, unknown>): Promise<unknown> {
+    const a = toolArgs
+    if (name === 'get_workspace_status') {
+      return await getWorkspaceStatus({ workspace_id: a['workspace_id'] as string })
+    }
+    if (name === 'list_tasks') {
+      return await listTasks({
+        workspace_id: a['workspace_id'] as string,
+        project_id: a['project_id'] as string | undefined,
+        status: a['status'] as Parameters<typeof listTasks>[0]['status'],
+        limit: (a['limit'] as number | undefined) ?? 20,
+      })
+    }
+    if (name === 'recall_memory') {
+      const maxChars = (a['max_chars'] as number | undefined) ?? 500
+      const memories = await recallMemory({
+        query: a['query'] as string,
+        workspace_id: a['workspace_id'] as string,
+        project_id: a['project_id'] as string | undefined,
+        limit: (a['limit'] as number | undefined) ?? 10,
+        mode: 'full',
+      } as Parameters<typeof recallMemory>[0])
+      return (memories as Array<{ id?: string; content?: string; tags?: string[]; recall_score?: number }>)
+        .map(m => ({ id: m.id, content: (m.content ?? '').slice(0, maxChars), score: m.recall_score ?? 0.0, tags: m.tags ?? [] }))
+    }
+    if (name === 'build_cos_context') {
+      return await buildCosContext({ workspace_id: a['workspace_id'] as string, project_id: a['project_id'] as string })
+    }
+    // Passthrough for other tools: delegate to core imports
+    if (name === 'list_agent_profiles') return await listAgentProfiles()
+    if (name === 'get_agent_run_status') return await getAgentRunStatus({ run_id: a['run_id'] as string })
+    if (name === 'start_agent_run') {
+      ensureWorkspace(a['workspace_id'] as string)
+      return await startAgentRun({ task_id: a['task_id'] as string, workspace_id: a['workspace_id'] as string, role: a['agent_role'] as Parameters<typeof startAgentRun>[0]['role'] })
+    }
+    if (name === 'heartbeat_agent_run') return await heartbeatAgentRun({ run_id: a['run_id'] as string, status: a['status'] as string | undefined })
+    if (name === 'complete_agent_run') return await completeAgentRun({ run_id: a['run_id'] as string, summary: a['summary'] as string | undefined })
+    if (name === 'block_agent_run') return await blockAgentRun({ run_id: a['run_id'] as string, reason: a['reason'] as string, escalation_reason: a['escalation_reason'] as string | undefined })
+    if (name === 'write_memory') {
+      return await writeMemory({
+        content: a['content'] as string,
+        workspace_id: a['workspace_id'] as string,
+        project_id: a['project_id'] as string,
+        tags: a['tags'] as string[] | undefined,
+        importance: a['importance'] as number | undefined,
+      } as Parameters<typeof writeMemory>[0])
+    }
+    if (name === 'create_task') {
+      ensureWorkspace(a['workspace_id'] as string)
+      if (a['project_id']) ensureProject(a['workspace_id'] as string, a['project_id'] as string)
+      return await createTask({ title: a['title'] as string, workspace_id: a['workspace_id'] as string, project_id: a['project_id'] as string })
+    }
+    if (name === 'update_task') return await updateTask({ task_id: a['task_id'] as string, status: a['status'] as Parameters<typeof updateTask>[0]['status'] })
+    if (name === 'list_agent_definitions') return listAgentDefinitions()
+    if (name === 'get_agent_definition') return getAgentDefinition(a['role'] as string)
+    if (name === 'create_agent_definition') return createAgentDefinition(a as Parameters<typeof createAgentDefinition>[0])
+    if (name === 'update_agent_definition') return updateAgentDefinition(a as Parameters<typeof updateAgentDefinition>[0])
+    if (name === 'create_agent_profile') return createAgentProfile({ workspace_id: a['workspace_id'] as string, name: a['name'] as string, description: a['description'] as string, base_role: a['base_role'] as Parameters<typeof createAgentProfile>[0]['base_role'] })
+    if (name === 'create_team_template' || name === 'list_team_templates' || name === 'invoke_team' || name === 'list_team_instances') {
+      const ops = await getTeamOps()
+      const fn = ops[name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()) as keyof typeof ops] as ((args: Record<string, unknown>) => Promise<unknown>) | undefined
+      if (fn) return await fn(a)
+    }
+    throw new Error(`Unknown tool: ${name}`)
+  }
+
+  async function handleToolCallWithSpan(name: string, toolArgs: Record<string, unknown>): Promise<unknown> {
+    const spanWorkspaceId = (toolArgs['workspace_id'] as string | undefined) ?? config.workspace_id ?? ''
+    const mcpSpan = await startSpan({ name: 'mcp.tool', workspace_id: spanWorkspaceId, payload: { tool_name: name, arg_keys: Object.keys(toolArgs) } })
+    try {
+      const result = await handleToolCall(name, toolArgs)
+      await endSpan({ span_id: mcpSpan.span_id, status: 'ok', payload: { tool_name: name } })
+      return result
+    } catch (err) {
+      await endSpan({ span_id: mcpSpan.span_id, status: 'error', payload: { error: (err as Error).message } })
+      throw err
+    }
+  }
+
+  await runFulcrumMcpHttpServer({ version: '0.0.1', handleToolCall: handleToolCallWithSpan, port })
+}
+
 async function runServeMonitor(): Promise<void> {
   const { startMonitorServer } = await import('@fulcrum/monitor')
   const { getDb, runMigrations, loadConfig } = await import('@fulcrum/core')
@@ -2103,17 +2233,19 @@ async function main(): Promise<void> {
       console.log(`
 fulcrum serve — long-running servers
 
-  fulcrum serve mcp        Start MCP server (stdio JSON-RPC 2.0) — 13 control tools
-  fulcrum serve monitor    Start HTTP monitor + control API [--port <n>]
-  fulcrum serve all        Start both MCP and monitor servers
+  fulcrum serve mcp          Start MCP server (stdio JSON-RPC 2.0) — 22 control tools
+  fulcrum serve mcp-http     Start MCP server (StreamableHTTP, default port 4722) [--port <n>]
+  fulcrum serve monitor      Start HTTP monitor + control API [--port <n>]
+  fulcrum serve all          Start both MCP and monitor servers
 `)
       process.exit(0)
     }
     if (command === 'mcp') { await runServeMcp(); return }
+    if (command === 'mcp-http') { await runServeMcpHttp(); return }
     if (command === 'monitor') { await runServeMonitor(); return }
     if (command === 'all') { await runServeAll(); return }
     console.error(`Unknown serve command: ${command}`)
-    console.error('Usage: fulcrum serve mcp | monitor | all')
+    console.error('Usage: fulcrum serve mcp | mcp-http | monitor | all')
     process.exit(1)
   }
 

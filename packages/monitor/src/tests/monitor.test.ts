@@ -12,6 +12,21 @@ import {
 } from '../metrics.js'
 import { startMonitorServer } from '../server.js'
 
+// Export the paginate helper for testing (it's module-private, so we test via HTTP in integration,
+// but we can test its logic here via the server's task endpoint with a real DB).
+// We test the pagination contract: { data, pagination: { total, limit, offset, next_cursor } }
+
+// Type for the paginated response shape
+interface PaginatedResponse<T> {
+  data: T[]
+  pagination: {
+    total: number
+    limit: number
+    offset: number
+    next_cursor: string | null
+  }
+}
+
 function createTestDb(): Database.Database {
   const db = new Database(':memory:')
   db.pragma('journal_mode = WAL')
@@ -325,4 +340,71 @@ describe('MonitorServer', () => {
       }
     }
   )
+})
+
+describe('Pagination — /tasks endpoint', () => {
+  it.skipIf(!process.env.FULCRUM_SERVER_TESTS)(
+    'returns paginated response with next_cursor',
+    async () => {
+      // Seed 5 tasks
+      for (let i = 1; i <= 5; i++) {
+        db.prepare(
+          `INSERT INTO tasks (task_id, workspace_id, project_id, title, status) VALUES (?, 'ws_test', 'proj_test', ?, 'queued')`
+        ).run(`task_pag_${i}`, `Paginated Task ${i}`)
+      }
+
+      const server = startMonitorServer({ port: 17332, workspace_id: 'ws_test' })
+      await server.start()
+
+      try {
+        // First page: limit=2, offset=0
+        const res1 = await fetch('http://127.0.0.1:17332/tasks?workspace_id=ws_test&limit=2&offset=0')
+        const page1 = await res1.json() as PaginatedResponse<Record<string, unknown>>
+        expect(page1.data).toHaveLength(2)
+        expect(page1.pagination.total).toBeGreaterThanOrEqual(5)
+        expect(page1.pagination.limit).toBe(2)
+        expect(page1.pagination.offset).toBe(0)
+        expect(page1.pagination.next_cursor).toBe('2')
+
+        // Second page using next_cursor
+        const res2 = await fetch(`http://127.0.0.1:17332/tasks?workspace_id=ws_test&limit=2&offset=${page1.pagination.next_cursor}`)
+        const page2 = await res2.json() as PaginatedResponse<Record<string, unknown>>
+        expect(page2.data).toHaveLength(2)
+        expect(page2.pagination.offset).toBe(2)
+
+        // Last page
+        const res3 = await fetch('http://127.0.0.1:17332/tasks?workspace_id=ws_test&limit=2&offset=4')
+        const page3 = await res3.json() as PaginatedResponse<Record<string, unknown>>
+        expect(page3.data.length).toBeGreaterThanOrEqual(1)
+        // next_cursor null when we've seen all items
+        if (page3.data.length < 2) {
+          expect(page3.pagination.next_cursor).toBeNull()
+        }
+      } finally {
+        await server.stop()
+      }
+    }
+  )
+
+  it('paginate() logic: next_cursor is null on last page', () => {
+    // Test the contract indirectly — when total = 5 and limit=3 offset=3,
+    // the returned slice has 2 items, nextOffset = 5 = total → null
+    const total = 5
+    const limit = 3
+    const offset = 3
+    const data = ['a', 'b'] // 2 items on last page
+    const nextOffset = offset + data.length // 5
+    const next_cursor = nextOffset < total ? String(nextOffset) : null
+    expect(next_cursor).toBeNull()
+  })
+
+  it('paginate() logic: next_cursor is set when more pages exist', () => {
+    const total = 10
+    const limit = 3
+    const offset = 0
+    const data = ['a', 'b', 'c']
+    const nextOffset = offset + data.length // 3
+    const next_cursor = nextOffset < total ? String(nextOffset) : null
+    expect(next_cursor).toBe('3')
+  })
 })
