@@ -13,7 +13,11 @@
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",
-    "ulid": "^2.3.0"
+    "ulid": "^2.3.0",
+    "gray-matter": "^4.0.3",
+    "simple-git": "^3.22.0",
+    "chokidar": "^3.6.0",
+    "kuzu": "^0.10.0"
   },
   "devDependencies": {
     "better-sqlite3": "^12.0.0",
