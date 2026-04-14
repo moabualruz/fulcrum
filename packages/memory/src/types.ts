@@ -1,12 +1,12 @@
 // packages/memory/src/types.ts
 
-export type MemoryScope = 'global' | 'project' | 'file' | 'task'
+// MemoryKind is the single source of truth in @fulcrum/core — the memory
+// package re-exports it here so consumers can keep importing from
+// '@fulcrum/memory' without reaching into core directly. See J-4.
+export type { MemoryKind } from '@fulcrum/core'
+import type { MemoryKind } from '@fulcrum/core'
 
-export type MemoryKind =
-  | 'fact' | 'summary' | 'symbol' | 'decision' | 'procedure'
-  | 'error' | 'diff' | 'doc' | 'code'
-  | 'task_goal' | 'task_decision' | 'task_failure' | 'task_outcome'
-  | 'tool_trace' | 'reasoning_step' | 'lesson'
+export type MemoryScope = 'global' | 'project' | 'file' | 'task'
 
 export type RecallMode = 'compact' | 'total_ranked' | 'total_timeline' | 'total_sourcemap'
 

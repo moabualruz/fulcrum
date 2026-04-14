@@ -428,3 +428,53 @@ describe('agent_runs.role CHECK constraint (J-3)', () => {
     `).run()).toThrow()
   })
 })
+
+describe('memories.kind CHECK alignment (J-4)', () => {
+  afterEach(() => closeDb())
+
+  function seedWsProj(db: Database.Database) {
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_1', 'ws_1', 'p', 'git', 'active', 'worktree', '2026-04-14T00:00:00Z')`).run()
+  }
+
+  it('accepts tool_trace / reasoning_step / lesson at the DB level', () => {
+    const db = freshDb()
+    runMigrations(db)
+    seedWsProj(db)
+
+    for (const kind of ['tool_trace', 'reasoning_step', 'lesson']) {
+      expect(() => db.prepare(`
+        INSERT INTO memories (memory_id, workspace_id, project_id, kind, scope, content, created_at, updated_at, last_accessed_at)
+        VALUES (?, 'ws_1', 'proj_1', ?, 'project', 'x', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')
+      `).run(`mem_${kind}`, kind)).not.toThrow()
+    }
+  })
+
+  it('still accepts all 13 canonical kinds at the DB level', () => {
+    const db = freshDb()
+    runMigrations(db)
+    seedWsProj(db)
+
+    const canonical = [
+      'fact','summary','symbol','decision','procedure','error','diff','doc','code',
+      'task_goal','task_decision','task_failure','task_outcome',
+    ]
+    for (const kind of canonical) {
+      expect(() => db.prepare(`
+        INSERT INTO memories (memory_id, workspace_id, project_id, kind, scope, content, created_at, updated_at, last_accessed_at)
+        VALUES (?, 'ws_1', 'proj_1', ?, 'project', 'x', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')
+      `).run(`mem_${kind}`, kind)).not.toThrow()
+    }
+  })
+
+  it('rejects unknown kind after migration', () => {
+    const db = freshDb()
+    runMigrations(db)
+    seedWsProj(db)
+
+    expect(() => db.prepare(`
+      INSERT INTO memories (memory_id, workspace_id, project_id, kind, scope, content, created_at, updated_at, last_accessed_at)
+      VALUES ('mem_bad', 'ws_1', 'proj_1', 'made_up_kind', 'project', 'x', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')
+    `).run()).toThrow()
+  })
+})

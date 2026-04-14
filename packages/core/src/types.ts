@@ -50,6 +50,7 @@ export type MemoryKind =
   | 'fact' | 'summary' | 'symbol' | 'decision' | 'procedure'
   | 'error' | 'diff' | 'doc' | 'code' | 'task_goal'
   | 'task_decision' | 'task_failure' | 'task_outcome'
+  | 'tool_trace' | 'reasoning_step' | 'lesson'
 
 export type ArtifactType =
   | 'prd' | 'plan' | 'issue_breakdown' | 'context_gathering_report'

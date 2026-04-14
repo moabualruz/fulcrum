@@ -381,3 +381,37 @@ describe('§10.7 weighted hybrid ranking (G-10)', () => {
     expect(sum).toBeCloseTo(1.0, 6)
   })
 })
+
+describe('MemoryKind alignment (J-4)', () => {
+  it('accepts the 3 extended kinds: tool_trace, reasoning_step, lesson', async () => {
+    seed()
+    for (const kind of ['tool_trace', 'reasoning_step', 'lesson'] as const) {
+      const m = await writeMemory({
+        content: `${kind} content here`,
+        workspace_id: 'ws_1',
+        project_id: 'proj_1',
+        kind,
+        scope: 'project',
+      })
+      expect(m.kind).toBe(kind)
+    }
+  })
+
+  it('still accepts all 13 canonical kinds', async () => {
+    seed()
+    const canonical = [
+      'fact','summary','symbol','decision','procedure','error','diff','doc','code',
+      'task_goal','task_decision','task_failure','task_outcome',
+    ] as const
+    for (const kind of canonical) {
+      const m = await writeMemory({
+        content: `${kind} content for canonical test`,
+        workspace_id: 'ws_1',
+        project_id: 'proj_1',
+        kind,
+        scope: 'project',
+      })
+      expect(m.kind).toBe(kind)
+    }
+  })
+})
