@@ -417,6 +417,8 @@ export interface TaskPacket {
 /**
  * SpawnableRun — everything Pi needs to spawn an agent for a given run.
  * Returned from buildSpawnableRun; consumed by @pi/executor.
+ * Optional definition fields are resolved from agent_definitions at build time
+ * so the caller has no DB access requirement.
  */
 export interface SpawnableRun {
   run_id: string
@@ -424,6 +426,12 @@ export interface SpawnableRun {
   role: AgentRole
   pi_profile: string          // e.g. 'claude-cli/claude-opus-4-5', 'gemini-cli/gemini-pro'
   task_packet: TaskPacket
+  // Resolved from agent_definitions (null = no definition registered for this role)
+  model: string | null
+  tools_allow: string[] | null
+  tools_deny: string[] | null
+  executor_uri: string | null
+  system_prompt: string | null
 }
 
 /**

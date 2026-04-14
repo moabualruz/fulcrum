@@ -3,6 +3,7 @@ import { createTestDb, resetTestDb } from './helpers.js'
 import { getDb } from '../db/client.js'
 import { createTask } from '../tasks.js'
 import { writeMemory } from '../memory.js'
+import { createAgentDefinition } from '../agent-definitions.js'
 import {
   startAgentRun,
   heartbeatAgentRun,
@@ -401,6 +402,45 @@ describe('buildSpawnableRun', () => {
     })
     expect(() => buildSpawnableRun(run, { goal: 'do work', task_type: 'implement' }))
       .toThrow(expect.objectContaining({ code: 'invalid_input' }))
+  })
+
+  it('resolves model, tools_allow, tools_deny, executor_uri from agent_definitions', async () => {
+    const task = await seedTask()
+    createAgentDefinition({
+      role: 'software_engineer',
+      display_name: 'Software Engineer',
+      description: 'Writes code',
+      model: 'claude-opus-4-6',
+      tools_allow: ['read_file', 'write_file'],
+      tools_deny: ['invoke_team'],
+      executor_uri: 'https://executor.example.com/run',
+    })
+    const run = await startAgentRun({
+      task_id: task.task_id,
+      workspace_id: 'ws_1',
+      role: 'software_engineer',
+      pi_profile: 'claude-cli/claude-opus-4-6',
+    })
+    const spawnable = buildSpawnableRun(run, { goal: 'implement X', task_type: 'implement' })
+    expect(spawnable.model).toBe('claude-opus-4-6')
+    expect(spawnable.tools_allow).toEqual(['read_file', 'write_file'])
+    expect(spawnable.tools_deny).toEqual(['invoke_team'])
+    expect(spawnable.executor_uri).toBe('https://executor.example.com/run')
+  })
+
+  it('returns null definition fields when no agent_definition registered for the role', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({
+      task_id: task.task_id,
+      workspace_id: 'ws_1',
+      role: 'data_engineer',
+      pi_profile: 'claude-cli/claude-sonnet-4-6',
+    })
+    const spawnable = buildSpawnableRun(run, { goal: 'pipeline work', task_type: 'implement' })
+    expect(spawnable.model).toBeNull()
+    expect(spawnable.tools_allow).toBeNull()
+    expect(spawnable.tools_deny).toBeNull()
+    expect(spawnable.executor_uri).toBeNull()
   })
 })
 

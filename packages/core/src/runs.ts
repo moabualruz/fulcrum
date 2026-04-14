@@ -5,6 +5,7 @@ import { statusCategory } from './status-category.js'
 import { emitEvent } from './events.js'
 import { createTask } from './tasks.js'
 import { writeMemory } from './memory.js'
+import { getAgentDefinition } from './agent-definitions.js'
 import { FulcrumError } from './types.js'
 import type { AgentRun, AgentRole, AgentRunStatus, RunArtifacts, Task, TaskPacket, SpawnableRun, StartAgentRunInput } from './types.js'
 
@@ -210,12 +211,17 @@ export async function startAgentRun(input: StartAgentRunInput): Promise<AgentRun
     task_id: input.task_id,
   })
 
+  // Resolve agent definition for this role (non-blocking — missing definition is fine)
+  const agentDef = (() => { try { return getAgentDefinition(input.role) } catch { return null } })()
+
   appendRunEvent(run_id, 'started', {
     agent_role: input.role,
     task_id: input.task_id,
     agent_id: agent_id || undefined,
     pi_profile: input.pi_profile,
     recalled_memories: recalled,
+    resolved_model: agentDef?.model ?? undefined,
+    resolved_executor_uri: agentDef?.executor_uri ?? undefined,
   })
 
   const startedRun = getRun(run_id)
@@ -387,16 +393,25 @@ export async function blockAgentRun(input: BlockRunInput): Promise<AgentRun> {
  * This is the typed handoff from Fulcrum → Pi containing everything Pi needs
  * to spawn an agent without reading additional state from the DB.
  *
+ * Resolves model, tools_allow, tools_deny, executor_uri, and system_prompt from
+ * agent_definitions at build time. Missing definition is fine — fields will be null.
+ *
  * @throws FulcrumError('invalid_input') if the run has no pi_profile set.
  */
 export function buildSpawnableRun(run: AgentRun, task_packet: TaskPacket): SpawnableRun {
   if (!run.pi_profile) throw new FulcrumError('run has no pi_profile', 'invalid_input')
+  const def = (() => { try { return getAgentDefinition(run.role) } catch { return null } })()
   return {
     run_id: run.run_id,
     workspace_id: run.workspace_id,
     role: run.role,
     pi_profile: run.pi_profile,
     task_packet,
+    model: def?.model ?? null,
+    tools_allow: def?.tools_allow ?? null,
+    tools_deny: def?.tools_deny ?? null,
+    executor_uri: def?.executor_uri ?? null,
+    system_prompt: def?.system_prompt ?? null,
   }
 }
 
