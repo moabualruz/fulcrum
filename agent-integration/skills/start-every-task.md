@@ -1,0 +1,65 @@
+---
+name: start-every-task
+description: Register an agent run before touching any code. Applies whenever the agent is about to call Write / Edit / MultiEdit / Bash for the first time in a session, or is targeted by a team invocation.
+---
+
+# Start every task with start_agent_run
+
+Before doing ANY work in a Fulcrum-managed project, call
+`mcp__fulcrum__start_agent_run` so the control plane knows you exist. This is
+non-negotiable — the WIP limiter and the chief-of-staff context builder both
+read from the `agent_runs` table, and a run that was never started cannot be
+heartbeated, blocked, or completed.
+
+## When to apply
+
+- The user asks you to "implement X", "fix Y", "refactor Z", or "investigate Q"
+- You are about to call `Write` / `Edit` / `MultiEdit` / `Bash` for the first
+  time in this session
+- You were invoked by a team (the PreToolUse hook has set `FULCRUM_RUN_ID` or
+  `FULCRUM_TASK_ID` in env — honor those values instead of creating new ones)
+- You transitioned from analysis/read-only mode into mutation mode
+
+## How
+
+Call the MCP tool with the required fields:
+
+```
+mcp__fulcrum__start_agent_run
+  workspace_id: (from .fulcrum.json, env, or get_workspace_status)
+  task_id:      (from the task you're working on)
+  agent_role:   (your canonical role — see list_agent_profiles)
+```
+
+The call returns a `run_id`. Keep it in scope for every subsequent
+`heartbeat_agent_run`, `complete_agent_run`, or `block_agent_run` call.
+
+### If you don't have a task_id
+
+1. Call `mcp__fulcrum__list_tasks` with a keyword from the user's request to
+   check whether a matching task already exists.
+2. If none matches, call `mcp__fulcrum__create_task` with a clear title,
+   acceptance criteria, and the owning role. Use the returned `task_id`.
+3. Never guess a task_id — a run with a bogus task_id will be rejected by the
+   policy layer.
+
+### If you don't know your role
+
+Call `mcp__fulcrum__list_agent_profiles` and pick the one whose purpose
+matches what you are about to do. Default to `software_engineer` for generic
+implementation work; defer to `tech_lead` for architecture, `code_reviewer`
+for review, and `integration_worker` for merges.
+
+## Red flags
+
+- You called `Write` / `Edit` without having started a run → stop, call
+  `start_agent_run`, then re-do the edit so the tool call is logged against
+  the correct run.
+- You have more than one `run_id` in flight in the same session → call
+  `block_agent_run` on the stale one before starting new work.
+- You hit a WIP-limit error → don't loop. See
+  [workspace-status-on-session-start](./workspace-status-on-session-start.md)
+  to diagnose who else is holding the budget.
+
+See also: [recall-before-writing](./recall-before-writing.md),
+[complete-agent-run](./complete-agent-run.md).
