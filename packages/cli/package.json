@@ -2,7 +2,13 @@
   "name": "@fulcrum/cli",
   "version": "0.0.1",
   "description": "CLI for Fulcrum — fulcrum memory init, accelerate, rebuild, status",
-  "keywords": ["cli", "agent-os", "fulcrum", "memory", "vault"],
+  "keywords": [
+    "cli",
+    "agent-os",
+    "fulcrum",
+    "memory",
+    "vault"
+  ],
   "type": "module",
   "bin": {
     "fulcrum": "./src/index.ts"
@@ -24,7 +30,9 @@
     "@fulcrum/worker": "workspace:*",
     "@fulcrum/workflows": "workspace:*",
     "@fulcrum/worktrees": "workspace:*",
-    "tsx": "^4.0.0"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "tsx": "^4.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
