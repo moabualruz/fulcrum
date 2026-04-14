@@ -13,6 +13,8 @@ export interface VaultGit {
 
 export function createVaultGit(vaultPath: string): VaultGit {
   const git = simpleGit(vaultPath)
+  // Track the default branch name set during init()
+  let _defaultBranch = 'main'
 
   return {
     async isRepo(): Promise<boolean> {
@@ -25,9 +27,20 @@ export function createVaultGit(vaultPath: string): VaultGit {
     },
 
     async init(): Promise<void> {
-      await git.init()
+      try {
+        // git >= 2.28 supports -b to set the initial branch name
+        await git.raw(['init', '-b', 'main'])
+      } catch {
+        // Older git doesn't support -b; fall back and rename the default branch
+        await git.init()
+        // Point HEAD at refs/heads/main before any commit exists
+        await git.raw(['symbolic-ref', 'HEAD', 'refs/heads/main'])
+      }
+      _defaultBranch = 'main'
       await git.raw(['config', 'user.email', 'vault@fulcrum.local'])
       await git.raw(['config', 'user.name', 'Fulcrum Vault'])
+      // Create an initial empty commit so HEAD is valid and branches can be created
+      await git.commit('init: fulcrum vault', { '--allow-empty': null })
     },
 
     async commitAll(message: string): Promise<void> {
@@ -41,8 +54,10 @@ export function createVaultGit(vaultPath: string): VaultGit {
 
     async mergeMemoryBranch(taskId: string): Promise<void> {
       const branch = `memory/${taskId}`
-      await git.checkout('main')
-      await git.merge([branch])
+      // Return to default branch; use _defaultBranch set during init
+      await git.checkout(_defaultBranch)
+      // --no-ff ensures a merge commit is always created (preserves branch history)
+      await git.merge([branch, '--no-ff', '-m', `merge: memory branch ${branch}`])
     },
 
     async getChangedFiles(from: string, to: string, pattern?: string): Promise<string[]> {
