@@ -8,10 +8,5 @@
       "command": "fulcrum",
       "args": ["serve", "mcp"]
     }
-  },
-  "hooks": {
-    "BeforeTool": {
-      "command": "fulcrum hook gemini"
-    }
   }
 }

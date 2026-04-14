@@ -1,0 +1,4 @@
+{
+  "BeforeTool": [{ "matcher": "*", "command": "fulcrum hook gemini pre" }],
+  "AfterTool":  [{ "matcher": "*", "command": "fulcrum hook gemini post" }]
+}

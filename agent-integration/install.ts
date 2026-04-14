@@ -503,10 +503,13 @@ function installGeminiExtension(): void {
   const srcDir = path.join(REPO_ROOT, "agent-integration", "gemini");
 
   mkdirp(extDir);
+  // hooks/ subdirectory must exist inside the extension dir
+  mkdirp(path.join(extDir, "hooks"));
 
   const files = [
     ["gemini-extension.json", "gemini-extension.json"],
     ["GEMINI.md", "GEMINI.md"],
+    [path.join("hooks", "hooks.json"), path.join("hooks", "hooks.json")],
   ];
   for (const [src, dst] of files) {
     const from = path.join(srcDir, src);
@@ -700,11 +703,12 @@ function runCheck(): number {
   const geminiDir = path.join(HOME, ".gemini", "extensions", "fulcrum");
   if (
     fs.existsSync(path.join(geminiDir, "gemini-extension.json")) &&
-    fs.existsSync(path.join(geminiDir, "GEMINI.md"))
+    fs.existsSync(path.join(geminiDir, "GEMINI.md")) &&
+    fs.existsSync(path.join(geminiDir, "hooks", "hooks.json"))
   ) {
     rows.push({ label: "Gemini extension", status: "ok", detail: geminiDir });
   } else if (fs.existsSync(geminiDir)) {
-    rows.push({ label: "Gemini extension", status: "fail", detail: `${geminiDir} exists but missing files` });
+    rows.push({ label: "Gemini extension", status: "fail", detail: `${geminiDir} exists but missing files (hooks/hooks.json required)` });
   } else {
     rows.push({ label: "Gemini extension", status: "fail", detail: `${geminiDir} does not exist` });
   }
