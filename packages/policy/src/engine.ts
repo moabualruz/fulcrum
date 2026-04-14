@@ -2,6 +2,8 @@
 import { ulid } from 'ulid'
 import { getDb, FulcrumError } from '@fulcrum/core'
 import { minimatch } from 'minimatch'
+import { L1_ROLES } from '@fulcrum/teams'
+import type { AgentRole } from '@fulcrum/teams'
 import type {
   PolicyRule, PolicyMatcher, EvaluatePolicyInput, PolicyDecision,
   CreatePolicyRuleInput, ListPolicyRulesInput, PolicyScope, PolicyAction, MatcherType,
@@ -23,7 +25,7 @@ export const SYSTEM_INVARIANTS: SystemInvariant[] = [
     priority: 1000,
     action: 'deny',
     rule_id: 'SYSTEM:only_l1_invokes_teams',
-    check: (input) => input.action === 'invoke_team' && input.actor_role !== 'chief_of_staff',
+    check: (input) => input.action === 'invoke_team' && !L1_ROLES.has(input.actor_role as AgentRole),
   },
   {
     name: 'only_integration_worker_merges',

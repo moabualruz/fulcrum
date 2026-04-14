@@ -1,11 +1,39 @@
 // packages/teams/src/types.ts
 
 export type AgentRole =
-  | 'chief_of_staff' | 'product_manager' | 'tech_lead' | 'software_engineer'
-  | 'qa_engineer' | 'security_reviewer' | 'devops_engineer' | 'data_engineer'
-  | 'ml_engineer' | 'documentation_writer' | 'code_reviewer' | 'issue_decomposer'
-  | 'prd_planner' | 'implementation_planner' | 'integration_worker'
-  | 'memory_curator' | 'orchestrator' | 'analyst' | 'custom'
+  // L1 orchestration roles
+  | 'chief_of_staff'
+  // Planning & decomposition roles
+  | 'context_gatherer'
+  | 'prd_planner'
+  | 'implementation_planner'
+  | 'issue_decomposer'
+  // Worker roles
+  | 'software_engineer'
+  | 'research_worker'
+  | 'refactor_worker'
+  | 'browser_worker'
+  | 'data_engineer'
+  | 'ml_engineer'
+  | 'devops_engineer'
+  // Review & quality roles
+  | 'architecture_reviewer'
+  | 'code_reviewer'
+  | 'qa_engineer'
+  // Support roles
+  | 'documentation_writer'
+  | 'memory_curator'
+  | 'tech_lead'
+  | 'product_manager'
+  | 'analyst'
+  | 'orchestrator'
+  | 'custom'
+
+/**
+ * L1 roles are the only roles allowed to invoke other teams.
+ * Per spec §17.4: only chief_of_staff can spawn sub-teams.
+ */
+export const L1_ROLES: ReadonlySet<AgentRole> = new Set(['chief_of_staff'])
 
 export interface TeamSlot {
   slot_id: string

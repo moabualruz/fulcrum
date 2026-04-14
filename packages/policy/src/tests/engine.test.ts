@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seed } from './helpers.js'
 import { getDb } from '@fulcrum/core'
+import { L1_ROLES } from '@fulcrum/teams'
 import {
   createPolicyRule,
   listPolicyRules,
@@ -601,5 +602,37 @@ describe('evaluatePolicy — regex matcher', () => {
       action: 'read_file',
     })
     expect(decision.allowed).toBe(true)
+  })
+})
+
+// --- L1_ROLES enforcement via evaluatePolicy ---
+
+describe('evaluatePolicy — L1_ROLES: invoke_team enforcement', () => {
+  it('allows invoke_team when actor_role is chief_of_staff (L1 role)', async () => {
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'chief_of_staff',
+      actor_id: 'agent_cos',
+      action: 'invoke_team',
+    })
+    expect(decision.allowed).toBe(true)
+    expect(decision.action).toBe('allow')
+  })
+
+  it('denies invoke_team when actor_role is software_engineer (non-L1)', async () => {
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'software_engineer',
+      actor_id: 'agent_eng',
+      action: 'invoke_team',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.action).toBe('deny')
+    expect(decision.rule_id).toBe('SYSTEM:only_l1_invokes_teams')
+  })
+
+  it('L1_ROLES set contains exactly chief_of_staff', () => {
+    expect(L1_ROLES.has('chief_of_staff')).toBe(true)
+    expect(L1_ROLES.size).toBe(1)
   })
 })

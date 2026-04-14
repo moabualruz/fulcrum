@@ -10,6 +10,8 @@ import {
   listTeamInstances,
   getTeamStatus,
 } from '../teams.js'
+import { L1_ROLES } from '../types.js'
+import type { AgentRole } from '../types.js'
 
 let db: Database.Database
 let workspace_id: string
@@ -452,6 +454,22 @@ describe('TeamSlot governance fields round-trip', () => {
     expect(slot.write_level).toBeUndefined()
     expect(slot.team_permissions).toBeUndefined()
     expect(slot.fallbacks).toBeUndefined()
+  })
+})
+
+describe('L1_ROLES', () => {
+  it('contains only chief_of_staff', () => {
+    expect(L1_ROLES.size).toBe(1)
+    expect(L1_ROLES.has('chief_of_staff')).toBe(true)
+  })
+
+  it('all roles in L1_ROLES are valid AgentRole values', () => {
+    // Verify each L1 role is assignable as AgentRole (compile-time check + runtime check)
+    for (const role of L1_ROLES) {
+      // If this cast compiles, the role is a valid AgentRole
+      const typed: AgentRole = role
+      expect(typeof typed).toBe('string')
+    }
   })
 })
 

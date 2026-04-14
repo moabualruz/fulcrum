@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",
+    "@fulcrum/teams": "workspace:*",
     "minimatch": "^10.2.5",
     "ulid": "^2.3.0"
   },
