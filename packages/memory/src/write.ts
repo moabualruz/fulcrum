@@ -1,7 +1,6 @@
 // packages/memory/src/write.ts
-import { ulid } from 'ulid'
 import { createHash } from 'crypto'
-import { getDb, FulcrumError } from '@fulcrum/core'
+import { getDb, FulcrumError, newId } from '@fulcrum/core'
 import { contentHash, isDuplicate } from './dedup.js'
 import { rowToFullMemory } from './mappers.js'
 import { getVaultPath, vaultExists, writeMemoryFile } from './vault/client.js'
@@ -44,7 +43,7 @@ export async function writeMemory(input: WriteMemoryInput): Promise<FullMemory> 
     return rowToFullMemory(updated)
   }
 
-  const memory_id = ulid()
+  const memory_id = newId('memory')
   const embeddingBuffer = input.embedding ? Buffer.from(input.embedding.buffer) : null
 
   // Build the FullMemory object we'll need for L0 write

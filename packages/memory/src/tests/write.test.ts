@@ -51,7 +51,7 @@ describe('writeMemory — insert', () => {
       content: 'We chose SQLite because it is local-first and has zero config.',
       tags: ['architecture'], confidence: 0.9,
     })
-    expect(m.memory_id).toMatch(/^[0-9A-Z]{26}$/)
+    expect(m.memory_id).toMatch(/^mem_[0-9A-Z]{26}$/)
     expect(m.scope).toBe('project')
     expect(m.kind).toBe('decision')
     expect(m.title).toBe('Use SQLite')
@@ -228,5 +228,30 @@ describe('writeMemory — importance', () => {
       scope: 'project', kind: 'fact',
       title: 't', summary: 's', content: 'c', importance: 1.5,
     })).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+})
+
+describe('memory_id prefix (J-1)', () => {
+  it('writeMemory returns an id starting with mem_', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    const m = await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 'prefix check', summary: 's', content: 'prefix check',
+    })
+    expect(m.memory_id).toMatch(/^mem_/)
+  })
+
+  it('persisted memory rows have mem_ prefix', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 'prefix check 2', summary: 's', content: 'prefix check 2',
+    })
+    const row = getDb().prepare('SELECT memory_id FROM memories LIMIT 1').get() as { memory_id: string }
+    expect(row.memory_id).toMatch(/^mem_/)
   })
 })
