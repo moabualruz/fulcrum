@@ -1,5 +1,5 @@
 // packages/memory/src/recall.ts
-import { getDb, FulcrumError, getTextEmbedder } from '@fulcrum/core'
+import { getDb, FulcrumError, getTextEmbedder, getReranker } from '@fulcrum/core'
 import { rrfScore, recallScore } from './scoring.js'
 import { rowToFullMemory } from './mappers.js'
 import type { RecallMemoryInput, CompactMemory, FullMemory, RecallMode, QueryScope } from './types.js'
@@ -8,7 +8,7 @@ import { queryMemoriesL2 } from './kuzu/query.js'
 import { extractStructured } from './extractors/structured.js'
 import { resolveEntity } from './kuzu/entity-store.js'
 
-function rowToCompact(row: Record<string, unknown>): CompactMemory {
+function rowToCompact(row: Record<string, unknown>, recall_score?: number): CompactMemory {
   return {
     memory_id: row.memory_id as string,
     title: row.title as string,
@@ -17,6 +17,7 @@ function rowToCompact(row: Record<string, unknown>): CompactMemory {
     kind: row.kind as CompactMemory['kind'],
     file_path: row.file_path as string | null,
     confidence: row.confidence as number,
+    recall_score,
   }
 }
 
@@ -297,12 +298,37 @@ export async function recallMemory(
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
 
-  const sorted = scored
-    .map(s => rowByRowid.get(s.rowid))
-    .filter((r): r is Record<string, unknown> => r !== undefined)
+  let sortedWithScores = scored.map(s => ({
+    row: rowByRowid.get(s.rowid)!,
+    score: s.score,
+  })).filter(s => s.row !== undefined)
 
-  updateAccessCounts(db, sorted.map(r => r.memory_id as string))
+  // ── Reranker (optional) ────────────────────────────────────────────────────
+  // Wire reranker scores into the final result. Reranker replaces the RRF
+  // score for the compact mode so callers see meaningful quality scores.
+  const reranker = getReranker()
+  if (reranker && sortedWithScores.length > 1) {
+    try {
+      const passages = sortedWithScores.map(s => (s.row.content as string) ?? '')
+      const rerankScores = await reranker.rerank(input.query, passages)
+      sortedWithScores = sortedWithScores
+        .map((s, i) => {
+          const rs = rerankScores[i]
+          return {
+            row: s.row,
+            score: typeof rs === 'number' && Number.isFinite(rs)
+              ? Math.max(0, Math.min(1, rs))  // clamp logits to [0,1]
+              : s.score,
+          }
+        })
+        .sort((a, b) => b.score - a.score)
+    } catch {
+      // Reranker unavailable — keep RRF scores
+    }
+  }
 
-  if (mode === 'compact') return sorted.map(rowToCompact)
-  return sorted.map(rowToFullMemory)  // total_ranked
+  updateAccessCounts(db, sortedWithScores.map(s => s.row.memory_id as string))
+
+  if (mode === 'compact') return sortedWithScores.map(s => rowToCompact(s.row, s.score))
+  return sortedWithScores.map(s => rowToFullMemory(s.row))  // total_ranked
 }

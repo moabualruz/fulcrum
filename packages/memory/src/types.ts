@@ -69,6 +69,8 @@ export interface CompactMemory {
   kind: MemoryKind
   file_path: string | null
   confidence: number
+  /** Recall quality score (0–1). Populated from reranker if available, else from RRF hybrid score. */
+  recall_score?: number
 }
 
 /** Full memory record returned by total_* modes */

@@ -883,8 +883,8 @@ async function runServeMcp(): Promise<void> {
         query_scope: (a['query_scope'] as 'session' | 'project' | 'workspace' | 'global' | undefined),
         session_id: a['session_id'] as string | undefined,
       } as Parameters<typeof recallMemory>[0])
-      return (memories as Array<{ content?: string; tags?: string[] }>)
-        .map(m => ({ content: (m.content ?? '').slice(0, 500), score: 0.0, tags: m.tags ?? [] }))
+      return (memories as Array<{ content?: string; tags?: string[]; recall_score?: number }>)
+        .map(m => ({ content: (m.content ?? '').slice(0, 500), score: m.recall_score ?? 0.0, tags: m.tags ?? [] }))
     }
 
     if (name === 'write_memory') {
