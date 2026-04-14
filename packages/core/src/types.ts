@@ -11,7 +11,7 @@ export type StatusCategory = 'backlog' | 'active' | 'blocked' | 'done'
 export type WorkspaceStatus = 'active' | 'archived'
 export type ProjectStatus = 'active' | 'archived' | 'paused'
 export type ProjectType = 'git' | 'non_git' | 'submodule' | 'logical'
-export type WriteMode = 'sequential' | 'worktree'
+export type WriteMode = 'worktree' | 'in_place' | 'sequential'
 
 export type AgentRole =
   | 'chief_of_staff'

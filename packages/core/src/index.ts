@@ -26,6 +26,10 @@ export { listTasks, createTask, updateTask } from './tasks.js'
 export { createWorkspace, getWorkspace, listWorkspaces, updateWorkspace } from './workspaces.js'
 export type { CreateWorkspaceInput, UpdateWorkspaceInput } from './workspaces.js'
 
+// Projects
+export { createProject, getProject, listProjects, updateProject } from './projects.js'
+export type { Project, CreateProjectInput, UpdateProjectInput, ListProjectsInput } from './projects.js'
+
 // Runs
 export {
   startAgentRun,
