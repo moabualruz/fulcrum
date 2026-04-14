@@ -85,6 +85,7 @@ export type { Lock, AcquireLockInput, AcquireLockResult } from './locks.js'
 // Telemetry
 export { startSpan, endSpan, getTrace } from './telemetry/spans.js'
 export type { StartSpanInput, EndSpanInput } from './telemetry/spans.js'
+export { initOtel, shutdownOtel, getOtelTracer } from './telemetry/otel.js'
 
 // Constants
 export * from './constants.js'

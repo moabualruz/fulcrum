@@ -82,4 +82,19 @@ describe('telemetry spans (G-12)', () => {
     const spans = await getTrace('span_missing')
     expect(spans).toEqual([])
   })
+
+  it('DB-only path works when OTel is not configured (J-7 regression)', async () => {
+    // Ensure OTel is opt-out (no endpoint env var). The dual-emit code must
+    // be a no-op, and the DB path must still behave identically.
+    delete process.env['OTEL_EXPORTER_OTLP_ENDPOINT']
+    const { getOtelTracer } = await import('../telemetry/otel.js')
+    expect(getOtelTracer()).toBeNull()
+    const span = await startSpan({ name: 'noop.otel', workspace_id: 'ws_1', payload: { k: 'v' } })
+    await endSpan({ span_id: span.span_id, status: 'ok', payload: { done: true } })
+    const trace = await getTrace(span.trace_id)
+    expect(trace.length).toBe(1)
+    expect(trace[0]!.status).toBe('ok')
+    expect(trace[0]!.payload!['k']).toBe('v')
+    expect(trace[0]!.payload!['done']).toBe(true)
+  })
 })

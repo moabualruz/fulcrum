@@ -249,6 +249,33 @@ async function warmEmbedding(): Promise<void> {
   }
 }
 
+let _otelWarmed = false
+async function warmOtel(): Promise<void> {
+  if (_otelWarmed) return
+  const { initOtel } = await import('@fulcrum/core')
+  try {
+    await initOtel()
+  } catch (err) {
+    process.stderr.write(`[fulcrum] otel init failed: ${(err as Error).message}\n`)
+  }
+  _otelWarmed = true
+}
+
+let _otelShutdownRegistered = false
+function registerOtelShutdown(): void {
+  if (_otelShutdownRegistered) return
+  _otelShutdownRegistered = true
+  const handler = async () => {
+    try {
+      const { shutdownOtel } = await import('@fulcrum/core')
+      await shutdownOtel()
+    } catch { /* best-effort */ }
+    process.exit(0)
+  }
+  process.once('SIGINT', handler)
+  process.once('SIGTERM', handler)
+}
+
 async function runServeMcp(): Promise<void> {
   const { getDb, runMigrations, loadConfig, createTask, updateTask, listTasks,
     startAgentRun, heartbeatAgentRun, completeAgentRun, blockAgentRun,
@@ -261,6 +288,8 @@ async function runServeMcp(): Promise<void> {
   runMigrations(db)
 
   await warmEmbedding()
+  await warmOtel()
+  registerOtelShutdown()
 
   // Auto-create workspace/project from config
   function ensureWorkspace(wsId: string, name?: string) {
@@ -708,6 +737,8 @@ async function runServeMonitor(): Promise<void> {
   runMigrations(db)
 
   await warmEmbedding()
+  await warmOtel()
+  registerOtelShutdown()
 
   const portArg = args.find(a => a.startsWith('--port'))
   let port = config.port ?? 4721
@@ -736,6 +767,8 @@ async function runServeAll(): Promise<void> {
   runMigrations(db)
 
   await warmEmbedding()
+  await warmOtel()
+  registerOtelShutdown()
 
   const server = startMonitorServer({ workspace_id: config.workspace_id || undefined })
   await server.start()

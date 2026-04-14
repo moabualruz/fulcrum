@@ -7,6 +7,7 @@
 import { getDb } from '../db/client.js'
 import { newId } from '../ids.js'
 import type { TelemetrySpan } from '../types.js'
+import { getOtelTracer, payloadToAttributes, registerOtelSpan, popOtelSpan } from './otel.js'
 
 export interface StartSpanInput {
   name: string
@@ -64,6 +65,18 @@ export async function startSpan(input: StartSpanInput): Promise<TelemetrySpan> {
   const row = db.prepare(
     `SELECT * FROM trace_events WHERE span_id = ?`
   ).get(span_id) as Record<string, unknown>
+
+  // Dual-emit to OTel if a tracer is installed (opt-in via OTEL_EXPORTER_OTLP_ENDPOINT).
+  const tracer = getOtelTracer()
+  if (tracer) {
+    try {
+      const otelSpan = tracer.startSpan(input.name, {
+        attributes: payloadToAttributes(input.name, input.payload ?? {}),
+      })
+      registerOtelSpan(span_id, otelSpan)
+    } catch { /* best-effort, never fail the DB path */ }
+  }
+
   return rowToSpan(row)
 }
 
@@ -83,6 +96,22 @@ export async function endSpan(input: EndSpanInput): Promise<void> {
     db.prepare(
       `UPDATE trace_events SET status = ?, ended_at = ? WHERE span_id = ?`
     ).run(input.status, now, input.span_id)
+  }
+
+  // Dual-emit: finalize the matching OTel span, if any.
+  const otelSpan = popOtelSpan(input.span_id)
+  if (otelSpan) {
+    try {
+      if (input.payload) {
+        const attrs = payloadToAttributes('', input.payload)
+        for (const [k, v] of Object.entries(attrs)) otelSpan.setAttribute(k, v)
+      }
+      if (input.status === 'error') {
+        const { SpanStatusCode } = await import('@opentelemetry/api')
+        otelSpan.setStatus({ code: SpanStatusCode.ERROR })
+      }
+      otelSpan.end()
+    } catch { /* best-effort */ }
   }
 }
 
