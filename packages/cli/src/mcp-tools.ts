@@ -81,15 +81,16 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Recall Memory',
     name: 'recall_memory',
-    description: 'Hybrid semantic search over agent memory (FTS5 + vector + rerank). Effect: read-only, queries embedding model. Returns: array of {content, score, tags} ordered by relevance. Requires workspace_id, project_id, and query.',
+    description: 'Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns the top-k most relevant memories for the given query in the specified scope. Requires workspace_id; project_id is optional (omit for workspace-wide recall). Returns: id, content (truncated to max_chars), score (0.0–1.0), tags.',
     annotations: { readOnlyHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Natural language search query' },
         workspace_id: { type: 'string', description: 'Workspace ID' },
-        project_id: { type: 'string', description: 'Project ID' },
+        project_id: { type: 'string', description: 'Project ID (optional — omit for workspace-wide recall)' },
         limit: { type: 'number', description: 'Max results (default 10)' },
+        max_chars: { type: 'number', description: 'Truncate content to this many characters (default 500)' },
         query_scope: {
           type: 'string',
           enum: ['session', 'project', 'workspace', 'global'],
@@ -97,7 +98,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         },
         session_id: { type: 'string', description: 'Session ID — required when query_scope=session' },
       },
-      required: ['query', 'workspace_id', 'project_id'],
+      required: ['query', 'workspace_id'],
     },
   },
   {
