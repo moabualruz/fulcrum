@@ -50,8 +50,20 @@ function genToolSection(): string {
   ]
 
   for (const tool of TOOL_SCHEMAS) {
-    lines.push(`### \`mcp__fulcrum__${tool.name}\``)
+    lines.push(`### \`mcp__fulcrum__${tool.name}\` — ${tool.title}`)
     lines.push('')
+    // Annotation badges
+    if (tool.annotations) {
+      const badges: string[] = []
+      if (tool.annotations.readOnlyHint) badges.push('`read-only`')
+      if (tool.annotations.idempotentHint) badges.push('`idempotent`')
+      if (tool.annotations.destructiveHint) badges.push('`destructive`')
+      if (tool.annotations.openWorldHint) badges.push('`open-world`')
+      if (badges.length > 0) {
+        lines.push(badges.join(' '))
+        lines.push('')
+      }
+    }
     lines.push(tool.description)
     lines.push('')
 

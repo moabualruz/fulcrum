@@ -2,9 +2,23 @@
 // Single source of truth for all MCP tool schemas.
 // Used by the MCP server (tool registration) and the CLAUDE.md code-generator.
 
+export interface ToolAnnotations {
+  /** True if the tool never writes to persistent state. */
+  readOnlyHint?: boolean
+  /** True if calling multiple times has the same effect as once. */
+  idempotentHint?: boolean
+  /** True if the tool may cause writes that are hard to reverse. */
+  destructiveHint?: boolean
+  /** True if the tool queries external systems or models (e.g. embeddings). */
+  openWorldHint?: boolean
+}
+
 export interface ToolSchema {
+  /** Human-readable name shown in UIs (≤ 60 chars). */
+  title: string
   name: string
   description: string
+  annotations?: ToolAnnotations
   inputSchema: {
     type: 'object'
     properties: Record<string, unknown>
@@ -14,8 +28,10 @@ export interface ToolSchema {
 
 export const TOOL_SCHEMAS: ToolSchema[] = [
   {
+    title: 'List Tasks',
     name: 'list_tasks',
-    description: 'Lists tasks in a workspace/project. Returns id, title, status, priority, assigned_to, blockers. Filters by status when provided. Effect: read-only. Returns: array of task summaries.',
+    description: 'Reads tasks in a workspace/project. Returns id, title, status, priority, assigned_to, blockers. Filters by status when provided. Effect: read-only. Returns: array of task summaries. Requires workspace_id and project_id.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -28,8 +44,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Create Task',
     name: 'create_task',
-    description: 'Creates a new task in the project. Auto-creates workspace and project if they do not exist. Effect: writes task row. Returns: task_id, title, status, priority, assigned_to.',
+    description: 'Creates a new task in the project. Auto-creates workspace and project if they do not exist. Effect: writes task row. Returns: task_id, title, status, priority, assigned_to. Requires title, project_id, workspace_id.',
+    annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -45,8 +63,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Update Task',
     name: 'update_task',
-    description: "Updates a task's status, note, or assignment. Effect: updates task row. Returns: task_id, updated=true, list of changed fields.",
+    description: "Updates a task's status, note, or assignment. Effect: updates task row in place. Returns: task_id, updated=true, list of changed fields. Requires task_id.",
+    annotations: { idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -59,8 +79,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Recall Memory',
     name: 'recall_memory',
-    description: 'Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns top-k most relevant memories for the query in the given workspace/project scope. Effect: read-only. Returns: array of {content, score, tags}. Requires workspace_id and project_id.',
+    description: 'Hybrid semantic search over agent memory (FTS5 + vector + rerank). Effect: read-only, queries embedding model. Returns: array of {content, score, tags} ordered by relevance. Requires workspace_id, project_id, and query.',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -73,8 +95,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Write Memory',
     name: 'write_memory',
-    description: 'Writes a memory note to the project memory store. Persists to vault (L0), SQLite FTS5 (L1), and vector index. Effect: writes memory row + vault file. Returns: saved=true, memory_id, project_id, tags.',
+    description: 'Persists a memory note to vault (L0), SQLite FTS5 (L1), and vector index (L2). Effect: writes memory row + vault file. Returns: saved=true, memory_id, project_id, tags. Requires content, workspace_id, project_id.',
+    annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -88,8 +112,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'List Agent Profiles',
     name: 'list_agent_profiles',
-    description: 'Lists all 24 canonical AgentRole profiles. When workspace_id is provided, also returns DB-backed custom profiles for that workspace. Effect: read-only. Returns: array of {role, name, description, capabilities}.',
+    description: 'Reads all 24 canonical AgentRole profiles. When workspace_id is provided, also returns DB-backed custom profiles for that workspace. Effect: read-only. Returns: array of {role, name, description, capabilities}.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -101,8 +127,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Get Agent Run Status',
     name: 'get_agent_run_status',
-    description: 'Gets live status of a running agent run. Effect: read-only. Returns: run_id, status, role, current_step, progress_pct.',
+    description: 'Reads live status of an agent run. Effect: read-only. Returns: run_id, status, role, current_step, progress_pct. Requires run_id.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: { run_id: { type: 'string', description: 'Run ID returned by start_agent_run' } },
@@ -110,8 +138,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Start Agent Run',
     name: 'start_agent_run',
-    description: 'Registers the start of an agent run. Call at the beginning of every task. Auto-creates a stub task if task_id is not provided. Effect: inserts agent_runs row, updates task status to running. Returns: run_id, status.',
+    description: 'Registers the start of an agent run. Call at the beginning of every task. Auto-creates a stub task if task_id is not provided. Effect: inserts agent_runs row, sets task status to running. Returns: run_id, status. Requires agent_role, workspace_id.',
+    annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -126,8 +156,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Heartbeat Agent Run',
     name: 'heartbeat_agent_run',
-    description: 'Sends a heartbeat for a running agent to prevent it being marked stale. Call every ~30 seconds during long tasks. Effect: updates heartbeat_at. Returns: run_id, ok=true.',
+    description: 'Sends a liveness heartbeat for a running agent to prevent it being marked stale. Call every ~30 seconds during long tasks. Effect: updates heartbeat_at and optional progress fields. Returns: run_id, ok=true. Requires run_id, workspace_id.',
+    annotations: { idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -140,8 +172,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Complete Agent Run',
     name: 'complete_agent_run',
-    description: 'Marks an agent run as completed with optional summary and artifact paths. Effect: sets agent_runs.status=finished, records artifacts. Returns: run_id, status.',
+    description: 'Marks an agent run as finished with optional summary and artifact paths. Effect: sets agent_runs.status=finished, records artifacts. Returns: run_id, status. Requires run_id, workspace_id.',
+    annotations: { destructiveHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -154,8 +188,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Block Agent Run',
     name: 'block_agent_run',
-    description: 'Marks an agent run as blocked with a reason. Use when work cannot continue without human input or another agent resolving a dependency. Effect: sets status=blocked, records reason. Returns: run_id, status, reason.',
+    description: 'Marks an agent run as blocked with a reason. Use when work cannot continue without human input or a dependency resolving. Effect: sets status=blocked, records reason. Returns: run_id, status, reason. Requires run_id, workspace_id, reason.',
+    annotations: { destructiveHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -167,8 +203,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Build Chief-of-Staff Context',
     name: 'build_cos_context',
-    description: 'Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, blockers, recent events. Use to orient before delegating work. Effect: read-only. Returns: context_markdown (formatted for system prompt injection).',
+    description: 'Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, blockers, recent events. Effect: read-only. Returns: context_markdown formatted for system prompt injection. Requires project_id, workspace_id.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -182,8 +220,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Get Workspace Status',
     name: 'get_workspace_status',
-    description: 'Gets full workspace status: running agents, blockers, WIP count, queue depth, recent runs. Effect: read-only. Returns: workspace_id, active_runs, blocked_runs, wip_count, queued_tasks, runs array, blockers array.',
+    description: 'Reads full workspace status: running agents, blockers, WIP count, queue depth, recent runs. Effect: read-only. Returns: workspace_id, active_runs, blocked_runs, wip_count, queued_tasks, runs array, blockers array. Requires workspace_id.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: { workspace_id: { type: 'string', description: 'Workspace ID' } },
@@ -191,8 +231,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Create Team Template',
     name: 'create_team_template',
-    description: 'Creates a new team template with role slots and policy. Templates are global (not workspace-scoped). Only chief_of_staff may invoke templates via invoke_team. Effect: writes team_templates row. Returns: template object.',
+    description: 'Creates a reusable team template with role slots and policy. Templates are global (not workspace-scoped). Effect: writes team_templates row. Returns: template object. Requires name and slots array.',
+    annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -226,8 +268,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Invoke Team',
     name: 'invoke_team',
-    description: 'Instantiates a team from a template and starts execution. Only chief_of_staff may invoke teams (enforced by canInvokeTeams capability check). Effect: creates team_instance, spawns agents. Returns: team instance object.',
+    description: 'Instantiates a team from a template and starts execution. Only chief_of_staff may invoke teams (enforced by canInvokeTeams check). Effect: creates team_instance row, spawns agents. Returns: team instance object. Requires template_id, workspace_id, purpose, caller_agent_id, caller_role.',
+    annotations: { destructiveHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -247,8 +291,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'List Team Templates',
     name: 'list_team_templates',
-    description: 'Lists all team templates. Templates are global (not workspace-scoped). Effect: read-only. Returns: array of template objects.',
+    description: 'Reads all team templates (global, not workspace-scoped). Effect: read-only. Returns: array of template objects with slots and policy.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -258,8 +304,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'List Team Instances',
     name: 'list_team_instances',
-    description: 'Lists team instances in a workspace, optionally filtered by status_category. Effect: read-only. Returns: array of team instance objects.',
+    description: 'Reads team instances in a workspace, optionally filtered by status_category. Effect: read-only. Returns: array of team instance objects. Requires workspace_id.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -277,8 +325,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Create Agent Profile',
     name: 'create_agent_profile',
-    description: 'Creates a DB-backed agent profile for a workspace. Extends the 24 canonical AgentRole slugs with workspace-scoped specializations referenceable from team template slots. Effect: writes agent_profiles row. Returns: profile object.',
+    description: 'Creates a DB-backed agent profile for a workspace. Extends the 24 canonical AgentRole slugs with workspace-scoped specializations. Effect: writes agent_profiles row. Returns: profile object. Requires workspace_id, name, description.',
+    annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -294,8 +344,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Create Agent Definition',
     name: 'create_agent_definition',
-    description: 'Creates a canonical agent definition for a role. Defines model, tools_allow/deny, executor_uri, and system prompt for a given AgentRole. Effect: writes agent_definitions row. Returns: definition object.',
+    description: 'Creates a canonical definition for a role: model, tools_allow/deny, executor_uri, system prompt. Effect: writes agent_definitions row. Returns: definition object. Requires role, display_name, description.',
+    annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -316,8 +368,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Get Agent Definition',
     name: 'get_agent_definition',
-    description: 'Gets the canonical definition for an AgentRole. Effect: read-only. Returns: definition object or null.',
+    description: 'Reads the canonical definition for an AgentRole: model, tools, executor_uri, system_prompt. Effect: read-only. Returns: definition object or null. Requires role.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -327,8 +381,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Update Agent Definition',
     name: 'update_agent_definition',
-    description: 'Updates fields on an existing agent definition. Effect: updates agent_definitions row. Returns: updated definition.',
+    description: 'Updates fields on an existing agent definition. Effect: updates agent_definitions row in place. Returns: updated definition object. Requires role.',
+    annotations: { idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -345,8 +401,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'List Agent Definitions',
     name: 'list_agent_definitions',
-    description: 'Lists all agent definitions, optionally filtered by stability. Effect: read-only. Returns: array of definition objects.',
+    description: 'Reads all agent definitions, optionally filtered by stability tier. Effect: read-only. Returns: array of definition objects.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {

@@ -36,9 +36,11 @@ All tools are prefixed `mcp__fulcrum__` in Claude Code.
 
 **Total: 22 tools**
 
-### `mcp__fulcrum__list_tasks`
+### `mcp__fulcrum__list_tasks` — List Tasks
 
-Lists tasks in a workspace/project. Returns id, title, status, priority, assigned_to, blockers. Filters by status when provided. Effect: read-only. Returns: array of task summaries.
+`read-only` `idempotent`
+
+Reads tasks in a workspace/project. Returns id, title, status, priority, assigned_to, blockers. Filters by status when provided. Effect: read-only. Returns: array of task summaries. Requires workspace_id and project_id.
 
 **Parameters:**
 
@@ -49,9 +51,9 @@ Lists tasks in a workspace/project. Returns id, title, status, priority, assigne
 | `status` | string | No | Filter by status (queued, running, blocked, completed) |
 | `limit` | number | No | Max results (default 40) |
 
-### `mcp__fulcrum__create_task`
+### `mcp__fulcrum__create_task` — Create Task
 
-Creates a new task in the project. Auto-creates workspace and project if they do not exist. Effect: writes task row. Returns: task_id, title, status, priority, assigned_to.
+Creates a new task in the project. Auto-creates workspace and project if they do not exist. Effect: writes task row. Returns: task_id, title, status, priority, assigned_to. Requires title, project_id, workspace_id.
 
 **Parameters:**
 
@@ -65,9 +67,11 @@ Creates a new task in the project. Auto-creates workspace and project if they do
 | `assigned_to` | string | No | Agent role slug to assign the task to |
 | `done_criteria` | string | No | Definition of done |
 
-### `mcp__fulcrum__update_task`
+### `mcp__fulcrum__update_task` — Update Task
 
-Updates a task's status, note, or assignment. Effect: updates task row. Returns: task_id, updated=true, list of changed fields.
+`idempotent`
+
+Updates a task's status, note, or assignment. Effect: updates task row in place. Returns: task_id, updated=true, list of changed fields. Requires task_id.
 
 **Parameters:**
 
@@ -78,9 +82,11 @@ Updates a task's status, note, or assignment. Effect: updates task row. Returns:
 | `note` | string | No | Progress note |
 | `assigned_to` | string | No | Reassign to this agent role slug |
 
-### `mcp__fulcrum__recall_memory`
+### `mcp__fulcrum__recall_memory` — Recall Memory
 
-Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns top-k most relevant memories for the query in the given workspace/project scope. Effect: read-only. Returns: array of {content, score, tags}. Requires workspace_id and project_id.
+`read-only` `open-world`
+
+Hybrid semantic search over agent memory (FTS5 + vector + rerank). Effect: read-only, queries embedding model. Returns: array of {content, score, tags} ordered by relevance. Requires workspace_id, project_id, and query.
 
 **Parameters:**
 
@@ -91,9 +97,9 @@ Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns top-k
 | `project_id` | string | Yes | Project ID |
 | `limit` | number | No | Max results (default 10) |
 
-### `mcp__fulcrum__write_memory`
+### `mcp__fulcrum__write_memory` — Write Memory
 
-Writes a memory note to the project memory store. Persists to vault (L0), SQLite FTS5 (L1), and vector index. Effect: writes memory row + vault file. Returns: saved=true, memory_id, project_id, tags.
+Persists a memory note to vault (L0), SQLite FTS5 (L1), and vector index (L2). Effect: writes memory row + vault file. Returns: saved=true, memory_id, project_id, tags. Requires content, workspace_id, project_id.
 
 **Parameters:**
 
@@ -105,9 +111,11 @@ Writes a memory note to the project memory store. Persists to vault (L0), SQLite
 | `title` | string | No | Optional title (defaults to first 80 chars of content) |
 | `tags` | string | No | Comma-separated tags (e.g. "decision,architecture") |
 
-### `mcp__fulcrum__list_agent_profiles`
+### `mcp__fulcrum__list_agent_profiles` — List Agent Profiles
 
-Lists all 24 canonical AgentRole profiles. When workspace_id is provided, also returns DB-backed custom profiles for that workspace. Effect: read-only. Returns: array of {role, name, description, capabilities}.
+`read-only` `idempotent`
+
+Reads all 24 canonical AgentRole profiles. When workspace_id is provided, also returns DB-backed custom profiles for that workspace. Effect: read-only. Returns: array of {role, name, description, capabilities}.
 
 **Parameters:**
 
@@ -115,9 +123,11 @@ Lists all 24 canonical AgentRole profiles. When workspace_id is provided, also r
 |------|------|----------|-------------|
 | `workspace_id` | string | No | Optional. When provided, DB-backed profiles for this workspace are merged into the response. |
 
-### `mcp__fulcrum__get_agent_run_status`
+### `mcp__fulcrum__get_agent_run_status` — Get Agent Run Status
 
-Gets live status of a running agent run. Effect: read-only. Returns: run_id, status, role, current_step, progress_pct.
+`read-only` `idempotent`
+
+Reads live status of an agent run. Effect: read-only. Returns: run_id, status, role, current_step, progress_pct. Requires run_id.
 
 **Parameters:**
 
@@ -125,9 +135,9 @@ Gets live status of a running agent run. Effect: read-only. Returns: run_id, sta
 |------|------|----------|-------------|
 | `run_id` | string | Yes | Run ID returned by start_agent_run |
 
-### `mcp__fulcrum__start_agent_run`
+### `mcp__fulcrum__start_agent_run` — Start Agent Run
 
-Registers the start of an agent run. Call at the beginning of every task. Auto-creates a stub task if task_id is not provided. Effect: inserts agent_runs row, updates task status to running. Returns: run_id, status.
+Registers the start of an agent run. Call at the beginning of every task. Auto-creates a stub task if task_id is not provided. Effect: inserts agent_runs row, sets task status to running. Returns: run_id, status. Requires agent_role, workspace_id.
 
 **Parameters:**
 
@@ -140,9 +150,11 @@ Registers the start of an agent run. Call at the beginning of every task. Auto-c
 | `worktree_path` | string | No | Optional git worktree path for code-writing roles |
 | `pi_run_id` | string | No | Optional custom run ID for external tracking |
 
-### `mcp__fulcrum__heartbeat_agent_run`
+### `mcp__fulcrum__heartbeat_agent_run` — Heartbeat Agent Run
 
-Sends a heartbeat for a running agent to prevent it being marked stale. Call every ~30 seconds during long tasks. Effect: updates heartbeat_at. Returns: run_id, ok=true.
+`idempotent`
+
+Sends a liveness heartbeat for a running agent to prevent it being marked stale. Call every ~30 seconds during long tasks. Effect: updates heartbeat_at and optional progress fields. Returns: run_id, ok=true. Requires run_id, workspace_id.
 
 **Parameters:**
 
@@ -153,9 +165,11 @@ Sends a heartbeat for a running agent to prevent it being marked stale. Call eve
 | `current_step` | string | No | Optional current step description |
 | `progress_pct` | number | No | Optional progress percentage (0–100) |
 
-### `mcp__fulcrum__complete_agent_run`
+### `mcp__fulcrum__complete_agent_run` — Complete Agent Run
 
-Marks an agent run as completed with optional summary and artifact paths. Effect: sets agent_runs.status=finished, records artifacts. Returns: run_id, status.
+`destructive`
+
+Marks an agent run as finished with optional summary and artifact paths. Effect: sets agent_runs.status=finished, records artifacts. Returns: run_id, status. Requires run_id, workspace_id.
 
 **Parameters:**
 
@@ -166,9 +180,11 @@ Marks an agent run as completed with optional summary and artifact paths. Effect
 | `output_summary` | string | No | Summary of what was accomplished |
 | `artifact_paths` | string | No | Comma-separated artifact file paths changed or created |
 
-### `mcp__fulcrum__block_agent_run`
+### `mcp__fulcrum__block_agent_run` — Block Agent Run
 
-Marks an agent run as blocked with a reason. Use when work cannot continue without human input or another agent resolving a dependency. Effect: sets status=blocked, records reason. Returns: run_id, status, reason.
+`destructive`
+
+Marks an agent run as blocked with a reason. Use when work cannot continue without human input or a dependency resolving. Effect: sets status=blocked, records reason. Returns: run_id, status, reason. Requires run_id, workspace_id, reason.
 
 **Parameters:**
 
@@ -178,9 +194,11 @@ Marks an agent run as blocked with a reason. Use when work cannot continue witho
 | `workspace_id` | string | Yes | Workspace ID |
 | `reason` | string | Yes | Why the run is blocked (will surface in workspace status) |
 
-### `mcp__fulcrum__build_cos_context`
+### `mcp__fulcrum__build_cos_context` — Build Chief-of-Staff Context
 
-Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, blockers, recent events. Use to orient before delegating work. Effect: read-only. Returns: context_markdown (formatted for system prompt injection).
+`read-only` `idempotent`
+
+Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, blockers, recent events. Effect: read-only. Returns: context_markdown formatted for system prompt injection. Requires project_id, workspace_id.
 
 **Parameters:**
 
@@ -192,9 +210,11 @@ Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, bloc
 | `max_tasks` | number | No | Max tasks to include (default 20) |
 | `max_events` | number | No | Max events to include (default 10) |
 
-### `mcp__fulcrum__get_workspace_status`
+### `mcp__fulcrum__get_workspace_status` — Get Workspace Status
 
-Gets full workspace status: running agents, blockers, WIP count, queue depth, recent runs. Effect: read-only. Returns: workspace_id, active_runs, blocked_runs, wip_count, queued_tasks, runs array, blockers array.
+`read-only` `idempotent`
+
+Reads full workspace status: running agents, blockers, WIP count, queue depth, recent runs. Effect: read-only. Returns: workspace_id, active_runs, blocked_runs, wip_count, queued_tasks, runs array, blockers array. Requires workspace_id.
 
 **Parameters:**
 
@@ -202,9 +222,9 @@ Gets full workspace status: running agents, blockers, WIP count, queue depth, re
 |------|------|----------|-------------|
 | `workspace_id` | string | Yes | Workspace ID |
 
-### `mcp__fulcrum__create_team_template`
+### `mcp__fulcrum__create_team_template` — Create Team Template
 
-Creates a new team template with role slots and policy. Templates are global (not workspace-scoped). Only chief_of_staff may invoke templates via invoke_team. Effect: writes team_templates row. Returns: template object.
+Creates a reusable team template with role slots and policy. Templates are global (not workspace-scoped). Effect: writes team_templates row. Returns: template object. Requires name and slots array.
 
 **Parameters:**
 
@@ -215,9 +235,11 @@ Creates a new team template with role slots and policy. Templates are global (no
 | `slots` | array | Yes | Team slots — each specifies a role, counts, and optional agent_profile |
 | `policy` | object | No | Optional team policy (communication_mode, budget_class, quality_class, etc.) |
 
-### `mcp__fulcrum__invoke_team`
+### `mcp__fulcrum__invoke_team` — Invoke Team
 
-Instantiates a team from a template and starts execution. Only chief_of_staff may invoke teams (enforced by canInvokeTeams capability check). Effect: creates team_instance, spawns agents. Returns: team instance object.
+`destructive`
+
+Instantiates a team from a template and starts execution. Only chief_of_staff may invoke teams (enforced by canInvokeTeams check). Effect: creates team_instance row, spawns agents. Returns: team instance object. Requires template_id, workspace_id, purpose, caller_agent_id, caller_role.
 
 **Parameters:**
 
@@ -232,9 +254,11 @@ Instantiates a team from a template and starts execution. Only chief_of_staff ma
 | `caller_role` | string | Yes | Role of the invoker (must be chief_of_staff) |
 | `initial_slots` | object | No | Optional initial slot → agent_id[] mapping |
 
-### `mcp__fulcrum__list_team_templates`
+### `mcp__fulcrum__list_team_templates` — List Team Templates
 
-Lists all team templates. Templates are global (not workspace-scoped). Effect: read-only. Returns: array of template objects.
+`read-only` `idempotent`
+
+Reads all team templates (global, not workspace-scoped). Effect: read-only. Returns: array of template objects with slots and policy.
 
 **Parameters:**
 
@@ -243,9 +267,11 @@ Lists all team templates. Templates are global (not workspace-scoped). Effect: r
 | `limit` | number | No | Max rows (default 50) |
 | `offset` | number | No | Pagination offset (default 0) |
 
-### `mcp__fulcrum__list_team_instances`
+### `mcp__fulcrum__list_team_instances` — List Team Instances
 
-Lists team instances in a workspace, optionally filtered by status_category. Effect: read-only. Returns: array of team instance objects.
+`read-only` `idempotent`
+
+Reads team instances in a workspace, optionally filtered by status_category. Effect: read-only. Returns: array of team instance objects. Requires workspace_id.
 
 **Parameters:**
 
@@ -257,9 +283,9 @@ Lists team instances in a workspace, optionally filtered by status_category. Eff
 | `limit` | number | No | Max rows (default 50) |
 | `offset` | number | No | Pagination offset (default 0) |
 
-### `mcp__fulcrum__create_agent_profile`
+### `mcp__fulcrum__create_agent_profile` — Create Agent Profile
 
-Creates a DB-backed agent profile for a workspace. Extends the 24 canonical AgentRole slugs with workspace-scoped specializations referenceable from team template slots. Effect: writes agent_profiles row. Returns: profile object.
+Creates a DB-backed agent profile for a workspace. Extends the 24 canonical AgentRole slugs with workspace-scoped specializations. Effect: writes agent_profiles row. Returns: profile object. Requires workspace_id, name, description.
 
 **Parameters:**
 
@@ -273,9 +299,9 @@ Creates a DB-backed agent profile for a workspace. Extends the 24 canonical Agen
 | `capabilities` | object | No | Optional capability flags / metadata |
 | `created_by` | string | No | Agent ID of the creator |
 
-### `mcp__fulcrum__create_agent_definition`
+### `mcp__fulcrum__create_agent_definition` — Create Agent Definition
 
-Creates a canonical agent definition for a role. Defines model, tools_allow/deny, executor_uri, and system prompt for a given AgentRole. Effect: writes agent_definitions row. Returns: definition object.
+Creates a canonical definition for a role: model, tools_allow/deny, executor_uri, system prompt. Effect: writes agent_definitions row. Returns: definition object. Requires role, display_name, description.
 
 **Parameters:**
 
@@ -294,9 +320,11 @@ Creates a canonical agent definition for a role. Defines model, tools_allow/deny
 | `capabilities` | array | No | Capability strings (e.g. ["code", "web_search"]) |
 | `executor_uri` | string | No | Executor URI (e.g. "claude-code://", "pi://") |
 
-### `mcp__fulcrum__get_agent_definition`
+### `mcp__fulcrum__get_agent_definition` — Get Agent Definition
 
-Gets the canonical definition for an AgentRole. Effect: read-only. Returns: definition object or null.
+`read-only` `idempotent`
+
+Reads the canonical definition for an AgentRole: model, tools, executor_uri, system_prompt. Effect: read-only. Returns: definition object or null. Requires role.
 
 **Parameters:**
 
@@ -304,9 +332,11 @@ Gets the canonical definition for an AgentRole. Effect: read-only. Returns: defi
 |------|------|----------|-------------|
 | `role` | string | Yes | AgentRole slug |
 
-### `mcp__fulcrum__update_agent_definition`
+### `mcp__fulcrum__update_agent_definition` — Update Agent Definition
 
-Updates fields on an existing agent definition. Effect: updates agent_definitions row. Returns: updated definition.
+`idempotent`
+
+Updates fields on an existing agent definition. Effect: updates agent_definitions row in place. Returns: updated definition object. Requires role.
 
 **Parameters:**
 
@@ -321,9 +351,11 @@ Updates fields on an existing agent definition. Effect: updates agent_definition
 | `model` | string | No | New model |
 | `executor_uri` | string | No | New executor URI |
 
-### `mcp__fulcrum__list_agent_definitions`
+### `mcp__fulcrum__list_agent_definitions` — List Agent Definitions
 
-Lists all agent definitions, optionally filtered by stability. Effect: read-only. Returns: array of definition objects.
+`read-only` `idempotent`
+
+Reads all agent definitions, optionally filtered by stability tier. Effect: read-only. Returns: array of definition objects.
 
 **Parameters:**
 
