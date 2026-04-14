@@ -85,3 +85,7 @@ export { rebuildFromVault, reconcileMergedBranch } from './setup/rebuild.js'
 export { runMemoryInit } from './setup/wizard.js'
 export { activateL2 } from './setup/activate.js'
 export type { RebuildOptions, RebuildResult } from './setup/rebuild.js'
+
+// Repo map
+export { buildRepoMap, scanAndBuildRepoMap } from './repo-map.js'
+export type { RepoMap, RepoFileEntry, RepoSymbol } from './repo-map.js'
