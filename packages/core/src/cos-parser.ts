@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3'
-import { ulid } from 'ulid'
-import { createHash } from 'crypto'
 import { statusCategory } from './status-category.js'
+import { writeMemory } from './memory.js'
+import type { MemoryKind, MemoryScope } from './types.js'
 
 export interface CoSResponse {
   task_updates?: Array<{
@@ -51,12 +51,12 @@ export function parseCoSResponse(raw: string): CoSResponse {
   return { reasoning: raw }
 }
 
-export function applyCoSResponse(
+export async function applyCoSResponse(
   db: Database.Database,
   workspace_id: string,
   response: CoSResponse,
   project_id?: string
-): { tasks_updated: number; memories_written: number } {
+): Promise<{ tasks_updated: number; memories_written: number }> {
   const now = new Date().toISOString()
   let tasks_updated = 0
   let memories_written = 0
@@ -102,51 +102,22 @@ export function applyCoSResponse(
     }
   }
 
-  // Apply memory writes
+  // Apply memory writes — delegate to writeMemory so we always match the
+  // canonical schema (freshness, importance, embedding, content_hash, etc.)
+  // and the canonical id scheme (newId('memory')).
   if (Array.isArray(response.memory_writes) && resolvedProjectId) {
     for (const mw of response.memory_writes) {
       if (!mw.content || !mw.content.trim()) continue
-
-      const memory_id = 'mem_' + ulid()
-      const kind = mw.kind ?? 'fact'
-      const scope = mw.scope ?? 'project'
-      const content = mw.content
-      const title = content.slice(0, 80)
-      const summary = title
-      const canonical_text = content
-      const content_hash = createHash('sha256').update(content).digest('hex')
-
-      db.prepare(`
-        INSERT INTO memories
-          (memory_id, workspace_id, project_id, scope, kind, title, summary,
-           content, canonical_text, tags, entities, confidence, embedding,
-           task_id, issue_id, artifact_id, provenance_refs,
-           content_hash, created_at, updated_at, last_accessed_at, access_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, 0)
-      `).run(
-        memory_id,
+      await writeMemory({
         workspace_id,
-        resolvedProjectId,
-        scope,
-        kind,
-        title,
-        summary,
-        content,
-        canonical_text,
-        JSON.stringify([]),
-        JSON.stringify([]),
-        1.0,
-        JSON.stringify([]),
-        content_hash,
-        now,
-        now,
-        now
-      )
-
+        project_id: resolvedProjectId,
+        content: mw.content,
+        kind: (mw.kind ?? 'fact') as MemoryKind,
+        scope: (mw.scope ?? 'project') as MemoryScope,
+      })
       memories_written += 1
     }
   }
 
   return { tasks_updated, memories_written }
 }
-

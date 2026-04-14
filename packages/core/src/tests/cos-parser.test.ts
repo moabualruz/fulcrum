@@ -3,6 +3,7 @@ import { createTestDb, resetTestDb } from './helpers.js'
 import { getDb } from '../db/client.js'
 import { createTask } from '../tasks.js'
 import { parseCoSResponse, applyCoSResponse } from '../cos-parser.js'
+import { recallMemory } from '../memory.js'
 
 beforeEach(() => { createTestDb() })
 afterEach(() => resetTestDb())
@@ -124,7 +125,7 @@ describe('applyCoSResponse — task updates', () => {
     const response = parseCoSResponse(JSON.stringify({
       task_updates: [{ task_id: task.task_id, status: 'completed' }],
     }))
-    const result = applyCoSResponse(db, 'ws_1', response)
+    const result = await applyCoSResponse(db, 'ws_1', response)
 
     expect(result.tasks_updated).toBe(1)
 
@@ -139,7 +140,7 @@ describe('applyCoSResponse — task updates', () => {
     const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Old title' })
     const db = getDb()
 
-    applyCoSResponse(db, 'ws_1', {
+    await applyCoSResponse(db, 'ws_1', {
       task_updates: [{ task_id: task.task_id, title: 'New title' }],
     })
 
@@ -153,7 +154,7 @@ describe('applyCoSResponse — task updates', () => {
     const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
     const db = getDb()
 
-    applyCoSResponse(db, 'ws_1', {
+    await applyCoSResponse(db, 'ws_1', {
       task_updates: [{ task_id: task.task_id, description: 'New description' }],
     })
 
@@ -167,7 +168,7 @@ describe('applyCoSResponse — task updates', () => {
     const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
     const db = getDb()
 
-    const result = applyCoSResponse(db, 'ws_2', {
+    const result = await applyCoSResponse(db, 'ws_2', {
       task_updates: [{ task_id: task.task_id, status: 'completed' }],
     })
 
@@ -177,31 +178,31 @@ describe('applyCoSResponse — task updates', () => {
     expect(row.status).toBe('queued')
   })
 
-  it('skips task_updates entries without task_id', () => {
+  it('skips task_updates entries without task_id', async () => {
     seed()
     const db = getDb()
 
-    const result = applyCoSResponse(db, 'ws_1', {
+    const result = await applyCoSResponse(db, 'ws_1', {
       task_updates: [{ task_id: '' }],
     })
 
     expect(result.tasks_updated).toBe(0)
   })
 
-  it('returns 0 when task_updates is empty', () => {
+  it('returns 0 when task_updates is empty', async () => {
     seed()
     const db = getDb()
-    const result = applyCoSResponse(db, 'ws_1', { task_updates: [] })
+    const result = await applyCoSResponse(db, 'ws_1', { task_updates: [] })
     expect(result.tasks_updated).toBe(0)
   })
 })
 
 describe('applyCoSResponse — memory writes', () => {
-  it('writes a memory and returns memories_written count', () => {
+  it('writes a memory and returns memories_written count', async () => {
     seed()
     const db = getDb()
 
-    const result = applyCoSResponse(db, 'ws_1', {
+    const result = await applyCoSResponse(db, 'ws_1', {
       memory_writes: [{ content: 'We decided to use SQLite for storage' }],
     })
 
@@ -214,11 +215,11 @@ describe('applyCoSResponse — memory writes', () => {
     expect(row.scope).toBe('project')
   })
 
-  it('uses explicit kind and scope when provided', () => {
+  it('uses explicit kind and scope when provided', async () => {
     seed()
     const db = getDb()
 
-    applyCoSResponse(db, 'ws_1', {
+    await applyCoSResponse(db, 'ws_1', {
       memory_writes: [{ content: 'Use TypeScript everywhere', kind: 'decision', scope: 'global' }],
     })
 
@@ -228,11 +229,11 @@ describe('applyCoSResponse — memory writes', () => {
     expect(row.scope).toBe('global')
   })
 
-  it('writes multiple memories', () => {
+  it('writes multiple memories', async () => {
     seed()
     const db = getDb()
 
-    const result = applyCoSResponse(db, 'ws_1', {
+    const result = await applyCoSResponse(db, 'ws_1', {
       memory_writes: [
         { content: 'First observation about the system' },
         { content: 'Second observation about performance' },
@@ -245,22 +246,22 @@ describe('applyCoSResponse — memory writes', () => {
     expect(count).toBe(2)
   })
 
-  it('skips memory writes with empty content', () => {
+  it('skips memory writes with empty content', async () => {
     seed()
     const db = getDb()
 
-    const result = applyCoSResponse(db, 'ws_1', {
+    const result = await applyCoSResponse(db, 'ws_1', {
       memory_writes: [{ content: '' }, { content: '   ' }],
     })
 
     expect(result.memories_written).toBe(0)
   })
 
-  it('generates a memory_id with mem_ prefix', () => {
+  it('generates a memory_id with mem_ prefix', async () => {
     seed()
     const db = getDb()
 
-    applyCoSResponse(db, 'ws_1', {
+    await applyCoSResponse(db, 'ws_1', {
       memory_writes: [{ content: 'Test memory content' }],
     })
 
@@ -269,11 +270,61 @@ describe('applyCoSResponse — memory writes', () => {
     expect(row.memory_id).toMatch(/^mem_[0-9A-Z]{26}$/)
   })
 
-  it('returns 0 when memory_writes is empty', () => {
+  it('returns 0 when memory_writes is empty', async () => {
     seed()
     const db = getDb()
-    const result = applyCoSResponse(db, 'ws_1', { memory_writes: [] })
+    const result = await applyCoSResponse(db, 'ws_1', { memory_writes: [] })
     expect(result.memories_written).toBe(0)
+  })
+})
+
+describe('applyCoSResponse — memory writes (K-1, K-3) delegate to writeMemory', () => {
+  it('applyCoSResponse creates memories with mem_ prefix', async () => {
+    seed()
+    const db = getDb()
+    const result = await applyCoSResponse(db, 'ws_1', {
+      memory_writes: [{ content: 'prefix check', kind: 'fact', scope: 'project' }],
+    })
+    expect(result.memories_written).toBe(1)
+    const row = db.prepare(`SELECT memory_id FROM memories LIMIT 1`).get() as { memory_id: string }
+    expect(row.memory_id).toMatch(/^mem_[0-9A-Z]{26}$/)
+  })
+
+  it('CoS-written memories have freshness set (not NULL)', async () => {
+    seed()
+    const db = getDb()
+    await applyCoSResponse(db, 'ws_1', {
+      memory_writes: [{ content: 'freshness check', kind: 'fact', scope: 'project' }],
+    })
+    const row = db.prepare(`SELECT freshness FROM memories LIMIT 1`).get() as { freshness: number | null }
+    expect(row.freshness).not.toBeNull()
+    expect(row.freshness).toBeGreaterThan(0)
+  })
+
+  it('CoS-written memories have importance set (not NULL)', async () => {
+    seed()
+    const db = getDb()
+    await applyCoSResponse(db, 'ws_1', {
+      memory_writes: [{ content: 'importance check', kind: 'fact', scope: 'project' }],
+    })
+    const row = db.prepare(`SELECT importance FROM memories LIMIT 1`).get() as { importance: number | null }
+    expect(row.importance).not.toBeNull()
+    expect(row.importance).toBeGreaterThan(0)
+  })
+
+  it('CoS-written memories appear in recallMemory results', async () => {
+    seed()
+    const db = getDb()
+    await applyCoSResponse(db, 'ws_1', {
+      memory_writes: [{ content: 'findable content for recall', kind: 'fact', scope: 'project' }],
+    })
+    const results = await recallMemory({
+      query: 'findable content',
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+    })
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].memory_id).toMatch(/^mem_/)
   })
 })
 
@@ -283,7 +334,7 @@ describe('applyCoSResponse — combined updates', () => {
     const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Combined task' })
     const db = getDb()
 
-    const result = applyCoSResponse(db, 'ws_1', {
+    const result = await applyCoSResponse(db, 'ws_1', {
       task_updates: [{ task_id: task.task_id, status: 'running' }],
       memory_writes: [{ content: 'Task is now running' }],
     })
@@ -292,11 +343,11 @@ describe('applyCoSResponse — combined updates', () => {
     expect(result.memories_written).toBe(1)
   })
 
-  it('handles response with no task_updates or memory_writes', () => {
+  it('handles response with no task_updates or memory_writes', async () => {
     seed()
     const db = getDb()
 
-    const result = applyCoSResponse(db, 'ws_1', {
+    const result = await applyCoSResponse(db, 'ws_1', {
       next_action: 'wait',
       reasoning: 'Waiting for dependencies',
     })
