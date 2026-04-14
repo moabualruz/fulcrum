@@ -21,6 +21,7 @@ export interface WriteMemoryInput {
   tags?: string[]
   confidence?: number                 // 0–1, default 1.0
   freshness?: number                  // 0–1, default 1.0; new memories start fresh
+  importance?: number                 // 0–1, default 0.5
   file_path?: string | null
   symbol_path?: string | null
   entities?: string[]
@@ -70,6 +71,7 @@ export interface FullMemory {
   entities: string[]
   confidence: number
   freshness: number
+  importance: number
   access_count: number
   event_time: string | null
   content_hash: string | null

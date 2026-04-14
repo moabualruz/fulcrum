@@ -152,6 +152,7 @@ export interface Memory {
   entities: string[]
   confidence: number
   freshness: number
+  importance: number
   access_count: number
   event_time: string | null
   content_hash: string | null

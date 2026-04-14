@@ -1149,4 +1149,14 @@ export function runMigrations(db: Database.Database): void {
     }
     db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('017_task_assigned_run')`).run()
   }
+
+  const already018 = db.prepare("SELECT 1 FROM schema_migrations WHERE name = 'MIGRATION_018_MEMORY_IMPORTANCE'").get()
+  if (!already018) {
+    try {
+      db.prepare('ALTER TABLE memories ADD COLUMN importance REAL NOT NULL DEFAULT 0.5').run()
+    } catch (e: unknown) {
+      if (!(e instanceof Error && (e.message.includes('duplicate column name') || e.message.includes('already exists')))) throw e
+    }
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('MIGRATION_018_MEMORY_IMPORTANCE')").run()
+  }
 }

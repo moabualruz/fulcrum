@@ -10,6 +10,7 @@ interface WriteMemoryInput {
   content: string
   tags?: string[]
   confidence?: number
+  importance?: number
   embedding?: Float32Array
   scope?: MemoryScope
   kind?: MemoryKind
@@ -47,6 +48,7 @@ function rowToMemory(row: Record<string, unknown>): Memory {
     entities: (() => { try { return JSON.parse(row.entities as string) as string[] } catch { return [] } })(),
     confidence: row.confidence as number,
     freshness: (row.freshness as number) ?? 1.0,
+    importance: (row.importance as number) ?? 0.5,
     access_count: row.access_count as number,
     event_time: (row.event_time as string | null) ?? null,
     content_hash: (row.content_hash as string | null) ?? null,
@@ -128,10 +130,10 @@ export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
   db.prepare(`
     INSERT INTO memories
       (memory_id, workspace_id, project_id, scope, kind, title, summary, content,
-       canonical_text, tags, entities, confidence, embedding,
+       canonical_text, tags, entities, confidence, importance, embedding,
        task_id, issue_id, artifact_id, provenance_refs,
        created_at, updated_at, last_accessed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     memory_id,
     input.workspace_id,
@@ -145,6 +147,7 @@ export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
     JSON.stringify(input.tags ?? []),
     JSON.stringify(input.entities ?? []),
     input.confidence ?? 1.0,
+    input.importance ?? 0.5,
     embeddingBuffer,
     input.task_id ?? null,
     input.issue_id ?? null,

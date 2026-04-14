@@ -179,3 +179,54 @@ describe('writeMemory — freshness', () => {
     expect(row.freshness).toBeCloseTo(0.5)
   })
 })
+
+describe('writeMemory — importance', () => {
+  it('newly written memory has importance === 0.5 by default', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    const m = await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 'Default importance', summary: 's', content: 'default importance content',
+    })
+    expect(m.importance).toBeCloseTo(0.5)
+    // Verify it is persisted to the DB
+    const row = db.prepare('SELECT importance FROM memories WHERE memory_id = ?').get(m.memory_id) as { importance: number }
+    expect(row.importance).toBeCloseTo(0.5)
+  })
+
+  it('stores explicit importance value', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    const m = await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'decision',
+      title: 'High importance decision', summary: 's', content: 'critical architecture decision',
+      importance: 0.9,
+    })
+    expect(m.importance).toBeCloseTo(0.9)
+    // Verify it is persisted to the DB
+    const row = db.prepare('SELECT importance FROM memories WHERE memory_id = ?').get(m.memory_id) as { importance: number }
+    expect(row.importance).toBeCloseTo(0.9)
+  })
+
+  it('throws invalid_input for importance below 0', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    await expect(writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 't', summary: 's', content: 'c', importance: -0.1,
+    })).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+
+  it('throws invalid_input for importance above 1', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    await expect(writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 't', summary: 's', content: 'c', importance: 1.5,
+    })).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+})
