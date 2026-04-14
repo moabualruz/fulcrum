@@ -8,6 +8,7 @@ export type {
   EmbeddingProviderConfig, FulcrumConfig, PolicyCheckResult,
   HandoffPacket, CreateHandoffInput, HandoffPriority, HandoffScope,
   TaskPacket, SpawnableRun, StartAgentRunInput,
+  Workspace, ArtifactContract,
 } from './types.js'
 export { FulcrumError } from './types.js'
 

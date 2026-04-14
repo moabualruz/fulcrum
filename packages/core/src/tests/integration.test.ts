@@ -11,7 +11,7 @@ afterEach(() => resetTestDb())
 
 function seed() {
   const db = getDb()
-  db.prepare("INSERT INTO workspaces VALUES ('ws_1','Acme Corp',datetime('now'),'active')").run()
+  db.prepare("INSERT INTO workspaces VALUES ('ws_1','Acme Corp',datetime('now'),'active',NULL)").run()
   db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','Backend API',datetime('now'),NULL,NULL,NULL,NULL,'sequential','active')").run()
 }
 

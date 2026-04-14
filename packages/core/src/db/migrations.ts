@@ -983,6 +983,10 @@ const MIGRATION_014_SYNC_DIRECTION = [
 // Wrapped in try/catch to guard against duplicate column errors on fresh databases.
 const MIGRATION_015_PI_PROFILE = `ALTER TABLE agent_runs ADD COLUMN pi_profile TEXT`
 
+// MIGRATION_016 — adds config_path to workspaces table.
+// Wrapped in try/catch to guard against duplicate column errors on fresh databases.
+const MIGRATION_016_WORKSPACE_CONFIG = `ALTER TABLE workspaces ADD COLUMN config_path TEXT`
+
 export function runMigrations(db: Database.Database): void {
   db.exec(MIGRATION_001)
   db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('001_initial')`).run()
@@ -1116,5 +1120,19 @@ export function runMigrations(db: Database.Database): void {
       }
     }
     db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('015_pi_profile')`).run()
+  }
+
+  const already016 = db.prepare("SELECT id FROM schema_migrations WHERE name = '016_workspace_config'").get()
+  if (!already016) {
+    try {
+      db.exec(MIGRATION_016_WORKSPACE_CONFIG)
+    } catch (err: unknown) {
+      // Duplicate column means workspaces already has config_path — safe to ignore
+      const msg = (err as { message?: string }).message ?? ''
+      if (!msg.includes('duplicate column name') && !msg.includes('already exists')) {
+        throw err
+      }
+    }
+    db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('016_workspace_config')`).run()
   }
 }

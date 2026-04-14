@@ -51,6 +51,17 @@ describe('createPlan', () => {
     expect(plan.file_path).toBe('/docs/plans/sprint1.md')
   })
 
+  it('Plan.prd_id roundtrips correctly', async () => {
+    const prd = await createPRD({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'PRD for roundtrip' })
+    const plan = await createPlan({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      title: 'Plan with prd_id',
+      prd_id: prd.prd_id,
+    })
+    expect(plan.prd_id).toBe(prd.prd_id)
+  })
+
   it('throws invalid_input for empty title', async () => {
     await expect(
       createPlan({ workspace_id: 'ws_1', project_id: 'proj_1', title: '' })

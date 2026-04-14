@@ -42,6 +42,27 @@ describe('createEpic', () => {
     expect(epic.milestone_id).toBe('mile_abc')
   })
 
+  it('creates epic with priority=high and milestone_id that roundtrip correctly', async () => {
+    const epic = await createEpic({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      title: 'Milestone epic',
+      priority: 'high',
+      milestone_id: 'mile_123',
+    })
+    expect(epic.priority).toBe('high')
+    expect(epic.milestone_id).toBe('mile_123')
+  })
+
+  it('defaults priority to medium when not specified', async () => {
+    const epic = await createEpic({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      title: 'Default priority epic',
+    })
+    expect(epic.priority).toBe('medium')
+  })
+
   it('throws invalid_input for empty title', async () => {
     await expect(
       createEpic({ workspace_id: 'ws_1', project_id: 'proj_1', title: '' })

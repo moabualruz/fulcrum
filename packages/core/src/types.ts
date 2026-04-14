@@ -319,6 +319,27 @@ export interface StartAgentRunInput {
   git_branch?: string
 }
 
+export interface Workspace {
+  workspace_id: string
+  name: string
+  status: WorkspaceStatus
+  config_path?: string  // path to workspace/project config file
+  created_at: string
+}
+
+export interface ArtifactContract {
+  contract_id: string
+  workspace_id: string
+  task_id?: string
+  workflow_id?: string
+  required_artifacts: ArtifactType[]
+  optional_artifacts?: ArtifactType[]
+  final_summary_artifact?: ArtifactType
+  review_inputs?: ArtifactType[]
+  merge_readiness_rules?: string[]
+  created_at: string
+}
+
 export class FulcrumError extends Error {
   constructor(
     message: string,

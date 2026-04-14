@@ -50,6 +50,17 @@ describe('createPRD', () => {
     expect(prd.file_path).toBe('/docs/prd/auth.md')
   })
 
+  it('PRD.linked_epic_id roundtrips correctly', async () => {
+    const epic = await createEpic({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Epic for roundtrip' })
+    const prd = await createPRD({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      title: 'PRD with linked_epic_id',
+      linked_epic_id: epic.epic_id,
+    })
+    expect(prd.linked_epic_id).toBe(epic.epic_id)
+  })
+
   it('throws invalid_input for empty title', async () => {
     await expect(
       createPRD({ workspace_id: 'ws_1', project_id: 'proj_1', title: '' })
