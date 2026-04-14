@@ -66,14 +66,23 @@ describe('createTeamTemplate', () => {
     expect(tmpl.updated_at).toBeTruthy()
   })
 
-  it('stores custom policy on the template', async () => {
+  it('stores full TeamPolicy fields on the template', async () => {
+    const ws = 'ws-policy-full'
     const tmpl = await createTeamTemplate({
-      name: 'policy-squad',
-      slots: SAMPLE_SLOTS,
-      policy: { max_parallel_tasks: 5, allow_external_tools: false },
+      name: 'policy-full-team',
+      description: 'test',
+      slots: [],
+      policy: {
+        communication_mode: 'hub_and_spoke',
+        budget_class: 'large',
+        latency_class: 'slow',
+        quality_class: 'high',
+        worktree_policy: 'shared',
+      },
     })
-
-    expect(tmpl.policy).toEqual({ max_parallel_tasks: 5, allow_external_tools: false })
+    expect(tmpl.policy?.communication_mode).toBe('hub_and_spoke')
+    expect(tmpl.policy?.budget_class).toBe('large')
+    expect(tmpl.policy?.worktree_policy).toBe('shared')
   })
 })
 

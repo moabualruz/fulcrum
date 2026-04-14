@@ -44,7 +44,7 @@ export interface TeamTemplate {
   name: string
   description?: string
   slots: TeamSlot[]
-  policy: TeamPolicy
+  policy?: TeamPolicy
   created_at: string
   updated_at: string
 }

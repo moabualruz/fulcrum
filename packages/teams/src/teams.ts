@@ -23,7 +23,7 @@ function rowToTemplate(row: Record<string, unknown>): TeamTemplate {
     name: row['name'] as string,
     description: (row['description'] as string | null) ?? undefined,
     slots: JSON.parse(row['slots'] as string) as TeamSlot[],
-    policy: JSON.parse(row['policy'] as string) as TeamPolicy,
+    policy: JSON.parse((row['policy'] as string | null) ?? '{}') as TeamPolicy,
     created_at: row['created_at'] as string,
     updated_at: row['updated_at'] as string,
   }
