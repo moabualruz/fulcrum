@@ -290,6 +290,7 @@ export class FulcrumError extends Error {
       | 'policy_blocked'
       | 'invalid_input'
       | 'invalid_state'
+      | 'rate_limited'
   ) {
     super(message)
     this.name = 'FulcrumError'

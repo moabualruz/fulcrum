@@ -288,8 +288,9 @@ describe('listTeamInstances', () => {
   })
 
   it('respects limit and offset pagination', async () => {
-    const tmpl = await createTeamTemplate({ name: 'page-squad', slots: SAMPLE_SLOTS })
+    // Use a separate template per instance to avoid hitting the per-template cap (2)
     for (let n = 0; n < 5; n++) {
+      const tmpl = await createTeamTemplate({ name: `page-squad-${n}`, slots: SAMPLE_SLOTS })
       await invokeTeam({
         template_id: tmpl.template_id,
         workspace_id,

@@ -127,3 +127,21 @@ export interface GetTeamStatusInput {
   instance_id: string
   workspace_id: string
 }
+
+export interface ScheduleCounts {
+  global: number
+  project: number
+  template: number
+}
+
+export interface ScheduleDecision {
+  allowed: boolean
+  reason?: string
+  counts: ScheduleCounts
+}
+
+export interface SchedulerConfig {
+  global_cap?: number    // default 8
+  per_project_cap?: number // default 4
+  per_template_cap?: number // default 2
+}

@@ -14,6 +14,7 @@ import type {
   GetTeamStatusInput,
   TeamSlot,
 } from './types.js'
+import { canStartTeam } from './scheduler.js'
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -72,6 +73,16 @@ export async function invokeTeam(input: InvokeTeamInput): Promise<TeamInstance> 
   }
 
   const db = getDb()
+
+  const decision = canStartTeam(db, {
+    workspace_id: input.workspace_id,
+    project_id: input.project_id,
+    template_id: input.template_id,
+  })
+  if (!decision.allowed) {
+    throw new FulcrumError(decision.reason ?? 'team concurrency cap reached', 'rate_limited')
+  }
+
   const instance_id = `ti_${ulid()}`
   const now = new Date().toISOString()
   const display_id = nextDisplayId('team', input.project_id ?? input.workspace_id, db)
