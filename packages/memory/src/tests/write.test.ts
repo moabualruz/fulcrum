@@ -151,3 +151,31 @@ describe('writeMemory — optional fields', () => {
     expect(m.task_id).toBe('task_abc123')
   })
 })
+
+describe('writeMemory — freshness', () => {
+  it('newly written memory has freshness === 1.0 by default', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    const m = await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 'Fresh memory', summary: 's', content: 'fresh content',
+    })
+    expect(m.freshness).toBe(1.0)
+  })
+
+  it('stores explicit freshness value', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    const m = await writeMemory({
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'project', kind: 'fact',
+      title: 'Stale memory', summary: 's', content: 'half-fresh content',
+      freshness: 0.5,
+    })
+    expect(m.freshness).toBeCloseTo(0.5)
+    // Verify it is persisted to the DB
+    const row = db.prepare('SELECT freshness FROM memories WHERE memory_id = ?').get(m.memory_id) as { freshness: number }
+    expect(row.freshness).toBeCloseTo(0.5)
+  })
+})

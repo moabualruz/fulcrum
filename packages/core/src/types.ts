@@ -130,6 +130,7 @@ export interface Memory {
   tags: string[]
   entities: string[]
   confidence: number
+  freshness: number
   access_count: number
   event_time: string | null
   content_hash: string | null

@@ -20,6 +20,7 @@ export interface WriteMemoryInput {
   canonical_text?: string             // optional structured canonical form; defaults to content if omitted
   tags?: string[]
   confidence?: number                 // 0–1, default 1.0
+  freshness?: number                  // 0–1, default 1.0; new memories start fresh
   file_path?: string | null
   symbol_path?: string | null
   entities?: string[]
@@ -68,6 +69,7 @@ export interface FullMemory {
   tags: string[]
   entities: string[]
   confidence: number
+  freshness: number
   access_count: number
   event_time: string | null
   content_hash: string | null

@@ -1,6 +1,6 @@
 // packages/memory/src/tests/scoring.test.ts
 import { describe, it, expect } from 'vitest'
-import { computeImportance, computeFreshness, rrfScore } from '../scoring.js'
+import { computeImportance, computeFreshness, rrfScore, recallScore } from '../scoring.js'
 
 describe('computeImportance', () => {
   it('returns 0 for all-zero inputs', () => {
@@ -76,5 +76,27 @@ describe('rrfScore', () => {
 
   it('lower rank (better match) produces higher score', () => {
     expect(rrfScore(1, 1)).toBeGreaterThan(rrfScore(10, 10))
+  })
+})
+
+describe('recallScore', () => {
+  it('freshness=1.0 leaves score unchanged relative to rrfScore', () => {
+    const base = rrfScore(1, 1)
+    expect(recallScore(1, 1, 1.0)).toBeCloseTo(base, 10)
+  })
+
+  it('freshness=0.5 halves the score', () => {
+    const base = rrfScore(1, 1)
+    expect(recallScore(1, 1, 0.5)).toBeCloseTo(base * 0.5, 10)
+  })
+
+  it('memory with freshness=0.5 scores lower than one with freshness=1.0 at equal semantic ranks', () => {
+    const fresh = recallScore(3, 3, 1.0)
+    const stale = recallScore(3, 3, 0.5)
+    expect(fresh).toBeGreaterThan(stale)
+  })
+
+  it('freshness=0 zeroes out the score', () => {
+    expect(recallScore(1, 1, 0)).toBe(0)
   })
 })

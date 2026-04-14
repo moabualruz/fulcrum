@@ -1,6 +1,6 @@
 // packages/memory/src/recall.ts
 import { getDb, FulcrumError, getTextEmbedder } from '@fulcrum/core'
-import { rrfScore } from './scoring.js'
+import { rrfScore, recallScore } from './scoring.js'
 import { rowToFullMemory } from './mappers.js'
 import type { RecallMemoryInput, CompactMemory, FullMemory, RecallMode } from './types.js'
 
@@ -158,21 +158,33 @@ export async function recallMemory(
   const ftsMap = new Map(ftsRows.map(r => [r.rowid, r.ftsRank]))
   const vecMap = new Map(vecRows.map(r => [r.rowid, r.vecRank]))
 
-  const scored = [...allRowids].map(rowid => ({
+  // First pass: RRF scores without freshness (to limit candidates)
+  const rrfScored = [...allRowids].map(rowid => ({
     rowid,
-    score: rrfScore(ftsMap.get(rowid) ?? null, vecMap.get(rowid) ?? null),
-  })).sort((a, b) => b.score - a.score).slice(0, limit)
+    rrfBase: rrfScore(ftsMap.get(rowid) ?? null, vecMap.get(rowid) ?? null),
+  })).sort((a, b) => b.rrfBase - a.rrfBase).slice(0, limit * 2)
 
-  if (scored.length === 0) return []
+  if (rrfScored.length === 0) return []
 
-  const rowids = scored.map(s => s.rowid)
+  const rowids = rrfScored.map(s => s.rowid)
   const placeholders = rowids.map(() => '?').join(',')
   const rows = db.prepare(
     `SELECT m.rowid, m.* FROM memories m WHERE m.rowid IN (${placeholders}) AND ${whereClause}`
   ).all(...rowids, ...params) as Record<string, unknown>[]
 
-  // Re-sort to match RRF order
+  // Apply freshness weighting and re-sort
   const rowByRowid = new Map(rows.map(r => [(r as Record<string, unknown> & { rowid: number }).rowid, r]))
+  const scored = rrfScored
+    .map(s => {
+      const row = rowByRowid.get(s.rowid)
+      if (!row) return null
+      const freshness = (row.freshness as number) ?? 1.0
+      return { rowid: s.rowid, score: recallScore(ftsMap.get(s.rowid) ?? null, vecMap.get(s.rowid) ?? null, freshness) }
+    })
+    .filter((s): s is { rowid: number; score: number } => s !== null)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+
   const sorted = scored
     .map(s => rowByRowid.get(s.rowid))
     .filter((r): r is Record<string, unknown> => r !== undefined)

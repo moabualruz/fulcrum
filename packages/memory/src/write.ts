@@ -33,14 +33,14 @@ export async function writeMemory(input: WriteMemoryInput): Promise<FullMemory> 
     INSERT INTO memories (
       memory_id, workspace_id, project_id,
       scope, kind, title, summary, canonical_text,
-      content, tags, entities, confidence,
+      content, tags, entities, confidence, freshness,
       file_path, symbol_path, event_time, content_hash,
       task_id, issue_id, artifact_id, provenance_refs,
       embedding, created_at, updated_at, last_accessed_at, access_count
     ) VALUES (
       ?, ?, ?,
       ?, ?, ?, ?, ?,
-      ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?, 0
@@ -50,7 +50,7 @@ export async function writeMemory(input: WriteMemoryInput): Promise<FullMemory> 
     // canonical_text defaults to raw content when no structured canonical form is provided;
     // callers may override by passing explicit canonical_text in WriteMemoryInput
     input.scope, input.kind, input.title, input.summary, input.canonical_text ?? input.content,
-    input.content, JSON.stringify(input.tags ?? []), JSON.stringify(input.entities ?? []), input.confidence ?? 1.0,
+    input.content, JSON.stringify(input.tags ?? []), JSON.stringify(input.entities ?? []), input.confidence ?? 1.0, input.freshness ?? 1.0,
     input.file_path ?? null, input.symbol_path ?? null, input.event_time ?? null, hash,
     input.task_id ?? null, input.issue_id ?? null, input.artifact_id ?? null, JSON.stringify(input.provenance_refs ?? []),
     embeddingBuffer, now, now, now

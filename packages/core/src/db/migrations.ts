@@ -925,6 +925,10 @@ CREATE TABLE IF NOT EXISTS graph_episodes (
 CREATE INDEX IF NOT EXISTS idx_graph_episodes_entity ON graph_episodes(workspace_id, entity_id);
 `
 
+const MIGRATION_012_MEMORY_FRESHNESS = `
+ALTER TABLE memories ADD COLUMN freshness REAL NOT NULL DEFAULT 1.0;
+`
+
 export function runMigrations(db: Database.Database): void {
   db.exec(MIGRATION_001)
   db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('001_initial')`).run()
@@ -1010,5 +1014,11 @@ export function runMigrations(db: Database.Database): void {
   if (!already011) {
     db.exec(MIGRATION_011_GRAPH)
     db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('011_graph')`).run()
+  }
+
+  const already012 = db.prepare("SELECT id FROM schema_migrations WHERE name = '012_memory_freshness'").get()
+  if (!already012) {
+    db.exec(MIGRATION_012_MEMORY_FRESHNESS)
+    db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('012_memory_freshness')`).run()
   }
 }

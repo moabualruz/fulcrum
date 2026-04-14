@@ -32,3 +32,15 @@ export function rrfScore(ftsRank: number | null, vectorRank: number | null): num
   const vec = vectorRank !== null ? 1 / (k + vectorRank) : 1 / (k + 1000)
   return fts + vec
 }
+
+/**
+ * Combined recall score: RRF score multiplied by the stored freshness field.
+ * freshness=1.0 (brand new) leaves the score unchanged; freshness=0 suppresses it entirely.
+ */
+export function recallScore(
+  ftsRank: number | null,
+  vectorRank: number | null,
+  freshness: number
+): number {
+  return rrfScore(ftsRank, vectorRank) * freshness
+}

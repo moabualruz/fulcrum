@@ -16,6 +16,7 @@ export function rowToFullMemory(row: Record<string, unknown>): FullMemory {
     tags: (() => { try { return JSON.parse(row.tags as string) as string[] } catch { return [] } })(),
     entities: (() => { try { return JSON.parse(row.entities as string) as string[] } catch { return [] } })(),
     confidence: row.confidence as number,
+    freshness: row.freshness as number,
     access_count: row.access_count as number,
     event_time: row.event_time as string | null,
     content_hash: row.content_hash as string | null,
