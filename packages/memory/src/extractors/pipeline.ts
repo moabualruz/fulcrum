@@ -4,9 +4,8 @@
 
 import { appendFileSync } from 'fs'
 import { join } from 'path'
-import { extractStructured } from './structured.js'
 import { getKuzuClient } from '../kuzu/client.js'
-import { resolveEntity, incrementMentionCount } from '../kuzu/entity-store.js'
+import { upsertMemoryToKuzu } from '../kuzu/upsert.js'
 import type { FullMemory } from '../types.js'
 
 export interface PendingL2Item {
@@ -27,8 +26,10 @@ export function enqueueForL2(vaultPath: string, memoryId: string, workspaceId: s
 
 /**
  * Run the full extraction pipeline for a memory:
- * - Track 1 (sync): structured extraction → MENTIONS + PRODUCED_IN edges
+ * - Track 1 (sync): upsert Memory node into Kuzu + entity extraction → edges
  * - Track 2 (async): enqueue for LLM extraction if L2 is active
+ *
+ * Guard: if KuzuClient is not ready, returns immediately (no-op).
  */
 export async function runExtractionPipeline(
   vaultPath: string,
@@ -37,34 +38,10 @@ export async function runExtractionPipeline(
   const kuzuClient = getKuzuClient()
   if (!kuzuClient?.isReady) return
 
-  const bodyText = memory.canonical_text ?? memory.title
-  const mentions = extractStructured(bodyText, {
-    task_id: memory.task_id,
-    run_id: null,
-  })
+  // Track 1: create/update Memory node + entity edges in Kuzu
+  await upsertMemoryToKuzu(kuzuClient, memory, null)
 
-  const now = new Date().toISOString()
-
-  for (const mention of mentions) {
-    const entity = await resolveEntity(kuzuClient, mention.raw, memory.workspace_id)
-    await incrementMentionCount(kuzuClient, entity.id)
-
-    if (mention.edgeType === 'PRODUCED_IN') {
-      await kuzuClient.query(
-        `MATCH (m:Memory {id: $mid}), (e:Entity {id: $eid})
-         CREATE (m)-[:PRODUCED_IN {weight: $weight, source: 'rule', created_at: CAST($now AS TIMESTAMP)}]->(e)`,
-        { mid: memory.memory_id, eid: entity.id, weight: mention.confidence, now }
-      ).catch(() => {})
-    } else {
-      await kuzuClient.query(
-        `MATCH (m:Memory {id: $mid}), (e:Entity {id: $eid})
-         CREATE (m)-[:MENTIONS {weight: $weight, confidence: $conf, source: 'rule', created_at: CAST($now AS TIMESTAMP)}]->(e)`,
-        { mid: memory.memory_id, eid: entity.id, weight: mention.confidence, conf: mention.confidence, now }
-      ).catch(() => {})
-    }
-  }
-
-  // Enqueue for LLM semantic extraction (Track 2) — curated kinds only
+  // Track 2: enqueue for LLM semantic extraction — curated kinds only
   const TRACK2_KINDS = new Set(['decision', 'fact', 'lesson', 'error', 'task_outcome'])
   if (TRACK2_KINDS.has(memory.kind)) {
     enqueueForL2(vaultPath, memory.memory_id, memory.workspace_id)
