@@ -27,6 +27,7 @@ const PREFIXES: Record<string, string> = {
   status_event: 'sev_',
   lock: 'lock_',
   span: 'span_',
+  policy_event: 'pevt_',
 }
 
 const DISPLAY_PREFIXES: Record<string, string> = {

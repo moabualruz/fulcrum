@@ -121,6 +121,7 @@ describe('newId prefixes (G-15)', () => {
     ['status_event', 'sev_'],
     ['lock', 'lock_'],
     ['span', 'span_'],
+    ['policy_event', 'pevt_'],
   ]
   for (const [kind, prefix] of cases) {
     it(`${kind} → ${prefix}...`, () => {

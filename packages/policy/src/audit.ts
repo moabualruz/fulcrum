@@ -1,6 +1,5 @@
 // packages/policy/src/audit.ts
-import { ulid } from 'ulid'
-import { getDb } from '@fulcrum/core'
+import { getDb, newId } from '@fulcrum/core'
 import type { PolicyEvent, LogPolicyEventInput, GetAuditLogInput } from './types.js'
 
 function rowToEvent(row: Record<string, unknown>): PolicyEvent {
@@ -23,7 +22,7 @@ function rowToEvent(row: Record<string, unknown>): PolicyEvent {
 
 export async function logPolicyEvent(input: LogPolicyEventInput): Promise<void> {
   const db = getDb()
-  const evt_id = 'pevt_' + ulid()
+  const evt_id = newId('policy_event')
   const now = new Date().toISOString()
 
   db.prepare(`
