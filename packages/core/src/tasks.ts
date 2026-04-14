@@ -178,8 +178,9 @@ export async function updateTask(input: UpdateTaskInput): Promise<Task> {
 
   if (input.labels !== undefined) {
     db.prepare('DELETE FROM task_labels WHERE task_id = ?').run(input.task_id)
+    const insertLabel = db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)')
     for (const label of input.labels) {
-      db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)').run(input.task_id, label)
+      insertLabel.run(input.task_id, label)
     }
   }
 
