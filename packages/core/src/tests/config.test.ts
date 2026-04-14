@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { writeFileSync, mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
-import { loadConfig, defaultConfig } from '../config.js'
+import { loadConfig, defaultConfig, validateFulcrumConfig } from '../config.js'
 
 const TMP = '/tmp/fulcrum-test-config'
 
@@ -64,5 +64,77 @@ describe('loadConfig', () => {
     const cfg = loadConfig(TMP)
     expect(cfg.port).toBe(4721)
     expect(cfg.policy.wip_limit).toBe(5)
+  })
+
+  it('throws with helpful message when .fulcrum.json has invalid schema', () => {
+    writeFileSync(
+      join(TMP, '.fulcrum.json'),
+      JSON.stringify({ port: 'not-a-number', policy: { wip_limit: -1 } })
+    )
+    expect(() => loadConfig(TMP)).toThrowError(/Invalid .fulcrum.json/)
+  })
+})
+
+describe('validateFulcrumConfig', () => {
+  it('returns ok for a valid minimal config', () => {
+    const result = validateFulcrumConfig({ workspace_id: 'ws_1', project_id: 'proj_1' })
+    expect(result.ok).toBe(true)
+  })
+
+  it('returns ok for a complete valid config', () => {
+    const result = validateFulcrumConfig({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      port: 4721,
+      embedding: {
+        text: { provider: 'local', model: 'some-model', dimensions: 512 },
+        code: null,
+      },
+      reranker: { provider: 'local', model: 'reranker-model' },
+      policy: { wip_limit: 5, heartbeat_timeout_minutes: 10, escalation_timeout_minutes: 30 },
+      vault: { path: '/tmp/vault', l2_enabled: false },
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  it('reports error for non-object input', () => {
+    const result = validateFulcrumConfig([1, 2, 3])
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.length).toBeGreaterThan(0)
+  })
+
+  it('reports error for invalid port', () => {
+    const result = validateFulcrumConfig({ port: 99999 })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.some(e => e.includes('port'))).toBe(true)
+  })
+
+  it('reports error for invalid embedding provider', () => {
+    const result = validateFulcrumConfig({
+      embedding: { text: { provider: 'unknown-provider', model: 'x' } },
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.some(e => e.includes('provider'))).toBe(true)
+  })
+
+  it('reports error for negative wip_limit', () => {
+    const result = validateFulcrumConfig({ policy: { wip_limit: -5 } })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.some(e => e.includes('wip_limit'))).toBe(true)
+  })
+
+  it('reports multiple errors at once', () => {
+    const result = validateFulcrumConfig({
+      port: 'oops',
+      policy: { wip_limit: -1, heartbeat_timeout_minutes: 0 },
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('reports error for vault.l2_enabled being non-boolean', () => {
+    const result = validateFulcrumConfig({ vault: { l2_enabled: 'yes' } })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.some(e => e.includes('l2_enabled'))).toBe(true)
   })
 })

@@ -15,7 +15,8 @@ export type {
 export { FulcrumError } from './types.js'
 
 // Config
-export { loadConfig, defaultConfig } from './config.js'
+export { loadConfig, defaultConfig, validateFulcrumConfig } from './config.js'
+export type { ValidationResult } from './config.js'
 
 // DB
 export { getDb, setDb, closeDb, _configureDb, globalDataDir } from './db/client.js'
