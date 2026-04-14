@@ -136,3 +136,7 @@ interface SyncAdapter {
   unmap(external: unknown): Record<string, unknown>
 }
 ```
+
+## Database tables owned
+
+This package owns tables: `sync_states`, `sync_conflicts`, `sync_queue`.

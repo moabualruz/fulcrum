@@ -136,3 +136,7 @@ Key status enums:
 | `PlanStatus` | `draft`, `active`, `completed`, `archived` |
 | `ReviewStatus` | `pending`, `changes_requested`, `approved`, `rejected` |
 | `TaskRelationType` | `blocks`, `blocked_by`, `follows`, `preceded_by`, `relates`, `duplicates`, `requires_context_from`, `must_merge_before`, `conflicts_with`, `reviewed_by`, `verifies` |
+
+## Database tables owned
+
+This package does not own any tables directly. It reads and writes to tables migrated and owned by `@fulcrum/core`: `epics`, `issues`, `issue_labels`, `prds`, `plans`, `plan_issues`, `prd_plans`, `task_relations`, `task_labels`.

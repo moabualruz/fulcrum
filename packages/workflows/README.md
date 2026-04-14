@@ -149,3 +149,7 @@ const defs = await listWorkflows()
 | `write-a-prd` | PRD generation from memory + user prompts via `prd_planner` agent |
 | `prd-to-plan` | Generate implementation plan from PRD via `implementation_planner` agent |
 | `prd-to-issues` | Decompose PRD into issues via `issue_decomposer` agent |
+
+## Database tables owned
+
+This package owns tables: `workflow_runs`.

@@ -88,3 +88,9 @@ reconcileMergedBranch(vaultPath, taskId): Promise<void>  // post-merge sync
 ```
 
 See [`docs/superpowers/specs/2026-04-14-memory-graph-l0-design.md`](../../docs/superpowers/specs/2026-04-14-memory-graph-l0-design.md) for full architecture documentation.
+
+## Database tables owned
+
+This package owns tables: `memories`, `vec_memories`, `memories_fts`.
+
+> **Cross-package exception:** `@fulcrum/core` also writes rows to `memories` for internal lifecycle events (agent run start/complete, CoS responses). This is a known exception — making `core` depend on `@fulcrum/memory` would be circular. The `memories` schema is migrated by `core`; this package owns all application-level reads and writes.

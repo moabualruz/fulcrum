@@ -182,3 +182,7 @@ canStartTeam(db, input, config?: SchedulerConfig): ScheduleDecision
 | `ListTeamInstancesInput` | `workspace_id`, `project_id?`, `status_category?`, `limit?`, `offset?` |
 | `GetTeamStatusInput` | `instance_id`, `workspace_id` |
 | `SchedulerConfig` | `global_cap?` (8), `per_project_cap?` (4), `per_template_cap?` (2) |
+
+## Database tables owned
+
+This package owns tables: `team_templates`, `team_instances`, `team_members`.

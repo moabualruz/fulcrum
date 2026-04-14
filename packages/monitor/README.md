@@ -120,3 +120,9 @@ interface MonitorServer {
 ```
 
 See [`docs/superpowers/plans/2026-04-13-monitor.md`](../../docs/superpowers/plans/2026-04-13-monitor.md) for the full implementation plan.
+
+## Database tables owned
+
+This package owns tables: `analytics_daily`, `analytics_cycle`, `analytics_project`, `analytics_agent`, `analytics_team`.
+
+All other tables (workspaces, tasks, agent_runs, memories, events, issues) are read-only from this package's perspective — it queries them but never writes.

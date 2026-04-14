@@ -109,3 +109,7 @@ const queue = await listMergeQueue('proj_01')
 | `ReviewTargetType` | `'task' \| 'artifact' \| 'worktree'` |
 | `HandoffMode` | `'brief' \| 'contextual' \| 'artifact_first_brief' \| 'branched_session'` |
 | `MergeResult` | `{ worktree_id, branch_name, success, error?, merged_at? }` |
+
+## Database tables owned
+
+This package owns tables: `worktrees`, `artifacts`, `artifacts_fts`, `reviews`, `artifact_contracts`, `handoffs`.

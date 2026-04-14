@@ -143,3 +143,9 @@ if (!policy.allowed) console.log(policy.reason)
 |---|---|
 | `parseCoSResponse(text)` | Parse structured CoS response from LLM output |
 | `applyCoSResponse(response)` | Apply parsed CoS response actions to the database |
+
+## Database tables owned
+
+This package owns tables: `schema_migrations`, `workspaces`, `projects`, `tasks`, `task_relations`, `task_labels`, `agent_runs`, `advisory_locks`, `display_id_sequences`, `events`, `epics`, `issues`, `issue_labels`, `prds`, `plans`, `plan_issues`, `prd_plans`, `policy_rules`, `agent_definitions`, `agent_profiles`.
+
+> **Cross-package exception:** `core` also writes rows to the `memories` table (via `safeWriteMemory` in `runs.ts` and `cos-parser.ts`) for internal lifecycle events. This is intentional — `@fulcrum/memory` cannot be a dependency of `core` (would be circular). All other memory reads/writes go through `@fulcrum/memory`.
