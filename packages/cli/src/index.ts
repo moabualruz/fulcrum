@@ -428,6 +428,7 @@ async function runServeMcp(): Promise<void> {
     startAgentRun, heartbeatAgentRun, completeAgentRun, blockAgentRun,
     getAgentRunStatus, writeMemory, recallMemory,
     buildCosContext, getWorkspaceStatus, listAgentProfiles,
+    createAgentProfile, getTeamOps,
     startSpan, endSpan } = await import('@fulcrum/core')
 
   const config = loadConfig()
@@ -533,8 +534,16 @@ async function runServeMcp(): Promise<void> {
     },
     {
       name: 'list_agent_profiles',
-      description: 'List available agent roles/profiles.',
-      inputSchema: { type: 'object', properties: {}, required: [] },
+      description: 'List all canonical AgentRole profiles. When workspace_id is provided, also returns DB-backed custom profiles created via create_agent_profile.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspace_id: {
+            type: 'string',
+            description: 'Optional. When provided, DB-backed dynamic profiles for this workspace are merged into the response.',
+          },
+        },
+      },
     },
     {
       name: 'get_agent_run_status',
@@ -626,6 +635,108 @@ async function runServeMcp(): Promise<void> {
         required: ['workspace_id'],
       },
     },
+    {
+      name: 'create_team_template',
+      description: 'Create a new team template (role slots + policy). Templates are global (not workspace-scoped). Only chief_of_staff may use the template via invoke_team — enforced by the only_l1_invokes_teams invariant.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Human-readable template name (globally unique)' },
+          description: { type: 'string', description: 'Optional description of the template' },
+          slots: {
+            type: 'array',
+            description: 'Team slots — each specifies a role, counts, and optional agent_profile',
+            items: {
+              type: 'object',
+              properties: {
+                slot_id: { type: 'string', description: 'Unique slot identifier within the template' },
+                role: { type: 'string', description: 'AgentRole slug (e.g. software_engineer)' },
+                min_count: { type: 'number', description: 'Minimum members of this slot' },
+                max_count: { type: 'number', description: 'Maximum members of this slot' },
+                concurrency_cap: { type: 'number', description: 'Max concurrent members allowed' },
+                required: { type: 'boolean', description: 'Whether the slot must be filled' },
+                description: { type: 'string' },
+                agent_profile: { type: 'string', description: 'Optional DB-backed profile_id' },
+                spawn_mode: { type: 'string', enum: ['auto', 'manual'] },
+              },
+              required: ['slot_id', 'role', 'min_count', 'max_count', 'concurrency_cap', 'required'],
+            },
+          },
+          policy: {
+            type: 'object',
+            description: 'Optional team policy (communication_mode, budget_class, quality_class, etc.)',
+          },
+        },
+        required: ['name', 'slots'],
+      },
+    },
+    {
+      name: 'invoke_team',
+      description: 'Instantiate a team from a template. Only chief_of_staff may invoke teams (enforced by canInvokeTeams).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          template_id: { type: 'string', description: 'Template to instantiate' },
+          workspace_id: { type: 'string' },
+          project_id: { type: 'string', description: 'Optional project scope' },
+          purpose: { type: 'string', description: 'Why this team is being spawned' },
+          task_id: { type: 'string', description: 'Optional originating task' },
+          caller_agent_id: { type: 'string', description: 'Agent ID of the invoker' },
+          caller_role: { type: 'string', description: 'Role of the invoker (must be chief_of_staff)' },
+          initial_slots: {
+            type: 'object',
+            description: 'Optional initial slot → agent_id[] mapping',
+          },
+        },
+        required: ['template_id', 'workspace_id', 'purpose', 'caller_agent_id', 'caller_role'],
+      },
+    },
+    {
+      name: 'list_team_templates',
+      description: 'List all team templates. Templates are global (not workspace-scoped).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: 'Max rows (default 50)' },
+          offset: { type: 'number', description: 'Pagination offset (default 0)' },
+        },
+      },
+    },
+    {
+      name: 'list_team_instances',
+      description: 'List team instances in a workspace, optionally filtered by status_category.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspace_id: { type: 'string' },
+          project_id: { type: 'string' },
+          status_category: {
+            type: 'string',
+            enum: ['backlog', 'active', 'blocked', 'done'],
+          },
+          limit: { type: 'number' },
+          offset: { type: 'number' },
+        },
+        required: ['workspace_id'],
+      },
+    },
+    {
+      name: 'create_agent_profile',
+      description: 'Create a dynamic, DB-backed agent profile for a workspace. Extends the 24 canonical AgentRole slugs with workspace-scoped specializations that can be referenced from team templates via the slot.agent_profile field.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspace_id: { type: 'string' },
+          name: { type: 'string', description: 'Profile name, unique within the workspace' },
+          description: { type: 'string' },
+          base_role: { type: 'string', description: 'Canonical AgentRole slug to inherit from (defaults to "custom")' },
+          system_prompt: { type: 'string', description: 'Optional system prompt override' },
+          capabilities: { type: 'object', description: 'Optional capability flags / metadata' },
+          created_by: { type: 'string', description: 'Agent ID of the creator' },
+        },
+        required: ['workspace_id', 'name', 'description'],
+      },
+    },
   ]
 
   type ToolArgs = Record<string, unknown>
@@ -702,7 +813,9 @@ async function runServeMcp(): Promise<void> {
     }
 
     if (name === 'list_agent_profiles') {
-      return await listAgentProfiles()
+      return await listAgentProfiles({
+        workspace_id: a['workspace_id'] as string | undefined,
+      })
     }
 
     if (name === 'get_agent_run_status') {
@@ -783,6 +896,78 @@ async function runServeMcp(): Promise<void> {
         runs: status.running_runs.slice(0, 10).map(r => ({ run_id: r.run_id, role: r.role, status: r.status, task_id: r.task_id })),
         blockers: status.blocked_runs.slice(0, 5).map(r => ({ run_id: r.run_id, reason: r.blocker ?? '?' })),
       }
+    }
+
+    if (name === 'create_team_template') {
+      const ops = await getTeamOps()
+      const createTeamTemplate = ops['createTeamTemplate'] as (
+        input: Record<string, unknown>,
+      ) => Promise<unknown>
+      const template = await createTeamTemplate({
+        name: a['name'] as string,
+        description: a['description'] as string | undefined,
+        slots: a['slots'] as unknown[],
+        policy: a['policy'] as Record<string, unknown> | undefined,
+      })
+      return template
+    }
+
+    if (name === 'invoke_team') {
+      const ops = await getTeamOps()
+      const invokeTeam = ops['invokeTeam'] as (
+        input: Record<string, unknown>,
+      ) => Promise<unknown>
+      const instance = await invokeTeam({
+        template_id: a['template_id'] as string,
+        workspace_id: a['workspace_id'] as string,
+        project_id: a['project_id'] as string | undefined,
+        purpose: a['purpose'] as string,
+        task_id: a['task_id'] as string | undefined,
+        caller_agent_id: a['caller_agent_id'] as string,
+        caller_role: a['caller_role'] as string,
+        initial_slots: a['initial_slots'] as Record<string, string[]> | undefined,
+      })
+      return instance
+    }
+
+    if (name === 'list_team_templates') {
+      const ops = await getTeamOps()
+      const listTeamTemplates = ops['listTeamTemplates'] as (
+        input?: Record<string, unknown>,
+      ) => Promise<unknown[]>
+      const rows = await listTeamTemplates({
+        limit: (a['limit'] as number | undefined) ?? 50,
+        offset: (a['offset'] as number | undefined) ?? 0,
+      })
+      return rows
+    }
+
+    if (name === 'list_team_instances') {
+      const ops = await getTeamOps()
+      const listTeamInstances = ops['listTeamInstances'] as (
+        input: Record<string, unknown>,
+      ) => Promise<unknown[]>
+      const rows = await listTeamInstances({
+        workspace_id: a['workspace_id'] as string,
+        project_id: a['project_id'] as string | undefined,
+        status_category: a['status_category'] as string | undefined,
+        limit: (a['limit'] as number | undefined) ?? 50,
+        offset: (a['offset'] as number | undefined) ?? 0,
+      })
+      return rows
+    }
+
+    if (name === 'create_agent_profile') {
+      const profile = await createAgentProfile({
+        workspace_id: a['workspace_id'] as string,
+        name: a['name'] as string,
+        description: a['description'] as string,
+        base_role: a['base_role'] as Parameters<typeof createAgentProfile>[0]['base_role'],
+        system_prompt: a['system_prompt'] as string | undefined,
+        capabilities: a['capabilities'] as Record<string, unknown> | undefined,
+        created_by: a['created_by'] as string | undefined,
+      })
+      return profile
     }
 
     throw new Error(`Unknown tool: ${name}`)

@@ -161,6 +161,21 @@ export async function completeTeam(input: CompleteTeamInput): Promise<TeamInstan
   return rowToInstance(row)
 }
 
+export interface ListTeamTemplatesInput {
+  limit?: number
+  offset?: number
+}
+
+export async function listTeamTemplates(input: ListTeamTemplatesInput = {}): Promise<TeamTemplate[]> {
+  const db = getDb()
+  const limit = input.limit ?? 50
+  const offset = input.offset ?? 0
+  const rows = db
+    .prepare(`SELECT * FROM team_templates ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+    .all(limit, offset) as Record<string, unknown>[]
+  return rows.map(rowToTemplate)
+}
+
 export async function listTeamInstances(input: ListTeamInstancesInput): Promise<TeamInstance[]> {
   const db = getDb()
   const conditions: string[] = ['workspace_id = ?']
