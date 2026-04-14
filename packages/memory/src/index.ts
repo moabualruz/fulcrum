@@ -81,7 +81,7 @@ export { extractStructured } from './extractors/structured.js'
 export type { ExtractedMention } from './extractors/structured.js'
 
 // Setup
-export { rebuildFromVault } from './setup/rebuild.js'
+export { rebuildFromVault, reconcileMergedBranch } from './setup/rebuild.js'
 export { runMemoryInit } from './setup/wizard.js'
 export { activateL2 } from './setup/activate.js'
 export type { RebuildOptions, RebuildResult } from './setup/rebuild.js'

@@ -2,8 +2,11 @@
 import { listMemoryFiles, readMemoryFile } from '../vault/client.js'
 import { insertMemoryDirect } from '../write.js'
 import { getKuzuClient } from '../kuzu/client.js'
-import { upsertMemoryToKuzu } from '../kuzu/upsert.js'
+import { upsertMemoryToKuzu, removeMemoryFromKuzu } from '../kuzu/upsert.js'
 import { getDb } from '@fulcrum/core'
+import { appendToLog } from '../vault/index-builder.js'
+import { readState } from '../vault/state.js'
+import simpleGit from 'simple-git'
 import type { FullMemory, MemoryKind, MemoryScope } from '../types.js'
 import type { MemoryFileFrontmatter } from '../types.js'
 
@@ -118,4 +121,99 @@ export async function rebuildFromVault(options: RebuildOptions): Promise<Rebuild
   }
 
   return result
+}
+
+/**
+ * Post-merge reconciliation: after `mergeMemoryBranch(taskId)` is called,
+ * this function syncs the vault changes into L1 (SQLite) and L2 (Kuzu) and
+ * appends a MERGE entry to log.md.
+ *
+ * It diffs `main` (or default branch) against `memory/<taskId>` to find
+ * files that were added/modified or deleted on the branch, then:
+ *  - changed/added: re-parse and upsert into L1 + L2
+ *  - deleted: remove from L1 + L2 using memory_id from .state.json
+ */
+export async function reconcileMergedBranch(
+  vaultPath: string,
+  taskId: string
+): Promise<void> {
+  const sg = simpleGit(vaultPath)
+  const memoriesPattern = 'memories/curated/'
+
+  // After a --no-ff merge, the current HEAD is a merge commit with two parents:
+  //   HEAD^1 = the old default branch tip (pre-merge)
+  //   HEAD^2 = the memory branch tip that was merged in
+  // Diffing HEAD^1..HEAD^2 gives exactly what the memory branch introduced.
+  const fromRef = 'HEAD^1'
+  const toRef = 'HEAD^2'
+
+  // Files added or modified on the branch
+  const changedRaw = await sg.raw([
+    'diff', '--name-only', '--diff-filter=AM',
+    fromRef, toRef,
+    '--', memoriesPattern,
+  ])
+  const changedFiles = changedRaw.split('\n').filter(Boolean)
+
+  // Files deleted on the branch
+  const deletedRaw = await sg.raw([
+    'diff', '--name-only', '--diff-filter=D',
+    fromRef, toRef,
+    '--', memoriesPattern,
+  ])
+  const deletedFiles = deletedRaw.split('\n').filter(Boolean)
+
+  const kuzuClient = getKuzuClient()
+  const db = getDb()
+
+  // --- Process changed / added files ---
+  for (const relPath of changedFiles) {
+    const absPath = `${vaultPath}/${relPath}`
+    try {
+      const { frontmatter, body } = await readMemoryFile(absPath)
+      const memory = frontmatterToFullMemory(frontmatter, body)
+      insertMemoryDirect(memory)
+      if (kuzuClient) {
+        await upsertMemoryToKuzu(kuzuClient, memory, null)
+      }
+    } catch {
+      // Skip files that can't be parsed (e.g. deleted before we read them)
+    }
+  }
+
+  // --- Process deleted files ---
+  const state = readState(vaultPath)
+  // Build a lookup from relative path → memory_id
+  const pathToId = new Map<string, string>()
+  for (const [memoryId, entry] of Object.entries(state)) {
+    pathToId.set(entry.path, memoryId)
+  }
+
+  for (const relPath of deletedFiles) {
+    const memoryId = pathToId.get(relPath)
+    if (!memoryId) continue
+
+    try {
+      db.prepare('DELETE FROM memories WHERE memory_id = ?').run(memoryId)
+    } catch {
+      // Row may not exist — ignore
+    }
+
+    if (kuzuClient) {
+      try {
+        await removeMemoryFromKuzu(kuzuClient, memoryId)
+      } catch {
+        // Node may not exist — ignore
+      }
+    }
+  }
+
+  // --- Append MERGE log entry ---
+  const totalCount = changedFiles.length + deletedFiles.length
+  appendToLog(vaultPath, {
+    ts: new Date().toISOString(),
+    op: 'MERGE',
+    id: taskId,
+    meta: `from=branch count=${totalCount}`,
+  })
 }
