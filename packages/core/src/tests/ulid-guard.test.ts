@@ -54,6 +54,11 @@ const ALLOWED_PATHS: Array<{ path: string; reason: string }> = [
     reason:
       'analytics_daily row id uses an unregistered adm_ prefix. Internal analytics row identifier; if promoted, add adm prefix to PREFIXES and switch to newId("analytics_daily").',
   },
+  {
+    path: 'packages/memory/src/eval/fixtures.ts',
+    reason:
+      'ulid() appears as a string literal inside fixture document content (describing how newId() works), not as an actual function call — the regex cannot distinguish string content from code.',
+  },
 ]
 
 function* walk(dir: string): Generator<string> {

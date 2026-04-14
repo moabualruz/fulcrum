@@ -192,9 +192,16 @@ export async function recallMemory(
   }
 
   // ── compact / total_ranked: RRF hybrid search ─────────────────────────────
-  // Wrap query in double-quotes to treat it as an FTS5 phrase literal;
-  // escape any inner double-quotes per FTS5 quoting rules.
-  const ftsQuery = `"${input.query.replace(/"/g, '""')}"`
+  // Build FTS5 query: tokenise into terms and join with OR so any matching
+  // term retrieves the document.  FTS5 BM25 rank naturally promotes documents
+  // that match more terms.  Each term is double-quoted so special characters
+  // are treated as literals rather than FTS5 operators.
+  const ftsQuery = input.query
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(w => `"${w.replace(/"/g, '""')}"`)
+    .join(' OR ')
   const ftsRows = ftsSearch(db, ftsQuery, whereClause, params, limit)
 
   // Vector search (optional — skip if embedder unavailable or vec_memories missing)

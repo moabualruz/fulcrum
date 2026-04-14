@@ -26,5 +26,5 @@ describe('OTel opt-in (J-7)', () => {
     // If the OTel package isn't installed in the test environment, tracer may
     // still be null — we don't want to fail in that case. Accept either.
     expect(tracer === null || typeof tracer.startSpan === 'function').toBe(true)
-  })
+  }, 15_000)  // BatchSpanProcessor shutdown flushes to localhost:4318 — allow up to 15s
 })
