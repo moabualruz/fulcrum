@@ -210,6 +210,25 @@ describe('enqueueMerge + listMergeQueue', () => {
   })
 })
 
+/**
+ * Helper: insert the two gate artifacts (`review_report` + `test_report`)
+ * with status='final' so a worktree can pass processMergeQueue's gate check.
+ */
+function createGateArtifacts(worktree_id: string): void {
+  db.prepare(`
+    INSERT INTO artifacts
+      (artifact_id, workspace_id, project_id, display_id, artifact_type,
+       title, file_path, owner_type, owner_id, status)
+    VALUES (?, 'ws_test', 'proj_test', ?, 'review_report', ?, ?, 'worktree', ?, 'final')
+  `).run(`art_rv_${worktree_id.slice(-8)}`, `ART-RV-${worktree_id.slice(-8)}`, `Review ${worktree_id}`, `/tmp/review-${worktree_id}.md`, worktree_id)
+  db.prepare(`
+    INSERT INTO artifacts
+      (artifact_id, workspace_id, project_id, display_id, artifact_type,
+       title, file_path, owner_type, owner_id, status)
+    VALUES (?, 'ws_test', 'proj_test', ?, 'test_report', ?, ?, 'worktree', ?, 'final')
+  `).run(`art_ts_${worktree_id.slice(-8)}`, `ART-TS-${worktree_id.slice(-8)}`, `Tests ${worktree_id}`, `/tmp/tests-${worktree_id}.md`, worktree_id)
+}
+
 describe('processMergeQueue', () => {
   it('processes queue and marks worktrees as merged for integration_worker', async () => {
     const wt = await allocateWorktree({
@@ -221,13 +240,14 @@ describe('processMergeQueue', () => {
     await markDirty({ worktree_id: wt.worktree_id })
     await markReadyForMerge({ worktree_id: wt.worktree_id })
     await enqueueMerge({ worktree_id: wt.worktree_id })
+    createGateArtifacts(wt.worktree_id)
 
-    const results = await processMergeQueue('proj_test', 'integration_worker')
+    const result = await processMergeQueue('proj_test', 'integration_worker')
 
-    expect(results).toHaveLength(1)
-    expect(results[0].worktree_id).toBe(wt.worktree_id)
-    expect(results[0].success).toBe(true)
-    expect(results[0].merged_at).toBeDefined()
+    expect(result.merged).toContain(wt.worktree_id)
+    expect(result.results).toHaveLength(1)
+    expect(result.results[0].success).toBe(true)
+    expect(result.results[0].merged_at).toBeDefined()
 
     // Verify DB row is updated
     const queue = await listMergeQueue('proj_test')
@@ -236,8 +256,8 @@ describe('processMergeQueue', () => {
 
   it('throws POLICY_DENIED for non-integration_worker callers', async () => {
     await expect(
-      processMergeQueue('proj_test', 'implementer')
-    ).rejects.toThrow('POLICY_DENIED: only integration_worker may process merge queue')
+      processMergeQueue('proj_test', 'software_engineer')
+    ).rejects.toMatchObject({ code: 'policy_denied' })
   })
 })
 
@@ -284,6 +304,7 @@ describe('discardWorktree', () => {
     })
     await markDirty({ worktree_id: wt.worktree_id })
     await markReadyForMerge({ worktree_id: wt.worktree_id })
+    createGateArtifacts(wt.worktree_id)
     await processMergeQueue('proj_test', 'integration_worker')
 
     await expect(discardWorktree({ worktree_id: wt.worktree_id })).rejects.toMatchObject({
@@ -670,5 +691,256 @@ describe('allocateWorktree git subprocess (H-3)', () => {
         base_branch: 'main',
       })
     ).rejects.toMatchObject({ code: 'not_found' })
+  })
+})
+
+// --- H-4: processMergeQueue runs real git merge ---------------------------
+
+describe('processMergeQueue real git merge (H-4)', () => {
+  let repoDir: string
+  const tmpDirs: string[] = []
+
+  function seedGitRepo(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'fulcrum-wt-h4-'))
+    tmpDirs.push(dir)
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: dir })
+    execFileSync('git', ['config', 'user.email', 'test@fulcrum.dev'], { cwd: dir })
+    execFileSync('git', ['config', 'user.name', 'Fulcrum Test'], { cwd: dir })
+    execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: dir })
+    writeFileSync(join(dir, 'README.md'), '# test\n')
+    execFileSync('git', ['add', '.'], { cwd: dir })
+    execFileSync('git', ['commit', '-m', 'init', '-q'], { cwd: dir })
+    return dir
+  }
+
+  function commitInWorktree(wtPath: string, fileName: string, content: string, msg: string): void {
+    writeFileSync(join(wtPath, fileName), content)
+    execFileSync('git', ['add', '.'], { cwd: wtPath })
+    execFileSync('git', ['commit', '-q', '-m', msg], { cwd: wtPath })
+  }
+
+  beforeEach(() => {
+    repoDir = seedGitRepo()
+    db.prepare(
+      `UPDATE projects SET git_url = ?, type = 'git' WHERE project_id = 'proj_test'`
+    ).run(repoDir)
+  })
+
+  afterEach(() => {
+    for (const d of tmpDirs) {
+      try { rmSync(d, { recursive: true, force: true }) } catch { /* ignore */ }
+    }
+    tmpDirs.length = 0
+  })
+
+  it('rejects callers that cannot merge (canMerge gate)', async () => {
+    const wt = await allocateWorktree({
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      agent_role: 'software_engineer',
+      base_branch: 'main',
+    })
+    commitInWorktree(wt.path, `feat-${wt.worktree_id}.txt`, 'new feature', 'feat: add feature')
+    await markDirty({ worktree_id: wt.worktree_id })
+    await markReadyForMerge({ worktree_id: wt.worktree_id })
+    createGateArtifacts(wt.worktree_id)
+
+    await expect(
+      processMergeQueue({ workspace_id: 'ws_test', actor_role: 'software_engineer' })
+    ).rejects.toMatchObject({ code: 'policy_denied' })
+  })
+
+  it('merges a ready worktree, removes its directory, and marks status=merged', async () => {
+    const wt = await allocateWorktree({
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      agent_role: 'software_engineer',
+      base_branch: 'main',
+    })
+    commitInWorktree(wt.path, `feat-${wt.worktree_id}.txt`, 'feature A', 'feat: A')
+    await markDirty({ worktree_id: wt.worktree_id })
+    await markReadyForMerge({ worktree_id: wt.worktree_id })
+    createGateArtifacts(wt.worktree_id)
+
+    const result = await processMergeQueue({
+      workspace_id: 'ws_test',
+      actor_role: 'integration_worker',
+    })
+
+    expect(result.merged).toContain(wt.worktree_id)
+    expect(result.conflicts).not.toContain(wt.worktree_id)
+    expect(result.skipped).not.toContain(wt.worktree_id)
+
+    // Main branch now contains a real merge commit referencing the branch.
+    const log = execFileSync('git', ['log', '--oneline', 'main'], {
+      cwd: repoDir, encoding: 'utf8',
+    })
+    expect(log).toMatch(/Merge/i)
+    expect(log).toContain('feat: A')
+
+    // Worktree row marked merged.
+    const row = db
+      .prepare(`SELECT status, merged_at FROM worktrees WHERE worktree_id = ?`)
+      .get(wt.worktree_id) as { status: string; merged_at: string | null }
+    expect(row.status).toBe('merged')
+    expect(row.merged_at).not.toBeNull()
+
+    // Git worktree directory is gone.
+    expect(existsSync(wt.path)).toBe(false)
+  })
+
+  it('skips worktrees missing gate artifacts and leaves them ready_for_merge', async () => {
+    const wt = await allocateWorktree({
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      agent_role: 'software_engineer',
+      base_branch: 'main',
+    })
+    commitInWorktree(wt.path, `feat-${wt.worktree_id}.txt`, 'ungated', 'feat: ungated')
+    await markDirty({ worktree_id: wt.worktree_id })
+    await markReadyForMerge({ worktree_id: wt.worktree_id })
+    // Intentionally no gate artifacts.
+
+    const result = await processMergeQueue({
+      workspace_id: 'ws_test',
+      actor_role: 'integration_worker',
+    })
+
+    expect(result.merged).not.toContain(wt.worktree_id)
+    expect(result.skipped).toContain(wt.worktree_id)
+
+    // Row still ready_for_merge.
+    const row = db
+      .prepare(`SELECT status FROM worktrees WHERE worktree_id = ?`)
+      .get(wt.worktree_id) as { status: string }
+    expect(row.status).toBe('ready_for_merge')
+
+    // Directory still present — nothing was removed.
+    expect(existsSync(wt.path)).toBe(true)
+  })
+
+  it('skips worktrees where only one gate is final (draft review fails)', async () => {
+    const wt = await allocateWorktree({
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      agent_role: 'software_engineer',
+      base_branch: 'main',
+    })
+    commitInWorktree(wt.path, `feat-${wt.worktree_id}.txt`, 'partial', 'feat: partial')
+    await markDirty({ worktree_id: wt.worktree_id })
+    await markReadyForMerge({ worktree_id: wt.worktree_id })
+
+    // Draft review (not final) + passing test — should still be skipped.
+    db.prepare(`
+      INSERT INTO artifacts
+        (artifact_id, workspace_id, project_id, display_id, artifact_type,
+         title, file_path, owner_type, owner_id, status)
+      VALUES (?, 'ws_test', 'proj_test', ?, 'review_report', ?, ?, 'worktree', ?, 'draft')
+    `).run(`art_rv_draft_${wt.worktree_id.slice(-8)}`, `ART-RV-D-${wt.worktree_id.slice(-8)}`, 'Draft review', '/tmp/rv.md', wt.worktree_id)
+    db.prepare(`
+      INSERT INTO artifacts
+        (artifact_id, workspace_id, project_id, display_id, artifact_type,
+         title, file_path, owner_type, owner_id, status)
+      VALUES (?, 'ws_test', 'proj_test', ?, 'test_report', ?, ?, 'worktree', ?, 'final')
+    `).run(`art_ts_${wt.worktree_id.slice(-8)}`, `ART-TS-${wt.worktree_id.slice(-8)}`, 'Tests', '/tmp/ts.md', wt.worktree_id)
+
+    const result = await processMergeQueue({
+      workspace_id: 'ws_test',
+      actor_role: 'integration_worker',
+    })
+    expect(result.skipped).toContain(wt.worktree_id)
+  })
+
+  it('detects merge conflicts, aborts the merge, and sets status=conflict', async () => {
+    const wt1 = await allocateWorktree({
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      agent_role: 'software_engineer',
+      base_branch: 'main',
+    })
+    const wt2 = await allocateWorktree({
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      agent_role: 'software_engineer',
+      base_branch: 'main',
+    })
+
+    // Both worktrees modify the SAME line of README.md.
+    commitInWorktree(wt1.path, 'README.md', '# version A\n', 'feat: A')
+    commitInWorktree(wt2.path, 'README.md', '# version B\n', 'feat: B')
+
+    await markDirty({ worktree_id: wt1.worktree_id })
+    await markReadyForMerge({ worktree_id: wt1.worktree_id })
+    createGateArtifacts(wt1.worktree_id)
+    await markDirty({ worktree_id: wt2.worktree_id })
+    await markReadyForMerge({ worktree_id: wt2.worktree_id })
+    createGateArtifacts(wt2.worktree_id)
+
+    const result = await processMergeQueue({
+      workspace_id: 'ws_test',
+      actor_role: 'integration_worker',
+    })
+
+    expect(result.merged).toContain(wt1.worktree_id)
+    expect(result.conflicts).toContain(wt2.worktree_id)
+
+    const row2 = db
+      .prepare(`SELECT status FROM worktrees WHERE worktree_id = ?`)
+      .get(wt2.worktree_id) as { status: string }
+    expect(row2.status).toBe('conflict')
+
+    // Main is at wt1's state — the failed wt2 merge was aborted.
+    const readme = readFileSync(join(repoDir, 'README.md'), 'utf8')
+    expect(readme).toContain('version A')
+    expect(readme).not.toContain('version B')
+
+    // The repo is not stuck mid-merge (no tracked changes dangling).
+    const status = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], {
+      cwd: repoDir, encoding: 'utf8',
+    })
+    expect(status.trim()).toBe('')
+
+    // A merge_conflict_report artifact was recorded for wt2.
+    const artifact = db
+      .prepare(
+        `SELECT artifact_type FROM artifacts WHERE owner_type = 'worktree' AND owner_id = ? AND artifact_type = 'merge_conflict_report'`
+      )
+      .get(wt2.worktree_id) as { artifact_type: string } | undefined
+    expect(artifact?.artifact_type).toBe('merge_conflict_report')
+  })
+
+  it('processes the queue in FIFO order by updated_at', async () => {
+    // Three worktrees committed to non-overlapping files so all merges succeed.
+    const wts: Array<{ id: string; path: string }> = []
+    for (let i = 0; i < 3; i++) {
+      const wt = await allocateWorktree({
+        workspace_id: 'ws_test',
+        project_id: 'proj_test',
+        agent_role: 'software_engineer',
+        base_branch: 'main',
+      })
+      commitInWorktree(wt.path, `file-${i}.txt`, `content ${i}\n`, `feat: file-${i}`)
+      wts.push({ id: wt.worktree_id, path: wt.path })
+    }
+
+    // Mark ready in a deliberate non-creation order and stamp updated_at so
+    // the queue processes wts[2], then wts[0], then wts[1].
+    const stamps = [
+      { id: wts[2].id, ts: '2026-01-01T00:00:00.000Z' },
+      { id: wts[0].id, ts: '2026-01-02T00:00:00.000Z' },
+      { id: wts[1].id, ts: '2026-01-03T00:00:00.000Z' },
+    ]
+    for (const s of stamps) {
+      await markDirty({ worktree_id: s.id })
+      await markReadyForMerge({ worktree_id: s.id })
+      createGateArtifacts(s.id)
+      db.prepare(`UPDATE worktrees SET updated_at = ? WHERE worktree_id = ?`).run(s.ts, s.id)
+    }
+
+    const result = await processMergeQueue({
+      workspace_id: 'ws_test',
+      actor_role: 'integration_worker',
+    })
+    expect(result.merged).toEqual([wts[2].id, wts[0].id, wts[1].id])
   })
 })

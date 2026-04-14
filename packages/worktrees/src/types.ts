@@ -5,7 +5,7 @@ export type { ArtifactType }
 export type ArtifactStatus = 'draft' | 'final' | 'archived'
 export type ReviewStatus = 'pending' | 'changes_requested' | 'approved' | 'rejected'
 export type ReviewTargetType = 'task' | 'artifact' | 'worktree'
-export type WorktreeStatus = 'allocated' | 'dirty' | 'ready_for_merge' | 'merged' | 'discarded'
+export type WorktreeStatus = 'allocated' | 'dirty' | 'ready_for_merge' | 'merged' | 'discarded' | 'conflict'
 export type HandoffMode = 'brief' | 'contextual' | 'artifact_first_brief' | 'branched_session'
 
 export interface Artifact {

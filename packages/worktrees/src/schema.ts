@@ -45,7 +45,7 @@ export function runMigration008(db: Database.Database): void {
       workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
       project_id   TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
       status       TEXT NOT NULL DEFAULT 'allocated'
-        CHECK(status IN ('allocated','dirty','ready_for_merge','merged','discarded')),
+        CHECK(status IN ('allocated','dirty','ready_for_merge','merged','discarded','conflict')),
       branch_name  TEXT NOT NULL,
       path         TEXT NOT NULL,
       base_branch  TEXT,
