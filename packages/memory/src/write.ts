@@ -8,6 +8,7 @@ import { getVaultPath, vaultExists, writeMemoryFile } from './vault/client.js'
 import { upsertStateEntry } from './vault/state.js'
 import { appendToLog } from './vault/index-builder.js'
 import type { WriteMemoryInput, FullMemory } from './types.js'
+import { runExtractionPipeline } from './extractors/pipeline.js'
 
 function bodyHash(text: string): string {
   return createHash('sha256').update(text).digest('hex').slice(0, 16)
@@ -124,8 +125,12 @@ export async function writeMemory(input: WriteMemoryInput): Promise<FullMemory> 
   if (!row) throw new FulcrumError(`Memory ${memory_id} not found after insert`, 'not_found')
 
   // ── L2 async enqueue (fire-and-forget when KuzuClient is active) ──────────
-  // pipeline.ts (Task 20) adds a setImmediate call here to runExtractionPipeline().
-  // Write.ts is patched again in Task 20 — see that task for the final version.
+  const vaultRoot = getVaultPath()
+  if (!input.skipVaultWrite) {
+    setImmediate(() => {
+      runExtractionPipeline(vaultRoot, rowToFullMemory(row!)).catch(() => {})
+    })
+  }
 
   return rowToFullMemory(row)
 }
