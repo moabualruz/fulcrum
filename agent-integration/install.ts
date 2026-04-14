@@ -496,6 +496,40 @@ function installClaudeAgentMds(): void {
   ok(`installed ${copied} agent MD file(s) → ${destDir}`);
 }
 
+// ── 5b. Claude Code: slash commands → ~/.claude/commands/ ────────────────────
+// fulcrum-status, fulcrum-task, fulcrum-memory, fulcrum-run are placed in the
+// global commands directory so they're available in every Claude Code session.
+
+function installClaudeCommands(): void {
+  const srcDir = path.join(REPO_ROOT, "agent-integration", "claude", "commands");
+  if (!fs.existsSync(srcDir)) {
+    warn(`commands source dir not found: ${srcDir}`);
+    return;
+  }
+  const files = fs.readdirSync(srcDir).filter((f) => f.endsWith(".md"));
+  if (files.length === 0) {
+    warn("no command files found in agent-integration/claude/commands/");
+    return;
+  }
+
+  const destDir = path.join(HOME, ".claude", "commands");
+  mkdirp(destDir);
+
+  let copied = 0;
+  for (const f of files) {
+    const src = path.join(srcDir, f);
+    const dest = path.join(destDir, f);
+    if (DRY_RUN) {
+      dry(`would copy ${src} → ${dest}`);
+      copied++;
+      continue;
+    }
+    fs.copyFileSync(src, dest);
+    copied++;
+  }
+  ok(`installed ${copied} slash command(s) → ${destDir}`);
+}
+
 // ── 6. Gemini CLI: user extension (~/.gemini/extensions/fulcrum/) ─────────────
 
 function installGeminiExtension(): void {
@@ -699,6 +733,23 @@ function runCheck(): number {
     rows.push({ label: "Claude skills", status: "fail", detail: `${skillsDir} (missing — run setup:claude)` });
   }
 
+  // Claude slash commands
+  const cmdDir = path.join(HOME, ".claude", "commands");
+  const srcCmdDir = path.join(REPO_ROOT, "agent-integration", "claude", "commands");
+  if (fs.existsSync(cmdDir)) {
+    const srcFiles = fs.existsSync(srcCmdDir)
+      ? fs.readdirSync(srcCmdDir).filter((f) => f.endsWith(".md"))
+      : [];
+    const destFiles = fs.readdirSync(cmdDir).filter((f) => f.startsWith("fulcrum-") && f.endsWith(".md"));
+    if (srcFiles.length > 0 && destFiles.length >= srcFiles.length) {
+      rows.push({ label: "Claude commands", status: "ok", detail: `${cmdDir} (${destFiles.length} commands)` });
+    } else {
+      rows.push({ label: "Claude commands", status: "warn", detail: `${cmdDir} (${destFiles.length}/${srcFiles.length} fulcrum commands)` });
+    }
+  } else {
+    rows.push({ label: "Claude commands", status: "fail", detail: `${cmdDir} (missing — run setup:claude)` });
+  }
+
   // Gemini extension
   const geminiDir = path.join(HOME, ".gemini", "extensions", "fulcrum");
   if (
@@ -761,6 +812,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["Claude Code: global CLAUDE.md context", installClaudeContext],
     ["Claude Code: skills → ~/.claude/skills/fulcrum/", installClaudeSkills],
     ["Claude Code: agent MDs → ~/.claude/agents/", installClaudeAgentMds],
+    ["Claude Code: slash commands → ~/.claude/commands/", installClaudeCommands],
     ["Gemini CLI: user extension", installGeminiExtension],
     ["PI: cockpit extension", installPiCockpit],
   ],
@@ -772,6 +824,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["Claude Code: global CLAUDE.md context", installClaudeContext],
     ["Claude Code: skills → ~/.claude/skills/fulcrum/", installClaudeSkills],
     ["Claude Code: agent MDs → ~/.claude/agents/", installClaudeAgentMds],
+    ["Claude Code: slash commands → ~/.claude/commands/", installClaudeCommands],
   ],
   gemini: [
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
@@ -806,6 +859,7 @@ function printSummary(target: Target): void {
     rows.push(["Claude hooks (5)", `~/.claude/settings.json (PreToolUse, PostToolUse, SessionStart, Stop, PreCompact)`]);
     rows.push(["Claude global context", `~/.claude/CLAUDE.md (<!-- fulcrum:... --> section)`]);
     rows.push(["Claude Code skills", `~/.claude/skills/fulcrum/ (13 skill MDs)`]);
+    rows.push(["Claude Code commands", `~/.claude/commands/ (fulcrum-status, fulcrum-task, fulcrum-memory, fulcrum-run)`]);
   }
   if (target === "all" || target === "gemini") {
     rows.push(["Gemini extension", `~/.gemini/extensions/fulcrum/`]);
