@@ -279,9 +279,12 @@ function installClaudeMcp(): void {
 
 // ── 3. Claude Code: PreToolUse hook → ~/.claude/settings.json ─────────────────
 
+// Hook commands kept in sync with agent-integration/claude/settings-hooks-snippet.json.
+const CLAUDE_PRE_COMMANDS = ["fulcrum hook claude pre", "fulcrum hook claude"];
+const CLAUDE_POST_COMMANDS = ["fulcrum hook claude post"];
+
 function installClaudeHook(): void {
   const settingsPath = path.join(HOME, ".claude", "settings.json");
-  const HOOK_COMMAND = "fulcrum hook claude";
 
   mkdirp(path.dirname(settingsPath));
 
@@ -295,27 +298,41 @@ function installClaudeHook(): void {
   }
 
   const hooks = (settings["hooks"] as Record<string, unknown[]> | undefined) ?? {};
-  const preToolUse = (hooks["PreToolUse"] as Array<Record<string, unknown>> | undefined) ?? [];
 
-  const alreadyInstalled = preToolUse.some((entry) => {
-    const list = (entry["hooks"] as Array<Record<string, unknown>> | undefined) ?? [];
-    return list.some((h) => h["command"] === HOOK_COMMAND);
-  });
+  const ensureHook = (
+    key: "PreToolUse" | "PostToolUse",
+    canonicalCommand: string,
+    acceptedCommands: string[],
+  ): "added" | "present" => {
+    const list = (hooks[key] as Array<Record<string, unknown>> | undefined) ?? [];
+    const alreadyInstalled = list.some((entry) => {
+      const inner = (entry["hooks"] as Array<Record<string, unknown>> | undefined) ?? [];
+      return inner.some((h) => acceptedCommands.includes(h["command"] as string));
+    });
+    if (alreadyInstalled) return "present";
+    list.push({
+      matcher: "*",
+      hooks: [{ type: "command", command: canonicalCommand }],
+    });
+    hooks[key] = list;
+    return "added";
+  };
 
-  if (alreadyInstalled) {
-    skip("PreToolUse hook already present");
+  const preResult = ensureHook("PreToolUse", "fulcrum hook claude pre", CLAUDE_PRE_COMMANDS);
+  const postResult = ensureHook("PostToolUse", "fulcrum hook claude post", CLAUDE_POST_COMMANDS);
+
+  settings["hooks"] = hooks;
+
+  if (preResult === "present" && postResult === "present") {
+    skip("PreToolUse + PostToolUse hooks already present");
     return;
   }
 
-  preToolUse.push({
-    matcher: "*",
-    hooks: [{ type: "command", command: HOOK_COMMAND }],
-  });
-  hooks["PreToolUse"] = preToolUse;
-  settings["hooks"] = hooks;
-
   writeJson(settingsPath, settings);
-  ok(`added PreToolUse hook → ${settingsPath}`);
+  const parts: string[] = [];
+  if (preResult === "added") parts.push("PreToolUse");
+  if (postResult === "added") parts.push("PostToolUse");
+  ok(`added ${parts.join(" + ")} hook${parts.length > 1 ? "s" : ""} → ${settingsPath}`);
 }
 
 // ── 4. Claude Code: global CLAUDE.md context (~/.claude/CLAUDE.md) ────────────
@@ -519,15 +536,26 @@ function runCheck(): number {
     try {
       const settings = readJson(settingsPath);
       const hooks = (settings["hooks"] as Record<string, unknown[]> | undefined) ?? {};
-      const pre = (hooks["PreToolUse"] as Array<Record<string, unknown>> | undefined) ?? [];
-      const found = pre.some((entry) => {
-        const list = (entry["hooks"] as Array<Record<string, unknown>> | undefined) ?? [];
-        return list.some((h) => h["command"] === "fulcrum hook claude");
-      });
-      if (found) {
-        rows.push({ label: "Claude hook", status: "ok", detail: `PreToolUse in ${settingsPath}` });
+      const hasHook = (
+        key: "PreToolUse" | "PostToolUse",
+        accepted: string[],
+      ): boolean => {
+        const list = (hooks[key] as Array<Record<string, unknown>> | undefined) ?? [];
+        return list.some((entry) => {
+          const inner = (entry["hooks"] as Array<Record<string, unknown>> | undefined) ?? [];
+          return inner.some((h) => accepted.includes(h["command"] as string));
+        });
+      };
+      const preFound = hasHook("PreToolUse", CLAUDE_PRE_COMMANDS);
+      const postFound = hasHook("PostToolUse", CLAUDE_POST_COMMANDS);
+      if (preFound && postFound) {
+        rows.push({ label: "Claude hook", status: "ok", detail: `PreToolUse + PostToolUse in ${settingsPath}` });
+      } else if (preFound && !postFound) {
+        rows.push({ label: "Claude hook", status: "warn", detail: `PreToolUse present but PostToolUse missing in ${settingsPath}` });
+      } else if (!preFound && postFound) {
+        rows.push({ label: "Claude hook", status: "warn", detail: `PostToolUse present but PreToolUse missing in ${settingsPath}` });
       } else {
-        rows.push({ label: "Claude hook", status: "fail", detail: `no fulcrum PreToolUse in ${settingsPath}` });
+        rows.push({ label: "Claude hook", status: "fail", detail: `no fulcrum hooks in ${settingsPath}` });
       }
     } catch {
       rows.push({ label: "Claude hook", status: "fail", detail: `${settingsPath} unreadable` });

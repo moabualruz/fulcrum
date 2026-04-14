@@ -18,6 +18,7 @@
     "@fulcrum/memory": "workspace:*",
     "@fulcrum/monitor": "workspace:*",
     "@fulcrum/planning": "workspace:*",
+    "@fulcrum/policy": "workspace:*",
     "@fulcrum/sync": "workspace:*",
     "@fulcrum/teams": "workspace:*",
     "@fulcrum/worker": "workspace:*",

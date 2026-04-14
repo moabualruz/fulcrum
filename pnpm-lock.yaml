@@ -36,6 +36,9 @@ importers:
       '@fulcrum/planning':
         specifier: workspace:*
         version: link:../planning
+      '@fulcrum/policy':
+        specifier: workspace:*
+        version: link:../policy
       '@fulcrum/sync':
         specifier: workspace:*
         version: link:../sync

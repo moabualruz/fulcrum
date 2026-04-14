@@ -312,17 +312,171 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
   return { toolName, toolInput, sessionId, agentRole, runId }
 }
 
-async function runHook(cliName: string): Promise<void> {
+export type HookPhase = 'pre' | 'post'
+
+export interface HookContext {
+  cliName: HookCli
+  phase: HookPhase
+  toolName: string
+  toolInput: Record<string, unknown>
+  sessionId: string
+  agentRole: string
+  runId: string
+  workspace_id: string
+}
+
+/**
+ * Hook I/O surface — injected so the pre/post handlers are pure and
+ * testable without spawning a subprocess. In production these are wired
+ * to process.stderr.write and process.exit.
+ */
+export interface HookIO {
+  stderr: (msg: string) => void
+  exit: (code: number) => void
+}
+
+const HOOK_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash'])
+
+/**
+ * PreToolUse handler: secret scan, chief-of-staff team-invoke guard, and
+ * task-scoped memory recall. Non-blocking for memory recall; hard-denies
+ * (exit 2) on secret scan matches or when CoS tries to invoke a team.
+ */
+export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
+  // 1. Secret scan on tool_input — deny if any pattern matches
+  try {
+    const { checkSecrets } = await import('@fulcrum/policy')
+    const inputStr = JSON.stringify(ctx.toolInput)
+    const scan = checkSecrets(inputStr)
+    if (scan.has_secrets) {
+      const patterns = Array.from(new Set(scan.matches.map(m => m.pattern_name)))
+      try {
+        const { emitEvent } = await import('@fulcrum/core')
+        emitEvent({
+          workspace_id: ctx.workspace_id,
+          evt_type: 'policy_denied',
+          object_type: 'tool_call',
+          object_id: ctx.runId || undefined,
+          actor_type: 'agent',
+          actor_id: ctx.cliName,
+          payload: {
+            reason: 'secret_scan_denied',
+            tool_name: ctx.toolName,
+            patterns,
+            phase: 'pre',
+          },
+          severity: 'warn',
+        })
+      } catch { /* best-effort */ }
+      io.stderr(`[fulcrum/pre] Tool call denied: secret detected in tool_input (${patterns.join(', ')})\n`)
+      io.stderr(`[fulcrum/pre] Never include credentials in tool inputs. Use env vars or a secret store.\n`)
+      io.exit(2)
+      return
+    }
+  } catch { /* best-effort; secret scan unavailable means we don't block */ }
+
+  // 2. Chief-of-staff no-direct-writes policy (existing behaviour)
+  const isTeamInvoke = ctx.toolName.includes('invoke_team') || ctx.toolName.includes('team_invoke')
+  if (isTeamInvoke && ctx.agentRole) {
+    try {
+      const { canInvokeTeams } = await import('@fulcrum/core')
+      type AgentRole = Parameters<typeof canInvokeTeams>[0]
+      if (!canInvokeTeams(ctx.agentRole as AgentRole)) {
+        io.stderr(`[fulcrum/pre] Tool call denied: role '${ctx.agentRole}' lacks can_invoke_teams\n`)
+        io.exit(2)
+        return
+      }
+    } catch { /* best-effort */ }
+  }
+
+  // 3. Recall relevant task-scoped memories for write-family tools.
+  //    Non-blocking — never fail the hook if recall is unavailable.
+  if (HOOK_WRITE_TOOLS.has(ctx.toolName) && ctx.runId) {
+    try {
+      const { getDb } = await import('@fulcrum/core')
+      const db = getDb()
+      const runRow = db.prepare(
+        `SELECT task_id, project_id FROM agent_runs WHERE run_id = ? AND workspace_id = ?`
+      ).get(ctx.runId, ctx.workspace_id) as { task_id: string | null; project_id: string | null } | undefined
+      if (runRow?.task_id) {
+        const rows = db.prepare(
+          `SELECT memory_id, kind, content FROM memories
+           WHERE workspace_id = ? AND task_id = ?
+             AND kind IN ('task_goal','task_decision','decision','lesson','task_outcome')
+           ORDER BY importance DESC, created_at DESC LIMIT 3`
+        ).all(ctx.workspace_id, runRow.task_id) as Array<{ memory_id: string; kind: string; content: string }>
+        if (rows.length > 0) {
+          io.stderr(`[fulcrum/pre] recalled ${rows.length} task memories:\n`)
+          for (const r of rows) {
+            const summary = r.content.slice(0, 200).replace(/\s+/g, ' ')
+            io.stderr(`[fulcrum/pre]   ${r.kind}: ${summary}\n`)
+          }
+        }
+      }
+    } catch { /* best-effort — never block on recall failure */ }
+  }
+
+  io.exit(0)
+}
+
+/**
+ * PostToolUse handler: writes a `tool_trace` operational memory capturing
+ * which tool was called, the input keys (NOT values — never re-log
+ * secrets), session, and run. Non-blocking: failures go to stderr only.
+ */
+export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
+  if (!ctx.runId) {
+    // No run = no task/project to scope the trace to; nothing useful to write.
+    io.exit(0)
+    return
+  }
+
+  try {
+    const { getDb, writeMemory } = await import('@fulcrum/core')
+    const db = getDb()
+    const runRow = db.prepare(
+      `SELECT task_id, project_id FROM agent_runs WHERE run_id = ? AND workspace_id = ?`
+    ).get(ctx.runId, ctx.workspace_id) as { task_id: string | null; project_id: string | null } | undefined
+
+    // Redact: only log the *keys* of tool_input, never the values.
+    const tool_input_keys = Object.keys(ctx.toolInput).slice(0, 20)
+    const content = [
+      `Tool: ${ctx.toolName}`,
+      `Keys: ${tool_input_keys.join(', ') || '(none)'}`,
+      `Session: ${ctx.sessionId}`,
+      `Run: ${ctx.runId}`,
+    ].join('\n')
+
+    await writeMemory({
+      workspace_id: ctx.workspace_id,
+      project_id: runRow?.project_id ?? ctx.workspace_id,
+      task_id: runRow?.task_id ?? undefined,
+      content,
+      kind: 'tool_trace',
+      scope: runRow?.task_id ? 'task' : 'project',
+      tags: [ctx.toolName, ctx.cliName],
+      importance: 0.2,
+    })
+  } catch (err) {
+    io.stderr(`[fulcrum/post] tool_trace write failed: ${(err as Error).message}\n`)
+    // Don't fail the hook.
+  }
+  io.exit(0)
+}
+
+async function runHook(cliName: string, phase: HookPhase = 'pre'): Promise<void> {
   if (cliName === '--help' || cliName === '-h' || !cliName) {
     console.log(`
 fulcrum hook — tool-call policy hooks for coding agents
 
-  fulcrum hook claude    PreToolUse hook for Claude Code (reads JSON from stdin)
-  fulcrum hook gemini    BeforeTool hook for Gemini CLI (reads JSON from stdin)
-  fulcrum hook pi        BeforeTool hook for PI coding agent (reads JSON from stdin)
+  fulcrum hook claude [pre|post]    Claude Code PreToolUse / PostToolUse hook
+  fulcrum hook gemini [pre|post]    Gemini CLI BeforeTool / AfterTool hook
+  fulcrum hook pi     [pre|post]    PI coding agent BeforeTool / AfterTool hook
 
-Each hook normalises the event to Fulcrum's canonical shape, logs the
-tool call, runs the policy check, and exits 0 (allow) or 2 (deny).
+Phase defaults to 'pre' when omitted (legacy). The pre hook normalises
+the event, scans for secrets, enforces the team-invoke policy, and
+recalls relevant task memories (surfaced via stderr). The post hook
+writes a tool_trace operational memory for the call.
 `)
     process.exit(0)
   }
@@ -360,23 +514,36 @@ tool call, runs the policy check, and exits 0 (allow) or 2 (deny).
       object_id: runId || undefined,
       actor_type: 'agent',
       actor_id: `${cliName}/${sessionId.slice(0, 8)}${runId ? ':' + runId.slice(-8) : ''}`,
-      payload: { tool_name: toolName, tool_input_keys: Object.keys(toolInput), session_id: sessionId, run_id: runId || undefined },
+      payload: {
+        tool_name: toolName,
+        tool_input_keys: Object.keys(toolInput),
+        session_id: sessionId,
+        run_id: runId || undefined,
+        phase,
+      },
     })
   } catch { /* logging best-effort */ }
 
-  // Policy check — only enforce team-invoke restriction
-  const isTeamInvoke = toolName.includes('invoke_team') || toolName.includes('team_invoke')
-  if (isTeamInvoke && agentRole) {
-    const { canInvokeTeams } = await import('@fulcrum/core')
-    type AgentRole = Parameters<typeof canInvokeTeams>[0]
-    if (!canInvokeTeams(agentRole as AgentRole)) {
-      process.stderr.write(`[fulcrum hook] Tool call denied: role '${agentRole}' lacks can_invoke_teams\n`)
-      process.exit(2)
-    }
+  const ctx: HookContext = {
+    cliName: cliName as HookCli,
+    phase,
+    toolName,
+    toolInput,
+    sessionId,
+    agentRole,
+    runId,
+    workspace_id,
+  }
+  const io: HookIO = {
+    stderr: (msg: string) => process.stderr.write(msg),
+    exit: (code: number) => process.exit(code),
   }
 
-  // Allow
-  process.exit(0)
+  if (phase === 'pre') {
+    await runPreHook(ctx, io)
+  } else {
+    await runPostHook(ctx, io)
+  }
 }
 
 // ── Serve commands ────────────────────────────────────────────────────────────
@@ -1985,11 +2152,20 @@ fulcrum serve — long-running servers
       return
     }
     if (cli === 'claude' || cli === 'gemini' || cli === 'pi') {
-      await runHook(cli)
+      // Optional second-level arg: 'pre' | 'post'. Default 'pre' for
+      // backward compatibility with existing settings.json entries.
+      const phaseArg = args[2] as string | undefined
+      const phase: HookPhase = phaseArg === 'post' ? 'post' : 'pre'
+      if (phaseArg && phaseArg !== 'pre' && phaseArg !== 'post') {
+        console.error(`Unknown hook phase: ${phaseArg}`)
+        console.error('Usage: fulcrum hook claude|gemini|pi [pre|post]')
+        process.exit(1)
+      }
+      await runHook(cli, phase)
       return
     }
     console.error(`Unknown hook: ${cli}`)
-    console.error('Usage: fulcrum hook claude | gemini | pi')
+    console.error('Usage: fulcrum hook claude|gemini|pi [pre|post]')
     process.exit(1)
   }
 

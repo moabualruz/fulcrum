@@ -6,7 +6,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "fulcrum hook claude"
+            "command": "fulcrum hook claude pre"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "fulcrum hook claude post"
           }
         ]
       }
