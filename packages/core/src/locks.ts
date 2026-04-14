@@ -1,6 +1,27 @@
 // packages/core/src/locks.ts
-// Advisory file-level locks for concurrent agent workflows (G-5, spec §5.5 / §18.1).
-// Non-blocking: acquireLock either succeeds or reports who holds the lock.
+/**
+ * Advisory file-level locks for concurrent agent workflows (G-5, H-7).
+ *
+ * These locks are **exclusive only**: at most one `(workspace_id, resource_path)`
+ * tuple holds a lock at any given time, and a subsequent `acquireLock` call on
+ * the same resource returns `acquired=false` with the current holder's `run_id`.
+ * The call is non-blocking — it never waits.
+ *
+ * The spec (`pi_local_first_agent_os_spec.md`) is silent on reader/writer lock
+ * semantics. §18.1 is "Worktree rule" — "Worktrees are used only for parallel
+ * write runs in git repos" — which describes isolation via worktrees rather
+ * than via in-process shared/exclusive mode locks. §5.7 mentions that non-git
+ * projects "use weaker write isolation", but does not pin down a multi-reader
+ * / single-writer contract. The closest concrete directive is §18.7
+ * "Non-git writing: Sequential by default", which is trivially satisfied by
+ * exclusive-only advisory locks.
+ *
+ * If future work requires shared/reader locks (e.g., two runs reading the same
+ * resource while a third wants to write), extend `AcquireLockInput` with a
+ * `mode: 'shared' | 'exclusive'` field, add a `mode` column to `advisory_locks`
+ * via a new migration, and update the conflict check. See H-7 in the Round 2
+ * gap-fix plan for the history of this decision.
+ */
 import { getDb } from './db/client.js'
 import { newId } from './ids.js'
 import { DEFAULT_LOCK_TTL_SEC } from './constants.js'
