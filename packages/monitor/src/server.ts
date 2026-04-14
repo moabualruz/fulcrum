@@ -559,12 +559,13 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         project_id: body.project_id,
         task_id: body.task_id,
         limit: body.limit ?? 10,
-      })
+        mode: 'full',
+      } as unknown as Parameters<typeof recallMemory>[0])
       return c.json({
-        memories: memories.map(m => ({
-          content: m.content.slice(0, 500),
+        memories: (memories as Array<{ content?: string; tags?: string[]; memory_id: string; kind?: string }>).map(m => ({
+          content: (m.content ?? '').slice(0, 500),
           score: 0.0,
-          tags: m.tags,
+          tags: m.tags ?? [],
           memory_id: m.memory_id,
           kind: m.kind,
         }))
@@ -586,15 +587,17 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       await ensureWorkspace(body.workspace_id)
       await ensureProject(body.workspace_id, body.project_id)
       const tagList = body.tags ? body.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
+      const title = body.title ?? body.content.slice(0, 80)
       const memory = await writeMemory({
         content: body.content,
         workspace_id: body.workspace_id,
         project_id: body.project_id,
-        title: body.title ?? body.content.slice(0, 80),
+        title,
+        summary: title,
+        scope: (body.scope ?? 'project') as Parameters<typeof writeMemory>[0]['scope'],
+        kind: (body.kind ?? 'fact') as Parameters<typeof writeMemory>[0]['kind'],
         tags: tagList,
-        scope: body.scope as 'global' | 'project' | 'file' | undefined,
-        kind: body.kind as Parameters<typeof writeMemory>[0]['kind'],
-      })
+      } as Parameters<typeof writeMemory>[0])
       return c.json({ saved: true, memory_id: memory.memory_id, project_id: body.project_id, tags: tagList })
     } catch (err) {
       return c.json({ error: (err as Error).message }, 500)

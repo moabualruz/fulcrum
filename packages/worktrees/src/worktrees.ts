@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from 'fs'
 import { dirname, join } from 'path'
-import { getDb, FulcrumError, newId, canMerge, type AgentRole } from '@fulcrum/core'
+import { getDb, FulcrumError, newId, canMerge, emitEvent, type AgentRole } from '@fulcrum/core'
 import type {
   Worktree,
   MergeResult,

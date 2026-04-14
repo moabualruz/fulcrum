@@ -481,6 +481,7 @@ export class FulcrumError extends Error {
       | 'conflict'
       | 'version_conflict'
       | 'policy_blocked'
+      | 'policy_denied'
       | 'invalid_input'
       | 'invalid_state'
       | 'rate_limited'

@@ -20,7 +20,8 @@
   },
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build": "tsup src/index.ts --format esm --dts --clean"
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",

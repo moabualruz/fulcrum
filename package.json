@@ -62,6 +62,7 @@
     ]
   },
   "devDependencies": {
+    "tsup": "^8.5.1",
     "tsx": "^4.21.0"
   }
 }
