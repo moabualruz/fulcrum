@@ -68,6 +68,10 @@ export {
 } from './agent-definitions.js'
 export type { AgentDefinition, CreateAgentDefinitionInput, UpdateAgentDefinitionInput } from './types.js'
 
+// A2A Agent Card
+export { buildA2ACard } from './a2a-card.js'
+export type { A2AAgentCard, A2ASkill, A2ACapabilities } from './a2a-card.js'
+
 // IDs
 export { newId, nextDisplayId } from './ids.js'
 
