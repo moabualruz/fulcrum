@@ -8,6 +8,7 @@ import {
   writeMemory, recallMemory,
   buildCosContext,
   loadConfig,
+  createWorkspace, createProject, getProject,
 } from '@fulcrum/core'
 import {
   getMetrics,
@@ -366,25 +367,16 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
   // ─── Control / write endpoints ─────────────────────────────────────────────
 
-  // Ensure workspace and project exist (auto-create for agent integrations)
-  function ensureWorkspace(db: ReturnType<typeof getDb>, ws: string, name?: string) {
-    const existing = db.prepare('SELECT workspace_id FROM workspaces WHERE workspace_id = ?').get(ws)
-    if (!existing) {
-      const now = new Date().toISOString()
-      db.prepare(
-        'INSERT OR IGNORE INTO workspaces (workspace_id, name, status, created_at) VALUES (?, ?, ?, ?)'
-      ).run(ws, name ?? ws, 'active', now)
-    }
+  // Ensure workspace and project exist (auto-create for agent integrations).
+  // Routed through core CRUD so FK/enum validation lives in one place.
+  async function ensureWorkspace(ws: string, name?: string): Promise<void> {
+    await createWorkspace({ workspace_id: ws, name: name ?? ws })
   }
 
-  function ensureProject(db: ReturnType<typeof getDb>, ws: string, proj: string, name?: string) {
-    const existing = db.prepare('SELECT project_id FROM projects WHERE project_id = ?').get(proj)
-    if (!existing) {
-      const now = new Date().toISOString()
-      db.prepare(
-        'INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at) VALUES (?, ?, ?, ?)'
-      ).run(proj, ws, name ?? proj, now)
-    }
+  async function ensureProject(ws: string, proj: string, name?: string): Promise<void> {
+    const existing = await getProject(proj)
+    if (existing) return
+    await createProject({ workspace_id: ws, project_id: proj, name: name ?? proj })
   }
 
   app.get('/tasks', (c) => {
@@ -430,9 +422,8 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       if (!body.title || !body.project_id || !body.workspace_id) {
         return c.json({ error: 'title, project_id, workspace_id are required' }, 400)
       }
-      const db = getDb()
-      ensureWorkspace(db, body.workspace_id)
-      ensureProject(db, body.workspace_id, body.project_id)
+      await ensureWorkspace(body.workspace_id)
+      await ensureProject(body.workspace_id, body.project_id)
       const task = await createTask({
         title: body.title,
         project_id: body.project_id,
@@ -475,8 +466,8 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       }
       const db = getDb()
       const proj = body.project_id || body.workspace_id
-      ensureWorkspace(db, body.workspace_id)
-      ensureProject(db, body.workspace_id, proj)
+      await ensureWorkspace(body.workspace_id)
+      await ensureProject(body.workspace_id, proj)
 
       // Auto-create a stub task if task_id is missing or not found
       let task_id = body.task_id
@@ -590,9 +581,8 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       if (!body.content || !body.workspace_id || !body.project_id) {
         return c.json({ error: 'content, workspace_id, project_id are required' }, 400)
       }
-      const db = getDb()
-      ensureWorkspace(db, body.workspace_id)
-      ensureProject(db, body.workspace_id, body.project_id)
+      await ensureWorkspace(body.workspace_id)
+      await ensureProject(body.workspace_id, body.project_id)
       const tagList = body.tags ? body.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
       const memory = await writeMemory({
         content: body.content,

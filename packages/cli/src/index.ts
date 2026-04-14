@@ -679,14 +679,11 @@ async function runServeAll(): Promise<void> {
 // ── Workspace/project commands ────────────────────────────────────────────────
 
 async function runWorkspaces(): Promise<void> {
-  const { getDb, runMigrations, newId } = await import('@fulcrum/core')
-  const db = getDb()
-  runMigrations(db)
-
+  const { listWorkspaces, createWorkspace } = await import('@fulcrum/core')
   const sub = command // e.g. 'list' or 'create'
 
   if (!sub || sub === 'list') {
-    const rows = db.prepare('SELECT workspace_id, name, status, created_at FROM workspaces ORDER BY created_at DESC').all() as {workspace_id:string; name:string; status:string; created_at:string}[]
+    const rows = await listWorkspaces()
     if (rows.length === 0) { console.log('No workspaces found.'); return }
     for (const r of rows) console.log(`  ${r.workspace_id}  ${r.name}  (${r.status})`)
     return
@@ -696,11 +693,10 @@ async function runWorkspaces(): Promise<void> {
     const nameIdx = args.indexOf('--name')
     const idIdx = args.indexOf('--id')
     const name = nameIdx >= 0 ? args[nameIdx + 1] : undefined
+    const workspace_id = idIdx >= 0 ? args[idIdx + 1] : undefined
     if (!name) { console.error('--name is required'); process.exit(1) }
-    const wsId = idIdx >= 0 ? args[idIdx + 1] : newId('ws')
-    const now = new Date().toISOString()
-    db.prepare('INSERT OR IGNORE INTO workspaces (workspace_id, name, status, created_at) VALUES (?, ?, ?, ?)').run(wsId, name, 'active', now)
-    console.log(`Created workspace: ${wsId}  (${name})`)
+    const ws = await createWorkspace({ name, workspace_id })
+    console.log(`Created workspace: ${ws.workspace_id}  (${ws.name})`)
     return
   }
 
@@ -709,20 +705,15 @@ async function runWorkspaces(): Promise<void> {
 }
 
 async function runProjects(): Promise<void> {
-  const { getDb, runMigrations, newId } = await import('@fulcrum/core')
-  const db = getDb()
-  runMigrations(db)
-
+  const { listProjects, createProject } = await import('@fulcrum/core')
   const sub = command
 
   if (!sub || sub === 'list') {
     const wsIdx = args.indexOf('--workspace-id')
-    const wsId = wsIdx >= 0 ? args[wsIdx + 1] : undefined
-    const rows = wsId
-      ? db.prepare('SELECT * FROM projects WHERE workspace_id = ? ORDER BY created_at DESC').all(wsId) as {project_id:string;name:string;workspace_id:string}[]
-      : db.prepare('SELECT * FROM projects ORDER BY created_at DESC').all() as {project_id:string;name:string;workspace_id:string}[]
+    const workspace_id = wsIdx >= 0 ? args[wsIdx + 1] : undefined
+    const rows = await listProjects({ workspace_id })
     if (rows.length === 0) { console.log('No projects found.'); return }
-    for (const r of rows) console.log(`  ${r.project_id}  ${r.name}  ws:${r.workspace_id}`)
+    for (const r of rows) console.log(`  ${r.project_id}  ${r.name}  type:${r.type}  status:${r.status}  ws:${r.workspace_id}`)
     return
   }
 
@@ -730,13 +721,14 @@ async function runProjects(): Promise<void> {
     const nameIdx = args.indexOf('--name')
     const wsIdx = args.indexOf('--workspace-id')
     const idIdx = args.indexOf('--id')
+    const typeIdx = args.indexOf('--type')
     const name = nameIdx >= 0 ? args[nameIdx + 1] : undefined
-    const wsId = wsIdx >= 0 ? args[wsIdx + 1] : undefined
-    if (!name || !wsId) { console.error('--name and --workspace-id are required'); process.exit(1) }
-    const projId = idIdx >= 0 ? args[idIdx + 1] : newId('proj')
-    const now = new Date().toISOString()
-    db.prepare('INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at) VALUES (?, ?, ?, ?)').run(projId, wsId, name, now)
-    console.log(`Created project: ${projId}  (${name}) in workspace ${wsId}`)
+    const workspace_id = wsIdx >= 0 ? args[wsIdx + 1] : undefined
+    if (!name || !workspace_id) { console.error('--name and --workspace-id are required'); process.exit(1) }
+    const project_id = idIdx >= 0 ? args[idIdx + 1] : undefined
+    const type = typeIdx >= 0 ? (args[typeIdx + 1] as Parameters<typeof createProject>[0]['type']) : undefined
+    const proj = await createProject({ name, workspace_id, project_id, type })
+    console.log(`Created project: ${proj.project_id}  (${proj.name}) in workspace ${proj.workspace_id}`)
     return
   }
 
@@ -770,7 +762,7 @@ async function ensureProjectInitialized(opts: { silent?: boolean } = {}): Promis
   const path = await import('path')
   const fs = await import('fs')
   const crypto = await import('crypto')
-  const { getDb, runMigrations } = await import('@fulcrum/core')
+  const { getDb, runMigrations, getWorkspace, getProject, createWorkspace, createProject } = await import('@fulcrum/core')
 
   const cwd = process.cwd()
 
@@ -787,15 +779,13 @@ async function ensureProjectInitialized(opts: { silent?: boolean } = {}): Promis
   const workspace_id = `ws_${sanitizedName}_${hash}`
   const project_id = `proj_${sanitizedName}_${hash}`
 
-  const now = new Date().toISOString()
-  const wsRes = db.prepare(
-    `INSERT OR IGNORE INTO workspaces (workspace_id, name, status, created_at)
-     VALUES (?, ?, 'active', ?)`
-  ).run(workspace_id, sanitizedName, now)
-  const projRes = db.prepare(
-    `INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at)
-     VALUES (?, ?, ?, ?)`
-  ).run(project_id, workspace_id, sanitizedName, now)
+  // Route workspace/project creation through core CRUD so FK/enum validation
+  // runs in one place. Both calls are effectively idempotent: we check
+  // existence first, and createWorkspace itself is INSERT OR IGNORE.
+  const existingWs = await getWorkspace(workspace_id)
+  const existingProj = await getProject(project_id)
+  if (!existingWs) await createWorkspace({ workspace_id, name: sanitizedName })
+  if (!existingProj) await createProject({ workspace_id, project_id, name: sanitizedName })
 
   // Write/update .fulcrum.json so PI cockpit and monitor pick up the same IDs
   const configPath = path.join(cwd, '.fulcrum.json')
@@ -820,7 +810,7 @@ async function ensureProjectInitialized(opts: { silent?: boolean } = {}): Promis
   }
 
   // Announce first-time init on stderr (never stdout — MCP stdio is strict)
-  const firstRun = wsRes.changes > 0 || projRes.changes > 0 || needsWrite
+  const firstRun = !existingWs || !existingProj || needsWrite
   if (firstRun && !opts.silent && !_projectInitialized) {
     process.stderr.write(`[fulcrum] initialized project "${sanitizedName}" (${workspace_id})\n`)
   }
