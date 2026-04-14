@@ -30,7 +30,7 @@ export { writeMemory } from './write.js'
 export { linkMemoryToEntity, getMemoryEntities } from './entities.js'
 
 // Recall
-export { recallMemory } from './recall.js'
+export { recallMemory, getMemory, getMemoriesForTask } from './recall.js'
 
 // Ingestion pipeline
 export { ingestFile, ingestProject } from './ingest.js'

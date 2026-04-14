@@ -84,6 +84,19 @@ function updateAccessCounts(db: DbType, ids: string[]): void {
   ).run(now, ...ids)
 }
 
+export async function getMemory(memory_id: string): Promise<FullMemory | null> {
+  const db = getDb()
+  const row = db.prepare('SELECT * FROM memories WHERE memory_id = ?').get(memory_id) as Record<string, unknown> | undefined
+  if (!row) return null
+  return rowToFullMemory(row)
+}
+
+export async function getMemoriesForTask(task_id: string): Promise<FullMemory[]> {
+  const db = getDb()
+  const rows = db.prepare('SELECT * FROM memories WHERE task_id = ? ORDER BY created_at DESC').all(task_id) as Record<string, unknown>[]
+  return rows.map(rowToFullMemory)
+}
+
 export async function recallMemory(
   input: RecallMemoryInput
 ): Promise<CompactMemory[] | FullMemory[]> {
