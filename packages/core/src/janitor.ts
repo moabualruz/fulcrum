@@ -2,6 +2,7 @@ import { getDb } from './db/client.js'
 import { escalateRun } from './runs.js'
 import { FulcrumError } from './types.js'
 import type { PolicyConfig } from './types.js'
+import { JANITOR_INTERVAL_SEC } from './constants.js'
 
 interface JanitorCycleInput {
   workspace_id: string
@@ -49,7 +50,7 @@ export async function runJanitorCycle(input: JanitorCycleInput): Promise<void> {
 }
 
 /** Start a background janitor loop. Returns a stop function. */
-export function startJanitor(workspace_id: string, policy: PolicyConfig, intervalMs = 60_000): () => void {
+export function startJanitor(workspace_id: string, policy: PolicyConfig, intervalMs = JANITOR_INTERVAL_SEC * 1000): () => void {
   let running = false
   const timer = setInterval(() => {
     if (running) return // skip if previous cycle hasn't finished

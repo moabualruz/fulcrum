@@ -1,11 +1,17 @@
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import type { FulcrumConfig, PolicyConfig, EmbeddingProviderConfig } from './types.js'
+import {
+  DEFAULT_EMBED_DIM,
+  DEFAULT_MONITOR_PORT,
+  DEFAULT_HEARTBEAT_TIMEOUT_SEC,
+  DEFAULT_ESCALATION_TIMEOUT_SEC,
+} from './constants.js'
 
 const DEFAULT_TEXT_EMBEDDING: EmbeddingProviderConfig = {
   provider: 'local',
   model: 'onnx-community/Qwen3-Embedding-0.6B-ONNX',
-  dimensions: 1024,
+  dimensions: DEFAULT_EMBED_DIM,
 }
 
 const DEFAULT_RERANKER: EmbeddingProviderConfig = {
@@ -16,14 +22,14 @@ const DEFAULT_RERANKER: EmbeddingProviderConfig = {
 const DEFAULT_POLICY: PolicyConfig = {
   wip_limit: 5,
   wip_limit_per_role: {},
-  heartbeat_timeout_minutes: 10,
-  escalation_timeout_minutes: 30,
+  heartbeat_timeout_minutes: DEFAULT_HEARTBEAT_TIMEOUT_SEC / 60,
+  escalation_timeout_minutes: DEFAULT_ESCALATION_TIMEOUT_SEC / 60,
 }
 
 export const defaultConfig: FulcrumConfig = {
   workspace_id: '',
   project_id: '',
-  port: 4721,
+  port: DEFAULT_MONITOR_PORT,
   embedding: { text: DEFAULT_TEXT_EMBEDDING, code: null },
   reranker: DEFAULT_RERANKER,
   policy: DEFAULT_POLICY,
