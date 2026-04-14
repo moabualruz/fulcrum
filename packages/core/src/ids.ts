@@ -29,6 +29,7 @@ const PREFIXES: Record<string, string> = {
   lock: 'lock_',
   span: 'span_',
   policy_event: 'pevt_',
+  agent_profile: 'ap_',
 }
 
 const DISPLAY_PREFIXES: Record<string, string> = {

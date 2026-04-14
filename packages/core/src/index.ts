@@ -10,6 +10,7 @@ export type {
   TaskPacket, SpawnableRun, StartAgentRunInput,
   Workspace, ArtifactContract,
   TelemetrySpan,
+  AgentProfileRow, CreateAgentProfileInput, UpdateAgentProfileInput,
 } from './types.js'
 export { FulcrumError } from './types.js'
 
@@ -101,3 +102,28 @@ export {
   canEditFiles,
 } from './roles.js'
 export type { RoleCapabilities } from './roles.js'
+
+// Agent profiles (dynamic, DB-backed — L-3)
+export {
+  createAgentProfile,
+  getAgentProfile,
+  listAgentProfileRows,
+  updateAgentProfile,
+  deleteAgentProfile,
+} from './agent-profiles.js'
+
+// Team management (L-4) — re-exported via a lazy getter to avoid a static
+// circular dependency. @fulcrum/teams imports from @fulcrum/core, so core
+// cannot statically import from teams. MCP tool handlers and other async
+// callers should use `const teams = await getTeamOps()` to access:
+//   createTeamTemplate, invokeTeam, heartbeatTeam, completeTeam,
+//   listTeamInstances, getTeamStatus, canStartTeam.
+// The return type is `Record<string, unknown>` because @fulcrum/teams is a
+// workspace sibling that depends on core and therefore isn't statically
+// visible to core's tsconfig (same pattern as janitor.ts → @fulcrum/worktrees).
+// Callers should import types from '@fulcrum/teams' directly when needed.
+export async function getTeamOps(): Promise<Record<string, unknown>> {
+  // @ts-ignore — dynamic sibling import; resolves at runtime via pnpm workspace
+  const mod = await import('@fulcrum/teams')
+  return mod as unknown as Record<string, unknown>
+}

@@ -2146,54 +2146,86 @@ export function runMigrations(db: Database.Database): void {
   // rebuild-with-preserved-indexes pattern as the other CHECK-widening
   // migrations above.
   const already029 = db.prepare("SELECT id FROM schema_migrations WHERE name = '029_worktrees_conflict_status'").get()
-  if (already029) return
+  if (!already029) {
+    const wtCols029 = db.prepare(`PRAGMA table_info(worktrees)`).all() as { name: string }[]
+    if (wtCols029.length === 0) {
+      // worktrees table doesn't exist yet — MIGRATION_008_WORKTREES will run next
+      // with the widened CHECK already in place.
+      db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('029_worktrees_conflict_status')").run()
+    } else {
+      const wtCreateRow = db
+        .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='worktrees'`)
+        .get() as { sql: string | null } | undefined
+      if (!wtCreateRow?.sql || wtCreateRow.sql.includes(`'conflict'`) || !wtCreateRow.sql.includes(`'discarded'`)) {
+        // Already widened (contains 'conflict') or CHECK removed entirely — nothing to do.
+        db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('029_worktrees_conflict_status')").run()
+      } else {
+        const wtIdxes029 = (db
+          .prepare(`SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='worktrees' AND sql IS NOT NULL`)
+          .all() as { sql: string }[]).map(r => r.sql)
 
-  const wtCols029 = db.prepare(`PRAGMA table_info(worktrees)`).all() as { name: string }[]
-  if (wtCols029.length === 0) {
-    // worktrees table doesn't exist yet — MIGRATION_008_WORKTREES will run next
-    // with the widened CHECK already in place.
-    db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('029_worktrees_conflict_status')").run()
-    return
-  }
+        const fkPrev029 = db.pragma('foreign_keys', { simple: true }) as number
+        db.pragma('foreign_keys = OFF')
+        try {
+          db.transaction(() => {
+            const withRenamed = wtCreateRow.sql!.replace(/CREATE TABLE\s+"?worktrees"?/i, 'CREATE TABLE worktrees_new')
+            const rebuilt = withRenamed.replace(
+              /CHECK\s*\(\s*status\s+IN\s*\(\s*'allocated'\s*,\s*'dirty'\s*,\s*'ready_for_merge'\s*,\s*'merged'\s*,\s*'discarded'\s*\)\s*\)/i,
+              `CHECK(status IN ('allocated','dirty','ready_for_merge','merged','discarded','conflict'))`
+            )
+            if (rebuilt === withRenamed) {
+              throw new Error('MIGRATION_029: failed to inject widened CHECK on worktrees.status')
+            }
+            db.exec(rebuilt)
 
-  const wtCreateRow = db
-    .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='worktrees'`)
-    .get() as { sql: string | null } | undefined
-  if (!wtCreateRow?.sql || wtCreateRow.sql.includes(`'conflict'`) || !wtCreateRow.sql.includes(`'discarded'`)) {
-    // Already widened (contains 'conflict') or CHECK removed entirely — nothing to do.
-    db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('029_worktrees_conflict_status')").run()
-    return
-  }
+            const colNames = wtCols029.map(c => c.name).join(', ')
+            db.exec(`INSERT INTO worktrees_new (${colNames}) SELECT ${colNames} FROM worktrees`)
+            db.exec(`DROP TABLE worktrees`)
+            db.exec(`ALTER TABLE worktrees_new RENAME TO worktrees`)
 
-  const wtIdxes029 = (db
-    .prepare(`SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='worktrees' AND sql IS NOT NULL`)
-    .all() as { sql: string }[]).map(r => r.sql)
-
-  const fkPrev029 = db.pragma('foreign_keys', { simple: true }) as number
-  db.pragma('foreign_keys = OFF')
-  try {
-    db.transaction(() => {
-      const withRenamed = wtCreateRow.sql.replace(/CREATE TABLE\s+"?worktrees"?/i, 'CREATE TABLE worktrees_new')
-      const rebuilt = withRenamed.replace(
-        /CHECK\s*\(\s*status\s+IN\s*\(\s*'allocated'\s*,\s*'dirty'\s*,\s*'ready_for_merge'\s*,\s*'merged'\s*,\s*'discarded'\s*\)\s*\)/i,
-        `CHECK(status IN ('allocated','dirty','ready_for_merge','merged','discarded','conflict'))`
-      )
-      if (rebuilt === withRenamed) {
-        throw new Error('MIGRATION_029: failed to inject widened CHECK on worktrees.status')
+            for (const idxSql of wtIdxes029) {
+              try { db.exec(idxSql) } catch { /* index may already exist */ }
+            }
+          })()
+        } finally {
+          db.pragma(fkPrev029 ? 'foreign_keys = ON' : 'foreign_keys = OFF')
+        }
+        db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('029_worktrees_conflict_status')").run()
       }
-      db.exec(rebuilt)
-
-      const colNames = wtCols029.map(c => c.name).join(', ')
-      db.exec(`INSERT INTO worktrees_new (${colNames}) SELECT ${colNames} FROM worktrees`)
-      db.exec(`DROP TABLE worktrees`)
-      db.exec(`ALTER TABLE worktrees_new RENAME TO worktrees`)
-
-      for (const idxSql of wtIdxes029) {
-        try { db.exec(idxSql) } catch { /* index may already exist */ }
-      }
-    })()
-  } finally {
-    db.pragma(fkPrev029 ? 'foreign_keys = ON' : 'foreign_keys = OFF')
+    }
   }
-  db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('029_worktrees_conflict_status')").run()
+
+  // MIGRATION_030 — agent_profiles table (L-3)
+  // Lets chief_of_staff and other authorized callers create DB-backed
+  // agent profiles at runtime. These extend (don't replace) the 24 hardcoded
+  // AgentRole values. When listAgentProfiles() is called, core merges the
+  // hardcoded list with the DB list for the given workspace.
+  const already030 = db.prepare("SELECT id FROM schema_migrations WHERE name = '030_agent_profiles'").get()
+  if (!already030) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS agent_profiles (
+        profile_id       TEXT PRIMARY KEY,
+        workspace_id     TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+        name             TEXT NOT NULL,
+        base_role        TEXT NOT NULL DEFAULT 'custom'
+          CHECK(base_role IN (
+            'chief_of_staff','context_gatherer','prd_planner','implementation_planner',
+            'issue_decomposer','software_engineer','research_worker','refactor_worker',
+            'browser_worker','data_engineer','ml_engineer','devops_engineer',
+            'architecture_reviewer','code_reviewer','qa_engineer','security_reviewer',
+            'integration_worker','documentation_writer','memory_curator','tech_lead',
+            'product_manager','analyst','orchestrator','custom'
+          )),
+        description      TEXT NOT NULL,
+        system_prompt    TEXT,
+        capabilities     TEXT NOT NULL DEFAULT '{}',
+        created_by       TEXT,
+        created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_agent_profiles_workspace ON agent_profiles(workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_agent_profiles_base_role ON agent_profiles(base_role);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_profiles_ws_name ON agent_profiles(workspace_id, name);
+    `)
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('030_agent_profiles')").run()
+  }
 }

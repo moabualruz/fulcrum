@@ -95,6 +95,9 @@ importers:
         specifier: ^2.3.0
         version: 2.4.0
     devDependencies:
+      '@fulcrum/teams':
+        specifier: workspace:*
+        version: link:../teams
       '@types/better-sqlite3':
         specifier: ^7.6.12
         version: 7.6.13

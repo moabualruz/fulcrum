@@ -140,6 +140,20 @@ const GUARDED_COLUMNS: EnumColumn[] = [
     column: 'scope',
     expected: ['task', 'issue', 'project', 'workspace'],
   },
+  {
+    // AgentRole — packages/core/src/types.ts — guarded on agent_profiles.base_role
+    // by MIGRATION_030 so DB-backed profiles can't drift from the TS enum.
+    table: 'agent_profiles',
+    column: 'base_role',
+    expected: [
+      'chief_of_staff', 'context_gatherer', 'prd_planner', 'implementation_planner',
+      'issue_decomposer', 'software_engineer', 'research_worker', 'refactor_worker',
+      'browser_worker', 'data_engineer', 'ml_engineer', 'devops_engineer',
+      'architecture_reviewer', 'code_reviewer', 'qa_engineer', 'security_reviewer',
+      'integration_worker', 'documentation_writer', 'memory_curator', 'tech_lead',
+      'product_manager', 'analyst', 'orchestrator', 'custom',
+    ],
+  },
 ]
 
 /**

@@ -3,7 +3,8 @@ import { fileURLToPath } from 'url'
 import * as pathModule from 'path'
 import { getDb } from './db/client.js'
 import { rowToRun } from './runs.js'
-import type { AgentProfile, WorkspaceStatusResult } from './types.js'
+import { listAgentProfileRows } from './agent-profiles.js'
+import type { AgentProfile, WorkspaceStatusResult, AgentRole } from './types.js'
 
 // Resolve the agent-integration/roles/ directory from this file's location.
 // packages/core/src/status.ts → packages/core → packages → repo root → agent-integration/roles
@@ -170,11 +171,36 @@ export async function buildCosContext(input: BuildCosContextInput): Promise<stri
   return parts.join('').slice(0, maxChars)
 }
 
-export async function listAgentProfiles(): Promise<AgentProfile[]> {
-  // Prefer each role's "Purpose" section from agent-integration/roles/<role>.md
-  // and fall back to the hardcoded description when no MD file is present.
-  return AGENT_PROFILES.map(profile => {
+interface ListAgentProfilesInput {
+  workspace_id?: string
+}
+
+export async function listAgentProfiles(
+  input?: ListAgentProfilesInput,
+): Promise<AgentProfile[]> {
+  // 1. Hardcoded profiles — prefer each role's "Purpose" section from
+  //    agent-integration/roles/<role>.md, fall back to the hardcoded description.
+  const hardcoded: AgentProfile[] = AGENT_PROFILES.map(profile => {
     const fromMd = loadRolePurpose(profile.role)
-    return fromMd ? { ...profile, description: fromMd } : profile
+    const base = fromMd ? { ...profile, description: fromMd } : profile
+    return { ...base, source: 'hardcoded' as const }
   })
+
+  // 2. DB-backed profiles for the given workspace (if one was provided).
+  //    When no workspace_id is passed we preserve the original behaviour
+  //    (hardcoded only) so existing callers remain unchanged.
+  if (!input?.workspace_id) return hardcoded
+
+  const rows = await listAgentProfileRows(input.workspace_id)
+  const dbProfiles: AgentProfile[] = rows.map(row => ({
+    role: row.base_role as AgentRole,
+    description: row.description,
+    can_create_teams: false,
+    can_dispatch_agents: false,
+    source: 'db' as const,
+    profile_id: row.profile_id,
+    name: row.name,
+  }))
+
+  return [...hardcoded, ...dbProfiles]
 }

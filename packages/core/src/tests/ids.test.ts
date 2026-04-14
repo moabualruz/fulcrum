@@ -123,6 +123,7 @@ describe('newId prefixes (G-15)', () => {
     ['span', 'span_'],
     ['policy_event', 'pevt_'],
     ['team_instance', 'ti_'],
+    ['agent_profile', 'ap_'],
   ]
   for (const [kind, prefix] of cases) {
     it(`${kind} → ${prefix}...`, () => {

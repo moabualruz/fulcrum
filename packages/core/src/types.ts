@@ -196,6 +196,47 @@ export interface AgentProfile {
   description: string
   can_create_teams: boolean
   can_dispatch_agents: boolean
+  /** Provenance marker: 'hardcoded' for the built-in 24 canonical roles,
+   *  'db' for workspace-scoped rows from the agent_profiles table. */
+  source?: 'hardcoded' | 'db'
+  /** DB-backed profiles expose their row id and human name so callers can
+   *  distinguish multiple custom profiles that share a base_role. */
+  profile_id?: string
+  name?: string
+}
+
+/** Row shape of the agent_profiles DB table — dynamic, workspace-scoped
+ *  profiles that supplement the hardcoded 24 AgentRole values. */
+export interface AgentProfileRow {
+  profile_id: string
+  workspace_id: string
+  name: string
+  base_role: AgentRole
+  description: string
+  system_prompt: string | null
+  capabilities: Record<string, unknown>
+  created_by: string | null
+  created_at: string
+}
+
+export interface CreateAgentProfileInput {
+  workspace_id: string
+  name: string
+  description: string
+  base_role?: AgentRole          // defaults to 'custom'
+  system_prompt?: string
+  capabilities?: Record<string, unknown>
+  created_by?: string
+  profile_id?: string            // optional supplied id
+}
+
+export interface UpdateAgentProfileInput {
+  profile_id: string
+  name?: string
+  description?: string
+  base_role?: AgentRole
+  system_prompt?: string | null
+  capabilities?: Record<string, unknown>
 }
 
 export interface WorkspaceStatusResult {
