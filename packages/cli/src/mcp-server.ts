@@ -4,6 +4,7 @@
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { SetLevelRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { TOOL_SCHEMAS } from './mcp-tools.js'
 
@@ -70,10 +71,10 @@ const READ_ONLY_TOOLS = new Set(
 // ---------- Server factory ----------
 
 export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
-  const server = new McpServer({
-    name: 'fulcrum',
-    version: options.version,
-  })
+  const server = new McpServer(
+    { name: 'fulcrum', version: options.version },
+    { capabilities: { logging: {} } },
+  )
 
   for (const tool of TOOL_SCHEMAS) {
     const shape = buildZodShape(
@@ -246,6 +247,61 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
       return result
     },
   )
+
+  // ---------- Prompts ----------
+  // Register fulcrum's two most useful context-builders as MCP prompts so
+  // clients (Claude Desktop, etc.) can embed them in their system prompt pane.
+
+  server.registerPrompt(
+    'build_cos_context',
+    {
+      title: 'Build Chief-of-Staff context',
+      description: 'Generate a structured CoS context summary for a workspace/project',
+      argsSchema: {
+        workspace_id: z.string().describe('Workspace ID'),
+        project_id: z.string().describe('Project ID'),
+      },
+    },
+    async ({ workspace_id, project_id }) => {
+      const result = await options.handleToolCall('build_cos_context', { workspace_id, project_id })
+      return {
+        messages: [{
+          role: 'user' as const,
+          content: { type: 'text' as const, text: typeof result === 'string' ? result : JSON.stringify(result) },
+        }],
+      }
+    },
+  )
+
+  server.registerPrompt(
+    'recall_memory',
+    {
+      title: 'Recall relevant memories',
+      description: 'Search and return memory entries relevant to a query',
+      argsSchema: {
+        query: z.string().describe('Natural-language memory search query'),
+        workspace_id: z.string().describe('Workspace ID'),
+        project_id: z.string().describe('Project ID'),
+      },
+    },
+    async ({ query, workspace_id, project_id }) => {
+      const result = await options.handleToolCall('recall_memory', { query, workspace_id, project_id })
+      return {
+        messages: [{
+          role: 'user' as const,
+          content: { type: 'text' as const, text: JSON.stringify(result) },
+        }],
+      }
+    },
+  )
+
+  // ---------- Logging capability ----------
+  // Handle logging/setLevel so clients can control server log verbosity.
+  server.server.setRequestHandler(SetLevelRequestSchema, (request) => {
+    const level = request.params.level
+    process.stderr.write(`[fulcrum mcp] logging level set to: ${level}\n`)
+    return {}
+  })
 
   return server
 }
