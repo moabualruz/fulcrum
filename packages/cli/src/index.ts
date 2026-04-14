@@ -205,6 +205,21 @@ async function runHook(cliName: string): Promise<void> {
 
 // ── Serve commands ────────────────────────────────────────────────────────────
 
+let _embeddingWarmed = false
+async function warmEmbedding(): Promise<void> {
+  if (_embeddingWarmed) return
+  const { initEmbedding, loadConfig } = await import('@fulcrum/core')
+  try {
+    const config = loadConfig()
+    await initEmbedding(config)
+    _embeddingWarmed = true
+    process.stderr.write('[fulcrum] embedding model ready\n')
+  } catch (err) {
+    process.stderr.write(`[fulcrum] embedding init failed: ${(err as Error).message}\n`)
+    process.exit(1)
+  }
+}
+
 async function runServeMcp(): Promise<void> {
   const { getDb, runMigrations, loadConfig, createTask, updateTask, listTasks,
     startAgentRun, heartbeatAgentRun, completeAgentRun, blockAgentRun,
@@ -214,6 +229,8 @@ async function runServeMcp(): Promise<void> {
   const config = loadConfig()
   const db = getDb()
   runMigrations(db)
+
+  await warmEmbedding()
 
   // Auto-create workspace/project from config
   function ensureWorkspace(wsId: string, name?: string) {
@@ -643,6 +660,8 @@ async function runServeMonitor(): Promise<void> {
   const db = getDb()
   runMigrations(db)
 
+  await warmEmbedding()
+
   const portArg = args.find(a => a.startsWith('--port'))
   let port = config.port ?? 4721
   if (portArg) {
@@ -668,6 +687,8 @@ async function runServeAll(): Promise<void> {
   const config = loadConfig()
   const db = getDb()
   runMigrations(db)
+
+  await warmEmbedding()
 
   const server = startMonitorServer({ workspace_id: config.workspace_id || undefined })
   await server.start()
