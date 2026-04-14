@@ -233,3 +233,40 @@ export interface RemoveTaskRelationInput {
 export interface GetTaskRelationsInput {
   task_id: string
 }
+
+// --- Review types ---
+
+export type ReviewStatus = 'pending' | 'changes_requested' | 'approved' | 'rejected'
+export type ReviewTargetType = 'task' | 'artifact' | 'worktree'
+
+export interface Review {
+  review_id: string
+  workspace_id: string
+  project_id?: string
+  display_id: string
+  status: ReviewStatus
+  target_type: ReviewTargetType
+  target_id: string
+  reviewer_agent_id?: string
+  summary?: string
+  file_path?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateReviewInput {
+  workspace_id: string
+  project_id?: string
+  target_type: ReviewTargetType
+  target_id: string
+  reviewer_agent_id?: string
+  summary?: string
+  file_path?: string
+}
+
+export interface UpdateReviewInput {
+  review_id: string
+  workspace_id: string
+  status: ReviewStatus
+  summary?: string
+}
