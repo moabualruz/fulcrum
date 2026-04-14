@@ -1,6 +1,8 @@
 {
   "name": "@fulcrum/policy",
   "version": "0.0.1",
+  "description": "Policy engine — system invariants, custom rule evaluation, secret guard (detect and redact), and audit logging",
+  "keywords": ["policy", "security", "secret-detection", "audit-log", "invariants", "access-control"],
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

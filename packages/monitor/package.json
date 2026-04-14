@@ -1,6 +1,8 @@
 {
   "name": "@fulcrum/monitor",
   "version": "0.0.1",
+  "description": "Real-time metrics dashboard — daily, project, and agent metrics, burndown data, HTTP monitoring server",
+  "keywords": ["metrics", "monitoring", "dashboard", "burndown", "agent-metrics", "http-server"],
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
