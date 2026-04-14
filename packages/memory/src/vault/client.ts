@@ -26,7 +26,7 @@ const SCHEMA_YAML_CONTENT = `# Fulcrum Vault Schema
 version: 1
 kinds:
   curated: [decision, fact, summary, task_outcome, task_decision, error, doc]
-  operational: [symbol, diff, code, procedure, task_goal, task_failure]
+  operational: [tool_trace, reasoning_step, symbol, diff, code, procedure, task_goal, task_failure]
 scopes: [global, project, file]
 `
 
@@ -56,6 +56,54 @@ export async function initVault(vaultPath: string): Promise<void> {
   if (!existsSync(logPath)) {
     writeFileSync(logPath, '', 'utf-8')
   }
+
+  // .obsidian/ — minimal config for Obsidian compatibility
+  const obsidianDir = join(vaultPath, '.obsidian')
+  mkdirSync(obsidianDir, { recursive: true })
+  const appJsonPath = join(obsidianDir, 'app.json')
+  if (!existsSync(appJsonPath)) {
+    writeFileSync(appJsonPath, JSON.stringify({ legacyEditor: false, livePreview: true }, null, 2) + '\n', 'utf-8')
+  }
+
+  // queries.md — pre-built Dataview queries for browsing
+  const queriesPath = join(vaultPath, 'queries.md')
+  if (!existsSync(queriesPath)) {
+    const queriesContent = `# Vault Queries
+
+Pre-built Dataview queries for browsing memories in Obsidian.
+
+## Recent Decisions
+
+\`\`\`dataview
+TABLE summary, tags, created_at AS "Created"
+FROM "memories/curated"
+WHERE kind = "decision"
+SORT created_at DESC
+LIMIT 20
+\`\`\`
+
+## Architecture Memories
+
+\`\`\`dataview
+TABLE summary, workspace_id
+FROM "memories/curated"
+WHERE contains(tags, "architecture")
+SORT importance DESC
+\`\`\`
+`
+    writeFileSync(queriesPath, queriesContent, 'utf-8')
+  }
+}
+
+/**
+ * Encode a file path for use as a vault directory segment.
+ * Replaces '/' with '--' so the full path becomes a single readable directory name.
+ * e.g. "packages/memory/src/write.ts" → "packages--memory--src--write.ts"
+ * Falls back to "_unknown" for empty paths.
+ */
+function encodeFilePath(filePath: string): string {
+  if (!filePath) return '_unknown'
+  return filePath.replace(/\//g, '--').replace(/\\/g, '--')
 }
 
 export function getMemoryFilePath(vaultPath: string, memory: FullMemory): string {
@@ -86,12 +134,14 @@ export function getMemoryFilePath(vaultPath: string, memory: FullMemory): string
       )
     } else {
       // scope === 'file'
-      // memories/curated/workspaces/<ws_id>/file/<project_id>/<yyyy>/<mm>/<id>.md
+      // memories/curated/workspaces/<ws_id>/file/<project_id>/<encoded_path>/<yyyy>/<mm>/<id>.md
+      const encodedPath = encodeFilePath(memory.file_path ?? '')
       return join(
         vaultPath,
         'memories', 'curated', 'workspaces',
         memory.workspace_id,
         'file', memory.project_id,
+        encodedPath,
         yyyy, mm,
         `${memory.memory_id}.md`
       )

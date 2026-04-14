@@ -55,6 +55,8 @@ describe('initVault', () => {
     expect(existsSync(join(vaultPath, 'schema.yaml'))).toBe(true)
     expect(existsSync(join(vaultPath, 'index.md'))).toBe(true)
     expect(existsSync(join(vaultPath, 'log.md'))).toBe(true)
+    expect(existsSync(join(vaultPath, '.obsidian', 'app.json'))).toBe(true)
+    expect(existsSync(join(vaultPath, 'queries.md'))).toBe(true)
   })
 
   it('is idempotent — second call does not overwrite existing files', async () => {
@@ -81,6 +83,27 @@ describe('getMemoryFilePath', () => {
     const opMemory: FullMemory = { ...baseMemory, kind: 'code', task_id: null }
     const p = getMemoryFilePath(vaultPath, opMemory)
     expect(p).toContain('01JBXK7Z9T8QH0F3VRDE5W2NPM')
+  })
+
+  it('includes encoded file_path segment for file-scoped curated memories', () => {
+    const fileMemory: FullMemory = {
+      ...baseMemory,
+      scope: 'file',
+      file_path: 'src/db/client.ts',
+    }
+    const p = getMemoryFilePath(vaultPath, fileMemory)
+    expect(p).toContain(join('file', 'proj_test', 'src--db--client.ts'))
+    expect(p).toContain('01JBXK7Z9T8QH0F3VRDE5W2NPM.md')
+  })
+
+  it('falls back to _unknown segment when file_path is null for file-scoped memories', () => {
+    const fileMemory: FullMemory = {
+      ...baseMemory,
+      scope: 'file',
+      file_path: null,
+    }
+    const p = getMemoryFilePath(vaultPath, fileMemory)
+    expect(p).toContain(join('file', 'proj_test', '_unknown'))
   })
 })
 
