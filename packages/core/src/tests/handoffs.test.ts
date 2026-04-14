@@ -173,13 +173,13 @@ describe('claimHandoff', () => {
     expect(claimed.to_agent_id).toBe('agent-claimer')
   })
 
-  it('throws not_found on double-claim', () => {
+  it('throws invalid_state on double-claim', () => {
     const db = seed()
     const handoff = createHandoff(db, makeHandoffInput())
     claimHandoff(db, { handoff_id: handoff.handoff_id, workspace_id: 'ws_1', agent_id: 'agent-1' })
     expect(() =>
       claimHandoff(db, { handoff_id: handoff.handoff_id, workspace_id: 'ws_1', agent_id: 'agent-2' })
-    ).toThrow(expect.objectContaining({ code: 'not_found' }))
+    ).toThrow(expect.objectContaining({ code: 'invalid_state' }))
   })
 
   it('throws not_found for unknown handoff_id', () => {

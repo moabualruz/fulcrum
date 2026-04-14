@@ -133,7 +133,7 @@ export function claimHandoff(
   if (existing.status !== 'pending') {
     throw new FulcrumError(
       `Handoff ${input.handoff_id} cannot be claimed — current status: ${existing.status}`,
-      'not_found'
+      'invalid_state'
     )
   }
 

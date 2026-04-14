@@ -1067,7 +1067,9 @@ export function runMigrations(db: Database.Database): void {
 
   const already013 = db.prepare("SELECT id FROM schema_migrations WHERE name = '013_handoff_status'").get()
   if (!already013) {
-    db.exec(MIGRATION_013_HANDOFF_STATUS)
+    db.transaction(() => {
+      db.exec(MIGRATION_013_HANDOFF_STATUS)
+    })()
     db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('013_handoff_status')`).run()
   }
 }
