@@ -24,6 +24,22 @@ interface EscalateRunInput { run_id: string; escalation_reason: string }
 // Keep RunStatus as alias for backward compat
 export type RunStatus = AgentRunStatus
 
+function upsertAgentStateProjection(db: ReturnType<typeof getDb>, run: AgentRun): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO agent_state_projection
+      (run_id, workspace_id, project_id, agent_id, agent_role, pi_profile, status,
+       task_id, current_step, current_path, progress_pct, heartbeat_at, blocker,
+       worktree_id, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    run.run_id, run.workspace_id, run.project_id ?? null, run.agent_id ?? null,
+    run.role, run.pi_profile ?? null, run.status,
+    run.task_id ?? null, run.current_step ?? null, run.current_path ?? null,
+    run.progress_pct ?? null, run.heartbeat_at ?? null, run.blocker ?? null,
+    run.worktree_id ?? null, run.updated_at
+  )
+}
+
 function captureGitContext(): { git_branch: string | null; git_commit: string | null } {
   try {
     const opts = { stdio: ['ignore', 'pipe', 'ignore'] as ['ignore', 'pipe', 'ignore'], timeout: 3000 }
@@ -108,6 +124,9 @@ export async function startAgentRun(input: StartAgentRunInput): Promise<AgentRun
     initialStatus, sc, git_branch, git_commit, now, now
   )
 
+  const startedRun = getRun(run_id)
+  upsertAgentStateProjection(db, startedRun)
+
   emitEvent({
     workspace_id: input.workspace_id,
     project_id: taskRow.project_id,
@@ -150,6 +169,8 @@ export async function heartbeatAgentRun(input: HeartbeatInput): Promise<void> {
     now, input.run_id
   )
   if (result.changes === 0) throw new FulcrumError(`Run ${input.run_id} not found`, 'not_found')
+  const heartbeatRun = getRun(input.run_id)
+  upsertAgentStateProjection(db, heartbeatRun)
 }
 
 export async function getAgentRunStatus(input: GetStatusInput): Promise<AgentRun> {
@@ -178,6 +199,9 @@ export async function completeAgentRun(input: CompleteRunInput): Promise<AgentRu
     now, now, input.run_id
   )
 
+  const completedRun = getRun(input.run_id)
+  upsertAgentStateProjection(db, completedRun)
+
   emitEvent({
     workspace_id: run.workspace_id,
     project_id: run.project_id || undefined,
@@ -203,6 +227,9 @@ export async function blockAgentRun(input: BlockRunInput): Promise<AgentRun> {
         updated_at = ?, version = version + 1
     WHERE run_id = ?
   `).run(blockedCategory, input.reason, new Date().toISOString(), input.run_id)
+
+  const blockedRun = getRun(input.run_id)
+  upsertAgentStateProjection(db, blockedRun)
 
   emitEvent({
     workspace_id: run.workspace_id,
@@ -245,6 +272,9 @@ export async function escalateRun(input: EscalateRunInput): Promise<Task> {
     UPDATE agent_runs SET status = 'aborted', status_category = 'done', updated_at = ?, version = version + 1
     WHERE run_id = ?
   `).run(new Date().toISOString(), input.run_id)
+
+  const abortedRun = getRun(input.run_id)
+  upsertAgentStateProjection(db, abortedRun)
 
   const taskRow = db.prepare('SELECT * FROM tasks WHERE task_id = ?')
     .get(run.task_id) as Record<string, unknown> | undefined
