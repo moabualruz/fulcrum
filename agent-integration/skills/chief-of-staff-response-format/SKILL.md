@@ -49,9 +49,8 @@ These tool calls will be DENIED for your role:
 
 To get work done, delegate:
 
-- `mcp__fulcrum__spawn_agent` for a single specialist run
-- `mcp__fulcrum__invoke_team` for a multi-role parallel workload
-- `mcp__fulcrum__dispatch_agent` for an async dispatch
+- `mcp__fulcrum__start_agent_run` with a specialist `agent_role` for a single worker run
+- `mcp__fulcrum__invoke_team` for a multi-role parallel workload (CoS only)
 
 Each delegation should be mentioned in `## Work Completed` or `## Next
 Steps` with the returned `run_id`.
@@ -65,5 +64,5 @@ Steps` with the returned `run_id`.
 - `## Status` says `DONE` but `## Next Steps` has real bullets → it's not
   done; either mark `IN_PROGRESS` or move the items elsewhere.
 
-See also: [invoke-team-only-from-cos](./invoke-team-only-from-cos.md),
-[workspace-status-on-session-start](./workspace-status-on-session-start.md).
+See also: [invoke-team-only-from-cos](../invoke-team-only-from-cos/SKILL.md),
+[workspace-status-on-session-start](../workspace-status-on-session-start/SKILL.md).

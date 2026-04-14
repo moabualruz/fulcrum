@@ -23,7 +23,7 @@ after 10 minutes of silence and a stale run has real costs:
   long install)
 - You're about to do a multi-step refactor touching > 5 files
 - You're reading and analysing many files before producing output
-- You invoked another agent via `spawn_agent` and are waiting for its
+- You dispatched another agent via `start_agent_run` and are waiting for its
   result
 - You issued a heartbeat more than ~30 seconds ago and are still alive
 
@@ -62,5 +62,5 @@ alive", not to be a perfect tracker.
 - You heartbeated a run you never started → the call will fail; fix
   the missing `start_agent_run` upstream.
 
-See also: [start-every-task](./start-every-task.md),
-[block-when-stuck](./block-when-stuck.md).
+See also: [start-every-task](../start-every-task/SKILL.md),
+[block-when-stuck](../block-when-stuck/SKILL.md).

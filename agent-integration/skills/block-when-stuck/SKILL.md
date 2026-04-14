@@ -18,8 +18,8 @@ to handle. A run that silently invents an answer is a liability.
 - **Ambiguous requirements**: two reasonable interpretations of the task
   would produce meaningfully different output.
 - **Permission denial**: a PreToolUse hook denied a tool call and you have
-  no alternative path (see [secret-hygiene](./secret-hygiene.md) and
-  [invoke-team-only-from-cos](./invoke-team-only-from-cos.md)).
+  no alternative path (see [secret-hygiene](../secret-hygiene/SKILL.md) and
+  [invoke-team-only-from-cos](../invoke-team-only-from-cos/SKILL.md)).
 - **WIP exhaustion**: a downstream role you need to invoke is at WIP limit
   and not draining.
 
@@ -65,5 +65,5 @@ routes those separately so credentials flow through env vars, not prompts.
 - You blocked a run and kept writing code → that's not blocked, that's
   hiding work; complete or cancel the run first.
 
-See also: [heartbeat-during-long-operations](./heartbeat-during-long-operations.md),
-[secret-hygiene](./secret-hygiene.md).
+See also: [heartbeat-during-long-operations](../heartbeat-during-long-operations/SKILL.md),
+[secret-hygiene](../secret-hygiene/SKILL.md).

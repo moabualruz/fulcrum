@@ -17,7 +17,7 @@ primary signal the chief-of-staff uses to decide what happens next.
 - You have committed and/or pushed, or produced the artifact the task asked
   for
 - You are about to stop responding for any reason other than being blocked
-  (if blocked, see [block-when-stuck](./block-when-stuck.md) instead)
+  (if blocked, see [block-when-stuck](../block-when-stuck/SKILL.md) instead)
 
 ## How
 
@@ -57,5 +57,5 @@ reviews.
 - You completed a run that was never started → the call will fail; start
   a new run, do the minimum to represent the state, then complete it.
 
-See also: [write-memory-on-completion](./write-memory-on-completion.md),
-[start-every-task](./start-every-task.md).
+See also: [write-memory-on-completion](../write-memory-on-completion/SKILL.md),
+[start-every-task](../start-every-task/SKILL.md).

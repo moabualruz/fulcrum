@@ -67,5 +67,5 @@ why.
 - A workflow failed mid-run and you restarted from scratch → workflows
   are resumable; pass the previous run_id and continue.
 
-See also: [start-every-task](./start-every-task.md),
-[heartbeat-during-long-operations](./heartbeat-during-long-operations.md).
+See also: [start-every-task](../start-every-task/SKILL.md),
+[heartbeat-during-long-operations](../heartbeat-during-long-operations/SKILL.md).

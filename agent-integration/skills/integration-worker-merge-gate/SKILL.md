@@ -27,21 +27,20 @@ A worktree is mergeable if and only if ALL of the following are true:
 ## How to verify
 
 ```
-mcp__fulcrum__list_artifacts
+mcp__fulcrum__get_workspace_status
   workspace_id: ...
-  worktree_id:  ...
 ```
 
-Inspect the returned list for `kind in ('review_report', 'test_report')`
-with `status='final'`. A `status='draft'` or missing record counts as
-absent — reject the merge.
+Check `runs` for any `code_reviewer` or `qa_engineer` run on the same task
+with `status=finished` and a non-empty `output_summary`. A run with no
+summary or still `running` counts as absent — reject the merge.
 
 ## If an artifact is missing
 
 Do NOT skip the gate. Instead:
 
-- **Missing review_report**: dispatch `code_reviewer` via `spawn_agent` (or
-  block the run with reason `"review pending on worktree-<id>"` and let
+- **Missing review**: call `mcp__fulcrum__start_agent_run` with `agent_role=code_reviewer` (or
+  block the run with reason `"review pending"` and let
   chief_of_staff schedule it).
 - **Missing test_report**: run the project's test script via `run_script`,
   capture the output, and attach it as an artifact with `kind=test_report`
@@ -58,5 +57,5 @@ Do NOT skip the gate. Instead:
 - You are NOT `integration_worker` and considered calling a merge tool →
   stop; that capability is gated to `integration_worker` only. Delegate.
 
-See also: [start-every-task](./start-every-task.md),
-[block-when-stuck](./block-when-stuck.md).
+See also: [start-every-task](../start-every-task/SKILL.md),
+[block-when-stuck](../block-when-stuck/SKILL.md).

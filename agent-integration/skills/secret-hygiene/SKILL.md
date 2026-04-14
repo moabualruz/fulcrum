@@ -56,5 +56,5 @@ When you need a secret to proceed:
 - You think the pattern scanner is wrong and want to bypass it → don't;
   file it as feedback via a `lesson` memory.
 
-See also: [block-when-stuck](./block-when-stuck.md),
-[write-memory-on-completion](./write-memory-on-completion.md).
+See also: [block-when-stuck](../block-when-stuck/SKILL.md),
+[write-memory-on-completion](../write-memory-on-completion/SKILL.md).

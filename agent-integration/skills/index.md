@@ -15,30 +15,30 @@ automatically when that condition is met.
 
 The skills are most useful in roughly this order within a session:
 
-1. [workspace-status-on-session-start](./workspace-status-on-session-start.md)
-2. [recall-before-writing](./recall-before-writing.md)
-3. [start-every-task](./start-every-task.md)
-4. [heartbeat-during-long-operations](./heartbeat-during-long-operations.md)
-5. [block-when-stuck](./block-when-stuck.md) (if applicable)
-6. [complete-agent-run](./complete-agent-run.md)
-7. [write-memory-on-completion](./write-memory-on-completion.md)
+1. [workspace-status-on-session-start](./workspace-status-on-session-start/SKILL.md)
+2. [recall-before-writing](./recall-before-writing/SKILL.md)
+3. [start-every-task](./start-every-task/SKILL.md)
+4. [heartbeat-during-long-operations](./heartbeat-during-long-operations/SKILL.md)
+5. [block-when-stuck](./block-when-stuck/SKILL.md) (if applicable)
+6. [complete-agent-run](./complete-agent-run/SKILL.md)
+7. [write-memory-on-completion](./write-memory-on-completion/SKILL.md)
 
 ## Full table
 
 | Skill | When to apply |
 |-------|---------------|
-| [start-every-task](./start-every-task.md) | Before any Write/Edit/Bash call |
-| [recall-before-writing](./recall-before-writing.md) | Before writing new code, docs, or decisions |
-| [complete-agent-run](./complete-agent-run.md) | When finishing work with a real summary |
-| [block-when-stuck](./block-when-stuck.md) | When you can't proceed and would otherwise guess |
-| [workspace-status-on-session-start](./workspace-status-on-session-start.md) | At the very start of a session |
-| [chief-of-staff-response-format](./chief-of-staff-response-format.md) | Every CoS turn — structured handoff block |
-| [write-memory-on-completion](./write-memory-on-completion.md) | After completing a decision/trade-off/finding |
-| [integration-worker-merge-gate](./integration-worker-merge-gate.md) | Before `processMergeQueue` as integration_worker |
-| [invoke-team-only-from-cos](./invoke-team-only-from-cos.md) | When a non-CoS role is tempted to call `invoke_team` |
-| [run-workflow-not-freestyle](./run-workflow-not-freestyle.md) | Named multi-step processes (PRD, plan, grill-me) |
-| [secret-hygiene](./secret-hygiene.md) | Any tool call that would embed credentials |
-| [heartbeat-during-long-operations](./heartbeat-during-long-operations.md) | Any run > ~60 seconds |
+| [start-every-task](./start-every-task/SKILL.md) | Before any Write/Edit/Bash call |
+| [recall-before-writing](./recall-before-writing/SKILL.md) | Before writing new code, docs, or decisions |
+| [complete-agent-run](./complete-agent-run/SKILL.md) | When finishing work with a real summary |
+| [block-when-stuck](./block-when-stuck/SKILL.md) | When you can't proceed and would otherwise guess |
+| [workspace-status-on-session-start](./workspace-status-on-session-start/SKILL.md) | At the very start of a session |
+| [chief-of-staff-response-format](./chief-of-staff-response-format/SKILL.md) | Every CoS turn — structured handoff block |
+| [write-memory-on-completion](./write-memory-on-completion/SKILL.md) | After completing a decision/trade-off/finding |
+| [integration-worker-merge-gate](./integration-worker-merge-gate/SKILL.md) | Before any merge attempt as integration_worker |
+| [invoke-team-only-from-cos](./invoke-team-only-from-cos/SKILL.md) | When a non-CoS role is tempted to call `invoke_team` |
+| [run-workflow-not-freestyle](./run-workflow-not-freestyle/SKILL.md) | Named multi-step processes (PRD, plan, grill-me) |
+| [secret-hygiene](./secret-hygiene/SKILL.md) | Any tool call that would embed credentials |
+| [heartbeat-during-long-operations](./heartbeat-during-long-operations/SKILL.md) | Any run > ~60 seconds |
 
 ## Quick reference
 
@@ -47,8 +47,8 @@ The skills are most useful in roughly this order within a session:
 - **Long-running** → `mcp__fulcrum__heartbeat_agent_run`
 - **Stuck** → `mcp__fulcrum__block_agent_run`
 - **Done** → `mcp__fulcrum__complete_agent_run` + `mcp__fulcrum__write_memory`
-- **CoS only** → `mcp__fulcrum__invoke_team`, `mcp__fulcrum__spawn_agent`, `mcp__fulcrum__build_cos_context`
-- **Merge** → `integration_worker` only, with review + test artifacts in place
+- **CoS only** → `mcp__fulcrum__invoke_team`, `mcp__fulcrum__build_cos_context`
+- **Merge** → `integration_worker` only, after code review and tests pass
 
 ## Conventions
 

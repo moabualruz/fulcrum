@@ -147,7 +147,7 @@ function recoveryHintFor(name: string): string | undefined {
     return `manual: append agent-integration/claude/CLAUDE.md to ~/.claude/CLAUDE.md`;
   }
   if (name.includes("Claude Code: skills")) {
-    return `manual: cp agent-integration/skills/*.md ~/.claude/skills/fulcrum/`;
+    return `manual: cp -r agent-integration/skills/*/ ~/.claude/skills/fulcrum/`;
   }
   if (name.includes("Gemini")) {
     return `manual: copy agent-integration/gemini/* into ~/.gemini/extensions/fulcrum/`;
@@ -404,11 +404,13 @@ function installClaudeContext(): void {
 }
 
 // ── 5b. Claude Code: skills → ~/.claude/skills/fulcrum/ ──────────────────────
-// Each file in agent-integration/skills/ gets copied to ~/.claude/skills/fulcrum/.
+// Skills are in directory form: agent-integration/skills/<name>/SKILL.md
+// Each skill directory is copied to ~/.claude/skills/fulcrum/<name>/SKILL.md.
 // Claude Code auto-loads user-scope skills from ~/.claude/skills/ at session start
 // and surfaces them to the agent when the skill's `description` frontmatter field
 // matches the current task. A namespaced subdirectory (`fulcrum/`) avoids
 // collisions with other tool suites that install their own skills.
+// index.md is installed as a flat file (not a skill, just an index README).
 
 function installClaudeSkills(): void {
   const srcDir = path.join(REPO_ROOT, "agent-integration", "skills");
@@ -416,28 +418,48 @@ function installClaudeSkills(): void {
     warn(`skills source dir not found: ${srcDir}`);
     return;
   }
-  const files = fs.readdirSync(srcDir).filter((f) => f.endsWith(".md"));
-  if (files.length === 0) {
-    skip("no skill files to install");
-    return;
-  }
 
   const destDir = path.join(HOME, ".claude", "skills", "fulcrum");
   mkdirp(destDir);
 
   let copied = 0;
-  for (const f of files) {
-    const src = path.join(srcDir, f);
-    const dest = path.join(destDir, f);
+
+  // Install directory-form skills: each <name>/SKILL.md
+  const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+  const skillDirs = entries.filter(
+    (e) => e.isDirectory() && fs.existsSync(path.join(srcDir, e.name, "SKILL.md"))
+  );
+
+  for (const dir of skillDirs) {
+    const skillSrc = path.join(srcDir, dir.name, "SKILL.md");
+    const skillDestDir = path.join(destDir, dir.name);
+    const skillDest = path.join(skillDestDir, "SKILL.md");
     if (DRY_RUN) {
-      dry(`would copy ${src} → ${dest}`);
+      dry(`would copy ${skillSrc} → ${skillDest}`);
       copied++;
       continue;
     }
-    fs.copyFileSync(src, dest);
+    mkdirp(skillDestDir);
+    fs.copyFileSync(skillSrc, skillDest);
     copied++;
   }
-  ok(`installed ${copied} skill file(s) → ${destDir}`);
+
+  // Also install flat index.md (README, not a skill)
+  const indexSrc = path.join(srcDir, "index.md");
+  if (fs.existsSync(indexSrc)) {
+    const indexDest = path.join(destDir, "index.md");
+    if (DRY_RUN) {
+      dry(`would copy ${indexSrc} → ${indexDest}`);
+    } else {
+      fs.copyFileSync(indexSrc, indexDest);
+    }
+  }
+
+  if (copied === 0 && skillDirs.length === 0) {
+    skip("no skill directories to install");
+    return;
+  }
+  ok(`installed ${copied} skill(s) → ${destDir}`);
 }
 
 // ── 5c. Claude Code: subagent MDs → ~/.claude/agents/ ────────────────────────
@@ -651,21 +673,23 @@ function runCheck(): number {
     rows.push({ label: "Claude context", status: "fail", detail: `${globalCtx} does not exist` });
   }
 
-  // Claude skills
+  // Claude skills (directory form: each skill is <name>/SKILL.md)
   const skillsDir = path.join(HOME, ".claude", "skills", "fulcrum");
   const srcSkillsDir = path.join(REPO_ROOT, "agent-integration", "skills");
   if (fs.existsSync(skillsDir)) {
-    const destFiles = fs.readdirSync(skillsDir).filter((f) => f.endsWith(".md")).length;
-    const srcFiles = fs.existsSync(srcSkillsDir)
-      ? fs.readdirSync(srcSkillsDir).filter((f) => f.endsWith(".md")).length
+    const destDirs = fs.readdirSync(skillsDir, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && fs.existsSync(path.join(skillsDir, e.name, "SKILL.md"))).length;
+    const srcDirs = fs.existsSync(srcSkillsDir)
+      ? fs.readdirSync(srcSkillsDir, { withFileTypes: true })
+          .filter((e) => e.isDirectory() && fs.existsSync(path.join(srcSkillsDir, e.name, "SKILL.md"))).length
       : 0;
-    if (srcFiles > 0 && destFiles >= srcFiles) {
-      rows.push({ label: "Claude skills", status: "ok", detail: `${skillsDir} (${destFiles} files)` });
+    if (srcDirs > 0 && destDirs >= srcDirs) {
+      rows.push({ label: "Claude skills", status: "ok", detail: `${skillsDir} (${destDirs} skills)` });
     } else {
       rows.push({
         label: "Claude skills",
         status: "warn",
-        detail: `${skillsDir} (${destFiles}/${srcFiles} files — re-run setup:claude)`,
+        detail: `${skillsDir} (${destDirs}/${srcDirs} skills — re-run setup:claude)`,
       });
     }
   } else {

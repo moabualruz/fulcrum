@@ -22,15 +22,14 @@ would let a single specialist reshape the task board without visibility.
 If you are an L2 role (software_engineer, code_reviewer, tech_lead,
 integration_worker, etc.) and you have work that genuinely needs a team:
 
-1. Call `mcp__fulcrum__escalate_run` on your current run with a clear
+1. Call `mcp__fulcrum__block_agent_run` on your current run with a clear
    `reason` describing:
    - What kind of team you need (roles)
    - Why your current role cannot finish the work alone
    - What the success criteria for the team would be
-2. The escalation is delivered to `chief_of_staff`, who can then
-   `invoke_team` on your behalf.
-3. Continue heartbeating until the CoS responds, or call
-   `block_agent_run` if you cannot make any progress while waiting.
+2. The blocked run is visible to `chief_of_staff` in `build_cos_context`,
+   who can then `invoke_team` on your behalf.
+3. Once the team completes, the CoS will unblock and resume your task.
 
 ## Example escalation reason
 
@@ -45,12 +44,12 @@ merged with both reviews passing and no new CVE surface.
 ## Red flags
 
 - You are `software_engineer` and you just called `invoke_team` → the
-  call failed; don't retry, escalate instead.
+  call failed; call `block_agent_run` with a team request instead.
 - You are `chief_of_staff` and you called `Write` or `Edit` to avoid
   invoking a team → that's a different violation; see
-  [chief-of-staff-response-format](./chief-of-staff-response-format.md).
-- You escalated without a clear `reason` → CoS has nothing to act on;
+  [chief-of-staff-response-format](../chief-of-staff-response-format/SKILL.md).
+- You blocked without a clear `reason` → CoS has nothing to act on;
   write the full context up front.
 
-See also: [chief-of-staff-response-format](./chief-of-staff-response-format.md),
-[block-when-stuck](./block-when-stuck.md).
+See also: [chief-of-staff-response-format](../chief-of-staff-response-format/SKILL.md),
+[block-when-stuck](../block-when-stuck/SKILL.md).

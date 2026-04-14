@@ -74,5 +74,5 @@ creates the memory graph the chief-of-staff traverses when planning.
 - You wrote a `lesson` that is actually a `task_outcome` — re-classify; a
   lesson should read as useful to a stranger with no context.
 
-See also: [recall-before-writing](./recall-before-writing.md),
-[complete-agent-run](./complete-agent-run.md).
+See also: [recall-before-writing](../recall-before-writing/SKILL.md),
+[complete-agent-run](../complete-agent-run/SKILL.md).

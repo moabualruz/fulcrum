@@ -58,8 +58,8 @@ for review, and `integration_worker` for merges.
 - You have more than one `run_id` in flight in the same session → call
   `block_agent_run` on the stale one before starting new work.
 - You hit a WIP-limit error → don't loop. See
-  [workspace-status-on-session-start](./workspace-status-on-session-start.md)
+  [workspace-status-on-session-start](../workspace-status-on-session-start/SKILL.md)
   to diagnose who else is holding the budget.
 
-See also: [recall-before-writing](./recall-before-writing.md),
-[complete-agent-run](./complete-agent-run.md).
+See also: [recall-before-writing](../recall-before-writing/SKILL.md),
+[complete-agent-run](../complete-agent-run/SKILL.md).

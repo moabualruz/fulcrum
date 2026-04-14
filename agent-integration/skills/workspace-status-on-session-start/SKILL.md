@@ -50,10 +50,10 @@ major planning turns — it is cheaper than re-deriving the state yourself.
 
 - You called `start_agent_run` without first calling `get_workspace_status`
   → you're flying blind; collect context first next time.
-- You spawned a role at the WIP ceiling → the spawn will be denied; check
-  status before calling `spawn_agent`.
+- You tried to start a role at the WIP ceiling → the call will be denied; check
+  status first with `get_workspace_status`.
 - You ignored a blocked run on the same task → it almost certainly explains
   the problem you're about to hit; read the reason.
 
-See also: [start-every-task](./start-every-task.md),
-[block-when-stuck](./block-when-stuck.md).
+See also: [start-every-task](../start-every-task/SKILL.md),
+[block-when-stuck](../block-when-stuck/SKILL.md).

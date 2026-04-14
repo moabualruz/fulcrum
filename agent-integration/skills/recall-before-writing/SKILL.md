@@ -64,5 +64,5 @@ This creates a visible chain of reasoning the chief_of_staff can audit later.
   search by file path; zero results usually means a bad query, not an empty
   memory store.
 
-See also: [start-every-task](./start-every-task.md),
-[write-memory-on-completion](./write-memory-on-completion.md).
+See also: [start-every-task](../start-every-task/SKILL.md),
+[write-memory-on-completion](../write-memory-on-completion/SKILL.md).
