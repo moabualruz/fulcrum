@@ -250,6 +250,14 @@ export interface PolicyCheckResult {
 
 export type HandoffPriority = 'critical' | 'high' | 'normal' | 'low'
 export type HandoffScope = 'task' | 'issue' | 'project' | 'workspace'
+/**
+ * HandoffMode — mirrors the Python enum in pi-agent-os.
+ * - sync:     caller blocks while the receiver runs
+ * - async:    fire-and-forget; receiver runs independently
+ * - review:   receiver is a reviewer gate
+ * - escalate: handoff raises the decision to a higher authority
+ */
+export type HandoffMode = 'sync' | 'async' | 'review' | 'escalate'
 
 export interface HandoffPacket {
   handoff_id: string
@@ -265,9 +273,9 @@ export interface HandoffPacket {
   scope: HandoffScope
   inputs: Record<string, unknown>
   constraints?: string[]
-  done_criteria?: string
+  done_criteria: string[]
   artifact_contract_id?: string
-  handoff_mode: string
+  handoff_mode: HandoffMode
   status: 'pending' | 'claimed' | 'completed' | 'cancelled'
   claimed_at?: string
   created_at: string
@@ -286,9 +294,9 @@ export interface CreateHandoffInput {
   scope?: HandoffScope
   inputs?: Record<string, unknown>
   constraints?: string[]
-  done_criteria?: string
+  done_criteria?: string[]
   artifact_contract_id?: string
-  handoff_mode?: string
+  handoff_mode?: HandoffMode
 }
 
 /**

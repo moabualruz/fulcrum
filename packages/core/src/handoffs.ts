@@ -3,7 +3,30 @@ import { getDb } from './db/client.js'
 import { newId } from './ids.js'
 import { emitEvent } from './events.js'
 import { FulcrumError } from './types.js'
-import type { HandoffPacket, CreateHandoffInput } from './types.js'
+import type { HandoffPacket, CreateHandoffInput, HandoffMode } from './types.js'
+
+const VALID_HANDOFF_MODES: readonly HandoffMode[] = ['sync', 'async', 'review', 'escalate']
+
+/**
+ * Parse a `done_criteria` column value into a string[].
+ * Accepts JSON arrays (canonical), legacy plain strings, and null.
+ */
+function parseDoneCriteria(raw: unknown): string[] {
+  if (raw === null || raw === undefined) return []
+  if (Array.isArray(raw)) return raw.map(String)
+  if (typeof raw !== 'string') return []
+  const trimmed = raw.trim()
+  if (!trimmed) return []
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (Array.isArray(parsed)) return parsed.map(String)
+    if (parsed === null || parsed === undefined) return []
+    return [String(parsed)]
+  } catch {
+    // Legacy plain-string row (pre-G-13)
+    return [trimmed]
+  }
+}
 
 function rowToHandoff(row: Record<string, unknown>): HandoffPacket {
   return {
@@ -29,9 +52,9 @@ function rowToHandoff(row: Record<string, unknown>): HandoffPacket {
         return Array.isArray(parsed) && parsed.length > 0 ? (parsed as string[]) : undefined
       } catch { return undefined }
     })(),
-    done_criteria: (row.done_criteria as string | null) ?? undefined,
+    done_criteria: parseDoneCriteria(row.done_criteria),
     artifact_contract_id: (row.artifact_contract_id as string | null) ?? undefined,
-    handoff_mode: (row.handoff_mode as string) || 'brief',
+    handoff_mode: (row.handoff_mode as HandoffMode) || 'sync',
     status: (row.status as HandoffPacket['status']) || 'pending',
     claimed_at: (row.claimed_at as string | null) ?? undefined,
     created_at: row.created_at as string,
@@ -47,7 +70,19 @@ export function createHandoff(db: Database, input: CreateHandoffInput): HandoffP
   const constraints = input.constraints && input.constraints.length > 0
     ? JSON.stringify(input.constraints)
     : null
-  const handoff_mode = input.handoff_mode ?? 'brief'
+
+  const handoff_mode: HandoffMode = input.handoff_mode ?? 'sync'
+  if (!VALID_HANDOFF_MODES.includes(handoff_mode)) {
+    throw new FulcrumError(
+      `Invalid handoff_mode: ${String(handoff_mode)} — must be one of ${VALID_HANDOFF_MODES.join(', ')}`,
+      'invalid_input'
+    )
+  }
+
+  const done_criteria: string[] = Array.isArray(input.done_criteria)
+    ? input.done_criteria.map(String)
+    : []
+  const done_criteria_json = JSON.stringify(done_criteria)
 
   db.prepare(`
     INSERT INTO handoffs (
@@ -70,7 +105,7 @@ export function createHandoff(db: Database, input: CreateHandoffInput): HandoffP
     scope,
     inputs,
     constraints,
-    input.done_criteria ?? null,
+    done_criteria_json,
     input.artifact_contract_id ?? null,
     handoff_mode,
     now,

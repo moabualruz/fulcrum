@@ -6,7 +6,7 @@ export type {
   TaskRelationType, MemoryScope, MemoryKind, ArtifactType, EventType,
   FulcrumEvent, TaskRelation,
   EmbeddingProviderConfig, FulcrumConfig, PolicyCheckResult,
-  HandoffPacket, CreateHandoffInput, HandoffPriority, HandoffScope,
+  HandoffPacket, CreateHandoffInput, HandoffPriority, HandoffScope, HandoffMode,
   TaskPacket, SpawnableRun, StartAgentRunInput,
   Workspace, ArtifactContract,
 } from './types.js'

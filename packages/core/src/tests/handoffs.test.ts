@@ -8,6 +8,8 @@ import {
   claimHandoff,
   completeHandoff,
 } from '../handoffs.js'
+import { FulcrumError } from '../types.js'
+import type { HandoffMode } from '../types.js'
 
 beforeEach(() => { createTestDb() })
 afterEach(() => resetTestDb())
@@ -42,8 +44,8 @@ describe('createHandoff', () => {
       scope: 'issue',
       inputs: { key: 'value', nested: { x: 1 } },
       constraints: ['must be fast', 'no side effects'],
-      done_criteria: 'All tests pass',
-      handoff_mode: 'contextual',
+      done_criteria: ['All tests pass', 'Reviewer approves'],
+      handoff_mode: 'review',
     })
 
     expect(handoff.handoff_id).toMatch(/^hof_/)
@@ -57,8 +59,8 @@ describe('createHandoff', () => {
     expect(handoff.scope).toBe('issue')
     expect(handoff.inputs).toEqual({ key: 'value', nested: { x: 1 } })
     expect(handoff.constraints).toEqual(['must be fast', 'no side effects'])
-    expect(handoff.done_criteria).toBe('All tests pass')
-    expect(handoff.handoff_mode).toBe('contextual')
+    expect(handoff.done_criteria).toEqual(['All tests pass', 'Reviewer approves'])
+    expect(handoff.handoff_mode).toBe('review')
     expect(handoff.status).toBe('pending')
     expect(handoff.claimed_at).toBeUndefined()
     expect(handoff.created_at).toBeTruthy()
@@ -72,10 +74,10 @@ describe('createHandoff', () => {
     expect(handoff.status).toBe('pending')
   })
 
-  it('applies default handoff_mode=brief when not provided', () => {
+  it('applies default handoff_mode=sync when not provided', () => {
     const db = seed()
     const handoff = createHandoff(db, makeHandoffInput())
-    expect(handoff.handoff_mode).toBe('brief')
+    expect(handoff.handoff_mode).toBe('sync')
   })
 
   it('emits handoff_created event', () => {
@@ -246,5 +248,90 @@ describe('inputs JSON round-trip', () => {
     const db = seed()
     const handoff = createHandoff(db, makeHandoffInput())
     expect(handoff.inputs).toEqual({})
+  })
+})
+
+describe('HandoffMode enum + done_criteria string[] (G-13)', () => {
+  it('createHandoff accepts done_criteria as an array and round-trips', () => {
+    const db = seed()
+    const h = createHandoff(db, makeHandoffInput({
+      project_id: 'proj_1',
+      handoff_mode: 'sync',
+      done_criteria: ['tests pass', 'reviewer approves'],
+    }))
+    expect(h.done_criteria).toEqual(['tests pass', 'reviewer approves'])
+    expect(h.handoff_mode).toBe('sync')
+
+    const fetched = getHandoff(db, h.handoff_id, 'ws_1')
+    expect(fetched?.done_criteria).toEqual(['tests pass', 'reviewer approves'])
+  })
+
+  it('createHandoff rejects invalid handoff_mode with FulcrumError (invalid_input)', () => {
+    const db = seed()
+    expect(() =>
+      createHandoff(db, makeHandoffInput({ handoff_mode: 'bogus' as unknown as HandoffMode }))
+    ).toThrow(FulcrumError)
+    expect(() =>
+      createHandoff(db, makeHandoffInput({ handoff_mode: 'brief' as unknown as HandoffMode }))
+    ).toThrow(expect.objectContaining({ code: 'invalid_input' }))
+  })
+
+  it('createHandoff accepts all four valid modes', () => {
+    const db = seed()
+    const modes: HandoffMode[] = ['sync', 'async', 'review', 'escalate']
+    for (const mode of modes) {
+      const h = createHandoff(db, makeHandoffInput({ goal: `g-${mode}`, handoff_mode: mode }))
+      expect(h.handoff_mode).toBe(mode)
+    }
+  })
+
+  it('done_criteria defaults to [] when omitted', () => {
+    const db = seed()
+    const h = createHandoff(db, makeHandoffInput({ handoff_mode: 'sync' }))
+    expect(h.done_criteria).toEqual([])
+    const fetched = getHandoff(db, h.handoff_id, 'ws_1')
+    expect(fetched?.done_criteria).toEqual([])
+  })
+
+  it('listHandoffs returns done_criteria arrays for all rows', () => {
+    const db = seed()
+    createHandoff(db, makeHandoffInput({
+      goal: 'a',
+      handoff_mode: 'sync',
+      done_criteria: ['one', 'two'],
+    }))
+    createHandoff(db, makeHandoffInput({
+      goal: 'b',
+      handoff_mode: 'async',
+    }))
+    const rows = listHandoffs(db, { workspace_id: 'ws_1' })
+    expect(rows).toHaveLength(2)
+    for (const row of rows) {
+      expect(Array.isArray(row.done_criteria)).toBe(true)
+    }
+    const a = rows.find(r => r.goal === 'a')!
+    const b = rows.find(r => r.goal === 'b')!
+    expect(a.done_criteria).toEqual(['one', 'two'])
+    expect(b.done_criteria).toEqual([])
+  })
+
+  it('parses legacy plain-string done_criteria rows as single-element array', () => {
+    const db = seed()
+    // Simulate a legacy row written before G-13 (plain string, not JSON).
+    const now = new Date().toISOString()
+    db.prepare(`
+      INSERT INTO handoffs (
+        handoff_id, workspace_id, project_id, from_agent_id, to_agent_id,
+        task_id, issue_id, goal, task_type, priority, scope,
+        inputs, constraints, done_criteria, artifact_contract_id,
+        handoff_mode, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+    `).run(
+      'hof_legacy1', 'ws_1', 'proj_1', null, null, null, null,
+      'legacy goal', 'impl', 'normal', 'task',
+      '{}', null, 'All tests pass', null, 'sync', now,
+    )
+    const fetched = getHandoff(db, 'hof_legacy1', 'ws_1')
+    expect(fetched?.done_criteria).toEqual(['All tests pass'])
   })
 })
