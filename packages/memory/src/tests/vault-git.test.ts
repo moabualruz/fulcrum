@@ -46,7 +46,7 @@ describe('VaultGit', () => {
     expect(branch).toBe('memory/tsk_test01')
   })
 
-  it('mergeMemoryBranch merges changes back to main', async () => {
+  it('mergeMemoryBranch merges changes back to main via --no-ff', async () => {
     const git = createVaultGit(vaultPath)
     await git.init()
 
@@ -54,23 +54,29 @@ describe('VaultGit', () => {
     writeFileSync(join(vaultPath, 'init.md'), 'init')
     await git.commitAll('initial')
 
-    // Determine default branch name
-    const defaultBranch = await git.currentBranch()
-
-    // Create branch and add a file
+    // Create memory branch and commit a new file on it
     await git.createMemoryBranch('tsk_merge01')
     writeFileSync(join(vaultPath, 'memory.md'), 'memory content')
     await git.commitAll('add memory')
 
-    // Merge back — the method checks out 'main' but default branch may be 'master'
-    // So we use the git object directly for the merge step
-    const sg = (await import('simple-git')).default(vaultPath)
-    await sg.checkout(defaultBranch)
-    await sg.merge([`memory/tsk_merge01`])
+    // Call the method under test — it checks out _defaultBranch ('main') and merges with --no-ff
+    await git.mergeMemoryBranch('tsk_merge01')
 
-    // Verify file exists on default branch
+    // Verify we are back on the default branch
+    const branch = await git.currentBranch()
+    expect(branch).toBe('main')
+
+    // Verify the merged file is present on main
     const { existsSync } = await import('fs')
     expect(existsSync(join(vaultPath, 'memory.md'))).toBe(true)
+
+    // Verify --no-ff: HEAD must be a merge commit (two parents)
+    const sg = (await import('simple-git')).default(vaultPath)
+    const headHash = (await sg.revparse(['HEAD'])).trim()
+    // git cat-file -p HEAD prints "parent <hash>" lines — two means a merge commit
+    const catFile = await sg.raw(['cat-file', '-p', headHash])
+    const parentLines = catFile.split('\n').filter(l => l.startsWith('parent '))
+    expect(parentLines.length).toBe(2)
   })
 
   it('getChangedFiles returns files changed between commits', async () => {
