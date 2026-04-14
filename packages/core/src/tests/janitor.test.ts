@@ -48,7 +48,7 @@ describe('runJanitorCycle', () => {
   it('marks running runs stale when heartbeat timeout exceeded', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
-    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'implementer' })
+    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
 
     // Backdating updated_at to simulate timeout
     const db = getDb()
@@ -63,7 +63,7 @@ describe('runJanitorCycle', () => {
   it('auto-escalates blocked runs past escalation timeout', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
-    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'implementer' })
+    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await blockAgentRun({ run_id: run.run_id, reason: 'stuck' })
 
     const db = getDb()

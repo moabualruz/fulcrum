@@ -242,7 +242,7 @@ export type ReviewTargetType = 'task' | 'artifact' | 'worktree'
 export interface Review {
   review_id: string
   workspace_id: string
-  project_id: string
+  project_id?: string
   display_id: string
   status: ReviewStatus
   target_type: ReviewTargetType
@@ -256,7 +256,7 @@ export interface Review {
 
 export interface CreateReviewInput {
   workspace_id: string
-  project_id: string
+  project_id?: string
   target_type: ReviewTargetType
   target_id: string
   reviewer_agent_id?: string

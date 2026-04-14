@@ -17,7 +17,7 @@ function seed() {
 
 const defaultPolicy: PolicyConfig = {
   wip_limit: 2,
-  wip_limit_per_role: { implementer: 1 },
+  wip_limit_per_role: { software_engineer: 1 },
   heartbeat_timeout_minutes: 10,
   escalation_timeout_minutes: 30,
 }
@@ -29,7 +29,7 @@ describe('checkPolicy — WIP limits', () => {
     const result = await checkPolicy({
       workspace_id: 'ws_1',
       task_id: t.task_id,
-      role: 'implementer',
+      role: 'software_engineer',
       policy: defaultPolicy,
     })
     expect(result.allowed).toBe(true)
@@ -40,12 +40,12 @@ describe('checkPolicy — WIP limits', () => {
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T2' })
     const t3 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T3' })
-    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'tester' })
-    await startAgentRun({ task_id: t2.task_id, workspace_id: 'ws_1', role: 'reviewer' })
+    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
+    await startAgentRun({ task_id: t2.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
     const result = await checkPolicy({
       workspace_id: 'ws_1',
       task_id: t3.task_id,
-      role: 'tester',
+      role: 'qa_engineer',
       policy: defaultPolicy,
     })
     expect(result.allowed).toBe(false)
@@ -58,11 +58,11 @@ describe('checkPolicy — WIP limits', () => {
     seed()
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T2' })
-    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'implementer' })
+    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     const result = await checkPolicy({
       workspace_id: 'ws_1',
       task_id: t2.task_id,
-      role: 'implementer',
+      role: 'software_engineer',
       policy: defaultPolicy,
     })
     expect(result.allowed).toBe(false)
@@ -79,7 +79,7 @@ describe('checkPolicy — wip_limit edge cases', () => {
     const result = await checkPolicy({
       workspace_id: 'ws_1',
       task_id: t.task_id,
-      role: 'implementer',
+      role: 'software_engineer',
       policy: { ...defaultPolicy, wip_limit: 0 },
     })
     expect(result.allowed).toBe(false)
@@ -93,7 +93,7 @@ describe('checkPolicy — invalid policy config', () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
     await expect(
-      checkPolicy({ workspace_id: 'ws_1', task_id: t.task_id, role: 'implementer', policy: { ...defaultPolicy, wip_limit: -1 } })
+      checkPolicy({ workspace_id: 'ws_1', task_id: t.task_id, role: 'software_engineer', policy: { ...defaultPolicy, wip_limit: -1 } })
     ).rejects.toMatchObject({ code: 'invalid_input' })
   })
 
@@ -104,8 +104,8 @@ describe('checkPolicy — invalid policy config', () => {
       checkPolicy({
         workspace_id: 'ws_1',
         task_id: t.task_id,
-        role: 'implementer',
-        policy: { ...defaultPolicy, wip_limit_per_role: { implementer: -1 } },
+        role: 'software_engineer',
+        policy: { ...defaultPolicy, wip_limit_per_role: { software_engineer: -1 } },
       })
     ).rejects.toMatchObject({ code: 'invalid_input' })
   })
@@ -115,7 +115,7 @@ describe('checkPolicy — unknown task', () => {
   it('throws not_found when task_id does not exist', async () => {
     seed()
     await expect(
-      checkPolicy({ workspace_id: 'ws_1', task_id: 'NONEXISTENT', role: 'implementer', policy: defaultPolicy })
+      checkPolicy({ workspace_id: 'ws_1', task_id: 'NONEXISTENT', role: 'software_engineer', policy: defaultPolicy })
     ).rejects.toMatchObject({ code: 'not_found' })
   })
 
@@ -127,7 +127,7 @@ describe('checkPolicy — unknown task', () => {
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
     // Task is in ws_1 but we query for ws_2 — should not find it
     await expect(
-      checkPolicy({ workspace_id: 'ws_2', task_id: t.task_id, role: 'implementer', policy: defaultPolicy })
+      checkPolicy({ workspace_id: 'ws_2', task_id: t.task_id, role: 'software_engineer', policy: defaultPolicy })
     ).rejects.toMatchObject({ code: 'not_found' })
   })
 })
@@ -145,7 +145,7 @@ describe('checkPolicy — task dependencies', () => {
     const result = await checkPolicy({
       workspace_id: 'ws_1',
       task_id: child.task_id,
-      role: 'implementer',
+      role: 'software_engineer',
       policy: defaultPolicy,
     })
     expect(result.allowed).toBe(false)
@@ -167,7 +167,7 @@ describe('checkPolicy — task dependencies', () => {
     const result = await checkPolicy({
       workspace_id: 'ws_1',
       task_id: child.task_id,
-      role: 'implementer',
+      role: 'software_engineer',
       policy: defaultPolicy,
     })
     expect(result.allowed).toBe(true)

@@ -92,7 +92,7 @@ function freshDb2() {
 }
 
 describe('MIGRATION_002 — new columns on workspaces', () => {
-  beforeEach(() => freshDb2())
+  beforeEach(() => { freshDb2() })
   afterEach(() => closeDb())
 
   it('workspaces has status column defaulting to active', () => {
@@ -105,7 +105,7 @@ describe('MIGRATION_002 — new columns on workspaces', () => {
 })
 
 describe('MIGRATION_002 — new columns on projects', () => {
-  beforeEach(() => freshDb2())
+  beforeEach(() => { freshDb2() })
   afterEach(() => closeDb())
 
   it('projects has project_type, root_path, default_branch, parent_project_id, write_mode, status', () => {
@@ -121,7 +121,7 @@ describe('MIGRATION_002 — new columns on projects', () => {
 })
 
 describe('MIGRATION_002 — new columns on tasks', () => {
-  beforeEach(() => freshDb2())
+  beforeEach(() => { freshDb2() })
   afterEach(() => closeDb())
 
   it('tasks has display_id, issue_id, priority, estimate_type, estimate_value, done_criteria, status_category, claimed_at, completed_at', () => {
@@ -146,7 +146,7 @@ describe('MIGRATION_002 — new columns on tasks', () => {
 })
 
 describe('MIGRATION_002 — new columns on agent_runs', () => {
-  beforeEach(() => freshDb2())
+  beforeEach(() => { freshDb2() })
   afterEach(() => closeDb())
 
   it('agent_runs has display_id, project_id, agent_id, pi_profile, status_category, current_path, heartbeat_at, blocker, worktree_id, finished_at', () => {
@@ -159,7 +159,7 @@ describe('MIGRATION_002 — new columns on agent_runs', () => {
 })
 
 describe('MIGRATION_002 — new columns on memories', () => {
-  beforeEach(() => freshDb2())
+  beforeEach(() => { freshDb2() })
   afterEach(() => closeDb())
 
   it('memories has scope, kind, title, summary, canonical_text, entities, event_time, content_hash, symbol_path, task_id, issue_id, artifact_id, provenance_refs', () => {
@@ -172,7 +172,7 @@ describe('MIGRATION_002 — new columns on memories', () => {
 })
 
 describe('MIGRATION_002 — new tables', () => {
-  beforeEach(() => freshDb2())
+  beforeEach(() => { freshDb2() })
   afterEach(() => closeDb())
 
   it('display_id_sequences table exists with correct columns', () => {
@@ -209,7 +209,7 @@ describe('MIGRATION_002 — new tables', () => {
 })
 
 describe('MIGRATION_002 — idempotent', () => {
-  beforeEach(() => freshDb2())
+  beforeEach(() => { freshDb2() })
   afterEach(() => closeDb())
 
   it('running runMigrations twice does not throw', () => {

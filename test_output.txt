@@ -1,0 +1,14 @@
+
+> @fulcrum/memory@0.0.1 test /home/mkh/workspace/pi-stack-plan/packages/memory
+> vitest run extractor
+
+
+ RUN  v1.6.1 /home/mkh/workspace/pi-stack-plan/packages/memory
+
+ ✓ src/tests/extractor-structured.test.ts  (11 tests) 6ms
+
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+   Start at  08:10:48
+   Duration  314ms (transform 43ms, setup 0ms, collect 34ms, tests 6ms, environment 0ms, prepare 82ms)
+

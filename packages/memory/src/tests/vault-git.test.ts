@@ -71,11 +71,11 @@ describe('VaultGit', () => {
     expect(existsSync(join(vaultPath, 'memory.md'))).toBe(true)
 
     // Verify --no-ff: HEAD must be a merge commit (two parents)
-    const sg = (await import('simple-git')).default(vaultPath)
+    const sg = (await import('simple-git')).simpleGit(vaultPath)
     const headHash = (await sg.revparse(['HEAD'])).trim()
     // git cat-file -p HEAD prints "parent <hash>" lines — two means a merge commit
     const catFile = await sg.raw(['cat-file', '-p', headHash])
-    const parentLines = catFile.split('\n').filter(l => l.startsWith('parent '))
+    const parentLines = catFile.split('\n').filter((l: string) => l.startsWith('parent '))
     expect(parentLines.length).toBe(2)
   })
 
@@ -88,7 +88,7 @@ describe('VaultGit', () => {
     writeFileSync(join(vaultPath, 'file2.md'), 'v2')
     await git.commitAll('second commit')
 
-    const sg = (await import('simple-git')).default(vaultPath)
+    const sg = (await import('simple-git')).simpleGit(vaultPath)
     const log = await sg.log()
     const commits = log.all
     expect(commits.length).toBeGreaterThanOrEqual(2)

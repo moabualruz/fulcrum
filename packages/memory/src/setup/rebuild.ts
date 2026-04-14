@@ -6,7 +6,7 @@ import { upsertMemoryToKuzu, removeMemoryFromKuzu } from '../kuzu/upsert.js'
 import { getDb } from '@fulcrum/core'
 import { appendToLog } from '../vault/index-builder.js'
 import { readState } from '../vault/state.js'
-import simpleGit from 'simple-git'
+import { simpleGit } from 'simple-git'
 import type { FullMemory, MemoryKind, MemoryScope } from '../types.js'
 import type { MemoryFileFrontmatter } from '../types.js'
 
@@ -153,7 +153,7 @@ export async function reconcileMergedBranch(
     '--',
     '.',
   ]).catch(() => '')
-  const mergeSha: string = rawLog.trim().split('\n').find(line => line.trim().length > 0)?.trim() ?? ''
+  const mergeSha: string = rawLog.trim().split('\n').find((line: string) => line.trim().length > 0)?.trim() ?? ''
 
   // Use the resolved merge commit's parents for the diff.
   // If no merge commit was found (unexpected), fall back to HEAD^1..HEAD^2 as a

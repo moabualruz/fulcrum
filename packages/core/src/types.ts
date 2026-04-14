@@ -67,7 +67,7 @@ export type EventType =
   | 'handoff_created' | 'handoff_consumed' | 'artifact_written'
   | 'artifact_validated' | 'memory_written' | 'memory_recalled'
   | 'worktree_allocated' | 'merge_queued' | 'merge_started'
-  | 'merge_conflicted' | 'merge_completed' | 'review_created'
+  | 'merge_conflicted' | 'merge_completed' | 'review_created' | 'review_updated'
   | 'validation_started' | 'validation_finished' | 'policy_denied'
   | 'hook_executed' | 'workflow_step_completed'
 

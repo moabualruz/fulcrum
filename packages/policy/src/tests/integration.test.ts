@@ -13,7 +13,7 @@ describe('L1 invariant enforcement + audit trail', () => {
   it('denies invoke_team for implementer and records audit event', async () => {
     const input: EvaluatePolicyInput = {
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_impl_1',
       action: 'invoke_team',
       resource_type: 'team',
@@ -57,7 +57,7 @@ describe('L1 invariant enforcement + audit trail', () => {
   it('denies merge_worktree for tester and records audit event', async () => {
     const input: EvaluatePolicyInput = {
       workspace_id: 'ws_1',
-      actor_role: 'tester',
+      actor_role: 'qa_engineer',
       actor_id: 'agent_tester_1',
       action: 'merge_worktree',
       resource_type: 'worktree',
@@ -83,7 +83,7 @@ describe('L1 invariant enforcement + audit trail', () => {
   })
 
   it('always denies start_run_without_task for any role', async () => {
-    const roles = ['chief_of_staff', 'implementer', 'integration_worker'] as const
+    const roles = ['chief_of_staff', 'software_engineer', 'integration_worker'] as const
     for (const role of roles) {
       const decision = await evaluatePolicy({
         workspace_id: 'ws_1',
@@ -171,7 +171,7 @@ describe('Workspace + project rule layering', () => {
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
       project_id: 'proj_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'write_file',
     })

@@ -36,7 +36,7 @@ describe('full lifecycle integration', () => {
   it('agent run lifecycle: created → running → heartbeat → finished', async () => {
     seed()
     const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Auth endpoint' })
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'implementer_backend', agent_id: 'agent-001' })
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'agent-001' })
 
     expect(run.display_id).toBe('RUN-1')
     expect(run.agent_id).toBe('agent-001')
@@ -68,7 +68,7 @@ describe('full lifecycle integration', () => {
   it('blocking a run sets blocker, status_category=blocked, emits event', async () => {
     seed()
     const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Review PR' })
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'reviewer', agent_id: 'agent-002' })
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'code_reviewer', agent_id: 'agent-002' })
     const blocked = await blockAgentRun({ run_id: run.run_id, reason: 'CI checks still running' })
 
     expect(blocked.status).toBe('blocked')
@@ -146,13 +146,13 @@ describe('full lifecycle integration', () => {
     expect(results[0].title).toBe('JWT expiry decision')
   })
 
-  it('listAgentProfiles returns 19 roles; workspace status reflects run counts', async () => {
+  it('listAgentProfiles returns 24 roles; workspace status reflects run counts', async () => {
     seed()
     const profiles = await listAgentProfiles()
-    expect(profiles).toHaveLength(19)
+    expect(profiles).toHaveLength(24)
 
     const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Status test task' })
-    await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'tester', agent_id: 'a1' })
+    await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'qa_engineer', agent_id: 'a1' })
     const status = await getWorkspaceStatus({ workspace_id: 'ws_1' })
     expect(status.running_runs.length).toBeGreaterThanOrEqual(1)
     expect(status.wip_count).toBeGreaterThanOrEqual(1)

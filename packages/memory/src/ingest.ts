@@ -126,7 +126,7 @@ export async function ingestFile(input: IngestFileInput): Promise<IngestResult> 
 
   for (const chunk of rawChunks) {
     const hash = contentHash(chunk.text)
-    const symbolPath = 'symbolPath' in chunk ? chunk.symbolPath : null
+    const symbolPath: string | null = 'symbolPath' in chunk ? (chunk.symbolPath as string | null) : null
 
     // Dedup check for code_chunks
     const existingChunk = db.prepare(

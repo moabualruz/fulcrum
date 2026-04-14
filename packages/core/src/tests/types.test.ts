@@ -50,6 +50,7 @@ describe('type exports — compile-time shape checks', () => {
       depends_on: [], assigned_to: null, note: null, done_criteria: null,
       version: 0, created_at: '', updated_at: '',
       claimed_at: null, completed_at: null,
+      assigned_run_id: null, labels: [], blockers: [],
     }
     expect(t.display_id).toBe('TASK-1')
     expect(t.status_category).toBe('backlog')
@@ -79,7 +80,7 @@ describe('type exports — compile-time shape checks', () => {
       workspace_id: 'ws_01', project_id: 'proj_01', file_path: null,
       symbol_path: null, title: 'A fact', summary: 'Short summary',
       content: 'A fact about the project', canonical_text: null,
-      tags: [], entities: [], confidence: 1.0, freshness: 1.0,
+      tags: [], entities: [], confidence: 1.0, freshness: 1.0, importance: 0.5,
       access_count: 0, event_time: null, content_hash: null,
       task_id: null, issue_id: null, artifact_id: null,
       provenance_refs: [], embedding: null,

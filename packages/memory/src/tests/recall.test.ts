@@ -24,7 +24,7 @@ describe('recallMemory — compact mode (default)', () => {
     await seedMemories(db)
     const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite' })
     expect(results.length).toBeGreaterThan(0)
-    const first = results[0] as Record<string, unknown>
+    const first = results[0] as unknown as Record<string, unknown>
     // compact mode must have these fields
     expect(first).toHaveProperty('memory_id')
     expect(first).toHaveProperty('title')
@@ -84,7 +84,7 @@ describe('recallMemory — compact mode (default)', () => {
     await seedMemories(db)
     const results = await recallMemory({ workspace_id: 'ws_1', query: 'the', scope: 'file' })
     for (const r of results) {
-      expect((r as Record<string, unknown>).scope).toBe('file')
+      expect((r as unknown as Record<string, unknown>).scope).toBe('file')
     }
   })
 
@@ -93,7 +93,7 @@ describe('recallMemory — compact mode (default)', () => {
     await seedMemories(db)
     const results = await recallMemory({ workspace_id: 'ws_1', query: 'the', kind: 'decision' })
     for (const r of results) {
-      expect((r as Record<string, unknown>).kind).toBe('decision')
+      expect((r as unknown as Record<string, unknown>).kind).toBe('decision')
     }
   })
 
@@ -122,7 +122,7 @@ describe('recallMemory — total_ranked mode', () => {
     await seedMemories(db)
     const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite', mode: 'total_ranked' })
     expect(results.length).toBeGreaterThan(0)
-    const first = results[0] as Record<string, unknown>
+    const first = results[0] as unknown as Record<string, unknown>
     expect(first).toHaveProperty('canonical_text')
     expect(first).toHaveProperty('access_count')
     expect(first).toHaveProperty('tags')

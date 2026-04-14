@@ -1,5 +1,5 @@
 // packages/memory/src/vault/git.ts
-import simpleGit from 'simple-git'
+import { simpleGit } from 'simple-git'
 
 export interface VaultGit {
   isRepo(): Promise<boolean>

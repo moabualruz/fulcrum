@@ -44,13 +44,13 @@ describe('integration: write → dedup → recall → link', () => {
     // 3. Recall — compact mode
     const compact = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite', mode: 'compact' })
     expect(compact.length).toBeGreaterThan(0)
-    expect((compact[0] as Record<string, unknown>).memory_id).toBe(m.memory_id)
-    expect((compact[0] as Record<string, unknown>)).not.toHaveProperty('canonical_text')
+    expect((compact[0] as unknown as Record<string, unknown>).memory_id).toBe(m.memory_id)
+    expect((compact[0] as unknown as Record<string, unknown>)).not.toHaveProperty('canonical_text')
 
     // 4. Recall — total_ranked with full fields
     const ranked = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite', mode: 'total_ranked' })
     expect(ranked.length).toBeGreaterThan(0)
-    expect((ranked[0] as Record<string, unknown>)).toHaveProperty('canonical_text')
+    expect((ranked[0] as unknown as Record<string, unknown>)).toHaveProperty('canonical_text')
 
     // 5. Link memory to entities
     await linkMemoryToEntity({ memory_id: m.memory_id, entity_type: 'project', entity_id: 'proj_1' })

@@ -32,7 +32,7 @@ function buildManager(): SyncManager {
   // Secret guard runs before every push (single-object and queue-batch paths)
   const beforePush = (serialisedData: string) => {
     const scanResult = checkSecrets(serialisedData)
-    if (scanResult.found) {
+    if (scanResult.has_secrets) {
       throw new Error(`Secret detected in sync payload: ${scanResult.matches.join(', ')}`)
     }
   }

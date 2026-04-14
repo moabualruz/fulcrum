@@ -18,7 +18,7 @@ describe('getWorkspaceStatus', () => {
   it('lists stale runs', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
-    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'implementer' })
+    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     const db = getDb()
     db.prepare("UPDATE agent_runs SET status = 'stale' WHERE run_id = ?").run(run.run_id)
     const status = await getWorkspaceStatus({ workspace_id: 'ws_1' })
@@ -31,8 +31,8 @@ describe('getWorkspaceStatus', () => {
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T2' })
     await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T3' })
-    const run1 = await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'implementer' })
-    const run2 = await startAgentRun({ task_id: t2.task_id, workspace_id: 'ws_1', role: 'tester' })
+    const run1 = await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run2 = await startAgentRun({ task_id: t2.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
     await blockAgentRun({ run_id: run2.run_id, reason: 'waiting' })
 
     const status = await getWorkspaceStatus({ workspace_id: 'ws_1' })
@@ -48,7 +48,7 @@ describe('getWorkspaceStatus — completed count', () => {
   it('increments completed_tasks_today when a run is completed today', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
-    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'implementer' })
+    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     const { completeAgentRun } = await import('../runs.js')
     await completeAgentRun({ run_id: run.run_id, output_summary: 'done' })
     const status = await getWorkspaceStatus({ workspace_id: 'ws_1' })
@@ -82,7 +82,7 @@ describe('buildCosContext', () => {
   it('includes blocked runs for the project in context', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Blocked task' })
-    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'reviewer' })
+    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
     await blockAgentRun({ run_id: run.run_id, reason: 'waiting for upstream' })
     const context = await buildCosContext({ workspace_id: 'ws_1', project_id: 'proj_1' })
     expect(context).toContain('Blocked')
@@ -97,12 +97,12 @@ describe('buildCosContext', () => {
 
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Task in P1' })
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_2', title: 'Task in P2' })
-    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'implementer' })
-    await startAgentRun({ task_id: t2.task_id, workspace_id: 'ws_1', role: 'tester' })
+    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    await startAgentRun({ task_id: t2.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
 
     const context = await buildCosContext({ workspace_id: 'ws_1', project_id: 'proj_1' })
-    expect(context).toContain('implementer')
-    expect(context).not.toContain('tester')
+    expect(context).toContain('software_engineer')
+    expect(context).not.toContain('qa_engineer')
   })
 })
 
@@ -114,7 +114,7 @@ describe('getWorkspaceStatus — cross-workspace isolation', () => {
     db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','p1')").run()
     db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2','ws_2','p2')").run()
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
-    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'tester' })
+    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
     const status = await getWorkspaceStatus({ workspace_id: 'ws_2' })
     expect(status.running_runs).toHaveLength(0)
     expect(status.wip_count).toBe(0)
@@ -122,40 +122,41 @@ describe('getWorkspaceStatus — cross-workspace isolation', () => {
 })
 
 describe('listAgentProfiles', () => {
-  it('returns all 19 roles', async () => {
+  it('returns all 24 roles', async () => {
     const profiles = await listAgentProfiles()
-    expect(profiles).toHaveLength(19)
+    expect(profiles).toHaveLength(24)
     const roles = profiles.map(p => p.role)
     expect(roles).toContain('chief_of_staff')
-    expect(roles).toContain('implementer')
-    expect(roles).toContain('tester')
+    expect(roles).toContain('software_engineer')
+    expect(roles).toContain('qa_engineer')
   })
 
   it('only chief_of_staff can create teams', async () => {
     const profiles = await listAgentProfiles()
     const cos = profiles.find(p => p.role === 'chief_of_staff')!
-    const impl = profiles.find(p => p.role === 'implementer')!
+    const impl = profiles.find(p => p.role === 'software_engineer')!
     expect(cos.can_create_teams).toBe(true)
     expect(impl.can_create_teams).toBe(false)
   })
 })
 
-describe('listAgentProfiles — all 19 roles', () => {
-  it('returns exactly 19 agent profiles', async () => {
+describe('listAgentProfiles — all 24 roles', () => {
+  it('returns exactly 24 agent profiles', async () => {
     const profiles = await listAgentProfiles()
-    expect(profiles).toHaveLength(19)
+    expect(profiles).toHaveLength(24)
   })
 
-  it('includes all 19 expected roles', async () => {
+  it('includes all 24 expected roles', async () => {
     const profiles = await listAgentProfiles()
     const roles = profiles.map(p => p.role)
     const expected = [
       'chief_of_staff', 'context_gatherer', 'prd_planner', 'implementation_planner',
       'issue_decomposer', 'architecture_reviewer', 'research_worker',
-      'implementer_backend', 'implementer_frontend', 'implementer',
-      'refactor_worker', 'browser_worker', 'tester', 'reviewer',
-      'security_reviewer', 'performance_reviewer', 'integration_worker',
-      'planner', 'researcher',
+      'software_engineer', 'refactor_worker', 'browser_worker',
+      'data_engineer', 'ml_engineer', 'devops_engineer',
+      'qa_engineer', 'code_reviewer', 'security_reviewer',
+      'integration_worker', 'documentation_writer', 'memory_curator',
+      'tech_lead', 'product_manager', 'analyst', 'orchestrator', 'custom',
     ]
     for (const role of expected) {
       expect(roles, `missing role: ${role}`).toContain(role)

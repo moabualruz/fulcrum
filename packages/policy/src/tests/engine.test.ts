@@ -128,7 +128,7 @@ describe('evaluatePolicy — SYSTEM_INVARIANTS: invoke_team', () => {
   it('denies invoke_team for non-chief_of_staff role', async () => {
     const input: EvaluatePolicyInput = {
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'invoke_team',
     }
@@ -155,7 +155,7 @@ describe('evaluatePolicy — SYSTEM_INVARIANTS: merge_worktree', () => {
   it('denies merge_worktree for non-integration_worker role', async () => {
     const input: EvaluatePolicyInput = {
       workspace_id: 'ws_1',
-      actor_role: 'reviewer',
+      actor_role: 'code_reviewer',
       actor_id: 'agent_1',
       action: 'merge_worktree',
     }
@@ -180,7 +180,7 @@ describe('evaluatePolicy — SYSTEM_INVARIANTS: merge_worktree', () => {
 
 describe('evaluatePolicy — SYSTEM_INVARIANTS: start_run_without_task', () => {
   it('always denies start_run_without_task regardless of role', async () => {
-    const roles: Array<EvaluatePolicyInput['actor_role']> = ['chief_of_staff', 'implementer', 'integration_worker']
+    const roles: Array<EvaluatePolicyInput['actor_role']> = ['chief_of_staff', 'software_engineer', 'integration_worker']
     for (const role of roles) {
       const decision = await evaluatePolicy({
         workspace_id: 'ws_1',
@@ -200,7 +200,7 @@ describe('evaluatePolicy — workspace rules', () => {
   it('allows by default when no rules match', async () => {
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'write_file',
       resource_type: 'file',
@@ -220,7 +220,7 @@ describe('evaluatePolicy — workspace rules', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'bash',
     })
@@ -247,7 +247,7 @@ describe('evaluatePolicy — workspace rules', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'read_file',
     })
@@ -267,7 +267,7 @@ describe('evaluatePolicy — workspace rules', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'write_file',
     })
@@ -285,7 +285,7 @@ describe('evaluatePolicy — workspace rules', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'bash',
     })
@@ -306,7 +306,7 @@ describe('evaluatePolicy — workspace rules', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'tester',
+      actor_role: 'qa_engineer',
       actor_id: 'agent_1',
       action: 'merge_worktree',
     })
@@ -327,7 +327,7 @@ describe('evaluatePolicy — path matcher', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'read_file',
       resource_id: '/secrets/api-key',
@@ -346,7 +346,7 @@ describe('evaluatePolicy — path matcher', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'read_file',
       resource_id: '/public/readme.md',
@@ -364,14 +364,14 @@ describe('evaluatePolicy — path matcher', () => {
     })
     const shallow = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'read_file',
       resource_id: '/secrets/api-key',
     })
     const deep = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'read_file',
       resource_id: '/secrets/a/b',
@@ -394,7 +394,7 @@ describe('evaluatePolicy — glob pattern matching (tool matcher)', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'file_read',
     })
@@ -412,7 +412,7 @@ describe('evaluatePolicy — glob pattern matching (tool matcher)', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'file_write',
     })
@@ -430,7 +430,7 @@ describe('evaluatePolicy — glob pattern matching (tool matcher)', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'shell_exec',
     })
@@ -449,7 +449,7 @@ describe('evaluatePolicy — glob pattern matching (command matcher)', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'git commit',
     })
@@ -467,7 +467,7 @@ describe('evaluatePolicy — glob pattern matching (command matcher)', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'git push',
     })
@@ -484,7 +484,7 @@ describe('evaluatePolicy — glob pattern matching (command matcher)', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'npm install',
     })
@@ -503,7 +503,7 @@ describe('evaluatePolicy — glob pattern matching (path matcher)', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'write_file',
       resource_id: 'src/foo/bar.ts',
@@ -522,7 +522,7 @@ describe('evaluatePolicy — glob pattern matching (path matcher)', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'write_file',
       resource_id: 'tests/foo.ts',
@@ -542,7 +542,7 @@ describe('evaluatePolicy — glob pattern matching (artifact matcher)', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'README.md',
     })
@@ -560,7 +560,7 @@ describe('evaluatePolicy — glob pattern matching (artifact matcher)', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'schema.sql',
     })
@@ -579,7 +579,7 @@ describe('evaluatePolicy — regex matcher', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'delete_file',
     })
@@ -597,7 +597,7 @@ describe('evaluatePolicy — regex matcher', () => {
     })
     const decision = await evaluatePolicy({
       workspace_id: 'ws_1',
-      actor_role: 'implementer',
+      actor_role: 'software_engineer',
       actor_id: 'agent_1',
       action: 'read_file',
     })

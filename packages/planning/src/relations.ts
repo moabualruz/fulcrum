@@ -29,6 +29,9 @@ function rowToTask(row: Record<string, unknown>): Task {
     updated_at: row.updated_at as string,
     claimed_at: row.claimed_at as string | null,
     completed_at: row.completed_at as string | null,
+    assigned_run_id: (row.assigned_run_id ?? null) as string | null,
+    labels: (() => { try { return JSON.parse(row.labels as string) as string[] } catch { return [] } })(),
+    blockers: (() => { try { return JSON.parse(row.blockers as string) as string[] } catch { return [] } })(),
   }
 }
 

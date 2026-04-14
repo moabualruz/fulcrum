@@ -377,13 +377,13 @@ describe('TeamPolicy round-trip', () => {
     })
 
     expect(tmpl.policy).toEqual(policy)
-    expect(tmpl.policy.communication_mode).toBe('hub_and_spoke')
-    expect(tmpl.policy.budget_class).toBe('large')
-    expect(tmpl.policy.latency_class).toBe('fast')
-    expect(tmpl.policy.quality_class).toBe('high')
-    expect(tmpl.policy.worktree_policy).toBe('per_slot')
-    expect(tmpl.policy.memory_policy).toBe('shared-project')
-    expect(tmpl.policy.review_policy).toBe('require-2-approvals')
+    expect(tmpl.policy!.communication_mode).toBe('hub_and_spoke')
+    expect(tmpl.policy!.budget_class).toBe('large')
+    expect(tmpl.policy!.latency_class).toBe('fast')
+    expect(tmpl.policy!.quality_class).toBe('high')
+    expect(tmpl.policy!.worktree_policy).toBe('per_slot')
+    expect(tmpl.policy!.memory_policy).toBe('shared-project')
+    expect(tmpl.policy!.review_policy).toBe('require-2-approvals')
   })
 
   it('defaults policy to empty object when not provided', async () => {
@@ -402,9 +402,9 @@ describe('TeamPolicy round-trip', () => {
       policy: { budget_class: 'small', communication_mode: 'broadcast' },
     })
 
-    expect(tmpl.policy.budget_class).toBe('small')
-    expect(tmpl.policy.communication_mode).toBe('broadcast')
-    expect(tmpl.policy.latency_class).toBeUndefined()
+    expect(tmpl.policy!.budget_class).toBe('small')
+    expect(tmpl.policy!.communication_mode).toBe('broadcast')
+    expect(tmpl.policy!.latency_class).toBeUndefined()
   })
 })
 
