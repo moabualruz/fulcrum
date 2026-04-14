@@ -83,6 +83,34 @@ describe('writeMemory', () => {
     const count = (db.prepare('SELECT COUNT(*) as c FROM memories').get() as { c: number }).c
     expect(count).toBe(1) // should deduplicate
   })
+
+  it('defaults content_type to "text" when not specified', async () => {
+    seed()
+    const m = await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'some text memory' })
+    expect(m.content_type).toBe('text')
+  })
+
+  it('stores content_type "code" when specified', async () => {
+    seed()
+    const m = await writeMemory({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      content: 'function greet(name: string) { return `Hello ${name}` }',
+      content_type: 'code',
+    })
+    expect(m.content_type).toBe('code')
+  })
+
+  it('normalizes unknown content_type to "text"', async () => {
+    seed()
+    const m = await writeMemory({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      content: 'some content',
+      content_type: 'text',
+    })
+    expect(m.content_type).toBe('text')
+  })
 })
 
 describe('recallMemory — cross-workspace isolation', () => {

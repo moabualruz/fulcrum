@@ -2,7 +2,7 @@ import { getDb } from './db/client.js'
 import { newId } from './ids.js'
 import { FulcrumError } from './types.js'
 import type { Memory, MemoryScope, MemoryKind } from './types.js'
-import { getTextEmbedder, getReranker } from './embedding/registry.js'
+import { getTextEmbedder, getCodeEmbedder, getReranker } from './embedding/registry.js'
 import { MEMORY_RANK_WEIGHTS } from './constants.js'
 
 /**
@@ -50,6 +50,7 @@ interface WriteMemoryInput {
   workspace_id: string
   project_id: string
   content: string
+  content_type?: 'text' | 'code'
   tags?: string[]
   confidence?: number
   importance?: number
@@ -81,6 +82,7 @@ function rowToMemory(row: Record<string, unknown>): Memory {
     project_id: row.project_id as string | null,
     scope: ((row.scope as string) || 'project') as MemoryScope,
     kind: ((row.kind as string) || 'fact') as MemoryKind,
+    content_type: ((row.content_type as string) === 'code' ? 'code' : 'text'),
     file_path: (row.file_path as string | null) ?? null,
     symbol_path: (row.symbol_path as string | null) ?? null,
     title: (row.title as string) || '',
@@ -172,22 +174,38 @@ export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
     }
   }
 
+  const contentType: 'text' | 'code' = input.content_type === 'code' ? 'code' : 'text'
+
+  // Auto-embed if no embedding was provided and a provider is available
+  let resolvedEmbedding = input.embedding
+  if (!resolvedEmbedding) {
+    const embedder = contentType === 'code' ? getCodeEmbedder() : getTextEmbedder()
+    if (embedder) {
+      try {
+        resolvedEmbedding = await embedder.embedDocument?.(input.content) ?? await embedder.embed(input.content)
+      } catch {
+        // Embedding failure is non-fatal — store without vector
+      }
+    }
+  }
+
   // Insert new memory
   const memory_id = newId('memory')
-  const embeddingBuffer = input.embedding ? Buffer.from(input.embedding.buffer) : null
+  const embeddingBuffer = resolvedEmbedding ? Buffer.from(resolvedEmbedding.buffer) : null
   db.prepare(`
     INSERT INTO memories
-      (memory_id, workspace_id, project_id, scope, kind, title, summary, content,
+      (memory_id, workspace_id, project_id, scope, kind, content_type, title, summary, content,
        canonical_text, tags, entities, confidence, importance, embedding,
        task_id, issue_id, artifact_id, provenance_refs,
        created_at, updated_at, last_accessed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     memory_id,
     input.workspace_id,
     input.project_id,
     scope,
     kind,
+    contentType,
     title,
     summary,
     input.content,

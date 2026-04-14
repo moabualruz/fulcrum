@@ -2325,4 +2325,16 @@ export function runMigrations(db: Database.Database): void {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(session_id) WHERE session_id IS NOT NULL`)
     db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('032_memories_session_id')").run()
   }
+
+  // MIGRATION_033 — add content_type column to memories ('text' | 'code', default 'text').
+  // Enables routing embeddings to the text vs code provider at write time.
+  const already033 = db.prepare("SELECT id FROM schema_migrations WHERE name = '033_memories_content_type'").get()
+  if (!already033) {
+    try {
+      db.exec(`ALTER TABLE memories ADD COLUMN content_type TEXT NOT NULL DEFAULT 'text'`)
+    } catch {
+      // Column may already exist — ignore
+    }
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('033_memories_content_type')").run()
+  }
 }

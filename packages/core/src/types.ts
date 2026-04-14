@@ -141,6 +141,7 @@ export interface Memory {
   memory_id: string
   scope: MemoryScope
   kind: MemoryKind
+  content_type: 'text' | 'code'
   workspace_id: string
   project_id: string | null
   file_path: string | null
