@@ -17,24 +17,12 @@ import { runMigrations } from '../db/migrations.js'
  * update this list — and the test will tell you if you also forgot to
  * update the corresponding migration.
  *
- * Columns intentionally omitted:
- *   - agent_runs.status  — MIGRATION_002 rebuilt agent_runs without a
- *     CHECK on status and no subsequent migration has restored one.
- *     AgentRunStatus is enforced at the TypeScript layer only. If you
- *     want to restore the CHECK, add a migration and then add the entry
- *     back to this list.
- *   - workspaces.status  — MIGRATION_002 adds the column via ALTER TABLE,
- *     which cannot attach a CHECK and no rebuild has added one.
- *     WorkspaceStatus is enforced at the TypeScript layer only.
- *   - handoffs.priority / handoffs.scope — the handoffs table (MIGRATION_008,
- *     rebuilt by MIGRATION_022) defines these columns with a DEFAULT but
- *     no CHECK. HandoffPriority / HandoffScope are enforced at the TS
- *     layer only.
- *
- * The omissions above are deliberate and documented in
- * docs/gap-analysis/phase-3-validated.md (J-5). Each one is a candidate
- * for a future migration that adds the missing CHECK — at which point
- * the entry should move back into GUARDED_COLUMNS.
+ * Previously-omitted columns, now guarded by MIGRATION_027:
+ *   - agent_runs.status, workspaces.status, handoffs.priority, handoffs.scope
+ *     were all documented as J-5 omissions (either silently dropped by a rebuild
+ *     or added via ALTER TABLE which cannot attach a CHECK). MIGRATION_027
+ *     rebuilds all three tables and injects the CHECKs, so they are now
+ *     enforced at the DB level and appear in GUARDED_COLUMNS below.
  */
 
 interface EnumColumn {
@@ -124,6 +112,33 @@ const GUARDED_COLUMNS: EnumColumn[] = [
     table: 'trace_events',
     column: 'status',
     expected: ['started', 'ok', 'error'],
+  },
+  {
+    // AgentRunStatus — packages/core/src/types.ts (restored by MIGRATION_027)
+    table: 'agent_runs',
+    column: 'status',
+    expected: [
+      'created', 'starting', 'running', 'waiting',
+      'blocked', 'failed', 'finished', 'aborted', 'stale',
+    ],
+  },
+  {
+    // WorkspaceStatus — packages/core/src/types.ts (restored by MIGRATION_027)
+    table: 'workspaces',
+    column: 'status',
+    expected: ['active', 'archived'],
+  },
+  {
+    // HandoffPriority — packages/core/src/types.ts (restored by MIGRATION_027)
+    table: 'handoffs',
+    column: 'priority',
+    expected: ['critical', 'high', 'normal', 'low'],
+  },
+  {
+    // HandoffScope — packages/core/src/types.ts (restored by MIGRATION_027)
+    table: 'handoffs',
+    column: 'scope',
+    expected: ['task', 'issue', 'project', 'workspace'],
   },
 ]
 

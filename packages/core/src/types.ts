@@ -4,7 +4,7 @@ export type TaskStatus =
 
 export type AgentRunStatus =
   | 'created' | 'starting' | 'running' | 'waiting'
-  | 'blocked' | 'failed' | 'finished' | 'aborted'
+  | 'blocked' | 'failed' | 'finished' | 'aborted' | 'stale'
 
 export type StatusCategory = 'backlog' | 'active' | 'blocked' | 'done'
 

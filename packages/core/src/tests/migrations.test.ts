@@ -478,3 +478,123 @@ describe('memories.kind CHECK alignment (J-4)', () => {
     `).run()).toThrow()
   })
 })
+
+describe('MIGRATION_027 restores CHECK on 4 columns (J-5 follow-up)', () => {
+  afterEach(() => closeDb())
+
+  function seedWsProjTask(db: Database.Database) {
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_1', 'ws_1', 'p', 'git', 'active', 'worktree', '2026-04-14T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO tasks (task_id, workspace_id, project_id, display_id, title, status, status_category, priority, created_at, updated_at) VALUES ('task_1', 'ws_1', 'proj_1', 'T-1', 't', 'queued', 'backlog', 'medium', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')`).run()
+  }
+
+  it('agent_runs.status rejects unknown values', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    seedWsProjTask(db)
+    expect(() => db.prepare(`
+      INSERT INTO agent_runs (run_id, task_id, workspace_id, project_id, display_id, agent_id, role, status, status_category, started_at, updated_at)
+      VALUES ('run_1', 'task_1', 'ws_1', 'proj_1', 'R-1', '', 'software_engineer', 'not_a_status', 'active', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')
+    `).run()).toThrow()
+  })
+
+  it('agent_runs.status accepts all canonical values', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    seedWsProjTask(db)
+    const valid = ['created', 'starting', 'running', 'waiting', 'blocked', 'failed', 'finished', 'aborted', 'stale']
+    let i = 0
+    for (const s of valid) {
+      expect(() => db.prepare(`
+        INSERT INTO agent_runs (run_id, task_id, workspace_id, project_id, display_id, agent_id, role, status, status_category, started_at, updated_at)
+        VALUES (?, 'task_1', 'ws_1', 'proj_1', ?, '', 'software_engineer', ?, 'active', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')
+      `).run(`run_${s}`, `R-${i}`, s)).not.toThrow()
+      i++
+    }
+  })
+
+  it('workspaces.status rejects unknown values', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    expect(() => db.prepare(`
+      INSERT INTO workspaces (workspace_id, name, status, created_at)
+      VALUES ('ws_bad', 'w', 'zombie', '2026-04-14T00:00:00Z')
+    `).run()).toThrow()
+  })
+
+  it('workspaces.status accepts canonical values', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    expect(() => db.prepare(`
+      INSERT INTO workspaces (workspace_id, name, status, created_at)
+      VALUES ('ws_a', 'a', 'active', '2026-04-14T00:00:00Z')
+    `).run()).not.toThrow()
+    expect(() => db.prepare(`
+      INSERT INTO workspaces (workspace_id, name, status, created_at)
+      VALUES ('ws_b', 'b', 'archived', '2026-04-14T00:00:00Z')
+    `).run()).not.toThrow()
+  })
+
+  it('handoffs.priority rejects unknown values', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    expect(() => db.prepare(`
+      INSERT INTO handoffs (
+        handoff_id, workspace_id, project_id, from_agent_id, to_agent_id,
+        task_id, issue_id, goal, task_type, priority, scope,
+        inputs, constraints, done_criteria, artifact_contract_id,
+        handoff_mode, status, created_at
+      ) VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, 'pending', ?)
+    `).run(
+      'hof_bad', 'ws_1', 'g', 't', 'super_urgent', 'task', '{}', 'brief', '2026-04-14T00:00:00Z'
+    )).toThrow()
+  })
+
+  it('handoffs.scope rejects unknown values', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    expect(() => db.prepare(`
+      INSERT INTO handoffs (
+        handoff_id, workspace_id, project_id, from_agent_id, to_agent_id,
+        task_id, issue_id, goal, task_type, priority, scope,
+        inputs, constraints, done_criteria, artifact_contract_id,
+        handoff_mode, status, created_at
+      ) VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, 'pending', ?)
+    `).run(
+      'hof_bad2', 'ws_1', 'g', 't', 'normal', 'galaxy', '{}', 'brief', '2026-04-14T00:00:00Z'
+    )).toThrow()
+  })
+
+  it('handoffs accepts canonical priority and scope values', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    const priorities = ['critical', 'high', 'normal', 'low']
+    const scopes = ['task', 'issue', 'project', 'workspace']
+    let i = 0
+    for (const p of priorities) {
+      for (const s of scopes) {
+        expect(() => db.prepare(`
+          INSERT INTO handoffs (
+            handoff_id, workspace_id, project_id, from_agent_id, to_agent_id,
+            task_id, issue_id, goal, task_type, priority, scope,
+            inputs, constraints, done_criteria, artifact_contract_id,
+            handoff_mode, status, created_at
+          ) VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, 'pending', ?)
+        `).run(
+          `hof_${i}`, 'ws_1', 'g', 't', p, s, '{}', 'brief', '2026-04-14T00:00:00Z'
+        )).not.toThrow()
+        i++
+      }
+    }
+  })
+})
