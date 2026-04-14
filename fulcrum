@@ -1,2 +1,4 @@
 #!/usr/bin/env sh
-exec "$(dirname "$0")/node_modules/.bin/tsx" "$(dirname "$0")/packages/cli/src/index.ts" "$@"
+SCRIPT=$(readlink -f "$0")
+DIR=$(dirname "$SCRIPT")
+exec "$DIR/node_modules/.bin/tsx" "$DIR/packages/cli/src/index.ts" "$@"

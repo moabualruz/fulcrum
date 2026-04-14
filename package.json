@@ -37,7 +37,8 @@
   "scripts": {
     "test": "pnpm -r test",
     "build": "pnpm -r build",
-    "fulcrum": "node --import tsx/esm packages/cli/src/index.ts"
+    "fulcrum": "node --import tsx/esm packages/cli/src/index.ts",
+    "install-bin": "mkdir -p $HOME/.local/bin && ln -sf $(pwd)/fulcrum $HOME/.local/bin/fulcrum && echo 'fulcrum → ~/.local/bin/fulcrum'"
   },
   "peerDependencies": {
     "@mariozechner/pi-ai": "*",
