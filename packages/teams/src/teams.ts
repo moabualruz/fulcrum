@@ -261,3 +261,44 @@ export async function getTeamStatus(input: GetTeamStatusInput): Promise<TeamStat
     concurrency_cap_violations,
   }
 }
+
+// ── TeamInstanceHeartbeat ─────────────────────────────────────────────────────
+// Lightweight class that keeps a running team instance's heartbeat_at column
+// fresh every 30 seconds, preventing the janitor from marking it stale.
+
+export class TeamInstanceHeartbeat {
+  private timer: ReturnType<typeof setInterval> | null = null
+
+  constructor(
+    private readonly instance_id: string,
+    private readonly intervalMs: number = 30_000,
+  ) {}
+
+  start(): void {
+    if (this.timer) return // already running
+    this.timer = setInterval(() => {
+      try {
+        const db = getDb()
+        db.prepare(
+          `UPDATE team_instances SET heartbeat_at = datetime('now') WHERE instance_id = ?`
+        ).run(this.instance_id)
+      } catch { /* db may be closed during teardown — ignore */ }
+    }, this.intervalMs)
+    // Unref so the timer does not prevent Node from exiting
+    if (typeof (this.timer as unknown as { unref?: () => void }).unref === 'function') {
+      (this.timer as unknown as { unref: () => void }).unref()
+    }
+  }
+
+  stop(): void {
+    if (this.timer) {
+      clearInterval(this.timer)
+      this.timer = null
+    }
+  }
+
+  /** True if the heartbeat loop is currently active. */
+  get running(): boolean {
+    return this.timer !== null
+  }
+}

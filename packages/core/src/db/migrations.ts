@@ -2305,6 +2305,15 @@ export function runMigrations(db: Database.Database): void {
     db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('032b_seed_agent_definitions')").run()
   }
 
+  // MIGRATION_032c — add heartbeat_at column to team_instances
+  const already032c = db.prepare("SELECT id FROM schema_migrations WHERE name = '032c_team_instances_heartbeat'").get()
+  if (!already032c) {
+    try {
+      db.exec(`ALTER TABLE team_instances ADD COLUMN heartbeat_at TEXT`)
+    } catch { /* column may already exist */ }
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('032c_team_instances_heartbeat')").run()
+  }
+
   // MIGRATION_032 — add session_id column to memories for session-scoped recall
   const already032 = db.prepare("SELECT id FROM schema_migrations WHERE name = '032_memories_session_id'").get()
   if (!already032) {
