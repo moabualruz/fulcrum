@@ -219,9 +219,13 @@ async function runHook(cliName: string): Promise<void> {
 
   // Policy check — only enforce team-invoke restriction
   const isTeamInvoke = toolName.includes('invoke_team') || toolName.includes('team_invoke')
-  if (isTeamInvoke && agentRole && agentRole !== 'chief_of_staff') {
-    process.stderr.write(`[fulcrum hook] Tool call denied: only chief_of_staff may invoke teams (role: ${agentRole})\n`)
-    process.exit(2)
+  if (isTeamInvoke && agentRole) {
+    const { canInvokeTeams } = await import('@fulcrum/core')
+    type AgentRole = Parameters<typeof canInvokeTeams>[0]
+    if (!canInvokeTeams(agentRole as AgentRole)) {
+      process.stderr.write(`[fulcrum hook] Tool call denied: role '${agentRole}' lacks can_invoke_teams\n`)
+      process.exit(2)
+    }
   }
 
   // Allow

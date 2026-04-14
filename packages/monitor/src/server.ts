@@ -9,6 +9,7 @@ import {
   buildCosContext,
   loadConfig,
   createWorkspace, createProject, getProject,
+  isL1, type AgentRole,
 } from '@fulcrum/core'
 import {
   getMetrics,
@@ -626,11 +627,11 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         workspace_id?: string; actor_type?: string
       }
       // TypeScript policy engine is WIP-limit based — always allow for tool-use checks
-      // unless the action is 'invoke_team' and role is not chief_of_staff
+      // unless the action is 'invoke_team' and the caller is not an L1 role
       const role = body.actor_id?.split('/')[1] ?? body.actor_id ?? ''
       const isTeamInvoke = body.action.includes('invoke_team') || body.action.includes('team_invoke')
-      const isChiefOfStaff = role === 'chief_of_staff'
-      if (isTeamInvoke && !isChiefOfStaff) {
+      const callerIsL1 = isL1(role as AgentRole)
+      if (isTeamInvoke && !callerIsL1) {
         return c.json({ allowed: false, reason: 'Only chief_of_staff may invoke teams' })
       }
       return c.json({ allowed: true, reason: '' })

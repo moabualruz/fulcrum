@@ -1,5 +1,5 @@
 // packages/worktrees/src/worktrees.ts
-import { getDb, FulcrumError, newId } from '@fulcrum/core'
+import { getDb, FulcrumError, newId, canMerge, type AgentRole } from '@fulcrum/core'
 import type {
   Worktree,
   MergeResult,
@@ -132,7 +132,7 @@ export async function processMergeQueue(
   projectId: string,
   callerRole: string
 ): Promise<MergeResult[]> {
-  if (callerRole !== 'integration_worker') {
+  if (!canMerge(callerRole as AgentRole)) {
     throw new Error('POLICY_DENIED: only integration_worker may process merge queue')
   }
 
