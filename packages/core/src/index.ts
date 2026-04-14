@@ -53,3 +53,11 @@ export { statusCategory } from './status-category.js'
 // Events
 export { emitEvent } from './events.js'
 export type { EmitEventInput } from './events.js'
+
+// CoS Context Builder
+export { buildWorldState } from './cos-context.js'
+export type { CoSWorldState, BuildWorldStateInput } from './cos-context.js'
+
+// CoS Response Parser
+export { parseCoSResponse, applyCoSResponse } from './cos-parser.js'
+export type { CoSResponse } from './cos-parser.js'
