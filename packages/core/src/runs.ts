@@ -4,8 +4,64 @@ import { newId, nextDisplayId } from './ids.js'
 import { statusCategory } from './status-category.js'
 import { emitEvent } from './events.js'
 import { createTask } from './tasks.js'
+import { writeMemory } from './memory.js'
 import { FulcrumError } from './types.js'
 import type { AgentRun, AgentRole, AgentRunStatus, RunArtifacts, Task, TaskPacket, SpawnableRun, StartAgentRunInput } from './types.js'
+
+/**
+ * Recall task-scoped memories at run start so the agent sees prior context
+ * (task_goal, task_decision, task_outcome, lessons) in the initial event.
+ * Non-throwing: a recall failure must never prevent a run from starting.
+ *
+ * Uses a direct task_id query (not FTS5 MATCH) because `recallMemory` requires
+ * a text query that matches content, whereas at run start we want *all*
+ * decision/lesson rows for this task regardless of wording.
+ *
+ * Returns a compact `{memory_id, kind, content}` summary list (top 5 by
+ * recency + importance, filtered to the relevant kinds).
+ */
+function recallTaskContext(opts: {
+  workspace_id: string
+  project_id: string | null
+  task_id: string | null
+}): Array<{ memory_id: string; kind: string; content: string }> {
+  if (!opts.task_id) return []
+  try {
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT memory_id, kind, content
+      FROM memories
+      WHERE workspace_id = ?
+        AND task_id = ?
+        AND kind IN ('task_goal', 'task_decision', 'decision', 'lesson', 'task_outcome')
+      ORDER BY importance DESC, created_at DESC
+      LIMIT 5
+    `).all(opts.workspace_id, opts.task_id) as Array<{
+      memory_id: string
+      kind: string
+      content: string
+    }>
+    return rows.map(r => ({
+      memory_id: r.memory_id,
+      kind: r.kind,
+      content: (r.content || '').slice(0, 400),
+    }))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Wrap writeMemory in a non-throwing facade so lifecycle transitions never
+ * fail on a memory write. Errors are logged to stderr for ops visibility.
+ */
+async function safeWriteMemory(input: Parameters<typeof writeMemory>[0]): Promise<void> {
+  try {
+    await writeMemory(input)
+  } catch (err) {
+    process.stderr.write(`[runs] auto-write memory failed: ${(err as Error).message}\n`)
+  }
+}
 interface HeartbeatInput {
   run_id: string
   current_step: string
@@ -146,11 +202,20 @@ export async function startAgentRun(input: StartAgentRunInput): Promise<AgentRun
     initialStatus, sc, git_branch, git_commit, now, now
   )
 
+  // Recall task-scoped memories so the agent sees prior context at startup.
+  // Non-blocking — a recall failure must never prevent a run from starting.
+  const recalled = recallTaskContext({
+    workspace_id: input.workspace_id,
+    project_id: taskRow.project_id ?? null,
+    task_id: input.task_id,
+  })
+
   appendRunEvent(run_id, 'started', {
     agent_role: input.role,
     task_id: input.task_id,
     agent_id: agent_id || undefined,
     pi_profile: input.pi_profile,
+    recalled_memories: recalled,
   })
 
   const startedRun = getRun(run_id)
@@ -252,6 +317,25 @@ export async function completeAgentRun(input: CompleteRunInput): Promise<AgentRu
     payload: { output_summary: input.output_summary },
   })
 
+  // Auto-write task_outcome memory when the summary is meaningful (>20 chars).
+  // Non-blocking — memory write failures never fail the completion.
+  if (
+    input.output_summary &&
+    input.output_summary.trim().length > 20 &&
+    completedRun.task_id
+  ) {
+    const artifact_paths = input.artifacts?.files_changed ?? []
+    await safeWriteMemory({
+      workspace_id: completedRun.workspace_id,
+      project_id: completedRun.project_id,
+      task_id: completedRun.task_id,
+      content: input.output_summary,
+      kind: 'task_outcome',
+      scope: 'task',
+      tags: artifact_paths.slice(0, 10),
+    })
+  }
+
   return getRun(input.run_id)
 }
 
@@ -282,6 +366,18 @@ export async function blockAgentRun(input: BlockRunInput): Promise<AgentRun> {
     actor_id: run.agent_id || 'system',
     payload: { reason: input.reason },
   })
+
+  // Auto-write a task_failure memory when we have a reason. Non-blocking.
+  if (input.reason && input.reason.trim() && blockedRun.task_id) {
+    await safeWriteMemory({
+      workspace_id: blockedRun.workspace_id,
+      project_id: blockedRun.project_id,
+      task_id: blockedRun.task_id,
+      content: `Blocked: ${input.reason}`,
+      kind: 'task_failure',
+      scope: 'task',
+    })
+  }
 
   return getRun(input.run_id)
 }
@@ -322,6 +418,18 @@ export async function escalateRun(input: EscalateRunInput): Promise<Task> {
   const taskRow = db.prepare('SELECT * FROM tasks WHERE task_id = ?')
     .get(run.task_id) as Record<string, unknown> | undefined
   if (!taskRow) throw new FulcrumError(`Task ${run.task_id} not found during escalation`, 'not_found')
+
+  // Auto-write a task_decision memory capturing the escalation. Non-blocking.
+  if (input.escalation_reason && input.escalation_reason.trim() && abortedRun.task_id) {
+    await safeWriteMemory({
+      workspace_id: abortedRun.workspace_id,
+      project_id: (taskRow.project_id as string) || abortedRun.project_id,
+      task_id: abortedRun.task_id,
+      content: `Escalated to chief_of_staff: ${input.escalation_reason}`,
+      kind: 'task_decision',
+      scope: 'task',
+    })
+  }
 
   return createTask({
     workspace_id: run.workspace_id,

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb } from './helpers.js'
 import { getDb } from '../db/client.js'
 import { createTask } from '../tasks.js'
+import { writeMemory } from '../memory.js'
 import {
   startAgentRun,
   heartbeatAgentRun,
@@ -475,5 +476,95 @@ describe('agent run event journal (G-7)', () => {
     expect(heartbeats.length).toBe(3)
     expect(heartbeats[0].payload.current_step).toBe('step 1')
     expect(heartbeats[2].payload.current_step).toBe('step 3')
+  })
+})
+
+describe('run lifecycle memory hooks (L-9, L-10)', () => {
+  type RunEvent = { ts: string; event_type: string; payload: Record<string, unknown> }
+
+  it('startAgentRun recalls task-scoped memories and stores them in the started event', async () => {
+    const task = await seedTask()
+    // Seed a task-scoped memory the agent should see at startup
+    await writeMemory({
+      content: 'prior context about the implementation approach',
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      task_id: task.task_id,
+      kind: 'task_decision',
+      scope: 'task',
+    })
+
+    const run = await startAgentRun({
+      workspace_id: 'ws_1',
+      task_id: task.task_id,
+      role: 'software_engineer',
+    })
+
+    const row = getDb().prepare('SELECT events FROM agent_runs WHERE run_id = ?').get(run.run_id) as { events: string }
+    const events = JSON.parse(row.events) as RunEvent[]
+    const started = events.find(e => e.event_type === 'started')
+    expect(started).toBeDefined()
+    const recalled = started!.payload.recalled_memories as Array<{ memory_id: string; kind: string; content: string }>
+    expect(Array.isArray(recalled)).toBe(true)
+    expect(recalled.length).toBeGreaterThanOrEqual(1)
+    expect(recalled[0]).toHaveProperty('memory_id')
+    expect(recalled[0]).toHaveProperty('kind')
+    expect(recalled[0]).toHaveProperty('content')
+  })
+
+  it('completeAgentRun auto-writes a task_outcome memory when summary is non-trivial', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    await completeAgentRun({
+      run_id: run.run_id,
+      output_summary: 'Implemented the feature and added 5 tests, all passing.',
+      artifacts: { files_changed: ['src/foo.ts', 'src/bar.ts'] },
+    })
+    const memoryRows = getDb().prepare(
+      "SELECT * FROM memories WHERE task_id = ? AND kind = 'task_outcome'"
+    ).all(task.task_id) as Array<Record<string, unknown>>
+    expect(memoryRows.length).toBeGreaterThanOrEqual(1)
+    expect(memoryRows[0].content).toContain('Implemented the feature')
+  })
+
+  it('completeAgentRun skips auto-memory when summary is trivial or missing', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    await completeAgentRun({ run_id: run.run_id, output_summary: 'ok' })
+    const memoryRows = getDb().prepare(
+      "SELECT * FROM memories WHERE task_id = ? AND kind = 'task_outcome'"
+    ).all(task.task_id) as Array<Record<string, unknown>>
+    expect(memoryRows.length).toBe(0)
+  })
+
+  it('blockAgentRun auto-writes a task_failure memory', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    await blockAgentRun({ run_id: run.run_id, reason: 'missing API credentials' })
+    const memoryRows = getDb().prepare(
+      "SELECT * FROM memories WHERE task_id = ? AND kind = 'task_failure'"
+    ).all(task.task_id) as Array<Record<string, unknown>>
+    expect(memoryRows.length).toBeGreaterThanOrEqual(1)
+    expect(memoryRows[0].content).toContain('missing API credentials')
+  })
+
+  it('escalateRun auto-writes a task_decision memory', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    await escalateRun({ run_id: run.run_id, escalation_reason: 'requires architecture review' })
+    const memoryRows = getDb().prepare(
+      "SELECT * FROM memories WHERE task_id = ? AND kind = 'task_decision'"
+    ).all(task.task_id) as Array<Record<string, unknown>>
+    expect(memoryRows.length).toBeGreaterThanOrEqual(1)
+    expect(memoryRows[0].content).toContain('requires architecture review')
+  })
+
+  it('recall failure never prevents startAgentRun (empty DB returns [])', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const row = getDb().prepare('SELECT events FROM agent_runs WHERE run_id = ?').get(run.run_id) as { events: string }
+    const events = JSON.parse(row.events) as RunEvent[]
+    const started = events.find(e => e.event_type === 'started')
+    expect(started!.payload.recalled_memories).toEqual([])
   })
 })
