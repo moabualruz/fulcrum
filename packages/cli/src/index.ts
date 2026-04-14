@@ -3,6 +3,7 @@
 
 import { runMemoryInit } from '@fulcrum/memory'
 import { activateL2 } from '@fulcrum/memory'
+import { runDoctor, printDoctorResults } from './doctor.js'
 
 const [, , ...args] = process.argv
 const [group, command] = args
@@ -81,8 +82,13 @@ OPTIONS
   --vault <path>       Override vault path (default: $FULCRUM_DATA_DIR/vault)
   --port <n>           Override monitor port (default: 4721 from .fulcrum.json)
 
+DIAGNOSTICS
+  doctor              Run environment + configuration health checks
+  doctor --json       Output checks as JSON
+
 EXAMPLES
   fulcrum memory init
+  fulcrum doctor
   fulcrum serve all
   fulcrum task list --json
   fulcrum workflow start --workflow-name implement_feature --workspace-id ws_1
@@ -2158,6 +2164,12 @@ fulcrum serve — long-running servers
   if (group === 'team' || group === 'teams') { await runTeams(); return }
   if (group === 'workflow' || group === 'workflows') { await runWorkflows(); return }
   if (group === 'agent' || group === 'agents') { await runAgent(); return }
+
+  if (group === 'doctor') {
+    const { results, exitCode } = runDoctor({ cwd: process.cwd(), json: args.includes('--json') })
+    printDoctorResults(results, args.includes('--json'))
+    process.exit(exitCode)
+  }
 
   console.error(`Unknown group: ${group}`)
   usage()
