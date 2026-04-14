@@ -77,5 +77,9 @@ export type { CoSWorldState, BuildWorldStateInput } from './cos-context.js'
 export { parseCoSResponse, applyCoSResponse } from './cos-parser.js'
 export type { CoSResponse } from './cos-parser.js'
 
+// Locks
+export { acquireLock, releaseLock, listLocks, cleanupExpiredLocks } from './locks.js'
+export type { Lock, AcquireLockInput, AcquireLockResult } from './locks.js'
+
 // Constants
 export * from './constants.js'

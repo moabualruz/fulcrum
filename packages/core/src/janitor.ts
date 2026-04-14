@@ -1,5 +1,6 @@
 import { getDb } from './db/client.js'
 import { escalateRun } from './runs.js'
+import { cleanupExpiredLocks } from './locks.js'
 import { FulcrumError } from './types.js'
 import type { PolicyConfig } from './types.js'
 import { JANITOR_INTERVAL_SEC } from './constants.js'
@@ -46,6 +47,13 @@ export async function runJanitorCycle(input: JanitorCycleInput): Promise<void> {
     } catch (err) {
       process.stderr.write(`[janitor] Failed to escalate run ${run_id}: ${String(err)}\n`)
     }
+  }
+
+  // Purge expired advisory locks (G-5).
+  try {
+    await cleanupExpiredLocks()
+  } catch (err) {
+    process.stderr.write(`[janitor] Failed to cleanup expired locks: ${String(err)}\n`)
   }
 }
 
