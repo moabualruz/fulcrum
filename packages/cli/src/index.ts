@@ -33,9 +33,10 @@ COMMANDS
   projects list --workspace-id <id>
   projects create --name <name> --workspace-id <id> [--id <id>]
 
-  init                 Drop per-project context files (CLAUDE.md, GEMINI.md,
-                       PI.md, .mcp.json) into $CWD
-                       Flags: --force  --claude  --gemini  --pi
+Every command auto-initializes $CWD as a Fulcrum project on first run
+(creates .fulcrum/fulcrum.db, default workspace + project, and
+.fulcrum.json with deterministic IDs derived from the absolute path).
+No explicit init step is required.
 
 OPTIONS
   --vault <path>       Override vault path (default: ~/.fulcrum/vault)
@@ -136,10 +137,9 @@ fulcrum memory — memory vault commands
 // ── Hook commands ─────────────────────────────────────────────────────────────
 
 async function runHook(cliName: string): Promise<void> {
-  const { runMigrations, getDb } = await import('@fulcrum/core')
-  try {
-    runMigrations(getDb())
-  } catch { /* DB init best-effort */ }
+  // Migrations and workspace/project already set up by ensureProjectInitialized()
+  // in main(). We just need the IDs for event logging.
+  const { workspace_id } = currentProjectIds()
 
   // Read stdin
   const chunks: Buffer[] = []
@@ -178,11 +178,11 @@ async function runHook(cliName: string): Promise<void> {
     agentRole = event['role'] as string ?? ''
   }
 
-  // Log the tool call (best-effort)
+  // Log the tool call (best-effort) — attached to the auto-initialized workspace
   try {
     const { emitEvent } = await import('@fulcrum/core')
     emitEvent({
-      workspace_id: '',
+      workspace_id,
       evt_type: 'hook_executed',
       object_type: 'tool_call',
       object_id: null,
@@ -744,77 +744,89 @@ async function runProjects(): Promise<void> {
   process.exit(1)
 }
 
-// ── Init command (per-project context files) ────────────────────────────────
+// ── Auto project initialization ───────────────────────────────────────────────
+//
+// Every fulcrum command that touches the DB runs through this first. It:
+//   1. creates $CWD/.fulcrum/ and runs migrations on fulcrum.db
+//   2. ensures a default workspace + project exist, with deterministic IDs
+//      derived from the absolute path of $CWD (so the same project always
+//      resolves to the same IDs across sessions, but moving the project
+//      starts a clean slate)
+//   3. writes $CWD/.fulcrum.json with those IDs + monitor_port so the PI
+//      cockpit, Gemini extension, and any child tool can discover them
+// Idempotent: safe to call on every invocation. Prints a one-line notice
+// on first-time init (to stderr so it never corrupts MCP stdio traffic).
 
-async function runInit(): Promise<void> {
-  const { fileURLToPath } = await import('url')
+let _projectInitialized = false
+let _projectIds: { workspace_id: string; project_id: string } | null = null
+
+function currentProjectIds(): { workspace_id: string; project_id: string } {
+  if (!_projectIds) throw new Error('ensureProjectInitialized() must be called before accessing project IDs')
+  return _projectIds
+}
+
+async function ensureProjectInitialized(opts: { silent?: boolean } = {}): Promise<{ workspace_id: string; project_id: string }> {
+  if (_projectIds) return _projectIds
   const path = await import('path')
   const fs = await import('fs')
+  const crypto = await import('crypto')
+  const { getDb, runMigrations } = await import('@fulcrum/core')
 
-  // Resolve repo root from this CLI file's location
-  // packages/cli/src/index.ts → repo root is 3 levels up
-  const cliPath = fileURLToPath(import.meta.url)
-  const repoRoot = path.resolve(path.dirname(cliPath), '..', '..', '..')
   const cwd = process.cwd()
 
-  const force = args.includes('--force')
-  const onlyClaude = args.includes('--claude')
-  const onlyGemini = args.includes('--gemini')
-  const onlyPi = args.includes('--pi')
-  const all = !onlyClaude && !onlyGemini && !onlyPi
+  // Ensure .fulcrum/ exists and migrations are current
+  fs.mkdirSync(path.join(cwd, '.fulcrum'), { recursive: true })
+  const db = getDb()
+  runMigrations(db)
 
-  const files: Array<{ src: string; dest: string; label: string; enabled: boolean }> = [
-    {
-      src: path.join(repoRoot, 'agent-integration', 'claude', '.mcp.json'),
-      dest: path.join(cwd, '.mcp.json'),
-      label: '.mcp.json (project-scope MCP server)',
-      enabled: all || onlyClaude,
-    },
-    {
-      src: path.join(repoRoot, 'agent-integration', 'claude', 'CLAUDE.md'),
-      dest: path.join(cwd, 'CLAUDE.md'),
-      label: 'CLAUDE.md',
-      enabled: all || onlyClaude,
-    },
-    {
-      src: path.join(repoRoot, 'agent-integration', 'gemini', 'GEMINI.md'),
-      dest: path.join(cwd, 'GEMINI.md'),
-      label: 'GEMINI.md',
-      enabled: all || onlyGemini,
-    },
-    {
-      src: path.join(repoRoot, 'agent-integration', 'pi', 'PI.md'),
-      dest: path.join(cwd, 'PI.md'),
-      label: 'PI.md',
-      enabled: all || onlyPi,
-    },
-  ]
+  // Deterministic IDs: sha256[:12] of the absolute path, prefixed with a
+  // sanitized directory name. Stable across runs, unique across projects.
+  const absPath = path.resolve(cwd)
+  const hash = crypto.createHash('sha256').update(absPath).digest('hex').slice(0, 12)
+  const sanitizedName = path.basename(absPath).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 24) || 'project'
+  const workspace_id = `ws_${sanitizedName}_${hash}`
+  const project_id = `proj_${sanitizedName}_${hash}`
 
-  console.log(`\nfulcrum init — writing per-project context files to ${cwd}\n`)
+  const now = new Date().toISOString()
+  const wsRes = db.prepare(
+    `INSERT OR IGNORE INTO workspaces (workspace_id, name, status, created_at)
+     VALUES (?, ?, 'active', ?)`
+  ).run(workspace_id, sanitizedName, now)
+  const projRes = db.prepare(
+    `INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at)
+     VALUES (?, ?, ?, ?)`
+  ).run(project_id, workspace_id, sanitizedName, now)
 
-  let written = 0
-  let skipped = 0
-
-  for (const f of files) {
-    if (!f.enabled) continue
-    if (!fs.existsSync(f.src)) {
-      console.warn(`  ⚠ template missing: ${f.src}`)
-      continue
+  // Write/update .fulcrum.json so PI cockpit and monitor pick up the same IDs
+  const configPath = path.join(cwd, '.fulcrum.json')
+  let config: Record<string, unknown> = {}
+  if (fs.existsSync(configPath)) {
+    try {
+      config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
+    } catch {
+      // malformed — overwrite with a clean one
+      config = {}
     }
-    if (fs.existsSync(f.dest) && !force) {
-      console.log(`  — ${f.label} already exists (use --force to overwrite)`)
-      skipped++
-      continue
-    }
-    fs.copyFileSync(f.src, f.dest)
-    console.log(`  ✓ ${f.label}`)
-    written++
+  }
+  const needsWrite =
+    config['workspace_id'] !== workspace_id ||
+    config['project_id'] !== project_id ||
+    typeof config['monitor_port'] !== 'number'
+  if (needsWrite) {
+    config['workspace_id'] = workspace_id
+    config['project_id'] = project_id
+    config['monitor_port'] = (typeof config['monitor_port'] === 'number' ? config['monitor_port'] : 4721)
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8')
   }
 
-  console.log(`\n${written} file(s) written, ${skipped} skipped.`)
-  if (skipped > 0 && !force) {
-    console.log(`Re-run with --force to overwrite existing files.\n`)
+  // Announce first-time init on stderr (never stdout — MCP stdio is strict)
+  const firstRun = wsRes.changes > 0 || projRes.changes > 0 || needsWrite
+  if (firstRun && !opts.silent && !_projectInitialized) {
+    process.stderr.write(`[fulcrum] initialized project "${sanitizedName}" (${workspace_id})\n`)
   }
+  _projectInitialized = true
+  _projectIds = { workspace_id, project_id }
+  return _projectIds
 }
 
 // ── Main dispatch ─────────────────────────────────────────────────────────────
@@ -836,6 +848,14 @@ async function main(): Promise<void> {
     }
     return
   }
+
+  // Auto-initialize the project in $CWD (creates .fulcrum/fulcrum.db,
+  // default workspace + project, and .fulcrum.json) before dispatching
+  // any command that touches the DB. The user never needs an explicit
+  // init step. `hook` and `serve mcp` ask for silent mode so the init
+  // notice doesn't spam stderr on every Claude/Gemini tool call.
+  const silentInit = group === 'hook' || (group === 'serve' && command === 'mcp')
+  await ensureProjectInitialized({ silent: silentInit })
 
   if (group === 'memory') { await runMemory(); return }
 
@@ -861,7 +881,6 @@ async function main(): Promise<void> {
 
   if (group === 'workspaces') { await runWorkspaces(); return }
   if (group === 'projects') { await runProjects(); return }
-  if (group === 'init') { await runInit(); return }
 
   console.error(`Unknown group: ${group}`)
   usage()
