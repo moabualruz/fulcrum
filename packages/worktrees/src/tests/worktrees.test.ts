@@ -1,7 +1,7 @@
 // packages/worktrees/src/tests/worktrees.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { setDb, newId } from '@fulcrum/core'
+import { setDb } from '@fulcrum/core'
 import { runMigration008 } from '../schema.js'
 import type { ArtifactType, HandoffMode } from '../types.js'
 import {
