@@ -20,6 +20,13 @@ const PREFIXES: Record<string, string> = {
   event: 'evt_',
   team: 'team_',
   policy: 'pol_',
+  subtask: 'subtask_',
+  cycle: 'cycle_',
+  milestone: 'mile_',
+  comment: 'cmt_',
+  status_event: 'sev_',
+  lock: 'lock_',
+  span: 'span_',
 }
 
 const DISPLAY_PREFIXES: Record<string, string> = {
@@ -33,6 +40,10 @@ const DISPLAY_PREFIXES: Record<string, string> = {
   artifact: 'ART',
   review: 'REV',
   team: 'TEAM',
+  subtask: 'SUBTASK',
+  cycle: 'CYC',
+  milestone: 'MILE',
+  comment: 'CMT',
 }
 
 export function newId(entityType: string): string {

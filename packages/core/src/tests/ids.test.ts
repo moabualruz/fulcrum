@@ -111,3 +111,22 @@ describe('nextDisplayId', () => {
     expect(() => nextDisplayId('workspace', 'proj_1', db)).toThrow('No display prefix')
   })
 })
+
+describe('newId prefixes (G-15)', () => {
+  const cases: Array<[string, string]> = [
+    ['subtask', 'subtask_'],
+    ['cycle', 'cycle_'],
+    ['milestone', 'mile_'],
+    ['comment', 'cmt_'],
+    ['status_event', 'sev_'],
+    ['lock', 'lock_'],
+    ['span', 'span_'],
+  ]
+  for (const [kind, prefix] of cases) {
+    it(`${kind} → ${prefix}...`, () => {
+      const id = newId(kind)
+      expect(id.startsWith(prefix)).toBe(true)
+      expect(id.length).toBeGreaterThan(prefix.length)
+    })
+  }
+})
