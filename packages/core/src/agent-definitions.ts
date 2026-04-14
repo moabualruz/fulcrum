@@ -74,6 +74,14 @@ export function getAgentDefinition(role: string): AgentDefinition | null {
   return row ? rowToDefinition(row) : null
 }
 
+/** Increments the patch segment of a semver string (e.g. "0.1.0" → "0.1.1"). */
+function bumpPatch(version: string): string {
+  const parts = version.split('.')
+  if (parts.length < 3) return version
+  const patch = parseInt(parts[2], 10)
+  return `${parts[0]}.${parts[1]}.${isNaN(patch) ? 1 : patch + 1}`
+}
+
 export function updateAgentDefinition(input: UpdateAgentDefinitionInput): AgentDefinition {
   const db = getDb()
   const existing = db.prepare('SELECT * FROM agent_definitions WHERE role = ?').get(input.role) as Record<string, unknown> | undefined
@@ -90,9 +98,11 @@ export function updateAgentDefinition(input: UpdateAgentDefinitionInput): AgentD
     params.push(serialize && value !== null ? JSON.stringify(value) : value)
   }
 
+  // Auto-bump patch version when no explicit version is provided
+  const resolvedVersion = input.version ?? bumpPatch(existing.version as string)
   setField('display_name', input.display_name)
   setField('description', input.description)
-  setField('version', input.version)
+  setField('version', resolvedVersion)
   setField('stability', input.stability)
   setField('system_prompt', input.system_prompt)
   setField('model', input.model)

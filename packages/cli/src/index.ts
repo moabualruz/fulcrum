@@ -1877,6 +1877,7 @@ fulcrum agent — agent runs and spawning
   fulcrum agent list [--workspace-id <id>] [--json]
   fulcrum agent status --run-id <id> [--json]
   fulcrum agent spawn --target-role <role> --caller-role <role> --task-id <id> [--workspace-id <id>] [--project-id <id>] [--adapter <name>]
+  fulcrum agent versions <role>
 `)
     process.exit(0)
   }
@@ -1943,6 +1944,28 @@ fulcrum agent — agent runs and spawning
       console.error(`agent spawn failed: ${(err as Error).message}`)
       process.exit(1)
     }
+    return
+  }
+
+  if (sub === 'versions') {
+    const role = args[2]
+    if (!role) {
+      console.error('Usage: fulcrum agent versions <role>')
+      process.exit(1)
+    }
+    const { getAgentDefinition } = await import('@fulcrum/core')
+    const def = getAgentDefinition(role)
+    if (!def) {
+      console.error(`No agent definition found for role: ${role}`)
+      process.exit(1)
+    }
+    outputObject({
+      role: def.role,
+      display_name: def.display_name,
+      version: def.version,
+      stability: def.stability,
+      updated_at: def.updated_at,
+    })
     return
   }
 
