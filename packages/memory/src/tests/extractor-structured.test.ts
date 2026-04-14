@@ -62,4 +62,18 @@ describe('extractStructured', () => {
     const mentions = extractStructured('Just plain text here.', {})
     expect(mentions).toHaveLength(0)
   })
+
+  it('extracts mem_ prefixed IDs as concept type', () => {
+    const mentions = extractStructured('See mem_01ABC for details.', {})
+    const memory = mentions.find(m => m.type === 'concept' && m.canonical.startsWith('mem_'))
+    expect(memory).toBeDefined()
+    expect(memory!.canonical).toBe('mem_01abc')
+  })
+
+  it('extracts file_ prefixed IDs as file type', () => {
+    const mentions = extractStructured('Check file_src_lib_ts for the handler.', {})
+    const file = mentions.find(m => m.type === 'file' && m.canonical.startsWith('file_'))
+    expect(file).toBeDefined()
+    expect(file!.canonical).toBe('file_src_lib_ts')
+  })
 })

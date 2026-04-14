@@ -42,6 +42,8 @@ function extractIdPrefixes(content: string): ExtractedMention[] {
     [/\brun_[a-zA-Z0-9_-]+/g, 'run'],
     [/\bws_[a-zA-Z0-9_-]+/g, 'project'],
     [/\bsym_[a-zA-Z0-9_.-]+/g, 'symbol'],
+    [/\bmem_[a-zA-Z0-9_-]+/g, 'concept'],
+    [/\bfile_[a-zA-Z0-9_/.-]+/g, 'file'],
   ]
   for (const [regex, type] of prefixRules) {
     let match: RegExpExecArray | null
