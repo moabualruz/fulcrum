@@ -249,6 +249,28 @@ importers:
         specifier: ^1.4.0
         version: 1.6.1(@types/node@20.19.39)
 
+  packages/worker:
+    dependencies:
+      '@fulcrum/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.12
+        version: 7.6.13
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.39
+      better-sqlite3:
+        specifier: ^12.0.0
+        version: 12.9.0
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.4.0
+        version: 1.6.1(@types/node@20.19.39)
+
   packages/workflows:
     dependencies:
       '@fulcrum/core':
