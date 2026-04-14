@@ -14,6 +14,7 @@ describe('normalizeHookEvent (H-21)', () => {
         toolInput: { file_path: '/x' },
         sessionId: 'sess_abc',
         agentRole: '',
+        runId: '',
       })
     })
 
@@ -23,6 +24,14 @@ describe('normalizeHookEvent (H-21)', () => {
       expect(result.toolInput).toEqual({})
       expect(result.sessionId).toBe('unknown')
       expect(result.agentRole).toBe('')
+      expect(result.runId).toBe('')
+    })
+
+    it('Claude events have empty runId', () => {
+      const result = normalizeHookEvent('claude', {
+        tool_name: 'Read', tool_input: {}, session_id: 's',
+      })
+      expect(result.runId).toBe('')
     })
   })
 
@@ -38,7 +47,15 @@ describe('normalizeHookEvent (H-21)', () => {
         toolInput: { path: '/y', content: 'hi' },
         sessionId: 'sess_g1',
         agentRole: '',
+        runId: '',
       })
+    })
+
+    it('Gemini events have empty runId', () => {
+      const result = normalizeHookEvent('gemini', {
+        toolName: 'Edit', toolInput: {}, conversationId: 'c',
+      })
+      expect(result.runId).toBe('')
     })
 
     it('normalizes camelCase fields (toolName / toolInput / conversationId)', () => {
@@ -75,6 +92,7 @@ describe('normalizeHookEvent (H-21)', () => {
       expect(result.toolInput).toEqual({ pattern: 'foo' })
       expect(result.sessionId).toBe('pi_sess_1')
       expect(result.agentRole).toBe('software_engineer')
+      expect(result.runId).toBe('run_xyz')
     })
 
     it('PI fall back: snake_case fields still work', () => {
@@ -89,9 +107,21 @@ describe('normalizeHookEvent (H-21)', () => {
       expect(result.agentRole).toBe('code_reviewer')
     })
 
+    it('PI snake_case run_id still round-trips', () => {
+      const result = normalizeHookEvent('pi', {
+        tool_name: 'Bash',
+        tool_input: { command: 'ls' },
+        session_id: 'pi_sess_2',
+        role: 'software_engineer',
+        run_id: 'run_snake',
+      })
+      expect(result.runId).toBe('run_snake')
+    })
+
     it('empty PI event defaults role to empty string', () => {
       const result = normalizeHookEvent('pi', {})
       expect(result.agentRole).toBe('')
+      expect(result.runId).toBe('')
     })
   })
 

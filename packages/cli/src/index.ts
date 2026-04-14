@@ -143,6 +143,7 @@ export interface NormalizedHookEvent {
   toolInput: Record<string, unknown>
   sessionId: string
   agentRole: string
+  runId: string
 }
 
 /**
@@ -157,6 +158,7 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
   let toolInput: Record<string, unknown> = {}
   let sessionId = 'unknown'
   let agentRole = ''
+  let runId = ''
 
   if (cliName === 'claude') {
     toolName = (event['tool_name'] as string) ?? ''
@@ -171,9 +173,10 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
     toolInput = (event['toolInput'] ?? event['tool_input'] ?? event['args'] ?? {}) as Record<string, unknown>
     sessionId = (event['sessionId'] ?? event['session_id']) as string ?? 'unknown'
     agentRole = (event['role'] as string) ?? ''
+    runId = (event['runId'] ?? event['run_id']) as string ?? ''
   }
 
-  return { toolName, toolInput, sessionId, agentRole }
+  return { toolName, toolInput, sessionId, agentRole, runId }
 }
 
 async function runHook(cliName: string): Promise<void> {
@@ -198,7 +201,7 @@ async function runHook(cliName: string): Promise<void> {
   }
 
   // Normalise to canonical shape based on CLI type
-  const { toolName, toolInput, sessionId, agentRole } = normalizeHookEvent(cliName as HookCli, event)
+  const { toolName, toolInput, sessionId, agentRole, runId } = normalizeHookEvent(cliName as HookCli, event)
 
   // Log the tool call (best-effort) — attached to the auto-initialized workspace
   try {
@@ -207,10 +210,10 @@ async function runHook(cliName: string): Promise<void> {
       workspace_id,
       evt_type: 'hook_executed',
       object_type: 'tool_call',
-      object_id: null,
+      object_id: runId || undefined,
       actor_type: 'agent',
-      actor_id: `${cliName}/${sessionId.slice(0, 8)}`,
-      payload: { tool_name: toolName, tool_input_keys: Object.keys(toolInput), session_id: sessionId },
+      actor_id: `${cliName}/${sessionId.slice(0, 8)}${runId ? ':' + runId.slice(-8) : ''}`,
+      payload: { tool_name: toolName, tool_input_keys: Object.keys(toolInput), session_id: sessionId, run_id: runId || undefined },
     })
   } catch { /* logging best-effort */ }
 
