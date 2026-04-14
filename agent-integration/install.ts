@@ -42,9 +42,15 @@ interface StepResult {
   status: "ok" | "skip" | "warn" | "fail";
   detail?: string;
   recovery?: string;
+  rollback?: string;   // how to undo this change if a later step fails
 }
 const results: StepResult[] = [];
 let currentStep: StepResult | null = null;
+
+/** Record a rollback instruction for the current step (called after a change is made). */
+function setRollback(instruction: string): void {
+  if (currentStep) currentStep.rollback = instruction;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -194,6 +200,7 @@ function installCliBin(): void {
     fs.symlinkSync(wrapperPath, linkPath);
   }
   ok(`${existed ? "re-" : ""}linked ${wrapperPath} → ${linkPath}`);
+  setRollback(`rm -f ${linkPath}`);
 
   // Warn if ~/.local/bin is not in PATH — show copy-pasteable lines for every shell.
   const pathEnv = process.env["PATH"] ?? "";
@@ -494,6 +501,7 @@ function installClaudeAgentMds(): void {
     copied++;
   }
   ok(`installed ${copied} agent MD file(s) → ${destDir}`);
+  setRollback(`rm -f ${destDir}/fulcrum-*.md  # removes fulcrum agent MDs only`);
 }
 
 // ── 5b. Claude Code: slash commands → ~/.claude/commands/ ────────────────────
@@ -528,6 +536,7 @@ function installClaudeCommands(): void {
     copied++;
   }
   ok(`installed ${copied} slash command(s) → ${destDir}`);
+  setRollback(`rm -f ${destDir}/fulcrum-*.md  # removes fulcrum slash commands only`);
 }
 
 // ── 6. Gemini CLI: user extension (~/.gemini/extensions/fulcrum/) ─────────────
@@ -555,6 +564,7 @@ function installGeminiExtension(): void {
     fs.copyFileSync(from, to);
   }
   ok(`installed extension → ${extDir}`);
+  setRollback(`rm -rf ${extDir}  # removes entire Gemini extension`);
 }
 
 // ── 7. PI: cockpit extension (pi install <cockpit>) ──────────────────────────
@@ -815,6 +825,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["Claude Code: slash commands → ~/.claude/commands/", installClaudeCommands],
     ["Gemini CLI: user extension", installGeminiExtension],
     ["PI: cockpit extension", installPiCockpit],
+    ["MCP smoke test", smokeMcp],
   ],
   claude: [
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
@@ -825,6 +836,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["Claude Code: skills → ~/.claude/skills/fulcrum/", installClaudeSkills],
     ["Claude Code: agent MDs → ~/.claude/agents/", installClaudeAgentMds],
     ["Claude Code: slash commands → ~/.claude/commands/", installClaudeCommands],
+    ["MCP smoke test", smokeMcp],
   ],
   gemini: [
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
@@ -837,6 +849,71 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["PI: cockpit extension", installPiCockpit],
   ],
 };
+
+// ── Post-install MCP smoke test ───────────────────────────────────────────────
+// Spawns `fulcrum serve mcp`, sends JSON-RPC `initialize`, verifies a valid
+// response within a 5-second timeout. Non-blocking: failure is a warning.
+
+async function smokeMcp(): Promise<void> {
+  if (DRY_RUN) {
+    dry("would run MCP smoke test: fulcrum serve mcp + initialize request");
+    ok("(dry-run) smoke test skipped");
+    return;
+  }
+  if (!commandExists("fulcrum")) {
+    warn("smoke test skipped — fulcrum not in PATH");
+    return;
+  }
+  const TIMEOUT_MS = 5000;
+  const initRequest = JSON.stringify({
+    jsonrpc: "2.0",
+    method: "initialize",
+    id: 1,
+    params: {
+      protocolVersion: "2025-11-25",
+      capabilities: {},
+      clientInfo: { name: "fulcrum-smoke-test", version: "1" },
+    },
+  }) + "\n";
+
+  try {
+    const child = spawnSync(
+      "fulcrum",
+      ["serve", "mcp"],
+      {
+        input: initRequest,
+        timeout: TIMEOUT_MS,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+
+    if (child.error) throw child.error;
+
+    const stdout = (child.stdout ?? "").trim();
+    // Find the first line that looks like a JSON-RPC response
+    const responseLine = stdout.split("\n").find((l) => {
+      try { const j = JSON.parse(l) as Record<string, unknown>; return j["jsonrpc"] === "2.0" && j["id"] === 1; }
+      catch { return false; }
+    });
+
+    if (!responseLine) {
+      warn(`MCP smoke test: no valid JSON-RPC response found (stdout: ${stdout.slice(0, 200)})`);
+      return;
+    }
+
+    const resp = JSON.parse(responseLine) as Record<string, unknown>;
+    if (resp["result"]) {
+      ok(`MCP smoke test passed — server responded to initialize`);
+    } else if (resp["error"]) {
+      warn(`MCP smoke test: server returned error: ${JSON.stringify(resp["error"])}`);
+    } else {
+      warn(`MCP smoke test: unexpected response shape`);
+    }
+  } catch (err) {
+    warn(`MCP smoke test failed: ${(err as Error).message}`);
+  }
+}
 
 function printSummary(target: Target): void {
   const failed = results.filter((r) => r.status === "fail");
@@ -879,6 +956,19 @@ function printSummary(target: Target): void {
       const icon = r.status === "fail" ? "❌" : "⚠";
       console.log(`  ${icon} ${r.name}: ${r.detail ?? ""}`);
       if (r.recovery) console.log(`     → ${r.recovery}`);
+    }
+  }
+
+  // Rollback guide — only shown when at least one step failed
+  if (failed.length > 0) {
+    const rollbackable = results.filter((r) => r.status === "ok" && r.rollback);
+    if (rollbackable.length > 0) {
+      console.log("");
+      console.log("To undo completed steps (run in reverse order):");
+      for (const r of [...rollbackable].reverse()) {
+        console.log(`  # undo: ${r.name}`);
+        console.log(`  ${r.rollback}`);
+      }
     }
   }
 
