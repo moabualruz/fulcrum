@@ -1,8 +1,9 @@
 // packages/memory/src/setup/rebuild.ts
 import { listMemoryFiles, readMemoryFile } from '../vault/client.js'
-import { writeMemory } from '../write.js'
+import { insertMemoryDirect } from '../write.js'
 import { getKuzuClient } from '../kuzu/client.js'
 import { upsertMemoryToKuzu } from '../kuzu/upsert.js'
+import { getDb } from '@fulcrum/core'
 import type { FullMemory, MemoryKind, MemoryScope } from '../types.js'
 import type { MemoryFileFrontmatter } from '../types.js'
 
@@ -69,32 +70,33 @@ export async function rebuildFromVault(options: RebuildOptions): Promise<Rebuild
 
     const memory = frontmatterToFullMemory(frontmatter, body)
 
-    // L1 rebuild
-    if ((target === 'l1' || target === 'both') && !verify) {
+    if (verify) {
+      // Dry-run: report drift between L0 and L1, don't modify anything
+      if (target === 'l1' || target === 'both') {
+        try {
+          const db = getDb()
+          const existing = db.prepare(
+            'SELECT memory_id, content_hash FROM memories WHERE memory_id = ?'
+          ).get(memory.memory_id) as { memory_id: string; content_hash: string | null } | undefined
+
+          if (!existing) {
+            result.errors.push(`drift: ${memory.memory_id} present in L0 but missing from L1`)
+          } else if (memory.content_hash && existing.content_hash !== memory.content_hash) {
+            result.errors.push(
+              `drift: ${memory.memory_id} content_hash mismatch — L0=${memory.content_hash} L1=${existing.content_hash ?? 'null'}`
+            )
+          }
+        } catch (err) {
+          result.errors.push(`verify error: ${memory.memory_id} — ${(err as Error).message}`)
+        }
+      }
+      continue  // verify mode never writes
+    }
+
+    // L1 rebuild — use insertMemoryDirect to preserve original memory_id
+    if (target === 'l1' || target === 'both') {
       try {
-        await writeMemory({
-          workspace_id: memory.workspace_id,
-          project_id: memory.project_id,
-          scope: memory.scope,
-          kind: memory.kind,
-          title: memory.title,
-          summary: memory.summary,
-          content: body,
-          canonical_text: body,
-          tags: memory.tags,
-          entities: memory.entities,
-          confidence: memory.confidence,
-          freshness: memory.freshness,
-          importance: memory.importance,
-          file_path: memory.file_path,
-          symbol_path: memory.symbol_path,
-          event_time: memory.event_time,
-          task_id: memory.task_id,
-          issue_id: memory.issue_id,
-          artifact_id: memory.artifact_id,
-          provenance_refs: memory.provenance_refs,
-          skipVaultWrite: true,  // L0 files already exist — do not rewrite
-        })
+        insertMemoryDirect(memory)
         result.l1Count++
       } catch (err) {
         result.errors.push(`l1 error: ${memory.memory_id} — ${(err as Error).message}`)
@@ -102,7 +104,7 @@ export async function rebuildFromVault(options: RebuildOptions): Promise<Rebuild
     }
 
     // L2 rebuild
-    if ((target === 'l2' || target === 'both') && !verify) {
+    if (target === 'l2' || target === 'both') {
       const kuzuClient = getKuzuClient()
       if (kuzuClient) {
         try {
