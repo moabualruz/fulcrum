@@ -64,6 +64,9 @@ export async function runExtractionPipeline(
     }
   }
 
-  // Enqueue for LLM semantic extraction (Track 2)
-  enqueueForL2(vaultPath, memory.memory_id, memory.workspace_id)
+  // Enqueue for LLM semantic extraction (Track 2) — curated kinds only
+  const TRACK2_KINDS = new Set(['decision', 'fact', 'lesson', 'error', 'task_outcome'])
+  if (TRACK2_KINDS.has(memory.kind)) {
+    enqueueForL2(vaultPath, memory.memory_id, memory.workspace_id)
+  }
 }
