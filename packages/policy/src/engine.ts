@@ -1,8 +1,7 @@
 // packages/policy/src/engine.ts
 import { ulid } from 'ulid'
-import { getDb, FulcrumError } from '@fulcrum/core'
+import { getDb, FulcrumError, isL1, canMerge } from '@fulcrum/core'
 import { minimatch } from 'minimatch'
-import { L1_ROLES } from '@fulcrum/teams'
 import type { AgentRole } from '@fulcrum/core'
 import type {
   PolicyRule, PolicyMatcher, EvaluatePolicyInput, PolicyDecision,
@@ -25,14 +24,14 @@ export const SYSTEM_INVARIANTS: SystemInvariant[] = [
     priority: 1000,
     action: 'deny',
     rule_id: 'SYSTEM:only_l1_invokes_teams',
-    check: (input) => input.action === 'invoke_team' && !L1_ROLES.has(input.actor_role as AgentRole),
+    check: (input) => input.action === 'invoke_team' && !isL1(input.actor_role as AgentRole),
   },
   {
     name: 'only_integration_worker_merges',
     priority: 1000,
     action: 'deny',
     rule_id: 'SYSTEM:only_integration_worker_merges',
-    check: (input) => input.action === 'merge_worktree' && input.actor_role !== 'integration_worker',
+    check: (input) => input.action === 'merge_worktree' && !canMerge(input.actor_role as AgentRole),
   },
   {
     name: 'no_task_bypass',
@@ -47,7 +46,9 @@ export const SYSTEM_INVARIANTS: SystemInvariant[] = [
     action: 'deny',
     rule_id: 'SYSTEM:chief_of_staff_no_direct_writes',
     check: (input) => {
-      if (input.actor_role !== 'chief_of_staff') return false
+      // Applies to all L1 roles (spec §4.1). chief_of_staff is currently
+      // the only L1 role, but future L1 roles inherit the prohibition.
+      if (!isL1(input.actor_role as AgentRole)) return false
       const action = input.action ?? ''
       // Deny any mutating Claude Code tool invocation
       const DENIED_TOOL_ACTIONS = [

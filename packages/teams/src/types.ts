@@ -6,8 +6,12 @@ export type { AgentRole }
 /**
  * L1 roles are the only roles allowed to invoke other teams.
  * Per spec §17.4: only chief_of_staff can spawn sub-teams.
+ *
+ * Re-exported from `@fulcrum/core` — see `roles.ts` for the single source
+ * of truth (H-11). This re-export preserves backward-compat for existing
+ * imports from `@fulcrum/teams`.
  */
-export const L1_ROLES: ReadonlySet<AgentRole> = new Set(['chief_of_staff'])
+export { L1_ROLES } from '@fulcrum/core'
 
 export interface TeamSlot {
   slot_id: string

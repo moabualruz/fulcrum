@@ -1,6 +1,6 @@
 // packages/teams/src/teams.ts
 import { ulid } from 'ulidx'
-import { getDb, nextDisplayId, FulcrumError } from '@fulcrum/core'
+import { getDb, nextDisplayId, FulcrumError, canInvokeTeams } from '@fulcrum/core'
 import type {
   TeamTemplate,
   TeamInstance,
@@ -68,7 +68,7 @@ export async function createTeamTemplate(input: CreateTeamTemplateInput): Promis
 }
 
 export async function invokeTeam(input: InvokeTeamInput): Promise<TeamInstance> {
-  if (input.caller_role !== 'chief_of_staff') {
+  if (!canInvokeTeams(input.caller_role)) {
     throw new Error('POLICY_DENIED: only chief_of_staff may invoke teams')
   }
 

@@ -88,3 +88,15 @@ export type { StartSpanInput, EndSpanInput } from './telemetry/spans.js'
 
 // Constants
 export * from './constants.js'
+
+// Roles
+export {
+  L1_ROLES,
+  isL1,
+  roleCapabilities,
+  canInvokeTeams,
+  canMerge,
+  canWriteCode,
+  canEditFiles,
+} from './roles.js'
+export type { RoleCapabilities } from './roles.js'
