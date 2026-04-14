@@ -35,6 +35,7 @@ interface UpdateTaskInput {
   done_criteria?: string
   claimed_at?: string | null
   completed_at?: string | null
+  assigned_run_id?: string | null
   labels?: string[]
 }
 
@@ -61,6 +62,7 @@ function rowToTaskBase(row: Record<string, unknown>): Omit<Task, 'labels' | 'blo
     updated_at: row.updated_at as string,
     claimed_at: (row.claimed_at as string | null) ?? null,
     completed_at: (row.completed_at as string | null) ?? null,
+    assigned_run_id: (row.assigned_run_id as string | null) ?? null,
   }
 }
 
@@ -172,6 +174,7 @@ export async function updateTask(input: UpdateTaskInput): Promise<Task> {
   if (input.done_criteria !== undefined) { fields.push('done_criteria = ?'); values.push(input.done_criteria) }
   if (input.claimed_at !== undefined) { fields.push('claimed_at = ?'); values.push(input.claimed_at) }
   if (input.completed_at !== undefined) { fields.push('completed_at = ?'); values.push(input.completed_at) }
+  if (input.assigned_run_id !== undefined) { fields.push('assigned_run_id = ?'); values.push(input.assigned_run_id) }
 
   values.push(input.task_id)
   db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE task_id = ?`).run(...values)

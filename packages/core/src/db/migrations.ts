@@ -1135,4 +1135,18 @@ export function runMigrations(db: Database.Database): void {
     }
     db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('016_workspace_config')`).run()
   }
+
+  const already017 = db.prepare("SELECT id FROM schema_migrations WHERE name = '017_task_assigned_run'").get()
+  if (!already017) {
+    try {
+      db.exec('ALTER TABLE tasks ADD COLUMN assigned_run_id TEXT REFERENCES agent_runs(run_id) ON DELETE SET NULL')
+    } catch (err: unknown) {
+      // Duplicate column means tasks already has assigned_run_id — safe to ignore
+      const msg = (err as { message?: string }).message ?? ''
+      if (!msg.includes('duplicate column name') && !msg.includes('already exists')) {
+        throw err
+      }
+    }
+    db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('017_task_assigned_run')`).run()
+  }
 }

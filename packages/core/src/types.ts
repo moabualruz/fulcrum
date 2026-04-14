@@ -96,6 +96,7 @@ export interface Task {
   updated_at: string
   claimed_at: string | null
   completed_at: string | null
+  assigned_run_id: string | null
   labels: string[]
   blockers: string[]
 }
