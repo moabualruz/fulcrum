@@ -121,3 +121,60 @@ describe('projects CRUD (G-1, G-2)', () => {
     ).rejects.toThrow(FulcrumError)
   })
 })
+
+describe('projects.description (H-19)', () => {
+  beforeEach(async () => {
+    createTestDb()
+    await createWorkspace({ workspace_id: 'ws_1', name: 'w' })
+  })
+  afterEach(() => resetTestDb())
+
+  it('createProject accepts description and round-trips', async () => {
+    const p = await createProject({
+      workspace_id: 'ws_1',
+      name: 'alpha',
+      description: 'The alpha project, a test run',
+    })
+    expect(p.description).toBe('The alpha project, a test run')
+
+    const fetched = await getProject(p.project_id)
+    expect(fetched?.description).toBe('The alpha project, a test run')
+  })
+
+  it('description defaults to null when omitted', async () => {
+    const p = await createProject({ workspace_id: 'ws_1', name: 'no-desc' })
+    expect(p.description).toBeNull()
+  })
+
+  it('updateProject sets description', async () => {
+    const p = await createProject({ workspace_id: 'ws_1', name: 'a' })
+    const updated = await updateProject({
+      project_id: p.project_id,
+      description: 'added later',
+    })
+    expect(updated.description).toBe('added later')
+  })
+
+  it('updateProject can clear description by passing null', async () => {
+    const p = await createProject({
+      workspace_id: 'ws_1',
+      name: 'a',
+      description: 'initial',
+    })
+    const updated = await updateProject({
+      project_id: p.project_id,
+      description: null,
+    })
+    expect(updated.description).toBeNull()
+  })
+
+  it('listProjects returns description for all rows', async () => {
+    await createProject({ workspace_id: 'ws_1', name: 'a', description: 'first' })
+    await createProject({ workspace_id: 'ws_1', name: 'b' })
+    const rows = await listProjects({ workspace_id: 'ws_1' })
+    const a = rows.find(r => r.name === 'a')
+    const b = rows.find(r => r.name === 'b')
+    expect(a?.description).toBe('first')
+    expect(b?.description).toBeNull()
+  })
+})

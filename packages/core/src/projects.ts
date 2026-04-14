@@ -6,6 +6,7 @@ export interface Project {
   project_id: string
   workspace_id: string
   name: string
+  description: string | null
   type: ProjectType
   status: ProjectStatus
   write_mode: WriteMode
@@ -17,6 +18,7 @@ export interface Project {
 export interface CreateProjectInput {
   workspace_id: string
   name: string
+  description?: string | null
   project_id?: string
   type?: ProjectType
   status?: ProjectStatus
@@ -28,6 +30,7 @@ export interface CreateProjectInput {
 export interface UpdateProjectInput {
   project_id: string
   name?: string
+  description?: string | null
   type?: ProjectType
   status?: ProjectStatus
   write_mode?: WriteMode
@@ -49,6 +52,7 @@ function rowToProject(row: Record<string, unknown>): Project {
     project_id: row['project_id'] as string,
     workspace_id: row['workspace_id'] as string,
     name: row['name'] as string,
+    description: (row['description'] as string) ?? null,
     type: row['type'] as ProjectType,
     status: row['status'] as ProjectStatus,
     write_mode: row['write_mode'] as WriteMode,
@@ -79,12 +83,13 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
   const project_id = input.project_id ?? newId('project')
   const now = new Date().toISOString()
   db.prepare(
-    `INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, git_url, parent_project_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO projects (project_id, workspace_id, name, description, type, status, write_mode, git_url, parent_project_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     project_id,
     input.workspace_id,
     input.name,
+    input.description ?? null,
     type,
     status,
     write_mode,
@@ -135,6 +140,10 @@ export async function updateProject(input: UpdateProjectInput): Promise<Project>
     if (!input.name.trim()) throw new FulcrumError('name must not be empty', 'invalid_input')
     fields.push('name = ?')
     values.push(input.name)
+  }
+  if (input.description !== undefined) {
+    fields.push('description = ?')
+    values.push(input.description)
   }
   if (input.type !== undefined) {
     if (!VALID_TYPES.includes(input.type)) {
