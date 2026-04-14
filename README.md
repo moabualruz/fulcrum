@@ -31,6 +31,13 @@ Multi-agent systems fail in predictable ways: agents go rogue, pile up stale wor
 |---------|-------------|
 | [`@fulcrum/core`](packages/core) | Domain functions, SQLite schema, embedding providers |
 | [`@fulcrum/memory`](packages/memory) | Three-layer memory stack — L0 git vault, L1 FTS5, L2 Kuzu graph + HNSW vector search |
+| [`@fulcrum/monitor`](packages/monitor) | Real-time metrics dashboard — daily/project/agent metrics, burndown data, HTTP monitoring server |
+| [`@fulcrum/planning`](packages/planning) | Project planning domain — epics, issues, PRDs, plans, task relations, code review workflows |
+| [`@fulcrum/policy`](packages/policy) | Policy engine — system invariants, custom rules, secret guard (detect and redact), audit logging |
+| [`@fulcrum/sync`](packages/sync) | Bidirectional sync adapter — Plane project management integration, conflict detection |
+| [`@fulcrum/teams`](packages/teams) | Agent team orchestration — team templates, role slots, communication and budget policies |
+| [`@fulcrum/workflows`](packages/workflows) | Workflow engine — define, register, and execute multi-step agent workflows |
+| [`@fulcrum/worktrees`](packages/worktrees) | Code worktree lifecycle — worktree provisioning, artifact tracking, code review workflows |
 
 ---
 

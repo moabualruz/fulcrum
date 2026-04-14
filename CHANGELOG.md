@@ -72,5 +72,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `fulcrum memory accelerate` / `activateL2()`: enable L2 on existing vault
 - `fulcrum memory rebuild [--target l1|l2|both] [--verify]`: idempotent index rebuild from L0 files
 
+---
+
+### `@fulcrum/monitor`
+- Daily, project, and agent metrics aggregation from SQLite task/run data
+- Burndown data computation (planned vs. completed over time)
+- HTTP server exposing `/metrics`, `/health` endpoints for external monitoring
+
+### `@fulcrum/planning`
+- Epic and issue management with status lifecycle (draft → active → closed)
+- PRD (Product Requirements Document) creation and versioning
+- Plan linking: associate issues to implementation plans
+- Task relation graph: `blocks`, `blocked_by`, `relates_to`, `duplicates` edges
+- Code review workflows: request, update, approve/reject with reviewer assignment
+
+### `@fulcrum/policy`
+- `SYSTEM_INVARIANTS`: always-on workspace rules (WIP cap, no orphaned runs, role allowlists)
+- Custom policy rules: per-workspace, per-role, per-action rule evaluation
+- `checkSecrets` / `redactSecrets`: pattern-based secret detection and redaction in agent outputs
+- Append-only audit log: every policy evaluation recorded with actor, outcome, and context
+
+### `@fulcrum/sync`
+- Plane API client: authenticated requests to Plane project management REST API
+- Plane adapter: maps Fulcrum `Task`/`Issue` fields to Plane cycle/issue model and back
+- Sync manager: bidirectional sync with configurable direction (fulcrum→plane, plane→fulcrum, both)
+- Conflict detection: tracks `SyncState` per item, flags diverged fields for resolution
+
+### `@fulcrum/teams`
+- `TeamTemplate`: defines team composition (role slots, size constraints, communication mode)
+- `TeamSlot`: typed role + model + latency/budget/quality class constraints
+- `canStartTeam(template, workspaceStatus)`: scheduler gate — checks WIP headroom before spawning
+- Team policy: `CommunicationMode`, `WorktreePolicy`, `BudgetClass`, `LatencyClass`, `QualityClass`
+
+### `@fulcrum/workflows`
+- `WorkflowDefinition`: named, versioned step graphs with typed transitions and entry points
+- `WorkflowStepDef`: step type (task, decision, parallel, wait), handler reference, retry policy
+- Workflow registry: lookup by `(name, version)`, list available definitions
+- Workflow engine: advance a `WorkflowRun` through steps, evaluate transitions, handle failures
+
+### `@fulcrum/worktrees`
+- `Worktree`: per-task isolated git workspace with status lifecycle (pending → active → merged/abandoned)
+- `Artifact`: typed output files (diff, report, build-output, test-results) attached to worktrees or runs
+- `Review`: code review request with status (pending → approved/rejected/changes_requested), reviewer tracking
+- Handoff mode: `auto` (merge on approval) vs `manual` (human review gate)
+
 [Unreleased]: https://github.com/moabualruz/fulcrum/compare/v0.0.1...HEAD
 [0.0.1]: https://github.com/moabualruz/fulcrum/releases/tag/v0.0.1
