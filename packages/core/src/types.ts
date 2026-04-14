@@ -44,7 +44,7 @@ export type TaskRelationType =
   | 'relates' | 'duplicates' | 'requires_context_from'
   | 'must_merge_before' | 'conflicts_with' | 'reviewed_by' | 'verifies'
 
-export type MemoryScope = 'global' | 'project' | 'file'
+export type MemoryScope = 'global' | 'project' | 'file' | 'task'
 
 export type MemoryKind =
   | 'fact' | 'summary' | 'symbol' | 'decision' | 'procedure'

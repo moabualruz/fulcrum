@@ -26,7 +26,8 @@ interface WriteMemoryInput {
 
 interface RecallMemoryInput {
   workspace_id: string
-  project_id: string
+  project_id?: string
+  task_id?: string
   query: string
   limit?: number
 }
@@ -88,6 +89,11 @@ export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
   const kind = input.kind ?? 'fact'
   const title = input.title ?? input.content.slice(0, 80)
   const summary = input.summary ?? title
+
+  // Validate scope=task requires task_id (task_id alone is allowed as a link field)
+  if (scope === 'task' && !input.task_id) {
+    throw new FulcrumError('scope=task requires task_id', 'invalid_input')
+  }
 
   // Always check exact content match first (fast path), scoped by scope+kind
   const existing = db.prepare(
@@ -167,6 +173,19 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
   const db = getDb()
   const candidates = new Map<string, { memory: Memory; score: number }>()
 
+  // Build dynamic WHERE clause — project_id and task_id are optional filters
+  const whereParts: string[] = ['m.workspace_id = ?']
+  const whereParams: unknown[] = [input.workspace_id]
+  if (input.project_id) {
+    whereParts.push('m.project_id = ?')
+    whereParams.push(input.project_id)
+  }
+  if (input.task_id) {
+    whereParts.push('m.task_id = ?')
+    whereParams.push(input.task_id)
+  }
+  const whereSql = whereParts.join(' AND ')
+
   // --- FTS5 lexical search ---
   let ftsRows: { rowid: number; rank: number }[] = []
   try {
@@ -175,17 +194,16 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
       FROM memories_fts f
       JOIN memories m ON m.rowid = f.rowid
       WHERE memories_fts MATCH ?
-        AND m.workspace_id = ?
-        AND m.project_id = ?
+        AND ${whereSql}
       ORDER BY f.rank
-    `).all(input.query, input.workspace_id, input.project_id) as { rowid: number; rank: number }[]
+    `).all(input.query, ...whereParams) as { rowid: number; rank: number }[]
   } catch (err) {
     // Fall back to LIKE on any SQLite error (FTS5 syntax errors, unavailable extension, etc.)
     // Re-throw non-SQLite errors (e.g. OOM, programming bugs outside this query)
     if ((err as { code?: string }).code !== 'SQLITE_ERROR') throw err
     const likeRows = db.prepare(
-      'SELECT rowid FROM memories WHERE workspace_id = ? AND project_id = ? AND content LIKE ? LIMIT ?'
-    ).all(input.workspace_id, input.project_id, `%${input.query}%`, limit) as { rowid: number }[]
+      `SELECT m.rowid FROM memories m WHERE ${whereSql} AND m.content LIKE ? LIMIT ?`
+    ).all(...whereParams, `%${input.query}%`, limit) as { rowid: number }[]
     ftsRows = likeRows.map(r => ({ rowid: r.rowid, rank: 0 }))
   }
 
@@ -193,8 +211,8 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
     const rowids = ftsRows.map(r => r.rowid)
     const placeholders = rowids.map(() => '?').join(',')
     const rows = db.prepare(
-      `SELECT * FROM memories WHERE rowid IN (${placeholders}) AND workspace_id = ? AND project_id = ?`
-    ).all(...rowids, input.workspace_id, input.project_id) as Record<string, unknown>[]
+      `SELECT m.* FROM memories m WHERE m.rowid IN (${placeholders}) AND ${whereSql}`
+    ).all(...rowids, ...whereParams) as Record<string, unknown>[]
     for (const row of rows) {
       const fts = ftsRows.find(f => f.rowid === (row as Record<string, unknown> & { rowid: number }).rowid)
       // FTS5 rank is negative (lower = better match); negate to get a positive score
@@ -215,8 +233,8 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
         const rowids = vecRows.map(r => r.rowid)
         const placeholders = rowids.map(() => '?').join(',')
         const rows = db.prepare(
-          `SELECT * FROM memories WHERE rowid IN (${placeholders}) AND workspace_id = ? AND project_id = ?`
-        ).all(...rowids, input.workspace_id, input.project_id) as Record<string, unknown>[]
+          `SELECT m.* FROM memories m WHERE m.rowid IN (${placeholders}) AND ${whereSql}`
+        ).all(...rowids, ...whereParams) as Record<string, unknown>[]
         for (const row of rows) {
           const vec = vecRows.find(v => v.rowid === (row as Record<string, unknown> & { rowid: number }).rowid)
           const vecScore = vec ? 1 / (1 + vec.distance) : 0

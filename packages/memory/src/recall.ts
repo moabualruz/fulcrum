@@ -33,6 +33,10 @@ function buildWhereClause(input: RecallMemoryInput): { clauses: string[]; params
     }
   }
 
+  if (input.task_id) {
+    clauses.push('m.task_id = ?')
+    params.push(input.task_id)
+  }
   if (input.scope) {
     clauses.push('m.scope = ?')
     params.push(input.scope)

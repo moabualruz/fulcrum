@@ -1,6 +1,6 @@
 // packages/memory/src/types.ts
 
-export type MemoryScope = 'global' | 'project' | 'file'
+export type MemoryScope = 'global' | 'project' | 'file' | 'task'
 
 export type MemoryKind =
   | 'fact' | 'summary' | 'symbol' | 'decision' | 'procedure'
@@ -38,6 +38,7 @@ export interface WriteMemoryInput {
 export interface RecallMemoryInput {
   workspace_id: string
   project_id?: string | null
+  task_id?: string
   query: string
   mode?: RecallMode                   // default: 'compact'
   limit?: number                      // default: 8 for compact, 20 for others

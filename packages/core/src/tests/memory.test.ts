@@ -175,6 +175,127 @@ describe('writeMemory — deduplication behaviour', () => {
   })
 })
 
+describe('recallMemory — project_id optional (G-3)', () => {
+  function seedTwoProjects() {
+    const db = getDb()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_a','ws_1','a')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_b','ws_1','b')").run()
+  }
+
+  it('returns results scoped to the whole workspace when project_id is omitted', async () => {
+    seedTwoProjects()
+    await writeMemory({
+      content: 'authentication uses bearer tokens',
+      workspace_id: 'ws_1', project_id: 'proj_a', kind: 'fact', scope: 'project',
+    })
+    await writeMemory({
+      content: 'authentication fails on expired tokens',
+      workspace_id: 'ws_1', project_id: 'proj_b', kind: 'fact', scope: 'project',
+    })
+
+    const results = await recallMemory({
+      query: 'authentication',
+      workspace_id: 'ws_1',
+      limit: 10,
+      // project_id intentionally omitted
+    })
+    expect(results.length).toBeGreaterThanOrEqual(2)
+    const projIds = new Set(results.map(r => r.project_id))
+    expect(projIds.has('proj_a')).toBe(true)
+    expect(projIds.has('proj_b')).toBe(true)
+  })
+
+  it('scopes results to a single project when project_id is provided', async () => {
+    seedTwoProjects()
+    await writeMemory({
+      content: 'authentication tokens proj a',
+      workspace_id: 'ws_1', project_id: 'proj_a', kind: 'fact', scope: 'project',
+    })
+    await writeMemory({
+      content: 'authentication tokens proj b',
+      workspace_id: 'ws_1', project_id: 'proj_b', kind: 'fact', scope: 'project',
+    })
+    const results = await recallMemory({
+      query: 'authentication',
+      workspace_id: 'ws_1',
+      project_id: 'proj_a',
+      limit: 10,
+    })
+    expect(results.length).toBeGreaterThan(0)
+    for (const r of results) {
+      expect(r.project_id).toBe('proj_a')
+    }
+  })
+})
+
+describe('MemoryScope task (G-4)', () => {
+  function seedWithTask(task_id = 'task_xyz') {
+    const db = getDb()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','test')").run()
+    db.prepare(
+      "INSERT INTO tasks (task_id, workspace_id, project_id, display_id, title, status, status_category, priority, depends_on, version, created_at, updated_at) " +
+      "VALUES (?, 'ws_1', 'proj_1', 'T-1', 't', 'pending', 'backlog', 'medium', '[]', 1, datetime('now'), datetime('now'))"
+    ).run(task_id)
+  }
+
+  it('writeMemory accepts task_id and scope=task', async () => {
+    seedWithTask('task_xyz')
+    const memory = await writeMemory({
+      content: 'debugged the JWT validation bug',
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      task_id: 'task_xyz',
+      scope: 'task',
+      kind: 'task_decision',
+    })
+    expect(memory.scope).toBe('task')
+    expect(memory.task_id).toBe('task_xyz')
+  })
+
+  it('writeMemory rejects scope=task without task_id', async () => {
+    seedWithTask()
+    await expect(writeMemory({
+      content: 'x', workspace_id: 'ws_1', project_id: 'proj_1',
+      scope: 'task', kind: 'task_decision',
+    })).rejects.toMatchObject({ code: 'invalid_input' })
+  })
+
+  it('recallMemory filters by task_id when provided', async () => {
+    const db = getDb()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','test')").run()
+    db.prepare(
+      "INSERT INTO tasks (task_id, workspace_id, project_id, display_id, title, status, status_category, priority, depends_on, version, created_at, updated_at) " +
+      "VALUES ('task_A', 'ws_1', 'proj_1', 'T-A', 'a', 'pending', 'backlog', 'medium', '[]', 1, datetime('now'), datetime('now'))"
+    ).run()
+    db.prepare(
+      "INSERT INTO tasks (task_id, workspace_id, project_id, display_id, title, status, status_category, priority, depends_on, version, created_at, updated_at) " +
+      "VALUES ('task_B', 'ws_1', 'proj_1', 'T-B', 'b', 'pending', 'backlog', 'medium', '[]', 1, datetime('now'), datetime('now'))"
+    ).run()
+
+    await writeMemory({
+      content: 'bug in jwt validation for task A', workspace_id: 'ws_1', project_id: 'proj_1',
+      task_id: 'task_A', scope: 'task', kind: 'task_decision',
+    })
+    await writeMemory({
+      content: 'bug in jwt validation for task B', workspace_id: 'ws_1', project_id: 'proj_1',
+      task_id: 'task_B', scope: 'task', kind: 'task_decision',
+    })
+    const results = await recallMemory({
+      query: 'jwt validation',
+      workspace_id: 'ws_1',
+      task_id: 'task_A',
+      limit: 10,
+    })
+    expect(results.length).toBeGreaterThanOrEqual(1)
+    for (const r of results) {
+      expect(r.task_id).toBe('task_A')
+    }
+  })
+})
+
 describe('writeMemory — scope, kind, title, summary', () => {
   it('defaults scope to project', async () => {
     seed()

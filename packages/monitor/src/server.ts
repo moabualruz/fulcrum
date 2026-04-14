@@ -550,12 +550,13 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
   app.post('/memory/recall', async (c) => {
     try {
-      const body = await c.req.json() as { query: string; workspace_id: string; project_id?: string; limit?: number }
+      const body = await c.req.json() as { query: string; workspace_id: string; project_id?: string; task_id?: string; limit?: number }
       if (!body.query || !body.workspace_id) return c.json({ error: 'query and workspace_id are required' }, 400)
       const memories = await recallMemory({
         query: body.query,
         workspace_id: body.workspace_id,
-        project_id: body.project_id ?? body.workspace_id,
+        project_id: body.project_id,
+        task_id: body.task_id,
         limit: body.limit ?? 10,
       })
       return c.json({

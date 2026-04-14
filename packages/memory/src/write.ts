@@ -26,6 +26,9 @@ export async function writeMemory(input: WriteMemoryInput): Promise<FullMemory> 
   if (input.importance !== undefined && (input.importance < 0 || input.importance > 1)) {
     throw new FulcrumError('importance must be between 0 and 1', 'invalid_input')
   }
+  if (input.scope === 'task' && !input.task_id) {
+    throw new FulcrumError('scope=task requires task_id', 'invalid_input')
+  }
 
   const db = getDb()
   const now = new Date().toISOString()
