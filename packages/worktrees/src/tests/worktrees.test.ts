@@ -12,6 +12,7 @@ import {
   processMergeQueue,
   discardWorktree,
   listMergeQueue,
+  cleanupAbandonedWorktrees,
 } from '../worktrees.js'
 
 function createTestDb(): Database.Database {
@@ -408,6 +409,82 @@ describe('HandoffMode Python-spec values', () => {
         VALUES ('hf_old', 'ws_test', 'proj_test', 'agent_a', 'agent_b', 'do work', 'full', 'context_first')
       `).run()
     ).toThrow()
+  })
+})
+
+describe('cleanupAbandonedWorktrees (H-10)', () => {
+  it('removes rows with status=discarded AND updated_at older than TTL', async () => {
+    const old = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString() // 48h ago
+    const now = new Date().toISOString()
+
+    db.prepare(`
+      INSERT INTO worktrees (worktree_id, workspace_id, project_id, path, branch_name, status, updated_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('wt_old_discarded', 'ws_test', 'proj_test', '/tmp/old', 'branch-old', 'discarded', old, old)
+    db.prepare(`
+      INSERT INTO worktrees (worktree_id, workspace_id, project_id, path, branch_name, status, updated_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('wt_new_discarded', 'ws_test', 'proj_test', '/tmp/new', 'branch-new', 'discarded', now, now)
+    db.prepare(`
+      INSERT INTO worktrees (worktree_id, workspace_id, project_id, path, branch_name, status, updated_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('wt_active', 'ws_test', 'proj_test', '/tmp/active', 'branch-active', 'allocated', old, old)
+
+    const deleted = await cleanupAbandonedWorktrees({ ttl_sec: 24 * 60 * 60 })
+    expect(deleted).toBe(1) // only wt_old_discarded
+
+    const remaining = db
+      .prepare(`SELECT worktree_id FROM worktrees`)
+      .all() as { worktree_id: string }[]
+    const ids = remaining.map((r) => r.worktree_id).sort()
+    expect(ids).toEqual(['wt_active', 'wt_new_discarded'])
+  })
+
+  it('also reaps old merged worktrees', async () => {
+    const old = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+    db.prepare(`
+      INSERT INTO worktrees (worktree_id, workspace_id, project_id, path, branch_name, status, updated_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('wt_old_merged', 'ws_test', 'proj_test', '/tmp/m', 'branch-m', 'merged', old, old)
+
+    const deleted = await cleanupAbandonedWorktrees({ ttl_sec: 24 * 60 * 60 })
+    expect(deleted).toBe(1)
+  })
+
+  it('returns 0 when no worktrees match', async () => {
+    const deleted = await cleanupAbandonedWorktrees({ ttl_sec: 3600 })
+    expect(deleted).toBe(0)
+  })
+
+  it('ttl_sec defaults to 24 hours when omitted', async () => {
+    const old = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+    db.prepare(`
+      INSERT INTO worktrees (worktree_id, workspace_id, project_id, path, branch_name, status, updated_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('wt_x', 'ws_test', 'proj_test', '/tmp/x', 'b', 'discarded', old, old)
+
+    const deleted = await cleanupAbandonedWorktrees()
+    expect(deleted).toBe(1)
+  })
+
+  it('does not touch in-progress statuses (allocated, dirty, ready_for_merge)', async () => {
+    const old = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+    for (const [id, status] of [
+      ['wt_a', 'allocated'],
+      ['wt_d', 'dirty'],
+      ['wt_r', 'ready_for_merge'],
+    ] as const) {
+      db.prepare(`
+        INSERT INTO worktrees (worktree_id, workspace_id, project_id, path, branch_name, status, updated_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, 'ws_test', 'proj_test', `/tmp/${id}`, `b-${id}`, status, old, old)
+    }
+
+    const deleted = await cleanupAbandonedWorktrees({ ttl_sec: 60 })
+    expect(deleted).toBe(0)
+
+    const count = (db.prepare(`SELECT COUNT(*) as c FROM worktrees`).get() as { c: number }).c
+    expect(count).toBe(3)
   })
 })
 

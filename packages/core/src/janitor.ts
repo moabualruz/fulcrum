@@ -55,6 +55,18 @@ export async function runJanitorCycle(input: JanitorCycleInput): Promise<void> {
   } catch (err) {
     process.stderr.write(`[janitor] Failed to cleanup expired locks: ${String(err)}\n`)
   }
+
+  // TTL-reap abandoned worktrees (H-10, spec §18.6).
+  // Dynamic import avoids circular dependency: @fulcrum/worktrees depends on @fulcrum/core.
+  // If @fulcrum/worktrees is not installed (e.g. core-only consumers), silently skip.
+  try {
+    const mod = await import('@fulcrum/worktrees').catch(() => null)
+    if (mod && typeof mod.cleanupAbandonedWorktrees === 'function') {
+      await mod.cleanupAbandonedWorktrees()
+    }
+  } catch (err) {
+    process.stderr.write(`[janitor] Failed to cleanup abandoned worktrees: ${String(err)}\n`)
+  }
 }
 
 /** Start a background janitor loop. Returns a stop function. */

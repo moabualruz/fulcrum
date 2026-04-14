@@ -197,6 +197,34 @@ export async function discardWorktree(input: DiscardWorktreeInput): Promise<void
   `).run(now, now, input.worktree_id)
 }
 
+export interface CleanupAbandonedWorktreesInput {
+  /** TTL in seconds. Worktrees older than this with cleanup-eligible status are removed. */
+  ttl_sec?: number
+}
+
+/**
+ * Remove worktree rows whose status indicates completion/abandonment AND whose
+ * updated_at is older than the TTL. The git worktree directory is NOT touched
+ * here — that's a separate concern (H-3 deferred). This just reaps DB state
+ * so the merge queue and board views stop listing stale rows.
+ *
+ * Spec §18.6 — janitor reaps abandoned worktrees (H-10).
+ */
+export async function cleanupAbandonedWorktrees(
+  input: CleanupAbandonedWorktreesInput = {}
+): Promise<number> {
+  const db = getDb()
+  const ttl_sec = input.ttl_sec ?? 24 * 60 * 60 // default 24h
+  const cutoff = new Date(Date.now() - ttl_sec * 1000).toISOString()
+  const result = db
+    .prepare(
+      `DELETE FROM worktrees
+       WHERE status IN ('discarded','merged') AND updated_at < ?`
+    )
+    .run(cutoff)
+  return result.changes
+}
+
 export async function listMergeQueue(projectId: string): Promise<Worktree[]> {
   const db = getDb()
   const rows = db
