@@ -5,16 +5,7 @@ import { statusCategory } from './status-category.js'
 import { emitEvent } from './events.js'
 import { createTask } from './tasks.js'
 import { FulcrumError } from './types.js'
-import type { AgentRun, AgentRole, AgentRunStatus, RunArtifacts, Task, TaskPacket, SpawnableRun } from './types.js'
-
-interface StartRunInput {
-  task_id: string
-  workspace_id: string
-  role: AgentRole
-  agent_id?: string
-  pi_profile?: string
-  git_branch?: string
-}
+import type { AgentRun, AgentRole, AgentRunStatus, RunArtifacts, Task, TaskPacket, SpawnableRun, StartAgentRunInput } from './types.js'
 interface HeartbeatInput {
   run_id: string
   current_step: string
@@ -87,7 +78,7 @@ function getRun(run_id: string): AgentRun {
  * NOTE: WIP limit and dependency enforcement is the caller's responsibility —
  * callers should call `checkPolicy` first and only proceed if `allowed: true`.
  */
-export async function startAgentRun(input: StartRunInput): Promise<AgentRun> {
+export async function startAgentRun(input: StartAgentRunInput): Promise<AgentRun> {
   const db = getDb()
   const taskRow = db.prepare('SELECT workspace_id, project_id FROM tasks WHERE task_id = ?')
     .get(input.task_id) as { workspace_id: string; project_id: string } | undefined

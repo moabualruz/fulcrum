@@ -30,14 +30,16 @@ Pi is the runtime that **actually runs agents**. It:
 
 ```typescript
 // Pi calls Fulcrum to create the run record:
-const run = startAgentRun(db, {
+const run = startAgentRun({
   workspace_id, task_id, role: 'software_engineer',
   pi_profile: 'claude-cli/claude-opus-4-5',
-  task_packet: { goal: 'implement feature X', task_type: 'implement' }
 })
 
-// Pi then uses run.pi_profile to spawn the actual agent:
-const spawnable = buildSpawnableRun(run, task_packet)
+// Pi builds the spawnable and passes task_packet separately:
+const spawnable = buildSpawnableRun(run, {
+  goal: 'implement feature X',
+  task_type: 'implement',
+})
 // → Pi's executor.spawn(spawnable) [not in this repo]
 ```
 
