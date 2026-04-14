@@ -1,0 +1,120 @@
+// packages/core/src/agent-definitions.ts
+// CRUD for the agent_definitions table (MIGRATION_031).
+// Canonical per-role definitions: model, tools_allow/deny, executor_uri, A2A card.
+
+import { getDb } from './db/client.js'
+import { newId } from './ids.js'
+import { FulcrumError } from './types.js'
+import type { AgentDefinition, CreateAgentDefinitionInput, UpdateAgentDefinitionInput } from './types.js'
+
+function rowToDefinition(row: Record<string, unknown>): AgentDefinition {
+  return {
+    id: row.id as string,
+    role: row.role as AgentDefinition['role'],
+    display_name: row.display_name as string,
+    description: row.description as string,
+    version: row.version as string,
+    stability: row.stability as AgentDefinition['stability'],
+    system_prompt: (row.system_prompt as string | null) ?? null,
+    model: (row.model as string | null) ?? null,
+    provider: (row.provider as string) ?? 'anthropic',
+    tools_allow: row.tools_allow ? (JSON.parse(row.tools_allow as string) as string[]) : null,
+    tools_deny: row.tools_deny ? (JSON.parse(row.tools_deny as string) as string[]) : null,
+    capabilities: row.capabilities ? (JSON.parse(row.capabilities as string) as string[]) : [],
+    output_schema: row.output_schema ? (JSON.parse(row.output_schema as string) as Record<string, unknown>) : null,
+    executor_uri: (row.executor_uri as string | null) ?? null,
+    a2a_card: row.a2a_card ? (JSON.parse(row.a2a_card as string) as Record<string, unknown>) : null,
+    eval_suites: row.eval_suites ? (JSON.parse(row.eval_suites as string) as string[]) : [],
+    created_at: row.created_at as number,
+    updated_at: row.updated_at as number,
+  }
+}
+
+export function createAgentDefinition(input: CreateAgentDefinitionInput): AgentDefinition {
+  const db = getDb()
+  const existing = db.prepare('SELECT id FROM agent_definitions WHERE role = ?').get(input.role)
+  if (existing) {
+    throw new FulcrumError(`Agent definition for role '${input.role}' already exists`, 'conflict')
+  }
+  const id = newId('agent_definition')
+  const now = Math.floor(Date.now() / 1000)
+  db.prepare(`
+    INSERT INTO agent_definitions
+      (id, role, display_name, description, version, stability, system_prompt, model, provider,
+       tools_allow, tools_deny, capabilities, output_schema, executor_uri, a2a_card, eval_suites,
+       created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    input.role,
+    input.display_name,
+    input.description,
+    input.version ?? '0.1.0',
+    input.stability ?? 'experimental',
+    input.system_prompt ?? null,
+    input.model ?? null,
+    input.provider ?? 'anthropic',
+    input.tools_allow ? JSON.stringify(input.tools_allow) : null,
+    input.tools_deny ? JSON.stringify(input.tools_deny) : null,
+    JSON.stringify(input.capabilities ?? []),
+    input.output_schema ? JSON.stringify(input.output_schema) : null,
+    input.executor_uri ?? null,
+    input.a2a_card ? JSON.stringify(input.a2a_card) : null,
+    JSON.stringify(input.eval_suites ?? []),
+    now,
+    now,
+  )
+  const row = db.prepare('SELECT * FROM agent_definitions WHERE id = ?').get(id) as Record<string, unknown>
+  return rowToDefinition(row)
+}
+
+export function getAgentDefinition(role: string): AgentDefinition | null {
+  const db = getDb()
+  const row = db.prepare('SELECT * FROM agent_definitions WHERE role = ?').get(role) as Record<string, unknown> | undefined
+  return row ? rowToDefinition(row) : null
+}
+
+export function updateAgentDefinition(input: UpdateAgentDefinitionInput): AgentDefinition {
+  const db = getDb()
+  const existing = db.prepare('SELECT * FROM agent_definitions WHERE role = ?').get(input.role) as Record<string, unknown> | undefined
+  if (!existing) {
+    throw new FulcrumError(`Agent definition for role '${input.role}' not found`, 'not_found')
+  }
+  const now = Math.floor(Date.now() / 1000)
+  const updates: string[] = ['updated_at = ?']
+  const params: unknown[] = [now]
+
+  const setField = (col: string, value: unknown, serialize = false): void => {
+    if (value === undefined) return
+    updates.push(`${col} = ?`)
+    params.push(serialize && value !== null ? JSON.stringify(value) : value)
+  }
+
+  setField('display_name', input.display_name)
+  setField('description', input.description)
+  setField('version', input.version)
+  setField('stability', input.stability)
+  setField('system_prompt', input.system_prompt)
+  setField('model', input.model)
+  setField('provider', input.provider)
+  setField('tools_allow', input.tools_allow, true)
+  setField('tools_deny', input.tools_deny, true)
+  setField('capabilities', input.capabilities, true)
+  setField('output_schema', input.output_schema, true)
+  setField('executor_uri', input.executor_uri)
+  setField('a2a_card', input.a2a_card, true)
+  setField('eval_suites', input.eval_suites, true)
+
+  params.push(input.role)
+  db.prepare(`UPDATE agent_definitions SET ${updates.join(', ')} WHERE role = ?`).run(...params)
+  const row = db.prepare('SELECT * FROM agent_definitions WHERE role = ?').get(input.role) as Record<string, unknown>
+  return rowToDefinition(row)
+}
+
+export function listAgentDefinitions(stability?: AgentDefinition['stability']): AgentDefinition[] {
+  const db = getDb()
+  const rows = stability
+    ? (db.prepare('SELECT * FROM agent_definitions WHERE stability = ? ORDER BY role').all(stability) as Record<string, unknown>[])
+    : (db.prepare('SELECT * FROM agent_definitions ORDER BY role').all() as Record<string, unknown>[])
+  return rows.map(rowToDefinition)
+}

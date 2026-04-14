@@ -239,6 +239,65 @@ export interface UpdateAgentProfileInput {
   capabilities?: Record<string, unknown>
 }
 
+// ── Agent Definitions ─────────────────────────────────────────────────────────
+
+export interface AgentDefinition {
+  id: string
+  role: AgentRole
+  display_name: string
+  description: string
+  version: string
+  stability: 'stable' | 'beta' | 'experimental' | 'deprecated'
+  system_prompt: string | null
+  model: string | null
+  provider: string
+  tools_allow: string[] | null
+  tools_deny: string[] | null
+  capabilities: string[]
+  output_schema: Record<string, unknown> | null
+  executor_uri: string | null
+  a2a_card: Record<string, unknown> | null
+  eval_suites: string[]
+  created_at: number
+  updated_at: number
+}
+
+export interface CreateAgentDefinitionInput {
+  role: AgentRole
+  display_name: string
+  description: string
+  version?: string
+  stability?: AgentDefinition['stability']
+  system_prompt?: string | null
+  model?: string | null
+  provider?: string
+  tools_allow?: string[] | null
+  tools_deny?: string[] | null
+  capabilities?: string[]
+  output_schema?: Record<string, unknown> | null
+  executor_uri?: string | null
+  a2a_card?: Record<string, unknown> | null
+  eval_suites?: string[]
+}
+
+export interface UpdateAgentDefinitionInput {
+  role: AgentRole
+  display_name?: string
+  description?: string
+  version?: string
+  stability?: AgentDefinition['stability']
+  system_prompt?: string | null
+  model?: string | null
+  provider?: string
+  tools_allow?: string[] | null
+  tools_deny?: string[] | null
+  capabilities?: string[]
+  output_schema?: Record<string, unknown> | null
+  executor_uri?: string | null
+  a2a_card?: Record<string, unknown> | null
+  eval_suites?: string[]
+}
+
 export interface WorkspaceStatusResult {
   workspace_id: string
   running_runs: AgentRun[]
@@ -419,6 +478,7 @@ export class FulcrumError extends Error {
     message: string,
     public readonly code:
       | 'not_found'
+      | 'conflict'
       | 'version_conflict'
       | 'policy_blocked'
       | 'invalid_input'

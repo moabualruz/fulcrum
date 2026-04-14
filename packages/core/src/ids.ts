@@ -30,6 +30,7 @@ const PREFIXES: Record<string, string> = {
   span: 'span_',
   policy_event: 'pevt_',
   agent_profile: 'ap_',
+  agent_definition: 'adef_',
 }
 
 const DISPLAY_PREFIXES: Record<string, string> = {

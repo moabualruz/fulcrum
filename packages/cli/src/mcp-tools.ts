@@ -293,6 +293,67 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       required: ['workspace_id', 'name', 'description'],
     },
   },
+  {
+    name: 'create_agent_definition',
+    description: 'Creates a canonical agent definition for a role. Defines model, tools_allow/deny, executor_uri, and system prompt for a given AgentRole. Effect: writes agent_definitions row. Returns: definition object.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        role: { type: 'string', description: 'AgentRole slug (must be one of the 24 canonical roles)' },
+        display_name: { type: 'string', description: 'Human-readable role name' },
+        description: { type: 'string', description: 'Role description' },
+        version: { type: 'string', description: 'Semver version (default "0.1.0")' },
+        stability: { type: 'string', enum: ['stable', 'beta', 'experimental', 'deprecated'], description: 'Stability tier' },
+        system_prompt: { type: 'string', description: 'System prompt override' },
+        model: { type: 'string', description: 'Model ID (e.g. "claude-sonnet-4-6")' },
+        provider: { type: 'string', description: 'Provider (default "anthropic")' },
+        tools_allow: { type: 'array', description: 'Tool names the agent may use (null = all)' },
+        tools_deny: { type: 'array', description: 'Tool names the agent may not use (null = none denied)' },
+        capabilities: { type: 'array', description: 'Capability strings (e.g. ["code", "web_search"])' },
+        executor_uri: { type: 'string', description: 'Executor URI (e.g. "claude-code://", "pi://")' },
+      },
+      required: ['role', 'display_name', 'description'],
+    },
+  },
+  {
+    name: 'get_agent_definition',
+    description: 'Gets the canonical definition for an AgentRole. Effect: read-only. Returns: definition object or null.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        role: { type: 'string', description: 'AgentRole slug' },
+      },
+      required: ['role'],
+    },
+  },
+  {
+    name: 'update_agent_definition',
+    description: 'Updates fields on an existing agent definition. Effect: updates agent_definitions row. Returns: updated definition.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        role: { type: 'string', description: 'AgentRole slug to update' },
+        display_name: { type: 'string', description: 'New display name' },
+        description: { type: 'string', description: 'New description' },
+        version: { type: 'string', description: 'New version' },
+        stability: { type: 'string', enum: ['stable', 'beta', 'experimental', 'deprecated'], description: 'New stability' },
+        system_prompt: { type: 'string', description: 'New system prompt' },
+        model: { type: 'string', description: 'New model' },
+        executor_uri: { type: 'string', description: 'New executor URI' },
+      },
+      required: ['role'],
+    },
+  },
+  {
+    name: 'list_agent_definitions',
+    description: 'Lists all agent definitions, optionally filtered by stability. Effect: read-only. Returns: array of definition objects.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        stability: { type: 'string', enum: ['stable', 'beta', 'experimental', 'deprecated'], description: 'Filter by stability tier' },
+      },
+    },
+  },
 ]
 
 /** Convenience lookup: tool name → schema */

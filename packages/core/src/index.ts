@@ -60,6 +60,12 @@ export { initEmbedding, getTextEmbedder, getCodeEmbedder, getReranker, resetProv
 // Status
 export { getWorkspaceStatus, buildCosContext, listAgentProfiles } from './status.js'
 
+// Agent Definitions (MIGRATION_031)
+export {
+  createAgentDefinition, getAgentDefinition, updateAgentDefinition, listAgentDefinitions,
+} from './agent-definitions.js'
+export type { AgentDefinition, CreateAgentDefinitionInput, UpdateAgentDefinitionInput } from './types.js'
+
 // IDs
 export { newId, nextDisplayId } from './ids.js'
 

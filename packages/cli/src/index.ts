@@ -795,6 +795,7 @@ async function runServeMcp(): Promise<void> {
     getAgentRunStatus,
     buildCosContext, getWorkspaceStatus, listAgentProfiles,
     createAgentProfile, getTeamOps,
+    createAgentDefinition, getAgentDefinition, updateAgentDefinition, listAgentDefinitions,
     startSpan, endSpan } = await import('@fulcrum/core')
   const { writeMemory, recallMemory } = await import('@fulcrum/memory')
 
@@ -1059,6 +1060,49 @@ async function runServeMcp(): Promise<void> {
         created_by: a['created_by'] as string | undefined,
       })
       return profile
+    }
+
+    if (name === 'create_agent_definition') {
+      const def = createAgentDefinition({
+        role: a['role'] as Parameters<typeof createAgentDefinition>[0]['role'],
+        display_name: a['display_name'] as string,
+        description: a['description'] as string,
+        version: a['version'] as string | undefined,
+        stability: a['stability'] as Parameters<typeof createAgentDefinition>[0]['stability'],
+        system_prompt: a['system_prompt'] as string | undefined,
+        model: a['model'] as string | undefined,
+        provider: a['provider'] as string | undefined,
+        tools_allow: a['tools_allow'] as string[] | undefined,
+        tools_deny: a['tools_deny'] as string[] | undefined,
+        capabilities: a['capabilities'] as string[] | undefined,
+        executor_uri: a['executor_uri'] as string | undefined,
+      })
+      return def
+    }
+
+    if (name === 'get_agent_definition') {
+      const def = getAgentDefinition(a['role'] as string)
+      return def ?? { error: `No definition found for role '${a['role'] as string}'` }
+    }
+
+    if (name === 'update_agent_definition') {
+      const def = updateAgentDefinition({
+        role: a['role'] as Parameters<typeof updateAgentDefinition>[0]['role'],
+        display_name: a['display_name'] as string | undefined,
+        description: a['description'] as string | undefined,
+        version: a['version'] as string | undefined,
+        stability: a['stability'] as Parameters<typeof updateAgentDefinition>[0]['stability'],
+        system_prompt: a['system_prompt'] as string | undefined,
+        model: a['model'] as string | undefined,
+        executor_uri: a['executor_uri'] as string | undefined,
+      })
+      return def
+    }
+
+    if (name === 'list_agent_definitions') {
+      return listAgentDefinitions(
+        a['stability'] as Parameters<typeof listAgentDefinitions>[0],
+      )
     }
 
     throw new Error(`Unknown tool: ${name}`)
