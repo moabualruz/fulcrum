@@ -615,6 +615,67 @@ export function getMemoryMetrics(
   }
 }
 
+// ─── Forecasting ─────────────────────────────────────────────────────────────
+
+export interface GetForecastingInput {
+  workspace_id: string
+  horizon_days?: number
+}
+
+export function getForecasting(
+  db: ReturnType<typeof getDb>,
+  input: GetForecastingInput,
+): {
+  avg_cycle_days: number | null
+  avg_daily_throughput: number | null
+  estimated_completion_days: number | null
+  open_task_count: number
+} {
+  const horizon = input.horizon_days ?? 30
+
+  // avg cycle time (days) for tasks completed in the past horizon days
+  const cycleRow = db.prepare(`
+    SELECT AVG(CAST((julianday(updated_at) - julianday(created_at)) AS REAL)) AS avg_cycle_days
+    FROM tasks
+    WHERE workspace_id = ?
+      AND status IN ('completed', 'done')
+      AND date(updated_at) >= date('now', ? || ' days')
+  `).get(input.workspace_id, `-${horizon}`) as { avg_cycle_days: number | null }
+
+  // completed tasks in the past horizon days
+  const completedRow = db.prepare(`
+    SELECT COUNT(*) AS cnt
+    FROM tasks
+    WHERE workspace_id = ?
+      AND status IN ('completed', 'done')
+      AND date(updated_at) >= date('now', ? || ' days')
+  `).get(input.workspace_id, `-${horizon}`) as { cnt: number }
+
+  // open task count
+  const openRow = db.prepare(`
+    SELECT COUNT(*) AS cnt
+    FROM tasks
+    WHERE workspace_id = ?
+      AND status NOT IN ('completed', 'done', 'cancelled')
+  `).get(input.workspace_id) as { cnt: number }
+
+  const avg_cycle_days = cycleRow.avg_cycle_days ?? null
+  const avg_daily_throughput = horizon > 0 ? completedRow.cnt / horizon : null
+  const open_task_count = openRow.cnt
+
+  const estimated_completion_days =
+    avg_daily_throughput && avg_daily_throughput > 0
+      ? open_task_count / avg_daily_throughput
+      : null
+
+  return {
+    avg_cycle_days,
+    avg_daily_throughput,
+    estimated_completion_days,
+    open_task_count,
+  }
+}
+
 // ─── Original replayRun ───────────────────────────────────────────────────────
 
 export async function replayRun(input: ReplayRunInput): Promise<RunReplay> {

@@ -8,6 +8,7 @@ import {
   replayRun,
   getPerRoleMetrics,
   getMemoryMetrics,
+  getForecasting,
 } from './metrics.js'
 import type { MonitorServer, MonitorServerConfig } from './types.js'
 
@@ -322,6 +323,42 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
     const db = getDb()
     const data = getMemoryMetrics(db, { workspace_id: ws })
+    return c.json({ data })
+  })
+
+  app.get('/replay/:run_id', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const run_id = c.req.param('run_id')
+
+    const db = getDb()
+    const events = db.prepare(`
+      SELECT event_id, event_type, payload, ts
+      FROM events
+      WHERE workspace_id = ? AND JSON_EXTRACT(payload, '$.run_id') = ?
+      ORDER BY ts ASC
+    `).all(ws, run_id) as Array<{ event_id: string; event_type: string; payload: string; ts: string }>
+
+    if (events.length === 0) {
+      return c.json({ error: 'run not found' }, 404)
+    }
+
+    return c.json({
+      data: events.map((e) => ({
+        ...e,
+        payload: JSON.parse(e.payload) as unknown,
+      })),
+    })
+  })
+
+  app.get('/analytics/forecast', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const horizon_days = parseInt(c.req.query('horizon_days') ?? '30', 10)
+    const db = getDb()
+    const data = getForecasting(db, { workspace_id: ws, horizon_days })
     return c.json({ data })
   })
 

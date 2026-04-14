@@ -15,6 +15,7 @@ import {
   getFailedRunRate,
   getMemoryRecallCount,
   getMemoryMetrics,
+  getForecasting,
 } from '../metrics.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -486,5 +487,69 @@ describe('getMemoryMetrics', () => {
 
     const projectCount = result.by_scope.find((s) => s.scope === 'project')?.count
     expect(projectCount).toBe(2)
+  })
+})
+
+// ─── getForecasting ───────────────────────────────────────────────────────────
+
+describe('getForecasting', () => {
+  it('returns all null advisory fields and zero open_task_count when no data', () => {
+    const result = getForecasting(db, { workspace_id: 'ws_test' })
+
+    expect(result.avg_cycle_days).toBeNull()
+    expect(result.avg_daily_throughput).toBe(0)
+    expect(result.estimated_completion_days).toBeNull()
+    expect(result.open_task_count).toBe(0)
+  })
+
+  it('returns estimated_completion_days when throughput > 0', () => {
+    // Insert 3 completed tasks with known dates so throughput is measurable
+    // Use a large horizon so the tasks fall within the window
+    db.prepare(`
+      INSERT INTO tasks (task_id, workspace_id, project_id, title, status, created_at, updated_at)
+      VALUES ('fc1', 'ws_test', 'proj_test', 'FC1', 'completed', datetime('now', '-5 days'), datetime('now', '-1 day'))
+    `).run()
+    db.prepare(`
+      INSERT INTO tasks (task_id, workspace_id, project_id, title, status, created_at, updated_at)
+      VALUES ('fc2', 'ws_test', 'proj_test', 'FC2', 'completed', datetime('now', '-4 days'), datetime('now', '-1 day'))
+    `).run()
+    // Open tasks
+    db.prepare(`
+      INSERT INTO tasks (task_id, workspace_id, project_id, title, status, created_at, updated_at)
+      VALUES ('fo1', 'ws_test', 'proj_test', 'FO1', 'queued', datetime('now'), datetime('now'))
+    `).run()
+    db.prepare(`
+      INSERT INTO tasks (task_id, workspace_id, project_id, title, status, created_at, updated_at)
+      VALUES ('fo2', 'ws_test', 'proj_test', 'FO2', 'in_progress', datetime('now'), datetime('now'))
+    `).run()
+
+    const result = getForecasting(db, { workspace_id: 'ws_test', horizon_days: 30 })
+
+    expect(result.open_task_count).toBe(2)
+    expect(result.avg_daily_throughput).toBeGreaterThan(0)
+    expect(result.estimated_completion_days).not.toBeNull()
+    // 2 open tasks / (2/30 per day) = 30 days
+    expect(result.estimated_completion_days).toBeCloseTo(30, 0)
+    expect(result.avg_cycle_days).not.toBeNull()
+    expect(result.avg_cycle_days).toBeGreaterThan(0)
+  })
+
+  it('does not include cancelled/completed tasks in open_task_count', () => {
+    db.prepare(`
+      INSERT INTO tasks (task_id, workspace_id, project_id, title, status, created_at, updated_at)
+      VALUES ('fc3', 'ws_test', 'proj_test', 'FC3', 'cancelled', datetime('now'), datetime('now'))
+    `).run()
+    db.prepare(`
+      INSERT INTO tasks (task_id, workspace_id, project_id, title, status, created_at, updated_at)
+      VALUES ('fc4', 'ws_test', 'proj_test', 'FC4', 'done', datetime('now'), datetime('now'))
+    `).run()
+    db.prepare(`
+      INSERT INTO tasks (task_id, workspace_id, project_id, title, status, created_at, updated_at)
+      VALUES ('fo3', 'ws_test', 'proj_test', 'FO3', 'queued', datetime('now'), datetime('now'))
+    `).run()
+
+    const result = getForecasting(db, { workspace_id: 'ws_test' })
+
+    expect(result.open_task_count).toBe(1)
   })
 })
