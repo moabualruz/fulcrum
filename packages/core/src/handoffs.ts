@@ -5,7 +5,12 @@ import { emitEvent } from './events.js'
 import { FulcrumError } from './types.js'
 import type { HandoffPacket, CreateHandoffInput, HandoffMode } from './types.js'
 
-const VALID_HANDOFF_MODES: readonly HandoffMode[] = ['sync', 'async', 'review', 'escalate']
+const VALID_HANDOFF_MODES: readonly HandoffMode[] = [
+  'brief',
+  'contextual',
+  'artifact_first_brief',
+  'branched_session',
+]
 
 /**
  * Parse a `done_criteria` column value into a string[].
@@ -54,7 +59,7 @@ function rowToHandoff(row: Record<string, unknown>): HandoffPacket {
     })(),
     done_criteria: parseDoneCriteria(row.done_criteria),
     artifact_contract_id: (row.artifact_contract_id as string | null) ?? undefined,
-    handoff_mode: (row.handoff_mode as HandoffMode) || 'sync',
+    handoff_mode: (row.handoff_mode as HandoffMode) || 'artifact_first_brief',
     status: (row.status as HandoffPacket['status']) || 'pending',
     claimed_at: (row.claimed_at as string | null) ?? undefined,
     created_at: row.created_at as string,
@@ -71,7 +76,8 @@ export function createHandoff(db: Database, input: CreateHandoffInput): HandoffP
     ? JSON.stringify(input.constraints)
     : null
 
-  const handoff_mode: HandoffMode = input.handoff_mode ?? 'sync'
+  // Default matches MIGRATION_008_HANDOFFS and Python pi_agent_os/models/handoff.py.
+  const handoff_mode: HandoffMode = input.handoff_mode ?? 'artifact_first_brief'
   if (!VALID_HANDOFF_MODES.includes(handoff_mode)) {
     throw new FulcrumError(
       `Invalid handoff_mode: ${String(handoff_mode)} — must be one of ${VALID_HANDOFF_MODES.join(', ')}`,

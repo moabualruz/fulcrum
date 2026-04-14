@@ -45,7 +45,7 @@ describe('createHandoff', () => {
       inputs: { key: 'value', nested: { x: 1 } },
       constraints: ['must be fast', 'no side effects'],
       done_criteria: ['All tests pass', 'Reviewer approves'],
-      handoff_mode: 'review',
+      handoff_mode: 'contextual',
     })
 
     expect(handoff.handoff_id).toMatch(/^hof_/)
@@ -60,7 +60,7 @@ describe('createHandoff', () => {
     expect(handoff.inputs).toEqual({ key: 'value', nested: { x: 1 } })
     expect(handoff.constraints).toEqual(['must be fast', 'no side effects'])
     expect(handoff.done_criteria).toEqual(['All tests pass', 'Reviewer approves'])
-    expect(handoff.handoff_mode).toBe('review')
+    expect(handoff.handoff_mode).toBe('contextual')
     expect(handoff.status).toBe('pending')
     expect(handoff.claimed_at).toBeUndefined()
     expect(handoff.created_at).toBeTruthy()
@@ -74,10 +74,10 @@ describe('createHandoff', () => {
     expect(handoff.status).toBe('pending')
   })
 
-  it('applies default handoff_mode=sync when not provided', () => {
+  it('applies default handoff_mode=artifact_first_brief when not provided', () => {
     const db = seed()
     const handoff = createHandoff(db, makeHandoffInput())
-    expect(handoff.handoff_mode).toBe('sync')
+    expect(handoff.handoff_mode).toBe('artifact_first_brief')
   })
 
   it('emits handoff_created event', () => {
@@ -256,11 +256,11 @@ describe('HandoffMode enum + done_criteria string[] (G-13)', () => {
     const db = seed()
     const h = createHandoff(db, makeHandoffInput({
       project_id: 'proj_1',
-      handoff_mode: 'sync',
+      handoff_mode: 'brief',
       done_criteria: ['tests pass', 'reviewer approves'],
     }))
     expect(h.done_criteria).toEqual(['tests pass', 'reviewer approves'])
-    expect(h.handoff_mode).toBe('sync')
+    expect(h.handoff_mode).toBe('brief')
 
     const fetched = getHandoff(db, h.handoff_id, 'ws_1')
     expect(fetched?.done_criteria).toEqual(['tests pass', 'reviewer approves'])
@@ -272,13 +272,13 @@ describe('HandoffMode enum + done_criteria string[] (G-13)', () => {
       createHandoff(db, makeHandoffInput({ handoff_mode: 'bogus' as unknown as HandoffMode }))
     ).toThrow(FulcrumError)
     expect(() =>
-      createHandoff(db, makeHandoffInput({ handoff_mode: 'brief' as unknown as HandoffMode }))
+      createHandoff(db, makeHandoffInput({ handoff_mode: 'sync' as unknown as HandoffMode }))
     ).toThrow(expect.objectContaining({ code: 'invalid_input' }))
   })
 
-  it('createHandoff accepts all four valid modes', () => {
+  it('createHandoff accepts all four valid modes (matches DB CHECK constraint)', () => {
     const db = seed()
-    const modes: HandoffMode[] = ['sync', 'async', 'review', 'escalate']
+    const modes: HandoffMode[] = ['brief', 'contextual', 'artifact_first_brief', 'branched_session']
     for (const mode of modes) {
       const h = createHandoff(db, makeHandoffInput({ goal: `g-${mode}`, handoff_mode: mode }))
       expect(h.handoff_mode).toBe(mode)
@@ -287,7 +287,7 @@ describe('HandoffMode enum + done_criteria string[] (G-13)', () => {
 
   it('done_criteria defaults to [] when omitted', () => {
     const db = seed()
-    const h = createHandoff(db, makeHandoffInput({ handoff_mode: 'sync' }))
+    const h = createHandoff(db, makeHandoffInput({ handoff_mode: 'brief' }))
     expect(h.done_criteria).toEqual([])
     const fetched = getHandoff(db, h.handoff_id, 'ws_1')
     expect(fetched?.done_criteria).toEqual([])
@@ -297,12 +297,12 @@ describe('HandoffMode enum + done_criteria string[] (G-13)', () => {
     const db = seed()
     createHandoff(db, makeHandoffInput({
       goal: 'a',
-      handoff_mode: 'sync',
+      handoff_mode: 'brief',
       done_criteria: ['one', 'two'],
     }))
     createHandoff(db, makeHandoffInput({
       goal: 'b',
-      handoff_mode: 'async',
+      handoff_mode: 'contextual',
     }))
     const rows = listHandoffs(db, { workspace_id: 'ws_1' })
     expect(rows).toHaveLength(2)
@@ -329,7 +329,7 @@ describe('HandoffMode enum + done_criteria string[] (G-13)', () => {
     `).run(
       'hof_legacy1', 'ws_1', 'proj_1', null, null, null, null,
       'legacy goal', 'impl', 'normal', 'task',
-      '{}', null, 'All tests pass', null, 'sync', now,
+      '{}', null, 'All tests pass', null, 'brief', now,
     )
     const fetched = getHandoff(db, 'hof_legacy1', 'ws_1')
     expect(fetched?.done_criteria).toEqual(['All tests pass'])

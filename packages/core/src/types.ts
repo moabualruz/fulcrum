@@ -251,13 +251,14 @@ export interface PolicyCheckResult {
 export type HandoffPriority = 'critical' | 'high' | 'normal' | 'low'
 export type HandoffScope = 'task' | 'issue' | 'project' | 'workspace'
 /**
- * HandoffMode — mirrors the Python enum in pi-agent-os.
- * - sync:     caller blocks while the receiver runs
- * - async:    fire-and-forget; receiver runs independently
- * - review:   receiver is a reviewer gate
- * - escalate: handoff raises the decision to a higher authority
+ * HandoffMode — mirrors the Python spec enum in pi-agent-os/models/handoff.py
+ * and the DB CHECK constraint in MIGRATION_008_HANDOFFS.
+ * - brief:                terse goal + done_criteria only (lowest context)
+ * - contextual:           brief + relevant memory excerpts + recent events
+ * - artifact_first_brief: contextual + authoritative artifacts inlined (default)
+ * - branched_session:     full conversation branch; receiver resumes from the fork
  */
-export type HandoffMode = 'sync' | 'async' | 'review' | 'escalate'
+export type HandoffMode = 'brief' | 'contextual' | 'artifact_first_brief' | 'branched_session'
 
 export interface HandoffPacket {
   handoff_id: string
