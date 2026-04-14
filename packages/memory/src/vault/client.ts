@@ -25,7 +25,7 @@ memories/operational/
 const SCHEMA_YAML_CONTENT = `# Fulcrum Vault Schema
 version: 1
 kinds:
-  curated: [decision, fact, summary, task_outcome, task_decision, error, doc]
+  curated: [decision, fact, lesson, summary, task_outcome, task_decision, error, doc]
   operational: [tool_trace, reasoning_step, symbol, diff, code, procedure, task_goal, task_failure]
 scopes: [global, project, file]
 `
