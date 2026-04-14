@@ -7,13 +7,26 @@ It covers invariants, patterns, and constraints — not package descriptions (th
 
 ## What This Repo Is (and Is Not)
 
-**Fulcrum is the control plane — state, policy, and intent only.**
+**Fulcrum is control-plane-first.** Its center of gravity is state, policy, intent,
+persistence, memory, and scheduling. It records work, enforces limits, stores memory
+across three layers (L0/L1/L2), and emits events.
 
-It records work, enforces limits, stores memory, and emits events.
-It does **not** spawn agent processes, make LLM API calls, or manage OS-level processes.
+**Fulcrum also ships `@fulcrum/worker`** — a thin execution layer built around a
+pluggable `AgentAdapter` contract. Two adapters ship in-box:
 
-**Pi is the execution layer** (separate repo). Pi resolves `AgentRole → pi_profile`, calls
-`startAgentRun()` to register intent, spawns the process, and calls `completeAgentRun()` when done.
+- `stub` — reads a canned `WorkerResult` JSON from `$FULCRUM_AGENT_STUB_DIR/<run_id>.json`,
+  used in tests and dry-runs
+- `subprocess` — runs a user-configured command, surfaces the `SpawnContext` via env
+  vars, and parses a `WorkerResult` from stdout
+
+Userland can register additional adapters (Claude CLI, Gemini CLI, a co-running Pi
+runtime, or anything else) via `registerAgentAdapter(adapter)`. The control plane
+itself still **never** hardcodes a specific LLM API, a specific agent CLI wire format,
+or OS-level process management — those always live in userland adapters.
+
+Integration with Pi as a co-runtime is still a valid and supported pattern, but it is
+no longer the only pattern. The same `SpawnableRun` / `SpawnContext` contract covers
+the built-in adapters, user-registered adapters, and Pi.
 
 See [README.md#architecture](README.md#architecture) for the full package map and dependency graph.
 
@@ -33,7 +46,8 @@ Each package owns exactly one concern. Never reach across boundaries:
 | `@fulcrum/sync` | External push/pull (Plane), conflict state | Internal domain state mutations |
 | `@fulcrum/teams` | Team template + instance lifecycle | Direct agent spawning |
 | `@fulcrum/workflows` | Workflow definition + run state machine | Executing step side-effects directly |
-| `@fulcrum/worktrees` | Worktree allocation, artifact tracking, merge queue | Git operations (those are in Pi) |
+| `@fulcrum/worker` | `AgentAdapter` registry, `spawnAgent` lifecycle, built-in `stub` + `subprocess` adapters | Direct LLM API calls; specific agent CLI wire formats (those live in userland adapters) |
+| `@fulcrum/worktrees` | Worktree allocation, artifact tracking, merge queue | Git operations inside a worktree (adapters/Pi run those) |
 
 If a function would need to cross a boundary, it belongs in the package being crossed into, not the one calling.
 
@@ -63,23 +77,72 @@ skip `checkPolicy` are testing implementation, not the production path.
 
 ### 4. Only `chief_of_staff` can invoke teams
 
-Enforced by `@fulcrum/policy` `SYSTEM_INVARIANTS`. Do not add bypass logic for any reason.
+Enforced by `@fulcrum/policy` `SYSTEM_INVARIANTS` (`only_l1_invokes_teams`) and by the
+capability helper `canInvokeTeams(role)` from `@fulcrum/core`. Do not add bypass logic
+for any reason. Call `canInvokeTeams(role)` — never compare `role === 'chief_of_staff'`.
 
 ### 5. Only `integration_worker` can merge worktrees
 
-Same invariant set. No exceptions.
+Same invariant set (`only_integration_worker_merges`). Call `canMerge(role)` — never
+compare against the role slug string. No exceptions.
 
-### 6. Task lookup must be scoped by workspace_id
+### 6. Only `chief_of_staff` can perform direct file edits
+
+Enforced by the `chief_of_staff_no_direct_writes` `SYSTEM_INVARIANT`. The policy engine
+denies any `tool_use:Write`, `tool_use:Edit`, `tool_use:MultiEdit`, `tool_use:NotebookEdit`,
+or `shell_exec:git *` action from a `chief_of_staff` agent. CoS delegates all code and
+state mutations to subordinate roles. This invariant is **not** overridable.
+
+### 7. Role boundary checks must use capability helpers, not string comparisons
+
+All role-based branching must go through the capability helpers exported from
+`@fulcrum/core`:
+
+- `isL1(role)` — is this an L1 (team-invoking) role?
+- `roleCapabilities(role)` — full capability object
+- `canInvokeTeams(role)` / `canMerge(role)` / `canWriteCode(role)` / `canEditFiles(role)`
+
+There is a guard test at `packages/core/src/tests/role-string-guard.test.ts` that walks
+every `packages/*/src/**/*.ts` file and fails if any production code compares against a
+role slug string (`'chief_of_staff'`, `'integration_worker'`, etc.). Exactly three files
+are allowlisted: `packages/core/src/roles.ts`, `packages/core/src/types.ts`, and
+`packages/core/src/status.ts`. If you add a new role check anywhere else, add a helper
+in `roles.ts` and call that instead.
+
+### 8. Use `newId()` for all first-class IDs
+
+All first-class entity IDs (tasks, runs, memories, workspaces, teams, artifacts, etc.)
+must be minted via `newId(<type>)` from `packages/core/src/ids.ts`. The function emits
+a typed, prefixed ULID (e.g. `run_01H…`) and is the only approved ID source for the
+domain layer.
+
+A guard test at `packages/core/src/tests/ulid-guard.test.ts` blocks bare `ulid()` calls
+outside a five-file allowlist (`core/ids.ts`, `memory/graph.ts`, `memory/ingest.ts`,
+`sync/sync-manager.ts`, `monitor/metrics.ts`). If you add a new entity type, register
+its prefix in `PREFIXES` in `packages/core/src/ids.ts` and call `newId(<type>)`.
+
+### 9. Enum columns must have a DB CHECK constraint
+
+Every TypeScript enum type union that is persisted to SQLite must also be enforced at
+the DB level via a `CHECK` constraint in the migration. The guard test at
+`packages/core/src/tests/check-constraints.test.ts` iterates every entry in
+`GUARDED_COLUMNS` (currently 15 enum columns across tasks, runs, memories, artifacts,
+workflows, etc.) and asserts that the `CHECK` values match the TS union exactly.
+
+If you introduce a new persisted enum: add the `CHECK` in the migration, add the column
+to `GUARDED_COLUMNS` in the guard test, and update the TS union — all in the same PR.
+
+### 10. Task lookup must be scoped by workspace_id
 
 Any query that fetches a task by ID must include `AND workspace_id = ?`. Cross-workspace
 task leakage is a security invariant, not just a data integrity concern.
 
-### 7. WIP limit 0 means fully blocked
+### 11. WIP limit 0 means fully blocked
 
 `wip_limit: 0` for a role means zero runs allowed — not "unlimited". `checkPolicy` must
 treat 0 as a hard block.
 
-### 8. Memory dedup is content-hash based, not semantic
+### 12. Memory dedup is content-hash based, not semantic
 
 `isDuplicate()` hashes the raw content string. Do not add semantic (vector) dedup to the
 write path — it would add LLM latency to every write.
@@ -125,10 +188,19 @@ Never change this to `threads`.
 See [README.md#memory-system-three-layers](README.md#memory-system-three-layers) for the
 full architecture. Agent rules:
 
+`MemoryKind` currently has **16** values (`fact`, `summary`, `symbol`, `decision`,
+`procedure`, `error`, `diff`, `doc`, `code`, `task_goal`, `task_decision`, `task_failure`,
+`task_outcome`, `tool_trace`, `reasoning_step`, `lesson`).
+
+The canonical definition of `MemoryKind` now lives in `@fulcrum/core/src/types.ts` and
+is re-exported from `@fulcrum/memory` — the memory package no longer owns the union.
+This is the same pattern Round 3 applied to every shared domain type: canonical in
+core, re-exported through other packages for ergonomics.
+
 **Do not add new memory kinds without updating all four locations:**
 
-1. `MemoryKind` union in `packages/memory/src/types.ts`
-2. `CuratedKind` or `OperationalKind` type alias (determines vault directory)
+1. `MemoryKind` union in `packages/core/src/types.ts` (canonical)
+2. `CuratedKind` or `OperationalKind` type alias in `@fulcrum/memory` (determines vault directory)
 3. `CURATED_KINDS` or `OPERATIONAL_KINDS` set (same file)
 4. `SCHEMA_YAML_CONTENT` string in `packages/memory/src/vault/client.ts`
 
@@ -160,7 +232,12 @@ deliberately suppressed.
 
 **System invariants live in `packages/policy/src/engine.ts` as `SYSTEM_INVARIANTS`.**
 They have priority 1000 and cannot be overridden by any custom rule. Never remove or
-weaken them.
+weaken them. The set currently has **four** rules:
+
+1. `only_l1_invokes_teams` — only `chief_of_staff` may invoke a team
+2. `only_integration_worker_merges` — only `integration_worker` may merge a worktree
+3. `no_task_bypass` — every run must be tied to a real task
+4. `chief_of_staff_no_direct_writes` — CoS cannot Write/Edit/MultiEdit/NotebookEdit or run `git *` via `shell_exec`
 
 **`evaluatePolicy()` never throws for a denial** — it returns `{ allowed: false, reason }`.
 It throws only for invalid configuration or unknown actor/resource types.
@@ -185,7 +262,9 @@ See [CONTRIBUTING.md#native-module-dependencies](CONTRIBUTING.md#native-module-d
 
 ## Testing Rules
 
-**Every code path must have a test.** Tests use in-memory SQLite (see patterns above).
+**Every code path must have a test.** The suite is currently at **~980 tests** across
+all packages and uses in-memory SQLite (see patterns above). New code lands with new
+tests — no exceptions.
 
 **Test file location:** `packages/<pkg>/src/tests/` — mirror the source file name:
 `vault/watcher.ts` → `tests/vault-watcher.test.ts`
@@ -225,6 +304,12 @@ import { writeMemory } from './write'       // ✗
 **Re-exports:** Each package has a single `src/index.ts` that defines the public API surface.
 Do not import from internal paths in other packages — always go through the index.
 
+**Canonical types live in `@fulcrum/core`.** Shared domain types (like `MemoryKind`,
+`AgentRole`, `AgentRunStatus`, `TaskStatus`) are defined in `packages/core/src/types.ts`
+and re-exported from downstream packages (`@fulcrum/memory`, `@fulcrum/policy`, etc.).
+Do not duplicate a type in a downstream package — import from core and re-export if you
+need it at the package boundary. This is the pattern Round 3 applied to `MemoryKind`.
+
 **Types live in `types.ts`** at the package root (`src/types.ts`). Do not scatter type
 definitions across implementation files.
 
@@ -232,19 +317,21 @@ definitions across implementation files.
 
 ## What NOT to Add
 
-- **No network calls in core** — Fulcrum is local-first by design
-- **No process.spawn / child_process** — that's Pi's job
+- **No network calls in core / memory / policy / planning** — those packages are local-first by design
+- **No `process.spawn` / `child_process` outside `@fulcrum/worker`** — subprocess spawning is confined to the worker package and its adapters; nothing else in the monorepo may spawn a child process
 - **No hardcoded workspace or project IDs** — always pass via input or config
 - **No synchronous LLM calls on the write path** — embedding and extraction are async
-- **No global mutable state outside `getDb()` / `setDb()`** — the DB singleton is the
-  only acceptable global in this codebase
+- **No LLM API clients or CLI wire formats in `@fulcrum/worker` itself** — those belong in userland adapters registered via `registerAgentAdapter`
+- **No global mutable state outside `getDb()` / `setDb()` and the `AgentAdapter` registry** — those are the only acceptable globals in this codebase
 
 ---
 
-## SpawnableRun — The Fulcrum → Pi Contract
+## SpawnableRun — The Fulcrum → Execution-Layer Contract
 
-`SpawnableRun` is the typed handoff from Fulcrum to Pi. It contains everything Pi needs
-to spawn an agent without re-querying the DB:
+`SpawnableRun` is the typed handoff from Fulcrum's domain layer to **any** execution
+layer — the built-in `@fulcrum/worker` `stub` / `subprocess` adapters, a user-registered
+adapter (Claude CLI, Gemini CLI, etc.), or a co-running Pi runtime. It contains
+everything the adapter needs to spawn an agent without re-querying the DB:
 
 ```typescript
 const run = startAgentRun({
@@ -253,15 +340,26 @@ const run = startAgentRun({
   pi_profile: 'claude-cli/claude-opus-4-6',
 })
 
-// Pi side (not in this repo):
+// Either side — built-in worker or userland adapter:
 const spawnable = buildSpawnableRun(run, {
   goal: 'implement feature X',
   task_type: 'implement',
 })
-// → pi.executor.spawn(spawnable)
 ```
 
-Changes to `AgentRun` shape that affect `SpawnableRun` are a breaking change for Pi.
+The execution layer then goes through the adapter contract defined in
+`@fulcrum/worker/src/types.ts`:
+
+- Each adapter implements `spawn(ctx: SpawnContext): Promise<WorkerResult>`
+- `SpawnContext` carries `run_id`, `handoff`, `worktree_path`, `adapter_config`, and
+  the full `SpawnableRun` blob — everything needed to dispatch work without touching
+  the DB
+- `WorkerResult` carries terminal status, artifacts, and any error info, and is
+  translated back into `completeAgentRun` / `blockAgentRun` / `failAgentRun` by
+  `spawnAgent` in `@fulcrum/worker/src/lifecycle.ts`
+
+Changes to `AgentRun` shape that affect `SpawnableRun` — or to `SpawnContext` /
+`WorkerResult` — are a breaking change for **every** downstream adapter, not just Pi.
 Treat them as such.
 
 ---
@@ -272,8 +370,10 @@ Treat them as such.
 |-------|----------|
 | Package descriptions and full API | [README.md](README.md) |
 | Memory system deep-dive (L0/L1/L2) | [README.md#memory-system-three-layers](README.md#memory-system-three-layers) |
-| Agent roles (all 23) | [README.md#agent-roles](README.md#agent-roles) |
+| Agent roles (all 24) | [README.md#agent-roles](README.md#agent-roles) |
 | Configuration reference | [README.md#configuration](README.md#configuration) |
 | Dev setup and test commands | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Design specs | [docs/superpowers/specs/](docs/superpowers/specs/) |
-| Implementation plans | [docs/superpowers/plans/](docs/superpowers/plans/) |
+| Implementation plans (per-package, round 1..5) | [docs/superpowers/plans/](docs/superpowers/plans/) — see especially `2026-04-14-round-1..5-*.md` for the Round 1–5 gap-closure plans |
+| Gap analysis history (5 rounds) | [docs/gap-analysis/](docs/gap-analysis/) — raw findings and validated gap lists that drove rounds 1–5 |
+| User-facing guides | [docs/guides/](docs/guides/) — workflow authoring, worker adapters, telemetry, CLI reference |
