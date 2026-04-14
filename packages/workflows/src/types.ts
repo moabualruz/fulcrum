@@ -5,6 +5,8 @@ export type WorkflowStepType =
   | 'create_task' | 'create_issue' | 'write_artifact' | 'read_artifact'
   | 'evaluate_policy' | 'search_web' | 'search_code' | 'run_tool'
   | 'wait_for_task' | 'wait_for_review' | 'branch' | 'parallel' | 'complete'
+  | 'invoke_team' | 'run_script' | 'read_project' | 'review_artifact'
+  | 'validate_schema' | 'gate'
 
 export interface WorkflowStepDef {
   step_id: string
@@ -18,7 +20,7 @@ export interface WorkflowStepDef {
 
 export interface WorkflowStepState {
   step_id: string
-  status: 'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'skipped'
+  status: 'pending' | 'ready' | 'running' | 'retrying' | 'waiting' | 'waiting_input' | 'waiting_dependency' | 'blocked' | 'completed' | 'failed' | 'skipped'
   result?: unknown
   error?: string
   attempts: number

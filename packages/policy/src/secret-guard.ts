@@ -6,11 +6,19 @@ interface PatternDef {
   regex: RegExp
 }
 
-// 5 secret detection patterns from spec
+// 9 secret detection patterns (parity with Python implementation)
 const PATTERNS: PatternDef[] = [
   {
     name: 'api_key',
     regex: /(sk|pk|api|key|token|secret)[-_][a-zA-Z0-9]{20,}/gi,
+  },
+  {
+    name: 'aws_access_key',
+    regex: /AKIA[0-9A-Z]{16}/g,
+  },
+  {
+    name: 'aws_secret_key',
+    regex: /aws_secret_access_key\s*[=:]\s*\S+/gi,
   },
   {
     name: 'private_key',
@@ -19,6 +27,14 @@ const PATTERNS: PatternDef[] = [
   {
     name: 'oauth_token',
     regex: /(ghp|ghu|ghs|gho)_[a-zA-Z0-9]{36}/g,
+  },
+  {
+    name: 'slack_token',
+    regex: /xox[baprs]-[0-9A-Za-z\-]+/g,
+  },
+  {
+    name: 'jwt_token',
+    regex: /eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/g,
   },
   {
     name: 'password_kv',
