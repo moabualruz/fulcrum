@@ -18,7 +18,7 @@ export interface McpServerOptions {
 
 // ---------- Zod shape builder ----------
 // Converts a JSON Schema-style properties object to a flat Zod shape.
-// Handles all types used in our 18 tool schemas.
+// Handles all types used in our 22 tool schemas.
 
 type JsonSchemaProp = {
   type?: string
@@ -68,13 +68,35 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
       tool.inputSchema.required ?? [],
     )
 
+    // Build a strict z.object for input validation. We validate inside the
+    // handler (not as the registered shape) so the MCP SDK still gets the
+    // raw shape for capabilities negotiation while we enforce strictness.
+    const strictSchema = z.object(shape).strict()
+
     server.tool(
       tool.name,
       tool.description,
       shape,
       async (args) => {
+        // Validate with strict schema — reject unknown keys and wrong types.
+        const parsed = strictSchema.safeParse(args)
+        if (!parsed.success) {
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: 'invalid_input',
+                details: parsed.error.issues.map(i => ({
+                  path: i.path.join('.'),
+                  message: i.message,
+                })),
+              }),
+            }],
+            isError: true,
+          }
+        }
         try {
-          const result = await options.handleToolCall(tool.name, args as Record<string, unknown>)
+          const result = await options.handleToolCall(tool.name, parsed.data as Record<string, unknown>)
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(result) }],
           }
