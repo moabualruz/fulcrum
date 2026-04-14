@@ -146,6 +146,9 @@ function recoveryHintFor(name: string): string | undefined {
   if (name.includes("Claude Code: global CLAUDE.md")) {
     return `manual: append agent-integration/claude/CLAUDE.md to ~/.claude/CLAUDE.md`;
   }
+  if (name.includes("Claude Code: skills")) {
+    return `manual: cp agent-integration/skills/*.md ~/.claude/skills/fulcrum/`;
+  }
   if (name.includes("Gemini")) {
     return `manual: copy agent-integration/gemini/* into ~/.gemini/extensions/fulcrum/`;
   }
@@ -355,7 +358,44 @@ function installClaudeContext(): void {
   ok(`wrote Fulcrum section → ${globalPath}`);
 }
 
-// ── 5. Gemini CLI: user extension (~/.gemini/extensions/fulcrum/) ─────────────
+// ── 5b. Claude Code: skills → ~/.claude/skills/fulcrum/ ──────────────────────
+// Each file in agent-integration/skills/ gets copied to ~/.claude/skills/fulcrum/.
+// Claude Code auto-loads user-scope skills from ~/.claude/skills/ at session start
+// and surfaces them to the agent when the skill's `description` frontmatter field
+// matches the current task. A namespaced subdirectory (`fulcrum/`) avoids
+// collisions with other tool suites that install their own skills.
+
+function installClaudeSkills(): void {
+  const srcDir = path.join(REPO_ROOT, "agent-integration", "skills");
+  if (!fs.existsSync(srcDir)) {
+    warn(`skills source dir not found: ${srcDir}`);
+    return;
+  }
+  const files = fs.readdirSync(srcDir).filter((f) => f.endsWith(".md"));
+  if (files.length === 0) {
+    skip("no skill files to install");
+    return;
+  }
+
+  const destDir = path.join(HOME, ".claude", "skills", "fulcrum");
+  mkdirp(destDir);
+
+  let copied = 0;
+  for (const f of files) {
+    const src = path.join(srcDir, f);
+    const dest = path.join(destDir, f);
+    if (DRY_RUN) {
+      dry(`would copy ${src} → ${dest}`);
+      copied++;
+      continue;
+    }
+    fs.copyFileSync(src, dest);
+    copied++;
+  }
+  ok(`installed ${copied} skill file(s) → ${destDir}`);
+}
+
+// ── 6. Gemini CLI: user extension (~/.gemini/extensions/fulcrum/) ─────────────
 
 function installGeminiExtension(): void {
   const extDir = path.join(HOME, ".gemini", "extensions", "fulcrum");
@@ -379,7 +419,7 @@ function installGeminiExtension(): void {
   ok(`installed extension → ${extDir}`);
 }
 
-// ── 6. PI: cockpit extension (pi install <cockpit>) ──────────────────────────
+// ── 7. PI: cockpit extension (pi install <cockpit>) ──────────────────────────
 
 function installPiCockpit(): void {
   const cockpitDir = path.join(REPO_ROOT, "agent-integration", "pi", "cockpit");
@@ -405,7 +445,7 @@ function installPiCockpit(): void {
   ok("PI cockpit installed");
 }
 
-// ── 7. Non-destructive check mode ─────────────────────────────────────────────
+// ── 8. Non-destructive check mode ─────────────────────────────────────────────
 
 interface CheckRow {
   label: string;
@@ -512,6 +552,27 @@ function runCheck(): number {
     rows.push({ label: "Claude context", status: "fail", detail: `${globalCtx} does not exist` });
   }
 
+  // Claude skills
+  const skillsDir = path.join(HOME, ".claude", "skills", "fulcrum");
+  const srcSkillsDir = path.join(REPO_ROOT, "agent-integration", "skills");
+  if (fs.existsSync(skillsDir)) {
+    const destFiles = fs.readdirSync(skillsDir).filter((f) => f.endsWith(".md")).length;
+    const srcFiles = fs.existsSync(srcSkillsDir)
+      ? fs.readdirSync(srcSkillsDir).filter((f) => f.endsWith(".md")).length
+      : 0;
+    if (srcFiles > 0 && destFiles >= srcFiles) {
+      rows.push({ label: "Claude skills", status: "ok", detail: `${skillsDir} (${destFiles} files)` });
+    } else {
+      rows.push({
+        label: "Claude skills",
+        status: "warn",
+        detail: `${skillsDir} (${destFiles}/${srcFiles} files — re-run setup:claude)`,
+      });
+    }
+  } else {
+    rows.push({ label: "Claude skills", status: "fail", detail: `${skillsDir} (missing — run setup:claude)` });
+  }
+
   // Gemini extension
   const geminiDir = path.join(HOME, ".gemini", "extensions", "fulcrum");
   if (
@@ -571,6 +632,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["Claude Code: user-scope MCP server", installClaudeMcp],
     ["Claude Code: PreToolUse hook", installClaudeHook],
     ["Claude Code: global CLAUDE.md context", installClaudeContext],
+    ["Claude Code: skills → ~/.claude/skills/fulcrum/", installClaudeSkills],
     ["Gemini CLI: user extension", installGeminiExtension],
     ["PI: cockpit extension", installPiCockpit],
   ],
@@ -580,6 +642,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["Claude Code: user-scope MCP server", installClaudeMcp],
     ["Claude Code: PreToolUse hook", installClaudeHook],
     ["Claude Code: global CLAUDE.md context", installClaudeContext],
+    ["Claude Code: skills → ~/.claude/skills/fulcrum/", installClaudeSkills],
   ],
   gemini: [
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
@@ -613,6 +676,7 @@ function printSummary(target: Target): void {
     rows.push(["Claude MCP server", `user scope — see: claude mcp list`]);
     rows.push(["Claude PreToolUse hook", `~/.claude/settings.json`]);
     rows.push(["Claude global context", `~/.claude/CLAUDE.md (<!-- fulcrum:... --> section)`]);
+    rows.push(["Claude Code skills", `~/.claude/skills/fulcrum/ (13 skill MDs)`]);
   }
   if (target === "all" || target === "gemini") {
     rows.push(["Gemini extension", `~/.gemini/extensions/fulcrum/`]);
