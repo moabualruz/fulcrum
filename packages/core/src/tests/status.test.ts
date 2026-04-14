@@ -179,3 +179,34 @@ describe('listAgentProfiles — all 24 roles', () => {
     }
   })
 })
+
+describe('listAgentProfiles reads role MDs (G-11)', () => {
+  it('chief_of_staff description matches Purpose from chief_of_staff.md', async () => {
+    const profiles = await listAgentProfiles()
+    const cos = profiles.find(p => p.role === 'chief_of_staff')
+    expect(cos).toBeDefined()
+    // Purpose paragraph mentions orchestration/L1/coordinate/chief
+    expect(cos!.description.toLowerCase()).toMatch(/orchestrat|coordinat|l1|chief/)
+  })
+
+  it('integration_worker description mentions merge', async () => {
+    const profiles = await listAgentProfiles()
+    const iw = profiles.find(p => p.role === 'integration_worker')
+    expect(iw).toBeDefined()
+    expect(iw!.description.toLowerCase()).toMatch(/merg|integrat/)
+  })
+
+  it('software_engineer description is non-empty', async () => {
+    const profiles = await listAgentProfiles()
+    const se = profiles.find(p => p.role === 'software_engineer')
+    expect(se?.description.length).toBeGreaterThan(20)
+  })
+
+  it('roles without an MD file still have a description (fallback)', async () => {
+    const profiles = await listAgentProfiles()
+    for (const p of profiles) {
+      expect(p.description).toBeTruthy()
+      expect(p.description.length).toBeGreaterThan(5)
+    }
+  })
+})

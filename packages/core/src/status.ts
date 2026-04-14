@@ -1,6 +1,44 @@
+import { readFileSync, existsSync } from 'fs'
+import { fileURLToPath } from 'url'
+import * as pathModule from 'path'
 import { getDb } from './db/client.js'
 import { rowToRun } from './runs.js'
 import type { AgentProfile, WorkspaceStatusResult } from './types.js'
+
+// Resolve the agent-integration/roles/ directory from this file's location.
+// packages/core/src/status.ts → packages/core → packages → repo root → agent-integration/roles
+function resolveRolesDir(): string | null {
+  try {
+    const here = pathModule.dirname(fileURLToPath(import.meta.url))
+    // Walk up 3 levels: src → core → packages → repo root
+    const root = pathModule.resolve(here, '..', '..', '..')
+    const candidate = pathModule.join(root, 'agent-integration', 'roles')
+    if (existsSync(candidate)) return candidate
+    // Fallback: walk up 4 levels in case this file is built to dist/
+    const rootAlt = pathModule.resolve(here, '..', '..', '..', '..')
+    const candidateAlt = pathModule.join(rootAlt, 'agent-integration', 'roles')
+    return existsSync(candidateAlt) ? candidateAlt : null
+  } catch {
+    return null
+  }
+}
+
+const ROLES_DIR = resolveRolesDir()
+
+/** Parse the first "## Purpose" paragraph from a role MD file. */
+function loadRolePurpose(role: string): string | null {
+  if (!ROLES_DIR) return null
+  const p = pathModule.join(ROLES_DIR, `${role}.md`)
+  if (!existsSync(p)) return null
+  try {
+    const content = readFileSync(p, 'utf8')
+    // Match "## Purpose\n\n{paragraph}" up to the next "##" or end of file
+    const match = content.match(/##\s+Purpose\s*\n+([^\n][\s\S]*?)(?=\n##|\n*$)/)
+    return match ? match[1].trim() : null
+  } catch {
+    return null
+  }
+}
 
 interface GetWorkspaceStatusInput { workspace_id: string }
 interface BuildCosContextInput { workspace_id: string; project_id: string; max_tokens?: number }
@@ -133,5 +171,10 @@ export async function buildCosContext(input: BuildCosContextInput): Promise<stri
 }
 
 export async function listAgentProfiles(): Promise<AgentProfile[]> {
-  return AGENT_PROFILES
+  // Prefer each role's "Purpose" section from agent-integration/roles/<role>.md
+  // and fall back to the hardcoded description when no MD file is present.
+  return AGENT_PROFILES.map(profile => {
+    const fromMd = loadRolePurpose(profile.role)
+    return fromMd ? { ...profile, description: fromMd } : profile
+  })
 }
