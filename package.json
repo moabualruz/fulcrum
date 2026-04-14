@@ -50,7 +50,8 @@
       "esbuild",
       "onnxruntime-node",
       "koffi",
-      "protobufjs"
+      "protobufjs",
+      "kuzu"
     ]
   },
   "devDependencies": {

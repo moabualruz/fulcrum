@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 // packages/cli/src/index.ts — fulcrum CLI entry point
 
 import { runMemoryInit } from '@fulcrum/memory'
