@@ -638,7 +638,7 @@ export function getForecasting(
     SELECT AVG(CAST((julianday(updated_at) - julianday(created_at)) AS REAL)) AS avg_cycle_days
     FROM tasks
     WHERE workspace_id = ?
-      AND status IN ('completed', 'done')
+      AND status = 'completed'
       AND date(updated_at) >= date('now', ? || ' days')
   `).get(input.workspace_id, `-${horizon}`) as { avg_cycle_days: number | null }
 
@@ -647,7 +647,7 @@ export function getForecasting(
     SELECT COUNT(*) AS cnt
     FROM tasks
     WHERE workspace_id = ?
-      AND status IN ('completed', 'done')
+      AND status = 'completed'
       AND date(updated_at) >= date('now', ? || ' days')
   `).get(input.workspace_id, `-${horizon}`) as { cnt: number }
 
@@ -656,7 +656,7 @@ export function getForecasting(
     SELECT COUNT(*) AS cnt
     FROM tasks
     WHERE workspace_id = ?
-      AND status NOT IN ('completed', 'done', 'cancelled')
+      AND status NOT IN ('completed', 'cancelled')
   `).get(input.workspace_id) as { cnt: number }
 
   const avg_cycle_days = cycleRow.avg_cycle_days ?? null

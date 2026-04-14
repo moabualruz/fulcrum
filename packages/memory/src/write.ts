@@ -11,6 +11,9 @@ export async function writeMemory(input: WriteMemoryInput): Promise<FullMemory> 
   if (input.confidence !== undefined && (input.confidence < 0 || input.confidence > 1)) {
     throw new FulcrumError('confidence must be between 0 and 1', 'invalid_input')
   }
+  if (input.freshness !== undefined && (input.freshness < 0 || input.freshness > 1)) {
+    throw new FulcrumError('freshness must be between 0 and 1', 'invalid_input')
+  }
 
   const db = getDb()
   const now = new Date().toISOString()

@@ -13,27 +13,8 @@ export type MatcherType =
   | 'artifact'
   | 'secret_content'
 
-// AgentRole as used in policy evaluation. Must match the 16 roles in the spec.
-export type AgentRole =
-  | 'chief_of_staff'
-  | 'context_gatherer'
-  | 'prd_planner'
-  | 'implementation_planner'
-  | 'issue_decomposer'
-  | 'architecture_reviewer'
-  | 'research_worker'
-  | 'implementer_backend'
-  | 'implementer_frontend'
-  | 'implementer'
-  | 'refactor_worker'
-  | 'browser_worker'
-  | 'tester'
-  | 'reviewer'
-  | 'security_reviewer'
-  | 'performance_reviewer'
-  | 'integration_worker'
-  | 'planner'
-  | 'researcher'
+import type { AgentRole } from '@fulcrum/core'
+export type { AgentRole }
 
 export interface PolicyMatcher {
   matcher_type: MatcherType

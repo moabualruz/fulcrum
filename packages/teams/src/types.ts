@@ -1,36 +1,7 @@
 // packages/teams/src/types.ts
 
-export type AgentRole =
-  // L1 orchestration roles
-  | 'chief_of_staff'
-  // Planning & decomposition roles
-  | 'context_gatherer'
-  | 'prd_planner'
-  | 'implementation_planner'
-  | 'issue_decomposer'
-  // Worker roles
-  | 'software_engineer'
-  | 'research_worker'
-  | 'refactor_worker'
-  | 'browser_worker'
-  | 'data_engineer'
-  | 'ml_engineer'
-  | 'devops_engineer'
-  // Review & quality roles
-  | 'architecture_reviewer'
-  | 'code_reviewer'
-  | 'qa_engineer'
-  | 'security_reviewer'
-  // Integration & merge roles
-  | 'integration_worker'
-  // Support roles
-  | 'documentation_writer'
-  | 'memory_curator'
-  | 'tech_lead'
-  | 'product_manager'
-  | 'analyst'
-  | 'orchestrator'
-  | 'custom'
+import type { AgentRole } from '@fulcrum/core'
+export type { AgentRole }
 
 /**
  * L1 roles are the only roles allowed to invoke other teams.

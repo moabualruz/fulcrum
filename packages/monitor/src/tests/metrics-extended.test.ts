@@ -541,7 +541,7 @@ describe('getForecasting', () => {
     `).run()
     db.prepare(`
       INSERT INTO tasks (task_id, workspace_id, project_id, title, status, created_at, updated_at)
-      VALUES ('fc4', 'ws_test', 'proj_test', 'FC4', 'done', datetime('now'), datetime('now'))
+      VALUES ('fc4', 'ws_test', 'proj_test', 'FC4', 'completed', datetime('now'), datetime('now'))
     `).run()
     db.prepare(`
       INSERT INTO tasks (task_id, workspace_id, project_id, title, status, created_at, updated_at)

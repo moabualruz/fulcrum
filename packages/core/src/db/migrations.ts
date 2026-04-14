@@ -929,10 +929,6 @@ const MIGRATION_012_MEMORY_FRESHNESS = `
 ALTER TABLE memories ADD COLUMN freshness REAL NOT NULL DEFAULT 1.0;
 `
 
-const MIGRATION_013_TEAM_POLICY = `
-ALTER TABLE team_templates ADD COLUMN policy TEXT NOT NULL DEFAULT '{}';
-`
-
 export function runMigrations(db: Database.Database): void {
   db.exec(MIGRATION_001)
   db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('001_initial')`).run()
@@ -1022,20 +1018,11 @@ export function runMigrations(db: Database.Database): void {
 
   const already012 = db.prepare("SELECT id FROM schema_migrations WHERE name = '012_memory_freshness'").get()
   if (!already012) {
-    db.exec(MIGRATION_012_MEMORY_FRESHNESS)
-    db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('012_memory_freshness')`).run()
-  }
-
-  const already013 = db.prepare("SELECT id FROM schema_migrations WHERE name = '013_team_policy'").get()
-  if (!already013) {
     try {
-      db.exec(MIGRATION_013_TEAM_POLICY)
-    } catch (err) {
-      const msg = (err as { message?: string }).message ?? ''
-      if (!msg.includes('duplicate column name') && !msg.includes('already exists')) {
-        throw err
-      }
+      db.exec(MIGRATION_012_MEMORY_FRESHNESS)
+    } catch (err: unknown) {
+      if (!(err instanceof Error && err.message.includes('duplicate column name'))) throw err
     }
-    db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('013_team_policy')`).run()
+    db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('012_memory_freshness')`).run()
   }
 }

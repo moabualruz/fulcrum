@@ -3,7 +3,7 @@ import { ulid } from 'ulid'
 import { getDb, FulcrumError } from '@fulcrum/core'
 import { minimatch } from 'minimatch'
 import { L1_ROLES } from '@fulcrum/teams'
-import type { AgentRole } from '@fulcrum/teams'
+import type { AgentRole } from '@fulcrum/core'
 import type {
   PolicyRule, PolicyMatcher, EvaluatePolicyInput, PolicyDecision,
   CreatePolicyRuleInput, ListPolicyRulesInput, PolicyScope, PolicyAction, MatcherType,

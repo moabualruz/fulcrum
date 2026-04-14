@@ -29,16 +29,16 @@ describe('type exports — compile-time shape checks', () => {
     expect(cats).toHaveLength(4)
   })
 
-  it('AgentRole includes all 19 roles', () => {
+  it('AgentRole includes all 24 roles', () => {
     const roles: AgentRole[] = [
       'chief_of_staff', 'context_gatherer', 'prd_planner', 'implementation_planner',
-      'issue_decomposer', 'architecture_reviewer', 'research_worker',
-      'implementer_backend', 'implementer_frontend', 'implementer',
-      'refactor_worker', 'browser_worker', 'tester', 'reviewer',
-      'security_reviewer', 'performance_reviewer', 'integration_worker',
-      'planner', 'researcher',
+      'issue_decomposer', 'software_engineer', 'research_worker',
+      'refactor_worker', 'browser_worker', 'data_engineer', 'ml_engineer', 'devops_engineer',
+      'architecture_reviewer', 'code_reviewer', 'qa_engineer', 'security_reviewer',
+      'integration_worker', 'documentation_writer', 'memory_curator',
+      'tech_lead', 'product_manager', 'analyst', 'orchestrator', 'custom',
     ]
-    expect(roles).toHaveLength(19)
+    expect(roles).toHaveLength(24)
   })
 
   it('Task interface has display_id, priority, status_category fields', () => {
@@ -60,7 +60,7 @@ describe('type exports — compile-time shape checks', () => {
     const r: AgentRun = {
       run_id: 'run_01', task_id: 'task_01', workspace_id: 'ws_01',
       project_id: 'proj_01', display_id: 'RUN-1', agent_id: 'agent-1',
-      role: 'implementer', pi_profile: null, status: 'running',
+      role: 'software_engineer', pi_profile: null, status: 'running',
       status_category: 'active', current_step: null, current_path: null,
       progress_pct: 0, output_summary: null, artifacts: null,
       git_branch: null, git_commit: null, heartbeat_at: null,
@@ -79,7 +79,7 @@ describe('type exports — compile-time shape checks', () => {
       workspace_id: 'ws_01', project_id: 'proj_01', file_path: null,
       symbol_path: null, title: 'A fact', summary: 'Short summary',
       content: 'A fact about the project', canonical_text: null,
-      tags: [], entities: [], confidence: 1.0,
+      tags: [], entities: [], confidence: 1.0, freshness: 1.0,
       access_count: 0, event_time: null, content_hash: null,
       task_id: null, issue_id: null, artifact_id: null,
       provenance_refs: [], embedding: null,

@@ -5,7 +5,6 @@ import { getDb } from '@fulcrum/core'
 import {
   getMetrics,
   getBurndown,
-  replayRun,
   getPerRoleMetrics,
   getMemoryMetrics,
   getForecasting,
@@ -111,12 +110,6 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         Connection: 'keep-alive',
       },
     })
-  })
-
-  app.get('/runs/:id/replay', async (c) => {
-    const run_id = c.req.param('id')
-    const result = await replayRun({ run_id })
-    return c.json(result)
   })
 
   // ─── Extended endpoints ─────────────────────────────────────────────────────

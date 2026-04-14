@@ -46,6 +46,7 @@ function rowToMemory(row: Record<string, unknown>): Memory {
     tags: (() => { try { return JSON.parse(row.tags as string) as string[] } catch { return [] } })(),
     entities: (() => { try { return JSON.parse(row.entities as string) as string[] } catch { return [] } })(),
     confidence: row.confidence as number,
+    freshness: (row.freshness as number) ?? 1.0,
     access_count: row.access_count as number,
     event_time: (row.event_time as string | null) ?? null,
     content_hash: (row.content_hash as string | null) ?? null,
