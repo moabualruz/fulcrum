@@ -1,6 +1,8 @@
 {
   "name": "@fulcrum/teams",
   "version": "0.0.1",
+  "description": "Agent team orchestration — team templates, role slots, communication and budget policies, team spawning",
+  "keywords": ["teams", "agent-orchestration", "team-templates", "multi-agent", "role-slots", "policies"],
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
