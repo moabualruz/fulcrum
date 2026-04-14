@@ -28,16 +28,17 @@
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",
-    "ulid": "^2.3.0",
-    "gray-matter": "^4.0.3",
-    "simple-git": "^3.22.0",
     "chokidar": "^3.6.0",
-    "kuzu": "^0.10.0"
+    "gray-matter": "^4.0.3",
+    "kuzu": "^0.10.0",
+    "simple-git": "^3.22.0",
+    "ulid": "^2.3.0",
+    "web-tree-sitter": "^0.26.8"
   },
   "devDependencies": {
-    "better-sqlite3": "^12.0.0",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^20.0.0",
+    "better-sqlite3": "^12.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
   }
