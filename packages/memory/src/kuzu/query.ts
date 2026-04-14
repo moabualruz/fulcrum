@@ -103,10 +103,11 @@ export async function queryMemoriesL2(
     }
   }
 
-  // Stage 2 — Vector seed (HNSW)
+  // Stage 2 — Vector seed (HNSW), filter superseded inline
   const vectorCandidates = await client.query<{ m: RawMemoryRow; distance: number }>(
     `CALL QUERY_VECTOR_INDEX('Memory', 'memory_embedding_idx', $query_vec, ${seedLimit})
      YIELD node AS m, distance
+     WHERE NOT EXISTS { MATCH (:Memory)-[:UPDATES]->(m) }
      RETURN m, distance`,
     { query_vec: Array.from(input.queryVector) }
   ).catch(() => [] as { m: RawMemoryRow; distance: number }[])  // fallback if index empty
@@ -122,10 +123,11 @@ export async function queryMemoriesL2(
   }
 
   if (input.queryEntityIds.length > 0) {
-    // Stage 3 — 1-hop graph expansion from query entities
+    // Stage 3 — 1-hop graph expansion from query entities, filter superseded inline
     const oneHopRows = await client.query<{ m: RawMemoryRow; w: number }>(
       `MATCH (e:Entity)-[r:ABOUT|CRITIQUES|AVOIDS|MENTIONS|USES]-(m:Memory)
        WHERE e.id IN $query_entity_ids
+         AND NOT EXISTS { MATCH (:Memory)-[:UPDATES]->(m) }
        RETURN m,
          CASE WHEN e.mention_count > 1000 THEN r.weight * 0.1 ELSE r.weight END AS w
        ORDER BY w DESC LIMIT ${graphLimit}`,
