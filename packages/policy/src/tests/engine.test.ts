@@ -352,6 +352,32 @@ describe('evaluatePolicy — path matcher', () => {
     })
     expect(decision.allowed).toBe(true)
   })
+
+  it('single * does not match across directory separators (use ** for deep paths)', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'block-shallow-secrets',
+      action: 'deny',
+      matchers: [{ matcher_type: 'path', pattern: '/secrets/*' }],
+    })
+    const shallow = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'read_file',
+      resource_id: '/secrets/api-key',
+    })
+    const deep = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'read_file',
+      resource_id: '/secrets/a/b',
+    })
+    expect(shallow.allowed).toBe(false)  // matched by /secrets/*
+    expect(deep.allowed).toBe(true)      // NOT matched — * won't cross /
+  })
 })
 
 // --- evaluatePolicy — glob pattern matchers ---

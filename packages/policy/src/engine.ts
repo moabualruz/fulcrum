@@ -69,7 +69,8 @@ function matcherMatches(matcher: PolicyMatcher, input: EvaluatePolicyInput): boo
       // Glob pattern match on action (mirrors Python fnmatch behavior)
       return minimatch(input.action, pattern, { nocase: true })
     case 'path': {
-      // Glob pattern match against resource_id (mirrors Python fnmatch behavior)
+      // minimatch glob against resource_id. Note: single '*' does NOT cross
+      // directory separators — use '**' to match nested paths (e.g. 'src/**').
       const target = input.resource_id ?? ''
       return minimatch(target, pattern, { nocase: true })
     }
