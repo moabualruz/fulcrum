@@ -3,7 +3,7 @@ import { createTestDb, resetTestDb } from './helpers.js'
 import { getDb } from '../db/client.js'
 import { createTask } from '../tasks.js'
 import { writeMemory } from '../memory.js'
-import { createAgentDefinition } from '../agent-definitions.js'
+import { updateAgentDefinition } from '../agent-definitions.js'
 import {
   startAgentRun,
   heartbeatAgentRun,
@@ -406,10 +406,9 @@ describe('buildSpawnableRun', () => {
 
   it('resolves model, tools_allow, tools_deny, executor_uri from agent_definitions', async () => {
     const task = await seedTask()
-    createAgentDefinition({
+    // software_engineer is seeded by migration_032b — update it with test-specific values
+    updateAgentDefinition({
       role: 'software_engineer',
-      display_name: 'Software Engineer',
-      description: 'Writes code',
       model: 'claude-opus-4-6',
       tools_allow: ['read_file', 'write_file'],
       tools_deny: ['invoke_team'],

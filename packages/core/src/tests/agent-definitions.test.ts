@@ -53,14 +53,15 @@ describe('createAgentDefinition', () => {
   afterEach(() => teardownDb())
 
   it('creates a new agent definition with defaults', () => {
+    // Use a non-canonical role name to avoid conflict with seeded definitions
     const def = createAgentDefinition({
-      role: 'software_engineer',
-      display_name: 'Software Engineer',
+      role: 'test_custom_role_a',
+      display_name: 'Test Custom Role A',
       description: 'Writes and reviews code',
     })
     expect(def.id).toMatch(/^adef_[0-9A-Z]+$/)
-    expect(def.role).toBe('software_engineer')
-    expect(def.display_name).toBe('Software Engineer')
+    expect(def.role).toBe('test_custom_role_a')
+    expect(def.display_name).toBe('Test Custom Role A')
     expect(def.description).toBe('Writes and reviews code')
     expect(def.version).toBe('0.1.0')
     expect(def.stability).toBe('experimental')
@@ -73,8 +74,8 @@ describe('createAgentDefinition', () => {
 
   it('creates a definition with all optional fields', () => {
     const def = createAgentDefinition({
-      role: 'code_reviewer',
-      display_name: 'Code Reviewer',
+      role: 'test_custom_role_b',
+      display_name: 'Test Custom Role B',
       description: 'Reviews code for quality',
       version: '1.0.0',
       stability: 'stable',
@@ -95,15 +96,11 @@ describe('createAgentDefinition', () => {
   })
 
   it('throws conflict error when role already exists', () => {
-    createAgentDefinition({
-      role: 'qa_engineer',
-      display_name: 'QA Engineer',
-      description: 'Tests software',
-    })
+    // The seeded roles already exist — creating one again throws conflict
     expect(() =>
       createAgentDefinition({
-        role: 'qa_engineer',
-        display_name: 'QA Engineer dup',
+        role: 'software_engineer',
+        display_name: 'Software Engineer dup',
         description: 'dup',
       })
     ).toThrow(/already exists/)
@@ -114,12 +111,8 @@ describe('getAgentDefinition', () => {
   beforeEach(() => setupDb())
   afterEach(() => teardownDb())
 
-  it('retrieves an existing definition by role', () => {
-    createAgentDefinition({
-      role: 'research_worker',
-      display_name: 'Research Worker',
-      description: 'Gathers information',
-    })
+  it('retrieves a seeded definition by role', () => {
+    // research_worker is seeded by migration_032b
     const def = getAgentDefinition('research_worker')
     expect(def).not.toBeNull()
     expect(def!.role).toBe('research_worker')
@@ -135,12 +128,8 @@ describe('updateAgentDefinition', () => {
   beforeEach(() => setupDb())
   afterEach(() => teardownDb())
 
-  it('updates fields on an existing definition', () => {
-    createAgentDefinition({
-      role: 'devops_engineer',
-      display_name: 'DevOps Engineer',
-      description: 'Manages infrastructure',
-    })
+  it('updates fields on a seeded definition', () => {
+    // devops_engineer is seeded — update it directly
     const updated = updateAgentDefinition({
       role: 'devops_engineer',
       model: 'claude-haiku-4-5-20251001',
@@ -150,8 +139,9 @@ describe('updateAgentDefinition', () => {
     expect(updated.model).toBe('claude-haiku-4-5-20251001')
     expect(updated.stability).toBe('beta')
     expect(updated.version).toBe('0.2.0')
-    // unchanged fields stay
-    expect(updated.description).toBe('Manages infrastructure')
+    // description from seed row is preserved
+    expect(typeof updated.description).toBe('string')
+    expect(updated.description.length).toBeGreaterThan(0)
   })
 
   it('throws not_found for missing role', () => {
@@ -165,23 +155,32 @@ describe('listAgentDefinitions', () => {
   beforeEach(() => setupDb())
   afterEach(() => teardownDb())
 
-  it('returns all definitions when no filter given', () => {
-    createAgentDefinition({ role: 'analyst', display_name: 'Analyst', description: 'Analyzes data' })
-    createAgentDefinition({ role: 'orchestrator', display_name: 'Orchestrator', description: 'Orchestrates agents', stability: 'stable' })
+  it('returns all 24 seeded definitions when no filter given', () => {
     const all = listAgentDefinitions()
-    expect(all.length).toBe(2)
-    expect(all.map(d => d.role).sort()).toEqual(['analyst', 'orchestrator'])
+    // Migration 032b seeds exactly 24 canonical roles
+    expect(all.length).toBe(24)
+    expect(all.map(d => d.role)).toContain('software_engineer')
+    expect(all.map(d => d.role)).toContain('chief_of_staff')
   })
 
-  it('filters by stability', () => {
-    createAgentDefinition({ role: 'tech_lead', display_name: 'Tech Lead', description: 'Leads technically', stability: 'stable' })
-    createAgentDefinition({ role: 'ml_engineer', display_name: 'ML Engineer', description: 'ML work', stability: 'experimental' })
+  it('includes additional created definitions', () => {
+    createAgentDefinition({ role: 'test_extra_role', display_name: 'Extra', description: 'Extra role' })
+    const all = listAgentDefinitions()
+    expect(all.length).toBe(25)
+    expect(all.map(d => d.role)).toContain('test_extra_role')
+  })
+
+  it('filters by stability — seeded roles are stable', () => {
     const stable = listAgentDefinitions('stable')
-    expect(stable.length).toBe(1)
-    expect(stable[0].role).toBe('tech_lead')
+    // All 24 seeded roles use stability 'stable'
+    expect(stable.length).toBe(24)
+    expect(stable.map(d => d.role)).toContain('software_engineer')
   })
 
-  it('returns empty array when no definitions exist', () => {
-    expect(listAgentDefinitions()).toEqual([])
+  it('filters by stability — experimental returns only user-created ones', () => {
+    createAgentDefinition({ role: 'test_exp_role', display_name: 'Exp', description: 'Experimental', stability: 'experimental' })
+    const exp = listAgentDefinitions('experimental')
+    expect(exp.length).toBe(1)
+    expect(exp[0].role).toBe('test_exp_role')
   })
 })

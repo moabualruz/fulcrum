@@ -44,33 +44,6 @@ function loadRolePurpose(role: string): string | null {
 interface GetWorkspaceStatusInput { workspace_id: string }
 interface BuildCosContextInput { workspace_id: string; project_id: string; max_tokens?: number }
 
-const AGENT_PROFILES: AgentProfile[] = [
-  { role: 'chief_of_staff',          description: 'Plans work, creates teams, dispatches agents, reviews CoS context',   can_create_teams: true,  can_dispatch_agents: true  },
-  { role: 'context_gatherer',        description: 'Gathers context about codebase, requirements, and environment',       can_create_teams: false, can_dispatch_agents: false },
-  { role: 'prd_planner',             description: 'Writes Product Requirements Documents from high-level specs',         can_create_teams: false, can_dispatch_agents: false },
-  { role: 'implementation_planner',  description: 'Breaks PRDs and epics into detailed implementation plans',            can_create_teams: false, can_dispatch_agents: false },
-  { role: 'issue_decomposer',        description: 'Decomposes issues into atomic tasks with acceptance criteria',        can_create_teams: false, can_dispatch_agents: false },
-  { role: 'architecture_reviewer',   description: 'Reviews architectural decisions and system design',                   can_create_teams: false, can_dispatch_agents: false },
-  { role: 'research_worker',         description: 'Investigates unknowns, evaluates libraries and approaches',          can_create_teams: false, can_dispatch_agents: false },
-  { role: 'software_engineer',       description: 'Implements features, APIs, data layers, and UI across the stack',    can_create_teams: false, can_dispatch_agents: false },
-  { role: 'refactor_worker',         description: 'Improves code quality, reduces duplication, applies patterns',       can_create_teams: false, can_dispatch_agents: false },
-  { role: 'browser_worker',          description: 'Performs browser automation, web scraping, and UI testing',          can_create_teams: false, can_dispatch_agents: false },
-  { role: 'data_engineer',           description: 'Builds data pipelines, ETL, and data infrastructure',                can_create_teams: false, can_dispatch_agents: false },
-  { role: 'ml_engineer',             description: 'Trains models, builds ML pipelines and evaluation tooling',          can_create_teams: false, can_dispatch_agents: false },
-  { role: 'devops_engineer',         description: 'Manages infrastructure, CI/CD, and deployment pipelines',            can_create_teams: false, can_dispatch_agents: false },
-  { role: 'qa_engineer',             description: 'Writes and runs tests, validates implementations against acceptance criteria', can_create_teams: false, can_dispatch_agents: false },
-  { role: 'code_reviewer',           description: 'Reviews pull requests, provides structured feedback and approval',    can_create_teams: false, can_dispatch_agents: false },
-  { role: 'security_reviewer',       description: 'Audits code for security vulnerabilities and policy violations',      can_create_teams: false, can_dispatch_agents: false },
-  { role: 'integration_worker',      description: 'Merges worktrees, resolves conflicts, coordinates cross-team deps',  can_create_teams: false, can_dispatch_agents: false },
-  { role: 'documentation_writer',    description: 'Writes and updates technical documentation and READMEs',              can_create_teams: false, can_dispatch_agents: false },
-  { role: 'memory_curator',          description: 'Curates and prunes the memory vault, promotes operational memories', can_create_teams: false, can_dispatch_agents: false },
-  { role: 'tech_lead',               description: 'Provides technical leadership, unblocks engineers, owns architecture', can_create_teams: false, can_dispatch_agents: false },
-  { role: 'product_manager',         description: 'Manages roadmap, prioritises work, writes PRDs and success criteria', can_create_teams: false, can_dispatch_agents: false },
-  { role: 'analyst',                 description: 'Analyses data, generates reports, and surfaces insights',             can_create_teams: false, can_dispatch_agents: false },
-  { role: 'orchestrator',            description: 'Generic sub-orchestrator for parallelising multi-agent work',         can_create_teams: false, can_dispatch_agents: false },
-  { role: 'custom',                  description: 'Custom agent role defined per-workspace',                             can_create_teams: false, can_dispatch_agents: false },
-]
-
 export async function getWorkspaceStatus(input: GetWorkspaceStatusInput): Promise<WorkspaceStatusResult> {
   const db = getDb()
 
@@ -178,18 +151,30 @@ interface ListAgentProfilesInput {
 export async function listAgentProfiles(
   input?: ListAgentProfilesInput,
 ): Promise<AgentProfile[]> {
-  // 1. Hardcoded profiles — prefer each role's "Purpose" section from
-  //    agent-integration/roles/<role>.md, fall back to the hardcoded description.
-  const hardcoded: AgentProfile[] = AGENT_PROFILES.map(profile => {
-    const fromMd = loadRolePurpose(profile.role)
-    const base = fromMd ? { ...profile, description: fromMd } : profile
-    return { ...base, source: 'hardcoded' as const }
+  const db = getDb()
+
+  // 1. Canonical profiles from agent_definitions (seeded by migration 032b).
+  //    Prefer each role's "Purpose" section from agent-integration/roles/<role>.md,
+  //    fall back to the DB description.
+  const defRows = db.prepare(
+    "SELECT role, description, capabilities FROM agent_definitions ORDER BY rowid ASC"
+  ).all() as Array<{ role: string; description: string; capabilities: string }>
+
+  const canonical: AgentProfile[] = defRows.map(row => {
+    const caps: string[] = JSON.parse(row.capabilities || '[]')
+    const fromMd = loadRolePurpose(row.role)
+    return {
+      role: row.role as AgentRole,
+      description: fromMd ?? row.description,
+      can_create_teams: caps.includes('create_teams'),
+      can_dispatch_agents: caps.includes('dispatch_agents'),
+      source: 'hardcoded' as const,
+    }
   })
 
-  // 2. DB-backed profiles for the given workspace (if one was provided).
-  //    When no workspace_id is passed we preserve the original behaviour
-  //    (hardcoded only) so existing callers remain unchanged.
-  if (!input?.workspace_id) return hardcoded
+  // 2. DB-backed workspace-scoped profiles (from agent_profiles table).
+  //    Only included when a workspace_id is provided.
+  if (!input?.workspace_id) return canonical
 
   const rows = await listAgentProfileRows(input.workspace_id)
   const dbProfiles: AgentProfile[] = rows.map(row => ({
@@ -202,5 +187,5 @@ export async function listAgentProfiles(
     name: row.name,
   }))
 
-  return [...hardcoded, ...dbProfiles]
+  return [...canonical, ...dbProfiles]
 }
