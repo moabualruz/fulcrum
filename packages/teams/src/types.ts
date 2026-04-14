@@ -20,6 +20,9 @@ export type AgentRole =
   | 'architecture_reviewer'
   | 'code_reviewer'
   | 'qa_engineer'
+  | 'security_reviewer'
+  // Integration & merge roles
+  | 'integration_worker'
   // Support roles
   | 'documentation_writer'
   | 'memory_curator'
