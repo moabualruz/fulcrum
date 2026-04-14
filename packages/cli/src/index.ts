@@ -14,82 +14,96 @@ fulcrum — local-first agent control plane
 USAGE
   fulcrum <group> <command> [options]
 
-COMMANDS
-  memory init          Initialize L0 vault + L1 SQLite, optionally enable L2
-  memory accelerate    Enable or rebuild L2 (Kuzu graph + HNSW vector search)
+CONTROL PLANE
+  memory init          Initialize L0 vault + L1 SQLite (+ optional L2)
+  memory accelerate    Enable L2 (Kuzu graph + HNSW vector search)
   memory rebuild       Rebuild L1 from L0 vault files
   memory status        Show vault path and layer status
 
-  serve mcp            Start MCP server (stdio, JSON-RPC 2.0) — 13 control-plane tools
-  serve monitor        Start monitor + control API server (HTTP, default port 4721)
+  serve mcp            Start MCP server (stdio JSON-RPC 2.0) — 13 control tools
+  serve monitor        Start HTTP monitor + control API (default port 4721)
   serve all            Start both MCP and monitor servers
 
-  hook claude          Run Claude PreToolUse hook (reads JSON from stdin, exits 0 or 2)
-  hook gemini          Run Gemini BeforeTool hook (normalises event, same logic)
-  hook pi              Run PI BeforeTool hook (normalises PI event, same logic)
+  hook claude          PreToolUse hook for Claude Code (stdin → policy check)
+  hook gemini          BeforeTool hook for Gemini CLI
+  hook pi              BeforeTool hook for PI coding agent
 
+DOMAIN
   workspaces list
   workspaces create --name <name> [--id <id>]
-  projects list --workspace-id <id>
-  projects create --name <name> --workspace-id <id> [--id <id>]
 
-  task list [--workspace-id W] [--project-id P] [--status S] [--limit N]
-  task get --id T
-  task create --title T [--project-id P] [--workspace-id W] [--description D] [--priority P] [--assigned-to R]
-  task update --id T [--status S] [--note N] [--assigned-to R]
+  projects list [--workspace-id <id>]
+  projects create --name <name> --workspace-id <id> [--type <type>] [--id <id>]
 
-  issue list [--workspace-id W] [--project-id P] [--status S]
-  issue create --title T [--workspace-id W] [--project-id P] [--description D]
-  issue get --id I
-  issue update --id I [--status S] [--title T]
+  task list [--workspace-id <id>] [--project-id <id>] [--status <status>] [--limit <n>]
+  task get --id <task_id>
+  task create --title <title> [--workspace-id <id>] [--project-id <id>] [--description <d>]
+  task update --id <task_id> [--status <s>] [--note <n>] [--assigned-to <role>]
 
-  epic list [--workspace-id W] [--project-id P]
-  epic create --title T [--workspace-id W] [--project-id P]
-  epic get --id E
+  issue list [--workspace-id <id>] [--project-id <id>]
+  issue create --title <title> [--workspace-id <id>] [--project-id <id>] [--description <d>]
+  issue get --id <issue_id>
+  issue update --id <issue_id> [--status <s>]
 
-  board show [--workspace-id W] [--project-id P]
+  epic list [--workspace-id <id>] [--project-id <id>]
+  epic create --title <title> [--workspace-id <id>] [--project-id <id>]
+  epic get --id <epic_id>
 
-  queue merge list [--workspace-id W]
-  queue merge process --workspace-id W --actor-role R [--project-id P]
-  queue review list [--workspace-id W] [--project-id P]
+  board show [--workspace-id <id>] [--project-id <id>]
+  queue merge list [--workspace-id <id>]
+  queue merge process --workspace-id <id> --actor-role integration_worker
+  queue review list [--workspace-id <id>]
 
-  sync status [--workspace-id W]
-  sync push --workspace-id W [--object-type T]
-  sync pull --workspace-id W [--object-type T]
+  sync status [--workspace-id <id>]
+  sync push [--workspace-id <id>]
+  sync pull [--workspace-id <id>]
 
-  team list [--workspace-id W]
-  team create --name N [--workspace-id W]
-  team invoke --template-id T --workspace-id W --caller-role R --purpose P [--project-id P]
-  team instances --workspace-id W [--project-id P]
+TEAMS + WORKFLOWS + AGENTS
+  team list [--workspace-id <id>]
+  team create --name <name> [--workspace-id <id>]
+  team invoke --template-id <id> --workspace-id <id> --caller-role <role> --goal <g>
+  team instances [--workspace-id <id>]
 
-  workflow list
-  workflow start --workflow-name N --workspace-id W [--project-id P]
-  workflow run --wf-id ID
-  workflow status --wf-id ID
-  workflow resume --wf-id ID
+  workflow list [--workspace-id <id>]
+  workflow start --workflow-name <n> [--workspace-id <id>] [--project-id <id>]
+  workflow run --wf-id <id>
+  workflow status --wf-id <id>
+  workflow resume --wf-id <id> [--step-id <s>]
 
-  agent list [--workspace-id W]
-  agent status --run-id R
-  agent spawn --target-role R --caller-role C --task-id T --workspace-id W --project-id P [--adapter A]
-
-All commands accept --json for machine-readable output.
-
-Every command auto-initializes $CWD as a Fulcrum project on first run
-(creates .fulcrum/fulcrum.db, default workspace + project, and
-.fulcrum.json with deterministic IDs derived from the absolute path).
-No explicit init step is required.
+  agent list [--workspace-id <id>]
+  agent status --run-id <id>
+  agent spawn --target-role <role> --caller-role <role> --task-id <id> [--adapter <name>]
 
 OPTIONS
+  --version, -v        Print the fulcrum version and exit
+  --help, -h           Show this help (or <group> --help for group help)
+  --json               Output as JSON (for list/get subcommands)
   --vault <path>       Override vault path (default: ~/.fulcrum/vault)
-  --port <n>           Override monitor port (default: from .fulcrum.json or 4721)
-  --help, -h           Show this help
+  --port <n>           Override monitor port (default: 4721 from .fulcrum.json)
 
 EXAMPLES
   fulcrum memory init
-  fulcrum serve mcp
-  fulcrum serve monitor --port 4721
-  fulcrum hook claude
-  fulcrum workspaces create --name myproject
+  fulcrum serve all
+  fulcrum task list --json
+  fulcrum workflow start --workflow-name implement_feature --workspace-id ws_1
+  fulcrum agent spawn --target-role software_engineer --caller-role chief_of_staff --task-id task_123
+  fulcrum queue merge process --workspace-id ws_1 --actor-role integration_worker
+
+AUTO-INITIALIZATION
+  Every fulcrum command auto-initializes $CWD as a Fulcrum project on first
+  run (creates .fulcrum/fulcrum.db, default workspace + project, and
+  .fulcrum.json with deterministic IDs derived from the absolute path).
+  No explicit init step required.
+
+GLOBAL INSTALL
+  From the repo root: pnpm install && pnpm run setup
+  Installs: ~/.local/bin/fulcrum symlink, Claude user-scope MCP server,
+  Gemini extension, PI cockpit, and PreToolUse hooks.
+
+DOCS
+  README.md               Full user guide
+  docs/guides/            Workflow authoring, worker adapters, telemetry
+  AGENTS.md               Invariants for contributors (and AI agents)
 `)
   process.exit(0)
 }
@@ -299,6 +313,20 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
 }
 
 async function runHook(cliName: string): Promise<void> {
+  if (cliName === '--help' || cliName === '-h' || !cliName) {
+    console.log(`
+fulcrum hook — tool-call policy hooks for coding agents
+
+  fulcrum hook claude    PreToolUse hook for Claude Code (reads JSON from stdin)
+  fulcrum hook gemini    BeforeTool hook for Gemini CLI (reads JSON from stdin)
+  fulcrum hook pi        BeforeTool hook for PI coding agent (reads JSON from stdin)
+
+Each hook normalises the event to Fulcrum's canonical shape, logs the
+tool call, runs the policy check, and exits 0 (allow) or 2 (deny).
+`)
+    process.exit(0)
+  }
+
   // Migrations and workspace/project already set up by ensureProjectInitialized()
   // in main(). We just need the IDs for event logging.
   const { workspace_id } = currentProjectIds()
@@ -902,7 +930,17 @@ async function runWorkspaces(): Promise<void> {
   const { listWorkspaces, createWorkspace } = await import('@fulcrum/core')
   const sub = command // e.g. 'list' or 'create'
 
-  if (!sub || sub === 'list') {
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum workspaces — workspace CRUD
+
+  fulcrum workspaces list
+  fulcrum workspaces create --name <name> [--id <id>]
+`)
+    process.exit(0)
+  }
+
+  if (sub === 'list') {
     const rows = await listWorkspaces()
     if (rows.length === 0) { console.log('No workspaces found.'); return }
     for (const r of rows) console.log(`  ${r.workspace_id}  ${r.name}  (${r.status})`)
@@ -928,7 +966,17 @@ async function runProjects(): Promise<void> {
   const { listProjects, createProject } = await import('@fulcrum/core')
   const sub = command
 
-  if (!sub || sub === 'list') {
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum projects — project CRUD
+
+  fulcrum projects list [--workspace-id <id>]
+  fulcrum projects create --name <name> --workspace-id <id> [--type <type>] [--id <id>]
+`)
+    process.exit(0)
+  }
+
+  if (sub === 'list') {
     const wsIdx = args.indexOf('--workspace-id')
     const workspace_id = wsIdx >= 0 ? args[wsIdx + 1] : undefined
     const rows = await listProjects({ workspace_id })
@@ -962,7 +1010,19 @@ export async function runTasks(): Promise<void> {
   const { listTasks, createTask, updateTask } = await import('@fulcrum/core')
   const sub = command
 
-  if (!sub || sub === 'list') {
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum task — task CRUD
+
+  fulcrum task list [--workspace-id <id>] [--project-id <id>] [--status <s>] [--limit <n>] [--json]
+  fulcrum task get --id <task_id> [--json]
+  fulcrum task create --title <title> [--workspace-id <id>] [--project-id <id>] [--description <d>] [--priority <p>] [--assigned-to <role>]
+  fulcrum task update --id <task_id> [--status <s>] [--note <n>] [--assigned-to <role>]
+`)
+    process.exit(0)
+  }
+
+  if (sub === 'list') {
     const workspace_id = optArg('--workspace-id') ?? currentProjectIds().workspace_id
     const project_id = optArg('--project-id')
     const status = optArg('--status') as Parameters<typeof listTasks>[0]['status']
@@ -1023,7 +1083,19 @@ export async function runIssues(): Promise<void> {
   const { createIssue, updateIssue, listIssues } = await import('@fulcrum/planning')
   const sub = command
 
-  if (!sub || sub === 'list') {
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum issue — issue CRUD
+
+  fulcrum issue list [--workspace-id <id>] [--project-id <id>] [--status <s>] [--json]
+  fulcrum issue get --id <issue_id> [--json]
+  fulcrum issue create --title <title> [--workspace-id <id>] [--project-id <id>] [--description <d>] [--priority <p>]
+  fulcrum issue update --id <issue_id> [--status <s>] [--title <t>] [--expected-version <n>]
+`)
+    process.exit(0)
+  }
+
+  if (sub === 'list') {
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
     const project_id = optArg('--project-id')
@@ -1083,7 +1155,18 @@ export async function runEpics(): Promise<void> {
   const { createEpic, listEpics } = await import('@fulcrum/planning')
   const sub = command
 
-  if (!sub || sub === 'list') {
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum epic — epic CRUD
+
+  fulcrum epic list [--workspace-id <id>] [--project-id <id>] [--json]
+  fulcrum epic get --id <epic_id> [--json]
+  fulcrum epic create --title <title> [--workspace-id <id>] [--project-id <id>] [--description <d>] [--priority <p>]
+`)
+    process.exit(0)
+  }
+
+  if (sub === 'list') {
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
     const project_id = optArg('--project-id')
@@ -1130,6 +1213,17 @@ export async function runBoard(): Promise<void> {
   const { listTasks } = await import('@fulcrum/core')
   const sub = command ?? 'show'
 
+  if (sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum board — kanban-style task board view
+
+  fulcrum board show [--workspace-id <id>] [--project-id <id>] [--json]
+
+Groups tasks by status_category (backlog, active, blocked, done).
+`)
+    process.exit(0)
+  }
+
   if (sub === 'show') {
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
@@ -1165,6 +1259,17 @@ export async function runQueue(): Promise<void> {
   // args[2]='list'.
   const sub = command
   const sub2 = args[2]
+
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum queue — integration and review queues
+
+  fulcrum queue merge list [--workspace-id <id>]
+  fulcrum queue merge process --workspace-id <id> --actor-role <role> [--project-id <id>]
+  fulcrum queue review list [--workspace-id <id>] [--project-id <id>]
+`)
+    process.exit(0)
+  }
 
   if (sub === 'merge' && sub2 === 'list') {
     const ids = currentProjectIds()
@@ -1223,6 +1328,18 @@ export async function runQueue(): Promise<void> {
 
 export async function runSync(): Promise<void> {
   const sub = command
+
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum sync — plane sync (push/pull to remote adapter)
+
+  fulcrum sync status [--workspace-id <id>] [--json]
+  fulcrum sync push [--workspace-id <id>] [--object-type <type>]
+  fulcrum sync pull [--workspace-id <id>]
+`)
+    process.exit(0)
+  }
+
   const { syncAll, listConflicts } = await import('@fulcrum/sync')
 
   if (sub === 'status') {
@@ -1285,8 +1402,21 @@ export async function runSync(): Promise<void> {
 // ── Team commands (J-6) ───────────────────────────────────────────────────────
 
 export async function runTeams(): Promise<void> {
-  const { createTeamTemplate, invokeTeam, listTeamInstances } = await import('@fulcrum/teams')
   const sub = command
+
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum team — team templates and instances
+
+  fulcrum team list [--workspace-id <id>]
+  fulcrum team create --name <name> [--description <d>] [--workspace-id <id>]
+  fulcrum team invoke --template-id <id> --workspace-id <id> --caller-role <role> [--goal <g> | --purpose <p>] [--project-id <id>] [--caller-agent-id <id>]
+  fulcrum team instances [--workspace-id <id>] [--project-id <id>]
+`)
+    process.exit(0)
+  }
+
+  const { createTeamTemplate, invokeTeam, listTeamInstances } = await import('@fulcrum/teams')
 
   if (sub === 'list') {
     const { getDb } = await import('@fulcrum/core')
@@ -1355,7 +1485,20 @@ export async function runTeams(): Promise<void> {
 export async function runWorkflows(): Promise<void> {
   const sub = command
 
-  if (!sub || sub === 'list') {
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum workflow — durable multi-step workflows
+
+  fulcrum workflow list [--workspace-id <id>]
+  fulcrum workflow start --workflow-name <name> [--workspace-id <id>] [--project-id <id>]
+  fulcrum workflow run --wf-id <id> [--workspace-id <id>]
+  fulcrum workflow status --wf-id <id> [--workspace-id <id>]
+  fulcrum workflow resume --wf-id <id> [--workspace-id <id>]
+`)
+    process.exit(0)
+  }
+
+  if (sub === 'list') {
     const { listWorkflows } = await import('@fulcrum/workflows')
     const defs = await listWorkflows()
     outputRows(defs.map(d => ({ name: d.name, version: d.version, steps: d.steps.length, description: d.description ?? '' })))
@@ -1438,7 +1581,18 @@ export async function runWorkflows(): Promise<void> {
 export async function runAgent(): Promise<void> {
   const sub = command
 
-  if (!sub || sub === 'list') {
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum agent — agent runs and spawning
+
+  fulcrum agent list [--workspace-id <id>] [--json]
+  fulcrum agent status --run-id <id> [--json]
+  fulcrum agent spawn --target-role <role> --caller-role <role> --task-id <id> [--workspace-id <id>] [--project-id <id>] [--adapter <name>]
+`)
+    process.exit(0)
+  }
+
+  if (sub === 'list') {
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
     const { getDb } = await import('@fulcrum/core')
@@ -1621,6 +1775,16 @@ async function main(): Promise<void> {
   if (group === 'memory') { await runMemory(); return }
 
   if (group === 'serve') {
+    if (!command || command === '--help' || command === '-h') {
+      console.log(`
+fulcrum serve — long-running servers
+
+  fulcrum serve mcp        Start MCP server (stdio JSON-RPC 2.0) — 13 control tools
+  fulcrum serve monitor    Start HTTP monitor + control API [--port <n>]
+  fulcrum serve all        Start both MCP and monitor servers
+`)
+      process.exit(0)
+    }
     if (command === 'mcp') { await runServeMcp(); return }
     if (command === 'monitor') { await runServeMonitor(); return }
     if (command === 'all') { await runServeAll(); return }
@@ -1630,7 +1794,11 @@ async function main(): Promise<void> {
   }
 
   if (group === 'hook') {
-    const cli = command // 'claude' | 'gemini' | 'pi'
+    const cli = command // 'claude' | 'gemini' | 'pi' | '--help' | '-h' | undefined
+    if (!cli || cli === '--help' || cli === '-h') {
+      await runHook(cli ?? '--help')
+      return
+    }
     if (cli === 'claude' || cli === 'gemini' || cli === 'pi') {
       await runHook(cli)
       return
