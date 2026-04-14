@@ -1,5 +1,5 @@
 // packages/memory/src/kuzu/client.ts
-import { ALL_DDL, SCHEMA_DDL_WITHOUT_INDEXES } from './schema.js'
+import { buildAllDDL } from './schema.js'
 
 // kuzu is a native addon — imported dynamically to avoid load failures when L2 is inactive
 let kuzuModule: typeof import('kuzu') | null = null
@@ -13,7 +13,7 @@ async function getKuzuModule(): Promise<typeof import('kuzu')> {
 
 export interface KuzuClientOptions {
   dbPath: string
-  embeddingDimensions?: number  // default 1536
+  embeddingDimensions?: number  // default 1024 (Qwen3-Embedding-0.6B)
 }
 
 export class KuzuClient {
@@ -25,9 +25,12 @@ export class KuzuClient {
 
   private constructor() {}
 
+  private dims: number = 1024
+
   static async create(options: KuzuClientOptions): Promise<KuzuClient> {
     const kuzu = await getKuzuModule()
     const client = new KuzuClient()
+    client.dims = options.embeddingDimensions ?? 1024
     client.db = new kuzu.Database(options.dbPath)
     client.conn = new kuzu.Connection(client.db)
     await client.initSchema()
@@ -51,8 +54,12 @@ export class KuzuClient {
   }
 
   async initSchema(): Promise<void> {
+    const allDdl = buildAllDDL(this.dims)
+    const schemaDdl = allDdl.filter(d => !d.includes('CREATE_VECTOR_INDEX'))
+    const vectorDdl = allDdl.filter(d => d.includes('CREATE_VECTOR_INDEX'))
+
     // Run node + rel table DDL first, then vector indexes
-    for (const ddl of SCHEMA_DDL_WITHOUT_INDEXES) {
+    for (const ddl of schemaDdl) {
       try {
         await this.conn.query(ddl)
       } catch (err) {
@@ -64,7 +71,6 @@ export class KuzuClient {
       }
     }
     // Vector indexes are created separately and may already exist
-    const vectorDdl = ALL_DDL.filter(d => d.includes('CREATE_VECTOR_INDEX'))
     for (const ddl of vectorDdl) {
       try {
         await this.conn.query(ddl)

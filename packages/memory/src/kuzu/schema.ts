@@ -1,6 +1,7 @@
 // packages/memory/src/kuzu/schema.ts
 
-export const MEMORY_NODE_DDL = `
+export function buildMemoryNodeDDL(dims: number): string {
+  return `
 CREATE NODE TABLE IF NOT EXISTS Memory (
   id STRING,
   workspace_id STRING,
@@ -14,11 +15,13 @@ CREATE NODE TABLE IF NOT EXISTS Memory (
   confidence FLOAT,
   created_at TIMESTAMP,
   updated_at TIMESTAMP,
-  embedding FLOAT[1536],
+  embedding FLOAT[${dims}],
   PRIMARY KEY (id)
 )`
+}
 
-export const ENTITY_NODE_DDL = `
+export function buildEntityNodeDDL(dims: number): string {
+  return `
 CREATE NODE TABLE IF NOT EXISTS Entity (
   id STRING,
   canonical_name STRING,
@@ -26,12 +29,13 @@ CREATE NODE TABLE IF NOT EXISTS Entity (
   scope STRING,
   aliases STRING[],
   description STRING,
-  embedding FLOAT[1536],
+  embedding FLOAT[${dims}],
   mention_count INT64,
   created_at TIMESTAMP,
   last_seen_at TIMESTAMP,
   PRIMARY KEY (id)
 )`
+}
 
 // Memory → Entity relationship tables
 export const MENTIONS_DDL = `CREATE REL TABLE IF NOT EXISTS MENTIONS (FROM Memory TO Entity, weight FLOAT, confidence FLOAT, source STRING, created_at TIMESTAMP)`
@@ -61,34 +65,39 @@ export const ELABORATES_DDL = `CREATE REL TABLE IF NOT EXISTS ELABORATES (FROM M
 export const MEMORY_VECTOR_INDEX_DDL = `CALL CREATE_VECTOR_INDEX('Memory', 'memory_embedding_idx', 'embedding', metric := 'cosine')`
 export const ENTITY_VECTOR_INDEX_DDL = `CALL CREATE_VECTOR_INDEX('Entity', 'entity_embedding_idx', 'embedding', metric := 'cosine')`
 
-export const ALL_DDL: string[] = [
-  MEMORY_NODE_DDL,
-  ENTITY_NODE_DDL,
-  // Memory → Entity
-  MENTIONS_DDL,
-  ABOUT_DDL,
-  USES_DDL,
-  CRITIQUES_DDL,
-  RECOMMENDS_DDL,
-  AVOIDS_DDL,
-  PRODUCED_IN_DDL,
-  // Entity → Entity
-  IS_A_DDL,
-  PART_OF_DDL,
-  RELATED_TO_DDL,
-  ALIAS_OF_DDL,
-  CAUSES_DDL,
-  PREVENTS_DDL,
-  USED_IN_DDL,
-  // Memory → Memory
-  CONTRADICTS_DDL,
-  UPDATES_DDL,
-  REINFORCES_DDL,
-  ELABORATES_DDL,
-  // Vector indexes — run last
-  MEMORY_VECTOR_INDEX_DDL,
-  ENTITY_VECTOR_INDEX_DDL,
-]
+export function buildAllDDL(dims: number): string[] {
+  return [
+    buildMemoryNodeDDL(dims),
+    buildEntityNodeDDL(dims),
+    // Memory → Entity
+    MENTIONS_DDL,
+    ABOUT_DDL,
+    USES_DDL,
+    CRITIQUES_DDL,
+    RECOMMENDS_DDL,
+    AVOIDS_DDL,
+    PRODUCED_IN_DDL,
+    // Entity → Entity
+    IS_A_DDL,
+    PART_OF_DDL,
+    RELATED_TO_DDL,
+    ALIAS_OF_DDL,
+    CAUSES_DDL,
+    PREVENTS_DDL,
+    USED_IN_DDL,
+    // Memory → Memory
+    CONTRADICTS_DDL,
+    UPDATES_DDL,
+    REINFORCES_DDL,
+    ELABORATES_DDL,
+    // Vector indexes — run last
+    MEMORY_VECTOR_INDEX_DDL,
+    ENTITY_VECTOR_INDEX_DDL,
+  ]
+}
+
+/** @deprecated use buildAllDDL(dims) */
+export const ALL_DDL: string[] = buildAllDDL(1024)
 
 export const SCHEMA_DDL_WITHOUT_INDEXES: string[] = ALL_DDL.filter(
   ddl => !ddl.includes('CREATE_VECTOR_INDEX')

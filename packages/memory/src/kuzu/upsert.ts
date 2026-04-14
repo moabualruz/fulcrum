@@ -49,7 +49,7 @@ export async function upsertMemoryToKuzu(
       confidence: memory.confidence,
       created_at: memory.created_at,
       updated_at: memory.updated_at,
-      embedding: embeddingArray ?? new Array(1536).fill(0),
+      embedding: embeddingArray ?? new Array(1024).fill(0),
     }
   )
 

@@ -9,9 +9,10 @@ import { rebuildFromVault } from './rebuild.js'
 import { KuzuClient, setKuzuClient } from '../kuzu/client.js'
 
 interface EmbeddingProviderSetup {
-  provider: 'ollama' | 'openai' | 'custom'
+  provider: 'local' | 'ollama' | 'openai' | 'custom'
   url?: string
   model?: string
+  rerankerModel?: string
   apiKey?: string
 }
 
@@ -48,27 +49,35 @@ function writeFulcrumConfig(config: Record<string, unknown>): void {
 
 async function setupEmbeddingProvider(rl: ReturnType<typeof createInterface>): Promise<EmbeddingProviderSetup | null> {
   console.log('\n  Requires an embedding model:\n')
-  console.log('    [1] Local — Ollama (no cost, runs on device)')
-  console.log('    [2] OpenAI text-embedding-3-small (API key)')
-  console.log('    [3] Custom OpenAI-compatible endpoint')
-  console.log('    [4] Skip — stay with L0 + L1\n')
+  console.log('    [1] Local — embedded ONNX (no network, fully offline)')
+  console.log('        Embedder : onnx-community/Qwen3-Embedding-0.6B-ONNX')
+  console.log('        Reranker : onnx-community/bge-reranker-v2-m3-ONNX')
+  console.log('    [2] Ollama (runs on device, needs Ollama running)')
+  console.log('    [3] OpenAI text-embedding-3-small (API key)')
+  console.log('    [4] Custom OpenAI-compatible endpoint')
+  console.log('    [5] Skip — stay with L0 + L1\n')
 
   const choice = (await ask(rl, '  Choice: ')).trim()
 
-  if (choice === '4' || choice === '') return null
+  if (choice === '5' || choice === '') return null
 
   if (choice === '1') {
-    const url = (await ask(rl, `  Ollama URL [http://localhost:11434]: `)).trim() || 'http://localhost:11434'
-    const model = (await ask(rl, `  Ollama model [nomic-embed-text]: `)).trim() || 'nomic-embed-text'
-    return { provider: 'ollama', url, model }
+    return { provider: 'local' }
   }
 
   if (choice === '2') {
+    const url = (await ask(rl, `  Ollama URL [http://localhost:11434]: `)).trim() || 'http://localhost:11434'
+    const model = (await ask(rl, `  Embedding model [qwen3:0.6b]: `)).trim() || 'qwen3:0.6b'
+    const rerankerModel = (await ask(rl, `  Reranker model [bge-reranker-v2-m3]: `)).trim() || 'bge-reranker-v2-m3'
+    return { provider: 'ollama', url, model, rerankerModel }
+  }
+
+  if (choice === '3') {
     const apiKey = (await ask(rl, '  OpenAI API key: ')).trim()
     return { provider: 'openai', apiKey, model: 'text-embedding-3-small' }
   }
 
-  if (choice === '3') {
+  if (choice === '4') {
     const url = (await ask(rl, '  Endpoint URL: ')).trim()
     const model = (await ask(rl, '  Model name: ')).trim()
     const apiKey = (await ask(rl, '  API key (leave blank if none): ')).trim() || undefined
@@ -122,6 +131,7 @@ export async function runMemoryInit(options?: { vaultPath?: string }): Promise<v
       provider: embeddingSetup.provider,
       url: embeddingSetup.url,
       model: embeddingSetup.model,
+      rerankerModel: embeddingSetup.rerankerModel,
       apiKey: embeddingSetup.apiKey,
     }
     writeFulcrumConfig(config)
