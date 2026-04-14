@@ -38,6 +38,7 @@
     "test": "pnpm -r test",
     "build": "pnpm -r build",
     "check:cycles": "node --import tsx/esm scripts/check-cycles.ts",
+    "gen:agent-mds": "node --import tsx/esm scripts/gen-agent-mds.ts",
     "fulcrum": "node --import tsx/esm packages/cli/src/index.ts",
     "install-bin": "mkdir -p $HOME/.local/bin && ln -sf $(pwd)/fulcrum $HOME/.local/bin/fulcrum && echo 'fulcrum → ~/.local/bin/fulcrum'",
     "setup": "node --import tsx/esm agent-integration/install.ts all",
