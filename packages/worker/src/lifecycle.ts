@@ -24,14 +24,15 @@ import type { RunArtifacts } from '@fulcrum/core'
 import { getAgentAdapter, registerAgentAdapter } from './adapter.js'
 import { stubAdapter } from './stub.js'
 import { subprocessAdapter } from './subprocess.js'
+import { claudeCodeAdapter } from './adapters/claude-code.js'
 import type { SpawnAgentInput, SpawnContext, WorkerResult } from './types.js'
 
 // Register built-in adapters once at module load. Re-registering is
-// idempotent for the `stub` and `subprocess` names — tests that need
-// to override these can call `registerAgentAdapter` again with the
-// same name.
+// idempotent for these names — tests that need to override can call
+// `registerAgentAdapter` again with the same name.
 registerAgentAdapter(stubAdapter)
 registerAgentAdapter(subprocessAdapter)
+registerAgentAdapter(claudeCodeAdapter)
 
 /**
  * Build a RunArtifacts blob from a WorkerResult. We only include keys

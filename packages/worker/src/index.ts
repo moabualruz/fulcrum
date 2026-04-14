@@ -10,6 +10,7 @@ export {
 } from './adapter.js'
 export { stubAdapter } from './stub.js'
 export { subprocessAdapter } from './subprocess.js'
+export { claudeCodeAdapter } from './adapters/claude-code.js'
 export type {
   AgentAdapter,
   SpawnContext,
