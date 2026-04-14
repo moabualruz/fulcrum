@@ -3,7 +3,7 @@ import { createTestDb, resetTestDb } from './helpers.js'
 import { getDb } from '../db/client.js'
 import { createTask } from '../tasks.js'
 import { startAgentRun, blockAgentRun } from '../runs.js'
-import { runJanitorCycle } from '../janitor.js'
+import { runJanitorCycle, decayMemories } from '../janitor.js'
 import type { PolicyConfig } from '../types.js'
 
 beforeEach(() => { createTestDb() })
@@ -77,5 +77,82 @@ describe('runJanitorCycle', () => {
     // Should have created a CoS task
     const cosTasks = db.prepare("SELECT * FROM tasks WHERE assigned_to = 'chief_of_staff'").all()
     expect(cosTasks.length).toBeGreaterThan(0)
+  })
+})
+
+describe('decayMemories', () => {
+  it('returns 0 when no memories exist', () => {
+    const count = decayMemories()
+    expect(count).toBe(0)
+  })
+
+  it('does not decay recently-accessed memories', () => {
+    seed()
+    const db = getDb()
+    // Insert a low-importance memory accessed today
+    db.prepare(`
+      INSERT INTO memories (memory_id, workspace_id, project_id, content, importance, last_accessed_at, created_at, updated_at)
+      VALUES ('mem_01', 'ws_1', 'proj_1', 'recent content', 0.3, datetime('now'), datetime('now'), datetime('now'))
+    `).run()
+    const count = decayMemories('ws_1')
+    expect(count).toBe(0)
+  })
+
+  it('decays low-importance memories not accessed in over 7 days', () => {
+    seed()
+    const db = getDb()
+    db.prepare(`
+      INSERT INTO memories (memory_id, workspace_id, project_id, content, importance, last_accessed_at, created_at, updated_at)
+      VALUES ('mem_02', 'ws_1', 'proj_1', 'stale content', 0.4, datetime('now', '-30 days'), datetime('now', '-30 days'), datetime('now', '-30 days'))
+    `).run()
+    const count = decayMemories('ws_1')
+    expect(count).toBe(1)
+    const row = db.prepare('SELECT importance FROM memories WHERE memory_id = ?').get('mem_02') as { importance: number }
+    expect(row.importance).toBeLessThan(0.4)
+    expect(row.importance).toBeGreaterThanOrEqual(0.01) // above floor
+  })
+
+  it('does not decay memories with importance >= threshold (0.5)', () => {
+    seed()
+    const db = getDb()
+    db.prepare(`
+      INSERT INTO memories (memory_id, workspace_id, project_id, content, importance, last_accessed_at, created_at, updated_at)
+      VALUES ('mem_03', 'ws_1', 'proj_1', 'important content', 0.8, datetime('now', '-60 days'), datetime('now', '-60 days'), datetime('now', '-60 days'))
+    `).run()
+    const count = decayMemories('ws_1')
+    expect(count).toBe(0)
+  })
+
+  it('does not decay below floor (0.01)', () => {
+    seed()
+    const db = getDb()
+    db.prepare(`
+      INSERT INTO memories (memory_id, workspace_id, project_id, content, importance, last_accessed_at, created_at, updated_at)
+      VALUES ('mem_04', 'ws_1', 'proj_1', 'very old content', 0.02, datetime('now', '-365 days'), datetime('now', '-365 days'), datetime('now', '-365 days'))
+    `).run()
+    decayMemories('ws_1')
+    const row = db.prepare('SELECT importance FROM memories WHERE memory_id = ?').get('mem_04') as { importance: number }
+    expect(row.importance).toBeGreaterThanOrEqual(0.01)
+  })
+
+  it('respects workspace_id filter', () => {
+    const db = getDb()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_1','test1')").run()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_2','test2')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','p1')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2','ws_2','p2')").run()
+    db.prepare(`
+      INSERT INTO memories (memory_id, workspace_id, project_id, content, importance, last_accessed_at, created_at, updated_at)
+      VALUES ('mem_05', 'ws_1', 'proj_1', 'ws1 memory', 0.3, datetime('now', '-30 days'), datetime('now', '-30 days'), datetime('now', '-30 days'))
+    `).run()
+    db.prepare(`
+      INSERT INTO memories (memory_id, workspace_id, project_id, content, importance, last_accessed_at, created_at, updated_at)
+      VALUES ('mem_06', 'ws_2', 'proj_2', 'ws2 memory', 0.3, datetime('now', '-30 days'), datetime('now', '-30 days'), datetime('now', '-30 days'))
+    `).run()
+    // Only decay ws_1
+    const count = decayMemories('ws_1')
+    expect(count).toBe(1)
+    const ws2row = db.prepare('SELECT importance FROM memories WHERE memory_id = ?').get('mem_06') as { importance: number }
+    expect(ws2row.importance).toBe(0.3) // untouched
   })
 })

@@ -48,7 +48,7 @@ export {
 export { checkPolicy } from './policy.js'
 
 // Janitor
-export { runJanitorCycle, startJanitor } from './janitor.js'
+export { runJanitorCycle, startJanitor, decayMemories } from './janitor.js'
 
 // Memory (internal implementations — use @fulcrum/memory for external callers)
 // writeMemory and recallMemory are intentionally NOT re-exported here.

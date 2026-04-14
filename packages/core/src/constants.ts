@@ -30,3 +30,12 @@ export const MEMORY_RANK_WEIGHTS = {
   recency: 0.2,
   confidence: 0.1,
 } as const
+
+/**
+ * Memory decay: multiplicative factor applied per week to importance values
+ * below MEMORY_DECAY_THRESHOLD. 0.9 = 10% per week.
+ */
+export const MEMORY_DECAY_FACTOR = 0.9
+export const MEMORY_DECAY_THRESHOLD = 0.5
+export const MEMORY_DECAY_MIN_DAYS_SINCE_ACCESS = 7
+export const MEMORY_DECAY_FLOOR = 0.01
