@@ -140,12 +140,24 @@ export async function reconcileMergedBranch(
   const sg = simpleGit(vaultPath)
   const memoriesPattern = 'memories/curated/'
 
-  // After a --no-ff merge, the current HEAD is a merge commit with two parents:
-  //   HEAD^1 = the old default branch tip (pre-merge)
-  //   HEAD^2 = the memory branch tip that was merged in
-  // Diffing HEAD^1..HEAD^2 gives exactly what the memory branch introduced.
-  const fromRef = 'HEAD^1'
-  const toRef = 'HEAD^2'
+  // Resolve the merge commit SHA explicitly by searching for the commit message.
+  // This is safer than using HEAD^1/HEAD^2 which only work if HEAD is still the
+  // merge commit at call time. Any commit landing between mergeMemoryBranch and
+  // reconcileMergedBranch would cause HEAD^1/HEAD^2 to diff the wrong commits.
+  const branch = `memory/${taskId}`
+  const logResult = await sg.log([
+    '--format=%H',
+    `--grep=merge: memory branch ${branch}`,
+    '--',
+    '.',
+  ])
+  const mergeSha: string = logResult.latest?.hash ?? logResult.all[0]?.hash ?? ''
+
+  // Use the resolved merge commit's parents for the diff.
+  // If no merge commit was found (unexpected), fall back to HEAD^1..HEAD^2 as a
+  // best-effort — callers should ensure mergeMemoryBranch ran before this.
+  const fromRef = mergeSha ? `${mergeSha}^1` : 'HEAD^1'
+  const toRef = mergeSha ? `${mergeSha}^2` : 'HEAD^2'
 
   // Files added or modified on the branch
   const changedRaw = await sg.raw([
@@ -191,7 +203,12 @@ export async function reconcileMergedBranch(
 
   for (const relPath of deletedFiles) {
     const memoryId = pathToId.get(relPath)
-    if (!memoryId) continue
+    if (!memoryId) {
+      // If the memory_id is not in .state.json, we can't look it up.
+      // This happens when the file was written on a different machine or .state.json was not propagated.
+      // Recovery: run `rebuildFromVault({ target: 'l1' })` to re-index from L0 files.
+      continue
+    }
 
     try {
       db.prepare('DELETE FROM memories WHERE memory_id = ?').run(memoryId)
