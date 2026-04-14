@@ -67,6 +67,102 @@ export interface GetMemoryMetricsInput {
   workspace_id: string
 }
 
+export interface RollupDailyInput {
+  workspace_id: string
+  project_id?: string
+  date?: string // ISO date 'YYYY-MM-DD', defaults to today
+}
+
+export async function rollupDaily(input: RollupDailyInput): Promise<void> {
+  const db = getDb()
+  const d = input.date ?? new Date().toISOString().slice(0, 10)
+  const dNext = new Date(d + 'T00:00:00.000Z')
+  dNext.setUTCDate(dNext.getUTCDate() + 1)
+  const dNextStr = dNext.toISOString().slice(0, 10)
+
+  const dStart = d + 'T00:00:00.000Z'
+  const dEnd = dNextStr + 'T00:00:00.000Z'
+  const ws = input.workspace_id
+
+  const count = (sql: string, params: unknown[]): number => {
+    const row = db.prepare(sql).get(...params) as { cnt: number }
+    return row?.cnt ?? 0
+  }
+
+  const issues_created = count(
+    `SELECT COUNT(*) AS cnt FROM issues WHERE workspace_id = ? AND created_at >= ? AND created_at < ?`,
+    [ws, dStart, dEnd],
+  )
+
+  const issues_closed = count(
+    `SELECT COUNT(*) AS cnt FROM issues WHERE workspace_id = ? AND status = 'done' AND updated_at >= ? AND updated_at < ?`,
+    [ws, dStart, dEnd],
+  )
+
+  const tasks_created = count(
+    `SELECT COUNT(*) AS cnt FROM tasks WHERE workspace_id = ? AND created_at >= ? AND created_at < ?`,
+    [ws, dStart, dEnd],
+  )
+
+  const tasks_completed = count(
+    `SELECT COUNT(*) AS cnt FROM tasks WHERE workspace_id = ? AND status = 'completed' AND updated_at >= ? AND updated_at < ?`,
+    [ws, dStart, dEnd],
+  )
+
+  const tasks_blocked = count(
+    `SELECT COUNT(*) AS cnt FROM tasks WHERE workspace_id = ? AND status = 'blocked' AND updated_at >= ? AND updated_at < ?`,
+    [ws, dStart, dEnd],
+  )
+
+  const runs_started = count(
+    `SELECT COUNT(*) AS cnt FROM agent_runs WHERE workspace_id = ? AND started_at >= ? AND started_at < ?`,
+    [ws, dStart, dEnd],
+  )
+
+  const runs_finished = count(
+    `SELECT COUNT(*) AS cnt FROM agent_runs WHERE workspace_id = ? AND status = 'completed' AND updated_at >= ? AND updated_at < ?`,
+    [ws, dStart, dEnd],
+  )
+
+  const runs_failed = count(
+    `SELECT COUNT(*) AS cnt FROM agent_runs WHERE workspace_id = ? AND status = 'failed' AND updated_at >= ? AND updated_at < ?`,
+    [ws, dStart, dEnd],
+  )
+
+  const memory_writes = count(
+    `SELECT COUNT(*) AS cnt FROM memories WHERE workspace_id = ? AND created_at >= ? AND created_at < ?`,
+    [ws, dStart, dEnd],
+  )
+
+  // memory_recalls: query events table for 'memory_recalled' event type
+  // Fall back to 0 if the events table doesn't have this column or no rows match
+  let memory_recalls = 0
+  try {
+    memory_recalls = count(
+      `SELECT COUNT(*) AS cnt FROM events WHERE workspace_id = ? AND event_type = 'memory_recalled' AND ts >= ? AND ts < ?`,
+      [ws, dStart, dEnd],
+    )
+  } catch {
+    memory_recalls = 0
+  }
+
+  await recordDailyMetrics({
+    workspace_id: ws,
+    project_id: input.project_id ?? '',
+    date: d,
+    issues_created,
+    issues_closed,
+    tasks_created,
+    tasks_completed,
+    tasks_blocked,
+    runs_started,
+    runs_finished,
+    runs_failed,
+    memory_writes,
+    memory_recalls,
+  })
+}
+
 export async function recordDailyMetrics(input: DailyMetrics): Promise<void> {
   const db = getDb()
   const id = `adm_${ulid()}`
