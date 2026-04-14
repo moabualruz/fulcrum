@@ -33,6 +33,47 @@ COMMANDS
   projects list --workspace-id <id>
   projects create --name <name> --workspace-id <id> [--id <id>]
 
+  task list [--workspace-id W] [--project-id P] [--status S] [--limit N]
+  task get --id T
+  task create --title T [--project-id P] [--workspace-id W] [--description D] [--priority P] [--assigned-to R]
+  task update --id T [--status S] [--note N] [--assigned-to R]
+
+  issue list [--workspace-id W] [--project-id P] [--status S]
+  issue create --title T [--workspace-id W] [--project-id P] [--description D]
+  issue get --id I
+  issue update --id I [--status S] [--title T]
+
+  epic list [--workspace-id W] [--project-id P]
+  epic create --title T [--workspace-id W] [--project-id P]
+  epic get --id E
+
+  board show [--workspace-id W] [--project-id P]
+
+  queue merge list [--workspace-id W]
+  queue merge process --workspace-id W --actor-role R [--project-id P]
+  queue review list [--workspace-id W] [--project-id P]
+
+  sync status [--workspace-id W]
+  sync push --workspace-id W [--object-type T]
+  sync pull --workspace-id W [--object-type T]
+
+  team list [--workspace-id W]
+  team create --name N [--workspace-id W]
+  team invoke --template-id T --workspace-id W --caller-role R --purpose P [--project-id P]
+  team instances --workspace-id W [--project-id P]
+
+  workflow list
+  workflow start --workflow-name N --workspace-id W [--project-id P]
+  workflow run --wf-id ID
+  workflow status --wf-id ID
+  workflow resume --wf-id ID
+
+  agent list [--workspace-id W]
+  agent status --run-id R
+  agent spawn --target-role R --caller-role C --task-id T --workspace-id W --project-id P [--adapter A]
+
+All commands accept --json for machine-readable output.
+
 Every command auto-initializes $CWD as a Fulcrum project on first run
 (creates .fulcrum/fulcrum.db, default workspace + project, and
 .fulcrum.json with deterministic IDs derived from the absolute path).
@@ -51,6 +92,84 @@ EXAMPLES
   fulcrum workspaces create --name myproject
 `)
   process.exit(0)
+}
+
+// ── CLI output + arg helpers (J-6) ────────────────────────────────────────────
+
+/**
+ * Print rows either as JSON (when --json is in argv) or as a simple
+ * tab-separated table. Works with arbitrary record shapes; caller may
+ * optionally supply a fixed column order.
+ */
+export function outputRows<T extends Record<string, unknown>>(
+  rows: T[],
+  columns?: Array<keyof T>,
+): void {
+  if (args.includes('--json')) {
+    console.log(JSON.stringify(rows, null, 2))
+    return
+  }
+  if (rows.length === 0) {
+    console.log('(no rows)')
+    return
+  }
+  const first = rows[0]
+  if (!first) {
+    console.log('(no rows)')
+    return
+  }
+  const cols = columns ?? (Object.keys(first) as Array<keyof T>)
+  console.log(cols.map(c => String(c)).join('\t'))
+  for (const row of rows) {
+    console.log(
+      cols.map(c => {
+        const v = row[c]
+        if (v === null || v === undefined) return ''
+        if (typeof v === 'object') return JSON.stringify(v)
+        return String(v)
+      }).join('\t'),
+    )
+  }
+}
+
+export function outputObject(obj: Record<string, unknown>): void {
+  if (args.includes('--json')) {
+    console.log(JSON.stringify(obj, null, 2))
+    return
+  }
+  for (const [k, v] of Object.entries(obj)) {
+    const val =
+      v === null || v === undefined ? '' :
+      typeof v === 'object' ? JSON.stringify(v) :
+      String(v)
+    console.log(`${k}: ${val}`)
+  }
+}
+
+export function requireArg(flag: string): string {
+  const idx = args.indexOf(flag)
+  if (idx < 0 || !args[idx + 1]) {
+    console.error(`${flag} is required`)
+    process.exit(1)
+  }
+  return args[idx + 1] as string
+}
+
+export function optArg(flag: string): string | undefined {
+  const idx = args.indexOf(flag)
+  return idx >= 0 ? args[idx + 1] : undefined
+}
+
+function optIntArg(flag: string): number | undefined {
+  const v = optArg(flag)
+  if (v === undefined) return undefined
+  const n = parseInt(v, 10)
+  return Number.isFinite(n) ? n : undefined
+}
+
+function featureNotImplemented(feature: string): never {
+  console.error(`feature not yet implemented: ${feature}`)
+  process.exit(1)
 }
 
 // ── Memory commands ──────────────────────────────────────────────────────────
@@ -837,6 +956,557 @@ async function runProjects(): Promise<void> {
   process.exit(1)
 }
 
+// ── Task commands (J-6) ───────────────────────────────────────────────────────
+
+export async function runTasks(): Promise<void> {
+  const { listTasks, createTask, updateTask } = await import('@fulcrum/core')
+  const sub = command
+
+  if (!sub || sub === 'list') {
+    const workspace_id = optArg('--workspace-id') ?? currentProjectIds().workspace_id
+    const project_id = optArg('--project-id')
+    const status = optArg('--status') as Parameters<typeof listTasks>[0]['status']
+    const limit = optIntArg('--limit') ?? 50
+    const rows = await listTasks({ workspace_id, project_id, status })
+    const trimmed = rows.slice(0, limit).map(t => ({
+      task_id: t.task_id,
+      display_id: t.display_id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      assigned_to: t.assigned_to ?? '',
+    }))
+    outputRows(trimmed)
+    return
+  }
+
+  if (sub === 'get') {
+    const task_id = requireArg('--id')
+    const { getDb } = await import('@fulcrum/core')
+    const db = getDb()
+    const row = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(task_id) as Record<string, unknown> | undefined
+    if (!row) { console.error(`task not found: ${task_id}`); process.exit(1) }
+    outputObject(row)
+    return
+  }
+
+  if (sub === 'create') {
+    const title = requireArg('--title')
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const project_id = optArg('--project-id') ?? ids.project_id
+    const description = optArg('--description')
+    const priority = optArg('--priority') as Parameters<typeof createTask>[0]['priority']
+    const assigned_to = optArg('--assigned-to')
+    const task = await createTask({ title, workspace_id, project_id, description, priority, assigned_to })
+    outputObject({ task_id: task.task_id, display_id: task.display_id, title: task.title, status: task.status, priority: task.priority })
+    return
+  }
+
+  if (sub === 'update') {
+    const task_id = requireArg('--id')
+    const status = optArg('--status') as Parameters<typeof updateTask>[0]['status']
+    const note = optArg('--note')
+    const assigned_to = optArg('--assigned-to')
+    const task = await updateTask({ task_id, status, note, assigned_to })
+    outputObject({ task_id: task.task_id, status: task.status, note: task.note ?? '', assigned_to: task.assigned_to ?? '' })
+    return
+  }
+
+  console.error(`Unknown task command: ${sub}`)
+  process.exit(1)
+}
+
+// ── Issue commands (J-6) ──────────────────────────────────────────────────────
+
+export async function runIssues(): Promise<void> {
+  const { createIssue, updateIssue, listIssues } = await import('@fulcrum/planning')
+  const sub = command
+
+  if (!sub || sub === 'list') {
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const project_id = optArg('--project-id')
+    const status = optArg('--status') as Parameters<typeof listIssues>[0]['status']
+    const rows = await listIssues({ workspace_id, project_id, status })
+    outputRows(rows.map(i => ({
+      issue_id: i.issue_id,
+      display_id: i.display_id,
+      title: i.title,
+      status: i.status,
+      priority: i.priority,
+    })))
+    return
+  }
+
+  if (sub === 'create') {
+    const title = requireArg('--title')
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const project_id = optArg('--project-id') ?? ids.project_id
+    const description = optArg('--description')
+    const priority = optArg('--priority') as Parameters<typeof createIssue>[0]['priority']
+    const issue = await createIssue({ title, workspace_id, project_id, description, priority })
+    outputObject({ issue_id: issue.issue_id, display_id: issue.display_id, title: issue.title, status: issue.status })
+    return
+  }
+
+  if (sub === 'get') {
+    const issue_id = requireArg('--id')
+    const { getDb } = await import('@fulcrum/core')
+    const db = getDb()
+    const row = db.prepare('SELECT * FROM issues WHERE issue_id = ?').get(issue_id) as Record<string, unknown> | undefined
+    if (!row) { console.error(`issue not found: ${issue_id}`); process.exit(1) }
+    outputObject(row)
+    return
+  }
+
+  if (sub === 'update') {
+    const issue_id = requireArg('--id')
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const status = optArg('--status') as Parameters<typeof updateIssue>[0]['status']
+    const title = optArg('--title')
+    const expected_version = optIntArg('--expected-version') ?? 0
+    const issue = await updateIssue({ issue_id, workspace_id, status, title, expected_version })
+    outputObject({ issue_id: issue.issue_id, status: issue.status, title: issue.title, version: issue.version })
+    return
+  }
+
+  console.error(`Unknown issue command: ${sub}`)
+  process.exit(1)
+}
+
+// ── Epic commands (J-6) ───────────────────────────────────────────────────────
+
+export async function runEpics(): Promise<void> {
+  const { createEpic, listEpics } = await import('@fulcrum/planning')
+  const sub = command
+
+  if (!sub || sub === 'list') {
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const project_id = optArg('--project-id')
+    const rows = await listEpics({ workspace_id, project_id })
+    outputRows(rows.map(e => ({
+      epic_id: e.epic_id,
+      display_id: e.display_id,
+      title: e.title,
+      status: e.status,
+      priority: e.priority,
+    })))
+    return
+  }
+
+  if (sub === 'create') {
+    const title = requireArg('--title')
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const project_id = optArg('--project-id') ?? ids.project_id
+    const description = optArg('--description')
+    const priority = optArg('--priority') as Parameters<typeof createEpic>[0]['priority']
+    const epic = await createEpic({ title, workspace_id, project_id, description, priority })
+    outputObject({ epic_id: epic.epic_id, display_id: epic.display_id, title: epic.title, status: epic.status })
+    return
+  }
+
+  if (sub === 'get') {
+    const epic_id = requireArg('--id')
+    const { getDb } = await import('@fulcrum/core')
+    const db = getDb()
+    const row = db.prepare('SELECT * FROM epics WHERE epic_id = ?').get(epic_id) as Record<string, unknown> | undefined
+    if (!row) { console.error(`epic not found: ${epic_id}`); process.exit(1) }
+    outputObject(row)
+    return
+  }
+
+  console.error(`Unknown epic command: ${sub}`)
+  process.exit(1)
+}
+
+// ── Board commands (J-6) ──────────────────────────────────────────────────────
+
+export async function runBoard(): Promise<void> {
+  const { listTasks } = await import('@fulcrum/core')
+  const sub = command ?? 'show'
+
+  if (sub === 'show') {
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const project_id = optArg('--project-id')
+    const tasks = await listTasks({ workspace_id, project_id })
+    const groups: Record<string, typeof tasks> = { backlog: [], active: [], blocked: [], done: [] }
+    for (const t of tasks) {
+      const cat = t.status_category as keyof typeof groups
+      if (groups[cat]) groups[cat].push(t)
+    }
+    if (args.includes('--json')) {
+      console.log(JSON.stringify(groups, null, 2))
+      return
+    }
+    for (const [cat, rows] of Object.entries(groups)) {
+      console.log(`\n== ${cat.toUpperCase()} (${rows.length}) ==`)
+      for (const t of rows) {
+        console.log(`  ${t.display_id}  ${t.status.padEnd(10)}  ${t.title}`)
+      }
+    }
+    console.log('')
+    return
+  }
+
+  console.error(`Unknown board command: ${sub}`)
+  process.exit(1)
+}
+
+// ── Queue commands (J-6) ──────────────────────────────────────────────────────
+
+export async function runQueue(): Promise<void> {
+  // Arg layout: `fulcrum queue merge list` → args[0]='queue', args[1]='merge',
+  // args[2]='list'.
+  const sub = command
+  const sub2 = args[2]
+
+  if (sub === 'merge' && sub2 === 'list') {
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const { getDb } = await import('@fulcrum/core')
+    const db = getDb()
+    const rows = db.prepare(
+      `SELECT worktree_id, branch_name, status, project_id, updated_at
+       FROM worktrees
+       WHERE workspace_id = ? AND status IN ('ready_for_merge','conflict')
+       ORDER BY updated_at ASC`,
+    ).all(workspace_id) as Record<string, unknown>[]
+    outputRows(rows)
+    return
+  }
+
+  if (sub === 'merge' && sub2 === 'process') {
+    const { processMergeQueue } = await import('@fulcrum/worktrees')
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const project_id = optArg('--project-id') ?? ids.project_id
+    const actor_role = requireArg('--actor-role')
+    const result = await processMergeQueue({ workspace_id, project_id, actor_role })
+    outputObject({
+      merged: result.merged.length,
+      skipped: result.skipped.length,
+      conflicts: result.conflicts.length,
+      results: result.results,
+    })
+    return
+  }
+
+  if (sub === 'review' && sub2 === 'list') {
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const project_id = optArg('--project-id')
+    const { getDb } = await import('@fulcrum/core')
+    const db = getDb()
+    let sql = `SELECT artifact_id, display_id, title, artifact_type, status, file_path, updated_at
+               FROM artifacts
+               WHERE workspace_id = ? AND artifact_type = 'review_summary'`
+    const params: unknown[] = [workspace_id]
+    if (project_id) { sql += ' AND project_id = ?'; params.push(project_id) }
+    sql += ' ORDER BY updated_at DESC LIMIT 50'
+    const rows = db.prepare(sql).all(...params) as Record<string, unknown>[]
+    outputRows(rows)
+    return
+  }
+
+  console.error(`Unknown queue command: ${sub} ${sub2 ?? ''}`)
+  console.error('Usage: fulcrum queue merge list|process | fulcrum queue review list')
+  process.exit(1)
+}
+
+// ── Sync commands (J-6) ───────────────────────────────────────────────────────
+
+export async function runSync(): Promise<void> {
+  const sub = command
+  const { syncAll, listConflicts } = await import('@fulcrum/sync')
+
+  if (sub === 'status') {
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const { getDb } = await import('@fulcrum/core')
+    const db = getDb()
+    const state = db.prepare(
+      `SELECT object_type, sync_status, COUNT(*) as count
+       FROM sync_states WHERE workspace_id = ?
+       GROUP BY object_type, sync_status
+       ORDER BY object_type, sync_status`,
+    ).all(workspace_id) as Record<string, unknown>[]
+    const conflicts = await listConflicts({ workspace_id, unresolved_only: true })
+    if (args.includes('--json')) {
+      console.log(JSON.stringify({ state, conflicts }, null, 2))
+      return
+    }
+    console.log('\nSync state:')
+    outputRows(state)
+    console.log(`\nUnresolved conflicts: ${conflicts.length}`)
+    return
+  }
+
+  if (sub === 'push') {
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const object_type = optArg('--object-type') as Parameters<typeof syncAll>[0]['object_type']
+    try {
+      const result = await syncAll({ workspace_id, object_type })
+      outputObject(result as unknown as Record<string, unknown>)
+    } catch (err) {
+      console.error(`sync push failed: ${(err as Error).message}`)
+      process.exit(1)
+    }
+    return
+  }
+
+  if (sub === 'pull') {
+    // Plane sync is push-based by design; pulling happens inside adapter on
+    // conflict detection. Expose as a no-op that runs syncAll (which will
+    // reconcile both directions for the queued objects).
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    try {
+      const result = await syncAll({ workspace_id })
+      outputObject(result as unknown as Record<string, unknown>)
+    } catch (err) {
+      console.error(`sync pull failed: ${(err as Error).message}`)
+      process.exit(1)
+    }
+    return
+  }
+
+  console.error(`Unknown sync command: ${sub}`)
+  console.error('Usage: fulcrum sync status|push|pull')
+  process.exit(1)
+}
+
+// ── Team commands (J-6) ───────────────────────────────────────────────────────
+
+export async function runTeams(): Promise<void> {
+  const { createTeamTemplate, invokeTeam, listTeamInstances } = await import('@fulcrum/teams')
+  const sub = command
+
+  if (sub === 'list') {
+    const { getDb } = await import('@fulcrum/core')
+    const db = getDb()
+    const rows = db.prepare(
+      `SELECT template_id, name, description, created_at FROM team_templates ORDER BY created_at DESC`,
+    ).all() as Record<string, unknown>[]
+    outputRows(rows)
+    return
+  }
+
+  if (sub === 'create') {
+    const name = requireArg('--name')
+    const description = optArg('--description')
+    const template = await createTeamTemplate({ name, description, slots: [] })
+    outputObject({ template_id: template.template_id, name: template.name })
+    return
+  }
+
+  if (sub === 'invoke') {
+    const template_id = requireArg('--template-id')
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const project_id = optArg('--project-id')
+    const caller_role = requireArg('--caller-role')
+    const purpose = optArg('--purpose') ?? optArg('--goal') ?? 'cli-invoked'
+    const caller_agent_id = optArg('--caller-agent-id') ?? `cli/${caller_role}`
+    try {
+      const inst = await invokeTeam({
+        template_id,
+        workspace_id,
+        project_id,
+        purpose,
+        caller_agent_id,
+        caller_role: caller_role as Parameters<typeof invokeTeam>[0]['caller_role'],
+      })
+      outputObject({ instance_id: inst.instance_id, display_id: inst.display_id, status: inst.status })
+    } catch (err) {
+      console.error(`team invoke failed: ${(err as Error).message}`)
+      process.exit(1)
+    }
+    return
+  }
+
+  if (sub === 'instances') {
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const project_id = optArg('--project-id')
+    const rows = await listTeamInstances({ workspace_id, project_id })
+    outputRows(rows.map(r => ({
+      instance_id: r.instance_id,
+      display_id: r.display_id,
+      template_id: r.template_id,
+      status: r.status,
+      purpose: r.purpose,
+    })))
+    return
+  }
+
+  console.error(`Unknown team command: ${sub}`)
+  process.exit(1)
+}
+
+// ── Workflow commands (J-6) ───────────────────────────────────────────────────
+
+export async function runWorkflows(): Promise<void> {
+  const sub = command
+
+  if (!sub || sub === 'list') {
+    const { listWorkflows } = await import('@fulcrum/workflows')
+    const defs = await listWorkflows()
+    outputRows(defs.map(d => ({ name: d.name, version: d.version, steps: d.steps.length, description: d.description ?? '' })))
+    return
+  }
+
+  if (sub === 'start') {
+    const { startWorkflow } = await import('@fulcrum/workflows')
+    const workflow_name = requireArg('--workflow-name')
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const project_id = optArg('--project-id')
+    try {
+      const run = await startWorkflow({ workflow_name, workspace_id, project_id })
+      outputObject({ wf_id: run.wf_id, display_id: run.display_id, status: run.status })
+    } catch (err) {
+      console.error(`workflow start failed: ${(err as Error).message}`)
+      process.exit(1)
+    }
+    return
+  }
+
+  if (sub === 'run') {
+    const { runWorkflow } = await import('@fulcrum/workflows')
+    const wf_id = requireArg('--wf-id')
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    try {
+      const result = await runWorkflow({ wf_id, workspace_id })
+      outputObject(result as unknown as Record<string, unknown>)
+    } catch (err) {
+      console.error(`workflow run failed: ${(err as Error).message}`)
+      process.exit(1)
+    }
+    return
+  }
+
+  if (sub === 'status') {
+    const { getWorkflowRun } = await import('@fulcrum/workflows')
+    const wf_id = requireArg('--wf-id')
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    try {
+      const run = await getWorkflowRun({ wf_id, workspace_id })
+      outputObject({
+        wf_id: run.wf_id,
+        display_id: run.display_id,
+        status: run.status,
+        current_step: run.current_step_id ?? '',
+        workflow_name: run.workflow_name,
+      })
+    } catch (err) {
+      console.error(`workflow status failed: ${(err as Error).message}`)
+      process.exit(1)
+    }
+    return
+  }
+
+  if (sub === 'resume') {
+    const { resumeWorkflow } = await import('@fulcrum/workflows')
+    const wf_id = requireArg('--wf-id')
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    try {
+      const run = await resumeWorkflow({ wf_id, workspace_id })
+      outputObject({ wf_id: run.wf_id, status: run.status })
+    } catch (err) {
+      console.error(`workflow resume failed: ${(err as Error).message}`)
+      process.exit(1)
+    }
+    return
+  }
+
+  console.error(`Unknown workflow command: ${sub}`)
+  process.exit(1)
+}
+
+// ── Agent commands (J-6) ──────────────────────────────────────────────────────
+
+export async function runAgent(): Promise<void> {
+  const sub = command
+
+  if (!sub || sub === 'list') {
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const { getDb } = await import('@fulcrum/core')
+    const db = getDb()
+    const rows = db.prepare(
+      `SELECT run_id, role, status, task_id, current_step, progress_pct, started_at
+       FROM agent_runs
+       WHERE workspace_id = ?
+       ORDER BY started_at DESC LIMIT 50`,
+    ).all(workspace_id) as Record<string, unknown>[]
+    outputRows(rows)
+    return
+  }
+
+  if (sub === 'status') {
+    const run_id = requireArg('--run-id')
+    const { getAgentRunStatus } = await import('@fulcrum/core')
+    try {
+      const run = await getAgentRunStatus({ run_id })
+      outputObject({
+        run_id: run.run_id,
+        status: run.status,
+        role: run.role,
+        task_id: run.task_id,
+        current_step: run.current_step ?? '',
+        progress_pct: run.progress_pct ?? 0,
+      })
+    } catch (err) {
+      console.error(`agent status failed: ${(err as Error).message}`)
+      process.exit(1)
+    }
+    return
+  }
+
+  if (sub === 'spawn') {
+    const { spawnAgent } = await import('@fulcrum/worker')
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
+    const project_id = optArg('--project-id') ?? ids.project_id
+    const target_role = requireArg('--target-role')
+    const caller_role = requireArg('--caller-role')
+    const task_id = requireArg('--task-id')
+    const adapter = optArg('--adapter')
+    try {
+      const result = await spawnAgent({
+        workspace_id,
+        project_id,
+        task_id,
+        target_role: target_role as Parameters<typeof spawnAgent>[0]['target_role'],
+        caller_role: caller_role as Parameters<typeof spawnAgent>[0]['caller_role'],
+        adapter,
+      })
+      outputObject({
+        run_id: result.run_id,
+        status: result.result.status,
+        summary: result.result.summary ?? '',
+      })
+    } catch (err) {
+      console.error(`agent spawn failed: ${(err as Error).message}`)
+      process.exit(1)
+    }
+    return
+  }
+
+  console.error(`Unknown agent command: ${sub}`)
+  process.exit(1)
+}
+
 // ── Auto project initialization ───────────────────────────────────────────────
 //
 // Every fulcrum command that touches the DB runs through this first. It:
@@ -972,6 +1642,19 @@ async function main(): Promise<void> {
 
   if (group === 'workspaces') { await runWorkspaces(); return }
   if (group === 'projects') { await runProjects(); return }
+
+  // J-6: 10 top-level command groups mirroring the Python reference CLI.
+  // Each delegates to existing @fulcrum/* package APIs via dynamic imports
+  // so we don't pay the module load cost for unused groups.
+  if (group === 'task' || group === 'tasks') { await runTasks(); return }
+  if (group === 'issue' || group === 'issues') { await runIssues(); return }
+  if (group === 'epic' || group === 'epics') { await runEpics(); return }
+  if (group === 'board') { await runBoard(); return }
+  if (group === 'queue') { await runQueue(); return }
+  if (group === 'sync') { await runSync(); return }
+  if (group === 'team' || group === 'teams') { await runTeams(); return }
+  if (group === 'workflow' || group === 'workflows') { await runWorkflows(); return }
+  if (group === 'agent' || group === 'agents') { await runAgent(); return }
 
   console.error(`Unknown group: ${group}`)
   usage()

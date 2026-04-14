@@ -30,6 +30,27 @@ importers:
       '@fulcrum/memory':
         specifier: workspace:*
         version: link:../memory
+      '@fulcrum/monitor':
+        specifier: workspace:*
+        version: link:../monitor
+      '@fulcrum/planning':
+        specifier: workspace:*
+        version: link:../planning
+      '@fulcrum/sync':
+        specifier: workspace:*
+        version: link:../sync
+      '@fulcrum/teams':
+        specifier: workspace:*
+        version: link:../teams
+      '@fulcrum/worker':
+        specifier: workspace:*
+        version: link:../worker
+      '@fulcrum/workflows':
+        specifier: workspace:*
+        version: link:../workflows
+      '@fulcrum/worktrees':
+        specifier: workspace:*
+        version: link:../worktrees
       tsx:
         specifier: ^4.0.0
         version: 4.21.0

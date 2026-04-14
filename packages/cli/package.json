@@ -16,6 +16,13 @@
   "dependencies": {
     "@fulcrum/core": "workspace:*",
     "@fulcrum/memory": "workspace:*",
+    "@fulcrum/monitor": "workspace:*",
+    "@fulcrum/planning": "workspace:*",
+    "@fulcrum/sync": "workspace:*",
+    "@fulcrum/teams": "workspace:*",
+    "@fulcrum/worker": "workspace:*",
+    "@fulcrum/workflows": "workspace:*",
+    "@fulcrum/worktrees": "workspace:*",
     "tsx": "^4.0.0"
   },
   "devDependencies": {
