@@ -22,6 +22,10 @@ export { runMigrations } from './db/migrations.js'
 // Tasks
 export { listTasks, createTask, updateTask } from './tasks.js'
 
+// Workspaces
+export { createWorkspace, getWorkspace, listWorkspaces, updateWorkspace } from './workspaces.js'
+export type { CreateWorkspaceInput, UpdateWorkspaceInput } from './workspaces.js'
+
 // Runs
 export {
   startAgentRun,
