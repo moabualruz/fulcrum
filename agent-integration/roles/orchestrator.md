@@ -16,13 +16,13 @@ The Orchestrator is a generic L2 sub-orchestrator for patterns that do not fit `
 ## Prohibitions
 
 - No direct source file edits (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`)
-- No cross-scope team invocation — scope is declared at dispatch time and enforced
+- No team invocation — only `chief_of_staff` (L1) may call `invoke_team`
 - No inheriting L1 authority — this role is L2 and subordinate to `chief_of_staff`
 - No merges or merge approvals
 
 ## Tools / Capabilities
 
-- `Read`, `list_profiles`, `get_run_status`
-- `invoke_team` limited to the declared scope
-- `spawn_agent`, `dispatch_agent` within scope
-- `create_task`, `update_task`, `get_workspace_status`
+- `Read`, `list_agent_profiles`, `get_agent_run_status`
+- `start_agent_run`, `heartbeat_agent_run`, `complete_agent_run`, `block_agent_run`
+- `create_task`, `update_task`, `list_tasks`, `get_workspace_status`
+- `build_cos_context` for orientation before dispatching
