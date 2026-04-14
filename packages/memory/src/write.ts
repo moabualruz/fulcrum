@@ -11,7 +11,7 @@ import type { WriteMemoryInput, FullMemory } from './types.js'
 import { runExtractionPipeline } from './extractors/pipeline.js'
 
 function bodyHash(text: string): string {
-  return createHash('sha256').update(text).digest('hex').slice(0, 16)
+  return createHash('sha256').update(text).digest('hex')
 }
 
 export async function writeMemory(input: WriteMemoryInput): Promise<FullMemory> {
