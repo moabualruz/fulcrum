@@ -7,7 +7,7 @@ Fulcrum is the persistence, coordination, and execution layer that keeps agents 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20+%20FTS5-003B57?logo=sqlite)](https://sqlite.org/)
-[![Tests](https://img.shields.io/badge/tests-980%20passing-brightgreen)](#running-tests)
+[![Tests](https://img.shields.io/badge/tests-1010%20passing-brightgreen)](#running-tests)
 [![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm)](https://pnpm.io/)
 
 ---
@@ -243,8 +243,11 @@ fulcrum
 │
 ├── serve
 │   ├── mcp             Start MCP server (stdio, JSON-RPC 2.0) — 13 control-plane tools
+│   ├── mcp-http        Start MCP server (HTTP, StreamableHTTP transport, default port 4722)
 │   ├── monitor         Start monitor + control API server (HTTP, default port 4721)
 │   └── all             Start both MCP and monitor servers
+│
+├── doctor [--json]     Environment + configuration health check (8 checks, exits 1 on FAIL)
 │
 ├── hook
 │   ├── claude          Run Claude PreToolUse hook (reads JSON from stdin, exits 0 or 2)
@@ -338,6 +341,10 @@ FULCRUM_AGENT_SUBPROCESS_CMD="claude --dangerously-skip-permissions" \
 
 # Start the MCP server + monitor HTTP server together
 fulcrum serve all --port 4721
+
+# Environment health check
+fulcrum doctor            # human-readable PASS/WARN/FAIL report
+fulcrum doctor --json     # machine-readable JSON output
 ```
 
 ---
@@ -603,6 +610,19 @@ Fulcrum ships 24 canonical roles. See [Role Capabilities](#role-capabilities) ab
 | `analyst` | Data analysis and reporting | — | — |
 | `orchestrator` | Generic sub-orchestration | — | — |
 | `custom` | Escape hatch for user-defined roles | — | — |
+
+### A2A Agent Cards
+
+`buildA2ACard` produces a standard [A2A protocol](https://google.github.io/A2A/) `AgentCard` from an `AgentDefinition`:
+
+```typescript
+import { buildA2ACard } from '@fulcrum/core'
+
+const card = buildA2ACard(agentDefinition, 'https://agents.example.com/run')
+// → { name, description, url, version, capabilities, skills, ... }
+```
+
+Known capability → skill mappings: `code_generation`, `code_review`, `planning`, `research`, `memory`, `task_management`, `orchestration`. Unknown capabilities fall back to a generic role skill.
 
 ---
 
@@ -887,6 +907,30 @@ echo '{"tool":"Write","params":{"path":"src/foo.ts"},"role":"chief_of_staff"}' \
 
 ---
 
+## Doctor
+
+`fulcrum doctor` runs a battery of environment and configuration health checks:
+
+```bash
+fulcrum doctor          # human-readable output
+fulcrum doctor --json   # JSON array of { name, status, message }
+```
+
+| Check | PASS | WARN | FAIL |
+|-------|------|------|------|
+| Node.js version | ≥ 20 | — | < 20 |
+| `.fulcrum.json` | Present + valid | Missing | Invalid / missing fields |
+| Data directory | Exists | Will be created on first use | — |
+| `better-sqlite3` | Loads | — | Cannot load |
+| Database liveness | `SELECT 1` OK | — | Error |
+| `@modelcontextprotocol/sdk` | Loads | — | Cannot load |
+| Environment variables | Any of `FULCRUM_DATA_DIR`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` set | None set | — |
+| Agent integration files | Any of `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` found | None found | — |
+
+Exit code is 0 when all checks pass or warn; 1 when any check fails.
+
+---
+
 ## Sync (Plane Integration)
 
 ```typescript
@@ -1062,7 +1106,7 @@ const stop = await startMonitorServer({ workspace_id: 'ws_1', port: 7331 })
 | `GET` | `/analytics/summary` | High-level analytics rollup |
 | `GET` | `/events/stream` | Server-Sent Events stream |
 | `GET` | `/board` | Kanban board snapshot |
-| `GET` | `/agents` · `/agents/:id` | Agent run list / detail |
+| `GET` | `/agents` · `/agents/:id` | Agent run list / detail (paginated) |
 | `GET` | `/merge-queue` | Current merge queue |
 | `GET` | `/review-queue` | Current review queue |
 | `GET` | `/artifacts` | Artifacts by workspace / project |
@@ -1071,7 +1115,13 @@ const stop = await startMonitorServer({ workspace_id: 'ws_1', port: 7331 })
 | `GET` | `/sync/state` | Plane sync state |
 | `GET` | `/teams` | Team templates + instances |
 | `GET` | `/replay/:run_id` | Replay an agent run's events |
-| `GET` | `/tasks` · `/workspaces` · `/projects` | Read models |
+| `GET` | `/tasks` · `/workspaces` · `/projects` | Read models (tasks paginated) |
+
+List endpoints that support pagination (`/tasks`, `/agents`, `/artifacts`, `/memory-trace`, `/teams`) accept `?limit=N&cursor=OFFSET` and return:
+```json
+{ "data": [...], "pagination": { "total": 42, "limit": 20, "offset": 0, "next_cursor": 20 } }
+```
+`next_cursor` is `null` when all results are exhausted. Maximum `limit` is 200.
 
 ### Control endpoints
 
@@ -1149,13 +1199,39 @@ stop()   // clears the interval
 
 The janitor is overlapping-cycle safe — if a cycle takes longer than the interval, the next tick is skipped. Every cycle emits a `janitor.cycle` span.
 
+The janitor also runs **memory decay** each cycle: memories with `importance < 0.5` that haven't been accessed in 7+ days are decayed by a multiplicative `0.9^weeksElapsed` factor (floor `0.01`). Pass `runDecay: false` to opt out for a specific invocation.
+
 ---
 
 ## Database
 
-Fulcrum uses SQLite with WAL mode, foreign keys, and FTS5. `runMigrations(db)` is fully idempotent and ships **29 migrations**.
+Fulcrum uses SQLite with WAL mode, foreign keys, and FTS5. `runMigrations(db)` is fully idempotent and ships **33 migrations** (including `content_type` column on `memories`).
 
-**Tables:** `workspaces`, `projects`, `tasks`, `agent_runs`, `memories`, `advisory_locks`, `handoffs`, `events`, `epics`, `issues`, `prds`, `plans`, `task_relations`, `task_labels`, `issue_labels`, `plan_issues`, `prd_plans`, `reviews`, `worktrees`, `artifacts`, `artifact_contracts`, `team_templates`, `team_instances`, `team_members`, `workflow_runs`, `sync_states`, `sync_conflicts`, `sync_queue`, `policy_rules`, `policy_events`, `display_id_sequences`, `agentrun_artifacts`, `review_targets`, `task_memory_links`, `artifact_memory_links`, `analytics_daily`, `analytics_cycle`, `analytics_project`, `analytics_agent`, `analytics_team`, `memory_entities`, `code_chunks`, `graph_entities`, `graph_edges`, `graph_episodes`, `trace_events`, `schema_migrations`
+**Pragmas set on every connection:** `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=5000`, `synchronous=NORMAL`, `cache_size=-8000` (8 MB).
+
+**Transaction helper:**
+
+```typescript
+import { withTransaction } from '@fulcrum/core'
+
+const result = withTransaction(() => {
+  getDb().prepare('INSERT INTO tasks ...').run(...)
+  return taskId
+})
+// Uses BEGIN IMMEDIATE — safe under concurrent WAL readers.
+// Rolls back automatically on any thrown error.
+```
+
+**Liveness check:**
+
+```typescript
+import { checkDbHealth } from '@fulcrum/core'
+
+const health = checkDbHealth()
+// { ok: true, latencyMs: 1 }  or  { ok: false, error: '...' }
+```
+
+**Tables:** `workspaces`, `projects`, `tasks`, `agent_runs`, `memories`, `advisory_locks`, `handoffs`, `events`, `epics`, `issues`, `prds`, `plans`, `task_relations`, `task_labels`, `issue_labels`, `plan_issues`, `prd_plans`, `reviews`, `worktrees`, `artifacts`, `artifact_contracts`, `team_templates`, `team_instances`, `team_members`, `workflow_runs`, `sync_states`, `sync_conflicts`, `sync_queue`, `policy_rules`, `policy_events`, `display_id_sequences`, `agentrun_artifacts`, `review_targets`, `task_memory_links`, `artifact_memory_links`, `analytics_daily`, `analytics_cycle`, `analytics_project`, `analytics_agent`, `analytics_team`, `memory_entities`, `code_chunks`, `graph_entities`, `graph_edges`, `graph_episodes`, `trace_events`, `agent_definitions`, `schema_migrations`
 
 **Virtual tables:** `tasks_fts`, `memories_fts`, `vec_memories` (when `sqlite-vec` is available)
 
@@ -1192,6 +1268,27 @@ Default models (run locally via ONNX, no API key required):
 | Code embedder | `onnx-community/Qwen3-Embedding-0.6B-ONNX` |
 | Reranker | `onnx-community/bge-reranker-v2-m3-ONNX` |
 
+`writeMemory` auto-selects the embedder based on `content_type`:
+
+```typescript
+await writeMemory({
+  content: 'function add(a, b) { return a + b }',
+  content_type: 'code',   // routes to code embedder; default is 'text'
+  workspace_id: 'ws_1',
+  project_id: 'proj_1',
+})
+```
+
+**Repo map** — `@fulcrum/memory` ships an aider-style repo map builder for passing relevant symbol context to agents:
+
+```typescript
+import { scanAndBuildRepoMap } from '@fulcrum/memory'
+
+const map = await scanAndBuildRepoMap('/path/to/project')
+// map.summary — compact "path.ts  [funcName:1, ClassName:10]" per-file lines
+// map.files   — RepoFileEntry[] with symbols[], language, path
+```
+
 ---
 
 ## Running Tests
@@ -1211,21 +1308,21 @@ pnpm test:watch
 FULCRUM_EMBEDDING_TESTS=1 pnpm test
 ```
 
-**980 tests passing across 11 packages.** Tests use an in-memory SQLite DB injected via `setDb()`.
+**~1010 tests passing across 11 packages.** Tests use an in-memory SQLite DB injected via `setDb()`.
 
 | Package | Tests |
 |---------|:-----:|
-| `@fulcrum/core`       | 432 |
-| `@fulcrum/memory`     | 175 |
-| `@fulcrum/planning`   | 102 |
-| `@fulcrum/policy`     | 95  |
-| `@fulcrum/worktrees`  | 41  |
-| `@fulcrum/teams`      | 31  |
-| `@fulcrum/monitor`    | 30  |
-| `@fulcrum/workflows`  | 25  |
-| `@fulcrum/cli`        | 21  |
-| `@fulcrum/sync`       | 15  |
-| `@fulcrum/worker`     | 8   |
+| `@fulcrum/core`       | ~513 |
+| `@fulcrum/memory`     | ~217 |
+| `@fulcrum/planning`   | 102  |
+| `@fulcrum/policy`     | 95   |
+| `@fulcrum/worktrees`  | 41   |
+| `@fulcrum/teams`      | 31   |
+| `@fulcrum/monitor`    | ~34  |
+| `@fulcrum/workflows`  | 25   |
+| `@fulcrum/cli`        | ~136 |
+| `@fulcrum/sync`       | 15   |
+| `@fulcrum/worker`     | 8    |
 
 ---
 
@@ -1358,7 +1455,9 @@ fulcrum/
 ├── agent-integration/      # Runtime installers
 │   ├── install.ts          # pnpm setup entry point
 │   ├── claude/             # Claude Code hook + CLAUDE.md
+│   ├── codex/              # OpenAI Codex CLI — AGENTS.md + mcp-config.json
 │   ├── gemini/             # Gemini extension + GEMINI.md
+│   ├── opencode/           # opencode — opencode.md + config.json
 │   └── pi/                 # PI cockpit extension
 │
 ├── docs/                   # Design specs and guides

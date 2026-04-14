@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### CLI
+- **`fulcrum doctor`** — environment and configuration health check command. Runs 8 checks (Node.js ≥ 20, `.fulcrum.json`, data directory, `better-sqlite3` native module, database liveness, `@modelcontextprotocol/sdk`, environment variables, agent integration files) and prints a PASS/WARN/FAIL report. Exits 1 when any check fails. Supports `--json` for machine-readable output.
+- **`fulcrum serve mcp-http`** — HTTP-transport MCP server using `StreamableHTTPServerTransport`. Each request gets a fresh `McpServer` + stateful transport (per-request session ID). Default port 4722. Suitable for network-accessible MCP access without stdio.
+- **`recall_memory` MCP tool** — `max_chars` optional parameter (default 8000) truncates each returned memory for token-budget control. `project_id` is now optional; omit to search across the whole workspace.
+
+#### Core APIs
+- **`withTransaction<T>(fn)`** — SQLite IMMEDIATE transaction wrapper in `@fulcrum/core/db/client`. Uses `.immediate()` locking (BEGIN IMMEDIATE) to prevent read-upgrade deadlocks under WAL mode. Rollback is automatic on any thrown error.
+- **`checkDbHealth()`** — liveness probe that runs `SELECT 1` and returns `{ ok: true, latencyMs: N }` or `{ ok: false, error: string }`. Used by `fulcrum doctor` and the monitor health endpoint.
+- **`decayMemories(workspace_id?)`** in `@fulcrum/core/janitor` — multiplicative freshness decay for low-importance memories not recently accessed. Formula: `importance * DECAY_FACTOR^weeksElapsed` (floor `DECAY_FLOOR`). Runs inside `runJanitorCycle` and can be disabled with `runDecay: false`.
+- **`buildA2ACard(def, executorUriOverride?)`** — builds an A2A-protocol `AgentCard` JSON from an `AgentDefinition`. Maps known capability strings (`code_generation`, `code_review`, `planning`, `research`, `memory`, `task_management`, `orchestration`) to typed `A2ASkill` descriptors. Falls back to a generic role skill for unrecognised capabilities.
+- **`AgentRoleDescriptor`** type alias — `AgentRoleDescriptor = AgentProfile` for vocabulary consistency with A2A spec; fully backward-compatible.
+- **Memory `content_type` routing** — `Memory` interface gains `content_type: 'text' | 'code'` field (migration 033, default `'text'`). `writeMemory` auto-selects the text or code embedder based on `content_type` when no explicit embedding is provided.
+- **Memory decay constants** in `@fulcrum/core/constants` — `MEMORY_DECAY_FACTOR`, `MEMORY_DECAY_THRESHOLD`, `MEMORY_DECAY_MIN_DAYS_SINCE_ACCESS`, `MEMORY_DECAY_FLOOR`.
+- **DB pragma hardening** — `synchronous = NORMAL` and `cache_size = -8000` (8 MB) added to `_configureDb`. WAL mode + NORMAL sync is crash-safe while delivering measurably better write throughput than FULL.
+
+#### Memory package
+- **`buildRepoMap` / `scanAndBuildRepoMap`** in `@fulcrum/memory/repo-map` — aider-style repository map. Walks a directory tree (skips `node_modules`, `.git`, `dist`, `build`, `.next`, `coverage`, worktree dirs), detects language from extension, and extracts top-level symbols (functions, classes, methods, arrow functions, consts) using an injectable tree-sitter parser. Returns a `RepoMap` with per-file symbol tables and a compact summary string. No WASM required in tests — parser is fully injectable.
+
+#### Agent integration
+- **`agent-integration/codex/`** — OpenAI Codex CLI integration (`AGENTS.md` context file auto-loaded by Codex CLI; `mcp-config.json` pointing at `fulcrum serve mcp`).
+- **`agent-integration/opencode/`** — opencode integration (`opencode.md` context file; `config.json` with `mcp.fulcrum` entry pointing at `fulcrum serve mcp`).
+
+#### Monitor server
+- **Pagination** on list endpoints (`/tasks`, `/agents`, `/artifacts`, `/memory-trace`, `/teams`) — `?limit=N&cursor=OFFSET` query params; response includes `{ data, pagination: { total, limit, offset, next_cursor } }`. Limit capped at 200. `next_cursor` is null when all results are exhausted.
+
+### Changed
+- `_configureDb` adds `synchronous = NORMAL` and `cache_size = -8000` pragmas (additive — no behavior regression).
+- `runJanitorCycle` runs `decayMemories` by default (opt-out with `runDecay: false`).
+- `fulcrum doctor` `checkDbLiveness` check added to the standard check list.
+
 ---
 
 ## [0.1.0] — 2026-04-14
