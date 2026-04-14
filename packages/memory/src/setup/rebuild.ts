@@ -140,18 +140,20 @@ export async function reconcileMergedBranch(
   const sg = simpleGit(vaultPath)
   const memoriesPattern = 'memories/curated/'
 
-  // Resolve the merge commit SHA explicitly by searching for the commit message.
-  // This is safer than using HEAD^1/HEAD^2 which only work if HEAD is still the
-  // merge commit at call time. Any commit landing between mergeMemoryBranch and
-  // reconcileMergedBranch would cause HEAD^1/HEAD^2 to diff the wrong commits.
+  // Resolve the merge commit SHA by running `git log` via sg.raw so that
+  // simple-git's parser is bypassed entirely (sg.log() prepends its own
+  // --pretty= format which conflicts with --format=%H and causes the parser to
+  // return empty results). sg.raw() returns the raw stdout string so we can
+  // split on newlines and take the first non-empty SHA directly.
   const branch = `memory/${taskId}`
-  const logResult = await sg.log([
+  const rawLog = await sg.raw([
+    'log',
     '--format=%H',
     `--grep=merge: memory branch ${branch}`,
     '--',
     '.',
-  ])
-  const mergeSha: string = logResult.latest?.hash ?? logResult.all[0]?.hash ?? ''
+  ]).catch(() => '')
+  const mergeSha: string = rawLog.trim().split('\n').find(line => line.trim().length > 0)?.trim() ?? ''
 
   // Use the resolved merge commit's parents for the diff.
   // If no merge commit was found (unexpected), fall back to HEAD^1..HEAD^2 as a
