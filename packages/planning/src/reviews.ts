@@ -1,6 +1,5 @@
 // packages/planning/src/reviews.ts
-import { ulid } from 'ulid'
-import { getDb, FulcrumError, emitEvent, nextDisplayId } from '@fulcrum/core'
+import { getDb, FulcrumError, emitEvent, nextDisplayId, newId } from '@fulcrum/core'
 import type { Review, CreateReviewInput, UpdateReviewInput, ReviewStatus } from './types.js'
 
 function rowToReview(row: Record<string, unknown>): Review {
@@ -23,7 +22,7 @@ function rowToReview(row: Record<string, unknown>): Review {
 export async function createReview(input: CreateReviewInput): Promise<Review> {
   if (!input.project_id) throw new FulcrumError('project_id is required', 'invalid_input')
   const db = getDb()
-  const review_id = 'rev_' + ulid()
+  const review_id = newId('review')
   const now = new Date().toISOString()
   const display_id = nextDisplayId('review', input.project_id, db)
 

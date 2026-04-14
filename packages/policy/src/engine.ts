@@ -1,6 +1,5 @@
 // packages/policy/src/engine.ts
-import { ulid } from 'ulid'
-import { getDb, FulcrumError, isL1, canMerge } from '@fulcrum/core'
+import { getDb, FulcrumError, isL1, canMerge, newId } from '@fulcrum/core'
 import { minimatch } from 'minimatch'
 import type { AgentRole } from '@fulcrum/core'
 import type {
@@ -178,7 +177,7 @@ export async function evaluatePolicy(input: EvaluatePolicyInput): Promise<Policy
 export async function createPolicyRule(input: CreatePolicyRuleInput): Promise<PolicyRule> {
   if (!input.name.trim()) throw new FulcrumError('name must not be empty', 'invalid_input')
   const db = getDb()
-  const rule_id = 'pol_' + ulid()
+  const rule_id = newId('policy')
   const now = new Date().toISOString()
   const priority = input.priority ?? 100
   const enabled = input.enabled !== false ? 1 : 0

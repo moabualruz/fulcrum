@@ -1,6 +1,5 @@
 // packages/workflows/src/workflows.ts
-import { ulid } from 'ulidx'
-import { getDb, nextDisplayId } from '@fulcrum/core'
+import { getDb, nextDisplayId, newId } from '@fulcrum/core'
 import { registry } from './registry.js'
 import { nextReadySteps, initStepStates, computeStatusCategory } from './engine.js'
 import type {
@@ -77,7 +76,7 @@ export async function startWorkflow(input: StartWorkflowInput): Promise<Workflow
   if (!def) throw new Error(`workflow not found: ${input.workflow_name}`)
 
   const db = getDb()
-  const wf_id = `wf_${ulid()}`
+  const wf_id = newId('wf')
   const now = new Date().toISOString()
   const display_id = nextDisplayId('wf', input.project_id ?? input.workspace_id, db)
 

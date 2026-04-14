@@ -1,6 +1,5 @@
 // packages/worktrees/src/worktrees.ts
-import { ulid } from 'ulidx'
-import { getDb, FulcrumError } from '@fulcrum/core'
+import { getDb, FulcrumError, newId } from '@fulcrum/core'
 import type {
   Worktree,
   MergeResult,
@@ -30,7 +29,7 @@ function rowToWorktree(row: Record<string, unknown>): Worktree {
 
 export async function allocateWorktree(input: AllocateWorktreeInput): Promise<Worktree> {
   const db = getDb()
-  const worktree_id = `wt_${ulid()}`
+  const worktree_id = newId('worktree')
   const now = new Date().toISOString()
 
   db.prepare(`

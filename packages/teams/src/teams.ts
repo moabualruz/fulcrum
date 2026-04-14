@@ -1,6 +1,5 @@
 // packages/teams/src/teams.ts
-import { ulid } from 'ulidx'
-import { getDb, nextDisplayId, FulcrumError, canInvokeTeams } from '@fulcrum/core'
+import { getDb, nextDisplayId, FulcrumError, canInvokeTeams, newId } from '@fulcrum/core'
 import type {
   TeamTemplate,
   TeamInstance,
@@ -53,7 +52,7 @@ function rowToInstance(row: Record<string, unknown>): TeamInstance {
 
 export async function createTeamTemplate(input: CreateTeamTemplateInput): Promise<TeamTemplate> {
   const db = getDb()
-  const template_id = `team_${ulid()}`
+  const template_id = newId('team')
   const now = new Date().toISOString()
   const slotsJson = JSON.stringify(input.slots)
   const policyJson = JSON.stringify(input.policy ?? {})
@@ -83,7 +82,7 @@ export async function invokeTeam(input: InvokeTeamInput): Promise<TeamInstance> 
     throw new FulcrumError(decision.reason ?? 'team concurrency cap reached', 'rate_limited')
   }
 
-  const instance_id = `ti_${ulid()}`
+  const instance_id = newId('team_instance')
   const now = new Date().toISOString()
   const display_id = nextDisplayId('team', input.project_id ?? input.workspace_id, db)
   const resolved_slots = JSON.stringify(input.initial_slots ?? {})

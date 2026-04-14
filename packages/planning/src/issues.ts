@@ -1,6 +1,5 @@
 // packages/planning/src/issues.ts
-import { ulid } from 'ulid'
-import { getDb, FulcrumError, emitEvent, nextDisplayId, statusCategory } from '@fulcrum/core'
+import { getDb, FulcrumError, emitEvent, nextDisplayId, statusCategory, newId } from '@fulcrum/core'
 import type { Issue, CreateIssueInput, UpdateIssueInput, ListIssuesInput, IssueStatus, StatusCategory, EstimateType } from './types.js'
 
 function rowToIssue(row: Record<string, unknown>, labels: string[]): Issue {
@@ -35,7 +34,7 @@ function getLabels(db: ReturnType<typeof getDb>, issue_id: string): string[] {
 export async function createIssue(input: CreateIssueInput): Promise<Issue> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
   const db = getDb()
-  const issue_id = 'iss_' + ulid()
+  const issue_id = newId('issue')
   const now = new Date().toISOString()
   const priority = input.priority ?? 'medium'
   const status: IssueStatus = 'backlog'

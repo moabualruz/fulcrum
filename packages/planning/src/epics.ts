@@ -1,6 +1,5 @@
 // packages/planning/src/epics.ts
-import { ulid } from 'ulid'
-import { getDb, FulcrumError, emitEvent, nextDisplayId, statusCategory } from '@fulcrum/core'
+import { getDb, FulcrumError, emitEvent, nextDisplayId, statusCategory, newId } from '@fulcrum/core'
 import type { Epic, CreateEpicInput, UpdateEpicInput, ListEpicsInput, EpicStatus, StatusCategory } from './types.js'
 
 function rowToEpic(row: Record<string, unknown>): Epic {
@@ -24,7 +23,7 @@ function rowToEpic(row: Record<string, unknown>): Epic {
 export async function createEpic(input: CreateEpicInput): Promise<Epic> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
   const db = getDb()
-  const epic_id = 'epic_' + ulid()
+  const epic_id = newId('epic')
   const now = new Date().toISOString()
   const priority = input.priority ?? 'medium'
   const status: EpicStatus = 'backlog'

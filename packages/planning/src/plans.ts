@@ -1,6 +1,5 @@
 // packages/planning/src/plans.ts
-import { ulid } from 'ulid'
-import { getDb, FulcrumError, emitEvent, nextDisplayId } from '@fulcrum/core'
+import { getDb, FulcrumError, emitEvent, nextDisplayId, newId } from '@fulcrum/core'
 import type { Plan, CreatePlanInput, UpdatePlanInput, ListPlansInput, LinkIssueToPlanInput, PlanStatus, StatusCategory } from './types.js'
 
 function planStatusCategory(status: PlanStatus): StatusCategory {
@@ -29,7 +28,7 @@ function rowToPlan(row: Record<string, unknown>): Plan {
 export async function createPlan(input: CreatePlanInput): Promise<Plan> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
   const db = getDb()
-  const plan_id = 'plan_' + ulid()
+  const plan_id = newId('plan')
   const now = new Date().toISOString()
   const status: PlanStatus = 'draft'
   const status_cat = planStatusCategory(status)

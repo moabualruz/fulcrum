@@ -1,6 +1,5 @@
 // packages/planning/src/prds.ts
-import { ulid } from 'ulid'
-import { getDb, FulcrumError, emitEvent, nextDisplayId } from '@fulcrum/core'
+import { getDb, FulcrumError, emitEvent, nextDisplayId, newId } from '@fulcrum/core'
 import type { PRD, CreatePRDInput, UpdatePRDInput, ListPRDsInput, PRDStatus, StatusCategory } from './types.js'
 
 function prdStatusCategory(status: PRDStatus): StatusCategory {
@@ -29,7 +28,7 @@ function rowToPRD(row: Record<string, unknown>): PRD {
 export async function createPRD(input: CreatePRDInput): Promise<PRD> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
   const db = getDb()
-  const prd_id = 'prd_' + ulid()
+  const prd_id = newId('prd')
   const now = new Date().toISOString()
   const status: PRDStatus = 'draft'
   const status_cat = prdStatusCategory(status)

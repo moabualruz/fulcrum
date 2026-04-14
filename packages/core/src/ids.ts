@@ -19,6 +19,7 @@ const PREFIXES: Record<string, string> = {
   contract: 'ac_',
   event: 'evt_',
   team: 'team_',
+  team_instance: 'ti_',
   policy: 'pol_',
   subtask: 'subtask_',
   cycle: 'cycle_',
