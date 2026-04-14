@@ -11,8 +11,11 @@ afterEach(() => resetTestDb())
 
 function seed() {
   const db = getDb()
-  db.prepare("INSERT INTO workspaces VALUES ('ws_1','Acme Corp',datetime('now'),'active',NULL)").run()
-  db.prepare("INSERT INTO projects VALUES ('proj_1','ws_1','Backend API',datetime('now'),NULL,NULL,NULL,NULL,'sequential','active')").run()
+  db.prepare("INSERT INTO workspaces (workspace_id, name, created_at, status, config_path) VALUES ('ws_1','Acme Corp',datetime('now'),'active',NULL)").run()
+  db.prepare(
+    "INSERT INTO projects (project_id, workspace_id, name, created_at, project_type, root_path, default_branch, parent_project_id, write_mode, status, type, git_url) " +
+    "VALUES ('proj_1','ws_1','Backend API',datetime('now'),NULL,NULL,NULL,NULL,'sequential','active','git',NULL)"
+  ).run()
 }
 
 describe('full lifecycle integration', () => {
@@ -115,7 +118,10 @@ describe('full lifecycle integration', () => {
   it('display_id sequences are project-scoped and monotonic', async () => {
     seed()
     const db = getDb()
-    db.prepare("INSERT INTO projects VALUES ('proj_2','ws_1','Frontend',datetime('now'),NULL,NULL,NULL,NULL,'sequential','active')").run()
+    db.prepare(
+      "INSERT INTO projects (project_id, workspace_id, name, created_at, project_type, root_path, default_branch, parent_project_id, write_mode, status, type, git_url) " +
+      "VALUES ('proj_2','ws_1','Frontend',datetime('now'),NULL,NULL,NULL,NULL,'sequential','active','git',NULL)"
+    ).run()
 
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'P1 T1' })
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'P1 T2' })

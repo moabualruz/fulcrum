@@ -217,3 +217,99 @@ describe('MIGRATION_002 — idempotent', () => {
     expect(() => runMigrations(db)).not.toThrow()
   })
 })
+
+describe('round 1 migration (G-2, G-4 schema, G-12 schema)', () => {
+  afterEach(() => closeDb())
+
+  it('projects table has type/status/write_mode/git_url/parent_project_id', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    const cols = db.prepare(`PRAGMA table_info(projects)`).all() as { name: string }[]
+    const names = cols.map(c => c.name)
+    expect(names).toContain('type')
+    expect(names).toContain('status')
+    expect(names).toContain('write_mode')
+    expect(names).toContain('git_url')
+    expect(names).toContain('parent_project_id')
+  })
+
+  it('projects.type has CHECK constraint for git/non_git/submodule/logical', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    // Valid value succeeds
+    expect(() => db.prepare(
+      `INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at)
+       VALUES ('proj_1', 'ws_1', 'p', 'git', 'active', 'worktree', '2026-04-14T00:00:00Z')`
+    ).run()).not.toThrow()
+    // Invalid value fails
+    expect(() => db.prepare(
+      `INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at)
+       VALUES ('proj_2', 'ws_1', 'p2', 'not_a_type', 'active', 'worktree', '2026-04-14T00:00:00Z')`
+    ).run()).toThrow()
+  })
+
+  it('projects.status has CHECK constraint for active/archived/paused', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    expect(() => db.prepare(
+      `INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at)
+       VALUES ('proj_bad', 'ws_1', 'p', 'git', 'nope', 'worktree', '2026-04-14T00:00:00Z')`
+    ).run()).toThrow()
+  })
+
+  it('memories.task_id column exists and is nullable', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    const cols = db.prepare(`PRAGMA table_info(memories)`).all() as { name: string; notnull: number }[]
+    const taskCol = cols.find(c => c.name === 'task_id')
+    expect(taskCol).toBeDefined()
+    expect(taskCol!.notnull).toBe(0)
+  })
+
+  it('idx_memories_task index exists', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    const indexes = db.prepare(`PRAGMA index_list(memories)`).all() as { name: string }[]
+    expect(indexes.some(i => i.name === 'idx_memories_task')).toBe(true)
+  })
+
+  it('trace_events table exists with expected columns', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    const cols = db.prepare(`PRAGMA table_info(trace_events)`).all() as { name: string }[]
+    const names = cols.map(c => c.name)
+    expect(names).toContain('span_id')
+    expect(names).toContain('trace_id')
+    expect(names).toContain('parent_span_id')
+    expect(names).toContain('name')
+    expect(names).toContain('workspace_id')
+    expect(names).toContain('run_id')
+    expect(names).toContain('status')
+    expect(names).toContain('started_at')
+    expect(names).toContain('ended_at')
+    expect(names).toContain('payload')
+  })
+
+  it('trace_events.status has CHECK constraint for started/ok/error', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    expect(() => db.prepare(
+      `INSERT INTO trace_events (span_id, trace_id, parent_span_id, name, workspace_id, run_id, status, started_at, ended_at, payload)
+       VALUES ('span_1', 'span_1', NULL, 'n', 'ws_1', NULL, 'started', '2026-04-14T00:00:00Z', NULL, NULL)`
+    ).run()).not.toThrow()
+    expect(() => db.prepare(
+      `INSERT INTO trace_events (span_id, trace_id, parent_span_id, name, workspace_id, run_id, status, started_at, ended_at, payload)
+       VALUES ('span_2', 'span_2', NULL, 'n', 'ws_1', NULL, 'bogus', '2026-04-14T00:00:00Z', NULL, NULL)`
+    ).run()).toThrow()
+  })
+})
