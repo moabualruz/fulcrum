@@ -136,6 +136,46 @@ fulcrum memory — memory vault commands
 
 // ── Hook commands ─────────────────────────────────────────────────────────────
 
+export type HookCli = 'claude' | 'gemini' | 'pi'
+
+export interface NormalizedHookEvent {
+  toolName: string
+  toolInput: Record<string, unknown>
+  sessionId: string
+  agentRole: string
+}
+
+/**
+ * Normalize a tool-call event from any of the three supported CLI runtimes
+ * (Claude Code PreToolUse, Gemini CLI BeforeTool, PI BeforeTool) into the
+ * canonical Fulcrum internal shape. Unknown fields default to empty strings
+ * / empty objects so downstream policy and logging code always has defined
+ * values to work with.
+ */
+export function normalizeHookEvent(cliName: HookCli, event: Record<string, unknown>): NormalizedHookEvent {
+  let toolName = ''
+  let toolInput: Record<string, unknown> = {}
+  let sessionId = 'unknown'
+  let agentRole = ''
+
+  if (cliName === 'claude') {
+    toolName = (event['tool_name'] as string) ?? ''
+    toolInput = (event['tool_input'] as Record<string, unknown>) ?? {}
+    sessionId = (event['session_id'] as string) ?? 'unknown'
+  } else if (cliName === 'gemini') {
+    toolName = (event['tool_name'] ?? event['toolName']) as string ?? ''
+    toolInput = (event['tool_input'] ?? event['toolInput'] ?? event['args'] ?? {}) as Record<string, unknown>
+    sessionId = (event['session_id'] ?? event['conversationId']) as string ?? 'unknown'
+  } else if (cliName === 'pi') {
+    toolName = (event['toolName'] ?? event['tool_name']) as string ?? ''
+    toolInput = (event['toolInput'] ?? event['tool_input'] ?? event['args'] ?? {}) as Record<string, unknown>
+    sessionId = (event['sessionId'] ?? event['session_id']) as string ?? 'unknown'
+    agentRole = (event['role'] as string) ?? ''
+  }
+
+  return { toolName, toolInput, sessionId, agentRole }
+}
+
 async function runHook(cliName: string): Promise<void> {
   // Migrations and workspace/project already set up by ensureProjectInitialized()
   // in main(). We just need the IDs for event logging.
@@ -158,25 +198,7 @@ async function runHook(cliName: string): Promise<void> {
   }
 
   // Normalise to canonical shape based on CLI type
-  let toolName = ''
-  let toolInput: Record<string, unknown> = {}
-  let sessionId = 'unknown'
-  let agentRole = ''
-
-  if (cliName === 'claude') {
-    toolName = event['tool_name'] as string ?? ''
-    toolInput = (event['tool_input'] as Record<string, unknown>) ?? {}
-    sessionId = event['session_id'] as string ?? 'unknown'
-  } else if (cliName === 'gemini') {
-    toolName = (event['tool_name'] ?? event['toolName']) as string ?? ''
-    toolInput = (event['tool_input'] ?? event['toolInput'] ?? event['args'] ?? {}) as Record<string, unknown>
-    sessionId = (event['session_id'] ?? event['conversationId']) as string ?? 'unknown'
-  } else if (cliName === 'pi') {
-    toolName = (event['toolName'] ?? event['tool_name']) as string ?? ''
-    toolInput = (event['toolInput'] ?? event['tool_input'] ?? event['args'] ?? {}) as Record<string, unknown>
-    sessionId = (event['sessionId'] ?? event['session_id']) as string ?? 'unknown'
-    agentRole = event['role'] as string ?? ''
-  }
+  const { toolName, toolInput, sessionId, agentRole } = normalizeHookEvent(cliName as HookCli, event)
 
   // Log the tool call (best-effort) — attached to the auto-initialized workspace
   try {
@@ -897,7 +919,23 @@ async function main(): Promise<void> {
   usage()
 }
 
-main().catch(err => {
-  console.error((err as Error).message)
-  process.exit(1)
-})
+// Only auto-run main() when executed as a script, not when imported as a
+// module (e.g. from unit tests importing `normalizeHookEvent`). import.meta.url
+// will equal the process entry path when run via `node --import tsx/esm src/index.ts`.
+const isEntry = (() => {
+  try {
+    const entry = process.argv[1]
+    if (!entry) return false
+    const entryUrl = new URL(`file://${entry}`).href
+    return import.meta.url === entryUrl
+  } catch {
+    return false
+  }
+})()
+
+if (isEntry) {
+  main().catch(err => {
+    console.error((err as Error).message)
+    process.exit(1)
+  })
+}

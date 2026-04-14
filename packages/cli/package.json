@@ -9,7 +9,9 @@
   },
   "main": "./src/index.ts",
   "scripts": {
-    "start": "node --import tsx/esm src/index.ts"
+    "start": "node --import tsx/esm src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",
@@ -18,6 +20,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
   }
 }
