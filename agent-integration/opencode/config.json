@@ -1,0 +1,8 @@
+{
+  "mcp": {
+    "fulcrum": {
+      "command": ["fulcrum", "serve", "mcp"],
+      "enabled": true
+    }
+  }
+}
