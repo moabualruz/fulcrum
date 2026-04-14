@@ -90,7 +90,7 @@ export async function writeMemory(input: WriteMemoryInput): Promise<FullMemory> 
         ts: now,
         op: 'WRITE',
         id: memory_id,
-        meta: `kind=${input.kind}`,
+        meta: `kind=${input.kind} scope=${input.scope} by=agent`,
       })
     }
   }
