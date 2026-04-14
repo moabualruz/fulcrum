@@ -16,9 +16,10 @@ export function runMigration010(db: Database): void {
                               'conflicted','failed','disabled')),
       last_sync_hash   TEXT,
       last_sync_error  TEXT,
-      direction        TEXT NOT NULL DEFAULT 'local_to_remote'
+      direction        TEXT NOT NULL DEFAULT 'bidirectional'
         CHECK(direction IN ('local_to_remote','remote_to_local','bidirectional')),
-      conflict_state   TEXT,
+      conflict_state   TEXT NOT NULL DEFAULT 'none'
+        CHECK(conflict_state IN ('none','detected','resolving','resolved','unresolvable')),
       created_at       TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(object_id, sync_target)

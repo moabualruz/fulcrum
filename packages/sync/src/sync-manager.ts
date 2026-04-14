@@ -12,6 +12,8 @@ import type {
   GetSyncStateInput,
   ResolveConflictInput,
   ListConflictsInput,
+  SyncDirection,
+  ConflictState,
 } from './types.js'
 
 // Object types that must never be synchronised to external systems.
@@ -53,8 +55,8 @@ interface SyncStateRow {
   sync_status: string
   last_sync_hash: string | null
   last_sync_error: string | null
-  direction: string
-  conflict_state: string | null
+  direction: SyncDirection
+  conflict_state: ConflictState | null
   created_at: string
   updated_at: string
 }
@@ -72,7 +74,7 @@ function rowToSyncState(row: SyncStateRow): SyncState {
     last_sync_hash: row.last_sync_hash ?? undefined,
     last_sync_error: row.last_sync_error ?? undefined,
     direction: row.direction as SyncState['direction'],
-    conflict_state: row.conflict_state ?? undefined,
+    conflict_state: (row.conflict_state ?? 'none') as SyncState['conflict_state'],
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
@@ -144,8 +146,8 @@ export class SyncManager {
       this.db
         .prepare(
           `INSERT INTO sync_states
-             (sync_id, object_type, object_id, workspace_id, sync_target, sync_status, direction)
-           VALUES (?, ?, ?, ?, ?, 'never_synced', 'local_to_remote')`,
+             (sync_id, object_type, object_id, workspace_id, sync_target, sync_status, direction, conflict_state)
+           VALUES (?, ?, ?, ?, ?, 'never_synced', 'bidirectional', 'none')`,
         )
         .run(sync_id, object_type, object_id, workspace_id, sync_target)
     }
@@ -219,10 +221,10 @@ export class SyncManager {
           this.db
             .prepare(
               `UPDATE sync_states
-                  SET sync_status = 'conflicted', conflict_state = ?, updated_at = datetime('now')
+                  SET sync_status = 'conflicted', conflict_state = 'detected', updated_at = datetime('now')
                 WHERE sync_id = ?`,
             )
-            .run(conflictId, sync_id)
+            .run(sync_id)
 
           const conflictedRow = this.db
             .prepare(`SELECT * FROM sync_states WHERE sync_id = ?`)
@@ -466,7 +468,7 @@ export class SyncManager {
         .prepare(
           `UPDATE sync_states
               SET sync_status = 'queued',
-                  conflict_state = NULL,
+                  conflict_state = 'resolved',
                   updated_at = datetime('now')
             WHERE sync_id = ?`,
         )
@@ -482,18 +484,18 @@ export class SyncManager {
         .prepare(
           `UPDATE sync_states
               SET sync_status = 'synced',
-                  conflict_state = NULL,
+                  conflict_state = 'resolved',
                   last_synced_at = datetime('now'),
                   updated_at = datetime('now')
             WHERE sync_id = ?`,
         )
         .run(conflictRow.sync_id)
     } else {
-      // manual — just clear conflict_state, leave status as-is
+      // manual — set conflict_state to resolved, leave status as-is
       this.db
         .prepare(
           `UPDATE sync_states
-              SET conflict_state = NULL,
+              SET conflict_state = 'resolved',
                   updated_at = datetime('now')
             WHERE sync_id = ?`,
         )

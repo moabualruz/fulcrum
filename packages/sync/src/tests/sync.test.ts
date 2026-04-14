@@ -230,8 +230,8 @@ describe('@fulcrum/sync — SyncManager', () => {
     ).run(conflictId, state.sync_id)
 
     db.prepare(
-      `UPDATE sync_states SET sync_status = 'conflicted', conflict_state = ? WHERE sync_id = ?`,
-    ).run(conflictId, state.sync_id)
+      `UPDATE sync_states SET sync_status = 'conflicted', conflict_state = 'detected' WHERE sync_id = ?`,
+    ).run(state.sync_id)
 
     const conflicts = manager.listConflicts({ workspace_id: 'ws-test', unresolved_only: true })
     expect(conflicts.length).toBeGreaterThanOrEqual(1)
@@ -262,8 +262,8 @@ describe('@fulcrum/sync — SyncManager', () => {
     ).run(conflictId, state.sync_id)
 
     db.prepare(
-      `UPDATE sync_states SET sync_status = 'conflicted', conflict_state = ? WHERE sync_id = ?`,
-    ).run(conflictId, state.sync_id)
+      `UPDATE sync_states SET sync_status = 'conflicted', conflict_state = 'detected' WHERE sync_id = ?`,
+    ).run(state.sync_id)
 
     const resolved = await manager.resolveConflict({
       conflict_id: conflictId,
@@ -408,6 +408,75 @@ describe('@fulcrum/sync — SyncManager', () => {
     })
     expect(second.sync_status).toBe('synced')
     expect(adapter.pushCalls).toHaveLength(2) // both pushes happened
+  })
+
+  // -----------------------------------------------------------------------
+  // Test 10: new sync state defaults to direction='bidirectional', conflict_state='none'
+  // -----------------------------------------------------------------------
+
+  it('new sync state defaults to direction=bidirectional and conflict_state=none', async () => {
+    const { manager } = makeManager(db)
+
+    const state = await manager.syncObject({
+      object_type: 'Issue' as const,
+      object_id: 'issue-defaults',
+      workspace_id: 'ws-test',
+      local_data: { title: 'Default direction test' },
+    })
+
+    expect(state.direction).toBe('bidirectional')
+    expect(state.conflict_state).toBe('none')
+  })
+
+  // -----------------------------------------------------------------------
+  // Test 11: can create sync state with explicit direction='local_to_remote'
+  // Note: syncObject always inserts 'bidirectional'; we verify via direct DB
+  // insert to confirm the column accepts 'local_to_remote'.
+  // -----------------------------------------------------------------------
+
+  it('accepts explicit direction=local_to_remote via direct DB insert', () => {
+    const { manager } = makeManager(db)
+    const syncId = 'sync-explicit-dir'
+    db.prepare(
+      `INSERT INTO sync_states
+         (sync_id, object_type, object_id, workspace_id, sync_target, sync_status, direction, conflict_state)
+       VALUES (?, 'Task', 'task-explicit', 'ws-test', 'plane', 'never_synced', 'local_to_remote', 'none')`,
+    ).run(syncId)
+
+    const state = manager.getSyncState({ object_id: 'task-explicit' })
+    expect(state).not.toBeNull()
+    expect(state?.direction).toBe('local_to_remote')
+    expect(state?.conflict_state).toBe('none')
+  })
+
+  // -----------------------------------------------------------------------
+  // Test 12: conflict detection sets conflict_state='detected'
+  // -----------------------------------------------------------------------
+
+  it('conflict detection sets conflict_state to detected', async () => {
+    const { manager, adapter } = makeManager(db)
+
+    // First sync — establishes last_sync_hash and external_id
+    const first = await manager.syncObject({
+      object_type: 'Issue' as const,
+      object_id: 'issue-conflict-detected',
+      workspace_id: 'ws-test',
+      local_data: { title: 'Version 1' },
+    })
+    expect(first.sync_status).toBe('synced')
+
+    // Simulate remote conflict
+    adapter.remoteHash = 'cafebabe0000000000000000000000000000000000000000000000000000dead'
+
+    const conflicted = await manager.syncObject({
+      object_type: 'Issue' as const,
+      object_id: 'issue-conflict-detected',
+      workspace_id: 'ws-test',
+      local_data: { title: 'Local change' },
+    })
+
+    expect(conflicted.sync_status).toBe('conflicted')
+    expect(conflicted.conflict_state).toBe('detected')
   })
 
   it('detects conflict when remote hash differs from last_sync_hash', async () => {

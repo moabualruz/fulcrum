@@ -1,5 +1,8 @@
 // packages/sync/src/types.ts
 
+export type SyncDirection = 'local_to_remote' | 'remote_to_local' | 'bidirectional'
+export type ConflictState = 'none' | 'detected' | 'resolving' | 'resolved' | 'unresolvable'
+
 // Syncable object types.
 // NEVER sync: Memory, PolicyRule, AgentRun, Event, Worktree, HandoffPacket, ArtifactContract
 export type SyncableType =
@@ -31,8 +34,8 @@ export interface SyncState {
     | 'disabled'
   last_sync_hash?: string
   last_sync_error?: string
-  direction: 'local_to_remote' | 'remote_to_local' | 'bidirectional'
-  conflict_state?: string
+  direction: SyncDirection      // default 'bidirectional'
+  conflict_state: ConflictState // default 'none'
   created_at: string
   updated_at: string
 }
@@ -97,6 +100,14 @@ export interface SyncObjectInput {
   workspace_id: string
   local_data: Record<string, unknown>
   sync_target?: string
+}
+
+export interface CreateSyncStateInput {
+  object_type: SyncableType
+  object_id: string
+  workspace_id: string
+  sync_target?: string
+  direction?: SyncDirection  // default 'bidirectional'
 }
 
 export interface SyncAllInput {

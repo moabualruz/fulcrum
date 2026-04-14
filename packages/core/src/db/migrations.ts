@@ -818,9 +818,10 @@ CREATE TABLE IF NOT EXISTS sync_states (
                           'conflicted','failed','disabled')),
   last_sync_hash   TEXT,
   last_sync_error  TEXT,
-  direction        TEXT NOT NULL DEFAULT 'local_to_remote'
+  direction        TEXT NOT NULL DEFAULT 'bidirectional'
     CHECK(direction IN ('local_to_remote','remote_to_local','bidirectional')),
-  conflict_state   TEXT,
+  conflict_state   TEXT NOT NULL DEFAULT 'none'
+    CHECK(conflict_state IN ('none','detected','resolving','resolved','unresolvable')),
   created_at       TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(object_id, sync_target)
@@ -968,6 +969,15 @@ DROP TABLE handoffs;
 ALTER TABLE handoffs_new RENAME TO handoffs;
 `
 
+// MIGRATION_014 — adds direction and conflict_state columns to sync_states for databases
+// created before MIGRATION_010_SYNC included these columns.
+// Each ALTER is wrapped in try/catch to guard against duplicate column errors on fresh
+// databases where MIGRATION_010_SYNC already created both columns.
+const MIGRATION_014_SYNC_DIRECTION = [
+  `ALTER TABLE sync_states ADD COLUMN direction TEXT NOT NULL DEFAULT 'bidirectional'`,
+  `ALTER TABLE sync_states ADD COLUMN conflict_state TEXT NOT NULL DEFAULT 'none'`,
+]
+
 export function runMigrations(db: Database.Database): void {
   db.exec(MIGRATION_001)
   db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('001_initial')`).run()
@@ -1071,5 +1081,21 @@ export function runMigrations(db: Database.Database): void {
       db.exec(MIGRATION_013_HANDOFF_STATUS)
     })()
     db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('013_handoff_status')`).run()
+  }
+
+  const already014 = db.prepare("SELECT id FROM schema_migrations WHERE name = '014_sync_direction'").get()
+  if (!already014) {
+    for (const stmt of MIGRATION_014_SYNC_DIRECTION) {
+      try {
+        db.exec(stmt)
+      } catch (err: unknown) {
+        // Duplicate column means MIGRATION_010 already created it — safe to ignore
+        const msg = (err as { message?: string }).message ?? ''
+        if (!msg.includes('duplicate column name') && !msg.includes('already exists')) {
+          throw err
+        }
+      }
+    }
+    db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('014_sync_direction')`).run()
   }
 }
