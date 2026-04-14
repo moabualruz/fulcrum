@@ -2,7 +2,7 @@
 // MCP server built on @modelcontextprotocol/sdk (protocol version 2025-11-25).
 // Replaces the hand-rolled JSON-RPC 2.0 loop in index.ts.
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { TOOL_SCHEMAS } from './mcp-tools.js'
@@ -139,6 +139,113 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
       },
     )
   }
+
+  // ---------- Resources ----------
+  // URI scheme: fulcrum://{workspace_id}
+  //             fulcrum://{workspace_id}/tasks
+  //             fulcrum://{workspace_id}/task/{task_id}
+  //             fulcrum://{workspace_id}/memory/{project_id}
+  //             fulcrum://{workspace_id}/run/{run_id}
+
+  const makeText = (data: unknown): { contents: Array<{ uri: string; text: string; mimeType: string }> } => ({
+    contents: [{ uri: '', text: JSON.stringify(data, null, 2), mimeType: 'application/json' }],
+  })
+
+  // fulcrum://{workspace_id} — workspace status
+  server.registerResource(
+    'workspace',
+    new ResourceTemplate('fulcrum://{workspace_id}', { list: undefined }),
+    {
+      title: 'Workspace status',
+      description: 'Current status and health of a Fulcrum workspace',
+      mimeType: 'application/json',
+    },
+    async (uri, { workspace_id }) => {
+      const data = await options.handleToolCall('get_workspace_status', { workspace_id })
+      const result = makeText(data)
+      result.contents[0].uri = uri.toString()
+      return result
+    },
+  )
+
+  // fulcrum://{workspace_id}/tasks — task list
+  server.registerResource(
+    'workspace-tasks',
+    new ResourceTemplate('fulcrum://{workspace_id}/tasks', { list: undefined }),
+    {
+      title: 'Workspace tasks',
+      description: 'All tasks in a workspace',
+      mimeType: 'application/json',
+    },
+    async (uri, { workspace_id }) => {
+      const data = await options.handleToolCall('list_tasks', { workspace_id })
+      const result = makeText(data)
+      result.contents[0].uri = uri.toString()
+      return result
+    },
+  )
+
+  // fulcrum://{workspace_id}/task/{task_id} — individual task
+  server.registerResource(
+    'task',
+    new ResourceTemplate('fulcrum://{workspace_id}/task/{task_id}', { list: undefined }),
+    {
+      title: 'Task detail',
+      description: 'Details of a single Fulcrum task',
+      mimeType: 'application/json',
+    },
+    async (uri, { workspace_id, task_id }) => {
+      // list_tasks filtered by title is the closest read we have for a single task;
+      // we pass task_id as a hint and return the full list entry.
+      const data = await options.handleToolCall('list_tasks', { workspace_id, limit: 1000 })
+      const tasks = (data as { tasks?: unknown[] }).tasks ?? (Array.isArray(data) ? data : [])
+      const task = (tasks as Array<{ id?: string; task_id?: string }>).find(
+        t => t.id === task_id || t.task_id === task_id,
+      ) ?? { error: 'not_found', task_id }
+      const result = makeText(task)
+      result.contents[0].uri = uri.toString()
+      return result
+    },
+  )
+
+  // fulcrum://{workspace_id}/memory/{project_id} — memory entries
+  server.registerResource(
+    'memory',
+    new ResourceTemplate('fulcrum://{workspace_id}/memory/{project_id}', { list: undefined }),
+    {
+      title: 'Project memory',
+      description: 'Recalled memory entries for a project',
+      mimeType: 'application/json',
+    },
+    async (uri, { workspace_id, project_id }) => {
+      const data = await options.handleToolCall('recall_memory', {
+        query: '',
+        workspace_id,
+        project_id,
+        limit: 50,
+      })
+      const result = makeText(data)
+      result.contents[0].uri = uri.toString()
+      return result
+    },
+  )
+
+  // fulcrum://{workspace_id}/run/{run_id} — agent run status
+  server.registerResource(
+    'agent-run',
+    new ResourceTemplate('fulcrum://{workspace_id}/run/{run_id}', { list: undefined }),
+    {
+      title: 'Agent run',
+      description: 'Status of a Fulcrum agent run',
+      mimeType: 'application/json',
+    },
+    async (uri, { run_id }) => {
+      const data = await options.handleToolCall('get_agent_run_status', { run_id })
+      const result = makeText(data)
+      result.contents[0].uri = uri.toString()
+      return result
+    },
+  )
 
   return server
 }
