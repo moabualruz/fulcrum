@@ -1,6 +1,8 @@
 {
   "name": "@fulcrum/worktrees",
   "version": "0.0.1",
+  "description": "Code worktree lifecycle management — worktree provisioning, artifact tracking, and code review workflows",
+  "keywords": ["worktrees", "git-worktrees", "artifacts", "code-review", "lifecycle", "agent-development"],
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

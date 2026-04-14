@@ -1,6 +1,8 @@
 {
   "name": "@fulcrum/workflows",
   "version": "0.0.1",
+  "description": "Workflow engine — define, register, and execute multi-step agent workflows with typed step transitions and run state tracking",
+  "keywords": ["workflows", "workflow-engine", "agent-workflows", "state-machine", "multi-step", "orchestration"],
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
