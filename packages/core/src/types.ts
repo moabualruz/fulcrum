@@ -238,6 +238,49 @@ export interface PolicyCheckResult {
   blocking_tasks?: string[]
 }
 
+export type HandoffPriority = 'critical' | 'high' | 'normal' | 'low'
+export type HandoffScope = 'task' | 'issue' | 'project' | 'workspace'
+
+export interface HandoffPacket {
+  handoff_id: string
+  workspace_id: string
+  project_id?: string
+  task_id?: string
+  issue_id?: string
+  from_agent_id?: string
+  to_agent_id?: string
+  goal: string
+  task_type: string
+  priority: HandoffPriority
+  scope: HandoffScope
+  inputs: Record<string, unknown>
+  constraints?: string[]
+  done_criteria?: string
+  artifact_contract_id?: string
+  handoff_mode: string
+  status: 'pending' | 'claimed' | 'completed' | 'cancelled'
+  claimed_at?: string
+  created_at: string
+}
+
+export interface CreateHandoffInput {
+  workspace_id: string
+  project_id?: string
+  task_id?: string
+  issue_id?: string
+  from_agent_id?: string
+  to_agent_id?: string
+  goal: string
+  task_type: string
+  priority?: HandoffPriority
+  scope?: HandoffScope
+  inputs?: Record<string, unknown>
+  constraints?: string[]
+  done_criteria?: string
+  artifact_contract_id?: string
+  handoff_mode?: string
+}
+
 export class FulcrumError extends Error {
   constructor(
     message: string,

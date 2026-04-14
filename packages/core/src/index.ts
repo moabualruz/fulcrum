@@ -6,6 +6,7 @@ export type {
   TaskRelationType, MemoryScope, MemoryKind, ArtifactType, EventType,
   FulcrumEvent, TaskRelation,
   EmbeddingProviderConfig, FulcrumConfig, PolicyCheckResult,
+  HandoffPacket, CreateHandoffInput, HandoffPriority, HandoffScope,
 } from './types.js'
 export { FulcrumError } from './types.js'
 
@@ -49,6 +50,9 @@ export { newId, nextDisplayId } from './ids.js'
 
 // Status Category
 export { statusCategory } from './status-category.js'
+
+// Handoffs
+export { createHandoff, getHandoff, listHandoffs, claimHandoff, completeHandoff } from './handoffs.js'
 
 // Events
 export { emitEvent } from './events.js'
