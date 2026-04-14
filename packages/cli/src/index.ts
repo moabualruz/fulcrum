@@ -33,6 +33,10 @@ COMMANDS
   projects list --workspace-id <id>
   projects create --name <name> --workspace-id <id> [--id <id>]
 
+  init                 Drop per-project context files (CLAUDE.md, GEMINI.md,
+                       PI.md, .mcp.json) into $CWD
+                       Flags: --force  --claude  --gemini  --pi
+
 OPTIONS
   --vault <path>       Override vault path (default: ~/.fulcrum/vault)
   --port <n>           Override monitor port (default: from .fulcrum.json or 4721)
@@ -740,10 +744,98 @@ async function runProjects(): Promise<void> {
   process.exit(1)
 }
 
+// ── Init command (per-project context files) ────────────────────────────────
+
+async function runInit(): Promise<void> {
+  const { fileURLToPath } = await import('url')
+  const path = await import('path')
+  const fs = await import('fs')
+
+  // Resolve repo root from this CLI file's location
+  // packages/cli/src/index.ts → repo root is 3 levels up
+  const cliPath = fileURLToPath(import.meta.url)
+  const repoRoot = path.resolve(path.dirname(cliPath), '..', '..', '..')
+  const cwd = process.cwd()
+
+  const force = args.includes('--force')
+  const onlyClaude = args.includes('--claude')
+  const onlyGemini = args.includes('--gemini')
+  const onlyPi = args.includes('--pi')
+  const all = !onlyClaude && !onlyGemini && !onlyPi
+
+  const files: Array<{ src: string; dest: string; label: string; enabled: boolean }> = [
+    {
+      src: path.join(repoRoot, 'agent-integration', 'claude', '.mcp.json'),
+      dest: path.join(cwd, '.mcp.json'),
+      label: '.mcp.json (project-scope MCP server)',
+      enabled: all || onlyClaude,
+    },
+    {
+      src: path.join(repoRoot, 'agent-integration', 'claude', 'CLAUDE.md'),
+      dest: path.join(cwd, 'CLAUDE.md'),
+      label: 'CLAUDE.md',
+      enabled: all || onlyClaude,
+    },
+    {
+      src: path.join(repoRoot, 'agent-integration', 'gemini', 'GEMINI.md'),
+      dest: path.join(cwd, 'GEMINI.md'),
+      label: 'GEMINI.md',
+      enabled: all || onlyGemini,
+    },
+    {
+      src: path.join(repoRoot, 'agent-integration', 'pi', 'PI.md'),
+      dest: path.join(cwd, 'PI.md'),
+      label: 'PI.md',
+      enabled: all || onlyPi,
+    },
+  ]
+
+  console.log(`\nfulcrum init — writing per-project context files to ${cwd}\n`)
+
+  let written = 0
+  let skipped = 0
+
+  for (const f of files) {
+    if (!f.enabled) continue
+    if (!fs.existsSync(f.src)) {
+      console.warn(`  ⚠ template missing: ${f.src}`)
+      continue
+    }
+    if (fs.existsSync(f.dest) && !force) {
+      console.log(`  — ${f.label} already exists (use --force to overwrite)`)
+      skipped++
+      continue
+    }
+    fs.copyFileSync(f.src, f.dest)
+    console.log(`  ✓ ${f.label}`)
+    written++
+  }
+
+  console.log(`\n${written} file(s) written, ${skipped} skipped.`)
+  if (skipped > 0 && !force) {
+    console.log(`Re-run with --force to overwrite existing files.\n`)
+  }
+}
+
 // ── Main dispatch ─────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   if (!group || group === '--help' || group === '-h') usage()
+
+  if (group === '--version' || group === '-v' || group === 'version') {
+    const { readFileSync } = await import('fs')
+    const { fileURLToPath } = await import('url')
+    const path = await import('path')
+    const cliPath = fileURLToPath(import.meta.url)
+    const pkgPath = path.resolve(path.dirname(cliPath), '..', 'package.json')
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version: string }
+      console.log(pkg.version)
+    } catch {
+      console.log('unknown')
+    }
+    return
+  }
 
   if (group === 'memory') { await runMemory(); return }
 
@@ -769,6 +861,7 @@ async function main(): Promise<void> {
 
   if (group === 'workspaces') { await runWorkspaces(); return }
   if (group === 'projects') { await runProjects(); return }
+  if (group === 'init') { await runInit(); return }
 
   console.error(`Unknown group: ${group}`)
   usage()
