@@ -96,6 +96,8 @@ export interface Task {
   updated_at: string
   claimed_at: string | null
   completed_at: string | null
+  labels: string[]
+  blockers: string[]
 }
 
 export interface RunArtifacts {

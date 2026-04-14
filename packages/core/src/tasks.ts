@@ -21,6 +21,7 @@ interface CreateTaskInput {
   priority?: 'critical' | 'high' | 'medium' | 'low' | 'none'
   done_criteria?: string
   issue_id?: string
+  labels?: string[]
 }
 
 interface UpdateTaskInput {
@@ -34,9 +35,10 @@ interface UpdateTaskInput {
   done_criteria?: string
   claimed_at?: string | null
   completed_at?: string | null
+  labels?: string[]
 }
 
-function rowToTask(row: Record<string, unknown>): Task {
+function rowToTaskBase(row: Record<string, unknown>): Omit<Task, 'labels' | 'blockers'> {
   return {
     task_id: row.task_id as string,
     workspace_id: row.workspace_id as string,
@@ -62,6 +64,17 @@ function rowToTask(row: Record<string, unknown>): Task {
   }
 }
 
+function hydrateTask(db: ReturnType<typeof getDb>, row: Record<string, unknown>): Task {
+  const task_id = row.task_id as string
+  const labelRows = db.prepare('SELECT label FROM task_labels WHERE task_id = ? ORDER BY label').all(task_id) as { label: string }[]
+  const labels = labelRows.map(r => r.label)
+  const blockerRows = db.prepare(
+    "SELECT task_id FROM task_relations WHERE target_task_id = ? AND relation_type = 'blocks'"
+  ).all(task_id) as { task_id: string }[]
+  const blockers = blockerRows.map(r => r.task_id)
+  return { ...rowToTaskBase(row), labels, blockers }
+}
+
 export async function listTasks(input: ListTasksInput): Promise<Task[]> {
   const db = getDb()
   let sql = 'SELECT * FROM tasks WHERE workspace_id = ?'
@@ -70,7 +83,7 @@ export async function listTasks(input: ListTasksInput): Promise<Task[]> {
   if (input.status) { sql += ' AND status = ?'; params.push(input.status) }
   sql += ' ORDER BY created_at ASC'
   const rows = db.prepare(sql).all(...params) as Record<string, unknown>[]
-  return rows.map(rowToTask)
+  return rows.map(row => hydrateTask(db, row))
 }
 
 export async function createTask(input: CreateTaskInput): Promise<Task> {
@@ -108,6 +121,13 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
     now
   )
 
+  if (input.labels && input.labels.length > 0) {
+    const insertLabel = db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)')
+    for (const label of input.labels) {
+      insertLabel.run(task_id, label)
+    }
+  }
+
   emitEvent({
     workspace_id: input.workspace_id,
     project_id: input.project_id,
@@ -121,7 +141,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
 
   const row = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(task_id) as Record<string, unknown> | undefined
   if (!row) throw new FulcrumError(`Task ${task_id} not found after insert`, 'not_found')
-  return rowToTask(row)
+  return hydrateTask(db, row)
 }
 
 export async function updateTask(input: UpdateTaskInput): Promise<Task> {
@@ -156,6 +176,13 @@ export async function updateTask(input: UpdateTaskInput): Promise<Task> {
   values.push(input.task_id)
   db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE task_id = ?`).run(...values)
 
+  if (input.labels !== undefined) {
+    db.prepare('DELETE FROM task_labels WHERE task_id = ?').run(input.task_id)
+    for (const label of input.labels) {
+      db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)').run(input.task_id, label)
+    }
+  }
+
   if (statusChanging) {
     emitEvent({
       workspace_id: existing.workspace_id as string,
@@ -175,5 +202,5 @@ export async function updateTask(input: UpdateTaskInput): Promise<Task> {
 
   const updated = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(input.task_id) as Record<string, unknown> | undefined
   if (!updated) throw new FulcrumError(`Task ${input.task_id} not found after update`, 'not_found')
-  return rowToTask(updated)
+  return hydrateTask(db, updated)
 }
