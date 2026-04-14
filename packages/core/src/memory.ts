@@ -3,6 +3,48 @@ import { newId } from './ids.js'
 import { FulcrumError } from './types.js'
 import type { Memory, MemoryScope, MemoryKind } from './types.js'
 import { getTextEmbedder, getReranker } from './embedding/registry.js'
+import { MEMORY_RANK_WEIGHTS } from './constants.js'
+
+/**
+ * §10.7 hybrid recall helpers. All component scores are in [0, 1].
+ */
+
+/** Exponential decay with ~21-day half-life (30-day time-constant). */
+function recencyScore(created_at: string): number {
+  const ts = new Date(created_at).getTime()
+  if (!Number.isFinite(ts)) return 0
+  const ageMs = Date.now() - ts
+  const ageDays = Math.max(0, ageMs / (1000 * 60 * 60 * 24))
+  return Math.exp(-ageDays / 30)
+}
+
+/** Normalize FTS5 bm25 rank (negative, lower = better) to a [0, 1] score. */
+function normalizeFtsRank(rank: number): number {
+  return 1 / (1 + Math.abs(rank))
+}
+
+/** Clamp a nullable confidence value into [0, 1] with a 0.5 default. */
+function normalizeConfidence(raw: unknown): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return 0.5
+  if (raw < 0) return 0
+  if (raw > 1) return 1
+  return raw
+}
+
+/** §10.7 weighted hybrid score. Each component must already be in [0, 1]. */
+function hybridScore(opts: {
+  semantic: number
+  lexical: number
+  recency: number
+  confidence: number
+}): number {
+  return (
+    opts.semantic * MEMORY_RANK_WEIGHTS.semantic +
+    opts.lexical * MEMORY_RANK_WEIGHTS.lexical +
+    opts.recency * MEMORY_RANK_WEIGHTS.recency +
+    opts.confidence * MEMORY_RANK_WEIGHTS.confidence
+  )
+}
 
 interface WriteMemoryInput {
   workspace_id: string
@@ -171,7 +213,39 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
   const limit = input.limit ?? 5
   if (limit <= 0) return []
   const db = getDb()
-  const candidates = new Map<string, { memory: Memory; score: number }>()
+
+  /**
+   * Candidate with per-component scores used by the §10.7 weighted hybrid formula.
+   * Missing components (e.g. a pure FTS hit with no dense match) stay at 0.
+   */
+  interface Candidate {
+    memory: Memory
+    semantic: number
+    lexical: number
+    recency: number
+    confidence: number
+    score: number
+  }
+  const candidates = new Map<string, Candidate>()
+
+  const upsertCandidate = (row: Record<string, unknown>, updates: Partial<Pick<Candidate, 'semantic' | 'lexical'>>) => {
+    const id = row.memory_id as string
+    const existing = candidates.get(id)
+    if (existing) {
+      if (updates.semantic !== undefined) existing.semantic = Math.max(existing.semantic, updates.semantic)
+      if (updates.lexical !== undefined) existing.lexical = Math.max(existing.lexical, updates.lexical)
+      return
+    }
+    const memory = rowToMemory(row)
+    candidates.set(id, {
+      memory,
+      semantic: updates.semantic ?? 0,
+      lexical: updates.lexical ?? 0,
+      recency: recencyScore(memory.created_at),
+      confidence: normalizeConfidence(memory.confidence),
+      score: 0,
+    })
+  }
 
   // Build dynamic WHERE clause — project_id and task_id are optional filters
   const whereParts: string[] = ['m.workspace_id = ?']
@@ -204,6 +278,7 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
     const likeRows = db.prepare(
       `SELECT m.rowid FROM memories m WHERE ${whereSql} AND m.content LIKE ? LIMIT ?`
     ).all(...whereParams, `%${input.query}%`, limit) as { rowid: number }[]
+    // LIKE fallback has no meaningful rank — synthesize a neutral rank so normalization → 1.0
     ftsRows = likeRows.map(r => ({ rowid: r.rowid, rank: 0 }))
   }
 
@@ -211,12 +286,12 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
     const rowids = ftsRows.map(r => r.rowid)
     const placeholders = rowids.map(() => '?').join(',')
     const rows = db.prepare(
-      `SELECT m.* FROM memories m WHERE m.rowid IN (${placeholders}) AND ${whereSql}`
-    ).all(...rowids, ...whereParams) as Record<string, unknown>[]
+      `SELECT m.*, m.rowid AS _rowid FROM memories m WHERE m.rowid IN (${placeholders}) AND ${whereSql}`
+    ).all(...rowids, ...whereParams) as (Record<string, unknown> & { _rowid: number })[]
     for (const row of rows) {
-      const fts = ftsRows.find(f => f.rowid === (row as Record<string, unknown> & { rowid: number }).rowid)
-      // FTS5 rank is negative (lower = better match); negate to get a positive score
-      candidates.set(row.memory_id as string, { memory: rowToMemory(row), score: fts ? Math.abs(fts.rank) : 0 })
+      const fts = ftsRows.find(f => f.rowid === row._rowid)
+      const lexical = fts ? normalizeFtsRank(fts.rank) : 0
+      upsertCandidate(row, { lexical })
     }
   }
 
@@ -233,17 +308,13 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
         const rowids = vecRows.map(r => r.rowid)
         const placeholders = rowids.map(() => '?').join(',')
         const rows = db.prepare(
-          `SELECT m.* FROM memories m WHERE m.rowid IN (${placeholders}) AND ${whereSql}`
-        ).all(...rowids, ...whereParams) as Record<string, unknown>[]
+          `SELECT m.*, m.rowid AS _rowid FROM memories m WHERE m.rowid IN (${placeholders}) AND ${whereSql}`
+        ).all(...rowids, ...whereParams) as (Record<string, unknown> & { _rowid: number })[]
         for (const row of rows) {
-          const vec = vecRows.find(v => v.rowid === (row as Record<string, unknown> & { rowid: number }).rowid)
-          const vecScore = vec ? 1 / (1 + vec.distance) : 0
-          const existing = candidates.get(row.memory_id as string)
-          if (existing) {
-            existing.score = (existing.score + vecScore) / 2
-          } else {
-            candidates.set(row.memory_id as string, { memory: rowToMemory(row), score: vecScore })
-          }
+          const vec = vecRows.find(v => v.rowid === row._rowid)
+          // vec0 returns L2 distance; map to similarity in [0, 1]
+          const semantic = vec ? 1 / (1 + vec.distance) : 0
+          upsertCandidate(row, { semantic })
         }
       }
     } catch {
@@ -253,19 +324,34 @@ export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> 
 
   if (candidates.size === 0) return []
 
-  // Sort by merged score, take top limit * 2 for reranking
+  // --- §10.7 weighted hybrid score ---
+  for (const c of candidates.values()) {
+    c.score = hybridScore(c)
+  }
+
+  // Sort by weighted score, take top limit * 2 for reranking
   let sorted = [...candidates.values()].sort((a, b) => b.score - a.score).slice(0, limit * 2)
 
   // --- Reranker (optional) ---
+  // Reranker score replaces the `semantic` component; recompute the weighted sum.
   const reranker = getReranker()
   if (reranker && sorted.length > 1) {
     try {
       const passages = sorted.map(c => c.memory.content)
       const scores = await reranker.rerank(input.query, passages)
-      sorted = sorted.map((c, i) => ({ ...c, score: scores[i] ?? c.score }))
-        .sort((a, b) => b.score - a.score)
+      sorted = sorted.map((c, i) => {
+        const rerankerScore = scores[i]
+        if (typeof rerankerScore !== 'number' || !Number.isFinite(rerankerScore)) return c
+        // Clamp into [0, 1]; some cross-encoders emit logits outside this range
+        const semantic = Math.max(0, Math.min(1, rerankerScore))
+        return {
+          ...c,
+          semantic,
+          score: hybridScore({ ...c, semantic }),
+        }
+      }).sort((a, b) => b.score - a.score)
     } catch {
-      // Reranker unavailable — use merged FTS5+vector scores
+      // Reranker unavailable — keep the pre-rerank weighted scores
     }
   }
 

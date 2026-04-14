@@ -336,3 +336,48 @@ describe('writeMemory — scope, kind, title, summary', () => {
     expect(m.summary).toBe('Custom summary')
   })
 })
+
+describe('§10.7 weighted hybrid ranking (G-10)', () => {
+  it('recent memories with higher confidence rank above older/lower-confidence ones with same lexical match', async () => {
+    seed()
+    const oldDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString() // 1 year ago
+
+    // A: old, low confidence
+    const a = await writeMemory({
+      content: 'jwt validation bug in auth service alpha',
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      kind: 'fact', scope: 'project',
+    })
+    getDb().prepare(
+      `UPDATE memories SET created_at = ?, confidence = 0.2 WHERE memory_id = ?`
+    ).run(oldDate, a.memory_id)
+
+    // B: recent, high confidence (distinct content so exact-match dedup doesn't fire)
+    const b = await writeMemory({
+      content: 'jwt validation bug in auth service beta',
+      workspace_id: 'ws_1', project_id: 'proj_1',
+      kind: 'fact', scope: 'project',
+    })
+    getDb().prepare(
+      `UPDATE memories SET confidence = 0.9 WHERE memory_id = ?`
+    ).run(b.memory_id)
+
+    const results = await recallMemory({
+      query: 'jwt validation bug',
+      workspace_id: 'ws_1', project_id: 'proj_1',
+    })
+
+    expect(results.length).toBeGreaterThanOrEqual(2)
+    expect(results[0].memory_id).toBe(b.memory_id)
+  })
+
+  it('weights sum to 1.0 and are importable from the public entrypoint', async () => {
+    const { MEMORY_RANK_WEIGHTS } = await import('../index.js')
+    const sum =
+      MEMORY_RANK_WEIGHTS.semantic +
+      MEMORY_RANK_WEIGHTS.lexical +
+      MEMORY_RANK_WEIGHTS.recency +
+      MEMORY_RANK_WEIGHTS.confidence
+    expect(sum).toBeCloseTo(1.0, 6)
+  })
+})
