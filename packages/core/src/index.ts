@@ -1,7 +1,7 @@
 // Types
 export type {
   Task, TaskStatus, AgentRun, AgentRunStatus, RunStatus, RunArtifacts, AgentRole,
-  Memory, AgentProfile, WorkspaceStatus, WorkspaceStatusResult, PolicyConfig,
+  Memory, AgentProfile, AgentRoleDescriptor, WorkspaceStatus, WorkspaceStatusResult, PolicyConfig,
   StatusCategory, ProjectStatus, ProjectType, WriteMode,
   TaskRelationType, MemoryScope, MemoryKind, ArtifactType, EventType,
   FulcrumEvent, TaskRelation,

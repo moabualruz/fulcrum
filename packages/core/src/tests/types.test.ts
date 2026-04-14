@@ -5,6 +5,7 @@ import type {
   AgentRole, TaskRelationType, MemoryScope, MemoryKind,
   ArtifactType, EventType,
   Task, AgentRun, Memory, FulcrumEvent, TaskRelation,
+  AgentProfile, AgentRoleDescriptor,
 } from '../types.js'
 
 describe('type exports — compile-time shape checks', () => {
@@ -109,5 +110,37 @@ describe('type exports — compile-time shape checks', () => {
       relation_type: 'blocks', created_at: '',
     }
     expect(tr.relation_type).toBe('blocks')
+  })
+
+  it('AgentRoleDescriptor is an alias for AgentProfile', () => {
+    // Both types should accept the same shape at compile time
+    const profile: AgentProfile = {
+      role: 'software_engineer',
+      description: 'Writes code',
+      can_create_teams: false,
+      can_dispatch_agents: true,
+      source: 'hardcoded',
+    }
+    // AgentRoleDescriptor and AgentProfile are structurally identical types
+    const descriptor: AgentRoleDescriptor = profile  // should not cause TS error
+    expect(descriptor.role).toBe('software_engineer')
+    expect(descriptor.can_create_teams).toBe(false)
+    expect(descriptor.can_dispatch_agents).toBe(true)
+  })
+
+  it('Memory interface has content_type field', () => {
+    const m: Memory = {
+      memory_id: 'mem_02', scope: 'project', kind: 'code',
+      content_type: 'code',
+      workspace_id: 'ws_01', project_id: 'proj_01', file_path: null,
+      symbol_path: null, title: 'Code snippet', summary: 'A code example',
+      content: 'function hello() {}', canonical_text: null,
+      tags: [], entities: [], confidence: 1.0, freshness: 1.0, importance: 0.5,
+      access_count: 0, event_time: null, content_hash: null,
+      task_id: null, issue_id: null, artifact_id: null,
+      provenance_refs: [], embedding: null,
+      created_at: '', updated_at: '', last_accessed_at: '',
+    }
+    expect(m.content_type).toBe('code')
   })
 })

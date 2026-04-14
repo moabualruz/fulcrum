@@ -192,6 +192,12 @@ export interface TaskRelation {
   created_at: string
 }
 
+/**
+ * Public view of an agent role returned by `listAgentProfiles()`.
+ * Merges the canonical 24 built-in roles with workspace-scoped custom profiles.
+ *
+ * @alias AgentRoleDescriptor — preferred name going forward; `AgentProfile` is kept for backward compat.
+ */
 export interface AgentProfile {
   role: AgentRole
   description: string
@@ -206,8 +212,18 @@ export interface AgentProfile {
   name?: string
 }
 
+/**
+ * Preferred alias for `AgentProfile`.
+ * Describes what an agent role can do (capabilities, team/dispatch rights).
+ * Use this in new code; `AgentProfile` remains for backward compat.
+ */
+export type AgentRoleDescriptor = AgentProfile
+
 /** Row shape of the agent_profiles DB table — dynamic, workspace-scoped
- *  profiles that supplement the hardcoded 24 AgentRole values. */
+ *  profiles that supplement the hardcoded 24 AgentRole values.
+ *
+ * @alias AgentCustomProfile — preferred name going forward.
+ */
 export interface AgentProfileRow {
   profile_id: string
   workspace_id: string
