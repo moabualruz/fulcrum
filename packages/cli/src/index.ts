@@ -464,14 +464,194 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
   io.exit(0)
 }
 
+// ── Session lifecycle hooks ───────────────────────────────────────────────────
+// These are called by Claude Code's SessionStart / Stop hooks (not PreToolUse).
+// They establish the run_id for the session and complete it on stop.
+
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
+import { join } from 'path'
+
+function getSessionFilePath(sessionId: string): string {
+  const dir = join(process.cwd(), '.fulcrum', 'sessions')
+  mkdirSync(dir, { recursive: true })
+  return join(dir, `${sessionId}.json`)
+}
+
+/**
+ * SessionStart hook: auto-start an agent run and stash the run_id.
+ * Claude Code calls this once when a new session opens.
+ * Stdin: JSON with { session_id, cwd, model? }
+ */
+export async function runSessionStartHook(): Promise<void> {
+  const chunks: Buffer[] = []
+  process.stdin.on('data', (c: Buffer) => chunks.push(c))
+  await new Promise<void>(r => process.stdin.on('end', r))
+  const raw = Buffer.concat(chunks).toString('utf-8').trim()
+
+  let sessionId = process.env['CLAUDE_SESSION_ID'] ?? ''
+  let model: string | undefined
+
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId || `sess_${Date.now()}`
+      model = evt['model'] as string | undefined
+    } catch { /* use env fallback */ }
+  }
+
+  if (!sessionId) sessionId = `sess_${Date.now()}`
+
+  try {
+    const { startAgentRun, getDb, runMigrations, loadConfig } = await import('@fulcrum/core')
+    const config = loadConfig()
+    const db = getDb()
+    runMigrations(db)
+
+    const wsId = config.workspace_id ?? 'default'
+    const projId = config.project_id ?? wsId
+
+    // Auto-ensure workspace + project exist
+    const now = new Date().toISOString()
+    db.prepare('INSERT OR IGNORE INTO workspaces (workspace_id, name, status, created_at) VALUES (?, ?, ?, ?)')
+      .run(wsId, wsId, 'active', now)
+    db.prepare('INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at) VALUES (?, ?, ?, ?)')
+      .run(projId, wsId, projId, now)
+
+    const run = await startAgentRun({
+      role: 'software_engineer',
+      workspace_id: wsId,
+      agent_id: `claude/${sessionId.slice(0, 12)}`,
+      pi_profile: model ?? 'claude',
+    })
+
+    const sessionFile = getSessionFilePath(sessionId)
+    writeFileSync(sessionFile, JSON.stringify({
+      session_id: sessionId,
+      run_id: run.run_id,
+      workspace_id: wsId,
+      project_id: projId,
+      started_at: now,
+    }, null, 2))
+
+    process.stderr.write(`[fulcrum/session] run started: ${run.run_id}\n`)
+  } catch (err) {
+    process.stderr.write(`[fulcrum/session-start] error (non-fatal): ${(err as Error).message}\n`)
+  }
+
+  // Always exit 0 — never block the session from starting
+  process.exit(0)
+}
+
+/**
+ * Stop hook: mark the run as completed.
+ * Claude Code calls this when the session is closing.
+ * Stdin: JSON with { session_id }
+ */
+export async function runSessionStopHook(): Promise<void> {
+  const chunks: Buffer[] = []
+  process.stdin.on('data', (c: Buffer) => chunks.push(c))
+  await new Promise<void>(r => process.stdin.on('end', r))
+  const raw = Buffer.concat(chunks).toString('utf-8').trim()
+
+  let sessionId = process.env['CLAUDE_SESSION_ID'] ?? ''
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId
+    } catch { /* use env fallback */ }
+  }
+
+  if (!sessionId) {
+    process.exit(0)
+    return
+  }
+
+  try {
+    const sessionFile = getSessionFilePath(sessionId)
+    if (!existsSync(sessionFile)) {
+      process.exit(0)
+      return
+    }
+    const session = JSON.parse(readFileSync(sessionFile, 'utf-8')) as {
+      run_id: string; workspace_id: string
+    }
+
+    const { completeAgentRun, getDb, runMigrations, loadConfig } = await import('@fulcrum/core')
+    const config = loadConfig()
+    const db = getDb()
+    runMigrations(db)
+    void config // loadConfig used for side effects (db path)
+
+    await completeAgentRun({
+      run_id: session.run_id,
+      output_summary: 'Claude session ended',
+    })
+    process.stderr.write(`[fulcrum/session] run completed: ${session.run_id}\n`)
+  } catch (err) {
+    process.stderr.write(`[fulcrum/session-stop] error (non-fatal): ${(err as Error).message}\n`)
+  }
+
+  process.exit(0)
+}
+
+/**
+ * PreCompact hook: write a memory entry from the compaction summary.
+ * Claude Code calls this before context compaction.
+ * Stdin: JSON with { session_id, summary }
+ */
+export async function runPreCompactHook(): Promise<void> {
+  const chunks: Buffer[] = []
+  process.stdin.on('data', (c: Buffer) => chunks.push(c))
+  await new Promise<void>(r => process.stdin.on('end', r))
+  const raw = Buffer.concat(chunks).toString('utf-8').trim()
+
+  if (!raw) { process.exit(0); return }
+
+  let sessionId = process.env['CLAUDE_SESSION_ID'] ?? 'unknown'
+  let summary = ''
+
+  try {
+    const evt = JSON.parse(raw) as Record<string, unknown>
+    sessionId = (evt['session_id'] as string) || sessionId
+    summary = (evt['summary'] as string) || (evt['compaction_summary'] as string) || ''
+  } catch { process.exit(0); return }
+
+  if (!summary) { process.exit(0); return }
+
+  try {
+    const { writeMemory, getDb, runMigrations, loadConfig } = await import('@fulcrum/core')
+    const config = loadConfig()
+    const db = getDb()
+    runMigrations(db)
+    void db
+
+    await writeMemory({
+      title: `Session compact — ${new Date().toISOString().slice(0, 10)}`,
+      content: summary,
+      workspace_id: config.workspace_id ?? 'default',
+      project_id: config.project_id ?? config.workspace_id ?? 'default',
+      tags: ['session-compact', `session:${sessionId.slice(0, 12)}`],
+      importance: 0.7,
+    } as Parameters<typeof writeMemory>[0])
+    process.stderr.write(`[fulcrum/pre-compact] memory saved (${summary.length} chars)\n`)
+  } catch (err) {
+    process.stderr.write(`[fulcrum/pre-compact] error (non-fatal): ${(err as Error).message}\n`)
+  }
+
+  process.exit(0)
+}
+
 async function runHook(cliName: string, phase: HookPhase = 'pre'): Promise<void> {
   if (cliName === '--help' || cliName === '-h' || !cliName) {
     console.log(`
 fulcrum hook — tool-call policy hooks for coding agents
 
-  fulcrum hook claude [pre|post]    Claude Code PreToolUse / PostToolUse hook
-  fulcrum hook gemini [pre|post]    Gemini CLI BeforeTool / AfterTool hook
-  fulcrum hook pi     [pre|post]    PI coding agent BeforeTool / AfterTool hook
+  fulcrum hook claude [pre|post]           Claude Code PreToolUse / PostToolUse hook
+  fulcrum hook claude session-start        Claude Code SessionStart hook
+  fulcrum hook claude session-stop         Claude Code Stop hook
+  fulcrum hook claude pre-compact          Claude Code PreCompact hook
+  fulcrum hook gemini [pre|post]           Gemini CLI BeforeTool / AfterTool hook
+  fulcrum hook pi     [pre|post]           PI coding agent BeforeTool / AfterTool hook
 
 Phase defaults to 'pre' when omitted (legacy). The pre hook normalises
 the event, scans for secrets, enforces the team-invoke policy, and
@@ -1810,13 +1990,21 @@ fulcrum serve — long-running servers
       return
     }
     if (cli === 'claude' || cli === 'gemini' || cli === 'pi') {
-      // Optional second-level arg: 'pre' | 'post'. Default 'pre' for
-      // backward compatibility with existing settings.json entries.
+      // Optional second-level arg: 'pre' | 'post' | 'session-start' | 'session-stop' | 'pre-compact'
+      // Default 'pre' for backward compatibility with existing settings.json entries.
       const phaseArg = args[2] as string | undefined
+
+      // Session lifecycle hooks (claude-only)
+      if (cli === 'claude') {
+        if (phaseArg === 'session-start') { await runSessionStartHook(); return }
+        if (phaseArg === 'session-stop')  { await runSessionStopHook();  return }
+        if (phaseArg === 'pre-compact')   { await runPreCompactHook();   return }
+      }
+
       const phase: HookPhase = phaseArg === 'post' ? 'post' : 'pre'
       if (phaseArg && phaseArg !== 'pre' && phaseArg !== 'post') {
         console.error(`Unknown hook phase: ${phaseArg}`)
-        console.error('Usage: fulcrum hook claude|gemini|pi [pre|post]')
+        console.error('Usage: fulcrum hook claude|gemini|pi [pre|post|session-start|session-stop|pre-compact]')
         process.exit(1)
       }
       await runHook(cli, phase)

@@ -1,5 +1,35 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "fulcrum hook claude session-start"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "fulcrum hook claude session-stop"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "fulcrum hook claude pre-compact"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "*",

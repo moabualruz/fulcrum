@@ -277,11 +277,14 @@ function installClaudeMcp(): void {
   ok(`wrote fulcrum MCP entry → ${claudeJsonPath}`);
 }
 
-// ── 3. Claude Code: PreToolUse hook → ~/.claude/settings.json ─────────────────
+// ── 3. Claude Code: hooks → ~/.claude/settings.json ──────────────────────────
 
 // Hook commands kept in sync with agent-integration/claude/settings-hooks-snippet.json.
-const CLAUDE_PRE_COMMANDS = ["fulcrum hook claude pre", "fulcrum hook claude"];
-const CLAUDE_POST_COMMANDS = ["fulcrum hook claude post"];
+const CLAUDE_PRE_COMMANDS          = ["fulcrum hook claude pre", "fulcrum hook claude"];
+const CLAUDE_POST_COMMANDS         = ["fulcrum hook claude post"];
+const CLAUDE_SESSION_START_COMMANDS = ["fulcrum hook claude session-start"];
+const CLAUDE_STOP_COMMANDS         = ["fulcrum hook claude session-stop"];
+const CLAUDE_PRE_COMPACT_COMMANDS  = ["fulcrum hook claude pre-compact"];
 
 function installClaudeHook(): void {
   const settingsPath = path.join(HOME, ".claude", "settings.json");
@@ -299,7 +302,8 @@ function installClaudeHook(): void {
 
   const hooks = (settings["hooks"] as Record<string, unknown[]> | undefined) ?? {};
 
-  const ensureHook = (
+  /** Tool-use hooks (PreToolUse / PostToolUse) have a `matcher` field. */
+  const ensureToolHook = (
     key: "PreToolUse" | "PostToolUse",
     canonicalCommand: string,
     acceptedCommands: string[],
@@ -318,20 +322,44 @@ function installClaudeHook(): void {
     return "added";
   };
 
-  const preResult = ensureHook("PreToolUse", "fulcrum hook claude pre", CLAUDE_PRE_COMMANDS);
-  const postResult = ensureHook("PostToolUse", "fulcrum hook claude post", CLAUDE_POST_COMMANDS);
+  /** Lifecycle hooks (SessionStart / Stop / PreCompact) have no `matcher`. */
+  const ensureLifecycleHook = (
+    key: "SessionStart" | "Stop" | "PreCompact",
+    canonicalCommand: string,
+    acceptedCommands: string[],
+  ): "added" | "present" => {
+    const list = (hooks[key] as Array<Record<string, unknown>> | undefined) ?? [];
+    const alreadyInstalled = list.some((entry) => {
+      const inner = (entry["hooks"] as Array<Record<string, unknown>> | undefined) ?? [];
+      return inner.some((h) => acceptedCommands.includes(h["command"] as string));
+    });
+    if (alreadyInstalled) return "present";
+    list.push({ hooks: [{ type: "command", command: canonicalCommand }] });
+    hooks[key] = list;
+    return "added";
+  };
+
+  const preResult          = ensureToolHook("PreToolUse",  "fulcrum hook claude pre",          CLAUDE_PRE_COMMANDS);
+  const postResult         = ensureToolHook("PostToolUse", "fulcrum hook claude post",         CLAUDE_POST_COMMANDS);
+  const startResult        = ensureLifecycleHook("SessionStart", "fulcrum hook claude session-start", CLAUDE_SESSION_START_COMMANDS);
+  const stopResult         = ensureLifecycleHook("Stop",         "fulcrum hook claude session-stop",  CLAUDE_STOP_COMMANDS);
+  const preCompactResult   = ensureLifecycleHook("PreCompact",   "fulcrum hook claude pre-compact",   CLAUDE_PRE_COMPACT_COMMANDS);
 
   settings["hooks"] = hooks;
 
-  if (preResult === "present" && postResult === "present") {
-    skip("PreToolUse + PostToolUse hooks already present");
+  const allPresent = [preResult, postResult, startResult, stopResult, preCompactResult].every(r => r === "present");
+  if (allPresent) {
+    skip("all 5 hooks already present");
     return;
   }
 
   writeJson(settingsPath, settings);
   const parts: string[] = [];
-  if (preResult === "added") parts.push("PreToolUse");
-  if (postResult === "added") parts.push("PostToolUse");
+  if (preResult        === "added") parts.push("PreToolUse");
+  if (postResult       === "added") parts.push("PostToolUse");
+  if (startResult      === "added") parts.push("SessionStart");
+  if (stopResult       === "added") parts.push("Stop");
+  if (preCompactResult === "added") parts.push("PreCompact");
   ok(`added ${parts.join(" + ")} hook${parts.length > 1 ? "s" : ""} → ${settingsPath}`);
 }
 
@@ -537,7 +565,7 @@ function runCheck(): number {
       const settings = readJson(settingsPath);
       const hooks = (settings["hooks"] as Record<string, unknown[]> | undefined) ?? {};
       const hasHook = (
-        key: "PreToolUse" | "PostToolUse",
+        key: "PreToolUse" | "PostToolUse" | "SessionStart" | "Stop" | "PreCompact",
         accepted: string[],
       ): boolean => {
         const list = (hooks[key] as Array<Record<string, unknown>> | undefined) ?? [];
@@ -546,14 +574,23 @@ function runCheck(): number {
           return inner.some((h) => accepted.includes(h["command"] as string));
         });
       };
-      const preFound = hasHook("PreToolUse", CLAUDE_PRE_COMMANDS);
-      const postFound = hasHook("PostToolUse", CLAUDE_POST_COMMANDS);
-      if (preFound && postFound) {
-        rows.push({ label: "Claude hook", status: "ok", detail: `PreToolUse + PostToolUse in ${settingsPath}` });
-      } else if (preFound && !postFound) {
-        rows.push({ label: "Claude hook", status: "warn", detail: `PreToolUse present but PostToolUse missing in ${settingsPath}` });
-      } else if (!preFound && postFound) {
-        rows.push({ label: "Claude hook", status: "warn", detail: `PostToolUse present but PreToolUse missing in ${settingsPath}` });
+      const preFound        = hasHook("PreToolUse",   CLAUDE_PRE_COMMANDS);
+      const postFound       = hasHook("PostToolUse",  CLAUDE_POST_COMMANDS);
+      const startFound      = hasHook("SessionStart", CLAUDE_SESSION_START_COMMANDS);
+      const stopFound       = hasHook("Stop",         CLAUDE_STOP_COMMANDS);
+      const preCompactFound = hasHook("PreCompact",   CLAUDE_PRE_COMPACT_COMMANDS);
+      const allFound = preFound && postFound && startFound && stopFound && preCompactFound;
+      const anyFound = preFound || postFound || startFound || stopFound || preCompactFound;
+      if (allFound) {
+        rows.push({ label: "Claude hook", status: "ok", detail: `all 5 lifecycle hooks in ${settingsPath}` });
+      } else if (anyFound) {
+        const missing: string[] = [];
+        if (!preFound)        missing.push("PreToolUse");
+        if (!postFound)       missing.push("PostToolUse");
+        if (!startFound)      missing.push("SessionStart");
+        if (!stopFound)       missing.push("Stop");
+        if (!preCompactFound) missing.push("PreCompact");
+        rows.push({ label: "Claude hook", status: "warn", detail: `missing: ${missing.join(", ")} in ${settingsPath}` });
       } else {
         rows.push({ label: "Claude hook", status: "fail", detail: `no fulcrum hooks in ${settingsPath}` });
       }
@@ -702,7 +739,7 @@ function printSummary(target: Target): void {
   }
   if (target === "all" || target === "claude") {
     rows.push(["Claude MCP server", `user scope — see: claude mcp list`]);
-    rows.push(["Claude PreToolUse hook", `~/.claude/settings.json`]);
+    rows.push(["Claude hooks (5)", `~/.claude/settings.json (PreToolUse, PostToolUse, SessionStart, Stop, PreCompact)`]);
     rows.push(["Claude global context", `~/.claude/CLAUDE.md (<!-- fulcrum:... --> section)`]);
     rows.push(["Claude Code skills", `~/.claude/skills/fulcrum/ (13 skill MDs)`]);
   }
