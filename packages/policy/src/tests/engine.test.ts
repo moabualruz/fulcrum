@@ -354,6 +354,193 @@ describe('evaluatePolicy — path matcher', () => {
   })
 })
 
+// --- evaluatePolicy — glob pattern matchers ---
+
+describe('evaluatePolicy — glob pattern matching (tool matcher)', () => {
+  it('tool: "file_*" matches file_read', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-file-tools',
+      action: 'deny',
+      matchers: [{ matcher_type: 'tool', pattern: 'file_*' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'file_read',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toBe('no-file-tools')
+  })
+
+  it('tool: "file_*" matches file_write', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-file-tools',
+      action: 'deny',
+      matchers: [{ matcher_type: 'tool', pattern: 'file_*' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'file_write',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toBe('no-file-tools')
+  })
+
+  it('tool: "file_*" does not match shell_exec', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-file-tools',
+      action: 'deny',
+      matchers: [{ matcher_type: 'tool', pattern: 'file_*' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'shell_exec',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+})
+
+describe('evaluatePolicy — glob pattern matching (command matcher)', () => {
+  it('command: "git *" matches git commit', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-git-commands',
+      action: 'deny',
+      matchers: [{ matcher_type: 'command', pattern: 'git *' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'git commit',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toBe('no-git-commands')
+  })
+
+  it('command: "git *" matches git push', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-git-commands',
+      action: 'deny',
+      matchers: [{ matcher_type: 'command', pattern: 'git *' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'git push',
+    })
+    expect(decision.allowed).toBe(false)
+  })
+
+  it('command: "git *" does not match npm install', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-git-commands',
+      action: 'deny',
+      matchers: [{ matcher_type: 'command', pattern: 'git *' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'npm install',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+})
+
+describe('evaluatePolicy — glob pattern matching (path matcher)', () => {
+  it('path: "src/**" matches src/foo/bar.ts', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'protect-src',
+      action: 'deny',
+      matchers: [{ matcher_type: 'path', pattern: 'src/**' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'write_file',
+      resource_id: 'src/foo/bar.ts',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toBe('protect-src')
+  })
+
+  it('path: "src/**" does not match tests/foo.ts', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'protect-src',
+      action: 'deny',
+      matchers: [{ matcher_type: 'path', pattern: 'src/**' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'write_file',
+      resource_id: 'tests/foo.ts',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+})
+
+describe('evaluatePolicy — glob pattern matching (artifact matcher)', () => {
+  it('artifact: "*.md" matches README.md', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-markdown-artifacts',
+      action: 'deny',
+      matchers: [{ matcher_type: 'artifact', pattern: '*.md' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'README.md',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toBe('no-markdown-artifacts')
+  })
+
+  it('artifact: "*.md" does not match schema.sql', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-markdown-artifacts',
+      action: 'deny',
+      matchers: [{ matcher_type: 'artifact', pattern: '*.md' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'implementer',
+      actor_id: 'agent_1',
+      action: 'schema.sql',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+})
+
 describe('evaluatePolicy — regex matcher', () => {
   it('denies when action matches regex pattern', async () => {
     await createPolicyRule({

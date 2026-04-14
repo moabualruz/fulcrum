@@ -132,6 +132,9 @@ importers:
       '@fulcrum/core':
         specifier: workspace:*
         version: link:../core
+      minimatch:
+        specifier: ^10.2.5
+        version: 10.2.5
       ulid:
         specifier: ^2.3.0
         version: 2.4.0

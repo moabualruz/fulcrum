@@ -1,6 +1,7 @@
 // packages/policy/src/engine.ts
 import { ulid } from 'ulid'
 import { getDb, FulcrumError } from '@fulcrum/core'
+import { minimatch } from 'minimatch'
 import type {
   PolicyRule, PolicyMatcher, EvaluatePolicyInput, PolicyDecision,
   CreatePolicyRuleInput, ListPolicyRulesInput, PolicyScope, PolicyAction, MatcherType,
@@ -64,19 +65,18 @@ function matcherMatches(matcher: PolicyMatcher, input: EvaluatePolicyInput): boo
   switch (matcher_type) {
     case 'tool':
     case 'command':
+    case 'artifact':
+      // Glob pattern match on action (mirrors Python fnmatch behavior)
+      return minimatch(input.action, pattern, { nocase: true })
+    case 'path': {
+      // Glob pattern match against resource_id (mirrors Python fnmatch behavior)
+      const target = input.resource_id ?? ''
+      return minimatch(target, pattern, { nocase: true })
+    }
     case 'agent_team':
     case 'workflow_step':
-    case 'artifact':
       // Exact match on action
       return input.action === pattern
-    case 'path': {
-      // Glob-style: support trailing * wildcard only — matches against resource_id
-      const target = input.resource_id ?? ''
-      if (pattern.endsWith('*')) {
-        return target.startsWith(pattern.slice(0, -1))
-      }
-      return target === pattern
-    }
     case 'regex':
       try {
         return new RegExp(pattern).test(input.action)
