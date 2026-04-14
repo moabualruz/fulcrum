@@ -1,9 +1,10 @@
 import { createHash } from 'crypto'
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { watch } from 'chokidar'
 import { join } from 'path'
+import matter from 'gray-matter'
 import { parseFromFile } from './formatter.js'
-import { readState, upsertStateEntry } from './state.js'
+import { readState, upsertStateEntry, removeStateEntry } from './state.js'
 import { appendToLog } from './index-builder.js'
 
 export interface VaultWatcherOptions {
@@ -58,13 +59,23 @@ export function startVaultWatcher(options: VaultWatcherOptions): () => void {
       // Genuine human edit
       const now = new Date().toISOString()
 
-      // Update state
+      // Update state FIRST so the file rewrite below is suppressed as a self-write echo
       upsertStateEntry(vaultPath, {
         id: memoryId,
         path: filePath.replace(vaultPath + '/', ''),
         mtime: Date.now(),
         sha256: currentHash,
       })
+
+      // Update content_hash and updated_at in the file frontmatter
+      // Parse raw file with gray-matter so we preserve exact YAML formatting
+      const parsed = matter(content)
+      parsed.data['content_hash'] = currentHash
+      parsed.data['updated_at'] = now
+      const updatedContent = matter.stringify(parsed.content, parsed.data)
+      writeFileSync(filePath, updatedContent, 'utf-8')
+      // Note: the chokidar event for this rewrite will be suppressed by the state entry above
+      // because sha256(body) hasn't changed — only the frontmatter changed
 
       // Append EDIT to log
       appendToLog(vaultPath, {
@@ -97,11 +108,15 @@ export function startVaultWatcher(options: VaultWatcherOptions): () => void {
       if (!entry) return
 
       const now = new Date().toISOString()
+
+      // Remove stale state entry so future re-creates are not suppressed
+      removeStateEntry(vaultPath, entry.id)
+
       appendToLog(vaultPath, {
         ts: now,
-        op: 'EDIT',
+        op: 'DELETE',
         id: entry.id,
-        meta: 'by=human op=delete',
+        meta: 'by=human',
       })
 
       await onHumanDelete(entry.id, filePath)

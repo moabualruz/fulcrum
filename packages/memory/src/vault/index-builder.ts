@@ -5,7 +5,7 @@ import { listMemoryFiles, readMemoryFile } from './client.js'
 
 export interface LogEntry {
   ts: string
-  op: 'WRITE' | 'EDIT' | 'INDEX-L1' | 'INDEX-L2' | 'REBUILD' | 'MERGE' | 'ERROR'
+  op: 'WRITE' | 'EDIT' | 'DELETE' | 'INDEX-L1' | 'INDEX-L2' | 'REBUILD' | 'MERGE' | 'ERROR'
   id: string
   meta?: string
 }
