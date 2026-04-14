@@ -383,6 +383,7 @@ export class FulcrumError extends Error {
       | 'invalid_input'
       | 'invalid_state'
       | 'rate_limited'
+      | 'git_error'
   ) {
     super(message)
     this.name = 'FulcrumError'

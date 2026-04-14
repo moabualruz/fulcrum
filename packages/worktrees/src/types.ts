@@ -46,6 +46,7 @@ export interface Worktree {
   status: WorktreeStatus
   branch_name: string
   path: string
+  base_branch?: string
   task_id?: string
   run_id?: string
   created_at: string
@@ -62,11 +63,33 @@ export interface MergeResult {
   merged_at?: string
 }
 
+/**
+ * Allocate a worktree.
+ *
+ * Two usage modes:
+ *
+ * 1. **Explicit mode (legacy / testing)** — caller supplies `branch_name` and
+ *    `path` directly; no git subprocess is run. Used by tests and low-level
+ *    callers that manage git themselves.
+ *
+ * 2. **Managed mode (H-3)** — caller supplies `agent_role` and `base_branch`;
+ *    worktrees.ts computes `path = <project_root>/.fulcrum-worktrees/<worktree_id>`,
+ *    `branch_name = fulcrum/<agent_role>/<suffix>`, and runs
+ *    `git worktree add` in the project root. For non-git projects
+ *    (`type='non_git'` or no `.git` dir), falls back to sequential mode and
+ *    uses the project root as the path with no branch.
+ */
 export interface AllocateWorktreeInput {
   workspace_id: string
   project_id: string
-  branch_name: string
-  path: string
+  /** Explicit mode: branch name (if omitted, managed mode derives one). */
+  branch_name?: string
+  /** Explicit mode: path (if omitted, managed mode computes one). */
+  path?: string
+  /** Managed mode: agent role used in the auto-generated branch name. */
+  agent_role?: string
+  /** Managed mode: base branch to branch off of (e.g. 'main'). */
+  base_branch?: string
   task_id?: string
   run_id?: string
 }

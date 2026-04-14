@@ -48,6 +48,7 @@ export function runMigration008(db: Database.Database): void {
         CHECK(status IN ('allocated','dirty','ready_for_merge','merged','discarded')),
       branch_name  TEXT NOT NULL,
       path         TEXT NOT NULL,
+      base_branch  TEXT,
       task_id      TEXT REFERENCES tasks(task_id),
       run_id       TEXT REFERENCES agent_runs(run_id),
       created_at   TEXT NOT NULL DEFAULT (datetime('now')),

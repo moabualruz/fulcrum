@@ -1,11 +1,16 @@
 // packages/worktrees/src/tests/worktrees.test.ts
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
+import { execFileSync } from 'child_process'
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { setDb } from '@fulcrum/core'
 import { runMigration008 } from '../schema.js'
 import type { ArtifactType, HandoffMode } from '../types.js'
 import {
   allocateWorktree,
+  deallocateWorktree,
   markDirty,
   markReadyForMerge,
   enqueueMerge,
@@ -33,7 +38,9 @@ function createTestDb(): Database.Database {
       project_id   TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
       name         TEXT NOT NULL,
+      type         TEXT NOT NULL DEFAULT 'git',
       status       TEXT NOT NULL DEFAULT 'active',
+      git_url      TEXT,
       created_at   TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -530,5 +537,138 @@ describe('listMergeQueue', () => {
 
     // All returned entries have correct status
     queue.forEach((w) => expect(w.status).toBe('ready_for_merge'))
+  })
+})
+
+// --- H-3: git subprocess integration --------------------------------------
+
+describe('allocateWorktree git subprocess (H-3)', () => {
+  let repoDir: string
+  const tmpDirs: string[] = []
+
+  function seedGitRepo(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'fulcrum-wt-h3-'))
+    tmpDirs.push(dir)
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: dir })
+    execFileSync('git', ['config', 'user.email', 'test@fulcrum.dev'], { cwd: dir })
+    execFileSync('git', ['config', 'user.name', 'Fulcrum Test'], { cwd: dir })
+    execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: dir })
+    writeFileSync(join(dir, 'README.md'), '# test\n')
+    execFileSync('git', ['add', '.'], { cwd: dir })
+    execFileSync('git', ['commit', '-m', 'init', '-q'], { cwd: dir })
+    return dir
+  }
+
+  beforeEach(() => {
+    // Fresh DB with a project pointing at a real temp git repo.
+    repoDir = seedGitRepo()
+    db.prepare(
+      `UPDATE projects SET git_url = ?, type = 'git' WHERE project_id = 'proj_test'`
+    ).run(repoDir)
+  })
+
+  afterEach(() => {
+    for (const d of tmpDirs) {
+      try { rmSync(d, { recursive: true, force: true }) } catch { /* ignore */ }
+    }
+    tmpDirs.length = 0
+  })
+
+  it('runs git worktree add and creates the directory + branch', async () => {
+    const wt = await allocateWorktree({
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      agent_role: 'software_engineer',
+      base_branch: 'main',
+    })
+    expect(wt.worktree_id).toMatch(/^wt_/)
+    expect(wt.path).toContain('.fulcrum-worktrees')
+    expect(existsSync(wt.path)).toBe(true)
+    expect(wt.branch_name).toMatch(/^fulcrum\/software_engineer\//)
+    expect(wt.base_branch).toBe('main')
+
+    const branches = execFileSync('git', ['branch', '--list', wt.branch_name], {
+      cwd: repoDir, encoding: 'utf8'
+    })
+    expect(branches).toContain(wt.branch_name)
+  })
+
+  it('appends .fulcrum-worktrees/ to .gitignore idempotently', async () => {
+    await allocateWorktree({
+      workspace_id: 'ws_test', project_id: 'proj_test',
+      agent_role: 'software_engineer', base_branch: 'main',
+    })
+    const gi1 = readFileSync(join(repoDir, '.gitignore'), 'utf8')
+    expect(gi1).toContain('.fulcrum-worktrees/')
+
+    // Second allocation — should NOT duplicate the entry
+    await allocateWorktree({
+      workspace_id: 'ws_test', project_id: 'proj_test',
+      agent_role: 'qa_engineer', base_branch: 'main',
+    })
+    const gi2 = readFileSync(join(repoDir, '.gitignore'), 'utf8')
+    const matches = gi2.match(/\.fulcrum-worktrees\//g) ?? []
+    expect(matches.length).toBe(1)
+  })
+
+  it('non-git project falls back to sequential mode (no .git, no subprocess)', async () => {
+    const nonGitDir = mkdtempSync(join(tmpdir(), 'fulcrum-nongit-'))
+    tmpDirs.push(nonGitDir)
+    db.prepare(
+      `INSERT INTO projects (project_id, workspace_id, name, type, git_url) VALUES (?, ?, ?, ?, ?)`
+    ).run('proj_nongit', 'ws_test', 'non-git', 'non_git', nonGitDir)
+
+    const wt = await allocateWorktree({
+      workspace_id: 'ws_test',
+      project_id: 'proj_nongit',
+      agent_role: 'software_engineer',
+      base_branch: 'main',
+    })
+    // In sequential mode, path is the project root itself and no
+    // .fulcrum-worktrees dir is created.
+    expect(wt.path).toBe(nonGitDir)
+    expect(existsSync(join(nonGitDir, '.fulcrum-worktrees'))).toBe(false)
+    expect(existsSync(join(nonGitDir, '.gitignore'))).toBe(false)
+  })
+
+  it('rolls back the DB row if git worktree add fails', async () => {
+    await expect(
+      allocateWorktree({
+        workspace_id: 'ws_test',
+        project_id: 'proj_test',
+        agent_role: 'software_engineer',
+        base_branch: 'nonexistent-branch-xyz',
+      })
+    ).rejects.toMatchObject({ code: 'git_error' })
+
+    const rows = db.prepare(`SELECT * FROM worktrees`).all()
+    expect(rows.length).toBe(0)
+  })
+
+  it('deallocateWorktree runs git worktree remove and deletes the row', async () => {
+    const wt = await allocateWorktree({
+      workspace_id: 'ws_test', project_id: 'proj_test',
+      agent_role: 'software_engineer', base_branch: 'main',
+    })
+    expect(existsSync(wt.path)).toBe(true)
+
+    await deallocateWorktree({ worktree_id: wt.worktree_id })
+    expect(existsSync(wt.path)).toBe(false)
+    const remaining = db.prepare(`SELECT * FROM worktrees WHERE worktree_id = ?`).get(wt.worktree_id)
+    expect(remaining).toBeUndefined()
+  })
+
+  it('rejects managed-mode allocation when project has no git_url', async () => {
+    db.prepare(
+      `INSERT INTO projects (project_id, workspace_id, name, type) VALUES ('proj_no_path', 'ws_test', 'no path', 'git')`
+    ).run()
+    await expect(
+      allocateWorktree({
+        workspace_id: 'ws_test',
+        project_id: 'proj_no_path',
+        agent_role: 'software_engineer',
+        base_branch: 'main',
+      })
+    ).rejects.toMatchObject({ code: 'not_found' })
   })
 })
