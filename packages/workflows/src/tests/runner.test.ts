@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seed } from './helpers.js'
-import { getDb, newId } from '@fulcrum/core'
+import { getDb, getTrace, newId } from '@fulcrum/core'
 import type Database from 'better-sqlite3'
 import { runWorkflow } from '../runner.js'
 import { executeStep, listStepHandlers } from '../step-executor.js'
@@ -286,6 +286,44 @@ describe('runWorkflow (H-1/H-5)', () => {
     const states = loadSteps(db, wf_id)
     const loopState = states.find((s) => s.step_id === 'l')!
     expect(loopState.attempts).toBeGreaterThanOrEqual(3)
+  })
+
+  it('emits workflow.run + workflow.step spans into trace_events (K-5)', async () => {
+    const wf_id = newId('wf')
+    seedWorkflowRun(db, wf_id, workspace_id, project_id, [
+      { step_id: 's1', step_type: 'create_task', config: { title: 'span-test task' } },
+      { step_id: 's2', step_type: 'halt', depends_on: ['s1'] },
+    ])
+
+    await runWorkflow({ wf_id, workspace_id, retry_backoff_cap_ms: 5 })
+
+    // Locate the root span by name. We don't have a handle on the id.
+    const rootRow = db
+      .prepare(
+        `SELECT span_id, trace_id FROM trace_events
+         WHERE name = 'workflow.run'
+         ORDER BY started_at DESC LIMIT 1`,
+      )
+      .get() as { span_id: string; trace_id: string } | undefined
+    expect(rootRow).toBeDefined()
+
+    const trace = await getTrace(rootRow!.trace_id)
+    expect(trace.length).toBeGreaterThanOrEqual(3) // root + s1 + s2
+
+    const names = trace.map((s) => s.name)
+    expect(names).toContain('workflow.run')
+    expect(names.filter((n) => n === 'workflow.step').length).toBeGreaterThanOrEqual(2)
+
+    // Every step span should chain off the root.
+    const stepSpans = trace.filter((s) => s.name === 'workflow.step')
+    for (const ss of stepSpans) {
+      expect(ss.parent_span_id).toBe(rootRow!.span_id)
+    }
+
+    // Root span terminated ok with the expected summary payload.
+    const root = trace.find((s) => s.span_id === rootRow!.span_id)!
+    expect(root.status).toBe('ok')
+    expect(root.payload).toMatchObject({ final_status: 'completed' })
   })
 
   it('executeStep returns failed for unknown step types', async () => {

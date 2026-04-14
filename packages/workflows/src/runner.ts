@@ -18,7 +18,7 @@
 // function has its own pause semantics for prompt_user etc. The runner
 // writes directly to the JSON blob instead.
 
-import { getDb } from '@fulcrum/core'
+import { getDb, startSpan, endSpan } from '@fulcrum/core'
 import { nextReadySteps } from './engine.js'
 import { executeStep } from './step-executor.js'
 import type {
@@ -190,6 +190,13 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
   const { workspace_id, project_id, step_defs } = loaded
   let states = loaded.steps
 
+  // Root span for the entire run. All step spans chain off this.
+  const runSpan = await startSpan({
+    name: 'workflow.run',
+    workspace_id,
+    payload: { wf_id: input.wf_id },
+  })
+
   // Hydrate outputs from any prior completed steps.
   const outputs: Record<string, unknown> = {}
   for (const s of states) {
@@ -202,6 +209,8 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
   let haltRequested = false
   let finalStatus: 'completed' | 'blocked' | 'failed' = 'completed'
   let lastCurrentStep: string | undefined
+
+  try {
 
   for (let iter = 0; iter < maxIter && !haltRequested; iter++) {
     const ready = nextReadySteps(states, step_defs)
@@ -232,6 +241,19 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
       state.started_at = state.started_at ?? now
       lastCurrentStep = step_id
 
+      const stepSpan = await startSpan({
+        name: 'workflow.step',
+        workspace_id,
+        parent_span_id: runSpan.span_id,
+        payload: {
+          step_id,
+          step_type: (def as unknown as { step_type?: string; type?: string }).step_type
+            ?? (def as unknown as { type?: string }).type
+            ?? 'unknown',
+          attempts: state.attempts,
+        },
+      })
+
       let result: StepResult
       try {
         const stepTimeout = (def as unknown as { timeout_ms?: number }).timeout_ms ?? defaultTimeout
@@ -239,6 +261,12 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
       } catch (err) {
         result = { status: 'failed', error: (err as Error).message }
       }
+
+      await endSpan({
+        span_id: stepSpan.span_id,
+        status: result.status === 'failed' ? 'error' : 'ok',
+        payload: { result_status: result.status, error: result.error },
+      })
 
       state.attempts += 1
 
@@ -338,10 +366,28 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
 
   persistStates(input.wf_id, states, step_defs, dbStatus, lastCurrentStep)
 
+  await endSpan({
+    span_id: runSpan.span_id,
+    status: finalStatus === 'failed' ? 'error' : 'ok',
+    payload: {
+      final_status: finalStatus,
+      steps_executed: stepsExecuted,
+      duration_ms: Date.now() - start,
+    },
+  })
+
   return {
     wf_id: input.wf_id,
     final_status: finalStatus,
     steps_executed: stepsExecuted,
     duration_ms: Date.now() - start,
+  }
+  } catch (err) {
+    await endSpan({
+      span_id: runSpan.span_id,
+      status: 'error',
+      payload: { error: (err as Error).message },
+    })
+    throw err
   }
 }

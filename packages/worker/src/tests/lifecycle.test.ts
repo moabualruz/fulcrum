@@ -16,6 +16,7 @@ import {
   getDb,
   createTask,
   getAgentRunStatus,
+  getTrace,
 } from '@fulcrum/core'
 import { spawnAgent, registerAgentAdapter } from '../index.js'
 
@@ -164,6 +165,37 @@ describe('spawnAgent lifecycle (H-2)', () => {
     const status = await getAgentRunStatus({ run_id })
     expect(status.status).toBe('blocked')
     expect(status.blocker).toBe('boom')
+  })
+
+  it('emits an agent.run span into trace_events (K-5)', async () => {
+    const { run_id } = await spawnAgent({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      task_id: taskId,
+      caller_role: 'chief_of_staff',
+      target_role: 'software_engineer',
+    })
+
+    const row = getDb()
+      .prepare(
+        `SELECT span_id, trace_id FROM trace_events
+         WHERE name = 'agent.run' AND run_id = ?
+         ORDER BY started_at DESC LIMIT 1`,
+      )
+      .get(run_id) as { span_id: string; trace_id: string } | undefined
+    expect(row).toBeDefined()
+
+    const trace = await getTrace(row!.trace_id)
+    expect(trace.length).toBe(1)
+    const span = trace[0]!
+    expect(span.name).toBe('agent.run')
+    expect(span.run_id).toBe(run_id)
+    expect(span.status).toBe('ok')
+    expect(span.payload).toMatchObject({
+      role: 'software_engineer',
+      adapter: 'stub',
+      status: 'completed',
+    })
   })
 
   it('unknown adapter name throws not_found', async () => {

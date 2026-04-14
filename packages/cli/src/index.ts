@@ -253,7 +253,8 @@ async function runServeMcp(): Promise<void> {
   const { getDb, runMigrations, loadConfig, createTask, updateTask, listTasks,
     startAgentRun, heartbeatAgentRun, completeAgentRun, blockAgentRun,
     getAgentRunStatus, writeMemory, recallMemory,
-    buildCosContext, getWorkspaceStatus, listAgentProfiles } = await import('@fulcrum/core')
+    buildCosContext, getWorkspaceStatus, listAgentProfiles,
+    startSpan, endSpan } = await import('@fulcrum/core')
 
   const config = loadConfig()
   const db = getDb()
@@ -657,10 +658,27 @@ async function runServeMcp(): Promise<void> {
     if (method === 'tools/call') {
       const toolName = (params?.['name'] ?? '') as string
       const toolArgs = ((params?.['arguments'] ?? {}) as Record<string, unknown>)
+      const spanWorkspaceId =
+        (toolArgs['workspace_id'] as string | undefined) ?? currentProjectIds().workspace_id
+      const mcpSpan = await startSpan({
+        name: 'mcp.tool',
+        workspace_id: spanWorkspaceId,
+        payload: { tool_name: toolName, request_id: String(id ?? '') },
+      })
       try {
         const result = await handleToolCall(toolName, toolArgs)
+        await endSpan({
+          span_id: mcpSpan.span_id,
+          status: 'ok',
+          payload: { tool_name: toolName },
+        })
         respond(id, { content: [{ type: 'text', text: JSON.stringify(result) }] })
       } catch (err) {
+        await endSpan({
+          span_id: mcpSpan.span_id,
+          status: 'error',
+          payload: { error: (err as Error).message },
+        })
         respond(id, {
           content: [{ type: 'text', text: JSON.stringify({ error: (err as Error).message }) }],
           isError: true,

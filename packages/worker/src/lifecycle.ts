@@ -17,6 +17,8 @@ import {
   blockAgentRun,
   canInvokeTeams,
   FulcrumError,
+  startSpan,
+  endSpan,
 } from '@fulcrum/core'
 import type { RunArtifacts } from '@fulcrum/core'
 import { getAgentAdapter, registerAgentAdapter } from './adapter.js'
@@ -70,6 +72,20 @@ export async function spawnAgent(
     role: input.target_role,
   })
 
+  // Telemetry: open a span for the agent run. Attaches to the new run_id
+  // so downstream consumers can correlate spans ↔ agent_runs rows.
+  const span = await startSpan({
+    name: 'agent.run',
+    workspace_id: input.workspace_id,
+    run_id: run.run_id,
+    payload: {
+      role: input.target_role,
+      adapter: adapterName,
+      model: input.model ?? null,
+      caller_role: input.caller_role,
+    },
+  })
+
   // 4. Invoke the adapter with a heartbeat callback that writes through
   //    to the DB. Heartbeats default to 0% progress when an adapter
   //    doesn't supply a number — the core API requires it.
@@ -99,17 +115,29 @@ export async function spawnAgent(
   }
 
   // 5. Persist terminal state.
-  if (result.status === 'completed') {
-    const artifacts = buildArtifacts(result)
-    await completeAgentRun({
-      run_id: run.run_id,
-      output_summary: result.summary ?? '',
-      ...(artifacts ? { artifacts } : {}),
-    })
-  } else {
-    await blockAgentRun({
-      run_id: run.run_id,
-      reason: result.error ?? 'adapter reported blocked status',
+  try {
+    if (result.status === 'completed') {
+      const artifacts = buildArtifacts(result)
+      await completeAgentRun({
+        run_id: run.run_id,
+        output_summary: result.summary ?? '',
+        ...(artifacts ? { artifacts } : {}),
+      })
+    } else {
+      await blockAgentRun({
+        run_id: run.run_id,
+        reason: result.error ?? 'adapter reported blocked status',
+      })
+    }
+  } finally {
+    await endSpan({
+      span_id: span.span_id,
+      status: result.status === 'blocked' ? 'error' : 'ok',
+      payload: {
+        status: result.status,
+        summary: result.summary,
+        error: result.error,
+      },
     })
   }
 
