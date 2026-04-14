@@ -236,7 +236,7 @@ describe('MemoryScope task (G-4)', () => {
     db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','test')").run()
     db.prepare(
       "INSERT INTO tasks (task_id, workspace_id, project_id, display_id, title, status, status_category, priority, depends_on, version, created_at, updated_at) " +
-      "VALUES (?, 'ws_1', 'proj_1', 'T-1', 't', 'pending', 'backlog', 'medium', '[]', 1, datetime('now'), datetime('now'))"
+      "VALUES (?, 'ws_1', 'proj_1', 'T-1', 't', 'queued', 'backlog', 'medium', '[]', 1, datetime('now'), datetime('now'))"
     ).run(task_id)
   }
 
@@ -268,11 +268,11 @@ describe('MemoryScope task (G-4)', () => {
     db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','test')").run()
     db.prepare(
       "INSERT INTO tasks (task_id, workspace_id, project_id, display_id, title, status, status_category, priority, depends_on, version, created_at, updated_at) " +
-      "VALUES ('task_A', 'ws_1', 'proj_1', 'T-A', 'a', 'pending', 'backlog', 'medium', '[]', 1, datetime('now'), datetime('now'))"
+      "VALUES ('task_A', 'ws_1', 'proj_1', 'T-A', 'a', 'queued', 'backlog', 'medium', '[]', 1, datetime('now'), datetime('now'))"
     ).run()
     db.prepare(
       "INSERT INTO tasks (task_id, workspace_id, project_id, display_id, title, status, status_category, priority, depends_on, version, created_at, updated_at) " +
-      "VALUES ('task_B', 'ws_1', 'proj_1', 'T-B', 'b', 'pending', 'backlog', 'medium', '[]', 1, datetime('now'), datetime('now'))"
+      "VALUES ('task_B', 'ws_1', 'proj_1', 'T-B', 'b', 'queued', 'backlog', 'medium', '[]', 1, datetime('now'), datetime('now'))"
     ).run()
 
     await writeMemory({

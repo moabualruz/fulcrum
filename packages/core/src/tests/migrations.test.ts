@@ -345,3 +345,86 @@ describe('memories.scope CHECK constraint includes task (H-6)', () => {
     `).run()).toThrow()
   })
 })
+
+describe('tasks.status CHECK constraint (J-2)', () => {
+  afterEach(() => closeDb())
+
+  it('accepts canonical TaskStatus values', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_1', 'ws_1', 'p', 'git', 'active', 'worktree', '2026-04-14T00:00:00Z')`).run()
+
+    // Canonical TaskStatus values from packages/core/src/types.ts
+    const validStatuses = ['queued', 'ready', 'claimed', 'running', 'blocked', 'failed', 'completed', 'cancelled']
+    let inserted = 0
+    for (const status of validStatuses) {
+      expect(() => db.prepare(`
+        INSERT INTO tasks (task_id, workspace_id, project_id, display_id, title, status, status_category, priority, created_at, updated_at)
+        VALUES (?, 'ws_1', 'proj_1', ?, ?, ?, 'backlog', 'medium', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')
+      `).run(`task_${status}`, `T-${inserted}`, `title-${status}`, status)).not.toThrow()
+      inserted++
+    }
+    expect(inserted).toBe(validStatuses.length)
+  })
+
+  it('rejects invalid task status after migration', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_1', 'ws_1', 'p', 'git', 'active', 'worktree', '2026-04-14T00:00:00Z')`).run()
+
+    expect(() => db.prepare(`
+      INSERT INTO tasks (task_id, workspace_id, project_id, display_id, title, status, status_category, priority, created_at, updated_at)
+      VALUES ('task_bad', 'ws_1', 'proj_1', 'T-bad', 'bad', 'nope_invalid', 'backlog', 'medium', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')
+    `).run()).toThrow()
+  })
+})
+
+describe('agent_runs.role CHECK constraint (J-3)', () => {
+  afterEach(() => closeDb())
+
+  it('accepts canonical AgentRole values', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_1', 'ws_1', 'p', 'git', 'active', 'worktree', '2026-04-14T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO tasks (task_id, workspace_id, project_id, display_id, title, status, status_category, priority, created_at, updated_at) VALUES ('task_1', 'ws_1', 'proj_1', 'T-1', 't', 'queued', 'backlog', 'medium', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')`).run()
+
+    // Full canonical AgentRole set (24 values) from packages/core/src/types.ts
+    const validRoles = [
+      'chief_of_staff', 'context_gatherer', 'prd_planner', 'implementation_planner',
+      'issue_decomposer', 'software_engineer', 'research_worker', 'refactor_worker',
+      'browser_worker', 'data_engineer', 'ml_engineer', 'devops_engineer',
+      'architecture_reviewer', 'code_reviewer', 'qa_engineer', 'security_reviewer',
+      'integration_worker', 'documentation_writer', 'memory_curator', 'tech_lead',
+      'product_manager', 'analyst', 'orchestrator', 'custom',
+    ]
+    let inserted = 0
+    for (const role of validRoles) {
+      expect(() => db.prepare(`
+        INSERT INTO agent_runs (run_id, task_id, workspace_id, project_id, display_id, agent_id, role, status, status_category, started_at, updated_at)
+        VALUES (?, 'task_1', 'ws_1', 'proj_1', ?, '', ?, 'running', 'active', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')
+      `).run(`run_${role}`, `R-${inserted}`, role)).not.toThrow()
+      inserted++
+    }
+    expect(inserted).toBe(validRoles.length)
+  })
+
+  it('rejects invalid agent role after migration', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_1', 'ws_1', 'p', 'git', 'active', 'worktree', '2026-04-14T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO tasks (task_id, workspace_id, project_id, display_id, title, status, status_category, priority, created_at, updated_at) VALUES ('task_1', 'ws_1', 'proj_1', 'T-1', 't', 'queued', 'backlog', 'medium', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')`).run()
+
+    expect(() => db.prepare(`
+      INSERT INTO agent_runs (run_id, task_id, workspace_id, project_id, display_id, agent_id, role, status, status_category, started_at, updated_at)
+      VALUES ('run_bad', 'task_1', 'ws_1', 'proj_1', 'R-bad', '', 'fake_role_123', 'running', 'active', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')
+    `).run()).toThrow()
+  })
+})
