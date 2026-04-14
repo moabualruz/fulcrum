@@ -10,10 +10,14 @@
     "vault"
   ],
   "type": "module",
+  "sideEffects": false,
   "bin": {
     "fulcrum": "./src/index.ts"
   },
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "start": "node --import tsx/esm src/index.ts",
     "test": "vitest run",

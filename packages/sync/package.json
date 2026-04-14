@@ -2,8 +2,16 @@
   "name": "@fulcrum/sync",
   "version": "0.0.1",
   "description": "Bidirectional sync adapter — Plane project management integration, conflict detection, and sync state management",
-  "keywords": ["sync", "plane", "project-management", "bidirectional-sync", "conflict-detection", "integration"],
+  "keywords": [
+    "sync",
+    "plane",
+    "project-management",
+    "bidirectional-sync",
+    "conflict-detection",
+    "integration"
+  ],
   "type": "module",
+  "sideEffects": false,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
