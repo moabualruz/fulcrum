@@ -46,10 +46,7 @@ export class KuzuClient {
     } else {
       result = await this.conn.query(cypher)
     }
-    const rows: T[] = []
-    while (result.hasNext()) {
-      rows.push(result.getNext() as T)
-    }
+    const rows: T[] = await result.getAll() as T[]
     return rows
   }
 

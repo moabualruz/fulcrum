@@ -1,0 +1,96 @@
+// packages/memory/src/kuzu/upsert.ts
+import type { KuzuClient } from './client.js'
+import { resolveEntity, incrementMentionCount } from './entity-store.js'
+import { extractStructured } from '../extractors/structured.js'
+import type { FullMemory } from '../types.js'
+
+export async function upsertMemoryToKuzu(
+  client: KuzuClient,
+  memory: FullMemory,
+  embedding: Float32Array | null
+): Promise<void> {
+  const now = new Date().toISOString()
+
+  // Step 1: Upsert Memory node (CREATE OR REPLACE semantics via MATCH DELETE + CREATE)
+  const embeddingArray = embedding ? Array.from(embedding) : null
+
+  // Kuzu does not have MERGE like Neo4j; use DELETE + CREATE pattern for upsert
+  await client.query(
+    `MATCH (m:Memory {id: $id}) DETACH DELETE m`,
+    { id: memory.memory_id }
+  ).catch(() => { /* node may not exist yet */ })
+
+  await client.query(
+    `CREATE (m:Memory {
+      id: $id,
+      workspace_id: $workspace_id,
+      project_id: $project_id,
+      kind: $kind,
+      scope: $scope,
+      title: $title,
+      summary: $summary,
+      importance: $importance,
+      freshness: $freshness,
+      confidence: $confidence,
+      created_at: CAST($created_at AS TIMESTAMP),
+      updated_at: CAST($updated_at AS TIMESTAMP),
+      embedding: $embedding
+    })`,
+    {
+      id: memory.memory_id,
+      workspace_id: memory.workspace_id,
+      project_id: memory.project_id ?? '',
+      kind: memory.kind,
+      scope: memory.scope,
+      title: memory.title,
+      summary: memory.summary,
+      importance: memory.importance,
+      freshness: memory.freshness,
+      confidence: memory.confidence,
+      created_at: memory.created_at,
+      updated_at: memory.updated_at,
+      embedding: embeddingArray ?? new Array(1536).fill(0),
+    }
+  )
+
+  // Step 2: Run structured extraction on content
+  const bodyText = memory.canonical_text ?? memory.title
+  const mentions = extractStructured(bodyText, {
+    task_id: memory.task_id,
+    run_id: null,
+  })
+
+  // Step 3: For each mention, resolve entity and create edge
+  for (const mention of mentions) {
+    const entity = await resolveEntity(client, mention.raw, memory.workspace_id)
+    await incrementMentionCount(client, entity.id)
+
+    const edgeTable = mention.edgeType  // 'MENTIONS' or 'PRODUCED_IN'
+    const weight = mention.confidence
+
+    if (edgeTable === 'PRODUCED_IN') {
+      await client.query(
+        `MATCH (m:Memory {id: $mid}), (e:Entity {id: $eid})
+         CREATE (m)-[:PRODUCED_IN {weight: $weight, source: 'rule', created_at: CAST($now AS TIMESTAMP)}]->(e)`,
+        { mid: memory.memory_id, eid: entity.id, weight, now }
+      ).catch(() => { /* edge may already exist */ })
+    } else {
+      await client.query(
+        `MATCH (m:Memory {id: $mid}), (e:Entity {id: $eid})
+         CREATE (m)-[:MENTIONS {weight: $weight, confidence: $confidence, source: 'rule', created_at: CAST($now AS TIMESTAMP)}]->(e)`,
+        { mid: memory.memory_id, eid: entity.id, weight, confidence: mention.confidence, now }
+      ).catch(() => { /* edge may already exist */ })
+    }
+  }
+}
+
+export async function removeMemoryFromKuzu(
+  client: KuzuClient,
+  memoryId: string
+): Promise<void> {
+  // DETACH DELETE removes the node and all incident edges
+  await client.query(
+    `MATCH (m:Memory {id: $id}) DETACH DELETE m`,
+    { id: memoryId }
+  )
+}

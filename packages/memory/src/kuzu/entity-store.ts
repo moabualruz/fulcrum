@@ -99,8 +99,8 @@ export async function resolveEntity(
       aliases: $aliases,
       description: $description,
       mention_count: 0,
-      created_at: datetime($created_at),
-      last_seen_at: datetime($last_seen_at)
+      created_at: CAST($created_at AS TIMESTAMP),
+      last_seen_at: CAST($last_seen_at AS TIMESTAMP)
     })`,
     {
       id,
@@ -122,7 +122,7 @@ export async function incrementMentionCount(client: KuzuClient, entityId: string
   await client.query(
     `MATCH (e:Entity {id: $id})
      SET e.mention_count = e.mention_count + 1,
-         e.last_seen_at = datetime($now)`,
+         e.last_seen_at = CAST($now AS TIMESTAMP)`,
     { id: entityId, now }
   )
 }
