@@ -31,6 +31,7 @@ export interface WriteMemoryInput {
   artifact_id?: string | null
   provenance_refs?: string[]
   embedding?: Float32Array
+  skipVaultWrite?: boolean   // internal flag for rebuild path — skips L0 write
 }
 
 export interface RecallMemoryInput {
@@ -132,3 +133,44 @@ export interface IngestProjectInput {
   project_id: string
   root_path: string
 }
+
+// ── Vault (L0) types ─────────────────────────────────────────────────────────
+
+export interface MemoryFileFrontmatter {
+  id: string
+  schema: 'fulcrum.memory/v1'
+  kind: MemoryKind
+  scope: MemoryScope
+  workspace_id: string
+  project_id?: string | null
+  file_path?: string | null
+  symbol_path?: string | null
+  title: string
+  summary?: string
+  tags?: string[]
+  confidence?: number
+  importance?: number
+  freshness?: number
+  created_at?: string
+  updated_at?: string
+  event_time?: string | null
+  task_id?: string | null
+  issue_id?: string | null
+  artifact_id?: string | null
+  entities?: string[]
+  provenance_refs?: string[]
+  content_hash?: string | null
+  source?: string
+  author?: string
+}
+
+export type CuratedKind = 'decision' | 'fact' | 'summary' | 'task_outcome' | 'task_decision' | 'error' | 'doc'
+export type OperationalKind = 'symbol' | 'diff' | 'code' | 'procedure' | 'task_goal' | 'task_failure'
+
+export const CURATED_KINDS: ReadonlySet<MemoryKind> = new Set<MemoryKind>([
+  'decision', 'fact', 'summary', 'task_outcome', 'task_decision', 'error', 'doc',
+])
+
+export const OPERATIONAL_KINDS: ReadonlySet<MemoryKind> = new Set<MemoryKind>([
+  'symbol', 'diff', 'code', 'procedure', 'task_goal', 'task_failure',
+])
