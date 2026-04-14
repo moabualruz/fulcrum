@@ -82,4 +82,5 @@ export type { ExtractedMention } from './extractors/structured.js'
 
 // Setup
 export { rebuildFromVault } from './setup/rebuild.js'
+export { runMemoryInit } from './setup/wizard.js'
 export type { RebuildOptions, RebuildResult } from './setup/rebuild.js'
