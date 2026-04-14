@@ -2,7 +2,13 @@
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
 import { getDb } from '@fulcrum/core'
-import { getMetrics, getBurndown, replayRun } from './metrics.js'
+import {
+  getMetrics,
+  getBurndown,
+  replayRun,
+  getPerRoleMetrics,
+  getMemoryMetrics,
+} from './metrics.js'
 import type { MonitorServer, MonitorServerConfig } from './types.js'
 
 export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
@@ -110,6 +116,213 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const run_id = c.req.param('id')
     const result = await replayRun({ run_id })
     return c.json(result)
+  })
+
+  // ─── Extended endpoints ─────────────────────────────────────────────────────
+
+  app.get('/board', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT status_category, COUNT(*) AS count
+      FROM tasks
+      WHERE workspace_id = ?
+      GROUP BY status_category
+    `).all(ws) as Array<{ status_category: string; count: number }>
+
+    const board: Record<string, number> = { backlog: 0, active: 0, blocked: 0, done: 0 }
+    for (const row of rows) {
+      if (row.status_category in board) board[row.status_category] = row.count
+    }
+
+    return c.json({ data: board })
+  })
+
+  app.get('/agents', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT * FROM agent_runs
+      WHERE workspace_id = ?
+      ORDER BY started_at DESC
+      LIMIT 50
+    `).all(ws)
+
+    return c.json({ data: rows })
+  })
+
+  app.get('/agents/:id', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const run = db.prepare(`
+      SELECT * FROM agent_runs WHERE run_id = ? AND workspace_id = ?
+    `).get(c.req.param('id'), ws)
+
+    if (!run) return c.json({ error: 'not found' }, 404)
+    return c.json({ data: run })
+  })
+
+  app.get('/merge-queue', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT * FROM worktrees
+      WHERE workspace_id = ? AND status = 'ready_for_merge'
+      ORDER BY updated_at DESC
+    `).all(ws)
+
+    return c.json({ data: rows })
+  })
+
+  app.get('/review-queue', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT * FROM reviews
+      WHERE workspace_id = ? AND status = 'pending'
+      ORDER BY created_at DESC
+    `).all(ws)
+
+    return c.json({ data: rows })
+  })
+
+  app.get('/artifacts', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT * FROM artifacts
+      WHERE workspace_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).all(ws)
+
+    return c.json({ data: rows })
+  })
+
+  app.get('/memory-trace', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT * FROM memories
+      WHERE workspace_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).all(ws)
+
+    return c.json({ data: rows })
+  })
+
+  app.get('/analytics/summary', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const taskCount = (db.prepare(
+      `SELECT COUNT(*) AS n FROM tasks WHERE workspace_id = ?`
+    ).get(ws) as { n: number }).n
+
+    const runCount = (db.prepare(
+      `SELECT COUNT(*) AS n FROM agent_runs WHERE workspace_id = ?`
+    ).get(ws) as { n: number }).n
+
+    const memoryCount = (db.prepare(
+      `SELECT COUNT(*) AS n FROM memories WHERE workspace_id = ?`
+    ).get(ws) as { n: number }).n
+
+    // events table uses evt_id, workspace_id
+    let eventCount = 0
+    try {
+      const r = db.prepare(
+        `SELECT COUNT(*) AS n FROM events WHERE workspace_id = ?`
+      ).get(ws) as { n: number } | undefined
+      eventCount = r?.n ?? 0
+    } catch {
+      // events table may have different schema
+    }
+
+    return c.json({
+      data: {
+        task_count: taskCount,
+        run_count: runCount,
+        memory_count: memoryCount,
+        event_count: eventCount,
+      },
+    })
+  })
+
+  app.get('/policy/events', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT * FROM policy_events
+      WHERE workspace_id = ?
+      ORDER BY ts DESC
+      LIMIT 50
+    `).all(ws)
+
+    return c.json({ data: rows })
+  })
+
+  app.get('/sync/state', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT * FROM sync_states
+      WHERE workspace_id = ?
+      ORDER BY updated_at DESC
+    `).all(ws)
+
+    return c.json({ data: rows })
+  })
+
+  app.get('/teams', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT * FROM team_instances
+      WHERE workspace_id = ?
+      ORDER BY created_at DESC
+    `).all(ws)
+
+    return c.json({ data: rows })
+  })
+
+  app.get('/analytics/per-role', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const data = getPerRoleMetrics(db, { workspace_id: ws })
+    return c.json({ data })
+  })
+
+  app.get('/analytics/memory', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const data = getMemoryMetrics(db, { workspace_id: ws })
+    return c.json({ data })
   })
 
   let serverInstance: ReturnType<typeof serve> | null = null
