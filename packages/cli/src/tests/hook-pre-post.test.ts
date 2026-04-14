@@ -14,7 +14,7 @@ import {
   closeDb,
   runMigrations,
 } from '@fulcrum/core'
-import { runPreHook, runPostHook, type HookContext, type HookIO } from '../index.js'
+import { runPreHook, runPostHook, type HookContext, type HookIO, type HookOutput } from '../index.js'
 
 // ── Test harness ──────────────────────────────────────────────────────────────
 
@@ -44,17 +44,25 @@ function resetTestDb(): void {
 
 interface CapturedIO {
   io: HookIO
+  stdout: string[]
   stderr: string[]
   exitCode: number | null
 }
 
 function makeCapturedIO(): CapturedIO {
-  const captured: CapturedIO = { io: null as unknown as HookIO, stderr: [], exitCode: null }
+  const captured: CapturedIO = { io: null as unknown as HookIO, stdout: [], stderr: [], exitCode: null }
   captured.io = {
+    stdout: (msg: string) => { captured.stdout.push(msg) },
     stderr: (msg: string) => { captured.stderr.push(msg) },
     exit: (code: number) => { if (captured.exitCode === null) captured.exitCode = code },
   }
   return captured
+}
+
+function parsedOutput(cap: CapturedIO): HookOutput | null {
+  const line = cap.stdout[0]
+  if (!line) return null
+  try { return JSON.parse(line) as HookOutput } catch { return null }
 }
 
 function seedWorkspaceProjectTaskRun(): { workspace_id: string; project_id: string; task_id: string; run_id: string } {
@@ -251,5 +259,52 @@ describe('runPostHook — tool_trace memory (L-8)', () => {
       `SELECT COUNT(*) AS n FROM memories WHERE kind = 'tool_trace'`
     ).get() as { n: number }
     expect(count.n).toBe(0)
+  })
+})
+
+describe('hook JSON output shape (Task 29)', () => {
+  beforeEach(() => { createTestDb() })
+  afterEach(() => resetTestDb())
+
+  it('runPreHook emits { continue: true } JSON on stdout for allowed calls', async () => {
+    seedWorkspaceProjectTaskRun()
+    const cap = makeCapturedIO()
+    await runPreHook(baseCtx({ toolName: 'Read', toolInput: { file_path: '/tmp/x.ts' } }), cap.io)
+    expect(cap.exitCode).toBe(0)
+    const out = parsedOutput(cap)
+    expect(out).not.toBeNull()
+    expect(out!.continue).toBe(true)
+  })
+
+  it('runPreHook emits { continue: false } JSON on stdout for blocked calls', async () => {
+    seedWorkspaceProjectTaskRun()
+    const cap = makeCapturedIO()
+    await runPreHook(
+      baseCtx({
+        toolName: 'Bash',
+        toolInput: { command: `curl -H "Authorization: Bearer ${CRED_A}"` },
+        runId: 'run_hook',
+      }),
+      cap.io,
+    )
+    expect(cap.exitCode).toBe(2)
+    const out = parsedOutput(cap)
+    expect(out).not.toBeNull()
+    expect(out!.continue).toBe(false)
+    expect(out!.stopReason).toBe('secret_detected')
+    expect(typeof out!.message).toBe('string')
+  })
+
+  it('runPostHook emits { continue: true } JSON on stdout', async () => {
+    const { run_id } = seedWorkspaceProjectTaskRun()
+    const cap = makeCapturedIO()
+    await runPostHook(
+      baseCtx({ phase: 'post', toolName: 'Edit', toolInput: { file_path: '/tmp/x.ts', old_string: 'a', new_string: 'b' }, runId: run_id }),
+      cap.io,
+    )
+    expect(cap.exitCode).toBe(0)
+    const out = parsedOutput(cap)
+    expect(out).not.toBeNull()
+    expect(out!.continue).toBe(true)
   })
 })

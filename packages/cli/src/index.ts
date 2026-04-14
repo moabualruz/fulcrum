@@ -327,11 +327,23 @@ export interface HookContext {
 }
 
 /**
+ * Normalized hook output — written as JSON to stdout before exit.
+ * Claude Code reads this shape from hook stdout (exit code 2 = block).
+ */
+export interface HookOutput {
+  continue: boolean
+  suppressOutput?: boolean
+  stopReason?: string
+  message?: string
+}
+
+/**
  * Hook I/O surface — injected so the pre/post handlers are pure and
  * testable without spawning a subprocess. In production these are wired
- * to process.stderr.write and process.exit.
+ * to process.stdout/stderr.write and process.exit.
  */
 export interface HookIO {
+  stdout: (msg: string) => void
   stderr: (msg: string) => void
   exit: (code: number) => void
 }
@@ -371,6 +383,11 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
       } catch { /* best-effort */ }
       io.stderr(`[fulcrum/pre] Tool call denied: secret detected in tool_input (${patterns.join(', ')})\n`)
       io.stderr(`[fulcrum/pre] Never include credentials in tool inputs. Use env vars or a secret store.\n`)
+      io.stdout(JSON.stringify({
+        continue: false,
+        stopReason: 'secret_detected',
+        message: `Tool call blocked: secret pattern(s) detected in tool input (${patterns.join(', ')}). Use env vars or a secret store instead.`,
+      } satisfies HookOutput))
       io.exit(2)
       return
     }
@@ -384,6 +401,11 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
       type AgentRole = Parameters<typeof canInvokeTeams>[0]
       if (!canInvokeTeams(ctx.agentRole as AgentRole)) {
         io.stderr(`[fulcrum/pre] Tool call denied: role '${ctx.agentRole}' lacks can_invoke_teams\n`)
+        io.stdout(JSON.stringify({
+          continue: false,
+          stopReason: 'policy_denied',
+          message: `Role '${ctx.agentRole}' is not permitted to invoke teams. Only chief_of_staff may use invoke_team.`,
+        } satisfies HookOutput))
         io.exit(2)
         return
       }
@@ -417,6 +439,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
     } catch { /* best-effort — never block on recall failure */ }
   }
 
+  io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
   io.exit(0)
 }
 
@@ -428,6 +451,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
 export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
   if (!ctx.runId) {
     // No run = no task/project to scope the trace to; nothing useful to write.
+    io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
     io.exit(0)
     return
   }
@@ -465,6 +489,7 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
     io.stderr(`[fulcrum/post] tool_trace write failed: ${(err as Error).message}\n`)
     // Don't fail the hook.
   }
+  io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
   io.exit(0)
 }
 
@@ -734,6 +759,7 @@ writes a tool_trace operational memory for the call.
     workspace_id,
   }
   const io: HookIO = {
+    stdout: (msg: string) => process.stdout.write(msg + '\n'),
     stderr: (msg: string) => process.stderr.write(msg),
     exit: (code: number) => process.exit(code),
   }
