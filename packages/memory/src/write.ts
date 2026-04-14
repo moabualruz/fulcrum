@@ -1,9 +1,17 @@
 // packages/memory/src/write.ts
 import { ulid } from 'ulid'
+import { createHash } from 'crypto'
 import { getDb, FulcrumError } from '@fulcrum/core'
 import { contentHash, isDuplicate } from './dedup.js'
 import { rowToFullMemory } from './mappers.js'
+import { getVaultPath, vaultExists, writeMemoryFile } from './vault/client.js'
+import { upsertStateEntry } from './vault/state.js'
+import { appendToLog } from './vault/index-builder.js'
 import type { WriteMemoryInput, FullMemory } from './types.js'
+
+function bodyHash(text: string): string {
+  return createHash('sha256').update(text).digest('hex').slice(0, 16)
+}
 
 export async function writeMemory(input: WriteMemoryInput): Promise<FullMemory> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
@@ -35,6 +43,58 @@ export async function writeMemory(input: WriteMemoryInput): Promise<FullMemory> 
   const memory_id = ulid()
   const embeddingBuffer = input.embedding ? Buffer.from(input.embedding.buffer) : null
 
+  // Build the FullMemory object we'll need for L0 write
+  const memoryForVault: FullMemory = {
+    memory_id,
+    scope: input.scope,
+    kind: input.kind,
+    workspace_id: input.workspace_id,
+    project_id: input.project_id ?? null,
+    file_path: input.file_path ?? null,
+    symbol_path: input.symbol_path ?? null,
+    title: input.title,
+    summary: input.summary,
+    canonical_text: input.canonical_text ?? input.content,
+    tags: input.tags ?? [],
+    entities: input.entities ?? [],
+    confidence: input.confidence ?? 1.0,
+    freshness: input.freshness ?? 1.0,
+    importance: input.importance ?? 0.5,
+    access_count: 0,
+    event_time: input.event_time ?? null,
+    content_hash: hash,
+    task_id: input.task_id ?? null,
+    issue_id: input.issue_id ?? null,
+    artifact_id: input.artifact_id ?? null,
+    provenance_refs: input.provenance_refs ?? [],
+    created_at: now,
+    updated_at: now,
+    last_accessed_at: now,
+  }
+
+  // ── L0 write — canonical commit point; must succeed before L1 ────────────
+  if (!input.skipVaultWrite) {
+    const vaultPath = getVaultPath()
+    if (vaultExists(vaultPath)) {
+      const filePath = await writeMemoryFile(vaultPath, memoryForVault)
+      const relPath = filePath.replace(vaultPath + '/', '')
+      const bodyContent = input.canonical_text ?? input.content
+      upsertStateEntry(vaultPath, {
+        id: memory_id,
+        path: relPath,
+        mtime: Date.now(),
+        sha256: bodyHash(bodyContent),
+      })
+      appendToLog(vaultPath, {
+        ts: now,
+        op: 'WRITE',
+        id: memory_id,
+        meta: `kind=${input.kind}`,
+      })
+    }
+  }
+
+  // ── L1 SQLite insert (synchronous) ────────────────────────────────────────
   db.prepare(`
     INSERT INTO memories (
       memory_id, workspace_id, project_id,
@@ -53,8 +113,6 @@ export async function writeMemory(input: WriteMemoryInput): Promise<FullMemory> 
     )
   `).run(
     memory_id, input.workspace_id, input.project_id ?? null,
-    // canonical_text defaults to raw content when no structured canonical form is provided;
-    // callers may override by passing explicit canonical_text in WriteMemoryInput
     input.scope, input.kind, input.title, input.summary, input.canonical_text ?? input.content,
     input.content, JSON.stringify(input.tags ?? []), JSON.stringify(input.entities ?? []), input.confidence ?? 1.0, input.freshness ?? 1.0, input.importance ?? 0.5,
     input.file_path ?? null, input.symbol_path ?? null, input.event_time ?? null, hash,
@@ -64,5 +122,10 @@ export async function writeMemory(input: WriteMemoryInput): Promise<FullMemory> 
 
   const row = db.prepare('SELECT * FROM memories WHERE memory_id = ?').get(memory_id) as Record<string, unknown> | undefined
   if (!row) throw new FulcrumError(`Memory ${memory_id} not found after insert`, 'not_found')
+
+  // ── L2 async enqueue (fire-and-forget when KuzuClient is active) ──────────
+  // pipeline.ts (Task 20) adds a setImmediate call here to runExtractionPipeline().
+  // Write.ts is patched again in Task 20 — see that task for the final version.
+
   return rowToFullMemory(row)
 }
