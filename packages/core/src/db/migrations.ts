@@ -978,6 +978,11 @@ const MIGRATION_014_SYNC_DIRECTION = [
   `ALTER TABLE sync_states ADD COLUMN conflict_state TEXT NOT NULL DEFAULT 'none'`,
 ]
 
+// MIGRATION_015 — adds pi_profile column to agent_runs for databases created before
+// pi_profile was included in the CREATE TABLE statement.
+// Wrapped in try/catch to guard against duplicate column errors on fresh databases.
+const MIGRATION_015_PI_PROFILE = `ALTER TABLE agent_runs ADD COLUMN pi_profile TEXT`
+
 export function runMigrations(db: Database.Database): void {
   db.exec(MIGRATION_001)
   db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('001_initial')`).run()
@@ -1097,5 +1102,19 @@ export function runMigrations(db: Database.Database): void {
       }
     }
     db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('014_sync_direction')`).run()
+  }
+
+  const already015 = db.prepare("SELECT id FROM schema_migrations WHERE name = '015_pi_profile'").get()
+  if (!already015) {
+    try {
+      db.exec(MIGRATION_015_PI_PROFILE)
+    } catch (err: unknown) {
+      // Duplicate column means CREATE TABLE already included pi_profile — safe to ignore
+      const msg = (err as { message?: string }).message ?? ''
+      if (!msg.includes('duplicate column name') && !msg.includes('already exists')) {
+        throw err
+      }
+    }
+    db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('015_pi_profile')`).run()
   }
 }

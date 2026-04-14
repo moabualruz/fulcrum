@@ -5,7 +5,7 @@ import { statusCategory } from './status-category.js'
 import { emitEvent } from './events.js'
 import { createTask } from './tasks.js'
 import { FulcrumError } from './types.js'
-import type { AgentRun, AgentRole, AgentRunStatus, RunArtifacts, Task } from './types.js'
+import type { AgentRun, AgentRole, AgentRunStatus, RunArtifacts, Task, TaskPacket, SpawnableRun } from './types.js'
 
 interface StartRunInput {
   task_id: string
@@ -225,6 +225,24 @@ export async function blockAgentRun(input: BlockRunInput): Promise<AgentRun> {
   })
 
   return getRun(input.run_id)
+}
+
+/**
+ * Builds a SpawnableRun from an AgentRun and a TaskPacket.
+ * This is the typed handoff from Fulcrum → Pi containing everything Pi needs
+ * to spawn an agent without reading additional state from the DB.
+ *
+ * @throws FulcrumError('invalid_input') if the run has no pi_profile set.
+ */
+export function buildSpawnableRun(run: AgentRun, task_packet: TaskPacket): SpawnableRun {
+  if (!run.pi_profile) throw new FulcrumError('run has no pi_profile', 'invalid_input')
+  return {
+    run_id: run.run_id,
+    workspace_id: run.workspace_id,
+    role: run.role,
+    pi_profile: run.pi_profile,
+    task_packet,
+  }
 }
 
 export async function escalateRun(input: EscalateRunInput): Promise<Task> {

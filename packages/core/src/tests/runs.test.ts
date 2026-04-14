@@ -9,6 +9,7 @@ import {
   completeAgentRun,
   blockAgentRun,
   escalateRun,
+  buildSpawnableRun,
 } from '../runs.js'
 
 beforeEach(() => { createTestDb() })
@@ -316,5 +317,88 @@ describe('blockAgentRun — blocker field, status_category, event', () => {
     const db = getDb()
     const evt = db.prepare("SELECT * FROM events WHERE evt_type = 'agent_run_blocked' AND object_id = ?").get(blocked.run_id)
     expect(evt).toBeTruthy()
+  })
+})
+
+describe('startAgentRun — pi_profile', () => {
+  it('stores and retrieves pi_profile when provided', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({
+      task_id: task.task_id,
+      workspace_id: 'ws_1',
+      role: 'software_engineer',
+      pi_profile: 'claude-cli/claude-opus-4-5',
+    })
+    expect(run.pi_profile).toBe('claude-cli/claude-opus-4-5')
+  })
+
+  it('stores null pi_profile when not provided', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    expect(run.pi_profile).toBeNull()
+  })
+
+  it('retrieves pi_profile via getAgentRunStatus', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({
+      task_id: task.task_id,
+      workspace_id: 'ws_1',
+      role: 'software_engineer',
+      pi_profile: 'gemini-cli/gemini-pro',
+    })
+    const fetched = await getAgentRunStatus({ run_id: run.run_id })
+    expect(fetched.pi_profile).toBe('gemini-cli/gemini-pro')
+  })
+})
+
+describe('buildSpawnableRun', () => {
+  it('returns correct SpawnableRun shape', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({
+      task_id: task.task_id,
+      workspace_id: 'ws_1',
+      role: 'software_engineer',
+      pi_profile: 'claude-cli/claude-opus-4-5',
+    })
+    const packet = { goal: 'implement feature X', task_type: 'implement' }
+    const spawnable = buildSpawnableRun(run, packet)
+    expect(spawnable.run_id).toBe(run.run_id)
+    expect(spawnable.workspace_id).toBe(run.workspace_id)
+    expect(spawnable.role).toBe('software_engineer')
+    expect(spawnable.pi_profile).toBe('claude-cli/claude-opus-4-5')
+    expect(spawnable.task_packet).toEqual(packet)
+  })
+
+  it('includes optional task_packet fields', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({
+      task_id: task.task_id,
+      workspace_id: 'ws_1',
+      role: 'code_reviewer',
+      pi_profile: 'gemini-cli/gemini-pro',
+    })
+    const packet = {
+      goal: 'review PR #42',
+      task_type: 'review',
+      constraints: ['no style nits', 'focus on correctness'],
+      done_criteria: 'all blocking issues addressed',
+      inputs: { pr_url: 'https://github.com/foo/bar/pull/42' },
+    }
+    const spawnable = buildSpawnableRun(run, packet)
+    expect(spawnable.task_packet.constraints).toEqual(['no style nits', 'focus on correctness'])
+    expect(spawnable.task_packet.done_criteria).toBe('all blocking issues addressed')
+    expect(spawnable.task_packet.inputs?.pr_url).toBe('https://github.com/foo/bar/pull/42')
+  })
+
+  it('throws invalid_input if run has no pi_profile', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({
+      task_id: task.task_id,
+      workspace_id: 'ws_1',
+      role: 'software_engineer',
+      // no pi_profile
+    })
+    expect(() => buildSpawnableRun(run, { goal: 'do work', task_type: 'implement' }))
+      .toThrow(expect.objectContaining({ code: 'invalid_input' }))
   })
 })

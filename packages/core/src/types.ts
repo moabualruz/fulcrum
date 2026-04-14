@@ -281,6 +281,44 @@ export interface CreateHandoffInput {
   handoff_mode?: string
 }
 
+/**
+ * TaskPacket — structured work specification passed to an agent.
+ * Fulcrum creates this; Pi's executor consumes it.
+ */
+export interface TaskPacket {
+  goal: string                        // what the agent must achieve
+  task_type: string                   // e.g. 'implement', 'review', 'research', 'plan'
+  inputs?: Record<string, unknown>    // structured inputs (files, context, etc.)
+  constraints?: string[]              // hard constraints the agent must respect
+  done_criteria?: string              // how to know the task is complete
+  artifact_contract_id?: string       // which artifacts must be produced
+}
+
+/**
+ * SpawnableRun — everything Pi needs to spawn an agent for a given run.
+ * Returned from buildSpawnableRun; consumed by @pi/executor.
+ */
+export interface SpawnableRun {
+  run_id: string
+  workspace_id: string
+  role: AgentRole
+  pi_profile: string          // e.g. 'claude-cli/claude-opus-4-5', 'gemini-cli/gemini-pro'
+  task_packet: TaskPacket
+}
+
+/**
+ * StartAgentRunInput — public input type for startAgentRun.
+ */
+export interface StartAgentRunInput {
+  task_id: string
+  workspace_id: string
+  role: AgentRole
+  agent_id?: string
+  pi_profile?: string
+  task_packet?: TaskPacket
+  git_branch?: string
+}
+
 export class FulcrumError extends Error {
   constructor(
     message: string,

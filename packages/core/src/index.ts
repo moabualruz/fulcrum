@@ -7,6 +7,7 @@ export type {
   FulcrumEvent, TaskRelation,
   EmbeddingProviderConfig, FulcrumConfig, PolicyCheckResult,
   HandoffPacket, CreateHandoffInput, HandoffPriority, HandoffScope,
+  TaskPacket, SpawnableRun, StartAgentRunInput,
 } from './types.js'
 export { FulcrumError } from './types.js'
 
@@ -28,6 +29,7 @@ export {
   completeAgentRun,
   blockAgentRun,
   escalateRun,
+  buildSpawnableRun,
 } from './runs.js'
 
 // Policy
