@@ -165,11 +165,11 @@ export interface MemoryFileFrontmatter {
   author?: string
 }
 
-export type CuratedKind = 'decision' | 'fact' | 'summary' | 'task_outcome' | 'task_decision' | 'error' | 'doc'
+export type CuratedKind = 'decision' | 'fact' | 'lesson' | 'summary' | 'task_outcome' | 'task_decision' | 'error' | 'doc'
 export type OperationalKind = 'symbol' | 'diff' | 'code' | 'procedure' | 'task_goal' | 'task_failure' | 'tool_trace' | 'reasoning_step'
 
 export const CURATED_KINDS: ReadonlySet<MemoryKind> = new Set<MemoryKind>([
-  'decision', 'fact', 'summary', 'task_outcome', 'task_decision', 'error', 'doc',
+  'decision', 'fact', 'lesson', 'summary', 'task_outcome', 'task_decision', 'error', 'doc',
 ])
 
 export const OPERATIONAL_KINDS: ReadonlySet<MemoryKind> = new Set<MemoryKind>([
