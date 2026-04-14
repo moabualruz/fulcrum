@@ -224,7 +224,7 @@ exec "$DIR/node_modules/.bin/tsx" "$DIR/packages/cli/src/index.ts" "$@"
 *Team Ops (lazy getter)*
 - `getTeamOps(): Promise<Record<string, unknown>>` — dynamically imports `@fulcrum/teams` to avoid circular dependency
 
-**Source Files (62 total)**
+**Source Files (~31 .ts modules + 32 tests; core/src has the largest footprint at ~5,891 LOC non-test)**
 
 Domain modules (non-test):
 - `index.ts` — public API surface
@@ -251,7 +251,7 @@ Domain modules (non-test):
 
 Database modules:
 - `db/client.ts` — getDb, setDb, closeDb, _configureDb
-- `db/migrations.ts` — 16 migrations (001-016)
+- `db/migrations.ts` — 30 migrations (001-030), single 2,231-line file
 
 Embedding modules:
 - `embedding/types.ts` — EmbeddingProvider interface
@@ -273,7 +273,7 @@ Test files (32):
 - `tests/status-category.test.ts`, `status.test.ts`, `tasks.*.test.ts` (3 files: main, labels, assigned_run)
 - `tests/telemetry.test.ts`, `types.test.ts`, `ulid-guard.test.ts`, `workspaces.test.ts`
 - Helper: `tests/helpers.ts`
-- **Total passing tests: 221** (from test run output)
+- **Total collected tests: 458** (454 passing + 4 skipped — from the latest vitest run)
 
 **Database Schema (16 Migrations)**
 
@@ -387,8 +387,8 @@ See `tests/check-constraints.test.ts` for validation. Key constraints:
 - Workflow runs: status ∈ {created, ready, running, waiting_input, waiting_dependency, blocked, failed, completed, cancelled}
 
 **Test Statistics**
-- 32 test files: 221 passing tests
-- Key areas: DB migrations, embedding, config, IDs, roles (capability guards), CoS parsing, tasks, runs, memory, handoffs, locks, policy, agent profiles
+- 32 test files: 454 passing + 4 skipped (458 collected)
+- Key areas: DB migrations, embedding, config, IDs, roles (capability guards), CoS parsing, tasks, runs, memory, handoffs, locks, policy, agent profiles, telemetry, check-constraint drift, role-string guard, ulid guard
 
 ---
 
@@ -533,7 +533,7 @@ Tests (21 files: 175 passing):
 - `metrics.ts` — getMetrics, getBurndown, getPerRoleMetrics, getMemoryMetrics, getForecasting
 - `server.ts` — HTTP server (Hono routes, see §6 below)
 
-**Tests (3 files: 10 passing)**
+**Tests (3 files: 30 passing, 1 skipped)**
 
 ---
 
@@ -562,7 +562,7 @@ Tests (21 files: 175 passing):
 - `index.ts`, `types.ts`
 - `epics.ts`, `issues.ts`, `prds.ts`, `plans.ts`, `relations.ts`, `reviews.ts`
 
-**Tests (7 files: 35 passing)**
+**Tests (7 files: 102 passing)**
 
 ---
 
@@ -641,7 +641,7 @@ Tests (21 files: 175 passing):
 
 - `index.ts`, `types.ts`, `schema.ts`, `teams.ts`, `scheduler.ts`
 
-**Tests (2 files: 8 passing)**
+**Tests (2 files: 31 passing)**
 
 ---
 
@@ -828,7 +828,7 @@ Standard JSON-RPC 2.0 stdio server with ~13 tools:
 | `telemetry/otel.ts` | OpenTelemetry setup |
 | `telemetry/spans.ts` | Span helpers |
 
-**Tests (32 files, 221 passing)**
+**Tests (32 files, 454 passing + 4 skipped)**
 
 ---
 
@@ -882,26 +882,42 @@ Virtual tables (FTS5):
 
 ---
 
-### 3.4 Migrations (All 16)
+### 3.4 Migrations (All 30)
 
-| # | Name | Tables Added | Key Fields |
-|---|------|--------------|------------|
-| 001 | initial | workspaces, projects, tasks, agent_runs, memories, advisory_locks, tasks_fts, memories_fts | Core entities + FTS |
-| 002 | extensions | (alters) | Add project metadata, task/run enrichment, events, task_relations, task_labels, display_id_sequences |
-| 003 | planning | epics, issues, prds, plans, plan_issues, prd_plans, issue_labels, *_fts tables | Planning domain |
-| 004 | policy | policy_rules, policy_events | Policy engine + audit |
-| 005 | memory_enrichment | (alters), memory_entities, code_chunks | Memory entity linking + code RAG |
-| 006 | teams | team_templates, team_instances, team_members | Team orchestration |
-| 007 | workflows | workflow_runs | Workflow engine |
-| 008 | worktrees | artifacts, artifact_contracts, reviews, worktrees, handoffs, *_links tables | Worktrees + handoffs + artifacts |
-| 009 | monitor | analytics_daily, analytics_cycle, analytics_project, analytics_agent, analytics_team | Analytics schemas |
-| 010 | sync | sync_states, sync_conflicts, sync_queue | Bidirectional sync |
-| 011 | graph | graph_entities, graph_edges, graph_episodes | Knowledge graph (L2) |
-| 012 | memory_freshness | (alters memories) | Add freshness column |
-| 013 | handoff_status | (recreate handoffs) | Add status + claimed_at |
-| 014 | sync_direction | (idempotent alters) | Add direction, conflict_state to sync_states (guard for old DBs) |
-| 015 | pi_profile | (idempotent alter) | Add pi_profile to agent_runs (guard for old DBs) |
-| 016 | workspace_config | (idempotent alter) | Add config_path to workspaces (guard for old DBs) |
+`db/migrations.ts` is a single 2231-line file with one exported `runMigrations(db)` function. Each migration is guarded by a `schema_migrations` row and/or `PRAGMA table_info` inspection so re-running is idempotent. Migrations 020-030 are organized as inline-gated blocks inside the runner rather than as separate template literals.
+
+| # | Name (schema_migrations row) | What it does |
+|---|------------------------------|--------------|
+| 001 | `001_initial` | Creates `schema_migrations`, `workspaces`, `projects`, `tasks`, `agent_runs`, `memories`, `advisory_locks`, plus `tasks_fts`/`memories_fts` FTS5 virtual tables + triggers + base indexes |
+| 002 | `002_extensions` | Alters workspaces/projects/memories; fully recreates `tasks` (drops status CHECK, adds display_id, issue_id, status_category, priority, estimate_type/value, done_criteria, claimed_at, completed_at); fully recreates `agent_runs` (drops role CHECK, adds project_id, display_id, agent_id, pi_profile, status_category, current_path, heartbeat_at, blocker, worktree_id, finished_at); adds `display_id_sequences`, `events`, `task_relations`, `task_labels`; rebuilds `memories_fts` to include title/summary/canonical_text |
+| 003 | `003_planning` | Adds `epics`, `issues`, `issue_labels`, `prds`, `plans`, `plan_issues`, `prd_plans`, plus `epics_fts`/`issues_fts`/`prds_fts`/`plans_fts` with triggers |
+| 004 | `004_policy` | Adds `policy_rules` (CHECK scope/action), `policy_events` |
+| 005 | `005_memory_enrichment` | Idempotent ALTERs to `memories` (scope/kind CHECK attempted but no-ops on existing DBs); adds `memory_entities`, `code_chunks` (CHECK chunk_strategy, source_type); indexes on memories(scope, kind, file_path, content_hash, event_time) |
+| 006 | `006_teams` | Adds `team_templates` (name UNIQUE), `team_instances` (CHECK status, status_category), `team_members` |
+| 007 | `007_workflows` | Adds `workflow_runs` (CHECK status, status_category) |
+| 008 | `008_worktrees` | Adds `artifacts` (+ `artifacts_fts`), `reviews` (CHECK target_type, status), `worktrees` (CHECK status 5-value), `artifact_contracts`, `handoffs` (CHECK handoff_mode), `agentrun_artifacts`, `review_targets`, `task_memory_links`, `artifact_memory_links` |
+| 009 | `009_monitor` | Adds `analytics_daily`, `analytics_cycle`, `analytics_project`, `analytics_agent`, `analytics_team` (all UNIQUE on workspace+keys+date) |
+| 010 | `010_sync` | Adds `sync_states` (CHECK sync_status, direction, conflict_state), `sync_conflicts` (CHECK resolution), `sync_queue` (CHECK operation) |
+| 011 | `011_graph` | Adds `graph_entities`, `graph_edges`, `graph_episodes` (SQLite-side graph storage; L2 Kuzu is a separate process) |
+| 012 | `012_memory_freshness` | `ALTER TABLE memories ADD COLUMN freshness REAL NOT NULL DEFAULT 1.0` |
+| 013 | `013_handoff_status` | Rebuilds `handoffs` to add `status` (CHECK pending/claimed/completed/cancelled) and `claimed_at`. Side effect: drops the handoff_mode CHECK — fixed in 022 |
+| 014 | `014_sync_direction` | Idempotent ALTERs adding `direction`, `conflict_state` to `sync_states` (guard for DBs created before 010 shipped these columns) |
+| 015 | `015_pi_profile` | Idempotent ALTER adding `agent_runs.pi_profile` for DBs from before 002 shipped it |
+| 016 | `016_workspace_config` | Idempotent ALTER adding `workspaces.config_path` |
+| 017 | `017_task_assigned_run` | `ALTER TABLE tasks ADD COLUMN assigned_run_id TEXT REFERENCES agent_runs(run_id) ON DELETE SET NULL` |
+| 018 | `018_memory_importance` | `ALTER TABLE memories ADD COLUMN importance REAL NOT NULL DEFAULT 0.5` |
+| 019 | `019_agent_state_projection` | Creates `agent_state_projection` (run_id PK, denormalized current status snapshot) with indexes on workspace_id and status |
+| 020 | `020_round_1_gap_fixes` | Rebuilds `projects` to add `type` (CHECK git/non_git/submodule/logical) and `git_url`, and CHECK constraints on status and write_mode. Ensures `memories.task_id` + `idx_memories_task`. Adds `trace_events` telemetry span table (CHECK status IN ('started','ok','error')) |
+| 021 | `021_advisory_locks` | Rebuilds `advisory_locks` with `lock_id` PK, `workspace_id` FK, structured `resource_path`, and UNIQUE(workspace_id, resource_path). Old rows are dropped (no workspace_id to map) |
+| 022 | `022_handoff_mode_check` | Restores `handoffs.handoff_mode` CHECK (brief/contextual/artifact_first_brief/branched_session) that 013 dropped; rebuilds table and normalizes bad values to `artifact_first_brief` |
+| 023 | `023_memory_scope_task` | Rebuilds `memories` to add `CHECK(scope IN ('global','project','file','task'))` — 005's attempt no-op'd because 002 created the column first without a CHECK. Preserves indexes, FTS triggers, and rebuilds `memories_fts` |
+| 024 | `024_project_description` | `ALTER TABLE projects ADD COLUMN description TEXT` |
+| 025 | `025_tasks_and_runs_checks` | Rebuilds `tasks` with `CHECK(status IN (<8 TaskStatus values>))` and `agent_runs` with `CHECK(role IN (<24 AgentRole values>))`. 001 had wrong CHECKs, 002 dropped them — this restores aligned ones. Preserves indexes + FTS triggers, rebuilds `tasks_fts` |
+| 026 | `026_memory_kind_align` | Rebuilds `memories` to add `CHECK(kind IN (<16 MemoryKind values>))` including tool_trace/reasoning_step/lesson. Preserves indexes + FTS triggers, rebuilds `memories_fts` |
+| 027 | `027_add_missing_checks` | Rebuilds three tables to add CHECKs that never existed: `agent_runs.status` (9 values incl. 'stale'), `workspaces.status` (active/archived), `handoffs.priority` (critical/high/normal/low) + `handoffs.scope` (task/issue/project/workspace). Normalizes legacy values during copy |
+| 028 | `028_worktrees_base_branch` | `ALTER TABLE worktrees ADD COLUMN base_branch TEXT` (for git worktree add -b merge operations) |
+| 029 | `029_worktrees_conflict_status` | Widens `worktrees.status` CHECK to include `'conflict'` (merge queue sets this when `git merge` fails). Rebuilds table |
+| 030 | `030_agent_profiles` | Creates `agent_profiles` table (profile_id PK, workspace_id FK, name, base_role CHECK 24 roles, description, system_prompt, capabilities JSON, created_by, created_at) with indexes and UNIQUE(workspace_id, name) |
 
 ---
 
@@ -959,41 +975,37 @@ Virtual tables (FTS5):
 
 ---
 
-### 4.4 Roles (25 MDs)
+### 4.4 Roles (24 role MDs + README, one-line purpose each)
 
-All in `agent-integration/roles/`:
+All in `agent-integration/roles/`. `listAgentProfiles()` surfaces the 24 canonical `AgentRole` values; each of the 24 has a prose file here that the Chief-of-Staff prompt template pulls in. `README.md` is a meta index. Purposes below are extracted verbatim from each file's opening paragraph.
 
-1. **chief_of_staff.md** — Orchestrator (L1)
-2. **software_engineer.md** — Implementation (L2)
-3. **code_reviewer.md** — Code review (L2)
-4. **security_reviewer.md** — Security review
-5. **tech_lead.md** — Technical leadership
-6. **integration_worker.md** — CI/CD + merge queue
-7. **context_gatherer.md** — Information gathering
-8. **prd_planner.md** — PRD authoring
-9. **implementation_planner.md** — Plan creation
-10. **issue_decomposer.md** — Issue breakdown
-11. **research_worker.md** — Research/investigation
-12. **refactor_worker.md** — Code refactoring
-13. **browser_worker.md** — Web research
-14. **data_engineer.md** — Data pipelines
-15. **ml_engineer.md** — ML/AI work
-16. **devops_engineer.md** — Infrastructure
-17. **architecture_reviewer.md** — Architecture review
-18. **qa_engineer.md** — Testing
-19. **analyst.md** — Analysis/strategy
-20. **product_manager.md** — Product planning
-21. **documentation_writer.md** — Documentation
-22. **memory_curator.md** — Memory management
-23. **orchestrator.md** — Team orchestration
-24. **custom.md** — Custom role template
-25. **README.md** — Role guide
+1. **chief_of_staff** — Sole L1 executive orchestrator. Decomposes high-level goals into concrete tasks, delegates to specialist L2 agents, coordinates multi-role workloads via team invocation, maintains the workspace task board. Plans and coordinates — never writes code or edits project source files directly.
+2. **software_engineer** — L2 implementation specialist for writing clean, well-tested, production-quality code across the full stack. Consolidates the Python reference stack's separate backend and frontend implementer roles into one.
+3. **code_reviewer** — L2 specialist for reading diffs and assessing code quality, style compliance, correctness, and test coverage. Reviewer verdicts gate `integration_worker` merges: a branch cannot be integrated without an APPROVED verdict.
+4. **security_reviewer** — L2 specialist auditing code and configuration for security vulnerabilities and policy violations (injection flaws, secret leakage, auth bugs, unsafe deserialization, OWASP Top 10). `CRITICAL` findings halt `integration_worker` until resolved.
+5. **tech_lead** — L2 architecture and design authority. Makes architectural decisions, reviews design documents, defines patterns for specialists to follow. Complements `chief_of_staff`: CoS decides *what*, tech_lead decides *how*.
+6. **integration_worker** — L2 merge owner. Only L2 role exempt from `chief_of_staff_no_direct_writes` for `shell_exec:git`. Enforced by the `only_integration_worker_merges` invariant.
+7. **context_gatherer** — L2 read-only scout. Sweeps the codebase, recalls prior memories, reads referenced files/PRs/tickets, distils breadth-first findings into a structured `context_brief` artifact. Never mutates state.
+8. **prd_planner** — L2 specialist converting stakeholder goal + context into a formal PRD. Defines problem, users, success metrics, scope/non-goals, open questions, risks. Output: one `prd` artifact.
+9. **implementation_planner** — L2 specialist turning an approved PRD into an executable sequence of tasks with done-criteria, effort estimates, dependency graph. Persists plan artifact + task rows.
+10. **issue_decomposer** — L2 specialist splitting a single too-large issue into 2–10 subtasks that fit per-role WIP limits. Narrower than implementation_planner. Output: `issue_breakdown` artifact + linked subtask rows.
+11. **research_worker** — L2 specialist for focused info-gathering outside the codebase — web search, vendor docs, RFC/paper reading, API exploration — distilled into a citable `research_note` artifact.
+12. **refactor_worker** — L2 specialist improving code without changing observable behaviour. Extracts functions, renames symbols, reduces duplication, proves behavioural equivalence with the test suite. Commits with a `refactor(...)` prefix.
+13. **browser_worker** — L2 specialist driving a headless browser for tasks needing real DOM access. Uses Playwright by default, captures screenshots/traces as artifacts.
+14. **data_engineer** — L2 specialist owning data pipelines, ETL, schema design, data quality, and migrations. Hands off to `integration_worker` for anything that touches production data paths.
+15. **ml_engineer** — L2 specialist training/evaluating ML models, feature engineering, eval harnesses, model registry. Model updates require evaluation reports before promotion.
+16. **devops_engineer** — L2 specialist owning infrastructure, CI/CD, deployments, monitoring, and incident response. Production deploys still flow through `integration_worker`.
+17. **architecture_reviewer** — L2 read-only gate reviewing system designs/PRDs/plans for architectural soundness before implementation. Produces `review_report` with `{approved, changes_requested, blocked}`.
+18. **qa_engineer** — L2 specialist writing/maintaining tests, enforcing coverage goals. Produces `test_report` artifacts summarising pass/fail status and coverage deltas.
+19. **analyst** — L2 read-only specialist turning raw workspace data (tasks, runs, events, metrics) into insights. Queries monitor endpoints. Go-to for "how are we doing?" questions.
+20. **product_manager** — L2 specialist maintaining the roadmap, prioritising backlog, writing strategic decision memories. No code authority, no merge authority.
+21. **documentation_writer** — L2 specialist writing/maintaining user-facing docs. Owns CHANGELOG updates and cross-reference hygiene. Runs every example against live source.
+22. **memory_curator** — L2 specialist pruning/deduplicating/reorganising the memory vault. Never hard-deletes — every removal leaves a tombstone.
+23. **orchestrator** — Generic L2 sub-orchestrator for bounded scopes (per-subsystem mini-CoS). Explicitly does NOT inherit L1 authority — only `chief_of_staff` is L1 and may invoke cross-scope teams.
+24. **custom** — Escape hatch for user-defined agents not fitting any canonical slot. Always paired with a DB-backed `agent_profiles` row providing the concrete description, system prompt, and capability overrides.
+25. **README.md** — Role index / guide (not an AgentRole).
 
-Each MD includes:
-- Purpose (one-liner)
-- Capabilities (what can this role do)
-- Example tasks
-- Key constraints
+Each role MD includes Purpose, When to Use, Capabilities / System Prompt snippet, Example Tasks, and Key Constraints sections.
 
 ---
 
@@ -1119,22 +1131,70 @@ TEAMS + WORKFLOWS + AGENTS
 | workflow | list, start, run, status, resume | Workflow execution |
 | agent | list, status, spawn | Agent runs |
 
+### 5.2a MCP Tools (18 tools exposed by `fulcrum serve mcp`)
+
+`runServeMcp` in `packages/cli/src/index.ts:593` registers 18 tools on stdio JSON-RPC 2.0 (protocolVersion `2024-11-05`). Every `tools/call` wraps the handler in `startSpan('mcp.tool')` / `endSpan`. Note: the usage text and README still say "13 control tools" — that string is stale after L-5.
+
+| # | Tool name | Required inputs | Handler behavior |
+|---|-----------|-----------------|------------------|
+| 1 | `list_tasks` | `project_id`, `workspace_id` (+ `status`, `limit`) | `listTasks(…)` → first 40 rows (or `limit`), projecting `task_id/title/description/status/priority/assigned_to/done_criteria/blockers` |
+| 2 | `create_task` | `title`, `project_id`, `workspace_id` (+ description/priority/assigned_to/done_criteria) | Ensures workspace + project, then `createTask` |
+| 3 | `update_task` | `task_id` (+ status/note/assigned_to) | `updateTask`; returns `{task_id, updated: true, changes}` |
+| 4 | `recall_memory` | `query`, `workspace_id`, `project_id` (+ limit) | Delegates to `recallMemory` (defaults limit 10) |
+| 5 | `write_memory` | `content`, `workspace_id`, `project_id` (+ title/tags) | Ensures workspace + project, splits comma tags, `writeMemory` |
+| 6 | `list_agent_profiles` | (optional `workspace_id`) | `listAgentProfiles({workspace_id})` — merges 24 canonical roles with DB-backed profiles when workspace given |
+| 7 | `get_agent_run_status` | `run_id` | `getAgentRunStatus` → projected run fields |
+| 8 | `start_agent_run` | `agent_role`, `workspace_id` (+ task_id/project_id/worktree_path/pi_run_id) | Ensures workspace + project, creates auto stub task if missing, `startAgentRun({task_id, role, workspace_id, agent_id, pi_profile})` |
+| 9 | `heartbeat_agent_run` | `run_id`, `workspace_id` (+ current_step/progress_pct) | `heartbeatAgentRun` |
+| 10 | `complete_agent_run` | `run_id`, `workspace_id` (+ output_summary/artifact_paths) | Splits comma artifact paths, `completeAgentRun({…, artifacts: {files_changed}})` |
+| 11 | `block_agent_run` | `run_id`, `workspace_id`, `reason` | `blockAgentRun` |
+| 12 | `build_cos_context` | `project_id`, `workspace_id` (+ goal/max_tasks/max_events) | `buildCosContext(…)` → `{context_markdown, project_id, workspace_id}` |
+| 13 | `get_workspace_status` | `workspace_id` | `getWorkspaceStatus` → `{active_runs, blocked_runs, wip_count, queued_tasks, runs[:10], blockers[:5]}` |
+| 14 | `create_team_template` | `name`, `slots` (+ description/policy) | Resolves `getTeamOps()` lazily, calls `ops.createTeamTemplate(…)`. Templates are global (not workspace-scoped) |
+| 15 | `invoke_team` | `template_id`, `workspace_id`, `purpose`, `caller_agent_id`, `caller_role` (+ project_id/task_id/initial_slots) | Via `getTeamOps()` → `ops.invokeTeam`; enforced at the teams-layer that only chief_of_staff may call |
+| 16 | `list_team_templates` | (optional limit/offset; defaults 50/0) | `ops.listTeamTemplates` |
+| 17 | `list_team_instances` | `workspace_id` (+ project_id/status_category/limit/offset) | `ops.listTeamInstances` |
+| 18 | `create_agent_profile` | `workspace_id`, `name`, `description` (+ base_role/system_prompt/capabilities/created_by) | `createAgentProfile` (DB-backed dynamic profile for the L-3 `agent_profiles` table) |
+
+JSON-RPC server loop (rl.on('line')) handles these methods:
+
+- `initialize` → returns protocolVersion `2024-11-05`, `capabilities.tools: {}`, `serverInfo.name: 'fulcrum'`
+- `notifications/initialized` → no-op
+- `tools/list` → returns the `tools` array verbatim
+- `tools/call` → dispatches to `handleToolCall(name, arguments)`, wraps span, returns `{content: [{type: 'text', text: JSON.stringify(result)}]}` (or `isError: true` on throw)
+- `ping` → empty result
+- anything else → `-32601 Method not found`
+
 ### 5.3 Output Helpers
 
 - `outputRows(rows, columns?)` — JSON or tab-separated table
 - `outputObject(obj)` — JSON or key-value format
 - Behavior depends on `--json` flag
 
-### 5.4 Auto-initialization Flow
+### 5.3a Hook pipeline (pre/post, `fulcrum hook <cli> [pre|post]`)
 
-Every `fulcrum` command:
-1. Loads `.fulcrum.json` (from cwd or parents)
-2. If not present, auto-creates in `.fulcrum/`:
-   - `fulcrum.db` (SQLite)
-   - `.fulcrum.json` config with workspace + project IDs (deterministic from path)
-   - Default workspace + project
+`runHook(cliName, phase)` in `packages/cli/src/index.ts:467` is the entry point. Flow:
 
-No explicit `init` step needed; first command initializes the project.
+1. `ensureProjectInitialized({silent: true})` (already called in `main()`) provides the workspace_id.
+2. Reads raw JSON from stdin; fails open on parse error (exit 0) so a broken hook never blocks the agent.
+3. `normalizeHookEvent(cliName, event)` maps each CLI's event shape to a canonical `{toolName, toolInput, sessionId, agentRole, runId}`. Claude uses `tool_name`/`tool_input`/`session_id`; Gemini uses `tool_name`|`toolName`, `tool_input`|`toolInput`|`args`, `session_id`|`conversationId`; PI additionally carries `role` and `runId`.
+4. Emits a `hook_executed` event with `tool_name`, `tool_input_keys` (keys only), `session_id`, `run_id`, `phase`.
+5. Dispatches to `runPreHook` or `runPostHook`:
+   - **Pre** — (a) `checkSecrets` against `JSON.stringify(tool_input)`; on match emits `policy_denied` event + stderr `[fulcrum/pre] Tool call denied: secret detected…` + `io.exit(2)`. (b) If `toolName` is `invoke_team`/`team_invoke` and `agentRole` is set, calls `canInvokeTeams(role)` and exits 2 on refusal. (c) For `HOOK_WRITE_TOOLS` (`Write/Edit/MultiEdit/NotebookEdit/Bash`) with a `runId`, looks up `task_id` from `agent_runs` then fetches up to 3 `task_goal|task_decision|decision|lesson|task_outcome` memories ordered by `importance DESC, created_at DESC` and writes them to stderr as `[fulcrum/pre] recalled N task memories`. Non-blocking.
+   - **Post** — If a `runId` is present, writes a `tool_trace` memory with `content = "Tool: …\nKeys: …\nSession: …\nRun: …"` (keys only, never values), `kind: 'tool_trace'`, `scope: 'task'|'project'`, `tags: [toolName, cliName]`, `importance: 0.2`. Failures are logged to stderr but never block.
+6. Injected `HookIO` (`{stderr, exit}`) makes `runPreHook`/`runPostHook` pure and unit-testable (`packages/cli/src/tests/hook-pre-post.test.ts`).
+
+### 5.4 Auto-initialization Flow (`ensureProjectInitialized`)
+
+`packages/cli/src/index.ts:2037`. Runs once per process before dispatching any command except `--version`. `hook` and `serve mcp` call it with `silent: true` so MCP stdio traffic isn't corrupted.
+
+1. `fs.mkdirSync('$CWD/.fulcrum', { recursive: true })`
+2. `getDb()` (opens `.fulcrum/fulcrum.db` via `db/client.ts`) → `runMigrations(db)` (runs all 30)
+3. Computes deterministic IDs: `sha256(abs_path).slice(0,12)`, `basename(abs_path).replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,24) || 'project'`. Produces `workspace_id = ws_${sanitized}_${hash12}` and `project_id = proj_${sanitized}_${hash12}`. Same project → same IDs across sessions; moving the project starts a clean slate.
+4. `getWorkspace(workspace_id)` / `getProject(project_id)`; if missing, calls `createWorkspace({workspace_id, name: sanitized})` / `createProject({workspace_id, project_id, name: sanitized})` — INSERT OR IGNORE-backed for idempotence.
+5. Reads `$CWD/.fulcrum.json`, merges `{workspace_id, project_id, monitor_port: 4721}`, and writes back only if any of those fields changed or were missing. Malformed JSON is overwritten.
+6. On first-run init (`!existingWs || !existingProj || needsWrite`) emits `[fulcrum] initialized project "<name>" (<workspace_id>)` to stderr. Never touches stdout.
+7. Caches the resolved `{workspace_id, project_id}` in a module-level `_projectIds` so subsequent commands in the same process reuse it; `currentProjectIds()` throws if called before `ensureProjectInitialized`.
 
 ---
 
@@ -1196,28 +1256,35 @@ No explicit `init` step needed; first command initializes the project.
 
 ---
 
-## 7. Tests (1004 Total)
+## 7. Tests (1009 Passing, 5 Skipped)
 
-### Per-Package Breakdown
+### Per-Package Breakdown (measured via `pnpm test`, 2026-04-14)
 
 | Package | Files | Passing | Skipped | Coverage Areas |
 |---------|-------|---------|---------|-----------------|
-| core | 32 | 221 | 0 | Migrations, DB, tasks, runs, roles, CoS, memory, events, handoffs, locks, profiles |
+| core | 32 (31 passed, 1 skipped) | 454 | 4 | Migrations, DB, tasks, runs, roles, CoS, memory, events, handoffs, locks, profiles, telemetry |
 | memory | 21 | 175 | 0 | Vault, FTS, Kuzu, ingestion, state, git, watcher, merge reconcile |
-| cli | 3 | 28 | 0 | Hook normalization, CLI coverage, pre/post hooks |
-| monitor | 3 | 10 | 0 | Metrics, dashboard, analytics |
-| planning | 7 | 35 | 0 | Epics, issues, PRDs, plans, relations, reviews |
+| monitor | 3 | 30 | 1 | Metrics, dashboard, analytics, rollup |
+| planning | 7 | 102 | 0 | Epics, issues, PRDs, plans, relations, reviews |
 | policy | 4 | 95 | 0 | Engine, rules, secrets, audit |
-| teams | 2 | 8 | 0 | Team CRUD, scheduler |
-| workflows | 2 | 25 | 0 | Runner, steps |
 | sync | 1 | 15 | 0 | Plane adapter, conflict resolution |
+| teams | 2 | 31 | 0 | Team CRUD, scheduler |
 | worker | 1 | 8 | 0 | Agent spawning, adapters |
+| workflows | 2 | 25 | 0 | Runner, steps |
 | worktrees | 1 | 41 | 0 | Git worktrees, merges, artifacts |
-| **TOTAL** | **77** | **1004** | **0** | — |
+| cli | 3 | 28 | 0 | Hook normalization, CLI coverage, pre/post hooks |
+| **TOTAL** | **77** | **1004 passing / 1009 collected** | **5** | — |
 
-**Test framework:** Vitest
-**Coverage:** No explicit coverage tool (tests are comprehensive but runtime coverage not measured)
-**Skipped tests:** None (all 1004 tests running)
+**Test framework:** Vitest 1.6.1 (one vitest.config.ts per package)
+**Coverage:** No explicit coverage tool configured
+**Skipped tests:** 5 total (4 in `@fulcrum/core`, 1 in `@fulcrum/monitor` — from vitest output `454 passed | 4 skipped` and `30 passed | 1 skipped`)
+
+### Guard tests (intentional drift detection)
+
+- `packages/core/src/tests/check-constraints.test.ts` — every DB CHECK constraint must enforce its TypeScript enum. Introduced the J-5 drift discovery that led to migrations 025/026/027.
+- `packages/core/src/tests/ulid-guard.test.ts` — greps core source and bans `import { ulid }` / raw `ulid()` calls — all first-class IDs must go through `newId()` (K-1/K-2/K-4).
+- `packages/core/src/tests/role-string-guard.test.ts` — bans hardcoded role-string compares in core (`=== 'chief_of_staff'` etc.), forcing use of `canInvokeTeams` / `canMerge` / `canWriteCode` / `canEditFiles` capability helpers.
+- `packages/core/src/tests/migrations.test.ts` — runs all 30 migrations on a fresh DB and asserts schema_migrations rows.
 
 ### Key Test Areas
 
@@ -1579,7 +1646,7 @@ No packages can be published to npm. Would require:
 
 ### Tests
 
-- **1004 passing tests** across 11 packages
+- **1004 passing tests + 5 skipped** (1009 collected) across 11 packages
 - **Coverage:** migrations, DB, CoS, memory, workflows, hooks, policy, roles, teams, worktrees
 - **Framework:** Vitest (no explicit coverage reporting)
 
@@ -1601,5 +1668,5 @@ No packages can be published to npm. Would require:
 
 ---
 
-**End of inventory. All facts. No opinions. Totals: 11 packages, 177 src files (excl. tests), 1004 tests, 16 migrations, 40 tables, 25 roles, 13 skills, 14 CLI groups.**
+**End of inventory. All facts. No opinions. Totals: 11 packages, ~19,090 LOC across all packages (non-test), 1004 passing tests (+5 skipped), 30 migrations, 24 canonical roles + 1 README, 13 Claude skills, 14 CLI command groups, 18 MCP tools, 32 HTTP monitor routes.**
 
