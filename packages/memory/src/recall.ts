@@ -3,6 +3,10 @@ import { getDb, FulcrumError, getTextEmbedder } from '@fulcrum/core'
 import { rrfScore, recallScore } from './scoring.js'
 import { rowToFullMemory } from './mappers.js'
 import type { RecallMemoryInput, CompactMemory, FullMemory, RecallMode } from './types.js'
+import { getKuzuClient } from './kuzu/client.js'
+import { queryMemoriesL2 } from './kuzu/query.js'
+import { extractStructured } from './extractors/structured.js'
+import { resolveEntity } from './kuzu/entity-store.js'
 
 function rowToCompact(row: Record<string, unknown>): CompactMemory {
   return {
@@ -105,6 +109,49 @@ export async function recallMemory(
   const mode: RecallMode = input.mode ?? 'compact'
   const limit = input.limit ?? (mode === 'compact' ? 8 : 20)
   if (limit <= 0) return []
+
+  // ── L2 path: if KuzuClient active and embedder available ─────────────────
+  const kuzuClient = getKuzuClient()
+  if (kuzuClient?.isReady) {
+    const embedder = getTextEmbedder()
+    if (embedder) {
+      try {
+        const queryVec = await embedder.embed(input.query)
+
+        // Extract query entities
+        const queryMentions = extractStructured(input.query, {})
+        const queryEntityIds: string[] = []
+        for (const mention of queryMentions) {
+          const entity = await resolveEntity(kuzuClient, mention.raw, input.workspace_id)
+          if (!entity.isNew) queryEntityIds.push(entity.id)
+        }
+
+        const l2Results = await queryMemoriesL2(kuzuClient, {
+          query: input.query,
+          queryVector: queryVec,
+          queryEntityIds,
+          workspaceId: input.workspace_id,
+          limit,
+        })
+
+        if (l2Results.length > 0) {
+          const db = getDb()
+          const ids = l2Results.map(r => r.id)
+          const placeholders = ids.map(() => '?').join(',')
+          const rows = db.prepare(
+            `SELECT m.* FROM memories m WHERE m.memory_id IN (${placeholders})`
+          ).all(...ids) as Record<string, unknown>[]
+
+          updateAccessCounts(db, ids)
+
+          if (mode === 'compact') return rows.map(rowToCompact)
+          return rows.map(rowToFullMemory)
+        }
+      } catch {
+        // L2 unavailable — fall through to L1
+      }
+    }
+  }
 
   const db = getDb()
   const { clauses, params } = buildWhereClause(input)
