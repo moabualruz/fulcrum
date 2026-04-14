@@ -402,3 +402,78 @@ describe('buildSpawnableRun', () => {
       .toThrow(expect.objectContaining({ code: 'invalid_input' }))
   })
 })
+
+describe('agent run event journal (G-7)', () => {
+  type RunEvent = { ts: string; event_type: string; payload: Record<string, unknown> }
+
+  function readEvents(run_id: string): RunEvent[] {
+    const row = getDb().prepare('SELECT events FROM agent_runs WHERE run_id = ?').get(run_id) as { events: string | null } | undefined
+    if (!row || !row.events) return []
+    return JSON.parse(row.events) as RunEvent[]
+  }
+
+  it('startAgentRun seeds events with a "started" entry', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const events = readEvents(run.run_id)
+    expect(events.length).toBe(1)
+    expect(events[0].event_type).toBe('started')
+    expect(events[0].payload.agent_role).toBe('software_engineer')
+    expect(events[0].payload.task_id).toBe(task.task_id)
+    expect(events[0].ts).toBeTruthy()
+  })
+
+  it('heartbeatAgentRun appends a "heartbeat" event with current_step and progress_pct', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    await heartbeatAgentRun({ run_id: run.run_id, current_step: 'editing', progress_pct: 25 })
+    const events = readEvents(run.run_id)
+    expect(events.length).toBe(2)
+    expect(events[1].event_type).toBe('heartbeat')
+    expect(events[1].payload.current_step).toBe('editing')
+    expect(events[1].payload.progress_pct).toBe(25)
+  })
+
+  it('completeAgentRun appends a "completed" event with output_summary', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    await completeAgentRun({ run_id: run.run_id, output_summary: 'all done' })
+    const events = readEvents(run.run_id)
+    const completed = events.find(e => e.event_type === 'completed')
+    expect(completed).toBeDefined()
+    expect(completed!.payload.output_summary).toBe('all done')
+  })
+
+  it('blockAgentRun appends a "blocked" event with reason', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    await blockAgentRun({ run_id: run.run_id, reason: 'waiting on API docs' })
+    const events = readEvents(run.run_id)
+    const blocked = events.find(e => e.event_type === 'blocked')
+    expect(blocked).toBeDefined()
+    expect(blocked!.payload.reason).toBe('waiting on API docs')
+  })
+
+  it('escalateRun appends an "escalated" event', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    await escalateRun({ run_id: run.run_id, escalation_reason: 'out of scope' })
+    const events = readEvents(run.run_id)
+    const escalated = events.find(e => e.event_type === 'escalated')
+    expect(escalated).toBeDefined()
+    expect(escalated!.payload.reason).toBe('out of scope')
+  })
+
+  it('multiple heartbeats accumulate in order', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step 1', progress_pct: 10 })
+    await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step 2', progress_pct: 50 })
+    await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step 3', progress_pct: 90 })
+    const events = readEvents(run.run_id)
+    const heartbeats = events.filter(e => e.event_type === 'heartbeat')
+    expect(heartbeats.length).toBe(3)
+    expect(heartbeats[0].payload.current_step).toBe('step 1')
+    expect(heartbeats[2].payload.current_step).toBe('step 3')
+  })
+})

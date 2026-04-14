@@ -24,6 +24,28 @@ interface EscalateRunInput { run_id: string; escalation_reason: string }
 // Keep RunStatus as alias for backward compat
 export type RunStatus = AgentRunStatus
 
+/**
+ * Append a structured event to agent_runs.events (spec §5.3/§16.5/§19).
+ * Each entry has shape { ts, event_type, payload } and records a lifecycle
+ * transition: started, heartbeat, completed, blocked, escalated. Reads the
+ * current JSON array, pushes, and writes back in a single UPDATE. `undefined`
+ * payload fields are stripped for clean JSON.
+ */
+function appendRunEvent(
+  run_id: string,
+  event_type: string,
+  payload: Record<string, unknown> = {},
+): void {
+  const db = getDb()
+  const row = db.prepare('SELECT events FROM agent_runs WHERE run_id = ?').get(run_id) as { events: string | null } | undefined
+  if (!row) return
+  const events: Array<{ ts: string; event_type: string; payload: Record<string, unknown> }> =
+    row.events ? JSON.parse(row.events) : []
+  const clean = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined))
+  events.push({ ts: new Date().toISOString(), event_type, payload: clean })
+  db.prepare('UPDATE agent_runs SET events = ? WHERE run_id = ?').run(JSON.stringify(events), run_id)
+}
+
 function upsertAgentStateProjection(db: ReturnType<typeof getDb>, run: AgentRun): void {
   db.prepare(`
     INSERT OR REPLACE INTO agent_state_projection
@@ -124,6 +146,13 @@ export async function startAgentRun(input: StartAgentRunInput): Promise<AgentRun
     initialStatus, sc, git_branch, git_commit, now, now
   )
 
+  appendRunEvent(run_id, 'started', {
+    agent_role: input.role,
+    task_id: input.task_id,
+    agent_id: agent_id || undefined,
+    pi_profile: input.pi_profile,
+  })
+
   const startedRun = getRun(run_id)
   upsertAgentStateProjection(db, startedRun)
 
@@ -169,6 +198,11 @@ export async function heartbeatAgentRun(input: HeartbeatInput): Promise<void> {
     now, input.run_id
   )
   if (result.changes === 0) throw new FulcrumError(`Run ${input.run_id} not found`, 'not_found')
+  appendRunEvent(input.run_id, 'heartbeat', {
+    current_step: input.current_step,
+    progress_pct: input.progress_pct,
+    current_path: input.current_path,
+  })
   const heartbeatRun = getRun(input.run_id)
   upsertAgentStateProjection(db, heartbeatRun)
 }
@@ -199,6 +233,11 @@ export async function completeAgentRun(input: CompleteRunInput): Promise<AgentRu
     now, now, input.run_id
   )
 
+  appendRunEvent(input.run_id, 'completed', {
+    output_summary: input.output_summary,
+    artifacts: input.artifacts,
+  })
+
   const completedRun = getRun(input.run_id)
   upsertAgentStateProjection(db, completedRun)
 
@@ -227,6 +266,8 @@ export async function blockAgentRun(input: BlockRunInput): Promise<AgentRun> {
         updated_at = ?, version = version + 1
     WHERE run_id = ?
   `).run(blockedCategory, input.reason, new Date().toISOString(), input.run_id)
+
+  appendRunEvent(input.run_id, 'blocked', { reason: input.reason })
 
   const blockedRun = getRun(input.run_id)
   upsertAgentStateProjection(db, blockedRun)
@@ -272,6 +313,8 @@ export async function escalateRun(input: EscalateRunInput): Promise<Task> {
     UPDATE agent_runs SET status = 'aborted', status_category = 'done', updated_at = ?, version = version + 1
     WHERE run_id = ?
   `).run(new Date().toISOString(), input.run_id)
+
+  appendRunEvent(input.run_id, 'escalated', { reason: input.escalation_reason })
 
   const abortedRun = getRun(input.run_id)
   upsertAgentStateProjection(db, abortedRun)
