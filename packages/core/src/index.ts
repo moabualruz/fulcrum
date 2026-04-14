@@ -9,6 +9,7 @@ export type {
   HandoffPacket, CreateHandoffInput, HandoffPriority, HandoffScope, HandoffMode,
   TaskPacket, SpawnableRun, StartAgentRunInput,
   Workspace, ArtifactContract,
+  TelemetrySpan,
 } from './types.js'
 export { FulcrumError } from './types.js'
 
@@ -80,6 +81,10 @@ export type { CoSResponse } from './cos-parser.js'
 // Locks
 export { acquireLock, releaseLock, listLocks, cleanupExpiredLocks } from './locks.js'
 export type { Lock, AcquireLockInput, AcquireLockResult } from './locks.js'
+
+// Telemetry
+export { startSpan, endSpan, getTrace } from './telemetry/spans.js'
+export type { StartSpanInput, EndSpanInput } from './telemetry/spans.js'
 
 // Constants
 export * from './constants.js'

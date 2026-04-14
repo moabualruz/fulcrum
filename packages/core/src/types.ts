@@ -358,6 +358,19 @@ export interface ArtifactContract {
   created_at: string
 }
 
+export interface TelemetrySpan {
+  span_id: string
+  trace_id: string
+  parent_span_id: string | null
+  name: string
+  workspace_id: string
+  run_id: string | null
+  status: 'started' | 'ok' | 'error'
+  started_at: string
+  ended_at: string | null
+  payload: Record<string, unknown> | null
+}
+
 export class FulcrumError extends Error {
   constructor(
     message: string,
