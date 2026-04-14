@@ -75,6 +75,21 @@ function checkSqliteBinary(): CheckResult {
   }
 }
 
+function checkDbLiveness(): CheckResult {
+  try {
+    // Dynamic import to avoid top-level DB initialization on doctor runs
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { checkDbHealth } = require('@fulcrum/core') as { checkDbHealth: () => { ok: boolean; latencyMs?: number; error?: string } }
+    const result = checkDbHealth()
+    if (result.ok) {
+      return { name: 'Database liveness', status: 'pass', message: `${result.latencyMs}ms round-trip` }
+    }
+    return { name: 'Database liveness', status: 'fail', message: result.error ?? 'DB check failed' }
+  } catch {
+    return { name: 'Database liveness', status: 'warn', message: 'Could not check DB — run a fulcrum command first to initialize' }
+  }
+}
+
 function checkMcpSdk(): CheckResult {
   try {
     execSync('node -e "require(\'@modelcontextprotocol/sdk/server/mcp.js\')"', { stdio: 'ignore' })
@@ -139,6 +154,7 @@ export function runDoctor(options: DoctorOptions = {}): { results: CheckResult[]
     checkFulcrumJson(cwd),
     checkDataDir(),
     checkSqliteBinary(),
+    checkDbLiveness(),
     checkMcpSdk(),
     checkEnvVars(),
     checkAgentIntegration(cwd),

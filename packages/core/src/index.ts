@@ -19,7 +19,7 @@ export { loadConfig, defaultConfig, validateFulcrumConfig } from './config.js'
 export type { ValidationResult } from './config.js'
 
 // DB
-export { getDb, setDb, closeDb, _configureDb, globalDataDir } from './db/client.js'
+export { getDb, setDb, closeDb, _configureDb, globalDataDir, withTransaction, checkDbHealth } from './db/client.js'
 export { runMigrations } from './db/migrations.js'
 
 // Tasks
