@@ -16,7 +16,14 @@ interface EmbeddingProviderSetup {
 }
 
 async function ask(rl: ReturnType<typeof createInterface>, question: string): Promise<string> {
-  return new Promise(resolve => rl.question(question, resolve))
+  return new Promise(resolve => {
+    if ((rl as unknown as { closed: boolean }).closed) { resolve(''); return }
+    rl.once('close', () => resolve(''))
+    rl.question(question, answer => {
+      rl.removeAllListeners('close')
+      resolve(answer)
+    })
+  })
 }
 
 function getFulcrumConfigPath(): string {

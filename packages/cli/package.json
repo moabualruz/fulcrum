@@ -1,0 +1,23 @@
+{
+  "name": "@fulcrum/cli",
+  "version": "0.0.1",
+  "description": "CLI for Fulcrum — fulcrum memory init, accelerate, rebuild, status",
+  "keywords": ["cli", "agent-os", "fulcrum", "memory", "vault"],
+  "type": "module",
+  "bin": {
+    "fulcrum": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "scripts": {
+    "start": "node --import tsx/esm src/index.ts"
+  },
+  "dependencies": {
+    "@fulcrum/core": "workspace:*",
+    "@fulcrum/memory": "workspace:*",
+    "tsx": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}

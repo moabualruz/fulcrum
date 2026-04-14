@@ -3,7 +3,21 @@
   "version": "0.0.1",
   "private": true,
   "description": "Local-first agent control plane — task tracking, WIP enforcement, human-readable memory vault (L0) + hybrid recall (L1 FTS5 + L2 Kuzu graph), and CoS context for multi-agent TypeScript systems",
-  "keywords": ["agent-os", "multi-agent", "sqlite", "local-first", "llm", "ai-agents", "task-management", "typescript", "vault", "kuzu", "graph-database", "entity-graph", "knowledge-graph"],
+  "keywords": [
+    "agent-os",
+    "multi-agent",
+    "sqlite",
+    "local-first",
+    "llm",
+    "ai-agents",
+    "task-management",
+    "typescript",
+    "vault",
+    "kuzu",
+    "graph-database",
+    "entity-graph",
+    "knowledge-graph"
+  ],
   "author": "Mo Abualruz <moabualruz@github>",
   "license": "MIT",
   "homepage": "https://github.com/moabualruz/fulcrum#readme",
@@ -16,18 +30,30 @@
   },
   "type": "module",
   "pi": {
-    "extensions": ["./packages/extension/index.ts"]
+    "extensions": [
+      "./packages/extension/index.ts"
+    ]
   },
   "scripts": {
     "test": "pnpm -r test",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "fulcrum": "node --import tsx/esm packages/cli/src/index.ts"
   },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-tui": "*"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "esbuild", "onnxruntime-node", "koffi", "protobufjs"]
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "onnxruntime-node",
+      "koffi",
+      "protobufjs"
+    ]
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
   }
 }
