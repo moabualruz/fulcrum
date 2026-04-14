@@ -57,6 +57,7 @@ export { runJanitorCycle, startJanitor } from './janitor.js'
 
 // Embedding
 export { initEmbedding, getTextEmbedder, getCodeEmbedder, getReranker, resetProviders } from './embedding/registry.js'
+export { QUERY_PREFIX, DOC_PREFIX, truncateDimensions } from './embedding/local.js'
 
 // Status
 export { getWorkspaceStatus, buildCosContext, listAgentProfiles } from './status.js'

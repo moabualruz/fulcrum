@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { LocalEmbeddingProvider } from '../embedding/local.js'
+import { LocalEmbeddingProvider, QUERY_PREFIX, DOC_PREFIX, truncateDimensions } from '../embedding/local.js'
 import { LocalRerankerProvider } from '../embedding/reranker.js'
 
 // NOTE: these tests download models on first run (~300MB+). Skipped in CI
@@ -69,3 +69,45 @@ function cosineSim(a: Float32Array, b: Float32Array): number {
   for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i] }
   return dot / (Math.sqrt(na) * Math.sqrt(nb))
 }
+
+// ---------- Instruction prefixes (unit — no model needed) ----------
+
+describe('instruction prefixes', () => {
+  it('QUERY_PREFIX and DOC_PREFIX are non-empty strings', () => {
+    expect(typeof QUERY_PREFIX).toBe('string')
+    expect(QUERY_PREFIX.length).toBeGreaterThan(0)
+    expect(typeof DOC_PREFIX).toBe('string')
+    expect(DOC_PREFIX.length).toBeGreaterThan(0)
+  })
+
+  it('QUERY_PREFIX and DOC_PREFIX are different', () => {
+    expect(QUERY_PREFIX).not.toBe(DOC_PREFIX)
+  })
+})
+
+// ---------- truncateDimensions (unit — no model needed) ----------
+
+describe('truncateDimensions', () => {
+  it('returns same vector when dims === length', () => {
+    const v = new Float32Array([1, 2, 3, 4])
+    const result = truncateDimensions(v, 4)
+    expect(Array.from(result)).toEqual([1, 2, 3, 4])
+  })
+
+  it('truncates to fewer dimensions (Matryoshka truncation)', () => {
+    const v = new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+    const result = truncateDimensions(v, 3)
+    expect(result.length).toBe(3)
+    // Use source Float32 values to avoid float64 precision mismatch
+    expect(result[0]).toBeCloseTo(0.1, 5)
+    expect(result[1]).toBeCloseTo(0.2, 5)
+    expect(result[2]).toBeCloseTo(0.3, 5)
+  })
+
+  it('zero-pads when dims > vector length', () => {
+    const v = new Float32Array([1, 2])
+    const result = truncateDimensions(v, 4)
+    expect(result.length).toBe(4)
+    expect(Array.from(result)).toEqual([1, 2, 0, 0])
+  })
+})
