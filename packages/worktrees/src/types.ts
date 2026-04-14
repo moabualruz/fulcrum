@@ -1,14 +1,12 @@
 // packages/worktrees/src/types.ts
-
-export type ArtifactType =
-  | 'prd' | 'plan' | 'review' | 'test_report' | 'code_diff'
-  | 'log' | 'spec' | 'diagram' | 'document' | 'config'
+import type { ArtifactType } from '@fulcrum/core'
+export type { ArtifactType }
 
 export type ArtifactStatus = 'draft' | 'final' | 'archived'
 export type ReviewStatus = 'pending' | 'changes_requested' | 'approved' | 'rejected'
 export type ReviewTargetType = 'task' | 'artifact' | 'worktree'
 export type WorktreeStatus = 'allocated' | 'dirty' | 'ready_for_merge' | 'merged' | 'discarded'
-export type HandoffMode = 'artifact_first_brief' | 'context_first' | 'goal_first' | 'resource_first'
+export type HandoffMode = 'brief' | 'contextual' | 'artifact_first_brief' | 'branched_session'
 
 export interface Artifact {
   artifact_id: string

@@ -706,7 +706,7 @@ CREATE TABLE IF NOT EXISTS handoffs (
   done_criteria        TEXT NOT NULL DEFAULT '[]',
   artifact_contract_id TEXT REFERENCES artifact_contracts(contract_id),
   handoff_mode         TEXT NOT NULL DEFAULT 'artifact_first_brief'
-    CHECK(handoff_mode IN ('artifact_first_brief','context_first','goal_first','resource_first')),
+    CHECK(handoff_mode IN ('brief','contextual','artifact_first_brief','branched_session')),
   created_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

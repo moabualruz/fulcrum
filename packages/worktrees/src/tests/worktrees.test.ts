@@ -1,8 +1,9 @@
 // packages/worktrees/src/tests/worktrees.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { setDb } from '@fulcrum/core'
+import { setDb, newId } from '@fulcrum/core'
 import { runMigration008 } from '../schema.js'
+import type { ArtifactType, HandoffMode } from '../types.js'
 import {
   allocateWorktree,
   markDirty,
@@ -287,6 +288,126 @@ describe('discardWorktree', () => {
     await expect(discardWorktree({ worktree_id: 'wt_nonexistent' })).rejects.toMatchObject({
       code: 'not_found',
     })
+  })
+})
+
+describe('ArtifactType canonical 18-value set', () => {
+  it('accepts all 18 canonical artifact types in the artifacts table', () => {
+    const types: ArtifactType[] = [
+      'prd',
+      'plan',
+      'issue_breakdown',
+      'context_gathering_report',
+      'patch',
+      'changed_files_manifest',
+      'command_log',
+      'test_report',
+      'benchmark_report',
+      'review_report',
+      'integration_report',
+      'merge_conflict_report',
+      'risk_report',
+      'research_note',
+      'source_digest',
+      'comparison_matrix',
+      'memory_promotion_summary',
+      'task_outcome_summary',
+    ]
+    expect(types).toHaveLength(18)
+
+    // Each type can be inserted without a CHECK constraint violation
+    for (const artifact_type of types) {
+      const artifactId = `art_${artifact_type}`
+      expect(() =>
+        db.prepare(`
+          INSERT INTO artifacts
+            (artifact_id, workspace_id, project_id, display_id, artifact_type,
+             title, file_path, owner_type, owner_id)
+          VALUES (?, 'ws_test', 'proj_test', ?, ?, ?, ?, 'task', 'task_1')
+        `).run(artifactId, `ART-${artifact_type}`, artifact_type, `Title ${artifact_type}`, `/tmp/${artifact_type}.md`)
+      ).not.toThrow()
+    }
+  })
+
+  it('stores and retrieves research_note artifact type', () => {
+    const artifactId = `art_rn_${Date.now()}`
+    db.prepare(`
+      INSERT INTO artifacts
+        (artifact_id, workspace_id, project_id, display_id, artifact_type,
+         title, file_path, owner_type, owner_id)
+      VALUES (?, 'ws_test', 'proj_test', 'ART-RN1', 'research_note',
+              'Research Note', '/tmp/research.md', 'task', 'task_1')
+    `).run(artifactId)
+
+    const row = db.prepare('SELECT artifact_type FROM artifacts WHERE artifact_id = ?').get(artifactId) as { artifact_type: string }
+    expect(row.artifact_type).toBe('research_note')
+  })
+
+  it('stores and retrieves memory_promotion_summary artifact type', () => {
+    const artifactId = `art_mps_${Date.now()}`
+    db.prepare(`
+      INSERT INTO artifacts
+        (artifact_id, workspace_id, project_id, display_id, artifact_type,
+         title, file_path, owner_type, owner_id)
+      VALUES (?, 'ws_test', 'proj_test', 'ART-MPS1', 'memory_promotion_summary',
+              'Memory Promotion Summary', '/tmp/mem.md', 'task', 'task_1')
+    `).run(artifactId)
+
+    const row = db.prepare('SELECT artifact_type FROM artifacts WHERE artifact_id = ?').get(artifactId) as { artifact_type: string }
+    expect(row.artifact_type).toBe('memory_promotion_summary')
+  })
+
+  it('stores and retrieves task_outcome_summary artifact type', () => {
+    const artifactId = `art_tos_${Date.now()}`
+    db.prepare(`
+      INSERT INTO artifacts
+        (artifact_id, workspace_id, project_id, display_id, artifact_type,
+         title, file_path, owner_type, owner_id)
+      VALUES (?, 'ws_test', 'proj_test', 'ART-TOS1', 'task_outcome_summary',
+              'Task Outcome Summary', '/tmp/outcome.md', 'task', 'task_1')
+    `).run(artifactId)
+
+    const row = db.prepare('SELECT artifact_type FROM artifacts WHERE artifact_id = ?').get(artifactId) as { artifact_type: string }
+    expect(row.artifact_type).toBe('task_outcome_summary')
+  })
+})
+
+describe('HandoffMode Python-spec values', () => {
+  // Seed prerequisite tables for handoff inserts
+  function insertHandoff(mode: HandoffMode): void {
+    db.prepare(`
+      INSERT INTO handoffs
+        (handoff_id, workspace_id, project_id, from_agent_id, to_agent_id,
+         goal, scope, handoff_mode)
+      VALUES (?, 'ws_test', 'proj_test', 'agent_a', 'agent_b', 'do work', 'full', ?)
+    `).run(`hf_${mode}_${Date.now()}`, mode)
+  }
+
+  it('accepts brief handoff mode', () => {
+    expect(() => insertHandoff('brief')).not.toThrow()
+  })
+
+  it('accepts contextual handoff mode', () => {
+    expect(() => insertHandoff('contextual')).not.toThrow()
+  })
+
+  it('accepts artifact_first_brief handoff mode', () => {
+    expect(() => insertHandoff('artifact_first_brief')).not.toThrow()
+  })
+
+  it('accepts branched_session handoff mode', () => {
+    expect(() => insertHandoff('branched_session')).not.toThrow()
+  })
+
+  it('rejects old context_first value', () => {
+    expect(() =>
+      db.prepare(`
+        INSERT INTO handoffs
+          (handoff_id, workspace_id, project_id, from_agent_id, to_agent_id,
+           goal, scope, handoff_mode)
+        VALUES ('hf_old', 'ws_test', 'proj_test', 'agent_a', 'agent_b', 'do work', 'full', 'context_first')
+      `).run()
+    ).toThrow()
   })
 })
 
