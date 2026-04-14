@@ -64,15 +64,38 @@ export function getMemoryFilePath(vaultPath: string, memory: FullMemory): string
   const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
 
   if (CURATED_KINDS.has(memory.kind)) {
-    // memories/curated/workspaces/<ws_id>/<scope>/<yyyy>/<mm>/<id>.md
-    return join(
-      vaultPath,
-      'memories', 'curated', 'workspaces',
-      memory.workspace_id,
-      memory.scope,
-      yyyy, mm,
-      `${memory.memory_id}.md`
-    )
+    if (memory.scope === 'global' || !memory.project_id) {
+      // memories/curated/workspaces/<ws_id>/global/<yyyy>/<mm>/<id>.md
+      return join(
+        vaultPath,
+        'memories', 'curated', 'workspaces',
+        memory.workspace_id,
+        'global',
+        yyyy, mm,
+        `${memory.memory_id}.md`
+      )
+    } else if (memory.scope === 'project') {
+      // memories/curated/workspaces/<ws_id>/project/<project_id>/<yyyy>/<mm>/<id>.md
+      return join(
+        vaultPath,
+        'memories', 'curated', 'workspaces',
+        memory.workspace_id,
+        'project', memory.project_id,
+        yyyy, mm,
+        `${memory.memory_id}.md`
+      )
+    } else {
+      // scope === 'file'
+      // memories/curated/workspaces/<ws_id>/file/<project_id>/<yyyy>/<mm>/<id>.md
+      return join(
+        vaultPath,
+        'memories', 'curated', 'workspaces',
+        memory.workspace_id,
+        'file', memory.project_id,
+        yyyy, mm,
+        `${memory.memory_id}.md`
+      )
+    }
   } else {
     // memories/operational/workspaces/<ws_id>/runs/<task_id_or_id>/<id>.md
     const runSegment = memory.task_id ?? memory.memory_id

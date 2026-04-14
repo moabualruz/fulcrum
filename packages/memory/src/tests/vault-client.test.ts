@@ -67,7 +67,7 @@ describe('initVault', () => {
 describe('getMemoryFilePath', () => {
   it('routes curated kind to memories/curated/workspaces path', () => {
     const p = getMemoryFilePath(vaultPath, baseMemory)
-    expect(p).toContain(join('memories', 'curated', 'workspaces', 'ws_test', 'project'))
+    expect(p).toContain(join('memories', 'curated', 'workspaces', 'ws_test', 'project', 'proj_test'))
     expect(p).toContain('01JBXK7Z9T8QH0F3VRDE5W2NPM.md')
   })
 
