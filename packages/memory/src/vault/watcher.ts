@@ -43,6 +43,27 @@ export function startVaultWatcher(options: VaultWatcherOptions): () => void {
     try {
       if (!existsSync(filePath)) return
       const content = readFileSync(filePath, 'utf-8')
+
+      // Parse frontmatter with gray-matter directly so we can validate BEFORE
+      // calling parseFromFile (which throws on missing required fields)
+      const rawParsed = matter(content)
+      const rawFm = rawParsed.data as Record<string, unknown>
+
+      // Validate required fields — log ERROR and bail out if invalid
+      const requiredFields = ['id', 'schema', 'kind', 'scope', 'workspace_id', 'title'] as const
+      const missingFields = requiredFields.filter(f => !rawFm[f])
+      if (missingFields.length > 0) {
+        const nowErr = new Date().toISOString()
+        appendToLog(vaultPath, {
+          ts: nowErr,
+          op: 'ERROR',
+          id: typeof rawFm['id'] === 'string' ? rawFm['id'] : 'unknown',
+          meta: `schema validation failed: missing fields [${missingFields.join(', ')}]`,
+        })
+        return // Do not call onHumanEdit or rewrite the file
+      }
+
+      // All required fields present — use parseFromFile for the typed result
       const { frontmatter, body } = parseFromFile(content)
       const memoryId = frontmatter.id
 
