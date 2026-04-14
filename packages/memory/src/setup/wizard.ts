@@ -1,6 +1,6 @@
 // packages/memory/src/setup/wizard.ts
 import { createInterface } from 'readline'
-import { writeFileSync, existsSync, mkdirSync, readFileSync } from 'fs'
+import { writeFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 import { getVaultPath, initVault } from '../vault/client.js'
@@ -136,8 +136,11 @@ export async function runMemoryInit(options?: { vaultPath?: string }): Promise<v
     }
     writeFulcrumConfig(config)
 
-    // Step 4: Initialize Kuzu
+    // Step 4: Initialize Kuzu — always recreate to ensure schema matches configured dimensions
     const kuzuDbPath = join(homedir(), '.fulcrum', 'kuzu')
+    if (existsSync(kuzuDbPath)) {
+      rmSync(kuzuDbPath, { recursive: true, force: true })
+    }
     mkdirSync(kuzuDbPath, { recursive: true })
     const kuzuClient = await KuzuClient.create({ dbPath: kuzuDbPath })
     setKuzuClient(kuzuClient)
@@ -146,7 +149,13 @@ export async function runMemoryInit(options?: { vaultPath?: string }): Promise<v
     const result = await rebuildFromVault({ vaultPath, target: 'l2' })
     console.log(`  ✓ L2 indexed ${result.l2Count} memories`)
     if (result.errors.length > 0) {
-      console.log(`  ⚠ ${result.errors.length} errors (see log.md)`)
+      console.log(`  ⚠ ${result.errors.length} errors:`)
+      for (const e of result.errors.slice(0, 5)) {
+        console.log(`    ${e}`)
+      }
+      if (result.errors.length > 5) {
+        console.log(`    ... and ${result.errors.length - 5} more`)
+      }
     }
     console.log('\n  L2 acceleration active.\n')
   } finally {
