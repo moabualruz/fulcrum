@@ -313,3 +313,35 @@ describe('round 1 migration (G-2, G-4 schema, G-12 schema)', () => {
     ).run()).toThrow()
   })
 })
+
+describe('memories.scope CHECK constraint includes task (H-6)', () => {
+  afterEach(() => closeDb())
+
+  it('accepts scope=task rows after migration', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    // Seed required FKs
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_1', 'ws_1', 'p', 'git', 'active', 'worktree', '2026-04-14T00:00:00Z')`).run()
+
+    // Insert a scope='task' memory — should succeed
+    expect(() => db.prepare(`
+      INSERT INTO memories (memory_id, workspace_id, project_id, kind, scope, content, created_at)
+      VALUES ('mem_1', 'ws_1', 'proj_1', 'task_decision', 'task', 'x', '2026-04-14T00:00:00Z')
+    `).run()).not.toThrow()
+  })
+
+  it('rejects scope=bogus after migration', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1', 'w', 'active', '2026-04-14T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_1', 'ws_1', 'p', 'git', 'active', 'worktree', '2026-04-14T00:00:00Z')`).run()
+
+    expect(() => db.prepare(`
+      INSERT INTO memories (memory_id, workspace_id, project_id, kind, scope, content, created_at)
+      VALUES ('mem_bad', 'ws_1', 'proj_1', 'fact', 'bogus', 'x', '2026-04-14T00:00:00Z')
+    `).run()).toThrow()
+  })
+})
