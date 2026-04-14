@@ -37,7 +37,8 @@ function fuseScore(
   mem: RawMemoryRow,
   vscore: number,
   graphScore: number,
-  queryWorkspaceId: string
+  queryWorkspaceId: string,
+  isContradicted: boolean = false
 ): number {
   return (
     1.0 * vscore
@@ -45,6 +46,7 @@ function fuseScore(
     + 0.3 * (mem.importance ?? 0.5)
     + 0.2 * recency(mem.created_at)
     + 0.25 * workspaceAffinity(mem.workspace_id, queryWorkspaceId)
+    - (isContradicted ? 0.6 : 0.0)
   )
 }
 
@@ -145,12 +147,41 @@ export async function queryMemoriesL2(
     }
   }
 
+  // Stage 4.5 — Remove superseded memories (pointed to by UPDATES edges)
+  if (scoreMap.size > 0) {
+    const candidateIds = [...scoreMap.keys()]
+    const supersededRows = await client.query<{ id: string }>(
+      `MATCH (newer:Memory)-[:UPDATES]->(old:Memory)
+       WHERE old.id IN $candidate_ids
+       RETURN old.id AS id`,
+      { candidate_ids: candidateIds }
+    ).catch(() => [] as { id: string }[])
+    for (const row of supersededRows) {
+      scoreMap.delete(row.id)
+    }
+  }
+
+  // Build contradiction set — ids that have an incoming CONTRADICTS edge
+  let contradictedIds = new Set<string>()
+  if (scoreMap.size > 0) {
+    const remainingIds = [...scoreMap.keys()]
+    const contradictRows = await client.query<{ id: string }>(
+      `MATCH (a:Memory)-[:CONTRADICTS]->(b:Memory)
+       WHERE b.id IN $ids
+       RETURN b.id AS id`,
+      { ids: remainingIds }
+    ).catch(() => [] as { id: string }[])
+    for (const row of contradictRows) {
+      contradictedIds.add(row.id)
+    }
+  }
+
   // Stage 5 — Fused scoring
   const candidateLimit = limit * 3
   const scored: ScoredMemoryId[] = []
 
   for (const [id, { mem, vscore, graphScore }] of scoreMap) {
-    const score = fuseScore(mem, vscore, graphScore, input.workspaceId)
+    const score = fuseScore(mem, vscore, graphScore, input.workspaceId, contradictedIds.has(id))
     scored.push({ id, score, vscore, graphScore })
   }
 
