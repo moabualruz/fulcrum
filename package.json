@@ -38,7 +38,11 @@
     "test": "pnpm -r test",
     "build": "pnpm -r build",
     "fulcrum": "node --import tsx/esm packages/cli/src/index.ts",
-    "install-bin": "mkdir -p $HOME/.local/bin && ln -sf $(pwd)/fulcrum $HOME/.local/bin/fulcrum && echo 'fulcrum → ~/.local/bin/fulcrum'"
+    "install-bin": "mkdir -p $HOME/.local/bin && ln -sf $(pwd)/fulcrum $HOME/.local/bin/fulcrum && echo 'fulcrum → ~/.local/bin/fulcrum'",
+    "setup": "node --import tsx/esm agent-integration/install.ts all",
+    "setup:claude": "node --import tsx/esm agent-integration/install.ts claude",
+    "setup:gemini": "node --import tsx/esm agent-integration/install.ts gemini",
+    "setup:pi": "node --import tsx/esm agent-integration/install.ts pi"
   },
   "peerDependencies": {
     "@mariozechner/pi-ai": "*",

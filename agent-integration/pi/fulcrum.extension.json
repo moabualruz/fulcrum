@@ -1,0 +1,25 @@
+{
+  "_note": "This file documents the Fulcrum extension. The real extension is the TypeScript cockpit in ./cockpit/. Install with: pi install ./cockpit",
+  "name": "fulcrum",
+  "version": "1.0.0",
+  "description": "Fulcrum agent control plane integration for PI — dashboard widget, task management, memory, lifecycle, and policy.",
+  "cockpit": "./cockpit/index.ts",
+  "contextFileName": "PI.md",
+  "hooks": {
+    "BeforeTool": {
+      "command": "fulcrum hook pi",
+      "_note": "Standalone hook for environments without the TypeScript cockpit"
+    }
+  },
+  "lifecycleTools": {
+    "_note": "When using the cockpit extension, these are native PI tools (fulcrum_*). When using MCP-only, they are mcp__fulcrum__* tools.",
+    "onRunStart": "fulcrum_start_run",
+    "onHeartbeat": "fulcrum_heartbeat",
+    "onRunComplete": "fulcrum_complete_run",
+    "onRunBlocked": "fulcrum_block_run",
+    "onCoSDispatch": "fulcrum_build_cos_context",
+    "onStatusQuery": "fulcrum_workspace_status"
+  },
+  "monitorPort": 4721,
+  "controlApiBase": "http://127.0.0.1:4721"
+}

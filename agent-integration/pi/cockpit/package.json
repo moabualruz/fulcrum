@@ -1,0 +1,21 @@
+{
+  "name": "fulcrum-cockpit",
+  "version": "1.0.0",
+  "description": "Fulcrum Cockpit — control-plane dashboard, task management, memory, lifecycle tools, and policy hook for the PI coding agent",
+  "keywords": ["pi-package", "fulcrum", "agent-os", "task-management", "cockpit", "multi-agent"],
+  "author": "Fulcrum",
+  "license": "MIT",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "*"
+  },
+  "devDependencies": {
+    "@sinclair/typebox": "^0.32.0"
+  }
+}
