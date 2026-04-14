@@ -18,7 +18,8 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
     if (!this._warmingUp) {
       this._warmingUp = (async () => {
         const { pipeline, env } = await import('@huggingface/transformers')
-        env.cacheDir = './.fulcrum/models'
+        const { globalDataDir } = await import('../db/client.js')
+        env.cacheDir = globalDataDir() + '/models'
         this.pipeline = await pipeline('feature-extraction', this.model, { dtype: 'q8' })
       })()
     }

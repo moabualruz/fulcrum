@@ -2,11 +2,11 @@
 import { createInterface } from 'readline'
 import { writeFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
-import { homedir } from 'os'
 import { getVaultPath, initVault } from '../vault/client.js'
 import { createVaultGit } from '../vault/git.js'
 import { rebuildFromVault } from './rebuild.js'
 import { KuzuClient, setKuzuClient } from '../kuzu/client.js'
+import { globalDataDir } from '@fulcrum/core'
 
 interface EmbeddingProviderSetup {
   provider: 'local' | 'ollama' | 'openai' | 'custom'
@@ -28,7 +28,7 @@ async function ask(rl: ReturnType<typeof createInterface>, question: string): Pr
 }
 
 function getFulcrumConfigPath(): string {
-  return join(homedir(), '.fulcrum', 'config.json')
+  return join(globalDataDir(), 'config.json')
 }
 
 function readFulcrumConfig(): Record<string, unknown> {
@@ -43,7 +43,7 @@ function readFulcrumConfig(): Record<string, unknown> {
 
 function writeFulcrumConfig(config: Record<string, unknown>): void {
   const configPath = getFulcrumConfigPath()
-  mkdirSync(join(homedir(), '.fulcrum'), { recursive: true })
+  mkdirSync(globalDataDir(), { recursive: true })
   writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
 }
 
@@ -137,7 +137,7 @@ export async function runMemoryInit(options?: { vaultPath?: string }): Promise<v
     writeFulcrumConfig(config)
 
     // Step 4: Initialize Kuzu — always recreate to ensure schema matches configured dimensions
-    const kuzuDbPath = join(homedir(), '.fulcrum', 'kuzu')
+    const kuzuDbPath = join(globalDataDir(), 'kuzu')
     if (existsSync(kuzuDbPath)) {
       rmSync(kuzuDbPath, { recursive: true, force: true })
     }

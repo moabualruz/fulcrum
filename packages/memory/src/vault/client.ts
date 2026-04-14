@@ -1,14 +1,14 @@
 // packages/memory/src/vault/client.ts
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'fs'
 import { join, dirname } from 'path'
-import { homedir } from 'os'
 import type { FullMemory } from '../types.js'
 import { CURATED_KINDS } from '../types.js'
 import { serializeToFile, parseFromFile } from './formatter.js'
 import type { MemoryFileFrontmatter } from '../types.js'
+import { globalDataDir } from '@fulcrum/core'
 
 export function getVaultPath(): string {
-  return process.env['FULCRUM_VAULT_PATH'] ?? join(homedir(), '.fulcrum', 'vault')
+  return process.env['FULCRUM_VAULT_PATH'] ?? join(globalDataDir(), 'vault')
 }
 
 export function vaultExists(vaultPath: string): boolean {

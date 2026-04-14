@@ -1,12 +1,32 @@
 import Database from 'better-sqlite3'
 import { mkdirSync } from 'fs'
 import { join } from 'path'
+import { homedir, platform } from 'os'
+
+/**
+ * Returns the single, global Fulcrum data directory.
+ * Never writes to project directories — all data is global.
+ *
+ * Priority:
+ *   1. $FULCRUM_DATA_DIR env var
+ *   2. $XDG_DATA_HOME/fulcrum  (Linux XDG standard)
+ *   3. ~/Library/Application Support/fulcrum  (macOS)
+ *   4. ~/.local/share/fulcrum  (Linux fallback)
+ */
+export function globalDataDir(): string {
+  if (process.env['FULCRUM_DATA_DIR']) return process.env['FULCRUM_DATA_DIR']
+  const home = homedir()
+  if (platform() === 'darwin') return join(home, 'Library', 'Application Support', 'fulcrum')
+  const xdg = process.env['XDG_DATA_HOME']
+  if (xdg) return join(xdg, 'fulcrum')
+  return join(home, '.local', 'share', 'fulcrum')
+}
 
 let _db: Database.Database | null = null
 
 export function getDb(dataDir?: string): Database.Database {
   if (_db) return _db
-  const dir = dataDir ?? join(process.cwd(), '.fulcrum')
+  const dir = dataDir ?? globalDataDir()
   mkdirSync(dir, { recursive: true })
   const db = new Database(join(dir, 'fulcrum.db'))
   _configureDb(db)

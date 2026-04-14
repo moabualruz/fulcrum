@@ -18,7 +18,8 @@ export class LocalRerankerProvider implements RerankerProvider {
     if (!this._warmingUp) {
       this._warmingUp = (async () => {
         const { AutoTokenizer, AutoModelForSequenceClassification, env } = await import('@huggingface/transformers')
-        env.cacheDir = './.fulcrum/models'
+        const { globalDataDir } = await import('../db/client.js')
+        env.cacheDir = globalDataDir() + '/models'
         this.tokenizer = await AutoTokenizer.from_pretrained(this.model)
         this.rankerModel = await AutoModelForSequenceClassification.from_pretrained(this.model, { dtype: 'q8' })
       })()

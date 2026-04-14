@@ -18,7 +18,7 @@ export { FulcrumError } from './types.js'
 export { loadConfig, defaultConfig } from './config.js'
 
 // DB
-export { getDb, setDb, closeDb, _configureDb } from './db/client.js'
+export { getDb, setDb, closeDb, _configureDb, globalDataDir } from './db/client.js'
 export { runMigrations } from './db/migrations.js'
 
 // Tasks

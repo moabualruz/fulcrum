@@ -78,7 +78,7 @@ OPTIONS
   --version, -v        Print the fulcrum version and exit
   --help, -h           Show this help (or <group> --help for group help)
   --json               Output as JSON (for list/get subcommands)
-  --vault <path>       Override vault path (default: ~/.fulcrum/vault)
+  --vault <path>       Override vault path (default: $FULCRUM_DATA_DIR/vault)
   --port <n>           Override monitor port (default: 4721 from .fulcrum.json)
 
 EXAMPLES
@@ -90,9 +90,10 @@ EXAMPLES
   fulcrum queue merge process --workspace-id ws_1 --actor-role integration_worker
 
 AUTO-INITIALIZATION
-  Every fulcrum command auto-initializes $CWD as a Fulcrum project on first
-  run (creates .fulcrum/fulcrum.db, default workspace + project, and
-  .fulcrum.json with deterministic IDs derived from the absolute path).
+  Every fulcrum command auto-initializes $CWD as a Fulcrum project on first run
+  (opens the single global DB at $FULCRUM_DATA_DIR or ~/.local/share/fulcrum/,
+  creates a workspace + project with deterministic IDs, and writes $CWD/.fulcrum.json
+  with those IDs so Claude/Gemini/PI can discover the project context).
   No explicit init step required.
 
 GLOBAL INSTALL
@@ -254,7 +255,7 @@ fulcrum memory — memory vault commands
       const count = Object.keys(state).length
       console.log(`L0 entries : ${count} memories tracked in .state.json`)
       console.log(`L1 SQLite  : ready (FTS5 full-text search)`)
-      const kuzuPath = `${process.env['HOME']}/.fulcrum/kuzu`
+      const kuzuPath = globalDataDir() + '/kuzu'
       const { existsSync } = await import('fs')
       console.log(`L2 Kuzu    : ${existsSync(kuzuPath) ? '✓ initialized' : '○ not enabled — run: fulcrum memory accelerate'}`)
     }
@@ -471,8 +472,18 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 
+/** Returns the global Fulcrum data directory (never project-local). */
+function globalDataDir(): string {
+  if (process.env['FULCRUM_DATA_DIR']) return process.env['FULCRUM_DATA_DIR']
+  const home = process.env['HOME'] ?? process.env['USERPROFILE'] ?? ''
+  if (process.platform === 'darwin') return join(home, 'Library', 'Application Support', 'fulcrum')
+  const xdg = process.env['XDG_DATA_HOME']
+  if (xdg) return join(xdg, 'fulcrum')
+  return join(home, '.local', 'share', 'fulcrum')
+}
+
 function getSessionFilePath(sessionId: string): string {
-  const dir = join(process.cwd(), '.fulcrum', 'sessions')
+  const dir = join(globalDataDir(), 'sessions')
   mkdirSync(dir, { recursive: true })
   return join(dir, `${sessionId}.json`)
 }
@@ -1854,13 +1865,14 @@ fulcrum agent — agent runs and spawning
 // ── Auto project initialization ───────────────────────────────────────────────
 //
 // Every fulcrum command that touches the DB runs through this first. It:
-//   1. creates $CWD/.fulcrum/ and runs migrations on fulcrum.db
-//   2. ensures a default workspace + project exist, with deterministic IDs
-//      derived from the absolute path of $CWD (so the same project always
-//      resolves to the same IDs across sessions, but moving the project
-//      starts a clean slate)
-//   3. writes $CWD/.fulcrum.json with those IDs + monitor_port so the PI
-//      cockpit, Gemini extension, and any child tool can discover them
+//   1. opens the single GLOBAL DB at globalDataDir()/fulcrum.db — NEVER in $CWD
+//      and runs migrations (idempotent)
+//   2. ensures a workspace + project exist, with deterministic IDs derived from
+//      the absolute $CWD path — logical isolation inside the one global DB,
+//      not physical separation
+//   3. writes $CWD/.fulcrum.json (lightweight config) with workspace_id,
+//      project_id, and monitor_port so the PI cockpit, Gemini extension, and
+//      child tools can discover which workspace/project this directory maps to
 // Idempotent: safe to call on every invocation. Prints a one-line notice
 // on first-time init (to stderr so it never corrupts MCP stdio traffic).
 
@@ -1881,8 +1893,7 @@ async function ensureProjectInitialized(opts: { silent?: boolean } = {}): Promis
 
   const cwd = process.cwd()
 
-  // Ensure .fulcrum/ exists and migrations are current
-  fs.mkdirSync(path.join(cwd, '.fulcrum'), { recursive: true })
+  // Initialize the global DB (data lives in globalDataDir(), never in $CWD)
   const db = getDb()
   runMigrations(db)
 
@@ -1954,10 +1965,10 @@ async function main(): Promise<void> {
     return
   }
 
-  // Auto-initialize the project in $CWD (creates .fulcrum/fulcrum.db,
-  // default workspace + project, and .fulcrum.json) before dispatching
-  // any command that touches the DB. The user never needs an explicit
-  // init step. `hook` and `serve mcp` ask for silent mode so the init
+  // Auto-initialize the project in $CWD (opens global DB, ensures workspace +
+  // project exist, writes $CWD/.fulcrum.json) before dispatching any command
+  // that touches the DB. The user never needs an explicit init step.
+  // `hook` and `serve mcp` ask for silent mode so the init
   // notice doesn't spam stderr on every Claude/Gemini tool call.
   const silentInit = group === 'hook' || (group === 'serve' && command === 'mcp')
   await ensureProjectInitialized({ silent: silentInit })
