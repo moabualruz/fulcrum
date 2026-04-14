@@ -29,8 +29,10 @@ function recency(createdAt: string): number {
   return Math.exp(-daysOld / 30 * Math.log(2))  // half-life 30 days
 }
 
-function workspaceAffinity(memWorkspaceId: string, queryWorkspaceId: string): number {
-  return memWorkspaceId === queryWorkspaceId ? 1.0 : 0.0
+function workspaceAffinity(memWorkspaceId: string, queryWorkspaceId: string, relatedIds: Set<string>): number {
+  if (memWorkspaceId === queryWorkspaceId) return 1.0
+  if (relatedIds.has(memWorkspaceId)) return 0.3
+  return 0.0
 }
 
 function fuseScore(
@@ -38,6 +40,7 @@ function fuseScore(
   vscore: number,
   graphScore: number,
   queryWorkspaceId: string,
+  relatedWorkspaceIds: Set<string>,
   isContradicted: boolean = false
 ): number {
   return (
@@ -45,7 +48,7 @@ function fuseScore(
     + 0.8 * graphScore
     + 0.3 * (mem.importance ?? 0.5)
     + 0.2 * recency(mem.created_at)
-    + 0.25 * workspaceAffinity(mem.workspace_id, queryWorkspaceId)
+    + 0.25 * workspaceAffinity(mem.workspace_id, queryWorkspaceId, relatedWorkspaceIds)
     - (isContradicted ? 0.6 : 0.0)
   )
 }
@@ -84,6 +87,22 @@ export async function queryMemoriesL2(
 
   const scoreMap = new Map<string, { mem: RawMemoryRow; vscore: number; graphScore: number }>()
 
+  // Stage 0 — Find related workspace IDs via entity scope relationships
+  let relatedWorkspaceIds = new Set<string>()
+  const wsScope = `workspace:${input.workspaceId}`
+  const relatedRows = await client.query<{ ws_id: string }>(
+    `MATCH (e1:Entity)-[:RELATED_TO|USED_IN|PART_OF|IS_A]-(e2:Entity)
+     WHERE e1.scope = $ws_scope
+       AND e2.scope <> $ws_scope
+     RETURN DISTINCT e2.scope AS ws_id`,
+    { ws_scope: wsScope }
+  ).catch(() => [] as { ws_id: string }[])
+  for (const row of relatedRows) {
+    if (row.ws_id.startsWith('workspace:')) {
+      relatedWorkspaceIds.add(row.ws_id.replace('workspace:', ''))
+    }
+  }
+
   // Stage 2 — Vector seed (HNSW)
   const vectorCandidates = await client.query<{ m: RawMemoryRow; distance: number }>(
     `CALL QUERY_VECTOR_INDEX('Memory', 'memory_embedding_idx', $query_vec, ${seedLimit})
@@ -107,7 +126,8 @@ export async function queryMemoriesL2(
     const oneHopRows = await client.query<{ m: RawMemoryRow; w: number }>(
       `MATCH (e:Entity)-[r:ABOUT|CRITIQUES|AVOIDS|MENTIONS|USES]-(m:Memory)
        WHERE e.id IN $query_entity_ids
-       RETURN m, r.weight AS w
+       RETURN m,
+         CASE WHEN e.mention_count > 1000 THEN r.weight * 0.1 ELSE r.weight END AS w
        ORDER BY w DESC LIMIT ${graphLimit}`,
       { query_entity_ids: input.queryEntityIds }
     ).catch(() => [])
@@ -131,7 +151,8 @@ export async function queryMemoriesL2(
          AND r1.weight > 0.4
          AND NOT m.id IN $already_seen
        RETURN m,
-         reduce(w=1.0, r IN [r1.weight, r2.weight] | w * r) * 0.49 AS path_weight
+         reduce(w=1.0, r IN [r1.weight, r2.weight] | w * r) * 0.49
+           * CASE WHEN e2.mention_count > 1000 THEN 0.1 ELSE 1.0 END AS path_weight
        ORDER BY path_weight DESC LIMIT ${hopLimit}`,
       { query_entity_ids: input.queryEntityIds, already_seen: alreadySeen }
     ).catch(() => [])
@@ -181,7 +202,7 @@ export async function queryMemoriesL2(
   const scored: ScoredMemoryId[] = []
 
   for (const [id, { mem, vscore, graphScore }] of scoreMap) {
-    const score = fuseScore(mem, vscore, graphScore, input.workspaceId, contradictedIds.has(id))
+    const score = fuseScore(mem, vscore, graphScore, input.workspaceId, relatedWorkspaceIds, contradictedIds.has(id))
     scored.push({ id, score, vscore, graphScore })
   }
 
