@@ -280,6 +280,15 @@ importers:
         specifier: ^2.0.0
         version: 2.4.1
     devDependencies:
+      '@fulcrum/planning':
+        specifier: workspace:*
+        version: link:../planning
+      '@fulcrum/teams':
+        specifier: workspace:*
+        version: link:../teams
+      '@fulcrum/worker':
+        specifier: workspace:*
+        version: link:../worker
       '@types/better-sqlite3':
         specifier: ^7.6.12
         version: 7.6.13

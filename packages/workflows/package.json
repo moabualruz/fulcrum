@@ -17,7 +17,20 @@
     "@fulcrum/core": "workspace:*",
     "ulidx": "^2.0.0"
   },
+  "peerDependencies": {
+    "@fulcrum/planning": "workspace:*",
+    "@fulcrum/teams": "workspace:*",
+    "@fulcrum/worker": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@fulcrum/planning": { "optional": true },
+    "@fulcrum/teams": { "optional": true },
+    "@fulcrum/worker": { "optional": true }
+  },
   "devDependencies": {
+    "@fulcrum/planning": "workspace:*",
+    "@fulcrum/teams": "workspace:*",
+    "@fulcrum/worker": "workspace:*",
     "better-sqlite3": "^12.0.0",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^20.0.0",
