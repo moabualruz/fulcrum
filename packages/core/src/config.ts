@@ -27,6 +27,7 @@ export const defaultConfig: FulcrumConfig = {
   embedding: { text: DEFAULT_TEXT_EMBEDDING, code: null },
   reranker: DEFAULT_RERANKER,
   policy: DEFAULT_POLICY,
+  vault: { path: undefined, l2_enabled: false },
 }
 
 export function loadConfig(projectRoot?: string): FulcrumConfig {
@@ -56,6 +57,10 @@ export function loadConfig(projectRoot?: string): FulcrumConfig {
     policy: {
       ...DEFAULT_POLICY,
       ...(fileConfig.policy ?? {}),
+    },
+    vault: {
+      path: fileConfig.vault?.path ?? undefined,
+      l2_enabled: fileConfig.vault?.l2_enabled ?? false,
     },
   }
 

@@ -222,6 +222,11 @@ export interface EmbeddingProviderConfig {
   dimensions?: number
 }
 
+export interface VaultConfig {
+  path?: string         // default: ~/.fulcrum/vault
+  l2_enabled?: boolean  // default: false
+}
+
 export interface FulcrumConfig {
   workspace_id: string
   project_id: string
@@ -232,6 +237,7 @@ export interface FulcrumConfig {
   }
   reranker: EmbeddingProviderConfig
   policy: PolicyConfig
+  vault?: VaultConfig
 }
 
 export interface PolicyCheckResult {
