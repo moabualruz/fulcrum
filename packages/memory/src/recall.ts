@@ -2,7 +2,7 @@
 import { getDb, FulcrumError, getTextEmbedder } from '@fulcrum/core'
 import { rrfScore, recallScore } from './scoring.js'
 import { rowToFullMemory } from './mappers.js'
-import type { RecallMemoryInput, CompactMemory, FullMemory, RecallMode } from './types.js'
+import type { RecallMemoryInput, CompactMemory, FullMemory, RecallMode, QueryScope } from './types.js'
 import { getKuzuClient } from './kuzu/client.js'
 import { queryMemoriesL2 } from './kuzu/query.js'
 import { extractStructured } from './extractors/structured.js'
@@ -21,16 +21,54 @@ function rowToCompact(row: Record<string, unknown>): CompactMemory {
 }
 
 function buildWhereClause(input: RecallMemoryInput): { clauses: string[]; params: unknown[] } {
-  const clauses: string[] = ['m.workspace_id = ?']
-  const params: unknown[] = [input.workspace_id]
+  const clauses: string[] = []
+  const params: unknown[] = []
 
-  if (input.project_id !== undefined) {
-    if (input.project_id === null) {
-      clauses.push('m.project_id IS NULL')
-    } else {
-      clauses.push('m.project_id = ?')
-      params.push(input.project_id)
-    }
+  // ── query_scope controls search breadth ─────────────────────────────────────
+  // 'session': filter by session_id only (narrowest)
+  // 'project': filter by workspace_id + project_id (default)
+  // 'workspace': filter by workspace_id only
+  // 'global': no workspace filter (cross-workspace)
+  const qs: QueryScope = input.query_scope ?? 'project'
+
+  switch (qs) {
+    case 'session':
+      // Must provide session_id; if missing, fall back to project scope
+      if (input.session_id) {
+        clauses.push('m.session_id = ?')
+        params.push(input.session_id)
+        // Still constrain to workspace for safety
+        clauses.push('m.workspace_id = ?')
+        params.push(input.workspace_id)
+      } else {
+        clauses.push('m.workspace_id = ?')
+        params.push(input.workspace_id)
+        if (input.project_id !== undefined && input.project_id !== null) {
+          clauses.push('m.project_id = ?')
+          params.push(input.project_id)
+        }
+      }
+      break
+    case 'workspace':
+      clauses.push('m.workspace_id = ?')
+      params.push(input.workspace_id)
+      break
+    case 'global':
+      // No workspace filter — cross-workspace search
+      break
+    case 'project':
+    default:
+      clauses.push('m.workspace_id = ?')
+      params.push(input.workspace_id)
+      if (input.project_id !== undefined) {
+        if (input.project_id === null) {
+          clauses.push('m.project_id IS NULL')
+        } else {
+          clauses.push('m.project_id = ?')
+          params.push(input.project_id)
+        }
+      }
+      break
   }
 
   if (input.task_id) {
@@ -49,6 +87,9 @@ function buildWhereClause(input: RecallMemoryInput): { clauses: string[]; params
     clauses.push('m.file_path = ?')
     params.push(input.file_path)
   }
+
+  // If no clauses, return a trivially-true clause
+  if (clauses.length === 0) return { clauses: ['1=1'], params }
 
   return { clauses, params }
 }

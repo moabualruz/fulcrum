@@ -90,6 +90,12 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         workspace_id: { type: 'string', description: 'Workspace ID' },
         project_id: { type: 'string', description: 'Project ID' },
         limit: { type: 'number', description: 'Max results (default 10)' },
+        query_scope: {
+          type: 'string',
+          enum: ['session', 'project', 'workspace', 'global'],
+          description: 'Search breadth: project (default) = workspace+project; workspace = all projects in workspace; global = cross-workspace; session = specific agent session',
+        },
+        session_id: { type: 'string', description: 'Session ID — required when query_scope=session' },
       },
       required: ['query', 'workspace_id', 'project_id'],
     },

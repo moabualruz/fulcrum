@@ -35,6 +35,17 @@ export interface WriteMemoryInput {
   skipVaultWrite?: boolean   // internal flag for rebuild path — skips L0 write
 }
 
+/**
+ * query_scope controls the breadth of the search (which workspaces/projects to include).
+ * Distinct from `scope` which filters by the memory's own scope column.
+ *
+ * - 'session':   filter to memories from a specific agent session (requires session_id)
+ * - 'project':   default — filter by workspace_id + project_id
+ * - 'workspace': drop project_id filter — search all projects in the workspace
+ * - 'global':    no workspace filter — cross-workspace search
+ */
+export type QueryScope = 'session' | 'project' | 'workspace' | 'global'
+
 export interface RecallMemoryInput {
   workspace_id: string
   project_id?: string | null
@@ -42,9 +53,11 @@ export interface RecallMemoryInput {
   query: string
   mode?: RecallMode                   // default: 'compact'
   limit?: number                      // default: 8 for compact, 20 for others
-  scope?: MemoryScope
+  scope?: MemoryScope                 // filter by memory.scope column
   kind?: MemoryKind
   file_path?: string
+  query_scope?: QueryScope            // search breadth: project (default) | workspace | global | session
+  session_id?: string                 // required when query_scope = 'session'
 }
 
 /** Compact recall result — minimal fields only */

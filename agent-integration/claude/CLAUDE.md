@@ -96,6 +96,8 @@ Hybrid semantic search over agent memory (FTS5 + vector + rerank). Effect: read-
 | `workspace_id` | string | Yes | Workspace ID |
 | `project_id` | string | Yes | Project ID |
 | `limit` | number | No | Max results (default 10) |
+| `query_scope` | `session` \| `project` \| `workspace` \| `global` | No | Search breadth: project (default) = workspace+project; workspace = all projects in workspace; global = cross-workspace; session = specific agent session |
+| `session_id` | string | No | Session ID — required when query_scope=session |
 
 ### `mcp__fulcrum__write_memory` — Write Memory
 
