@@ -6,6 +6,7 @@ export type MemoryKind =
   | 'fact' | 'summary' | 'symbol' | 'decision' | 'procedure'
   | 'error' | 'diff' | 'doc' | 'code'
   | 'task_goal' | 'task_decision' | 'task_failure' | 'task_outcome'
+  | 'tool_trace' | 'reasoning_step' | 'lesson'
 
 export type RecallMode = 'compact' | 'total_ranked' | 'total_timeline' | 'total_sourcemap'
 
@@ -165,12 +166,12 @@ export interface MemoryFileFrontmatter {
 }
 
 export type CuratedKind = 'decision' | 'fact' | 'summary' | 'task_outcome' | 'task_decision' | 'error' | 'doc'
-export type OperationalKind = 'symbol' | 'diff' | 'code' | 'procedure' | 'task_goal' | 'task_failure'
+export type OperationalKind = 'symbol' | 'diff' | 'code' | 'procedure' | 'task_goal' | 'task_failure' | 'tool_trace' | 'reasoning_step'
 
 export const CURATED_KINDS: ReadonlySet<MemoryKind> = new Set<MemoryKind>([
   'decision', 'fact', 'summary', 'task_outcome', 'task_decision', 'error', 'doc',
 ])
 
 export const OPERATIONAL_KINDS: ReadonlySet<MemoryKind> = new Set<MemoryKind>([
-  'symbol', 'diff', 'code', 'procedure', 'task_goal', 'task_failure',
+  'symbol', 'diff', 'code', 'procedure', 'task_goal', 'task_failure', 'tool_trace', 'reasoning_step',
 ])
