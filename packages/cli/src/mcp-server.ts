@@ -54,6 +54,19 @@ function buildZodShape(
   return shape
 }
 
+// ---------- Output schema (read tools) ----------
+// A passthrough Zod object accepts any additional fields — lets clients
+// that support structuredContent parse the result directly without
+// the client needing to know the exact shape of every tool response.
+const READ_OUTPUT_SCHEMA = z.object({}).passthrough()
+
+// Tools that carry structuredContent alongside text (all readOnly tools).
+const READ_ONLY_TOOLS = new Set(
+  TOOL_SCHEMAS
+    .filter(t => t.annotations?.readOnlyHint === true)
+    .map(t => t.name)
+)
+
 // ---------- Server factory ----------
 
 export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
@@ -73,10 +86,22 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
     // raw shape for capabilities negotiation while we enforce strictness.
     const strictSchema = z.object(shape).strict()
 
-    server.tool(
+    const isReadTool = READ_ONLY_TOOLS.has(tool.name)
+
+    server.registerTool(
       tool.name,
-      tool.description,
-      shape,
+      {
+        title: tool.title,
+        description: tool.description,
+        inputSchema: shape,
+        outputSchema: isReadTool ? READ_OUTPUT_SCHEMA : undefined,
+        annotations: tool.annotations ? {
+          readOnlyHint: tool.annotations.readOnlyHint,
+          idempotentHint: tool.annotations.idempotentHint,
+          destructiveHint: tool.annotations.destructiveHint,
+          openWorldHint: tool.annotations.openWorldHint,
+        } : undefined,
+      },
       async (args) => {
         // Validate with strict schema — reject unknown keys and wrong types.
         const parsed = strictSchema.safeParse(args)
@@ -97,9 +122,14 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
         }
         try {
           const result = await options.handleToolCall(tool.name, parsed.data as Record<string, unknown>)
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+          const textContent = { type: 'text' as const, text: JSON.stringify(result) }
+          if (isReadTool) {
+            return {
+              content: [textContent],
+              structuredContent: result as Record<string, unknown>,
+            }
           }
+          return { content: [textContent] }
         } catch (err) {
           return {
             content: [{ type: 'text' as const, text: JSON.stringify({ error: (err as Error).message }) }],
