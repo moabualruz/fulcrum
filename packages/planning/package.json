@@ -1,6 +1,8 @@
 {
   "name": "@fulcrum/planning",
   "version": "0.0.1",
+  "description": "Project planning domain — epics, issues, PRDs, plans, task relations, and code review workflows",
+  "keywords": ["planning", "epics", "issues", "prd", "code-review", "task-relations", "project-management"],
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
