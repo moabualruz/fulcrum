@@ -19,7 +19,7 @@ Multi-agent systems fail in predictable ways: agents go rogue, pile up stale wor
 - **Local-first** — SQLite on disk, zero network dependencies, zero cold starts
 - **Hexagonal architecture** — pure domain functions, no transport concerns
 - **WIP enforcement** — global and per-role concurrency limits prevent runaway parallelism
-- **Hybrid memory recall** — FTS5 + optional vector ANN + BGE reranker
+- **Three-layer memory** — L0 human-readable vault (git-backed markdown), L1 FTS5 keyword search, L2 Kuzu graph + HNSW vector search (opt-in)
 - **Automatic janitor** — marks stale runs, auto-escalates blocked ones
 - **Chief-of-staff context** — one call gives the orchestrator agent everything it needs
 
@@ -30,6 +30,7 @@ Multi-agent systems fail in predictable ways: agents go rogue, pile up stale wor
 | Package | Description |
 |---------|-------------|
 | [`@fulcrum/core`](packages/core) | Domain functions, SQLite schema, embedding providers |
+| [`@fulcrum/memory`](packages/memory) | Three-layer memory stack — L0 git vault, L1 FTS5, L2 Kuzu graph + HNSW vector search |
 
 ---
 
@@ -37,6 +38,11 @@ Multi-agent systems fail in predictable ways: agents go rogue, pile up stale wor
 
 ```bash
 pnpm install
+```
+
+```bash
+fulcrum memory init        # initialize vault + L1
+fulcrum memory accelerate  # enable L2 (Kuzu + embeddings, optional)
 ```
 
 ```typescript
