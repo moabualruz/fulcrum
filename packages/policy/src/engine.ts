@@ -41,6 +41,28 @@ export const SYSTEM_INVARIANTS: SystemInvariant[] = [
     rule_id: 'SYSTEM:no_task_bypass',
     check: (input) => input.action === 'start_run_without_task',
   },
+  {
+    name: 'chief_of_staff_no_direct_writes',
+    priority: 1000,
+    action: 'deny',
+    rule_id: 'SYSTEM:chief_of_staff_no_direct_writes',
+    check: (input) => {
+      if (input.actor_role !== 'chief_of_staff') return false
+      const action = input.action ?? ''
+      // Deny any mutating Claude Code tool invocation
+      const DENIED_TOOL_ACTIONS = [
+        'tool_use:Write',
+        'tool_use:Edit',
+        'tool_use:MultiEdit',
+        'tool_use:NotebookEdit',
+      ]
+      if (DENIED_TOOL_ACTIONS.includes(action)) return true
+      // Deny any shell git subcommand (covers commit, push, merge, rebase, etc.)
+      if (action === 'shell_exec:git') return true
+      if (action.startsWith('shell_exec:git ')) return true
+      return false
+    },
+  },
 ]
 
 function rowToRule(row: Record<string, unknown>): PolicyRule {

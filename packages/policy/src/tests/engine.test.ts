@@ -17,8 +17,8 @@ afterEach(() => resetTestDb())
 // --- SYSTEM_INVARIANTS ---
 
 describe('SYSTEM_INVARIANTS', () => {
-  it('exports 3 invariants', () => {
-    expect(SYSTEM_INVARIANTS).toHaveLength(3)
+  it('exports 4 invariants', () => {
+    expect(SYSTEM_INVARIANTS).toHaveLength(4)
   })
 
   it('all invariants have priority 1000', () => {
@@ -46,6 +46,103 @@ describe('SYSTEM_INVARIANTS', () => {
   it('invariant named no_task_bypass exists', () => {
     const inv = SYSTEM_INVARIANTS.find(i => i.name === 'no_task_bypass')
     expect(inv).toBeDefined()
+  })
+
+  it('invariant named chief_of_staff_no_direct_writes exists', () => {
+    const inv = SYSTEM_INVARIANTS.find(i => i.name === 'chief_of_staff_no_direct_writes')
+    expect(inv).toBeDefined()
+  })
+})
+
+describe('chief_of_staff_no_direct_writes (G-6)', () => {
+  it('denies CoS calling tool_use:Write', async () => {
+    const decision = await evaluatePolicy({
+      action: 'tool_use:Write',
+      resource_id: 'src/foo.ts',
+      actor_role: 'chief_of_staff',
+      actor_id: 'run_cos',
+      workspace_id: 'ws_1',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.rule_id).toBe('SYSTEM:chief_of_staff_no_direct_writes')
+  })
+
+  it('denies CoS calling tool_use:Edit', async () => {
+    const decision = await evaluatePolicy({
+      action: 'tool_use:Edit',
+      resource_id: 'src/foo.ts',
+      actor_role: 'chief_of_staff',
+      actor_id: 'run_cos',
+      workspace_id: 'ws_1',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.rule_id).toBe('SYSTEM:chief_of_staff_no_direct_writes')
+  })
+
+  it('denies CoS calling tool_use:MultiEdit', async () => {
+    const decision = await evaluatePolicy({
+      action: 'tool_use:MultiEdit',
+      resource_id: 'src/foo.ts',
+      actor_role: 'chief_of_staff',
+      actor_id: 'run_cos',
+      workspace_id: 'ws_1',
+    })
+    expect(decision.allowed).toBe(false)
+  })
+
+  it('denies CoS calling tool_use:NotebookEdit', async () => {
+    const decision = await evaluatePolicy({
+      action: 'tool_use:NotebookEdit',
+      resource_id: 'notebook.ipynb',
+      actor_role: 'chief_of_staff',
+      actor_id: 'run_cos',
+      workspace_id: 'ws_1',
+    })
+    expect(decision.allowed).toBe(false)
+  })
+
+  it('denies CoS calling shell_exec:git commit ...', async () => {
+    const decision = await evaluatePolicy({
+      action: 'shell_exec:git commit -m "foo"',
+      resource_id: 'git commit',
+      actor_role: 'chief_of_staff',
+      actor_id: 'run_cos',
+      workspace_id: 'ws_1',
+    })
+    expect(decision.allowed).toBe(false)
+  })
+
+  it('allows CoS calling tool_use:Read (read-only tools are fine)', async () => {
+    const decision = await evaluatePolicy({
+      action: 'tool_use:Read',
+      resource_id: 'src/foo.ts',
+      actor_role: 'chief_of_staff',
+      actor_id: 'run_cos',
+      workspace_id: 'ws_1',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+
+  it('allows software_engineer calling tool_use:Write (non-L1 roles unaffected)', async () => {
+    const decision = await evaluatePolicy({
+      action: 'tool_use:Write',
+      resource_id: 'src/foo.ts',
+      actor_role: 'software_engineer',
+      actor_id: 'run_se',
+      workspace_id: 'ws_1',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+
+  it('allows integration_worker calling shell_exec:git commit (merge owner exception)', async () => {
+    const decision = await evaluatePolicy({
+      action: 'shell_exec:git commit -m "merge"',
+      resource_id: 'git commit',
+      actor_role: 'integration_worker',
+      actor_id: 'run_iw',
+      workspace_id: 'ws_1',
+    })
+    expect(decision.allowed).toBe(true)
   })
 })
 
