@@ -433,7 +433,8 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
   }
 
   try {
-    const { getDb, writeMemory } = await import('@fulcrum/core')
+    const { getDb } = await import('@fulcrum/core')
+    const { writeMemory } = await import('@fulcrum/memory')
     const db = getDb()
     const runRow = db.prepare(
       `SELECT task_id, project_id FROM agent_runs WHERE run_id = ? AND workspace_id = ?`
@@ -453,11 +454,13 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
       project_id: runRow?.project_id ?? ctx.workspace_id,
       task_id: runRow?.task_id ?? undefined,
       content,
+      title: `Tool: ${ctx.toolName}`,
+      summary: `${ctx.toolName} called with keys: ${Object.keys(ctx.toolInput).join(', ') || '(none)'}`,
       kind: 'tool_trace',
       scope: runRow?.task_id ? 'task' : 'project',
       tags: [ctx.toolName, ctx.cliName],
       importance: 0.2,
-    })
+    } as Parameters<typeof writeMemory>[0])
   } catch (err) {
     io.stderr(`[fulcrum/post] tool_trace write failed: ${(err as Error).message}\n`)
     // Don't fail the hook.
@@ -630,15 +633,20 @@ export async function runPreCompactHook(): Promise<void> {
   if (!summary) { process.exit(0); return }
 
   try {
-    const { writeMemory, getDb, runMigrations, loadConfig } = await import('@fulcrum/core')
+    const { getDb, runMigrations, loadConfig } = await import('@fulcrum/core')
+    const { writeMemory } = await import('@fulcrum/memory')
     const config = loadConfig()
     const db = getDb()
     runMigrations(db)
     void db
 
+    const compactTitle = `Session compact — ${new Date().toISOString().slice(0, 10)}`
     await writeMemory({
-      title: `Session compact — ${new Date().toISOString().slice(0, 10)}`,
+      title: compactTitle,
+      summary: compactTitle,
       content: summary,
+      scope: 'project',
+      kind: 'session_summary',
       workspace_id: config.workspace_id ?? 'default',
       project_id: config.project_id ?? config.workspace_id ?? 'default',
       tags: ['session-compact', `session:${sessionId.slice(0, 12)}`],
@@ -784,10 +792,11 @@ function registerOtelShutdown(): void {
 async function runServeMcp(): Promise<void> {
   const { getDb, runMigrations, loadConfig, createTask, updateTask, listTasks,
     startAgentRun, heartbeatAgentRun, completeAgentRun, blockAgentRun,
-    getAgentRunStatus, writeMemory, recallMemory,
+    getAgentRunStatus,
     buildCosContext, getWorkspaceStatus, listAgentProfiles,
     createAgentProfile, getTeamOps,
     startSpan, endSpan } = await import('@fulcrum/core')
+  const { writeMemory, recallMemory } = await import('@fulcrum/memory')
 
   const config = loadConfig()
   const db = getDb()
@@ -869,21 +878,28 @@ async function runServeMcp(): Promise<void> {
         workspace_id: a['workspace_id'] as string,
         project_id: a['project_id'] as string,
         limit: (a['limit'] as number | undefined) ?? 10,
-      })
-      return memories.map(m => ({ content: m.content.slice(0, 500), score: 0.0, tags: m.tags }))
+        mode: 'full',
+      } as Parameters<typeof recallMemory>[0])
+      return (memories as Array<{ content?: string; tags?: string[] }>)
+        .map(m => ({ content: (m.content ?? '').slice(0, 500), score: 0.0, tags: m.tags ?? [] }))
     }
 
     if (name === 'write_memory') {
       ensureWorkspace(a['workspace_id'] as string)
       ensureProject(a['workspace_id'] as string, a['project_id'] as string)
       const tagList = ((a['tags'] as string | undefined) ?? '').split(',').map(t => t.trim()).filter(Boolean)
+      const content = a['content'] as string
+      const title = (a['title'] as string | undefined) ?? content.slice(0, 80)
       const memory = await writeMemory({
-        content: a['content'] as string,
+        content,
         workspace_id: a['workspace_id'] as string,
         project_id: a['project_id'] as string,
-        title: (a['title'] as string | undefined) ?? (a['content'] as string).slice(0, 80),
+        title,
+        summary: title,
+        scope: 'project',
+        kind: 'fact',
         tags: tagList,
-      })
+      } as Parameters<typeof writeMemory>[0])
       return { saved: true, memory_id: memory.memory_id, project_id: a['project_id'], tags: tagList }
     }
 

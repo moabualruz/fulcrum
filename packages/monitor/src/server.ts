@@ -5,12 +5,12 @@ import {
   getDb,
   listTasks, createTask, updateTask,
   startAgentRun, heartbeatAgentRun, completeAgentRun, blockAgentRun,
-  writeMemory, recallMemory,
   buildCosContext,
   loadConfig,
   createWorkspace, createProject, getProject,
   isL1, type AgentRole,
 } from '@fulcrum/core'
+import { writeMemory, recallMemory } from '@fulcrum/memory'
 import {
   getMetrics,
   getBurndown,

@@ -233,11 +233,11 @@ describe('runPreCompactHook', () => {
   it('calls writeMemory with session-compact tag when summary is present', async () => {
     const writeMemory = vi.fn().mockResolvedValue({ memory_id: 'mem_compact' })
     vi.doMock('@fulcrum/core', () => ({
-      writeMemory,
       getDb:         vi.fn().mockReturnValue({}),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_compact', project_id: 'proj_compact', db_path: ':memory:' }),
     }))
+    vi.doMock('@fulcrum/memory', () => ({ writeMemory }))
 
     fakeStdin({ session_id: 'sess_compact', summary: 'Agent finished building the auth module.' })
 
@@ -256,11 +256,11 @@ describe('runPreCompactHook', () => {
   it('accepts compaction_summary as an alias for summary', async () => {
     const writeMemory = vi.fn().mockResolvedValue({ memory_id: 'mem_alias' })
     vi.doMock('@fulcrum/core', () => ({
-      writeMemory,
       getDb:         vi.fn().mockReturnValue({}),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_alias', project_id: 'proj_alias', db_path: ':memory:' }),
     }))
+    vi.doMock('@fulcrum/memory', () => ({ writeMemory }))
 
     fakeStdin({ session_id: 'sess_alias', compaction_summary: 'Compacted via alias key.' })
 

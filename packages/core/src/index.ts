@@ -49,8 +49,10 @@ export { checkPolicy } from './policy.js'
 // Janitor
 export { runJanitorCycle, startJanitor } from './janitor.js'
 
-// Memory
-export { writeMemory, recallMemory } from './memory.js'
+// Memory (internal implementations — use @fulcrum/memory for external callers)
+// writeMemory and recallMemory are intentionally NOT re-exported here.
+// External packages should import from '@fulcrum/memory' to get the full
+// hybrid-search + RRF + Kuzu implementation instead of the core-only version.
 
 // Embedding
 export { initEmbedding, getTextEmbedder, getCodeEmbedder, getReranker, resetProviders } from './embedding/registry.js'

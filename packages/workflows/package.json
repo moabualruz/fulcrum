@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",
+    "@fulcrum/memory": "workspace:*",
     "ulidx": "^2.0.0"
   },
   "peerDependencies": {

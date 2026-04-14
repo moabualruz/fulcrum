@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",
+    "@fulcrum/memory": "workspace:*",
     "ulidx": "^2.3.0",
     "hono": "^4.4.0",
     "@hono/node-server": "^1.12.0"

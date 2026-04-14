@@ -147,14 +147,17 @@ HANDLERS['read_artifact'] = async (ctx) => {
 }
 
 HANDLERS['write_memory'] = async (ctx) => {
-  const { writeMemory } = await import('@fulcrum/core')
+  const { writeMemory } = await import('@fulcrum/memory')
   const c = cfg(ctx)
   if (!ctx.project_id) return { status: 'failed', error: 'write_memory requires project_id' }
+  const content = str(c['content'], `workflow ${ctx.wf_id} step ${ctx.step_id}`)
+  const title = str(c['title'], content.slice(0, 80))
   const m = await writeMemory({
     workspace_id: ctx.workspace_id,
     project_id: ctx.project_id,
-    content: str(c['content'], `workflow ${ctx.wf_id} step ${ctx.step_id}`),
-    // Keep defaults aligned with the memory module — scope=project, kind=fact.
+    content,
+    title,
+    summary: str(c['summary'], title),
     kind: (c['kind'] as MemoryKind | undefined) ?? 'fact',
     scope: (c['scope'] as MemoryScope | undefined) ?? 'project',
   })
@@ -162,10 +165,9 @@ HANDLERS['write_memory'] = async (ctx) => {
 }
 
 HANDLERS['read_memory'] = async (ctx) => {
-  const { recallMemory } = await import('@fulcrum/core')
+  const { recallMemory } = await import('@fulcrum/memory')
   const c = cfg(ctx)
   if (!ctx.project_id) return { status: 'failed', error: 'read_memory requires project_id' }
-  // recallMemory signature varies — pass the canonical fields, let core ignore extras.
   try {
     const memories = await (recallMemory as unknown as (i: Record<string, unknown>) => Promise<unknown[]>)({
       workspace_id: ctx.workspace_id,
