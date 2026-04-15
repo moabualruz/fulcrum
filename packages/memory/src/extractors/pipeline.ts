@@ -3,12 +3,15 @@
 // and manages the .queue/l2-pending.jsonl queue file.
 
 import { appendFileSync } from 'fs'
-import { join } from 'path'
+import { join, extname } from 'path'
 import { getKuzuClient } from '../kuzu/client.js'
 import { upsertMemoryToKuzu } from '../kuzu/upsert.js'
 import { resolveEntity, incrementMentionCount } from '../kuzu/entity-store.js'
 import { extractSemantic } from './semantic.js'
+import { parseLocalImports } from '../import-parser.js'
 import type { FullMemory } from '../types.js'
+
+const TS_JS_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx'])
 
 export interface PendingL2Item {
   memory_id: string
@@ -42,6 +45,30 @@ export async function runExtractionPipeline(
 
   // Track 1: create/update Memory node + entity edges in Kuzu
   await upsertMemoryToKuzu(kuzuClient, memory, null)
+
+  // Track 1b (GAP-RAG-4): emit structural USES edges from import declarations.
+  // Parses `import ... from`, `require()`, `export ... from` in TS/JS files and
+  // creates USES edges from the Memory node to Entity nodes for each local import.
+  // Only runs for TypeScript/JavaScript source files.
+  if (memory.file_path && TS_JS_EXTS.has(extname(memory.file_path).toLowerCase())) {
+    const chunkText = memory.canonical_text ?? ''
+    const importPaths = parseLocalImports(chunkText)
+    const now = new Date().toISOString()
+    for (const importPath of importPaths) {
+      try {
+        // Force entity type 'file' by using wikilink syntax [[file/<path>]]
+        const entity = await resolveEntity(kuzuClient, `[[file/${importPath}]]`, memory.workspace_id)
+        await incrementMentionCount(kuzuClient, entity.id)
+        await kuzuClient.query(
+          `MATCH (m:Memory {id: $mid}), (e:Entity {id: $eid})
+           CREATE (m)-[:USES {weight: 1.0, confidence: 1.0, source: 'import', created_at: CAST($now AS TIMESTAMP)}]->(e)`,
+          { mid: memory.memory_id, eid: entity.id, now }
+        ).catch(() => { /* edge or nodes may not exist yet — non-fatal */ })
+      } catch {
+        // Entity resolution failed — skip this import, don't fail the whole pipeline
+      }
+    }
+  }
 
   // Track 2: LLM semantic extraction — curated kinds only
   const TRACK2_KINDS = new Set(['decision', 'fact', 'lesson', 'error', 'task_outcome'])

@@ -16,6 +16,15 @@ import { getDb, listWorkspaces } from '@fulcrum/core'
 
 export type ToolHandler = (name: string, args: Record<string, unknown>) => Promise<unknown>
 
+export interface ToolContext {
+  toolName: string
+  args: Record<string, unknown>
+  result?: unknown
+  error?: Error
+}
+
+export type ToolMiddleware = (ctx: ToolContext, next: () => Promise<void>) => Promise<void>
+
 export interface McpServerOptions {
   version: string
   handleToolCall: ToolHandler
@@ -26,6 +35,12 @@ export interface McpServerOptions {
    * must register their own handler logic by name in the hook they provide.
    */
   additionalTools?: import('./mcp-tools.js').ToolSchema[]
+  /**
+   * Optional middleware chain executed around every tool call.
+   * Each middleware receives a ToolContext and a `next` function.
+   * Chain runs in order: middleware[0] wraps middleware[1] wraps ... wraps the actual call.
+   */
+  middleware?: ToolMiddleware[]
 }
 
 // ---------- Zod shape builder ----------
@@ -78,6 +93,28 @@ function buildReadOnlySet(tools: import('./mcp-tools.js').ToolSchema[]): Set<str
   return new Set(tools.filter(t => t.annotations?.readOnlyHint === true).map(t => t.name))
 }
 
+// ---------- Middleware chain runner ----------
+// Composes an array of ToolMiddleware around a core handler function.
+// Runs in order: middleware[0] wraps middleware[1] wraps ... wraps core.
+// If no middleware is provided, core is called directly.
+
+async function runMiddlewareChain(
+  middleware: ToolMiddleware[],
+  ctx: ToolContext,
+  core: () => Promise<void>,
+): Promise<void> {
+  let index = 0
+  const dispatch = async (): Promise<void> => {
+    if (index < middleware.length) {
+      const mw = middleware[index++]
+      await mw(ctx, dispatch)
+    } else {
+      await core()
+    }
+  }
+  await dispatch()
+}
+
 // ---------- Server factory ----------
 
 export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
@@ -127,8 +164,21 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
           const details = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')
           throw new Error(`invalid_input: ${details}`)
         }
+        const ctx: ToolContext = { toolName: tool.name, args: parsed.data as Record<string, unknown> }
         try {
-          const result = await options.handleToolCall(tool.name, parsed.data as Record<string, unknown>)
+          await runMiddlewareChain(
+            options.middleware ?? [],
+            ctx,
+            async () => {
+              try {
+                ctx.result = await options.handleToolCall(ctx.toolName, ctx.args)
+              } catch (err) {
+                ctx.error = err as Error
+              }
+            },
+          )
+          if (ctx.error) throw ctx.error
+          const result = ctx.result
           const textContent = { type: 'text' as const, text: JSON.stringify(result) }
           if (isReadTool) {
             return {
