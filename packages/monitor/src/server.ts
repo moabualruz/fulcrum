@@ -1,7 +1,8 @@
 // packages/monitor/src/server.ts
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
-import { getDb, listAgentDefinitions } from '@fulcrum/core'
+import { getDb, listAgentDefinitions, getEventBus } from '@fulcrum/core'
+import type { EmitEventInput } from '@fulcrum/core'
 import { evaluatePolicy } from '@fulcrum/policy'
 import {
   getMetrics,
@@ -12,6 +13,7 @@ import {
   replayRun,
 } from './metrics.js'
 import type { MonitorServer, MonitorServerConfig } from './types.js'
+
 
 const CAPABILITY_SKILL_MAP: Record<string, { name: string; description: string }> = {
   code_generation:    { name: 'Code Generation',    description: 'Generates code from specifications' },
@@ -29,6 +31,31 @@ const CAPABILITY_SKILL_MAP: Record<string, { name: string; description: string }
 }
 
 export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
+  // Per-instance set of active SSE controllers for event-bus push mode.
+  const sseControllers = new Set<ReadableStreamDefaultController>()
+
+  // Subscribe to the in-process event bus so events are pushed to SSE clients immediately.
+  let busHandler: ((event: EmitEventInput) => void) | null = null
+
+  if (!config.isSubprocess) {
+    busHandler = (event: EmitEventInput) => {
+      if (sseControllers.size === 0) return
+      const sseId = Date.now().toString()
+      const data = JSON.stringify(event)
+      const chunk = new TextEncoder().encode(`id: ${sseId}\ndata: ${data}\n\n`)
+
+      for (const controller of [...sseControllers]) {
+        try {
+          controller.enqueue(chunk)
+        } catch {
+          // Broken pipe or closed stream — remove and continue
+          sseControllers.delete(controller)
+        }
+      }
+    }
+    getEventBus().onAny(busHandler)
+  }
+
   const app = new Hono()
   const port = config.port ?? 7331
   const host = config.host ?? '127.0.0.1'
@@ -74,49 +101,89 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
     const stream = new ReadableStream({
       start(controller) {
-        let lastId = c.req.header('Last-Event-ID') ?? ''
+        const lastEventId = c.req.header('Last-Event-ID') ?? ''
 
-        const poll = () => {
+        // ── Resume: replay missed events from DB ──────────────────────────────
+        if (lastEventId) {
           try {
             const db = getDb()
-            let query = `SELECT * FROM events WHERE workspace_id = ? AND event_id > ? ORDER BY event_id ASC LIMIT 100`
-            const params: unknown[] = [ws ?? '', lastId]
-
-            if (!ws) {
-              query = `SELECT * FROM events WHERE event_id > ? ORDER BY event_id ASC LIMIT 100`
-              params.splice(0, 1) // remove ws placeholder, keep only lastId
+            let query: string
+            let params: unknown[]
+            if (ws) {
+              query = `SELECT evt_id, evt_type, payload, ts FROM events WHERE workspace_id = ? AND evt_id > ? ORDER BY evt_id ASC LIMIT 100`
+              params = [ws, lastEventId]
+            } else {
+              query = `SELECT evt_id, evt_type, payload, ts FROM events WHERE evt_id > ? ORDER BY evt_id ASC LIMIT 100`
+              params = [lastEventId]
             }
-
             const rows = db.prepare(query).all(...params) as Array<{
-              event_id: string
-              event_type: string
+              evt_id: string
+              evt_type: string
               payload: string
               ts: string
             }>
-
             for (const row of rows) {
               const data = JSON.stringify({
-                event_id: row.event_id,
-                event_type: row.event_type,
+                event_id: row.evt_id,
+                event_type: row.evt_type,
                 payload: JSON.parse(row.payload) as unknown,
                 ts: row.ts,
               })
-              controller.enqueue(new TextEncoder().encode(`id: ${row.event_id}\ndata: ${data}\n\n`))
-              lastId = row.event_id
+              controller.enqueue(new TextEncoder().encode(`id: ${row.evt_id}\ndata: ${data}\n\n`))
             }
           } catch {
-            // DB not yet available — skip this tick
+            // DB not yet available — skip catchup
           }
         }
 
-        const interval = setInterval(poll, 2000)
-        poll() // immediate first tick
-
-        // Close stream cleanup (if client disconnects)
-        c.req.raw.signal.addEventListener('abort', () => {
-          clearInterval(interval)
-          controller.close()
-        })
+        if (config.isSubprocess) {
+          // ── Subprocess mode: poll every 500ms ────────────────────────────────
+          let lastId = lastEventId
+          const poll = () => {
+            try {
+              const db = getDb()
+              let query: string
+              let params: unknown[]
+              if (ws) {
+                query = `SELECT evt_id, evt_type, payload, ts FROM events WHERE workspace_id = ? AND evt_id > ? ORDER BY evt_id ASC LIMIT 100`
+                params = [ws, lastId]
+              } else {
+                query = `SELECT evt_id, evt_type, payload, ts FROM events WHERE evt_id > ? ORDER BY evt_id ASC LIMIT 100`
+                params = [lastId]
+              }
+              const rows = db.prepare(query).all(...params) as Array<{
+                evt_id: string
+                evt_type: string
+                payload: string
+                ts: string
+              }>
+              for (const row of rows) {
+                const data = JSON.stringify({
+                  event_id: row.evt_id,
+                  event_type: row.evt_type,
+                  payload: JSON.parse(row.payload) as unknown,
+                  ts: row.ts,
+                })
+                controller.enqueue(new TextEncoder().encode(`id: ${row.evt_id}\ndata: ${data}\n\n`))
+                lastId = row.evt_id
+              }
+            } catch {
+              // DB not yet available — skip this tick
+            }
+          }
+          const interval = setInterval(poll, 500)
+          c.req.raw.signal.addEventListener('abort', () => {
+            clearInterval(interval)
+            controller.close()
+          })
+        } else {
+          // ── Event-bus mode: in-process push, sub-50ms delivery ───────────────
+          sseControllers.add(controller)
+          c.req.raw.signal.addEventListener('abort', () => {
+            sseControllers.delete(controller)
+            try { controller.close() } catch { /* already closed */ }
+          })
+        }
       },
     })
 
@@ -483,6 +550,15 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         serverInstance.close()
         serverInstance = null
       }
+      // Unsubscribe from event bus and close all active SSE controllers
+      if (busHandler) {
+        getEventBus().offAny(busHandler)
+        busHandler = null
+      }
+      for (const controller of [...sseControllers]) {
+        try { controller.close() } catch { /* already closed */ }
+      }
+      sseControllers.clear()
     },
   }
 }
