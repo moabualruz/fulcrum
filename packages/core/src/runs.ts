@@ -1,5 +1,5 @@
 import { execSync } from 'child_process'
-import { getDb } from './db/client.js'
+import { getDb , Db} from './db/client.js'
 import { newId, nextDisplayId } from './ids.js'
 import { statusCategory } from './status-category.js'
 import { emitEvent } from './events.js'
@@ -25,7 +25,7 @@ function recallTaskContext(opts: {
   workspace_id: string
   project_id: string | null
   task_id: string | null
-}, db = getDb()): Array<{ memory_id: string; kind: string; content: string }> {
+}, db: Db = getDb()): Array<{ memory_id: string; kind: string; content: string }> {
   if (!opts.task_id) return []
   try {
     const rows = db.prepare(`
@@ -105,7 +105,7 @@ function appendRunEvent(
   run_id: string,
   event_type: string,
   payload: Record<string, unknown> = {},
-  db = getDb(),
+  db: Db = getDb(),
 ): void {
   const id = newId('run_event')
   const ts = new Date().toISOString()
@@ -118,7 +118,7 @@ function appendRunEvent(
 /**
  * Get the full event history for a run, ordered by ts ASC.
  */
-export function getRunHistory(run_id: string, db = getDb()): RunEvent[] {
+export function getRunHistory(run_id: string, db: Db = getDb()): RunEvent[] {
   return db.prepare(
     'SELECT id, run_id, ts, event_type, payload FROM run_events WHERE run_id = ? ORDER BY ts ASC'
   ).all(run_id) as RunEvent[]
@@ -182,7 +182,7 @@ export function rowToRun(row: Record<string, unknown>): AgentRun {
   }
 }
 
-function getRun(run_id: string, db = getDb()): AgentRun {
+function getRun(run_id: string, db: Db = getDb()): AgentRun {
   const row = db.prepare('SELECT * FROM agent_runs WHERE run_id = ?').get(run_id) as Record<string, unknown> | undefined
   if (!row) throw new FulcrumError(`Run ${run_id} not found`, 'not_found')
   return rowToRun(row)
@@ -193,7 +193,7 @@ function getRun(run_id: string, db = getDb()): AgentRun {
  * NOTE: WIP limit and dependency enforcement is the caller's responsibility —
  * callers should call `checkPolicy` first and only proceed if `allowed: true`.
  */
-export async function startAgentRun(input: StartAgentRunInput, db = getDb()): Promise<AgentRun> {
+export async function startAgentRun(input: StartAgentRunInput, db: Db = getDb()): Promise<AgentRun> {
   const taskRow = db.prepare('SELECT workspace_id, project_id FROM tasks WHERE task_id = ?')
     .get(input.task_id) as { workspace_id: string; project_id: string } | undefined
   if (!taskRow) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
@@ -270,7 +270,7 @@ export async function startAgentRun(input: StartAgentRunInput, db = getDb()): Pr
   return getRun(run_id, db)
 }
 
-export async function heartbeatAgentRun(input: HeartbeatInput, db = getDb()): Promise<void> {
+export async function heartbeatAgentRun(input: HeartbeatInput, db: Db = getDb()): Promise<void> {
   const existing = getRun(input.run_id, db) // throws not_found before any mutation
   assertRunIsLive(existing, input.run_id)
   if (input.progress_pct < 0 || input.progress_pct > 100) {
@@ -298,7 +298,7 @@ export async function heartbeatAgentRun(input: HeartbeatInput, db = getDb()): Pr
   upsertAgentStateProjection(db, heartbeatRun)
 }
 
-export async function getAgentRunStatus(input: GetStatusInput, db = getDb()): Promise<AgentRun> {
+export async function getAgentRunStatus(input: GetStatusInput, db: Db = getDb()): Promise<AgentRun> {
   return getRun(input.run_id, db)
 }
 
@@ -307,7 +307,7 @@ export async function getAgentRunStatus(input: GetStatusInput, db = getDb()): Pr
  * callers (typically the CoS or CLI) are responsible for calling `updateTask`
  * to move the task to 'completed' when all runs for it are done.
  */
-export async function completeAgentRun(input: CompleteRunInput, db = getDb()): Promise<AgentRun> {
+export async function completeAgentRun(input: CompleteRunInput, db: Db = getDb()): Promise<AgentRun> {
   const run = getRun(input.run_id, db) // throws not_found before any mutation
   assertRunIsLive(run, input.run_id)
   const now = new Date().toISOString()
@@ -365,7 +365,7 @@ export async function completeAgentRun(input: CompleteRunInput, db = getDb()): P
   return getRun(input.run_id, db)
 }
 
-export async function blockAgentRun(input: BlockRunInput, db = getDb()): Promise<AgentRun> {
+export async function blockAgentRun(input: BlockRunInput, db: Db = getDb()): Promise<AgentRun> {
   if (!input.reason.trim()) throw new FulcrumError('reason must not be empty', 'invalid_input')
   const run = getRun(input.run_id, db) // throws not_found before any mutation
   assertRunIsLive(run, input.run_id, new Set(['finished', 'aborted']))
@@ -435,7 +435,7 @@ export function buildSpawnableRun(run: AgentRun, task_packet: TaskPacket): Spawn
   }
 }
 
-export async function escalateRun(input: EscalateRunInput, db = getDb()): Promise<Task> {
+export async function escalateRun(input: EscalateRunInput, db: Db = getDb()): Promise<Task> {
   if (!input.escalation_reason.trim()) throw new FulcrumError('escalation_reason must not be empty', 'invalid_input')
   const run = getRun(input.run_id, db)
 

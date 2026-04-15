@@ -17,6 +17,12 @@ export function runM043(db: Database.Database): void {
   const cols = db.prepare("PRAGMA table_info(agent_definitions)").all() as Array<{ name: string }>
   const hasWorkspaceId = cols.some(c => c.name === 'workspace_id')
 
+  // When workspace_id already exists (e.g. added by m036 with sentinel 'default'),
+  // migrate those rows to 'global'. m036 used 'default'; m043+ standardises on 'global'.
+  if (hasWorkspaceId) {
+    db.prepare("UPDATE agent_definitions SET workspace_id = 'global' WHERE workspace_id = 'default'").run()
+  }
+
   if (!hasWorkspaceId) {
     db.exec(`
       -- Step 1: Create new table with correct schema

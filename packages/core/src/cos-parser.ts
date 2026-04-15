@@ -1,7 +1,7 @@
-import type Database from 'better-sqlite3'
-import { statusCategory } from './status-category.js'
 import { writeLifecycleMemory } from './memory-insert.js'
-import type { MemoryKind, MemoryScope } from './types.js'
+import type { Db } from './db/client.js'
+import { updateTask } from './tasks.js'
+import type { MemoryKind, MemoryScope, TaskStatus } from './types.js'
 
 export interface CoSResponse {
   task_updates?: Array<{
@@ -52,12 +52,11 @@ export function parseCoSResponse(raw: string): CoSResponse {
 }
 
 export async function applyCoSResponse(
-  db: Database.Database,
+  db: Db,
   workspace_id: string,
   response: CoSResponse,
   project_id?: string
 ): Promise<{ tasks_updated: number; memories_written: number }> {
-  const now = new Date().toISOString()
   let tasks_updated = 0
   let memories_written = 0
 
@@ -69,36 +68,30 @@ export async function applyCoSResponse(
     resolvedProjectId = proj?.project_id
   }
 
-  // Apply task updates
+  // Apply task updates — route through updateTask() so VALID_TRANSITIONS is
+  // enforced and task_status_changed events are emitted (CORE-002 fix).
+  // Verify workspace ownership before update to prevent cross-workspace writes.
   if (Array.isArray(response.task_updates)) {
     for (const update of response.task_updates) {
       if (!update.task_id) continue
-
-      const fields: string[] = ['updated_at = ?', 'version = version + 1']
-      const values: unknown[] = [now]
-
-      if (update.status !== undefined) {
-        fields.push('status = ?')
-        values.push(update.status)
-        // Also update status_category based on status
-        fields.push('status_category = ?')
-        values.push(statusCategory(update.status))
+      // Workspace ownership check — only update tasks belonging to this workspace
+      const owner = db.prepare('SELECT workspace_id FROM tasks WHERE task_id = ?')
+        .get(update.task_id) as { workspace_id: string } | undefined
+      if (!owner || owner.workspace_id !== workspace_id) continue
+      try {
+        await updateTask(
+          {
+            task_id: update.task_id,
+            ...(update.status !== undefined ? { status: update.status as TaskStatus } : {}),
+            ...(update.title !== undefined ? { title: update.title } : {}),
+            ...(update.description !== undefined ? { description: update.description } : {}),
+          },
+          db,
+        )
+        tasks_updated += 1
+      } catch {
+        // Invalid transition or task not found — skip this directive, do not abort the batch
       }
-      if (update.title !== undefined) {
-        fields.push('title = ?')
-        values.push(update.title)
-      }
-      if (update.description !== undefined) {
-        fields.push('description = ?')
-        values.push(update.description)
-      }
-
-      values.push(update.task_id, workspace_id)
-      const result = db.prepare(
-        `UPDATE tasks SET ${fields.join(', ')} WHERE task_id = ? AND workspace_id = ?`
-      ).run(...values)
-
-      tasks_updated += result.changes
     }
   }
 

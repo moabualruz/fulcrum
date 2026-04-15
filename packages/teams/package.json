@@ -1,7 +1,7 @@
 {
   "name": "@fulcrum/teams",
   "version": "0.0.1",
-  "description": "Agent team orchestration — team templates, role slots, communication and budget policies, team spawning",
+  "description": "Agent team orchestration \u2014 team templates, role slots, communication and budget policies, team spawning",
   "keywords": [
     "teams",
     "agent-orchestration",
@@ -20,7 +20,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsup src/index.ts --format esm --dts --clean"
+    "build": "tsup"
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",

@@ -233,9 +233,6 @@ importers:
       '@fulcrum/core':
         specifier: workspace:*
         version: link:../core
-      '@fulcrum/teams':
-        specifier: workspace:*
-        version: link:../teams
       minimatch:
         specifier: ^10.2.5
         version: 10.2.5

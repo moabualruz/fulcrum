@@ -1,4 +1,4 @@
-import { getDb } from './db/client.js'
+import { getDb , Db} from './db/client.js'
 import { newId } from './ids.js'
 import type { EventType } from './types.js'
 import { getEventBus } from './event-bus.js'
@@ -18,7 +18,7 @@ export interface EmitEventInput {
   correlation_id?: string
 }
 
-export function emitEvent(input: EmitEventInput, db = getDb()): void {
+export function emitEvent(input: EmitEventInput, db: Db = getDb()): void {
   db.prepare(`
     INSERT INTO events
       (evt_id, workspace_id, project_id, evt_type, ts,

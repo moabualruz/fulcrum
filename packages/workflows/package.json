@@ -1,7 +1,7 @@
 {
   "name": "@fulcrum/workflows",
   "version": "0.0.1",
-  "description": "Workflow engine — define, register, and execute multi-step agent workflows with typed step transitions and run state tracking",
+  "description": "Workflow engine \u2014 define, register, and execute multi-step agent workflows with typed step transitions and run state tracking",
   "keywords": [
     "workflows",
     "workflow-engine",
@@ -20,7 +20,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsup src/index.ts --format esm --dts --clean"
+    "build": "tsup"
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",

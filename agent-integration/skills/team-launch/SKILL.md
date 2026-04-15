@@ -1,13 +1,6 @@
 ---
 name: team-launch
 description: Invoke a team template to orchestrate a multi-agent workstream
-triggers:
-  - launching a multi-agent team
-  - complex task requiring multiple specialists
-  - chief_of_staff orchestration
-version: 1.0.0
-author: fulcrum
-user-invocable: true
 allowed-tools:
   - mcp__fulcrum__list_team_templates
   - mcp__fulcrum__invoke_team

@@ -702,22 +702,16 @@ describe('evaluatePolicy — regex matcher', () => {
 })
 
 describe('evaluatePolicy — invalid regex pattern', () => {
-  it('does not throw when regex pattern is invalid — rule is silently skipped', async () => {
-    await createPolicyRule({
+  it('throws FulcrumError at creation time when regex pattern is invalid', async () => {
+    // POL-001 fix: validate regex at creation time rather than silently skipping at eval time.
+    // This fails fast and prevents broken policies from being persisted.
+    await expect(createPolicyRule({
       scope: 'workspace',
       scope_id: 'ws_1',
       name: 'bad-regex-rule',
       action: 'deny',
       matchers: [{ matcher_type: 'regex', pattern: '[invalid regex(' }],
-    })
-    // Should not throw — matcherMatches catches the error and returns false
-    const decision = await evaluatePolicy({
-      workspace_id: 'ws_1',
-      actor_role: 'software_engineer',
-      actor_id: 'agent_1',
-      action: 'anything',
-    })
-    expect(decision.allowed).toBe(true)
+    })).rejects.toThrow('invalid regex pattern')
   })
 })
 

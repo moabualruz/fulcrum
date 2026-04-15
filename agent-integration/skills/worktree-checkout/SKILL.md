@@ -1,13 +1,6 @@
 ---
 name: worktree-checkout
 description: Provision a git worktree for isolated branch-based development
-triggers:
-  - starting development on a feature branch
-  - need isolated workspace for a task
-  - provisioning code workspace for agent
-version: 1.0.0
-author: fulcrum
-user-invocable: true
 allowed-tools:
   - mcp__fulcrum__write_memory
   - Bash

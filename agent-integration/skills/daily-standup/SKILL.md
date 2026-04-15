@@ -1,13 +1,6 @@
 ---
 name: daily-standup
 description: Generate a concise status summary of workspace activity for standup
-triggers:
-  - daily check-in
-  - status report requested
-  - beginning of work session review
-version: 1.0.0
-author: fulcrum
-user-invocable: true
 allowed-tools:
   - mcp__fulcrum__get_workspace_status
   - mcp__fulcrum__list_tasks

@@ -1,4 +1,4 @@
-import { getDb } from './db/client.js'
+import { getDb , Db} from './db/client.js'
 import { newId, nextDisplayId } from './ids.js'
 import { statusCategory } from './status-category.js'
 import { emitEvent } from './events.js'
@@ -28,6 +28,7 @@ interface UpdateTaskInput {
   status?: TaskStatus
   action?: 'reopen'
   note?: string
+  title?: string
   assigned_to?: string
   description?: string
   expected_version?: number
@@ -87,7 +88,7 @@ function hydrateTask(db: ReturnType<typeof getDb>, row: Record<string, unknown>)
   return { ...rowToTaskBase(row), labels, blockers }
 }
 
-export async function listTasks(input: ListTasksInput, db = getDb()): Promise<Task[]> {
+export async function listTasks(input: ListTasksInput, db: Db = getDb()): Promise<Task[]> {
   let sql = 'SELECT * FROM tasks WHERE workspace_id = ?'
   const params: unknown[] = [input.workspace_id]
   if (input.project_id) { sql += ' AND project_id = ?'; params.push(input.project_id) }
@@ -130,7 +131,7 @@ export async function listTasks(input: ListTasksInput, db = getDb()): Promise<Ta
   })
 }
 
-export async function createTask(input: CreateTaskInput, db = getDb()): Promise<Task> {
+export async function createTask(input: CreateTaskInput, db: Db = getDb()): Promise<Task> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
   const task_id = newId('task')
   const now = new Date().toISOString()
@@ -190,7 +191,7 @@ export async function createTask(input: CreateTaskInput, db = getDb()): Promise<
   return hydrateTask(db, row)
 }
 
-export async function updateTask(input: UpdateTaskInput, db = getDb()): Promise<Task> {
+export async function updateTask(input: UpdateTaskInput, db: Db = getDb()): Promise<Task> {
   const existing = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(input.task_id) as Record<string, unknown> | undefined
   if (!existing) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
 
@@ -232,6 +233,7 @@ export async function updateTask(input: UpdateTaskInput, db = getDb()): Promise<
     fields.push('status = ?'); values.push(input.status)
     fields.push('status_category = ?'); values.push(statusCategory(input.status))
   }
+  if (input.title !== undefined) { fields.push('title = ?'); values.push(input.title) }
   if (input.note !== undefined) { fields.push('note = ?'); values.push(input.note) }
   if (input.assigned_to !== undefined) { fields.push('assigned_to = ?'); values.push(input.assigned_to) }
   if (input.description !== undefined) { fields.push('description = ?'); values.push(input.description) }

@@ -1,7 +1,7 @@
 {
   "name": "@fulcrum/core",
   "version": "0.0.1",
-  "description": "Core persistence and orchestration layer — SQLite tasks, agent runs, policy enforcement, workspace status, handoffs, events, and embedding providers",
+  "description": "Core persistence and orchestration layer \u2014 SQLite tasks, agent runs, policy enforcement, workspace status, handoffs, events, and embedding providers",
   "keywords": [
     "agent-os",
     "tasks",
@@ -22,7 +22,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsup src/index.ts --format esm --dts --clean"
+    "build": "tsup"
   },
   "dependencies": {
     "better-sqlite3": "^12.0.0",

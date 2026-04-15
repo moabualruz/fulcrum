@@ -82,6 +82,8 @@ export interface MonitorServerConfig {
   port?: number  // default 7331
   host?: string  // default '127.0.0.1'
   workspace_id?: string
+  /** Skip bearer-token auth entirely — for unit tests only. */
+  bypass_auth?: boolean
 }
 
 export interface MonitorServer {

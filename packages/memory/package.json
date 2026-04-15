@@ -1,7 +1,7 @@
 {
   "name": "@fulcrum/memory",
   "version": "0.0.1",
-  "description": "Three-layer memory stack — git vault (L0), FTS5 full-text search (L1), Kuzu graph + HNSW vector search (L2) for agent memory and cross-project knowledge graphs",
+  "description": "Three-layer memory stack \u2014 git vault (L0), FTS5 full-text search (L1), Kuzu graph + HNSW vector search (L2) for agent memory and cross-project knowledge graphs",
   "keywords": [
     "memory",
     "vault",
@@ -24,7 +24,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsup src/index.ts --format esm --dts --clean"
+    "build": "tsup"
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",

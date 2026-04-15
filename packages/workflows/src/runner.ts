@@ -18,9 +18,10 @@
 // function has its own pause semantics for prompt_user etc. The runner
 // writes directly to the JSON blob instead.
 
-import { getDb, startSpan, endSpan } from '@fulcrum/core'
+import { getDb, startSpan, endSpan, Db} from '@fulcrum/core'
 import { nextReadySteps } from './engine.js'
 import { executeStep } from './step-executor.js'
+import { registry } from './registry.js'
 import type {
   WorkflowStepDef,
   WorkflowStepState,
@@ -86,7 +87,7 @@ interface LoadedRun {
  * registry convention (states only). If only states are present we look
  * up the definition in the registry.
  */
-function loadRun(wf_id: string, workspace_id: string, db = getDb()): LoadedRun {
+function loadRun(wf_id: string, workspace_id: string, db: Db = getDb()): LoadedRun {
   const row = db
     .prepare(`SELECT * FROM workflow_runs WHERE wf_id = ? AND workspace_id = ?`)
     .get(wf_id, workspace_id) as Record<string, unknown> | undefined
@@ -103,9 +104,6 @@ function loadRun(wf_id: string, workspace_id: string, db = getDb()): LoadedRun {
     // from the registry by workflow_name.
     states = parsed as WorkflowStepState[]
     const workflow_name = row['workflow_name'] as string
-    // Lazy import to avoid circular with workflows.ts
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { registry } = require('./registry.js') as typeof import('./registry.js')
     const def = registry.getDefinition(workflow_name)
     defs = def?.steps ?? []
   } else if (parsed && typeof parsed === 'object') {
@@ -135,7 +133,7 @@ function persistStates(
   defs: WorkflowStepDef[],
   status?: string,
   current_step_id?: string | null,
-  db = getDb(),
+  db: Db = getDb(),
 ): void {
   const now = new Date().toISOString()
   const blob = JSON.stringify(defs.length > 0 ? { states, defs } : states)

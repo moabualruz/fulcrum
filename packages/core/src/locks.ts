@@ -22,7 +22,7 @@
  * via a new migration, and update the conflict check. See H-7 in the Round 2
  * gap-fix plan for the history of this decision.
  */
-import { getDb } from './db/client.js'
+import { getDb , Db} from './db/client.js'
 import { newId } from './ids.js'
 import { DEFAULT_LOCK_TTL_SEC } from './constants.js'
 
@@ -60,7 +60,7 @@ function rowToLock(row: Record<string, unknown>): Lock {
   }
 }
 
-export async function acquireLock(input: AcquireLockInput, db = getDb()): Promise<AcquireLockResult> {
+export async function acquireLock(input: AcquireLockInput, db: Db = getDb()): Promise<AcquireLockResult> {
   const ttl = input.ttl_sec ?? DEFAULT_LOCK_TTL_SEC
   const nowMs = Date.now()
   const now = new Date(nowMs).toISOString()
@@ -100,19 +100,19 @@ export async function acquireLock(input: AcquireLockInput, db = getDb()): Promis
   })()
 }
 
-export async function releaseLock(lock_id: string, run_id: string, db = getDb()): Promise<boolean> {
+export async function releaseLock(lock_id: string, run_id: string, db: Db = getDb()): Promise<boolean> {
   const result = db.prepare(`DELETE FROM advisory_locks WHERE lock_id = ? AND run_id = ?`).run(lock_id, run_id)
   return result.changes === 1
 }
 
-export async function listLocks(workspace_id: string, db = getDb()): Promise<Lock[]> {
+export async function listLocks(workspace_id: string, db: Db = getDb()): Promise<Lock[]> {
   const rows = db.prepare(
     `SELECT * FROM advisory_locks WHERE workspace_id = ? ORDER BY acquired_at DESC`
   ).all(workspace_id) as Record<string, unknown>[]
   return rows.map(rowToLock)
 }
 
-export async function cleanupExpiredLocks(db = getDb()): Promise<number> {
+export async function cleanupExpiredLocks(db: Db = getDb()): Promise<number> {
   const now = new Date().toISOString()
   const result = db.prepare(`DELETE FROM advisory_locks WHERE expires_at <= ?`).run(now)
   return result.changes

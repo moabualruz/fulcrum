@@ -1,4 +1,4 @@
-import { getDb } from './db/client.js'
+import { getDb , Db} from './db/client.js'
 import { FulcrumError } from './types.js'
 import type { AgentRole, PolicyConfig, PolicyCheckResult } from './types.js'
 
@@ -9,7 +9,7 @@ interface CheckPolicyInput {
   policy: PolicyConfig
 }
 
-export async function checkPolicy(input: CheckPolicyInput, db = getDb()): Promise<PolicyCheckResult> {
+export async function checkPolicy(input: CheckPolicyInput, db: Db = getDb()): Promise<PolicyCheckResult> {
   if (!Number.isFinite(input.policy.wip_limit) || input.policy.wip_limit < 0) {
     throw new FulcrumError(`Invalid wip_limit: ${input.policy.wip_limit}`, 'invalid_input')
   }

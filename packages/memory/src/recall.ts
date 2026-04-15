@@ -1,5 +1,5 @@
 // packages/memory/src/recall.ts
-import { getDb, FulcrumError, getTextEmbedder, getReranker } from '@fulcrum/core'
+import { getDb, FulcrumError, getTextEmbedder, getReranker, Db} from '@fulcrum/core'
 import { rrfScore, rrfScoreWithSparse, recallScore, computeFreshness } from './scoring.js'
 import { sparseRank } from './sparse.js'
 import { rowToFullMemory } from './mappers.js'
@@ -126,20 +126,20 @@ function updateAccessCounts(db: DbType, ids: string[]): void {
   ).run(now, ...ids)
 }
 
-export async function getMemory(memory_id: string, db = getDb()): Promise<FullMemory | null> {
+export async function getMemory(memory_id: string, db: Db = getDb()): Promise<FullMemory | null> {
   const row = db.prepare('SELECT * FROM memories WHERE memory_id = ?').get(memory_id) as Record<string, unknown> | undefined
   if (!row) return null
   return rowToFullMemory(row)
 }
 
-export async function getMemoriesForTask(task_id: string, db = getDb()): Promise<FullMemory[]> {
+export async function getMemoriesForTask(task_id: string, db: Db = getDb()): Promise<FullMemory[]> {
   const rows = db.prepare('SELECT * FROM memories WHERE task_id = ? ORDER BY created_at DESC').all(task_id) as Record<string, unknown>[]
   return rows.map(rowToFullMemory)
 }
 
 export async function recallMemory(
   input: RecallMemoryInput,
-  db = getDb(),
+  db: Db = getDb(),
 ): Promise<CompactMemory[] | FullMemory[]> {
   if (!input.query.trim()) throw new FulcrumError('query must not be empty', 'invalid_input')
 

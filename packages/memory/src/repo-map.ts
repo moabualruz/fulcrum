@@ -8,7 +8,7 @@
 //   const map = buildRepoMap(files, parser)    // files + parser provided by caller
 //   const map = await scanAndBuildRepoMap(dir) // async, real file system walk
 
-import { readdirSync, readFileSync, statSync } from 'fs'
+import { readdirSync, readFileSync, statSync, type Dirent } from 'fs'
 import { join, relative, extname } from 'path'
 import type { TreeSitterParser, SyntaxNode, ParseTree } from './chunkers/ast-chunker.js'
 
@@ -148,7 +148,7 @@ const MAX_FILE_SIZE = 512 * 1024  // 512 KB — skip very large generated files
 
 function walkDir(dir: string, root: string): string[] {
   const results: string[] = []
-  let entries: ReturnType<typeof readdirSync>
+  let entries: Dirent<string>[]
   try {
     entries = readdirSync(dir, { withFileTypes: true })
   } catch {

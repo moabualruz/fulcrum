@@ -1,7 +1,7 @@
 {
   "name": "@fulcrum/sync",
   "version": "0.0.1",
-  "description": "Bidirectional sync adapter — Plane project management integration, conflict detection, and sync state management",
+  "description": "Bidirectional sync adapter \u2014 Plane project management integration, conflict detection, and sync state management",
   "keywords": [
     "sync",
     "plane",
@@ -20,7 +20,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsup src/index.ts --format esm --dts --clean"
+    "build": "tsup"
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",

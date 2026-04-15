@@ -20,6 +20,7 @@ export type { ValidationResult } from './config.js'
 
 // DB
 export { getDb, setDb, closeDb, _configureDb, globalDataDir, withTransaction, checkDbHealth } from './db/client.js'
+export type { Db } from './db/client.js'
 export { runMigrations } from './db/migrations.js'
 
 // Tasks
@@ -112,7 +113,22 @@ export type { StartSpanInput, EndSpanInput } from './telemetry/spans.js'
 export { initOtel, shutdownOtel, getOtelTracer } from './telemetry/otel.js'
 
 // Constants
-export * from './constants.js'
+export {
+  DEFAULT_HEARTBEAT_TIMEOUT_SEC,
+  DEFAULT_ESCALATION_TIMEOUT_SEC,
+  DEFAULT_WIP_LIMIT,
+  DEFAULT_MONITOR_PORT,
+  DEFAULT_EMBED_DIM,
+  DEFAULT_LOCK_TTL_SEC,
+  JANITOR_INTERVAL_SEC,
+  MEMORY_RANK_WEIGHTS,
+  MEMORY_DECAY_FACTOR,
+  MEMORY_DECAY_THRESHOLD,
+  MEMORY_DECAY_MIN_DAYS_SINCE_ACCESS,
+  MEMORY_DECAY_FLOOR,
+  MEMORY_CONSOLIDATION_THRESHOLD,
+  MEMORY_CONSOLIDATION_BATCH_SIZE,
+} from './constants.js'
 
 // Roles
 export {

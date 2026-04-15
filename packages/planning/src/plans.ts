@@ -1,5 +1,5 @@
 // packages/planning/src/plans.ts
-import { getDb, FulcrumError, emitEvent, nextDisplayId, newId } from '@fulcrum/core'
+import { getDb, FulcrumError, emitEvent, nextDisplayId, newId, Db} from '@fulcrum/core'
 import type { Plan, CreatePlanInput, UpdatePlanInput, ListPlansInput, LinkIssueToPlanInput, PlanStatus, StatusCategory } from './types.js'
 
 function planStatusCategory(status: PlanStatus): StatusCategory {
@@ -25,7 +25,7 @@ function rowToPlan(row: Record<string, unknown>): Plan {
   }
 }
 
-export async function createPlan(input: CreatePlanInput, db = getDb()): Promise<Plan> {
+export async function createPlan(input: CreatePlanInput, db: Db = getDb()): Promise<Plan> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
   const plan_id = newId('plan')
   const now = new Date().toISOString()
@@ -58,7 +58,7 @@ export async function createPlan(input: CreatePlanInput, db = getDb()): Promise<
   return rowToPlan(row)
 }
 
-export async function updatePlan(input: UpdatePlanInput, db = getDb()): Promise<Plan> {
+export async function updatePlan(input: UpdatePlanInput, db: Db = getDb()): Promise<Plan> {
   const existing = db.prepare('SELECT * FROM plans WHERE plan_id = ? AND workspace_id = ?')
     .get(input.plan_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!existing) throw new FulcrumError(`Plan ${input.plan_id} not found`, 'not_found')
@@ -104,7 +104,7 @@ export async function updatePlan(input: UpdatePlanInput, db = getDb()): Promise<
   return rowToPlan(updated)
 }
 
-export async function listPlans(input: ListPlansInput, db = getDb()): Promise<Plan[]> {
+export async function listPlans(input: ListPlansInput, db: Db = getDb()): Promise<Plan[]> {
   let sql = 'SELECT * FROM plans WHERE workspace_id = ?'
   const params: unknown[] = [input.workspace_id]
   if (input.project_id) { sql += ' AND project_id = ?'; params.push(input.project_id) }
@@ -115,7 +115,7 @@ export async function listPlans(input: ListPlansInput, db = getDb()): Promise<Pl
   return rows.map(rowToPlan)
 }
 
-export async function linkIssueToPlan(input: LinkIssueToPlanInput, db = getDb()): Promise<void> {
+export async function linkIssueToPlan(input: LinkIssueToPlanInput, db: Db = getDb()): Promise<void> {
   const plan = db.prepare('SELECT plan_id FROM plans WHERE plan_id = ? AND workspace_id = ?')
     .get(input.plan_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!plan) throw new FulcrumError(`Plan ${input.plan_id} not found`, 'not_found')

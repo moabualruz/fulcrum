@@ -42,3 +42,6 @@ npm-debug.log*
 pnpm-debug.log*
 .worktrees/
 .fulcrum.json
+
+# Claude worktrees
+.claude/worktrees/

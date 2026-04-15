@@ -1,13 +1,6 @@
 ---
 name: create-plan
 description: Generate a structured implementation plan from a PRD or issue
-triggers:
-  - planning implementation from requirements
-  - breaking down a PRD into tasks
-  - generating issue decomposition
-version: 1.0.0
-author: fulcrum
-user-invocable: true
 allowed-tools:
   - mcp__fulcrum__recall_memory
   - mcp__fulcrum__list_tasks

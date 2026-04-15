@@ -1,5 +1,5 @@
 // packages/policy/src/audit.ts
-import { getDb, newId } from '@fulcrum/core'
+import { getDb, newId , Db} from '@fulcrum/core'
 import type { PolicyEvent, LogPolicyEventInput, GetAuditLogInput } from './types.js'
 
 function rowToEvent(row: Record<string, unknown>): PolicyEvent {
@@ -20,7 +20,7 @@ function rowToEvent(row: Record<string, unknown>): PolicyEvent {
   }
 }
 
-export async function logPolicyEvent(input: LogPolicyEventInput, db = getDb()): Promise<void> {
+export async function logPolicyEvent(input: LogPolicyEventInput, db: Db = getDb()): Promise<void> {
   const evt_id = newId('policy_event')
   const now = new Date().toISOString()
 
@@ -42,7 +42,7 @@ export async function logPolicyEvent(input: LogPolicyEventInput, db = getDb()): 
   )
 }
 
-export async function getAuditLog(input: GetAuditLogInput, db = getDb()): Promise<PolicyEvent[]> {
+export async function getAuditLog(input: GetAuditLogInput, db: Db = getDb()): Promise<PolicyEvent[]> {
   let sql = 'SELECT * FROM policy_events WHERE workspace_id = ?'
   const params: unknown[] = [input.workspace_id]
   if (input.actor_id) { sql += ' AND actor_id = ?'; params.push(input.actor_id) }

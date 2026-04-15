@@ -1,13 +1,6 @@
 ---
 name: spawn-agent
 description: Start a new agent run for a specific role and task
-triggers:
-  - launching a specialist agent
-  - starting a parallel workstream
-  - handing off to a specific role
-version: 1.0.0
-author: fulcrum
-user-invocable: true
 allowed-tools:
   - mcp__fulcrum__list_tasks
   - mcp__fulcrum__start_agent_run

@@ -7,23 +7,6 @@ allowed-tools:
   - mcp__fulcrum__list_tasks
   - mcp__fulcrum__create_task
   - mcp__fulcrum__list_agent_profiles
-user-invocable: false
-version: 1.0.0
-author: fulcrum
-input:
-  description: "Triggered automatically before the first write-family tool call."
-  fields:
-    - name: task_id
-      type: string
-      required: false
-      description: "Task ID to associate this run with. If absent, call list_tasks or create_task first."
-    - name: agent_role
-      type: string
-      required: true
-      description: "Canonical role slug (e.g. software_engineer). Use list_agent_profiles to discover."
-output:
-  artifact: run_id
-  description: "A run_id string used to heartbeat, complete, or block this run."
 ---
 
 # Start every task with start_agent_run

@@ -1,5 +1,5 @@
 // packages/teams/src/teams.ts
-import { getDb, nextDisplayId, FulcrumError, canInvokeTeams, newId } from '@fulcrum/core'
+import { getDb, nextDisplayId, FulcrumError, canInvokeTeams, newId , Db} from '@fulcrum/core'
 import type {
   TeamTemplate,
   TeamInstance,
@@ -43,6 +43,7 @@ function rowToInstance(row: Record<string, unknown>): TeamInstance {
     created_by_agent_id: row['created_by_agent_id'] as string,
     resolved_slots: JSON.parse(row['resolved_slots'] as string) as Record<string, string[]>,
     version: row['version'] as number,
+    heartbeat_at: (row['heartbeat_at'] as string | null) ?? undefined,
     created_at: row['created_at'] as string,
     updated_at: row['updated_at'] as string,
   }
@@ -50,7 +51,7 @@ function rowToInstance(row: Record<string, unknown>): TeamInstance {
 
 // ── public API ─────────────────────────────────────────────────────────────
 
-export async function createTeamTemplate(input: CreateTeamTemplateInput, db = getDb()): Promise<TeamTemplate> {
+export async function createTeamTemplate(input: CreateTeamTemplateInput, db: Db = getDb()): Promise<TeamTemplate> {
   const template_id = newId('team')
   const now = new Date().toISOString()
   const slotsJson = JSON.stringify(input.slots)
@@ -65,7 +66,7 @@ export async function createTeamTemplate(input: CreateTeamTemplateInput, db = ge
   return rowToTemplate(row)
 }
 
-export async function invokeTeam(input: InvokeTeamInput, db = getDb()): Promise<TeamInstance> {
+export async function invokeTeam(input: InvokeTeamInput, db: Db = getDb()): Promise<TeamInstance> {
   if (!canInvokeTeams(input.caller_role)) {
     throw new Error('POLICY_DENIED: only chief_of_staff may invoke teams')
   }
@@ -108,7 +109,7 @@ export async function invokeTeam(input: InvokeTeamInput, db = getDb()): Promise<
   return rowToInstance(row)
 }
 
-export async function heartbeatTeam(input: HeartbeatTeamInput, db = getDb()): Promise<TeamInstance> {
+export async function heartbeatTeam(input: HeartbeatTeamInput, db: Db = getDb()): Promise<TeamInstance> {
   const now = new Date().toISOString()
 
   let changes: number
@@ -136,7 +137,7 @@ export async function heartbeatTeam(input: HeartbeatTeamInput, db = getDb()): Pr
   return rowToInstance(row)
 }
 
-export async function completeTeam(input: CompleteTeamInput, db = getDb()): Promise<TeamInstance> {
+export async function completeTeam(input: CompleteTeamInput, db: Db = getDb()): Promise<TeamInstance> {
   const now = new Date().toISOString()
 
   // failed → blocked; completed and cancelled → done
@@ -161,7 +162,7 @@ export interface ListTeamTemplatesInput {
   offset?: number
 }
 
-export async function listTeamTemplates(input: ListTeamTemplatesInput = {}, db = getDb()): Promise<TeamTemplate[]> {
+export async function listTeamTemplates(input: ListTeamTemplatesInput = {}, db: Db = getDb()): Promise<TeamTemplate[]> {
   const limit = input.limit ?? 50
   const offset = input.offset ?? 0
   const rows = db
@@ -170,7 +171,7 @@ export async function listTeamTemplates(input: ListTeamTemplatesInput = {}, db =
   return rows.map(rowToTemplate)
 }
 
-export async function listTeamInstances(input: ListTeamInstancesInput, db = getDb()): Promise<TeamInstance[]> {
+export async function listTeamInstances(input: ListTeamInstancesInput, db: Db = getDb()): Promise<TeamInstance[]> {
   const conditions: string[] = ['workspace_id = ?']
   const params: unknown[] = [input.workspace_id]
 
@@ -199,7 +200,7 @@ export async function listTeamInstances(input: ListTeamInstancesInput, db = getD
   return rows.map(rowToInstance)
 }
 
-export async function getTeamStatus(input: GetTeamStatusInput, db = getDb()): Promise<TeamStatus> {
+export async function getTeamStatus(input: GetTeamStatusInput, db: Db = getDb()): Promise<TeamStatus> {
 
   const instanceRow = db
     .prepare(`SELECT * FROM team_instances WHERE instance_id = ? AND workspace_id = ?`)
@@ -270,7 +271,7 @@ export class TeamInstanceHeartbeat {
     if (this.timer) return // already running
     this.timer = setInterval(() => {
       try {
-        const db = getDb()
+        const db: Db = getDb()
         db.prepare(
           `UPDATE team_instances SET heartbeat_at = datetime('now') WHERE instance_id = ?`
         ).run(this.instance_id)

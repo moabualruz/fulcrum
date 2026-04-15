@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import * as pathModule from 'path'
-import { getDb } from './db/client.js'
+import { getDb , Db} from './db/client.js'
 import { rowToRun } from './runs.js'
 import { listAgentProfileRows } from './agent-profiles.js'
 import type { AgentProfile, WorkspaceStatusResult, AgentRole } from './types.js'
@@ -44,7 +44,7 @@ function loadRolePurpose(role: string): string | null {
 interface GetWorkspaceStatusInput { workspace_id: string }
 interface BuildCosContextInput { workspace_id: string; project_id: string; max_tokens?: number }
 
-export async function getWorkspaceStatus(input: GetWorkspaceStatusInput, db = getDb()): Promise<WorkspaceStatusResult> {
+export async function getWorkspaceStatus(input: GetWorkspaceStatusInput, db: Db = getDb()): Promise<WorkspaceStatusResult> {
 
   const running = db.prepare(
     "SELECT * FROM agent_runs WHERE workspace_id = ? AND status = 'running' ORDER BY started_at DESC"
@@ -78,7 +78,7 @@ export async function getWorkspaceStatus(input: GetWorkspaceStatusInput, db = ge
   }
 }
 
-export async function buildCosContext(input: BuildCosContextInput, db = getDb()): Promise<string> {
+export async function buildCosContext(input: BuildCosContextInput, db: Db = getDb()): Promise<string> {
   const maxChars = (input.max_tokens ?? 4000) * 4 // ~4 chars per token
   const parts: string[] = []
 
@@ -148,7 +148,7 @@ interface ListAgentProfilesInput {
 
 export async function listAgentProfiles(
   input?: ListAgentProfilesInput,
-  db = getDb(),
+  db: Db = getDb(),
 ): Promise<AgentProfile[]> {
 
   // 1. Canonical profiles from agent_definitions (seeded by migration 032b).

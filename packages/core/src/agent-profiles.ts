@@ -5,7 +5,7 @@
 // custom specializations can be composed into team templates without
 // requiring a code change.
 
-import { getDb } from './db/client.js'
+import { getDb , Db} from './db/client.js'
 import { newId } from './ids.js'
 import { FulcrumError } from './types.js'
 import type {
@@ -47,7 +47,7 @@ function rowToProfile(row: Record<string, unknown>): AgentProfileRow {
   }
 }
 
-export async function createAgentProfile(input: CreateAgentProfileInput, db = getDb()): Promise<AgentProfileRow> {
+export async function createAgentProfile(input: CreateAgentProfileInput, db: Db = getDb()): Promise<AgentProfileRow> {
   if (!input.name || !input.name.trim()) {
     throw new FulcrumError('agent profile name must not be empty', 'invalid_input')
   }
@@ -90,14 +90,14 @@ export async function createAgentProfile(input: CreateAgentProfileInput, db = ge
   return (await getAgentProfile(profile_id, db))!
 }
 
-export async function getAgentProfile(profile_id: string, db = getDb()): Promise<AgentProfileRow | null> {
+export async function getAgentProfile(profile_id: string, db: Db = getDb()): Promise<AgentProfileRow | null> {
   const row = db
     .prepare(`SELECT * FROM agent_profiles WHERE profile_id = ?`)
     .get(profile_id) as Record<string, unknown> | undefined
   return row ? rowToProfile(row) : null
 }
 
-export async function listAgentProfileRows(workspace_id?: string, db = getDb()): Promise<AgentProfileRow[]> {
+export async function listAgentProfileRows(workspace_id?: string, db: Db = getDb()): Promise<AgentProfileRow[]> {
   const rows = workspace_id
     ? (db
         .prepare(`SELECT * FROM agent_profiles WHERE workspace_id = ? ORDER BY created_at DESC`)
@@ -108,7 +108,7 @@ export async function listAgentProfileRows(workspace_id?: string, db = getDb()):
   return rows.map(rowToProfile)
 }
 
-export async function updateAgentProfile(input: UpdateAgentProfileInput, db = getDb()): Promise<AgentProfileRow> {
+export async function updateAgentProfile(input: UpdateAgentProfileInput, db: Db = getDb()): Promise<AgentProfileRow> {
   const existing = await getAgentProfile(input.profile_id, db)
   if (!existing) {
     throw new FulcrumError(`agent profile not found: ${input.profile_id}`, 'not_found')
@@ -153,6 +153,6 @@ export async function updateAgentProfile(input: UpdateAgentProfileInput, db = ge
   return (await getAgentProfile(input.profile_id, db))!
 }
 
-export async function deleteAgentProfile(profile_id: string, db = getDb()): Promise<void> {
+export async function deleteAgentProfile(profile_id: string, db: Db = getDb()): Promise<void> {
   db.prepare(`DELETE FROM agent_profiles WHERE profile_id = ?`).run(profile_id)
 }

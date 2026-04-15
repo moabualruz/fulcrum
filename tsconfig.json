@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/memory" },
+    { "path": "./packages/policy" },
+    { "path": "./packages/planning" },
+    { "path": "./packages/teams" },
+    { "path": "./packages/worker" },
+    { "path": "./packages/monitor" },
+    { "path": "./packages/sync" },
+    { "path": "./packages/workflows" },
+    { "path": "./packages/worktrees" },
+    { "path": "./packages/cli" }
+  ]
+}

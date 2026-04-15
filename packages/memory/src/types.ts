@@ -89,8 +89,8 @@ export interface FullMemory {
   tags: string[]
   entities: string[]
   confidence: number
-  /** Freshness is computed at query time from updated_at (exponential decay). Not read from DB. */
-  freshness: number
+  /** Freshness is computed at query time from updated_at (exponential decay). Not stored in DB. */
+  freshness?: number
   importance: number
   access_count: number
   event_time: string | null

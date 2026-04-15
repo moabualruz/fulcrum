@@ -3,6 +3,11 @@ import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { homedir, platform } from 'os'
 
+/** Nameable alias for the better-sqlite3 Database instance type.
+ *  Use this in exported function signatures so TypeScript can generate
+ *  valid ESM-compatible declaration files (avoids TS4076). */
+export type Db = Database.Database
+
 /**
  * Returns the single, global Fulcrum data directory.
  * Never writes to project directories — all data is global.

@@ -1,5 +1,5 @@
 // packages/planning/src/epics.ts
-import { getDb, FulcrumError, emitEvent, nextDisplayId, statusCategory, newId } from '@fulcrum/core'
+import { getDb, FulcrumError, emitEvent, nextDisplayId, statusCategory, newId, Db} from '@fulcrum/core'
 import type { Epic, CreateEpicInput, UpdateEpicInput, ListEpicsInput, EpicStatus, StatusCategory } from './types.js'
 
 function rowToEpic(row: Record<string, unknown>): Epic {
@@ -20,7 +20,7 @@ function rowToEpic(row: Record<string, unknown>): Epic {
   }
 }
 
-export async function createEpic(input: CreateEpicInput, db = getDb()): Promise<Epic> {
+export async function createEpic(input: CreateEpicInput, db: Db = getDb()): Promise<Epic> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
   const epic_id = newId('epic')
   const now = new Date().toISOString()
@@ -54,7 +54,7 @@ export async function createEpic(input: CreateEpicInput, db = getDb()): Promise<
   return rowToEpic(row)
 }
 
-export async function updateEpic(input: UpdateEpicInput, db = getDb()): Promise<Epic> {
+export async function updateEpic(input: UpdateEpicInput, db: Db = getDb()): Promise<Epic> {
   const existing = db.prepare('SELECT * FROM epics WHERE epic_id = ? AND workspace_id = ?')
     .get(input.epic_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!existing) throw new FulcrumError(`Epic ${input.epic_id} not found`, 'not_found')
@@ -99,7 +99,7 @@ export async function updateEpic(input: UpdateEpicInput, db = getDb()): Promise<
   return rowToEpic(updated)
 }
 
-export async function listEpics(input: ListEpicsInput, db = getDb()): Promise<Epic[]> {
+export async function listEpics(input: ListEpicsInput, db: Db = getDb()): Promise<Epic[]> {
   let sql = 'SELECT * FROM epics WHERE workspace_id = ?'
   const params: unknown[] = [input.workspace_id]
   if (input.project_id) { sql += ' AND project_id = ?'; params.push(input.project_id) }

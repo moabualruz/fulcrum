@@ -1,13 +1,6 @@
 ---
 name: team-status
 description: Check the status of a running team instance
-triggers:
-  - checking team progress
-  - monitoring multi-agent workstream
-  - looking for blocked team members
-version: 1.0.0
-author: fulcrum
-user-invocable: true
 allowed-tools:
   - mcp__fulcrum__list_team_instances
   - mcp__fulcrum__get_agent_run_status

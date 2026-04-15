@@ -15,8 +15,7 @@ import {
   loadConfig,
   createWorkspace, createProject, getProject,
   isL1, type AgentRole,
-  globalDataDir,
-} from '@fulcrum/core'
+  globalDataDir, Db} from '@fulcrum/core'
 import { writeMemory, recallMemory } from '@fulcrum/memory'
 import { evaluatePolicy, logPolicyEvent, type EvaluatePolicyInput } from '@fulcrum/policy'
 import {
@@ -100,9 +99,21 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     allowHeaders: ['Content-Type', 'Authorization'],
   }))
 
-  // Load or create the bearer token for mutating endpoints
-  const monitorToken = getOrCreateMonitorToken()
-  const auth = requireAuth(monitorToken)
+  // Load or create the bearer token — applies to ALL data endpoints (SEC-001).
+  // bypass_auth is only for unit tests; never use in production.
+  const monitorToken = config.bypass_auth ? '' : getOrCreateMonitorToken()
+  const auth: MiddlewareHandler = config.bypass_auth
+    ? ((_c, next) => next())
+    : requireAuth(monitorToken)
+
+  // Apply auth globally; exempt only the two public discovery/health endpoints.
+  app.use('*', async (c, next) => {
+    const path = c.req.path
+    if (path === '/.well-known/agent.json' || path === '/status' || config.bypass_auth) {
+      return next()
+    }
+    return auth(c, next)
+  })
 
   // A2A Agent Card — public discovery endpoint, no auth required
   app.get('/.well-known/agent.json', (c) => {
@@ -114,7 +125,6 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/status', (c) => {
     return c.json({
       status: 'ok',
-      workspace_id: workspace_id ?? null,
       ts: new Date().toISOString(),
     })
   })
@@ -148,6 +158,8 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
   app.get('/events/stream', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
+    // workspace_id is required — reject unscoped streaming to prevent cross-workspace leakage (MON-007).
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
     const stream = new ReadableStream({
       start(controller) {
@@ -155,14 +167,9 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
         const poll = () => {
           try {
-            const db = getDb()
-            let query = `SELECT *, rowid FROM events WHERE workspace_id = ? AND rowid > ? ORDER BY rowid ASC LIMIT 100`
-            const params: unknown[] = [ws ?? '', lastRowid]
-
-            if (!ws) {
-              query = `SELECT *, rowid FROM events WHERE rowid > ? ORDER BY rowid ASC LIMIT 100`
-              params.splice(0, 1) // remove ws placeholder, keep only lastRowid
-            }
+            const db: Db = getDb()
+            const query = `SELECT *, rowid FROM events WHERE workspace_id = ? AND rowid > ? ORDER BY rowid ASC LIMIT 100`
+            const params: unknown[] = [ws, lastRowid]
 
             const rows = db.prepare(query).all(...params) as Array<{
               evt_id: string
@@ -213,7 +220,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db = getDb()
+    const db: Db = getDb()
     const rows = db.prepare(`
       SELECT status_category, COUNT(*) AS count
       FROM tasks
@@ -232,7 +239,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/agents', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-    const db = getDb()
+    const db: Db = getDb()
     const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
     const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
 
@@ -247,7 +254,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db = getDb()
+    const db: Db = getDb()
     const run = db.prepare(`
       SELECT * FROM agent_runs WHERE run_id = ? AND workspace_id = ?
     `).get(c.req.param('id'), ws)
@@ -260,7 +267,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db = getDb()
+    const db: Db = getDb()
     const rows = db.prepare(`
       SELECT * FROM worktrees
       WHERE workspace_id = ? AND status = 'ready_for_merge'
@@ -274,7 +281,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db = getDb()
+    const db: Db = getDb()
     const rows = db.prepare(`
       SELECT * FROM reviews
       WHERE workspace_id = ? AND status = 'pending'
@@ -287,7 +294,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/artifacts', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-    const db = getDb()
+    const db: Db = getDb()
     const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
     const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
 
@@ -301,7 +308,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/memory-trace', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-    const db = getDb()
+    const db: Db = getDb()
     const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
     const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
 
@@ -316,7 +323,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db = getDb()
+    const db: Db = getDb()
     const taskCount = (db.prepare(
       `SELECT COUNT(*) AS n FROM tasks WHERE workspace_id = ?`
     ).get(ws) as { n: number }).n
@@ -354,7 +361,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db = getDb()
+    const db: Db = getDb()
     const rows = db.prepare(`
       SELECT * FROM policy_events
       WHERE workspace_id = ?
@@ -369,7 +376,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db = getDb()
+    const db: Db = getDb()
     const rows = db.prepare(`
       SELECT * FROM sync_states
       WHERE workspace_id = ?
@@ -382,7 +389,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/teams', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-    const db = getDb()
+    const db: Db = getDb()
     const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
     const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
 
@@ -397,7 +404,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db = getDb()
+    const db: Db = getDb()
     const data = getPerRoleMetrics(db, { workspace_id: ws })
     return c.json({ data })
   })
@@ -406,7 +413,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db = getDb()
+    const db: Db = getDb()
     const data = getMemoryMetrics(db, { workspace_id: ws })
     return c.json({ data })
   })
@@ -417,7 +424,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
     const run_id = c.req.param('run_id')
 
-    const db = getDb()
+    const db: Db = getDb()
     const events = db.prepare(`
       SELECT evt_id AS event_id, evt_type AS event_type, payload, ts
       FROM events
@@ -442,7 +449,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
     const horizon_days = parseInt(c.req.query('horizon_days') ?? '30', 10)
-    const db = getDb()
+    const db: Db = getDb()
     const data = getForecasting(db, { workspace_id: ws, horizon_days })
     return c.json({ data })
   })
@@ -464,7 +471,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/tasks', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-    const db = getDb()
+    const db: Db = getDb()
     const proj = c.req.query('project_id')
     const status = c.req.query('status')
     const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
@@ -482,7 +489,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   })
 
   app.get('/workspaces', (c) => {
-    const db = getDb()
+    const db: Db = getDb()
     const rows = db.prepare(
       'SELECT workspace_id, name, status, created_at FROM workspaces ORDER BY created_at DESC LIMIT 50'
     ).all()
@@ -491,7 +498,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
   app.get('/projects', (c) => {
     const ws = c.req.query('workspace_id')
-    const db = getDb()
+    const db: Db = getDb()
     const rows = ws
       ? db.prepare('SELECT * FROM projects WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 100').all(ws)
       : db.prepare('SELECT * FROM projects ORDER BY created_at DESC LIMIT 100').all()
@@ -549,7 +556,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       if (!body.agent_role || !body.workspace_id) {
         return c.json({ error: 'agent_role and workspace_id are required' }, 400)
       }
-      const db = getDb()
+      const db: Db = getDb()
       const proj = body.project_id || body.workspace_id
       await ensureWorkspace(body.workspace_id)
       await ensureProject(body.workspace_id, proj)
@@ -780,7 +787,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
   return {
     port,
-    fetch: (req: Request) => app.fetch(req),
+    fetch: (req: Request) => Promise.resolve(app.fetch(req)),
     start: async () => {
       serverInstance = serve({ fetch: app.fetch, port, hostname: host })
     },

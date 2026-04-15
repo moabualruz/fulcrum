@@ -1,13 +1,6 @@
 ---
 name: session-end
 description: Complete or hand off the Fulcrum agent run at end of session
-triggers:
-  - session closing
-  - work complete
-  - handoff required
-version: 1.0.0
-author: fulcrum
-user-invocable: false
 allowed-tools:
   - mcp__fulcrum__complete_agent_run
   - mcp__fulcrum__block_agent_run

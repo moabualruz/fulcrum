@@ -1,5 +1,5 @@
 // packages/planning/src/relations.ts
-import { getDb, FulcrumError } from '@fulcrum/core'
+import { getDb, FulcrumError, Db} from '@fulcrum/core'
 import type { Task } from '@fulcrum/core'
 import type { TaskRelation, AddTaskRelationInput, RemoveTaskRelationInput, GetTaskRelationsInput } from './types.js'
 
@@ -17,10 +17,6 @@ function rowToTask(row: Record<string, unknown>): Task {
     priority: row.priority as Task['priority'],
     estimate_type: row.estimate_type as Task['estimate_type'],
     estimate_value: row.estimate_value as number | null,
-    depends_on: (() => {
-      try { return JSON.parse(row.depends_on as string) as string[] }
-      catch { return [] }
-    })(),
     assigned_to: row.assigned_to as string | null,
     note: row.note as string | null,
     done_criteria: row.done_criteria as string | null,
@@ -35,7 +31,7 @@ function rowToTask(row: Record<string, unknown>): Task {
   }
 }
 
-export async function addTaskRelation(input: AddTaskRelationInput, db = getDb()): Promise<void> {
+export async function addTaskRelation(input: AddTaskRelationInput, db: Db = getDb()): Promise<void> {
   if (input.task_id === input.target_task_id) {
     throw new FulcrumError('task_id and target_task_id must be different', 'invalid_input')
   }
@@ -50,7 +46,7 @@ export async function addTaskRelation(input: AddTaskRelationInput, db = getDb())
   `).run(input.task_id, input.target_task_id, input.relation_type)
 }
 
-export async function removeTaskRelation(input: RemoveTaskRelationInput, db = getDb()): Promise<void> {
+export async function removeTaskRelation(input: RemoveTaskRelationInput, db: Db = getDb()): Promise<void> {
   const result = db.prepare(`
     DELETE FROM task_relations WHERE task_id = ? AND target_task_id = ? AND relation_type = ?
   `).run(input.task_id, input.target_task_id, input.relation_type)
@@ -62,7 +58,7 @@ export async function removeTaskRelation(input: RemoveTaskRelationInput, db = ge
   }
 }
 
-export async function getBlockers(taskId: string, db = getDb()): Promise<Task[]> {
+export async function getBlockers(taskId: string, db: Db = getDb()): Promise<Task[]> {
   // A blocker is any task T where T blocks taskId, i.e. task_relations(T, taskId, 'blocks')
   const rows = db.prepare(`
     SELECT t.* FROM tasks t
@@ -73,7 +69,7 @@ export async function getBlockers(taskId: string, db = getDb()): Promise<Task[]>
   return rows.map(rowToTask)
 }
 
-export async function getTaskRelations(input: GetTaskRelationsInput, db = getDb()): Promise<TaskRelation[]> {
+export async function getTaskRelations(input: GetTaskRelationsInput, db: Db = getDb()): Promise<TaskRelation[]> {
   const rows = db.prepare(`
     SELECT * FROM task_relations WHERE task_id = ? ORDER BY created_at ASC
   `).all(input.task_id) as Array<{

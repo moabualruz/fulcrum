@@ -3,7 +3,7 @@ import { listMemoryFiles, readMemoryFile } from '../vault/client.js'
 import { insertMemoryDirect } from '../write.js'
 import { getKuzuClient } from '../kuzu/client.js'
 import { upsertMemoryToKuzu, removeMemoryFromKuzu } from '../kuzu/upsert.js'
-import { getDb } from '@fulcrum/core'
+import { getDb, Db} from '@fulcrum/core'
 import { appendToLog } from '../vault/index-builder.js'
 import { readState } from '../vault/state.js'
 import { simpleGit } from 'simple-git'
@@ -135,7 +135,7 @@ export async function rebuildFromVault(options: RebuildOptions): Promise<Rebuild
 export async function reconcileMergedBranch(
   vaultPath: string,
   taskId: string,
-  db = getDb(),
+  db: Db = getDb(),
 ): Promise<void> {
   const sg = simpleGit(vaultPath)
   const memoriesPattern = 'memories/curated/'

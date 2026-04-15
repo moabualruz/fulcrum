@@ -1,4 +1,4 @@
-import { getDb } from './db/client.js'
+import { getDb , Db} from './db/client.js'
 import { newId } from './ids.js'
 import { FulcrumError, type ProjectStatus, type ProjectType, type WriteMode } from './types.js'
 
@@ -62,7 +62,7 @@ function rowToProject(row: Record<string, unknown>): Project {
   }
 }
 
-export async function createProject(input: CreateProjectInput, db = getDb()): Promise<Project> {
+export async function createProject(input: CreateProjectInput, db: Db = getDb()): Promise<Project> {
   if (!input.name || !input.name.trim()) {
     throw new FulcrumError('name must not be empty', 'invalid_input')
   }
@@ -105,14 +105,14 @@ export async function createProject(input: CreateProjectInput, db = getDb()): Pr
   return rowToProject(row)
 }
 
-export async function getProject(project_id: string, db = getDb()): Promise<Project | null> {
+export async function getProject(project_id: string, db: Db = getDb()): Promise<Project | null> {
   const row = db
     .prepare(`SELECT * FROM projects WHERE project_id = ?`)
     .get(project_id) as Record<string, unknown> | undefined
   return row ? rowToProject(row) : null
 }
 
-export async function listProjects(input: ListProjectsInput = {}, db = getDb()): Promise<Project[]> {
+export async function listProjects(input: ListProjectsInput = {}, db: Db = getDb()): Promise<Project[]> {
   const limit = input.limit ?? 200
   const rows = input.workspace_id
     ? (db
@@ -126,7 +126,7 @@ export async function listProjects(input: ListProjectsInput = {}, db = getDb()):
   return rows.map(rowToProject)
 }
 
-export async function updateProject(input: UpdateProjectInput, db = getDb()): Promise<Project> {
+export async function updateProject(input: UpdateProjectInput, db: Db = getDb()): Promise<Project> {
   const existing = await getProject(input.project_id, db)
   if (!existing) {
     throw new FulcrumError(`project not found: ${input.project_id}`, 'not_found')

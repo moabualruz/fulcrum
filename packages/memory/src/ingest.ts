@@ -2,7 +2,7 @@
 import { ulid } from 'ulidx'
 import { readdirSync, readFileSync, statSync } from 'fs'
 import { join, extname, basename } from 'path'
-import { getDb } from '@fulcrum/core'
+import { getDb, Db} from '@fulcrum/core'
 import { contentHash, isDuplicate } from './dedup.js'
 import { writeMemory } from './write.js'
 import type { IngestFileInput, IngestResult, IngestProjectInput } from './types.js'
@@ -75,9 +75,9 @@ function chunkSyntax(content: string): { text: string; symbolPath: string | null
   return chunks
 }
 
-function chunkSemantic(content: string): { text: string; startLine: number; endLine: number }[] {
+function chunkSemantic(content: string): { text: string; symbolPath: string | null; startLine: number; endLine: number }[] {
   const paragraphs = content.split(/\n\n+/).filter(p => p.trim())
-  const chunks: { text: string; startLine: number; endLine: number }[] = []
+  const chunks: { text: string; symbolPath: string | null; startLine: number; endLine: number }[] = []
   let lineOffset = 1
   for (const para of paragraphs) {
     const paraLines = para.split('\n').length
@@ -87,11 +87,11 @@ function chunkSemantic(content: string): { text: string; startLine: number; endL
       let ln = lineOffset
       for (const sub of subChunks) {
         const subLines = sub.split('\n').length
-        chunks.push({ text: sub, startLine: ln, endLine: ln + subLines - 1 })
+        chunks.push({ text: sub, symbolPath: null, startLine: ln, endLine: ln + subLines - 1 })
         ln += subLines
       }
     } else {
-      chunks.push({ text, startLine: lineOffset, endLine: lineOffset + paraLines - 1 })
+      chunks.push({ text, symbolPath: null, startLine: lineOffset, endLine: lineOffset + paraLines - 1 })
     }
     lineOffset += paraLines + 1  // +1 for blank line separator
   }
@@ -139,7 +139,7 @@ function byteOffsetToLine(offset: number, lineStarts: number[]): number {
   return lo + 1  // 1-based
 }
 
-export async function ingestFile(input: IngestFileInput, db = getDb()): Promise<IngestResult> {
+export async function ingestFile(input: IngestFileInput, db: Db = getDb()): Promise<IngestResult> {
   const { workspace_id, project_id, file_path, content, language } = input
 
   const lang = language?.toLowerCase()

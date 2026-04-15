@@ -9,7 +9,7 @@
 // External callers should use @fulcrum/memory for full pipeline writes.
 
 import { createHash } from 'crypto'
-import { getDb } from './db/client.js'
+import { getDb , Db} from './db/client.js'
 import { newId } from './ids.js'
 import type { MemoryKind, MemoryScope } from './types.js'
 
@@ -37,7 +37,7 @@ export interface LifecycleMemoryInput {
  */
 export async function writeLifecycleMemory(
   input: LifecycleMemoryInput,
-  db = getDb(),
+  db: Db = getDb(),
 ): Promise<void> {
   if (!input.content.trim()) return
 

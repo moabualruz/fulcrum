@@ -33,7 +33,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
-import { getDb } from './db/client.js'
+import { getDb , Db} from './db/client.js'
 import { getAgentDefinition, createAgentDefinition, updateAgentDefinition } from './agent-definitions.js'
 import { globalDataDir } from './db/client.js'
 import type { AgentRole, CreateAgentDefinitionInput } from './types.js'
@@ -62,7 +62,7 @@ const AGENT_DEF_GLOB = /^[a-z0-9_-]+\.agent\.json$/
  * Load agent definition files from a directory.
  * Returns the number of definitions created or updated.
  */
-function loadDir(dir: string, workspaceId: string, db = getDb()): number {
+function loadDir(dir: string, workspaceId: string, db: Db = getDb()): number {
   if (!existsSync(dir)) return 0
   let count = 0
   let entries: string[]
@@ -120,7 +120,7 @@ function loadDir(dir: string, workspaceId: string, db = getDb()): number {
 export function loadAgentDefsFromDir(
   startDir: string = process.cwd(),
   workspaceId = 'default',
-  db = getDb(),
+  db: Db = getDb(),
 ): number {
   let total = 0
   // 1. Committed project-level definitions (tracked in version control)

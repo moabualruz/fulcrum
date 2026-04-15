@@ -17,7 +17,7 @@
 //     failure instead of crashing at module load.
 
 import { spawn } from 'node:child_process'
-import { getDb, newId } from '@fulcrum/core'
+import { getDb, newId, Db} from '@fulcrum/core'
 import type { MemoryKind, MemoryScope } from '@fulcrum/core'
 import type { StepContext, StepResult, StepHandler } from './types.js'
 
@@ -119,7 +119,7 @@ HANDLERS['write_artifact'] = async (ctx) => {
   // require a file_path column and use status IN ('draft','final','archived').
   const c = cfg(ctx)
   if (!ctx.project_id) return { status: 'failed', error: 'write_artifact requires project_id' }
-  const db = getDb()
+  const db: Db = getDb()
   const artifact_id = newId('artifact')
   const now = new Date().toISOString()
 
@@ -154,7 +154,7 @@ HANDLERS['write_artifact'] = async (ctx) => {
 
 HANDLERS['read_artifact'] = async (ctx) => {
   const c = cfg(ctx)
-  const db = getDb()
+  const db: Db = getDb()
   const artifact_id = str(c['artifact_id'])
   if (!artifact_id) return { status: 'failed', error: 'read_artifact requires artifact_id' }
   const row = db.prepare(`SELECT * FROM artifacts WHERE artifact_id = ?`).get(artifact_id) as
@@ -276,7 +276,7 @@ HANDLERS['wait_for_task'] = async (ctx) => {
   const target_task_id = str(c['task_id'])
   const expected_status = str(c['status'], 'done')
   if (!target_task_id) return { status: 'failed', error: 'wait_for_task requires task_id' }
-  const db = getDb()
+  const db: Db = getDb()
   const row = db.prepare(`SELECT status FROM tasks WHERE task_id = ?`).get(target_task_id) as
     | { status: string }
     | undefined
@@ -295,7 +295,7 @@ HANDLERS['wait_for_review'] = async (ctx) => {
   const c = cfg(ctx)
   const target = str(c['target_id'], str(c['owner_id']))
   if (!target) return { status: 'failed', error: 'wait_for_review requires target_id' }
-  const db = getDb()
+  const db: Db = getDb()
   const row = db
     .prepare(
       `SELECT status FROM reviews WHERE target_id = ? ORDER BY created_at DESC LIMIT 1`,
@@ -314,7 +314,7 @@ HANDLERS['wait_for_artifact'] = async (ctx) => {
   if (!owner_id || !artifact_type) {
     return { status: 'failed', error: 'wait_for_artifact requires owner_id and artifact_type' }
   }
-  const db = getDb()
+  const db: Db = getDb()
   const row = db
     .prepare(
       `SELECT artifact_id FROM artifacts WHERE owner_id = ? AND artifact_type = ? LIMIT 1`,
@@ -393,7 +393,7 @@ HANDLERS['prompt_user'] = async () => {
 }
 
 HANDLERS['read_project'] = async (ctx) => {
-  const db = getDb()
+  const db: Db = getDb()
   if (!ctx.project_id) return { status: 'failed', error: 'read_project requires project_id' }
   const row = db.prepare(`SELECT * FROM projects WHERE project_id = ?`).get(ctx.project_id) as
     | Record<string, unknown>
@@ -407,7 +407,7 @@ HANDLERS['review_artifact'] = async (ctx) => {
   const c = cfg(ctx)
   const target_id = str(c['target_id'])
   if (!target_id) return { status: 'failed', error: 'review_artifact requires target_id' }
-  const db = getDb()
+  const db: Db = getDb()
   const review_id = newId('review')
   const display_id = `REV-${review_id.slice(-6)}`
   const now = new Date().toISOString()
@@ -584,7 +584,9 @@ HANDLERS['validate_schema'] = async (ctx) => {
       }, ctx.outputs)
     : c['data']
 
-  const { default: Ajv } = await import('ajv')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const AjvMod = await import('ajv') as any
+  const Ajv = AjvMod.default ?? AjvMod
   const ajv = new Ajv()
   const validate = ajv.compile(schema)
   const valid = validate(data)

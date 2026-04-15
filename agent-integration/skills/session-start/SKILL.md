@@ -1,12 +1,6 @@
 ---
 name: session-start
 description: Initialize a Fulcrum agent run at the start of every working session
-triggers:
-  - session opened
-  - new conversation started
-version: 1.0.0
-author: fulcrum
-user-invocable: false
 allowed-tools:
   - mcp__fulcrum__get_current_context
   - mcp__fulcrum__get_workspace_status

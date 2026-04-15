@@ -5,7 +5,7 @@
 // Delegates per-definition card building to buildA2ACard() in @fulcrum/core
 // so both call-sites produce spec-compliant cards from a single builder.
 
-import { getDb, listAgentDefinitions, buildA2ACard, A2A_PROTOCOL_VERSION } from '@fulcrum/core'
+import { getDb, listAgentDefinitions, buildA2ACard, A2A_PROTOCOL_VERSION, Db} from '@fulcrum/core'
 import type { A2ASkill } from '@fulcrum/core'
 
 /**
@@ -16,7 +16,7 @@ export function buildAgentCard(options: {
   baseUrl: string
   workspace_id?: string
 }): Record<string, unknown> {
-  const db = getDb()
+  const db: Db = getDb()
   const defs = listAgentDefinitions(undefined, options.workspace_id ?? 'default', db)
 
   // Collect skills from per-definition cards so each skill is spec-compliant

@@ -1,7 +1,7 @@
 {
   "name": "@fulcrum/monitor",
   "version": "0.0.1",
-  "description": "Real-time metrics dashboard — daily, project, and agent metrics, burndown data, HTTP monitoring server",
+  "description": "Real-time metrics dashboard \u2014 daily, project, and agent metrics, burndown data, HTTP monitoring server",
   "keywords": [
     "metrics",
     "monitoring",
@@ -20,7 +20,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsup src/index.ts --format esm --dts --clean"
+    "build": "tsup"
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",

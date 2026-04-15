@@ -1,8 +1,8 @@
 // packages/memory/src/entities.ts
-import { getDb, FulcrumError } from '@fulcrum/core'
+import { getDb, FulcrumError, Db} from '@fulcrum/core'
 import type { MemoryEntity, LinkMemoryToEntityInput } from './types.js'
 
-export async function linkMemoryToEntity(input: LinkMemoryToEntityInput, db = getDb()): Promise<MemoryEntity> {
+export async function linkMemoryToEntity(input: LinkMemoryToEntityInput, db: Db = getDb()): Promise<MemoryEntity> {
   const { memory_id, entity_type, entity_id, relation_type = 'subject_of' } = input
 
   // Verify memory exists
@@ -26,7 +26,7 @@ export async function linkMemoryToEntity(input: LinkMemoryToEntityInput, db = ge
   }
 }
 
-export async function getMemoryEntities(memory_id: string, db = getDb()): Promise<MemoryEntity[]> {
+export async function getMemoryEntities(memory_id: string, db: Db = getDb()): Promise<MemoryEntity[]> {
   const rows = db.prepare(
     'SELECT * FROM memory_entities WHERE memory_id = ?'
   ).all(memory_id) as Record<string, unknown>[]

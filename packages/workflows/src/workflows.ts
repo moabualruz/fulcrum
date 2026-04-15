@@ -1,5 +1,5 @@
 // packages/workflows/src/workflows.ts
-import { getDb, nextDisplayId, newId } from '@fulcrum/core'
+import { getDb, nextDisplayId, newId, Db} from '@fulcrum/core'
 import { registry } from './registry.js'
 import { nextReadySteps, initStepStates, computeStatusCategory } from './engine.js'
 import type {
@@ -40,7 +40,7 @@ function rowToRun(row: Record<string, unknown>): WorkflowRun {
   }
 }
 
-function fetchRun(wf_id: string, workspace_id: string, db = getDb()): WorkflowRun {
+function fetchRun(wf_id: string, workspace_id: string, db: Db = getDb()): WorkflowRun {
   const row = db.prepare(`SELECT * FROM workflow_runs WHERE wf_id = ? AND workspace_id = ?`).get(wf_id, workspace_id) as Record<string, unknown> | undefined
   if (!row) throw new Error(`workflow run not found: ${wf_id}`)
   return rowToRun(row)
@@ -70,7 +70,7 @@ function deriveWorkflowStatus(
 
 // ── public API ─────────────────────────────────────────────────────────────
 
-export async function startWorkflow(input: StartWorkflowInput, db = getDb()): Promise<WorkflowRun> {
+export async function startWorkflow(input: StartWorkflowInput, db: Db = getDb()): Promise<WorkflowRun> {
   const def = registry.getDefinition(input.workflow_name)
   if (!def) throw new Error(`workflow not found: ${input.workflow_name}`)
   const wf_id = newId('wf')
@@ -121,7 +121,7 @@ export async function startWorkflow(input: StartWorkflowInput, db = getDb()): Pr
   return fetchRun(wf_id, input.workspace_id, db)
 }
 
-export async function stepWorkflow(input: StepWorkflowInput, db = getDb()): Promise<WorkflowRun> {
+export async function stepWorkflow(input: StepWorkflowInput, db: Db = getDb()): Promise<WorkflowRun> {
   const run = fetchRun(input.wf_id, input.workspace_id, db)
   const def = registry.getDefinition(run.workflow_name)
   if (!def) throw new Error(`workflow definition not found: ${run.workflow_name}`)
@@ -192,7 +192,7 @@ export async function stepWorkflow(input: StepWorkflowInput, db = getDb()): Prom
   return fetchRun(input.wf_id, input.workspace_id, db)
 }
 
-export async function resumeWorkflow(input: ResumeWorkflowInput, db = getDb()): Promise<WorkflowRun> {
+export async function resumeWorkflow(input: ResumeWorkflowInput, db: Db = getDb()): Promise<WorkflowRun> {
   const run = fetchRun(input.wf_id, input.workspace_id, db)
   const def = registry.getDefinition(run.workflow_name)
   if (!def) throw new Error(`workflow definition not found: ${run.workflow_name}`)
@@ -236,15 +236,16 @@ export async function resumeWorkflow(input: ResumeWorkflowInput, db = getDb()): 
   return fetchRun(input.wf_id, input.workspace_id, db)
 }
 
-export async function cancelWorkflow(input: CancelWorkflowInput, db = getDb()): Promise<WorkflowRun> {
+export async function cancelWorkflow(input: CancelWorkflowInput, db: Db = getDb()): Promise<WorkflowRun> {
   const now = new Date().toISOString()
 
+  // Include workspace_id in WHERE clause to prevent cross-workspace cancellation (WORK-002).
   db.prepare(
     `UPDATE workflow_runs
      SET status = 'cancelled', status_category = 'done',
          error = ?, version = version + 1, updated_at = ?, completed_at = COALESCE(completed_at, ?)
-     WHERE wf_id = ?`
-  ).run(input.reason ?? null, now, now, input.wf_id)
+     WHERE wf_id = ? AND workspace_id = ?`
+  ).run(input.reason ?? null, now, now, input.wf_id, input.workspace_id)
 
   return fetchRun(input.wf_id, input.workspace_id, db)
 }
@@ -253,6 +254,6 @@ export async function listWorkflows(): Promise<WorkflowDefinition[]> {
   return registry.listAll()
 }
 
-export async function getWorkflowRun(input: GetWorkflowRunInput, db = getDb()): Promise<WorkflowRun> {
+export async function getWorkflowRun(input: GetWorkflowRunInput, db: Db = getDb()): Promise<WorkflowRun> {
   return fetchRun(input.wf_id, input.workspace_id, db)
 }

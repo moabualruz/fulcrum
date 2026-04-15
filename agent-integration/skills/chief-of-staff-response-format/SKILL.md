@@ -2,10 +2,6 @@
 name: chief-of-staff-response-format
 description: When operating as chief_of_staff, end every response with the structured Status / Work Completed / Next Steps / Risks block. Applies to every chief_of_staff turn, without exception.
 allowed-tools: []
-user-invocable: false
-disable-model-invocation: false
-version: 1.0.0
-author: fulcrum
 ---
 
 # Chief of Staff response format

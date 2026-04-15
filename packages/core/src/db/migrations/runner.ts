@@ -89,17 +89,16 @@ export function runMigrations(db: Database.Database): void {
   runM020(db)
   runM021(db)
 
-  // Migrations 022-027 use early-return semantics: if the migration was already
-  // applied, the original monolithic runMigrations() returned immediately,
-  // skipping all subsequent migrations. We preserve this behavior by having
-  // each of these functions return false when already done, causing the runner
-  // to exit early.
-  if (!runM022(db)) return
-  if (!runM023(db)) return
-  if (!runM024(db)) return
-  if (!runM025(db)) return
-  if (!runM026(db)) return
-  if (!runM027(db)) return
+  // Migrations 022-027 are idempotent via schema_migrations table (same as
+  // m028+). Run them unconditionally — each self-guards against re-application.
+  // The old early-return pattern was a bug: it caused m028–m048 to be silently
+  // skipped on any database upgraded past m022 (CORE-003).
+  runM022(db)
+  runM023(db)
+  runM024(db)
+  runM025(db)
+  runM026(db)
+  runM027(db)
 
   runM028(db)
   runM029(db)

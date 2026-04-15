@@ -2,7 +2,7 @@
 // CRUD for the agent_definitions table (MIGRATION_031).
 // Canonical per-role definitions: model, tools_allow/deny, executor_uri, A2A card.
 
-import { getDb } from './db/client.js'
+import { getDb , Db} from './db/client.js'
 import { newId } from './ids.js'
 import { FulcrumError } from './types.js'
 import type { AgentDefinition, CreateAgentDefinitionInput, UpdateAgentDefinitionInput } from './types.js'
@@ -28,7 +28,7 @@ function validateToolNames(list: string[] | null | undefined, field: string): vo
 function rowToDefinition(row: Record<string, unknown>): AgentDefinition {
   return {
     id: row.id as string,
-    workspace_id: (row.workspace_id as string) ?? 'default',
+    workspace_id: (row.workspace_id as string) ?? GLOBAL_WORKSPACE_ID,
     role: row.role as AgentDefinition['role'],
     display_name: row.display_name as string,
     description: row.description as string,
@@ -51,8 +51,11 @@ function rowToDefinition(row: Record<string, unknown>): AgentDefinition {
   }
 }
 
-export function createAgentDefinition(input: CreateAgentDefinitionInput, db = getDb()): AgentDefinition {
-  const workspace_id = input.workspace_id ?? 'default'
+/** Sentinel workspace_id shared by all built-in agent definitions (set by m043). */
+export const GLOBAL_WORKSPACE_ID = 'global'
+
+export function createAgentDefinition(input: CreateAgentDefinitionInput, db: Db = getDb()): AgentDefinition {
+  const workspace_id = input.workspace_id ?? GLOBAL_WORKSPACE_ID
   const existing = db.prepare('SELECT id FROM agent_definitions WHERE workspace_id = ? AND role = ?').get(workspace_id, input.role)
   if (existing) {
     throw new FulcrumError(`Agent definition for role '${input.role}' already exists`, 'conflict')
@@ -94,7 +97,7 @@ export function createAgentDefinition(input: CreateAgentDefinitionInput, db = ge
   return rowToDefinition(row)
 }
 
-export function getAgentDefinition(role: string, workspace_id = 'default', db = getDb()): AgentDefinition | null {
+export function getAgentDefinition(role: string, workspace_id = GLOBAL_WORKSPACE_ID, db: Db = getDb()): AgentDefinition | null {
   const row = db.prepare('SELECT * FROM agent_definitions WHERE workspace_id = ? AND role = ?').get(workspace_id, role) as Record<string, unknown> | undefined
   return row ? rowToDefinition(row) : null
 }
@@ -107,8 +110,8 @@ function bumpPatch(version: string): string {
   return `${parts[0]}.${parts[1]}.${isNaN(patch) ? 1 : patch + 1}`
 }
 
-export function updateAgentDefinition(input: UpdateAgentDefinitionInput, db = getDb()): AgentDefinition {
-  const workspace_id = input.workspace_id ?? 'default'
+export function updateAgentDefinition(input: UpdateAgentDefinitionInput, db: Db = getDb()): AgentDefinition {
+  const workspace_id = input.workspace_id ?? GLOBAL_WORKSPACE_ID
   const existing = db.prepare('SELECT * FROM agent_definitions WHERE workspace_id = ? AND role = ?').get(workspace_id, input.role) as Record<string, unknown> | undefined
   if (!existing) {
     throw new FulcrumError(`Agent definition for role '${input.role}' not found`, 'not_found')
@@ -153,7 +156,7 @@ export function updateAgentDefinition(input: UpdateAgentDefinitionInput, db = ge
   return rowToDefinition(row)
 }
 
-export function listAgentDefinitions(stability?: AgentDefinition['stability'], workspace_id = 'default', db = getDb()): AgentDefinition[] {
+export function listAgentDefinitions(stability?: AgentDefinition['stability'], workspace_id = GLOBAL_WORKSPACE_ID, db: Db = getDb()): AgentDefinition[] {
   const rows = stability
     ? (db.prepare('SELECT * FROM agent_definitions WHERE workspace_id = ? AND stability = ? ORDER BY role').all(workspace_id, stability) as Record<string, unknown>[])
     : (db.prepare('SELECT * FROM agent_definitions WHERE workspace_id = ? ORDER BY role').all(workspace_id) as Record<string, unknown>[])

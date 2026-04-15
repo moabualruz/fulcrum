@@ -325,7 +325,7 @@ describe('MonitorServer', () => {
   it.skipIf(!process.env.FULCRUM_SERVER_TESTS)(
     'starts and responds to GET /status',
     async () => {
-      const server = startMonitorServer({ port: 17331, workspace_id: 'ws_test' })
+      const server = startMonitorServer({ bypass_auth: true, port: 17331, workspace_id: 'ws_test' })
       await server.start()
 
       try {
@@ -345,7 +345,7 @@ describe('MonitorServer', () => {
 describe('MonitorServer — /tasks filter + pagination (in-process)', () => {
   it('GET /tasks returns 400 when workspace_id is missing and no config default', async () => {
     // Pass empty string so neither query param nor config default is available
-    const server = startMonitorServer({ workspace_id: '' })
+    const server = startMonitorServer({ bypass_auth: true, workspace_id: '' })
     const res = await server.fetch(new Request('http://localhost/tasks'))
     expect(res.status).toBe(400)
     const body = await res.json() as { error: string }
@@ -363,7 +363,7 @@ describe('MonitorServer — /tasks filter + pagination (in-process)', () => {
       `INSERT INTO tasks (task_id, workspace_id, project_id, title, status) VALUES (?, 'ws_test', 'proj_test', ?, ?)`
     ).run('t_done_2', 'Done Task 2', 'done')
 
-    const server = startMonitorServer({ workspace_id: 'ws_test' })
+    const server = startMonitorServer({ bypass_auth: true, workspace_id: 'ws_test' })
     const res = await server.fetch(
       new Request('http://localhost/tasks?workspace_id=ws_test&status=done')
     )
@@ -381,7 +381,7 @@ describe('MonitorServer — /tasks filter + pagination (in-process)', () => {
       ).run(`t_pag_${i}`, `Pag Task ${i}`)
     }
 
-    const server = startMonitorServer({ workspace_id: 'ws_test' })
+    const server = startMonitorServer({ bypass_auth: true, workspace_id: 'ws_test' })
 
     // Page 1
     const res1 = await server.fetch(
@@ -415,7 +415,7 @@ describe('Pagination — /tasks endpoint', () => {
         ).run(`task_pag_${i}`, `Paginated Task ${i}`)
       }
 
-      const server = startMonitorServer({ port: 17332, workspace_id: 'ws_test' })
+      const server = startMonitorServer({ bypass_auth: true, port: 17332, workspace_id: 'ws_test' })
       await server.start()
 
       try {
@@ -486,10 +486,10 @@ describe('POST /policy/check — real evaluatePolicy engine (in-process)', () =>
   })
 
   it('allows a normal action for a non-L1 role', async () => {
-    const server = startMonitorServer({ workspace_id: 'ws_policy' })
+    const server = startMonitorServer({ bypass_auth: true, workspace_id: 'ws_policy' })
     const res = await server.fetch(new Request('http://localhost/policy/check', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         workspace_id: 'ws_policy',
         actor_id: 'pi/software_engineer',
@@ -498,29 +498,17 @@ describe('POST /policy/check — real evaluatePolicy engine (in-process)', () =>
         resource_id: 'src/main.ts',
       }),
     }))
-    // Auth is not enforced in unit test mode (no token file), so status should be 200 or 401
-    // We test the policy logic, so try without auth first (server may allow unauthenticated in test)
-    const body = await res.json() as { allowed?: boolean; error?: string }
-    // The engine defaults to allow for unknown actions with no DB rules
-    if (res.status === 200) {
-      expect(body.allowed).toBe(true)
-    } else {
-      // 401 means auth is active — acceptable, the point is the route is wired
-      expect(res.status).toBe(401)
-    }
+    // With bypass_auth, route is accessible. Engine defaults to allow for unknown actions.
+    expect(res.status).toBe(200)
+    const body = await res.json() as { allowed?: boolean }
+    expect(body.allowed).toBe(true)
   })
 
   it('denies invoke_team for non-L1 role via SYSTEM_INVARIANTS', async () => {
-    const server = startMonitorServer({ workspace_id: 'ws_policy' })
-
-    // We call server.fetch directly — auth middleware uses a token from globalDataDir()
-    // which doesn't exist in test, so we test through the in-process fetch without auth.
-    // The route has `auth` middleware; we test the logic by inspecting the deny result
-    // when auth header is provided with a wrong token (expect 401), confirming the route
-    // exists. For the policy logic itself, we verify via the fallback stub path.
+    const server = startMonitorServer({ bypass_auth: true, workspace_id: 'ws_policy' })
     const res = await server.fetch(new Request('http://localhost/policy/check', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer wrongtoken' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         workspace_id: 'ws_policy',
         actor_id: 'pi/software_engineer',
@@ -528,8 +516,10 @@ describe('POST /policy/check — real evaluatePolicy engine (in-process)', () =>
         action: 'invoke_team',
       }),
     }))
-    // With wrong token: 401
-    expect(res.status).toBe(401)
+    // SYSTEM_INVARIANT: invoke_team is always denied for non-L1 roles
+    expect(res.status).toBe(200)
+    const body = await res.json() as { allowed: boolean }
+    expect(body.allowed).toBe(false)
   })
 
   it('SYSTEM_INVARIANT: invoke_team denied for non-L1 regardless of DB rules', async () => {
@@ -609,13 +599,13 @@ describe('GET /.well-known/agent.json — A2A Agent Card', () => {
   })
 
   it('returns 200 with no auth header required', async () => {
-    const server = startMonitorServer({ workspace_id: 'ws_a2a' })
+    const server = startMonitorServer({ bypass_auth: true, workspace_id: 'ws_a2a' })
     const res = await server.fetch(new Request('http://localhost/.well-known/agent.json'))
     expect(res.status).toBe(200)
   })
 
   it('response has required A2A fields: name, skills, authentication.schemes', async () => {
-    const server = startMonitorServer({ workspace_id: 'ws_a2a' })
+    const server = startMonitorServer({ bypass_auth: true, workspace_id: 'ws_a2a' })
     const res = await server.fetch(new Request('http://localhost/.well-known/agent.json'))
     expect(res.status).toBe(200)
 
@@ -641,7 +631,7 @@ describe('GET /.well-known/agent.json — A2A Agent Card', () => {
       capabilities: ['code_generation', 'code_review'],
     }, a2aDb)
 
-    const server = startMonitorServer({ workspace_id: 'ws_a2a' })
+    const server = startMonitorServer({ bypass_auth: true, workspace_id: 'ws_a2a' })
     const res = await server.fetch(new Request('http://localhost/.well-known/agent.json'))
     const body = await res.json() as { skills: Array<{ id: string; name: string }> }
     expect(body.skills.length).toBeGreaterThanOrEqual(1)
@@ -654,7 +644,7 @@ describe('GET /.well-known/agent.json — A2A Agent Card', () => {
   })
 
   it('response follows A2A format with url, version, capabilities', async () => {
-    const server = startMonitorServer({ workspace_id: 'ws_a2a' })
+    const server = startMonitorServer({ bypass_auth: true, workspace_id: 'ws_a2a' })
     const res = await server.fetch(new Request('http://localhost/.well-known/agent.json'))
     const body = await res.json() as Record<string, unknown>
     expect(body).toHaveProperty('url')

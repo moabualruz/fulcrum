@@ -1,13 +1,6 @@
 ---
 name: heartbeat
 description: Send regular heartbeats to keep long-running agent runs alive
-triggers:
-  - any task expected to take more than 5 minutes
-  - long-running computation or build
-  - multi-step implementation task
-version: 1.0.0
-author: fulcrum
-user-invocable: false
 allowed-tools:
   - mcp__fulcrum__heartbeat_agent_run
 ---

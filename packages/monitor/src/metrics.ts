@@ -1,6 +1,6 @@
 // packages/monitor/src/metrics.ts
 import { ulid } from 'ulidx'
-import { getDb } from '@fulcrum/core'
+import { getDb, Db} from '@fulcrum/core'
 import type {
   DailyMetrics,
   ProjectMetrics,
@@ -73,7 +73,7 @@ export interface RollupDailyInput {
   date?: string // ISO date 'YYYY-MM-DD', defaults to today
 }
 
-export async function rollupDaily(input: RollupDailyInput, db = getDb()): Promise<void> {
+export async function rollupDaily(input: RollupDailyInput, db: Db = getDb()): Promise<void> {
   const d = input.date ?? new Date().toISOString().slice(0, 10)
   const dNext = new Date(d + 'T00:00:00.000Z')
   dNext.setUTCDate(dNext.getUTCDate() + 1)
@@ -162,7 +162,7 @@ export async function rollupDaily(input: RollupDailyInput, db = getDb()): Promis
   })
 }
 
-export async function recordDailyMetrics(input: DailyMetrics, db = getDb()): Promise<void> {
+export async function recordDailyMetrics(input: DailyMetrics, db: Db = getDb()): Promise<void> {
   const id = `adm_${ulid()}`
 
   db.prepare(`
@@ -200,7 +200,7 @@ export async function recordDailyMetrics(input: DailyMetrics, db = getDb()): Pro
   )
 }
 
-export async function getMetrics(input: GetMetricsInput, db = getDb()): Promise<Metrics> {
+export async function getMetrics(input: GetMetricsInput, db: Db = getDb()): Promise<Metrics> {
 
   let dailyQuery = `SELECT * FROM analytics_daily WHERE workspace_id = ?`
   const dailyParams: unknown[] = [input.workspace_id]
@@ -269,7 +269,7 @@ export async function getMetrics(input: GetMetricsInput, db = getDb()): Promise<
   return { daily, project }
 }
 
-export async function getBurndown(input: GetBurndownInput, db = getDb()): Promise<BurndownData> {
+export async function getBurndown(input: GetBurndownInput, db: Db = getDb()): Promise<BurndownData> {
 
   // One query: completions per day within the range
   const completions = db.prepare(`
@@ -327,7 +327,7 @@ export async function getBurndown(input: GetBurndownInput, db = getDb()): Promis
   }
 }
 
-export async function getAgentMetrics(input: GetAgentMetricsInput, db = getDb()): Promise<AgentMetrics[]> {
+export async function getAgentMetrics(input: GetAgentMetricsInput, db: Db = getDb()): Promise<AgentMetrics[]> {
 
   let query = `SELECT * FROM analytics_agent WHERE workspace_id = ?`
   const params: unknown[] = [input.workspace_id]
@@ -769,7 +769,7 @@ export function getForecasting(
 
 // ─── Original replayRun ───────────────────────────────────────────────────────
 
-export async function replayRun(input: ReplayRunInput, db = getDb()): Promise<RunReplay> {
+export async function replayRun(input: ReplayRunInput, db: Db = getDb()): Promise<RunReplay> {
 
   // Events table stores payload as JSON text; run_id is embedded in payload
   const rows = db.prepare(`

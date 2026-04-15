@@ -1,13 +1,6 @@
 ---
 name: escalate
 description: Escalate a blocked run to the chief_of_staff with a clear reason
-triggers:
-  - stuck on a problem
-  - cannot proceed without a decision
-  - ambiguous requirements
-version: 1.0.0
-author: fulcrum
-user-invocable: false
 allowed-tools:
   - mcp__fulcrum__block_agent_run
 ---

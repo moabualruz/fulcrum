@@ -1,7 +1,7 @@
 // packages/sync/src/schema.ts
-import type { Database } from 'better-sqlite3'
+import type { Db } from '@fulcrum/core'
 
-export function runMigration010(db: Database): void {
+export function runMigration010(db: Db): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS sync_states (
       sync_id          TEXT PRIMARY KEY,

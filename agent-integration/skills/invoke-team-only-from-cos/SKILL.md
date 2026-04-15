@@ -2,10 +2,6 @@
 name: invoke-team-only-from-cos
 description: Only chief_of_staff may call invoke_team. Applies whenever a non-CoS role is about to call mcp__fulcrum__invoke_team — escalate instead of attempting the call.
 allowed-tools: []
-user-invocable: false
-disable-model-invocation: false
-version: 1.0.0
-author: fulcrum
 ---
 
 # invoke_team is chief-of-staff only

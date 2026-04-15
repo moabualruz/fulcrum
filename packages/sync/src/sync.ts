@@ -1,5 +1,5 @@
 // packages/sync/src/sync.ts
-import { getDb } from '@fulcrum/core'
+import { getDb, Db} from '@fulcrum/core'
 import { checkSecrets } from '@fulcrum/policy'
 import { PlaneAPIClient } from './plane/client.js'
 import { PlaneSyncAdapter } from './plane/adapter.js'
@@ -34,7 +34,7 @@ function getOrCreateClient(): PlaneAPIClient {
   return _cachedClient
 }
 
-function buildManager(db = getDb()): SyncManager {
+function buildManager(db: Db = getDb()): SyncManager {
   const client = getOrCreateClient()
   const adapter = new PlaneSyncAdapter(client)
 
@@ -60,7 +60,7 @@ function buildManager(db = getDb()): SyncManager {
  *  5. Otherwise push via adapter, store external_id, mark synced.
  *  6. On detected remote conflict: record sync_conflict, set status='conflicted'.
  */
-export async function syncObject(input: SyncObjectInput, db = getDb()): Promise<SyncState> {
+export async function syncObject(input: SyncObjectInput, db: Db = getDb()): Promise<SyncState> {
   const manager = buildManager(db)
   return manager.syncObject(input)
 }
@@ -69,7 +69,7 @@ export async function syncObject(input: SyncObjectInput, db = getDb()): Promise<
  * Process the sync_queue in batches, honouring priority ordering.
  * Default batch size: 50.
  */
-export async function syncAll(input: SyncAllInput, db = getDb()): Promise<SyncResult> {
+export async function syncAll(input: SyncAllInput, db: Db = getDb()): Promise<SyncResult> {
   const manager = buildManager(db)
   return manager.syncAll(input)
 }
@@ -77,7 +77,7 @@ export async function syncAll(input: SyncAllInput, db = getDb()): Promise<SyncRe
 /**
  * Return the current SyncState for an object, or null if not registered.
  */
-export async function getSyncState(input: GetSyncStateInput, db = getDb()): Promise<SyncState | null> {
+export async function getSyncState(input: GetSyncStateInput, db: Db = getDb()): Promise<SyncState | null> {
   const manager = buildManager(db)
   return manager.getSyncState(input)
 }
@@ -89,7 +89,7 @@ export async function getSyncState(input: GetSyncStateInput, db = getDb()): Prom
  * - remote_wins → pulls the remote version via adapter.pull().
  * - manual      → clears conflict_state only; no automatic re-sync.
  */
-export async function resolveConflict(input: ResolveConflictInput, db = getDb()): Promise<SyncState> {
+export async function resolveConflict(input: ResolveConflictInput, db: Db = getDb()): Promise<SyncState> {
   const manager = buildManager(db)
   return manager.resolveConflict(input)
 }
@@ -98,7 +98,7 @@ export async function resolveConflict(input: ResolveConflictInput, db = getDb())
  * List all sync conflicts for a workspace, optionally filtered by target
  * and/or restricted to unresolved conflicts only.
  */
-export async function listConflicts(input: ListConflictsInput, db = getDb()): Promise<SyncConflict[]> {
+export async function listConflicts(input: ListConflictsInput, db: Db = getDb()): Promise<SyncConflict[]> {
   const manager = buildManager(db)
   return manager.listConflicts(input)
 }

@@ -28,8 +28,8 @@ export type {
   SchedulerConfig,
 } from './types.js'
 
-// Schema migration (used by CLI startup to ensure DB is up to date)
-export { runMigration006Teams } from './schema.js'
+// Schema migrations (used by CLI startup to ensure DB is up to date)
+export { runMigration006Teams, runMigration006TeamsHeartbeat } from './schema.js'
 
 // Team operations
 export {

@@ -3,9 +3,6 @@ name: block-when-stuck
 description: Call block_agent_run instead of guessing when you cannot proceed. Applies whenever you hit missing info, a failing dependency, ambiguous requirements, or a permission denial.
 allowed-tools:
   - mcp__fulcrum__block_agent_run
-user-invocable: false
-version: 1.0.0
-author: fulcrum
 ---
 
 # Block when stuck — do not guess

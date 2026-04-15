@@ -1,4 +1,4 @@
-import { getDb } from './db/client.js'
+import { getDb , Db} from './db/client.js'
 import { newId } from './ids.js'
 import { FulcrumError } from './types.js'
 import type { Workspace, WorkspaceStatus } from './types.js'
@@ -24,7 +24,7 @@ function rowToWorkspace(row: Record<string, unknown>): Workspace {
   }
 }
 
-export async function createWorkspace(input: CreateWorkspaceInput, db = getDb()): Promise<Workspace> {
+export async function createWorkspace(input: CreateWorkspaceInput, db: Db = getDb()): Promise<Workspace> {
   if (!input.name || !input.name.trim()) {
     throw new FulcrumError('name must not be empty', 'invalid_input')
   }
@@ -43,21 +43,21 @@ export async function createWorkspace(input: CreateWorkspaceInput, db = getDb())
   return rowToWorkspace(row)
 }
 
-export async function getWorkspace(workspace_id: string, db = getDb()): Promise<Workspace | null> {
+export async function getWorkspace(workspace_id: string, db: Db = getDb()): Promise<Workspace | null> {
   const row = db
     .prepare(`SELECT * FROM workspaces WHERE workspace_id = ?`)
     .get(workspace_id) as Record<string, unknown> | undefined
   return row ? rowToWorkspace(row) : null
 }
 
-export async function listWorkspaces(db = getDb()): Promise<Workspace[]> {
+export async function listWorkspaces(db: Db = getDb()): Promise<Workspace[]> {
   const rows = db
     .prepare(`SELECT * FROM workspaces ORDER BY created_at DESC, workspace_id DESC LIMIT 500`)
     .all() as Record<string, unknown>[]
   return rows.map(rowToWorkspace)
 }
 
-export async function updateWorkspace(input: UpdateWorkspaceInput, db = getDb()): Promise<Workspace> {
+export async function updateWorkspace(input: UpdateWorkspaceInput, db: Db = getDb()): Promise<Workspace> {
   const existing = await getWorkspace(input.workspace_id, db)
   if (!existing) {
     throw new FulcrumError(`workspace not found: ${input.workspace_id}`, 'not_found')

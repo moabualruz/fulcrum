@@ -4,7 +4,7 @@
 // Payload semantics: on endSpan, a provided payload is MERGED over the existing
 // payload (shallow {...current, ...new}). This lets callers attach start-time
 // metadata in startSpan and end-time metrics in endSpan without losing either.
-import { getDb } from '../db/client.js'
+import { getDb , Db} from '../db/client.js'
 import { newId } from '../ids.js'
 import type { TelemetrySpan } from '../types.js'
 import { getOtelTracer, payloadToAttributes, registerOtelSpan, popOtelSpan } from './otel.js'
@@ -38,7 +38,7 @@ function rowToSpan(row: Record<string, unknown>): TelemetrySpan {
   }
 }
 
-export async function startSpan(input: StartSpanInput, db = getDb()): Promise<TelemetrySpan> {
+export async function startSpan(input: StartSpanInput, db: Db = getDb()): Promise<TelemetrySpan> {
   const span_id = newId('span')
   let trace_id = span_id
   if (input.parent_span_id) {
@@ -79,7 +79,7 @@ export async function startSpan(input: StartSpanInput, db = getDb()): Promise<Te
   return rowToSpan(row)
 }
 
-export async function endSpan(input: EndSpanInput, db = getDb()): Promise<void> {
+export async function endSpan(input: EndSpanInput, db: Db = getDb()): Promise<void> {
   const now = new Date().toISOString()
   if (input.payload) {
     const existing = db.prepare(
@@ -113,7 +113,7 @@ export async function endSpan(input: EndSpanInput, db = getDb()): Promise<void> 
   }
 }
 
-export async function getTrace(trace_id: string, db = getDb()): Promise<TelemetrySpan[]> {
+export async function getTrace(trace_id: string, db: Db = getDb()): Promise<TelemetrySpan[]> {
   const rows = db.prepare(
     `SELECT * FROM trace_events WHERE trace_id = ? ORDER BY started_at ASC, span_id ASC`
   ).all(trace_id) as Record<string, unknown>[]

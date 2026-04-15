@@ -1,13 +1,6 @@
 ---
 name: search-memory
 description: Search agent memory before starting work to surface relevant prior knowledge
-triggers:
-  - starting any non-trivial task
-  - before writing code
-  - need context on prior decisions
-version: 1.0.0
-author: fulcrum
-user-invocable: false
 allowed-tools:
   - mcp__fulcrum__recall_memory
 ---

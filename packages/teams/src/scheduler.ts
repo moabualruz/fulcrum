@@ -1,5 +1,5 @@
 // packages/teams/src/scheduler.ts
-import type { Database } from 'better-sqlite3'
+import type { Db } from '@fulcrum/core'
 import type { ScheduleDecision, SchedulerConfig } from './types.js'
 
 const DEFAULTS: Required<SchedulerConfig> = {
@@ -12,7 +12,7 @@ const DEFAULTS: Required<SchedulerConfig> = {
 const ACTIVE_STATUSES = ["'created'", "'ready'", "'spawning'", "'running'", "'waiting'"].join(',')
 
 export function canStartTeam(
-  db: Database,
+  db: Db,
   input: {
     workspace_id: string
     project_id?: string

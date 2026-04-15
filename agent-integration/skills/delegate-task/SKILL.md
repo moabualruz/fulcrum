@@ -1,13 +1,6 @@
 ---
 name: delegate-task
 description: Create and assign a task to another agent role
-triggers:
-  - need to assign work to a specialist
-  - breaking down a large task
-  - parallel workstreams needed
-version: 1.0.0
-author: fulcrum
-user-invocable: true
 allowed-tools:
   - mcp__fulcrum__create_task
   - mcp__fulcrum__write_memory

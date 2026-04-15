@@ -135,7 +135,8 @@ export async function createASTChunker(): Promise<ASTChunker | null> {
   if (_parserInstance) return new ASTChunker(_parserInstance)
   try {
     // Dynamic import — web-tree-sitter is optional; if not present, fall back
-    const Parser = (await import('web-tree-sitter')).default
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const Parser = (await import('web-tree-sitter')).default as any
     await Parser.init()
     const parser = new Parser()
     // Attempt to load TypeScript grammar from the package
@@ -147,7 +148,7 @@ export async function createASTChunker(): Promise<ASTChunker | null> {
     const Language = await Parser.Language.load(grammarPath).catch(() => null)
     if (!Language) return null
     parser.setLanguage(Language)
-    _parserInstance = parser
+    _parserInstance = parser as TreeSitterParser
     return new ASTChunker(_parserInstance)
   } catch {
     return null

@@ -1,13 +1,6 @@
 ---
 name: worktree-merge
 description: Merge a completed worktree branch back to the base branch
-triggers:
-  - feature branch is ready
-  - code review approved
-  - ready to merge worktree
-version: 1.0.0
-author: fulcrum
-user-invocable: true
 allowed-tools:
   - mcp__fulcrum__get_workspace_status
   - mcp__fulcrum__write_memory

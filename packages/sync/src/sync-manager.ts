@@ -1,7 +1,7 @@
 // packages/sync/src/sync-manager.ts
 import { createHash } from 'node:crypto'
 import { ulid } from 'ulidx'
-import type { Database } from 'better-sqlite3'
+import type { Db } from '@fulcrum/core'
 import type {
   SyncState,
   SyncConflict,
@@ -106,7 +106,7 @@ function rowToConflict(row: ConflictRow): SyncConflict {
 
 export class SyncManager {
   constructor(
-    private db: Database,
+    private db: Db,
     private adapter: SyncAdapter,
     /** Optional hook called with serialised local_data before each push.  Throw to abort. */
     private beforePush?: (serialisedData: string) => void,

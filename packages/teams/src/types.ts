@@ -68,6 +68,7 @@ export interface TeamInstance {
   created_by_agent_id: string
   resolved_slots: Record<string, string[]>
   version: number
+  heartbeat_at?: string
   created_at: string
   updated_at: string
 }

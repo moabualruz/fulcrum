@@ -1,13 +1,6 @@
 ---
 name: list-agents
 description: Discover available agent roles and their capabilities before assigning work
-triggers:
-  - choosing which agent to assign a task to
-  - exploring available roles
-  - checking agent definitions
-version: 1.0.0
-author: fulcrum
-user-invocable: true
 allowed-tools:
   - mcp__fulcrum__list_agent_profiles
 ---

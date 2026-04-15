@@ -3,9 +3,6 @@ name: recall-before-writing
 description: Query the Fulcrum memory layer before writing new code, docs, or architectural decisions. Applies whenever you are about to produce novel output on a topic the project may have prior context on.
 allowed-tools:
   - mcp__fulcrum__recall_memory
-user-invocable: false
-version: 1.0.0
-author: fulcrum
 ---
 
 # Recall memory before writing

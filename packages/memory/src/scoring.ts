@@ -29,17 +29,14 @@ export function computeFreshness(updatedAt: string): number {
 }
 
 /**
- * Reciprocal Rank Fusion — k=60.
+ * Two-signal Reciprocal Rank Fusion (FTS5 + dense vector) — k=60.
  * Null rank means signal absent: uses penalty position 1000.
  *
- * Accepts an optional third signal (sparseRank) for the sparse vector
- * dot-product retrieval path (GAP-RAG-7). When present, the sparse score
- * adds an independent term-overlap signal to the FTS5+dense fusion.
+ * For the full 3-signal version (FTS5 + dense + sparse), use rrfScoreWithSparse.
  */
 export function rrfScore(
   ftsRank: number | null,
   vectorRank: number | null,
-  sparseRank: number | null = null,
 ): number {
   const k = 60
   const fts = ftsRank !== null ? 1 / (k + ftsRank) : 1 / (k + 1000)

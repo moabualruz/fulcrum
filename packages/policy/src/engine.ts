@@ -1,5 +1,5 @@
 // packages/policy/src/engine.ts
-import { getDb, FulcrumError, isL1, canMerge, newId, getAgentDefinition } from '@fulcrum/core'
+import { getDb, FulcrumError, isL1, canMerge, newId, getAgentDefinition , Db} from '@fulcrum/core'
 import { minimatch } from 'minimatch'
 import type { AgentRole } from '@fulcrum/core'
 import type {
@@ -9,12 +9,15 @@ import type {
 
 // Hardcoded SYSTEM_INVARIANTS — priority 1000, cannot be overridden by DB rules.
 // Each entry has a `check` function: returns true if this invariant should DENY.
+// db is forwarded from evaluatePolicy so invariants use the same DB connection
+// as the rest of the policy evaluation (POL-002 fix).
+type DbType = ReturnType<typeof getDb>
 interface SystemInvariant {
   name: string
   priority: 1000
   action: 'deny'
   rule_id: string    // synthetic ID used in PolicyDecision
-  check: (input: EvaluatePolicyInput) => boolean
+  check: (input: EvaluatePolicyInput, db: DbType) => boolean
 }
 
 export const SYSTEM_INVARIANTS: SystemInvariant[] = [
@@ -23,21 +26,21 @@ export const SYSTEM_INVARIANTS: SystemInvariant[] = [
     priority: 1000,
     action: 'deny',
     rule_id: 'SYSTEM:only_l1_invokes_teams',
-    check: (input) => input.action === 'invoke_team' && !isL1(input.actor_role as AgentRole),
+    check: (input, _db) => input.action === 'invoke_team' && !isL1(input.actor_role as AgentRole),
   },
   {
     name: 'only_integration_worker_merges',
     priority: 1000,
     action: 'deny',
     rule_id: 'SYSTEM:only_integration_worker_merges',
-    check: (input) => input.action === 'merge_worktree' && !canMerge(input.actor_role as AgentRole),
+    check: (input, _db) => input.action === 'merge_worktree' && !canMerge(input.actor_role as AgentRole),
   },
   {
     name: 'no_task_bypass',
     priority: 1000,
     action: 'deny',
     rule_id: 'SYSTEM:no_task_bypass',
-    check: (input) => input.action === 'start_run_without_task',
+    check: (input, _db) => input.action === 'start_run_without_task',
   },
   {
     // GAP-AGENTDEF-6: capability-based enforcement.
@@ -47,7 +50,8 @@ export const SYSTEM_INVARIANTS: SystemInvariant[] = [
     priority: 1000,
     action: 'deny',
     rule_id: 'SYSTEM:capability_required_for_action',
-    check: (input) => {
+    // db is passed via the outer evaluatePolicy call (POL-002 fix: no longer calls getDb() directly)
+    check: (input, db) => {
       // Map action → required capability
       const ACTION_CAPABILITY: Record<string, string> = {
         invoke_team:     'create_teams',
@@ -59,7 +63,6 @@ export const SYSTEM_INVARIANTS: SystemInvariant[] = [
 
       // Look up the agent definition for this workspace + role
       try {
-        const db = getDb()
         const def = getAgentDefinition(input.actor_role, input.workspace_id, db)
         if (!def) return false  // no definition → defer to other checks
         const caps: string[] = def.capabilities ?? []
@@ -74,7 +77,7 @@ export const SYSTEM_INVARIANTS: SystemInvariant[] = [
     priority: 1000,
     action: 'deny',
     rule_id: 'SYSTEM:chief_of_staff_no_direct_writes',
-    check: (input) => {
+    check: (input, _db) => {
       // Applies to all L1 roles (spec §4.1). chief_of_staff is currently
       // the only L1 role, but future L1 roles inherit the prohibition.
       if (!isL1(input.actor_role as AgentRole)) return false
@@ -159,10 +162,10 @@ function ruleMatches(rule: PolicyRule, input: EvaluatePolicyInput): boolean {
   return rule.matchers.some(m => matcherMatches(m, input))
 }
 
-export async function evaluatePolicy(input: EvaluatePolicyInput, db = getDb()): Promise<PolicyDecision> {
+export async function evaluatePolicy(input: EvaluatePolicyInput, db: Db = getDb()): Promise<PolicyDecision> {
   // Step 1: Check SYSTEM_INVARIANTS first (cannot be overridden)
   for (const invariant of SYSTEM_INVARIANTS) {
-    if (invariant.check(input)) {
+    if (invariant.check(input, db)) {
       return {
         allowed: false,
         reason: invariant.name,
@@ -203,8 +206,23 @@ export async function evaluatePolicy(input: EvaluatePolicyInput, db = getDb()): 
   return { allowed: true, action: 'allow' }
 }
 
-export async function createPolicyRule(input: CreatePolicyRuleInput, db = getDb()): Promise<PolicyRule> {
+export async function createPolicyRule(input: CreatePolicyRuleInput, db: Db = getDb()): Promise<PolicyRule> {
   if (!input.name.trim()) throw new FulcrumError('name must not be empty', 'invalid_input')
+
+  // Validate regex matchers at creation time to prevent ReDoS (POL-001).
+  for (const m of input.matchers ?? []) {
+    if (m.matcher_type === 'regex') {
+      if (m.pattern.length > 256) {
+        throw new FulcrumError('regex pattern exceeds 256-character limit', 'invalid_input')
+      }
+      try {
+        new RegExp(m.pattern)
+      } catch {
+        throw new FulcrumError(`invalid regex pattern: ${m.pattern}`, 'invalid_input')
+      }
+    }
+  }
+
   const rule_id = newId('policy')
   const now = new Date().toISOString()
   const priority = input.priority ?? 100
@@ -231,7 +249,7 @@ export async function createPolicyRule(input: CreatePolicyRuleInput, db = getDb(
   return rowToRule(row)
 }
 
-export async function listPolicyRules(input: ListPolicyRulesInput, db = getDb()): Promise<PolicyRule[]> {
+export async function listPolicyRules(input: ListPolicyRulesInput, db: Db = getDb()): Promise<PolicyRule[]> {
   let sql = 'SELECT * FROM policy_rules WHERE 1=1'
   const params: unknown[] = []
   if (input.scope) { sql += ' AND scope = ?'; params.push(input.scope) }

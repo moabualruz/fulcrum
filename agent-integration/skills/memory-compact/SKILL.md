@@ -1,13 +1,6 @@
 ---
 name: memory-compact
 description: Compact and consolidate session memories before context window fills
-triggers:
-  - context approaching limit
-  - before session ends with accumulated knowledge
-  - pre-compact hook fires
-version: 1.0.0
-author: fulcrum
-user-invocable: true
 allowed-tools:
   - mcp__fulcrum__recall_memory
   - mcp__fulcrum__write_memory

@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from 'fs'
 import { dirname, join } from 'path'
-import { getDb, FulcrumError, newId, canMerge, emitEvent, type AgentRole } from '@fulcrum/core'
+import { getDb, FulcrumError, newId, canMerge, emitEvent, type AgentRole, Db} from '@fulcrum/core'
 import type {
   Worktree,
   MergeResult,
@@ -46,7 +46,7 @@ function rowToWorktree(row: Record<string, unknown>): Worktree {
  * Returns `null` if the project doesn't exist, has no path, or the path is
  * missing from disk.
  */
-function projectRootFor(project_id: string, db = getDb()): string | null {
+function projectRootFor(project_id: string, db: Db = getDb()): string | null {
   const row = db
     .prepare(`SELECT git_url FROM projects WHERE project_id = ?`)
     .get(project_id) as { git_url: string | null } | undefined
@@ -80,7 +80,7 @@ function ensureGitignoreEntry(projectRoot: string): void {
   }
 }
 
-export async function allocateWorktree(input: AllocateWorktreeInput, db = getDb()): Promise<Worktree> {
+export async function allocateWorktree(input: AllocateWorktreeInput, db: Db = getDb()): Promise<Worktree> {
   const worktree_id = newId('worktree')
   const now = new Date().toISOString()
 
@@ -179,7 +179,7 @@ export async function allocateWorktree(input: AllocateWorktreeInput, db = getDb(
  * project root itself, only the DB row is removed — we never delete the
  * project root.
  */
-export async function deallocateWorktree(input: { worktree_id: string }, db = getDb()): Promise<void> {
+export async function deallocateWorktree(input: { worktree_id: string }, db: Db = getDb()): Promise<void> {
   const row = db
     .prepare(`SELECT project_id, path FROM worktrees WHERE worktree_id = ?`)
     .get(input.worktree_id) as { project_id: string; path: string } | undefined
@@ -200,7 +200,7 @@ export async function deallocateWorktree(input: { worktree_id: string }, db = ge
   db.prepare(`DELETE FROM worktrees WHERE worktree_id = ?`).run(input.worktree_id)
 }
 
-export async function markDirty(input: MarkDirtyInput, db = getDb()): Promise<Worktree> {
+export async function markDirty(input: MarkDirtyInput, db: Db = getDb()): Promise<Worktree> {
   const now = new Date().toISOString()
 
   const current = db
@@ -226,7 +226,7 @@ export async function markDirty(input: MarkDirtyInput, db = getDb()): Promise<Wo
   return rowToWorktree(row)
 }
 
-export async function markReadyForMerge(input: MarkReadyInput, db = getDb()): Promise<Worktree> {
+export async function markReadyForMerge(input: MarkReadyInput, db: Db = getDb()): Promise<Worktree> {
   const now = new Date().toISOString()
 
   const current = db
@@ -252,7 +252,7 @@ export async function markReadyForMerge(input: MarkReadyInput, db = getDb()): Pr
   return rowToWorktree(row)
 }
 
-export async function enqueueMerge(input: EnqueueMergeInput, db = getDb()): Promise<void> {
+export async function enqueueMerge(input: EnqueueMergeInput, db: Db = getDb()): Promise<void> {
   // enqueueMerge is a no-op at the DB level — the worktree is already marked
   // ready_for_merge. This function exists so callers can set a priority hint
   // in the future. For now it validates the worktree exists and is in the
@@ -308,7 +308,7 @@ export interface ProcessMergeQueueResult {
  */
 function gateArtifactsSatisfied(
   worktree_id: string,
-  db = getDb(),
+  db: Db = getDb(),
 ): { ok: boolean; missing: string[] } {
   const review = db
     .prepare(
@@ -366,7 +366,7 @@ export async function processMergeQueue(
 export async function processMergeQueue(
   inputOrProjectId: ProcessMergeQueueInput | string,
   callerRole?: string,
-  db = getDb(),
+  db: Db = getDb(),
 ): Promise<ProcessMergeQueueResult> {
   const input: ProcessMergeQueueInput =
     typeof inputOrProjectId === 'string'
@@ -594,7 +594,7 @@ export async function processMergeQueue(
   return { merged, skipped, conflicts, results }
 }
 
-export async function discardWorktree(input: DiscardWorktreeInput, db = getDb()): Promise<void> {
+export async function discardWorktree(input: DiscardWorktreeInput, db: Db = getDb()): Promise<void> {
   const now = new Date().toISOString()
 
   const current = db
@@ -631,7 +631,7 @@ export interface CleanupAbandonedWorktreesInput {
  */
 export async function cleanupAbandonedWorktrees(
   input: CleanupAbandonedWorktreesInput = {},
-  db = getDb(),
+  db: Db = getDb(),
 ): Promise<number> {
   const ttl_sec = input.ttl_sec ?? 24 * 60 * 60 // default 24h
   const cutoff = new Date(Date.now() - ttl_sec * 1000).toISOString()
@@ -644,7 +644,7 @@ export async function cleanupAbandonedWorktrees(
   return result.changes
 }
 
-export async function listMergeQueue(projectId: string, db = getDb()): Promise<Worktree[]> {
+export async function listMergeQueue(projectId: string, db: Db = getDb()): Promise<Worktree[]> {
   const rows = db
     .prepare(`
       SELECT * FROM worktrees

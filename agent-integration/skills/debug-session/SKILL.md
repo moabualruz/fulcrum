@@ -1,13 +1,6 @@
 ---
 name: debug-session
 description: Structured approach to debugging a failing test or unexpected behavior
-triggers:
-  - test is failing
-  - unexpected runtime behavior
-  - error message not understood
-version: 1.0.0
-author: fulcrum
-user-invocable: true
 allowed-tools:
   - mcp__fulcrum__recall_memory
   - mcp__fulcrum__write_memory
