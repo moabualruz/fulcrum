@@ -13,6 +13,37 @@ function bodyHash(text: string): string {
   return createHash('sha256').update(text).digest('hex')
 }
 
+// GAP-RAG-3: Normalize code identifiers for FTS5 recall.
+//
+// FTS5's default tokenizer (unicode61) splits on whitespace and punctuation
+// but does NOT split camelCase or snake_case identifiers. A query for "user"
+// will not match "getUserById" or "user_profile_service".
+//
+// This function expands identifiers into separate tokens so FTS5 can match
+// any word within a compound identifier:
+//   getUserById         → "get User By Id"
+//   UserProfileService  → "User Profile Service"
+//   user_profile_svc    → "user profile svc"
+//   SCREAMING_SNAKE     → "SCREAMING SNAKE"
+//
+// Only applied to code-type memories (symbol, code, doc, diff) — prose
+// memories like 'fact' and 'decision' should be indexed as written.
+const CODE_KINDS = new Set<string>(['symbol', 'code', 'doc', 'diff'])
+
+export function normalizeCodeText(text: string): string {
+  return text
+    // Insert space before an uppercase letter that follows a lowercase letter (camelCase)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    // Insert space before an uppercase letter that starts a word in a sequence of caps followed by lower
+    // (e.g. "XMLParser" → "XML Parser", not "X M L Parser")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    // Replace underscores with spaces (snake_case, SCREAMING_SNAKE_CASE)
+    .replace(/_+/g, ' ')
+    // Collapse multiple spaces
+    .replace(/  +/g, ' ')
+    .trim()
+}
+
 export async function writeMemory(input: WriteMemoryInput, db = getDb()): Promise<FullMemory> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
   if (!input.content.trim()) throw new FulcrumError('content must not be empty', 'invalid_input')
@@ -53,7 +84,9 @@ export async function writeMemory(input: WriteMemoryInput, db = getDb()): Promis
     symbol_path: input.symbol_path ?? null,
     title: input.title,
     summary: input.summary,
-    canonical_text: input.canonical_text ?? input.content,
+    canonical_text: input.canonical_text ?? (
+      CODE_KINDS.has(input.kind) ? normalizeCodeText(input.content) : input.content
+    ),
     tags: input.tags ?? [],
     entities: input.entities ?? [],
     confidence: input.confidence ?? 1.0,
@@ -76,7 +109,7 @@ export async function writeMemory(input: WriteMemoryInput, db = getDb()): Promis
     if (vaultExists(vaultPath)) {
       const filePath = await writeMemoryFile(vaultPath, memoryForVault)
       const relPath = filePath.replace(vaultPath + '/', '')
-      const bodyContent = input.canonical_text ?? input.content
+      const bodyContent = memoryForVault.canonical_text
       upsertStateEntry(vaultPath, {
         id: memory_id,
         path: relPath,
@@ -112,7 +145,7 @@ export async function writeMemory(input: WriteMemoryInput, db = getDb()): Promis
     )
   `).run(
     memory_id, input.workspace_id, input.project_id ?? null,
-    input.scope, input.kind, input.title, input.summary, input.canonical_text ?? input.content,
+    input.scope, input.kind, input.title, input.summary, memoryForVault.canonical_text,
     input.content, JSON.stringify(input.tags ?? []), JSON.stringify(input.entities ?? []), input.confidence ?? 1.0, input.importance ?? 0.5,
     input.file_path ?? null, input.symbol_path ?? null, input.event_time ?? null, hash,
     input.task_id ?? null, input.issue_id ?? null, input.artifact_id ?? null, JSON.stringify(input.provenance_refs ?? []),

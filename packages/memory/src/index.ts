@@ -24,7 +24,7 @@ export { computeImportance, computeFreshness, rrfScore } from './scoring.js'
 export { contentHash, isDuplicate } from './dedup.js'
 
 // Write
-export { writeMemory, insertMemoryDirect } from './write.js'
+export { writeMemory, insertMemoryDirect, normalizeCodeText } from './write.js'
 
 // Entities
 export { linkMemoryToEntity, getMemoryEntities } from './entities.js'
