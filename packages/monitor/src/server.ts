@@ -608,8 +608,10 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.post('/runs/:id/complete', auth, async (c) => {
     try {
       const run_id = c.req.param('id')
-      const body = await c.req.json() as { workspace_id?: string; output_summary?: string; artifact_paths?: string }
-      const paths = (body.artifact_paths ?? '').split(',').map(p => p.trim()).filter(Boolean)
+      const body = await c.req.json() as { workspace_id?: string; output_summary?: string; artifact_paths?: string | string[] }
+      const rawPaths = body.artifact_paths ?? ''
+      const paths = Array.isArray(rawPaths) ? rawPaths.map(String).filter(Boolean)
+        : rawPaths.split(',').map(p => p.trim()).filter(Boolean)
       const run = await completeAgentRun({
         run_id,
         output_summary: body.output_summary ?? '',
@@ -663,14 +665,16 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     try {
       const body = await c.req.json() as {
         content: string; workspace_id: string; project_id: string
-        title?: string; tags?: string; scope?: string; kind?: string
+        title?: string; tags?: string | string[]; scope?: string; kind?: string
       }
       if (!body.content || !body.workspace_id || !body.project_id) {
         return c.json({ error: 'content, workspace_id, project_id are required' }, 400)
       }
       await ensureWorkspace(body.workspace_id)
       await ensureProject(body.workspace_id, body.project_id)
-      const tagList = body.tags ? body.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
+      const rawTags = body.tags
+      const tagList = Array.isArray(rawTags) ? rawTags.map(String).filter(Boolean)
+        : rawTags ? rawTags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
       const title = body.title ?? body.content.slice(0, 80)
       const memory = await writeMemory({
         content: body.content,

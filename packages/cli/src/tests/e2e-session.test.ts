@@ -56,6 +56,7 @@ describe('E2E session lifecycle — full hook sequence', () => {
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_e2e', project_id: 'proj_e2e', db_path: ':memory:' }),
+      globalDataDir: vi.fn().mockReturnValue('/tmp/fulcrum-test'),
     }))
     vi.doMock('fs', async () => {
       const actual = await vi.importActual<typeof import('fs')>('fs')
@@ -85,6 +86,7 @@ describe('E2E session lifecycle — full hook sequence', () => {
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_e2e', db_path: ':memory:' }),
+      globalDataDir: vi.fn().mockReturnValue('/tmp/fulcrum-test'),
     }))
     vi.doMock('fs', async () => {
       const actual = await vi.importActual<typeof import('fs')>('fs')
@@ -120,6 +122,7 @@ describe('E2E session lifecycle — full hook sequence', () => {
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_e2e', project_id: 'proj_e2e', db_path: ':memory:' }),
+      globalDataDir: vi.fn().mockReturnValue('/tmp/fulcrum-test'),
     }))
     vi.doMock('fs', async () => {
       const actual = await vi.importActual<typeof import('fs')>('fs')
@@ -161,6 +164,7 @@ describe('E2E session lifecycle — full hook sequence', () => {
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_chain', project_id: 'proj_chain', db_path: ':memory:' }),
+      globalDataDir: vi.fn().mockReturnValue('/tmp/fulcrum-test'),
     }))
     vi.doMock('fs', async () => {
       const actual = await vi.importActual<typeof import('fs')>('fs')
@@ -190,6 +194,7 @@ describe('E2E session lifecycle — full hook sequence', () => {
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_chain', db_path: ':memory:' }),
+      globalDataDir: vi.fn().mockReturnValue('/tmp/fulcrum-test'),
     }))
     vi.doMock('fs', async () => {
       const actual = await vi.importActual<typeof import('fs')>('fs')

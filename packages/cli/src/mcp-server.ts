@@ -77,7 +77,8 @@ const READ_ONLY_TOOLS = new Set(
 export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
   const server = new McpServer(
     { name: 'fulcrum', version: options.version },
-    { capabilities: { logging: {} } },
+    // Spec §Lifecycle.Capability Negotiation: declare all active features
+    { capabilities: { logging: {}, tools: {}, resources: {}, prompts: {} } },
   )
 
   for (const tool of TOOL_SCHEMAS) {
@@ -109,21 +110,13 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
       },
       async (args) => {
         // Validate with strict schema — reject unknown keys and wrong types.
+        // Spec §Tools.Error Handling: schema validation failures are protocol
+        // errors (throw), not execution errors (isError: true). isError is
+        // reserved for runtime failures AFTER successful validation.
         const parsed = strictSchema.safeParse(args)
         if (!parsed.success) {
-          return {
-            content: [{
-              type: 'text' as const,
-              text: JSON.stringify({
-                error: 'invalid_input',
-                details: parsed.error.issues.map(i => ({
-                  path: i.path.join('.'),
-                  message: i.message,
-                })),
-              }),
-            }],
-            isError: true,
-          }
+          const details = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')
+          throw new Error(`invalid_input: ${details}`)
         }
         try {
           const result = await options.handleToolCall(tool.name, parsed.data as Record<string, unknown>)
@@ -377,12 +370,56 @@ export async function runFulcrumMcpHttpServer(options: McpHttpServerOptions): Pr
     }
   }, 5 * 60 * 1000).unref()
 
+  // SECURITY NOTE: This server binds to 127.0.0.1 only (no network exposure by default).
+  // For any deployment accessible over a network, add bearer token middleware
+  // and implement /.well-known/oauth-protected-resource per RFC 9728.
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', `http://${host}`)
+
+    // Spec §Transports.Security: validate Origin to prevent DNS rebinding attacks.
+    // Reject any cross-origin request. Allow null (no-origin) and localhost origins.
+    const origin = req.headers['origin']
+    if (origin && origin !== 'null') {
+      let originHost: string
+      try { originHost = new URL(origin).hostname } catch { originHost = '' }
+      const isLocalhost = originHost === 'localhost' || originHost === '127.0.0.1' || originHost === '::1'
+      if (!isLocalhost) {
+        res.writeHead(403, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'Forbidden: invalid Origin header' }))
+        return
+      }
+    }
 
     if (url.pathname !== '/mcp') {
       res.writeHead(404, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'Not found. Use POST /mcp for MCP requests.' }))
+      return
+    }
+
+    // Spec §Transports.Protocol Version Header: validate MCP-Protocol-Version
+    // on non-initialize requests. Absent header is treated as 2025-03-26 (previous version).
+    const protocolVersion = req.headers['mcp-protocol-version']
+    const SUPPORTED_VERSIONS = new Set(['2025-11-25', '2025-03-26'])
+    if (protocolVersion && !SUPPORTED_VERSIONS.has(protocolVersion as string)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: `Unsupported MCP-Protocol-Version: ${protocolVersion}` }))
+      return
+    }
+
+    // Spec §Transports.Session Management: handle DELETE for client-initiated session termination
+    if (req.method === 'DELETE') {
+      const deleteSessionId = req.headers['mcp-session-id'] as string | undefined
+      if (deleteSessionId && sessions.has(deleteSessionId)) {
+        const entry = sessions.get(deleteSessionId)!
+        sessions.delete(deleteSessionId)
+        entry.server.close().catch(() => {})
+        res.writeHead(200)
+      } else if (deleteSessionId) {
+        res.writeHead(404)
+      } else {
+        res.writeHead(400)
+      }
+      res.end()
       return
     }
 

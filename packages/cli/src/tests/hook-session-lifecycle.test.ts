@@ -58,6 +58,7 @@ describe('runSessionStartHook', () => {
       getDb:          vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations:  vi.fn(),
       loadConfig:     vi.fn().mockReturnValue({ workspace_id: 'ws_test', project_id: 'proj_test', db_path: ':memory:' }),
+      globalDataDir:  vi.fn().mockReturnValue('/tmp/fulcrum-test'),
     }
   })
 
@@ -170,6 +171,7 @@ describe('runSessionStopHook', () => {
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_test', db_path: ':memory:' }),
+      globalDataDir: vi.fn().mockReturnValue('/tmp/fulcrum-test'),
     }))
     vi.doMock('fs', async () => {
       const actual = await vi.importActual<typeof import('fs')>('fs')
@@ -236,6 +238,7 @@ describe('runPreCompactHook', () => {
       getDb:         vi.fn().mockReturnValue({}),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_compact', project_id: 'proj_compact', db_path: ':memory:' }),
+      globalDataDir: vi.fn().mockReturnValue('/tmp/fulcrum-test'),
     }))
     vi.doMock('@fulcrum/memory', () => ({ writeMemory }))
 
@@ -259,6 +262,7 @@ describe('runPreCompactHook', () => {
       getDb:         vi.fn().mockReturnValue({}),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_alias', project_id: 'proj_alias', db_path: ':memory:' }),
+      globalDataDir: vi.fn().mockReturnValue('/tmp/fulcrum-test'),
     }))
     vi.doMock('@fulcrum/memory', () => ({ writeMemory }))
 

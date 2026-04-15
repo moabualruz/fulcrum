@@ -4,6 +4,8 @@
 import { runMemoryInit } from '@fulcrum/memory'
 import { activateL2 } from '@fulcrum/memory'
 import { runDoctor, printDoctorResults } from './doctor.js'
+import { globalDataDir } from '@fulcrum/core'
+import { discoverPlugins, registerPlugins } from './plugin-discovery.js'
 
 const [, , ...args] = process.argv
 const [group, command] = args
@@ -505,15 +507,7 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 
-/** Returns the global Fulcrum data directory (never project-local). */
-function globalDataDir(): string {
-  if (process.env['FULCRUM_DATA_DIR']) return process.env['FULCRUM_DATA_DIR']
-  const home = process.env['HOME'] ?? process.env['USERPROFILE'] ?? ''
-  if (process.platform === 'darwin') return join(home, 'Library', 'Application Support', 'fulcrum')
-  const xdg = process.env['XDG_DATA_HOME']
-  if (xdg) return join(xdg, 'fulcrum')
-  return join(home, '.local', 'share', 'fulcrum')
-}
+// globalDataDir is imported from @fulcrum/core (single canonical implementation)
 
 function getSessionFilePath(sessionId: string): string {
   const dir = join(globalDataDir(), 'sessions')
@@ -927,7 +921,9 @@ async function runServeMcp(): Promise<void> {
     if (name === 'write_memory') {
       ensureWorkspace(a['workspace_id'] as string)
       ensureProject(a['workspace_id'] as string, a['project_id'] as string)
-      const tagList = ((a['tags'] as string | undefined) ?? '').split(',').map(t => t.trim()).filter(Boolean)
+      const rawTags = a['tags']
+      const tagList = Array.isArray(rawTags) ? rawTags.map(String).filter(Boolean)
+        : ((rawTags as string | undefined) ?? '').split(',').map(t => t.trim()).filter(Boolean)
       const content = a['content'] as string
       const title = (a['title'] as string | undefined) ?? content.slice(0, 80)
       const memory = await writeMemory({
@@ -1009,7 +1005,9 @@ async function runServeMcp(): Promise<void> {
     }
 
     if (name === 'complete_agent_run') {
-      const paths = ((a['artifact_paths'] as string | undefined) ?? '').split(',').map(p => p.trim()).filter(Boolean)
+      const rawPaths = a['artifact_paths']
+      const paths = Array.isArray(rawPaths) ? rawPaths.map(String).filter(Boolean)
+        : ((rawPaths as string | undefined) ?? '').split(',').map(p => p.trim()).filter(Boolean)
       const run = await completeAgentRun({
         run_id: a['run_id'] as string,
         output_summary: (a['output_summary'] as string | undefined) ?? '',
@@ -2192,6 +2190,18 @@ async function ensureProjectInitialized(opts: { silent?: boolean } = {}): Promis
 // ── Main dispatch ─────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  // Discover and wire plugins from project node_modules + globalDataDir()/plugins/
+  // GAP-PLUGIN-1 fix: plugin-discovery.ts was fully implemented but never called.
+  try {
+    const plugins = discoverPlugins(process.cwd())
+    const registration = registerPlugins(plugins)
+    for (const hookModulePath of registration.hookModules) {
+      await import(hookModulePath)
+    }
+  } catch {
+    // Plugin discovery failure is non-fatal — continue without plugins
+  }
+
   if (!group || group === '--help' || group === '-h') usage()
 
   if (group === '--version' || group === '-v' || group === 'version') {

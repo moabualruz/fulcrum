@@ -152,7 +152,7 @@ export async function recallMemory(
     const embedder = getTextEmbedder()
     if (embedder) {
       try {
-        const queryVec = await embedder.embed(input.query)
+        const queryVec = await (embedder.embedQuery ?? embedder.embed.bind(embedder))(input.query)
 
         // Extract query entities
         const queryMentions = extractStructured(input.query, {})
@@ -209,7 +209,7 @@ export async function recallMemory(
   const embedder = getTextEmbedder()
   if (embedder) {
     try {
-      const queryVec = await embedder.embed(input.query)
+      const queryVec = await (embedder.embedQuery ?? embedder.embed.bind(embedder))(input.query)
       const raw = db.prepare(
         'SELECT rowid, row_number() OVER (ORDER BY distance) AS vecRank FROM vec_memories WHERE embedding MATCH ? ORDER BY distance LIMIT ?'
       ).all(Buffer.from(queryVec.buffer), limit * 3) as { rowid: number; vecRank: number }[]
@@ -276,7 +276,7 @@ export async function recallMemory(
           return {
             row: s.row,
             score: typeof rs === 'number' && Number.isFinite(rs)
-              ? Math.max(0, Math.min(1, rs))  // clamp logits to [0,1]
+              ? 1 / (1 + Math.exp(-rs))  // sigmoid: maps any logit to (0,1), preserves rank order
               : s.score,
           }
         })
