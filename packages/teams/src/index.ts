@@ -1,6 +1,51 @@
 // packages/teams/src/index.ts
-export * from './types.js'
-export * from './schema.js'
-export * from './teams.js'
+// Explicit named exports — avoids wildcard `export *` so tree-shaking works
+// and internal symbols don't accidentally become public API surface.
+
+// Types
+export type { AgentRole } from '@fulcrum/core'
+export { L1_ROLES } from '@fulcrum/core'
+export type {
+  TeamSlot,
+  CommunicationMode,
+  WorktreePolicy,
+  BudgetClass,
+  LatencyClass,
+  QualityClass,
+  TeamPolicy,
+  TeamTemplate,
+  TeamInstance,
+  TeamMember,
+  TeamStatus,
+  CreateTeamTemplateInput,
+  InvokeTeamInput,
+  HeartbeatTeamInput,
+  CompleteTeamInput,
+  ListTeamInstancesInput,
+  GetTeamStatusInput,
+  ScheduleCounts,
+  ScheduleDecision,
+  SchedulerConfig,
+} from './types.js'
+
+// Schema migration (used by CLI startup to ensure DB is up to date)
+export { runMigration006Teams } from './schema.js'
+
+// Team operations
+export {
+  createTeamTemplate,
+  invokeTeam,
+  heartbeatTeam,
+  completeTeam,
+  listTeamTemplates,
+  listTeamInstances,
+  getTeamStatus,
+  TeamInstanceHeartbeat,
+} from './teams.js'
+export type { ListTeamTemplatesInput } from './teams.js'
+
+// Scheduler
 export { canStartTeam } from './scheduler.js'
+
+// Factory (IoC wiring for core)
 export { createTeamOps } from './factory.js'

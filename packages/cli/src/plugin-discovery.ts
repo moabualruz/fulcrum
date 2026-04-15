@@ -4,6 +4,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join, resolve } from 'path'
+import { globalDataDir } from '@fulcrum/core'
 
 // ---------- Types ----------
 
@@ -26,39 +27,52 @@ export interface DiscoveredPlugin {
 // ---------- Discovery ----------
 
 /**
- * Scan the closest `node_modules` directory (walking up from `startDir`)
- * for packages that declare a top-level `"fulcrum"` key in their `package.json`.
+ * Scan two locations for Fulcrum plugins:
+ *  1. The closest `node_modules` directory (walking up from `startDir`) — project-local plugins
+ *  2. `globalDataDir()/plugins/` — globally installed plugins (e.g. via `fulcrum plugin install`)
  *
- * Returns a list of discovered plugins. Never throws — silently skips packages
- * that are malformed or unreadable.
+ * A package is a plugin if it declares a top-level `"fulcrum"` key with `"type": "plugin"`
+ * in its `package.json`.
+ *
+ * Returns a deduplicated list of discovered plugins. Never throws — silently skips
+ * packages that are malformed or unreadable.
  */
 export function discoverPlugins(startDir: string = process.cwd()): DiscoveredPlugin[] {
-  const nmDir = findNodeModules(startDir)
-  if (!nmDir) return []
-
   const plugins: DiscoveredPlugin[] = []
+  const seenRoots = new Set<string>()
 
-  let entries: string[]
-  try {
-    entries = readdirSync(nmDir)
-  } catch {
-    return []
-  }
+  function scanNodeModules(nmDir: string): void {
+    let entries: string[]
+    try { entries = readdirSync(nmDir) } catch { return }
 
-  for (const entry of entries) {
-    // Handle scoped packages (@org/pkg)
-    if (entry.startsWith('@')) {
-      let scoped: string[]
-      try { scoped = readdirSync(join(nmDir, entry)) } catch { continue }
-      for (const sub of scoped) {
-        const pkg = tryLoadPlugin(join(nmDir, entry, sub), `${entry}/${sub}`)
+    for (const entry of entries) {
+      if (entry.startsWith('@')) {
+        let scoped: string[]
+        try { scoped = readdirSync(join(nmDir, entry)) } catch { continue }
+        for (const sub of scoped) {
+          const root = join(nmDir, entry, sub)
+          if (seenRoots.has(root)) continue
+          seenRoots.add(root)
+          const pkg = tryLoadPlugin(root, `${entry}/${sub}`)
+          if (pkg) plugins.push(pkg)
+        }
+      } else {
+        const root = join(nmDir, entry)
+        if (seenRoots.has(root)) continue
+        seenRoots.add(root)
+        const pkg = tryLoadPlugin(root, entry)
         if (pkg) plugins.push(pkg)
       }
-    } else {
-      const pkg = tryLoadPlugin(join(nmDir, entry), entry)
-      if (pkg) plugins.push(pkg)
     }
   }
+
+  // 1. Project-local: closest node_modules walking up from startDir
+  const nmDir = findNodeModules(startDir)
+  if (nmDir) scanNodeModules(nmDir)
+
+  // 2. Global: globalDataDir()/plugins/ — individually-installed plugin packages
+  const globalPluginsDir = join(globalDataDir(), 'plugins')
+  if (existsSync(globalPluginsDir)) scanNodeModules(globalPluginsDir)
 
   return plugins
 }

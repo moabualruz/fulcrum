@@ -1,12 +1,12 @@
 // packages/memory/src/setup/wizard.ts
 import { createInterface } from 'readline'
-import { writeFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
+import { existsSync, mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { getVaultPath, initVault } from '../vault/client.js'
 import { createVaultGit } from '../vault/git.js'
 import { rebuildFromVault } from './rebuild.js'
 import { KuzuClient, setKuzuClient } from '../kuzu/client.js'
-import { globalDataDir } from '@fulcrum/core'
+import { globalDataDir, readRawConfig, writeRawConfig } from '@fulcrum/core'
 
 interface EmbeddingProviderSetup {
   provider: 'local' | 'ollama' | 'openai' | 'custom'
@@ -27,25 +27,6 @@ async function ask(rl: ReturnType<typeof createInterface>, question: string): Pr
   })
 }
 
-function getFulcrumConfigPath(): string {
-  return join(globalDataDir(), 'config.json')
-}
-
-function readFulcrumConfig(): Record<string, unknown> {
-  const configPath = getFulcrumConfigPath()
-  if (!existsSync(configPath)) return {}
-  try {
-    return JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>
-  } catch {
-    return {}
-  }
-}
-
-function writeFulcrumConfig(config: Record<string, unknown>): void {
-  const configPath = getFulcrumConfigPath()
-  mkdirSync(globalDataDir(), { recursive: true })
-  writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
-}
 
 async function setupEmbeddingProvider(rl: ReturnType<typeof createInterface>): Promise<EmbeddingProviderSetup | null> {
   console.log('\n  Requires an embedding model:\n')
@@ -124,8 +105,8 @@ export async function runMemoryInit(options?: { vaultPath?: string }): Promise<v
       return
     }
 
-    // Step 3: Write embedding config to ~/.fulcrum/config.json
-    const config = readFulcrumConfig()
+    // Step 3: Write embedding config to globalDataDir()/config.json
+    const config = readRawConfig()
     config['vault'] = { path: vaultPath, l2_enabled: true }
     config['embedding'] = {
       provider: embeddingSetup.provider,
@@ -134,7 +115,7 @@ export async function runMemoryInit(options?: { vaultPath?: string }): Promise<v
       rerankerModel: embeddingSetup.rerankerModel,
       apiKey: embeddingSetup.apiKey,
     }
-    writeFulcrumConfig(config)
+    writeRawConfig(config)
 
     // Step 4: Initialize Kuzu — always recreate to ensure schema matches configured dimensions
     const kuzuDbPath = join(globalDataDir(), 'kuzu')

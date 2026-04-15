@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import type { FulcrumConfig, PolicyConfig, EmbeddingProviderConfig } from './types.js'
 import { globalDataDir } from './db/client.js'
@@ -209,4 +209,30 @@ export function loadConfig(_projectRoot?: string): FulcrumConfig {
   }
 
   return merged
+}
+
+/**
+ * Read the raw JSON config object from globalDataDir()/config.json without
+ * validation. Returns an empty object if the file does not exist or is malformed.
+ * Use this when you need to read-then-patch the config (e.g. the memory wizard).
+ * Prefer `loadConfig()` when you need a fully-typed, validated FulcrumConfig.
+ */
+export function readRawConfig(): Record<string, unknown> {
+  const configPath = join(globalDataDir(), 'config.json')
+  if (!existsSync(configPath)) return {}
+  try {
+    return JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Write a raw config object to globalDataDir()/config.json.
+ * Creates the directory if it does not exist.
+ */
+export function writeRawConfig(config: Record<string, unknown>): void {
+  const dir = globalDataDir()
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'config.json'), JSON.stringify(config, null, 2), 'utf-8')
 }
