@@ -58,6 +58,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`packages/worker/README.md`** — `AgentAdapter` contract, built-in adapters, subprocess + stub usage.
 - **`docs/guides/skill-authoring.md`** — Complete guide to writing Fulcrum skills: frontmatter schema, body format, naming conventions, trigger phrase best practices, policy vs procedure skills, scripted pattern / `gen-claude-md.ts` integration.
 
+#### Round 2 audit fixes — MCP protocol compliance
+- **Per-tool `outputSchema`** — 11 tools now declare typed output schemas (`create_task`, `update_task`, `write_memory`, `get_agent_run_status`, `start_agent_run`, `heartbeat_agent_run`, `complete_agent_run`, `block_agent_run`, `build_cos_context`, `get_workspace_status`, `get_current_context`). All output fields are optional so mock handlers don't break validation. (GAP-MCP-5)
+- **`buildZodShape` typed array items** — `string[]`, `number[]`, and `object[]` item types now mapped correctly instead of silently degrading to `z.array(z.unknown())`. (GAP-MCP-6)
+- **JSON-RPC `-32602` validation errors** — MCP Zod parse failures now return `{ code: -32602, message: 'Invalid params: ...' }` instead of opaque `isError: true` responses. (GAP-MCP-8)
+- **Resource template `list: undefined` removed** — parameterized `ResourceTemplate` registrations no longer suppress resource discovery. (GAP-MCP-9)
+- **MCP middleware chain** — `Origin` header validation, `MCP-Protocol-Version` header check, and HTTP DELETE session termination handler added to the HTTP transport. (GAP-MCP-2, GAP-MCP-3, GAP-MCP-4)
+- **`tools.listChanged` capability** — `capabilities.tools` now declared as `{}` (not omitted), enabling client-side `listChanged` subscription. (GAP-MCP-14)
+- **Sampling capability** — `capabilities.sampling` declared; `createMessage` handler registered and routed to the `@fulcrum/worker` adapter. (GAP-MCP-13)
+- **`tags` / `artifact_paths` as arrays** — MCP tool schemas changed from comma-string to `array` type for `write_memory`, `complete_agent_run`. (GAP-MCP-12)
+
+#### Round 2 audit fixes — Skills
+- **`allowed-tools` in all 32 skills** — each skill frontmatter now declares exactly which MCP tools it reads/writes, so Claude Code can enforce per-skill tool grants. (GAP-SKILLS-3)
+- **`user-invocable` flag in all 32 skills** — 13 skills marked `user-invocable: true` (manual trigger OK); 19 marked `false` (auto-trigger only, never user-initiated). (GAP-SKILLS-6)
+- **`version` / `author` metadata** — all 32 skill files now carry `version: 1.0.0` and `author: fulcrum` frontmatter for drift detection. (GAP-SKILLS-5)
+- **`triggers` convention documented** — `docs/guides/skill-authoring.md` updated with formal trigger phrase convention; inconsistent `triggers` entries across skills normalised. (GAP-SKILLS-1)
+- **`$ARGUMENTS` / artifact contract** — 20 skills now declare an `## Arguments` section (accepted keys + types) and an `## Output` section (artifact path and structure). (GAP-SKILLS-2)
+- **End-to-end examples** — 12 skills with non-obvious output shapes now include a `## Examples` section with sample arguments and expected output. (GAP-SKILLS-8)
+- **`output_schema` wired** — `AgentDefinition.output_schema` populated for 8 roles from matched skill output contracts; `fulcrum doctor` gains a `checkSkillContracts` check that warns when roles with skills have no output schema. (GAP-SKILLS-7)
+- **System prompts for key roles** — `chief_of_staff`, `software_engineer`, `code_reviewer`, `qa_engineer`, `security_reviewer` now have non-null `system_prompt` in the seed data (migration m043). (GAP-SKILLS-4)
+- **`fulcrum skills install`** — new CLI command; symlinks `agent-integration/skills/` into `~/.claude/skills/` (or `.claude/skills/` with `--project`) so Claude Code auto-loads Fulcrum skills on next launch. `fulcrum skills list` prints installed skills with version. (GAP-SKILLS-9)
+
+#### Round 2 audit fixes — Agent definitions
+- **File-based agent definition loader** — `loadAgentDefsFromDir()` in `@fulcrum/core` syncs `*.agent.json` files from `agent-integration/agent-defs/`, `.fulcrum/agent-defs/`, and `globalDataDir()/agent-defs/` into the DB at startup. Project-local files take precedence; global files fill gaps. (GAP-AGENTDEF-5)
+- **Enriched role descriptions** — all 24 built-in roles updated with three-part descriptions (purpose / when to use / key outputs) via migration m047. Existing operator customisations are preserved (update only fires when description still matches original seed). (GAP-AGENTDEF-8)
+- **OpenAPI `securitySchemes`** — `A2AAgentCard.authentication` restructured to proper OpenAPI security scheme objects (`type`, `scheme`, `bearerFormat`) instead of a flat string array. (GAP-AGENTDEF-2)
+- **Consolidated A2A card builder** — two divergent `buildA2ACard` implementations merged into a single canonical builder with `examples`, `provider`, and all auth fields. (GAP-AGENTDEF-3)
+- **`protocolVersion` in A2AAgentCard** — field added to `AgentCard` type and populated by the card builder. (GAP-AGENTDEF-1)
+- **`allow_dispatch` flag** — `AgentDefinition` gains `allow_dispatch: boolean` column (migration m044); only definitions with `allow_dispatch: true` may be invoked via `start_agent_run`. (GAP-AGENTDEF-7)
+- **`iconUrl` in A2AAgentCard** — field wired from `AgentDefinition.icon_url` into the card builder output. (GAP-AGENTDEF-9)
+- **Workspace-scoped UNIQUE** — `agent_definitions` UNIQUE constraint changed from `(role)` to `(role, workspace_id)` (migration m045), enabling per-workspace definition overrides. (GAP-AGENTDEF-10)
+- **`capabilities` enforcement** — `capabilities` array entries checked against a known set at write time; capability → permission mapping documented in `docs/guides/capabilities.md`. (GAP-AGENTDEF-6)
+- **`A2ASkill.examples`** — `examples` field added to `A2ASkill` type and emitted by `buildA2ACard`. (GAP-AGENTDEF-4)
+
+#### Round 2 audit fixes — RAG / Memory
+- **`ASTChunker` wired into `ingestFile`** — code files now produce fine-grained chunk memories (function/class level) in addition to whole-file memories; chunks carry `file_path` + `symbol_path` for precise retrieval. (GAP-RAG-1)
+- **`embedQuery()` for queries** — recall pipeline uses the query-optimised embedding path instead of the document path, reducing asymmetric embedding bias. (GAP-RAG-2)
+- **camelCase FTS normalisation** — `normalizeCodeText()` expands code identifiers into separate tokens at write time (`getUserById` → `get User By Id`). Applied to `canonical_text` for `symbol`, `code`, `doc`, `diff` memories; prose memories unchanged. (GAP-RAG-3)
+- **Real cosine MMR** — `mmrDiversify()` in `@fulcrum/memory/kuzu` now computes actual cosine similarity between candidate embeddings instead of falling back to score ordering. (GAP-RAG-5)
+- **Sigmoid reranker logits** — cross-encoder logits converted with `sigmoid(x)` instead of hard-clamping to `[0,1]`, preserving rank ordering among high-quality results. (GAP-RAG-6)
+- **`offset` on `recall_memory`** — MCP tool and `recallMemory()` now accept an `offset` parameter for virtual context paging (MemGPT-style "memory window"). (GAP-RAG-8)
+- **Import/call-graph edges in Kuzu** — static analysis now emits `IMPORTS` and `CALLS` edges between `File` and `Symbol` nodes after AST chunking. (GAP-RAG-4)
+
+#### Round 2 audit fixes — Architecture
+- **`core` ↔ `teams` circular dep broken** — `TeamOps` interface injected via `setTeamOps()`/`getTeamOps()` IoC pattern; `@fulcrum/core` no longer imports from `@fulcrum/teams`. (GAP-ARCH-1)
+- **`policy` → `teams` layer violation fixed** — `@fulcrum/policy` resolves team membership through the `TeamOps` interface; direct `@fulcrum/teams` import removed. (GAP-ARCH-2)
+- **Hook types moved out of CLI** — `HookCli`, `HookPhase`, `HookContext`, etc. extracted into `packages/cli/src/hooks.ts`; CLI `index.ts` no longer exports library-level types directly. (GAP-ARCH-3)
+- **Wildcard `export *` replaced** — `@fulcrum/teams`, `@fulcrum/policy`, `@fulcrum/workflows` now use named exports only; no barrel `export *`. (GAP-ARCH-4)
+- **Config loading deduplication** — `@fulcrum/memory` config loader removed; memory package reads from `@fulcrum/core`'s `globalDataDir()` exclusively. (GAP-ARCH-7)
+- **Global plugin discovery** — plugin scanner now checks `globalDataDir()/plugins/` in addition to project `node_modules`; first match wins. (GAP-PLUGIN-5)
+- **Peer dependency runtime validation** — `fulcrum doctor` gains a `checkPeerDeps` check; startup emits a warning (not a crash) when an optional peer (`sqlite-vec`, `voyageai`, `openai`) is missing. (GAP-ARCH-9)
+- **`globalDataDir()` deduplicated** — `packages/cli/src/index.ts` inline copy removed; all callers import from `@fulcrum/core`. (GAP-ARCH-10)
+
+#### Round 2 audit fixes — Plugins
+- **Plugin management commands** — `fulcrum plugin install/update/remove/list` added to CLI; backed by `installPlugin()` / `removePlugin()` in `@fulcrum/core`. (GAP-PLUGIN-4)
+- **Plugin tool injection** — plugins with `contributes.tools` in their manifest are merged into `TOOL_SCHEMAS` at MCP server startup; operator-contributed tools appear alongside built-in tools. (GAP-PLUGIN-7)
+- **Plugin settings/secrets manifest** — `PluginManifest` gains `settings` (config key declarations) and `secrets` (secret key declarations) arrays. `fulcrum plugin install` prompts for secrets and writes them to `globalDataDir()/secrets/<plugin-id>/`. (GAP-PLUGIN-3)
+- **Inbound hook lifecycle** — Fulcrum runtime now fires its own `pre_tool_use` / `post_tool_use` hooks via `runPreHook`/`runPostHook` around every MCP tool invocation. (GAP-PLUGIN-2)
+
 ### Changed
 - `_configureDb` adds `synchronous = NORMAL` and `cache_size = -8000` pragmas (additive — no behavior regression).
 - `runJanitorCycle` runs `decayMemories` and `consolidateMemories` by default (opt-out with `runDecay: false` / `runConsolidate: false`).
