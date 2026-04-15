@@ -700,13 +700,60 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   })
 
   app.post('/policy/check', auth, async (c) => {
+    let body: EvaluatePolicyInput & { run_id?: string }
     try {
-      const body = await c.req.json() as {
-        action: string; resource: string; actor_id?: string
-        workspace_id?: string; actor_type?: string
+      body = await c.req.json() as EvaluatePolicyInput & { run_id?: string }
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500)
+    }
+
+    try {
+      // Identity resolution: if run_id is provided, look up authoritative role from DB.
+      // This prevents callers from spoofing their role via actor_id/actor_role.
+      let actor_id = body.actor_id
+      let actor_role = body.actor_role
+      if (body.run_id) {
+        try {
+          const run = await getAgentRunStatus({ run_id: body.run_id })
+          actor_id = run.agent_id || body.actor_id
+          actor_role = run.role
+        } catch {
+          // run not found — use caller-supplied identity as-is
+        }
       }
-      // TypeScript policy engine is WIP-limit based — always allow for tool-use checks
-      // unless the action is 'invoke_team' and the caller is not an L1 role
+
+      // If actor_role is not provided, derive it from actor_id (legacy format: "pi/<role>")
+      if (!actor_role) {
+        actor_role = (body.actor_id?.split('/')[1] ?? body.actor_id ?? '') as AgentRole
+      }
+
+      const input: EvaluatePolicyInput = {
+        ...body,
+        actor_id,
+        actor_role,
+      }
+
+      const decision = await evaluatePolicy(input)
+
+      // Log the policy event asynchronously — audit log failures must not affect the decision
+      logPolicyEvent({
+        workspace_id: body.workspace_id ?? '',
+        action: body.action,
+        matched: !decision.allowed,
+        actor_id: actor_id ?? '',
+        rule_id: decision.rule_id ?? undefined,
+        resource_type: body.resource_type,
+        resource_id: body.resource_id,
+        payload: body as unknown as Record<string, unknown>,
+      }).catch((logErr: unknown) => {
+        process.stderr.write(`[policy/check] logPolicyEvent failed: ${(logErr as Error).message}\n`)
+      })
+
+      return c.json({ allowed: decision.allowed, reason: decision.reason ?? '' })
+    } catch (err) {
+      // Policy engine error — fall back to the simple invariant check so callers
+      // still get the invoke_team guard even when the DB is unavailable.
+      process.stderr.write(`[policy/check] evaluatePolicy error, falling back to stub: ${(err as Error).message}\n`)
       const role = body.actor_id?.split('/')[1] ?? body.actor_id ?? ''
       const isTeamInvoke = body.action.includes('invoke_team') || body.action.includes('team_invoke')
       const callerIsL1 = isL1(role as AgentRole)
@@ -714,8 +761,6 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         return c.json({ allowed: false, reason: 'Only chief_of_staff may invoke teams' })
       }
       return c.json({ allowed: true, reason: '' })
-    } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
     }
   })
 
