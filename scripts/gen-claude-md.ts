@@ -42,8 +42,8 @@ export function spliceSection(original: string, generated: string): string {
   const startIdx = original.indexOf(START_MARKER)
   const endIdx = original.indexOf(END_MARKER)
 
-  if (startIdx === -1 || endIdx === -1) {
-    // Markers not present — append section at end
+  if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) {
+    // Markers not present or inverted — append section at end
     return original.trimEnd() + '\n\n' + START_MARKER + '\n\n' + generated + '\n\n' + END_MARKER + '\n'
   }
 
@@ -55,7 +55,7 @@ export function spliceSection(original: string, generated: string): string {
 export function spliceToolCount(original: string, toolCount: number): string {
   const startIdx = original.indexOf(COUNT_START)
   const endIdx = original.indexOf(COUNT_END)
-  if (startIdx === -1 || endIdx === -1) return original
+  if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) return original
 
   const before = original.slice(0, startIdx + COUNT_START.length)
   const after = original.slice(endIdx)

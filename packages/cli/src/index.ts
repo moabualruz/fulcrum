@@ -23,7 +23,7 @@ CONTROL PLANE
   memory rebuild       Rebuild L1 from L0 vault files
   memory status        Show vault path and layer status
 
-  serve mcp            Start MCP server (stdio JSON-RPC 2.0) — 13 control tools
+  serve mcp            Start MCP server (stdio JSON-RPC 2.0) + auto-starts monitor
   serve monitor        Start HTTP monitor + control API (default port 4721)
   serve all            Start both MCP and monitor servers
 
@@ -594,7 +594,7 @@ async function probeMonitor(url: string): Promise<boolean> {
   let running = false
   try {
     const resp = await fetch(url, { signal: AbortSignal.timeout(MONITOR_PROBE_TIMEOUT_MS) })
-    running = resp.status < 500
+    running = resp.ok
   } catch { /* timeout or connection refused = not running */ }
 
   _monitorProbeCache.set(url, { running, ts: now })
@@ -1058,7 +1058,7 @@ async function runServeMcp(): Promise<void> {
   if (!NO_MONITOR && !_monitorStarted) {
     try {
       const { startMonitorServer } = await import('@fulcrum/monitor')
-      const monitorPort = parseInt(process.env['FULCRUM_MONITOR_PORT'] ?? '4721', 10)
+      const monitorPort = parseInt(process.env['FULCRUM_MONITOR_PORT'] ?? '4721', 10) || 4721
       const monitorServer = startMonitorServer({
         port: monitorPort,
         workspace_id: config.workspace_id || undefined,

@@ -150,7 +150,7 @@ function recoveryHintFor(name: string): string | undefined {
     return `edit ~/.claude/settings.json manually, see agent-integration/claude/settings-hooks-snippet.json`;
   }
   if (name.includes("Regenerate CLAUDE.md")) {
-    return `manual: node --import tsx/esm scripts/gen-claude-md.ts`;
+    return `run: pnpm gen:claude-md`;
   }
   if (name.includes("Doctor gate")) {
     return `fix failing checks shown above, then re-run setup; or bypass with: FULCRUM_SETUP_NO_GATE=1 pnpm setup`;
@@ -1041,7 +1041,7 @@ async function writeSeedData(): Promise<void> {
       } catch { /* skip non-JSON */ }
     }
 
-    if (workspaceId) {
+    if (workspaceId && projectId) {
       const writeRequest = JSON.stringify({
         jsonrpc: "2.0", method: "tools/call", id: 3,
         params: {
