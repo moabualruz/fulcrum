@@ -373,13 +373,9 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
       mimeType: 'application/json',
     },
     async (uri, { workspace_id, task_id }) => {
-      // list_tasks filtered by title is the closest read we have for a single task;
-      // we pass task_id as a hint and return the full list entry.
-      const data = await options.handleToolCall('list_tasks', { workspace_id, limit: 1000 })
-      const tasks = (data as { tasks?: unknown[] }).tasks ?? (Array.isArray(data) ? data : [])
-      const task = (tasks as Array<{ id?: string; task_id?: string }>).find(
-        t => t.id === task_id || t.task_id === task_id,
-      ) ?? { error: 'not_found', task_id }
+      // CLI-005: point lookup — use get_task instead of fetching 1000 tasks
+      const data = await options.handleToolCall('get_task', { workspace_id, task_id })
+      const task = (data && typeof data === 'object') ? data : { error: 'not_found', task_id }
       const result = makeText(task)
       result.contents[0].uri = uri.toString()
       return result
@@ -609,10 +605,24 @@ export async function runFulcrumMcpHttpServer(options: McpHttpServerOptions): Pr
 
     if (!sessionEntry) {
       // New session: create server and transport, connect them once.
+      // CLI-006: pre-index the session synchronously inside sessionIdGenerator so
+      // there is no TOCTOU window between the response carrying the session ID
+      // and the server storing it in the map.
       const mcpServer = createFulcrumMcpServer(options)
+      const pendingEntry: { server: typeof mcpServer; transport: StreamableHTTPServerTransport; lastUsed: number } = {
+        server: mcpServer,
+        transport: null as unknown as StreamableHTTPServerTransport,
+        lastUsed: Date.now(),
+      }
       const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
+        sessionIdGenerator: () => {
+          const id = randomUUID()
+          // Index synchronously before response headers are written — closes the TOCTOU window.
+          sessions.set(id, pendingEntry)
+          return id
+        },
       })
+      pendingEntry.transport = transport
 
       // Clean up the session entry when transport closes.
       transport.onclose = () => {
@@ -622,23 +632,13 @@ export async function runFulcrumMcpHttpServer(options: McpHttpServerOptions): Pr
       }
 
       await mcpServer.connect(transport)
-
-      // The transport generates its session ID on the first initialize request.
-      // We store under a placeholder key until we can retrieve the real session ID
-      // after handleRequest writes the response headers.
-      sessionEntry = { server: mcpServer, transport, lastUsed: Date.now() }
+      sessionEntry = pendingEntry
     } else {
       sessionEntry.lastUsed = Date.now()
     }
 
     try {
       await sessionEntry.transport.handleRequest(req, res)
-
-      // After the first request the transport has a session ID — index it.
-      const sid = sessionEntry.transport.sessionId
-      if (sid && !sessions.has(sid)) {
-        sessions.set(sid, sessionEntry)
-      }
     } catch (err) {
       if (!res.headersSent) {
         res.writeHead(500, { 'Content-Type': 'application/json' })

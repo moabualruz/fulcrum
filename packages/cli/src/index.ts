@@ -354,7 +354,8 @@ export async function runSessionStartHook(): Promise<void> {
       .run(projId, wsId, projId, now)
 
     // CLI-012: read role from env var with software_engineer as fallback
-    const agentRole = process.env['FULCRUM_AGENT_ROLE'] ?? 'software_engineer'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const agentRole = (process.env['FULCRUM_AGENT_ROLE'] ?? 'software_engineer') as any
 
     const run = await startAgentRun({
       role: agentRole,
@@ -654,6 +655,21 @@ async function runServeMcp(): Promise<void> {
 
   async function handleToolCall(name: string, toolArgs: ToolArgs): Promise<unknown> {
     const a = toolArgs
+
+    if (name === 'get_task') {
+      // CLI-005: point lookup — avoids fetching 1000 tasks for a single task_id
+      const task = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(a['task_id'] as string) as Record<string, unknown> | undefined
+      if (!task) return { error: 'not_found', task_id: a['task_id'] }
+      return {
+        task_id: task['task_id'],
+        title: task['title'],
+        description: task['description'] ?? '',
+        status: task['status'],
+        priority: task['priority'],
+        assigned_to: task['assigned_to'] ?? '',
+        done_criteria: task['done_criteria'] ?? '',
+      }
+    }
 
     if (name === 'list_tasks') {
       const tasks = await listTasks({
@@ -1047,6 +1063,20 @@ async function runServeMcpHttp(): Promise<void> {
     const a = toolArgs
     if (name === 'get_workspace_status') {
       return await getWorkspaceStatus({ workspace_id: a['workspace_id'] as string })
+    }
+    if (name === 'get_task') {
+      // CLI-005: point lookup
+      const task = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(a['task_id'] as string) as Record<string, unknown> | undefined
+      if (!task) return { error: 'not_found', task_id: a['task_id'] }
+      return {
+        task_id: task['task_id'],
+        title: task['title'],
+        description: task['description'] ?? '',
+        status: task['status'],
+        priority: task['priority'],
+        assigned_to: task['assigned_to'] ?? '',
+        done_criteria: task['done_criteria'] ?? '',
+      }
     }
     if (name === 'list_tasks') {
       return await listTasks({
