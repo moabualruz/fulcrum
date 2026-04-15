@@ -9,6 +9,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Audit Round 3 (2026-04-15)
+
+Complete resolution of all findings from the third codebase audit across every package. 1308 tests pass (6 skipped).
+
+#### Security
+
+- **SEC-002 — `FULCRUM_CLAUDE_BIN` validation**: `findClaudeBin()` in the `claude-code` adapter now validates the override is an absolute path and is executable (`accessSync(path, X_OK)`) before using it.
+- **SEC-003 — `search_code` cwd path traversal**: `step-executor.ts` resolves the raw `cwd` config value with `realpathSync(resolve(rawCwd))` before passing it to the subprocess. Symlink traversal is now caught.
+- **SEC-005 — Plane API retry + error safety**: `PlaneAPIClient.fetchWithRetry` retries on 429 (respects `Retry-After`), 5xx (exponential backoff), and network errors (up to 3 attempts). Error messages expose only the HTTP status code, not response bodies.
+- **SEC-010 — `walkDir` depth cap**: `ingest.ts` limits directory traversal to 10 levels deep (`maxDepth = 10`) to prevent path-traversal or stack overflow on symlink loops.
+- **POL-001 — ReDoS guard**: policy engine regex validation rejects patterns with nested quantifiers (`([+*]...)[+*]`) in addition to the existing length (≤256) and parseability checks.
+- **POL-004 — `authorization_bearer` pattern**: new `Authorization: Bearer <token>` detector added to secret guard.
+- **POL-005 — `anthropic_api_key` / `openai_api_key` patterns**: named patterns for Anthropic (`sk-ant-api03-` + 80+ chars) and OpenAI (`sk-` or `sk-proj-` + 40+ chars) keys, placed before the generic `api_key` and `authorization_bearer` patterns so range-based deduplication preserves the specific match name.
+
+#### Memory
+
+- **MEM-001 — `recallScore` sparse signal**: `recallScore(ftsRank, vectorRank, freshness, sparseRank?)` now accepts an optional `sparseRank` and routes through `rrfScoreWithSparse` for 3-signal RRF when provided. The sparse path is a rescue-only signal — it only contributes for documents missed by FTS5 and dense vector, so it adds recall without displacing existing high-quality results.
+- **MEM-007 — shared `computeFreshness`**: `kuzu/query.ts` now imports and delegates to `computeFreshness` from `scoring.ts` instead of re-implementing the exponential decay inline. Both L1 and L2 layers now use the identical formula: `0.1 + 0.9 × exp(−ageDays / 130)`.
+- **MEM-009 — `EntityType` single definition**: `EntityType` union type defined once in `packages/memory/src/types.ts` and re-exported from `extractors/structured.ts`. `entity-store.ts` imports from `types.ts`.
+- **MEM-010 — `inferType` file path detection**: the entity type inference heuristic now detects file entities when the mention string contains a slash and ends with a file extension (`/\.\w+$/`), in addition to the `file_` prefix check.
+- **MEM-012 — VALID_EDGE_TYPES Cypher injection guard**: `pipeline.ts` validates Track 2 LLM-extracted edge types against a strict allowlist (`MENTIONS`, `PRODUCED_IN`, `RELATES_TO`, `DEPENDS_ON`, `IMPLEMENTS`) before interpolating them into Cypher queries. Unknown or unsupported edge types are silently skipped.
+- **MEM-013 — prose chunk overlap**: `PROSE_OVERLAP` in `ingest.ts` increased from 50 to 200 characters (~50 tokens at 4 chars/token), reducing context discontinuity at chunk boundaries.
+
+#### Policy
+
+- **POL-003 — audit log default limit**: `getAuditLog` now defaults to `LIMIT 100` instead of returning all rows.
+- **POL-008 — sync audit functions**: `logPolicyEvent` and `getAuditLog` changed from `async function … Promise<…>` to synchronous `function … void/PolicyEvent[]`. Both are pure SQLite calls with no async I/O, so the `async` was misleading and caused spurious promise allocations.
+- **POL-010 — range-based deduplication**: `checkSecrets` now deduplicates overlapping matches by keeping the earlier (more-specific) pattern and removing any later pattern whose range is fully contained. This prevents `authorization_bearer` from shadowing `anthropic_api_key` or `openai_api_key` when they appear in the same `Authorization: Bearer` header.
+
+#### Core
+
+- **CORE-004 — `rowToTaskBase` export**: `rowToTaskBase` is now exported from `@fulcrum/core`. `@fulcrum/planning` uses it instead of maintaining a duplicate conversion function.
+- **CORE-012 — ESM-safe `sqlite-vec` load**: `db/client.ts` uses `createRequire(import.meta.url)` to load the CJS `sqlite-vec` module from ESM, eliminating the bare `require()` call that broke under `"type": "module"`.
+- **CORE-013 — migration runner import**: `runner.ts` now imports m050 (sync queue index migration).
+
+#### Planning
+
+- **PLAN-003 — `blocking_issue_id`**: `Issue` type and `issues` table gain `blocking_issue_id: string | null`. `createIssue` and `updateIssue` accept and persist it.
+- **PLAN-005 — status transition validation**: `updateIssue` validates transitions through `ISSUE_TRANSITIONS` and rejects invalid state jumps with `FulcrumError { code: 'invalid_input' }`.
+- **PLAN-006 — `rowToTaskBase` from core**: `relations.ts` no longer duplicates the task-row-to-domain-object conversion; it imports `rowToTaskBase` from `@fulcrum/core`.
+- **PLAN-007 — `limit`/`offset` pagination**: `listIssues`, `listPlans`, and `listPRDs` all accept `limit` and `offset` parameters.
+
+#### Sync
+
+- **SYNC-010 — sync query functions are sync**: `getSyncState` and `listConflicts` are synchronous (no `async`/`await`) since they perform only SQLite reads.
+- **SYNC-012 — `sync_queue` index**: migration m050 adds `CREATE INDEX IF NOT EXISTS idx_sync_queue_sync_id ON sync_queue(sync_id)`.
+
+#### Workflows
+
+- **WORK-004 — `RetryPolicy` fields**: the workflow runner now reads `retryPolicy.maxAttempts`, `.initialDelayMs`, `.backoffMultiplier`, and `.maxDelayMs` from the step definition, falling back to `max_retries` + hard-coded defaults if the structured policy is absent.
+- **WORK-009 — registry duplicate guard**: `register()` emits a `process.stderr.write` warning when overwriting an existing definition with the same name but different version, and throws if the version differs.
+
+#### Monitor
+
+- **MON-015 — `project_id` null-safe filter**: `getMetrics` uses `(project_id = ? OR (? IS NULL AND project_id IS NULL))` so null project IDs are compared safely.
+- **MON-016 — `/replay/:run_id` delegation**: the route now calls the shared `replayRun()` helper instead of duplicating the SQL inline.
+- **MON-NEW — `replayRun` column aliases**: `replayRun` in `metrics.ts` aliases `evt_id AS event_id` and `evt_type AS event_type` to match the `RunReplay` contract (the events table uses `evt_id`/`evt_type`).
+- **MON-NEW — `MonitorServer.fetch`**: `startMonitorServer` now returns a `fetch(req): Promise<Response>` method that routes requests through the Hono app in-process, enabling unit tests without binding a TCP port.
+- **MON-NEW — `GET /tasks` pagination**: `/tasks` endpoint with `?workspace_id=`, `?status=`, `?limit=`, and `?offset=` query params; response: `{ data, pagination: { total, limit, offset, next_cursor } }`.
+- **MON-NEW — `POST /policy/check`**: evaluates a policy decision (`actor_id`, `actor_role`, `action`, optional `resource_id`) and returns `{ allowed, rule_id }`.
+- **MON-NEW — `GET /.well-known/agent.json`**: A2A Agent Card endpoint. Skills are derived from registered `AgentDefinition` capabilities via `CAPABILITY_SKILL_MAP`. Returns `{ name, version, url, description, skills, authentication: { schemes }, capabilities: { streaming, pushNotifications, stateTransitionHistory } }`.
+
+#### Architecture
+
+- **ARCH-001 — `composite: true` in all tsconfigs**: all 11 package `tsconfig.json` files have `composite: true` and `declarationMap: true`. `tsup.config.ts` files override with `composite: false` in the `dts` option to avoid tsup/tsbuildinfo conflicts.
+
+### Changed
+
+#### Documentation
+
+- README test badge: 1258 → **1308 passing**
+- README MCP tools count: 13 → **23 tools** (added team templates, agent definitions, agent profiles, `get_current_context`)
+- README database migrations: 33 → **52 migrations**
+- README L1 scoring formula: corrected from `importance × freshness × log(access_count)` to the actual three-signal RRF formula with freshness multiplier
+- README L2 retrieval stages: expanded to 7 stages with accurate stage numbers and edge type details
+- README monitor endpoints: added `/.well-known/agent.json` to the read endpoints table
+- README worker adapters: added `claude-code` adapter to the built-in adapters table
+- README policy invariants: added fifth invariant (`capability_required_for_action`), documented ReDoS guard
+- README sync: documented `PlaneAPIClient` retry behaviour
+- README env vars: added `FULCRUM_CLAUDE_BIN`, `FULCRUM_CLAUDE_TIMEOUT_MS`, `ANTHROPIC_API_KEY`, `TAVILY_API_KEY`, `SERPER_API_KEY`
+- README secret guard: updated pattern list to 12 named patterns with deduplication semantics
+
 ### Added
 
 #### Workflow step handlers

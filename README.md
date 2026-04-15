@@ -7,7 +7,7 @@ Fulcrum is the persistence, coordination, and execution layer that keeps agents 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20+%20FTS5-003B57?logo=sqlite)](https://sqlite.org/)
-[![Tests](https://img.shields.io/badge/tests-1258%20passing-brightgreen)](#running-tests)
+[![Tests](https://img.shields.io/badge/tests-1308%20passing-brightgreen)](#running-tests)
 [![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm)](https://pnpm.io/)
 
 ---
@@ -174,13 +174,13 @@ if (policy.allowed) {
 | [`@fulcrum/memory`](packages/memory) | Three-layer memory stack — L0 git vault, L1 FTS5 + scoring, L2 Kuzu graph + HNSW vector search |
 | [`@fulcrum/monitor`](packages/monitor) | Real-time metrics dashboard — daily/project/agent metrics, burndown, SSE event stream, HTTP control API |
 | [`@fulcrum/planning`](packages/planning) | Project planning domain — epics, issues, PRDs, plans, dependency graph, code review workflows |
-| [`@fulcrum/policy`](packages/policy) | Policy engine — 4 system invariants, custom rules, secret guard (9 patterns, auto-redact), audit log |
-| [`@fulcrum/sync`](packages/sync) | Bidirectional sync — Plane integration, conflict detection, secret scan before push, priority queue |
-| [`@fulcrum/teams`](packages/teams) | Agent team orchestration — typed templates, slot policies, communication and budget classes |
-| [`@fulcrum/worker`](packages/worker) | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess adapters, `spawnAgent` lifecycle with policy gate and span instrumentation |
-| [`@fulcrum/workflows`](packages/workflows) | Workflow engine — declarative step graphs, runner with retries/timeouts/backoff, 29 step handlers, run state machine |
+| [`@fulcrum/policy`](packages/policy) | Policy engine — 5 system invariants, custom rules, secret guard (12 named patterns, range-based dedup, auto-redact), audit log |
+| [`@fulcrum/sync`](packages/sync) | Bidirectional sync — Plane integration with retry/backoff, conflict detection, secret scan before push, priority queue |
+| [`@fulcrum/teams`](packages/teams) | Agent team orchestration — typed templates, slot policies, communication/budget/quality/latency classes |
+| [`@fulcrum/worker`](packages/worker) | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess + claude-code adapters, `spawnAgent` lifecycle with policy gate and span instrumentation |
+| [`@fulcrum/workflows`](packages/workflows) | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers, run state machine |
 | [`@fulcrum/worktrees`](packages/worktrees) | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, integration merge queue with `git merge --no-ff` and conflict handling |
-| [`@fulcrum/cli`](packages/cli) | `fulcrum` binary — 14 command groups, auto-init per project, hook handlers for Claude/Gemini/PI |
+| [`@fulcrum/cli`](packages/cli) | `fulcrum` binary — 14 command groups, 23 MCP tools, auto-init per project, hook handlers for Claude/Gemini/PI |
 
 ---
 
@@ -212,7 +212,7 @@ pnpm run setup:check      # Verify an existing install (symlink, MCP entry, hook
 | Target | Path | What it does |
 |--------|------|--------------|
 | CLI binary | `~/.local/bin/fulcrum` | Symlink to the wrapper that execs `node --import tsx/esm packages/cli/src/index.ts` |
-| Claude MCP | `claude mcp add --scope user` | Registers Fulcrum as a user-scope MCP server so every Claude project sees the 13 control-plane tools |
+| Claude MCP | `claude mcp add --scope user` | Registers Fulcrum as a user-scope MCP server so every Claude project sees the 23 control-plane tools |
 | Claude hook | `~/.claude/settings.json` | Merges a `PreToolUse` hook that runs `fulcrum hook claude` before any tool_use, enforcing `chief_of_staff_no_direct_writes` and logging a `hook_executed` event |
 | Gemini extension | `~/.gemini/extensions/fulcrum/` | Installs the extension manifest so Gemini CLI picks up Fulcrum automatically |
 | PI cockpit | `pi install` | Installs Fulcrum's PI extension (`packages/extension/index.ts`) as a PI cockpit |
@@ -242,7 +242,7 @@ fulcrum
 │   └── status          Show vault path and layer status
 │
 ├── serve
-│   ├── mcp             Start MCP server (stdio, JSON-RPC 2.0) — 13 control-plane tools
+│   ├── mcp             Start MCP server (stdio, JSON-RPC 2.0) — 23 control-plane tools
 │   ├── mcp-http        Start MCP server (HTTP, StreamableHTTP transport, default port 4722)
 │   ├── monitor         Start monitor + control API server (HTTP, default port 4721)
 │   └── all             Start both MCP and monitor servers
@@ -346,6 +346,38 @@ fulcrum serve all --port 4721
 fulcrum doctor            # human-readable PASS/WARN/FAIL report
 fulcrum doctor --json     # machine-readable JSON output
 ```
+
+---
+
+## MCP Tools Reference
+
+The MCP server (`fulcrum serve mcp`) exposes 23 tools over stdio JSON-RPC 2.0. All tool names are prefixed `mcp__fulcrum__` when used from Claude Code.
+
+| Tool | Description |
+|------|-------------|
+| `list_tasks` | List tasks filtered by workspace/project/status, with limit/offset pagination |
+| `create_task` | Create a queued task; auto-creates workspace/project on first use |
+| `update_task` | Update task status, note, assignee, priority, or labels (optimistic locking via `expected_version`) |
+| `recall_memory` | Hybrid FTS5 + vector search across L1/L2; supports `mode`, `scope`, `query_scope`, `session_id`, `offset` |
+| `write_memory` | Persist a memory to L0 vault + L1 SQLite, enqueue for L2 graph extraction |
+| `list_agent_profiles` | List all 24 canonical roles plus any workspace-scoped custom profiles |
+| `get_agent_run_status` | Fetch a run by `run_id` — status, role, task linkage, heartbeat timestamp |
+| `start_agent_run` | Start a run for a role + task; optionally dispatches a subprocess via the worker adapter |
+| `heartbeat_agent_run` | Update progress (`current_step`, `progress_pct`) to keep the run alive |
+| `complete_agent_run` | Mark a run completed with summary, artifact paths, and test counts |
+| `block_agent_run` | Mark a run blocked with a reason; triggers escalation if `escalation_reason` is set |
+| `build_cos_context` | Build a Chief-of-Staff world-state snapshot (active runs, queued tasks, blockers, recent events) |
+| `get_workspace_status` | Workspace-level health metrics — WIP counts, stale runs, blocked tasks |
+| `get_current_context` | Deterministic `workspace_id` + `project_id` from the current working directory — no config file read |
+| `create_team_template` | Create a global team template with typed slots and communication/budget/quality policy |
+| `invoke_team` | Instantiate a team from a template (L1 `chief_of_staff` only — policy-enforced) |
+| `list_team_templates` | List registered team templates (paginated) |
+| `list_team_instances` | List active team instances, optionally filtered by workspace or status |
+| `create_agent_profile` | Create a workspace-scoped agent profile (specialisation of a canonical role) |
+| `create_agent_definition` | Create a canonical role definition (model, `tools_allow`/`deny`, `executor_uri`, stability tier, system prompt) |
+| `get_agent_definition` | Fetch an `AgentDefinition` by role slug |
+| `update_agent_definition` | PATCH an `AgentDefinition` — any subset of fields |
+| `list_agent_definitions` | List definitions, optionally filtered by stability tier (`stable`/`experimental`/`deprecated`) |
 
 ---
 
@@ -531,15 +563,20 @@ The vault watcher detects human edits in Obsidian or any editor, validates requi
 
 ### L1 — FTS5 Full-Text Search (always on)
 
-Hybrid scoring formula applied to all FTS5 results:
+Three-signal hybrid recall using Reciprocal Rank Fusion (RRF, k=60):
 
 ```
-score = importance × freshness × log(1 + access_count)
+rrf_score   = 1/(k + fts_rank) + 1/(k + dense_rank) + sparse_rescue_term
+recall_score = rrf_score × freshness
+freshness   = 0.1 + 0.9 × exp(−ageDays / 130)   ← 90-day half-life, floor 0.1
 ```
 
+- **Dense vector**: local ONNX embedder (Qwen3-Embedding-0.6B or bge-m3)
+- **Sparse vector**: BM25-style query/document prefix scoring (rescue path only — adds recall for documents missed by FTS5/dense without displacing existing results)
+- **FTS5 fallback**: LIKE scan when the FTS5 parse fails (e.g., unterminated strings)
 - Content deduplication by SHA-256 hash
-- Cross-workspace scope (with related-workspace affinity boost)
-- Graceful FTS5 fallback to LIKE on SQLite parse errors (e.g., unterminated strings)
+- Cross-workspace scope with related-workspace affinity boost
+- `mode: 'compact'` (default, 8 results) or `'total_ranked'` (20 results) with `offset` pagination
 
 ### L2 — Kuzu Graph + HNSW Vector Search (opt-in)
 
@@ -547,18 +584,18 @@ score = importance × freshness × log(1 + access_count)
 fulcrum memory accelerate  # enables L2 and rebuilds from vault
 ```
 
-Six-stage retrieval pipeline:
+Seven-stage retrieval pipeline:
 
 | Stage | What happens |
 |-------|-------------|
-| 0 | Expand related workspace IDs via entity graph |
-| 1 | Extract query entities (structured + semantic extraction) |
-| 2 | HNSW seed: top-40 vector candidates with NOT EXISTS superseded filter |
-| 3 | 1-hop graph expansion from seed entities |
-| 4 | 2-hop entity-entity traversal (hot entities >1000 mentions penalised 10×) |
-| 4.5 | Filter superseded memories via `UPDATES` edges |
-| 5 | Fused scoring: `1.0×vscore + 0.8×graphScore + 0.3×importance + 0.2×recency + 0.25×workspace_affinity − 0.6×contradiction_penalty` |
-| 6 | MMR diversification (λ=0.7) |
+| 0 | Expand related workspace IDs via entity-scope graph |
+| 2 | HNSW vector seed — top-40 candidates, `NOT EXISTS superseded` filter inline |
+| 3 | 1-hop graph expansion from query entities via `ABOUT/CRITIQUES/AVOIDS/MENTIONS/USES` edges |
+| 4 | 2-hop entity-entity traversal (`RELATED_TO/PART_OF/IS_A`); hot entities >1000 mentions penalised 10× |
+| 4.5 | Remove superseded memories via `UPDATES` edges across all candidates |
+| 5 | Contradiction penalty: memories with an incoming `CONTRADICTS` edge penalised −0.6 |
+| Fuse | `1.0×vscore + 0.8×graphScore + 0.3×importance + 0.2×recency + 0.25×workspace_affinity − 0.6×contradiction` |
+| 6 | MMR diversification (λ=0.7) with cosine similarity on retrieved embeddings |
 
 **Activation (via rebuild):**
 
@@ -667,6 +704,8 @@ Team scheduling caps: global (8 concurrent), per-project (4), per-template (2). 
 ```typescript
 import { registerWorkflow } from '@fulcrum/workflows'
 
+// Re-registering the same name+version is a no-op.
+// Re-registering the same name with a different version logs a warning and throws.
 registerWorkflow({
   name: 'implement_feature',
   version: '1.0',
@@ -709,7 +748,7 @@ Under the hood, the runner:
 1. Loads the run + step defs from `workflow_runs` (steps stored as JSON in the `steps` column)
 2. Computes the set of currently-ready steps via `nextReadySteps()`
 3. Executes each ready step through `executeStep()` with a timeout race
-4. Retries failures up to `max_retries` with exponential backoff (1s, 2s, 4s, 8s, capped at 30s)
+4. Retries failures using the step's `retryPolicy` (`maxAttempts`, `initialDelayMs`, `backoffMultiplier`, `maxDelayMs`) or falls back to the definition's `max_retries` field with a 1s initial delay, 2× multiplier, 30s cap
 5. Persists step state after every transition
 6. Emits `workflow.run` and `workflow.step` spans for telemetry
 7. Terminates with `completed`, `blocked`, or `failed`
@@ -789,8 +828,9 @@ Adapters never touch `@fulcrum/core` directly — they just describe how to run 
 
 | Name | When to use | Configuration |
 |------|-------------|---------------|
-| `stub` | Tests and local dev. Reads canned `WorkerResult` JSON so tests can seed deterministic results. | `FULCRUM_AGENT_STUB_DIR` — a directory where `<run_id>.json` holds a canned result |
-| `subprocess` | Running any external CLI (Claude, Gemini, PI, a custom script) as a Fulcrum agent. Parses `WorkerResult` JSON from stdout; non-JSON stdout becomes a plain-text summary. | `FULCRUM_AGENT_SUBPROCESS_CMD` — the full command line to exec |
+| `stub` | Tests and local dev. Reads canned `WorkerResult` JSON so tests can seed deterministic results. | `FULCRUM_AGENT_STUB_DIR` — directory where `<run_id>.json` holds a canned result |
+| `subprocess` | Running any external CLI (Gemini, PI, a custom script) as a Fulcrum agent. Parses `WorkerResult` JSON from stdout; non-JSON stdout becomes a plain-text summary. | `FULCRUM_AGENT_SUBPROCESS_CMD` — full command line to exec |
+| `claude-code` | Spawns Claude Code CLI as a Fulcrum agent. Validates the binary path is absolute and executable; sends a JSON prompt via stdin; 30-minute timeout (override with `FULCRUM_CLAUDE_TIMEOUT_MS`); cleans up temp prompt files on exit. | `FULCRUM_CLAUDE_BIN` — absolute path override; falls back to `claude` in `PATH` |
 
 ### Registering a custom adapter
 
@@ -849,14 +889,17 @@ See `docs/guides/worker-adapters.md` for a full walkthrough on writing a custom 
 
 ### System Invariants (cannot be overridden)
 
-Priority 1000, evaluated before any DB-defined rules. All four check capabilities via `roleCapabilities()`, not hardcoded string comparisons — the `role-string-guard` test enforces this.
+Priority 1000, evaluated before any DB-defined rules. All five check capabilities via `roleCapabilities()`, not hardcoded string comparisons — the `role-string-guard` test enforces this.
 
 | Rule | Description |
 |------|-------------|
-| `only_l1_invokes_teams` | Only roles with `can_invoke_teams` may create or invoke teams (§15) |
-| `only_integration_worker_merges` | Only roles with `can_merge` may process the merge queue (§17) |
+| `only_l1_invokes_teams` | Only roles with `can_invoke_teams` may create or invoke teams |
+| `only_integration_worker_merges` | Only roles with `can_merge` may process the merge queue |
 | `no_task_bypass` | `start_run` requires an existing task (no orphan runs) |
-| `chief_of_staff_no_direct_writes` | L1 orchestrators must not directly edit files, write code, or merge — they coordinate, they don't execute |
+| `capability_required_for_action` | `invoke_team`, `dispatch_agents`, and `merge_worktree` require the matching capability on the agent's `AgentDefinition` (not just the role) |
+| `chief_of_staff_no_direct_writes` | L1 orchestrators must not directly edit files, write code, or run shell commands — they coordinate, they don't execute |
+
+**Regex pattern validation** — user-defined rules that specify regex matchers are validated for length (≤256 chars), parseability, and absence of nested quantifiers (ReDoS guard). Invalid patterns throw `FulcrumError { code: 'invalid_input' }`.
 
 ### Custom Rules
 
@@ -886,13 +929,13 @@ const decision = await evaluatePolicy({
 import { checkSecrets, redactSecrets } from '@fulcrum/policy'
 
 const result = checkSecrets(text)
-// { found: true, matches: [{ pattern: 'api_key', value: 'sk-...' }] }
+// { has_secrets: true, matches: [{ pattern_name: 'anthropic_api_key', match: 'sk-ant-...', index: 22 }] }
 
 const safe = redactSecrets(text)
-// Replaces secrets with [REDACTED_API_KEY], [REDACTED_AWS_ACCESS_KEY], etc.
+// Replaces all matched secrets with [REDACTED]
 ```
 
-Detects: API keys, AWS credentials, private keys, OAuth tokens, Slack tokens, JWTs, password key-value pairs, credential URLs.
+Detects 12 named pattern classes with range-based deduplication (more-specific patterns take precedence over generic ones): `anthropic_api_key`, `openai_api_key`, `api_key` (generic), `aws_access_key`, `aws_secret_key`, `private_key` (RSA/EC/OPENSSH headers), `oauth_token` (GitHub PATs), `slack_token`, `jwt_token`, `password_kv` (key-value assignments), `credential_url` (embedded in connection strings), `authorization_bearer` (HTTP header).
 
 ### Hook System
 
@@ -948,6 +991,8 @@ await resolveConflict({
   resolution:  'local_wins',   // or 'remote_wins' / 'manual'
 })
 ```
+
+The `PlaneAPIClient` includes automatic retry: 429 responses wait for the `Retry-After` header; 5xx responses use exponential backoff; network errors retry up to 3 times. Error messages expose only the HTTP status code, not response bodies.
 
 Required env vars: `PLANE_API_KEY`, `PLANE_BASE_URL`, `PLANE_WORKSPACE_SLUG`, `PLANE_PROJECT_ID`.
 
@@ -1089,8 +1134,12 @@ See `docs/guides/telemetry.md` for exporter configuration, attribute mapping, an
 ```typescript
 import { startMonitorServer } from '@fulcrum/monitor'
 
-const stop = await startMonitorServer({ workspace_id: 'ws_1', port: 7331 })
-// stop() to shut down
+const server = startMonitorServer({ workspace_id: 'ws_1', port: 7331 })
+await server.start()    // binds the HTTP port
+await server.stop()     // graceful shutdown
+
+// In tests — call routes in-process without binding a port:
+const res = await server.fetch(new Request('http://localhost/status'))
 ```
 
 ### Read endpoints
@@ -1116,6 +1165,7 @@ const stop = await startMonitorServer({ workspace_id: 'ws_1', port: 7331 })
 | `GET` | `/teams` | Team templates + instances |
 | `GET` | `/replay/:run_id` | Replay an agent run's events |
 | `GET` | `/tasks` · `/workspaces` · `/projects` | Read models (tasks paginated) |
+| `GET` | `/.well-known/agent.json` | A2A Agent Card — skills derived from registered `AgentDefinition` capabilities |
 
 List endpoints that support pagination (`/tasks`, `/agents`, `/artifacts`, `/memory-trace`, `/teams`) accept `?limit=N&cursor=OFFSET` and return:
 ```json
@@ -1178,6 +1228,11 @@ List endpoints that support pagination (`/tasks`, `/agents`, `/artifacts`, `/mem
 | `FULCRUM_AGENT_STUB_DIR` | Directory with canned `WorkerResult` JSON for the stub adapter |
 | `FULCRUM_AGENT_SUBPROCESS_CMD` | Command line for the subprocess adapter |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Enable OTLP span export to a collector |
+| `FULCRUM_CLAUDE_BIN` | Absolute path to the Claude CLI binary (overrides PATH discovery in `claude-code` adapter) |
+| `FULCRUM_CLAUDE_TIMEOUT_MS` | Claude adapter subprocess timeout in ms (default 1 800 000 = 30 min) |
+| `ANTHROPIC_API_KEY` | Enables Track 2 LLM semantic extraction in the memory pipeline |
+| `TAVILY_API_KEY` | Enables Tavily web search in the `search_web` workflow step |
+| `SERPER_API_KEY` | Enables Serper web search in the `search_web` workflow step (fallback to Tavily) |
 | `PLANE_API_KEY` | Plane sync credentials |
 | `PLANE_BASE_URL` | Plane API base URL |
 | `PLANE_WORKSPACE_SLUG` | Plane workspace |
@@ -1205,7 +1260,7 @@ The janitor also runs **memory decay** each cycle: memories with `importance < 0
 
 ## Database
 
-Fulcrum uses SQLite with WAL mode, foreign keys, and FTS5. `runMigrations(db)` is fully idempotent and ships **33 migrations** (including `content_type` column on `memories`).
+Fulcrum uses SQLite with WAL mode, foreign keys, and FTS5. `runMigrations(db)` is fully idempotent and ships **52 migrations** covering all domain tables, indices, and `content_type` / `sparse_vector` columns on `memories`.
 
 **Pragmas set on every connection:** `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=5000`, `synchronous=NORMAL`, `cache_size=-8000` (8 MB).
 
@@ -1308,7 +1363,7 @@ pnpm test:watch
 FULCRUM_EMBEDDING_TESTS=1 pnpm test
 ```
 
-**1258 tests passing across 11 packages.** Tests use an in-memory SQLite DB injected via `setDb()`.
+**1308 tests passing across 11 packages** (6 skipped — integration tests requiring live servers). Tests use an in-memory SQLite DB injected via `setDb()`.
 
 | Package | Tests |
 |---------|:-----:|
