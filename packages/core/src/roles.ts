@@ -2,6 +2,14 @@
 // Central role → capability lookup (H-11, spec §4 / §15 / §17).
 // This replaces scattered string comparisons with a single source of truth
 // for role boundaries: who can invoke teams, who can merge, who can edit files.
+//
+// NOTE (GAP-AGENTDEF-6): The `capabilities` array stored in agent_definitions
+// (e.g. ["write_code","edit_files"]) is A2A metadata for external routing and
+// capability advertisement.  Runtime enforcement of what an agent may do is
+// governed solely by this module (roleCapabilities / canInvokeTeams / etc.) — it
+// is intentionally hardcoded rather than DB-driven to keep the critical path
+// free of runtime DB reads.  If a custom workspace role requires different
+// enforcement semantics, deploy a custom policy rule via @fulcrum/policy.
 
 import type { AgentRole } from './types.js'
 
