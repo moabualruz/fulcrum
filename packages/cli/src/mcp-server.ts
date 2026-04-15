@@ -10,6 +10,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'http'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { TOOL_SCHEMAS } from './mcp-tools.js'
+import { getDb } from '@fulcrum/core'
 
 // ---------- Types ----------
 
@@ -222,15 +223,21 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
       mimeType: 'application/json',
     },
     async (uri, { workspace_id, project_id }) => {
-      const data = await options.handleToolCall('recall_memory', {
-        query: '',
-        workspace_id,
-        project_id,
-        limit: 50,
-      })
-      const result = makeText(data)
-      result.contents[0].uri = uri.toString()
-      return result
+      const db = getDb()
+      const rows = db.prepare(`
+        SELECT memory_id, content, kind, title, importance, created_at, updated_at
+        FROM memories
+        WHERE workspace_id = ? AND project_id = ?
+        ORDER BY created_at DESC
+        LIMIT 20
+      `).all(workspace_id, project_id)
+      return {
+        contents: [{
+          uri: uri.toString(),
+          mimeType: 'application/json',
+          text: JSON.stringify(rows, null, 2),
+        }],
+      }
     },
   )
 
@@ -344,12 +351,31 @@ export interface McpHttpServerOptions extends McpServerOptions {
 
 /**
  * Serve the Fulcrum MCP server over HTTP using the StreamableHTTP transport.
- * Each request creates a new stateless transport instance — no session state.
+ * Session state is preserved across requests via a session map keyed by
+ * the MCP session ID returned in the mcp-session-id response header.
  * Listens on /mcp for POST (tool calls) and GET (SSE notifications).
  */
 export async function runFulcrumMcpHttpServer(options: McpHttpServerOptions): Promise<void> {
   const port = options.port ?? 4722
   const host = options.host ?? '127.0.0.1'
+
+  // Session map: session ID → { server, transport } pair kept alive across requests.
+  const sessions = new Map<string, {
+    server: McpServer
+    transport: StreamableHTTPServerTransport
+    lastUsed: number
+  }>()
+
+  // Evict sessions inactive for >30 minutes every 5 minutes.
+  setInterval(() => {
+    const cutoff = Date.now() - 30 * 60 * 1000
+    for (const [id, session] of sessions) {
+      if (session.lastUsed < cutoff) {
+        session.server.close().catch(() => {})
+        sessions.delete(id)
+      }
+    }
+  }, 5 * 60 * 1000).unref()
 
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', `http://${host}`)
@@ -360,19 +386,42 @@ export async function runFulcrumMcpHttpServer(options: McpHttpServerOptions): Pr
       return
     }
 
-    const mcpServer = createFulcrumMcpServer(options)
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-    })
+    // For existing sessions, reuse the stored server+transport pair.
+    const incomingSessionId = req.headers['mcp-session-id'] as string | undefined
+    let sessionEntry = incomingSessionId ? sessions.get(incomingSessionId) : undefined
 
-    // Clean up the per-request server when transport closes
-    transport.onclose = () => {
-      mcpServer.close().catch(() => {})
+    if (!sessionEntry) {
+      // New session: create server and transport, connect them once.
+      const mcpServer = createFulcrumMcpServer(options)
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+      })
+
+      // Clean up the session entry when transport closes.
+      transport.onclose = () => {
+        const sid = transport.sessionId
+        if (sid) sessions.delete(sid)
+        mcpServer.close().catch(() => {})
+      }
+
+      await mcpServer.connect(transport)
+
+      // The transport generates its session ID on the first initialize request.
+      // We store under a placeholder key until we can retrieve the real session ID
+      // after handleRequest writes the response headers.
+      sessionEntry = { server: mcpServer, transport, lastUsed: Date.now() }
+    } else {
+      sessionEntry.lastUsed = Date.now()
     }
 
     try {
-      await mcpServer.connect(transport)
-      await transport.handleRequest(req, res)
+      await sessionEntry.transport.handleRequest(req, res)
+
+      // After the first request the transport has a session ID — index it.
+      const sid = sessionEntry.transport.sessionId
+      if (sid && !sessions.has(sid)) {
+        sessions.set(sid, sessionEntry)
+      }
     } catch (err) {
       if (!res.headersSent) {
         res.writeHead(500, { 'Content-Type': 'application/json' })
