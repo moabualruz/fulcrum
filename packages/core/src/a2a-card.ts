@@ -27,9 +27,20 @@ export interface A2AProvider {
   url?: string
 }
 
+export interface A2ASecurityScheme {
+  type: 'http' | 'apiKey' | 'openIdConnect' | 'oauth2'
+  scheme?: string        // for type 'http': 'bearer', 'basic', etc.
+  bearerFormat?: string  // for http bearer: e.g. 'JWT'
+  in?: string            // for apiKey: 'header' | 'query' | 'cookie'
+  name?: string          // for apiKey: header/query/cookie name
+  description?: string
+}
+
 export interface A2AAuthentication {
   schemes: string[]
   credentials?: string | null
+  /** OpenAPI-format security schemes (A2A v0.3.x, preferred over flat schemes array) */
+  securitySchemes?: Record<string, A2ASecurityScheme>
 }
 
 export interface A2AAgentCard {
@@ -91,7 +102,12 @@ export function buildA2ACard(
     defaultInputModes: ['text/plain', 'application/json'],
     defaultOutputModes: ['text/plain', 'application/json'],
     skills,
-    authentication: { schemes: ['Bearer'] },
+    authentication: {
+      schemes: ['Bearer'],
+      securitySchemes: {
+        bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'opaque' },
+      },
+    },
     provider: { organization: 'fulcrum', url: DEFAULT_URL_BASE },
   }
 }

@@ -1,6 +1,13 @@
 ---
 name: start-every-task
 description: Register an agent run before touching any code. Applies whenever the agent is about to call Write / Edit / MultiEdit / Bash for the first time in a session, or is targeted by a team invocation.
+allowed-tools:
+  - mcp__fulcrum__get_current_context
+  - mcp__fulcrum__start_agent_run
+  - mcp__fulcrum__list_tasks
+  - mcp__fulcrum__create_task
+  - mcp__fulcrum__list_agent_profiles
+user-invocable: false
 ---
 
 # Start every task with start_agent_run

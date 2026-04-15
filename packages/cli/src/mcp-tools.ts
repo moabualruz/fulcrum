@@ -429,6 +429,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     inputSchema: {
       type: 'object',
       properties: {},
+      additionalProperties: false,
     },
   },
 ]

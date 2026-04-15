@@ -41,6 +41,9 @@ export function buildAgentCard(options: {
     skills,
     authentication: {
       schemes: ['Bearer'],
+      securitySchemes: {
+        bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'opaque' },
+      },
     },
     provider: {
       organization: 'fulcrum',

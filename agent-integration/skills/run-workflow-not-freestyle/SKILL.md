@@ -1,6 +1,8 @@
 ---
 name: run-workflow-not-freestyle
 description: Run multi-step repeatable processes as registered workflows, not ad-hoc. Applies whenever you are about to execute a named process like grill-me, write-a-prd, prd-to-plan, or prd-to-issues.
+allowed-tools: []
+user-invocable: false
 ---
 
 # Run registered workflows, not freestyle scripts

@@ -1,6 +1,10 @@
 ---
 name: workspace-status-on-session-start
 description: Fetch workspace status at the start of every session to see running agents, WIP budget, and blocked runs. Applies before you start any new run or respond to a user request in a Fulcrum workspace.
+allowed-tools:
+  - mcp__fulcrum__get_current_context
+  - mcp__fulcrum__get_workspace_status
+user-invocable: false
 ---
 
 # Check workspace status on session start

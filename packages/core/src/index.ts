@@ -71,7 +71,7 @@ export type { AgentDefinition, CreateAgentDefinitionInput, UpdateAgentDefinition
 
 // A2A Agent Card
 export { buildA2ACard, A2A_PROTOCOL_VERSION } from './a2a-card.js'
-export type { A2AAgentCard, A2ASkill, A2ACapabilities, A2AProvider, A2AAuthentication } from './a2a-card.js'
+export type { A2AAgentCard, A2ASkill, A2ACapabilities, A2AProvider, A2AAuthentication, A2ASecurityScheme } from './a2a-card.js'
 
 // IDs
 export { newId, nextDisplayId, projectIdsFromPath } from './ids.js'

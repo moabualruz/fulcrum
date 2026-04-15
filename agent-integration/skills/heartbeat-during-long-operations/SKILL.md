@@ -1,6 +1,9 @@
 ---
 name: heartbeat-during-long-operations
 description: Emit heartbeat_agent_run every ~30 seconds during any run that takes more than ~60 seconds. Applies to long script runs, large-file edits, and multi-step analysis.
+allowed-tools:
+  - mcp__fulcrum__heartbeat_agent_run
+user-invocable: false
 ---
 
 # Heartbeat during long operations

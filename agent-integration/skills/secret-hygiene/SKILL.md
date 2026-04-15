@@ -1,6 +1,9 @@
 ---
 name: secret-hygiene
 description: Never include credentials, API keys, tokens, or passwords in tool inputs or memory writes. Applies to every tool call that accepts free-form text from the agent.
+allowed-tools: []
+user-invocable: false
+disable-model-invocation: false
 ---
 
 # Secret hygiene

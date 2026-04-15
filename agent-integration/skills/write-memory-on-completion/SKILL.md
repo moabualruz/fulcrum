@@ -1,6 +1,9 @@
 ---
 name: write-memory-on-completion
 description: Persist a memory after completing any task that involved a decision, trade-off, or surprising finding. Applies after complete_agent_run when the work produced durable knowledge.
+allowed-tools:
+  - mcp__fulcrum__write_memory
+user-invocable: false
 ---
 
 # Write memory on completion

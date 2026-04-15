@@ -1,6 +1,9 @@
 ---
 name: complete-agent-run
 description: Finalize an agent run with a meaningful summary and changed-file list. Applies whenever you finish work, hand off, or are about to stop responding on a run you started.
+allowed-tools:
+  - mcp__fulcrum__complete_agent_run
+user-invocable: false
 ---
 
 # Complete agent runs with a real summary
