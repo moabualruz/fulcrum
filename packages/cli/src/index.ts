@@ -107,6 +107,13 @@ DIAGNOSTICS
   doctor              Run environment + configuration health checks
   doctor --json       Output checks as JSON
 
+ACTIVITY LOG
+  log                         Show last 50 agent events (human-readable)
+  log --follow                Tail live SSE stream from monitor
+  log --run-id <id>           Filter to a single run
+  log --since <duration>      Filter by time (e.g. 30m, 2h, 1d)
+  log --limit <n>             Number of events to show (default 50)
+
 EXAMPLES
   fulcrum memory init
   fulcrum doctor
@@ -2198,6 +2205,12 @@ OPTIONS (serve mcp)
   if (group === 'skills' || group === 'skill') { await runSkills(); return }
 
   if (group === 'init') { await runInit(); return }
+
+  if (group === 'log') {
+    const { runLog } = await import('./log.js')
+    await runLog(args)
+    return
+  }
 
   if (group === 'doctor') {
     const fix = args.includes('--fix')

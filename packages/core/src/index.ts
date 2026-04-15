@@ -46,6 +46,10 @@ export {
   getRunHistory,
 } from './runs.js'
 
+// Notifications
+export { notifyBlocked } from './notify.js'
+export type { BlockedNotification } from './notify.js'
+
 // Policy
 export { checkPolicy } from './policy.js'
 
