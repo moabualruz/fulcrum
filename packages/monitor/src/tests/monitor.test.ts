@@ -59,9 +59,9 @@ function createTestDb(): Database.Database {
       updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE TABLE IF NOT EXISTS events (
-      event_id     TEXT PRIMARY KEY,
+      evt_id       TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
-      event_type   TEXT NOT NULL,
+      evt_type     TEXT NOT NULL,
       payload      TEXT NOT NULL DEFAULT '{}',
       ts           TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -286,23 +286,23 @@ describe('replayRun', () => {
     const run_id = 'run_replay_001'
 
     db.prepare(`
-      INSERT INTO events (event_id, workspace_id, event_type, payload, ts)
+      INSERT INTO events (evt_id, workspace_id, evt_type, payload, ts)
       VALUES (?, 'ws_test', 'run_step_completed', ?, ?)
     `).run('evt_001', JSON.stringify({ run_id, step: 1 }), '2026-04-13T10:00:00.000Z')
 
     db.prepare(`
-      INSERT INTO events (event_id, workspace_id, event_type, payload, ts)
+      INSERT INTO events (evt_id, workspace_id, evt_type, payload, ts)
       VALUES (?, 'ws_test', 'run_step_completed', ?, ?)
     `).run('evt_002', JSON.stringify({ run_id, step: 2 }), '2026-04-13T10:01:00.000Z')
 
     db.prepare(`
-      INSERT INTO events (event_id, workspace_id, event_type, payload, ts)
+      INSERT INTO events (evt_id, workspace_id, evt_type, payload, ts)
       VALUES (?, 'ws_test', 'run_finished', ?, ?)
     `).run('evt_003', JSON.stringify({ run_id, result: 'ok' }), '2026-04-13T10:02:00.000Z')
 
     // Insert an event for a DIFFERENT run — must not be returned
     db.prepare(`
-      INSERT INTO events (event_id, workspace_id, event_type, payload, ts)
+      INSERT INTO events (evt_id, workspace_id, evt_type, payload, ts)
       VALUES (?, 'ws_test', 'run_finished', ?, ?)
     `).run('evt_999', JSON.stringify({ run_id: 'run_other', result: 'ok' }), '2026-04-13T10:03:00.000Z')
 

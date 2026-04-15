@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { execSync } from 'child_process'
 import { homedir } from 'os'
+import { globalDataDir } from '@fulcrum/core'
 
 // ---------- Check result type ----------
 
@@ -146,6 +147,18 @@ function checkAgentIntegration(cwd: string): CheckResult {
   return { name: 'Agent integration files', status: 'pass', message: `Found: ${found.join(', ')}` }
 }
 
+function checkMonitorToken(): CheckResult {
+  const tokenPath = join(globalDataDir(), 'token')
+  if (existsSync(tokenPath)) {
+    return { name: 'Monitor token', status: 'pass', message: tokenPath }
+  }
+  return {
+    name: 'Monitor token',
+    status: 'warn',
+    message: `${tokenPath} — not yet created (will be generated on first monitor start)`,
+  }
+}
+
 // ---------- Runner ----------
 
 export interface DoctorOptions {
@@ -165,6 +178,7 @@ export function runDoctor(options: DoctorOptions = {}): { results: CheckResult[]
     checkMcpSdk(),
     checkEnvVars(),
     checkAgentIntegration(cwd),
+    checkMonitorToken(),
   ]
 
   const exitCode = results.some(r => r.status === 'fail') ? 1 : 0

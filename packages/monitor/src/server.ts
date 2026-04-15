@@ -1,16 +1,24 @@
 // packages/monitor/src/server.ts
 import { Hono } from 'hono'
+import type { MiddlewareHandler } from 'hono'
+import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
+import { randomBytes, timingSafeEqual } from 'crypto'
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
+import { join } from 'path'
 import {
   getDb,
   listTasks, createTask, updateTask,
   startAgentRun, heartbeatAgentRun, completeAgentRun, blockAgentRun,
+  getAgentRunStatus,
   buildCosContext,
   loadConfig,
   createWorkspace, createProject, getProject,
   isL1, type AgentRole,
+  globalDataDir,
 } from '@fulcrum/core'
 import { writeMemory, recallMemory } from '@fulcrum/memory'
+import { evaluatePolicy, logPolicyEvent, type EvaluatePolicyInput } from '@fulcrum/policy'
 import {
   getMetrics,
   getBurndown,
@@ -19,6 +27,35 @@ import {
   getForecasting,
 } from './metrics.js'
 import type { MonitorServer, MonitorServerConfig } from './types.js'
+
+// ---------- Auth helpers ----------
+
+function getOrCreateMonitorToken(): string {
+  const dir = globalDataDir()
+  const tokenPath = join(dir, 'token')
+  mkdirSync(dir, { recursive: true })
+  if (existsSync(tokenPath)) {
+    return readFileSync(tokenPath, 'utf-8').trim()
+  }
+  const token = randomBytes(32).toString('hex')
+  writeFileSync(tokenPath, token, { mode: 0o600 })
+  return token
+}
+
+function requireAuth(token: string): MiddlewareHandler {
+  const tokenBuf = Buffer.from(token)
+  return async (c, next) => {
+    const auth = c.req.header('Authorization') ?? ''
+    if (!auth.startsWith('Bearer ')) {
+      return c.json({ error: 'unauthorized' }, 401)
+    }
+    const provided = Buffer.from(auth.slice(7))
+    if (provided.length !== tokenBuf.length || !timingSafeEqual(provided, tokenBuf)) {
+      return c.json({ error: 'unauthorized' }, 401)
+    }
+    await next()
+  }
+}
 
 // ---------- Pagination helper ----------
 
@@ -54,6 +91,17 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   const port = config.port ?? fulcrumConfig.port ?? 4721
   const host = config.host ?? '127.0.0.1'
   const workspace_id = config.workspace_id ?? fulcrumConfig.workspace_id ?? undefined
+
+  // CORS — restrict to localhost only
+  app.use('*', cors({
+    origin: ['http://localhost:4721', 'http://127.0.0.1:4721'],
+    allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+  }))
+
+  // Load or create the bearer token for mutating endpoints
+  const monitorToken = getOrCreateMonitorToken()
+  const auth = requireAuth(monitorToken)
 
   app.get('/status', (c) => {
     return c.json({
@@ -95,35 +143,36 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
     const stream = new ReadableStream({
       start(controller) {
-        let lastId = c.req.header('Last-Event-ID') ?? ''
+        let lastRowid = parseInt(c.req.header('Last-Event-ID') ?? '0', 10) || 0
 
         const poll = () => {
           try {
             const db = getDb()
-            let query = `SELECT * FROM events WHERE workspace_id = ? AND event_id > ? ORDER BY event_id ASC LIMIT 100`
-            const params: unknown[] = [ws ?? '', lastId]
+            let query = `SELECT *, rowid FROM events WHERE workspace_id = ? AND rowid > ? ORDER BY rowid ASC LIMIT 100`
+            const params: unknown[] = [ws ?? '', lastRowid]
 
             if (!ws) {
-              query = `SELECT * FROM events WHERE event_id > ? ORDER BY event_id ASC LIMIT 100`
-              params.splice(0, 1) // remove ws placeholder, keep only lastId
+              query = `SELECT *, rowid FROM events WHERE rowid > ? ORDER BY rowid ASC LIMIT 100`
+              params.splice(0, 1) // remove ws placeholder, keep only lastRowid
             }
 
             const rows = db.prepare(query).all(...params) as Array<{
-              event_id: string
-              event_type: string
+              evt_id: string
+              evt_type: string
               payload: string
               ts: string
+              rowid: number
             }>
 
             for (const row of rows) {
               const data = JSON.stringify({
-                event_id: row.event_id,
-                event_type: row.event_type,
+                event_id: row.evt_id,
+                event_type: row.evt_type,
                 payload: JSON.parse(row.payload) as unknown,
                 ts: row.ts,
               })
-              controller.enqueue(new TextEncoder().encode(`id: ${row.event_id}\ndata: ${data}\n\n`))
-              lastId = row.event_id
+              controller.enqueue(new TextEncoder().encode(`id: ${row.rowid}\ndata: ${data}\n\n`))
+              lastRowid = row.rowid
             }
           } catch {
             // DB not yet available — skip this tick
@@ -362,7 +411,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
     const db = getDb()
     const events = db.prepare(`
-      SELECT event_id, event_type, payload, ts
+      SELECT evt_id AS event_id, evt_type AS event_type, payload, ts
       FROM events
       WHERE workspace_id = ? AND JSON_EXTRACT(payload, '$.run_id') = ?
       ORDER BY ts ASC
@@ -441,7 +490,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     return c.json({ projects: rows })
   })
 
-  app.post('/tasks', async (c) => {
+  app.post('/tasks', auth, async (c) => {
     try {
       const body = await c.req.json() as {
         title: string; project_id: string; workspace_id: string
@@ -467,7 +516,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
   })
 
-  app.patch('/tasks/:id', async (c) => {
+  app.patch('/tasks/:id', auth, async (c) => {
     try {
       const task_id = c.req.param('id')
       const body = await c.req.json() as { status?: string; note?: string; assigned_to?: string }
@@ -483,7 +532,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
   })
 
-  app.post('/runs', async (c) => {
+  app.post('/runs', auth, async (c) => {
     try {
       const body = await c.req.json() as {
         task_id?: string; agent_role: string; workspace_id: string
@@ -533,7 +582,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
   })
 
-  app.post('/runs/:id/heartbeat', async (c) => {
+  app.post('/runs/:id/heartbeat', auth, async (c) => {
     try {
       const run_id = c.req.param('id')
       const body = await c.req.json() as { workspace_id?: string; current_step?: string; progress_pct?: number }
@@ -548,7 +597,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
   })
 
-  app.post('/runs/:id/complete', async (c) => {
+  app.post('/runs/:id/complete', auth, async (c) => {
     try {
       const run_id = c.req.param('id')
       const body = await c.req.json() as { workspace_id?: string; output_summary?: string; artifact_paths?: string }
@@ -564,7 +613,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
   })
 
-  app.post('/runs/:id/block', async (c) => {
+  app.post('/runs/:id/block', auth, async (c) => {
     try {
       const run_id = c.req.param('id')
       const body = await c.req.json() as { workspace_id?: string; reason: string }
@@ -576,7 +625,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
   })
 
-  app.post('/memory/recall', async (c) => {
+  app.post('/memory/recall', auth, async (c) => {
     try {
       const body = await c.req.json() as { query: string; workspace_id: string; project_id?: string; task_id?: string; limit?: number }
       if (!body.query || !body.workspace_id) return c.json({ error: 'query and workspace_id are required' }, 400)
@@ -602,7 +651,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
   })
 
-  app.post('/memory/write', async (c) => {
+  app.post('/memory/write', auth, async (c) => {
     try {
       const body = await c.req.json() as {
         content: string; workspace_id: string; project_id: string
@@ -631,7 +680,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
   })
 
-  app.post('/cos-context', async (c) => {
+  app.post('/cos-context', auth, async (c) => {
     try {
       const body = await c.req.json() as {
         goal?: string; project_id: string; workspace_id: string
@@ -650,7 +699,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
   })
 
-  app.post('/policy/check', async (c) => {
+  app.post('/policy/check', auth, async (c) => {
     try {
       const body = await c.req.json() as {
         action: string; resource: string; actor_id?: string

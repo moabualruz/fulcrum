@@ -138,7 +138,7 @@ export async function rollupDaily(input: RollupDailyInput, db = getDb()): Promis
   let memory_recalls = 0
   try {
     memory_recalls = count(
-      `SELECT COUNT(*) AS cnt FROM events WHERE workspace_id = ? AND event_type = 'memory_recalled' AND ts >= ? AND ts < ?`,
+      `SELECT COUNT(*) AS cnt FROM events WHERE workspace_id = ? AND evt_type = 'memory_recalled' AND ts >= ? AND ts < ?`,
       [ws, dStart, dEnd],
     )
   } catch {
@@ -773,7 +773,7 @@ export async function replayRun(input: ReplayRunInput, db = getDb()): Promise<Ru
 
   // Events table stores payload as JSON text; run_id is embedded in payload
   const rows = db.prepare(`
-    SELECT event_id, event_type, payload, ts
+    SELECT evt_id AS event_id, evt_type AS event_type, payload, ts
     FROM events
     WHERE json_extract(payload, '$.run_id') = ?
     ORDER BY ts ASC
