@@ -261,6 +261,7 @@ export interface UpdateAgentProfileInput {
 
 export interface AgentDefinition {
   id: string
+  workspace_id: string
   role: AgentRole
   display_name: string
   description: string
@@ -282,6 +283,7 @@ export interface AgentDefinition {
 
 export interface CreateAgentDefinitionInput {
   role: AgentRole
+  workspace_id?: string
   display_name: string
   description: string
   version?: string
@@ -300,6 +302,7 @@ export interface CreateAgentDefinitionInput {
 
 export interface UpdateAgentDefinitionInput {
   role: AgentRole
+  workspace_id?: string
   display_name?: string
   description?: string
   version?: string

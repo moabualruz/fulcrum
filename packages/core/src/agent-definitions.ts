@@ -28,6 +28,7 @@ function validateToolNames(list: string[] | null | undefined, field: string): vo
 function rowToDefinition(row: Record<string, unknown>): AgentDefinition {
   return {
     id: row.id as string,
+    workspace_id: (row.workspace_id as string) ?? 'default',
     role: row.role as AgentDefinition['role'],
     display_name: row.display_name as string,
     description: row.description as string,
@@ -49,7 +50,8 @@ function rowToDefinition(row: Record<string, unknown>): AgentDefinition {
 }
 
 export function createAgentDefinition(input: CreateAgentDefinitionInput, db = getDb()): AgentDefinition {
-  const existing = db.prepare('SELECT id FROM agent_definitions WHERE role = ?').get(input.role)
+  const workspace_id = input.workspace_id ?? 'default'
+  const existing = db.prepare('SELECT id FROM agent_definitions WHERE workspace_id = ? AND role = ?').get(workspace_id, input.role)
   if (existing) {
     throw new FulcrumError(`Agent definition for role '${input.role}' already exists`, 'conflict')
   }
@@ -59,12 +61,13 @@ export function createAgentDefinition(input: CreateAgentDefinitionInput, db = ge
   const now = Math.floor(Date.now() / 1000)
   db.prepare(`
     INSERT INTO agent_definitions
-      (id, role, display_name, description, version, stability, system_prompt, model, provider,
+      (id, workspace_id, role, display_name, description, version, stability, system_prompt, model, provider,
        tools_allow, tools_deny, capabilities, output_schema, executor_uri, a2a_card, eval_suites,
        created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
+    workspace_id,
     input.role,
     input.display_name,
     input.description,
@@ -87,8 +90,8 @@ export function createAgentDefinition(input: CreateAgentDefinitionInput, db = ge
   return rowToDefinition(row)
 }
 
-export function getAgentDefinition(role: string, db = getDb()): AgentDefinition | null {
-  const row = db.prepare('SELECT * FROM agent_definitions WHERE role = ?').get(role) as Record<string, unknown> | undefined
+export function getAgentDefinition(role: string, workspace_id = 'default', db = getDb()): AgentDefinition | null {
+  const row = db.prepare('SELECT * FROM agent_definitions WHERE workspace_id = ? AND role = ?').get(workspace_id, role) as Record<string, unknown> | undefined
   return row ? rowToDefinition(row) : null
 }
 
@@ -101,7 +104,8 @@ function bumpPatch(version: string): string {
 }
 
 export function updateAgentDefinition(input: UpdateAgentDefinitionInput, db = getDb()): AgentDefinition {
-  const existing = db.prepare('SELECT * FROM agent_definitions WHERE role = ?').get(input.role) as Record<string, unknown> | undefined
+  const workspace_id = input.workspace_id ?? 'default'
+  const existing = db.prepare('SELECT * FROM agent_definitions WHERE workspace_id = ? AND role = ?').get(workspace_id, input.role) as Record<string, unknown> | undefined
   if (!existing) {
     throw new FulcrumError(`Agent definition for role '${input.role}' not found`, 'not_found')
   }
@@ -134,15 +138,15 @@ export function updateAgentDefinition(input: UpdateAgentDefinitionInput, db = ge
   setField('a2a_card', input.a2a_card, true)
   setField('eval_suites', input.eval_suites, true)
 
-  params.push(input.role)
-  db.prepare(`UPDATE agent_definitions SET ${updates.join(', ')} WHERE role = ?`).run(...params)
-  const row = db.prepare('SELECT * FROM agent_definitions WHERE role = ?').get(input.role) as Record<string, unknown>
+  params.push(workspace_id, input.role)
+  db.prepare(`UPDATE agent_definitions SET ${updates.join(', ')} WHERE workspace_id = ? AND role = ?`).run(...params)
+  const row = db.prepare('SELECT * FROM agent_definitions WHERE workspace_id = ? AND role = ?').get(workspace_id, input.role) as Record<string, unknown>
   return rowToDefinition(row)
 }
 
-export function listAgentDefinitions(stability?: AgentDefinition['stability'], db = getDb()): AgentDefinition[] {
+export function listAgentDefinitions(stability?: AgentDefinition['stability'], workspace_id = 'default', db = getDb()): AgentDefinition[] {
   const rows = stability
-    ? (db.prepare('SELECT * FROM agent_definitions WHERE stability = ? ORDER BY role').all(stability) as Record<string, unknown>[])
-    : (db.prepare('SELECT * FROM agent_definitions ORDER BY role').all() as Record<string, unknown>[])
+    ? (db.prepare('SELECT * FROM agent_definitions WHERE workspace_id = ? AND stability = ? ORDER BY role').all(workspace_id, stability) as Record<string, unknown>[])
+    : (db.prepare('SELECT * FROM agent_definitions WHERE workspace_id = ? ORDER BY role').all(workspace_id) as Record<string, unknown>[])
   return rows.map(rowToDefinition)
 }

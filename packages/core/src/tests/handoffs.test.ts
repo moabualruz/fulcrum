@@ -220,11 +220,12 @@ describe('completeHandoff', () => {
     ).toThrow(expect.objectContaining({ code: 'not_found' }))
   })
 
-  it('can complete a pending handoff directly (no claim required)', () => {
+  it('throws invalid_state when completing a pending handoff (must be claimed first)', () => {
     const db = seed()
     const handoff = createHandoff(db, makeHandoffInput())
-    const completed = completeHandoff(db, { handoff_id: handoff.handoff_id, workspace_id: 'ws_1' })
-    expect(completed.status).toBe('completed')
+    expect(() =>
+      completeHandoff(db, { handoff_id: handoff.handoff_id, workspace_id: 'ws_1' })
+    ).toThrow(expect.objectContaining({ code: 'invalid_state' }))
   })
 })
 

@@ -206,6 +206,12 @@ export function completeHandoff(
   if (!existing) {
     throw new FulcrumError(`Handoff ${input.handoff_id} not found`, 'not_found')
   }
+  if (existing.status !== 'claimed') {
+    throw new FulcrumError(
+      `Cannot complete handoff with status '${existing.status}' — must be 'claimed'`,
+      'invalid_state'
+    )
+  }
 
   db.prepare(`
     UPDATE handoffs

@@ -27,6 +27,7 @@ interface CreateTaskInput {
 interface UpdateTaskInput {
   task_id: string
   status?: TaskStatus
+  action?: 'reopen'
   note?: string
   assigned_to?: string
   description?: string
@@ -37,6 +38,17 @@ interface UpdateTaskInput {
   completed_at?: string | null
   assigned_run_id?: string | null
   labels?: string[]
+}
+
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  queued:    ['ready', 'claimed', 'running', 'blocked', 'failed', 'completed', 'cancelled'],
+  ready:     ['claimed', 'running', 'blocked', 'failed', 'completed', 'cancelled'],
+  claimed:   ['running', 'blocked', 'failed', 'completed', 'cancelled'],
+  running:   ['blocked', 'failed', 'completed', 'cancelled'],
+  blocked:   ['queued', 'ready', 'claimed', 'running', 'failed', 'cancelled'],
+  failed:    [],
+  completed: [],
+  cancelled: [],
 }
 
 function rowToTaskBase(row: Record<string, unknown>): Omit<Task, 'labels' | 'blockers'> {
@@ -151,6 +163,28 @@ export async function createTask(input: CreateTaskInput, db = getDb()): Promise<
 export async function updateTask(input: UpdateTaskInput, db = getDb()): Promise<Task> {
   const existing = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(input.task_id) as Record<string, unknown> | undefined
   if (!existing) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
+
+  // Handle explicit reopen action — bypasses transition guard for terminal states
+  if (input.action === 'reopen') {
+    const currentStatus = existing.status as string
+    if (currentStatus !== 'completed' && currentStatus !== 'cancelled' && currentStatus !== 'failed') {
+      throw new FulcrumError(
+        `Cannot reopen task with status '${currentStatus}' — reopen is for terminal tasks only`,
+        'invalid_state'
+      )
+    }
+    // Override status to 'queued' for reopen
+    input = { ...input, status: 'queued' as TaskStatus }
+  } else if (input.status && input.status !== (existing.status as string)) {
+    // Validate state transition
+    const allowed = VALID_TRANSITIONS[existing.status as string] ?? []
+    if (!allowed.includes(input.status)) {
+      throw new FulcrumError(
+        `Invalid status transition: ${existing.status as string} → ${input.status}`,
+        'invalid_state'
+      )
+    }
+  }
 
   if (input.expected_version !== undefined && existing.version !== input.expected_version) {
     throw new FulcrumError(
