@@ -5,7 +5,7 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import { SetLevelRequestSchema } from '@modelcontextprotocol/sdk/types.js'
+import { SetLevelRequestSchema, McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js'
 import { createServer, type IncomingMessage, type ServerResponse } from 'http'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
@@ -162,7 +162,9 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
         const parsed = strictSchema.safeParse(args)
         if (!parsed.success) {
           const details = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')
-          throw new Error(`invalid_input: ${details}`)
+          // Spec §Tools.Error Handling: schema failures → JSON-RPC -32602 (InvalidParams),
+          // not isError:true (which is for runtime errors post-validation).
+          throw new McpError(ErrorCode.InvalidParams, `invalid_input: ${details}`)
         }
         const ctx: ToolContext = { toolName: tool.name, args: parsed.data as Record<string, unknown> }
         try {
