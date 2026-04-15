@@ -416,6 +416,15 @@ importers:
         specifier: ^1.4.0
         version: 1.6.1(@types/node@20.19.39)
 
+  scripts:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.39
+      vitest:
+        specifier: ^1.4.0
+        version: 1.6.1(@types/node@20.19.39)
+
 packages:
 
   '@anthropic-ai/sdk@0.73.0':

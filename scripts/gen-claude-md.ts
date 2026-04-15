@@ -42,9 +42,14 @@ export function spliceSection(original: string, generated: string): string {
   const startIdx = original.indexOf(START_MARKER)
   const endIdx = original.indexOf(END_MARKER)
 
-  if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) {
-    // Markers not present or inverted — append section at end
+  if (startIdx === -1 && endIdx === -1) {
+    // First run — no markers yet, append the generated section
     return original.trimEnd() + '\n\n' + START_MARKER + '\n\n' + generated + '\n\n' + END_MARKER + '\n'
+  }
+
+  if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) {
+    // One marker missing or inverted — don't corrupt, return unchanged
+    return original
   }
 
   const before = original.slice(0, startIdx + START_MARKER.length)
