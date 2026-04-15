@@ -4,6 +4,7 @@ import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js
 import { getDb } from '@fulcrum/core'
 import { writeMemory } from '../write.js'
 import { recallMemory } from '../recall.js'
+import { rrfFuse } from '../scoring.js'
 import type { FullMemory } from '../types.js'
 
 beforeEach(() => { createTestDb() })
@@ -142,45 +143,58 @@ describe('recallMemory — total_ranked mode', () => {
   })
 })
 
-// ── total_timeline mode ───────────────────────────────────────────────────────
+// ── RRF fusion (rrfFuse unit tests) ───────────────────────────────────────────
 
-describe('recallMemory — total_timeline mode', () => {
-  it('returns results sorted by event_time ASC, null last', async () => {
-    const db = getDb()
-    seedWorkspaceAndProject(db)
-    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', scope: 'project', kind: 'fact', title: 'middle', summary: 's', content: 'SQLite timeline test', event_time: '2025-06-01T00:00:00Z' })
-    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', scope: 'project', kind: 'fact', title: 'first',  summary: 's', content: 'SQLite timeline early', event_time: '2025-01-01T00:00:00Z' })
-    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', scope: 'project', kind: 'fact', title: 'no time', summary: 's', content: 'SQLite timeline no event' })
-    const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite timeline', mode: 'total_timeline' })
-    expect(results.length).toBeGreaterThan(0)
-    // Null event_time entries should come last
-    const eventTimes = (results as FullMemory[]).map(r => r.event_time)
-    const nonNullIdx = eventTimes.findIndex(t => t !== null)
-    const nullIdx = eventTimes.findIndex(t => t === null)
-    if (nonNullIdx !== -1 && nullIdx !== -1) {
-      expect(nullIdx).toBeGreaterThan(nonNullIdx)
-    }
-    // Non-null entries should be in ascending order
-    const nonNull = eventTimes.filter((t): t is string => t !== null)
-    for (let i = 1; i < nonNull.length; i++) {
-      expect(nonNull[i] >= nonNull[i - 1]).toBe(true)
-    }
+describe('rrfFuse — hybrid result fusion', () => {
+  it('merges two lists and returns items from both', () => {
+    const listA = [
+      { memory_id: 'a1', title: 'alpha one' },
+      { memory_id: 'a2', title: 'alpha two' },
+    ]
+    const listB = [
+      { memory_id: 'b1', title: 'beta one' },
+      { memory_id: 'b2', title: 'beta two' },
+    ]
+    const fused = rrfFuse(listA, listB)
+    const ids = fused.map(x => x.memory_id)
+    expect(ids).toContain('a1')
+    expect(ids).toContain('a2')
+    expect(ids).toContain('b1')
+    expect(ids).toContain('b2')
+    expect(fused).toHaveLength(4)
+  })
+
+  it('items appearing in both lists rank higher than items in only one list', () => {
+    // shared is rank 1 in listA, rank 1 in listB — should outscore solo items
+    const shared = { memory_id: 'shared', title: 'shared item' }
+    const onlyA  = { memory_id: 'onlyA',  title: 'only in A' }
+    const onlyB  = { memory_id: 'onlyB',  title: 'only in B' }
+    const listA = [shared, onlyA]
+    const listB = [shared, onlyB]
+    const fused = rrfFuse(listA, listB)
+    expect(fused[0].memory_id).toBe('shared')
+  })
+
+  it('gracefully handles empty listB (FTS5-only degradation)', () => {
+    const listA = [
+      { memory_id: 'a1', title: 'alpha one' },
+      { memory_id: 'a2', title: 'alpha two' },
+    ]
+    const fused = rrfFuse(listA, [])
+    // All items from listA should appear; order preserved (both have same absent-B penalty)
+    expect(fused.map(x => x.memory_id)).toEqual(expect.arrayContaining(['a1', 'a2']))
+    expect(fused).toHaveLength(2)
   })
 })
 
-// ── total_sourcemap mode ──────────────────────────────────────────────────────
+// ── hybrid graceful degradation via recall pipeline ───────────────────────────
 
-describe('recallMemory — total_sourcemap mode', () => {
-  it('returns results sorted by file_path ASC, symbol_path ASC', async () => {
+describe('recallMemory — hybrid graceful degradation', () => {
+  it('returns FTS5 results when no embedder is configured (vector search absent)', async () => {
     const db = getDb()
-    seedWorkspaceAndProject(db)
-    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', scope: 'file', kind: 'symbol', title: 'z fn', summary: 's', content: 'getDb function details', file_path: 'src/z.ts', symbol_path: 'zFn' })
-    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', scope: 'file', kind: 'symbol', title: 'a fn', summary: 's', content: 'getDb other function', file_path: 'src/a.ts', symbol_path: 'aFn' })
-    const results = await recallMemory({ workspace_id: 'ws_1', query: 'getDb', mode: 'total_sourcemap' })
+    await seedMemories(db)
+    // No embedder registered in test environment — recall must still return FTS5 hits
+    const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite' })
     expect(results.length).toBeGreaterThan(0)
-    const filePaths = (results as FullMemory[]).map(r => r.file_path).filter(Boolean)
-    for (let i = 1; i < filePaths.length; i++) {
-      expect((filePaths[i] as string) >= (filePaths[i - 1] as string)).toBe(true)
-    }
   })
 })

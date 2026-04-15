@@ -44,3 +44,39 @@ export function recallScore(
 ): number {
   return rrfScore(ftsRank, vectorRank) * freshness
 }
+
+/**
+ * Reciprocal Rank Fusion list combiner.
+ *
+ * Given two ranked lists (listA, listB), fuses them into a single list
+ * ordered by descending RRF score: score(d) = Σ 1/(k + rank(d)), k=60.
+ * Items present in only one list receive a penalty rank of listLength+1
+ * for the absent signal.
+ */
+export function rrfFuse<T extends { memory_id?: string; id?: string }>(
+  listA: T[],
+  listB: T[],
+  k = 60
+): T[] {
+  const getId = (item: T): string =>
+    item.memory_id ?? (item as unknown as { id: string }).id
+
+  const rankA = new Map(listA.map((item, i) => [getId(item), i + 1]))
+  const rankB = new Map(listB.map((item, i) => [getId(item), i + 1]))
+
+  // Union of all IDs
+  const allIds = new Set([...listA.map(getId), ...listB.map(getId)])
+
+  // Score each
+  const scored = Array.from(allIds).map(id => {
+    const rA = rankA.get(id) ?? (listA.length + 1)
+    const rB = rankB.get(id) ?? (listB.length + 1)
+    const score = 1 / (k + rA) + 1 / (k + rB)
+    const item = listA.find(x => getId(x) === id) ?? listB.find(x => getId(x) === id)!
+    return { item, score }
+  })
+
+  // Sort by RRF score descending
+  scored.sort((a, b) => b.score - a.score)
+  return scored.map(s => s.item)
+}

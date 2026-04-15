@@ -8,7 +8,7 @@ import type { MemoryKind } from '@fulcrum/core'
 
 export type MemoryScope = 'global' | 'project' | 'file' | 'task'
 
-export type RecallMode = 'compact' | 'total_ranked' | 'total_timeline' | 'total_sourcemap'
+export type RecallMode = 'compact' | 'total_ranked'
 
 export interface WriteMemoryInput {
   workspace_id: string

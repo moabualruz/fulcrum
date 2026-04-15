@@ -91,7 +91,7 @@ function buildWhereClause(input: RecallMemoryInput): { clauses: string[]; params
 
 type DbType = ReturnType<typeof getDb>
 
-/** Run FTS5 match, fall back to LIKE on SQLITE_ERROR */
+/** Run FTS5 match. Returns empty array on SQLITE_ERROR (e.g. invalid FTS5 syntax). */
 function ftsSearch(
   db: DbType,
   query: string,
@@ -111,11 +111,8 @@ function ftsSearch(
     `).all(query, ...whereParams, limit * 3) as { rowid: number; ftsRank: number }[])
   } catch (err) {
     if ((err as { code?: string }).code !== 'SQLITE_ERROR') throw err
-    // LIKE fallback
-    const likeRows = db.prepare(
-      `SELECT m.rowid FROM memories m WHERE (m.content LIKE ? OR m.title LIKE ? OR m.summary LIKE ?) AND ${whereClause} LIMIT ?`
-    ).all(`%${query}%`, `%${query}%`, `%${query}%`, ...whereParams, limit) as { rowid: number }[]
-    return likeRows.map((r, i) => ({ rowid: r.rowid, ftsRank: i + 1 }))
+    // Invalid FTS5 query syntax — return empty, let vector search carry the result
+    return []
   }
 }
 
@@ -193,36 +190,6 @@ export async function recallMemory(
 
   const { clauses, params } = buildWhereClause(input)
   const whereClause = clauses.join(' AND ')
-
-  // ── total_timeline: sorted by event_time ASC, null last ───────────────────
-  if (mode === 'total_timeline') {
-    const rows = db.prepare(`
-      SELECT m.*
-      FROM memories m
-      WHERE ${whereClause}
-        AND (m.content LIKE ? OR m.title LIKE ? OR m.summary LIKE ?)
-      ORDER BY CASE WHEN m.event_time IS NULL THEN 1 ELSE 0 END, m.event_time ASC
-      LIMIT ?
-    `).all(...params, `%${input.query}%`, `%${input.query}%`, `%${input.query}%`, limit) as Record<string, unknown>[]
-    const memories = rows.map(rowToFullMemory)
-    updateAccessCounts(db, memories.map(m => m.memory_id))
-    return memories
-  }
-
-  // ── total_sourcemap: sorted by file_path ASC, symbol_path ASC ────────────
-  if (mode === 'total_sourcemap') {
-    const rows = db.prepare(`
-      SELECT m.*
-      FROM memories m
-      WHERE ${whereClause}
-        AND (m.content LIKE ? OR m.title LIKE ? OR m.summary LIKE ?)
-      ORDER BY m.file_path ASC, m.symbol_path ASC
-      LIMIT ?
-    `).all(...params, `%${input.query}%`, `%${input.query}%`, `%${input.query}%`, limit) as Record<string, unknown>[]
-    const memories = rows.map(rowToFullMemory)
-    updateAccessCounts(db, memories.map(m => m.memory_id))
-    return memories
-  }
 
   // ── compact / total_ranked: RRF hybrid search ─────────────────────────────
   // Build FTS5 query: tokenise into terms and join with OR so any matching
