@@ -5,6 +5,7 @@ import type Database from 'better-sqlite3'
 import { canStartTeam } from '../scheduler.js'
 import { invokeTeam, createTeamTemplate, heartbeatTeam } from '../teams.js'
 import { FulcrumError } from '@fulcrum/core'
+import { ulid } from 'ulidx'
 
 let db: Database.Database
 let workspace_id: string
@@ -37,7 +38,6 @@ afterEach(() => {
 function insertActiveInstance(
   overrides: { template_id: string; status?: string; project_id?: string }
 ): void {
-  const { ulid } = require('ulidx')
   const instance_id = `ti_${ulid()}`
   const now = new Date().toISOString()
   db.prepare(

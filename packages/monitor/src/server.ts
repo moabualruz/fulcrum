@@ -383,14 +383,17 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
     const db: Db = getDb()
+    // MON-014: add pagination instead of hardcoded LIMIT 50
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10) || 50, 500)
+    const offset = parseInt(c.req.query('offset') ?? '0', 10) || 0
     const rows = db.prepare(`
       SELECT * FROM policy_events
       WHERE workspace_id = ?
       ORDER BY ts DESC
-      LIMIT 50
-    `).all(ws)
+      LIMIT ? OFFSET ?
+    `).all(ws, limit, offset)
 
-    return c.json({ data: rows })
+    return c.json({ data: rows, pagination: { limit, offset } })
   })
 
   app.get('/sync/state', (c) => {
@@ -470,6 +473,10 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
     const horizon_days = parseInt(c.req.query('horizon_days') ?? '30', 10)
+    // MON-012: reject NaN and out-of-range values
+    if (isNaN(horizon_days) || horizon_days < 1 || horizon_days > 365) {
+      return c.json({ error: 'horizon_days must be an integer between 1 and 365' }, 400)
+    }
     const db: Db = getDb()
     const data = getForecasting(db, { workspace_id: ws, horizon_days })
     return c.json({ data })
