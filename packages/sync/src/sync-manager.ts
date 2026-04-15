@@ -429,7 +429,7 @@ export class SyncManager {
   // ------------------------------------------------------------------ //
 
   async resolveConflict(input: ResolveConflictInput): Promise<SyncState> {
-    const { conflict_id, resolution, resolved_by } = input
+    const { conflict_id, resolution, resolved_by, local_data } = input
 
     const conflictRow = this.db
       .prepare(`SELECT * FROM sync_conflicts WHERE conflict_id = ?`)
@@ -455,14 +455,17 @@ export class SyncManager {
       .get(conflictRow.sync_id) as SyncStateRow
 
     if (resolution === 'local_wins') {
-      // Re-enqueue for push
+      if (!local_data) {
+        throw new Error('local_data is required for local_wins resolution')
+      }
+      // Re-enqueue for push, including local_data so processQueue can push it (SYNC-009 fix)
       const queueId = ulid()
       this.db
         .prepare(
-          `INSERT INTO sync_queue (queue_id, sync_id, operation, priority)
-           VALUES (?, ?, 'upsert', 200)`,
+          `INSERT INTO sync_queue (queue_id, sync_id, operation, priority, local_data)
+           VALUES (?, ?, 'upsert', 200, ?)`,
         )
-        .run(queueId, conflictRow.sync_id)
+        .run(queueId, conflictRow.sync_id, JSON.stringify(local_data))
 
       this.db
         .prepare(

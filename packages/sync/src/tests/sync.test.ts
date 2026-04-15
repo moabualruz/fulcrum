@@ -270,6 +270,7 @@ describe('@fulcrum/sync — SyncManager', () => {
       conflict_id: conflictId,
       resolution: 'local_wins',
       resolved_by: 'agent-chief',
+      local_data: { title: 'Sprint 10', priority: 'high' },
     })
 
     // SyncState should now be queued (re-enqueued for push)
@@ -565,12 +566,14 @@ describe('PlaneAPIClient — error handling', () => {
   })
 
   it('updateIssue throws on non-OK response', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+    // 500 is retried up to MAX_RETRIES; mock all attempts to avoid falling
+    // through to real fetch (which doesn't exist in test env)
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('server error', { status: 500 })
     )
     await expect(client.updateIssue('ext-123', { name: 'Updated' })).rejects.toThrow('Plane API error: 500')
     fetchSpy.mockRestore()
-  })
+  }, 10_000)
 
   it('createIssue returns the parsed response body on success', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(

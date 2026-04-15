@@ -126,6 +126,8 @@ export interface ResolveConflictInput {
   conflict_id: string
   resolution: 'local_wins' | 'remote_wins' | 'manual'
   resolved_by?: string
+  /** Required for local_wins — the authoritative local data to push on re-enqueue. */
+  local_data?: Record<string, unknown>
 }
 
 export interface ListConflictsInput {
