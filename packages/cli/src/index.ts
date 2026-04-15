@@ -90,6 +90,11 @@ PLUGINS
   plugin link <path>                  Link a local plugin directory (dev mode)
   plugin remove <package>             Remove a globally-installed plugin
 
+SKILLS
+  skills install                      Install bundled skills to ~/.claude/skills/ (Claude Code auto-loads)
+  skills install --project            Install to .claude/skills/ (project scope)
+  skills list                         List available skills
+
 DIAGNOSTICS
   doctor              Run environment + configuration health checks
   doctor --json       Output checks as JSON
@@ -2085,6 +2090,110 @@ PLUGIN SEARCH PATH
   }
 }
 
+// ── Skills management ────────────────────────────────────────────────────────
+// GAP-SKILLS-9: Install skills to the Claude Code load path.
+// Claude Code reads skills from ~/.claude/skills/ (user scope) or
+// <project>/.claude/skills/ (project scope). `fulcrum skills install` creates
+// a symlink so the bundled skills are discoverable without manual copying.
+
+async function runSkills(): Promise<void> {
+  const { symlinkSync, existsSync, mkdirSync, readdirSync, statSync } = await import('fs')
+  const { join, resolve } = await import('path')
+
+  // Locate the bundled skills directory inside the Fulcrum repo.
+  // Priority: CWD/agent-integration/skills (repo context) → globalDataDir()/skills (installed context)
+  function findSourceDir(): string | null {
+    const cwdSource = join(process.cwd(), 'agent-integration', 'skills')
+    if (existsSync(cwdSource)) return cwdSource
+    const globalSource = join(globalDataDir(), 'agent-integration', 'skills')
+    if (existsSync(globalSource)) return globalSource
+    return null
+  }
+
+  switch (command) {
+    case 'install': {
+      const sourceDir = findSourceDir()
+      if (!sourceDir) {
+        console.error('Cannot find agent-integration/skills/ in CWD or global data dir.')
+        console.error('Run this command from the Fulcrum repo root, or install Fulcrum globally first.')
+        process.exit(1)
+      }
+
+      // Destination: ~/.claude/skills/ (user-scoped, always loaded by Claude Code)
+      const homeDir = process.env['HOME'] ?? process.env['USERPROFILE'] ?? ''
+      const destParent = join(homeDir, '.claude')
+      const destLink = join(destParent, 'skills')
+
+      // Also support project scope: <cwd>/.claude/skills/
+      const projectScope = args.includes('--project')
+      const targetDir = projectScope ? join(process.cwd(), '.claude') : destParent
+      const targetLink = projectScope ? join(process.cwd(), '.claude', 'skills') : destLink
+
+      if (existsSync(targetLink)) {
+        const stat = statSync(targetLink, { bigint: false })
+        if ((stat as unknown as { isSymbolicLink?: () => boolean }).isSymbolicLink?.()) {
+          console.log(`Skills already installed at ${targetLink} (symlink).`)
+          console.log(`  → ${resolve(sourceDir)}`)
+        } else {
+          console.log(`${targetLink} exists but is not a symlink — skipping.`)
+          console.log('Remove it manually and re-run to install the skills symlink.')
+        }
+        return
+      }
+
+      mkdirSync(targetDir, { recursive: true })
+      symlinkSync(resolve(sourceDir), targetLink)
+      const count = readdirSync(sourceDir).filter(d => existsSync(join(sourceDir, d, 'SKILL.md'))).length
+      console.log(`Installed ${count} Fulcrum skills → ${targetLink}`)
+      console.log(`  Symlinked from: ${resolve(sourceDir)}`)
+      console.log(`  Claude Code will load these skills automatically.`)
+      return
+    }
+
+    case 'list': {
+      const sourceDir = findSourceDir()
+      if (!sourceDir) {
+        console.log('No bundled skills found. Run this command from the Fulcrum repo root.')
+        return
+      }
+      const skillDirs = readdirSync(sourceDir).filter(d => existsSync(join(sourceDir, d, 'SKILL.md')))
+      console.log(`Fulcrum skills (${skillDirs.length}) — source: ${sourceDir}`)
+      for (const dir of skillDirs) {
+        const skillPath = join(sourceDir, dir, 'SKILL.md')
+        // Extract name and description from frontmatter
+        const raw = (await import('fs')).readFileSync(skillPath, 'utf8').split('\n')
+        const nameLine = raw.find(l => l.startsWith('name:'))
+        const descLine = raw.find(l => l.startsWith('description:'))
+        const name = nameLine?.replace('name:', '').trim() ?? dir
+        const desc = descLine?.replace('description:', '').trim() ?? ''
+        const invocable = raw.some(l => l.includes('user-invocable: true')) ? '✓' : '○'
+        console.log(`  ${invocable} ${name.padEnd(30)} ${desc.slice(0, 60)}`)
+      }
+      console.log('\n  ✓ = user-invocable  ○ = auto-trigger only')
+      return
+    }
+
+    default:
+      console.log(`
+fulcrum skills — manage Fulcrum skills for Claude Code
+
+USAGE
+  fulcrum skills install             Install bundled skills to ~/.claude/skills/ (user scope)
+  fulcrum skills install --project   Install to .claude/skills/ (project scope)
+  fulcrum skills list                List available bundled skills
+
+ABOUT
+  Skills teach Claude Code agents how to use Fulcrum's MCP tools correctly.
+  They are loaded by Claude Code from ~/.claude/skills/ or .claude/skills/.
+  Run 'fulcrum skills install' once after setup to activate them.
+
+  Source: agent-integration/skills/ in the Fulcrum repo
+  Docs:   agent-integration/skills/index.md
+`)
+      process.exit(0)
+  }
+}
+
 // ── Main dispatch ─────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -2218,6 +2327,8 @@ fulcrum serve — long-running servers
   if (group === 'agent' || group === 'agents') { await runAgent(); return }
 
   if (group === 'plugin' || group === 'plugins') { await runPlugin(); return }
+
+  if (group === 'skills' || group === 'skill') { await runSkills(); return }
 
   if (group === 'doctor') {
     const { results, exitCode } = runDoctor({ cwd: process.cwd(), json: args.includes('--json') })
