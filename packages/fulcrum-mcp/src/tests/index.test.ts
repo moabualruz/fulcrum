@@ -4,7 +4,7 @@
 // Verifies the argv injection and delegation pattern without spawning
 // a full MCP server (embedding model not required).
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -54,5 +54,35 @@ describe('fulcrum-mcp package', () => {
     // kuzu should be in optionalDependencies
     const optDeps = pkg['optionalDependencies'] as Record<string, unknown> | undefined
     expect(optDeps?.['kuzu']).toBeDefined()
+  })
+})
+
+describe('argv injection', () => {
+  let savedArgv: string[]
+
+  beforeEach(() => {
+    savedArgv = process.argv.slice()
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    process.argv = savedArgv
+  })
+
+  it('injects serve mcp at index 2', async () => {
+    process.argv = ['node', '/path/to/fulcrum-mcp/index.ts']
+    vi.doMock('@fulcrum/cli', () => ({}))
+    await import('../index.js')
+    expect(process.argv[2]).toBe('serve')
+    expect(process.argv[3]).toBe('mcp')
+  })
+
+  it('preserves existing args after the injection point', async () => {
+    process.argv = ['node', '/path/to/fulcrum-mcp/index.ts', '--no-monitor']
+    vi.doMock('@fulcrum/cli', () => ({}))
+    await import('../index.js')
+    expect(process.argv[2]).toBe('serve')
+    expect(process.argv[3]).toBe('mcp')
+    expect(process.argv[4]).toBe('--no-monitor')
   })
 })
