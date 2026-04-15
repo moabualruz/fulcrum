@@ -464,6 +464,58 @@ describe('runWorkflow (H-1/H-5)', () => {
     expect((result.output as Record<string, unknown>)['validated']).toBe(false)
   })
 
+  it('search_web returns completed with empty results and note when no API key', async () => {
+    const savedTavily = process.env['TAVILY_API_KEY']
+    const savedSerper = process.env['SERPER_API_KEY']
+    delete process.env['TAVILY_API_KEY']
+    delete process.env['SERPER_API_KEY']
+    const ctx: StepContext = {
+      wf_id: 'wf_fake', workspace_id, project_id, step_id: 's_sw',
+      step: { step_id: 's_sw', step_type: 'search_web' as WorkflowStepDef['step_type'], name: 'web', config: { query: 'agent OS' } },
+      outputs: {}, attempts: 0,
+    }
+    const result = await executeStep(ctx)
+    if (savedTavily) process.env['TAVILY_API_KEY'] = savedTavily
+    if (savedSerper) process.env['SERPER_API_KEY'] = savedSerper
+    expect(result.status).toBe('completed')
+    const out = result.output as Record<string, unknown>
+    expect(out['configured']).toBe(false)
+    expect(Array.isArray(out['results'])).toBe(true)
+    expect(typeof out['note']).toBe('string')
+  })
+
+  it('call_mcp_tool returns failed with actionable error', async () => {
+    const ctx: StepContext = {
+      wf_id: 'wf_fake', workspace_id, project_id, step_id: 's_mcp',
+      step: { step_id: 's_mcp', step_type: 'call_mcp_tool' as WorkflowStepDef['step_type'], name: 'mcp', config: { tool_name: 'some_tool', args: {} } },
+      outputs: {}, attempts: 0,
+    }
+    const result = await executeStep(ctx)
+    expect(result.status).toBe('failed')
+    expect(result.error).toMatch(/mcp/i)
+  })
+
+  it('call_mcp_tool returns failed when tool_name missing', async () => {
+    const ctx: StepContext = {
+      wf_id: 'wf_fake', workspace_id, project_id, step_id: 's_mcp2',
+      step: { step_id: 's_mcp2', step_type: 'call_mcp_tool' as WorkflowStepDef['step_type'], name: 'mcp2', config: {} },
+      outputs: {}, attempts: 0,
+    }
+    const result = await executeStep(ctx)
+    expect(result.status).toBe('failed')
+  })
+
+  it('run_tool returns failed with actionable error', async () => {
+    const ctx: StepContext = {
+      wf_id: 'wf_fake', workspace_id, project_id, step_id: 's_rt',
+      step: { step_id: 's_rt', step_type: 'run_tool' as WorkflowStepDef['step_type'], name: 'rt', config: { tool: 'some_tool' } },
+      outputs: {}, attempts: 0,
+    }
+    const result = await executeStep(ctx)
+    expect(result.status).toBe('failed')
+    expect(result.error).toMatch(/mcp/i)
+  })
+
   it('executeStep returns failed for unknown step types', async () => {
     const ctx: StepContext = {
       wf_id: 'wf_fake',

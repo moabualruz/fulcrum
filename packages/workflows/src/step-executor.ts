@@ -260,18 +260,14 @@ HANDLERS['run_script'] = async (ctx) => {
 }
 
 HANDLERS['call_mcp_tool'] = async (ctx) => {
-  // Stub: actual MCP tool invocation requires a running MCP server and
-  // per-tool schema validation. For now we record the intent so workflows
-  // that reference MCP tools don't fail hard — future rounds will wire
-  // this to @fulcrum/mcp when that package lands.
   const c = cfg(ctx)
+  const tool_name = str(c['tool_name'])
+  if (!tool_name) return { status: 'failed', error: 'call_mcp_tool requires tool_name' }
+  // MCP tool invocation requires a running MCP server connection.
+  // Returning failed lets the workflow branch on the result via a 'branch' step.
   return {
-    status: 'completed',
-    output: {
-      tool_name: c['tool_name'] ?? null,
-      args: c['args'] ?? {},
-      note: 'call_mcp_tool stubbed pending MCP integration',
-    },
+    status: 'failed',
+    error: `call_mcp_tool: no MCP server connection — tool '${tool_name}' could not be invoked. Run workflows via 'fulcrum serve mcp' to enable MCP steps.`,
   }
 }
 
@@ -452,11 +448,48 @@ HANDLERS['evaluate_policy'] = async (ctx) => {
 }
 
 HANDLERS['search_web'] = async (ctx) => {
-  // No built-in web search in this monorepo yet — stub the step so
-  // workflows that reference it don't fail. Future rounds will wire
-  // this to an external search adapter.
   const c = cfg(ctx)
-  return { status: 'completed', output: { query: c['query'] ?? '', results: [], note: 'search_web stubbed' } }
+  const query = str(c['query'])
+  const tavilyKey = process.env['TAVILY_API_KEY']
+  const serperKey = process.env['SERPER_API_KEY']
+
+  if (tavilyKey) {
+    try {
+      const resp = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ api_key: tavilyKey, query, search_depth: 'basic', max_results: num(c['max_results'], 5) }),
+      })
+      const data = await resp.json() as { results?: unknown[] }
+      return { status: 'completed', output: { query, results: data.results ?? [], configured: true } }
+    } catch (err) {
+      return { status: 'completed', output: { query, results: [], configured: true, note: (err as Error).message } }
+    }
+  }
+
+  if (serperKey) {
+    try {
+      const resp = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: { 'x-api-key': serperKey, 'content-type': 'application/json' },
+        body: JSON.stringify({ q: query, num: num(c['max_results'], 5) }),
+      })
+      const data = await resp.json() as { organic?: unknown[] }
+      return { status: 'completed', output: { query, results: data.organic ?? [], configured: true } }
+    } catch (err) {
+      return { status: 'completed', output: { query, results: [], configured: true, note: (err as Error).message } }
+    }
+  }
+
+  return {
+    status: 'completed',
+    output: {
+      query,
+      results: [],
+      configured: false,
+      note: 'Set TAVILY_API_KEY or SERPER_API_KEY environment variable to enable web search',
+    },
+  }
 }
 
 HANDLERS['search_code'] = async (ctx) => {
@@ -516,8 +549,14 @@ HANDLERS['search_code'] = async (ctx) => {
 }
 
 HANDLERS['run_tool'] = async (ctx) => {
+  // run_tool delegates to call_mcp_tool semantics — both require a running MCP server.
   const c = cfg(ctx)
-  return { status: 'completed', output: { tool: c['tool'] ?? null, note: 'run_tool stubbed' } }
+  const tool = str(c['tool'])
+  if (!tool) return { status: 'failed', error: 'run_tool requires tool' }
+  return {
+    status: 'failed',
+    error: `run_tool: no MCP server connection — tool '${tool}' could not be invoked. Run workflows via 'fulcrum serve mcp' to enable MCP steps.`,
+  }
 }
 
 HANDLERS['parallel'] = async () => {
