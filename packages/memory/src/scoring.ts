@@ -15,11 +15,17 @@ export function computeImportance(m: {
 }
 
 /**
- * Freshness decays linearly from 1 (now) to 0 (90 days old). Never negative.
+ * Freshness decays exponentially from 1.0 (now) toward 0.1 (very old).
+ * Formula: 0.1 + 0.9 * exp(-ageDays / 130)
+ *   - At 0 days:   1.0
+ *   - At ~90 days: ~0.55
+ *   - At ~200 days: ~0.25
+ *   - Asymptotes toward 0.1 (never reaches 0)
  */
 export function computeFreshness(updatedAt: string): number {
-  const daysSinceUpdate = (Date.now() - Date.parse(updatedAt)) / 86_400_000
-  return Math.max(0, 1 - daysSinceUpdate / 90)
+  const ageMs = Date.now() - new Date(updatedAt).getTime()
+  const ageDays = ageMs / (1000 * 60 * 60 * 24)
+  return 0.1 + 0.9 * Math.exp(-ageDays / 130)
 }
 
 /**

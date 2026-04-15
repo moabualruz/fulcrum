@@ -27,6 +27,7 @@ import {
   getForecasting,
 } from './metrics.js'
 import type { MonitorServer, MonitorServerConfig } from './types.js'
+import { buildAgentCard } from './agent-card.js'
 
 // ---------- Auth helpers ----------
 
@@ -102,6 +103,13 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   // Load or create the bearer token for mutating endpoints
   const monitorToken = getOrCreateMonitorToken()
   const auth = requireAuth(monitorToken)
+
+  // A2A Agent Card — public discovery endpoint, no auth required
+  app.get('/.well-known/agent.json', (c) => {
+    const baseUrl = `http://${host}:${port}`
+    const card = buildAgentCard({ baseUrl, workspace_id })
+    return c.json(card)
+  })
 
   app.get('/status', (c) => {
     return c.json({

@@ -1,6 +1,6 @@
 // packages/memory/src/recall.ts
 import { getDb, FulcrumError, getTextEmbedder, getReranker } from '@fulcrum/core'
-import { rrfScore, recallScore } from './scoring.js'
+import { rrfScore, recallScore, computeFreshness } from './scoring.js'
 import { rowToFullMemory } from './mappers.js'
 import type { RecallMemoryInput, CompactMemory, FullMemory, RecallMode, QueryScope } from './types.js'
 import { getKuzuClient } from './kuzu/client.js'
@@ -249,7 +249,8 @@ export async function recallMemory(
     .map(s => {
       const row = rowByRowid.get(s.rowid)
       if (!row) return null
-      const freshness = (row.freshness as number) ?? 1.0
+      // Compute freshness at query time from updated_at — not from the stored freshness column
+      const freshness = computeFreshness(row.updated_at as string)
       return { rowid: s.rowid, score: recallScore(ftsMap.get(s.rowid) ?? null, vecMap.get(s.rowid) ?? null, freshness) }
     })
     .filter((s): s is { rowid: number; score: number } => s !== null)

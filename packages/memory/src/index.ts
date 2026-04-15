@@ -35,27 +35,6 @@ export { recallMemory, getMemory, getMemoriesForTask } from './recall.js'
 // Ingestion pipeline
 export { ingestFile, ingestProject } from './ingest.js'
 
-// Graph memory backend
-export type {
-  GraphEntity,
-  GraphEdge,
-  GraphEpisode,
-  AddEntityInput,
-  AddEdgeInput,
-  AddEpisodeInput,
-  GetNeighborsInput,
-  SearchEntitiesInput,
-} from './graph-types.js'
-
-export {
-  addEntity,
-  getEntity,
-  searchEntities,
-  addEdge,
-  getNeighbors,
-  addEpisode,
-  getEpisodes,
-} from './graph.js'
 
 // Vault (L0)
 export { getVaultPath, vaultExists, initVault, writeMemoryFile, readMemoryFile, listMemoryFiles } from './vault/client.js'

@@ -153,7 +153,7 @@ describe('writeMemory — optional fields', () => {
 })
 
 describe('writeMemory — freshness', () => {
-  it('newly written memory has freshness === 1.0 by default', async () => {
+  it('newly written memory has freshness close to 1.0 (computed from updated_at)', async () => {
     const db = getDb()
     seedWorkspaceAndProject(db)
     const m = await writeMemory({
@@ -161,22 +161,26 @@ describe('writeMemory — freshness', () => {
       scope: 'project', kind: 'fact',
       title: 'Fresh memory', summary: 's', content: 'fresh content',
     })
-    expect(m.freshness).toBe(1.0)
+    // freshness is now computed from updated_at at query time — newly written rows get ~1.0
+    expect(m.freshness).toBeCloseTo(1.0, 1)
   })
 
-  it('stores explicit freshness value', async () => {
+  it('explicit freshness input is ignored — returned value computed from updated_at', async () => {
     const db = getDb()
     seedWorkspaceAndProject(db)
     const m = await writeMemory({
       workspace_id: 'ws_1', project_id: 'proj_1',
       scope: 'project', kind: 'fact',
       title: 'Stale memory', summary: 's', content: 'half-fresh content',
+      // passing freshness: 0.5 is deprecated — should be ignored
       freshness: 0.5,
     })
-    expect(m.freshness).toBeCloseTo(0.5)
-    // Verify it is persisted to the DB
-    const row = db.prepare('SELECT freshness FROM memories WHERE memory_id = ?').get(m.memory_id) as { freshness: number }
-    expect(row.freshness).toBeCloseTo(0.5)
+    // The returned freshness is computed from updated_at (just now), so it should be ~1.0, NOT 0.5
+    expect(m.freshness).toBeCloseTo(1.0, 1)
+    // The DB column does NOT store the caller-supplied value (0.5 is not in the DB)
+    const row = db.prepare('SELECT freshness FROM memories WHERE memory_id = ?').get(m.memory_id) as { freshness: number | null }
+    // Column may be NULL or have a schema default — either way it should NOT be 0.5
+    expect(row.freshness).not.toBeCloseTo(0.5)
   })
 })
 

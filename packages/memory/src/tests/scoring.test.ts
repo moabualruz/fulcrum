@@ -37,19 +37,33 @@ describe('computeFreshness', () => {
     expect(computeFreshness(now)).toBeCloseTo(1.0, 1)
   })
 
-  it('returns 0 for a record updated 90+ days ago', () => {
+  it('returns ~0.55 for a record updated 90 days ago (exponential, not linear)', () => {
+    // Formula: 0.1 + 0.9 * exp(-90/130) ≈ 0.1 + 0.9 * 0.4994 ≈ 0.549
     const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000).toISOString()
-    expect(computeFreshness(ninetyDaysAgo)).toBeCloseTo(0, 1)
+    const value = computeFreshness(ninetyDaysAgo)
+    expect(value).toBeGreaterThan(0.4)
+    expect(value).toBeLessThan(0.7)
   })
 
-  it('returns ~0.5 for a record updated 45 days ago', () => {
+  it('returns ~0.74 for a record updated 45 days ago', () => {
+    // Formula: 0.1 + 0.9 * exp(-45/130) ≈ 0.1 + 0.9 * 0.707 ≈ 0.736
     const fortyFiveDaysAgo = new Date(Date.now() - 45 * 86_400_000).toISOString()
-    expect(computeFreshness(fortyFiveDaysAgo)).toBeCloseTo(0.5, 1)
+    const value = computeFreshness(fortyFiveDaysAgo)
+    expect(value).toBeGreaterThan(0.65)
+    expect(value).toBeLessThan(0.85)
   })
 
-  it('never returns a negative value', () => {
+  it('never returns below 0.1 even for very old records (asymptote)', () => {
     const veryOld = new Date(Date.now() - 365 * 86_400_000).toISOString()
-    expect(computeFreshness(veryOld)).toBeGreaterThanOrEqual(0)
+    expect(computeFreshness(veryOld)).toBeGreaterThanOrEqual(0.1)
+  })
+
+  it('strictly decreases as the record gets older', () => {
+    const fresh = computeFreshness(new Date(Date.now() - 1 * 86_400_000).toISOString())
+    const medium = computeFreshness(new Date(Date.now() - 60 * 86_400_000).toISOString())
+    const old = computeFreshness(new Date(Date.now() - 200 * 86_400_000).toISOString())
+    expect(fresh).toBeGreaterThan(medium)
+    expect(medium).toBeGreaterThan(old)
   })
 })
 

@@ -1,7 +1,13 @@
 // packages/memory/src/mappers.ts
 import type { FullMemory } from './types.js'
+import { computeFreshness } from './scoring.js'
 
 export function rowToFullMemory(row: Record<string, unknown>): FullMemory {
+  // Freshness is always computed at query time from updated_at.
+  // The stored DB column (if any) is ignored — it was a static snapshot.
+  const updatedAt = row.updated_at as string
+  const freshness = updatedAt ? computeFreshness(updatedAt) : 1.0
+
   return {
     memory_id: row.memory_id as string,
     scope: row.scope as FullMemory['scope'],
@@ -16,7 +22,7 @@ export function rowToFullMemory(row: Record<string, unknown>): FullMemory {
     tags: (() => { try { return JSON.parse(row.tags as string) as string[] } catch { return [] } })(),
     entities: (() => { try { return JSON.parse(row.entities as string) as string[] } catch { return [] } })(),
     confidence: row.confidence as number,
-    freshness: row.freshness as number,
+    freshness,
     importance: (row.importance as number) ?? 0.5,
     access_count: row.access_count as number,
     event_time: row.event_time as string | null,

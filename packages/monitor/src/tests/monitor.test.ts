@@ -1,5 +1,5 @@
 // packages/monitor/src/tests/monitor.test.ts
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
 import { setDb, _configureDb, runMigrations } from '@fulcrum/core'
 import { runMigration009 } from '../schema.js'
@@ -588,5 +588,77 @@ describe('POST /policy/check — real evaluatePolicy engine (in-process)', () =>
       action: 'invoke_team',
     })
     expect(decision.allowed).toBe(true)
+  })
+})
+
+// ─── GET /.well-known/agent.json — A2A Agent Card ─────────────────────────────
+
+describe('GET /.well-known/agent.json — A2A Agent Card', () => {
+  let a2aDb: Database.Database
+
+  beforeEach(() => {
+    a2aDb = new Database(':memory:')
+    _configureDb(a2aDb)
+    runMigrations(a2aDb)
+    a2aDb.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_a2a', 'A2A Test WS')").run()
+    setDb(a2aDb)
+  })
+
+  afterEach(() => {
+    a2aDb.close()
+  })
+
+  it('returns 200 with no auth header required', async () => {
+    const server = startMonitorServer({ workspace_id: 'ws_a2a' })
+    const res = await server.fetch(new Request('http://localhost/.well-known/agent.json'))
+    expect(res.status).toBe(200)
+  })
+
+  it('response has required A2A fields: name, skills, authentication.schemes', async () => {
+    const server = startMonitorServer({ workspace_id: 'ws_a2a' })
+    const res = await server.fetch(new Request('http://localhost/.well-known/agent.json'))
+    expect(res.status).toBe(200)
+
+    const body = await res.json() as Record<string, unknown>
+    expect(body).toHaveProperty('name')
+    expect(typeof body.name).toBe('string')
+    expect(body).toHaveProperty('skills')
+    expect(Array.isArray(body.skills)).toBe(true)
+    expect(body).toHaveProperty('authentication')
+    const auth = body.authentication as Record<string, unknown>
+    expect(auth).toHaveProperty('schemes')
+    expect(Array.isArray(auth.schemes)).toBe(true)
+    expect((auth.schemes as string[]).length).toBeGreaterThan(0)
+  })
+
+  it('skills array is populated from registered agent definitions', async () => {
+    const { createAgentDefinition } = await import('@fulcrum/core')
+    createAgentDefinition({
+      workspace_id: 'ws_a2a',
+      role: 'software_engineer',
+      display_name: 'Software Engineer',
+      description: 'Writes and reviews code',
+      capabilities: ['code_generation', 'code_review'],
+    }, a2aDb)
+
+    const server = startMonitorServer({ workspace_id: 'ws_a2a' })
+    const res = await server.fetch(new Request('http://localhost/.well-known/agent.json'))
+    const body = await res.json() as { skills: Array<{ id: string; name: string }> }
+    expect(body.skills.length).toBeGreaterThanOrEqual(1)
+    const skill = body.skills.find(s => s.id === 'software_engineer')
+    expect(skill).toBeDefined()
+    expect(skill!.name).toBe('Software Engineer')
+  })
+
+  it('response follows A2A format with url, version, capabilities', async () => {
+    const server = startMonitorServer({ workspace_id: 'ws_a2a' })
+    const res = await server.fetch(new Request('http://localhost/.well-known/agent.json'))
+    const body = await res.json() as Record<string, unknown>
+    expect(body).toHaveProperty('url')
+    expect(body).toHaveProperty('version')
+    expect(body).toHaveProperty('capabilities')
+    const caps = body.capabilities as Record<string, unknown>
+    expect(caps).toHaveProperty('streaming')
+    expect(caps).toHaveProperty('pushNotifications')
   })
 })

@@ -21,7 +21,8 @@ export interface WriteMemoryInput {
   canonical_text?: string             // optional structured canonical form; defaults to content if omitted
   tags?: string[]
   confidence?: number                 // 0–1, default 1.0
-  freshness?: number                  // 0–1, default 1.0; new memories start fresh
+  /** @deprecated freshness is computed at query time from updated_at — this field is ignored on write */
+  freshness?: number
   importance?: number                 // 0–1, default 0.5
   file_path?: string | null
   symbol_path?: string | null
@@ -87,6 +88,7 @@ export interface FullMemory {
   tags: string[]
   entities: string[]
   confidence: number
+  /** Freshness is computed at query time from updated_at (exponential decay). Not read from DB. */
   freshness: number
   importance: number
   access_count: number

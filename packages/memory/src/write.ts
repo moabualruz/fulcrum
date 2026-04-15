@@ -19,9 +19,6 @@ export async function writeMemory(input: WriteMemoryInput, db = getDb()): Promis
   if (input.confidence !== undefined && (input.confidence < 0 || input.confidence > 1)) {
     throw new FulcrumError('confidence must be between 0 and 1', 'invalid_input')
   }
-  if (input.freshness !== undefined && (input.freshness < 0 || input.freshness > 1)) {
-    throw new FulcrumError('freshness must be between 0 and 1', 'invalid_input')
-  }
   if (input.importance !== undefined && (input.importance < 0 || input.importance > 1)) {
     throw new FulcrumError('importance must be between 0 and 1', 'invalid_input')
   }
@@ -60,7 +57,6 @@ export async function writeMemory(input: WriteMemoryInput, db = getDb()): Promis
     tags: input.tags ?? [],
     entities: input.entities ?? [],
     confidence: input.confidence ?? 1.0,
-    freshness: input.freshness ?? 1.0,
     importance: input.importance ?? 0.5,
     access_count: 0,
     event_time: input.event_time ?? null,
@@ -97,18 +93,19 @@ export async function writeMemory(input: WriteMemoryInput, db = getDb()): Promis
   }
 
   // ── L1 SQLite insert (synchronous) ────────────────────────────────────────
+  // freshness is NOT written here — it is computed at query time from updated_at
   db.prepare(`
     INSERT INTO memories (
       memory_id, workspace_id, project_id,
       scope, kind, title, summary, canonical_text,
-      content, tags, entities, confidence, freshness, importance,
+      content, tags, entities, confidence, importance,
       file_path, symbol_path, event_time, content_hash,
       task_id, issue_id, artifact_id, provenance_refs,
       embedding, created_at, updated_at, last_accessed_at, access_count
     ) VALUES (
       ?, ?, ?,
       ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?, 0
@@ -116,7 +113,7 @@ export async function writeMemory(input: WriteMemoryInput, db = getDb()): Promis
   `).run(
     memory_id, input.workspace_id, input.project_id ?? null,
     input.scope, input.kind, input.title, input.summary, input.canonical_text ?? input.content,
-    input.content, JSON.stringify(input.tags ?? []), JSON.stringify(input.entities ?? []), input.confidence ?? 1.0, input.freshness ?? 1.0, input.importance ?? 0.5,
+    input.content, JSON.stringify(input.tags ?? []), JSON.stringify(input.entities ?? []), input.confidence ?? 1.0, input.importance ?? 0.5,
     input.file_path ?? null, input.symbol_path ?? null, input.event_time ?? null, hash,
     input.task_id ?? null, input.issue_id ?? null, input.artifact_id ?? null, JSON.stringify(input.provenance_refs ?? []),
     embeddingBuffer, now, now, now
