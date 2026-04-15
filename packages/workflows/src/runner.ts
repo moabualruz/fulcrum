@@ -22,6 +22,7 @@ import { getDb, startSpan, endSpan, Db} from '@fulcrum/core'
 import { nextReadySteps } from './engine.js'
 import { executeStep } from './step-executor.js'
 import { registry } from './registry.js'
+import { checkWorkflowPeers } from './check-peers.js'
 import type {
   WorkflowStepDef,
   WorkflowStepState,
@@ -178,6 +179,9 @@ function persistStates(
  *  - max_iterations is reached → `blocked` (safety cap)
  */
 export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowResult> {
+  // Advisory peer check — cached after first call, so no overhead in loops.
+  checkWorkflowPeers()
+
   const start = Date.now()
   const maxIter = input.max_iterations ?? DEFAULT_MAX_ITERATIONS
   const defaultTimeout = input.default_timeout_ms ?? DEFAULT_STEP_TIMEOUT_MS

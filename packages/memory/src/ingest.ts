@@ -7,6 +7,8 @@ import { contentHash, isDuplicate } from './dedup.js'
 import { writeMemory } from './write.js'
 import type { IngestFileInput, IngestResult, IngestProjectInput } from './types.js'
 import { createASTChunker } from './chunkers/ast-chunker.js'
+import { getKuzuClient } from './kuzu/client.js'
+import { resolveEntity, incrementMentionCount } from './kuzu/entity-store.js'
 
 const CODE_LANGUAGES = new Set(['typescript', 'javascript', 'python', 'java', 'go', 'rust', 'c', 'cpp'])
 const LANG_EXT_MAP: Record<string, string> = {
@@ -142,6 +144,35 @@ function byteOffsetToLine(offset: number, lineStarts: number[]): number {
   return lo + 1  // 1-based
 }
 
+/**
+ * Extract relative import paths from TypeScript/JavaScript source.
+ * Returns only paths starting with './' or '../' — node_modules are excluded.
+ */
+export function extractImports(content: string, language: string): string[] {
+  const lang = language.toLowerCase()
+  if (lang !== 'typescript' && lang !== 'javascript') return []
+
+  const paths: string[] = []
+
+  // ES module static imports: import ... from '...' or import('...')
+  const esImportRe = /(?:^|[\s;])import\s+(?:[^'"]*\s+from\s+)?['"]([^'"]+)['"]/gm
+  let m: RegExpExecArray | null
+  while ((m = esImportRe.exec(content)) !== null) {
+    const p = m[1]!
+    if (p.startsWith('./') || p.startsWith('../')) paths.push(p)
+  }
+
+  // require('...') calls
+  const requireRe = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+  while ((m = requireRe.exec(content)) !== null) {
+    const p = m[1]!
+    if (p.startsWith('./') || p.startsWith('../')) paths.push(p)
+  }
+
+  // Deduplicate
+  return [...new Set(paths)]
+}
+
 export async function ingestFile(input: IngestFileInput, db: Db = getDb()): Promise<IngestResult> {
   const { workspace_id, project_id, file_path, content, language } = input
 
@@ -209,7 +240,7 @@ export async function ingestFile(input: IngestFileInput, db: Db = getDb()): Prom
 
     const existingMemId = isDuplicate({ db, workspace_id, project_id, hash })
     if (!existingMemId) {
-      await writeMemory({
+      const mem = await writeMemory({
         workspace_id, project_id,
         scope: 'file',
         kind: memoryKind as 'symbol' | 'doc',
@@ -220,6 +251,29 @@ export async function ingestFile(input: IngestFileInput, db: Db = getDb()): Prom
         symbol_path: symbolPath ?? undefined,
       })
       memories_created++
+
+      // GAP-RAG-4: Emit USES edges from this Memory node to Entity nodes
+      // representing files imported by this source file.
+      if (lang === 'typescript' || lang === 'javascript') {
+        const kuzuClient = getKuzuClient()
+        if (kuzuClient) {
+          try {
+            const importPaths = extractImports(chunk.text, lang)
+            const now = new Date().toISOString()
+            for (const importPath of importPaths) {
+              const entity = await resolveEntity(kuzuClient, `[[file/${importPath}]]`, workspace_id)
+              await incrementMentionCount(kuzuClient, entity.id)
+              await kuzuClient.query(
+                `MATCH (m:Memory {id: $mid}), (e:Entity {id: $eid})
+                 CREATE (m)-[:USES {weight: $weight, confidence: $confidence, source: 'import-graph', created_at: CAST($now AS TIMESTAMP)}]->(e)`,
+                { mid: mem.memory_id, eid: entity.id, weight: 1.0, confidence: 1.0, now }
+              ).catch(() => { /* edge may already exist or node not yet committed */ })
+            }
+          } catch (err) {
+            process.stderr.write(`[ingestFile] graph USES write failed for ${file_path}: ${err instanceof Error ? err.message : String(err)}\n`)
+          }
+        }
+      }
     }
   }
 

@@ -1,22 +1,8 @@
 import { getDb , Db} from './db/client.js'
 import { newId } from './ids.js'
-import type { EventType } from './types.js'
 import { getEventBus } from './event-bus.js'
-
-export interface EmitEventInput {
-  workspace_id: string
-  project_id?: string
-  evt_type: EventType
-  object_type?: string
-  object_id?: string
-  actor_type: string
-  actor_id: string
-  payload?: Record<string, unknown>
-  severity?: 'debug' | 'info' | 'warn' | 'error'
-  trace_id?: string
-  span_id?: string
-  correlation_id?: string
-}
+export type { EmitEventInput } from './types.js'
+import type { EmitEventInput } from './types.js'
 
 export function emitEvent(input: EmitEventInput, db: Db = getDb()): void {
   db.prepare(`

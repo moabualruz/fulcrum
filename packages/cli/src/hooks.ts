@@ -1,58 +1,15 @@
 // packages/cli/src/hooks.ts
-// Pure hook types, normalisation logic, and pre/post handler implementations.
-// Extracted from index.ts so this business logic lives in its own module,
-// separate from the CLI dispatch entrypoint (index.ts).
+// Normalisation logic and pre/post handler implementations.
+// Pure hook types have been moved to @fulcrum/core (GAP-ARCH-3) and are
+// re-exported from here for backward-compat.
 //
 // Callers:
 //   - index.ts re-exports these for backward-compat (tests import from there)
 //   - runHook() in index.ts calls normalizeHookEvent / runPreHook / runPostHook
 
-// ---------- Types ----------
+import type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO } from '@fulcrum/core'
 
-export type HookCli = 'claude' | 'gemini' | 'pi'
-
-export interface NormalizedHookEvent {
-  toolName: string
-  toolInput: Record<string, unknown>
-  sessionId: string
-  agentRole: string
-  runId: string
-}
-
-export type HookPhase = 'pre' | 'post'
-
-export interface HookContext {
-  cliName: HookCli
-  phase: HookPhase
-  toolName: string
-  toolInput: Record<string, unknown>
-  sessionId: string
-  agentRole: string
-  runId: string
-  workspace_id: string
-}
-
-/**
- * Normalized hook output — written as JSON to stdout before exit.
- * Claude Code reads this shape from hook stdout (exit code 2 = block).
- */
-export interface HookOutput {
-  continue: boolean
-  suppressOutput?: boolean
-  stopReason?: string
-  message?: string
-}
-
-/**
- * Hook I/O surface — injected so the pre/post handlers are pure and
- * testable without spawning a subprocess. In production these are wired
- * to process.stdout/stderr.write and process.exit.
- */
-export interface HookIO {
-  stdout: (msg: string) => void
-  stderr: (msg: string) => void
-  exit: (code: number) => void
-}
+export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO }
 
 // ---------- Normalisation ----------
 

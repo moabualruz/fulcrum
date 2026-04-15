@@ -28,8 +28,7 @@
 //   // Emit (called automatically by emitEvent() — most code should NOT call this directly)
 //   getEventBus().emit({ evt_type: 'task_created', ... })
 
-import type { EventType } from './types.js'
-import type { EmitEventInput } from './events.js'
+import type { EventType, EmitEventInput } from './types.js'
 
 export type EventHandler = (event: EmitEventInput) => void | Promise<void>
 

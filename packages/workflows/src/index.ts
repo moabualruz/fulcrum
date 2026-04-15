@@ -43,3 +43,6 @@ export {
 // H-1/H-5: runner + step handlers
 export { runWorkflow } from './runner.js'
 export { executeStep, getStepHandler, listStepHandlers } from './step-executor.js'
+
+// Peer dependency advisory check
+export { checkWorkflowPeers } from './check-peers.js'

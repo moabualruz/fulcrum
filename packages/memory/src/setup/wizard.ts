@@ -1,8 +1,9 @@
 // packages/memory/src/setup/wizard.ts
 import { createInterface } from 'readline'
-import { writeFileSync, existsSync, mkdirSync, readFileSync } from 'fs'
+import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
+import { readRawConfig, writeRawConfig } from '@fulcrum/core'
 import { getVaultPath, initVault } from '../vault/client.js'
 import { createVaultGit } from '../vault/git.js'
 import { rebuildFromVault } from './rebuild.js'
@@ -26,25 +27,6 @@ async function ask(rl: ReturnType<typeof createInterface>, question: string): Pr
   })
 }
 
-function getFulcrumConfigPath(): string {
-  return join(homedir(), '.fulcrum', 'config.json')
-}
-
-function readFulcrumConfig(): Record<string, unknown> {
-  const configPath = getFulcrumConfigPath()
-  if (!existsSync(configPath)) return {}
-  try {
-    return JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>
-  } catch {
-    return {}
-  }
-}
-
-function writeFulcrumConfig(config: Record<string, unknown>): void {
-  const configPath = getFulcrumConfigPath()
-  mkdirSync(join(homedir(), '.fulcrum'), { recursive: true })
-  writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
-}
 
 async function setupEmbeddingProvider(rl: ReturnType<typeof createInterface>): Promise<EmbeddingProviderSetup | null> {
   console.log('\n  Requires an embedding model:\n')
@@ -127,7 +109,7 @@ export async function runMemoryInit(options?: { vaultPath?: string }): Promise<v
     } else if (storedApiKey) {
       console.warn(`\n  ⚠ Deprecation: storing API key in config file. Set ${envVarName} as an environment variable instead.\n`)
     }
-    const config = readFulcrumConfig()
+    const config = readRawConfig()
     config['vault'] = { path: vaultPath, l2_enabled: true }
     config['embedding'] = {
       provider: embeddingSetup.provider,
@@ -135,7 +117,7 @@ export async function runMemoryInit(options?: { vaultPath?: string }): Promise<v
       model: embeddingSetup.model,
       apiKey: storedApiKey,
     }
-    writeFulcrumConfig(config)
+    writeRawConfig(config)
 
     // Step 4: Initialize Kuzu
     const kuzuDbPath = join(homedir(), '.fulcrum', 'kuzu')
