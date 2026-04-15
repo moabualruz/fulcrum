@@ -567,7 +567,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Get Current Context',
     name: 'get_current_context',
-    description: 'Returns the workspace_id and project_id for the directory the MCP server was started from (computed deterministically — no file needed). Use this at session start to discover the current workspace without reading .fulcrum.json or any project-local file. Effect: read-only. Returns: workspace_id, project_id, cwd.',
+    description: 'Returns the workspace_id and project_id for the directory the MCP server was started from (computed deterministically — no file needed). Use this at session start to discover the current workspace without reading .fulcrum.json or any project-local file. Also returns a readiness object with tools_available count, monitor_url, monitor_running (probed with 200ms timeout, cached 15s), and suggested_next_call. Effect: read-only. Returns: workspace_id, project_id, cwd, readiness.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -580,8 +580,18 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         workspace_id: { type: 'string' },
         project_id: { type: 'string' },
         cwd: { type: 'string' },
+        readiness: {
+          type: 'object',
+          properties: {
+            tools_available: { type: 'number' },
+            monitor_url: { type: 'string' },
+            monitor_running: { type: 'boolean' },
+            suggested_next_call: { type: 'string' },
+          },
+          required: ['tools_available', 'monitor_url', 'monitor_running', 'suggested_next_call'],
+        },
       },
-      required: ['workspace_id', 'project_id', 'cwd'],
+      required: ['workspace_id', 'project_id', 'cwd', 'readiness'],
     },
   },
 ]

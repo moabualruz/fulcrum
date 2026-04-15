@@ -572,6 +572,30 @@ writes a tool_trace operational memory for the call.
   }
 }
 
+// ── Monitor probe cache ───────────────────────────────────────────────────────
+// Caches monitor liveness per URL for 15 seconds to avoid hammering on every
+// get_current_context call without introducing noticeable staleness.
+
+interface MonitorProbeEntry { running: boolean; ts: number }
+const _monitorProbeCache = new Map<string, MonitorProbeEntry>()
+const MONITOR_PROBE_TTL_MS = 15_000
+const MONITOR_PROBE_TIMEOUT_MS = 200
+
+async function probeMonitor(url: string): Promise<boolean> {
+  const now = Date.now()
+  const cached = _monitorProbeCache.get(url)
+  if (cached && (now - cached.ts) < MONITOR_PROBE_TTL_MS) return cached.running
+
+  let running = false
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(MONITOR_PROBE_TIMEOUT_MS) })
+    running = resp.status < 500
+  } catch { /* timeout or connection refused = not running */ }
+
+  _monitorProbeCache.set(url, { running, ts: now })
+  return running
+}
+
 // ── Serve commands ────────────────────────────────────────────────────────────
 
 let _embeddingWarmed = false
@@ -978,7 +1002,21 @@ async function runServeMcp(): Promise<void> {
 
     if (name === 'get_current_context') {
       const ids = currentProjectIds()
-      return { workspace_id: ids.workspace_id, project_id: ids.project_id, cwd: process.cwd() }
+      const monitorPort = process.env['FULCRUM_MONITOR_PORT'] ?? '4721'
+      const monitorUrl = `http://localhost:${monitorPort}`
+      const { TOOL_SCHEMAS } = await import('./mcp-tools.js')
+      const monitorRunning = await probeMonitor(monitorUrl)
+      return {
+        workspace_id: ids.workspace_id,
+        project_id: ids.project_id,
+        cwd: process.cwd(),
+        readiness: {
+          tools_available: TOOL_SCHEMAS.length,
+          monitor_url: monitorUrl,
+          monitor_running: monitorRunning,
+          suggested_next_call: 'mcp__fulcrum__list_tasks',
+        },
+      }
     }
 
     throw new Error(`Unknown tool: ${name}`)
@@ -1139,7 +1177,21 @@ async function runServeMcpHttp(): Promise<void> {
       if (fn) return await fn(a)
     }
     if (name === 'get_current_context') {
-      return { workspace_id: config.workspace_id, project_id: config.project_id, cwd: process.cwd() }
+      const monitorPort = process.env['FULCRUM_MONITOR_PORT'] ?? '4721'
+      const monitorUrl = `http://localhost:${monitorPort}`
+      const { TOOL_SCHEMAS } = await import('./mcp-tools.js')
+      const monitorRunning = await probeMonitor(monitorUrl)
+      return {
+        workspace_id: config.workspace_id,
+        project_id: config.project_id,
+        cwd: process.cwd(),
+        readiness: {
+          tools_available: TOOL_SCHEMAS.length,
+          monitor_url: monitorUrl,
+          monitor_running: monitorRunning,
+          suggested_next_call: 'mcp__fulcrum__list_tasks',
+        },
+      }
     }
     throw new Error(`Unknown tool: ${name}`)
   }

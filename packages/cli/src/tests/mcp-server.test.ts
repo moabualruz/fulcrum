@@ -241,6 +241,52 @@ describe('resources/read', () => {
   })
 })
 
+// ---------- get_current_context readiness ----------
+
+describe('get_current_context readiness object', () => {
+  it('returns readiness with expected shape when handler returns it', async () => {
+    const readinessPayload = {
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      cwd: '/repo',
+      readiness: {
+        tools_available: 27,
+        monitor_url: 'http://localhost:4721',
+        monitor_running: false,
+        suggested_next_call: 'mcp__fulcrum__list_tasks',
+      },
+    }
+    const { client } = await makeConnectedPair(async () => readinessPayload)
+    const result = await callRaw(client, 'get_current_context', {})
+    expect(result.isError).toBeFalsy()
+    const parsed = JSON.parse((result.content[0] as { text: string }).text)
+    expect(parsed.workspace_id).toBe('ws_test')
+    expect(parsed.readiness).toBeDefined()
+    expect(typeof parsed.readiness.tools_available).toBe('number')
+    expect(parsed.readiness.tools_available).toBeGreaterThan(0)
+    expect(typeof parsed.readiness.monitor_url).toBe('string')
+    expect(typeof parsed.readiness.monitor_running).toBe('boolean')
+    expect(typeof parsed.readiness.suggested_next_call).toBe('string')
+  })
+
+  it('returns structuredContent for get_current_context (read tool)', async () => {
+    const { client } = await makeConnectedPair(async () => ({
+      workspace_id: 'ws_test',
+      project_id: 'proj_test',
+      cwd: '/repo',
+      readiness: {
+        tools_available: 27,
+        monitor_url: 'http://localhost:4721',
+        monitor_running: false,
+        suggested_next_call: 'mcp__fulcrum__list_tasks',
+      },
+    }))
+    const result = await callRaw(client, 'get_current_context', {})
+    expect(result.isError).toBeFalsy()
+    expect((result as { structuredContent?: unknown }).structuredContent).toBeDefined()
+  })
+})
+
 // ---------- GAP-MCP-11: progress notifications ----------
 
 describe('tools/call progress notifications', () => {

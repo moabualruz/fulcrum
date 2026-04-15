@@ -7,7 +7,7 @@ This file is auto-loaded by Claude Code. It configures your connection to the Fu
 ## MCP Server
 
 <!-- GENERATED:tool-count-start -->
-The `fulcrum` MCP server exposes 27 tools for task management, memory, agent runs, and workspace context.
+The `fulcrum` MCP server exposes 23 tools for task management, memory, agent runs, and workspace context.
 <!-- GENERATED:tool-count-end -->
 It runs as a local stdio process via the `fulcrum serve mcp` command.
 
@@ -37,7 +37,7 @@ All tools are prefixed `mcp__fulcrum__` in Claude Code.
 > Auto-generated from `TOOL_SCHEMAS` in `packages/cli/src/mcp-tools.ts`.
 > Run `pnpm gen:claude-md` to regenerate after editing tools.
 
-**Total: 22 tools**
+**Total: 23 tools**
 
 ### `mcp__fulcrum__list_tasks` — List Tasks
 
@@ -89,7 +89,7 @@ Updates a task's status, note, or assignment. Effect: updates task row in place.
 
 `read-only` `open-world`
 
-Hybrid semantic search over agent memory (FTS5 + vector + rerank). Effect: read-only, queries embedding model. Returns: array of {content, score, tags} ordered by relevance. Requires workspace_id, project_id, and query.
+Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns the top-k most relevant memories for the given query in the specified scope. Requires workspace_id; project_id is optional (omit for workspace-wide recall). Returns: id, content (truncated to max_chars), score (0.0–1.0), tags.
 
 **Parameters:**
 
@@ -97,9 +97,11 @@ Hybrid semantic search over agent memory (FTS5 + vector + rerank). Effect: read-
 |------|------|----------|-------------|
 | `query` | string | Yes | Natural language search query |
 | `workspace_id` | string | Yes | Workspace ID |
-| `project_id` | string | Yes | Project ID |
+| `project_id` | string | No | Project ID (optional — omit for workspace-wide recall) |
 | `limit` | number | No | Max results (default 10) |
-| `query_scope` | `session` \| `project` \| `workspace` \| `global` | No | Search breadth: project (default) = workspace+project; workspace = all projects in workspace; global = cross-workspace; session = specific agent session |
+| `offset` | number | No | Pagination offset — skip this many top results (default 0). Use for MemGPT-style context paging. |
+| `max_chars` | number | No | Truncate content to this many characters (default 500) |
+| `query_scope` | `session` \| `project` \| `workspace` | No | Search breadth: project (default) = workspace+project; workspace = all projects in workspace; session = specific agent session |
 | `session_id` | string | No | Session ID — required when query_scope=session |
 
 ### `mcp__fulcrum__write_memory` — Write Memory
@@ -114,7 +116,7 @@ Persists a memory note to vault (L0), SQLite FTS5 (L1), and vector index (L2). E
 | `workspace_id` | string | Yes | Workspace ID |
 | `project_id` | string | Yes | Project ID |
 | `title` | string | No | Optional title (defaults to first 80 chars of content) |
-| `tags` | string | No | Comma-separated tags (e.g. "decision,architecture") |
+| `tags` | array | No | Tag strings (e.g. ["decision","architecture"]) |
 
 ### `mcp__fulcrum__list_agent_profiles` — List Agent Profiles
 
@@ -154,6 +156,8 @@ Registers the start of an agent run. Call at the beginning of every task. Auto-c
 | `project_id` | string | No | Optional project ID (defaults to workspace_id) |
 | `worktree_path` | string | No | Optional git worktree path for code-writing roles |
 | `pi_run_id` | string | No | Optional custom run ID for external tracking |
+| `model` | string | No | Optional model override (e.g. "claude-sonnet-4-6") |
+| `dispatch` | boolean | No | If true, spawn a Claude Code subprocess for this run (fire-and-forget) |
 
 ### `mcp__fulcrum__heartbeat_agent_run` — Heartbeat Agent Run
 
@@ -183,7 +187,7 @@ Marks an agent run as finished with optional summary and artifact paths. Effect:
 | `run_id` | string | Yes | Run ID from start_agent_run |
 | `workspace_id` | string | Yes | Workspace ID |
 | `output_summary` | string | No | Summary of what was accomplished |
-| `artifact_paths` | string | No | Comma-separated artifact file paths changed or created |
+| `artifact_paths` | array | No | Artifact file paths changed or created |
 
 ### `mcp__fulcrum__block_agent_run` — Block Agent Run
 
@@ -367,6 +371,12 @@ Reads all agent definitions, optionally filtered by stability tier. Effect: read
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `stability` | `stable` \| `beta` \| `experimental` \| `deprecated` | No | Filter by stability tier |
+
+### `mcp__fulcrum__get_current_context` — Get Current Context
+
+`read-only` `idempotent`
+
+Returns the workspace_id and project_id for the directory the MCP server was started from (computed deterministically — no file needed). Use this at session start to discover the current workspace without reading .fulcrum.json or any project-local file. Also returns a readiness object with tools_available count, monitor_url, monitor_running (probed with 200ms timeout, cached 15s), and suggested_next_call. Effect: read-only. Returns: workspace_id, project_id, cwd, readiness.
 
 
 <!-- GENERATED:tools-end -->
