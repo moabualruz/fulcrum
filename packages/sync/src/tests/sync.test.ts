@@ -1,9 +1,10 @@
 // packages/sync/src/tests/sync.test.ts
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import type { Database as DB } from 'better-sqlite3'
 import { runMigration010 } from '../schema.js'
 import { SyncManager } from '../sync-manager.js'
+import { PlaneAPIClient } from '../plane/client.js'
 import type { SyncAdapter, ExternalPayload } from '../types.js'
 
 // ---------------------------------------------------------------------------
@@ -479,6 +480,26 @@ describe('@fulcrum/sync — SyncManager', () => {
     expect(conflicted.conflict_state).toBe('detected')
   })
 
+  it('beforePush guard: error is captured in sync state (status=failed), push not called', async () => {
+    // The SyncManager catches beforePush errors and records them as sync failures.
+    // The error does NOT bubble up — the state is returned with sync_status='failed'.
+    const adapter = new StubAdapter()
+    const manager = new SyncManager(db, adapter, (data) => {
+      if (data.includes('SK_LIVE_')) {
+        throw new Error('Secret detected in sync payload: SK_LIVE_')
+      }
+    })
+    const state = await manager.syncObject({
+      object_type: 'Issue' as const,
+      object_id: 'issue-secret',
+      workspace_id: 'ws-test',
+      local_data: { title: 'Deploy', api_key: 'SK_LIVE_12345abcdef' },
+    })
+    expect(state.sync_status).toBe('failed')
+    expect(state.last_sync_error).toMatch(/Secret detected/)
+    expect(adapter.pushCalls).toHaveLength(0) // push was never called
+  })
+
   it('detects conflict when remote hash differs from last_sync_hash', async () => {
     const { manager, adapter } = makeManager(db)
 
@@ -512,5 +533,51 @@ describe('@fulcrum/sync — SyncManager', () => {
     expect(found).toBeDefined()
     expect(found?.remote_hash).toBe(adapter.remoteHash)
     expect(found?.resolution).toBe('local_wins')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// PlaneAPIClient — error handling
+// ---------------------------------------------------------------------------
+
+describe('PlaneAPIClient — error handling', () => {
+  const client = new PlaneAPIClient({
+    baseUrl: 'https://api.plane.test',
+    apiKey: 'test-key',
+    workspaceSlug: 'ws-slug',
+    projectId: 'proj-id',
+  })
+
+  it('createIssue throws on non-OK response', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('{"detail":"not authorized"}', { status: 401 })
+    )
+    await expect(client.createIssue({ name: 'Test issue' })).rejects.toThrow('Plane API error: 401')
+    fetchSpy.mockRestore()
+  })
+
+  it('getIssue throws on non-OK response', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('not found', { status: 404 })
+    )
+    await expect(client.getIssue('nonexistent')).rejects.toThrow('Plane API error: 404')
+    fetchSpy.mockRestore()
+  })
+
+  it('updateIssue throws on non-OK response', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('server error', { status: 500 })
+    )
+    await expect(client.updateIssue('ext-123', { name: 'Updated' })).rejects.toThrow('Plane API error: 500')
+    fetchSpy.mockRestore()
+  })
+
+  it('createIssue returns the parsed response body on success', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: 'plane-issue-abc' }), { status: 200 })
+    )
+    const result = await client.createIssue({ name: 'New issue' })
+    expect(result.id).toBe('plane-issue-abc')
+    fetchSpy.mockRestore()
   })
 })
