@@ -292,6 +292,9 @@ fulcrum memory — memory vault commands
 
 export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO } from './hooks.js'
 export { normalizeHookEvent, runPreHook, runPostHook } from './hooks.js'
+// Also import into local scope so runHook() can call them as functions.
+import { normalizeHookEvent, runPreHook, runPostHook } from './hooks.js'
+import type { HookCli, HookPhase, HookContext, HookIO } from './hooks.js'
 
 // ── Session lifecycle hooks ───────────────────────────────────────────────────
 // These are called by Claude Code's SessionStart / Stop hooks (not PreToolUse).

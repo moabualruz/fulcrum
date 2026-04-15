@@ -35,7 +35,7 @@ import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { getDb } from './db/client.js'
 import { getAgentDefinition, createAgentDefinition, updateAgentDefinition } from './agent-definitions.js'
-import { globalDataDir } from './config.js'
+import { globalDataDir } from './db/client.js'
 import type { AgentRole, CreateAgentDefinitionInput } from './types.js'
 
 export interface AgentDefFile {
