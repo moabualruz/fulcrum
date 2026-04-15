@@ -115,6 +115,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Plugin tool injection** — plugins with `contributes.tools` in their manifest are merged into `TOOL_SCHEMAS` at MCP server startup; operator-contributed tools appear alongside built-in tools. (GAP-PLUGIN-7)
 - **Plugin settings/secrets manifest** — `PluginManifest` gains `settings` (config key declarations) and `secrets` (secret key declarations) arrays. `fulcrum plugin install` prompts for secrets and writes them to `globalDataDir()/secrets/<plugin-id>/`. (GAP-PLUGIN-3)
 - **Inbound hook lifecycle** — Fulcrum runtime now fires its own `pre_tool_use` / `post_tool_use` hooks via `runPreHook`/`runPostHook` around every MCP tool invocation. (GAP-PLUGIN-2)
+- **Hook isolation model documented** — `packages/cli/README.md` gains a "Hook isolation model" section explaining that hook modules run as short-lived child processes (not in-process modules), how DB isolation is achieved via stdin/stdout stdio transport, current trust level (OS-level, no sandbox), and the roadmap for seccomp/landlock sandboxing. (GAP-PLUGIN-6)
+
+#### Round 2 audit fixes — MCP (continued)
+- **Progress notifications for long-running tools** — `start_agent_run`, `complete_agent_run`, `block_agent_run`, and `build_cos_context` emit `notifications/progress` (progress=0 "starting" → progress=1 "done") when the caller supplies `_meta.progressToken` via the SDK `onprogress` callback. Best-effort: notification failures never break the tool response. (GAP-MCP-11)
 
 ### Changed
 - `_configureDb` adds `synchronous = NORMAL` and `cache_size = -8000` pragmas (additive — no behavior regression).
