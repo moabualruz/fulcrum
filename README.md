@@ -7,7 +7,7 @@ Fulcrum is the persistence, coordination, and execution layer that keeps agents 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20+%20FTS5-003B57?logo=sqlite)](https://sqlite.org/)
-[![Tests](https://img.shields.io/badge/tests-1308%20passing-brightgreen)](#running-tests)
+[![Tests](https://img.shields.io/badge/tests-1505%20passing-brightgreen)](#running-tests)
 [![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm)](https://pnpm.io/)
 
 ---
@@ -150,7 +150,7 @@ pnpm test:watch                    # watch mode
 FULCRUM_EMBEDDING_TESTS=1 pnpm test  # embedding integration tests
 ```
 
-**1308 tests passing across 11 packages** (6 skipped — integration tests requiring live servers).
+**1505 tests passing across 13 packages** (6 skipped — integration tests requiring live servers).
 
 ---
 
