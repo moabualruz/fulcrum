@@ -1,7 +1,7 @@
 ---
 title: Fix Monitor Reliability, Test Gaps, and Housekeeping
 id: 2026-04-15-002
-status: active
+status: completed
 created: 2026-04-15
 tags: [reliability, testing, cli, monitor, housekeeping]
 ---
@@ -297,15 +297,15 @@ Units 3, 4, and 6 are fully independent. Units 1 and 2 share the same file — d
 
 ## Success Criteria
 
-- [ ] `probeMonitor` is tested with real fetch stubs, not mock handlers
-- [ ] `_monitorStarted` guard has at least one test exercising the real flag
-- [ ] `fulcrum-mcp` argv injection test exists and passes
-- [ ] `spliceSection` with inverted markers returns original (no file corruption)
-- [ ] `scripts/gen-claude-md.test.ts` covers all 4 marker combinations
-- [ ] Monitor EADDRINUSE error message includes recovery hint
-- [ ] `_monitorStarted = true` in catch block prevents retry on next invocation
-- [ ] `process.on('exit')` synchronous cleanup stops monitor port
-- [ ] `suggested_next_call` is `create_task` for empty workspace, `list_tasks` otherwise
-- [ ] `docs/brainstorms/` and `docs/ideation/` committed
-- [ ] `.claude/worktrees/agent-ae556031` deletion staged and committed
-- [ ] All existing 1505+ tests still pass
+- [x] `probeMonitor` is tested with real fetch stubs, not mock handlers
+- [x] `_monitorStarted` guard has at least one test exercising the real flag
+- [x] `fulcrum-mcp` argv injection test exists and passes
+- [x] `spliceSection` with inverted markers returns original (no file corruption)
+- [x] `scripts/gen-claude-md.test.ts` covers all 4 marker combinations
+- [x] Monitor EADDRINUSE error message includes recovery hint
+- [x] `_monitorStarted = true` in catch block prevents retry on next invocation
+- [x] `process.on('exit')` synchronous cleanup stops monitor port
+- [x] `suggested_next_call` is `create_task` for empty workspace, `list_tasks` otherwise
+- [x] `docs/brainstorms/` and `docs/ideation/` committed
+- [x] `.claude/worktrees/agent-ae556031` deletion staged and committed
+- [x] All existing tests still pass (1367 passing + 6 skipped across 101 test files)
