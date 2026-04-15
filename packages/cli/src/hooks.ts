@@ -93,6 +93,18 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
 
 const HOOK_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash'])
 
+/** Rate-limit the hook_events cap warning to once per hour per workspace. */
+const _hookCapWarnedAt = new Map<string, number>()
+
+function _emitHookCapWarning(workspaceId: string, io: HookIO): void {
+  const key = workspaceId || ''
+  const last = _hookCapWarnedAt.get(key) ?? 0
+  if (Date.now() - last > 3_600_000) {
+    _hookCapWarnedAt.set(key, Date.now())
+    io.stderr(`[fulcrum/pre] hook_events cap reached (50000 rows for workspace '${key}') — skipping write until janitor cleans up\n`)
+  }
+}
+
 /**
  * PreToolUse handler: secret scan, chief-of-staff team-invoke guard, and
  * task-scoped memory recall. Non-blocking for memory recall; hard-denies
@@ -181,6 +193,38 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
       }
     } catch { /* best-effort — never block on recall failure */ }
   }
+
+  // 4. Write hook_event row (best-effort, never blocks the hook).
+  //    Captures every tool call regardless of run_id — makes normal Claude
+  //    sessions visible in the monitor without requiring start_agent_run.
+  try {
+    const { getDb, newId } = await import('@fulcrum/core')
+    const db = getDb()
+    const wsId = ctx.workspace_id || ''
+
+    // Row-count cap: skip INSERT if workspace has accumulated > 50k rows.
+    const countRow = db.prepare(
+      `SELECT COUNT(*) AS n FROM hook_events WHERE workspace_id = ?`
+    ).get(wsId) as { n: number }
+
+    if (countRow.n < 50_000) {
+      db.prepare(`
+        INSERT INTO hook_events (hook_event_id, workspace_id, session_id, tool_name, agent_role, run_id, ts, cli_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        newId('hook_event'),
+        wsId,
+        ctx.sessionId,
+        ctx.toolName,
+        ctx.agentRole || '',
+        ctx.runId || null,
+        new Date().toISOString(),
+        ctx.cliName,
+      )
+    } else {
+      _emitHookCapWarning(wsId, io)
+    }
+  } catch { /* best-effort — never fail the hook */ }
 
   io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
   io.exit(0)

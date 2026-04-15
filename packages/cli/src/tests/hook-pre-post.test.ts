@@ -262,6 +262,87 @@ describe('runPostHook — tool_trace memory (L-8)', () => {
   })
 })
 
+describe('runPreHook — hook_events passive trace (Unit 1)', () => {
+  beforeEach(() => { createTestDb() })
+  afterEach(() => resetTestDb())
+
+  it('writes a hook_events row on every allowed tool call', async () => {
+    seedWorkspaceProjectTaskRun()
+    const cap = makeCapturedIO()
+    await runPreHook(
+      baseCtx({ toolName: 'Read', toolInput: { file_path: '/tmp/x.ts' }, sessionId: 'sess_trace_1' }),
+      cap.io,
+    )
+    expect(cap.exitCode).toBe(0)
+
+    const db = getDb()
+    const row = db.prepare(
+      `SELECT tool_name, session_id, workspace_id, cli_name FROM hook_events ORDER BY rowid DESC LIMIT 1`
+    ).get() as { tool_name: string; session_id: string; workspace_id: string; cli_name: string } | undefined
+    expect(row).toBeDefined()
+    expect(row!.tool_name).toBe('Read')
+    expect(row!.session_id).toBe('sess_trace_1')
+    expect(row!.workspace_id).toBe('ws_hook')
+    expect(row!.cli_name).toBe('claude')
+  })
+
+  it('still exits 0 and emits continue:true when DB write throws', async () => {
+    seedWorkspaceProjectTaskRun()
+    // Drop the table to force a write failure
+    const db = getDb()
+    db.exec(`DROP TABLE hook_events`)
+
+    const cap = makeCapturedIO()
+    await runPreHook(baseCtx({ toolName: 'Read', toolInput: {} }), cap.io)
+    expect(cap.exitCode).toBe(0)
+    const out = parsedOutput(cap)
+    expect(out?.continue).toBe(true)
+  })
+
+  it('writes a row with workspace_id empty string when context is absent', async () => {
+    seedWorkspaceProjectTaskRun()
+    const cap = makeCapturedIO()
+    await runPreHook(
+      baseCtx({ toolName: 'Glob', toolInput: {}, workspace_id: '' }),
+      cap.io,
+    )
+    expect(cap.exitCode).toBe(0)
+
+    const db = getDb()
+    const row = db.prepare(
+      `SELECT workspace_id FROM hook_events WHERE workspace_id = '' ORDER BY rowid DESC LIMIT 1`
+    ).get() as { workspace_id: string } | undefined
+    expect(row).toBeDefined()
+    expect(row!.workspace_id).toBe('')
+  })
+
+  it('rows with empty workspace_id do not appear in workspace-specific count', async () => {
+    seedWorkspaceProjectTaskRun()
+    const cap = makeCapturedIO()
+    // Write one row with empty workspace_id
+    await runPreHook(baseCtx({ toolName: 'Read', toolInput: {}, workspace_id: '' }), cap.io)
+
+    const db = getDb()
+    const wsCount = db.prepare(
+      `SELECT COUNT(*) AS n FROM hook_events WHERE workspace_id = 'ws_hook'`
+    ).get() as { n: number }
+    expect(wsCount.n).toBe(0)
+  })
+
+  it('concurrent calls with different session_ids produce distinct rows', async () => {
+    seedWorkspaceProjectTaskRun()
+    const cap1 = makeCapturedIO()
+    const cap2 = makeCapturedIO()
+    await Promise.all([
+      runPreHook(baseCtx({ toolName: 'Read', toolInput: {}, sessionId: 'sess_a' }), cap1.io),
+      runPreHook(baseCtx({ toolName: 'Write', toolInput: {}, sessionId: 'sess_b' }), cap2.io),
+    ])
+    const db = getDb()
+    const count = db.prepare(`SELECT COUNT(*) AS n FROM hook_events`).get() as { n: number }
+    expect(count.n).toBe(2)
+  })
+})
+
 describe('hook JSON output shape (Task 29)', () => {
   beforeEach(() => { createTestDb() })
   afterEach(() => resetTestDb())

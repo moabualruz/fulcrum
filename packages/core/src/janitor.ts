@@ -248,6 +248,15 @@ export async function runJanitorCycle(input: JanitorCycleInput, db: Db = getDb()
       }
     }
 
+    // TTL cleanup: delete hook_events rows older than 30 days.
+    // Runs unconditionally (independent of workspace_id filtering) since
+    // hook_events are global audit data — we clean by age, not workspace.
+    try {
+      deleteOldHookEvents(db)
+    } catch (err) {
+      process.stderr.write(`[janitor] Failed to cleanup old hook_events: ${String(err)}\n`)
+    }
+
     await endSpan({
       span_id: span.span_id,
       status: 'ok',
@@ -268,6 +277,18 @@ export async function runJanitorCycle(input: JanitorCycleInput, db: Db = getDb()
     })
     throw err
   }
+}
+
+/**
+ * Delete hook_events rows older than 30 days.
+ * Called during the janitor cycle as a lightweight TTL cleanup.
+ * Returns the number of rows deleted.
+ */
+export function deleteOldHookEvents(db: Db = getDb()): number {
+  const result = db.prepare(
+    `DELETE FROM hook_events WHERE ts < datetime('now', '-30 days')`
+  ).run()
+  return result.changes ?? 0
 }
 
 /** Start a background janitor loop. Returns a stop function. */

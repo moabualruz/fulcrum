@@ -265,12 +265,26 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       // events table may have different schema
     }
 
+    // hook_events: passive trace rows written by the PreToolUse hook.
+    // Only count rows for the requested workspace_id so empty-string rows
+    // (written when workspace_id context is absent) don't pollute this metric.
+    let hookEventCount = 0
+    try {
+      const r = db.prepare(
+        `SELECT COUNT(*) AS n FROM hook_events WHERE workspace_id = ?`
+      ).get(ws) as { n: number } | undefined
+      hookEventCount = r?.n ?? 0
+    } catch {
+      // hook_events table may not exist on older databases
+    }
+
     return c.json({
       data: {
         task_count: taskCount,
         run_count: runCount,
         memory_count: memoryCount,
         event_count: eventCount,
+        hook_event_count: hookEventCount,
       },
     })
   })

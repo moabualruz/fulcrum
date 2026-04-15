@@ -51,6 +51,7 @@ import { runM047 } from './m047.js'
 import { runM048 } from './m048.js'
 import { runM049 } from './m049.js'
 import { runM050 } from './m050.js'
+import { runM051 } from './m051.js'
 
 export function runMigrations(db: Database.Database): void {
   runM001(db)
@@ -127,4 +128,5 @@ export function runMigrations(db: Database.Database): void {
   runM048(db)
   runM049(db)
   runM050(db)
+  runM051(db)
 }

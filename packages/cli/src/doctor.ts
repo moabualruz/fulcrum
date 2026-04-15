@@ -150,6 +150,39 @@ function checkMonitorToken(): CheckResult {
 }
 
 /**
+ * Verify that the hook_events table is writable.
+ * Performs a test INSERT + immediate DELETE — a round-trip that proves the
+ * migration ran, the DB is writable, and the table exists.
+ */
+function checkHookEventsWritable(): CheckResult {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getDb, newId } = require('@fulcrum/core') as {
+      getDb: () => import('better-sqlite3').Database
+      newId: (t: string) => string
+    }
+    const db = getDb()
+    const testId = newId('hook_event')
+    db.prepare(`
+      INSERT INTO hook_events (hook_event_id, workspace_id, session_id, tool_name, agent_role, run_id, ts, cli_name)
+      VALUES (?, '', 'doctor-check', 'doctor', '', NULL, datetime('now'), 'doctor')
+    `).run(testId)
+    db.prepare(`DELETE FROM hook_events WHERE hook_event_id = ?`).run(testId)
+    return { name: 'Hook events writable', status: 'pass', message: 'INSERT + DELETE round-trip succeeded' }
+  } catch (err) {
+    const msg = (err as Error).message ?? String(err)
+    const isBusy = msg.toLowerCase().includes('busy') || msg.toLowerCase().includes('locked')
+    return {
+      name: 'Hook events writable',
+      status: isBusy ? 'warn' : 'fail',
+      message: isBusy
+        ? `DB busy during check — hook_events may be writable but SQLite is locked: ${msg}`
+        : `hook_events write failed: ${msg}`,
+    }
+  }
+}
+
+/**
  * GAP-ARCH-9: Validate that optional peer dependencies are importable when
  * they are expected to be present.  A missing peer normally surfaces as an
  * opaque "Cannot find module" error at the first call site — this check
@@ -210,6 +243,7 @@ export function runDoctor(options: DoctorOptions = {}): { results: CheckResult[]
     checkDataDir(),
     checkSqliteBinary(),
     checkDbLiveness(),
+    checkHookEventsWritable(),
     checkMcpSdk(),
     checkEnvVars(),
     checkAgentIntegration(cwd),

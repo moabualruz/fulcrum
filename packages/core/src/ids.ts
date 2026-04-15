@@ -34,6 +34,7 @@ const PREFIXES: Record<string, string> = {
   agent_profile: 'ap_',
   agent_definition: 'adef_',
   run_event: 'revt_',
+  hook_event: 'hev_',
 }
 
 const DISPLAY_PREFIXES: Record<string, string> = {
