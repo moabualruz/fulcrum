@@ -69,6 +69,10 @@ export {
 } from './agent-definitions.js'
 export type { AgentDefinition, CreateAgentDefinitionInput, UpdateAgentDefinitionInput } from './types.js'
 
+// File-based agent definition loader (GAP-AGENTDEF-5)
+export { loadAgentDefsFromDir } from './agent-def-loader.js'
+export type { AgentDefFile } from './agent-def-loader.js'
+
 // A2A Agent Card
 export { buildA2ACard, A2A_PROTOCOL_VERSION } from './a2a-card.js'
 export type { A2AAgentCard, A2ASkill, A2ACapabilities, A2AProvider, A2AAuthentication, A2ASecurityScheme } from './a2a-card.js'

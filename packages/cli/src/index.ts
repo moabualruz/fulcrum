@@ -2100,6 +2100,16 @@ async function main(): Promise<void> {
     // Plugin discovery failure is non-fatal — continue without plugins
   }
 
+  // Sync file-based agent definitions (GAP-AGENTDEF-5).
+  // Reads .fulcrum/agent-defs/*.agent.json and globalDataDir()/agent-defs/*.agent.json.
+  // Non-fatal — a missing directory or malformed file is silently skipped.
+  try {
+    const { loadAgentDefsFromDir } = await import('@fulcrum/core')
+    loadAgentDefsFromDir(process.cwd())
+  } catch {
+    // DB not initialised yet at this point in some sub-commands — ignore
+  }
+
   // Wire @fulcrum/teams implementation into core's TeamOps registry.
   // GAP-ARCH-1 fix: breaks the core ↔ teams circular dependency — core never
   // imports teams; the CLI (which depends on both) registers the impl once.

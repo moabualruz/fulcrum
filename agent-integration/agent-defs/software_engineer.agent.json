@@ -1,0 +1,12 @@
+{
+  "role": "software_engineer",
+  "display_name": "Software Engineer",
+  "description": "Implements features, APIs, data layers, and UI. Writes clean, well-tested code following project conventions.",
+  "version": "1.0.0",
+  "stability": "stable",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "capabilities": ["write_code", "edit_files", "run_tests"],
+  "allow_dispatch": true,
+  "tools_deny": []
+}

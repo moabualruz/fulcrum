@@ -1,0 +1,22 @@
+{
+  "role": "integration_worker",
+  "display_name": "Integration Worker",
+  "description": "Merges worktrees, resolves conflicts, runs full test suite, and coordinates cross-team dependencies.",
+  "version": "1.0.0",
+  "stability": "stable",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "capabilities": ["write_code", "edit_files"],
+  "allow_dispatch": true,
+  "tools_allow": [
+    "Bash",
+    "Read",
+    "Write",
+    "Edit",
+    "MultiEdit",
+    "mcp__fulcrum__complete_agent_run",
+    "mcp__fulcrum__block_agent_run",
+    "mcp__fulcrum__recall_memory",
+    "mcp__fulcrum__write_memory"
+  ]
+}

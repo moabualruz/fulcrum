@@ -1,0 +1,27 @@
+{
+  "role": "chief_of_staff",
+  "display_name": "Chief of Staff",
+  "description": "L1 orchestrator: decomposes goals, creates tasks, dispatches agents, synthesises results. Never writes code.",
+  "version": "1.0.0",
+  "stability": "stable",
+  "provider": "anthropic",
+  "model": "claude-opus-4-6",
+  "capabilities": ["create_teams", "dispatch_agents"],
+  "allow_dispatch": true,
+  "tools_allow": [
+    "mcp__fulcrum__get_current_context",
+    "mcp__fulcrum__get_workspace_status",
+    "mcp__fulcrum__build_cos_context",
+    "mcp__fulcrum__create_task",
+    "mcp__fulcrum__update_task",
+    "mcp__fulcrum__list_tasks",
+    "mcp__fulcrum__start_agent_run",
+    "mcp__fulcrum__heartbeat_agent_run",
+    "mcp__fulcrum__complete_agent_run",
+    "mcp__fulcrum__block_agent_run",
+    "mcp__fulcrum__recall_memory",
+    "mcp__fulcrum__write_memory",
+    "mcp__fulcrum__list_agent_profiles"
+  ],
+  "tools_deny": ["Write", "Edit", "MultiEdit", "NotebookEdit"]
+}
