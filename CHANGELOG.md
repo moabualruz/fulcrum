@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Workflow step handlers
+- **`search_code`** — real implementation using `rg` (ripgrep) with `grep` fallback. Uses `spawn` with `stdio: ['ignore', 'pipe', 'pipe']` to avoid stdin-pipe hangs. Accepts `query`, `path`, `file_pattern`, and `case_sensitive` config keys; returns `{ results, query, tool }`.
+- **`validate_schema`** — JSON Schema validation via Ajv v8. Accepts `schema` (JSON Schema object) and `data` or `data_key` (dot-path into `ctx.outputs`) config keys. Returns `{ valid: true }` on success, or `status: 'failed'` with the Ajv error text on validation failure. Schema missing → passthrough `{ valid: true, validated: false }`.
+- **`search_web`** — Tavily (env `TAVILY_API_KEY`) and Serper (env `SERPER_API_KEY`) adapters. If neither key is configured, returns `{ configured: false, note: '...' }` rather than hard-failing.
+- **`call_mcp_tool`** / **`run_tool`** — return `status: 'failed'` with an actionable error message pointing to MCP server configuration instead of silently returning empty output.
+- **`run_script`** now uses the shared `runCommand()` helper (spawn with stdin=ignore) for consistency.
+
+#### Core
+- **Migration 034** — four missing indices: `idx_memories_importance_access` on `(importance, last_accessed_at)`, `idx_sync_states_workspace` on `(workspace_id)`, `idx_sync_states_object` on `(workspace_id, object_type, object_id)`, `idx_wf_runs_project` on `(workspace_id, project_id) WHERE project_id IS NOT NULL`. All idempotent (`IF NOT EXISTS`).
+
+#### Monitor server
+- **`MonitorServer.fetch`** — test-only helper: call Hono routes in-process without binding a TCP port. Non-breaking addition to the `MonitorServer` interface.
+
 #### CLI
 - **`fulcrum doctor`** — environment and configuration health check command. Runs 8 checks (Node.js ≥ 20, `.fulcrum.json`, data directory, `better-sqlite3` native module, database liveness, `@modelcontextprotocol/sdk`, environment variables, agent integration files) and prints a PASS/WARN/FAIL report. Exits 1 when any check fails. Supports `--json` for machine-readable output.
 - **`fulcrum serve mcp-http`** — HTTP-transport MCP server using `StreamableHTTPServerTransport`. Each request gets a fresh `McpServer` + stateful transport (per-request session ID). Default port 4722. Suitable for network-accessible MCP access without stdio.
@@ -49,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `_configureDb` adds `synchronous = NORMAL` and `cache_size = -8000` pragmas (additive — no behavior regression).
 - `runJanitorCycle` runs `decayMemories` and `consolidateMemories` by default (opt-out with `runDecay: false` / `runConsolidate: false`).
 - `fulcrum doctor` `checkDbLiveness` check added to the standard check list.
+- `step-executor.ts` `run_script` now uses `runCommand()` (spawn, stdin=ignore) — same fix that resolved `search_code`'s stdin-pipe hang.
+- **Test count: 1010 → 1258 passing** (+248 across `@fulcrum/core`, `@fulcrum/policy`, `@fulcrum/sync`, `@fulcrum/monitor`, `@fulcrum/workflows`).
 - All packages now use `ulidx` (standardised, ESM-compatible); `ulid` dependency removed from core, memory, planning, policy.
 - `docs/gap-analysis/` renamed to `docs/history/`.
 

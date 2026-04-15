@@ -7,7 +7,7 @@ Fulcrum is the persistence, coordination, and execution layer that keeps agents 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20+%20FTS5-003B57?logo=sqlite)](https://sqlite.org/)
-[![Tests](https://img.shields.io/badge/tests-1010%20passing-brightgreen)](#running-tests)
+[![Tests](https://img.shields.io/badge/tests-1258%20passing-brightgreen)](#running-tests)
 [![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm)](https://pnpm.io/)
 
 ---
@@ -1308,21 +1308,21 @@ pnpm test:watch
 FULCRUM_EMBEDDING_TESTS=1 pnpm test
 ```
 
-**~1010 tests passing across 11 packages.** Tests use an in-memory SQLite DB injected via `setDb()`.
+**1258 tests passing across 11 packages.** Tests use an in-memory SQLite DB injected via `setDb()`.
 
 | Package | Tests |
 |---------|:-----:|
-| `@fulcrum/core`       | ~513 |
-| `@fulcrum/memory`     | ~217 |
+| `@fulcrum/core`       | 524  |
+| `@fulcrum/memory`     | 217  |
 | `@fulcrum/planning`   | 102  |
-| `@fulcrum/policy`     | 95   |
+| `@fulcrum/policy`     | 100  |
 | `@fulcrum/worktrees`  | 41   |
-| `@fulcrum/teams`      | 31   |
-| `@fulcrum/monitor`    | ~34  |
-| `@fulcrum/workflows`  | 25   |
-| `@fulcrum/cli`        | ~136 |
-| `@fulcrum/sync`       | 15   |
-| `@fulcrum/worker`     | 8    |
+| `@fulcrum/teams`      | 35   |
+| `@fulcrum/monitor`    | 35   |
+| `@fulcrum/workflows`  | 35   |
+| `@fulcrum/cli`        | 136  |
+| `@fulcrum/sync`       | 20   |
+| `@fulcrum/worker`     | 13   |
 
 ---
 
