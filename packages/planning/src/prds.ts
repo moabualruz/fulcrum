@@ -91,7 +91,7 @@ export async function updatePRD(input: UpdatePRDInput, db: Db = getDb()): Promis
     emitEvent({
       workspace_id: existing.workspace_id as string,
       project_id: existing.project_id as string,
-      evt_type: 'task_status_changed',
+      evt_type: 'prd_status_changed',
       object_type: 'prd',
       object_id: input.prd_id,
       actor_type: 'system',

@@ -9,14 +9,23 @@ export type WorkflowStepType =
   | 'invoke_team' | 'run_script' | 'call_mcp_tool' | 'read_project' | 'review_artifact'
   | 'validate_schema' | 'gate'
 
+export interface RetryPolicy {
+  maxAttempts: number
+  backoffMultiplier?: number
+  initialDelayMs?: number
+  maxDelayMs?: number
+}
+
 export interface WorkflowStepDef {
   step_id: string
   step_type: WorkflowStepType
   name: string
   config: Record<string, unknown>
   depends_on?: string[]
+  /** @deprecated Use retryPolicy.maxAttempts instead. */
   max_retries?: number
   timeout_ms?: number
+  retryPolicy?: RetryPolicy
 }
 
 export interface WorkflowStepState {

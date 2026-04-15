@@ -27,7 +27,12 @@ function rowToRun(row: Record<string, unknown>): WorkflowRun {
     status_category: row['status_category'] as WorkflowRun['status_category'],
     task_id: (row['task_id'] as string | null) ?? undefined,
     issue_id: (row['issue_id'] as string | null) ?? undefined,
-    steps: JSON.parse(row['steps'] as string) as WorkflowStepState[],
+    steps: (() => {
+      const parsed = JSON.parse(row['steps'] as string) as unknown
+      if (Array.isArray(parsed)) return parsed as WorkflowStepState[]
+      const obj = parsed as { states?: WorkflowStepState[] }
+      return obj.states ?? []
+    })(),
     current_step_id: (row['current_step_id'] as string | null) ?? undefined,
     handoff_refs: JSON.parse(row['handoff_refs'] as string) as string[],
     artifact_refs: JSON.parse(row['artifact_refs'] as string) as string[],
@@ -111,7 +116,7 @@ export async function startWorkflow(input: StartWorkflowInput, db: Db = getDb())
     status_category,
     input.task_id ?? null,
     input.issue_id ?? null,
-    JSON.stringify(steps),
+    JSON.stringify({ states: steps, defs: def.steps }),
     current_step_id ?? null,
     now,
     now,

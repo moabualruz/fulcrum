@@ -100,13 +100,13 @@ function loadRun(wf_id: string, workspace_id: string, db: Db = getDb()): LoadedR
   let defs: WorkflowStepDef[] = []
 
   if (Array.isArray(parsed)) {
-    // Legacy shape — an array of states keyed by step_id. Look up defs
-    // from the registry by workflow_name.
+    // Legacy shape (pre-WORK-005) — states only; look up defs from registry.
     states = parsed as WorkflowStepState[]
     const workflow_name = row['workflow_name'] as string
     const def = registry.getDefinition(workflow_name)
     defs = def?.steps ?? []
   } else if (parsed && typeof parsed === 'object') {
+    // Canonical shape: { states, defs } written by startWorkflow and persistStates.
     const obj = parsed as { states?: WorkflowStepState[]; defs?: WorkflowStepDef[] }
     states = obj.states ?? []
     defs = obj.defs ?? []
@@ -299,7 +299,7 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
         // Failed — retry if we have budget.
         const maxRetries =
           (def as unknown as { max_retries?: number }).max_retries ?? defaultRetries
-        if (state.attempts < maxRetries) {
+        if (state.attempts <= maxRetries) {
           state.status = 'retrying'
           state.error = result.error
           persistStates(input.wf_id, states, step_defs, undefined, lastCurrentStep)

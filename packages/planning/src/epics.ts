@@ -105,7 +105,7 @@ export async function updateEpic(input: UpdateEpicInput, db: Db = getDb()): Prom
     emitEvent({
       workspace_id: existing.workspace_id as string,
       project_id: existing.project_id as string,
-      evt_type: 'task_status_changed',
+      evt_type: 'epic_status_changed',
       object_type: 'epic',
       object_id: input.epic_id,
       actor_type: 'system',

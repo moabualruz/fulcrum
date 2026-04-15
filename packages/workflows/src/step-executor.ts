@@ -460,10 +460,11 @@ HANDLERS['search_web'] = async (ctx) => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ api_key: tavilyKey, query, search_depth: 'basic', max_results: num(c['max_results'], 5) }),
       })
+      if (!resp.ok) return { status: 'failed', error: `search_web: Tavily HTTP ${resp.status}` }
       const data = await resp.json() as { results?: unknown[] }
       return { status: 'completed', output: { query, results: data.results ?? [], configured: true } }
     } catch (err) {
-      return { status: 'completed', output: { query, results: [], configured: true, note: (err as Error).message } }
+      return { status: 'failed', error: `search_web: ${(err as Error).message}` }
     }
   }
 
@@ -474,10 +475,11 @@ HANDLERS['search_web'] = async (ctx) => {
         headers: { 'x-api-key': serperKey, 'content-type': 'application/json' },
         body: JSON.stringify({ q: query, num: num(c['max_results'], 5) }),
       })
+      if (!resp.ok) return { status: 'failed', error: `search_web: Serper HTTP ${resp.status}` }
       const data = await resp.json() as { organic?: unknown[] }
       return { status: 'completed', output: { query, results: data.organic ?? [], configured: true } }
     } catch (err) {
-      return { status: 'completed', output: { query, results: [], configured: true, note: (err as Error).message } }
+      return { status: 'failed', error: `search_web: ${(err as Error).message}` }
     }
   }
 

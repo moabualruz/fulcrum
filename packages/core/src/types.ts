@@ -63,6 +63,7 @@ export type ArtifactType =
 export type EventType =
   | 'project_registered' | 'epic_created' | 'issue_created' | 'task_created'
   | 'task_status_changed' | 'plan_status_changed' | 'issue_status_changed'
+  | 'epic_status_changed' | 'prd_status_changed'
   | 'team_created' | 'team_invoked'
   | 'agent_run_created' | 'agent_run_started' | 'agent_run_progress'
   | 'agent_run_blocked' | 'agent_run_failed' | 'agent_run_finished'

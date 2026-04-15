@@ -143,7 +143,7 @@ describe('runWorkflow (H-1/H-5)', () => {
     const states = loadSteps(db, wf_id)
     const s1 = states.find((s) => s.step_id === 's1')!
     expect(s1.status).toBe('failed')
-    expect(s1.attempts).toBe(2)
+    expect(s1.attempts).toBe(3) // 1 initial + 2 retries (max_retries=2)
     expect(s1.error).toMatch(/not in allowlist/)
     expect(loadRunRow(db, wf_id)['status']).toBe('failed')
   })
