@@ -13,8 +13,9 @@ const PATTERNS: PatternDef[] = [
     regex: /sk-ant-api03-[A-Za-z0-9_\-]{95}/g,
   },
   {
+    // POL-005: covers both legacy sk-<48chars> and newer sk-proj-<40+chars> formats
     name: 'openai_api_key',
-    regex: /sk-[A-Za-z0-9]{48}/g,
+    regex: /sk-(?:proj-)?[A-Za-z0-9_\-]{40,}/g,
   },
   {
     name: 'api_key',
@@ -43,6 +44,11 @@ const PATTERNS: PatternDef[] = [
   {
     name: 'jwt_token',
     regex: /eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/g,
+  },
+  {
+    // POL-004: HTTP Authorization: Bearer <token> header pattern
+    name: 'bearer_token',
+    regex: /(?:Authorization|authorization)\s*:\s*Bearer\s+[A-Za-z0-9\-._~+/]{16,}/g,
   },
   {
     name: 'password_kv',

@@ -48,12 +48,10 @@ export async function getAuditLog(input: GetAuditLogInput, db: Db = getDb()): Pr
   if (input.actor_id) { sql += ' AND actor_id = ?'; params.push(input.actor_id) }
   if (input.action) { sql += ' AND action = ?'; params.push(input.action) }
   sql += ' ORDER BY ts DESC, rowid DESC'
-  if (input.limit !== undefined) { sql += ' LIMIT ?'; params.push(input.limit) }
-  if (input.offset !== undefined && input.limit !== undefined) {
-    sql += ' OFFSET ?'; params.push(input.offset)
-  } else if (input.offset !== undefined) {
-    sql += ' LIMIT -1 OFFSET ?'; params.push(input.offset)
-  }
+  // POL-003: always apply a limit — default 100 to prevent unbounded scans
+  const limitVal = input.limit ?? 100
+  sql += ' LIMIT ?'; params.push(limitVal)
+  if (input.offset !== undefined) { sql += ' OFFSET ?'; params.push(input.offset) }
   const rows = db.prepare(sql).all(...params) as Record<string, unknown>[]
   return rows.map(rowToEvent)
 }
