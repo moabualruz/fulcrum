@@ -149,6 +149,9 @@ function recoveryHintFor(name: string): string | undefined {
   if (name.includes("Claude Code: PreToolUse")) {
     return `edit ~/.claude/settings.json manually, see agent-integration/claude/settings-hooks-snippet.json`;
   }
+  if (name.includes("Regenerate CLAUDE.md")) {
+    return `manual: node --import tsx/esm scripts/gen-claude-md.ts`;
+  }
   if (name.includes("Claude Code: global CLAUDE.md")) {
     return `manual: append agent-integration/claude/CLAUDE.md to ~/.claude/CLAUDE.md`;
   }
@@ -368,6 +371,28 @@ function installClaudeHook(): void {
   if (stopResult       === "added") parts.push("Stop");
   if (preCompactResult === "added") parts.push("PreCompact");
   ok(`added ${parts.join(" + ")} hook${parts.length > 1 ? "s" : ""} → ${settingsPath}`);
+}
+
+// ── 3b. Regenerate CLAUDE.md from TOOL_SCHEMAS ───────────────────────────────
+// Keeps the installed CLAUDE.md in sync with the actual MCP tool list so the
+// tool count and table are never stale after a tool is added or removed.
+
+function regenerateClaudeMd(): void {
+  if (DRY_RUN) {
+    dry("would run: pnpm gen:claude-md");
+    ok("(dry-run) CLAUDE.md regeneration");
+    return;
+  }
+  const result = spawnSync("pnpm", ["gen:claude-md"], {
+    cwd: REPO_ROOT,
+    stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
+  });
+  if (result.status === 0) {
+    ok("regenerated agent-integration/claude/CLAUDE.md from TOOL_SCHEMAS");
+  } else {
+    warn(`gen:claude-md failed (non-fatal): ${(result.stderr ?? result.stdout ?? "").trim().slice(0, 200)}`);
+  }
 }
 
 // ── 4. Claude Code: global CLAUDE.md context (~/.claude/CLAUDE.md) ────────────
@@ -819,6 +844,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["Verify fulcrum in PATH", verifyCliInPath],
     ["Claude Code: user-scope MCP server", installClaudeMcp],
     ["Claude Code: PreToolUse hook", installClaudeHook],
+    ["Regenerate CLAUDE.md from TOOL_SCHEMAS", regenerateClaudeMd],
     ["Claude Code: global CLAUDE.md context", installClaudeContext],
     ["Claude Code: skills → ~/.claude/skills/fulcrum/", installClaudeSkills],
     ["Claude Code: agent MDs → ~/.claude/agents/", installClaudeAgentMds],
@@ -832,6 +858,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["Verify fulcrum in PATH", verifyCliInPath],
     ["Claude Code: user-scope MCP server", installClaudeMcp],
     ["Claude Code: PreToolUse hook", installClaudeHook],
+    ["Regenerate CLAUDE.md from TOOL_SCHEMAS", regenerateClaudeMd],
     ["Claude Code: global CLAUDE.md context", installClaudeContext],
     ["Claude Code: skills → ~/.claude/skills/fulcrum/", installClaudeSkills],
     ["Claude Code: agent MDs → ~/.claude/agents/", installClaudeAgentMds],

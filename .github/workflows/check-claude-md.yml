@@ -1,0 +1,32 @@
+name: Check CLAUDE.md drift
+
+on:
+  pull_request:
+    paths:
+      - 'packages/cli/src/mcp-tools.ts'
+      - 'agent-integration/claude/CLAUDE.md'
+      - 'scripts/gen-claude-md.ts'
+
+jobs:
+  check-claude-md:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Check CLAUDE.md is up to date
+        run: pnpm check:claude-md

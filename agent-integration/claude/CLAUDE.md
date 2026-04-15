@@ -6,7 +6,10 @@ This file is auto-loaded by Claude Code. It configures your connection to the Fu
 
 ## MCP Server
 
-The `fulcrum` MCP server exposes 13 tools for task management, memory, agent runs, and workspace context. It runs as a local stdio process via the `fulcrum serve mcp` command.
+<!-- GENERATED:tool-count-start -->
+The `fulcrum` MCP server exposes 27 tools for task management, memory, agent runs, and workspace context.
+<!-- GENERATED:tool-count-end -->
+It runs as a local stdio process via the `fulcrum serve mcp` command.
 
 Start the HTTP monitor (optional, for dashboard/debugging):
 ```
