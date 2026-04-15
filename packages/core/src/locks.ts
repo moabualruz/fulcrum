@@ -66,40 +66,43 @@ export async function acquireLock(input: AcquireLockInput, db = getDb()): Promis
   const now = new Date(nowMs).toISOString()
   const expires = new Date(nowMs + ttl * 1000).toISOString()
 
-  // Purge any stale lock on this resource first so re-acquisition works.
-  db.prepare(
-    `DELETE FROM advisory_locks WHERE workspace_id = ? AND resource_path = ? AND expires_at <= ?`
-  ).run(input.workspace_id, input.resource_path, now)
+  return db.transaction((): AcquireLockResult => {
+    // Purge any stale lock on this resource first so re-acquisition works.
+    db.prepare(
+      `DELETE FROM advisory_locks WHERE workspace_id = ? AND resource_path = ? AND expires_at <= ?`
+    ).run(input.workspace_id, input.resource_path, now)
 
-  const existing = db.prepare(
-    `SELECT * FROM advisory_locks WHERE workspace_id = ? AND resource_path = ? LIMIT 1`
-  ).get(input.workspace_id, input.resource_path) as Record<string, unknown> | undefined
+    const existing = db.prepare(
+      `SELECT * FROM advisory_locks WHERE workspace_id = ? AND resource_path = ? LIMIT 1`
+    ).get(input.workspace_id, input.resource_path) as Record<string, unknown> | undefined
 
-  if (existing) {
-    return {
-      acquired: false,
-      lock_id: null,
-      held_by: existing['run_id'] as string,
-      expires_at: existing['expires_at'] as string,
+    if (existing) {
+      return {
+        acquired: false,
+        lock_id: null,
+        held_by: existing['run_id'] as string,
+        expires_at: existing['expires_at'] as string,
+      }
     }
-  }
 
-  const lock_id = newId('lock')
-  db.prepare(
-    `INSERT INTO advisory_locks (lock_id, workspace_id, resource_path, run_id, acquired_at, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(lock_id, input.workspace_id, input.resource_path, input.run_id, now, expires)
+    const lock_id = newId('lock')
+    db.prepare(
+      `INSERT INTO advisory_locks (lock_id, workspace_id, resource_path, run_id, acquired_at, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(lock_id, input.workspace_id, input.resource_path, input.run_id, now, expires)
 
-  return {
-    acquired: true,
-    lock_id,
-    held_by: input.run_id,
-    expires_at: expires,
-  }
+    return {
+      acquired: true,
+      lock_id,
+      held_by: input.run_id,
+      expires_at: expires,
+    }
+  })()
 }
 
-export async function releaseLock(lock_id: string, db = getDb()): Promise<void> {
-  db.prepare(`DELETE FROM advisory_locks WHERE lock_id = ?`).run(lock_id)
+export async function releaseLock(lock_id: string, run_id: string, db = getDb()): Promise<boolean> {
+  const result = db.prepare(`DELETE FROM advisory_locks WHERE lock_id = ? AND run_id = ?`).run(lock_id, run_id)
+  return result.changes === 1
 }
 
 export async function listLocks(workspace_id: string, db = getDb()): Promise<Lock[]> {

@@ -34,14 +34,29 @@ describe('advisory locks (G-5)', () => {
     expect(second.held_by).toBe('run_1')
   })
 
-  it('releaseLock frees the resource', async () => {
+  it('releaseLock frees the resource when called by the owner', async () => {
     const first = await acquireLock({ workspace_id: 'ws_1', resource_path: 'src/foo.ts', run_id: 'run_1', ttl_sec: 60 })
     expect(first.lock_id).not.toBeNull()
-    await releaseLock(first.lock_id!)
+    const released = await releaseLock(first.lock_id!, 'run_1')
+    expect(released).toBe(true)
     const second = await acquireLock({
       workspace_id: 'ws_1', resource_path: 'src/foo.ts', run_id: 'run_2', ttl_sec: 60,
     })
     expect(second.acquired).toBe(true)
+  })
+
+  it('releaseLock by a non-owner returns false and leaves the lock intact', async () => {
+    const first = await acquireLock({ workspace_id: 'ws_1', resource_path: 'src/foo.ts', run_id: 'run_1', ttl_sec: 60 })
+    expect(first.lock_id).not.toBeNull()
+    // run_2 tries to release a lock it doesn't own
+    const released = await releaseLock(first.lock_id!, 'run_2')
+    expect(released).toBe(false)
+    // Lock should still exist — run_1 still holds it
+    const attempt = await acquireLock({
+      workspace_id: 'ws_1', resource_path: 'src/foo.ts', run_id: 'run_2', ttl_sec: 60,
+    })
+    expect(attempt.acquired).toBe(false)
+    expect(attempt.held_by).toBe('run_1')
   })
 
   it('listLocks returns active locks for a workspace', async () => {
