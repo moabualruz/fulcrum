@@ -573,6 +573,27 @@ describe('MIGRATION_027 restores CHECK on 4 columns (J-5 follow-up)', () => {
     )).toThrow()
   })
 
+  it('MIGRATION_034 records 034_missing_indices and creates expected indices', () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    const row = db.prepare(
+      "SELECT name FROM schema_migrations WHERE name = '034_missing_indices'"
+    ).get() as { name: string } | undefined
+    expect(row?.name).toBe('034_missing_indices')
+
+    // Verify the indices exist
+    const memIdx = (db.prepare('PRAGMA index_list(memories)').all() as { name: string }[]).map(i => i.name)
+    expect(memIdx).toContain('idx_memories_importance_access')
+
+    const syncIdx = (db.prepare('PRAGMA index_list(sync_states)').all() as { name: string }[]).map(i => i.name)
+    expect(syncIdx).toContain('idx_sync_states_workspace')
+    expect(syncIdx).toContain('idx_sync_states_object')
+
+    const wfIdx = (db.prepare('PRAGMA index_list(workflow_runs)').all() as { name: string }[]).map(i => i.name)
+    expect(wfIdx).toContain('idx_wf_runs_project')
+  })
+
   it('handoffs accepts canonical priority and scope values', () => {
     const db = new Database(':memory:')
     _configureDb(db)
