@@ -144,7 +144,10 @@ export async function recallMemory(
 
   const mode: RecallMode = input.mode ?? 'compact'
   const limit = input.limit ?? (mode === 'compact' ? 8 : 20)
+  const offset = input.offset ?? 0
   if (limit <= 0) return []
+  // Fetch enough candidates to satisfy offset + limit pages.
+  const fetchLimit = limit + offset
 
   // ── L2 path: if KuzuClient active and embedder available ─────────────────
   const kuzuClient = getKuzuClient()
@@ -167,15 +170,18 @@ export async function recallMemory(
           queryVector: queryVec,
           queryEntityIds,
           workspaceId: input.workspace_id,
-          limit,
+          limit: fetchLimit,
         })
 
         if (l2Results.length > 0) {
-          const ids = l2Results.map(r => r.id)
+          const pagedResults = l2Results.slice(offset, offset + limit)
+          const ids = pagedResults.map(r => r.id)
           const placeholders = ids.map(() => '?').join(',')
-          const rows = db.prepare(
-            `SELECT m.* FROM memories m WHERE m.memory_id IN (${placeholders})`
-          ).all(...ids) as Record<string, unknown>[]
+          const rows = ids.length > 0
+            ? db.prepare(
+                `SELECT m.* FROM memories m WHERE m.memory_id IN (${placeholders})`
+              ).all(...ids) as Record<string, unknown>[]
+            : []
 
           updateAccessCounts(db, ids)
 
@@ -202,7 +208,7 @@ export async function recallMemory(
     .filter(Boolean)
     .map(w => `"${w.replace(/"/g, '""')}"`)
     .join(' OR ')
-  const ftsRows = ftsSearch(db, ftsQuery, whereClause, params, limit)
+  const ftsRows = ftsSearch(db, ftsQuery, whereClause, params, fetchLimit)
 
   // Vector search (optional — skip if embedder unavailable or vec_memories missing)
   let vecRows: { rowid: number; vecRank: number }[] = []
@@ -212,7 +218,7 @@ export async function recallMemory(
       const queryVec = await (embedder.embedQuery ?? embedder.embed.bind(embedder))(input.query)
       const raw = db.prepare(
         'SELECT rowid, row_number() OVER (ORDER BY distance) AS vecRank FROM vec_memories WHERE embedding MATCH ? ORDER BY distance LIMIT ?'
-      ).all(Buffer.from(queryVec.buffer), limit * 3) as { rowid: number; vecRank: number }[]
+      ).all(Buffer.from(queryVec.buffer), fetchLimit * 3) as { rowid: number; vecRank: number }[]
       vecRows = raw
     } catch {
       // vec_memories unavailable — FTS5 only
@@ -233,7 +239,7 @@ export async function recallMemory(
   const rrfScored = [...allRowids].map(rowid => ({
     rowid,
     rrfBase: rrfScore(ftsMap.get(rowid) ?? null, vecMap.get(rowid) ?? null),
-  })).sort((a, b) => b.rrfBase - a.rrfBase).slice(0, limit * 2)
+  })).sort((a, b) => b.rrfBase - a.rrfBase).slice(0, fetchLimit * 2)
 
   if (rrfScored.length === 0) return []
 
@@ -255,7 +261,7 @@ export async function recallMemory(
     })
     .filter((s): s is { rowid: number; score: number } => s !== null)
     .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
+    .slice(offset, offset + limit)
 
   let sortedWithScores = scored.map(s => ({
     row: rowByRowid.get(s.rowid)!,

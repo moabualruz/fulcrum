@@ -284,6 +284,12 @@ export interface AgentDefinition {
   executor_uri: string | null
   a2a_card: Record<string, unknown> | null
   eval_suites: string[]
+  /** Whether this agent role can be dispatched by other roles (GAP-AGENTDEF-7).
+   *  true = any caller with dispatch authority may invoke this agent.
+   *  false = reserved / internal — not listed in routing tables. */
+  allow_dispatch: boolean
+  /** URL of an icon image for the A2A AgentCard (GAP-AGENTDEF-9) */
+  icon_url: string | null
   created_at: number
   updated_at: number
 }
@@ -305,6 +311,8 @@ export interface CreateAgentDefinitionInput {
   executor_uri?: string | null
   a2a_card?: Record<string, unknown> | null
   eval_suites?: string[]
+  allow_dispatch?: boolean
+  icon_url?: string | null
 }
 
 export interface UpdateAgentDefinitionInput {
@@ -324,6 +332,8 @@ export interface UpdateAgentDefinitionInput {
   executor_uri?: string | null
   a2a_card?: Record<string, unknown> | null
   eval_suites?: string[]
+  allow_dispatch?: boolean
+  icon_url?: string | null
 }
 
 export interface WorkspaceStatusResult {

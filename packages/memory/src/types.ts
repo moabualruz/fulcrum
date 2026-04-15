@@ -53,6 +53,7 @@ export interface RecallMemoryInput {
   query: string
   mode?: RecallMode                   // default: 'compact'
   limit?: number                      // default: 8 for compact, 20 for others
+  offset?: number                     // page offset — skip this many results (GAP-RAG-8 / MemGPT pattern)
   scope?: MemoryScope                 // filter by memory.scope column
   kind?: MemoryKind
   file_path?: string

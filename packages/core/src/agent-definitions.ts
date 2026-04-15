@@ -44,6 +44,8 @@ function rowToDefinition(row: Record<string, unknown>): AgentDefinition {
     executor_uri: (row.executor_uri as string | null) ?? null,
     a2a_card: row.a2a_card ? (JSON.parse(row.a2a_card as string) as Record<string, unknown>) : null,
     eval_suites: row.eval_suites ? (JSON.parse(row.eval_suites as string) as string[]) : [],
+    allow_dispatch: row.allow_dispatch !== undefined ? Boolean(row.allow_dispatch) : true,
+    icon_url: (row.icon_url as string | null) ?? null,
     created_at: row.created_at as number,
     updated_at: row.updated_at as number,
   }
@@ -63,8 +65,8 @@ export function createAgentDefinition(input: CreateAgentDefinitionInput, db = ge
     INSERT INTO agent_definitions
       (id, workspace_id, role, display_name, description, version, stability, system_prompt, model, provider,
        tools_allow, tools_deny, capabilities, output_schema, executor_uri, a2a_card, eval_suites,
-       created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       allow_dispatch, icon_url, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     workspace_id,
@@ -83,6 +85,8 @@ export function createAgentDefinition(input: CreateAgentDefinitionInput, db = ge
     input.executor_uri ?? null,
     input.a2a_card ? JSON.stringify(input.a2a_card) : null,
     JSON.stringify(input.eval_suites ?? []),
+    input.allow_dispatch !== undefined ? (input.allow_dispatch ? 1 : 0) : 1,
+    input.icon_url ?? null,
     now,
     now,
   )
@@ -137,6 +141,11 @@ export function updateAgentDefinition(input: UpdateAgentDefinitionInput, db = ge
   setField('executor_uri', input.executor_uri)
   setField('a2a_card', input.a2a_card, true)
   setField('eval_suites', input.eval_suites, true)
+  if (input.allow_dispatch !== undefined) {
+    updates.push('allow_dispatch = ?')
+    params.push(input.allow_dispatch ? 1 : 0)
+  }
+  setField('icon_url', input.icon_url)
 
   params.push(workspace_id, input.role)
   db.prepare(`UPDATE agent_definitions SET ${updates.join(', ')} WHERE workspace_id = ? AND role = ?`).run(...params)

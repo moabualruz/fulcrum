@@ -50,6 +50,8 @@ export interface A2AAgentCard {
   url: string
   version: string
   documentationUrl?: string
+  /** URL of an icon image for this agent (GAP-AGENTDEF-9) */
+  iconUrl?: string
   capabilities: A2ACapabilities
   defaultInputModes: string[]
   defaultOutputModes: string[]
@@ -94,6 +96,7 @@ export function buildA2ACard(
     url,
     version: def.version,
     documentationUrl: `${DEFAULT_URL_BASE}/${def.role}/docs`,
+    iconUrl: def.icon_url ?? undefined,
     capabilities: {
       streaming: canStream || undefined,
       pushNotifications: canPush || undefined,

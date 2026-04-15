@@ -90,6 +90,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         workspace_id: { type: 'string', description: 'Workspace ID' },
         project_id: { type: 'string', description: 'Project ID (optional — omit for workspace-wide recall)' },
         limit: { type: 'number', description: 'Max results (default 10)' },
+        offset: { type: 'number', description: 'Pagination offset — skip this many top results (default 0). Use for MemGPT-style context paging.' },
         max_chars: { type: 'number', description: 'Truncate content to this many characters (default 500)' },
         query_scope: {
           type: 'string',

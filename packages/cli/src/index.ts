@@ -693,6 +693,7 @@ async function runServeMcp(): Promise<void> {
         workspace_id: a['workspace_id'] as string,
         project_id: a['project_id'] as string | undefined,
         limit: (a['limit'] as number | undefined) ?? 10,
+        offset: (a['offset'] as number | undefined) ?? 0,
         mode: 'full',
         query_scope: (a['query_scope'] as 'session' | 'project' | 'workspace' | 'global' | undefined),
         session_id: a['session_id'] as string | undefined,
@@ -1049,6 +1050,7 @@ async function runServeMcpHttp(): Promise<void> {
         workspace_id: a['workspace_id'] as string,
         project_id: a['project_id'] as string | undefined,
         limit: (a['limit'] as number | undefined) ?? 10,
+        offset: (a['offset'] as number | undefined) ?? 0,
         mode: 'full',
       } as Parameters<typeof recallMemory>[0])
       return (memories as Array<{ id?: string; content?: string; tags?: string[]; recall_score?: number }>)

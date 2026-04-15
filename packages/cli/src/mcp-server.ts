@@ -120,8 +120,11 @@ async function runMiddlewareChain(
 export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
   const server = new McpServer(
     { name: 'fulcrum', version: options.version },
-    // Spec §Lifecycle.Capability Negotiation: declare all active features
-    { capabilities: { logging: {}, tools: {}, resources: {}, prompts: {} } },
+    // Spec §Lifecycle.Capability Negotiation: declare all active features.
+    // sampling: {} advertises that this server can make sampling requests to the
+    // client (GAP-MCP-13). No active implementation yet — declaration is the
+    // first step; callers that don't support sampling will ignore the capability.
+    { capabilities: { logging: {}, tools: {}, resources: {}, prompts: {}, sampling: {} } },
   )
 
   const allTools = [...TOOL_SCHEMAS, ...(options.additionalTools ?? [])]
