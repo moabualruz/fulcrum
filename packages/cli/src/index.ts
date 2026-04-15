@@ -603,6 +603,17 @@ async function probeMonitor(url: string): Promise<boolean> {
   return running
 }
 
+// ── Test helpers (not part of the public CLI surface) ────────────────────────
+export async function probeMonitorForTest(url: string): Promise<boolean> {
+  return probeMonitor(url)
+}
+export function _resetMonitorProbeCache(): void {
+  _monitorProbeCache.clear()
+}
+export function _setMonitorStarted(val: boolean): void {
+  _monitorStarted = val
+}
+
 // ── Shared get_current_context response builder ───────────────────────────────
 // Both the stdio MCP handler (runServeMcp) and the HTTP MCP handler
 // (runServeMcpHttp) use identical logic. A single canonical builder avoids
