@@ -36,10 +36,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Monitor server
 - **Pagination** on list endpoints (`/tasks`, `/agents`, `/artifacts`, `/memory-trace`, `/teams`) — `?limit=N&cursor=OFFSET` query params; response includes `{ data, pagination: { total, limit, offset, next_cursor } }`. Limit capped at 200. `next_cursor` is null when all results are exhausted.
 
+#### Core APIs (continued)
+- **`consolidateMemories(workspace_id?)`** in `@fulcrum/core/janitor` — background memory deduplication. Compares embeddings within a workspace using cosine similarity; pairs above `MEMORY_CONSOLIDATION_THRESHOLD = 0.92` are merged (higher-importance survives). Batch-limited to `MEMORY_CONSOLIDATION_BATCH_SIZE = 200` memories per cycle. Runs in `runJanitorCycle` (opt-out with `runConsolidate: false`).
+- **Tool name validation** in `createAgentDefinition` / `updateAgentDefinition` — `tools_allow` and `tools_deny` entries are validated against `/^[a-zA-Z_][a-zA-Z0-9_-]*$/`. Throws `FulcrumError { code: 'invalid_input' }` on the first bad name.
+
+#### Documentation
+- **`packages/cli/README.md`** — CLI command tree, 13 MCP tools table, auto-init, plugin discovery, hook system.
+- **`packages/worker/README.md`** — `AgentAdapter` contract, built-in adapters, subprocess + stub usage.
+- **`docs/guides/skill-authoring.md`** — Complete guide to writing Fulcrum skills: frontmatter schema, body format, naming conventions, trigger phrase best practices, policy vs procedure skills, scripted pattern / `gen-claude-md.ts` integration.
+
 ### Changed
 - `_configureDb` adds `synchronous = NORMAL` and `cache_size = -8000` pragmas (additive — no behavior regression).
-- `runJanitorCycle` runs `decayMemories` by default (opt-out with `runDecay: false`).
+- `runJanitorCycle` runs `decayMemories` and `consolidateMemories` by default (opt-out with `runDecay: false` / `runConsolidate: false`).
 - `fulcrum doctor` `checkDbLiveness` check added to the standard check list.
+- All packages now use `ulidx` (standardised, ESM-compatible); `ulid` dependency removed from core, memory, planning, policy.
+- `docs/gap-analysis/` renamed to `docs/history/`.
 
 ---
 
