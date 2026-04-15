@@ -19,6 +19,13 @@ export type ToolHandler = (name: string, args: Record<string, unknown>) => Promi
 export interface McpServerOptions {
   version: string
   handleToolCall: ToolHandler
+  /**
+   * Additional tool schemas contributed by plugins. These are appended after
+   * the built-in TOOL_SCHEMAS and registered with the same validation pipeline.
+   * Plugin tools are routed through the same handleToolCall handler — plugins
+   * must register their own handler logic by name in the hook they provide.
+   */
+  additionalTools?: import('./mcp-tools.js').ToolSchema[]
 }
 
 // ---------- Zod shape builder ----------
@@ -66,11 +73,10 @@ function buildZodShape(
 const READ_OUTPUT_SCHEMA = z.object({}).passthrough()
 
 // Tools that carry structuredContent alongside text (all readOnly tools).
-const READ_ONLY_TOOLS = new Set(
-  TOOL_SCHEMAS
-    .filter(t => t.annotations?.readOnlyHint === true)
-    .map(t => t.name)
-)
+// Built at server creation time once allTools is known (see inside factory fn).
+function buildReadOnlySet(tools: import('./mcp-tools.js').ToolSchema[]): Set<string> {
+  return new Set(tools.filter(t => t.annotations?.readOnlyHint === true).map(t => t.name))
+}
 
 // ---------- Server factory ----------
 
@@ -81,7 +87,10 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
     { capabilities: { logging: {}, tools: {}, resources: {}, prompts: {} } },
   )
 
-  for (const tool of TOOL_SCHEMAS) {
+  const allTools = [...TOOL_SCHEMAS, ...(options.additionalTools ?? [])]
+  const readOnlyTools = buildReadOnlySet(allTools)
+
+  for (const tool of allTools) {
     const shape = buildZodShape(
       tool.inputSchema.properties as Record<string, JsonSchemaProp>,
       tool.inputSchema.required ?? [],
@@ -92,7 +101,7 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
     // raw shape for capabilities negotiation while we enforce strictness.
     const strictSchema = z.object(shape).strict()
 
-    const isReadTool = READ_ONLY_TOOLS.has(tool.name)
+    const isReadTool = readOnlyTools.has(tool.name)
 
     server.registerTool(
       tool.name,

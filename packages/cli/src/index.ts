@@ -84,6 +84,12 @@ OPTIONS
   --vault <path>       Override vault path (default: $FULCRUM_DATA_DIR/vault)
   --port <n>           Override monitor port (default: 4721)
 
+PLUGINS
+  plugin list                         List discovered plugins (project + global)
+  plugin install <package>            Install plugin from npm registry
+  plugin link <path>                  Link a local plugin directory (dev mode)
+  plugin remove <package>             Remove a globally-installed plugin
+
 DIAGNOSTICS
   doctor              Run environment + configuration health checks
   doctor --json       Output checks as JSON
@@ -2192,6 +2198,109 @@ async function ensureProjectInitialized(opts: { silent?: boolean } = {}): Promis
   return _projectIds
 }
 
+// ── Plugin management ────────────────────────────────────────────────────────
+
+async function runPlugin(): Promise<void> {
+  const { execSync } = await import('child_process')
+  const { existsSync, mkdirSync } = await import('fs')
+  const { join } = await import('path')
+
+  switch (command) {
+    case 'list': {
+      const plugins = discoverPlugins(process.cwd())
+      if (plugins.length === 0) {
+        console.log('No Fulcrum plugins found.')
+        console.log(`(searched project node_modules and ${globalDataDir()}/plugins/)`)
+        return
+      }
+      const rows = plugins.map(p => ({
+        name: p.name,
+        root: p.root,
+        hooks: p.manifest.hooks ?? '',
+        skills: p.manifest.skills ?? '',
+        agents: p.manifest.agents ?? '',
+      }))
+      outputRows(rows, ['name', 'root', 'hooks', 'skills', 'agents'])
+      return
+    }
+
+    case 'install': {
+      // Install an npm package as a globally-available Fulcrum plugin
+      const pkgArg = args.find(a => !a.startsWith('--') && a !== 'plugin' && a !== 'install')
+      if (!pkgArg) {
+        console.error('Usage: fulcrum plugin install <package-name-or-path>')
+        process.exit(1)
+      }
+      const pluginsDir = join(globalDataDir(), 'plugins')
+      mkdirSync(pluginsDir, { recursive: true })
+      console.log(`Installing ${pkgArg} into ${pluginsDir}...`)
+      execSync(`npm install --prefix ${pluginsDir} ${pkgArg}`, { stdio: 'inherit' })
+      console.log(`Plugin installed. Run 'fulcrum plugin list' to verify.`)
+      return
+    }
+
+    case 'link': {
+      // Link a local plugin directory (development mode)
+      const dirArg = args.find(a => !a.startsWith('--') && a !== 'plugin' && a !== 'link')
+      if (!dirArg) {
+        console.error('Usage: fulcrum plugin link <path-to-plugin-dir>')
+        process.exit(1)
+      }
+      const pluginsDir = join(globalDataDir(), 'plugins')
+      mkdirSync(pluginsDir, { recursive: true })
+      const absPath = join(process.cwd(), dirArg)
+      if (!existsSync(absPath)) {
+        console.error(`Directory not found: ${absPath}`)
+        process.exit(1)
+      }
+      execSync(`npm install --prefix ${pluginsDir} ${absPath}`, { stdio: 'inherit' })
+      console.log(`Plugin linked from ${absPath}. Run 'fulcrum plugin list' to verify.`)
+      return
+    }
+
+    case 'remove':
+    case 'uninstall': {
+      const pkgArg = args.find(a => !a.startsWith('--') && a !== 'plugin' && a !== command)
+      if (!pkgArg) {
+        console.error(`Usage: fulcrum plugin ${command} <package-name>`)
+        process.exit(1)
+      }
+      const pluginsDir = join(globalDataDir(), 'plugins')
+      console.log(`Removing ${pkgArg} from ${pluginsDir}...`)
+      execSync(`npm uninstall --prefix ${pluginsDir} ${pkgArg}`, { stdio: 'inherit' })
+      console.log(`Plugin removed.`)
+      return
+    }
+
+    default:
+      console.log(`
+fulcrum plugin — manage Fulcrum plugins
+
+USAGE
+  fulcrum plugin list                         List discovered plugins
+  fulcrum plugin install <package>            Install plugin from npm
+  fulcrum plugin link <path>                  Link a local plugin (dev mode)
+  fulcrum plugin remove <package>             Remove a globally-installed plugin
+
+PLUGIN FORMAT
+  A Fulcrum plugin is any npm package with a "fulcrum" key in package.json:
+    {
+      "fulcrum": {
+        "type": "plugin",
+        "hooks": "dist/hooks.js",   // optional: hook handler module
+        "skills": "skills/",        // optional: directory of SKILL.md files
+        "agents": "agents/"         // optional: directory of agent .md files
+      }
+    }
+
+PLUGIN SEARCH PATH
+  1. Closest project node_modules (walking up from CWD)
+  2. ${globalDataDir()}/plugins/  (globally installed)
+`)
+      process.exit(0)
+  }
+}
+
 // ── Main dispatch ─────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -2313,6 +2422,8 @@ fulcrum serve — long-running servers
   if (group === 'team' || group === 'teams') { await runTeams(); return }
   if (group === 'workflow' || group === 'workflows') { await runWorkflows(); return }
   if (group === 'agent' || group === 'agents') { await runAgent(); return }
+
+  if (group === 'plugin' || group === 'plugins') { await runPlugin(); return }
 
   if (group === 'doctor') {
     const { results, exitCode } = runDoctor({ cwd: process.cwd(), json: args.includes('--json') })
