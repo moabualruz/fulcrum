@@ -139,22 +139,25 @@ describe('query_scope composition in recallMemory', () => {
     expect(ids.length).toBe(1)
   })
 
-  it('session scope without session_id falls back to project scope', async () => {
+  it("session scope without session_id throws FulcrumError", async () => {
     seed()
-    const id = await writeTestMemory({
-      workspace_id: 'ws_1',
-      project_id: 'proj_a',
-      content: 'fallback project memory',
-    })
+    await expect(
+      recallMemory({
+        query: 'fallback project memory',
+        workspace_id: 'ws_1',
+        project_id: 'proj_a',
+        query_scope: 'session',
+        // no session_id provided — must throw
+      })
+    ).rejects.toThrow(FulcrumError)
 
-    const results = await recallMemory({
-      query: 'fallback project memory',
-      workspace_id: 'ws_1',
-      project_id: 'proj_a',
-      query_scope: 'session',
-      // no session_id provided — fallback to project
-    })
-    const ids = (results as Array<{ memory_id: string }>).map(r => r.memory_id)
-    expect(ids).toContain(id)
+    await expect(
+      recallMemory({
+        query: 'fallback project memory',
+        workspace_id: 'ws_1',
+        project_id: 'proj_a',
+        query_scope: 'session',
+      })
+    ).rejects.toMatchObject({ code: 'invalid_input', message: "session_id is required when query_scope is 'session'" })
   })
 })

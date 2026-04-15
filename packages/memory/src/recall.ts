@@ -38,21 +38,14 @@ function buildWhereClause(input: RecallMemoryInput): { clauses: string[]; params
 
   switch (qs) {
     case 'session':
-      // Must provide session_id; if missing, fall back to project scope
-      if (input.session_id) {
-        clauses.push('m.session_id = ?')
-        params.push(input.session_id)
-        // Still constrain to workspace for safety
-        clauses.push('m.workspace_id = ?')
-        params.push(input.workspace_id)
-      } else {
-        clauses.push('m.workspace_id = ?')
-        params.push(input.workspace_id)
-        if (input.project_id !== undefined && input.project_id !== null) {
-          clauses.push('m.project_id = ?')
-          params.push(input.project_id)
-        }
+      if (!input.session_id) {
+        throw new FulcrumError("session_id is required when query_scope is 'session'", 'invalid_input')
       }
+      clauses.push('m.session_id = ?')
+      params.push(input.session_id)
+      // Still constrain to workspace for safety
+      clauses.push('m.workspace_id = ?')
+      params.push(input.workspace_id)
       break
     case 'workspace':
       clauses.push('m.workspace_id = ?')
