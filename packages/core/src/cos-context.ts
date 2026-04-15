@@ -72,12 +72,13 @@ export function buildWorldState(db: Database.Database, input: BuildWorldStateInp
 
   // Simple LIKE-based memory recall using goal's first 50 chars
   const goalSnippet = input.goal.slice(0, 50)
+  const escaped = goalSnippet.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
   const memoryRows = db.prepare(
     `SELECT memory_id, content, kind
      FROM memories
-     WHERE workspace_id = ? AND content LIKE ?
+     WHERE workspace_id = ? AND content LIKE ? ESCAPE '\\'
      LIMIT ?`
-  ).all(input.workspace_id, `%${goalSnippet}%`, limitMemories) as MemoryRow[]
+  ).all(input.workspace_id, `%${escaped}%`, limitMemories) as MemoryRow[]
 
   const recalledMemories = memoryRows.map(r => ({
     memory_id: r.memory_id,

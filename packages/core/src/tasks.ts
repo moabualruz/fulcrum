@@ -96,37 +96,41 @@ export async function createTask(input: CreateTaskInput, db = getDb()): Promise<
   const sc = statusCategory(initialStatus)
   const priority = input.priority ?? 'medium'
 
-  db.prepare(`
+  const insertTask = db.prepare(`
     INSERT INTO tasks
       (task_id, workspace_id, project_id, display_id, issue_id, title, description,
        status, status_category, priority, depends_on, assigned_to, note, done_criteria,
        created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    task_id,
-    input.workspace_id,
-    input.project_id,
-    display_id,
-    input.issue_id ?? null,
-    input.title,
-    input.description ?? null,
-    initialStatus,
-    sc,
-    priority,
-    JSON.stringify(input.depends_on ?? []),
-    input.assigned_to ?? null,
-    null,
-    input.done_criteria ?? null,
-    now,
-    now
-  )
+  `)
+  const insertLabel = db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)')
 
-  if (input.labels && input.labels.length > 0) {
-    const insertLabel = db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)')
-    for (const label of input.labels) {
-      insertLabel.run(task_id, label)
+  const trx = db.transaction(() => {
+    insertTask.run(
+      task_id,
+      input.workspace_id,
+      input.project_id,
+      display_id,
+      input.issue_id ?? null,
+      input.title,
+      input.description ?? null,
+      initialStatus,
+      sc,
+      priority,
+      JSON.stringify(input.depends_on ?? []),
+      input.assigned_to ?? null,
+      null,
+      input.done_criteria ?? null,
+      now,
+      now
+    )
+    if (input.labels && input.labels.length > 0) {
+      for (const label of input.labels) {
+        insertLabel.run(task_id, label)
+      }
     }
-  }
+  })
+  trx()
 
   emitEvent({
     workspace_id: input.workspace_id,
@@ -174,15 +178,20 @@ export async function updateTask(input: UpdateTaskInput, db = getDb()): Promise<
   if (input.assigned_run_id !== undefined) { fields.push('assigned_run_id = ?'); values.push(input.assigned_run_id) }
 
   values.push(input.task_id)
-  db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE task_id = ?`).run(...values)
+  const updateStmt = db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE task_id = ?`)
+  const deleteLabelStmt = db.prepare('DELETE FROM task_labels WHERE task_id = ?')
+  const insertLabelStmt = db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)')
 
-  if (input.labels !== undefined) {
-    db.prepare('DELETE FROM task_labels WHERE task_id = ?').run(input.task_id)
-    const insertLabel = db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)')
-    for (const label of input.labels) {
-      insertLabel.run(input.task_id, label)
+  const trx = db.transaction(() => {
+    updateStmt.run(...values)
+    if (input.labels !== undefined) {
+      deleteLabelStmt.run(input.task_id)
+      for (const label of input.labels) {
+        insertLabelStmt.run(input.task_id, label)
+      }
     }
-  }
+  })
+  trx()
 
   if (statusChanging) {
     emitEvent({
