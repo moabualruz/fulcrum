@@ -326,6 +326,78 @@ describe('runWorkflow (H-1/H-5)', () => {
     expect(root.payload).toMatchObject({ final_status: 'completed' })
   })
 
+  it('search_code finds matches with grep', async () => {
+    const ctx: StepContext = {
+      wf_id: 'wf_fake',
+      workspace_id,
+      project_id,
+      step_id: 's_sc',
+      step: {
+        step_id: 's_sc',
+        step_type: 'search_code' as WorkflowStepDef['step_type'],
+        name: 'search',
+        config: {
+          query: 'search_code',
+          cwd: new URL('../', import.meta.url).pathname,
+          glob: '*.ts',
+        },
+      },
+      outputs: {},
+      attempts: 0,
+    }
+    const result = await executeStep(ctx)
+    expect(result.status).toBe('completed')
+    const out = result.output as Record<string, unknown>
+    expect(Array.isArray(out['matches'])).toBe(true)
+    expect((out['matches'] as unknown[]).length).toBeGreaterThan(0)
+  })
+
+  it('search_code returns completed and echoes query back', async () => {
+    // Validates the handler structure regardless of whether matches are found.
+    const ctx: StepContext = {
+      wf_id: 'wf_fake',
+      workspace_id,
+      project_id,
+      step_id: 's_sc2',
+      step: {
+        step_id: 's_sc2',
+        step_type: 'search_code' as WorkflowStepDef['step_type'],
+        name: 'search_echo',
+        config: {
+          query: 'someSearchQuery',
+          cwd: new URL('../', import.meta.url).pathname,
+        },
+      },
+      outputs: {},
+      attempts: 0,
+    }
+    const result = await executeStep(ctx)
+    expect(result.status).toBe('completed')
+    const out = result.output as Record<string, unknown>
+    expect(out['query']).toBe('someSearchQuery')
+    expect(Array.isArray(out['matches'])).toBe(true)
+  })
+
+  it('search_code returns failed when query is missing', async () => {
+    const ctx: StepContext = {
+      wf_id: 'wf_fake',
+      workspace_id,
+      project_id,
+      step_id: 's_sc3',
+      step: {
+        step_id: 's_sc3',
+        step_type: 'search_code' as WorkflowStepDef['step_type'],
+        name: 'search_noq',
+        config: {},
+      },
+      outputs: {},
+      attempts: 0,
+    }
+    const result = await executeStep(ctx)
+    expect(result.status).toBe('failed')
+    expect(result.error).toMatch(/query/)
+  })
+
   it('executeStep returns failed for unknown step types', async () => {
     const ctx: StepContext = {
       wf_id: 'wf_fake',

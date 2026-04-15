@@ -16,9 +16,27 @@
 //     handler can catch ERR_MODULE_NOT_FOUND and return a structured
 //     failure instead of crashing at module load.
 
+import { spawn } from 'node:child_process'
 import { getDb, newId } from '@fulcrum/core'
 import type { MemoryKind, MemoryScope } from '@fulcrum/core'
 import type { StepContext, StepResult, StepHandler } from './types.js'
+
+/** Run a command with stdin ignored, collect stdout. Resolves on exit code 0 or 1 (grep/rg
+ * exit 1 on "no matches" which is not an error). Rejects on exit code 2+ (real errors). */
+function runCommand(cmd: string, args: string[], cwd: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', (d: Buffer) => { stdout += d.toString() })
+    child.stderr.on('data', (d: Buffer) => { stderr += d.toString() })
+    child.on('error', reject)
+    child.on('close', (code) => {
+      if (code === 0 || code === 1) resolve(stdout)
+      else reject(new Error(`${cmd} exited with code ${code}: ${stderr.slice(0, 200)}`))
+    })
+  })
+}
 
 // ── config helpers ─────────────────────────────────────────────────────────
 
@@ -233,10 +251,8 @@ HANDLERS['run_script'] = async (ctx) => {
   if (!ALLOWED_SCRIPTS.has(script)) {
     return { status: 'failed', error: `run_script: '${script}' not in allowlist` }
   }
-  const { execFile } = await import('node:child_process')
-  const { promisify } = await import('node:util')
   try {
-    const { stdout } = await promisify(execFile)('npm', ['run', script], { cwd: process.cwd() })
+    const stdout = await runCommand('npm', ['run', script], process.cwd())
     return { status: 'completed', output: { stdout: stdout.slice(0, 4000) } }
   } catch (err) {
     return { status: 'failed', error: (err as Error).message }
@@ -445,7 +461,58 @@ HANDLERS['search_web'] = async (ctx) => {
 
 HANDLERS['search_code'] = async (ctx) => {
   const c = cfg(ctx)
-  return { status: 'completed', output: { query: c['query'] ?? '', matches: [], note: 'search_code stubbed' } }
+  const query = str(c['query'])
+  if (!query) return { status: 'failed', error: 'search_code requires query' }
+  const cwd = str(c['cwd'], process.cwd())
+  const glob = str(c['glob'], '')
+
+  type Match = { path: string; line: number; text: string }
+
+  const tryRg = async (): Promise<Match[]> => {
+    const args = ['--json', '--max-count=50', query]
+    if (glob) args.push('--glob', glob)
+    const stdout = await runCommand('rg', args, cwd)
+    return stdout
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((l): Record<string, unknown> | null => {
+        try { return JSON.parse(l) as Record<string, unknown> } catch { return null }
+      })
+      .filter((r): r is Record<string, unknown> => r !== null && r['type'] === 'match')
+      .map((r) => {
+        const data = r['data'] as Record<string, unknown>
+        return {
+          path: (data['path'] as { text: string }).text,
+          line: data['line_number'] as number,
+          text: ((data['lines'] as { text: string }).text ?? '').trim(),
+        }
+      })
+  }
+
+  const tryGrep = async (): Promise<Match[]> => {
+    const include = glob ? `--include=${glob}` : '--include=*.ts'
+    const stdout = await runCommand(
+      'grep', ['-rn', include, `--max-count=50`, query, '.'], cwd
+    ).catch(() => '')
+    return stdout
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const m = line.match(/^(.+?):(\d+):(.*)$/)
+        if (!m) return null
+        return { path: m[1]!, line: parseInt(m[2]!, 10), text: m[3]!.trim() }
+      })
+      .filter((r): r is Match => r !== null)
+  }
+
+  try {
+    const matches = await tryRg().catch(() => tryGrep())
+    return { status: 'completed', output: { query, matches } }
+  } catch (err) {
+    return { status: 'completed', output: { query, matches: [], note: (err as Error).message } }
+  }
 }
 
 HANDLERS['run_tool'] = async (ctx) => {
