@@ -38,7 +38,20 @@ export class LocalRerankerProvider implements RerankerProvider {
       return_tensors: 'pt',
     })
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    const { logits } = await this.rankerModel(inputs) as { logits: { data: Float32Array } }
+    const { logits } = await this.rankerModel(inputs) as { logits: { data: Float32Array; dims: number[] } }
+    // Handle two common output shapes:
+    //   [n_pairs]    — scalar relevance score per pair (most cross-encoders)
+    //   [n_pairs, 1] — single-column relevance score per pair
+    //   [n_pairs, 2] — [irrelevance, relevance] logit pair; take the relevance column (index 1)
+    const dims: number[] = logits.dims ?? []
+    if (dims.length === 2 && dims[1] === 2) {
+      // Binary classifier: extract relevance logit (column 1) for each pair
+      const scores: number[] = []
+      for (let i = 0; i < passages.length; i++) {
+        scores.push(logits.data[i * 2 + 1] ?? 0)
+      }
+      return scores
+    }
     return Array.from(logits.data)
   }
 }

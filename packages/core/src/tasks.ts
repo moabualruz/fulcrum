@@ -94,7 +94,40 @@ export async function listTasks(input: ListTasksInput, db = getDb()): Promise<Ta
   if (input.status) { sql += ' AND status = ?'; params.push(input.status) }
   sql += ' ORDER BY created_at ASC'
   const rows = db.prepare(sql).all(...params) as Record<string, unknown>[]
-  return rows.map(row => hydrateTask(db, row))
+  if (rows.length === 0) return []
+
+  // Batch labels and blockers — two queries total instead of 2×N (M-3).
+  const taskIds = rows.map(r => r.task_id as string)
+  const placeholders = taskIds.map(() => '?').join(',')
+
+  const labelRows = db.prepare(
+    `SELECT task_id, label FROM task_labels WHERE task_id IN (${placeholders}) ORDER BY label`
+  ).all(...taskIds) as { task_id: string; label: string }[]
+  const labelMap = new Map<string, string[]>()
+  for (const lr of labelRows) {
+    const list = labelMap.get(lr.task_id) ?? []
+    list.push(lr.label)
+    labelMap.set(lr.task_id, list)
+  }
+
+  const blockerRows = db.prepare(
+    `SELECT target_task_id, task_id FROM task_relations WHERE target_task_id IN (${placeholders}) AND relation_type = 'blocks'`
+  ).all(...taskIds) as { target_task_id: string; task_id: string }[]
+  const blockerMap = new Map<string, string[]>()
+  for (const br of blockerRows) {
+    const list = blockerMap.get(br.target_task_id) ?? []
+    list.push(br.task_id)
+    blockerMap.set(br.target_task_id, list)
+  }
+
+  return rows.map(row => {
+    const task_id = row.task_id as string
+    return {
+      ...rowToTaskBase(row),
+      labels: labelMap.get(task_id) ?? [],
+      blockers: blockerMap.get(task_id) ?? [],
+    }
+  })
 }
 
 export async function createTask(input: CreateTaskInput, db = getDb()): Promise<Task> {

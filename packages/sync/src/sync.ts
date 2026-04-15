@@ -16,15 +16,26 @@ import type {
   PlaneAPIClientConfig,
 } from './types.js'
 
-function buildManager(db = getDb()): SyncManager {
+// Singleton PlaneAPIClient — re-created only when env vars change (m-5).
+let _cachedClient: PlaneAPIClient | null = null
+let _cachedConfig: string | null = null
+
+function getOrCreateClient(): PlaneAPIClient {
   const config: PlaneAPIClientConfig = {
     baseUrl: process.env['PLANE_BASE_URL'] ?? 'https://api.plane.so',
     apiKey: process.env['PLANE_API_KEY'] ?? '',
     workspaceSlug: process.env['PLANE_WORKSPACE_SLUG'] ?? '',
     projectId: process.env['PLANE_PROJECT_ID'],
   }
+  const key = JSON.stringify(config)
+  if (_cachedClient && _cachedConfig === key) return _cachedClient
+  _cachedClient = new PlaneAPIClient(config)
+  _cachedConfig = key
+  return _cachedClient
+}
 
-  const client = new PlaneAPIClient(config)
+function buildManager(db = getDb()): SyncManager {
+  const client = getOrCreateClient()
   const adapter = new PlaneSyncAdapter(client)
 
   // Secret guard runs before every push (single-object and queue-batch paths)

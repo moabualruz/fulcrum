@@ -29,7 +29,7 @@ primary signal the chief-of-staff uses to decide what happens next.
 ```
 mcp__fulcrum__complete_agent_run
   run_id:        (from start_agent_run)
-  summary:       (1-3 paragraphs — see below)
+  output_summary: (1-3 paragraphs — see below)
   files_changed: ["packages/core/src/memory/recall.ts", ...]
   tests_passed:  91
   tests_failed:  0
@@ -37,7 +37,7 @@ mcp__fulcrum__complete_agent_run
   artifacts:     [{ kind: "test_report", path: "..." }, ...]
 ```
 
-### What belongs in `summary`
+### What belongs in `output_summary`
 
 - What changed and why — one paragraph. Not "fixed bug", but "fixed the FTS5
   fallback path so it catches any `SQLITE_ERROR` from a MATCH query, not just
@@ -53,12 +53,12 @@ reviews.
 
 ## Red flags
 
-- Summary under 40 characters → almost certainly useless; expand it.
+- `output_summary` under 40 characters → almost certainly useless; expand it.
 - `files_changed` is empty but you called `Edit` or `Write` → bug in your
   tracking; fix it before completing.
 - You completed without running tests on a code change → the next agent
   will discover the regression; run tests first, or explicitly record the
-  gap in `summary`.
+  gap in `output_summary`.
 - You completed a run that was never started → the call will fail; start
   a new run, do the minimum to represent the state, then complete it.
 

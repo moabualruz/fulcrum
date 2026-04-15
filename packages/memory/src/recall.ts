@@ -178,13 +178,17 @@ export async function recallMemory(
           const pagedResults = l2Results.slice(offset, offset + limit)
           const ids = pagedResults.map(r => r.id)
           const placeholders = ids.map(() => '?').join(',')
-          const rows = ids.length > 0
+          const rawRows = ids.length > 0
             ? db.prepare(
                 `SELECT m.* FROM memories m WHERE m.memory_id IN (${placeholders})`
               ).all(...ids) as Record<string, unknown>[]
             : []
 
           updateAccessCounts(db, ids)
+
+          // Restore L2 vector-similarity ordering (SQLite IN clause is non-deterministic — M-10).
+          const rowById = new Map(rawRows.map(r => [r.memory_id as string, r]))
+          const rows = ids.map(id => rowById.get(id)).filter(Boolean) as Record<string, unknown>[]
 
           if (mode === 'compact') return rows.map(rowToCompact)
           return rows.map(rowToFullMemory)
