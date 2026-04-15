@@ -20,8 +20,9 @@
  * Install (npm, once published):
  *   pi install npm:fulcrum-cockpit
  *
- * Config — .fulcrum.json in project root (wizard creates it on first run):
- *   { "workspace_id": "ws_...", "project_id": "proj_...", "monitor_port": 4721 }
+ * Config — workspace_id / project_id are computed deterministically from the
+ *   project directory path (sha256[:12] of abs path, prefixed with dir name).
+ *   No files are written to your project directory.
  *
  * Env-var overrides: FULCRUM_WORKSPACE_ID  FULCRUM_PROJECT_ID  FULCRUM_PORT
  *
@@ -33,6 +34,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 const { spawn, execSync } = require("child_process") as typeof import("child_process");
+const { createHash } = require("crypto") as typeof import("crypto");
 import * as fs from "fs";
 import * as path from "path";
 
@@ -61,40 +63,26 @@ interface WorkspaceSnapshot {
 }
 
 // ── Config discovery ───────────────────────────────────────────────────────────
+// workspace_id / project_id are computed deterministically from the project
+// directory path — no .fulcrum.json file is written to or read from the project.
 
-function findConfigFile(cwd: string): string | null {
-  let dir = cwd;
-  for (let i = 0; i < 6; i++) {
-    const p = path.join(dir, ".fulcrum.json");
-    if (fs.existsSync(p)) return p;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return null;
+function computeProjectIds(absPath: string): { workspace_id: string; project_id: string } {
+  const hash = createHash("sha256").update(absPath).digest("hex").slice(0, 12);
+  const sanitizedName = path.basename(absPath).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 24) || "project";
+  return {
+    workspace_id: `ws_${sanitizedName}_${hash}`,
+    project_id: `proj_${sanitizedName}_${hash}`,
+  };
 }
 
 function loadCockpitConfig(cwd: string): CockpitConfig {
-  const defaults: CockpitConfig = {
-    workspace_id: process.env["FULCRUM_WORKSPACE_ID"] ?? "",
-    project_id: process.env["FULCRUM_PROJECT_ID"] ?? "",
+  const absPath = path.resolve(cwd);
+  const { workspace_id: computedWs, project_id: computedProj } = computeProjectIds(absPath);
+  return {
+    workspace_id: process.env["FULCRUM_WORKSPACE_ID"] ?? computedWs,
+    project_id: process.env["FULCRUM_PROJECT_ID"] ?? computedProj,
     monitor_port: parseInt(process.env["FULCRUM_PORT"] ?? "4721", 10),
   };
-  const cfgPath = findConfigFile(cwd);
-  if (cfgPath) {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
-      return { ...defaults, ...parsed };
-    } catch {
-      /* ignore malformed config */
-    }
-  }
-  return defaults;
-}
-
-function writeConfigFile(cwd: string, cfg: CockpitConfig): void {
-  const p = path.join(cwd, ".fulcrum.json");
-  fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + "\n", "utf-8");
 }
 
 // ── HTTP helpers ───────────────────────────────────────────────────────────────
@@ -201,7 +189,7 @@ export default function (pi: ExtensionAPI) {
 
     ui.notify(
       "Fulcrum Cockpit — first-run setup\n" +
-      "This wizard creates .fulcrum.json in your project root.",
+      "Workspace and project IDs are derived automatically from your project path.",
       "info",
     );
 
@@ -217,58 +205,33 @@ export default function (pi: ExtensionAPI) {
       return null;
     }
 
-    // 2. workspace_id
-    const wsInput = await ui.input(
-      "Fulcrum Workspace ID (leave blank to create new)",
-      process.env["FULCRUM_WORKSPACE_ID"] ?? "",
+    // 2. Compute IDs from CWD (deterministic, no file needed)
+    const absPath = path.resolve(cwd);
+    const computed = computeProjectIds(absPath);
+    const workspace_id = process.env["FULCRUM_WORKSPACE_ID"] ?? computed.workspace_id;
+    const project_id = process.env["FULCRUM_PROJECT_ID"] ?? computed.project_id;
+
+    ui.notify(
+      `Auto-computed IDs from path:\n  workspace: ${workspace_id}\n  project:   ${project_id}\n\nOverride with FULCRUM_WORKSPACE_ID / FULCRUM_PROJECT_ID env vars.`,
+      "success",
     );
-    if (wsInput === null) return null; // user cancelled
 
-    let workspace_id = wsInput.trim();
-    if (!workspace_id) {
-      // Create a new workspace via CLI
-      try {
-        const out = execSync('fulcrum workspaces create --name "default"', {
-          encoding: "utf-8",
-        });
-        const match = out.match(/ws_\w+/);
-        workspace_id = match ? match[0] : "";
-        if (workspace_id) {
-          ui.notify(`Created workspace: ${workspace_id}`, "success");
-        }
-      } catch {
-        ui.notify("Could not auto-create workspace — enter an ID manually", "warning");
-        workspace_id = "";
-      }
-    }
-
-    if (!workspace_id) {
-      const retry = await ui.input("Workspace ID (required)", "ws_...");
-      if (!retry) return null;
-      workspace_id = retry.trim();
-    }
-
-    // 3. project_id (optional)
-    const projInput = await ui.input(
-      "Fulcrum Project ID (optional, leave blank for all projects)",
-      process.env["FULCRUM_PROJECT_ID"] ?? "",
-    );
-    if (projInput === null) return null;
-    const project_id = projInput.trim();
-
-    // 4. port
+    // 3. port
     const portInput = await ui.input("Monitor port", "4721");
     if (portInput === null) return null;
     const monitor_port = parseInt(portInput.trim() || "4721", 10);
 
     const newCfg: CockpitConfig = { workspace_id, project_id, monitor_port };
 
-    // 5. Write .fulcrum.json
+    // Ensure workspace + project exist in the global DB via the CLI
     try {
-      writeConfigFile(cwd, newCfg);
-      ui.notify(`Wrote .fulcrum.json — workspace: ${workspace_id}`, "success");
-    } catch (e) {
-      ui.notify(`Could not write .fulcrum.json: ${String(e)}`, "error");
+      execSync(`fulcrum task list --workspace ${workspace_id} --limit 1`, {
+        encoding: "utf-8",
+        stdio: "pipe",
+      });
+      ui.notify(`Workspace initialized: ${workspace_id}`, "success");
+    } catch {
+      // CLI will auto-init on next run — non-fatal
     }
 
     return newCfg;
@@ -481,7 +444,7 @@ export default function (pi: ExtensionAPI) {
 
     // /fulcrum-setup — (re-)run config wizard
     pi.registerCommand("fulcrum-setup", {
-      description: "Configure Fulcrum workspace (creates .fulcrum.json)",
+      description: "Configure Fulcrum workspace (IDs derived from project path, no files written)",
       handler: async (_args, ctx) => {
         const newCfg = await runSetupWizard(ctx as Parameters<typeof runSetupWizard>[0]);
         if (newCfg) {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb } from './helpers.js'
 import { getDb } from '../db/client.js'
-import { newId, nextDisplayId } from '../ids.js'
+import { newId, nextDisplayId, projectIdsFromPath } from '../ids.js'
 
 beforeEach(() => {
   const db = createTestDb()
@@ -109,6 +109,38 @@ describe('nextDisplayId', () => {
     seed()
     const db = getDb()
     expect(() => nextDisplayId('workspace', 'proj_1', db)).toThrow('No display prefix')
+  })
+})
+
+describe('projectIdsFromPath', () => {
+  it('returns ws_ and proj_ prefixed IDs', () => {
+    const { workspace_id, project_id } = projectIdsFromPath('/home/user/myproject')
+    expect(workspace_id).toMatch(/^ws_myproject_[a-f0-9]{12}$/)
+    expect(project_id).toMatch(/^proj_myproject_[a-f0-9]{12}$/)
+  })
+
+  it('is deterministic — same path produces same IDs', () => {
+    const a = projectIdsFromPath('/home/user/myproject')
+    const b = projectIdsFromPath('/home/user/myproject')
+    expect(a.workspace_id).toBe(b.workspace_id)
+    expect(a.project_id).toBe(b.project_id)
+  })
+
+  it('produces different IDs for different paths', () => {
+    const a = projectIdsFromPath('/home/user/project-a')
+    const b = projectIdsFromPath('/home/user/project-b')
+    expect(a.workspace_id).not.toBe(b.workspace_id)
+    expect(a.project_id).not.toBe(b.project_id)
+  })
+
+  it('sanitizes special characters in dirname', () => {
+    const { workspace_id } = projectIdsFromPath('/home/user/my-cool.project!')
+    expect(workspace_id).toMatch(/^ws_my-cool_project__[a-f0-9]{12}$/)
+  })
+
+  it('uses process.cwd() when no path provided', () => {
+    const { workspace_id } = projectIdsFromPath()
+    expect(workspace_id).toMatch(/^ws_/)
   })
 })
 

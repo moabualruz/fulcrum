@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { execSync } from 'child_process'
+import { homedir } from 'os'
 
 // ---------- Check result type ----------
 
@@ -29,24 +30,30 @@ function checkNodeVersion(): CheckResult {
   return { name: 'Node.js version', status: 'fail', message: `${version} — need Node.js ≥ 20` }
 }
 
-function checkFulcrumJson(cwd: string): CheckResult {
-  const configPath = join(cwd, '.fulcrum.json')
+function getGlobalDataDir(): string {
+  if (process.env['FULCRUM_DATA_DIR']) return process.env['FULCRUM_DATA_DIR']
+  // macOS
+  if (process.platform === 'darwin') return join(homedir(), 'Library', 'Application Support', 'fulcrum')
+  // XDG
+  if (process.env['XDG_DATA_HOME']) return join(process.env['XDG_DATA_HOME'], 'fulcrum')
+  return join(homedir(), '.local', 'share', 'fulcrum')
+}
+
+function checkGlobalConfig(): CheckResult {
+  const configPath = join(getGlobalDataDir(), 'config.json')
   if (!existsSync(configPath)) {
     return {
-      name: '.fulcrum.json',
-      status: 'warn',
-      message: 'Not found — run a fulcrum command to auto-initialize the project',
+      name: 'Global config',
+      status: 'pass',
+      message: `No ${configPath} — using defaults (workspace_id derived from CWD on each run)`,
     }
   }
   try {
     const raw = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>
-    const missing = ['workspace_id', 'project_id'].filter(k => !raw[k])
-    if (missing.length > 0) {
-      return { name: '.fulcrum.json', status: 'fail', message: `Missing fields: ${missing.join(', ')}` }
-    }
-    return { name: '.fulcrum.json', status: 'pass', message: `workspace_id=${raw.workspace_id as string}` }
+    const keys = Object.keys(raw).join(', ') || '(empty)'
+    return { name: 'Global config', status: 'pass', message: `${configPath} — keys: ${keys}` }
   } catch {
-    return { name: '.fulcrum.json', status: 'fail', message: 'Cannot parse .fulcrum.json — invalid JSON' }
+    return { name: 'Global config', status: 'fail', message: `Cannot parse ${configPath} — invalid JSON` }
   }
 }
 
@@ -151,7 +158,7 @@ export function runDoctor(options: DoctorOptions = {}): { results: CheckResult[]
 
   const results: CheckResult[] = [
     checkNodeVersion(),
-    checkFulcrumJson(cwd),
+    checkGlobalConfig(),
     checkDataDir(),
     checkSqliteBinary(),
     checkDbLiveness(),

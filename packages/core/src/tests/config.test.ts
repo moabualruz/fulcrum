@@ -3,28 +3,35 @@ import { writeFileSync, mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { loadConfig, defaultConfig, validateFulcrumConfig } from '../config.js'
 
-const TMP = '/tmp/fulcrum-test-config'
+// All config reads from globalDataDir()/config.json (never from CWD).
+// We point FULCRUM_DATA_DIR at a temp dir to control what gets read.
 
-beforeEach(() => { mkdirSync(TMP, { recursive: true }) })
+const TMP_DATA = '/tmp/fulcrum-test-config-data'
+
+beforeEach(() => {
+  mkdirSync(TMP_DATA, { recursive: true })
+  vi.stubEnv('FULCRUM_DATA_DIR', TMP_DATA)
+})
+
 afterEach(() => {
-  rmSync(TMP, { recursive: true, force: true })
+  rmSync(TMP_DATA, { recursive: true, force: true })
   vi.unstubAllEnvs()
 })
 
 describe('loadConfig', () => {
-  it('returns defaults when no file exists', () => {
-    const cfg = loadConfig(join(TMP, 'nonexistent'))
+  it('returns defaults when no config.json exists', () => {
+    const cfg = loadConfig()
     expect(cfg.port).toBe(4721)
     expect(cfg.embedding.text.provider).toBe('local')
     expect(cfg.policy.wip_limit).toBe(5)
   })
 
-  it('reads values from .fulcrum.json', () => {
+  it('reads values from globalDataDir()/config.json', () => {
     writeFileSync(
-      join(TMP, '.fulcrum.json'),
+      join(TMP_DATA, 'config.json'),
       JSON.stringify({ workspace_id: 'ws_test', project_id: 'proj_test', port: 9999 })
     )
-    const cfg = loadConfig(TMP)
+    const cfg = loadConfig()
     expect(cfg.workspace_id).toBe('ws_test')
     expect(cfg.project_id).toBe('proj_test')
     expect(cfg.port).toBe(9999)
@@ -32,46 +39,53 @@ describe('loadConfig', () => {
 
   it('env vars override file values', () => {
     writeFileSync(
-      join(TMP, '.fulcrum.json'),
+      join(TMP_DATA, 'config.json'),
       JSON.stringify({ workspace_id: 'ws_file', project_id: 'proj_file', port: 4721 })
     )
     vi.stubEnv('FULCRUM_WORKSPACE_ID', 'ws_env')
     vi.stubEnv('FULCRUM_PORT', '5000')
-    const cfg = loadConfig(TMP)
+    const cfg = loadConfig()
     expect(cfg.workspace_id).toBe('ws_env')
     expect(cfg.port).toBe(5000)
   })
 
   it('merges partial policy config with defaults', () => {
     writeFileSync(
-      join(TMP, '.fulcrum.json'),
+      join(TMP_DATA, 'config.json'),
       JSON.stringify({ workspace_id: 'ws_x', project_id: 'p_x', policy: { wip_limit: 10 } })
     )
-    const cfg = loadConfig(TMP)
+    const cfg = loadConfig()
     expect(cfg.policy.wip_limit).toBe(10)
     expect(cfg.policy.heartbeat_timeout_minutes).toBe(10) // default preserved
   })
 
   it('ignores non-numeric FULCRUM_PORT', () => {
     vi.stubEnv('FULCRUM_PORT', 'abc')
-    const cfg = loadConfig(join(TMP, 'nonexistent'))
+    const cfg = loadConfig()
     expect(cfg.port).toBe(4721) // default preserved
     expect(Number.isNaN(cfg.port)).toBe(false)
   })
 
-  it('falls back to defaults when .fulcrum.json is malformed JSON', () => {
-    writeFileSync(join(TMP, '.fulcrum.json'), '{ this is not valid json }')
-    const cfg = loadConfig(TMP)
+  it('falls back to defaults when config.json is malformed JSON', () => {
+    writeFileSync(join(TMP_DATA, 'config.json'), '{ this is not valid json }')
+    const cfg = loadConfig()
     expect(cfg.port).toBe(4721)
     expect(cfg.policy.wip_limit).toBe(5)
   })
 
-  it('throws with helpful message when .fulcrum.json has invalid schema', () => {
+  it('throws with helpful message when config.json has invalid schema', () => {
     writeFileSync(
-      join(TMP, '.fulcrum.json'),
+      join(TMP_DATA, 'config.json'),
       JSON.stringify({ port: 'not-a-number', policy: { wip_limit: -1 } })
     )
-    expect(() => loadConfig(TMP)).toThrowError(/Invalid .fulcrum.json/)
+    expect(() => loadConfig()).toThrowError(/Invalid config/)
+  })
+
+  it('ignores any projectRoot argument (kept for backwards compat)', () => {
+    // loadConfig() no longer reads from projectRoot — this should still work and
+    // return defaults (no config.json in TMP_DATA at this point)
+    const cfg = loadConfig('/some/project/path')
+    expect(cfg.port).toBe(4721)
   })
 })
 

@@ -80,7 +80,7 @@ OPTIONS
   --help, -h           Show this help (or <group> --help for group help)
   --json               Output as JSON (for list/get subcommands)
   --vault <path>       Override vault path (default: $FULCRUM_DATA_DIR/vault)
-  --port <n>           Override monitor port (default: 4721 from .fulcrum.json)
+  --port <n>           Override monitor port (default: 4721)
 
 DIAGNOSTICS
   doctor              Run environment + configuration health checks
@@ -98,9 +98,8 @@ EXAMPLES
 AUTO-INITIALIZATION
   Every fulcrum command auto-initializes $CWD as a Fulcrum project on first run
   (opens the single global DB at $FULCRUM_DATA_DIR or ~/.local/share/fulcrum/,
-  creates a workspace + project with deterministic IDs, and writes $CWD/.fulcrum.json
-  with those IDs so Claude/Gemini/PI can discover the project context).
-  No explicit init step required.
+  creates a workspace + project with deterministic IDs derived from $CWD).
+  No explicit init step required. Nothing is written to your project directory.
 
 GLOBAL INSTALL
   From the repo root: pnpm install && pnpm run setup
@@ -1145,6 +1144,11 @@ async function runServeMcp(): Promise<void> {
       )
     }
 
+    if (name === 'get_current_context') {
+      const ids = currentProjectIds()
+      return { workspace_id: ids.workspace_id, project_id: ids.project_id, cwd: process.cwd() }
+    }
+
     throw new Error(`Unknown tool: ${name}`)
   }
 
@@ -1286,6 +1290,9 @@ async function runServeMcpHttp(): Promise<void> {
       const ops = await getTeamOps()
       const fn = ops[name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()) as keyof typeof ops] as ((args: Record<string, unknown>) => Promise<unknown>) | undefined
       if (fn) return await fn(a)
+    }
+    if (name === 'get_current_context') {
+      return { workspace_id: config.workspace_id, project_id: config.project_id, cwd: process.cwd() }
     }
     throw new Error(`Unknown tool: ${name}`)
   }
@@ -2123,11 +2130,9 @@ fulcrum agent — agent runs and spawning
 //   2. ensures a workspace + project exist, with deterministic IDs derived from
 //      the absolute $CWD path — logical isolation inside the one global DB,
 //      not physical separation
-//   3. writes $CWD/.fulcrum.json (lightweight config) with workspace_id,
-//      project_id, and monitor_port so the PI cockpit, Gemini extension, and
-//      child tools can discover which workspace/project this directory maps to
 // Idempotent: safe to call on every invocation. Prints a one-line notice
 // on first-time init (to stderr so it never corrupts MCP stdio traffic).
+// NEVER writes any files to $CWD or any project directory.
 
 let _projectInitialized = false
 let _projectIds: { workspace_id: string; project_id: string } | null = null
@@ -2139,24 +2144,17 @@ function currentProjectIds(): { workspace_id: string; project_id: string } {
 
 async function ensureProjectInitialized(opts: { silent?: boolean } = {}): Promise<{ workspace_id: string; project_id: string }> {
   if (_projectIds) return _projectIds
-  const path = await import('path')
-  const fs = await import('fs')
-  const crypto = await import('crypto')
-  const { getDb, runMigrations, getWorkspace, getProject, createWorkspace, createProject } = await import('@fulcrum/core')
+  const { getDb, runMigrations, getWorkspace, getProject, createWorkspace, createProject, projectIdsFromPath } = await import('@fulcrum/core')
 
-  const cwd = process.cwd()
-
-  // Initialize the global DB (data lives in globalDataDir(), never in $CWD)
+  // Initialize the global DB (data lives in globalDataDir(), NEVER in $CWD)
   const db = getDb()
   runMigrations(db)
 
-  // Deterministic IDs: sha256[:12] of the absolute path, prefixed with a
+  // Deterministic IDs: sha256[:12] of the absolute CWD path, prefixed with a
   // sanitized directory name. Stable across runs, unique across projects.
-  const absPath = path.resolve(cwd)
-  const hash = crypto.createHash('sha256').update(absPath).digest('hex').slice(0, 12)
-  const sanitizedName = path.basename(absPath).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 24) || 'project'
-  const workspace_id = `ws_${sanitizedName}_${hash}`
-  const project_id = `proj_${sanitizedName}_${hash}`
+  // No file is written to the project directory.
+  const { workspace_id, project_id } = projectIdsFromPath(process.cwd())
+  const sanitizedName = workspace_id.replace(/^ws_/, '').replace(/_[a-f0-9]{12}$/, '')
 
   // Route workspace/project creation through core CRUD so FK/enum validation
   // runs in one place. Both calls are effectively idempotent: we check
@@ -2166,30 +2164,8 @@ async function ensureProjectInitialized(opts: { silent?: boolean } = {}): Promis
   if (!existingWs) await createWorkspace({ workspace_id, name: sanitizedName })
   if (!existingProj) await createProject({ workspace_id, project_id, name: sanitizedName })
 
-  // Write/update .fulcrum.json so PI cockpit and monitor pick up the same IDs
-  const configPath = path.join(cwd, '.fulcrum.json')
-  let config: Record<string, unknown> = {}
-  if (fs.existsSync(configPath)) {
-    try {
-      config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
-    } catch {
-      // malformed — overwrite with a clean one
-      config = {}
-    }
-  }
-  const needsWrite =
-    config['workspace_id'] !== workspace_id ||
-    config['project_id'] !== project_id ||
-    typeof config['monitor_port'] !== 'number'
-  if (needsWrite) {
-    config['workspace_id'] = workspace_id
-    config['project_id'] = project_id
-    config['monitor_port'] = (typeof config['monitor_port'] === 'number' ? config['monitor_port'] : 4721)
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8')
-  }
-
   // Announce first-time init on stderr (never stdout — MCP stdio is strict)
-  const firstRun = !existingWs || !existingProj || needsWrite
+  const firstRun = !existingWs || !existingProj
   if (firstRun && !opts.silent && !_projectInitialized) {
     process.stderr.write(`[fulcrum] initialized project "${sanitizedName}" (${workspace_id})\n`)
   }
@@ -2219,10 +2195,10 @@ async function main(): Promise<void> {
   }
 
   // Auto-initialize the project in $CWD (opens global DB, ensures workspace +
-  // project exist, writes $CWD/.fulcrum.json) before dispatching any command
-  // that touches the DB. The user never needs an explicit init step.
-  // `hook` and `serve mcp` ask for silent mode so the init
-  // notice doesn't spam stderr on every Claude/Gemini tool call.
+  // project exist) before dispatching any command that touches the DB.
+  // Nothing is written to $CWD. workspace_id/project_id are computed
+  // deterministically from the abs path. `hook` and `serve mcp` use silent
+  // mode so the init notice doesn't spam stderr on every tool call.
   const silentInit = group === 'hook' || (group === 'serve' && command === 'mcp')
   await ensureProjectInitialized({ silent: silentInit })
 

@@ -107,7 +107,7 @@ All 13 MCP tools are available: `mcp__fulcrum__list_tasks`, `mcp__fulcrum__creat
 
 | Command | Description |
 |---------|-------------|
-| `/fulcrum-setup` | Configure workspace (creates `.fulcrum.json`) |
+| `/fulcrum-setup` | Confirm workspace IDs (computed from project path, no files written) |
 | `/fulcrum-status` | Show workspace status: running agents, blockers, WIP |
 | `/fulcrum-start` | Start the Fulcrum monitor server |
 | `/fulcrum-monitor` | Open the monitor in your browser |
@@ -179,16 +179,9 @@ When acting as `chief_of_staff`, structure your final response as:
 
 ---
 
-## Config File
+## Config
 
-The cockpit reads `.fulcrum.json` from the project root (walks up 6 directories):
-```json
-{
-  "workspace_id": "ws_...",
-  "project_id": "proj_...",
-  "monitor_port": 4721
-}
-```
+No project-local config files. `workspace_id` and `project_id` are computed deterministically from the project directory path (sha256[:12] of absolute path). Nothing is written to your project directory.
 
 Environment variable overrides: `FULCRUM_WORKSPACE_ID`, `FULCRUM_PROJECT_ID`, `FULCRUM_PORT`
 

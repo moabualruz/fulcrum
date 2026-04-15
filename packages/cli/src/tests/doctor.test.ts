@@ -4,17 +4,23 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
-import { tmpdir } from 'os'
+import { tmpdir, homedir } from 'os'
 import { runDoctor } from '../doctor.js'
 
 let tmpDir: string
+let tmpDataDir: string
 
 function setup(): void {
   tmpDir = mkdtempSync(join(tmpdir(), 'fulcrum-doctor-test-'))
+  tmpDataDir = mkdtempSync(join(tmpdir(), 'fulcrum-doctor-data-'))
+  // Point FULCRUM_DATA_DIR at a temp global dir so tests don't touch ~/.local/share/fulcrum
+  process.env['FULCRUM_DATA_DIR'] = tmpDataDir
 }
 
 function teardown(): void {
+  delete process.env['FULCRUM_DATA_DIR']
   try { rmSync(tmpDir, { recursive: true, force: true }) } catch { /* ignore */ }
+  try { rmSync(tmpDataDir, { recursive: true, force: true }) } catch { /* ignore */ }
 }
 
 describe('runDoctor', () => {
@@ -34,44 +40,33 @@ describe('runDoctor', () => {
   })
 
   it('returns exitCode 0 when no checks fail', () => {
-    // tmpDir has no .fulcrum.json — that will be a warn, not fail
-    // Node.js version check and env check should pass/warn
     const { exitCode, results } = runDoctor({ cwd: tmpDir })
     const hasFail = results.some(r => r.status === 'fail')
     expect(exitCode).toBe(hasFail ? 1 : 0)
   })
 
-  it('returns exitCode 1 when a check fails (invalid .fulcrum.json)', () => {
-    writeFileSync(join(tmpDir, '.fulcrum.json'), '{ invalid json ]]]')
-    const { exitCode, results } = runDoctor({ cwd: tmpDir })
-    const fulcrumCheck = results.find(r => r.name === '.fulcrum.json')
-    expect(fulcrumCheck?.status).toBe('fail')
-    expect(exitCode).toBe(1)
-  })
-
-  it('warns when .fulcrum.json is missing', () => {
+  it('passes global config check when no config.json exists (uses defaults)', () => {
+    // No config.json in global data dir — that is fine, IDs are derived from CWD
     const { results } = runDoctor({ cwd: tmpDir })
-    const fulcrumCheck = results.find(r => r.name === '.fulcrum.json')
-    expect(fulcrumCheck?.status).toBe('warn')
-  })
-
-  it('passes .fulcrum.json check with valid config', () => {
-    writeFileSync(join(tmpDir, '.fulcrum.json'), JSON.stringify({
-      workspace_id: 'ws_test',
-      project_id: 'proj_test',
-    }))
-    const { results } = runDoctor({ cwd: tmpDir })
-    const check = results.find(r => r.name === '.fulcrum.json')
+    const check = results.find(r => r.name === 'Global config')
     expect(check?.status).toBe('pass')
-    expect(check?.message).toContain('ws_test')
+    expect(check?.message).toContain('defaults')
   })
 
-  it('fails .fulcrum.json check when required fields missing', () => {
-    writeFileSync(join(tmpDir, '.fulcrum.json'), JSON.stringify({ workspace_id: 'ws_test' }))
+  it('passes global config check when config.json exists with valid JSON', () => {
+    writeFileSync(join(tmpDataDir, 'config.json'), JSON.stringify({ port: 4721 }))
     const { results } = runDoctor({ cwd: tmpDir })
-    const check = results.find(r => r.name === '.fulcrum.json')
+    const check = results.find(r => r.name === 'Global config')
+    expect(check?.status).toBe('pass')
+    expect(check?.message).toContain('port')
+  })
+
+  it('fails global config check when config.json contains invalid JSON', () => {
+    writeFileSync(join(tmpDataDir, 'config.json'), '{ invalid json ]]]')
+    const { exitCode, results } = runDoctor({ cwd: tmpDir })
+    const check = results.find(r => r.name === 'Global config')
     expect(check?.status).toBe('fail')
-    expect(check?.message).toContain('project_id')
+    expect(exitCode).toBe(1)
   })
 
   it('detects agent integration files', () => {
@@ -107,5 +102,13 @@ describe('runDoctor', () => {
     // Both run without throwing
     expect(r1.length).toBeGreaterThan(0)
     expect(r2.length).toBeGreaterThan(0)
+  })
+
+  it('does not check for .fulcrum.json in project directory', () => {
+    // Write a .fulcrum.json to the cwd — doctor should not look at it
+    writeFileSync(join(tmpDir, '.fulcrum.json'), JSON.stringify({ workspace_id: 'ws_old' }))
+    const { results } = runDoctor({ cwd: tmpDir })
+    const legacyCheck = results.find(r => r.name === '.fulcrum.json')
+    expect(legacyCheck).toBeUndefined()
   })
 })

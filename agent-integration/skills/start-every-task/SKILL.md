@@ -25,8 +25,12 @@ heartbeated, blocked, or completed.
 Call the MCP tool with the required fields:
 
 ```
+# Step 1: get workspace_id (no parameters needed)
+mcp__fulcrum__get_current_context
+
+# Step 2: start your run
 mcp__fulcrum__start_agent_run
-  workspace_id: (from .fulcrum.json, env, or get_workspace_status)
+  workspace_id: <from get_current_context result>
   task_id:      (from the task you're working on)
   agent_role:   (your canonical role — see list_agent_profiles)
 ```

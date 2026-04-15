@@ -34,7 +34,7 @@ Always-visible at the bottom of PI:
 
 | Command | Description |
 |---------|-------------|
-| `/fulcrum-setup` | Configure workspace (creates `.fulcrum.json` in project root) |
+| `/fulcrum-setup` | Confirm workspace IDs (computed from project path, no files written) |
 | `/fulcrum-status` | Show workspace status: running agents, blockers, WIP count |
 | `/fulcrum-start` | Start the Fulcrum monitor server |
 | `/fulcrum-monitor` | Open monitor in browser (http://localhost:4721) |
@@ -71,27 +71,18 @@ Every tool call in PI is checked against the Fulcrum policy engine. Currently en
 ### Auto-start
 
 On PI session start, the cockpit:
-1. Loads config from `.fulcrum.json` (walks up 6 directories)
+1. Computes `workspace_id` and `project_id` deterministically from the project directory path (sha256[:12] of abs path) — no file needed
 2. Starts the Fulcrum monitor server (`fulcrum serve monitor`) if not already running
-3. Shows a setup wizard on first run if no config file is found
-4. Polls workspace status every 5 s
+3. Polls workspace status every 5 s
 
 ## Configuration
 
-The cockpit reads `.fulcrum.json` from your project root:
-
-```json
-{
-  "workspace_id": "ws_01ABCDEFGH",
-  "project_id": "proj_01ABCDEFGH",
-  "monitor_port": 4721
-}
-```
+No project-local config files. IDs are computed from the directory path automatically.
 
 Environment variable overrides:
-- `FULCRUM_WORKSPACE_ID`
-- `FULCRUM_PROJECT_ID`
-- `FULCRUM_PORT`
+- `FULCRUM_WORKSPACE_ID` — override computed workspace_id
+- `FULCRUM_PROJECT_ID` — override computed project_id
+- `FULCRUM_PORT` — override monitor port (default 4721)
 
 ## Monitor URLs
 

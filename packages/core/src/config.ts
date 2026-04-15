@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import type { FulcrumConfig, PolicyConfig, EmbeddingProviderConfig } from './types.js'
+import { globalDataDir } from './db/client.js'
 import {
   DEFAULT_EMBED_DIM,
   DEFAULT_MONITOR_PORT,
@@ -147,9 +148,16 @@ export const defaultConfig: FulcrumConfig = {
   vault: { path: undefined, l2_enabled: false },
 }
 
-export function loadConfig(projectRoot?: string): FulcrumConfig {
-  const root = projectRoot ?? process.cwd()
-  const configPath = join(root, '.fulcrum.json')
+/**
+ * Load Fulcrum configuration from the global config file at globalDataDir()/config.json.
+ * NEVER reads from project-local directories — all config is global.
+ * The `projectRoot` parameter is ignored and kept for backwards-compatible call sites;
+ * workspace_id / project_id are always computed deterministically from CWD by callers,
+ * not stored in files.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function loadConfig(_projectRoot?: string): FulcrumConfig {
+  const configPath = join(globalDataDir(), 'config.json')
 
   let fileConfig: Partial<FulcrumConfig> = {}
   if (existsSync(configPath)) {
@@ -157,14 +165,14 @@ export function loadConfig(projectRoot?: string): FulcrumConfig {
     try {
       raw = JSON.parse(readFileSync(configPath, 'utf-8'))
     } catch {
-      process.stderr.write(`[fulcrum] Warning: malformed JSON in .fulcrum.json at ${configPath}, using defaults\n`)
+      process.stderr.write(`[fulcrum] Warning: malformed JSON in ${configPath}, using defaults\n`)
       raw = null
     }
     if (raw !== null) {
       const result = validateFulcrumConfig(raw)
       if (!result.ok) {
         throw new Error(
-          `[fulcrum] Invalid .fulcrum.json at ${configPath}:\n` +
+          `[fulcrum] Invalid config at ${configPath}:\n` +
           result.errors.map(e => `  • ${e}`).join('\n')
         )
       }

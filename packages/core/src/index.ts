@@ -73,7 +73,7 @@ export { buildA2ACard } from './a2a-card.js'
 export type { A2AAgentCard, A2ASkill, A2ACapabilities } from './a2a-card.js'
 
 // IDs
-export { newId, nextDisplayId } from './ids.js'
+export { newId, nextDisplayId, projectIdsFromPath } from './ids.js'
 
 // Status Category
 export { statusCategory } from './status-category.js'

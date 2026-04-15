@@ -1,4 +1,6 @@
 import { ulid } from 'ulidx'
+import { createHash } from 'crypto'
+import { basename, resolve } from 'path'
 import type Database from 'better-sqlite3'
 
 const PREFIXES: Record<string, string> = {
@@ -48,6 +50,23 @@ const DISPLAY_PREFIXES: Record<string, string> = {
   cycle: 'CYC',
   milestone: 'MILE',
   comment: 'CMT',
+}
+
+/**
+ * Compute deterministic workspace_id and project_id from an absolute directory path.
+ * Uses sha256[:12] of the resolved path, prefixed with a sanitized directory name.
+ * Stable across runs, unique across projects. No file I/O required.
+ *
+ * Example: /home/user/myproject → { workspace_id: 'ws_myproject_a1b2c3d4e5f6', project_id: 'proj_myproject_a1b2c3d4e5f6' }
+ */
+export function projectIdsFromPath(absPath?: string): { workspace_id: string; project_id: string } {
+  const resolved = resolve(absPath ?? process.cwd())
+  const hash = createHash('sha256').update(resolved).digest('hex').slice(0, 12)
+  const sanitizedName = basename(resolved).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 24) || 'project'
+  return {
+    workspace_id: `ws_${sanitizedName}_${hash}`,
+    project_id: `proj_${sanitizedName}_${hash}`,
+  }
 }
 
 export function newId(entityType: string): string {

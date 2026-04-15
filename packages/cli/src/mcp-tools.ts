@@ -419,6 +419,16 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       },
     },
   },
+  {
+    title: 'Get Current Context',
+    name: 'get_current_context',
+    description: 'Returns the workspace_id and project_id for the directory the MCP server was started from (computed deterministically — no file needed). Use this at session start to discover the current workspace without reading .fulcrum.json or any project-local file. Effect: read-only. Returns: workspace_id, project_id, cwd.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
 ]
 
 /** Convenience lookup: tool name → schema */

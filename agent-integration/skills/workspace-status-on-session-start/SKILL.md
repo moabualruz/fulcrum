@@ -21,8 +21,12 @@ duplicate work, WIP-limit surprises, and stale context.
 ## How
 
 ```
+# Step 1: get workspace_id (no parameters needed)
+mcp__fulcrum__get_current_context
+
+# Step 2: use the returned workspace_id
 mcp__fulcrum__get_workspace_status
-  workspace_id: (from .fulcrum.json or env)
+  workspace_id: <from get_current_context result>
 ```
 
 The response tells you:
