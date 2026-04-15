@@ -7,6 +7,10 @@ triggers:
   - provisioning code workspace for agent
 version: 1.0.0
 author: fulcrum
+user-invocable: true
+allowed-tools:
+  - mcp__fulcrum__write_memory
+  - Bash
 ---
 
 # Worktree Checkout

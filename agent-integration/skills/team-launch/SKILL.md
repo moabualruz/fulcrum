@@ -7,6 +7,12 @@ triggers:
   - chief_of_staff orchestration
 version: 1.0.0
 author: fulcrum
+user-invocable: true
+allowed-tools:
+  - mcp__fulcrum__list_team_templates
+  - mcp__fulcrum__invoke_team
+  - mcp__fulcrum__list_team_instances
+  - mcp__fulcrum__write_memory
 ---
 
 # Team Launch

@@ -7,6 +7,11 @@ triggers:
   - parallel workstreams needed
 version: 1.0.0
 author: fulcrum
+user-invocable: true
+allowed-tools:
+  - mcp__fulcrum__create_task
+  - mcp__fulcrum__write_memory
+  - mcp__fulcrum__get_workspace_status
 ---
 
 # Delegate Task

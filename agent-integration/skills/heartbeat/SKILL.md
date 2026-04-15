@@ -7,6 +7,9 @@ triggers:
   - multi-step implementation task
 version: 1.0.0
 author: fulcrum
+user-invocable: false
+allowed-tools:
+  - mcp__fulcrum__heartbeat_agent_run
 ---
 
 # Heartbeat

@@ -7,6 +7,13 @@ triggers:
   - qa_engineer or code_reviewer role active
 version: 1.0.0
 author: fulcrum
+user-invocable: true
+allowed-tools:
+  - mcp__fulcrum__recall_memory
+  - mcp__fulcrum__write_memory
+  - mcp__fulcrum__update_task
+  - Bash
+  - Read
 ---
 
 # Review PR

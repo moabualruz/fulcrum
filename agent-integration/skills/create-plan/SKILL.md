@@ -7,6 +7,12 @@ triggers:
   - generating issue decomposition
 version: 1.0.0
 author: fulcrum
+user-invocable: true
+allowed-tools:
+  - mcp__fulcrum__recall_memory
+  - mcp__fulcrum__list_tasks
+  - mcp__fulcrum__create_task
+  - mcp__fulcrum__write_memory
 ---
 
 # Create Plan

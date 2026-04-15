@@ -8,6 +8,10 @@ triggers:
   - invoking teams
 version: 1.0.0
 author: fulcrum
+user-invocable: false
+allowed-tools:
+  - mcp__fulcrum__get_workspace_status
+  - mcp__fulcrum__block_agent_run
 ---
 
 # Policy Check

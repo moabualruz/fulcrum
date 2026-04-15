@@ -7,6 +7,11 @@ triggers:
   - looking for blocked team members
 version: 1.0.0
 author: fulcrum
+user-invocable: true
+allowed-tools:
+  - mcp__fulcrum__list_team_instances
+  - mcp__fulcrum__get_agent_run_status
+  - mcp__fulcrum__block_agent_run
 ---
 
 # Team Status

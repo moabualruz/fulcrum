@@ -7,6 +7,9 @@ triggers:
   - checking agent definitions
 version: 1.0.0
 author: fulcrum
+user-invocable: true
+allowed-tools:
+  - mcp__fulcrum__list_agent_profiles
 ---
 
 # List Agents

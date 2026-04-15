@@ -7,6 +7,11 @@ triggers:
   - handoff required
 version: 1.0.0
 author: fulcrum
+user-invocable: false
+allowed-tools:
+  - mcp__fulcrum__complete_agent_run
+  - mcp__fulcrum__block_agent_run
+  - mcp__fulcrum__write_memory
 ---
 
 # Session End

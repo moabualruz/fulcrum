@@ -8,6 +8,10 @@ triggers:
   - code review pipeline
 version: 1.0.0
 author: fulcrum
+user-invocable: true
+allowed-tools:
+  - mcp__fulcrum__start_agent_run
+  - mcp__fulcrum__complete_agent_run
 ---
 
 # Run Workflow

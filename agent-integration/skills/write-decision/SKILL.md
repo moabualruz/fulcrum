@@ -7,6 +7,9 @@ triggers:
   - established a constraint or pattern
 version: 1.0.0
 author: fulcrum
+user-invocable: false
+allowed-tools:
+  - mcp__fulcrum__write_memory
 ---
 
 # Write Decision

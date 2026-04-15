@@ -7,6 +7,12 @@ triggers:
   - handing off to a specific role
 version: 1.0.0
 author: fulcrum
+user-invocable: true
+allowed-tools:
+  - mcp__fulcrum__list_tasks
+  - mcp__fulcrum__start_agent_run
+  - mcp__fulcrum__get_agent_run_status
+  - mcp__fulcrum__get_workspace_status
 ---
 
 # Spawn Agent

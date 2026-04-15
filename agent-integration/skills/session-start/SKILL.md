@@ -6,6 +6,12 @@ triggers:
   - new conversation started
 version: 1.0.0
 author: fulcrum
+user-invocable: false
+allowed-tools:
+  - mcp__fulcrum__get_current_context
+  - mcp__fulcrum__get_workspace_status
+  - mcp__fulcrum__start_agent_run
+  - mcp__fulcrum__recall_memory
 ---
 
 # Session Start
