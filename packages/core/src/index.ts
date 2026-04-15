@@ -127,21 +127,12 @@ export {
   deleteAgentProfile,
 } from './agent-profiles.js'
 
-// Team management (L-4) — re-exported via a lazy getter to avoid a static
-// circular dependency. @fulcrum/teams imports from @fulcrum/core, so core
-// cannot statically import from teams. MCP tool handlers and other async
-// callers should use `const teams = await getTeamOps()` to access:
-//   createTeamTemplate, invokeTeam, heartbeatTeam, completeTeam,
-//   listTeamInstances, getTeamStatus, canStartTeam.
+// Team management — IoC registry.
+// @fulcrum/teams implements TeamOps and registers itself at startup via:
+//   import { createTeamOps } from '@fulcrum/teams'
+//   import { setTeamOps } from '@fulcrum/core'
+//   setTeamOps(createTeamOps())
+// This breaks the static circular dependency (teams → core is fine;
+// core must never import teams).
 export type { TeamOps } from './team-ops.js'
-
-export async function getTeamOps(): Promise<import('./team-ops.js').TeamOps | null> {
-  try {
-    // Dynamic sibling import — resolves at runtime via pnpm workspace.
-    // @fulcrum/teams depends on @fulcrum/core so we cannot statically import it.
-    const mod = await import('@fulcrum/teams')
-    return mod as unknown as import('./team-ops.js').TeamOps
-  } catch {
-    return null
-  }
-}
+export { setTeamOps, getTeamOps } from './team-ops.js'

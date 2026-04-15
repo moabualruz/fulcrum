@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seed } from './helpers.js'
 import { getDb } from '@fulcrum/core'
-import { L1_ROLES } from '@fulcrum/teams'
+import { L1_ROLES } from '@fulcrum/core'
 import {
   createPolicyRule,
   listPolicyRules,

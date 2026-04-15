@@ -1,6 +1,9 @@
 // packages/core/src/team-ops.ts
-// Type-only interface for the @fulcrum/teams sibling package operations.
+// Interface + registry for @fulcrum/teams operations.
 // Zero imports from other workspace packages — safe to import from any package.
+// The CLI (which depends on both @fulcrum/core and @fulcrum/teams) wires the
+// implementation at startup via setTeamOps(createTeamOps()), breaking the
+// circular dependency without a dynamic import inside core.
 
 export interface TeamOps {
   /** Create a new team template */
@@ -63,4 +66,18 @@ export interface TeamOps {
     limit?: number
     offset?: number
   }): Promise<Record<string, unknown>[]>
+}
+
+// ── Registry ─────────────────────────────────────────────────────────────────
+
+let _impl: TeamOps | null = null
+
+/** Register the @fulcrum/teams implementation. Call once at process startup. */
+export function setTeamOps(impl: TeamOps): void {
+  _impl = impl
+}
+
+/** Get the registered TeamOps implementation, or null if not yet registered. */
+export function getTeamOps(): TeamOps | null {
+  return _impl
 }

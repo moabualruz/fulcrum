@@ -24,7 +24,6 @@
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",
-    "@fulcrum/teams": "workspace:*",
     "minimatch": "^10.2.5",
     "ulidx": "^2.3.0"
   },

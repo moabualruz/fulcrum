@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb } from './helpers.js'
 import { createWorkspace } from '../workspaces.js'
 import {
@@ -156,16 +156,20 @@ describe('agent profiles (L-3)', () => {
     expect(cosEntry).toBeDefined()
   })
 
-  it('getTeamOps (L-4) lazily resolves @fulcrum/teams', async () => {
-    const { getTeamOps } = await import('../index.js')
-    const ops = await getTeamOps()
-    expect(typeof ops.createTeamTemplate).toBe('function')
-    expect(typeof ops.invokeTeam).toBe('function')
-    expect(typeof ops.listTeamInstances).toBe('function')
-    expect(typeof ops.getTeamStatus).toBe('function')
-    expect(typeof ops.heartbeatTeam).toBe('function')
-    expect(typeof ops.completeTeam).toBe('function')
-    expect(typeof ops.canStartTeam).toBe('function')
+  it('getTeamOps / setTeamOps (L-4) IoC registry works', async () => {
+    const { getTeamOps, setTeamOps } = await import('../index.js')
+    const fakeOps = {
+      createTeamTemplate: vi.fn(),
+      invokeTeam: vi.fn(),
+      heartbeatTeam: vi.fn(),
+      completeTeam: vi.fn(),
+      listTeamInstances: vi.fn(),
+      listTeamTemplates: vi.fn(),
+      getTeamStatus: vi.fn(),
+      canStartTeam: vi.fn(),
+    }
+    setTeamOps(fakeOps as never)
+    expect(getTeamOps()).toBe(fakeOps)
   })
 
   it('listAgentProfiles without workspace_id returns hardcoded only', async () => {

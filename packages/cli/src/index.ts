@@ -1043,7 +1043,7 @@ async function runServeMcp(): Promise<void> {
     }
 
     if (name === 'create_team_template') {
-      const ops = await getTeamOps()
+      const ops = getTeamOps()
       const createTeamTemplate = ops['createTeamTemplate'] as (
         input: Record<string, unknown>,
       ) => Promise<unknown>
@@ -1057,7 +1057,7 @@ async function runServeMcp(): Promise<void> {
     }
 
     if (name === 'invoke_team') {
-      const ops = await getTeamOps()
+      const ops = getTeamOps()
       const invokeTeam = ops['invokeTeam'] as (
         input: Record<string, unknown>,
       ) => Promise<unknown>
@@ -1075,7 +1075,7 @@ async function runServeMcp(): Promise<void> {
     }
 
     if (name === 'list_team_templates') {
-      const ops = await getTeamOps()
+      const ops = getTeamOps()
       const listTeamTemplates = ops['listTeamTemplates'] as (
         input?: Record<string, unknown>,
       ) => Promise<unknown[]>
@@ -1087,7 +1087,7 @@ async function runServeMcp(): Promise<void> {
     }
 
     if (name === 'list_team_instances') {
-      const ops = await getTeamOps()
+      const ops = getTeamOps()
       const listTeamInstances = ops['listTeamInstances'] as (
         input: Record<string, unknown>,
       ) => Promise<unknown[]>
@@ -1300,7 +1300,7 @@ async function runServeMcpHttp(): Promise<void> {
     if (name === 'update_agent_definition') return updateAgentDefinition(a as Parameters<typeof updateAgentDefinition>[0])
     if (name === 'create_agent_profile') return createAgentProfile({ workspace_id: a['workspace_id'] as string, name: a['name'] as string, description: a['description'] as string, base_role: a['base_role'] as Parameters<typeof createAgentProfile>[0]['base_role'] })
     if (name === 'create_team_template' || name === 'list_team_templates' || name === 'invoke_team' || name === 'list_team_instances') {
-      const ops = await getTeamOps()
+      const ops = getTeamOps()
       const fn = ops[name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()) as keyof typeof ops] as ((args: Record<string, unknown>) => Promise<unknown>) | undefined
       if (fn) return await fn(a)
     }
@@ -1867,7 +1867,12 @@ fulcrum team — team templates and instances
     process.exit(0)
   }
 
-  const { createTeamTemplate, invokeTeam, listTeamInstances } = await import('@fulcrum/teams')
+  const { getTeamOps: _getTeamOpsForCli } = await import('@fulcrum/core')
+  const _cliTeamOps = _getTeamOpsForCli()
+  if (!_cliTeamOps) {
+    console.error('team: @fulcrum/teams is not available')
+    process.exit(1)
+  }
 
   if (sub === 'list') {
     const { getDb } = await import('@fulcrum/core')
@@ -1882,7 +1887,7 @@ fulcrum team — team templates and instances
   if (sub === 'create') {
     const name = requireArg('--name')
     const description = optArg('--description')
-    const template = await createTeamTemplate({ name, description, slots: [] })
+    const template = await _cliTeamOps.createTeamTemplate({ name, description, slots: [] })
     outputObject({ template_id: template.template_id, name: template.name })
     return
   }
@@ -1896,13 +1901,13 @@ fulcrum team — team templates and instances
     const purpose = optArg('--purpose') ?? optArg('--goal') ?? 'cli-invoked'
     const caller_agent_id = optArg('--caller-agent-id') ?? `cli/${caller_role}`
     try {
-      const inst = await invokeTeam({
+      const inst = await _cliTeamOps.invokeTeam({
         template_id,
         workspace_id,
         project_id,
         purpose,
         caller_agent_id,
-        caller_role: caller_role as Parameters<typeof invokeTeam>[0]['caller_role'],
+        caller_role,
       })
       outputObject({ instance_id: inst.instance_id, display_id: inst.display_id, status: inst.status })
     } catch (err) {
@@ -1916,7 +1921,7 @@ fulcrum team — team templates and instances
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
     const project_id = optArg('--project-id')
-    const rows = await listTeamInstances({ workspace_id, project_id })
+    const rows = await _cliTeamOps.listTeamInstances({ workspace_id, project_id })
     outputRows(rows.map(r => ({
       instance_id: r.instance_id,
       display_id: r.display_id,
@@ -2200,6 +2205,17 @@ async function main(): Promise<void> {
     }
   } catch {
     // Plugin discovery failure is non-fatal — continue without plugins
+  }
+
+  // Wire @fulcrum/teams implementation into core's TeamOps registry.
+  // GAP-ARCH-1 fix: breaks the core ↔ teams circular dependency — core never
+  // imports teams; the CLI (which depends on both) registers the impl once.
+  try {
+    const { createTeamOps } = await import('@fulcrum/teams')
+    const { setTeamOps } = await import('@fulcrum/core')
+    setTeamOps(createTeamOps())
+  } catch {
+    // @fulcrum/teams may not be installed — team operations will return null
   }
 
   if (!group || group === '--help' || group === '-h') usage()
