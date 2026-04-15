@@ -46,8 +46,7 @@ function rowToWorktree(row: Record<string, unknown>): Worktree {
  * Returns `null` if the project doesn't exist, has no path, or the path is
  * missing from disk.
  */
-function projectRootFor(project_id: string): string | null {
-  const db = getDb()
+function projectRootFor(project_id: string, db = getDb()): string | null {
   const row = db
     .prepare(`SELECT git_url FROM projects WHERE project_id = ?`)
     .get(project_id) as { git_url: string | null } | undefined
@@ -81,8 +80,7 @@ function ensureGitignoreEntry(projectRoot: string): void {
   }
 }
 
-export async function allocateWorktree(input: AllocateWorktreeInput): Promise<Worktree> {
-  const db = getDb()
+export async function allocateWorktree(input: AllocateWorktreeInput, db = getDb()): Promise<Worktree> {
   const worktree_id = newId('worktree')
   const now = new Date().toISOString()
 
@@ -98,7 +96,7 @@ export async function allocateWorktree(input: AllocateWorktreeInput): Promise<Wo
   let projectRoot: string | null = null
 
   if (managed) {
-    projectRoot = projectRootFor(input.project_id)
+    projectRoot = projectRootFor(input.project_id, db)
     if (!projectRoot) {
       throw new FulcrumError(
         `project ${input.project_id} has no valid filesystem path (git_url)`,
@@ -181,14 +179,13 @@ export async function allocateWorktree(input: AllocateWorktreeInput): Promise<Wo
  * project root itself, only the DB row is removed — we never delete the
  * project root.
  */
-export async function deallocateWorktree(input: { worktree_id: string }): Promise<void> {
-  const db = getDb()
+export async function deallocateWorktree(input: { worktree_id: string }, db = getDb()): Promise<void> {
   const row = db
     .prepare(`SELECT project_id, path FROM worktrees WHERE worktree_id = ?`)
     .get(input.worktree_id) as { project_id: string; path: string } | undefined
   if (!row) return
 
-  const root = projectRootFor(row.project_id)
+  const root = projectRootFor(row.project_id, db)
   if (root && isGitRepo(root) && row.path !== root) {
     try {
       execFileSync('git', ['worktree', 'remove', '--force', row.path], {
@@ -203,8 +200,7 @@ export async function deallocateWorktree(input: { worktree_id: string }): Promis
   db.prepare(`DELETE FROM worktrees WHERE worktree_id = ?`).run(input.worktree_id)
 }
 
-export async function markDirty(input: MarkDirtyInput): Promise<Worktree> {
-  const db = getDb()
+export async function markDirty(input: MarkDirtyInput, db = getDb()): Promise<Worktree> {
   const now = new Date().toISOString()
 
   const current = db
@@ -230,8 +226,7 @@ export async function markDirty(input: MarkDirtyInput): Promise<Worktree> {
   return rowToWorktree(row)
 }
 
-export async function markReadyForMerge(input: MarkReadyInput): Promise<Worktree> {
-  const db = getDb()
+export async function markReadyForMerge(input: MarkReadyInput, db = getDb()): Promise<Worktree> {
   const now = new Date().toISOString()
 
   const current = db
@@ -257,12 +252,11 @@ export async function markReadyForMerge(input: MarkReadyInput): Promise<Worktree
   return rowToWorktree(row)
 }
 
-export async function enqueueMerge(input: EnqueueMergeInput): Promise<void> {
+export async function enqueueMerge(input: EnqueueMergeInput, db = getDb()): Promise<void> {
   // enqueueMerge is a no-op at the DB level — the worktree is already marked
   // ready_for_merge. This function exists so callers can set a priority hint
   // in the future. For now it validates the worktree exists and is in the
   // correct state before returning.
-  const db = getDb()
   const row = db
     .prepare(`SELECT status FROM worktrees WHERE worktree_id = ?`)
     .get(input.worktree_id) as { status: string } | undefined
@@ -313,9 +307,9 @@ export interface ProcessMergeQueueResult {
  * Draft / archived / missing all fail the gate.
  */
 function gateArtifactsSatisfied(
-  worktree_id: string
+  worktree_id: string,
+  db = getDb(),
 ): { ok: boolean; missing: string[] } {
-  const db = getDb()
   const review = db
     .prepare(
       `SELECT status FROM artifacts
@@ -371,7 +365,8 @@ export async function processMergeQueue(
 ): Promise<ProcessMergeQueueResult>
 export async function processMergeQueue(
   inputOrProjectId: ProcessMergeQueueInput | string,
-  callerRole?: string
+  callerRole?: string,
+  db = getDb(),
 ): Promise<ProcessMergeQueueResult> {
   const input: ProcessMergeQueueInput =
     typeof inputOrProjectId === 'string'
@@ -385,7 +380,6 @@ export async function processMergeQueue(
     )
   }
 
-  const db = getDb()
   const actor_id = input.actor_id ?? input.actor_role
 
   // FIFO by updated_at (time the worktree entered ready_for_merge).
@@ -419,7 +413,7 @@ export async function processMergeQueue(
     const base_branch = (row.base_branch as string | null) ?? null
 
     // 1. Gate check — must have review_report + test_report (both 'final').
-    const gate = gateArtifactsSatisfied(worktree_id)
+    const gate = gateArtifactsSatisfied(worktree_id, db)
     if (!gate.ok) {
       skipped.push(worktree_id)
       results.push({
@@ -443,7 +437,7 @@ export async function processMergeQueue(
     }
 
     // 2. Locate project root.
-    const projectRoot = projectRootFor(project_id)
+    const projectRoot = projectRootFor(project_id, db)
     const now = new Date().toISOString()
 
     // 3. Non-git / sequential mode — nothing to merge, just mark merged.
@@ -600,8 +594,7 @@ export async function processMergeQueue(
   return { merged, skipped, conflicts, results }
 }
 
-export async function discardWorktree(input: DiscardWorktreeInput): Promise<void> {
-  const db = getDb()
+export async function discardWorktree(input: DiscardWorktreeInput, db = getDb()): Promise<void> {
   const now = new Date().toISOString()
 
   const current = db
@@ -637,9 +630,9 @@ export interface CleanupAbandonedWorktreesInput {
  * Spec §18.6 — janitor reaps abandoned worktrees (H-10).
  */
 export async function cleanupAbandonedWorktrees(
-  input: CleanupAbandonedWorktreesInput = {}
+  input: CleanupAbandonedWorktreesInput = {},
+  db = getDb(),
 ): Promise<number> {
-  const db = getDb()
   const ttl_sec = input.ttl_sec ?? 24 * 60 * 60 // default 24h
   const cutoff = new Date(Date.now() - ttl_sec * 1000).toISOString()
   const result = db
@@ -651,8 +644,7 @@ export async function cleanupAbandonedWorktrees(
   return result.changes
 }
 
-export async function listMergeQueue(projectId: string): Promise<Worktree[]> {
-  const db = getDb()
+export async function listMergeQueue(projectId: string, db = getDb()): Promise<Worktree[]> {
   const rows = db
     .prepare(`
       SELECT * FROM worktrees

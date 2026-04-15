@@ -48,8 +48,7 @@ function rowToDefinition(row: Record<string, unknown>): AgentDefinition {
   }
 }
 
-export function createAgentDefinition(input: CreateAgentDefinitionInput): AgentDefinition {
-  const db = getDb()
+export function createAgentDefinition(input: CreateAgentDefinitionInput, db = getDb()): AgentDefinition {
   const existing = db.prepare('SELECT id FROM agent_definitions WHERE role = ?').get(input.role)
   if (existing) {
     throw new FulcrumError(`Agent definition for role '${input.role}' already exists`, 'conflict')
@@ -88,8 +87,7 @@ export function createAgentDefinition(input: CreateAgentDefinitionInput): AgentD
   return rowToDefinition(row)
 }
 
-export function getAgentDefinition(role: string): AgentDefinition | null {
-  const db = getDb()
+export function getAgentDefinition(role: string, db = getDb()): AgentDefinition | null {
   const row = db.prepare('SELECT * FROM agent_definitions WHERE role = ?').get(role) as Record<string, unknown> | undefined
   return row ? rowToDefinition(row) : null
 }
@@ -102,8 +100,7 @@ function bumpPatch(version: string): string {
   return `${parts[0]}.${parts[1]}.${isNaN(patch) ? 1 : patch + 1}`
 }
 
-export function updateAgentDefinition(input: UpdateAgentDefinitionInput): AgentDefinition {
-  const db = getDb()
+export function updateAgentDefinition(input: UpdateAgentDefinitionInput, db = getDb()): AgentDefinition {
   const existing = db.prepare('SELECT * FROM agent_definitions WHERE role = ?').get(input.role) as Record<string, unknown> | undefined
   if (!existing) {
     throw new FulcrumError(`Agent definition for role '${input.role}' not found`, 'not_found')
@@ -143,8 +140,7 @@ export function updateAgentDefinition(input: UpdateAgentDefinitionInput): AgentD
   return rowToDefinition(row)
 }
 
-export function listAgentDefinitions(stability?: AgentDefinition['stability']): AgentDefinition[] {
-  const db = getDb()
+export function listAgentDefinitions(stability?: AgentDefinition['stability'], db = getDb()): AgentDefinition[] {
   const rows = stability
     ? (db.prepare('SELECT * FROM agent_definitions WHERE stability = ? ORDER BY role').all(stability) as Record<string, unknown>[])
     : (db.prepare('SELECT * FROM agent_definitions ORDER BY role').all() as Record<string, unknown>[])

@@ -44,8 +44,7 @@ function loadRolePurpose(role: string): string | null {
 interface GetWorkspaceStatusInput { workspace_id: string }
 interface BuildCosContextInput { workspace_id: string; project_id: string; max_tokens?: number }
 
-export async function getWorkspaceStatus(input: GetWorkspaceStatusInput): Promise<WorkspaceStatusResult> {
-  const db = getDb()
+export async function getWorkspaceStatus(input: GetWorkspaceStatusInput, db = getDb()): Promise<WorkspaceStatusResult> {
 
   const running = db.prepare(
     "SELECT * FROM agent_runs WHERE workspace_id = ? AND status = 'running' ORDER BY started_at DESC"
@@ -79,8 +78,7 @@ export async function getWorkspaceStatus(input: GetWorkspaceStatusInput): Promis
   }
 }
 
-export async function buildCosContext(input: BuildCosContextInput): Promise<string> {
-  const db = getDb()
+export async function buildCosContext(input: BuildCosContextInput, db = getDb()): Promise<string> {
   const maxChars = (input.max_tokens ?? 4000) * 4 // ~4 chars per token
   const parts: string[] = []
 
@@ -150,8 +148,8 @@ interface ListAgentProfilesInput {
 
 export async function listAgentProfiles(
   input?: ListAgentProfilesInput,
+  db = getDb(),
 ): Promise<AgentProfile[]> {
-  const db = getDb()
 
   // 1. Canonical profiles from agent_definitions (seeded by migration 032b).
   //    Prefer each role's "Purpose" section from agent-integration/roles/<role>.md,

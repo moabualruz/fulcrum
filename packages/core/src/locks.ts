@@ -60,8 +60,7 @@ function rowToLock(row: Record<string, unknown>): Lock {
   }
 }
 
-export async function acquireLock(input: AcquireLockInput): Promise<AcquireLockResult> {
-  const db = getDb()
+export async function acquireLock(input: AcquireLockInput, db = getDb()): Promise<AcquireLockResult> {
   const ttl = input.ttl_sec ?? DEFAULT_LOCK_TTL_SEC
   const nowMs = Date.now()
   const now = new Date(nowMs).toISOString()
@@ -99,19 +98,19 @@ export async function acquireLock(input: AcquireLockInput): Promise<AcquireLockR
   }
 }
 
-export async function releaseLock(lock_id: string): Promise<void> {
-  getDb().prepare(`DELETE FROM advisory_locks WHERE lock_id = ?`).run(lock_id)
+export async function releaseLock(lock_id: string, db = getDb()): Promise<void> {
+  db.prepare(`DELETE FROM advisory_locks WHERE lock_id = ?`).run(lock_id)
 }
 
-export async function listLocks(workspace_id: string): Promise<Lock[]> {
-  const rows = getDb().prepare(
+export async function listLocks(workspace_id: string, db = getDb()): Promise<Lock[]> {
+  const rows = db.prepare(
     `SELECT * FROM advisory_locks WHERE workspace_id = ? ORDER BY acquired_at DESC`
   ).all(workspace_id) as Record<string, unknown>[]
   return rows.map(rowToLock)
 }
 
-export async function cleanupExpiredLocks(): Promise<number> {
+export async function cleanupExpiredLocks(db = getDb()): Promise<number> {
   const now = new Date().toISOString()
-  const result = getDb().prepare(`DELETE FROM advisory_locks WHERE expires_at <= ?`).run(now)
+  const result = db.prepare(`DELETE FROM advisory_locks WHERE expires_at <= ?`).run(now)
   return result.changes
 }

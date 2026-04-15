@@ -17,8 +17,7 @@ export interface EmitEventInput {
   correlation_id?: string
 }
 
-export function emitEvent(input: EmitEventInput): void {
-  const db = getDb()
+export function emitEvent(input: EmitEventInput, db = getDb()): void {
   db.prepare(`
     INSERT INTO events
       (evt_id, workspace_id, project_id, evt_type, ts,

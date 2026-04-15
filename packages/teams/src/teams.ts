@@ -50,8 +50,7 @@ function rowToInstance(row: Record<string, unknown>): TeamInstance {
 
 // ── public API ─────────────────────────────────────────────────────────────
 
-export async function createTeamTemplate(input: CreateTeamTemplateInput): Promise<TeamTemplate> {
-  const db = getDb()
+export async function createTeamTemplate(input: CreateTeamTemplateInput, db = getDb()): Promise<TeamTemplate> {
   const template_id = newId('team')
   const now = new Date().toISOString()
   const slotsJson = JSON.stringify(input.slots)
@@ -66,12 +65,10 @@ export async function createTeamTemplate(input: CreateTeamTemplateInput): Promis
   return rowToTemplate(row)
 }
 
-export async function invokeTeam(input: InvokeTeamInput): Promise<TeamInstance> {
+export async function invokeTeam(input: InvokeTeamInput, db = getDb()): Promise<TeamInstance> {
   if (!canInvokeTeams(input.caller_role)) {
     throw new Error('POLICY_DENIED: only chief_of_staff may invoke teams')
   }
-
-  const db = getDb()
 
   const decision = canStartTeam(db, {
     workspace_id: input.workspace_id,
@@ -111,8 +108,7 @@ export async function invokeTeam(input: InvokeTeamInput): Promise<TeamInstance> 
   return rowToInstance(row)
 }
 
-export async function heartbeatTeam(input: HeartbeatTeamInput): Promise<TeamInstance> {
-  const db = getDb()
+export async function heartbeatTeam(input: HeartbeatTeamInput, db = getDb()): Promise<TeamInstance> {
   const now = new Date().toISOString()
 
   let changes: number
@@ -140,8 +136,7 @@ export async function heartbeatTeam(input: HeartbeatTeamInput): Promise<TeamInst
   return rowToInstance(row)
 }
 
-export async function completeTeam(input: CompleteTeamInput): Promise<TeamInstance> {
-  const db = getDb()
+export async function completeTeam(input: CompleteTeamInput, db = getDb()): Promise<TeamInstance> {
   const now = new Date().toISOString()
 
   // failed → blocked; completed and cancelled → done
@@ -166,8 +161,7 @@ export interface ListTeamTemplatesInput {
   offset?: number
 }
 
-export async function listTeamTemplates(input: ListTeamTemplatesInput = {}): Promise<TeamTemplate[]> {
-  const db = getDb()
+export async function listTeamTemplates(input: ListTeamTemplatesInput = {}, db = getDb()): Promise<TeamTemplate[]> {
   const limit = input.limit ?? 50
   const offset = input.offset ?? 0
   const rows = db
@@ -176,8 +170,7 @@ export async function listTeamTemplates(input: ListTeamTemplatesInput = {}): Pro
   return rows.map(rowToTemplate)
 }
 
-export async function listTeamInstances(input: ListTeamInstancesInput): Promise<TeamInstance[]> {
-  const db = getDb()
+export async function listTeamInstances(input: ListTeamInstancesInput, db = getDb()): Promise<TeamInstance[]> {
   const conditions: string[] = ['workspace_id = ?']
   const params: unknown[] = [input.workspace_id]
 
@@ -206,8 +199,7 @@ export async function listTeamInstances(input: ListTeamInstancesInput): Promise<
   return rows.map(rowToInstance)
 }
 
-export async function getTeamStatus(input: GetTeamStatusInput): Promise<TeamStatus> {
-  const db = getDb()
+export async function getTeamStatus(input: GetTeamStatusInput, db = getDb()): Promise<TeamStatus> {
 
   const instanceRow = db
     .prepare(`SELECT * FROM team_instances WHERE instance_id = ? AND workspace_id = ?`)

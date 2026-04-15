@@ -35,11 +35,10 @@ function rowToTask(row: Record<string, unknown>): Task {
   }
 }
 
-export async function addTaskRelation(input: AddTaskRelationInput): Promise<void> {
+export async function addTaskRelation(input: AddTaskRelationInput, db = getDb()): Promise<void> {
   if (input.task_id === input.target_task_id) {
     throw new FulcrumError('task_id and target_task_id must be different', 'invalid_input')
   }
-  const db = getDb()
   const task = db.prepare('SELECT task_id FROM tasks WHERE task_id = ?').get(input.task_id)
   if (!task) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
   const target = db.prepare('SELECT task_id FROM tasks WHERE task_id = ?').get(input.target_task_id)
@@ -51,8 +50,7 @@ export async function addTaskRelation(input: AddTaskRelationInput): Promise<void
   `).run(input.task_id, input.target_task_id, input.relation_type)
 }
 
-export async function removeTaskRelation(input: RemoveTaskRelationInput): Promise<void> {
-  const db = getDb()
+export async function removeTaskRelation(input: RemoveTaskRelationInput, db = getDb()): Promise<void> {
   const result = db.prepare(`
     DELETE FROM task_relations WHERE task_id = ? AND target_task_id = ? AND relation_type = ?
   `).run(input.task_id, input.target_task_id, input.relation_type)
@@ -64,8 +62,7 @@ export async function removeTaskRelation(input: RemoveTaskRelationInput): Promis
   }
 }
 
-export async function getBlockers(taskId: string): Promise<Task[]> {
-  const db = getDb()
+export async function getBlockers(taskId: string, db = getDb()): Promise<Task[]> {
   // A blocker is any task T where T blocks taskId, i.e. task_relations(T, taskId, 'blocks')
   const rows = db.prepare(`
     SELECT t.* FROM tasks t
@@ -76,8 +73,7 @@ export async function getBlockers(taskId: string): Promise<Task[]> {
   return rows.map(rowToTask)
 }
 
-export async function getTaskRelations(input: GetTaskRelationsInput): Promise<TaskRelation[]> {
-  const db = getDb()
+export async function getTaskRelations(input: GetTaskRelationsInput, db = getDb()): Promise<TaskRelation[]> {
   const rows = db.prepare(`
     SELECT * FROM task_relations WHERE task_id = ? ORDER BY created_at ASC
   `).all(input.task_id) as Array<{

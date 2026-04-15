@@ -109,8 +109,7 @@ function splitByMaxSize(text: string, maxChars: number, overlap: number): string
   return result
 }
 
-export async function ingestFile(input: IngestFileInput): Promise<IngestResult> {
-  const db = getDb()
+export async function ingestFile(input: IngestFileInput, db = getDb()): Promise<IngestResult> {
   const { workspace_id, project_id, file_path, content, language } = input
 
   const lang = language?.toLowerCase()

@@ -38,8 +38,7 @@ function rowToSpan(row: Record<string, unknown>): TelemetrySpan {
   }
 }
 
-export async function startSpan(input: StartSpanInput): Promise<TelemetrySpan> {
-  const db = getDb()
+export async function startSpan(input: StartSpanInput, db = getDb()): Promise<TelemetrySpan> {
   const span_id = newId('span')
   let trace_id = span_id
   if (input.parent_span_id) {
@@ -80,8 +79,7 @@ export async function startSpan(input: StartSpanInput): Promise<TelemetrySpan> {
   return rowToSpan(row)
 }
 
-export async function endSpan(input: EndSpanInput): Promise<void> {
-  const db = getDb()
+export async function endSpan(input: EndSpanInput, db = getDb()): Promise<void> {
   const now = new Date().toISOString()
   if (input.payload) {
     const existing = db.prepare(
@@ -115,8 +113,8 @@ export async function endSpan(input: EndSpanInput): Promise<void> {
   }
 }
 
-export async function getTrace(trace_id: string): Promise<TelemetrySpan[]> {
-  const rows = getDb().prepare(
+export async function getTrace(trace_id: string, db = getDb()): Promise<TelemetrySpan[]> {
+  const rows = db.prepare(
     `SELECT * FROM trace_events WHERE trace_id = ? ORDER BY started_at ASC, span_id ASC`
   ).all(trace_id) as Record<string, unknown>[]
   return rows.map(rowToSpan)

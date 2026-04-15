@@ -16,9 +16,7 @@ import type {
   PlaneAPIClientConfig,
 } from './types.js'
 
-function buildManager(): SyncManager {
-  const db = getDb()
-
+function buildManager(db = getDb()): SyncManager {
   const config: PlaneAPIClientConfig = {
     baseUrl: process.env['PLANE_BASE_URL'] ?? 'https://api.plane.so',
     apiKey: process.env['PLANE_API_KEY'] ?? '',
@@ -51,8 +49,8 @@ function buildManager(): SyncManager {
  *  5. Otherwise push via adapter, store external_id, mark synced.
  *  6. On detected remote conflict: record sync_conflict, set status='conflicted'.
  */
-export async function syncObject(input: SyncObjectInput): Promise<SyncState> {
-  const manager = buildManager()
+export async function syncObject(input: SyncObjectInput, db = getDb()): Promise<SyncState> {
+  const manager = buildManager(db)
   return manager.syncObject(input)
 }
 
@@ -60,16 +58,16 @@ export async function syncObject(input: SyncObjectInput): Promise<SyncState> {
  * Process the sync_queue in batches, honouring priority ordering.
  * Default batch size: 50.
  */
-export async function syncAll(input: SyncAllInput): Promise<SyncResult> {
-  const manager = buildManager()
+export async function syncAll(input: SyncAllInput, db = getDb()): Promise<SyncResult> {
+  const manager = buildManager(db)
   return manager.syncAll(input)
 }
 
 /**
  * Return the current SyncState for an object, or null if not registered.
  */
-export async function getSyncState(input: GetSyncStateInput): Promise<SyncState | null> {
-  const manager = buildManager()
+export async function getSyncState(input: GetSyncStateInput, db = getDb()): Promise<SyncState | null> {
+  const manager = buildManager(db)
   return manager.getSyncState(input)
 }
 
@@ -80,8 +78,8 @@ export async function getSyncState(input: GetSyncStateInput): Promise<SyncState 
  * - remote_wins → pulls the remote version via adapter.pull().
  * - manual      → clears conflict_state only; no automatic re-sync.
  */
-export async function resolveConflict(input: ResolveConflictInput): Promise<SyncState> {
-  const manager = buildManager()
+export async function resolveConflict(input: ResolveConflictInput, db = getDb()): Promise<SyncState> {
+  const manager = buildManager(db)
   return manager.resolveConflict(input)
 }
 
@@ -89,7 +87,7 @@ export async function resolveConflict(input: ResolveConflictInput): Promise<Sync
  * List all sync conflicts for a workspace, optionally filtered by target
  * and/or restricted to unresolved conflicts only.
  */
-export async function listConflicts(input: ListConflictsInput): Promise<SyncConflict[]> {
-  const manager = buildManager()
+export async function listConflicts(input: ListConflictsInput, db = getDb()): Promise<SyncConflict[]> {
+  const manager = buildManager(db)
   return manager.listConflicts(input)
 }

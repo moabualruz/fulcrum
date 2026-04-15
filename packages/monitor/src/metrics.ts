@@ -73,8 +73,7 @@ export interface RollupDailyInput {
   date?: string // ISO date 'YYYY-MM-DD', defaults to today
 }
 
-export async function rollupDaily(input: RollupDailyInput): Promise<void> {
-  const db = getDb()
+export async function rollupDaily(input: RollupDailyInput, db = getDb()): Promise<void> {
   const d = input.date ?? new Date().toISOString().slice(0, 10)
   const dNext = new Date(d + 'T00:00:00.000Z')
   dNext.setUTCDate(dNext.getUTCDate() + 1)
@@ -163,8 +162,7 @@ export async function rollupDaily(input: RollupDailyInput): Promise<void> {
   })
 }
 
-export async function recordDailyMetrics(input: DailyMetrics): Promise<void> {
-  const db = getDb()
+export async function recordDailyMetrics(input: DailyMetrics, db = getDb()): Promise<void> {
   const id = `adm_${ulid()}`
 
   db.prepare(`
@@ -202,8 +200,7 @@ export async function recordDailyMetrics(input: DailyMetrics): Promise<void> {
   )
 }
 
-export async function getMetrics(input: GetMetricsInput): Promise<Metrics> {
-  const db = getDb()
+export async function getMetrics(input: GetMetricsInput, db = getDb()): Promise<Metrics> {
 
   let dailyQuery = `SELECT * FROM analytics_daily WHERE workspace_id = ?`
   const dailyParams: unknown[] = [input.workspace_id]
@@ -272,8 +269,7 @@ export async function getMetrics(input: GetMetricsInput): Promise<Metrics> {
   return { daily, project }
 }
 
-export async function getBurndown(input: GetBurndownInput): Promise<BurndownData> {
-  const db = getDb()
+export async function getBurndown(input: GetBurndownInput, db = getDb()): Promise<BurndownData> {
 
   // One query: completions per day within the range
   const completions = db.prepare(`
@@ -331,8 +327,7 @@ export async function getBurndown(input: GetBurndownInput): Promise<BurndownData
   }
 }
 
-export async function getAgentMetrics(input: GetAgentMetricsInput): Promise<AgentMetrics[]> {
-  const db = getDb()
+export async function getAgentMetrics(input: GetAgentMetricsInput, db = getDb()): Promise<AgentMetrics[]> {
 
   let query = `SELECT * FROM analytics_agent WHERE workspace_id = ?`
   const params: unknown[] = [input.workspace_id]
@@ -774,8 +769,7 @@ export function getForecasting(
 
 // ─── Original replayRun ───────────────────────────────────────────────────────
 
-export async function replayRun(input: ReplayRunInput): Promise<RunReplay> {
-  const db = getDb()
+export async function replayRun(input: ReplayRunInput, db = getDb()): Promise<RunReplay> {
 
   // Events table stores payload as JSON text; run_id is embedded in payload
   const rows = db.prepare(`

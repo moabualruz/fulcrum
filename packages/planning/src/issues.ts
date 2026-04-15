@@ -31,9 +31,8 @@ function getLabels(db: ReturnType<typeof getDb>, issue_id: string): string[] {
   return rows.map(r => r.label)
 }
 
-export async function createIssue(input: CreateIssueInput): Promise<Issue> {
+export async function createIssue(input: CreateIssueInput, db = getDb()): Promise<Issue> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
-  const db = getDb()
   const issue_id = newId('issue')
   const now = new Date().toISOString()
   const priority = input.priority ?? 'medium'
@@ -71,8 +70,7 @@ export async function createIssue(input: CreateIssueInput): Promise<Issue> {
   return rowToIssue(row, [])
 }
 
-export async function updateIssue(input: UpdateIssueInput): Promise<Issue> {
-  const db = getDb()
+export async function updateIssue(input: UpdateIssueInput, db = getDb()): Promise<Issue> {
   const existing = db.prepare('SELECT * FROM issues WHERE issue_id = ? AND workspace_id = ?')
     .get(input.issue_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!existing) throw new FulcrumError(`Issue ${input.issue_id} not found`, 'not_found')
@@ -130,8 +128,7 @@ export async function updateIssue(input: UpdateIssueInput): Promise<Issue> {
   return rowToIssue(updated, labels)
 }
 
-export async function listIssues(input: ListIssuesInput): Promise<Issue[]> {
-  const db = getDb()
+export async function listIssues(input: ListIssuesInput, db = getDb()): Promise<Issue[]> {
   let sql = 'SELECT * FROM issues WHERE workspace_id = ?'
   const params: unknown[] = [input.workspace_id]
   if (input.project_id) { sql += ' AND project_id = ?'; params.push(input.project_id) }

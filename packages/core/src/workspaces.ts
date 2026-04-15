@@ -24,11 +24,10 @@ function rowToWorkspace(row: Record<string, unknown>): Workspace {
   }
 }
 
-export async function createWorkspace(input: CreateWorkspaceInput): Promise<Workspace> {
+export async function createWorkspace(input: CreateWorkspaceInput, db = getDb()): Promise<Workspace> {
   if (!input.name || !input.name.trim()) {
     throw new FulcrumError('name must not be empty', 'invalid_input')
   }
-  const db = getDb()
   const workspace_id = input.workspace_id ?? newId('workspace')
   const now = new Date().toISOString()
   db.prepare(
@@ -44,24 +43,22 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<Work
   return rowToWorkspace(row)
 }
 
-export async function getWorkspace(workspace_id: string): Promise<Workspace | null> {
-  const db = getDb()
+export async function getWorkspace(workspace_id: string, db = getDb()): Promise<Workspace | null> {
   const row = db
     .prepare(`SELECT * FROM workspaces WHERE workspace_id = ?`)
     .get(workspace_id) as Record<string, unknown> | undefined
   return row ? rowToWorkspace(row) : null
 }
 
-export async function listWorkspaces(): Promise<Workspace[]> {
-  const db = getDb()
+export async function listWorkspaces(db = getDb()): Promise<Workspace[]> {
   const rows = db
     .prepare(`SELECT * FROM workspaces ORDER BY created_at DESC, workspace_id DESC LIMIT 500`)
     .all() as Record<string, unknown>[]
   return rows.map(rowToWorkspace)
 }
 
-export async function updateWorkspace(input: UpdateWorkspaceInput): Promise<Workspace> {
-  const existing = await getWorkspace(input.workspace_id)
+export async function updateWorkspace(input: UpdateWorkspaceInput, db = getDb()): Promise<Workspace> {
+  const existing = await getWorkspace(input.workspace_id, db)
   if (!existing) {
     throw new FulcrumError(`workspace not found: ${input.workspace_id}`, 'not_found')
   }
@@ -78,11 +75,10 @@ export async function updateWorkspace(input: UpdateWorkspaceInput): Promise<Work
   }
   if (fields.length > 0) {
     values.push(input.workspace_id)
-    getDb()
-      .prepare(`UPDATE workspaces SET ${fields.join(', ')} WHERE workspace_id = ?`)
+    db.prepare(`UPDATE workspaces SET ${fields.join(', ')} WHERE workspace_id = ?`)
       .run(...values)
   }
-  const updated = await getWorkspace(input.workspace_id)
+  const updated = await getWorkspace(input.workspace_id, db)
   if (!updated) {
     throw new FulcrumError(`workspace not found after update: ${input.workspace_id}`, 'not_found')
   }

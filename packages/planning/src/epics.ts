@@ -20,9 +20,8 @@ function rowToEpic(row: Record<string, unknown>): Epic {
   }
 }
 
-export async function createEpic(input: CreateEpicInput): Promise<Epic> {
+export async function createEpic(input: CreateEpicInput, db = getDb()): Promise<Epic> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
-  const db = getDb()
   const epic_id = newId('epic')
   const now = new Date().toISOString()
   const priority = input.priority ?? 'medium'
@@ -55,8 +54,7 @@ export async function createEpic(input: CreateEpicInput): Promise<Epic> {
   return rowToEpic(row)
 }
 
-export async function updateEpic(input: UpdateEpicInput): Promise<Epic> {
-  const db = getDb()
+export async function updateEpic(input: UpdateEpicInput, db = getDb()): Promise<Epic> {
   const existing = db.prepare('SELECT * FROM epics WHERE epic_id = ? AND workspace_id = ?')
     .get(input.epic_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!existing) throw new FulcrumError(`Epic ${input.epic_id} not found`, 'not_found')
@@ -101,8 +99,7 @@ export async function updateEpic(input: UpdateEpicInput): Promise<Epic> {
   return rowToEpic(updated)
 }
 
-export async function listEpics(input: ListEpicsInput): Promise<Epic[]> {
-  const db = getDb()
+export async function listEpics(input: ListEpicsInput, db = getDb()): Promise<Epic[]> {
   let sql = 'SELECT * FROM epics WHERE workspace_id = ?'
   const params: unknown[] = [input.workspace_id]
   if (input.project_id) { sql += ' AND project_id = ?'; params.push(input.project_id) }

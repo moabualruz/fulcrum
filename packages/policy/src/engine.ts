@@ -129,7 +129,7 @@ function ruleMatches(rule: PolicyRule, input: EvaluatePolicyInput): boolean {
   return rule.matchers.some(m => matcherMatches(m, input))
 }
 
-export async function evaluatePolicy(input: EvaluatePolicyInput): Promise<PolicyDecision> {
+export async function evaluatePolicy(input: EvaluatePolicyInput, db = getDb()): Promise<PolicyDecision> {
   // Step 1: Check SYSTEM_INVARIANTS first (cannot be overridden)
   for (const invariant of SYSTEM_INVARIANTS) {
     if (invariant.check(input)) {
@@ -143,7 +143,6 @@ export async function evaluatePolicy(input: EvaluatePolicyInput): Promise<Policy
   }
 
   // Step 2: Load workspace/project rules, ordered by priority DESC
-  const db = getDb()
   const params: unknown[] = [input.workspace_id]
   let scopeFilter = `(scope = 'workspace' AND scope_id = ?)`
   if (input.project_id) {
@@ -174,9 +173,8 @@ export async function evaluatePolicy(input: EvaluatePolicyInput): Promise<Policy
   return { allowed: true, action: 'allow' }
 }
 
-export async function createPolicyRule(input: CreatePolicyRuleInput): Promise<PolicyRule> {
+export async function createPolicyRule(input: CreatePolicyRuleInput, db = getDb()): Promise<PolicyRule> {
   if (!input.name.trim()) throw new FulcrumError('name must not be empty', 'invalid_input')
-  const db = getDb()
   const rule_id = newId('policy')
   const now = new Date().toISOString()
   const priority = input.priority ?? 100
@@ -203,8 +201,7 @@ export async function createPolicyRule(input: CreatePolicyRuleInput): Promise<Po
   return rowToRule(row)
 }
 
-export async function listPolicyRules(input: ListPolicyRulesInput): Promise<PolicyRule[]> {
-  const db = getDb()
+export async function listPolicyRules(input: ListPolicyRulesInput, db = getDb()): Promise<PolicyRule[]> {
   let sql = 'SELECT * FROM policy_rules WHERE 1=1'
   const params: unknown[] = []
   if (input.scope) { sql += ' AND scope = ?'; params.push(input.scope) }

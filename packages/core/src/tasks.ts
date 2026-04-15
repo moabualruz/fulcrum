@@ -77,8 +77,7 @@ function hydrateTask(db: ReturnType<typeof getDb>, row: Record<string, unknown>)
   return { ...rowToTaskBase(row), labels, blockers }
 }
 
-export async function listTasks(input: ListTasksInput): Promise<Task[]> {
-  const db = getDb()
+export async function listTasks(input: ListTasksInput, db = getDb()): Promise<Task[]> {
   let sql = 'SELECT * FROM tasks WHERE workspace_id = ?'
   const params: unknown[] = [input.workspace_id]
   if (input.project_id) { sql += ' AND project_id = ?'; params.push(input.project_id) }
@@ -88,9 +87,8 @@ export async function listTasks(input: ListTasksInput): Promise<Task[]> {
   return rows.map(row => hydrateTask(db, row))
 }
 
-export async function createTask(input: CreateTaskInput): Promise<Task> {
+export async function createTask(input: CreateTaskInput, db = getDb()): Promise<Task> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
-  const db = getDb()
   const task_id = newId('task')
   const now = new Date().toISOString()
   const display_id = nextDisplayId('task', input.project_id, db)
@@ -146,8 +144,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   return hydrateTask(db, row)
 }
 
-export async function updateTask(input: UpdateTaskInput): Promise<Task> {
-  const db = getDb()
+export async function updateTask(input: UpdateTaskInput, db = getDb()): Promise<Task> {
   const existing = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(input.task_id) as Record<string, unknown> | undefined
   if (!existing) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
 

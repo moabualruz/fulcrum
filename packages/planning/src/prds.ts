@@ -25,9 +25,8 @@ function rowToPRD(row: Record<string, unknown>): PRD {
   }
 }
 
-export async function createPRD(input: CreatePRDInput): Promise<PRD> {
+export async function createPRD(input: CreatePRDInput, db = getDb()): Promise<PRD> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
-  const db = getDb()
   const prd_id = newId('prd')
   const now = new Date().toISOString()
   const status: PRDStatus = 'draft'
@@ -59,8 +58,7 @@ export async function createPRD(input: CreatePRDInput): Promise<PRD> {
   return rowToPRD(row)
 }
 
-export async function updatePRD(input: UpdatePRDInput): Promise<PRD> {
-  const db = getDb()
+export async function updatePRD(input: UpdatePRDInput, db = getDb()): Promise<PRD> {
   const existing = db.prepare('SELECT * FROM prds WHERE prd_id = ? AND workspace_id = ?')
     .get(input.prd_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!existing) throw new FulcrumError(`PRD ${input.prd_id} not found`, 'not_found')
@@ -106,8 +104,7 @@ export async function updatePRD(input: UpdatePRDInput): Promise<PRD> {
   return rowToPRD(updated)
 }
 
-export async function listPRDs(input: ListPRDsInput): Promise<PRD[]> {
-  const db = getDb()
+export async function listPRDs(input: ListPRDsInput, db = getDb()): Promise<PRD[]> {
   let sql = 'SELECT * FROM prds WHERE workspace_id = ?'
   const params: unknown[] = [input.workspace_id]
   if (input.project_id) { sql += ' AND project_id = ?'; params.push(input.project_id) }

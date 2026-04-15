@@ -86,8 +86,7 @@ interface LoadedRun {
  * registry convention (states only). If only states are present we look
  * up the definition in the registry.
  */
-function loadRun(wf_id: string, workspace_id: string): LoadedRun {
-  const db = getDb()
+function loadRun(wf_id: string, workspace_id: string, db = getDb()): LoadedRun {
   const row = db
     .prepare(`SELECT * FROM workflow_runs WHERE wf_id = ? AND workspace_id = ?`)
     .get(wf_id, workspace_id) as Record<string, unknown> | undefined
@@ -136,8 +135,8 @@ function persistStates(
   defs: WorkflowStepDef[],
   status?: string,
   current_step_id?: string | null,
+  db = getDb(),
 ): void {
-  const db = getDb()
   const now = new Date().toISOString()
   const blob = JSON.stringify(defs.length > 0 ? { states, defs } : states)
 

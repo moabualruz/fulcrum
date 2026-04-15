@@ -25,9 +25,8 @@ function rowToPlan(row: Record<string, unknown>): Plan {
   }
 }
 
-export async function createPlan(input: CreatePlanInput): Promise<Plan> {
+export async function createPlan(input: CreatePlanInput, db = getDb()): Promise<Plan> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
-  const db = getDb()
   const plan_id = newId('plan')
   const now = new Date().toISOString()
   const status: PlanStatus = 'draft'
@@ -59,8 +58,7 @@ export async function createPlan(input: CreatePlanInput): Promise<Plan> {
   return rowToPlan(row)
 }
 
-export async function updatePlan(input: UpdatePlanInput): Promise<Plan> {
-  const db = getDb()
+export async function updatePlan(input: UpdatePlanInput, db = getDb()): Promise<Plan> {
   const existing = db.prepare('SELECT * FROM plans WHERE plan_id = ? AND workspace_id = ?')
     .get(input.plan_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!existing) throw new FulcrumError(`Plan ${input.plan_id} not found`, 'not_found')
@@ -106,8 +104,7 @@ export async function updatePlan(input: UpdatePlanInput): Promise<Plan> {
   return rowToPlan(updated)
 }
 
-export async function listPlans(input: ListPlansInput): Promise<Plan[]> {
-  const db = getDb()
+export async function listPlans(input: ListPlansInput, db = getDb()): Promise<Plan[]> {
   let sql = 'SELECT * FROM plans WHERE workspace_id = ?'
   const params: unknown[] = [input.workspace_id]
   if (input.project_id) { sql += ' AND project_id = ?'; params.push(input.project_id) }
@@ -118,8 +115,7 @@ export async function listPlans(input: ListPlansInput): Promise<Plan[]> {
   return rows.map(rowToPlan)
 }
 
-export async function linkIssueToPlan(input: LinkIssueToPlanInput): Promise<void> {
-  const db = getDb()
+export async function linkIssueToPlan(input: LinkIssueToPlanInput, db = getDb()): Promise<void> {
   const plan = db.prepare('SELECT plan_id FROM plans WHERE plan_id = ? AND workspace_id = ?')
     .get(input.plan_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!plan) throw new FulcrumError(`Plan ${input.plan_id} not found`, 'not_found')

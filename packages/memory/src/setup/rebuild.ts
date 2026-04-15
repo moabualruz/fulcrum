@@ -77,8 +77,7 @@ export async function rebuildFromVault(options: RebuildOptions): Promise<Rebuild
       // Dry-run: report drift between L0 and L1, don't modify anything
       if (target === 'l1' || target === 'both') {
         try {
-          const db = getDb()
-          const existing = db.prepare(
+          const existing = getDb().prepare(
             'SELECT memory_id, content_hash FROM memories WHERE memory_id = ?'
           ).get(memory.memory_id) as { memory_id: string; content_hash: string | null } | undefined
 
@@ -135,7 +134,8 @@ export async function rebuildFromVault(options: RebuildOptions): Promise<Rebuild
  */
 export async function reconcileMergedBranch(
   vaultPath: string,
-  taskId: string
+  taskId: string,
+  db = getDb(),
 ): Promise<void> {
   const sg = simpleGit(vaultPath)
   const memoriesPattern = 'memories/curated/'
@@ -178,7 +178,6 @@ export async function reconcileMergedBranch(
   const deletedFiles = deletedRaw.split('\n').filter(Boolean)
 
   const kuzuClient = getKuzuClient()
-  const db = getDb()
 
   // --- Process changed / added files ---
   for (const relPath of changedFiles) {

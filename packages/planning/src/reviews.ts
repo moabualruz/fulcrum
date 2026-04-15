@@ -19,9 +19,8 @@ function rowToReview(row: Record<string, unknown>): Review {
   }
 }
 
-export async function createReview(input: CreateReviewInput): Promise<Review> {
+export async function createReview(input: CreateReviewInput, db = getDb()): Promise<Review> {
   if (!input.project_id) throw new FulcrumError('project_id is required', 'invalid_input')
-  const db = getDb()
   const review_id = newId('review')
   const now = new Date().toISOString()
   const display_id = nextDisplayId('review', input.project_id, db)
@@ -56,8 +55,7 @@ export async function createReview(input: CreateReviewInput): Promise<Review> {
   return rowToReview(row)
 }
 
-export async function updateReview(input: UpdateReviewInput): Promise<Review> {
-  const db = getDb()
+export async function updateReview(input: UpdateReviewInput, db = getDb()): Promise<Review> {
   const existing = db.prepare('SELECT * FROM reviews WHERE review_id = ? AND workspace_id = ?')
     .get(input.review_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!existing) throw new FulcrumError(`Review ${input.review_id} not found`, 'not_found')
@@ -85,8 +83,7 @@ export async function updateReview(input: UpdateReviewInput): Promise<Review> {
   return rowToReview(updated)
 }
 
-export async function getReview(review_id: string, workspace_id: string): Promise<Review | null> {
-  const db = getDb()
+export async function getReview(review_id: string, workspace_id: string, db = getDb()): Promise<Review | null> {
   const row = db.prepare('SELECT * FROM reviews WHERE review_id = ? AND workspace_id = ?')
     .get(review_id, workspace_id) as Record<string, unknown> | undefined
   return row ? rowToReview(row) : null
@@ -98,8 +95,7 @@ export async function listReviews(input: {
   status?: ReviewStatus
   reviewer_agent_id?: string
   limit?: number
-}): Promise<Review[]> {
-  const db = getDb()
+}, db = getDb()): Promise<Review[]> {
   let sql = 'SELECT * FROM reviews WHERE workspace_id = ?'
   const params: unknown[] = [input.workspace_id]
   if (input.target_id) { sql += ' AND target_id = ?'; params.push(input.target_id) }

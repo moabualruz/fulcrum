@@ -25,10 +25,9 @@ function recallTaskContext(opts: {
   workspace_id: string
   project_id: string | null
   task_id: string | null
-}): Array<{ memory_id: string; kind: string; content: string }> {
+}, db = getDb()): Array<{ memory_id: string; kind: string; content: string }> {
   if (!opts.task_id) return []
   try {
-    const db = getDb()
     const rows = db.prepare(`
       SELECT memory_id, kind, content
       FROM memories
@@ -92,8 +91,8 @@ function appendRunEvent(
   run_id: string,
   event_type: string,
   payload: Record<string, unknown> = {},
+  db = getDb(),
 ): void {
-  const db = getDb()
   const row = db.prepare('SELECT events FROM agent_runs WHERE run_id = ?').get(run_id) as { events: string | null } | undefined
   if (!row) return
   const events: Array<{ ts: string; event_type: string; payload: Record<string, unknown> }> =
@@ -161,8 +160,7 @@ export function rowToRun(row: Record<string, unknown>): AgentRun {
   }
 }
 
-function getRun(run_id: string): AgentRun {
-  const db = getDb()
+function getRun(run_id: string, db = getDb()): AgentRun {
   const row = db.prepare('SELECT * FROM agent_runs WHERE run_id = ?').get(run_id) as Record<string, unknown> | undefined
   if (!row) throw new FulcrumError(`Run ${run_id} not found`, 'not_found')
   return rowToRun(row)
@@ -173,8 +171,7 @@ function getRun(run_id: string): AgentRun {
  * NOTE: WIP limit and dependency enforcement is the caller's responsibility —
  * callers should call `checkPolicy` first and only proceed if `allowed: true`.
  */
-export async function startAgentRun(input: StartAgentRunInput): Promise<AgentRun> {
-  const db = getDb()
+export async function startAgentRun(input: StartAgentRunInput, db = getDb()): Promise<AgentRun> {
   const taskRow = db.prepare('SELECT workspace_id, project_id FROM tasks WHERE task_id = ?')
     .get(input.task_id) as { workspace_id: string; project_id: string } | undefined
   if (!taskRow) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
@@ -222,9 +219,9 @@ export async function startAgentRun(input: StartAgentRunInput): Promise<AgentRun
     recalled_memories: recalled,
     resolved_model: agentDef?.model ?? undefined,
     resolved_executor_uri: agentDef?.executor_uri ?? undefined,
-  })
+  }, db)
 
-  const startedRun = getRun(run_id)
+  const startedRun = getRun(run_id, db)
   upsertAgentStateProjection(db, startedRun)
 
   emitEvent({
@@ -248,14 +245,13 @@ export async function startAgentRun(input: StartAgentRunInput): Promise<AgentRun
     payload: { display_id, role: input.role },
   })
 
-  return getRun(run_id)
+  return getRun(run_id, db)
 }
 
-export async function heartbeatAgentRun(input: HeartbeatInput): Promise<void> {
+export async function heartbeatAgentRun(input: HeartbeatInput, db = getDb()): Promise<void> {
   if (input.progress_pct < 0 || input.progress_pct > 100) {
     throw new FulcrumError('progress_pct must be between 0 and 100', 'invalid_input')
   }
-  const db = getDb()
   const now = new Date().toISOString()
   const result = db.prepare(`
     UPDATE agent_runs
@@ -273,13 +269,13 @@ export async function heartbeatAgentRun(input: HeartbeatInput): Promise<void> {
     current_step: input.current_step,
     progress_pct: input.progress_pct,
     current_path: input.current_path,
-  })
-  const heartbeatRun = getRun(input.run_id)
+  }, db)
+  const heartbeatRun = getRun(input.run_id, db)
   upsertAgentStateProjection(db, heartbeatRun)
 }
 
-export async function getAgentRunStatus(input: GetStatusInput): Promise<AgentRun> {
-  return getRun(input.run_id)
+export async function getAgentRunStatus(input: GetStatusInput, db = getDb()): Promise<AgentRun> {
+  return getRun(input.run_id, db)
 }
 
 /**
@@ -287,9 +283,8 @@ export async function getAgentRunStatus(input: GetStatusInput): Promise<AgentRun
  * callers (typically the CoS or CLI) are responsible for calling `updateTask`
  * to move the task to 'completed' when all runs for it are done.
  */
-export async function completeAgentRun(input: CompleteRunInput): Promise<AgentRun> {
-  const run = getRun(input.run_id) // throws not_found before any mutation
-  const db = getDb()
+export async function completeAgentRun(input: CompleteRunInput, db = getDb()): Promise<AgentRun> {
+  const run = getRun(input.run_id, db) // throws not_found before any mutation
   const now = new Date().toISOString()
   const doneCategory = statusCategory('finished')
   db.prepare(`
@@ -307,9 +302,9 @@ export async function completeAgentRun(input: CompleteRunInput): Promise<AgentRu
   appendRunEvent(input.run_id, 'completed', {
     output_summary: input.output_summary,
     artifacts: input.artifacts,
-  })
+  }, db)
 
-  const completedRun = getRun(input.run_id)
+  const completedRun = getRun(input.run_id, db)
   upsertAgentStateProjection(db, completedRun)
 
   emitEvent({
@@ -342,13 +337,12 @@ export async function completeAgentRun(input: CompleteRunInput): Promise<AgentRu
     })
   }
 
-  return getRun(input.run_id)
+  return getRun(input.run_id, db)
 }
 
-export async function blockAgentRun(input: BlockRunInput): Promise<AgentRun> {
+export async function blockAgentRun(input: BlockRunInput, db = getDb()): Promise<AgentRun> {
   if (!input.reason.trim()) throw new FulcrumError('reason must not be empty', 'invalid_input')
-  const run = getRun(input.run_id) // throws not_found before any mutation
-  const db = getDb()
+  const run = getRun(input.run_id, db) // throws not_found before any mutation
   const blockedCategory = statusCategory('blocked')
   db.prepare(`
     UPDATE agent_runs
@@ -357,9 +351,9 @@ export async function blockAgentRun(input: BlockRunInput): Promise<AgentRun> {
     WHERE run_id = ?
   `).run(blockedCategory, input.reason, new Date().toISOString(), input.run_id)
 
-  appendRunEvent(input.run_id, 'blocked', { reason: input.reason })
+  appendRunEvent(input.run_id, 'blocked', { reason: input.reason }, db)
 
-  const blockedRun = getRun(input.run_id)
+  const blockedRun = getRun(input.run_id, db)
   upsertAgentStateProjection(db, blockedRun)
 
   emitEvent({
@@ -385,7 +379,7 @@ export async function blockAgentRun(input: BlockRunInput): Promise<AgentRun> {
     })
   }
 
-  return getRun(input.run_id)
+  return getRun(input.run_id, db)
 }
 
 /**
@@ -415,19 +409,18 @@ export function buildSpawnableRun(run: AgentRun, task_packet: TaskPacket): Spawn
   }
 }
 
-export async function escalateRun(input: EscalateRunInput): Promise<Task> {
+export async function escalateRun(input: EscalateRunInput, db = getDb()): Promise<Task> {
   if (!input.escalation_reason.trim()) throw new FulcrumError('escalation_reason must not be empty', 'invalid_input')
-  const db = getDb()
-  const run = getRun(input.run_id)
+  const run = getRun(input.run_id, db)
 
   db.prepare(`
     UPDATE agent_runs SET status = 'aborted', status_category = 'done', updated_at = ?, version = version + 1
     WHERE run_id = ?
   `).run(new Date().toISOString(), input.run_id)
 
-  appendRunEvent(input.run_id, 'escalated', { reason: input.escalation_reason })
+  appendRunEvent(input.run_id, 'escalated', { reason: input.escalation_reason }, db)
 
-  const abortedRun = getRun(input.run_id)
+  const abortedRun = getRun(input.run_id, db)
   upsertAgentStateProjection(db, abortedRun)
 
   const taskRow = db.prepare('SELECT * FROM tasks WHERE task_id = ?')

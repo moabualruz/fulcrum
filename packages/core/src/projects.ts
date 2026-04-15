@@ -62,7 +62,7 @@ function rowToProject(row: Record<string, unknown>): Project {
   }
 }
 
-export async function createProject(input: CreateProjectInput): Promise<Project> {
+export async function createProject(input: CreateProjectInput, db = getDb()): Promise<Project> {
   if (!input.name || !input.name.trim()) {
     throw new FulcrumError('name must not be empty', 'invalid_input')
   }
@@ -79,7 +79,6 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
     throw new FulcrumError(`invalid write_mode: ${write_mode}`, 'invalid_input')
   }
 
-  const db = getDb()
   const project_id = input.project_id ?? newId('project')
   const now = new Date().toISOString()
   db.prepare(
@@ -106,16 +105,14 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
   return rowToProject(row)
 }
 
-export async function getProject(project_id: string): Promise<Project | null> {
-  const db = getDb()
+export async function getProject(project_id: string, db = getDb()): Promise<Project | null> {
   const row = db
     .prepare(`SELECT * FROM projects WHERE project_id = ?`)
     .get(project_id) as Record<string, unknown> | undefined
   return row ? rowToProject(row) : null
 }
 
-export async function listProjects(input: ListProjectsInput = {}): Promise<Project[]> {
-  const db = getDb()
+export async function listProjects(input: ListProjectsInput = {}, db = getDb()): Promise<Project[]> {
   const limit = input.limit ?? 200
   const rows = input.workspace_id
     ? (db
@@ -129,8 +126,8 @@ export async function listProjects(input: ListProjectsInput = {}): Promise<Proje
   return rows.map(rowToProject)
 }
 
-export async function updateProject(input: UpdateProjectInput): Promise<Project> {
-  const existing = await getProject(input.project_id)
+export async function updateProject(input: UpdateProjectInput, db = getDb()): Promise<Project> {
+  const existing = await getProject(input.project_id, db)
   if (!existing) {
     throw new FulcrumError(`project not found: ${input.project_id}`, 'not_found')
   }
@@ -176,11 +173,10 @@ export async function updateProject(input: UpdateProjectInput): Promise<Project>
   }
   if (fields.length > 0) {
     values.push(input.project_id)
-    getDb()
-      .prepare(`UPDATE projects SET ${fields.join(', ')} WHERE project_id = ?`)
+    db.prepare(`UPDATE projects SET ${fields.join(', ')} WHERE project_id = ?`)
       .run(...values)
   }
-  const updated = await getProject(input.project_id)
+  const updated = await getProject(input.project_id, db)
   if (!updated) {
     throw new FulcrumError(`project not found after update: ${input.project_id}`, 'not_found')
   }

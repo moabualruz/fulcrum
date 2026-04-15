@@ -40,8 +40,7 @@ function rowToRun(row: Record<string, unknown>): WorkflowRun {
   }
 }
 
-function fetchRun(wf_id: string, workspace_id: string): WorkflowRun {
-  const db = getDb()
+function fetchRun(wf_id: string, workspace_id: string, db = getDb()): WorkflowRun {
   const row = db.prepare(`SELECT * FROM workflow_runs WHERE wf_id = ? AND workspace_id = ?`).get(wf_id, workspace_id) as Record<string, unknown> | undefined
   if (!row) throw new Error(`workflow run not found: ${wf_id}`)
   return rowToRun(row)
@@ -71,11 +70,9 @@ function deriveWorkflowStatus(
 
 // ── public API ─────────────────────────────────────────────────────────────
 
-export async function startWorkflow(input: StartWorkflowInput): Promise<WorkflowRun> {
+export async function startWorkflow(input: StartWorkflowInput, db = getDb()): Promise<WorkflowRun> {
   const def = registry.getDefinition(input.workflow_name)
   if (!def) throw new Error(`workflow not found: ${input.workflow_name}`)
-
-  const db = getDb()
   const wf_id = newId('wf')
   const now = new Date().toISOString()
   const display_id = nextDisplayId('wf', input.project_id ?? input.workspace_id, db)
@@ -121,12 +118,11 @@ export async function startWorkflow(input: StartWorkflowInput): Promise<Workflow
     now
   )
 
-  return fetchRun(wf_id, input.workspace_id)
+  return fetchRun(wf_id, input.workspace_id, db)
 }
 
-export async function stepWorkflow(input: StepWorkflowInput): Promise<WorkflowRun> {
-  const db = getDb()
-  const run = fetchRun(input.wf_id, input.workspace_id)
+export async function stepWorkflow(input: StepWorkflowInput, db = getDb()): Promise<WorkflowRun> {
+  const run = fetchRun(input.wf_id, input.workspace_id, db)
   const def = registry.getDefinition(run.workflow_name)
   if (!def) throw new Error(`workflow definition not found: ${run.workflow_name}`)
 
@@ -193,12 +189,11 @@ export async function stepWorkflow(input: StepWorkflowInput): Promise<WorkflowRu
     input.wf_id
   )
 
-  return fetchRun(input.wf_id, input.workspace_id)
+  return fetchRun(input.wf_id, input.workspace_id, db)
 }
 
-export async function resumeWorkflow(input: ResumeWorkflowInput): Promise<WorkflowRun> {
-  const db = getDb()
-  const run = fetchRun(input.wf_id, input.workspace_id)
+export async function resumeWorkflow(input: ResumeWorkflowInput, db = getDb()): Promise<WorkflowRun> {
+  const run = fetchRun(input.wf_id, input.workspace_id, db)
   const def = registry.getDefinition(run.workflow_name)
   if (!def) throw new Error(`workflow definition not found: ${run.workflow_name}`)
 
@@ -238,11 +233,10 @@ export async function resumeWorkflow(input: ResumeWorkflowInput): Promise<Workfl
      WHERE wf_id = ?`
   ).run(JSON.stringify(steps), current_step_id ?? null, derivedStatus, statusCat, completed_at, now, input.wf_id)
 
-  return fetchRun(input.wf_id, input.workspace_id)
+  return fetchRun(input.wf_id, input.workspace_id, db)
 }
 
-export async function cancelWorkflow(input: CancelWorkflowInput): Promise<WorkflowRun> {
-  const db = getDb()
+export async function cancelWorkflow(input: CancelWorkflowInput, db = getDb()): Promise<WorkflowRun> {
   const now = new Date().toISOString()
 
   db.prepare(
@@ -252,13 +246,13 @@ export async function cancelWorkflow(input: CancelWorkflowInput): Promise<Workfl
      WHERE wf_id = ?`
   ).run(input.reason ?? null, now, now, input.wf_id)
 
-  return fetchRun(input.wf_id, input.workspace_id)
+  return fetchRun(input.wf_id, input.workspace_id, db)
 }
 
 export async function listWorkflows(): Promise<WorkflowDefinition[]> {
   return registry.listAll()
 }
 
-export async function getWorkflowRun(input: GetWorkflowRunInput): Promise<WorkflowRun> {
-  return fetchRun(input.wf_id, input.workspace_id)
+export async function getWorkflowRun(input: GetWorkflowRunInput, db = getDb()): Promise<WorkflowRun> {
+  return fetchRun(input.wf_id, input.workspace_id, db)
 }

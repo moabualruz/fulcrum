@@ -47,7 +47,7 @@ function rowToProfile(row: Record<string, unknown>): AgentProfileRow {
   }
 }
 
-export async function createAgentProfile(input: CreateAgentProfileInput): Promise<AgentProfileRow> {
+export async function createAgentProfile(input: CreateAgentProfileInput, db = getDb()): Promise<AgentProfileRow> {
   if (!input.name || !input.name.trim()) {
     throw new FulcrumError('agent profile name must not be empty', 'invalid_input')
   }
@@ -58,7 +58,6 @@ export async function createAgentProfile(input: CreateAgentProfileInput): Promis
   if (!VALID_BASE_ROLES.includes(base_role)) {
     throw new FulcrumError(`invalid base_role: ${base_role}`, 'invalid_input')
   }
-  const db = getDb()
   const profile_id = input.profile_id ?? newId('agent_profile')
   const now = new Date().toISOString()
   try {
@@ -88,18 +87,17 @@ export async function createAgentProfile(input: CreateAgentProfileInput): Promis
     }
     throw err
   }
-  return (await getAgentProfile(profile_id))!
+  return (await getAgentProfile(profile_id, db))!
 }
 
-export async function getAgentProfile(profile_id: string): Promise<AgentProfileRow | null> {
-  const row = getDb()
+export async function getAgentProfile(profile_id: string, db = getDb()): Promise<AgentProfileRow | null> {
+  const row = db
     .prepare(`SELECT * FROM agent_profiles WHERE profile_id = ?`)
     .get(profile_id) as Record<string, unknown> | undefined
   return row ? rowToProfile(row) : null
 }
 
-export async function listAgentProfileRows(workspace_id?: string): Promise<AgentProfileRow[]> {
-  const db = getDb()
+export async function listAgentProfileRows(workspace_id?: string, db = getDb()): Promise<AgentProfileRow[]> {
   const rows = workspace_id
     ? (db
         .prepare(`SELECT * FROM agent_profiles WHERE workspace_id = ? ORDER BY created_at DESC`)
@@ -110,8 +108,8 @@ export async function listAgentProfileRows(workspace_id?: string): Promise<Agent
   return rows.map(rowToProfile)
 }
 
-export async function updateAgentProfile(input: UpdateAgentProfileInput): Promise<AgentProfileRow> {
-  const existing = await getAgentProfile(input.profile_id)
+export async function updateAgentProfile(input: UpdateAgentProfileInput, db = getDb()): Promise<AgentProfileRow> {
+  const existing = await getAgentProfile(input.profile_id, db)
   if (!existing) {
     throw new FulcrumError(`agent profile not found: ${input.profile_id}`, 'not_found')
   }
@@ -149,13 +147,12 @@ export async function updateAgentProfile(input: UpdateAgentProfileInput): Promis
   }
   if (fields.length > 0) {
     values.push(input.profile_id)
-    getDb()
-      .prepare(`UPDATE agent_profiles SET ${fields.join(', ')} WHERE profile_id = ?`)
+    db.prepare(`UPDATE agent_profiles SET ${fields.join(', ')} WHERE profile_id = ?`)
       .run(...values)
   }
-  return (await getAgentProfile(input.profile_id))!
+  return (await getAgentProfile(input.profile_id, db))!
 }
 
-export async function deleteAgentProfile(profile_id: string): Promise<void> {
-  getDb().prepare(`DELETE FROM agent_profiles WHERE profile_id = ?`).run(profile_id)
+export async function deleteAgentProfile(profile_id: string, db = getDb()): Promise<void> {
+  db.prepare(`DELETE FROM agent_profiles WHERE profile_id = ?`).run(profile_id)
 }

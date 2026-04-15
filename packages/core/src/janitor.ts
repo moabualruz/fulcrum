@@ -22,8 +22,7 @@ import { startSpan, endSpan } from './telemetry/spans.js'
  *
  * Returns the count of memories updated.
  */
-export function decayMemories(workspace_id?: string): number {
-  const db = getDb()
+export function decayMemories(workspace_id?: string, db = getDb()): number {
 
   // Fetch candidates: low-importance memories not accessed recently
   const whereParts = [
@@ -86,8 +85,7 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
  *
  * Returns the number of memories deleted (merged away).
  */
-export function consolidateMemories(workspace_id?: string): number {
-  const db = getDb()
+export function consolidateMemories(workspace_id?: string, db = getDb()): number {
 
   // Fetch the N most-recently-accessed memories that have embeddings
   const whereParts = ['embedding IS NOT NULL']
@@ -154,8 +152,7 @@ interface JanitorCycleInput {
   runConsolidate?: boolean
 }
 
-export async function runJanitorCycle(input: JanitorCycleInput): Promise<void> {
-  const db = getDb()
+export async function runJanitorCycle(input: JanitorCycleInput, db = getDb()): Promise<void> {
   const { heartbeat_timeout_minutes, escalation_timeout_minutes } = input.policy
 
   if (!Number.isFinite(heartbeat_timeout_minutes) || heartbeat_timeout_minutes < 0) {

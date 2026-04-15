@@ -121,12 +121,11 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
   return denom === 0 ? 0 : dot / denom
 }
 
-export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
+export async function writeMemory(input: WriteMemoryInput, db = getDb()): Promise<Memory> {
   if (!input.content.trim()) throw new FulcrumError('content must not be empty', 'invalid_input')
   if (input.confidence !== undefined && (input.confidence < 0 || input.confidence > 1)) {
     throw new FulcrumError('confidence must be between 0 and 1', 'invalid_input')
   }
-  const db = getDb()
   const now = new Date().toISOString()
 
   const scope = input.scope ?? 'project'
@@ -226,11 +225,10 @@ export async function writeMemory(input: WriteMemoryInput): Promise<Memory> {
   return rowToMemory(row)
 }
 
-export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]> {
+export async function recallMemory(input: RecallMemoryInput, db = getDb()): Promise<Memory[]> {
   if (!input.query.trim()) throw new FulcrumError('query must not be empty', 'invalid_input')
   const limit = input.limit ?? 5
   if (limit <= 0) return []
-  const db = getDb()
 
   /**
    * Candidate with per-component scores used by the §10.7 weighted hybrid formula.

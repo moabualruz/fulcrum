@@ -9,7 +9,7 @@ interface CheckPolicyInput {
   policy: PolicyConfig
 }
 
-export async function checkPolicy(input: CheckPolicyInput): Promise<PolicyCheckResult> {
+export async function checkPolicy(input: CheckPolicyInput, db = getDb()): Promise<PolicyCheckResult> {
   if (!Number.isFinite(input.policy.wip_limit) || input.policy.wip_limit < 0) {
     throw new FulcrumError(`Invalid wip_limit: ${input.policy.wip_limit}`, 'invalid_input')
   }
@@ -18,7 +18,6 @@ export async function checkPolicy(input: CheckPolicyInput): Promise<PolicyCheckR
       throw new FulcrumError(`Invalid wip_limit_per_role[${role}]: ${limit}`, 'invalid_input')
     }
   }
-  const db = getDb()
 
   // Check dependency completion — scope by workspace to prevent cross-workspace leakage
   const taskRow = db.prepare('SELECT depends_on FROM tasks WHERE task_id = ? AND workspace_id = ?')
