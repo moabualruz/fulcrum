@@ -645,9 +645,12 @@ describe('GET /.well-known/agent.json — A2A Agent Card', () => {
     const res = await server.fetch(new Request('http://localhost/.well-known/agent.json'))
     const body = await res.json() as { skills: Array<{ id: string; name: string }> }
     expect(body.skills.length).toBeGreaterThanOrEqual(1)
-    const skill = body.skills.find(s => s.id === 'software_engineer')
+    // Skills are now derived from capabilities via CAPABILITY_SKILL_MAP,
+    // so a software_engineer with ['code_generation', 'code_review'] capabilities
+    // produces skills with ids 'code_generation' and 'code_review'.
+    const skill = body.skills.find(s => s.id === 'code_generation')
     expect(skill).toBeDefined()
-    expect(skill!.name).toBe('Software Engineer')
+    expect(skill!.name).toBe('Code Generation')
   })
 
   it('response follows A2A format with url, version, capabilities', async () => {

@@ -11,6 +11,7 @@ export interface A2ASkill {
   name: string
   description: string
   tags?: string[]
+  examples?: string[]
   inputModes?: string[]
   outputModes?: string[]
 }
@@ -21,7 +22,18 @@ export interface A2ACapabilities {
   stateTransitionHistory?: boolean
 }
 
+export interface A2AProvider {
+  organization: string
+  url?: string
+}
+
+export interface A2AAuthentication {
+  schemes: string[]
+  credentials?: string | null
+}
+
 export interface A2AAgentCard {
+  protocolVersion: string
   name: string
   description: string
   url: string
@@ -31,6 +43,8 @@ export interface A2AAgentCard {
   defaultInputModes: string[]
   defaultOutputModes: string[]
   skills: A2ASkill[]
+  provider?: A2AProvider
+  authentication?: A2AAuthentication
 }
 
 // ---------- Builder ----------
@@ -44,6 +58,8 @@ const DEFAULT_URL_BASE = 'https://fulcrum.local/agents'
  * URL for the agent, falling back to `def.executor_uri` then a default
  * placeholder derived from the agent role.
  */
+export const A2A_PROTOCOL_VERSION = '0.3.0'
+
 export function buildA2ACard(
   def: AgentDefinition,
   executorUriOverride?: string,
@@ -61,6 +77,7 @@ export function buildA2ACard(
   const skills: A2ASkill[] = deriveSkills(def)
 
   return {
+    protocolVersion: A2A_PROTOCOL_VERSION,
     name: def.display_name,
     description: def.description,
     url,
@@ -74,6 +91,8 @@ export function buildA2ACard(
     defaultInputModes: ['text/plain', 'application/json'],
     defaultOutputModes: ['text/plain', 'application/json'],
     skills,
+    authentication: { schemes: ['Bearer'] },
+    provider: { organization: 'fulcrum', url: DEFAULT_URL_BASE },
   }
 }
 
