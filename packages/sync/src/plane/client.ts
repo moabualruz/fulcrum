@@ -1,49 +1,81 @@
 // packages/sync/src/plane/client.ts
 import type { ExternalPayload, PlaneAPIClientConfig } from '../types.js'
 
-const REQUEST_TIMEOUT_MS = 10_000
 const MAX_RETRIES = 3
-const INITIAL_BACKOFF_MS = 500
 
-/** Retryable fetch with AbortSignal timeout and exponential backoff (SYNC-001, SYNC-002). */
-async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
-  let lastError: Error | undefined
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-    try {
-      const resp = await fetch(url, { ...init, signal: controller.signal })
-      clearTimeout(timer)
-      // Retry on 429 (rate-limited) with Retry-After header support
-      if (resp.status === 429) {
-        const retryAfter = parseInt(resp.headers.get('Retry-After') ?? '0', 10)
-        const backoff = retryAfter > 0
-          ? retryAfter * 1000
-          : INITIAL_BACKOFF_MS * 2 ** attempt
-        await sleep(backoff)
-        lastError = new Error(`Plane API rate-limited (429)`)
-        continue
-      }
-      // Retry on 5xx server errors
-      if (resp.status >= 500 && attempt < MAX_RETRIES - 1) {
-        await sleep(INITIAL_BACKOFF_MS * 2 ** attempt)
-        lastError = new Error(`Plane API server error: ${resp.status}`)
-        continue
-      }
-      return resp
-    } catch (err) {
-      clearTimeout(timer)
-      lastError = err instanceof Error ? err : new Error(String(err))
-      if (attempt < MAX_RETRIES - 1) {
-        await sleep(INITIAL_BACKOFF_MS * 2 ** attempt)
-      }
-    }
+/**
+ * Parse a Retry-After header value into milliseconds to wait.
+ * The header can be an integer (seconds) or an HTTP-date string.
+ */
+function parseRetryAfterMs(headerValue: string): number {
+  const asSeconds = Number(headerValue)
+  if (!isNaN(asSeconds) && isFinite(asSeconds)) {
+    return Math.max(0, asSeconds * 1000)
   }
-  throw lastError ?? new Error('Plane API request failed after retries')
+  const asDate = Date.parse(headerValue)
+  if (!isNaN(asDate)) {
+    return Math.max(0, asDate - Date.now())
+  }
+  // Fallback: 1 second
+  return 1000
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Perform a fetch with retry logic:
+ *  - 429: honour Retry-After header (seconds or HTTP-date)
+ *  - 5xx: exponential backoff starting at 1 s
+ *  - Network errors: retry up to MAX_RETRIES times
+ *
+ * On a non-retryable HTTP error the body is written to stderr and only the
+ * status code is included in the thrown Error.
+ */
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  let attempt = 0
+  while (true) {
+    let resp: Response
+    try {
+      resp = await fetch(url, init)
+    } catch (networkErr) {
+      attempt++
+      if (attempt >= MAX_RETRIES) {
+        throw networkErr
+      }
+      const backoffMs = 1000 * Math.pow(2, attempt - 1)
+      await sleep(backoffMs)
+      continue
+    }
+
+    if (resp.ok) {
+      return resp
+    }
+
+    if (resp.status === 429 && attempt < MAX_RETRIES - 1) {
+      attempt++
+      const retryAfter = resp.headers.get('Retry-After')
+      const waitMs = retryAfter ? parseRetryAfterMs(retryAfter) : 1000 * attempt
+      await sleep(waitMs)
+      continue
+    }
+
+    if (resp.status >= 500 && attempt < MAX_RETRIES - 1) {
+      attempt++
+      const backoffMs = 1000 * Math.pow(2, attempt - 1)
+      await sleep(backoffMs)
+      continue
+    }
+
+    // Non-retryable error: log body to stderr, throw with status only
+    const body = await resp.text()
+    process.stderr.write(`Plane API error body (status ${resp.status}): ${body}\n`)
+    throw new Error(`Plane API error: ${resp.status}`)
+  }
 }
 
 export class PlaneAPIClient {
@@ -61,9 +93,6 @@ export class PlaneAPIClient {
         body: JSON.stringify(payload),
       },
     )
-    if (!resp.ok) {
-      throw new Error(`Plane API error: ${resp.status} ${await resp.text()}`)
-    }
     return resp.json() as Promise<{ id: string }>
   }
 
@@ -74,9 +103,6 @@ export class PlaneAPIClient {
         headers: { 'X-API-Key': this.config.apiKey },
       },
     )
-    if (!resp.ok) {
-      throw new Error(`Plane API error: ${resp.status}`)
-    }
     return resp.json()
   }
 
@@ -92,9 +118,6 @@ export class PlaneAPIClient {
         body: JSON.stringify(payload),
       },
     )
-    if (!resp.ok) {
-      throw new Error(`Plane API error: ${resp.status}`)
-    }
     return resp.json() as Promise<{ id: string }>
   }
 }

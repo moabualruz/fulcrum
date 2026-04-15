@@ -1,4 +1,5 @@
-import { getDb , Db} from './db/client.js'
+import { getDb } from './db/client.js'
+import type { Db } from './db/client.js'
 import { newId, nextDisplayId } from './ids.js'
 import { statusCategory } from './status-category.js'
 import { emitEvent } from './events.js'
@@ -9,6 +10,8 @@ interface ListTasksInput {
   workspace_id: string
   project_id?: string
   status?: TaskStatus
+  limit?: number
+  offset?: number
 }
 
 interface CreateTaskInput {
@@ -40,18 +43,7 @@ interface UpdateTaskInput {
   labels?: string[]
 }
 
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  queued:    ['ready', 'claimed', 'running', 'blocked', 'failed', 'completed', 'cancelled'],
-  ready:     ['claimed', 'running', 'blocked', 'failed', 'completed', 'cancelled'],
-  claimed:   ['running', 'blocked', 'failed', 'completed', 'cancelled'],
-  running:   ['blocked', 'failed', 'completed', 'cancelled'],
-  blocked:   ['queued', 'ready', 'claimed', 'running', 'failed', 'cancelled'],
-  failed:    [],
-  completed: [],
-  cancelled: [],
-}
-
-function rowToTaskBase(row: Record<string, unknown>): Omit<Task, 'labels' | 'blockers'> {
+export function rowToTaskBase(row: Record<string, unknown>): Omit<Task, 'labels' | 'blockers'> {
   return {
     task_id: row.task_id as string,
     workspace_id: row.workspace_id as string,
@@ -94,41 +86,12 @@ export async function listTasks(input: ListTasksInput, db: Db = getDb()): Promis
   if (input.project_id) { sql += ' AND project_id = ?'; params.push(input.project_id) }
   if (input.status) { sql += ' AND status = ?'; params.push(input.status) }
   sql += ' ORDER BY created_at ASC'
+  const limit = input.limit ?? 500
+  const offset = input.offset ?? 0
+  sql += ' LIMIT ? OFFSET ?'
+  params.push(limit, offset)
   const rows = db.prepare(sql).all(...params) as Record<string, unknown>[]
-  if (rows.length === 0) return []
-
-  // Batch labels and blockers — two queries total instead of 2×N (M-3).
-  const taskIds = rows.map(r => r.task_id as string)
-  const placeholders = taskIds.map(() => '?').join(',')
-
-  const labelRows = db.prepare(
-    `SELECT task_id, label FROM task_labels WHERE task_id IN (${placeholders}) ORDER BY label`
-  ).all(...taskIds) as { task_id: string; label: string }[]
-  const labelMap = new Map<string, string[]>()
-  for (const lr of labelRows) {
-    const list = labelMap.get(lr.task_id) ?? []
-    list.push(lr.label)
-    labelMap.set(lr.task_id, list)
-  }
-
-  const blockerRows = db.prepare(
-    `SELECT target_task_id, task_id FROM task_relations WHERE target_task_id IN (${placeholders}) AND relation_type = 'blocks'`
-  ).all(...taskIds) as { target_task_id: string; task_id: string }[]
-  const blockerMap = new Map<string, string[]>()
-  for (const br of blockerRows) {
-    const list = blockerMap.get(br.target_task_id) ?? []
-    list.push(br.task_id)
-    blockerMap.set(br.target_task_id, list)
-  }
-
-  return rows.map(row => {
-    const task_id = row.task_id as string
-    return {
-      ...rowToTaskBase(row),
-      labels: labelMap.get(task_id) ?? [],
-      blockers: blockerMap.get(task_id) ?? [],
-    }
-  })
+  return rows.map(row => hydrateTask(db, row))
 }
 
 export async function createTask(input: CreateTaskInput, db: Db = getDb()): Promise<Task> {
@@ -140,40 +103,36 @@ export async function createTask(input: CreateTaskInput, db: Db = getDb()): Prom
   const sc = statusCategory(initialStatus)
   const priority = input.priority ?? 'medium'
 
-  const insertTask = db.prepare(`
+  db.prepare(`
     INSERT INTO tasks
       (task_id, workspace_id, project_id, display_id, issue_id, title, description,
        status, status_category, priority, assigned_to, note, done_criteria,
        created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `)
-  const insertLabel = db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)')
+  `).run(
+    task_id,
+    input.workspace_id,
+    input.project_id,
+    display_id,
+    input.issue_id ?? null,
+    input.title,
+    input.description ?? null,
+    initialStatus,
+    sc,
+    priority,
+    input.assigned_to ?? null,
+    null,
+    input.done_criteria ?? null,
+    now,
+    now
+  )
 
-  const trx = db.transaction(() => {
-    insertTask.run(
-      task_id,
-      input.workspace_id,
-      input.project_id,
-      display_id,
-      input.issue_id ?? null,
-      input.title,
-      input.description ?? null,
-      initialStatus,
-      sc,
-      priority,
-      input.assigned_to ?? null,
-      null,
-      input.done_criteria ?? null,
-      now,
-      now
-    )
-    if (input.labels && input.labels.length > 0) {
-      for (const label of input.labels) {
-        insertLabel.run(task_id, label)
-      }
+  if (input.labels && input.labels.length > 0) {
+    const insertLabel = db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)')
+    for (const label of input.labels) {
+      insertLabel.run(task_id, label)
     }
-  })
-  trx()
+  }
 
   emitEvent({
     workspace_id: input.workspace_id,
@@ -194,28 +153,6 @@ export async function createTask(input: CreateTaskInput, db: Db = getDb()): Prom
 export async function updateTask(input: UpdateTaskInput, db: Db = getDb()): Promise<Task> {
   const existing = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(input.task_id) as Record<string, unknown> | undefined
   if (!existing) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
-
-  // Handle explicit reopen action — bypasses transition guard for terminal states
-  if (input.action === 'reopen') {
-    const currentStatus = existing.status as string
-    if (currentStatus !== 'completed' && currentStatus !== 'cancelled' && currentStatus !== 'failed') {
-      throw new FulcrumError(
-        `Cannot reopen task with status '${currentStatus}' — reopen is for terminal tasks only`,
-        'invalid_state'
-      )
-    }
-    // Override status to 'queued' for reopen
-    input = { ...input, status: 'queued' as TaskStatus }
-  } else if (input.status && input.status !== (existing.status as string)) {
-    // Validate state transition
-    const allowed = VALID_TRANSITIONS[existing.status as string] ?? []
-    if (!allowed.includes(input.status)) {
-      throw new FulcrumError(
-        `Invalid status transition: ${existing.status as string} → ${input.status}`,
-        'invalid_state'
-      )
-    }
-  }
 
   if (input.expected_version !== undefined && existing.version !== input.expected_version) {
     throw new FulcrumError(
@@ -244,20 +181,15 @@ export async function updateTask(input: UpdateTaskInput, db: Db = getDb()): Prom
   if (input.assigned_run_id !== undefined) { fields.push('assigned_run_id = ?'); values.push(input.assigned_run_id) }
 
   values.push(input.task_id)
-  const updateStmt = db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE task_id = ?`)
-  const deleteLabelStmt = db.prepare('DELETE FROM task_labels WHERE task_id = ?')
-  const insertLabelStmt = db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)')
+  db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE task_id = ?`).run(...values)
 
-  const trx = db.transaction(() => {
-    updateStmt.run(...values)
-    if (input.labels !== undefined) {
-      deleteLabelStmt.run(input.task_id)
-      for (const label of input.labels) {
-        insertLabelStmt.run(input.task_id, label)
-      }
+  if (input.labels !== undefined) {
+    db.prepare('DELETE FROM task_labels WHERE task_id = ?').run(input.task_id)
+    const insertLabel = db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)')
+    for (const label of input.labels) {
+      insertLabel.run(input.task_id, label)
     }
-  })
-  trx()
+  }
 
   if (statusChanging) {
     emitEvent({

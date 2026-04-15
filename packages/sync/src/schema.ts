@@ -1,7 +1,7 @@
 // packages/sync/src/schema.ts
-import type { Db } from '@fulcrum/core'
+import type { Database } from 'better-sqlite3'
 
-export function runMigration010(db: Db): void {
+export function runMigration010(db: Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS sync_states (
       sync_id          TEXT PRIMARY KEY,
@@ -50,5 +50,6 @@ export function runMigration010(db: Db): void {
 
     CREATE INDEX IF NOT EXISTS idx_sync_queue_scheduled ON sync_queue(scheduled_at);
     CREATE INDEX IF NOT EXISTS idx_sync_queue_priority  ON sync_queue(priority DESC);
+    CREATE INDEX IF NOT EXISTS idx_sync_queue_sync_id   ON sync_queue(sync_id);
   `)
 }

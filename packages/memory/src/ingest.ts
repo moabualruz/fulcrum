@@ -19,8 +19,11 @@ const LANG_EXT_MAP: Record<string, string> = {
   '.c': 'c',
   '.cpp': 'cpp', '.cc': 'cpp',
 }
-const MAX_CHUNK_CHARS = 1600  // ~400 tokens
-const PROSE_OVERLAP = 50
+const MAX_CHUNK_CHARS = 1600  // ~400 tokens at ~4 chars/token
+// NOTE(MEM-013): PROSE_OVERLAP is measured in characters, not tokens.
+// At ~4 chars/token this gives ~50 tokens of overlap, matching the prose overlap target.
+// A full tokenizer is not used to avoid adding a dependency.
+const PROSE_OVERLAP = 200  // ~50 tokens × 4 chars/token
 
 // Regex-based syntax chunker: splits at top-level function/class/arrow-function boundaries
 const SYNTAX_BOUNDARIES = /(?=^(?:export\s+)?(?:async\s+)?(?:function|class)\s+\w)/gm
@@ -223,7 +226,8 @@ export async function ingestFile(input: IngestFileInput, db: Db = getDb()): Prom
   return { chunks_created, memories_created }
 }
 
-function walkDir(dir: string, extensions: Set<string>): string[] {
+function walkDir(dir: string, extensions: Set<string>, depth = 0, maxDepth = 10): string[] {
+  if (depth >= maxDepth) return []
   const result: string[] = []
   try {
     const entries = readdirSync(dir, { withFileTypes: true })
@@ -232,7 +236,7 @@ function walkDir(dir: string, extensions: Set<string>): string[] {
       if (entry.isDirectory()) {
         // Skip node_modules and hidden dirs
         if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue
-        result.push(...walkDir(full, extensions))
+        result.push(...walkDir(full, extensions, depth + 1, maxDepth))
       } else if (entry.isFile() && extensions.has(extname(entry.name).toLowerCase())) {
         result.push(full)
       }

@@ -1,5 +1,6 @@
 // packages/memory/src/kuzu/query.ts
 import type { KuzuClient } from './client.js'
+import { computeFreshness } from '../scoring.js'
 
 export interface L2QueryInput {
   query: string
@@ -24,10 +25,9 @@ interface RawMemoryRow {
   created_at: string
 }
 
+// MEM-007: delegate to shared computeFreshness so L2 and L1 use identical decay (90d half-life)
 function recency(createdAt: string): number {
-  const daysOld = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
-  // MEM-007: half-life ~90 days — matches L1 computeFreshness (exp(-ageDays/130))
-  return Math.exp(-daysOld / 130 * Math.log(2))
+  return computeFreshness(createdAt)
 }
 
 function workspaceAffinity(memWorkspaceId: string, queryWorkspaceId: string, relatedIds: Set<string>): number {

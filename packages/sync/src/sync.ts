@@ -1,5 +1,5 @@
 // packages/sync/src/sync.ts
-import { getDb, Db} from '@fulcrum/core'
+import { getDb } from '@fulcrum/core'
 import { checkSecrets } from '@fulcrum/policy'
 import { PlaneAPIClient } from './plane/client.js'
 import { PlaneSyncAdapter } from './plane/adapter.js'
@@ -16,26 +16,17 @@ import type {
   PlaneAPIClientConfig,
 } from './types.js'
 
-// Singleton PlaneAPIClient — re-created only when env vars change (m-5).
-let _cachedClient: PlaneAPIClient | null = null
-let _cachedConfig: string | null = null
+function buildManager(): SyncManager {
+  const db = getDb()
 
-function getOrCreateClient(): PlaneAPIClient {
   const config: PlaneAPIClientConfig = {
     baseUrl: process.env['PLANE_BASE_URL'] ?? 'https://api.plane.so',
     apiKey: process.env['PLANE_API_KEY'] ?? '',
     workspaceSlug: process.env['PLANE_WORKSPACE_SLUG'] ?? '',
     projectId: process.env['PLANE_PROJECT_ID'],
   }
-  const key = JSON.stringify(config)
-  if (_cachedClient && _cachedConfig === key) return _cachedClient
-  _cachedClient = new PlaneAPIClient(config)
-  _cachedConfig = key
-  return _cachedClient
-}
 
-function buildManager(db: Db = getDb()): SyncManager {
-  const client = getOrCreateClient()
+  const client = new PlaneAPIClient(config)
   const adapter = new PlaneSyncAdapter(client)
 
   // Secret guard runs before every push (single-object and queue-batch paths)
@@ -60,8 +51,8 @@ function buildManager(db: Db = getDb()): SyncManager {
  *  5. Otherwise push via adapter, store external_id, mark synced.
  *  6. On detected remote conflict: record sync_conflict, set status='conflicted'.
  */
-export async function syncObject(input: SyncObjectInput, db: Db = getDb()): Promise<SyncState> {
-  const manager = buildManager(db)
+export async function syncObject(input: SyncObjectInput): Promise<SyncState> {
+  const manager = buildManager()
   return manager.syncObject(input)
 }
 
@@ -69,16 +60,16 @@ export async function syncObject(input: SyncObjectInput, db: Db = getDb()): Prom
  * Process the sync_queue in batches, honouring priority ordering.
  * Default batch size: 50.
  */
-export async function syncAll(input: SyncAllInput, db: Db = getDb()): Promise<SyncResult> {
-  const manager = buildManager(db)
+export async function syncAll(input: SyncAllInput): Promise<SyncResult> {
+  const manager = buildManager()
   return manager.syncAll(input)
 }
 
 /**
  * Return the current SyncState for an object, or null if not registered.
  */
-export async function getSyncState(input: GetSyncStateInput, db: Db = getDb()): Promise<SyncState | null> {
-  const manager = buildManager(db)
+export function getSyncState(input: GetSyncStateInput): SyncState | null {
+  const manager = buildManager()
   return manager.getSyncState(input)
 }
 
@@ -89,8 +80,8 @@ export async function getSyncState(input: GetSyncStateInput, db: Db = getDb()): 
  * - remote_wins → pulls the remote version via adapter.pull().
  * - manual      → clears conflict_state only; no automatic re-sync.
  */
-export async function resolveConflict(input: ResolveConflictInput, db: Db = getDb()): Promise<SyncState> {
-  const manager = buildManager(db)
+export async function resolveConflict(input: ResolveConflictInput): Promise<SyncState> {
+  const manager = buildManager()
   return manager.resolveConflict(input)
 }
 
@@ -98,7 +89,7 @@ export async function resolveConflict(input: ResolveConflictInput, db: Db = getD
  * List all sync conflicts for a workspace, optionally filtered by target
  * and/or restricted to unresolved conflicts only.
  */
-export async function listConflicts(input: ListConflictsInput, db: Db = getDb()): Promise<SyncConflict[]> {
-  const manager = buildManager(db)
+export function listConflicts(input: ListConflictsInput): SyncConflict[] {
+  const manager = buildManager()
   return manager.listConflicts(input)
 }

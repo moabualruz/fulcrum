@@ -17,6 +17,8 @@
 //     failure instead of crashing at module load.
 
 import { spawn } from 'node:child_process'
+import { realpathSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { getDb, newId, Db} from '@fulcrum/core'
 import type { MemoryKind, MemoryScope } from '@fulcrum/core'
 import type { StepContext, StepResult, StepHandler } from './types.js'
@@ -498,7 +500,16 @@ HANDLERS['search_code'] = async (ctx) => {
   const c = cfg(ctx)
   const query = str(c['query'])
   if (!query) return { status: 'failed', error: 'search_code requires query' }
-  const cwd = str(c['cwd'], process.cwd())
+  const rawCwd = str(c['cwd'], process.cwd())
+  let cwd: string
+  try {
+    // Resolve to an absolute path and canonicalize symlinks so that
+    // path traversal sequences (e.g. "../../etc") are normalised before
+    // they reach the shell command.
+    cwd = realpathSync(resolve(rawCwd))
+  } catch {
+    return { status: 'failed', error: `search_code: invalid cwd '${rawCwd}'` }
+  }
   const glob = str(c['glob'], '')
 
   type Match = { path: string; line: number; text: string }

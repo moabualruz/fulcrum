@@ -220,6 +220,10 @@ export async function createPolicyRule(input: CreatePolicyRuleInput, db: Db = ge
       } catch {
         throw new FulcrumError(`invalid regex pattern: ${m.pattern}`, 'invalid_input')
       }
+      // Reject nested quantifiers that cause exponential backtracking (ReDoS)
+      if (/\([^)]*[+*][^)]*\)[+*]/.test(m.pattern)) {
+        throw new FulcrumError('regex pattern contains nested quantifiers (ReDoS risk)', 'invalid_input')
+      }
     }
   }
 

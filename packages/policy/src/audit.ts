@@ -20,7 +20,7 @@ function rowToEvent(row: Record<string, unknown>): PolicyEvent {
   }
 }
 
-export async function logPolicyEvent(input: LogPolicyEventInput, db: Db = getDb()): Promise<void> {
+export function logPolicyEvent(input: LogPolicyEventInput, db: Db = getDb()): void {
   const evt_id = newId('policy_event')
   const now = new Date().toISOString()
 
@@ -42,7 +42,7 @@ export async function logPolicyEvent(input: LogPolicyEventInput, db: Db = getDb(
   )
 }
 
-export async function getAuditLog(input: GetAuditLogInput, db: Db = getDb()): Promise<PolicyEvent[]> {
+export function getAuditLog(input: GetAuditLogInput, db: Db = getDb()): PolicyEvent[] {
   let sql = 'SELECT * FROM policy_events WHERE workspace_id = ?'
   const params: unknown[] = [input.workspace_id]
   if (input.actor_id) { sql += ' AND actor_id = ?'; params.push(input.actor_id) }

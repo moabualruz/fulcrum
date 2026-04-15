@@ -12,7 +12,8 @@
 //   5. Returns a WorkerResult parsed from the process's exit code + stdout
 
 import { execFileSync, spawn } from 'child_process'
-import { writeFileSync, unlinkSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs'
+import { writeFileSync, unlinkSync, existsSync, mkdirSync, readdirSync, statSync, accessSync, constants } from 'fs'
+import { isAbsolute } from 'path'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { AgentAdapter, SpawnContext, WorkerResult } from '../types.js'
@@ -49,7 +50,17 @@ function cleanupStalePromptFiles(dir: string): void {
 /** Locate the `claude` binary. Respects $FULCRUM_CLAUDE_BIN override. */
 export function findClaudeBin(): string | null {
   const override = process.env['FULCRUM_CLAUDE_BIN']
-  if (override) return override
+  if (override) {
+    if (!isAbsolute(override)) {
+      throw new Error(`FULCRUM_CLAUDE_BIN must be an absolute path, got: ${override}`)
+    }
+    try {
+      accessSync(override, constants.X_OK)
+    } catch {
+      throw new Error(`FULCRUM_CLAUDE_BIN is not executable: ${override}`)
+    }
+    return override
+  }
   try {
     return execFileSync('which', ['claude'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || null
   } catch {

@@ -1,140 +1,43 @@
 // packages/monitor/src/server.ts
 import { Hono } from 'hono'
-import type { MiddlewareHandler } from 'hono'
-import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
-import { randomBytes, timingSafeEqual } from 'crypto'
-import { readFileSync, writeFileSync, mkdirSync } from 'fs'
-import { join } from 'path'
-import {
-  getDb,
-  listTasks, createTask, updateTask,
-  startAgentRun, heartbeatAgentRun, completeAgentRun, blockAgentRun,
-  getAgentRunStatus,
-  buildCosContext,
-  loadConfig,
-  createWorkspace, createProject, getProject,
-  isL1, type AgentRole,
-  globalDataDir, Db} from '@fulcrum/core'
-import { writeMemory, recallMemory } from '@fulcrum/memory'
-import { evaluatePolicy, logPolicyEvent, type EvaluatePolicyInput } from '@fulcrum/policy'
+import { getDb, listAgentDefinitions } from '@fulcrum/core'
+import { evaluatePolicy } from '@fulcrum/policy'
 import {
   getMetrics,
   getBurndown,
   getPerRoleMetrics,
   getMemoryMetrics,
   getForecasting,
+  replayRun,
 } from './metrics.js'
 import type { MonitorServer, MonitorServerConfig } from './types.js'
-import { buildAgentCard } from './agent-card.js'
 
-// ---------- Auth helpers ----------
-
-function getOrCreateMonitorToken(): string {
-  const dir = globalDataDir()
-  const tokenPath = join(dir, 'token')
-  mkdirSync(dir, { recursive: true })
-  // MON-006: avoid TOCTOU — attempt read first, create only if missing
-  try {
-    const existing = readFileSync(tokenPath, 'utf-8').trim()
-    // Validate it's a 64-char hex string before trusting it
-    if (/^[0-9a-f]{64}$/.test(existing)) return existing
-  } catch { /* file not found — create */ }
-  const token = randomBytes(32).toString('hex')
-  writeFileSync(tokenPath, token, { mode: 0o600 })
-  return token
-}
-
-function requireAuth(token: string): MiddlewareHandler {
-  const tokenBuf = Buffer.from(token)
-  return async (c, next) => {
-    const auth = c.req.header('Authorization') ?? ''
-    if (!auth.startsWith('Bearer ')) {
-      return c.json({ error: 'unauthorized' }, 401)
-    }
-    const provided = Buffer.from(auth.slice(7))
-    if (provided.length !== tokenBuf.length || !timingSafeEqual(provided, tokenBuf)) {
-      return c.json({ error: 'unauthorized' }, 401)
-    }
-    await next()
-  }
-}
-
-// ---------- Validation helpers ----------
-
-/** Returns true if the string is a valid YYYY-MM-DD date (MON-005). */
-function isValidDate(s: unknown): s is string {
-  return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)
-}
-
-// ---------- Pagination helper ----------
-
-interface PaginatedResult<T> {
-  data: T[]
-  pagination: {
-    total: number
-    limit: number
-    offset: number
-    next_cursor: string | null
-  }
-}
-
-/**
- * Wrap a list query result with standard pagination metadata.
- * `next_cursor` is the next offset as a string, or null when on the last page.
- */
-function paginate<T>(
-  data: T[],
-  total: number,
-  limit: number,
-  offset: number,
-): PaginatedResult<T> {
-  const nextOffset = offset + data.length
-  const next_cursor = nextOffset < total ? String(nextOffset) : null
-  return { data, pagination: { total, limit, offset, next_cursor } }
+const CAPABILITY_SKILL_MAP: Record<string, { name: string; description: string }> = {
+  code_generation:    { name: 'Code Generation',    description: 'Generates code from specifications' },
+  code_review:        { name: 'Code Review',         description: 'Reviews code for quality and correctness' },
+  test_generation:    { name: 'Test Generation',     description: 'Writes automated tests' },
+  refactoring:        { name: 'Refactoring',         description: 'Improves code structure without behavior change' },
+  documentation:      { name: 'Documentation',       description: 'Writes technical documentation' },
+  planning:           { name: 'Planning',             description: 'Breaks down work into tasks' },
+  research:           { name: 'Research',             description: 'Investigates technical topics' },
+  debugging:          { name: 'Debugging',            description: 'Diagnoses and fixes defects' },
+  deployment:         { name: 'Deployment',           description: 'Manages CI/CD and releases' },
+  data_analysis:      { name: 'Data Analysis',        description: 'Analyzes data and metrics' },
+  security_review:    { name: 'Security Review',      description: 'Identifies security vulnerabilities' },
+  architecture:       { name: 'Architecture Review',  description: 'Reviews system design decisions' },
 }
 
 export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   const app = new Hono()
-  // Use config port (default 4721) unless explicitly overridden
-  const fulcrumConfig = loadConfig()
-  const port = config.port ?? fulcrumConfig.port ?? 4721
+  const port = config.port ?? 7331
   const host = config.host ?? '127.0.0.1'
-  const workspace_id = config.workspace_id ?? fulcrumConfig.workspace_id ?? undefined
-
-  // CORS — restrict to localhost only
-  app.use('*', cors({
-    origin: ['http://localhost:4721', 'http://127.0.0.1:4721'],
-    allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
-  }))
-
-  // Load or create the bearer token — applies to ALL data endpoints (SEC-001).
-  // bypass_auth is only for unit tests; never use in production.
-  const monitorToken = config.bypass_auth ? '' : getOrCreateMonitorToken()
-  const auth: MiddlewareHandler = config.bypass_auth
-    ? ((_c, next) => next())
-    : requireAuth(monitorToken)
-
-  // Apply auth globally; exempt only the two public discovery/health endpoints.
-  app.use('*', async (c, next) => {
-    const path = c.req.path
-    if (path === '/.well-known/agent.json' || path === '/status' || config.bypass_auth) {
-      return next()
-    }
-    return auth(c, next)
-  })
-
-  // A2A Agent Card — public discovery endpoint, no auth required
-  app.get('/.well-known/agent.json', (c) => {
-    const baseUrl = `http://${host}:${port}`
-    const card = buildAgentCard({ baseUrl, workspace_id })
-    return c.json(card)
-  })
+  const workspace_id = config.workspace_id
 
   app.get('/status', (c) => {
     return c.json({
       status: 'ok',
+      workspace_id: workspace_id ?? null,
       ts: new Date().toISOString(),
     })
   })
@@ -143,19 +46,11 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const start_date = c.req.query('start_date')
-    const end_date = c.req.query('end_date')
-    // MON-005: validate date format before passing to DB
-    if (start_date !== undefined && !isValidDate(start_date))
-      return c.json({ error: 'start_date must be YYYY-MM-DD' }, 400)
-    if (end_date !== undefined && !isValidDate(end_date))
-      return c.json({ error: 'end_date must be YYYY-MM-DD' }, 400)
-
     const result = await getMetrics({
       workspace_id: ws,
       project_id: c.req.query('project_id'),
-      start_date,
-      end_date,
+      start_date: c.req.query('start_date'),
+      end_date: c.req.query('end_date'),
     })
     return c.json(result)
   })
@@ -169,9 +64,6 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws || !project_id || !start_date || !end_date) {
       return c.json({ error: 'workspace_id, project_id, start_date, end_date are required' }, 400)
     }
-    // MON-005: validate date format
-    if (!isValidDate(start_date)) return c.json({ error: 'start_date must be YYYY-MM-DD' }, 400)
-    if (!isValidDate(end_date)) return c.json({ error: 'end_date must be YYYY-MM-DD' }, 400)
 
     const result = await getBurndown({ workspace_id: ws, project_id, start_date, end_date })
     return c.json(result)
@@ -179,36 +71,38 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
   app.get('/events/stream', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
-    // workspace_id is required — reject unscoped streaming to prevent cross-workspace leakage (MON-007).
-    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
     const stream = new ReadableStream({
       start(controller) {
-        let lastRowid = parseInt(c.req.header('Last-Event-ID') ?? '0', 10) || 0
+        let lastId = c.req.header('Last-Event-ID') ?? ''
 
         const poll = () => {
           try {
-            const db: Db = getDb()
-            const query = `SELECT *, rowid FROM events WHERE workspace_id = ? AND rowid > ? ORDER BY rowid ASC LIMIT 100`
-            const params: unknown[] = [ws, lastRowid]
+            const db = getDb()
+            let query = `SELECT * FROM events WHERE workspace_id = ? AND event_id > ? ORDER BY event_id ASC LIMIT 100`
+            const params: unknown[] = [ws ?? '', lastId]
+
+            if (!ws) {
+              query = `SELECT * FROM events WHERE event_id > ? ORDER BY event_id ASC LIMIT 100`
+              params.splice(0, 1) // remove ws placeholder, keep only lastId
+            }
 
             const rows = db.prepare(query).all(...params) as Array<{
-              evt_id: string
-              evt_type: string
+              event_id: string
+              event_type: string
               payload: string
               ts: string
-              rowid: number
             }>
 
             for (const row of rows) {
               const data = JSON.stringify({
-                event_id: row.evt_id,
-                event_type: row.evt_type,
+                event_id: row.event_id,
+                event_type: row.event_type,
                 payload: JSON.parse(row.payload) as unknown,
                 ts: row.ts,
               })
-              controller.enqueue(new TextEncoder().encode(`id: ${row.rowid}\ndata: ${data}\n\n`))
-              lastRowid = row.rowid
+              controller.enqueue(new TextEncoder().encode(`id: ${row.event_id}\ndata: ${data}\n\n`))
+              lastId = row.event_id
             }
           } catch {
             // DB not yet available — skip this tick
@@ -241,7 +135,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db: Db = getDb()
+    const db = getDb()
     const rows = db.prepare(`
       SELECT status_category, COUNT(*) AS count
       FROM tasks
@@ -260,22 +154,23 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/agents', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-    const db: Db = getDb()
-    const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
-    const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
 
-    const total = (db.prepare('SELECT COUNT(*) AS n FROM agent_runs WHERE workspace_id = ?').get(ws) as { n: number }).n
-    const rows = db.prepare(
-      'SELECT * FROM agent_runs WHERE workspace_id = ? ORDER BY started_at DESC LIMIT ? OFFSET ?'
-    ).all(ws, limit, offset)
-    return c.json(paginate(rows, total, limit, offset))
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT * FROM agent_runs
+      WHERE workspace_id = ?
+      ORDER BY started_at DESC
+      LIMIT 50
+    `).all(ws)
+
+    return c.json({ data: rows })
   })
 
   app.get('/agents/:id', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db: Db = getDb()
+    const db = getDb()
     const run = db.prepare(`
       SELECT * FROM agent_runs WHERE run_id = ? AND workspace_id = ?
     `).get(c.req.param('id'), ws)
@@ -288,7 +183,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db: Db = getDb()
+    const db = getDb()
     const rows = db.prepare(`
       SELECT * FROM worktrees
       WHERE workspace_id = ? AND status = 'ready_for_merge'
@@ -302,7 +197,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db: Db = getDb()
+    const db = getDb()
     const rows = db.prepare(`
       SELECT * FROM reviews
       WHERE workspace_id = ? AND status = 'pending'
@@ -315,36 +210,38 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/artifacts', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-    const db: Db = getDb()
-    const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
-    const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
 
-    const total = (db.prepare('SELECT COUNT(*) AS n FROM artifacts WHERE workspace_id = ?').get(ws) as { n: number }).n
-    const rows = db.prepare(
-      'SELECT * FROM artifacts WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-    ).all(ws, limit, offset)
-    return c.json(paginate(rows, total, limit, offset))
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT * FROM artifacts
+      WHERE workspace_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).all(ws)
+
+    return c.json({ data: rows })
   })
 
   app.get('/memory-trace', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-    const db: Db = getDb()
-    const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
-    const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
 
-    const total = (db.prepare('SELECT COUNT(*) AS n FROM memories WHERE workspace_id = ?').get(ws) as { n: number }).n
-    const rows = db.prepare(
-      'SELECT * FROM memories WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-    ).all(ws, limit, offset)
-    return c.json(paginate(rows, total, limit, offset))
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT * FROM memories
+      WHERE workspace_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).all(ws)
+
+    return c.json({ data: rows })
   })
 
   app.get('/analytics/summary', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db: Db = getDb()
+    const db = getDb()
     const taskCount = (db.prepare(
       `SELECT COUNT(*) AS n FROM tasks WHERE workspace_id = ?`
     ).get(ws) as { n: number }).n
@@ -382,25 +279,22 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db: Db = getDb()
-    // MON-014: add pagination instead of hardcoded LIMIT 50
-    const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10) || 50, 500)
-    const offset = parseInt(c.req.query('offset') ?? '0', 10) || 0
+    const db = getDb()
     const rows = db.prepare(`
       SELECT * FROM policy_events
       WHERE workspace_id = ?
       ORDER BY ts DESC
-      LIMIT ? OFFSET ?
-    `).all(ws, limit, offset)
+      LIMIT 50
+    `).all(ws)
 
-    return c.json({ data: rows, pagination: { limit, offset } })
+    return c.json({ data: rows })
   })
 
   app.get('/sync/state', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db: Db = getDb()
+    const db = getDb()
     const rows = db.prepare(`
       SELECT * FROM sync_states
       WHERE workspace_id = ?
@@ -413,22 +307,22 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/teams', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-    const db: Db = getDb()
-    const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
-    const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
 
-    const total = (db.prepare('SELECT COUNT(*) AS n FROM team_instances WHERE workspace_id = ?').get(ws) as { n: number }).n
-    const rows = db.prepare(
-      'SELECT * FROM team_instances WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-    ).all(ws, limit, offset)
-    return c.json(paginate(rows, total, limit, offset))
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT * FROM team_instances
+      WHERE workspace_id = ?
+      ORDER BY created_at DESC
+    `).all(ws)
+
+    return c.json({ data: rows })
   })
 
   app.get('/analytics/per-role', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db: Db = getDb()
+    const db = getDb()
     const data = getPerRoleMetrics(db, { workspace_id: ws })
     return c.json({ data })
   })
@@ -437,35 +331,24 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
-    const db: Db = getDb()
+    const db = getDb()
     const data = getMemoryMetrics(db, { workspace_id: ws })
     return c.json({ data })
   })
 
-  app.get('/replay/:run_id', (c) => {
+  app.get('/replay/:run_id', async (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
     const run_id = c.req.param('run_id')
 
-    const db: Db = getDb()
-    const events = db.prepare(`
-      SELECT evt_id AS event_id, evt_type AS event_type, payload, ts
-      FROM events
-      WHERE workspace_id = ? AND JSON_EXTRACT(payload, '$.run_id') = ?
-      ORDER BY ts ASC
-    `).all(ws, run_id) as Array<{ event_id: string; event_type: string; payload: string; ts: string }>
+    const result = await replayRun({ run_id })
 
-    if (events.length === 0) {
+    if (result.events.length === 0) {
       return c.json({ error: 'run not found' }, 404)
     }
 
-    return c.json({
-      data: events.map((e) => ({
-        ...e,
-        payload: JSON.parse(e.payload) as unknown,
-      })),
-    })
+    return c.json({ data: result.events })
   })
 
   app.get('/analytics/forecast', (c) => {
@@ -473,354 +356,111 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
     const horizon_days = parseInt(c.req.query('horizon_days') ?? '30', 10)
-    // MON-012: reject NaN and out-of-range values
-    if (isNaN(horizon_days) || horizon_days < 1 || horizon_days > 365) {
-      return c.json({ error: 'horizon_days must be an integer between 1 and 365' }, 400)
-    }
-    const db: Db = getDb()
+    const db = getDb()
     const data = getForecasting(db, { workspace_id: ws, horizon_days })
     return c.json({ data })
   })
 
-  // ─── Control / write endpoints ─────────────────────────────────────────────
-
-  // Ensure workspace and project exist (auto-create for agent integrations).
-  // Routed through core CRUD so FK/enum validation lives in one place.
-  async function ensureWorkspace(ws: string, name?: string): Promise<void> {
-    await createWorkspace({ workspace_id: ws, name: name ?? ws })
-  }
-
-  async function ensureProject(ws: string, proj: string, name?: string): Promise<void> {
-    const existing = await getProject(proj)
-    if (existing) return
-    await createProject({ workspace_id: ws, project_id: proj, name: name ?? proj })
-  }
+  // ─── /tasks — list with filter + pagination ───────────────────────────────
 
   app.get('/tasks', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-    const db: Db = getDb()
-    const proj = c.req.query('project_id')
+
+    const db = getDb()
     const status = c.req.query('status')
-    const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200)
-    const offset = parseInt(c.req.query('offset') ?? c.req.query('cursor') ?? '0', 10)
+    const limit  = Math.min(parseInt(c.req.query('limit')  ?? '50',  10), 500)
+    const offset = parseInt(c.req.query('offset') ?? '0', 10)
 
-    const whereParts = ['workspace_id = ?']
+    let countSql = `SELECT COUNT(*) AS n FROM tasks WHERE workspace_id = ?`
+    let dataSql  = `SELECT * FROM tasks WHERE workspace_id = ?`
     const params: unknown[] = [ws]
-    if (proj) { whereParts.push('project_id = ?'); params.push(proj) }
-    if (status) { whereParts.push('status = ?'); params.push(status) }
-    const where = whereParts.join(' AND ')
 
-    const total = (db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE ${where}`).get(...params) as { n: number }).n
-    const rows = db.prepare(`SELECT * FROM tasks WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset)
-    return c.json(paginate(rows, total, limit, offset))
-  })
-
-  app.get('/workspaces', (c) => {
-    const db: Db = getDb()
-    const rows = db.prepare(
-      'SELECT workspace_id, name, status, created_at FROM workspaces ORDER BY created_at DESC LIMIT 50'
-    ).all()
-    return c.json({ workspaces: rows })
-  })
-
-  app.get('/projects', (c) => {
-    const ws = c.req.query('workspace_id')
-    const db: Db = getDb()
-    const rows = ws
-      ? db.prepare('SELECT * FROM projects WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 100').all(ws)
-      : db.prepare('SELECT * FROM projects ORDER BY created_at DESC LIMIT 100').all()
-    return c.json({ projects: rows })
-  })
-
-  app.post('/tasks', auth, async (c) => {
-    try {
-      const body = await c.req.json() as {
-        title: string; project_id: string; workspace_id: string
-        description?: string; priority?: string; assigned_to?: string; done_criteria?: string
-      }
-      if (!body.title || !body.project_id || !body.workspace_id) {
-        return c.json({ error: 'title, project_id, workspace_id are required' }, 400)
-      }
-      await ensureWorkspace(body.workspace_id)
-      await ensureProject(body.workspace_id, body.project_id)
-      const task = await createTask({
-        title: body.title,
-        project_id: body.project_id,
-        workspace_id: body.workspace_id,
-        description: body.description,
-        priority: body.priority as 'critical' | 'high' | 'medium' | 'low' | 'none' | undefined,
-        assigned_to: body.assigned_to,
-        done_criteria: body.done_criteria,
-      })
-      return c.json(task)
-    } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
+    if (status) {
+      countSql += ` AND status = ?`
+      dataSql  += ` AND status = ?`
+      params.push(status)
     }
+
+    const total = (db.prepare(countSql).get(...params) as { n: number }).n
+    dataSql += ` ORDER BY created_at ASC LIMIT ? OFFSET ?`
+    const data = db.prepare(dataSql).all(...params, limit, offset)
+    const next_cursor = offset + data.length < total ? String(offset + data.length) : null
+
+    return c.json({
+      data,
+      pagination: { total, limit, offset, next_cursor },
+    })
   })
 
-  app.patch('/tasks/:id', auth, async (c) => {
-    try {
-      const task_id = c.req.param('id')
-      const body = await c.req.json() as { status?: string; note?: string; assigned_to?: string }
-      const task = await updateTask({
-        task_id,
-        status: body.status as Parameters<typeof updateTask>[0]['status'],
-        note: body.note,
-        assigned_to: body.assigned_to,
-      })
-      return c.json(task)
-    } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
+  // ─── POST /policy/check ───────────────────────────────────────────────────
+
+  app.post('/policy/check', async (c) => {
+    const body = await c.req.json() as {
+      workspace_id?: string
+      actor_id: string
+      actor_role: string
+      action: string
+      resource_id?: string
     }
+    const ws = body.workspace_id ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const decision = await evaluatePolicy({
+      workspace_id: ws,
+      actor_id: body.actor_id,
+      actor_role: body.actor_role as import('@fulcrum/core').AgentRole,
+      action: body.action,
+      resource_id: body.resource_id,
+    })
+
+    return c.json({ allowed: decision.allowed, rule_id: decision.rule_id ?? null })
   })
 
-  app.post('/runs', auth, async (c) => {
-    try {
-      const body = await c.req.json() as {
-        task_id?: string; agent_role: string; workspace_id: string
-        project_id?: string; worktree_path?: string; pi_run_id?: string
-      }
-      if (!body.agent_role || !body.workspace_id) {
-        return c.json({ error: 'agent_role and workspace_id are required' }, 400)
-      }
-      const db: Db = getDb()
-      const proj = body.project_id || body.workspace_id
-      await ensureWorkspace(body.workspace_id)
-      await ensureProject(body.workspace_id, proj)
+  // ─── GET /.well-known/agent.json — A2A Agent Card ────────────────────────
 
-      // Auto-create a stub task if task_id is missing or not found
-      let task_id = body.task_id
-      if (!task_id) {
-        const stub = await createTask({
-          title: `[auto] ${body.agent_role} run`,
-          workspace_id: body.workspace_id,
-          project_id: proj,
-          description: 'Auto-created stub task for agent run registration',
-        })
-        task_id = stub.task_id
-      } else {
-        const existing = db.prepare('SELECT task_id FROM tasks WHERE task_id = ?').get(task_id)
-        if (!existing) {
-          const stub = await createTask({
-            title: `[auto] ${body.agent_role} run`,
-            workspace_id: body.workspace_id,
-            project_id: proj,
-            description: `Auto-created stub task for run with task_id=${task_id}`,
-          })
-          task_id = stub.task_id
+  app.get('/.well-known/agent.json', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    const db = getDb()
+
+    // Build skills from registered agent definitions in this workspace
+    const skillMap = new Map<string, { id: string; name: string; description: string }>()
+    try {
+      const defs = ws ? listAgentDefinitions(undefined, ws, db) : []
+      for (const def of defs) {
+        for (const cap of def.capabilities ?? []) {
+          if (!skillMap.has(cap)) {
+            const meta = CAPABILITY_SKILL_MAP[cap] ?? { name: cap, description: '' }
+            skillMap.set(cap, { id: cap, name: meta.name, description: meta.description })
+          }
         }
       }
-
-      const run = await startAgentRun({
-        task_id,
-        role: body.agent_role as Parameters<typeof startAgentRun>[0]['role'],
-        workspace_id: body.workspace_id,
-        agent_id: `pi/${body.agent_role}`,
-        pi_profile: body.agent_role,
-      })
-      return c.json({ run_id: run.run_id, status: run.status })
-    } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
-    }
-  })
-
-  app.post('/runs/:id/heartbeat', auth, async (c) => {
-    try {
-      const run_id = c.req.param('id')
-      const body = await c.req.json() as { workspace_id?: string; current_step?: string; progress_pct?: number }
-      await heartbeatAgentRun({
-        run_id,
-        current_step: body.current_step ?? '',
-        progress_pct: body.progress_pct ?? 0,
-      })
-      return c.json({ run_id, ok: true })
-    } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
-    }
-  })
-
-  app.post('/runs/:id/complete', auth, async (c) => {
-    try {
-      const run_id = c.req.param('id')
-      const body = await c.req.json() as { workspace_id?: string; output_summary?: string; artifact_paths?: string | string[] }
-      const rawPaths = body.artifact_paths ?? ''
-      const paths = Array.isArray(rawPaths) ? rawPaths.map(String).filter(Boolean)
-        : rawPaths.split(',').map(p => p.trim()).filter(Boolean)
-      const run = await completeAgentRun({
-        run_id,
-        output_summary: body.output_summary ?? '',
-        artifacts: paths.length > 0 ? { files_changed: paths } : undefined,
-      })
-      return c.json({ run_id: run.run_id, status: run.status })
-    } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
-    }
-  })
-
-  app.post('/runs/:id/block', auth, async (c) => {
-    try {
-      const run_id = c.req.param('id')
-      const body = await c.req.json() as { workspace_id?: string; reason: string }
-      if (!body.reason?.trim()) return c.json({ error: 'reason is required' }, 400)
-      const run = await blockAgentRun({ run_id, reason: body.reason })
-      return c.json({ run_id: run.run_id, status: run.status, reason: run.blocker })
-    } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
-    }
-  })
-
-  app.post('/memory/recall', auth, async (c) => {
-    try {
-      const body = await c.req.json() as { query: string; workspace_id: string; project_id?: string; task_id?: string; limit?: number }
-      if (!body.query || !body.workspace_id) return c.json({ error: 'query and workspace_id are required' }, 400)
-      const memories = await recallMemory({
-        query: body.query,
-        workspace_id: body.workspace_id,
-        project_id: body.project_id,
-        task_id: body.task_id,
-        limit: body.limit ?? 10,
-        mode: 'full',
-      } as unknown as Parameters<typeof recallMemory>[0])
-      return c.json({
-        memories: (memories as Array<{ content?: string; tags?: string[]; memory_id: string; kind?: string }>).map(m => ({
-          content: (m.content ?? '').slice(0, 500),
-          score: 0.0,
-          tags: m.tags ?? [],
-          memory_id: m.memory_id,
-          kind: m.kind,
-        }))
-      })
-    } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
-    }
-  })
-
-  app.post('/memory/write', auth, async (c) => {
-    try {
-      const body = await c.req.json() as {
-        content: string; workspace_id: string; project_id: string
-        title?: string; tags?: string | string[]; scope?: string; kind?: string
-      }
-      if (!body.content || !body.workspace_id || !body.project_id) {
-        return c.json({ error: 'content, workspace_id, project_id are required' }, 400)
-      }
-      await ensureWorkspace(body.workspace_id)
-      await ensureProject(body.workspace_id, body.project_id)
-      const rawTags = body.tags
-      const tagList = Array.isArray(rawTags) ? rawTags.map(String).filter(Boolean)
-        : rawTags ? rawTags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
-      const title = body.title ?? body.content.slice(0, 80)
-      const memory = await writeMemory({
-        content: body.content,
-        workspace_id: body.workspace_id,
-        project_id: body.project_id,
-        title,
-        summary: title,
-        scope: (body.scope ?? 'project') as Parameters<typeof writeMemory>[0]['scope'],
-        kind: (body.kind ?? 'fact') as Parameters<typeof writeMemory>[0]['kind'],
-        tags: tagList,
-      } as Parameters<typeof writeMemory>[0])
-      return c.json({ saved: true, memory_id: memory.memory_id, project_id: body.project_id, tags: tagList })
-    } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
-    }
-  })
-
-  app.post('/cos-context', auth, async (c) => {
-    try {
-      const body = await c.req.json() as {
-        goal?: string; project_id: string; workspace_id: string
-        max_tasks?: number; max_events?: number
-      }
-      if (!body.project_id || !body.workspace_id) {
-        return c.json({ error: 'project_id and workspace_id are required' }, 400)
-      }
-      const contextMarkdown = await buildCosContext({
-        workspace_id: body.workspace_id,
-        project_id: body.project_id,
-      })
-      return c.json({ context_markdown: contextMarkdown, project_id: body.project_id, workspace_id: body.workspace_id })
-    } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
-    }
-  })
-
-  app.post('/policy/check', auth, async (c) => {
-    let body: EvaluatePolicyInput & { run_id?: string }
-    try {
-      body = await c.req.json() as EvaluatePolicyInput & { run_id?: string }
-    } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
+    } catch {
+      // listAgentDefinitions may fail if DB not initialised — return empty skills
     }
 
-    try {
-      // Identity resolution: if run_id is provided, look up authoritative role from DB.
-      // This prevents callers from spoofing their role via actor_id/actor_role.
-      let actor_id = body.actor_id
-      let actor_role = body.actor_role
-      if (body.run_id) {
-        try {
-          const run = await getAgentRunStatus({ run_id: body.run_id })
-          actor_id = run.agent_id || body.actor_id
-          actor_role = run.role
-        } catch {
-          // run not found — use caller-supplied identity as-is
-        }
-      }
-
-      // If actor_role is not provided, derive it from actor_id (expected format: "<prefix>/<role>")
-      // MON-009: reject unexpected formats by leaving role as empty string (deny by default)
-      if (!actor_role) {
-        const parts = body.actor_id?.split('/')
-        actor_role = (parts && parts.length >= 2 ? parts[1] : '') as AgentRole
-      }
-
-      const input: EvaluatePolicyInput = {
-        ...body,
-        actor_id,
-        actor_role,
-      }
-
-      const decision = await evaluatePolicy(input)
-
-      // Log the policy event asynchronously — audit log failures must not affect the decision
-      logPolicyEvent({
-        workspace_id: body.workspace_id ?? '',
-        action: body.action,
-        matched: !decision.allowed,
-        actor_id: actor_id ?? '',
-        rule_id: decision.rule_id ?? undefined,
-        resource_type: body.resource_type,
-        resource_id: body.resource_id,
-        payload: body as unknown as Record<string, unknown>,
-      }).catch((logErr: unknown) => {
-        process.stderr.write(`[policy/check] logPolicyEvent failed: ${(logErr as Error).message}\n`)
-      })
-
-      return c.json({ allowed: decision.allowed, reason: decision.reason ?? '' })
-    } catch (err) {
-      // Policy engine error — fall back to the simple invariant check so callers
-      // still get the invoke_team guard even when the DB is unavailable.
-      process.stderr.write(`[policy/check] evaluatePolicy error, falling back to stub: ${(err as Error).message}\n`)
-      // MON-009: derive role strictly; deny on unexpected format rather than allowing
-      const parts = body.actor_id?.split('/')
-      const role = (parts && parts.length >= 2 ? parts[1] : '') as AgentRole
-      const isTeamInvoke = body.action.includes('invoke_team') || body.action.includes('team_invoke')
-      const callerIsL1 = isL1(role)
-      if (isTeamInvoke && !callerIsL1) {
-        return c.json({ allowed: false, reason: 'Only chief_of_staff may invoke teams' })
-      }
-      // Fail-closed on engine error for any other action — deny until engine recovers
-      return c.json({ allowed: false, reason: 'policy engine unavailable' })
+    const card = {
+      name: 'Fulcrum Agent OS',
+      version: '1.0.0',
+      url: `http://${config.host ?? '127.0.0.1'}:${config.port ?? 7331}`,
+      description: 'Fulcrum multi-agent orchestration platform',
+      skills: Array.from(skillMap.values()),
+      authentication: { schemes: ['bearer', 'none'] },
+      capabilities: {
+        streaming: true,
+        pushNotifications: false,
+        stateTransitionHistory: true,
+      },
     }
+
+    return c.json(card)
   })
 
   let serverInstance: ReturnType<typeof serve> | null = null
 
   return {
     port,
-    fetch: (req: Request) => Promise.resolve(app.fetch(req)),
+    fetch: (req: Request) => app.fetch(req),
     start: async () => {
       serverInstance = serve({ fetch: app.fetch, port, hostname: host })
     },

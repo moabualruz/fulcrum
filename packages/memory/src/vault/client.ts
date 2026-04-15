@@ -1,23 +1,14 @@
 // packages/memory/src/vault/client.ts
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'fs'
 import { join, dirname } from 'path'
+import { homedir } from 'os'
 import type { FullMemory } from '../types.js'
 import { CURATED_KINDS } from '../types.js'
 import { serializeToFile, parseFromFile } from './formatter.js'
 import type { MemoryFileFrontmatter } from '../types.js'
-import { globalDataDir, FulcrumError } from '@fulcrum/core'
-
-function assertSafePathSegment(id: string, fieldName: string): void {
-  if (!id || !/^[a-zA-Z0-9_\-]{1,128}$/.test(id)) {
-    throw new FulcrumError(
-      `Invalid ${fieldName} for path use: must match [a-zA-Z0-9_\\-]{1,128}`,
-      'invalid_input'
-    )
-  }
-}
 
 export function getVaultPath(): string {
-  return process.env['FULCRUM_VAULT_PATH'] ?? join(globalDataDir(), 'vault')
+  return process.env['FULCRUM_VAULT_PATH'] ?? join(homedir(), '.fulcrum', 'vault')
 }
 
 export function vaultExists(vaultPath: string): boolean {
@@ -40,11 +31,11 @@ scopes: [global, project, file]
 `
 
 export async function initVault(vaultPath: string): Promise<void> {
-  mkdirSync(vaultPath, { recursive: true, mode: 0o700 })
-  mkdirSync(join(vaultPath, 'memories', 'curated'), { recursive: true, mode: 0o700 })
-  mkdirSync(join(vaultPath, 'memories', 'operational'), { recursive: true, mode: 0o700 })
-  mkdirSync(join(vaultPath, 'entities'), { recursive: true, mode: 0o700 })
-  mkdirSync(join(vaultPath, '.queue'), { recursive: true, mode: 0o700 })
+  mkdirSync(vaultPath, { recursive: true })
+  mkdirSync(join(vaultPath, 'memories', 'curated'), { recursive: true })
+  mkdirSync(join(vaultPath, 'memories', 'operational'), { recursive: true })
+  mkdirSync(join(vaultPath, 'entities'), { recursive: true })
+  mkdirSync(join(vaultPath, '.queue'), { recursive: true })
 
   const gitignorePath = join(vaultPath, '.gitignore')
   if (!existsSync(gitignorePath)) {
@@ -68,7 +59,7 @@ export async function initVault(vaultPath: string): Promise<void> {
 
   // .obsidian/ — minimal config for Obsidian compatibility
   const obsidianDir = join(vaultPath, '.obsidian')
-  mkdirSync(obsidianDir, { recursive: true, mode: 0o700 })
+  mkdirSync(obsidianDir, { recursive: true })
   const appJsonPath = join(obsidianDir, 'app.json')
   if (!existsSync(appJsonPath)) {
     writeFileSync(appJsonPath, JSON.stringify({ legacyEditor: false, livePreview: true }, null, 2) + '\n', 'utf-8')
@@ -112,15 +103,11 @@ SORT importance DESC
  */
 function encodeFilePath(filePath: string): string {
   if (!filePath) return '_unknown'
+  if (filePath.includes('\0')) throw new Error('path must not contain null bytes')
   return filePath.replace(/\//g, '--').replace(/\\/g, '--')
 }
 
 export function getMemoryFilePath(vaultPath: string, memory: FullMemory): string {
-  assertSafePathSegment(memory.workspace_id, 'workspace_id')
-  assertSafePathSegment(memory.memory_id, 'memory_id')
-  if (memory.project_id) assertSafePathSegment(memory.project_id, 'project_id')
-  if (memory.task_id) assertSafePathSegment(memory.task_id, 'task_id')
-
   const date = new Date(memory.created_at)
   const yyyy = date.getUTCFullYear().toString()
   const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
@@ -178,8 +165,8 @@ export async function writeMemoryFile(vaultPath: string, memory: FullMemory): Pr
   const content = serializeToFile(memory, body)
   const filePath = getMemoryFilePath(vaultPath, memory)
 
-  mkdirSync(dirname(filePath), { recursive: true, mode: 0o700 })
-  writeFileSync(filePath, content, { encoding: 'utf-8', mode: 0o600 })
+  mkdirSync(dirname(filePath), { recursive: true })
+  writeFileSync(filePath, content, 'utf-8')
 
   return filePath
 }

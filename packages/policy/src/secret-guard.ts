@@ -6,14 +6,16 @@ interface PatternDef {
   regex: RegExp
 }
 
-// 11 secret detection patterns (parity with Python implementation)
+// Secret detection patterns (parity with Python implementation)
+// Order matters: more-specific patterns first so deduplication keeps them over generic matches.
 const PATTERNS: PatternDef[] = [
   {
+    // Anthropic API keys: sk-ant-api03-<80+ chars>. Must precede authorization_bearer.
     name: 'anthropic_api_key',
-    regex: /sk-ant-api03-[A-Za-z0-9_\-]{95}/g,
+    regex: /sk-ant-api03-[A-Za-z0-9_\-]{80,}/g,
   },
   {
-    // POL-005: covers both legacy sk-<48chars> and newer sk-proj-<40+chars> formats
+    // OpenAI API keys: sk-<40+ chars> or sk-proj-<40+ chars>. Must precede authorization_bearer.
     name: 'openai_api_key',
     regex: /sk-(?:proj-)?[A-Za-z0-9_\-]{40,}/g,
   },
@@ -46,11 +48,6 @@ const PATTERNS: PatternDef[] = [
     regex: /eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/g,
   },
   {
-    // POL-004: HTTP Authorization: Bearer <token> header pattern
-    name: 'bearer_token',
-    regex: /(?:Authorization|authorization)\s*:\s*Bearer\s+[A-Za-z0-9\-._~+/]{16,}/g,
-  },
-  {
     name: 'password_kv',
     regex: /(password|passwd|pwd|secret)\s*[=:]\s*\S+/gi,
   },
@@ -58,17 +55,21 @@ const PATTERNS: PatternDef[] = [
     name: 'credential_url',
     regex: /[a-zA-Z][a-zA-Z0-9+\-.]+:\/\/[^:@\s]+:[^@\s]{3,}@/g,
   },
+  {
+    name: 'authorization_bearer',
+    regex: /\bAuthorization\s*:\s*Bearer\s+[A-Za-z0-9\-_+/]{20,}/gi,
+  },
 ]
 
 export function checkSecrets(text: string): SecretScanResult {
-  const matches: SecretMatch[] = []
+  const rawMatches: SecretMatch[] = []
 
   for (const pattern of PATTERNS) {
     // Reset regex state between calls (g flag keeps lastIndex)
     pattern.regex.lastIndex = 0
     let match: RegExpExecArray | null
     while ((match = pattern.regex.exec(text)) !== null) {
-      matches.push({
+      rawMatches.push({
         pattern_name: pattern.name,
         match: match[0],
         index: match.index,
@@ -76,6 +77,22 @@ export function checkSecrets(text: string): SecretScanResult {
     }
     pattern.regex.lastIndex = 0
   }
+
+  // Deduplicate: remove any match whose range is fully covered by another match.
+  // Patterns are ordered from most-specific to least-specific, so an earlier match
+  // (higher specificity) takes precedence over a later one that covers the same range.
+  const matches = rawMatches.filter((candidate, i) => {
+    const cStart = candidate.index
+    const cEnd = candidate.index + candidate.match.length
+    return !rawMatches.some((other, j) => {
+      if (i === j) return false
+      const oStart = other.index
+      const oEnd = other.index + other.match.length
+      // Keep candidate only if no other match fully covers it (and that other match
+      // appears earlier in the array, meaning it's a higher-specificity pattern).
+      return j < i && oStart <= cStart && oEnd >= cEnd
+    })
+  })
 
   return {
     has_secrets: matches.length > 0,

@@ -1,18 +1,17 @@
 // packages/memory/src/setup/wizard.ts
 import { createInterface } from 'readline'
-import { existsSync, mkdirSync, rmSync } from 'fs'
+import { writeFileSync, existsSync, mkdirSync, readFileSync } from 'fs'
 import { join } from 'path'
+import { homedir } from 'os'
 import { getVaultPath, initVault } from '../vault/client.js'
 import { createVaultGit } from '../vault/git.js'
 import { rebuildFromVault } from './rebuild.js'
 import { KuzuClient, setKuzuClient } from '../kuzu/client.js'
-import { globalDataDir, readRawConfig, writeRawConfig } from '@fulcrum/core'
 
 interface EmbeddingProviderSetup {
-  provider: 'local' | 'ollama' | 'openai' | 'custom'
+  provider: 'ollama' | 'openai' | 'custom'
   url?: string
   model?: string
-  rerankerModel?: string
   apiKey?: string
 }
 
@@ -27,38 +26,49 @@ async function ask(rl: ReturnType<typeof createInterface>, question: string): Pr
   })
 }
 
+function getFulcrumConfigPath(): string {
+  return join(homedir(), '.fulcrum', 'config.json')
+}
+
+function readFulcrumConfig(): Record<string, unknown> {
+  const configPath = getFulcrumConfigPath()
+  if (!existsSync(configPath)) return {}
+  try {
+    return JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+function writeFulcrumConfig(config: Record<string, unknown>): void {
+  const configPath = getFulcrumConfigPath()
+  mkdirSync(join(homedir(), '.fulcrum'), { recursive: true })
+  writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
+}
 
 async function setupEmbeddingProvider(rl: ReturnType<typeof createInterface>): Promise<EmbeddingProviderSetup | null> {
   console.log('\n  Requires an embedding model:\n')
-  console.log('    [1] Local — embedded ONNX (no network, fully offline)')
-  console.log('        Embedder : onnx-community/Qwen3-Embedding-0.6B-ONNX')
-  console.log('        Reranker : onnx-community/bge-reranker-v2-m3-ONNX')
-  console.log('    [2] Ollama (runs on device, needs Ollama running)')
-  console.log('    [3] OpenAI text-embedding-3-small (API key)')
-  console.log('    [4] Custom OpenAI-compatible endpoint')
-  console.log('    [5] Skip — stay with L0 + L1\n')
+  console.log('    [1] Local — Ollama (no cost, runs on device)')
+  console.log('    [2] OpenAI text-embedding-3-small (API key)')
+  console.log('    [3] Custom OpenAI-compatible endpoint')
+  console.log('    [4] Skip — stay with L0 + L1\n')
 
   const choice = (await ask(rl, '  Choice: ')).trim()
 
-  if (choice === '5' || choice === '') return null
+  if (choice === '4' || choice === '') return null
 
   if (choice === '1') {
-    return { provider: 'local' }
+    const url = (await ask(rl, `  Ollama URL [http://localhost:11434]: `)).trim() || 'http://localhost:11434'
+    const model = (await ask(rl, `  Ollama model [nomic-embed-text]: `)).trim() || 'nomic-embed-text'
+    return { provider: 'ollama', url, model }
   }
 
   if (choice === '2') {
-    const url = (await ask(rl, `  Ollama URL [http://localhost:11434]: `)).trim() || 'http://localhost:11434'
-    const model = (await ask(rl, `  Embedding model [qwen3:0.6b]: `)).trim() || 'qwen3:0.6b'
-    const rerankerModel = (await ask(rl, `  Reranker model [bge-reranker-v2-m3]: `)).trim() || 'bge-reranker-v2-m3'
-    return { provider: 'ollama', url, model, rerankerModel }
-  }
-
-  if (choice === '3') {
     const apiKey = (await ask(rl, '  OpenAI API key: ')).trim()
     return { provider: 'openai', apiKey, model: 'text-embedding-3-small' }
   }
 
-  if (choice === '4') {
+  if (choice === '3') {
     const url = (await ask(rl, '  Endpoint URL: ')).trim()
     const model = (await ask(rl, '  Model name: ')).trim()
     const apiKey = (await ask(rl, '  API key (leave blank if none): ')).trim() || undefined
@@ -105,23 +115,30 @@ export async function runMemoryInit(options?: { vaultPath?: string }): Promise<v
       return
     }
 
-    // Step 3: Write embedding config to globalDataDir()/config.json
-    const config = readRawConfig()
+    // Step 3: Write embedding config to ~/.fulcrum/config.json
+    // API key handling: if the relevant env var is already set, store "env" as the sentinel
+    // value instead of the raw key. At runtime, "env" means "read from environment variable".
+    // If the user typed a key interactively and the env var is not set, we store it as-is
+    // but warn them to prefer an environment variable.
+    let storedApiKey: string | undefined = embeddingSetup.apiKey
+    const envVarName = embeddingSetup.provider === 'openai' ? 'OPENAI_API_KEY' : 'EMBEDDING_API_KEY'
+    if (process.env[envVarName]) {
+      storedApiKey = 'env'
+    } else if (storedApiKey) {
+      console.warn(`\n  ⚠ Deprecation: storing API key in config file. Set ${envVarName} as an environment variable instead.\n`)
+    }
+    const config = readFulcrumConfig()
     config['vault'] = { path: vaultPath, l2_enabled: true }
     config['embedding'] = {
       provider: embeddingSetup.provider,
       url: embeddingSetup.url,
       model: embeddingSetup.model,
-      rerankerModel: embeddingSetup.rerankerModel,
-      apiKey: embeddingSetup.apiKey,
+      apiKey: storedApiKey,
     }
-    writeRawConfig(config)
+    writeFulcrumConfig(config)
 
-    // Step 4: Initialize Kuzu — always recreate to ensure schema matches configured dimensions
-    const kuzuDbPath = join(globalDataDir(), 'kuzu')
-    if (existsSync(kuzuDbPath)) {
-      rmSync(kuzuDbPath, { recursive: true, force: true })
-    }
+    // Step 4: Initialize Kuzu
+    const kuzuDbPath = join(homedir(), '.fulcrum', 'kuzu')
     mkdirSync(kuzuDbPath, { recursive: true })
     const kuzuClient = await KuzuClient.create({ dbPath: kuzuDbPath })
     setKuzuClient(kuzuClient)
@@ -130,13 +147,7 @@ export async function runMemoryInit(options?: { vaultPath?: string }): Promise<v
     const result = await rebuildFromVault({ vaultPath, target: 'l2' })
     console.log(`  ✓ L2 indexed ${result.l2Count} memories`)
     if (result.errors.length > 0) {
-      console.log(`  ⚠ ${result.errors.length} errors:`)
-      for (const e of result.errors.slice(0, 5)) {
-        console.log(`    ${e}`)
-      }
-      if (result.errors.length > 5) {
-        console.log(`    ... and ${result.errors.length - 5} more`)
-      }
+      console.log(`  ⚠ ${result.errors.length} errors (see log.md)`)
     }
     console.log('\n  L2 acceleration active.\n')
   } finally {

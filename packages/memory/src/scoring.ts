@@ -75,13 +75,18 @@ export function rrfScoreWithSparse(
 /**
  * Combined recall score: RRF score multiplied by the stored freshness field.
  * freshness=1.0 (brand new) leaves the score unchanged; freshness=0 suppresses it entirely.
+ * sparseRank, when provided, routes through rrfScoreWithSparse for the 3-signal score.
  */
 export function recallScore(
   ftsRank: number | null,
   vectorRank: number | null,
   freshness: number,
+  sparseRank: number | null = null,
 ): number {
-  return rrfScore(ftsRank, vectorRank) * freshness
+  const base = sparseRank !== null
+    ? rrfScoreWithSparse(ftsRank, vectorRank, sparseRank)
+    : rrfScore(ftsRank, vectorRank)
+  return base * freshness
 }
 
 /**

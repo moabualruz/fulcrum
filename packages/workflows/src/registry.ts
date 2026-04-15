@@ -66,6 +66,17 @@ export class WorkflowRegistry {
   }
 
   register(def: WorkflowDefinition): void {
+    const existing = this.definitions.get(def.name)
+    if (existing !== undefined) {
+      if (existing.version !== def.version) {
+        throw new Error(
+          `WorkflowRegistry: cannot overwrite '${def.name}' v${existing.version} with v${def.version} — versions differ`
+        )
+      }
+      process.stderr.write(
+        `WorkflowRegistry: overwriting existing definition '${def.name}' (v${def.version})\n`
+      )
+    }
     this.definitions.set(def.name, def)
   }
 

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3'
 import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { homedir, platform } from 'os'
+import { createRequire } from 'node:module'
 
 /** Nameable alias for the better-sqlite3 Database instance type.
  *  Use this in exported function signatures so TypeScript can generate
@@ -59,8 +60,8 @@ export function _configureDb(db: Database.Database): void {
   // Increase cache size to 8 MB for read-heavy workloads
   db.pragma('cache_size = -8000')
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const sqliteVec = require('sqlite-vec') as { load: (db: Database.Database) => void }
+    const _require = createRequire(import.meta.url)
+    const sqliteVec = _require('sqlite-vec') as { load: (db: Database.Database) => void }
     sqliteVec.load(db)
   } catch {
     // sqlite-vec optional — vector search degrades to FTS5-only if unavailable

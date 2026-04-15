@@ -52,16 +52,15 @@ describe('claudeCodeAdapter', () => {
     }
   })
 
-  it('uses FULCRUM_CLAUDE_BIN when set (even if non-existent) — verifies env override', async () => {
-    // Set FULCRUM_CLAUDE_BIN to a path that exists but won't run — /dev/null
-    // The adapter will find the binary but the process will fail immediately.
-    // This verifies the env override is respected.
+  it('uses FULCRUM_CLAUDE_BIN when set to an absolute executable — verifies env override', async () => {
+    // Set FULCRUM_CLAUDE_BIN to /bin/false: absolute, executable, exits non-zero immediately.
+    // The adapter will find the binary, spawn it, and it will fail with a non-zero exit code.
     const origBin = process.env['FULCRUM_CLAUDE_BIN']
-    process.env['FULCRUM_CLAUDE_BIN'] = '/dev/null'
+    process.env['FULCRUM_CLAUDE_BIN'] = '/bin/false'
 
     try {
       const result = await claudeCodeAdapter.spawn({ ...baseCtx, heartbeat: vi.fn().mockResolvedValue(undefined) })
-      // /dev/null is not executable on Linux (exits non-zero) → blocked
+      // /bin/false exits 1 → the adapter treats non-zero exit as blocked
       expect(result.status).toBe('blocked')
       // Should NOT say "binary not found" — it found the binary but it failed
       expect(result.error).not.toMatch(/binary not found/i)

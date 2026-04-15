@@ -1,9 +1,6 @@
 // packages/memory/src/extractors/structured.ts
-
-export type EntityType =
-  | 'technology' | 'concept' | 'pattern' | 'bug_class' | 'library'
-  | 'language_feature' | 'person' | 'tool' | 'organization'
-  | 'project' | 'file' | 'symbol' | 'task' | 'run'
+export type { EntityType } from '../types.js'
+import type { EntityType } from '../types.js'
 
 export interface ExtractedMention {
   raw: string

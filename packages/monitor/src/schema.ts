@@ -6,7 +6,7 @@ export function runMigration009(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS analytics_daily (
       id                TEXT PRIMARY KEY,
       workspace_id      TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
-      project_id        TEXT NOT NULL,
+      project_id        TEXT,
       date              TEXT NOT NULL,
       issues_created    INTEGER NOT NULL DEFAULT 0,
       issues_closed     INTEGER NOT NULL DEFAULT 0,

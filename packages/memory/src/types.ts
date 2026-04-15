@@ -6,6 +6,12 @@
 export type { MemoryKind } from '@fulcrum/core'
 import type { MemoryKind } from '@fulcrum/core'
 
+/** MEM-009: single definition used by both structured.ts and entity-store.ts */
+export type EntityType =
+  | 'technology' | 'concept' | 'pattern' | 'bug_class' | 'library'
+  | 'language_feature' | 'person' | 'tool' | 'organization'
+  | 'project' | 'file' | 'symbol' | 'task' | 'run'
+
 export type MemoryScope = 'global' | 'project' | 'file' | 'task'
 
 export type RecallMode = 'compact' | 'total_ranked'

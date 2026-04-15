@@ -175,11 +175,34 @@ describe('dispatchClaudeCode', () => {
 })
 
 describe('findClaudeBin', () => {
-  it('respects FULCRUM_CLAUDE_BIN override', () => {
+  it('respects FULCRUM_CLAUDE_BIN override when path is absolute and executable', () => {
     const orig = process.env['FULCRUM_CLAUDE_BIN']
-    process.env['FULCRUM_CLAUDE_BIN'] = '/custom/claude'
+    // /bin/sh is guaranteed to be an absolute, executable path on any POSIX system
+    process.env['FULCRUM_CLAUDE_BIN'] = '/bin/sh'
     try {
-      expect(findClaudeBin()).toBe('/custom/claude')
+      expect(findClaudeBin()).toBe('/bin/sh')
+    } finally {
+      if (orig !== undefined) process.env['FULCRUM_CLAUDE_BIN'] = orig
+      else delete process.env['FULCRUM_CLAUDE_BIN']
+    }
+  })
+
+  it('throws when FULCRUM_CLAUDE_BIN is not an absolute path', () => {
+    const orig = process.env['FULCRUM_CLAUDE_BIN']
+    process.env['FULCRUM_CLAUDE_BIN'] = 'relative/claude'
+    try {
+      expect(() => findClaudeBin()).toThrow(/must be an absolute path/)
+    } finally {
+      if (orig !== undefined) process.env['FULCRUM_CLAUDE_BIN'] = orig
+      else delete process.env['FULCRUM_CLAUDE_BIN']
+    }
+  })
+
+  it('throws when FULCRUM_CLAUDE_BIN is not executable', () => {
+    const orig = process.env['FULCRUM_CLAUDE_BIN']
+    process.env['FULCRUM_CLAUDE_BIN'] = '/etc/hostname'
+    try {
+      expect(() => findClaudeBin()).toThrow(/not executable/)
     } finally {
       if (orig !== undefined) process.env['FULCRUM_CLAUDE_BIN'] = orig
       else delete process.env['FULCRUM_CLAUDE_BIN']

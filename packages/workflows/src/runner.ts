@@ -29,6 +29,7 @@ import type {
   StepResult,
   RunWorkflowInput,
   RunWorkflowResult,
+  RetryPolicy,
 } from './types.js'
 
 const DEFAULT_MAX_ITERATIONS = 1000
@@ -297,14 +298,20 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
         persistStates(input.wf_id, states, step_defs, undefined, lastCurrentStep)
       } else {
         // Failed — retry if we have budget.
+        const policy = (def as unknown as { retryPolicy?: RetryPolicy }).retryPolicy
         const maxRetries =
-          (def as unknown as { max_retries?: number }).max_retries ?? defaultRetries
+          policy?.maxAttempts ??
+          (def as unknown as { max_retries?: number }).max_retries ??
+          defaultRetries
         if (state.attempts <= maxRetries) {
           state.status = 'retrying'
           state.error = result.error
           persistStates(input.wf_id, states, step_defs, undefined, lastCurrentStep)
           // Exponential backoff — capped at backoffCap so tests stay fast.
-          const delay = getBackoffMs(state.attempts, backoffCap)
+          const initialDelay = policy?.initialDelayMs ?? 1000
+          const multiplier = policy?.backoffMultiplier ?? 2
+          const cap = policy?.maxDelayMs ?? backoffCap
+          const delay = Math.min(initialDelay * Math.pow(multiplier, state.attempts - 1), cap)
           if (delay > 0) {
             await new Promise((r) => setTimeout(r, delay))
           }

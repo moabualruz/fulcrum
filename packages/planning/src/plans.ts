@@ -111,6 +111,10 @@ export async function listPlans(input: ListPlansInput, db: Db = getDb()): Promis
   if (input.status) { sql += ' AND status = ?'; params.push(input.status) }
   if (input.status_category) { sql += ' AND status_category = ?'; params.push(input.status_category) }
   sql += ' ORDER BY created_at ASC'
+  // PLAN-007: pagination
+  sql += ' LIMIT ? OFFSET ?'
+  params.push(input.limit ?? 100)
+  params.push(input.offset ?? 0)
   const rows = db.prepare(sql).all(...params) as Record<string, unknown>[]
   return rows.map(rowToPlan)
 }

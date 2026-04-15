@@ -1,31 +1,13 @@
 // packages/planning/src/relations.ts
-import { getDb, FulcrumError, Db} from '@fulcrum/core'
+import { getDb, FulcrumError, rowToTaskBase, Db} from '@fulcrum/core'
 import type { Task } from '@fulcrum/core'
 import type { TaskRelation, AddTaskRelationInput, RemoveTaskRelationInput, GetTaskRelationsInput } from './types.js'
 
+// PLAN-006: rowToTask builds on core's rowToTaskBase, adding labels/blockers
+// parsed from JSON columns (as stored in the tasks table).
 function rowToTask(row: Record<string, unknown>): Task {
   return {
-    task_id: row.task_id as string,
-    workspace_id: row.workspace_id as string,
-    project_id: row.project_id as string,
-    issue_id: row.issue_id as string | null,
-    display_id: row.display_id as string,
-    title: row.title as string,
-    description: row.description as string | null,
-    status: row.status as Task['status'],
-    status_category: row.status_category as Task['status_category'],
-    priority: row.priority as Task['priority'],
-    estimate_type: row.estimate_type as Task['estimate_type'],
-    estimate_value: row.estimate_value as number | null,
-    assigned_to: row.assigned_to as string | null,
-    note: row.note as string | null,
-    done_criteria: row.done_criteria as string | null,
-    version: row.version as number,
-    created_at: row.created_at as string,
-    updated_at: row.updated_at as string,
-    claimed_at: row.claimed_at as string | null,
-    completed_at: row.completed_at as string | null,
-    assigned_run_id: (row.assigned_run_id ?? null) as string | null,
+    ...rowToTaskBase(row),
     labels: (() => { try { return JSON.parse(row.labels as string) as string[] } catch { return [] } })(),
     blockers: (() => { try { return JSON.parse(row.blockers as string) as string[] } catch { return [] } })(),
   }

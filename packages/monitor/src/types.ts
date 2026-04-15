@@ -2,7 +2,7 @@
 
 export interface DailyMetrics {
   workspace_id: string
-  project_id: string
+  project_id: string | null
   date: string
   issues_created: number
   issues_closed: number
@@ -82,16 +82,15 @@ export interface MonitorServerConfig {
   port?: number  // default 7331
   host?: string  // default '127.0.0.1'
   workspace_id?: string
-  /** Skip bearer-token auth entirely — for unit tests only. */
-  bypass_auth?: boolean
+  bypass_auth?: boolean  // skip auth checks in tests
 }
 
 export interface MonitorServer {
   start(): Promise<void>
   stop(): Promise<void>
   port: number
-  /** Test helper: call routes without binding a real port. */
-  fetch(req: Request): Promise<Response>
+  /** In-process fetch for unit testing without starting a real HTTP server */
+  fetch(req: Request): Promise<Response> | Response
 }
 
 export interface RunReplay {

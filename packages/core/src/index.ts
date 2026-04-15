@@ -24,7 +24,7 @@ export type { Db } from './db/client.js'
 export { runMigrations } from './db/migrations.js'
 
 // Tasks
-export { listTasks, createTask, updateTask } from './tasks.js'
+export { listTasks, createTask, updateTask, rowToTaskBase } from './tasks.js'
 
 // Workspaces
 export { createWorkspace, getWorkspace, listWorkspaces, updateWorkspace } from './workspaces.js'

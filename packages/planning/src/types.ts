@@ -41,6 +41,8 @@ export interface Issue {
   parent_issue_id: string | null
   /** PLAN-003: task that is currently blocking this issue (denormalized for quick access). */
   blocking_task_id: string | null
+  /** PLAN-003: issue that is currently blocking this issue (issue-to-issue dependency). */
+  blocking_issue_id: string | null
   display_id: string
   title: string
   description: string | null
@@ -128,6 +130,8 @@ export interface CreateIssueInput {
   project_id: string
   epic_id?: string
   parent_issue_id?: string
+  /** PLAN-003: optional issue that is blocking this issue at creation time. */
+  blocking_issue_id?: string
   title: string
   description?: string
   priority?: Priority
@@ -149,6 +153,8 @@ export interface UpdateIssueInput {
   labels?: string[]
   /** PLAN-003: set/clear the task that is blocking this issue. */
   blocking_task_id?: string | null
+  /** PLAN-003: set/clear the issue that is blocking this issue (issue-to-issue dependency). */
+  blocking_issue_id?: string | null
   expected_version: number
 }
 
@@ -160,6 +166,10 @@ export interface ListIssuesInput {
   status?: IssueStatus
   status_category?: StatusCategory
   assignee_agent_id?: string
+  /** PLAN-007: max number of results to return (default 100). */
+  limit?: number
+  /** PLAN-007: number of results to skip (default 0). */
+  offset?: number
 }
 
 export interface CreatePRDInput {
@@ -187,6 +197,10 @@ export interface ListPRDsInput {
   project_id?: string
   status?: PRDStatus
   status_category?: StatusCategory
+  /** PLAN-007: max number of results to return (default 100). */
+  limit?: number
+  /** PLAN-007: number of results to skip (default 0). */
+  offset?: number
 }
 
 export interface CreatePlanInput {
@@ -214,6 +228,10 @@ export interface ListPlansInput {
   project_id?: string
   status?: PlanStatus
   status_category?: StatusCategory
+  /** PLAN-007: max number of results to return (default 100). */
+  limit?: number
+  /** PLAN-007: number of results to skip (default 0). */
+  offset?: number
 }
 
 export interface LinkIssueToPlanInput {

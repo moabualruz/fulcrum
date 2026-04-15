@@ -21,6 +21,7 @@ function rowToIssue(row: Record<string, unknown>, labels: string[]): Issue {
     epic_id: row.epic_id as string | null,
     parent_issue_id: row.parent_issue_id as string | null,
     blocking_task_id: (row.blocking_task_id ?? null) as string | null, // PLAN-003
+    blocking_issue_id: (row.blocking_issue_id ?? null) as string | null, // PLAN-003
     display_id: row.display_id as string,
     title: row.title as string,
     description: row.description as string | null,
@@ -56,14 +57,15 @@ export async function createIssue(input: CreateIssueInput, db: Db = getDb()): Pr
     INSERT INTO issues
       (issue_id, workspace_id, project_id, epic_id, parent_issue_id, display_id,
        title, description, status, status_category, priority, assignee_agent_id,
-       estimate_type, estimate_value, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       estimate_type, estimate_value, blocking_issue_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     issue_id, input.workspace_id, input.project_id,
     input.epic_id ?? null, input.parent_issue_id ?? null, display_id,
     input.title, input.description ?? null, status, status_cat, priority,
     input.assignee_agent_id ?? null,
     input.estimate_type ?? null, input.estimate_value ?? null,
+    input.blocking_issue_id ?? null,
     now, now
   )
 
@@ -125,6 +127,10 @@ export async function updateIssue(input: UpdateIssueInput, db: Db = getDb()): Pr
   if ('blocking_task_id' in input) {
     fields.push('blocking_task_id = ?'); values.push(input.blocking_task_id ?? null)
   }
+  // PLAN-003: update blocking_issue_id if provided
+  if ('blocking_issue_id' in input) {
+    fields.push('blocking_issue_id = ?'); values.push(input.blocking_issue_id ?? null)
+  }
   values.push(input.issue_id)
 
   db.prepare(`UPDATE issues SET ${fields.join(', ')} WHERE issue_id = ?`).run(...values)
@@ -166,6 +172,10 @@ export async function listIssues(input: ListIssuesInput, db: Db = getDb()): Prom
   if (input.status_category) { sql += ' AND status_category = ?'; params.push(input.status_category) }
   if (input.assignee_agent_id) { sql += ' AND assignee_agent_id = ?'; params.push(input.assignee_agent_id) }
   sql += ' ORDER BY created_at ASC'
+  // PLAN-007: pagination
+  sql += ' LIMIT ? OFFSET ?'
+  params.push(input.limit ?? 100)
+  params.push(input.offset ?? 0)
   const rows = db.prepare(sql).all(...params) as Record<string, unknown>[]
   const issueIds = rows.map(r => r.issue_id as string)
   if (issueIds.length === 0) return []

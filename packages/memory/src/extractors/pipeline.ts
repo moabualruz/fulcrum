@@ -83,9 +83,14 @@ export async function runExtractionPipeline(
         const edges = await extractSemantic(memory.memory_id, bodyText, memory.workspace_id)
         const now = new Date().toISOString()
 
+        // MEM-012: allowlist of valid edge types — prevent unvalidated interpolation into Cypher
+        const VALID_EDGE_TYPES = new Set(['MENTIONS', 'PRODUCED_IN', 'RELATES_TO', 'DEPENDS_ON', 'IMPLEMENTS'])
+
         for (const edge of edges) {
           // CAUSES and PREVENTS are Entity→Entity in schema — skip graph write for those
           if (edge.edgeType === 'CAUSES' || edge.edgeType === 'PREVENTS') continue
+          // Skip any edge type not in the allowlist to prevent Cypher injection
+          if (!VALID_EDGE_TYPES.has(edge.edgeType)) continue
 
           try {
             const entity = await resolveEntity(kuzuClient, edge.toEntityId, memory.workspace_id)
