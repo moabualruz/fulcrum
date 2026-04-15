@@ -398,6 +398,72 @@ describe('runWorkflow (H-1/H-5)', () => {
     expect(result.error).toMatch(/query/)
   })
 
+  it('validate_schema passes when data matches schema', async () => {
+    const ctx: StepContext = {
+      wf_id: 'wf_fake',
+      workspace_id,
+      project_id,
+      step_id: 's_vs1',
+      step: {
+        step_id: 's_vs1',
+        step_type: 'validate_schema' as WorkflowStepDef['step_type'],
+        name: 'validate',
+        config: {
+          schema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
+          data_key: 'prev.output',
+        },
+      },
+      outputs: { prev: { output: { name: 'Alice' } } },
+      attempts: 0,
+    }
+    const result = await executeStep(ctx)
+    expect(result.status).toBe('completed')
+    expect((result.output as Record<string, unknown>)['valid']).toBe(true)
+  })
+
+  it('validate_schema fails when data violates schema', async () => {
+    const ctx: StepContext = {
+      wf_id: 'wf_fake',
+      workspace_id,
+      project_id,
+      step_id: 's_vs2',
+      step: {
+        step_id: 's_vs2',
+        step_type: 'validate_schema' as WorkflowStepDef['step_type'],
+        name: 'validate_fail',
+        config: {
+          schema: { type: 'object', properties: { age: { type: 'number' } }, required: ['age'] },
+          data_key: 'prev.output',
+        },
+      },
+      outputs: { prev: { output: { age: 'not-a-number' } } },
+      attempts: 0,
+    }
+    const result = await executeStep(ctx)
+    expect(result.status).toBe('failed')
+    expect(result.error).toMatch(/schema/i)
+  })
+
+  it('validate_schema completes without error when no schema provided', async () => {
+    const ctx: StepContext = {
+      wf_id: 'wf_fake',
+      workspace_id,
+      project_id,
+      step_id: 's_vs3',
+      step: {
+        step_id: 's_vs3',
+        step_type: 'validate_schema' as WorkflowStepDef['step_type'],
+        name: 'validate_noschema',
+        config: {},
+      },
+      outputs: {},
+      attempts: 0,
+    }
+    const result = await executeStep(ctx)
+    expect(result.status).toBe('completed')
+    expect((result.output as Record<string, unknown>)['validated']).toBe(false)
+  })
+
   it('executeStep returns failed for unknown step types', async () => {
     const ctx: StepContext = {
       wf_id: 'wf_fake',

@@ -532,9 +532,28 @@ HANDLERS['complete'] = async () => {
 }
 
 HANDLERS['validate_schema'] = async (ctx) => {
-  // Stub — a real implementation would JSON-schema-check an output.
   const c = cfg(ctx)
-  return { status: 'completed', output: { validated: true, schema: c['schema'] ?? null } }
+  const schema = c['schema'] as Record<string, unknown> | undefined
+  if (!schema) return { status: 'completed', output: { valid: true, validated: false } }
+
+  // Resolve data from outputs using dotted key path, or use inline data key
+  const dataKey = str(c['data_key'], '')
+  const data: unknown = dataKey
+    ? dataKey.split('.').reduce<unknown>((acc, part) => {
+        if (acc && typeof acc === 'object') return (acc as Record<string, unknown>)[part]
+        return undefined
+      }, ctx.outputs)
+    : c['data']
+
+  const { default: Ajv } = await import('ajv')
+  const ajv = new Ajv()
+  const validate = ajv.compile(schema)
+  const valid = validate(data)
+  if (!valid) {
+    const errors = ajv.errorsText(validate.errors)
+    return { status: 'failed', error: `schema validation failed: ${errors}` }
+  }
+  return { status: 'completed', output: { valid: true } }
 }
 
 HANDLERS['gate'] = async (ctx) => {

@@ -339,6 +339,9 @@ importers:
       '@fulcrum/memory':
         specifier: workspace:*
         version: link:../memory
+      ajv:
+        specifier: ^8.18.0
+        version: 8.18.0
       ulidx:
         specifier: ^2.0.0
         version: 2.4.1
