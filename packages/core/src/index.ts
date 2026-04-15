@@ -57,7 +57,7 @@ export { runJanitorCycle, startJanitor, decayMemories, consolidateMemories } fro
 // hybrid-search + RRF + Kuzu implementation instead of the core-only version.
 
 // Embedding
-export { initEmbedding, getTextEmbedder, getCodeEmbedder, getReranker, resetProviders } from './embedding/registry.js'
+export { initEmbedding, getTextEmbedder, getCodeEmbedder, getReranker, resetProviders, registerEmbeddingProvider } from './embedding/registry.js'
 export { QUERY_PREFIX, DOC_PREFIX, truncateDimensions } from './embedding/local.js'
 
 // Status

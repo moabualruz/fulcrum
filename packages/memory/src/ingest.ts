@@ -6,6 +6,7 @@ import { getDb } from '@fulcrum/core'
 import { contentHash, isDuplicate } from './dedup.js'
 import { writeMemory } from './write.js'
 import type { IngestFileInput, IngestResult, IngestProjectInput } from './types.js'
+import { createASTChunker } from './chunkers/ast-chunker.js'
 
 const CODE_LANGUAGES = new Set(['typescript', 'javascript', 'python', 'java', 'go', 'rust', 'c', 'cpp'])
 const LANG_EXT_MAP: Record<string, string> = {
@@ -109,6 +110,26 @@ function splitByMaxSize(text: string, maxChars: number, overlap: number): string
   return result
 }
 
+/** Build a sorted array of byte offsets where each line begins. */
+function buildLineStartIndex(source: string): number[] {
+  const starts = [0]
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] === '\n') starts.push(i + 1)
+  }
+  return starts
+}
+
+/** Convert a zero-based byte offset to a 1-based line number. */
+function byteOffsetToLine(offset: number, lineStarts: number[]): number {
+  let lo = 0, hi = lineStarts.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1
+    if (lineStarts[mid] <= offset) lo = mid
+    else hi = mid - 1
+  }
+  return lo + 1  // 1-based
+}
+
 export async function ingestFile(input: IngestFileInput, db = getDb()): Promise<IngestResult> {
   const { workspace_id, project_id, file_path, content, language } = input
 
@@ -118,7 +139,27 @@ export async function ingestFile(input: IngestFileInput, db = getDb()): Promise<
   const sourceType = isSyntax ? 'code' : 'prose'
   const memoryKind = isSyntax ? 'symbol' : 'doc'
 
-  const rawChunks = isSyntax ? chunkSyntax(content) : chunkSemantic(content)
+  // AST-based chunking for supported languages (ts/tsx/js/jsx).
+  // Falls back to regex-based chunkSyntax() if web-tree-sitter is unavailable.
+  const AST_SUPPORTED = new Set(['typescript', 'javascript'])
+  let rawChunks: { text: string; symbolPath: string | null; startLine: number; endLine: number }[]
+  if (isSyntax && lang !== undefined && AST_SUPPORTED.has(lang)) {
+    const astChunker = await createASTChunker()
+    if (astChunker) {
+      const astChunks = astChunker.chunkWithLanguage(content, lang)
+      const lineStarts = buildLineStartIndex(content)
+      rawChunks = astChunks.map(c => ({
+        text: c.text,
+        symbolPath: c.name ?? null,
+        startLine: byteOffsetToLine(c.start, lineStarts),
+        endLine: byteOffsetToLine(c.end - 1, lineStarts),
+      }))
+    } else {
+      rawChunks = chunkSyntax(content)
+    }
+  } else {
+    rawChunks = isSyntax ? chunkSyntax(content) : chunkSemantic(content)
+  }
 
   let chunks_created = 0
   let memories_created = 0
