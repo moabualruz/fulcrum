@@ -27,6 +27,7 @@ CONTROL PLANE
   serve monitor        Start HTTP monitor + control API (default port 4721)
   serve all            Start both MCP and monitor servers
 
+  hook auto            Auto-detect runtime hook (stdin → policy check)
   hook claude          PreToolUse hook for Claude Code (stdin → policy check)
   hook gemini          BeforeTool hook for Gemini CLI
   hook pi              BeforeTool hook for PI coding agent
@@ -2127,7 +2128,7 @@ OPTIONS (serve mcp)
       await runHook(cli ?? '--help')
       return
     }
-    if (cli === 'claude' || cli === 'gemini' || cli === 'pi') {
+    if (cli === 'claude' || cli === 'gemini' || cli === 'pi' || cli === 'auto') {
       // Optional second-level arg: 'pre' | 'post' | 'session-start' | 'session-stop' | 'pre-compact'
       // Default 'pre' for backward compatibility with existing settings.json entries.
       const phaseArg = args[2] as string | undefined
@@ -2142,14 +2143,14 @@ OPTIONS (serve mcp)
       const phase: HookPhase = phaseArg === 'post' ? 'post' : 'pre'
       if (phaseArg && phaseArg !== 'pre' && phaseArg !== 'post') {
         console.error(`Unknown hook phase: ${phaseArg}`)
-        console.error('Usage: fulcrum hook claude|gemini|pi [pre|post|session-start|session-stop|pre-compact]')
+        console.error('Usage: fulcrum hook auto|claude|gemini|pi [pre|post|session-start|session-stop|pre-compact]')
         process.exit(1)
       }
       await runHook(cli, phase)
       return
     }
     console.error(`Unknown hook: ${cli}`)
-    console.error('Usage: fulcrum hook claude|gemini|pi [pre|post]')
+    console.error('Usage: fulcrum hook auto|claude|gemini|pi [pre|post]')
     process.exit(1)
   }
 
