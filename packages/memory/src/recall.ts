@@ -1,6 +1,7 @@
 // packages/memory/src/recall.ts
 import { getDb, FulcrumError, getTextEmbedder, getReranker } from '@fulcrum/core'
-import { rrfScore, recallScore, computeFreshness } from './scoring.js'
+import { rrfScore, rrfScoreWithSparse, recallScore, computeFreshness } from './scoring.js'
+import { sparseRank } from './sparse.js'
 import { rowToFullMemory } from './mappers.js'
 import type { RecallMemoryInput, CompactMemory, FullMemory, RecallMode, QueryScope } from './types.js'
 import { getKuzuClient } from './kuzu/client.js'
@@ -225,11 +226,42 @@ export async function recallMemory(
     }
   }
 
-  // FULL OUTER JOIN via UNION ALL + GROUP BY
-  const allRowids = new Set<number>([
+  // ── Sparse rescue candidates (GAP-RAG-7) ──────────────────────────────────
+  // Fetch additional candidates via sparse dot-product retrieval. These are
+  // documents that share significant term overlap with the query but may not
+  // appear in FTS5 or dense vector results (e.g., documents with code
+  // identifiers that FTS5 indexed differently, or rare terms not in embeddings).
+  //
+  // Sparse candidates are ONLY added to the pool if they are NOT already
+  // covered by FTS5 or dense vector. This preserves the existing ranking
+  // for already-retrieved documents while expanding recall for missed ones.
+  let sparseOnlyRowids: number[] = []
+  const combinedRowids = new Set<number>([
     ...ftsRows.map(r => r.rowid),
     ...vecRows.map(r => r.rowid),
   ])
+
+  // Only run sparse retrieval when we have fewer candidates than needed —
+  // avoids the cost when FTS5 + vec already have ample candidates.
+  if (combinedRowids.size < fetchLimit) {
+    try {
+      const sparseLimit = fetchLimit - combinedRowids.size
+      const sparseRows = db.prepare(
+        `SELECT m.rowid, m.sparse_vector FROM memories m WHERE m.sparse_vector IS NOT NULL AND ${whereClause} LIMIT ?`
+      ).all(...params, sparseLimit * 4) as { rowid: number; sparse_vector: string | null }[]
+
+      const sparseRanked = sparseRank(input.query, sparseRows)
+      // Add only sparse-only candidates (not already in FTS5/vec results)
+      for (const rowid of sparseRanked.keys()) {
+        if (!combinedRowids.has(rowid)) {
+          sparseOnlyRowids.push(rowid)
+          if (sparseOnlyRowids.length >= sparseLimit) break
+        }
+      }
+    } catch { /* sparse retrieval is best-effort */ }
+  }
+
+  const allRowids = new Set<number>([...combinedRowids, ...sparseOnlyRowids])
   if (allRowids.size === 0) return []
 
   const ftsMap = new Map(ftsRows.map(r => [r.rowid, r.ftsRank]))
@@ -247,17 +279,26 @@ export async function recallMemory(
   const placeholders = rowids.map(() => '?').join(',')
   const rows = db.prepare(
     `SELECT m.rowid, m.* FROM memories m WHERE m.rowid IN (${placeholders}) AND ${whereClause}`
-  ).all(...rowids, ...params) as Record<string, unknown>[]
+  ).all(...rowids, ...params) as (Record<string, unknown> & { rowid: number; sparse_vector: string | null })[]
+
+  // Build sparse rank map for the final scored set (needed for sparse-only rescue docs)
+  const scoredSparseRows = rows.map(r => ({ rowid: r.rowid, sparse_vector: r.sparse_vector ?? null }))
+  const sparseMap = sparseRank(input.query, scoredSparseRows)
+  const sparseOnlySet = new Set(sparseOnlyRowids)
 
   // Apply freshness weighting and re-sort
-  const rowByRowid = new Map(rows.map(r => [(r as Record<string, unknown> & { rowid: number }).rowid, r]))
+  const rowByRowid = new Map(rows.map(r => [r.rowid, r]))
   const scored = rrfScored
     .map(s => {
       const row = rowByRowid.get(s.rowid)
       if (!row) return null
-      // Compute freshness at query time from updated_at — not from the stored freshness column
       const freshness = computeFreshness(row.updated_at as string)
-      return { rowid: s.rowid, score: recallScore(ftsMap.get(s.rowid) ?? null, vecMap.get(s.rowid) ?? null, freshness) }
+      const spRank = sparseMap.get(s.rowid) ?? null
+      // Use 3-signal scoring for sparse-rescue docs; 2-signal for FTS5/vec docs
+      const score = sparseOnlySet.has(s.rowid)
+        ? rrfScoreWithSparse(null, null, spRank) * freshness
+        : recallScore(ftsMap.get(s.rowid) ?? null, vecMap.get(s.rowid) ?? null, freshness)
+      return { rowid: s.rowid, score }
     })
     .filter((s): s is { rowid: number; score: number } => s !== null)
     .sort((a, b) => b.score - a.score)

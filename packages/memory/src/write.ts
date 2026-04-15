@@ -8,6 +8,7 @@ import { upsertStateEntry } from './vault/state.js'
 import { appendToLog } from './vault/index-builder.js'
 import type { WriteMemoryInput, FullMemory } from './types.js'
 import { runExtractionPipeline } from './extractors/pipeline.js'
+import { computeSparseVector } from './sparse.js'
 
 function bodyHash(text: string): string {
   return createHash('sha256').update(text).digest('hex')
@@ -125,6 +126,12 @@ export async function writeMemory(input: WriteMemoryInput, db = getDb()): Promis
     }
   }
 
+  // ── Sparse vector (GAP-RAG-7) ─────────────────────────────────────────────
+  // Compute a BM25-style sparse vector from canonical_text for the 3rd RRF
+  // signal in recall. Stored as JSON; top-128 terms, L2-normalised.
+  const sparseVec = computeSparseVector(memoryForVault.canonical_text ?? input.content)
+  const sparseVectorJson = Object.keys(sparseVec).length > 0 ? JSON.stringify(sparseVec) : null
+
   // ── L1 SQLite insert (synchronous) ────────────────────────────────────────
   // freshness is NOT written here — it is computed at query time from updated_at
   db.prepare(`
@@ -134,14 +141,14 @@ export async function writeMemory(input: WriteMemoryInput, db = getDb()): Promis
       content, tags, entities, confidence, importance,
       file_path, symbol_path, event_time, content_hash,
       task_id, issue_id, artifact_id, provenance_refs,
-      embedding, created_at, updated_at, last_accessed_at, access_count
+      embedding, sparse_vector, created_at, updated_at, last_accessed_at, access_count
     ) VALUES (
       ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?,
-      ?, ?, ?, ?, 0
+      ?, ?, ?, ?, ?, 0
     )
   `).run(
     memory_id, input.workspace_id, input.project_id ?? null,
@@ -149,7 +156,7 @@ export async function writeMemory(input: WriteMemoryInput, db = getDb()): Promis
     input.content, JSON.stringify(input.tags ?? []), JSON.stringify(input.entities ?? []), input.confidence ?? 1.0, input.importance ?? 0.5,
     input.file_path ?? null, input.symbol_path ?? null, input.event_time ?? null, hash,
     input.task_id ?? null, input.issue_id ?? null, input.artifact_id ?? null, JSON.stringify(input.provenance_refs ?? []),
-    embeddingBuffer, now, now, now
+    embeddingBuffer, sparseVectorJson, now, now, now
   )
 
   const row = db.prepare('SELECT * FROM memories WHERE memory_id = ?').get(memory_id) as Record<string, unknown> | undefined

@@ -1,6 +1,7 @@
 import { getDb } from './db/client.js'
 import { newId } from './ids.js'
 import type { EventType } from './types.js'
+import { getEventBus } from './event-bus.js'
 
 export interface EmitEventInput {
   workspace_id: string
@@ -39,4 +40,8 @@ export function emitEvent(input: EmitEventInput, db = getDb()): void {
     input.span_id ?? null,
     input.correlation_id ?? null
   )
+
+  // Fire in-process event bus after successful DB write (GAP-ARCH-8).
+  // Non-blocking: subscriber errors are swallowed inside fire().
+  getEventBus().fire(input)
 }

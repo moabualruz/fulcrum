@@ -90,6 +90,10 @@ export { createHandoff, getHandoff, listHandoffs, claimHandoff, completeHandoff 
 export { emitEvent } from './events.js'
 export type { EmitEventInput } from './events.js'
 
+// Event bus (GAP-ARCH-8): in-process pub-sub wired into emitEvent()
+export { getEventBus, setEventBus, resetEventBus } from './event-bus.js'
+export type { FulcrumEventBus, EventHandler } from './event-bus.js'
+
 // CoS Context Builder
 export { buildWorldState } from './cos-context.js'
 export type { CoSWorldState, BuildWorldStateInput } from './cos-context.js'

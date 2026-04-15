@@ -31,12 +31,48 @@ export function computeFreshness(updatedAt: string): number {
 /**
  * Reciprocal Rank Fusion — k=60.
  * Null rank means signal absent: uses penalty position 1000.
+ *
+ * Accepts an optional third signal (sparseRank) for the sparse vector
+ * dot-product retrieval path (GAP-RAG-7). When present, the sparse score
+ * adds an independent term-overlap signal to the FTS5+dense fusion.
  */
-export function rrfScore(ftsRank: number | null, vectorRank: number | null): number {
+export function rrfScore(
+  ftsRank: number | null,
+  vectorRank: number | null,
+  sparseRank: number | null = null,
+): number {
   const k = 60
   const fts = ftsRank !== null ? 1 / (k + ftsRank) : 1 / (k + 1000)
   const vec = vectorRank !== null ? 1 / (k + vectorRank) : 1 / (k + 1000)
   return fts + vec
+}
+
+/**
+ * Three-signal RRF: FTS5 + dense vector + sparse vector.
+ *
+ * The sparse signal is used ONLY as a rescue path — it contributes a score
+ * for documents that appeared in the sparse retrieval BUT NOT in either
+ * FTS5 or dense vector results. Documents already ranked by FTS5/dense
+ * are NOT re-scored by sparse to avoid noise from TF-only weighting.
+ *
+ * This approach adds recall (surfaces documents missed by BM25/vec) without
+ * displacing existing high-quality results. Full sparse re-scoring would require
+ * IDF calibration (corpus-level document frequencies) which sqlite-vec/FTS5
+ * provides via fts5vocab — that is left as a future enhancement.
+ */
+export function rrfScoreWithSparse(
+  ftsRank: number | null,
+  vectorRank: number | null,
+  sparseRank: number | null,
+): number {
+  const k = 60
+  const fts = ftsRank !== null ? 1 / (k + ftsRank) : 1 / (k + 1000)
+  const vec = vectorRank !== null ? 1 / (k + vectorRank) : 1 / (k + 1000)
+  // Sparse contributes only for rescue candidates (no FTS5 or vec rank).
+  // For candidates that already have FTS5/vec signals, sparse adds 0.
+  const isSparseOnly = ftsRank === null && vectorRank === null
+  const spr = (isSparseOnly && sparseRank !== null) ? 1 / (k + sparseRank) : 0
+  return fts + vec + spr
 }
 
 /**
@@ -46,7 +82,7 @@ export function rrfScore(ftsRank: number | null, vectorRank: number | null): num
 export function recallScore(
   ftsRank: number | null,
   vectorRank: number | null,
-  freshness: number
+  freshness: number,
 ): number {
   return rrfScore(ftsRank, vectorRank) * freshness
 }

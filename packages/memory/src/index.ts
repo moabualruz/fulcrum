@@ -68,3 +68,7 @@ export type { RebuildOptions, RebuildResult } from './setup/rebuild.js'
 // Repo map
 export { buildRepoMap, scanAndBuildRepoMap } from './repo-map.js'
 export type { RepoMap, RepoFileEntry, RepoSymbol } from './repo-map.js'
+
+// Sparse vectors (GAP-RAG-7)
+export { computeSparseVector, sparseDotProduct, sparseRank, tokenise } from './sparse.js'
+export type { SparseVector } from './sparse.js'
