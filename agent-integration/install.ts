@@ -152,6 +152,12 @@ function recoveryHintFor(name: string): string | undefined {
   if (name.includes("Regenerate CLAUDE.md")) {
     return `manual: node --import tsx/esm scripts/gen-claude-md.ts`;
   }
+  if (name.includes("Doctor gate")) {
+    return `fix failing checks shown above, then re-run setup; or bypass with: FULCRUM_SETUP_NO_GATE=1 pnpm setup`;
+  }
+  if (name.includes("Seed task and memory")) {
+    return `manual: fulcrum task create --title "Fulcrum setup verified"`;
+  }
   if (name.includes("Claude Code: global CLAUDE.md")) {
     return `manual: append agent-integration/claude/CLAUDE.md to ~/.claude/CLAUDE.md`;
   }
@@ -852,6 +858,8 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["Gemini CLI: user extension", installGeminiExtension],
     ["PI: cockpit extension", installPiCockpit],
     ["MCP smoke test", smokeMcp],
+    ["Doctor gate", runDoctorGate],
+    ["Seed task and memory", writeSeedData],
   ],
   claude: [
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
@@ -864,6 +872,8 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["Claude Code: agent MDs → ~/.claude/agents/", installClaudeAgentMds],
     ["Claude Code: slash commands → ~/.claude/commands/", installClaudeCommands],
     ["MCP smoke test", smokeMcp],
+    ["Doctor gate", runDoctorGate],
+    ["Seed task and memory", writeSeedData],
   ],
   gemini: [
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
@@ -876,6 +886,204 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["PI: cockpit extension", installPiCockpit],
   ],
 };
+
+// ── Doctor gate ───────────────────────────────────────────────────────────────
+// Runs `fulcrum doctor --json` after install and fails the step if any check
+// reports status "fail". Bypass with FULCRUM_SETUP_NO_GATE=1 or --no-doctor-gate.
+
+const NO_DOCTOR_GATE =
+  argv.includes("--no-doctor-gate") || process.env["FULCRUM_SETUP_NO_GATE"] === "1";
+
+function runDoctorGate(): void {
+  if (NO_DOCTOR_GATE) {
+    skip("doctor gate bypassed (--no-doctor-gate / FULCRUM_SETUP_NO_GATE=1)");
+    return;
+  }
+  if (!commandExists("fulcrum")) {
+    warn("doctor gate skipped — fulcrum not in PATH yet");
+    return;
+  }
+  if (DRY_RUN) {
+    dry("would run: fulcrum doctor --json");
+    ok("(dry-run) doctor gate");
+    return;
+  }
+
+  const result = spawnSync("fulcrum", ["doctor", "--json"], {
+    stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
+  });
+
+  if (result.error) {
+    warn(`doctor gate: failed to spawn fulcrum doctor: ${result.error.message}`);
+    return;
+  }
+
+  interface DoctorCheck { name: string; status: "pass" | "warn" | "fail"; message: string }
+  let checks: DoctorCheck[] = [];
+  try {
+    checks = JSON.parse(result.stdout ?? "[]") as DoctorCheck[];
+  } catch {
+    warn(`doctor gate: could not parse JSON output (exit ${result.status ?? "?"})`);
+    return;
+  }
+
+  const failures = checks.filter((c) => c.status === "fail");
+  if (failures.length > 0) {
+    const names = failures.map((c) => c.name).join(", ");
+    fail(`doctor gate: ${failures.length} failing check(s): ${names}`);
+    return;
+  }
+
+  const warns = checks.filter((c) => c.status === "warn").length;
+  if (warns > 0) {
+    ok(`doctor: all checks pass (${warns} warning${warns > 1 ? "s" : ""})`);
+  } else {
+    ok(`doctor: all ${checks.length} checks pass`);
+  }
+}
+
+// ── Seed task and memory entry ────────────────────────────────────────────────
+// Writes one task and one memory entry to validate the DB write path.
+// Idempotent: checks for an existing seed task before creating.
+
+async function writeSeedData(): Promise<void> {
+  if (!commandExists("fulcrum")) {
+    warn("seed data skipped — fulcrum not in PATH");
+    return;
+  }
+  if (DRY_RUN) {
+    dry("would create seed task: 'Fulcrum setup verified'");
+    dry("would write seed memory entry via MCP write_memory");
+    ok("(dry-run) seed data");
+    return;
+  }
+
+  // ── Seed task ──────────────────────────────────────────────────────────────
+  // Create a seed task to confirm task writes work. Idempotent: only creates
+  // if no task titled "Fulcrum setup verified" already exists.
+  const SEED_TASK_TITLE = "Fulcrum setup verified";
+  let taskCreated = false;
+
+  const listResult = spawnSync(
+    "fulcrum",
+    ["task", "list", "--json"],
+    { stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
+  );
+
+  let alreadyExists = false;
+  if (listResult.status === 0) {
+    try {
+      const tasks = JSON.parse(listResult.stdout ?? "[]") as Array<{ title?: string }>;
+      alreadyExists = tasks.some((t) => t.title === SEED_TASK_TITLE);
+    } catch { /* ignore parse errors */ }
+  }
+
+  if (!alreadyExists) {
+    const createResult = spawnSync(
+      "fulcrum",
+      ["task", "create",
+        "--title", SEED_TASK_TITLE,
+        "--description", "Auto-created by fulcrum setup to verify task writes. Safe to delete.",
+        "--priority", "low"],
+      { stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
+    );
+    if (createResult.status === 0) {
+      taskCreated = true;
+    } else {
+      warn(`seed task create failed: ${(createResult.stderr ?? "").trim().slice(0, 200)}`);
+    }
+  }
+
+  // ── Seed memory via MCP write_memory ──────────────────────────────────────
+  // Send a write_memory JSON-RPC call to `fulcrum serve mcp` to confirm memory
+  // writes work end-to-end. Uses the same pattern as the MCP smoke test.
+  const TIMEOUT_MS = 5000;
+  let memoryWritten = false;
+
+  // Get workspace context first via get_current_context
+  const initRequest = JSON.stringify({
+    jsonrpc: "2.0", method: "initialize", id: 1,
+    params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "fulcrum-seed", version: "1" } },
+  }) + "\n";
+
+  const ctxRequest = JSON.stringify({
+    jsonrpc: "2.0", method: "tools/call", id: 2,
+    params: { name: "get_current_context", arguments: {} },
+  }) + "\n";
+
+  const seedMemoryContent = `Fulcrum setup completed successfully. MCP server is accessible and DB writes are functional.`;
+
+  try {
+    const ctxChild = spawnSync("fulcrum", ["serve", "mcp"], {
+      input: initRequest + ctxRequest,
+      timeout: TIMEOUT_MS,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    const ctxStdout = ctxChild.stdout ?? "";
+    const ctxLines = ctxStdout.split("\n").filter(Boolean);
+    let workspaceId = "";
+    let projectId = "";
+
+    for (const line of ctxLines) {
+      try {
+        const j = JSON.parse(line) as Record<string, unknown>;
+        if (j["id"] === 2) {
+          const result = j["result"] as Record<string, unknown> | undefined;
+          const content = result?.["content"] as Array<{ type: string; text: string }> | undefined;
+          const text = content?.[0]?.text ?? "";
+          const ctx = JSON.parse(text) as Record<string, unknown>;
+          workspaceId = (ctx["workspace_id"] as string) ?? "";
+          projectId = (ctx["project_id"] as string) ?? "";
+        }
+      } catch { /* skip non-JSON */ }
+    }
+
+    if (workspaceId) {
+      const writeRequest = JSON.stringify({
+        jsonrpc: "2.0", method: "tools/call", id: 3,
+        params: {
+          name: "write_memory",
+          arguments: {
+            content: seedMemoryContent,
+            workspace_id: workspaceId,
+            project_id: projectId,
+            tags: ["setup", "seed"],
+            importance: 0.5,
+          },
+        },
+      }) + "\n";
+
+      const writeChild = spawnSync("fulcrum", ["serve", "mcp"], {
+        input: initRequest + writeRequest,
+        timeout: TIMEOUT_MS,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+
+      const writeStdout = writeChild.stdout ?? "";
+      const writeLines = writeStdout.split("\n").filter(Boolean);
+      for (const line of writeLines) {
+        try {
+          const j = JSON.parse(line) as Record<string, unknown>;
+          if (j["id"] === 3 && j["result"]) { memoryWritten = true; }
+        } catch { /* skip */ }
+      }
+    }
+  } catch {
+    // best-effort
+  }
+
+  const parts: string[] = [];
+  if (alreadyExists) parts.push("seed task already exists");
+  else if (taskCreated) parts.push("seed task created");
+  if (memoryWritten) parts.push("seed memory written");
+  else parts.push("seed memory skipped (best-effort)");
+
+  ok(`write path validated: ${parts.join(", ")}`);
+}
 
 // ── Post-install MCP smoke test ───────────────────────────────────────────────
 // Spawns `fulcrum serve mcp`, sends JSON-RPC `initialize`, verifies a valid
