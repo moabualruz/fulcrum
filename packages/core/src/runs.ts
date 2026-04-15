@@ -80,6 +80,21 @@ interface EscalateRunInput { run_id: string; escalation_reason: string }
 // Keep RunStatus as alias for backward compat
 export type RunStatus = AgentRunStatus
 
+const DEFAULT_TERMINAL = new Set(['finished', 'aborted', 'failed'])
+
+function assertRunIsLive(
+  run: { status: string },
+  run_id: string,
+  terminal: Set<string> = DEFAULT_TERMINAL,
+): void {
+  if (terminal.has(run.status)) {
+    throw new FulcrumError(
+      `Run ${run_id} is already in terminal state '${run.status}'`,
+      'invalid_state'
+    )
+  }
+}
+
 /**
  * Append a structured event to agent_runs.events (spec §5.3/§16.5/§19).
  * Each entry has shape { ts, event_type, payload } and records a lifecycle
@@ -249,6 +264,8 @@ export async function startAgentRun(input: StartAgentRunInput, db = getDb()): Pr
 }
 
 export async function heartbeatAgentRun(input: HeartbeatInput, db = getDb()): Promise<void> {
+  const existing = getRun(input.run_id, db) // throws not_found before any mutation
+  assertRunIsLive(existing, input.run_id)
   if (input.progress_pct < 0 || input.progress_pct > 100) {
     throw new FulcrumError('progress_pct must be between 0 and 100', 'invalid_input')
   }
@@ -285,6 +302,7 @@ export async function getAgentRunStatus(input: GetStatusInput, db = getDb()): Pr
  */
 export async function completeAgentRun(input: CompleteRunInput, db = getDb()): Promise<AgentRun> {
   const run = getRun(input.run_id, db) // throws not_found before any mutation
+  assertRunIsLive(run, input.run_id)
   const now = new Date().toISOString()
   const doneCategory = statusCategory('finished')
   db.prepare(`
@@ -343,6 +361,7 @@ export async function completeAgentRun(input: CompleteRunInput, db = getDb()): P
 export async function blockAgentRun(input: BlockRunInput, db = getDb()): Promise<AgentRun> {
   if (!input.reason.trim()) throw new FulcrumError('reason must not be empty', 'invalid_input')
   const run = getRun(input.run_id, db) // throws not_found before any mutation
+  assertRunIsLive(run, input.run_id, new Set(['finished', 'aborted']))
   const blockedCategory = statusCategory('blocked')
   db.prepare(`
     UPDATE agent_runs

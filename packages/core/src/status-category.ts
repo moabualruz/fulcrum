@@ -8,7 +8,7 @@ const ACTIVE = new Set([
   'in_review', 'syncing', 'created',
 ])
 const BLOCKED = new Set([
-  'blocked', 'waiting_input', 'waiting_dependency', 'conflicted',
+  'blocked', 'waiting_input', 'waiting_dependency', 'conflicted', 'stale',
 ])
 const DONE = new Set([
   'completed', 'done', 'finished', 'cancelled', 'failed',
