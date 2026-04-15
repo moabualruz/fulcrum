@@ -31,6 +31,33 @@ function rowToTask(row: Record<string, unknown>): Task {
   }
 }
 
+// PLAN-004: relation types that form directional dependency chains — checked for cycles
+const DIRECTED_RELATION_TYPES: ReadonlySet<string> = new Set([
+  'blocks', 'follows', 'must_merge_before',
+])
+
+/**
+ * Returns true if adding (fromId → toId) for the given relation type would
+ * create a cycle. Uses a recursive CTE to walk the existing graph.
+ * Only checked for directed dependency relations.
+ */
+function wouldCreateCycle(db: Db, fromId: string, toId: string, relationType: string): boolean {
+  if (!DIRECTED_RELATION_TYPES.has(relationType)) return false
+  // A cycle exists if `toId` already transitively reaches `fromId` via the same relation type.
+  const row = db.prepare(`
+    WITH RECURSIVE reachable(node) AS (
+      SELECT target_task_id FROM task_relations
+       WHERE task_id = ? AND relation_type = ?
+      UNION
+      SELECT r.target_task_id FROM task_relations r
+      JOIN reachable rc ON r.task_id = rc.node
+       WHERE r.relation_type = ?
+    )
+    SELECT 1 FROM reachable WHERE node = ? LIMIT 1
+  `).get(toId, relationType, relationType, fromId)
+  return row !== undefined
+}
+
 export async function addTaskRelation(input: AddTaskRelationInput, db: Db = getDb()): Promise<void> {
   if (input.task_id === input.target_task_id) {
     throw new FulcrumError('task_id and target_task_id must be different', 'invalid_input')
@@ -39,6 +66,14 @@ export async function addTaskRelation(input: AddTaskRelationInput, db: Db = getD
   if (!task) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
   const target = db.prepare('SELECT task_id FROM tasks WHERE task_id = ?').get(input.target_task_id)
   if (!target) throw new FulcrumError(`Task ${input.target_task_id} not found`, 'not_found')
+
+  // PLAN-004: reject cycles in directed dependency relations
+  if (wouldCreateCycle(db, input.task_id, input.target_task_id, input.relation_type)) {
+    throw new FulcrumError(
+      `Adding relation '${input.relation_type}' from ${input.task_id} to ${input.target_task_id} would create a cycle`,
+      'invalid_input'
+    )
+  }
 
   db.prepare(`
     INSERT OR IGNORE INTO task_relations (task_id, target_task_id, relation_type)

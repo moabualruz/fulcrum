@@ -2,6 +2,14 @@
 import { getDb, FulcrumError, emitEvent, nextDisplayId, statusCategory, newId, Db} from '@fulcrum/core'
 import type { Epic, CreateEpicInput, UpdateEpicInput, ListEpicsInput, EpicStatus, StatusCategory } from './types.js'
 
+// PLAN-005: allowed epic status transitions
+const EPIC_TRANSITIONS: Record<EpicStatus, readonly EpicStatus[]> = {
+  backlog:     ['in_progress', 'done', 'cancelled'],
+  in_progress: ['done', 'cancelled', 'backlog'],
+  done:        ['cancelled'],
+  cancelled:   [],
+}
+
 function rowToEpic(row: Record<string, unknown>): Epic {
   return {
     epic_id: row.epic_id as string,
@@ -75,6 +83,17 @@ export async function updateEpic(input: UpdateEpicInput, db: Db = getDb()): Prom
   const statusChanging = input.status !== undefined && input.status !== (existing.status as string)
 
   if (input.status !== undefined) {
+    // PLAN-005: validate transition is allowed
+    if (statusChanging) {
+      const from = existing.status as EpicStatus
+      const allowed = EPIC_TRANSITIONS[from] ?? []
+      if (!(allowed as readonly string[]).includes(input.status)) {
+        throw new FulcrumError(
+          `Invalid epic status transition: ${from} → ${input.status}`,
+          'invalid_state'
+        )
+      }
+    }
     fields.push('status = ?'); values.push(input.status)
     fields.push('status_category = ?'); values.push(statusCategory(input.status))
   }

@@ -2,6 +2,17 @@
 import { getDb, FulcrumError, emitEvent, nextDisplayId, statusCategory, newId, Db} from '@fulcrum/core'
 import type { Issue, CreateIssueInput, UpdateIssueInput, ListIssuesInput, IssueStatus, StatusCategory, EstimateType } from './types.js'
 
+// PLAN-005: allowed status transitions — enforced in updateIssue
+const ISSUE_TRANSITIONS: Record<IssueStatus, readonly IssueStatus[]> = {
+  backlog:     ['ready', 'in_progress', 'done', 'cancelled'],
+  ready:       ['in_progress', 'backlog', 'done', 'cancelled'],
+  in_progress: ['in_review', 'blocked', 'done', 'cancelled', 'backlog'],
+  blocked:     ['in_progress', 'cancelled'],
+  in_review:   ['in_progress', 'done', 'cancelled'],
+  done:        ['cancelled'],
+  cancelled:   [],
+}
+
 function rowToIssue(row: Record<string, unknown>, labels: string[]): Issue {
   return {
     issue_id: row.issue_id as string,
@@ -9,6 +20,7 @@ function rowToIssue(row: Record<string, unknown>, labels: string[]): Issue {
     project_id: row.project_id as string,
     epic_id: row.epic_id as string | null,
     parent_issue_id: row.parent_issue_id as string | null,
+    blocking_task_id: (row.blocking_task_id ?? null) as string | null, // PLAN-003
     display_id: row.display_id as string,
     title: row.title as string,
     description: row.description as string | null,
@@ -94,8 +106,24 @@ export async function updateIssue(input: UpdateIssueInput, db: Db = getDb()): Pr
   const statusChanging = input.status !== undefined && input.status !== (existing.status as string)
 
   if (input.status !== undefined) {
+    // PLAN-005: validate transition is allowed
+    if (statusChanging) {
+      const from = existing.status as IssueStatus
+      const allowed = ISSUE_TRANSITIONS[from] ?? []
+      if (!(allowed as readonly string[]).includes(input.status)) {
+        throw new FulcrumError(
+          `Invalid issue status transition: ${from} → ${input.status}`,
+          'invalid_state'
+        )
+      }
+    }
     fields.push('status = ?'); values.push(input.status)
     fields.push('status_category = ?'); values.push(statusCategory(input.status))
+  }
+
+  // PLAN-003: update blocking_task_id if provided
+  if ('blocking_task_id' in input) {
+    fields.push('blocking_task_id = ?'); values.push(input.blocking_task_id ?? null)
   }
   values.push(input.issue_id)
 

@@ -39,6 +39,8 @@ export interface Issue {
   project_id: string
   epic_id: string | null
   parent_issue_id: string | null
+  /** PLAN-003: task that is currently blocking this issue (denormalized for quick access). */
+  blocking_task_id: string | null
   display_id: string
   title: string
   description: string | null
@@ -145,6 +147,8 @@ export interface UpdateIssueInput {
   estimate_type?: EstimateType
   estimate_value?: number
   labels?: string[]
+  /** PLAN-003: set/clear the task that is blocking this issue. */
+  blocking_task_id?: string | null
   expected_version: number
 }
 
