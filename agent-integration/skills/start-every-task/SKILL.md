@@ -10,6 +10,20 @@ allowed-tools:
 user-invocable: false
 version: 1.0.0
 author: fulcrum
+input:
+  description: "Triggered automatically before the first write-family tool call."
+  fields:
+    - name: task_id
+      type: string
+      required: false
+      description: "Task ID to associate this run with. If absent, call list_tasks or create_task first."
+    - name: agent_role
+      type: string
+      required: true
+      description: "Canonical role slug (e.g. software_engineer). Use list_agent_profiles to discover."
+output:
+  artifact: run_id
+  description: "A run_id string used to heartbeat, complete, or block this run."
 ---
 
 # Start every task with start_agent_run
@@ -73,6 +87,31 @@ for review, and `integration_worker` for merges.
 - You hit a WIP-limit error → don't loop. See
   [workspace-status-on-session-start](../workspace-status-on-session-start/SKILL.md)
   to diagnose who else is holding the budget.
+
+## Worked example
+
+**Scenario:** The user asks "fix the failing auth test in `packages/auth/src/tests/login.test.ts`".
+
+```
+# 1. Discover workspace context
+mcp__fulcrum__get_current_context
+→ { workspace_id: "ws_abc123", project_id: "proj_xyz" }
+
+# 2. Find or create the task
+mcp__fulcrum__list_tasks
+  workspace_id: "ws_abc123"
+  status: "open"
+→ (search result includes) { task_id: "task_001", title: "Fix failing auth login test" }
+
+# 3. Start the run
+mcp__fulcrum__start_agent_run
+  workspace_id: "ws_abc123"
+  task_id: "task_001"
+  agent_role: "software_engineer"
+→ { run_id: "run_999" }
+
+# 4. Proceed with the fix — run_id is now in scope for heartbeat/complete/block
+```
 
 See also: [recall-before-writing](../recall-before-writing/SKILL.md),
 [complete-agent-run](../complete-agent-run/SKILL.md).

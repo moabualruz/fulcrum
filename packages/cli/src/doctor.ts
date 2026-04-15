@@ -159,6 +159,51 @@ function checkMonitorToken(): CheckResult {
   }
 }
 
+/**
+ * GAP-ARCH-9: Validate that optional peer dependencies are importable when
+ * they are expected to be present.  A missing peer normally surfaces as an
+ * opaque "Cannot find module" error at the first call site — this check
+ * surfaces the problem early with a clear message.
+ */
+function checkOptionalPeerDeps(): CheckResult {
+  const peers: Array<{ name: string; pkg: string; feature: string }> = [
+    { name: 'better-sqlite3',           pkg: 'better-sqlite3',                      feature: 'L1 SQLite storage' },
+    { name: 'kuzu',                     pkg: 'kuzu',                                feature: 'L2 graph search (optional)' },
+    { name: 'sqlite-vec',               pkg: 'sqlite-vec',                          feature: 'L2 vector search (optional)' },
+    { name: '@modelcontextprotocol/sdk', pkg: '@modelcontextprotocol/sdk/server/mcp.js', feature: 'MCP server' },
+  ]
+
+  const missing: string[] = []
+  const present: string[] = []
+
+  for (const peer of peers) {
+    try {
+      require.resolve(peer.pkg)
+      present.push(peer.name)
+    } catch {
+      missing.push(`${peer.name} (${peer.feature})`)
+    }
+  }
+
+  if (missing.length === 0) {
+    return { name: 'Optional peer deps', status: 'pass', message: `All present: ${present.join(', ')}` }
+  }
+  // sqlite-vec and kuzu are truly optional — only warn
+  const criticalMissing = missing.filter(m => !m.includes('L2'))
+  if (criticalMissing.length > 0) {
+    return {
+      name: 'Optional peer deps',
+      status: 'fail',
+      message: `Missing: ${criticalMissing.join(', ')} — run: pnpm install`,
+    }
+  }
+  return {
+    name: 'Optional peer deps',
+    status: 'warn',
+    message: `L2 components not installed (${missing.join(', ')}) — L1-only mode`,
+  }
+}
+
 // ---------- Runner ----------
 
 export interface DoctorOptions {
@@ -179,6 +224,7 @@ export function runDoctor(options: DoctorOptions = {}): { results: CheckResult[]
     checkEnvVars(),
     checkAgentIntegration(cwd),
     checkMonitorToken(),
+    checkOptionalPeerDeps(),
   ]
 
   const exitCode = results.some(r => r.status === 'fail') ? 1 : 0

@@ -67,6 +67,16 @@ triggers:                      # optional — explicit conditions that activate 
   - before_tool_use            #   before_tool_use: fires on PreToolUse hook match
   - session_start              #   session_start: fires on SessionStart hook
   - on_demand                  #   on_demand: user explicitly requests it (implies user-invocable: true)
+input:                         # optional — contract for callers (GAP-SKILLS-2)
+  description: "When/how this skill is invoked."
+  fields:
+    - name: some_field
+      type: string
+      required: false
+      description: "What this field means."
+output:                        # optional — what this skill produces
+  artifact: run_id             # artifact type (run_id | memory_id | report | commit_sha | ...)
+  description: "What the skill returns or persists."
 ---
 ```
 
