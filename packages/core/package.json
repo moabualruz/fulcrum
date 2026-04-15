@@ -35,14 +35,6 @@
     "@opentelemetry/semantic-conventions": "^1.27.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.53.0"
   },
-  "peerDependencies": {
-    "@fulcrum/teams": "workspace:*"
-  },
-  "peerDependenciesMeta": {
-    "@fulcrum/teams": {
-      "optional": true
-    }
-  },
   "devDependencies": {
     "@fulcrum/teams": "workspace:*",
     "@types/better-sqlite3": "^7.6.12",

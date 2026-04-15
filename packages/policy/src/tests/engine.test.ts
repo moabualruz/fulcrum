@@ -1,8 +1,7 @@
 // packages/policy/src/tests/engine.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seed } from './helpers.js'
-import { getDb } from '@fulcrum/core'
-import { L1_ROLES } from '@fulcrum/core'
+import { getDb, createAgentDefinition, L1_ROLES } from '@fulcrum/core'
 import {
   createPolicyRule,
   listPolicyRules,
@@ -829,5 +828,84 @@ describe('evaluatePolicy — L1_ROLES: invoke_team enforcement', () => {
   it('L1_ROLES set contains exactly chief_of_staff', () => {
     expect(L1_ROLES.has('chief_of_staff')).toBe(true)
     expect(L1_ROLES.size).toBe(1)
+  })
+})
+
+// --- capability_required_for_action ---
+
+describe('evaluatePolicy — SYSTEM_INVARIANTS: capability_required_for_action', () => {
+  it('allows invoke_team when agent_definitions row has create_teams capability', async () => {
+    // Seed an agent_definitions row that grants create_teams to chief_of_staff
+    const db = getDb()
+    createAgentDefinition({
+      role: 'chief_of_staff',
+      workspace_id: 'ws_1',
+      display_name: 'Chief of Staff',
+      description: 'L1 orchestrator',
+      capabilities: ['create_teams'],
+    }, db)
+
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'chief_of_staff',
+      actor_id: 'run_cos',
+      action: 'invoke_team',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+
+  it('denies invoke_team when agent_definitions row exists but lacks create_teams', async () => {
+    // Seed chief_of_staff WITHOUT create_teams. The capability_required_for_action
+    // invariant fires AFTER only_l1_invokes_teams (which passes for chief_of_staff).
+    const db = getDb()
+    createAgentDefinition({
+      role: 'chief_of_staff',
+      workspace_id: 'ws_1',
+      display_name: 'Chief of Staff',
+      description: 'L1 orchestrator without team cap',
+      capabilities: [],  // explicitly empty — missing create_teams
+    }, db)
+
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'chief_of_staff',
+      actor_id: 'run_cos',
+      action: 'invoke_team',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.rule_id).toBe('SYSTEM:capability_required_for_action')
+  })
+
+  it('allows actions with no capability mapping regardless of agent_definitions', async () => {
+    const db = getDb()
+    createAgentDefinition({
+      role: 'software_engineer',
+      workspace_id: 'ws_1',
+      display_name: 'Software Engineer',
+      description: 'L2 implementor',
+      capabilities: [],
+    }, db)
+
+    // 'write_file' has no ACTION_CAPABILITY entry → capability gate is skipped
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'software_engineer',
+      actor_id: 'run_se',
+      action: 'write_file',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+
+  it('defers to other checks when no agent_definitions row exists for role', async () => {
+    // No agent_definitions row for qa_engineer in ws_1
+    // capability_required_for_action returns false (defer) → only_integration_worker_merges fires
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'qa_engineer',
+      actor_id: 'run_qa',
+      action: 'merge_worktree',
+    })
+    expect(decision.allowed).toBe(false)
+    expect(decision.rule_id).toBe('SYSTEM:only_integration_worker_merges')
   })
 })

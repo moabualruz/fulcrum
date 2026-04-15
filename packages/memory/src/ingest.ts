@@ -110,7 +110,16 @@ function splitByMaxSize(text: string, maxChars: number, overlap: number): string
   return result
 }
 
-/** Build a sorted array of byte offsets where each line begins. */
+// NOTE: tree-sitter reports offsets in bytes (UTF-8), but JavaScript strings
+// are UTF-16. For ASCII-only source files these are identical. Files containing
+// multi-byte characters (e.g. CJK literals, emoji in comments) will produce
+// slightly inaccurate line numbers because we index by JS code-unit position
+// rather than raw byte position. This is acceptable for chunk attribution
+// purposes — the chunk text itself is correct; only the reported line number
+// may be off by at most one line per multi-byte character encountered before
+// the split boundary.
+
+/** Build a sorted array of character (code-unit) offsets where each line begins. */
 function buildLineStartIndex(source: string): number[] {
   const starts = [0]
   for (let i = 0; i < source.length; i++) {
@@ -119,7 +128,7 @@ function buildLineStartIndex(source: string): number[] {
   return starts
 }
 
-/** Convert a zero-based byte offset to a 1-based line number. */
+/** Convert a zero-based character offset to a 1-based line number. */
 function byteOffsetToLine(offset: number, lineStarts: number[]): number {
   let lo = 0, hi = lineStarts.length - 1
   while (lo < hi) {

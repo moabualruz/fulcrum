@@ -1,5 +1,5 @@
 // packages/policy/src/engine.ts
-import { getDb, FulcrumError, isL1, canMerge, newId, listAgentDefinitions } from '@fulcrum/core'
+import { getDb, FulcrumError, isL1, canMerge, newId, getAgentDefinition } from '@fulcrum/core'
 import { minimatch } from 'minimatch'
 import type { AgentRole } from '@fulcrum/core'
 import type {
@@ -60,9 +60,9 @@ export const SYSTEM_INVARIANTS: SystemInvariant[] = [
       // Look up the agent definition for this workspace + role
       try {
         const db = getDb()
-        const defs = listAgentDefinitions(input.actor_role, input.workspace_id, db)
-        if (defs.length === 0) return false  // no definition → defer to other checks
-        const caps: string[] = defs[0].capabilities ?? []
+        const def = getAgentDefinition(input.actor_role, input.workspace_id, db)
+        if (!def) return false  // no definition → defer to other checks
+        const caps: string[] = def.capabilities ?? []
         return !caps.includes(required)
       } catch {
         return false  // graceful degradation if DB not ready
