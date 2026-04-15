@@ -93,8 +93,8 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         max_chars: { type: 'number', description: 'Truncate content to this many characters (default 500)' },
         query_scope: {
           type: 'string',
-          enum: ['session', 'project', 'workspace', 'global'],
-          description: 'Search breadth: project (default) = workspace+project; workspace = all projects in workspace; global = cross-workspace; session = specific agent session',
+          enum: ['session', 'project', 'workspace'],
+          description: 'Search breadth: project (default) = workspace+project; workspace = all projects in workspace; session = specific agent session',
         },
         session_id: { type: 'string', description: 'Session ID — required when query_scope=session' },
       },

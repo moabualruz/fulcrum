@@ -29,8 +29,12 @@ function buildWhereClause(input: RecallMemoryInput): { clauses: string[]; params
   // 'session': filter by session_id only (narrowest)
   // 'project': filter by workspace_id + project_id (default)
   // 'workspace': filter by workspace_id only
-  // 'global': no workspace filter (cross-workspace)
-  const qs: QueryScope = input.query_scope ?? 'project'
+  const qs = input.query_scope ?? 'project'
+
+  // Explicitly block 'global' — cross-workspace queries are not permitted
+  if ((qs as string) === 'global') {
+    throw new FulcrumError("query_scope 'global' is not permitted", 'invalid_input')
+  }
 
   switch (qs) {
     case 'session':
@@ -53,9 +57,6 @@ function buildWhereClause(input: RecallMemoryInput): { clauses: string[]; params
     case 'workspace':
       clauses.push('m.workspace_id = ?')
       params.push(input.workspace_id)
-      break
-    case 'global':
-      // No workspace filter — cross-workspace search
       break
     case 'project':
     default:

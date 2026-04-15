@@ -42,9 +42,8 @@ export interface WriteMemoryInput {
  * - 'session':   filter to memories from a specific agent session (requires session_id)
  * - 'project':   default — filter by workspace_id + project_id
  * - 'workspace': drop project_id filter — search all projects in the workspace
- * - 'global':    no workspace filter — cross-workspace search
  */
-export type QueryScope = 'session' | 'project' | 'workspace' | 'global'
+export type QueryScope = 'session' | 'project' | 'workspace'
 
 export interface RecallMemoryInput {
   workspace_id: string
@@ -56,7 +55,7 @@ export interface RecallMemoryInput {
   scope?: MemoryScope                 // filter by memory.scope column
   kind?: MemoryKind
   file_path?: string
-  query_scope?: QueryScope            // search breadth: project (default) | workspace | global | session
+  query_scope?: QueryScope            // search breadth: project (default) | workspace | session
   session_id?: string                 // required when query_scope = 'session'
 }
 

@@ -1,12 +1,12 @@
 // packages/memory/src/tests/recall-scope.test.ts
 //
 // Tests for query_scope composition in recallMemory.
-// Verifies that session/project/workspace/global scope correctly
+// Verifies that session/project/workspace scope correctly
 // controls which memories are included in search results.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
-import { getDb } from '@fulcrum/core'
+import { getDb, FulcrumError } from '@fulcrum/core'
 import { writeMemory } from '../write.js'
 import { recallMemory } from '../recall.js'
 
@@ -87,20 +87,25 @@ describe('query_scope composition in recallMemory', () => {
     expect(allIds.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('global scope returns memories from all workspaces', async () => {
+  it("global scope throws FulcrumError — cross-workspace queries are not permitted", async () => {
     seed()
-    const idA = await writeTestMemory({ workspace_id: 'ws_1', project_id: 'proj_a', content: 'global recall alpha' })
-    const idC = await writeTestMemory({ workspace_id: 'ws_2', project_id: 'proj_c', content: 'global recall gamma' })
+    await expect(
+      recallMemory({
+        query: 'global recall',
+        workspace_id: 'ws_1',
+        project_id: 'proj_a',
+        query_scope: 'global' as never,
+      })
+    ).rejects.toThrow(FulcrumError)
 
-    const results = await recallMemory({
-      query: 'global recall',
-      workspace_id: 'ws_1',  // still provided (may be used for other filters)
-      project_id: 'proj_a',
-      query_scope: 'global',
-    })
-    const ids = (results as Array<{ memory_id: string }>).map(r => r.memory_id)
-    expect(ids).toContain(idA)
-    expect(ids).toContain(idC)
+    await expect(
+      recallMemory({
+        query: 'global recall',
+        workspace_id: 'ws_1',
+        project_id: 'proj_a',
+        query_scope: 'global' as never,
+      })
+    ).rejects.toMatchObject({ code: 'invalid_input', message: "query_scope 'global' is not permitted" })
   })
 
   it('session scope returns only memories with matching session_id', async () => {
