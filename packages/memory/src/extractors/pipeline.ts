@@ -6,6 +6,8 @@ import { appendFileSync } from 'fs'
 import { join } from 'path'
 import { getKuzuClient } from '../kuzu/client.js'
 import { upsertMemoryToKuzu } from '../kuzu/upsert.js'
+import { resolveEntity, incrementMentionCount } from '../kuzu/entity-store.js'
+import { extractSemantic } from './semantic.js'
 import type { FullMemory } from '../types.js'
 
 export interface PendingL2Item {
@@ -41,9 +43,45 @@ export async function runExtractionPipeline(
   // Track 1: create/update Memory node + entity edges in Kuzu
   await upsertMemoryToKuzu(kuzuClient, memory, null)
 
-  // Track 2: enqueue for LLM semantic extraction — curated kinds only
+  // Track 2: LLM semantic extraction — curated kinds only
   const TRACK2_KINDS = new Set(['decision', 'fact', 'lesson', 'error', 'task_outcome'])
   if (TRACK2_KINDS.has(memory.kind)) {
+    // Enqueue for async processing
     enqueueForL2(vaultPath, memory.memory_id, memory.workspace_id)
+
+    // Run semantic extraction inline if API key is available
+    const bodyText = memory.canonical_text ?? memory.title
+    if (process.env.ANTHROPIC_API_KEY && bodyText.length > 50) {
+      try {
+        const edges = await extractSemantic(memory.memory_id, bodyText, memory.workspace_id)
+        const now = new Date().toISOString()
+
+        for (const edge of edges) {
+          // CAUSES and PREVENTS are Entity→Entity in schema — skip graph write for those
+          if (edge.edgeType === 'CAUSES' || edge.edgeType === 'PREVENTS') continue
+
+          try {
+            const entity = await resolveEntity(kuzuClient, edge.toEntityId, memory.workspace_id)
+            await incrementMentionCount(kuzuClient, entity.id)
+
+            await kuzuClient.query(
+              `MATCH (m:Memory {id: $mid}), (e:Entity {id: $eid})
+               CREATE (m)-[:${edge.edgeType} {weight: $weight, confidence: $confidence, source: 'llm', created_at: CAST($now AS TIMESTAMP)}]->(e)`,
+              {
+                mid: memory.memory_id,
+                eid: entity.id,
+                weight: edge.confidence,
+                confidence: edge.confidence,
+                now,
+              }
+            ).catch(() => { /* edge may already exist */ })
+          } catch {
+            // Entity resolution or graph write failed — continue with next edge
+          }
+        }
+      } catch {
+        // Semantic extraction failed — continue without graph population
+      }
+    }
   }
 }
