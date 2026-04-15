@@ -677,6 +677,7 @@ function registerOtelShutdown(): void {
   _otelShutdownRegistered = true
   const handler = async () => {
     try { _monitorServer?.stop() } catch { /* best-effort */ }
+    _monitorServer = null
     try {
       const { shutdownOtel } = await import('@fulcrum/core')
       await shutdownOtel()
@@ -685,6 +686,9 @@ function registerOtelShutdown(): void {
   }
   process.once('SIGINT', handler)
   process.once('SIGTERM', handler)
+  process.on('exit', () => {
+    try { _monitorServer?.stop() } catch { /* best-effort */ }
+  })
 }
 
 async function runServeMcp(): Promise<void> {
@@ -1093,8 +1097,12 @@ async function runServeMcp(): Promise<void> {
       _monitorServer = monitorServer
       process.stderr.write(`[fulcrum] Monitor running on http://127.0.0.1:${monitorPort}\n`)
     } catch (err) {
+      _monitorStarted = true  // prevent retry on next runServeMcp() call
+      const hint = err instanceof Error && err.message.includes('EADDRINUSE')
+        ? ' (port in use — set FULCRUM_MONITOR_PORT or FULCRUM_NO_MONITOR=1 to skip)'
+        : ''
       // Non-fatal: MCP server still works without the monitor
-      process.stderr.write(`[fulcrum] Monitor auto-start failed (non-fatal): ${(err as Error).message}\n`)
+      process.stderr.write(`[fulcrum] Monitor auto-start failed (non-fatal): ${(err as Error).message}${hint}\n`)
     }
   }
 
