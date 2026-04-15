@@ -5,6 +5,8 @@ triggers:
   - starting development on a feature branch
   - need isolated workspace for a task
   - provisioning code workspace for agent
+version: 1.0.0
+author: fulcrum
 ---
 
 # Worktree Checkout

@@ -5,6 +5,8 @@ triggers:
   - made a significant design choice
   - chose between multiple approaches
   - established a constraint or pattern
+version: 1.0.0
+author: fulcrum
 ---
 
 # Write Decision

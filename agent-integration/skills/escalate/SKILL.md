@@ -5,6 +5,8 @@ triggers:
   - stuck on a problem
   - cannot proceed without a decision
   - ambiguous requirements
+version: 1.0.0
+author: fulcrum
 ---
 
 # Escalate

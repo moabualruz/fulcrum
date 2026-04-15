@@ -4,6 +4,8 @@ description: Finalize an agent run with a meaningful summary and changed-file li
 allowed-tools:
   - mcp__fulcrum__complete_agent_run
 user-invocable: false
+version: 1.0.0
+author: fulcrum
 ---
 
 # Complete agent runs with a real summary

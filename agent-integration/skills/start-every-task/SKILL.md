@@ -8,6 +8,8 @@ allowed-tools:
   - mcp__fulcrum__create_task
   - mcp__fulcrum__list_agent_profiles
 user-invocable: false
+version: 1.0.0
+author: fulcrum
 ---
 
 # Start every task with start_agent_run

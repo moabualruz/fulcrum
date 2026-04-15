@@ -5,6 +5,8 @@ triggers:
   - feature branch is ready
   - code review approved
   - ready to merge worktree
+version: 1.0.0
+author: fulcrum
 ---
 
 # Worktree Merge

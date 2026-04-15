@@ -5,6 +5,8 @@ triggers:
   - daily check-in
   - status report requested
   - beginning of work session review
+version: 1.0.0
+author: fulcrum
 ---
 
 # Daily Standup

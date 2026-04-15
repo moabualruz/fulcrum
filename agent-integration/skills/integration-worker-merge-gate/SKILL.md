@@ -3,6 +3,8 @@ name: integration-worker-merge-gate
 description: When operating as integration_worker, verify review and test artifacts exist before calling processMergeQueue. Applies to every merge attempt by the integration_worker role.
 allowed-tools: []
 user-invocable: false
+version: 1.0.0
+author: fulcrum
 ---
 
 # Integration worker merge gate

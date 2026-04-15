@@ -4,6 +4,8 @@ description: Only chief_of_staff may call invoke_team. Applies whenever a non-Co
 allowed-tools: []
 user-invocable: false
 disable-model-invocation: false
+version: 1.0.0
+author: fulcrum
 ---
 
 # invoke_team is chief-of-staff only

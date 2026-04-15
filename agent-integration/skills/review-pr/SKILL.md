@@ -5,6 +5,8 @@ triggers:
   - asked to review a PR
   - code review checkpoint
   - qa_engineer or code_reviewer role active
+version: 1.0.0
+author: fulcrum
 ---
 
 # Review PR

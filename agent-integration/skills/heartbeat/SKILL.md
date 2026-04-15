@@ -5,6 +5,8 @@ triggers:
   - any task expected to take more than 5 minutes
   - long-running computation or build
   - multi-step implementation task
+version: 1.0.0
+author: fulcrum
 ---
 
 # Heartbeat

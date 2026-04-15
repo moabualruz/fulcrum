@@ -5,6 +5,8 @@ triggers:
   - session closing
   - work complete
   - handoff required
+version: 1.0.0
+author: fulcrum
 ---
 
 # Session End

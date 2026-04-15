@@ -4,6 +4,8 @@ description: Persist a memory after completing any task that involved a decision
 allowed-tools:
   - mcp__fulcrum__write_memory
 user-invocable: false
+version: 1.0.0
+author: fulcrum
 ---
 
 # Write memory on completion

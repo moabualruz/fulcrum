@@ -4,6 +4,8 @@ description: Emit heartbeat_agent_run every ~30 seconds during any run that take
 allowed-tools:
   - mcp__fulcrum__heartbeat_agent_run
 user-invocable: false
+version: 1.0.0
+author: fulcrum
 ---
 
 # Heartbeat during long operations

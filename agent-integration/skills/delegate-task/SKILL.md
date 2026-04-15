@@ -5,6 +5,8 @@ triggers:
   - need to assign work to a specialist
   - breaking down a large task
   - parallel workstreams needed
+version: 1.0.0
+author: fulcrum
 ---
 
 # Delegate Task

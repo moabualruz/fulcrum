@@ -5,6 +5,8 @@ triggers:
   - launching a multi-agent team
   - complex task requiring multiple specialists
   - chief_of_staff orchestration
+version: 1.0.0
+author: fulcrum
 ---
 
 # Team Launch

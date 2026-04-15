@@ -5,6 +5,8 @@ allowed-tools:
   - mcp__fulcrum__get_current_context
   - mcp__fulcrum__get_workspace_status
 user-invocable: false
+version: 1.0.0
+author: fulcrum
 ---
 
 # Check workspace status on session start

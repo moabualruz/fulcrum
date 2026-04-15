@@ -5,6 +5,8 @@ triggers:
   - choosing which agent to assign a task to
   - exploring available roles
   - checking agent definitions
+version: 1.0.0
+author: fulcrum
 ---
 
 # List Agents

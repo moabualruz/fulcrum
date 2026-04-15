@@ -4,6 +4,8 @@ description: Never include credentials, API keys, tokens, or passwords in tool i
 allowed-tools: []
 user-invocable: false
 disable-model-invocation: false
+version: 1.0.0
+author: fulcrum
 ---
 
 # Secret hygiene

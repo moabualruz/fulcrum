@@ -5,6 +5,8 @@ triggers:
   - launching a specialist agent
   - starting a parallel workstream
   - handing off to a specific role
+version: 1.0.0
+author: fulcrum
 ---
 
 # Spawn Agent

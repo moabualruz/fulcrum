@@ -4,6 +4,8 @@ description: Initialize a Fulcrum agent run at the start of every working sessio
 triggers:
   - session opened
   - new conversation started
+version: 1.0.0
+author: fulcrum
 ---
 
 # Session Start

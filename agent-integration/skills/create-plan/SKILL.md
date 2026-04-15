@@ -5,6 +5,8 @@ triggers:
   - planning implementation from requirements
   - breaking down a PRD into tasks
   - generating issue decomposition
+version: 1.0.0
+author: fulcrum
 ---
 
 # Create Plan

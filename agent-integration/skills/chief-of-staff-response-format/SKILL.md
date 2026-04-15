@@ -4,6 +4,8 @@ description: When operating as chief_of_staff, end every response with the struc
 allowed-tools: []
 user-invocable: false
 disable-model-invocation: false
+version: 1.0.0
+author: fulcrum
 ---
 
 # Chief of Staff response format

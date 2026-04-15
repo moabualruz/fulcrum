@@ -5,6 +5,8 @@ triggers:
   - checking team progress
   - monitoring multi-agent workstream
   - looking for blocked team members
+version: 1.0.0
+author: fulcrum
 ---
 
 # Team Status

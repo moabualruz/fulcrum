@@ -6,6 +6,8 @@ triggers:
   - spawning agents
   - merging branches
   - invoking teams
+version: 1.0.0
+author: fulcrum
 ---
 
 # Policy Check

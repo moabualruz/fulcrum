@@ -6,6 +6,8 @@ triggers:
   - PRD generation
   - issue decomposition
   - code review pipeline
+version: 1.0.0
+author: fulcrum
 ---
 
 # Run Workflow

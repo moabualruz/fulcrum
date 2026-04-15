@@ -4,6 +4,8 @@ description: Query the Fulcrum memory layer before writing new code, docs, or ar
 allowed-tools:
   - mcp__fulcrum__recall_memory
 user-invocable: false
+version: 1.0.0
+author: fulcrum
 ---
 
 # Recall memory before writing

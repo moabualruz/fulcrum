@@ -50,10 +50,34 @@ The skills are most useful in roughly this order within a session:
 - **CoS only** → `mcp__fulcrum__invoke_team`, `mcp__fulcrum__build_cos_context`
 - **Merge** → `integration_worker` only, after code review and tests pass
 
-## Conventions
+## Skill Frontmatter Reference
 
-- Every skill file has YAML frontmatter with `name` and `description` —
-  Claude Code filters skills by the `description`, so keep it specific.
+Every `SKILL.md` uses YAML frontmatter.  Required and optional fields:
+
+```yaml
+---
+name: <kebab-case-id>          # required — unique, stable identifier
+description: <one-liner>       # required — Claude Code filters skills by this; be specific
+version: 1.0.0                 # required — semver; bump on breaking behaviour change
+author: fulcrum                # required — "fulcrum" for built-ins, your package name for plugins
+allowed-tools:                 # required — exhaustive list of MCP / built-in tools this skill uses
+  - mcp__fulcrum__some_tool
+user-invocable: true | false   # required — false = auto-trigger only; true = user can /invoke
+triggers:                      # optional — explicit conditions that activate this skill
+  - before_tool_use            #   before_tool_use: fires on PreToolUse hook match
+  - session_start              #   session_start: fires on SessionStart hook
+  - on_demand                  #   on_demand: user explicitly requests it (implies user-invocable: true)
+---
+```
+
+**`triggers` convention** (GAP-SKILLS-1 resolution):
+| Value | When Claude Code activates the skill |
+|---|---|
+| `before_tool_use` | PreToolUse hook fires and `description` matches the tool context |
+| `session_start` | SessionStart hook fires |
+| `on_demand` | User explicitly types `/skill-name` or references it by name |
+| *(omitted)* | Description-match only — Claude Code decides from the `description` field |
+
 - Cross-links use relative paths so the directory is portable between
   `agent-integration/skills/` and `~/.claude/skills/`.
 - Red flags in each skill are the fastest way to self-audit — scan them

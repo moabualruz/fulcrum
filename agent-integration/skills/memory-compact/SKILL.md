@@ -5,6 +5,8 @@ triggers:
   - context approaching limit
   - before session ends with accumulated knowledge
   - pre-compact hook fires
+version: 1.0.0
+author: fulcrum
 ---
 
 # Memory Compact

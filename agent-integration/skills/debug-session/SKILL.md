@@ -5,6 +5,8 @@ triggers:
   - test is failing
   - unexpected runtime behavior
   - error message not understood
+version: 1.0.0
+author: fulcrum
 ---
 
 # Debug Session

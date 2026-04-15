@@ -5,6 +5,8 @@ triggers:
   - starting any non-trivial task
   - before writing code
   - need context on prior decisions
+version: 1.0.0
+author: fulcrum
 ---
 
 # Search Memory
