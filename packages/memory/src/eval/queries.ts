@@ -1,5 +1,6 @@
 // packages/memory/src/eval/queries.ts
-// 25 eval query cases, each with a query string and set of relevant fixture IDs.
+// 35 eval query cases, each with a query string and set of relevant fixture IDs.
+// Includes 10 paraphrastic cases (q26–q35) where query vocabulary differs from document vocabulary.
 
 export interface QueryCase {
   id: string
@@ -133,5 +134,56 @@ export const QUERY_CASES: QueryCase[] = [
     id: 'q25',
     query: 'recall@5 evaluation metric retrieval quality',
     relevant: ['fix_49'],
+  },
+  // ── Paraphrastic query cases (vocabulary diverges from fixture content) ──
+  {
+    id: 'q26',
+    query: 'retrieve person information from server asynchronously',
+    relevant: ['fix_51'],
+  },
+  {
+    id: 'q27',
+    query: 'check if visitor has permission to proceed',
+    relevant: ['fix_52'],
+  },
+  {
+    id: 'q28',
+    query: 'repeat failed operation with increasing wait intervals',
+    relevant: ['fix_53'],
+  },
+  {
+    id: 'q29',
+    query: 'notify listeners when something interesting happens',
+    relevant: ['fix_54'],
+  },
+  {
+    id: 'q30',
+    query: 'duplicate a nested structure without shared references',
+    relevant: ['fix_55'],
+  },
+  {
+    id: 'q31',
+    query: 'prevent too many requests from the same origin',
+    relevant: ['fix_56'],
+  },
+  {
+    id: 'q32',
+    query: 'defer heavy setup until first use then reuse result',
+    relevant: ['fix_57'],
+  },
+  {
+    id: 'q33',
+    query: 'split a large collection into equal-sized batches',
+    relevant: ['fix_58'],
+  },
+  {
+    id: 'q34',
+    query: 'wait until typing stops before running expensive operation',
+    relevant: ['fix_59'],
+  },
+  {
+    id: 'q35',
+    query: 'produce a new object with changed fields without modifying original',
+    relevant: ['fix_60'],
   },
 ]

@@ -62,6 +62,28 @@ export interface AggregateResult {
   passRate: number
 }
 
+/**
+ * ndcg@k — Normalized Discounted Cumulative Gain at k.
+ * DCG@K = sum of (rel_i / log2(i+2)) for i in 0..K-1 (binary relevance: 1 if relevant, 0 otherwise)
+ * NDCG@K = DCG@K / IDCG@K where IDCG is the perfect ranking
+ */
+export function ndcg(
+  retrieved: string[],
+  relevant: Set<string>,
+  k = 5
+): number {
+  const topK = retrieved.slice(0, k)
+  const dcg = topK.reduce((sum, id, i) => {
+    const rel = relevant.has(id) ? 1 : 0
+    return sum + rel / Math.log2(i + 2)
+  }, 0)
+  // IDCG: perfect case where all relevant docs are at top
+  const perfectK = Math.min(relevant.size, k)
+  const idcg = Array.from({ length: perfectK }, (_, i) => 1 / Math.log2(i + 2))
+    .reduce((a, b) => a + b, 0)
+  return idcg === 0 ? 0 : dcg / idcg
+}
+
 export function aggregate(results: EvalResult[]): AggregateResult {
   if (results.length === 0) {
     return { meanRecallAt5: 0, meanPrecisionAt5: 0, mrrScore: 0, passCount: 0, totalCount: 0, passRate: 0 }

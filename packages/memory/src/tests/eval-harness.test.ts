@@ -46,10 +46,10 @@ afterAll(() => {
   closeDb()
 })
 
-describe('retrieval eval harness — 50 fixtures, 25 query cases', () => {
-  it('all 50 fixtures are indexed', () => {
+describe('retrieval eval harness — 60 fixtures, 35 query cases', () => {
+  it('all 60 fixtures are indexed', () => {
     const count = db.prepare('SELECT count(*) as n FROM memories WHERE workspace_id = ?').get(WS) as { n: number }
-    expect(count.n).toBeGreaterThanOrEqual(50)
+    expect(count.n).toBeGreaterThanOrEqual(60)
   })
 
   it('individual query cases — recall@5 per query', async () => {
@@ -98,7 +98,7 @@ describe('retrieval eval harness — 50 fixtures, 25 query cases', () => {
 
     // Assert aggregate recall@5 >= 0.70
     expect(agg.meanRecallAt5).toBeGreaterThanOrEqual(0.70)
-    expect(agg.totalCount).toBe(QUERY_CASES.length)
+    expect(agg.totalCount).toBe(QUERY_CASES.length) // now 35
   })
 
   it('metrics: recallAtK with full overlap returns 1.0', () => {
