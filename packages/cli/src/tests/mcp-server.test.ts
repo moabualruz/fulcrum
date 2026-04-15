@@ -8,6 +8,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { CompatibilityCallToolResultSchema } from '@modelcontextprotocol/sdk/types.js'
 import { createFulcrumMcpServer } from '../mcp-server.js'
 import { TOOL_SCHEMAS } from '../mcp-tools.js'
+import { buildProfileFilter, TOOL_REGISTRY } from '../tool-registry.js'
 
 // ---------- Helpers ----------
 
@@ -284,6 +285,82 @@ describe('get_current_context readiness object', () => {
     const result = await callRaw(client, 'get_current_context', {})
     expect(result.isError).toBeFalsy()
     expect((result as { structuredContent?: unknown }).structuredContent).toBeDefined()
+  })
+})
+
+// ---------- --profile filtering ----------
+
+describe('--profile filter', () => {
+  // The 3 hookEquivalent tools that hook-only removes.
+  const HOOK_EQUIVALENT = ['recall_memory', 'write_memory', 'get_current_context']
+  const EXPECTED_HOOK_ONLY_COUNT = TOOL_SCHEMAS.length - HOOK_EQUIVALENT.length
+
+  it('hook-only filter returns a function', async () => {
+    const filter = await buildProfileFilter('hook-only')
+    expect(typeof filter).toBe('function')
+  })
+
+  it('hook-only filter excludes exactly the 3 hookEquivalent tools', async () => {
+    const filter = await buildProfileFilter('hook-only')
+    expect(filter).toBeDefined()
+    const served = TOOL_SCHEMAS.filter(filter!)
+    const servedNames = served.map(t => t.name)
+    for (const name of HOOK_EQUIVALENT) {
+      expect(servedNames).not.toContain(name)
+    }
+    expect(served).toHaveLength(EXPECTED_HOOK_ONLY_COUNT)
+  })
+
+  it('MCP server with hook-only profile serves exactly 20 tools', async () => {
+    const filter = await buildProfileFilter('hook-only')
+    expect(filter).toBeDefined()
+
+    const server = createFulcrumMcpServer({
+      version: '0.0.0-test',
+      handleToolCall: async (name, args) => ({ tool: name, args, ok: true }),
+      filter: filter!,
+    })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    const client = new Client({ name: 'test-profile-client', version: '0.0.0' })
+    await server.connect(serverTransport)
+    await client.connect(clientTransport)
+
+    const result = await client.listTools()
+    expect(result.tools).toHaveLength(EXPECTED_HOOK_ONLY_COUNT)
+    const toolNames = result.tools.map(t => t.name)
+    for (const name of HOOK_EQUIVALENT) {
+      expect(toolNames).not.toContain(name)
+    }
+  })
+
+  it('undefined profile (no --profile) returns undefined (no filter)', async () => {
+    const filter = await buildProfileFilter('')
+    expect(filter).toBeUndefined()
+  })
+
+  it('unknown role profile warns and returns undefined', async () => {
+    const stderrWrites: string[] = []
+    const origWrite = process.stderr.write.bind(process.stderr)
+    process.stderr.write = (chunk: string | Uint8Array, ...rest: Parameters<typeof process.stderr.write>[1][]) => {
+      stderrWrites.push(typeof chunk === 'string' ? chunk : String(chunk))
+      return origWrite(chunk, ...rest as [never])
+    }
+
+    try {
+      const filter = await buildProfileFilter('nonexistent_role_xyz')
+      expect(filter).toBeUndefined()
+      expect(stderrWrites.some(w => w.includes('nonexistent_role_xyz'))).toBe(true)
+    } finally {
+      process.stderr.write = origWrite
+    }
+  })
+
+  it('TOOL_REGISTRY hookEquivalent entries match the 3 expected names', () => {
+    const hookTools = Array.from(TOOL_REGISTRY.entries())
+      .filter(([, e]) => e.capabilities.hookEquivalent)
+      .map(([name]) => name)
+      .sort()
+    expect(hookTools).toEqual([...HOOK_EQUIVALENT].sort())
   })
 })
 

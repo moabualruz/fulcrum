@@ -23,6 +23,20 @@ To use a different port:
 FULCRUM_MONITOR_PORT=5000 fulcrum serve mcp
 ```
 
+### Recommended for Claude Code (hooks installed)
+
+Use `--profile hook-only` to strip the 3 hook-equivalent tools (`recall_memory`, `write_memory`, `get_current_context`) from the MCP surface. Claude Code's hooks already call these in-process, so removing them from MCP reduces context noise and avoids double-charging:
+
+```
+fulcrum serve mcp --profile hook-only
+```
+
+This serves 20 tools instead of 23. For role-based filtering (e.g. only expose tools a `software_engineer` may use):
+
+```
+fulcrum serve mcp --profile software_engineer
+```
+
 Monitor URLs (default port 4721):
 - Dashboard: http://localhost:4721
 - Tasks API: http://localhost:4721/tasks

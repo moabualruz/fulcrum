@@ -67,6 +67,7 @@ export { getWorkspaceStatus, buildCosContext, listAgentProfiles } from './status
 // Agent Definitions (MIGRATION_031)
 export {
   createAgentDefinition, getAgentDefinition, updateAgentDefinition, listAgentDefinitions,
+  GLOBAL_WORKSPACE_ID,
 } from './agent-definitions.js'
 export type { AgentDefinition, CreateAgentDefinitionInput, UpdateAgentDefinitionInput } from './types.js'
 

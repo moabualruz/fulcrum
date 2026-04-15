@@ -7,6 +7,8 @@
 //   - index.ts re-exports these for backward-compat (tests import from there)
 //   - runHook() in index.ts calls normalizeHookEvent / runPreHook / runPostHook
 
+import { readFileSync, existsSync } from 'fs'
+import { join } from 'path'
 import type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO } from '@fulcrum/core'
 
 export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO }
@@ -68,6 +70,30 @@ function _emitHookCapWarning(workspaceId: string, io: HookIO): void {
  * (exit 2) on secret scan matches or when CoS tries to invoke a team.
  */
 export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
+  // 0. Inject pre-fetched workspace snapshot if still fresh (< 5 minutes).
+  //    SessionStart hook writes this to the session file alongside run_id.
+  //    Injecting here means Claude sees workspace context before its first tool call,
+  //    reducing redundant get_workspace_status calls at session start.
+  //    Non-blocking — silently skipped on any error or missing file.
+  if (ctx.sessionId && ctx.sessionId !== 'unknown') {
+    try {
+      const { globalDataDir } = await import('@fulcrum/core')
+      const sessionFile = join(globalDataDir(), 'sessions', `${ctx.sessionId}.json`)
+      if (existsSync(sessionFile)) {
+        const session = JSON.parse(readFileSync(sessionFile, 'utf-8')) as Record<string, unknown>
+        const fetchedAt = session['fetched_at'] as string | undefined
+        const snapshot = session['workspace_snapshot'] as Record<string, unknown> | undefined
+        if (snapshot && fetchedAt) {
+          const ageMs = Date.now() - new Date(fetchedAt).getTime()
+          if (ageMs < 5 * 60 * 1000) {
+            const ageS = Math.round(ageMs / 1000)
+            io.stderr(`[fulcrum/pre] workspace context (${ageS}s old): ${JSON.stringify(snapshot).slice(0, 500)}\n`)
+          }
+        }
+      }
+    } catch { /* best-effort — never block on snapshot failure */ }
+  }
+
   // 1. Secret scan on tool_input — deny if any pattern matches
   try {
     const { checkSecrets } = await import('@fulcrum/policy')

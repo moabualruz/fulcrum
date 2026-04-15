@@ -114,6 +114,88 @@ describe('runSessionStartHook', () => {
     const { runSessionStartHook } = await import('../index.js')
     await expect(runSessionStartHook()).rejects.toThrow('EXIT_0')
   })
+
+  it('writes workspace_snapshot and fetched_at to session file when pre-fetch succeeds', async () => {
+    // The pre-fetch calls TOOL_REGISTRY handlers; mock the registry.
+    const fakeStatusResult = { active_runs: 0, blocked_runs: 0, wip_count: 0 }
+    const fakeTasksResult  = { tasks: [], total: 0 }
+    const fakeRegistryMap = new Map<string, { handler: ReturnType<typeof vi.fn> }>()
+    fakeRegistryMap.set('get_workspace_status', { handler: vi.fn().mockResolvedValue(fakeStatusResult) })
+    fakeRegistryMap.set('list_tasks', { handler: vi.fn().mockResolvedValue(fakeTasksResult) })
+
+    vi.doMock('../tool-registry.js', () => ({
+      TOOL_REGISTRY: fakeRegistryMap,
+      buildDeps: vi.fn().mockReturnValue({ db: {}, workspace_id: 'ws_test', project_id: 'proj_test' }),
+    }))
+    vi.doMock('@fulcrum/core', () => coreModuleMock)
+
+    let capturedSessionData: Record<string, unknown> | null = null
+    vi.doMock('fs', async () => {
+      const actual = await vi.importActual<typeof import('fs')>('fs')
+      return {
+        ...actual,
+        mkdirSync:     vi.fn(),
+        existsSync:    vi.fn().mockReturnValue(false),
+        writeFileSync: vi.fn().mockImplementation((_path: string, data: string) => {
+          try { capturedSessionData = JSON.parse(data) as Record<string, unknown> } catch { /* ignore */ }
+        }),
+        readFileSync:  vi.fn().mockReturnValue('{}'),
+      }
+    })
+
+    fakeStdin({ session_id: 'sess_snapshot_test', model: 'claude-sonnet-4-6' })
+
+    vi.resetModules()
+    const { runSessionStartHook } = await import('../index.js')
+    await expect(runSessionStartHook()).rejects.toThrow('EXIT_0')
+
+    expect(capturedSessionData).not.toBeNull()
+    expect(capturedSessionData!['run_id']).toBe('run_session_test')
+    expect(capturedSessionData!['workspace_snapshot']).toBeDefined()
+    expect(capturedSessionData!['fetched_at']).toEqual(expect.any(String))
+    const snap = capturedSessionData!['workspace_snapshot'] as Record<string, unknown>
+    expect(snap['status']).toMatchObject(fakeStatusResult)
+    expect(snap['tasks']).toMatchObject(fakeTasksResult)
+  })
+
+  it('writes session file without snapshot when pre-fetch fails', async () => {
+    // Registry throws on both calls — snapshot should be absent but session still succeeds.
+    const throwingHandler = { handler: vi.fn().mockRejectedValue(new Error('db error')) }
+    vi.doMock('../tool-registry.js', () => ({
+      TOOL_REGISTRY: new Map([
+        ['get_workspace_status', throwingHandler],
+        ['list_tasks',           throwingHandler],
+      ]),
+      buildDeps: vi.fn().mockReturnValue({ db: {}, workspace_id: 'ws_test', project_id: 'proj_test' }),
+    }))
+    vi.doMock('@fulcrum/core', () => coreModuleMock)
+
+    let capturedSessionData: Record<string, unknown> | null = null
+    vi.doMock('fs', async () => {
+      const actual = await vi.importActual<typeof import('fs')>('fs')
+      return {
+        ...actual,
+        mkdirSync:     vi.fn(),
+        existsSync:    vi.fn().mockReturnValue(false),
+        writeFileSync: vi.fn().mockImplementation((_path: string, data: string) => {
+          try { capturedSessionData = JSON.parse(data) as Record<string, unknown> } catch { /* ignore */ }
+        }),
+        readFileSync:  vi.fn().mockReturnValue('{}'),
+      }
+    })
+
+    fakeStdin({ session_id: 'sess_no_snapshot', model: 'claude' })
+
+    vi.resetModules()
+    const { runSessionStartHook } = await import('../index.js')
+    await expect(runSessionStartHook()).rejects.toThrow('EXIT_0')
+
+    // Session file must still be written with run_id, but no snapshot
+    expect(capturedSessionData).not.toBeNull()
+    expect(capturedSessionData!['run_id']).toBe('run_session_test')
+    expect(capturedSessionData!['workspace_snapshot']).toBeUndefined()
+    expect(capturedSessionData!['fetched_at']).toBeUndefined()
+  })
 })
 
 describe('runSessionStopHook', () => {

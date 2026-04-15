@@ -95,6 +95,13 @@ SKILLS
   skills install --project            Install to .claude/skills/ (project scope)
   skills list                         List available skills
 
+TOOL REGISTRY
+  tool list                           List all 23 MCP tools with names and descriptions
+  tool list --json                    Same, as JSON array
+  tool exec <name>                    Execute a tool using cwd workspace context
+  tool exec <name> --json <payload>   Execute with JSON payload string
+  cat payload.json | tool exec <name> Execute with JSON payload from stdin
+
 DIAGNOSTICS
   doctor              Run environment + configuration health checks
   doctor --json       Output checks as JSON
@@ -364,6 +371,21 @@ export async function runSessionStartHook(): Promise<void> {
       pi_profile: model ?? 'claude',
     })
 
+    // Pre-fetch workspace snapshot for injection in PreToolUse hooks (non-blocking).
+    // Reduces redundant get_workspace_status + list_tasks calls at session start.
+    let workspaceSnapshot: Record<string, unknown> | undefined
+    let fetchedAt: string | undefined
+    try {
+      const { TOOL_REGISTRY, buildDeps } = await import('./tool-registry.js')
+      const snapDeps = buildDeps(wsId, projId)
+      const [statusResult, tasksResult] = await Promise.all([
+        TOOL_REGISTRY.get('get_workspace_status')!.handler({ workspace_id: wsId }, snapDeps),
+        TOOL_REGISTRY.get('list_tasks')!.handler({ workspace_id: wsId, project_id: projId, status: 'open', limit: 10 }, snapDeps),
+      ])
+      workspaceSnapshot = { status: statusResult, tasks: tasksResult }
+      fetchedAt = new Date().toISOString()
+    } catch { /* non-fatal — session file written without snapshot */ }
+
     const sessionFile = getSessionFilePath(sessionId)
     writeFileSync(sessionFile, JSON.stringify({
       session_id: sessionId,
@@ -371,6 +393,7 @@ export async function runSessionStartHook(): Promise<void> {
       workspace_id: wsId,
       project_id: projId,
       started_at: now,
+      ...(workspaceSnapshot ? { workspace_snapshot: workspaceSnapshot, fetched_at: fetchedAt } : {}),
     }, null, 2))
 
     process.stderr.write(`[fulcrum/session] run started: ${run.run_id}\n`)
@@ -580,35 +603,20 @@ let _monitorStarted = false
 let _monitorServer: { stop(): void } | null = null
 
 // ── Monitor probe cache ───────────────────────────────────────────────────────
-// Caches monitor liveness per URL for 15 seconds to avoid hammering on every
-// get_current_context call without introducing noticeable staleness.
+// Monitor probe — moved to tool-registry.ts (lives with get_current_context handler).
+// Re-exported here for backward-compat with existing tests.
+import { probeMonitor, resetMonitorProbeCache } from './tool-registry.js'
 
-interface MonitorProbeEntry { running: boolean; ts: number }
-const _monitorProbeCache = new Map<string, MonitorProbeEntry>()
-const MONITOR_PROBE_TTL_MS = 15_000
-const MONITOR_PROBE_TIMEOUT_MS = 200
-
-async function probeMonitor(url: string): Promise<boolean> {
-  const now = Date.now()
-  const cached = _monitorProbeCache.get(url)
-  if (cached && (now - cached.ts) < MONITOR_PROBE_TTL_MS) return cached.running
-
-  let running = false
-  try {
-    const resp = await fetch(url, { signal: AbortSignal.timeout(MONITOR_PROBE_TIMEOUT_MS) })
-    running = resp.ok
-  } catch { /* timeout or connection refused = not running */ }
-
-  _monitorProbeCache.set(url, { running, ts: now })
-  return running
+async function probeMonitor_local(url: string): Promise<boolean> {
+  return probeMonitor(url)
 }
 
 // ── Test helpers (not part of the public CLI surface) ────────────────────────
 export async function probeMonitorForTest(url: string): Promise<boolean> {
-  return probeMonitor(url)
+  return probeMonitor_local(url)
 }
 export function _resetMonitorProbeCache(): void {
-  _monitorProbeCache.clear()
+  resetMonitorProbeCache()
 }
 export function _setMonitorStarted(val: boolean): void {
   _monitorStarted = val
@@ -630,34 +638,112 @@ async function buildCurrentContextResponse(): Promise<{
   workspace_id: string; project_id: string; cwd: string
   readiness: { tools_available: number; monitor_url: string; monitor_running: boolean; suggested_next_call: string }
 }> {
+  // Delegate to the unified registry handler so stdio and HTTP paths stay in sync.
+  const { TOOL_REGISTRY, buildDeps } = await import('./tool-registry.js')
   const ids = currentProjectIds()
-  const monitorPort = process.env['FULCRUM_MONITOR_PORT'] ?? '4721'
-  const monitorUrl = `http://localhost:${monitorPort}`
-  const { TOOL_SCHEMAS } = await import('./mcp-tools.js')
-  const monitorRunning = await probeMonitor(monitorUrl)
+  const deps = buildDeps(ids.workspace_id, ids.project_id)
+  return TOOL_REGISTRY.get('get_current_context')!.handler({}, deps) as Promise<{
+    workspace_id: string; project_id: string; cwd: string
+    readiness: { tools_available: number; monitor_url: string; monitor_running: boolean; suggested_next_call: string }
+  }>
+}
 
-  let suggestedNextCall = 'mcp__fulcrum__list_tasks'
-  try {
-    const { listTasks } = await import('@fulcrum/core')
-    const tasks = await listTasks({ workspace_id: ids.workspace_id, limit: 1 })
-    if (tasks.length === 0) {
-      suggestedNextCall = 'mcp__fulcrum__create_task'
+// ── Tool commands ─────────────────────────────────────────────────────────────
+
+async function runTool(): Promise<void> {
+  const sub = command  // 'exec' | 'list' | '--help' | undefined
+
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum tool — invoke MCP tools directly without a live MCP server
+
+  fulcrum tool list [--json]           List all available tools
+  fulcrum tool exec <name>             Execute tool with cwd context (reads stdin for payload)
+  fulcrum tool exec <name> --json <p>  Execute with inline JSON payload string
+`)
+    return
+  }
+
+  const { TOOL_REGISTRY, buildDeps } = await import('./tool-registry.js')
+  const ids = currentProjectIds()
+  const deps = buildDeps(ids.workspace_id, ids.project_id)
+
+  if (sub === 'list') {
+    const { TOOL_SCHEMAS } = await import('./mcp-tools.js')
+    const json = args.includes('--json')
+    if (json) {
+      const rows = TOOL_SCHEMAS.map(t => {
+        const entry = TOOL_REGISTRY.get(t.name)
+        return {
+          name: t.name,
+          title: t.title,
+          readOnly: entry?.capabilities.readOnly ?? false,
+          hookEquivalent: entry?.capabilities.hookEquivalent ?? false,
+          destructive: entry?.capabilities.destructive ?? false,
+        }
+      })
+      console.log(JSON.stringify(rows, null, 2))
+    } else {
+      const { TOOL_SCHEMAS: schemas } = await import('./mcp-tools.js')
+      const padded = schemas.map(t => `  ${t.name.padEnd(30)} ${t.description.slice(0, 70)}`)
+      console.log('Available tools:\n' + padded.join('\n'))
     }
-  } catch {
-    // DB not ready yet or no workspace — fall through to default
+    return
   }
 
-  return {
-    workspace_id: ids.workspace_id,
-    project_id: ids.project_id,
-    cwd: process.cwd(),
-    readiness: {
-      tools_available: TOOL_SCHEMAS.length,
-      monitor_url: monitorUrl,
-      monitor_running: monitorRunning,
-      suggested_next_call: suggestedNextCall,
-    },
+  if (sub === 'exec') {
+    const toolName = args[2]
+    if (!toolName || toolName.startsWith('--')) {
+      console.error('Usage: fulcrum tool exec <tool-name> [--json <payload>]')
+      process.exit(1)
+    }
+
+    const entry = TOOL_REGISTRY.get(toolName)
+    if (!entry) {
+      console.error(`Unknown tool: ${toolName}`)
+      console.error('Run `fulcrum tool list` to see available tools.')
+      process.exit(1)
+    }
+
+    // Parse payload: --json <string> or stdin
+    let toolArgs: Record<string, unknown> = {}
+    const jsonFlagIdx = args.indexOf('--json')
+    if (jsonFlagIdx !== -1 && jsonFlagIdx < args.length - 1) {
+      // --json '<payload>' inline
+      try {
+        toolArgs = JSON.parse(args[jsonFlagIdx + 1]!) as Record<string, unknown>
+      } catch (err) {
+        console.error(`Invalid JSON payload: ${(err as Error).message}`)
+        process.exit(1)
+      }
+    } else if (!process.stdin.isTTY) {
+      // Read from stdin pipe
+      const chunks: Buffer[] = []
+      for await (const chunk of process.stdin) chunks.push(chunk as Buffer)
+      const raw = Buffer.concat(chunks).toString('utf8').trim()
+      if (raw) {
+        try {
+          toolArgs = JSON.parse(raw) as Record<string, unknown>
+        } catch (err) {
+          console.error(`Invalid JSON from stdin: ${(err as Error).message}`)
+          process.exit(1)
+        }
+      }
+    }
+
+    try {
+      const result = await entry.handler(toolArgs, deps)
+      console.log(JSON.stringify(result, null, 2))
+    } catch (err) {
+      console.error(JSON.stringify({ error: (err as Error).message, tool: toolName }))
+      process.exit(1)
+    }
+    return
   }
+
+  console.error(`Unknown tool subcommand: ${sub}`)
+  console.error('Usage: fulcrum tool list | fulcrum tool exec <name>')
+  process.exit(1)
 }
 
 // ── Serve commands ────────────────────────────────────────────────────────────
@@ -710,14 +796,8 @@ function registerOtelShutdown(): void {
 }
 
 async function runServeMcp(): Promise<void> {
-  const { getDb, runMigrations, loadConfig, createTask, updateTask, listTasks,
-    startAgentRun, heartbeatAgentRun, completeAgentRun, blockAgentRun,
-    getAgentRunStatus,
-    buildCosContext, getWorkspaceStatus, listAgentProfiles,
-    createAgentProfile, getTeamOps,
-    createAgentDefinition, getAgentDefinition, updateAgentDefinition, listAgentDefinitions,
-    startSpan, endSpan } = await import('@fulcrum/core')
-  const { writeMemory, recallMemory } = await import('@fulcrum/memory')
+  const { getDb, runMigrations, loadConfig, startSpan, endSpan } = await import('@fulcrum/core')
+  const { TOOL_REGISTRY, buildDeps, buildProfileFilter } = await import('./tool-registry.js')
 
   const config = loadConfig()
   const db = getDb()
@@ -727,360 +807,23 @@ async function runServeMcp(): Promise<void> {
   await warmOtel()
   registerOtelShutdown()
 
-  // Auto-create workspace/project from config
-  function ensureWorkspace(wsId: string, name?: string) {
-    const existing = db.prepare('SELECT workspace_id FROM workspaces WHERE workspace_id = ?').get(wsId)
-    if (!existing) {
-      const now = new Date().toISOString()
-      db.prepare('INSERT OR IGNORE INTO workspaces (workspace_id, name, status, created_at) VALUES (?, ?, ?, ?)').run(wsId, name ?? wsId, 'active', now)
-    }
-  }
-
-  function ensureProject(wsId: string, projId: string, name?: string) {
-    const existing = db.prepare('SELECT project_id FROM projects WHERE project_id = ?').get(projId)
-    if (!existing) {
-      const now = new Date().toISOString()
-      db.prepare('INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at) VALUES (?, ?, ?, ?)').run(projId, wsId, name ?? projId, now)
-    }
-  }
-
-  type ToolArgs = Record<string, unknown>
-
-  async function handleToolCall(name: string, toolArgs: ToolArgs): Promise<unknown> {
-    const a = toolArgs
-
-    if (name === 'get_task') {
-      // CLI-005: point lookup — avoids fetching 1000 tasks for a single task_id
-      const task = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(a['task_id'] as string) as Record<string, unknown> | undefined
-      if (!task) return { error: 'not_found', task_id: a['task_id'] }
-      return {
-        task_id: task['task_id'],
-        title: task['title'],
-        description: task['description'] ?? '',
-        status: task['status'],
-        priority: task['priority'],
-        assigned_to: task['assigned_to'] ?? '',
-        done_criteria: task['done_criteria'] ?? '',
-      }
-    }
-
-    if (name === 'list_tasks') {
-      const tasks = await listTasks({
-        workspace_id: a['workspace_id'] as string,
-        project_id: a['project_id'] as string | undefined,
-        status: a['status'] as Parameters<typeof listTasks>[0]['status'],
-      })
-      const limited = tasks.slice(0, (a['limit'] as number | undefined) ?? 40)
-      return limited.map(t => ({
-        task_id: t.task_id,
-        title: t.title,
-        description: t.description ?? '',
-        status: t.status,
-        priority: t.priority,
-        assigned_to: t.assigned_to ?? '',
-        done_criteria: t.done_criteria ?? '',
-        blockers: t.blockers,
-      }))
-    }
-
-    if (name === 'create_task') {
-      ensureWorkspace(a['workspace_id'] as string)
-      ensureProject(a['workspace_id'] as string, a['project_id'] as string)
-      const task = await createTask({
-        title: a['title'] as string,
-        project_id: a['project_id'] as string,
-        workspace_id: a['workspace_id'] as string,
-        description: a['description'] as string | undefined,
-        priority: a['priority'] as Parameters<typeof createTask>[0]['priority'],
-        assigned_to: a['assigned_to'] as string | undefined,
-        done_criteria: a['done_criteria'] as string | undefined,
-      })
-      return { task_id: task.task_id, title: task.title, status: task.status, priority: task.priority, assigned_to: task.assigned_to ?? '' }
-    }
-
-    if (name === 'update_task') {
-      const task = await updateTask({
-        task_id: a['task_id'] as string,
-        status: a['status'] as Parameters<typeof updateTask>[0]['status'],
-        note: a['note'] as string | undefined,
-        assigned_to: a['assigned_to'] as string | undefined,
-      })
-      return { task_id: task.task_id, updated: true, changes: Object.keys(a).filter(k => k !== 'task_id') }
-    }
-
-    if (name === 'recall_memory') {
-      const maxChars = (a['max_chars'] as number | undefined) ?? 500
-      const memories = await recallMemory({
-        query: a['query'] as string,
-        workspace_id: a['workspace_id'] as string,
-        project_id: a['project_id'] as string | undefined,
-        limit: (a['limit'] as number | undefined) ?? 10,
-        offset: (a['offset'] as number | undefined) ?? 0,
-        mode: 'full',
-        query_scope: (a['query_scope'] as 'session' | 'project' | 'workspace' | 'global' | undefined),
-        session_id: a['session_id'] as string | undefined,
-      } as Parameters<typeof recallMemory>[0])
-      return (memories as Array<{ id?: string; content?: string; tags?: string[]; recall_score?: number; source?: string }>)
-        .map(m => ({
-          id: m.id,
-          content: (m.content ?? '').slice(0, maxChars),
-          score: m.recall_score ?? 0.0,
-          tags: m.tags ?? [],
-          source: m.source ?? 'manual',
-        }))
-    }
-
-    if (name === 'write_memory') {
-      ensureWorkspace(a['workspace_id'] as string)
-      ensureProject(a['workspace_id'] as string, a['project_id'] as string)
-      const rawTags = a['tags']
-      const tagList = Array.isArray(rawTags) ? rawTags.map(String).filter(Boolean)
-        : ((rawTags as string | undefined) ?? '').split(',').map(t => t.trim()).filter(Boolean)
-      const content = a['content'] as string
-      const title = (a['title'] as string | undefined) ?? content.slice(0, 80)
-      const memory = await writeMemory({
-        content,
-        workspace_id: a['workspace_id'] as string,
-        project_id: a['project_id'] as string,
-        title,
-        summary: title,
-        scope: 'project',
-        kind: 'fact',
-        tags: tagList,
-      } as Parameters<typeof writeMemory>[0])
-      return { saved: true, memory_id: memory.memory_id, project_id: a['project_id'], tags: tagList }
-    }
-
-    if (name === 'list_agent_profiles') {
-      return await listAgentProfiles({
-        workspace_id: a['workspace_id'] as string | undefined,
-      })
-    }
-
-    if (name === 'get_agent_run_status') {
-      const run = await getAgentRunStatus({ run_id: a['run_id'] as string })
-      return { run_id: run.run_id, status: run.status, role: run.role, current_step: run.current_step, progress_pct: run.progress_pct }
-    }
-
-    if (name === 'start_agent_run') {
-      const wsId = a['workspace_id'] as string
-      const projId = (a['project_id'] as string | undefined) ?? wsId
-      ensureWorkspace(wsId)
-      ensureProject(wsId, projId)
-
-      // Find or create task
-      let task_id = a['task_id'] as string | undefined
-      if (!task_id) {
-        const stub = await createTask({ title: `[auto] ${a['agent_role']} run`, workspace_id: wsId, project_id: projId })
-        task_id = stub.task_id
-      } else {
-        const existing = db.prepare('SELECT task_id FROM tasks WHERE task_id = ?').get(task_id)
-        if (!existing) {
-          const stub = await createTask({ title: `[auto] ${a['agent_role']} run`, workspace_id: wsId, project_id: projId })
-          task_id = stub.task_id
-        }
-      }
-
-      const role = a['agent_role'] as string
-      const run = await startAgentRun({
-        task_id,
-        role: role as Parameters<typeof startAgentRun>[0]['role'],
-        workspace_id: wsId,
-        agent_id: `pi/${role}`,
-        pi_profile: role,
-      })
-
-      // Dispatch path: spawn a detached Claude Code subprocess when requested
-      if (a['dispatch'] === true) {
-        const { dispatchClaudeCode } = await import('@fulcrum/worker')
-        const { pid } = dispatchClaudeCode({
-          run_id: run.run_id,
-          task_id,
-          workspace_id: wsId,
-          project_id: projId,
-          agent_role: role,
-          model: a['model'] as string | undefined,
-        })
-        return { run_id: run.run_id, status: run.status, dispatched: true, pid }
-      }
-
-      return { run_id: run.run_id, status: run.status }
-    }
-
-    if (name === 'heartbeat_agent_run') {
-      await heartbeatAgentRun({
-        run_id: a['run_id'] as string,
-        current_step: (a['current_step'] as string | undefined) ?? '',
-        progress_pct: (a['progress_pct'] as number | undefined) ?? 0,
-      })
-      return { run_id: a['run_id'], ok: true }
-    }
-
-    if (name === 'complete_agent_run') {
-      const rawPaths = a['artifact_paths']
-      const paths = Array.isArray(rawPaths) ? rawPaths.map(String).filter(Boolean)
-        : ((rawPaths as string | undefined) ?? '').split(',').map(p => p.trim()).filter(Boolean)
-      const run = await completeAgentRun({
-        run_id: a['run_id'] as string,
-        output_summary: (a['output_summary'] as string | undefined) ?? '',
-        artifacts: paths.length > 0 ? { files_changed: paths } : undefined,
-      })
-      return { run_id: run.run_id, status: run.status }
-    }
-
-    if (name === 'block_agent_run') {
-      const run = await blockAgentRun({ run_id: a['run_id'] as string, reason: a['reason'] as string })
-      return { run_id: run.run_id, status: run.status, reason: run.blocker }
-    }
-
-    if (name === 'build_cos_context') {
-      const ctx = await buildCosContext({
-        workspace_id: a['workspace_id'] as string,
-        project_id: a['project_id'] as string,
-      })
-      return { context_markdown: ctx, project_id: a['project_id'], workspace_id: a['workspace_id'] }
-    }
-
-    if (name === 'get_workspace_status') {
-      const status = await getWorkspaceStatus({ workspace_id: a['workspace_id'] as string })
-      return {
-        workspace_id: a['workspace_id'],
-        active_runs: status.running_runs.length,
-        blocked_runs: status.blocked_runs.length,
-        wip_count: status.wip_count,
-        queued_tasks: status.queued_tasks,
-        runs: status.running_runs.slice(0, 10).map(r => ({ run_id: r.run_id, role: r.role, status: r.status, task_id: r.task_id })),
-        blockers: status.blocked_runs.slice(0, 5).map(r => ({ run_id: r.run_id, reason: r.blocker ?? '?' })),
-      }
-    }
-
-    if (name === 'create_team_template') {
-      const ops = getTeamOps()
-      const createTeamTemplate = ops['createTeamTemplate'] as (
-        input: Record<string, unknown>,
-      ) => Promise<unknown>
-      const template = await createTeamTemplate({
-        name: a['name'] as string,
-        description: a['description'] as string | undefined,
-        slots: a['slots'] as unknown[],
-        policy: a['policy'] as Record<string, unknown> | undefined,
-      })
-      return template
-    }
-
-    if (name === 'invoke_team') {
-      const ops = getTeamOps()
-      const invokeTeam = ops['invokeTeam'] as (
-        input: Record<string, unknown>,
-      ) => Promise<unknown>
-      const instance = await invokeTeam({
-        template_id: a['template_id'] as string,
-        workspace_id: a['workspace_id'] as string,
-        project_id: a['project_id'] as string | undefined,
-        purpose: a['purpose'] as string,
-        task_id: a['task_id'] as string | undefined,
-        caller_agent_id: a['caller_agent_id'] as string,
-        caller_role: a['caller_role'] as string,
-        initial_slots: a['initial_slots'] as Record<string, string[]> | undefined,
-      })
-      return instance
-    }
-
-    if (name === 'list_team_templates') {
-      const ops = getTeamOps()
-      const listTeamTemplates = ops['listTeamTemplates'] as (
-        input?: Record<string, unknown>,
-      ) => Promise<unknown[]>
-      const rows = await listTeamTemplates({
-        limit: (a['limit'] as number | undefined) ?? 50,
-        offset: (a['offset'] as number | undefined) ?? 0,
-      })
-      return rows
-    }
-
-    if (name === 'list_team_instances') {
-      const ops = getTeamOps()
-      const listTeamInstances = ops['listTeamInstances'] as (
-        input: Record<string, unknown>,
-      ) => Promise<unknown[]>
-      const rows = await listTeamInstances({
-        workspace_id: a['workspace_id'] as string,
-        project_id: a['project_id'] as string | undefined,
-        status_category: a['status_category'] as string | undefined,
-        limit: (a['limit'] as number | undefined) ?? 50,
-        offset: (a['offset'] as number | undefined) ?? 0,
-      })
-      return rows
-    }
-
-    if (name === 'create_agent_profile') {
-      const profile = await createAgentProfile({
-        workspace_id: a['workspace_id'] as string,
-        name: a['name'] as string,
-        description: a['description'] as string,
-        base_role: a['base_role'] as Parameters<typeof createAgentProfile>[0]['base_role'],
-        system_prompt: a['system_prompt'] as string | undefined,
-        capabilities: a['capabilities'] as Record<string, unknown> | undefined,
-        created_by: a['created_by'] as string | undefined,
-      })
-      return profile
-    }
-
-    if (name === 'create_agent_definition') {
-      const def = createAgentDefinition({
-        role: a['role'] as Parameters<typeof createAgentDefinition>[0]['role'],
-        display_name: a['display_name'] as string,
-        description: a['description'] as string,
-        version: a['version'] as string | undefined,
-        stability: a['stability'] as Parameters<typeof createAgentDefinition>[0]['stability'],
-        system_prompt: a['system_prompt'] as string | undefined,
-        model: a['model'] as string | undefined,
-        provider: a['provider'] as string | undefined,
-        tools_allow: a['tools_allow'] as string[] | undefined,
-        tools_deny: a['tools_deny'] as string[] | undefined,
-        capabilities: a['capabilities'] as string[] | undefined,
-        executor_uri: a['executor_uri'] as string | undefined,
-      })
-      return def
-    }
-
-    if (name === 'get_agent_definition') {
-      const def = getAgentDefinition(a['role'] as string)
-      return def ?? { error: `No definition found for role '${a['role'] as string}'` }
-    }
-
-    if (name === 'update_agent_definition') {
-      const def = updateAgentDefinition({
-        role: a['role'] as Parameters<typeof updateAgentDefinition>[0]['role'],
-        display_name: a['display_name'] as string | undefined,
-        description: a['description'] as string | undefined,
-        version: a['version'] as string | undefined,
-        stability: a['stability'] as Parameters<typeof updateAgentDefinition>[0]['stability'],
-        system_prompt: a['system_prompt'] as string | undefined,
-        model: a['model'] as string | undefined,
-        executor_uri: a['executor_uri'] as string | undefined,
-      })
-      return def
-    }
-
-    if (name === 'list_agent_definitions') {
-      return listAgentDefinitions(
-        a['stability'] as Parameters<typeof listAgentDefinitions>[0],
-      )
-    }
-
-    if (name === 'get_current_context') return buildCurrentContextResponse()
-
-    throw new Error(`Unknown tool: ${name}`)
-  }
+  const ids = currentProjectIds()
+  const deps = buildDeps(ids.workspace_id, ids.project_id)
 
   // ── SDK-based MCP server (protocol 2025-11-25) ──
   const { runFulcrumMcpServer } = await import('./mcp-server.js')
 
+  // Thin adapter: delegates every tool call to the unified registry.
+  async function handleToolCall(name: string, toolArgs: Record<string, unknown>): Promise<unknown> {
+    const entry = TOOL_REGISTRY.get(name)
+    if (!entry) throw new Error(`Unknown tool: ${name}`)
+    return entry.handler(toolArgs, deps)
+  }
+
   // Wrap handleToolCall with telemetry spans
   async function handleToolCallWithSpan(name: string, toolArgs: Record<string, unknown>): Promise<unknown> {
     const spanWorkspaceId =
-      (toolArgs['workspace_id'] as string | undefined) ?? currentProjectIds().workspace_id
+      (toolArgs['workspace_id'] as string | undefined) ?? ids.workspace_id
     const mcpSpan = await startSpan({
       name: 'mcp.tool',
       workspace_id: spanWorkspaceId,
@@ -1095,6 +838,16 @@ async function runServeMcp(): Promise<void> {
       throw err
     }
   }
+
+  // Silence unused variable warning — config is used below for workspace auto-init
+  void config
+
+  // ── Profile filter ────────────────────────────────────────────────────────
+  // --profile hook-only  → strip the 3 hookEquivalent tools (Claude Code hooks cover them)
+  // --profile <role>     → enforce agent_definitions tools_allow / tools_deny
+  const profileIdx = args.indexOf('--profile')
+  const profile = profileIdx !== -1 ? args[profileIdx + 1] : undefined
+  const profileFilter = profile ? await buildProfileFilter(profile) : undefined
 
   // ── Auto-start monitor ────────────────────────────────────────────────────
   // Start the HTTP monitor in-process alongside the MCP stdio server unless:
@@ -1127,18 +880,13 @@ async function runServeMcp(): Promise<void> {
   await runFulcrumMcpServer({
     version: '0.0.1',
     handleToolCall: handleToolCallWithSpan,
+    ...(profileFilter ? { filter: profileFilter } : {}),
   })
 }
 
 async function runServeMcpHttp(): Promise<void> {
-  const { getDb, runMigrations, loadConfig, createTask, updateTask, listTasks,
-    startAgentRun, heartbeatAgentRun, completeAgentRun, blockAgentRun,
-    getAgentRunStatus,
-    buildCosContext, getWorkspaceStatus, listAgentProfiles,
-    createAgentProfile, getTeamOps,
-    createAgentDefinition, getAgentDefinition, updateAgentDefinition, listAgentDefinitions,
-    startSpan, endSpan } = await import('@fulcrum/core')
-  const { writeMemory, recallMemory } = await import('@fulcrum/memory')
+  const { getDb, runMigrations, loadConfig, startSpan, endSpan } = await import('@fulcrum/core')
+  const { TOOL_REGISTRY, buildDeps } = await import('./tool-registry.js')
   const { runFulcrumMcpHttpServer } = await import('./mcp-server.js')
 
   const config = loadConfig()
@@ -1149,26 +897,10 @@ async function runServeMcpHttp(): Promise<void> {
   await warmOtel()
   registerOtelShutdown()
 
-  // Reuse the same tool handler setup as stdio MCP — only transport differs
-  function ensureWorkspace(wsId: string, name?: string) {
-    const existing = db.prepare('SELECT workspace_id FROM workspaces WHERE workspace_id = ?').get(wsId)
-    if (!existing) {
-      const now = new Date().toISOString()
-      db.prepare('INSERT OR IGNORE INTO workspaces (workspace_id, name, status, created_at) VALUES (?, ?, ?, ?)').run(wsId, name ?? wsId, 'active', now)
-    }
-  }
-  function ensureProject(wsId: string, projId: string, name?: string) {
-    const existing = db.prepare('SELECT project_id FROM projects WHERE project_id = ?').get(projId)
-    if (!existing) {
-      const now = new Date().toISOString()
-      db.prepare('INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at) VALUES (?, ?, ?, ?)').run(projId, wsId, name ?? projId, now)
-    }
-  }
-  if (config.workspace_id) ensureWorkspace(config.workspace_id)
-  if (config.workspace_id && config.project_id) ensureProject(config.workspace_id, config.project_id)
+  const ids = currentProjectIds()
+  const deps = buildDeps(ids.workspace_id, ids.project_id)
+  void db  // used via deps.db; suppress unused-var lint
 
-  // Import same handler factory — use an inline import to get handleToolCall
-  // (The full handler is too large to duplicate; we reuse it via mcp-server's createFulcrumMcpServer)
   const portArg = args.find(a => a.startsWith('--port'))
   let port = 4722
   if (portArg) {
@@ -1177,87 +909,11 @@ async function runServeMcpHttp(): Promise<void> {
     if (val) port = parseInt(val, 10)
   }
 
-  // Build same handleToolCall (subset — reuse the shared core for brevity)
+  // Thin adapter: delegates every tool call to the unified registry.
   async function handleToolCall(name: string, toolArgs: Record<string, unknown>): Promise<unknown> {
-    const a = toolArgs
-    if (name === 'get_workspace_status') {
-      return await getWorkspaceStatus({ workspace_id: a['workspace_id'] as string })
-    }
-    if (name === 'get_task') {
-      // CLI-005: point lookup
-      const task = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(a['task_id'] as string) as Record<string, unknown> | undefined
-      if (!task) return { error: 'not_found', task_id: a['task_id'] }
-      return {
-        task_id: task['task_id'],
-        title: task['title'],
-        description: task['description'] ?? '',
-        status: task['status'],
-        priority: task['priority'],
-        assigned_to: task['assigned_to'] ?? '',
-        done_criteria: task['done_criteria'] ?? '',
-      }
-    }
-    if (name === 'list_tasks') {
-      return await listTasks({
-        workspace_id: a['workspace_id'] as string,
-        project_id: a['project_id'] as string | undefined,
-        status: a['status'] as Parameters<typeof listTasks>[0]['status'],
-        limit: (a['limit'] as number | undefined) ?? 20,
-      })
-    }
-    if (name === 'recall_memory') {
-      const maxChars = (a['max_chars'] as number | undefined) ?? 500
-      const memories = await recallMemory({
-        query: a['query'] as string,
-        workspace_id: a['workspace_id'] as string,
-        project_id: a['project_id'] as string | undefined,
-        limit: (a['limit'] as number | undefined) ?? 10,
-        offset: (a['offset'] as number | undefined) ?? 0,
-        mode: 'full',
-      } as Parameters<typeof recallMemory>[0])
-      return (memories as Array<{ id?: string; content?: string; tags?: string[]; recall_score?: number; source?: string }>)
-        .map(m => ({ id: m.id, content: (m.content ?? '').slice(0, maxChars), score: m.recall_score ?? 0.0, tags: m.tags ?? [], source: m.source ?? 'manual' }))
-    }
-    if (name === 'build_cos_context') {
-      return await buildCosContext({ workspace_id: a['workspace_id'] as string, project_id: a['project_id'] as string })
-    }
-    // Passthrough for other tools: delegate to core imports
-    if (name === 'list_agent_profiles') return await listAgentProfiles()
-    if (name === 'get_agent_run_status') return await getAgentRunStatus({ run_id: a['run_id'] as string })
-    if (name === 'start_agent_run') {
-      ensureWorkspace(a['workspace_id'] as string)
-      return await startAgentRun({ task_id: a['task_id'] as string, workspace_id: a['workspace_id'] as string, role: a['agent_role'] as Parameters<typeof startAgentRun>[0]['role'] })
-    }
-    if (name === 'heartbeat_agent_run') return await heartbeatAgentRun({ run_id: a['run_id'] as string, status: a['status'] as string | undefined })
-    if (name === 'complete_agent_run') return await completeAgentRun({ run_id: a['run_id'] as string, summary: a['summary'] as string | undefined })
-    if (name === 'block_agent_run') return await blockAgentRun({ run_id: a['run_id'] as string, reason: a['reason'] as string, escalation_reason: a['escalation_reason'] as string | undefined })
-    if (name === 'write_memory') {
-      return await writeMemory({
-        content: a['content'] as string,
-        workspace_id: a['workspace_id'] as string,
-        project_id: a['project_id'] as string,
-        tags: a['tags'] as string[] | undefined,
-        importance: a['importance'] as number | undefined,
-      } as Parameters<typeof writeMemory>[0])
-    }
-    if (name === 'create_task') {
-      ensureWorkspace(a['workspace_id'] as string)
-      if (a['project_id']) ensureProject(a['workspace_id'] as string, a['project_id'] as string)
-      return await createTask({ title: a['title'] as string, workspace_id: a['workspace_id'] as string, project_id: a['project_id'] as string })
-    }
-    if (name === 'update_task') return await updateTask({ task_id: a['task_id'] as string, status: a['status'] as Parameters<typeof updateTask>[0]['status'] })
-    if (name === 'list_agent_definitions') return listAgentDefinitions()
-    if (name === 'get_agent_definition') return getAgentDefinition(a['role'] as string)
-    if (name === 'create_agent_definition') return createAgentDefinition(a as Parameters<typeof createAgentDefinition>[0])
-    if (name === 'update_agent_definition') return updateAgentDefinition(a as Parameters<typeof updateAgentDefinition>[0])
-    if (name === 'create_agent_profile') return createAgentProfile({ workspace_id: a['workspace_id'] as string, name: a['name'] as string, description: a['description'] as string, base_role: a['base_role'] as Parameters<typeof createAgentProfile>[0]['base_role'] })
-    if (name === 'create_team_template' || name === 'list_team_templates' || name === 'invoke_team' || name === 'list_team_instances') {
-      const ops = getTeamOps()
-      const fn = ops[name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()) as keyof typeof ops] as ((args: Record<string, unknown>) => Promise<unknown>) | undefined
-      if (fn) return await fn(a)
-    }
-    if (name === 'get_current_context') return buildCurrentContextResponse()
-    throw new Error(`Unknown tool: ${name}`)
+    const entry = TOOL_REGISTRY.get(name)
+    if (!entry) throw new Error(`Unknown tool: ${name}`)
+    return entry.handler(toolArgs, deps)
   }
 
   async function handleToolCallWithSpan(name: string, toolArgs: Record<string, unknown>): Promise<unknown> {
@@ -2419,10 +2075,16 @@ async function main(): Promise<void> {
       console.log(`
 fulcrum serve — long-running servers
 
-  fulcrum serve mcp          Start MCP server (stdio JSON-RPC 2.0) — 22 control tools
+  fulcrum serve mcp          Start MCP server (stdio JSON-RPC 2.0) — 23 control tools
   fulcrum serve mcp-http     Start MCP server (StreamableHTTP, default port 4722) [--port <n>]
   fulcrum serve monitor      Start HTTP monitor + control API [--port <n>]
   fulcrum serve all          Start both MCP and monitor servers
+
+OPTIONS (serve mcp)
+  --profile hook-only        Strip the 3 hook-equivalent tools (recall_memory, write_memory,
+                             get_current_context) — recommended for Claude Code with hooks
+  --profile <role>           Enforce agent_definitions tools_allow / tools_deny for <role>
+  --no-monitor               Skip auto-starting the HTTP monitor alongside the MCP server
 `)
       process.exit(0)
     }
@@ -2466,6 +2128,8 @@ fulcrum serve — long-running servers
     console.error('Usage: fulcrum hook claude|gemini|pi [pre|post]')
     process.exit(1)
   }
+
+  if (group === 'tool' || group === 'tools') { await runTool(); return }
 
   if (group === 'workspaces') { await runWorkspaces(); return }
   if (group === 'projects') { await runProjects(); return }

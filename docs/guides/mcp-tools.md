@@ -3,10 +3,35 @@
 The MCP server (`fulcrum serve mcp`) exposes 23 tools over stdio JSON-RPC 2.0. All tool names are prefixed `mcp__fulcrum__` when used from Claude Code.
 
 ```bash
-fulcrum serve mcp          # stdio — JSON-RPC 2.0 (Claude Code, PI, codex, opencode)
-fulcrum serve mcp-http     # HTTP StreamableHTTP transport (default port 4722)
-fulcrum serve all          # MCP + HTTP monitor together (default port 4721)
+fulcrum serve mcp                              # all 23 tools (stdio)
+fulcrum serve mcp --profile hook-only          # 20 tools — strips hook-covered tools (recommended for Claude Code)
+fulcrum serve mcp --profile software_engineer  # role-gated surface
+fulcrum serve mcp-http                         # HTTP StreamableHTTP (default port 4722)
+fulcrum serve all                              # MCP + HTTP monitor (default port 4721)
 ```
+
+### MCP filtering with `--profile`
+
+Two filtering modes are available:
+
+| Profile | Effect |
+|---------|--------|
+| `hook-only` | Removes the 3 hook-equivalent tools (`recall_memory`, `write_memory`, `get_current_context`). Claude Code's hooks already handle these in-process — serving them via MCP wastes context. Serves 20 tools. |
+| `<role-slug>` | Enforces the role's `tools_allow` / `tools_deny` lists from `agent_definitions`. Falls back to all tools if the role definition is not found (warns to stderr). |
+
+**Recommendation for Claude Code:** add `--profile hook-only` to your MCP server config to eliminate ~3 redundant tools and reduce initial context overhead.
+
+### Calling tools without MCP
+
+Every tool implementation is also callable directly from the CLI (no live MCP server required):
+
+```bash
+fulcrum tool exec list_tasks --json '{"status":"open"}'
+fulcrum tool exec get_workspace_status
+echo '{"title":"Implement auth"}' | fulcrum tool exec create_task
+```
+
+This is the recommended path for hooks, CI pipelines, and non-hook platforms (Gemini CLI, PI).
 
 **Annotations**: every tool carries machine-readable hints.
 
@@ -22,10 +47,14 @@ fulcrum serve all          # MCP + HTTP monitor together (default port 4721)
 
 ## Session Start
 
-Call these two tools at the beginning of every session, in order:
+**When hooks are installed (Claude Code):** The `SessionStart` hook pre-fetches `get_workspace_status` and `list_tasks` (open, limit 10) in-process and writes the result to the session file. The `PreToolUse` hook then injects that snapshot into your context (as a stderr note) on the first tool call of the session — so Claude already has workspace context before making any MCP call. No explicit session-start calls are needed for orientation in this case.
+
+**Without hooks (PI, Gemini, Codex, CI):** Call these two tools at the beginning of every session, in order:
 
 1. `get_current_context` — derive `workspace_id`, `project_id`, and readiness
 2. `get_workspace_status` — understand active runs, blockers, and queue depth
+
+**Optional `workspace_id`/`project_id`:** Most tools now accept these as optional — the server defaults them to the directory the MCP server was started from. You only need to pass them explicitly when targeting a different workspace or project than the cwd context.
 
 ---
 
@@ -39,8 +68,8 @@ Reads tasks in a workspace/project. Filters by status when provided.
 
 | Parameter | Type | Required | Description |
 |-----------|------|:--------:|-------------|
-| `workspace_id` | string | ✓ | Workspace ID |
-| `project_id` | string | ✓ | Project ID |
+| `workspace_id` | string | — | Workspace ID (defaults to cwd context) |
+| `project_id` | string | — | Project ID (defaults to cwd context) |
 | `status` | `queued` \| `running` \| `blocked` \| `completed` | — | Filter by status |
 | `limit` | number | — | Max results (default 40) |
 

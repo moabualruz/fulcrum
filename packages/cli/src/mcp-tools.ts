@@ -50,36 +50,35 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'List Tasks',
     name: 'list_tasks',
-    description: 'Reads tasks in a workspace/project. Returns id, title, status, priority, assigned_to, blockers. Filters by status when provided. Effect: read-only. Returns: array of task summaries. Requires workspace_id and project_id.',
+    description: 'Reads tasks in a workspace/project. Returns id, title, status, priority, assigned_to, blockers. Filters by status when provided. Effect: read-only. Returns: array of task summaries. workspace_id and project_id are optional — defaults to the server cwd context.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {
-        project_id: { type: 'string', description: 'Project ID' },
-        workspace_id: { type: 'string', description: 'Workspace ID' },
+        project_id: { type: 'string', description: 'Project ID (optional — defaults to cwd project)' },
+        workspace_id: { type: 'string', description: 'Workspace ID (optional — defaults to cwd workspace)' },
         status: { type: 'string', description: 'Filter by status (queued, running, blocked, completed)' },
         limit: { type: 'number', description: 'Max results (default 40)' },
       },
-      required: ['project_id', 'workspace_id'],
     },
   },
   {
     title: 'Create Task',
     name: 'create_task',
-    description: 'Creates a new task in the project. Auto-creates workspace and project if they do not exist. Effect: writes task row. Returns: task_id, title, status, priority, assigned_to. Requires title, project_id, workspace_id.',
+    description: 'Creates a new task in the project. Auto-creates workspace and project if they do not exist. Effect: writes task row. Returns: task_id, title, status, priority, assigned_to. Requires title. workspace_id and project_id are optional — defaults to cwd context.',
     annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
       properties: {
         title: { type: 'string', description: 'Task title' },
-        project_id: { type: 'string', description: 'Project ID' },
-        workspace_id: { type: 'string', description: 'Workspace ID' },
+        project_id: { type: 'string', description: 'Project ID (optional — defaults to cwd project)' },
+        workspace_id: { type: 'string', description: 'Workspace ID (optional — defaults to cwd workspace)' },
         description: { type: 'string', description: 'Optional task description' },
         priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low', 'none'], description: 'Priority level' },
         assigned_to: { type: 'string', description: 'Agent role slug to assign the task to' },
         done_criteria: { type: 'string', description: 'Definition of done' },
       },
-      required: ['title', 'project_id', 'workspace_id'],
+      required: ['title'],
     },
     outputSchema: {
       type: 'object',
@@ -121,13 +120,13 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Recall Memory',
     name: 'recall_memory',
-    description: 'Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns the top-k most relevant memories for the given query in the specified scope. Requires workspace_id; project_id is optional (omit for workspace-wide recall). Returns: id, content (truncated to max_chars), score (0.0–1.0), tags.',
+    description: 'Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns the top-k most relevant memories for the given query in the specified scope. workspace_id is optional — defaults to cwd workspace. project_id is optional — omit for workspace-wide recall. Returns: id, content (truncated to max_chars), score (0.0–1.0), tags.',
     annotations: { readOnlyHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Natural language search query' },
-        workspace_id: { type: 'string', description: 'Workspace ID' },
+        workspace_id: { type: 'string', description: 'Workspace ID (optional — defaults to cwd workspace)' },
         project_id: { type: 'string', description: 'Project ID (optional — omit for workspace-wide recall)' },
         limit: { type: 'number', description: 'Max results (default 10)' },
         offset: { type: 'number', description: 'Pagination offset — skip this many top results (default 0). Use for MemGPT-style context paging.' },
@@ -139,24 +138,24 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         },
         session_id: { type: 'string', description: 'Session ID — required when query_scope=session' },
       },
-      required: ['query', 'workspace_id'],
+      required: ['query'],
     },
   },
   {
     title: 'Write Memory',
     name: 'write_memory',
-    description: 'Persists a memory note to vault (L0), SQLite FTS5 (L1), and vector index (L2). Effect: writes memory row + vault file. Returns: saved=true, memory_id, project_id, tags. Requires content, workspace_id, project_id.',
+    description: 'Persists a memory note to vault (L0), SQLite FTS5 (L1), and vector index (L2). Effect: writes memory row + vault file. Returns: saved=true, memory_id, project_id, tags. Requires content. workspace_id and project_id are optional — defaults to cwd context.',
     annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
       properties: {
         content: { type: 'string', description: 'Memory content (plain text)' },
-        workspace_id: { type: 'string', description: 'Workspace ID' },
-        project_id: { type: 'string', description: 'Project ID' },
+        workspace_id: { type: 'string', description: 'Workspace ID (optional — defaults to cwd workspace)' },
+        project_id: { type: 'string', description: 'Project ID (optional — defaults to cwd project)' },
         title: { type: 'string', description: 'Optional title (defaults to first 80 chars of content)' },
         tags: { type: 'array', items: { type: 'string' }, description: 'Tag strings (e.g. ["decision","architecture"])' },
       },
-      required: ['content', 'workspace_id', 'project_id'],
+      required: ['content'],
     },
     outputSchema: {
       type: 'object',
@@ -209,7 +208,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Start Agent Run',
     name: 'start_agent_run',
-    description: 'Registers the start of an agent run. Call at the beginning of every task. Auto-creates a stub task if task_id is not provided. Effect: inserts agent_runs row, sets task status to running. Returns: run_id, status. Requires agent_role, workspace_id.',
+    description: 'Registers the start of an agent run. Call at the beginning of every task. Auto-creates a stub task if task_id is not provided. Effect: inserts agent_runs row, sets task status to running. Returns: run_id, status. Requires agent_role. workspace_id is optional — defaults to cwd workspace.',
     annotations: { idempotentHint: false },
     longRunningHint: true,
     inputSchema: {
@@ -217,14 +216,14 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       properties: {
         task_id: { type: 'string', description: 'Task ID to associate (auto-creates stub if not found or not provided)' },
         agent_role: { type: 'string', description: 'One of the 24 canonical role slugs (e.g. software_engineer)' },
-        workspace_id: { type: 'string', description: 'Workspace ID' },
+        workspace_id: { type: 'string', description: 'Workspace ID (optional — defaults to cwd workspace)' },
         project_id: { type: 'string', description: 'Optional project ID (defaults to workspace_id)' },
         worktree_path: { type: 'string', description: 'Optional git worktree path for code-writing roles' },
         pi_run_id: { type: 'string', description: 'Optional custom run ID for external tracking' },
         model: { type: 'string', description: 'Optional model override (e.g. "claude-sonnet-4-6")' },
         dispatch: { type: 'boolean', description: 'If true, spawn a Claude Code subprocess for this run (fire-and-forget)' },
       },
-      required: ['agent_role', 'workspace_id'],
+      required: ['agent_role'],
     },
     outputSchema: {
       type: 'object',
@@ -240,17 +239,17 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Heartbeat Agent Run',
     name: 'heartbeat_agent_run',
-    description: 'Sends a liveness heartbeat for a running agent to prevent it being marked stale. Call every ~30 seconds during long tasks. Effect: updates heartbeat_at and optional progress fields. Returns: run_id, ok=true. Requires run_id, workspace_id.',
+    description: 'Sends a liveness heartbeat for a running agent to prevent it being marked stale. Call every ~30 seconds during long tasks. Effect: updates heartbeat_at and optional progress fields. Returns: run_id, ok=true. Requires run_id. workspace_id is optional — defaults to cwd workspace.',
     annotations: { idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {
         run_id: { type: 'string', description: 'Run ID from start_agent_run' },
-        workspace_id: { type: 'string', description: 'Workspace ID' },
+        workspace_id: { type: 'string', description: 'Workspace ID (optional — defaults to cwd workspace)' },
         current_step: { type: 'string', description: 'Optional current step description' },
         progress_pct: { type: 'number', description: 'Optional progress percentage (0–100)' },
       },
-      required: ['run_id', 'workspace_id'],
+      required: ['run_id'],
     },
     outputSchema: {
       type: 'object',
@@ -264,18 +263,18 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Complete Agent Run',
     name: 'complete_agent_run',
-    description: 'Marks an agent run as finished with optional summary and artifact paths. Effect: sets agent_runs.status=finished, records artifacts. Returns: run_id, status. Requires run_id, workspace_id.',
+    description: 'Marks an agent run as finished with optional summary and artifact paths. Effect: sets agent_runs.status=finished, records artifacts. Returns: run_id, status. Requires run_id. workspace_id is optional — defaults to cwd workspace.',
     annotations: { destructiveHint: true },
     longRunningHint: true,
     inputSchema: {
       type: 'object',
       properties: {
         run_id: { type: 'string', description: 'Run ID from start_agent_run' },
-        workspace_id: { type: 'string', description: 'Workspace ID' },
+        workspace_id: { type: 'string', description: 'Workspace ID (optional — defaults to cwd workspace)' },
         output_summary: { type: 'string', description: 'Summary of what was accomplished' },
         artifact_paths: { type: 'array', items: { type: 'string' }, description: 'Artifact file paths changed or created' },
       },
-      required: ['run_id', 'workspace_id'],
+      required: ['run_id'],
     },
     outputSchema: {
       type: 'object',
@@ -289,17 +288,17 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Block Agent Run',
     name: 'block_agent_run',
-    description: 'Marks an agent run as blocked with a reason. Use when work cannot continue without human input or a dependency resolving. Effect: sets status=blocked, records reason. Returns: run_id, status, reason. Requires run_id, workspace_id, reason.',
+    description: 'Marks an agent run as blocked with a reason. Use when work cannot continue without human input or a dependency resolving. Effect: sets status=blocked, records reason. Returns: run_id, status, reason. Requires run_id and reason. workspace_id is optional — defaults to cwd workspace.',
     annotations: { destructiveHint: true },
     longRunningHint: true,
     inputSchema: {
       type: 'object',
       properties: {
         run_id: { type: 'string', description: 'Run ID from start_agent_run' },
-        workspace_id: { type: 'string', description: 'Workspace ID' },
+        workspace_id: { type: 'string', description: 'Workspace ID (optional — defaults to cwd workspace)' },
         reason: { type: 'string', description: 'Why the run is blocked (will surface in workspace status)' },
       },
-      required: ['run_id', 'workspace_id', 'reason'],
+      required: ['run_id', 'reason'],
     },
     outputSchema: {
       type: 'object',
@@ -314,19 +313,18 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Build Chief-of-Staff Context',
     name: 'build_cos_context',
-    description: 'Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, blockers, recent events. Effect: read-only. Returns: context_markdown formatted for system prompt injection. Requires project_id, workspace_id.',
+    description: 'Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, blockers, recent events. Effect: read-only. Returns: context_markdown formatted for system prompt injection. workspace_id and project_id are optional — defaults to cwd context.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     longRunningHint: true,
     inputSchema: {
       type: 'object',
       properties: {
         goal: { type: 'string', description: 'Optional goal description (included in snapshot header)' },
-        project_id: { type: 'string', description: 'Project ID' },
-        workspace_id: { type: 'string', description: 'Workspace ID' },
+        project_id: { type: 'string', description: 'Project ID (optional — defaults to cwd project)' },
+        workspace_id: { type: 'string', description: 'Workspace ID (optional — defaults to cwd workspace)' },
         max_tasks: { type: 'number', description: 'Max tasks to include (default 20)' },
         max_events: { type: 'number', description: 'Max events to include (default 10)' },
       },
-      required: ['project_id', 'workspace_id'],
     },
     outputSchema: {
       type: 'object',
@@ -341,12 +339,11 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Get Workspace Status',
     name: 'get_workspace_status',
-    description: 'Reads full workspace status: running agents, blockers, WIP count, queue depth, recent runs. Effect: read-only. Returns: workspace_id, active_runs, blocked_runs, wip_count, queued_tasks, runs array, blockers array. Requires workspace_id.',
+    description: 'Reads full workspace status: running agents, blockers, WIP count, queue depth, recent runs. Effect: read-only. Returns: workspace_id, active_runs, blocked_runs, wip_count, queued_tasks, runs array, blockers array. workspace_id is optional — defaults to cwd workspace.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
-      properties: { workspace_id: { type: 'string', description: 'Workspace ID' } },
-      required: ['workspace_id'],
+      properties: { workspace_id: { type: 'string', description: 'Workspace ID (optional — defaults to cwd workspace)' } },
     },
     outputSchema: {
       type: 'object',

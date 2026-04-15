@@ -99,10 +99,23 @@ Output: five-line status block listing vault path and the state of L0/L1/L2.
 
 ### `fulcrum serve mcp`
 
-Start the MCP server (JSON-RPC 2.0 over stdio) exposing 13 control tools: `list_tasks`, `create_task`, `update_task`, `recall_memory`, `write_memory`, `list_agent_profiles`, `get_agent_run_status`, `start_agent_run`, `heartbeat_agent_run`, `complete_agent_run`, `block_agent_run`, `build_cos_context`, `get_workspace_status`.
+Start the MCP server (JSON-RPC 2.0 over stdio) exposing all 23 control tools. Also auto-starts the HTTP monitor on port 4721 in-process unless suppressed.
+
+```
+fulcrum serve mcp [--profile <value>] [--no-monitor]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--profile hook-only` | — | Strip the 3 hook-equivalent tools (`recall_memory`, `write_memory`, `get_current_context`) — serves 20 tools instead of 23. Recommended for Claude Code, which already calls these via hooks |
+| `--profile <role>` | — | Enforce the role's `tools_allow` / `tools_deny` lists from `agent_definitions`. If the role is not found, warns and serves all tools |
+| `--no-monitor` | — | Skip auto-starting the HTTP monitor alongside the MCP server |
 
 ```bash
-fulcrum serve mcp
+fulcrum serve mcp                              # all 23 tools + monitor on :4721
+fulcrum serve mcp --profile hook-only          # 20 tools (recommended for Claude Code)
+fulcrum serve mcp --profile software_engineer  # role-gated surface
+FULCRUM_NO_MONITOR=1 fulcrum serve mcp         # MCP only, no monitor
 ```
 
 Runs until killed. Logs to stderr only (stdout is reserved for JSON-RPC).
@@ -667,6 +680,54 @@ fulcrum agent spawn --target-role reviewer --caller-role chief_of_staff --task-i
 ```
 
 Output: `{run_id, status, summary}`.
+
+---
+
+## `tool` — direct tool registry access
+
+Every MCP tool implementation lives in a shared registry (`packages/cli/src/tool-registry.ts`). The `tool` group exposes those implementations as first-class CLI commands — no live MCP server required. Useful for hooks, CI pipelines, and non-hook platforms (Gemini CLI, PI).
+
+### `fulcrum tool list`
+
+List all registered tools and their capabilities.
+
+```
+fulcrum tool list [--json]
+```
+
+```bash
+fulcrum tool list
+fulcrum tool list --json
+```
+
+Output (text): one row per tool — `<name>  readOnly:<bool>  hookEquivalent:<bool>  <description>`
+Output (JSON): `[ { name, description, readOnly, hookEquivalent, destructive } ]`
+
+### `fulcrum tool exec`
+
+Invoke any tool handler directly. `workspace_id` and `project_id` default to cwd-derived values when omitted.
+
+```
+fulcrum tool exec <tool-name> [--json <payload>]
+```
+
+| Argument | Description |
+|----------|-------------|
+| `<tool-name>` | Exact tool name (e.g. `list_tasks`, `get_workspace_status`) |
+| `--json <payload>` | JSON string of tool arguments. If omitted, reads from stdin |
+
+```bash
+# Read from --json flag
+fulcrum tool exec list_tasks --json '{"status":"open","limit":5}'
+
+# Read from stdin (pipe-friendly)
+echo '{"title":"Implement auth","priority":"high"}' | fulcrum tool exec create_task
+
+# workspace_id / project_id default from cwd — no need to supply them
+fulcrum tool exec get_workspace_status
+```
+
+Output: JSON on stdout (same shape as the MCP tool response). Exit code `0` on success, `1` on error.
 
 ---
 

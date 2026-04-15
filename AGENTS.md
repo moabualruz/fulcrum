@@ -364,6 +364,49 @@ Treat them as such.
 
 ---
 
+## Tool Registry — Unified Handler Pattern
+
+All 23 MCP tool implementations live in `packages/cli/src/tool-registry.ts` as a `Map<string, RegistryEntry>`. Every entry has:
+
+```typescript
+interface RegistryEntry {
+  schema: ToolSchema | undefined     // undefined = internal tool (not served via MCP)
+  capabilities: ToolCapabilities     // readOnly, destructive, hookEquivalent, minRole?
+  handler: (args, deps) => Promise<unknown>
+}
+```
+
+**Rules:**
+- Add new tools to `TOOL_REGISTRY` in `tool-registry.ts` — never add handler logic directly to `index.ts`
+- `buildDeps(workspace_id, project_id)` resolves DB + workspace context once at server startup. Do not call `currentProjectIds()` inside handlers.
+- Handlers default `workspace_id`/`project_id` from `deps` when the caller omits them: `const ws = (args.workspace_id as string | undefined) ?? deps.workspace_id`
+- Set `hookEquivalent: true` only for tools whose logic is already called in-process by a hook. Currently: `recall_memory`, `write_memory`, `get_current_context`.
+- Set `minRole: 'chief_of_staff'` for tools that only L1 roles may call. Currently: `invoke_team`.
+- `schema: undefined` marks internal tools visible to the MCP resource handler but not served in the tool list (currently: `get_task`).
+
+**Capability lint:** `packages/cli/src/tests/tool-registry.test.ts` asserts that all 23 public entries have complete capabilities, `readOnly` matches `readOnlyHint`, `hookEquivalent` is set on exactly 3 tools, and `minRole` is set on exactly `invoke_team`.
+
+**CLI access:** Every tool is also callable without a live MCP server:
+```bash
+fulcrum tool exec <tool-name> [--json <payload>]
+fulcrum tool list [--json]
+```
+
+---
+
+## MCP Tool Naming Conventions
+
+Tool schemas live in `packages/cli/src/mcp-tools.ts`. When adding a new tool:
+
+- **Names must be `snake_case`** — enforced by `mcp-tools-lint.test.ts`
+- **Read tools must declare `readOnlyHint: true`** — any tool whose `name` starts with `list_`, `get_`, `recall_`, or `build_` is classified as read-only. Set `annotations: { readOnlyHint: true }` or CI will fail.
+- **Write tools must NOT declare `readOnlyHint: true`** — tools starting with `create_`, `update_`, `delete_`, `write_`, `start_`, `complete_`, `block_`, or `invoke_` cannot claim to be read-only.
+- **Idempotent reads should also set `idempotentHint: true`** — most `list_*` and `get_*` tools qualify.
+
+The lint test is `packages/cli/src/tests/mcp-tools-lint.test.ts`. Run `pnpm test` in `packages/cli` to verify.
+
+---
+
 ## Further Reading
 
 | Topic | Location |

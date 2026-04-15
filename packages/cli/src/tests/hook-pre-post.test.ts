@@ -5,8 +5,8 @@
 // don't need to spawn a subprocess — matching the in-process pattern
 // used elsewhere in this package's test suite.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync } from 'fs'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import {
@@ -340,6 +340,110 @@ describe('runPreHook — hook_events passive trace (Unit 1)', () => {
     const db = getDb()
     const count = db.prepare(`SELECT COUNT(*) AS n FROM hook_events`).get() as { n: number }
     expect(count.n).toBe(2)
+  })
+})
+
+// ── Phase 6: snapshot injection ───────────────────────────────────────────────
+
+describe('runPreHook — snapshot injection (Phase 6)', () => {
+  let tmpDataDir: string
+
+  beforeEach(() => {
+    createTestDb()
+    tmpDataDir = mkdtempSync(join(tmpdir(), 'fulcrum-snap-'))
+    mkdirSync(join(tmpDataDir, 'sessions'), { recursive: true })
+    vi.stubEnv('FULCRUM_DATA_DIR', tmpDataDir)
+  })
+
+  afterEach(() => {
+    resetTestDb()
+    try { rmSync(tmpDataDir, { recursive: true, force: true }) } catch { /* ignore */ }
+    vi.unstubAllEnvs()
+  })
+
+  function writeSessionFile(sessionId: string, data: Record<string, unknown>): void {
+    writeFileSync(
+      join(tmpDataDir, 'sessions', `${sessionId}.json`),
+      JSON.stringify(data),
+    )
+  }
+
+  it('injects workspace snapshot as stderr when session file is fresh', async () => {
+    const snapshot = { status: { active_runs: 2 }, tasks: { tasks: [{ id: 't1' }] } }
+    writeSessionFile('sess_snap_fresh', {
+      run_id: 'run_snap_1',
+      workspace_id: 'ws_hook',
+      project_id: 'proj_hook',
+      workspace_snapshot: snapshot,
+      fetched_at: new Date().toISOString(), // 0 seconds old
+    })
+
+    const cap = makeCapturedIO()
+    await runPreHook(baseCtx({ sessionId: 'sess_snap_fresh' }), cap.io)
+
+    const stderrJoined = cap.stderr.join('')
+    expect(stderrJoined).toContain('[fulcrum/pre] workspace context')
+    expect(stderrJoined).toContain('active_runs')
+    expect(cap.exitCode).toBe(0)
+  })
+
+  it('skips snapshot injection when fetched_at is older than 5 minutes', async () => {
+    const snapshot = { status: { active_runs: 1 }, tasks: { tasks: [] } }
+    writeSessionFile('sess_snap_stale', {
+      run_id: 'run_snap_stale',
+      workspace_id: 'ws_hook',
+      project_id: 'proj_hook',
+      workspace_snapshot: snapshot,
+      fetched_at: new Date(Date.now() - 6 * 60 * 1000).toISOString(), // 6 min ago
+    })
+
+    const cap = makeCapturedIO()
+    await runPreHook(baseCtx({ sessionId: 'sess_snap_stale' }), cap.io)
+
+    const stderrJoined = cap.stderr.join('')
+    expect(stderrJoined).not.toContain('[fulcrum/pre] workspace context')
+    expect(cap.exitCode).toBe(0)
+  })
+
+  it('skips snapshot injection when session file has no workspace_snapshot', async () => {
+    writeSessionFile('sess_no_snap', {
+      run_id: 'run_no_snap',
+      workspace_id: 'ws_hook',
+      project_id: 'proj_hook',
+      // no workspace_snapshot or fetched_at
+    })
+
+    const cap = makeCapturedIO()
+    await runPreHook(baseCtx({ sessionId: 'sess_no_snap' }), cap.io)
+
+    const stderrJoined = cap.stderr.join('')
+    expect(stderrJoined).not.toContain('[fulcrum/pre] workspace context')
+    expect(cap.exitCode).toBe(0)
+  })
+
+  it('skips snapshot injection when session file is absent', async () => {
+    // Do NOT write a session file for this ID
+    const cap = makeCapturedIO()
+    await runPreHook(baseCtx({ sessionId: 'sess_missing_entirely' }), cap.io)
+
+    const stderrJoined = cap.stderr.join('')
+    expect(stderrJoined).not.toContain('[fulcrum/pre] workspace context')
+    expect(cap.exitCode).toBe(0)
+  })
+
+  it('does not inject when sessionId is "unknown"', async () => {
+    // Even with a session file named "unknown.json", injection is skipped.
+    writeSessionFile('unknown', {
+      workspace_snapshot: { status: {} },
+      fetched_at: new Date().toISOString(),
+    })
+
+    const cap = makeCapturedIO()
+    await runPreHook(baseCtx({ sessionId: 'unknown' }), cap.io)
+
+    const stderrJoined = cap.stderr.join('')
+    expect(stderrJoined).not.toContain('[fulcrum/pre] workspace context')
+    expect(cap.exitCode).toBe(0)
   })
 })
 

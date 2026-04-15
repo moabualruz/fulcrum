@@ -34,7 +34,7 @@
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { getDb , Db} from './db/client.js'
-import { getAgentDefinition, createAgentDefinition, updateAgentDefinition } from './agent-definitions.js'
+import { getAgentDefinition, createAgentDefinition, updateAgentDefinition, GLOBAL_WORKSPACE_ID } from './agent-definitions.js'
 import { globalDataDir } from './db/client.js'
 import type { AgentRole, CreateAgentDefinitionInput } from './types.js'
 
@@ -119,7 +119,7 @@ function loadDir(dir: string, workspaceId: string, db: Db = getDb()): number {
  */
 export function loadAgentDefsFromDir(
   startDir: string = process.cwd(),
-  workspaceId = 'default',
+  workspaceId = GLOBAL_WORKSPACE_ID,
   db: Db = getDb(),
 ): number {
   let total = 0

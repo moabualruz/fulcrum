@@ -43,6 +43,15 @@ export interface McpServerOptions {
    * Chain runs in order: middleware[0] wraps middleware[1] wraps ... wraps the actual call.
    */
   middleware?: ToolMiddleware[]
+  /**
+   * Optional predicate to filter which tools are registered with the MCP server.
+   * Used by --profile <value> in `fulcrum serve mcp`:
+   *   - 'hook-only': removes hookEquivalent tools (recall_memory, write_memory, get_current_context)
+   *   - '<role>': enforces tools_allow / tools_deny from agent_definitions for the role
+   * When undefined, all tools are registered (default behaviour).
+   * Built by buildProfileFilter() in tool-registry.ts.
+   */
+  filter?: (tool: import('./mcp-tools.js').ToolSchema) => boolean
 }
 
 // ---------- Zod shape builder ----------
@@ -196,6 +205,7 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
   )
 
   const allTools = [...TOOL_SCHEMAS, ...(options.additionalTools ?? [])]
+    .filter(tool => !options.filter || options.filter(tool))
 
   for (const tool of allTools) {
     const shape = buildZodShape(
