@@ -114,7 +114,7 @@ export async function updateIssue(input: UpdateIssueInput, db = getDb()): Promis
     emitEvent({
       workspace_id: existing.workspace_id as string,
       project_id: existing.project_id as string,
-      evt_type: 'task_status_changed',
+      evt_type: 'issue_status_changed',
       object_type: 'issue',
       object_id: input.issue_id,
       actor_type: 'system',
@@ -139,5 +139,16 @@ export async function listIssues(input: ListIssuesInput, db = getDb()): Promise<
   if (input.assignee_agent_id) { sql += ' AND assignee_agent_id = ?'; params.push(input.assignee_agent_id) }
   sql += ' ORDER BY created_at ASC'
   const rows = db.prepare(sql).all(...params) as Record<string, unknown>[]
-  return rows.map(row => rowToIssue(row, getLabels(db, row.issue_id as string)))
+  const issueIds = rows.map(r => r.issue_id as string)
+  if (issueIds.length === 0) return []
+  const labelRows = db.prepare(
+    `SELECT issue_id, label FROM issue_labels WHERE issue_id IN (${issueIds.map(() => '?').join(',')}) ORDER BY added_at ASC`
+  ).all(...issueIds) as Array<{ issue_id: string; label: string }>
+  const labelMap = new Map<string, string[]>()
+  for (const lr of labelRows) {
+    const arr = labelMap.get(lr.issue_id) ?? []
+    arr.push(lr.label)
+    labelMap.set(lr.issue_id, arr)
+  }
+  return rows.map(row => rowToIssue(row, labelMap.get(row.issue_id as string) ?? []))
 }

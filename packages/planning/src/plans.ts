@@ -91,7 +91,7 @@ export async function updatePlan(input: UpdatePlanInput, db = getDb()): Promise<
     emitEvent({
       workspace_id: existing.workspace_id as string,
       project_id: existing.project_id as string,
-      evt_type: 'task_status_changed',
+      evt_type: 'plan_status_changed',
       object_type: 'plan',
       object_id: input.plan_id,
       actor_type: 'system',
