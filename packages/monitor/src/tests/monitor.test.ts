@@ -342,6 +342,68 @@ describe('MonitorServer', () => {
   )
 })
 
+describe('MonitorServer — /tasks filter + pagination (in-process)', () => {
+  it('GET /tasks returns 400 when workspace_id is missing and no config default', async () => {
+    // Pass empty string so neither query param nor config default is available
+    const server = startMonitorServer({ workspace_id: '' })
+    const res = await server.fetch(new Request('http://localhost/tasks'))
+    expect(res.status).toBe(400)
+    const body = await res.json() as { error: string }
+    expect(body.error).toMatch(/workspace_id/)
+  })
+
+  it('GET /tasks?status= filters to only matching tasks', async () => {
+    db.prepare(
+      `INSERT INTO tasks (task_id, workspace_id, project_id, title, status) VALUES (?, 'ws_test', 'proj_test', ?, ?)`
+    ).run('t_open_1', 'Open Task 1', 'open')
+    db.prepare(
+      `INSERT INTO tasks (task_id, workspace_id, project_id, title, status) VALUES (?, 'ws_test', 'proj_test', ?, ?)`
+    ).run('t_done_1', 'Done Task 1', 'done')
+    db.prepare(
+      `INSERT INTO tasks (task_id, workspace_id, project_id, title, status) VALUES (?, 'ws_test', 'proj_test', ?, ?)`
+    ).run('t_done_2', 'Done Task 2', 'done')
+
+    const server = startMonitorServer({ workspace_id: 'ws_test' })
+    const res = await server.fetch(
+      new Request('http://localhost/tasks?workspace_id=ws_test&status=done')
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json() as PaginatedResponse<Record<string, unknown>>
+    expect(body.data.every((t) => t['status'] === 'done')).toBe(true)
+    expect(body.data.length).toBe(2)
+    expect(body.pagination.total).toBe(2)
+  })
+
+  it('GET /tasks?limit= + offset= returns paginated slices', async () => {
+    for (let i = 1; i <= 5; i++) {
+      db.prepare(
+        `INSERT INTO tasks (task_id, workspace_id, project_id, title, status) VALUES (?, 'ws_test', 'proj_test', ?, 'queued')`
+      ).run(`t_pag_${i}`, `Pag Task ${i}`)
+    }
+
+    const server = startMonitorServer({ workspace_id: 'ws_test' })
+
+    // Page 1
+    const res1 = await server.fetch(
+      new Request('http://localhost/tasks?workspace_id=ws_test&limit=2&offset=0')
+    )
+    const page1 = await res1.json() as PaginatedResponse<Record<string, unknown>>
+    expect(page1.data).toHaveLength(2)
+    expect(page1.pagination.limit).toBe(2)
+    expect(page1.pagination.offset).toBe(0)
+    expect(page1.pagination.total).toBeGreaterThanOrEqual(5)
+    expect(page1.pagination.next_cursor).toBe('2')
+
+    // Page 2 using next_cursor
+    const res2 = await server.fetch(
+      new Request(`http://localhost/tasks?workspace_id=ws_test&limit=2&offset=${page1.pagination.next_cursor}`)
+    )
+    const page2 = await res2.json() as PaginatedResponse<Record<string, unknown>>
+    expect(page2.data).toHaveLength(2)
+    expect(page2.pagination.offset).toBe(2)
+  })
+})
+
 describe('Pagination — /tasks endpoint', () => {
   it.skipIf(!process.env.FULCRUM_SERVER_TESTS)(
     'returns paginated response with next_cursor',

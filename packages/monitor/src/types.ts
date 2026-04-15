@@ -88,6 +88,8 @@ export interface MonitorServer {
   start(): Promise<void>
   stop(): Promise<void>
   port: number
+  /** Test helper: call routes without binding a real port. */
+  fetch(req: Request): Promise<Response>
 }
 
 export interface RunReplay {

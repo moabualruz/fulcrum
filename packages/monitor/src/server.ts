@@ -674,6 +674,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
   return {
     port,
+    fetch: (req: Request) => app.fetch(req),
     start: async () => {
       serverInstance = serve({ fetch: app.fetch, port, hostname: host })
     },
