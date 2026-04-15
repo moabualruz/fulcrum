@@ -8,6 +8,19 @@ import { globalDataDir } from '@fulcrum/core'
 
 // ---------- Types ----------
 
+export interface PluginSetting {
+  /** Setting name (used as key in config) */
+  name: string
+  /** Environment variable to read the value from at runtime */
+  envVar: string
+  /** Human-readable description shown during install prompting */
+  description?: string
+  /** If true, the value should be stored in the vault and masked in output */
+  sensitive?: boolean
+  /** Default value used when neither envVar nor explicit config is set */
+  default?: string
+}
+
 export interface FulcrumPluginManifest {
   type: 'plugin'
   /** Path (relative to package root) to a CommonJS/ESM module exporting hook handlers */
@@ -16,6 +29,8 @@ export interface FulcrumPluginManifest {
   skills?: string
   /** Directory (relative to package root) containing agent MD files */
   agents?: string
+  /** Settings/secrets this plugin requires. Shown during install; read from env vars at runtime. */
+  settings?: PluginSetting[]
 }
 
 export interface DiscoveredPlugin {

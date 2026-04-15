@@ -53,24 +53,72 @@ function fuseScore(
   )
 }
 
-// MMR diversification (λ=0.7) — reduce to k from 3k candidates
+/** Cosine similarity between two equal-length float vectors. Returns 0 for zero vectors. */
+function cosineSim(a: number[], b: number[]): number {
+  let dot = 0, normA = 0, normB = 0
+  for (let i = 0; i < a.length; i++) {
+    dot   += a[i]! * b[i]!
+    normA += a[i]! * a[i]!
+    normB += b[i]! * b[i]!
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB)
+  return denom > 0 ? dot / denom : 0
+}
+
+/**
+ * MMR diversification (λ=0.7) — reduce candidates to k items using
+ * Maximal Marginal Relevance.
+ *
+ * Full MMR formula:
+ *   score = λ × relevance(d) - (1-λ) × max_{s ∈ S} cosine(d, s)
+ *
+ * When candidate embeddings are provided the cosine term is computed exactly.
+ * When embeddings are absent (empty map), falls back to greedy score ordering
+ * (the previous behaviour, preserved for callers that can't supply embeddings).
+ */
 function mmrDiversify(
   candidates: ScoredMemoryId[],
   k: number,
-  lambda: number = 0.7
+  lambda: number = 0.7,
+  embeddings: Map<string, number[]> = new Map()
 ): ScoredMemoryId[] {
   if (candidates.length <= k) return candidates
 
   const selected: ScoredMemoryId[] = []
   const remaining = [...candidates]
+  const selectedEmbeddings: number[][] = []
 
   while (selected.length < k && remaining.length > 0) {
-    // For now use score directly (full MMR requires embedding cosine between candidates)
-    // Score = λ × relevance_score - (1-λ) × max_similarity_to_selected
-    // Without candidate embeddings in memory, we use score ordering as approximation
-    // A real implementation would pass candidate embeddings through
-    remaining.sort((a, b) => b.score - a.score)
-    selected.push(remaining.shift()!)
+    let bestIdx = 0
+    let bestMmr = -Infinity
+
+    for (let i = 0; i < remaining.length; i++) {
+      const cand = remaining[i]!
+      const relevance = cand.score  // λ term
+
+      let maxSim = 0
+      if (selectedEmbeddings.length > 0) {
+        const candEmb = embeddings.get(cand.id)
+        if (candEmb) {
+          for (const selEmb of selectedEmbeddings) {
+            maxSim = Math.max(maxSim, cosineSim(candEmb, selEmb))
+          }
+        }
+        // If no embedding available for this candidate, treat maxSim as 0
+        // (optimistic: don't penalise it for unknown similarity)
+      }
+
+      const mmr = lambda * relevance - (1 - lambda) * maxSim
+      if (mmr > bestMmr) {
+        bestMmr = mmr
+        bestIdx = i
+      }
+    }
+
+    const winner = remaining.splice(bestIdx, 1)[0]!
+    selected.push(winner)
+    const winnerEmb = embeddings.get(winner.id)
+    if (winnerEmb) selectedEmbeddings.push(winnerEmb)
   }
 
   return selected
@@ -211,6 +259,20 @@ export async function queryMemoriesL2(
   scored.sort((a, b) => b.score - a.score)
   const topCandidates = scored.slice(0, candidateLimit)
 
-  // Stage 6 — MMR diversification (λ=0.7)
-  return mmrDiversify(topCandidates, limit, 0.7)
+  // Stage 6 — MMR diversification (λ=0.7) with actual cosine similarity
+  // Fetch embeddings for all top candidates so mmrDiversify can compute the
+  // diversity penalty exactly rather than falling back to score ordering.
+  let candidateEmbeddings: Map<string, number[]> = new Map()
+  if (topCandidates.length > 1) {
+    const candidateIds = topCandidates.map(c => c.id)
+    const embRows = await client.query<{ id: string; embedding: number[] }>(
+      `MATCH (m:Memory) WHERE m.id IN $ids RETURN m.id AS id, m.embedding AS embedding`,
+      { ids: candidateIds }
+    ).catch(() => [] as { id: string; embedding: number[] }[])
+    for (const row of embRows) {
+      if (row.embedding) candidateEmbeddings.set(row.id, row.embedding)
+    }
+  }
+
+  return mmrDiversify(topCandidates, limit, 0.7, candidateEmbeddings)
 }
