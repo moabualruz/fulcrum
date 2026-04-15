@@ -26,7 +26,7 @@
     "@fulcrum/core": "workspace:*",
     "@fulcrum/teams": "workspace:*",
     "minimatch": "^10.2.5",
-    "ulid": "^2.3.0"
+    "ulidx": "^2.3.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",

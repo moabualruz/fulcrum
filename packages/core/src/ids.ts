@@ -1,4 +1,4 @@
-import { ulid } from 'ulid'
+import { ulid } from 'ulidx'
 import type Database from 'better-sqlite3'
 
 const PREFIXES: Record<string, string> = {

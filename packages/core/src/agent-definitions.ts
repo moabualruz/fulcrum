@@ -7,6 +7,24 @@ import { newId } from './ids.js'
 import { FulcrumError } from './types.js'
 import type { AgentDefinition, CreateAgentDefinitionInput, UpdateAgentDefinitionInput } from './types.js'
 
+/**
+ * MCP tool names must start with a letter or underscore and contain only
+ * letters, digits, underscores, and hyphens. This matches the MCP spec §2.4.
+ */
+const TOOL_NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_-]*$/
+
+function validateToolNames(list: string[] | null | undefined, field: string): void {
+  if (!list) return
+  for (const name of list) {
+    if (!TOOL_NAME_RE.test(name)) {
+      throw new FulcrumError(
+        `Invalid tool name '${name}' in ${field}: must match /^[a-zA-Z_][a-zA-Z0-9_-]*$/`,
+        'invalid_input',
+      )
+    }
+  }
+}
+
 function rowToDefinition(row: Record<string, unknown>): AgentDefinition {
   return {
     id: row.id as string,
@@ -36,6 +54,8 @@ export function createAgentDefinition(input: CreateAgentDefinitionInput): AgentD
   if (existing) {
     throw new FulcrumError(`Agent definition for role '${input.role}' already exists`, 'conflict')
   }
+  validateToolNames(input.tools_allow, 'tools_allow')
+  validateToolNames(input.tools_deny, 'tools_deny')
   const id = newId('agent_definition')
   const now = Math.floor(Date.now() / 1000)
   db.prepare(`
@@ -107,6 +127,8 @@ export function updateAgentDefinition(input: UpdateAgentDefinitionInput): AgentD
   setField('system_prompt', input.system_prompt)
   setField('model', input.model)
   setField('provider', input.provider)
+  validateToolNames(input.tools_allow, 'tools_allow')
+  validateToolNames(input.tools_deny, 'tools_deny')
   setField('tools_allow', input.tools_allow, true)
   setField('tools_deny', input.tools_deny, true)
   setField('capabilities', input.capabilities, true)

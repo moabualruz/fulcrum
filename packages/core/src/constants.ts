@@ -39,3 +39,17 @@ export const MEMORY_DECAY_FACTOR = 0.9
 export const MEMORY_DECAY_THRESHOLD = 0.5
 export const MEMORY_DECAY_MIN_DAYS_SINCE_ACCESS = 7
 export const MEMORY_DECAY_FLOOR = 0.01
+
+/**
+ * Memory consolidation: two memories with cosine similarity above this
+ * threshold are considered duplicates and merged by the janitor.
+ * Slightly higher than the write-time threshold (0.9) to be conservative
+ * about merging existing memories.
+ */
+export const MEMORY_CONSOLIDATION_THRESHOLD = 0.92
+
+/**
+ * Maximum number of embedding-bearing memories to compare per consolidation
+ * cycle. Keeps the O(n²) comparison bounded for large workspaces.
+ */
+export const MEMORY_CONSOLIDATION_BATCH_SIZE = 200

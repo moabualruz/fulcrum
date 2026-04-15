@@ -184,3 +184,48 @@ describe('listAgentDefinitions', () => {
     expect(exp[0].role).toBe('test_exp_role')
   })
 })
+
+describe('tool name validation', () => {
+  beforeEach(() => setupDb())
+  afterEach(() => teardownDb())
+
+  it('accepts valid tool names in tools_allow', () => {
+    expect(() =>
+      createAgentDefinition({
+        role: 'test_tool_valid',
+        display_name: 'Test',
+        description: 'Test',
+        tools_allow: ['read_file', 'write_memory', 'list-tasks', '_internal'],
+      })
+    ).not.toThrow()
+  })
+
+  it('rejects tools_allow with invalid names', () => {
+    expect(() =>
+      createAgentDefinition({
+        role: 'test_tool_invalid_allow',
+        display_name: 'Test',
+        description: 'Test',
+        tools_allow: ['read file', '123bad'],
+      })
+    ).toThrow(expect.objectContaining({ code: 'invalid_input' }))
+  })
+
+  it('rejects tools_deny with invalid names', () => {
+    expect(() =>
+      createAgentDefinition({
+        role: 'test_tool_invalid_deny',
+        display_name: 'Test',
+        description: 'Test',
+        tools_deny: ['bad name!'],
+      })
+    ).toThrow(expect.objectContaining({ code: 'invalid_input' }))
+  })
+
+  it('rejects tools_allow with invalid name on update', () => {
+    createAgentDefinition({ role: 'test_update_tool', display_name: 'T', description: 'T' })
+    expect(() =>
+      updateAgentDefinition({ role: 'test_update_tool', tools_allow: ['bad name!'] })
+    ).toThrow(expect.objectContaining({ code: 'invalid_input' }))
+  })
+})

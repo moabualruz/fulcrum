@@ -1,5 +1,5 @@
 // packages/memory/src/graph.ts
-import { ulid } from 'ulid'
+import { ulid } from 'ulidx'
 import type Database from 'better-sqlite3'
 import type {
   GraphEntity,

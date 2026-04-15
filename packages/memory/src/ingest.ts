@@ -1,5 +1,5 @@
 // packages/memory/src/ingest.ts
-import { ulid } from 'ulid'
+import { ulid } from 'ulidx'
 import { readdirSync, readFileSync, statSync } from 'fs'
 import { join, extname, basename } from 'path'
 import { getDb } from '@fulcrum/core'

@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",
-    "ulid": "^2.3.0"
+    "ulidx": "^2.3.0"
   },
   "devDependencies": {
     "better-sqlite3": "^12.0.0",
