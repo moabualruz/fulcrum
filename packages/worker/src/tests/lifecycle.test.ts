@@ -137,12 +137,10 @@ describe('spawnAgent lifecycle (H-2)', () => {
       target_role: 'software_engineer',
       adapter: 'test-heartbeat',
     })
-    const row = getDb()
-      .prepare(`SELECT events FROM agent_runs WHERE run_id = ?`)
-      .get(run_id) as { events: string | null }
-    const events: Array<{ event_type: string }> = row.events ? JSON.parse(row.events) : []
-    const heartbeats = events.filter((e) => e.event_type === 'heartbeat')
-    expect(heartbeats.length).toBe(3)
+    const rows = getDb()
+      .prepare(`SELECT event_type FROM run_events WHERE run_id = ? AND event_type = 'heartbeat'`)
+      .all(run_id) as { event_type: string }[]
+    expect(rows.length).toBe(3)
   })
 
   it('adapter throwing → run is blocked with the error message', async () => {

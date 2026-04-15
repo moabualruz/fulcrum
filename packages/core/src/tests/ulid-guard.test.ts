@@ -35,11 +35,6 @@ const ALLOWED_PATHS: Array<{ path: string; reason: string }> = [
     reason: 'Canonical newId() implementation — wraps ulid() by design.',
   },
   {
-    path: 'packages/memory/src/graph.ts',
-    reason:
-      'Internal graph entity/edge/episode IDs — not first-class objects in the ID prefix system. If the graph becomes user-visible, promote to newId("graph_entity") etc.',
-  },
-  {
     path: 'packages/memory/src/ingest.ts',
     reason:
       'code_chunks.chunk_id is an internal, unprefixed identifier for a sub-object owned by the ingest pipeline — no registered prefix in ids.ts.',

@@ -209,10 +209,10 @@ describe('runWorkflow (H-1/H-5)', () => {
       .prepare(
         `INSERT INTO tasks (
            task_id, workspace_id, project_id, display_id, title, description,
-           status, status_category, priority, depends_on, assigned_to, note, done_criteria,
+           status, status_category, priority, assigned_to, note, done_criteria,
            created_at, updated_at
          ) VALUES ('task_wait_1', ?, ?, 'T-WAIT-1', 'pending thing', NULL,
-                   'queued', 'active', 'medium', '[]', NULL, NULL, NULL,
+                   'queued', 'active', 'medium', NULL, NULL, NULL,
                    datetime('now'), datetime('now'))`,
       )
       .run(workspace_id, project_id)
