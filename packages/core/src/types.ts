@@ -89,7 +89,6 @@ export interface Task {
   priority: 'critical' | 'high' | 'medium' | 'low' | 'none'
   estimate_type: 'story_points' | 'hours' | null
   estimate_value: number | null
-  depends_on: string[]
   assigned_to: string | null
   note: string | null
   done_criteria: string | null
@@ -191,6 +190,14 @@ export interface TaskRelation {
   target_task_id: string
   relation_type: TaskRelationType
   created_at: string
+}
+
+export interface RunEvent {
+  id: string
+  run_id: string
+  ts: string
+  event_type: string
+  payload?: string | null
 }
 
 /**

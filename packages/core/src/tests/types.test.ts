@@ -48,7 +48,7 @@ describe('type exports — compile-time shape checks', () => {
       issue_id: null, display_id: 'TASK-1', title: 'Test task',
       description: null, status: 'queued', status_category: 'backlog',
       priority: 'medium', estimate_type: null, estimate_value: null,
-      depends_on: [], assigned_to: null, note: null, done_criteria: null,
+      assigned_to: null, note: null, done_criteria: null,
       version: 0, created_at: '', updated_at: '',
       claimed_at: null, completed_at: null,
       assigned_run_id: null, labels: [], blockers: [],

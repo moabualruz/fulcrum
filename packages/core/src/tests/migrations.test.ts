@@ -34,13 +34,13 @@ describe('runMigrations', () => {
     expect(() => runMigrations(db)).not.toThrow()
   })
 
-  it('tasks table has version and depends_on columns', () => {
+  it('tasks table has version column but not depends_on (removed in migration 037)', () => {
     const db = freshDb()
     runMigrations(db)
     const cols = db.prepare('PRAGMA table_info(tasks)').all() as { name: string }[]
     const colNames = cols.map(c => c.name)
     expect(colNames).toContain('version')
-    expect(colNames).toContain('depends_on')
+    expect(colNames).not.toContain('depends_on')
   })
 
   it('agent_runs table has artifacts and git_branch columns', () => {

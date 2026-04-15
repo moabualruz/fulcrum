@@ -23,20 +23,14 @@ describe('createTask', () => {
     expect(task.status).toBe('queued')
     expect(task.title).toBe('Write tests')
     expect(task.version).toBe(0)
-    expect(task.depends_on).toEqual([])
     expect(task.task_id).toMatch(/^task_[0-9A-Z]{26}$|^[0-9A-Z]{26}$/) // prefixed ULID or plain ULID
   })
 
-  it('creates a task with dependencies', async () => {
+  it('creates a second task in the same project without error', async () => {
     seed()
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'A' })
-    const t2 = await createTask({
-      workspace_id: 'ws_1',
-      project_id: 'proj_1',
-      title: 'B',
-      depends_on: [t1.task_id],
-    })
-    expect(t2.depends_on).toEqual([t1.task_id])
+    const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'B' })
+    expect(t1.task_id).not.toBe(t2.task_id)
   })
 })
 

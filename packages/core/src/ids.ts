@@ -33,6 +33,7 @@ const PREFIXES: Record<string, string> = {
   policy_event: 'pevt_',
   agent_profile: 'ap_',
   agent_definition: 'adef_',
+  run_event: 'revt_',
 }
 
 const DISPLAY_PREFIXES: Record<string, string> = {

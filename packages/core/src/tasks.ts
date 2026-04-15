@@ -16,7 +16,6 @@ interface CreateTaskInput {
   project_id: string
   title: string
   description?: string
-  depends_on?: string[]
   assigned_to?: string
   priority?: 'critical' | 'high' | 'medium' | 'low' | 'none'
   done_criteria?: string
@@ -65,7 +64,6 @@ function rowToTaskBase(row: Record<string, unknown>): Omit<Task, 'labels' | 'blo
     priority: ((row.priority as string) || 'medium') as Task['priority'],
     estimate_type: (row.estimate_type as Task['estimate_type']) ?? null,
     estimate_value: (row.estimate_value as number | null) ?? null,
-    depends_on: (() => { try { return JSON.parse(row.depends_on as string) as string[] } catch { return [] } })(),
     assigned_to: row.assigned_to as string | null,
     note: row.note as string | null,
     done_criteria: (row.done_criteria as string | null) ?? null,
@@ -111,9 +109,9 @@ export async function createTask(input: CreateTaskInput, db = getDb()): Promise<
   const insertTask = db.prepare(`
     INSERT INTO tasks
       (task_id, workspace_id, project_id, display_id, issue_id, title, description,
-       status, status_category, priority, depends_on, assigned_to, note, done_criteria,
+       status, status_category, priority, assigned_to, note, done_criteria,
        created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   const insertLabel = db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)')
 
@@ -129,7 +127,6 @@ export async function createTask(input: CreateTaskInput, db = getDb()): Promise<
       initialStatus,
       sc,
       priority,
-      JSON.stringify(input.depends_on ?? []),
       input.assigned_to ?? null,
       null,
       input.done_criteria ?? null,

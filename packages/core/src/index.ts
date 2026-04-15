@@ -4,7 +4,7 @@ export type {
   Memory, AgentProfile, AgentRoleDescriptor, WorkspaceStatus, WorkspaceStatusResult, PolicyConfig,
   StatusCategory, ProjectStatus, ProjectType, WriteMode,
   TaskRelationType, MemoryScope, MemoryKind, ArtifactType, EventType,
-  FulcrumEvent, TaskRelation,
+  FulcrumEvent, TaskRelation, RunEvent,
   EmbeddingProviderConfig, FulcrumConfig, PolicyCheckResult,
   HandoffPacket, CreateHandoffInput, HandoffPriority, HandoffScope, HandoffMode,
   TaskPacket, SpawnableRun, StartAgentRunInput,
@@ -42,6 +42,7 @@ export {
   blockAgentRun,
   escalateRun,
   buildSpawnableRun,
+  getRunHistory,
 } from './runs.js'
 
 // Policy
@@ -132,12 +133,15 @@ export {
 // callers should use `const teams = await getTeamOps()` to access:
 //   createTeamTemplate, invokeTeam, heartbeatTeam, completeTeam,
 //   listTeamInstances, getTeamStatus, canStartTeam.
-// The return type is `Record<string, unknown>` because @fulcrum/teams is a
-// workspace sibling that depends on core and therefore isn't statically
-// visible to core's tsconfig (same pattern as janitor.ts → @fulcrum/worktrees).
-// Callers should import types from '@fulcrum/teams' directly when needed.
-export async function getTeamOps(): Promise<Record<string, unknown>> {
-  // @ts-ignore — dynamic sibling import; resolves at runtime via pnpm workspace
-  const mod = await import('@fulcrum/teams')
-  return mod as unknown as Record<string, unknown>
+export type { TeamOps } from './team-ops.js'
+
+export async function getTeamOps(): Promise<import('./team-ops.js').TeamOps | null> {
+  try {
+    // Dynamic sibling import — resolves at runtime via pnpm workspace.
+    // @fulcrum/teams depends on @fulcrum/core so we cannot statically import it.
+    const mod = await import('@fulcrum/teams')
+    return mod as unknown as import('./team-ops.js').TeamOps
+  } catch {
+    return null
+  }
 }

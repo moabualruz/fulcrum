@@ -12,6 +12,7 @@ import {
   blockAgentRun,
   escalateRun,
   buildSpawnableRun,
+  getRunHistory,
 } from '../runs.js'
 
 beforeEach(() => { createTestDb() })
@@ -444,12 +445,17 @@ describe('buildSpawnableRun', () => {
 })
 
 describe('agent run event journal (G-7)', () => {
-  type RunEvent = { ts: string; event_type: string; payload: Record<string, unknown> }
+  type RunEventRow = { ts: string; event_type: string; payload: string | null }
 
-  function readEvents(run_id: string): RunEvent[] {
-    const row = getDb().prepare('SELECT events FROM agent_runs WHERE run_id = ?').get(run_id) as { events: string | null } | undefined
-    if (!row || !row.events) return []
-    return JSON.parse(row.events) as RunEvent[]
+  function readEvents(run_id: string): Array<{ ts: string; event_type: string; payload: Record<string, unknown> }> {
+    const rows = getDb().prepare(
+      'SELECT ts, event_type, payload FROM run_events WHERE run_id = ? ORDER BY ts ASC'
+    ).all(run_id) as RunEventRow[]
+    return rows.map(r => ({
+      ts: r.ts,
+      event_type: r.event_type,
+      payload: r.payload ? (JSON.parse(r.payload) as Record<string, unknown>) : {},
+    }))
   }
 
   it('startAgentRun seeds events with a "started" entry', async () => {
@@ -516,10 +522,31 @@ describe('agent run event journal (G-7)', () => {
     expect(heartbeats[0].payload.current_step).toBe('step 1')
     expect(heartbeats[2].payload.current_step).toBe('step 3')
   })
+
+  it('getRunHistory returns events ordered by ts ASC', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step 1', progress_pct: 10 })
+    await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step 2', progress_pct: 50 })
+    const history = getRunHistory(run.run_id)
+    expect(history.length).toBe(3) // started + 2 heartbeats
+    expect(history[0].event_type).toBe('started')
+    expect(history[1].event_type).toBe('heartbeat')
+    expect(history[2].event_type).toBe('heartbeat')
+  })
 })
 
 describe('run lifecycle memory hooks (L-9, L-10)', () => {
-  type RunEvent = { ts: string; event_type: string; payload: Record<string, unknown> }
+  function readRunEvents(run_id: string): Array<{ ts: string; event_type: string; payload: Record<string, unknown> }> {
+    const rows = getDb().prepare(
+      'SELECT ts, event_type, payload FROM run_events WHERE run_id = ? ORDER BY ts ASC'
+    ).all(run_id) as Array<{ ts: string; event_type: string; payload: string | null }>
+    return rows.map(r => ({
+      ts: r.ts,
+      event_type: r.event_type,
+      payload: r.payload ? (JSON.parse(r.payload) as Record<string, unknown>) : {},
+    }))
+  }
 
   it('startAgentRun recalls task-scoped memories and stores them in the started event', async () => {
     const task = await seedTask()
@@ -539,8 +566,7 @@ describe('run lifecycle memory hooks (L-9, L-10)', () => {
       role: 'software_engineer',
     })
 
-    const row = getDb().prepare('SELECT events FROM agent_runs WHERE run_id = ?').get(run.run_id) as { events: string }
-    const events = JSON.parse(row.events) as RunEvent[]
+    const events = readRunEvents(run.run_id)
     const started = events.find(e => e.event_type === 'started')
     expect(started).toBeDefined()
     const recalled = started!.payload.recalled_memories as Array<{ memory_id: string; kind: string; content: string }>
@@ -601,8 +627,7 @@ describe('run lifecycle memory hooks (L-9, L-10)', () => {
   it('recall failure never prevents startAgentRun (empty DB returns [])', async () => {
     const task = await seedTask()
     const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
-    const row = getDb().prepare('SELECT events FROM agent_runs WHERE run_id = ?').get(run.run_id) as { events: string }
-    const events = JSON.parse(row.events) as RunEvent[]
+    const events = readRunEvents(run.run_id)
     const started = events.find(e => e.event_type === 'started')
     expect(started!.payload.recalled_memories).toEqual([])
   })

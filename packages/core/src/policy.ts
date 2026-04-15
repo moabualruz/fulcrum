@@ -19,13 +19,16 @@ export async function checkPolicy(input: CheckPolicyInput, db = getDb()): Promis
     }
   }
 
-  // Check dependency completion — scope by workspace to prevent cross-workspace leakage
-  const taskRow = db.prepare('SELECT depends_on FROM tasks WHERE task_id = ? AND workspace_id = ?')
-    .get(input.task_id, input.workspace_id) as { depends_on: string } | undefined
-  if (!taskRow) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
+  // Check dependency completion — use task_relations (single source of truth)
+  const taskExists = db.prepare('SELECT task_id FROM tasks WHERE task_id = ? AND workspace_id = ?')
+    .get(input.task_id, input.workspace_id) as { task_id: string } | undefined
+  if (!taskExists) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
 
-  let deps: string[] = []
-  try { deps = JSON.parse(taskRow.depends_on) as string[] } catch { deps = [] }
+  // Find all tasks that this task depends on (follows/blocked_by/preceded_by relations)
+  const depRows = db.prepare(
+    `SELECT target_task_id FROM task_relations WHERE task_id = ? AND relation_type IN ('follows','blocked_by','preceded_by')`
+  ).all(input.task_id) as { target_task_id: string }[]
+  const deps = depRows.map(r => r.target_task_id)
   if (deps.length > 0) {
     const placeholders = deps.map(() => '?').join(',')
     const incomplete = db.prepare(

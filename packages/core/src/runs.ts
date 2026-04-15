@@ -7,7 +7,7 @@ import { createTask } from './tasks.js'
 import { writeLifecycleMemory, type LifecycleMemoryInput } from './memory-insert.js'
 import { getAgentDefinition } from './agent-definitions.js'
 import { FulcrumError } from './types.js'
-import type { AgentRun, AgentRole, AgentRunStatus, RunArtifacts, Task, TaskPacket, SpawnableRun, StartAgentRunInput } from './types.js'
+import type { AgentRun, AgentRole, AgentRunStatus, RunArtifacts, RunEvent, Task, TaskPacket, SpawnableRun, StartAgentRunInput } from './types.js'
 
 /**
  * Recall task-scoped memories at run start so the agent sees prior context
@@ -96,11 +96,10 @@ function assertRunIsLive(
 }
 
 /**
- * Append a structured event to agent_runs.events (spec §5.3/§16.5/§19).
- * Each entry has shape { ts, event_type, payload } and records a lifecycle
- * transition: started, heartbeat, completed, blocked, escalated. Reads the
- * current JSON array, pushes, and writes back in a single UPDATE. `undefined`
- * payload fields are stripped for clean JSON.
+ * Append a structured event to run_events table (replaces the JSON blob approach).
+ * Each row has shape { id, run_id, ts, event_type, payload } and records a lifecycle
+ * transition: started, heartbeat, completed, blocked, escalated.
+ * `undefined` payload fields are stripped for clean JSON.
  */
 function appendRunEvent(
   run_id: string,
@@ -108,13 +107,21 @@ function appendRunEvent(
   payload: Record<string, unknown> = {},
   db = getDb(),
 ): void {
-  const row = db.prepare('SELECT events FROM agent_runs WHERE run_id = ?').get(run_id) as { events: string | null } | undefined
-  if (!row) return
-  const events: Array<{ ts: string; event_type: string; payload: Record<string, unknown> }> =
-    row.events ? JSON.parse(row.events) : []
+  const id = newId('run_event')
+  const ts = new Date().toISOString()
   const clean = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined))
-  events.push({ ts: new Date().toISOString(), event_type, payload: clean })
-  db.prepare('UPDATE agent_runs SET events = ? WHERE run_id = ?').run(JSON.stringify(events), run_id)
+  db.prepare(
+    'INSERT INTO run_events (id, run_id, ts, event_type, payload) VALUES (?, ?, ?, ?, ?)'
+  ).run(id, run_id, ts, event_type, JSON.stringify(clean))
+}
+
+/**
+ * Get the full event history for a run, ordered by ts ASC.
+ */
+export function getRunHistory(run_id: string, db = getDb()): RunEvent[] {
+  return db.prepare(
+    'SELECT id, run_id, ts, event_type, payload FROM run_events WHERE run_id = ? ORDER BY ts ASC'
+  ).all(run_id) as RunEvent[]
 }
 
 function upsertAgentStateProjection(db: ReturnType<typeof getDb>, run: AgentRun): void {

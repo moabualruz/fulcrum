@@ -193,13 +193,13 @@ describe('checkPolicy — stale runs excluded from WIP (G-8)', () => {
 describe('checkPolicy — task dependencies', () => {
   it('blocks when a dependency is not completed', async () => {
     seed()
+    const db = getDb()
     const dep = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Dep' })
-    const child = await createTask({
-      workspace_id: 'ws_1',
-      project_id: 'proj_1',
-      title: 'Child',
-      depends_on: [dep.task_id],
-    })
+    const child = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Child' })
+    // Use task_relations as the single source for dependency data
+    db.prepare(
+      "INSERT INTO task_relations (task_id, target_task_id, relation_type, created_at) VALUES (?, ?, 'follows', datetime('now'))"
+    ).run(child.task_id, dep.task_id)
     const result = await checkPolicy({
       workspace_id: 'ws_1',
       task_id: child.task_id,
@@ -213,15 +213,15 @@ describe('checkPolicy — task dependencies', () => {
 
   it('allows when all dependencies are completed', async () => {
     seed()
+    const db = getDb()
     const dep = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Dep' })
     const { updateTask } = await import('../tasks.js')
     await updateTask({ task_id: dep.task_id, status: 'completed' })
-    const child = await createTask({
-      workspace_id: 'ws_1',
-      project_id: 'proj_1',
-      title: 'Child',
-      depends_on: [dep.task_id],
-    })
+    const child = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Child' })
+    // Use task_relations as the single source for dependency data
+    db.prepare(
+      "INSERT INTO task_relations (task_id, target_task_id, relation_type, created_at) VALUES (?, ?, 'follows', datetime('now'))"
+    ).run(child.task_id, dep.task_id)
     const result = await checkPolicy({
       workspace_id: 'ws_1',
       task_id: child.task_id,

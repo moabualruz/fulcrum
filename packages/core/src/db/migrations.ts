@@ -2471,4 +2471,172 @@ export function runMigrations(db: Database.Database): void {
     }
     db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('036_agent_definitions_workspace_scope')").run()
   }
+
+  // MIGRATION_037 — remove tasks.depends_on JSON column (Task 3.3)
+  // The `task_relations` table is the single source of truth for dependency
+  // relationships. The `depends_on` JSON column on `tasks` was a dual
+  // representation that caused drift. This migration drops it via table rebuild,
+  // preserving all other columns, indexes, and FTS triggers.
+  const already037 = db.prepare("SELECT id FROM schema_migrations WHERE name = '037_remove_tasks_depends_on'").get()
+  if (!already037) {
+    const tasksCols037 = db.prepare(`PRAGMA table_info(tasks)`).all() as { name: string }[]
+    const hasDependsOn = tasksCols037.some(c => c.name === 'depends_on')
+
+    if (hasDependsOn && tasksCols037.length > 0) {
+      // Collect indexes and triggers to preserve
+      const tasksIdxes037 = (db
+        .prepare(`SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='tasks' AND sql IS NOT NULL`)
+        .all() as { sql: string }[]).map(r => r.sql)
+      const tasksTriggers037 = db
+        .prepare(`SELECT name, sql FROM sqlite_master WHERE type='trigger' AND tbl_name='tasks'`)
+        .all() as { name: string; sql: string | null }[]
+
+      const fkPrev037 = db.pragma('foreign_keys', { simple: true }) as number
+      db.pragma('foreign_keys = OFF')
+      try {
+        db.transaction(() => {
+          // Drop FTS triggers before rename to avoid them firing on INSERT INTO tasks_new SELECT
+          for (const trig of tasksTriggers037) {
+            db.exec(`DROP TRIGGER IF EXISTS ${trig.name}`)
+          }
+
+          // Build new CREATE TABLE without the depends_on column
+          const colsWithoutDependsOn = tasksCols037.filter(c => c.name !== 'depends_on')
+          const colNames = colsWithoutDependsOn.map(c => c.name)
+
+          // Read the current CREATE TABLE SQL and rebuild without depends_on
+          const tasksCreateRow = db
+            .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'`)
+            .get() as { sql: string | null } | undefined
+          if (!tasksCreateRow?.sql) return
+
+          // Rename to tasks_new, remove the depends_on column line
+          const withRenamed = tasksCreateRow.sql.replace(
+            /CREATE TABLE\s+"?tasks"?/i,
+            'CREATE TABLE tasks_new'
+          )
+          // Remove the depends_on column definition (matches line with depends_on)
+          const rebuilt = withRenamed.replace(
+            /\s*depends_on\s+TEXT[^\n,)]*[,]?/gi,
+            ''
+          )
+          // Clean up any double commas or trailing commas before closing paren
+          const cleaned = rebuilt
+            .replace(/,(\s*,)+/g, ',')
+            .replace(/,(\s*\))/g, '$1')
+
+          db.exec(cleaned)
+
+          const colList = colNames.join(', ')
+          db.exec(`INSERT INTO tasks_new (${colList}) SELECT ${colList} FROM tasks`)
+          db.exec(`DROP TABLE tasks`)
+          db.exec(`ALTER TABLE tasks_new RENAME TO tasks`)
+
+          // Recreate indexes
+          for (const idxSql of tasksIdxes037) {
+            try { db.exec(idxSql) } catch { /* may already exist */ }
+          }
+
+          // Recreate FTS triggers
+          for (const trig of tasksTriggers037) {
+            if (trig.sql) {
+              try { db.exec(trig.sql) } catch { /* may already exist */ }
+            }
+          }
+
+          // Rebuild FTS index so rowids align with the new tasks table
+          try {
+            db.exec(`INSERT INTO tasks_fts(tasks_fts) VALUES ('rebuild')`)
+          } catch {
+            // tasks_fts may not exist on minimal DBs
+          }
+        })()
+      } finally {
+        db.pragma(fkPrev037 ? 'foreign_keys = ON' : 'foreign_keys = OFF')
+      }
+    }
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('037_remove_tasks_depends_on')").run()
+  }
+
+  // MIGRATION_038 — timestamp format standard documentation (Task 3.4)
+  // This is a metadata-only migration (no schema change).
+  // -- Future DEFAULT expressions should use strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  // -- NOT datetime('now'). Existing application code uses new Date().toISOString()
+  // -- (T format). New columns should match that format for consistency.
+  const already038 = db.prepare("SELECT id FROM schema_migrations WHERE name = '038_timestamp_standard'").get()
+  if (!already038) {
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('038_timestamp_standard')").run()
+  }
+
+  // MIGRATION_039 — separate run_events table (Task 4.6)
+  // Replaces the agent_runs.events JSON blob with a proper relational table.
+  // Each heartbeat/lifecycle event becomes a single INSERT instead of a
+  // JSON read-modify-write cycle, eliminating O(N) write amplification.
+  const already039 = db.prepare("SELECT id FROM schema_migrations WHERE name = '039_run_events_table'").get()
+  if (!already039) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS run_events (
+        id          TEXT PRIMARY KEY,
+        run_id      TEXT NOT NULL REFERENCES agent_runs(run_id) ON DELETE CASCADE,
+        ts          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        event_type  TEXT NOT NULL,
+        payload     TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_run_events_run ON run_events(run_id, ts);
+    `)
+
+    // Backfill: migrate existing events JSON blobs from agent_runs.events
+    // into individual run_events rows.
+    const runRows = db.prepare(`SELECT run_id, events FROM agent_runs WHERE events IS NOT NULL AND events != '[]'`).all() as Array<{ run_id: string; events: string }>
+    const insertEvt = db.prepare(
+      'INSERT OR IGNORE INTO run_events (id, run_id, ts, event_type, payload) VALUES (?, ?, ?, ?, ?)'
+    )
+    const getRandomId = db.prepare("SELECT lower(hex(randomblob(10))) AS v")
+    const backfill = db.transaction(() => {
+      for (const runRow of runRows) {
+        let eventsArr: Array<{ ts?: string; event_type?: string; payload?: Record<string, unknown> }> = []
+        try {
+          eventsArr = JSON.parse(runRow.events) as typeof eventsArr
+        } catch {
+          continue
+        }
+        if (!Array.isArray(eventsArr)) continue
+        for (const evt of eventsArr) {
+          if (!evt.event_type) continue
+          const idRow = getRandomId.get() as { v: string }
+          const evtId = 'revt_' + idRow.v
+          const ts = evt.ts ?? new Date().toISOString()
+          const payload = evt.payload ? JSON.stringify(evt.payload) : null
+          insertEvt.run(evtId, runRow.run_id, ts, evt.event_type, payload)
+        }
+      }
+    })
+    backfill()
+
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('039_run_events_table')").run()
+  }
+
+  // MIGRATION_040 — drop shadow graph tables (Task 5.2)
+  // MIGRATION_011 created graph_entities and graph_edges as SQLite shadow tables
+  // for the Kuzu graph. No application code in @fulcrum/core reads or writes
+  // these tables — the actual graph operations are handled by @fulcrum/memory
+  // using Kuzu. Dropping them reduces DB size and avoids confusion.
+  // FK checks are disabled temporarily because graph_episodes references
+  // graph_entities — disabling FKs lets us drop graph_entities without also
+  // dropping graph_episodes (FK enforcement is a read-time check in SQLite,
+  // not a structural constraint that prevents DDL).
+  const already040 = db.prepare("SELECT id FROM schema_migrations WHERE name = '040_drop_shadow_graph_tables'").get()
+  if (!already040) {
+    const fkPrev040 = db.pragma('foreign_keys', { simple: true }) as number
+    db.pragma('foreign_keys = OFF')
+    try {
+      db.exec(`
+        DROP TABLE IF EXISTS graph_edges;
+        DROP TABLE IF EXISTS graph_entities;
+      `)
+    } finally {
+      db.pragma(fkPrev040 ? 'foreign_keys = ON' : 'foreign_keys = OFF')
+    }
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('040_drop_shadow_graph_tables')").run()
+  }
 }
