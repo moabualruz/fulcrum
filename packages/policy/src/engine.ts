@@ -1,5 +1,5 @@
 // packages/policy/src/engine.ts
-import { getDb, FulcrumError, isL1, canMerge, newId } from '@fulcrum/core'
+import { getDb, FulcrumError, isL1, canMerge, newId, listAgentDefinitions } from '@fulcrum/core'
 import { minimatch } from 'minimatch'
 import type { AgentRole } from '@fulcrum/core'
 import type {
@@ -38,6 +38,36 @@ export const SYSTEM_INVARIANTS: SystemInvariant[] = [
     action: 'deny',
     rule_id: 'SYSTEM:no_task_bypass',
     check: (input) => input.action === 'start_run_without_task',
+  },
+  {
+    // GAP-AGENTDEF-6: capability-based enforcement.
+    // If an agent_definitions row exists for this role and it does NOT include
+    // the required capability, deny the action.
+    name: 'capability_required_for_action',
+    priority: 1000,
+    action: 'deny',
+    rule_id: 'SYSTEM:capability_required_for_action',
+    check: (input) => {
+      // Map action → required capability
+      const ACTION_CAPABILITY: Record<string, string> = {
+        invoke_team:     'create_teams',
+        dispatch_agents: 'dispatch_agents',
+        merge_worktree:  'merge_worktrees',
+      }
+      const required = ACTION_CAPABILITY[input.action]
+      if (!required) return false  // no capability gating for this action
+
+      // Look up the agent definition for this workspace + role
+      try {
+        const db = getDb()
+        const defs = listAgentDefinitions(input.actor_role, input.workspace_id, db)
+        if (defs.length === 0) return false  // no definition → defer to other checks
+        const caps: string[] = defs[0].capabilities ?? []
+        return !caps.includes(required)
+      } catch {
+        return false  // graceful degradation if DB not ready
+      }
+    },
   },
   {
     name: 'chief_of_staff_no_direct_writes',

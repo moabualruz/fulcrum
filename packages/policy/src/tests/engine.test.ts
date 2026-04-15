@@ -17,8 +17,8 @@ afterEach(() => resetTestDb())
 // --- SYSTEM_INVARIANTS ---
 
 describe('SYSTEM_INVARIANTS', () => {
-  it('exports 4 invariants', () => {
-    expect(SYSTEM_INVARIANTS).toHaveLength(4)
+  it('exports 5 invariants', () => {
+    expect(SYSTEM_INVARIANTS).toHaveLength(5)
   })
 
   it('all invariants have priority 1000', () => {

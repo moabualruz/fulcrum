@@ -10,7 +10,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'http'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { TOOL_SCHEMAS } from './mcp-tools.js'
-import { getDb } from '@fulcrum/core'
+import { getDb, listWorkspaces } from '@fulcrum/core'
 
 // ---------- Types ----------
 
@@ -152,7 +152,18 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
   // fulcrum://{workspace_id} — workspace status
   server.registerResource(
     'workspace',
-    new ResourceTemplate('fulcrum://{workspace_id}', { list: undefined }),
+    new ResourceTemplate('fulcrum://{workspace_id}', {
+      list: async () => {
+        const workspaces = await listWorkspaces(getDb())
+        return {
+          resources: workspaces.map(ws => ({
+            uri: `fulcrum://${ws.workspace_id}`,
+            name: ws.name ?? ws.workspace_id,
+            mimeType: 'application/json',
+          })),
+        }
+      },
+    }),
     {
       title: 'Workspace status',
       description: 'Current status and health of a Fulcrum workspace',
@@ -169,7 +180,18 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
   // fulcrum://{workspace_id}/tasks — task list
   server.registerResource(
     'workspace-tasks',
-    new ResourceTemplate('fulcrum://{workspace_id}/tasks', { list: undefined }),
+    new ResourceTemplate('fulcrum://{workspace_id}/tasks', {
+      list: async () => {
+        const workspaces = await listWorkspaces(getDb())
+        return {
+          resources: workspaces.map(ws => ({
+            uri: `fulcrum://${ws.workspace_id}/tasks`,
+            name: `Tasks — ${ws.name ?? ws.workspace_id}`,
+            mimeType: 'application/json',
+          })),
+        }
+      },
+    }),
     {
       title: 'Workspace tasks',
       description: 'All tasks in a workspace',
