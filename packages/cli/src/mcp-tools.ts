@@ -38,6 +38,12 @@ export interface ToolSchema {
     properties: Record<string, unknown>
     required?: string[]
   }
+  /**
+   * When true, the server will emit `notifications/progress` before and after
+   * dispatching this tool if the caller provides `_meta.progressToken`.
+   * (GAP-MCP-11: progress notifications for long-running tools)
+   */
+  longRunningHint?: boolean
 }
 
 export const TOOL_SCHEMAS: ToolSchema[] = [
@@ -205,6 +211,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     name: 'start_agent_run',
     description: 'Registers the start of an agent run. Call at the beginning of every task. Auto-creates a stub task if task_id is not provided. Effect: inserts agent_runs row, sets task status to running. Returns: run_id, status. Requires agent_role, workspace_id.',
     annotations: { idempotentHint: false },
+    longRunningHint: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -259,6 +266,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     name: 'complete_agent_run',
     description: 'Marks an agent run as finished with optional summary and artifact paths. Effect: sets agent_runs.status=finished, records artifacts. Returns: run_id, status. Requires run_id, workspace_id.',
     annotations: { destructiveHint: true },
+    longRunningHint: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -283,6 +291,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     name: 'block_agent_run',
     description: 'Marks an agent run as blocked with a reason. Use when work cannot continue without human input or a dependency resolving. Effect: sets status=blocked, records reason. Returns: run_id, status, reason. Requires run_id, workspace_id, reason.',
     annotations: { destructiveHint: true },
+    longRunningHint: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -307,6 +316,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     name: 'build_cos_context',
     description: 'Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, blockers, recent events. Effect: read-only. Returns: context_markdown formatted for system prompt injection. Requires project_id, workspace_id.',
     annotations: { readOnlyHint: true, idempotentHint: true },
+    longRunningHint: true,
     inputSchema: {
       type: 'object',
       properties: {

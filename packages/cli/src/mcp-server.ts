@@ -6,6 +6,8 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { SetLevelRequestSchema, McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js'
+import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js'
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js'
 import { createServer, type IncomingMessage, type ServerResponse } from 'http'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
@@ -129,6 +131,36 @@ function buildToolOutputSchema(
   return z.object(shape).passthrough()
 }
 
+// ---------- Progress notification helper ----------
+// GAP-MCP-11: Send notifications/progress for long-running tools when the
+// caller provides _meta.progressToken. The MCP spec says receivers are not
+// obligated to send these, but clients that supply a token expect updates.
+//
+// We emit two notifications per long-running invocation:
+//   • progress=0 / total=1 immediately before dispatch ("starting")
+//   • progress=1 / total=1 immediately after dispatch ("done")
+// This gives clients a definitive completion signal even for fast calls.
+
+type ProgressExtra = RequestHandlerExtra<ServerRequest, ServerNotification>
+
+async function sendProgressNotification(
+  extra: ProgressExtra,
+  progressToken: string | number,
+  progress: number,
+  total: number,
+  message?: string,
+): Promise<void> {
+  try {
+    await extra.sendNotification({
+      method: 'notifications/progress',
+      params: { progressToken, progress, total, ...(message ? { message } : {}) },
+    } as ServerNotification)
+  } catch {
+    // Progress notifications are best-effort; never let a failure here
+    // bubble up and break the actual tool response.
+  }
+}
+
 // ---------- Middleware chain runner ----------
 // Composes an array of ToolMiddleware around a core handler function.
 // Runs in order: middleware[0] wraps middleware[1] wraps ... wraps core.
@@ -200,7 +232,7 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
           openWorldHint: tool.annotations.openWorldHint,
         } : undefined,
       },
-      async (args) => {
+      async (args, extra) => {
         // Validate with strict schema — reject unknown keys and wrong types.
         // Spec §Tools.Error Handling: schema validation failures are protocol
         // errors (throw), not execution errors (isError: true). isError is
@@ -212,6 +244,15 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
           // not isError:true (which is for runtime errors post-validation).
           throw new McpError(ErrorCode.InvalidParams, `invalid_input: ${details}`)
         }
+
+        // GAP-MCP-11: Emit progress notifications for long-running tools when
+        // the caller supplies _meta.progressToken. Two-phase: 0→1 (started→done).
+        const progressToken = extra._meta?.progressToken
+        const isLongRunning = tool.longRunningHint === true
+        if (isLongRunning && progressToken !== undefined) {
+          await sendProgressNotification(extra as ProgressExtra, progressToken, 0, 1, 'starting')
+        }
+
         const ctx: ToolContext = { toolName: tool.name, args: parsed.data as Record<string, unknown> }
         try {
           await runMiddlewareChain(
@@ -226,6 +267,11 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
             },
           )
           if (ctx.error) throw ctx.error
+
+          if (isLongRunning && progressToken !== undefined) {
+            await sendProgressNotification(extra as ProgressExtra, progressToken, 1, 1, 'done')
+          }
+
           const result = ctx.result
           const textContent = { type: 'text' as const, text: JSON.stringify(result) }
           // Return structuredContent for any tool that has an output schema
@@ -238,6 +284,9 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
           }
           return { content: [textContent] }
         } catch (err) {
+          if (isLongRunning && progressToken !== undefined) {
+            await sendProgressNotification(extra as ProgressExtra, progressToken, 1, 1, 'failed')
+          }
           return {
             content: [{ type: 'text' as const, text: JSON.stringify({ error: (err as Error).message }) }],
             isError: true,

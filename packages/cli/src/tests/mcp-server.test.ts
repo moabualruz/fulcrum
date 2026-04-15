@@ -240,3 +240,65 @@ describe('resources/read', () => {
     expect(parsed.run_id).toBe('run_1')
   })
 })
+
+// ---------- GAP-MCP-11: progress notifications ----------
+
+describe('tools/call progress notifications', () => {
+  it('long-running tool emits progress notifications when onprogress callback supplied', async () => {
+    const server = makeServer()
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    const client = new Client({ name: 'test-progress-client', version: '0.0.0' })
+
+    await server.connect(serverTransport)
+    await client.connect(clientTransport)
+
+    // The SDK sends _meta.progressToken when caller provides onprogress.
+    // Collect progress events via the callback.
+    const progressEvents: Array<{ progress: number; total?: number }> = []
+    await client.callTool(
+      {
+        name: 'start_agent_run',
+        arguments: { workspace_id: 'ws_test', agent_role: 'software_engineer' },
+      },
+      CompatibilityCallToolResultSchema,
+      {
+        onprogress: (p) => {
+          progressEvents.push({ progress: p.progress, total: p.total })
+        },
+      },
+    )
+
+    // Should have received two progress notifications: progress=0 and progress=1
+    expect(progressEvents.length).toBeGreaterThanOrEqual(2)
+    expect(progressEvents[0].progress).toBe(0)
+    expect(progressEvents[0].total).toBe(1)
+    expect(progressEvents[progressEvents.length - 1].progress).toBe(1)
+    expect(progressEvents[progressEvents.length - 1].total).toBe(1)
+  })
+
+  it('non-long-running tool does NOT emit progress notifications', async () => {
+    const server = makeServer()
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    const client = new Client({ name: 'test-no-progress-client', version: '0.0.0' })
+
+    await server.connect(serverTransport)
+    await client.connect(clientTransport)
+
+    const progressEvents: Array<unknown> = []
+    // list_tasks is NOT a long-running tool — should fire no progress events
+    await client.callTool(
+      {
+        name: 'list_tasks',
+        arguments: { workspace_id: 'ws_test' },
+      },
+      CompatibilityCallToolResultSchema,
+      {
+        onprogress: (p) => {
+          progressEvents.push(p)
+        },
+      },
+    )
+
+    expect(progressEvents.length).toBe(0)
+  })
+})

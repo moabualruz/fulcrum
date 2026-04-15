@@ -74,3 +74,18 @@ pnpm run setup:pi       # installs PI cockpit extension
 ```
 
 Hooks read a tool-call JSON from stdin, normalise the event format across runtimes, log a `hook_executed` event, and enforce the `chief_of_staff_no_direct_writes` invariant.
+
+### Hook isolation model (GAP-PLUGIN-6)
+
+**Current trust level: full in-process.** Hook modules (`hook claude`, `hook gemini`, `hook pi`) run as Node.js child processes spawned by the agent runtime, not as dynamically-loaded in-process modules. Each hook invocation is a short-lived process that:
+
+1. Receives the tool-call event on **stdin** (never directly touches the DB connection of the parent).
+2. Calls back into the Fulcrum MCP server via the standard JSON-RPC stdio transport if it needs to read/write state — going through the same policy gate as any other caller.
+3. Exits after processing one event; the agent runtime waits for exit code 0 (allow) or non-zero (block).
+
+**Consequences:**
+- A buggy or malicious hook cannot corrupt the in-process DB connection or memory state of the parent process.
+- A hook CAN read any file accessible to the user running the agent (it runs with the same OS privileges).
+- There is no sandboxing of filesystem or network access; operators must trust hook modules they install.
+
+**Roadmap:** A future release will add a manifest-level `trust` declaration (`"trust": "sandboxed"`) and optionally run hook processes inside a seccomp/landlock container on Linux. For now, treat hook modules the same as any other local CLI tool: install only from trusted sources.
