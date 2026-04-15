@@ -73,8 +73,8 @@ describe('buildCosContext', () => {
 
   it('includes memories in context output', async () => {
     seed()
-    const { writeMemory } = await import('../memory.js')
-    await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'Use SQLite for local-first storage' })
+    const { writeLifecycleMemory } = await import('../memory-insert.js')
+    await writeLifecycleMemory({ workspace_id: 'ws_1', project_id: 'proj_1', content: 'Use SQLite for local-first storage', kind: 'fact', scope: 'project' })
     const context = await buildCosContext({ workspace_id: 'ws_1', project_id: 'proj_1' })
     expect(context).toContain('SQLite')
   })

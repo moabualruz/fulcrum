@@ -4,7 +4,7 @@ import { newId, nextDisplayId } from './ids.js'
 import { statusCategory } from './status-category.js'
 import { emitEvent } from './events.js'
 import { createTask } from './tasks.js'
-import { writeMemory } from './memory.js'
+import { writeLifecycleMemory, type LifecycleMemoryInput } from './memory-insert.js'
 import { getAgentDefinition } from './agent-definitions.js'
 import { FulcrumError } from './types.js'
 import type { AgentRun, AgentRole, AgentRunStatus, RunArtifacts, Task, TaskPacket, SpawnableRun, StartAgentRunInput } from './types.js'
@@ -52,12 +52,12 @@ function recallTaskContext(opts: {
 }
 
 /**
- * Wrap writeMemory in a non-throwing facade so lifecycle transitions never
- * fail on a memory write. Errors are logged to stderr for ops visibility.
+ * Wrap writeLifecycleMemory in a non-throwing facade so lifecycle transitions
+ * never fail on a memory write. Errors are logged to stderr for ops visibility.
  */
-async function safeWriteMemory(input: Parameters<typeof writeMemory>[0]): Promise<void> {
+async function safeWriteMemory(input: LifecycleMemoryInput): Promise<void> {
   try {
-    await writeMemory(input)
+    await writeLifecycleMemory(input)
   } catch (err) {
     process.stderr.write(`[runs] auto-write memory failed: ${(err as Error).message}\n`)
   }

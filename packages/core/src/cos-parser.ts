@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import { statusCategory } from './status-category.js'
-import { writeMemory } from './memory.js'
+import { writeLifecycleMemory } from './memory-insert.js'
 import type { MemoryKind, MemoryScope } from './types.js'
 
 export interface CoSResponse {
@@ -108,7 +108,7 @@ export async function applyCoSResponse(
   if (Array.isArray(response.memory_writes) && resolvedProjectId) {
     for (const mw of response.memory_writes) {
       if (!mw.content || !mw.content.trim()) continue
-      await writeMemory({
+      await writeLifecycleMemory({
         workspace_id,
         project_id: resolvedProjectId,
         content: mw.content,

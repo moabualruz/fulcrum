@@ -3,7 +3,6 @@ import { createTestDb, resetTestDb } from './helpers.js'
 import { getDb } from '../db/client.js'
 import { createTask } from '../tasks.js'
 import { parseCoSResponse, applyCoSResponse } from '../cos-parser.js'
-import { recallMemory } from '../memory.js'
 
 beforeEach(() => { createTestDb() })
 afterEach(() => resetTestDb())
@@ -312,19 +311,18 @@ describe('applyCoSResponse — memory writes (K-1, K-3) delegate to writeMemory'
     expect(row.importance).toBeGreaterThan(0)
   })
 
-  it('CoS-written memories appear in recallMemory results', async () => {
+  it('CoS-written memories are persisted and retrievable by direct DB query', async () => {
     seed()
     const db = getDb()
     await applyCoSResponse(db, 'ws_1', {
       memory_writes: [{ content: 'findable content for recall', kind: 'fact', scope: 'project' }],
     })
-    const results = await recallMemory({
-      query: 'findable content',
-      workspace_id: 'ws_1',
-      project_id: 'proj_1',
-    })
-    expect(results.length).toBeGreaterThan(0)
-    expect(results[0].memory_id).toMatch(/^mem_/)
+    // Verify the memory row was written with the expected content
+    const row = db.prepare(
+      "SELECT memory_id, content FROM memories WHERE workspace_id = 'ws_1' AND content = 'findable content for recall' LIMIT 1"
+    ).get() as { memory_id: string; content: string } | undefined
+    expect(row).toBeDefined()
+    expect(row!.memory_id).toMatch(/^mem_/)
   })
 })
 

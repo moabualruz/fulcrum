@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb } from './helpers.js'
 import { getDb } from '../db/client.js'
 import { createTask } from '../tasks.js'
-import { writeMemory } from '../memory.js'
+import { writeLifecycleMemory } from '../memory-insert.js'
 import { updateAgentDefinition } from '../agent-definitions.js'
 import {
   startAgentRun,
@@ -524,7 +524,7 @@ describe('run lifecycle memory hooks (L-9, L-10)', () => {
   it('startAgentRun recalls task-scoped memories and stores them in the started event', async () => {
     const task = await seedTask()
     // Seed a task-scoped memory the agent should see at startup
-    await writeMemory({
+    await writeLifecycleMemory({
       content: 'prior context about the implementation approach',
       workspace_id: 'ws_1',
       project_id: 'proj_1',

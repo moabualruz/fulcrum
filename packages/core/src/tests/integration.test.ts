@@ -3,7 +3,7 @@ import { createTestDb, resetTestDb } from './helpers.js'
 import { getDb } from '../db/client.js'
 import { createTask, updateTask } from '../tasks.js'
 import { startAgentRun, heartbeatAgentRun, completeAgentRun, blockAgentRun, getAgentRunStatus } from '../runs.js'
-import { writeMemory, recallMemory } from '../memory.js'
+import { writeLifecycleMemory } from '../memory-insert.js'
 import { listAgentProfiles, getWorkspaceStatus } from '../status.js'
 
 beforeEach(() => { createTestDb() })
@@ -133,23 +133,22 @@ describe('full lifecycle integration', () => {
     expect(t4.display_id).toBe('TASK-3')
   })
 
-  it('memory writeMemory stores scope, kind, title, summary; recallMemory returns them', async () => {
+  it('writeLifecycleMemory stores scope, kind, content; row is readable by direct query', async () => {
     seed()
-    const m = await writeMemory({
+    await writeLifecycleMemory({
       workspace_id: 'ws_1', project_id: 'proj_1',
       content: 'JWT tokens expire after 24 hours',
       scope: 'project', kind: 'decision',
-      title: 'JWT expiry decision', summary: 'We chose 24h for JWT token expiry',
       tags: ['auth', 'jwt'],
     })
-    expect(m.scope).toBe('project')
-    expect(m.kind).toBe('decision')
-    expect(m.title).toBe('JWT expiry decision')
-    expect(m.summary).toBe('We chose 24h for JWT token expiry')
-
-    const results = await recallMemory({ workspace_id: 'ws_1', project_id: 'proj_1', query: 'JWT' })
-    expect(results.length).toBeGreaterThan(0)
-    expect(results[0].title).toBe('JWT expiry decision')
+    const db = getDb()
+    const row = db.prepare(
+      "SELECT * FROM memories WHERE workspace_id = 'ws_1' AND project_id = 'proj_1' LIMIT 1"
+    ).get() as Record<string, unknown> | undefined
+    expect(row).toBeDefined()
+    expect(row!.scope).toBe('project')
+    expect(row!.kind).toBe('decision')
+    expect(row!.content).toBe('JWT tokens expire after 24 hours')
   })
 
   it('listAgentProfiles returns 24 roles; workspace status reflects run counts', async () => {
