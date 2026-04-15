@@ -4,6 +4,39 @@ import { checkSecrets, redactSecrets } from '../secret-guard.js'
 
 // No DB required — pure synchronous functions
 
+describe('checkSecrets — Anthropic API key pattern', () => {
+  it('detects sk-ant-api03-... key', () => {
+    // 95 alphanumeric/hyphen/underscore chars after the prefix
+    const key = 'sk-ant-api03-' + 'A'.repeat(95)
+    const result = checkSecrets(`Authorization: Bearer ${key}`)
+    expect(result.has_secrets).toBe(true)
+    expect(result.matches.some(m => m.pattern_name === 'anthropic_api_key')).toBe(true)
+  })
+
+  it('does not match a truncated Anthropic key (too short)', () => {
+    const key = 'sk-ant-api03-' + 'A'.repeat(50)
+    const result = checkSecrets(key)
+    const anthropicMatch = result.matches.filter(m => m.pattern_name === 'anthropic_api_key')
+    expect(anthropicMatch).toHaveLength(0)
+  })
+})
+
+describe('checkSecrets — OpenAI API key pattern', () => {
+  it('detects sk-[48 alphanumeric chars] key', () => {
+    const key = 'sk-' + 'A'.repeat(48)
+    const result = checkSecrets(`OPENAI_API_KEY=${key}`)
+    expect(result.has_secrets).toBe(true)
+    expect(result.matches.some(m => m.pattern_name === 'openai_api_key')).toBe(true)
+  })
+
+  it('does not match a truncated OpenAI key (too short)', () => {
+    const key = 'sk-' + 'A'.repeat(20)
+    const result = checkSecrets(key)
+    const openaiMatch = result.matches.filter(m => m.pattern_name === 'openai_api_key')
+    expect(openaiMatch).toHaveLength(0)
+  })
+})
+
 describe('checkSecrets — API key pattern', () => {
   it('detects sk_ prefixed API key', () => {
     const result = checkSecrets('Use token sk_abcdefghijklmnopqrstuvwx for auth')

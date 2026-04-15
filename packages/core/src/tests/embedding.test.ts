@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { LocalEmbeddingProvider, QUERY_PREFIX, DOC_PREFIX, truncateDimensions } from '../embedding/local.js'
 import { LocalRerankerProvider } from '../embedding/reranker.js'
+import { VoyageEmbeddingProvider, OpenAIEmbeddingProvider } from '../embedding/remote.js'
+import { createProvider } from '../embedding/registry.js'
 
 // NOTE: these tests download models on first run (~300MB+). Skipped in CI
 // unless FULCRUM_EMBEDDING_TESTS=1 is set.
@@ -109,5 +111,240 @@ describe('truncateDimensions', () => {
     const result = truncateDimensions(v, 4)
     expect(result.length).toBe(4)
     expect(Array.from(result)).toEqual([1, 2, 0, 0])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// VoyageEmbeddingProvider — mocked fetch (no real API calls)
+// ---------------------------------------------------------------------------
+
+function makeVoyageResponse(dims: number) {
+  return {
+    ok: true,
+    text: () => Promise.resolve(''),
+    json: () => Promise.resolve({
+      data: [{ embedding: Array.from({ length: dims }, (_, i) => i * 0.001) }],
+    }),
+  }
+}
+
+function makeOpenAIResponse(dims: number) {
+  return {
+    ok: true,
+    text: () => Promise.resolve(''),
+    json: () => Promise.resolve({
+      data: [{ embedding: Array.from({ length: dims }, (_, i) => i * 0.001) }],
+    }),
+  }
+}
+
+describe('VoyageEmbeddingProvider', () => {
+  let savedKey: string | undefined
+
+  beforeEach(() => {
+    savedKey = process.env.VOYAGE_API_KEY
+    process.env.VOYAGE_API_KEY = 'test-voyage-key'
+  })
+
+  afterEach(() => {
+    if (savedKey === undefined) {
+      delete process.env.VOYAGE_API_KEY
+    } else {
+      process.env.VOYAGE_API_KEY = savedKey
+    }
+    vi.restoreAllMocks()
+  })
+
+  it('returns Float32Array of correct dimensions from embed()', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeVoyageResponse(1024)))
+
+    const provider = new VoyageEmbeddingProvider({ provider: 'voyage', model: 'voyage-code-3', dimensions: 1024 })
+    const result = await provider.embed('hello world')
+
+    expect(result).toBeInstanceOf(Float32Array)
+    expect(result.length).toBe(1024)
+  })
+
+  it('sends input_type: document for embedDocument()', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeVoyageResponse(1024))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const provider = new VoyageEmbeddingProvider({ provider: 'voyage', model: 'voyage-code-3', dimensions: 1024 })
+    await provider.embedDocument('some code')
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+    expect(body.input_type).toBe('document')
+  })
+
+  it('sends input_type: query for embedQuery()', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeVoyageResponse(1024))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const provider = new VoyageEmbeddingProvider({ provider: 'voyage', model: 'voyage-code-3', dimensions: 1024 })
+    await provider.embedQuery('find code')
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+    expect(body.input_type).toBe('query')
+  })
+
+  it('embedBatch sends all texts in one request', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(''),
+      json: () => Promise.resolve({
+        data: [
+          { embedding: new Array(1024).fill(0.1) },
+          { embedding: new Array(1024).fill(0.2) },
+        ],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const provider = new VoyageEmbeddingProvider({ provider: 'voyage', model: 'voyage-code-3', dimensions: 1024 })
+    const results = await provider.embedBatch(['text1', 'text2'])
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(results).toHaveLength(2)
+    expect(results[0]).toBeInstanceOf(Float32Array)
+  })
+
+  it('throws if VOYAGE_API_KEY is not set', () => {
+    delete process.env.VOYAGE_API_KEY
+    expect(() => new VoyageEmbeddingProvider({ provider: 'voyage', model: 'voyage-code-3' }))
+      .toThrow('VOYAGE_API_KEY is not set')
+  })
+
+  it('throws on non-ok API response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: () => Promise.resolve('Unauthorized'),
+    }))
+
+    const provider = new VoyageEmbeddingProvider({ provider: 'voyage', model: 'voyage-code-3', dimensions: 1024 })
+    await expect(provider.embed('test')).rejects.toThrow('Voyage API error: 401')
+  })
+
+  it('uses config.apiKey over env var when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeVoyageResponse(1024))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const provider = new VoyageEmbeddingProvider({
+      provider: 'voyage',
+      model: 'voyage-code-3',
+      dimensions: 1024,
+      apiKey: 'config-key-override',
+    })
+    await provider.embed('test')
+
+    const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+    expect(headers['Authorization']).toBe('Bearer config-key-override')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// OpenAIEmbeddingProvider — mocked fetch (no real API calls)
+// ---------------------------------------------------------------------------
+
+describe('OpenAIEmbeddingProvider', () => {
+  let savedKey: string | undefined
+
+  beforeEach(() => {
+    savedKey = process.env.OPENAI_API_KEY
+    process.env.OPENAI_API_KEY = 'test-openai-key'
+  })
+
+  afterEach(() => {
+    if (savedKey === undefined) {
+      delete process.env.OPENAI_API_KEY
+    } else {
+      process.env.OPENAI_API_KEY = savedKey
+    }
+    vi.restoreAllMocks()
+  })
+
+  it('returns Float32Array of correct dimensions from embed()', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeOpenAIResponse(3072)))
+
+    const provider = new OpenAIEmbeddingProvider({ provider: 'openai', model: 'text-embedding-3-large', dimensions: 3072 })
+    const result = await provider.embed('hello world')
+
+    expect(result).toBeInstanceOf(Float32Array)
+    expect(result.length).toBe(3072)
+  })
+
+  it('embedBatch sends all texts in one request', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(''),
+      json: () => Promise.resolve({
+        data: [
+          { embedding: new Array(3072).fill(0.1) },
+          { embedding: new Array(3072).fill(0.2) },
+        ],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const provider = new OpenAIEmbeddingProvider({ provider: 'openai', model: 'text-embedding-3-large', dimensions: 3072 })
+    const results = await provider.embedBatch(['text1', 'text2'])
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(results).toHaveLength(2)
+    expect(results[0]).toBeInstanceOf(Float32Array)
+  })
+
+  it('throws if OPENAI_API_KEY is not set', () => {
+    delete process.env.OPENAI_API_KEY
+    expect(() => new OpenAIEmbeddingProvider({ provider: 'openai', model: 'text-embedding-3-large' }))
+      .toThrow('OPENAI_API_KEY is not set')
+  })
+
+  it('throws on non-ok API response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      text: () => Promise.resolve('Rate limit exceeded'),
+    }))
+
+    const provider = new OpenAIEmbeddingProvider({ provider: 'openai', model: 'text-embedding-3-large', dimensions: 3072 })
+    await expect(provider.embed('test')).rejects.toThrow('OpenAI API error: 429')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// createProvider — unknown provider throws
+// ---------------------------------------------------------------------------
+
+describe('createProvider', () => {
+  it('throws on unknown provider name', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(() => createProvider({ provider: 'unknown_provider' as any, model: 'x' }))
+      .toThrow('Unknown embedding provider: "unknown_provider"')
+  })
+
+  it('returns LocalEmbeddingProvider for provider: local', () => {
+    const provider = createProvider({ provider: 'local', model: 'some-model', dimensions: 512 })
+    expect(provider).toBeInstanceOf(LocalEmbeddingProvider)
+  })
+
+  it('returns VoyageEmbeddingProvider for provider: voyage (with apiKey in config)', () => {
+    const provider = createProvider({
+      provider: 'voyage',
+      model: 'voyage-code-3',
+      dimensions: 1024,
+      apiKey: 'test-key',
+    })
+    expect(provider).toBeInstanceOf(VoyageEmbeddingProvider)
+  })
+
+  it('returns OpenAIEmbeddingProvider for provider: openai (with apiKey in config)', () => {
+    const provider = createProvider({
+      provider: 'openai',
+      model: 'text-embedding-3-large',
+      dimensions: 3072,
+      apiKey: 'test-key',
+    })
+    expect(provider).toBeInstanceOf(OpenAIEmbeddingProvider)
   })
 })
