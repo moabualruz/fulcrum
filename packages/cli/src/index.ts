@@ -2031,6 +2031,27 @@ ABOUT
   }
 }
 
+// ── Init: Cursor / Windsurf per-project integration ──────────────────────────
+
+async function runInit(): Promise<void> {
+  const dryRun = args.includes('--dry-run')
+  const cursor = args.includes('--cursor')
+  const windsurf = args.includes('--windsurf')
+  const global = args.includes('--global')
+
+  const targetDir = global ? (process.env['HOME'] ?? process.cwd()) : process.cwd()
+
+  if (!cursor && !windsurf) {
+    console.error('Usage: fulcrum init --cursor | --windsurf [--global] [--dry-run]')
+    process.exit(1)
+  }
+
+  const { installCursor, installWindsurf } = await import('../../../agent-integration/install.js')
+
+  if (cursor) await installCursor({ dryRun, targetDir })
+  if (windsurf) await installWindsurf({ dryRun, targetDir })
+}
+
 // ── Main dispatch ─────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -2176,9 +2197,17 @@ OPTIONS (serve mcp)
 
   if (group === 'skills' || group === 'skill') { await runSkills(); return }
 
+  if (group === 'init') { await runInit(); return }
+
   if (group === 'doctor') {
-    const { results, exitCode } = runDoctor({ cwd: process.cwd(), json: args.includes('--json') })
-    printDoctorResults(results, args.includes('--json'))
+    const fix = args.includes('--fix')
+    const dryRun = args.includes('--dry-run')
+    const json = args.includes('--json')
+    const { results, exitCode, fixesApplied } = await runDoctor({ cwd: process.cwd(), json, fix, dryRun })
+    printDoctorResults(results, json)
+    if (fix && !dryRun) {
+      console.log(`\nApplied ${fixesApplied} fix(es). Re-run 'fulcrum doctor' to verify.`)
+    }
     process.exit(exitCode)
   }
 
