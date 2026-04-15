@@ -120,6 +120,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Round 2 audit fixes — MCP (continued)
 - **Progress notifications for long-running tools** — `start_agent_run`, `complete_agent_run`, `block_agent_run`, and `build_cos_context` emit `notifications/progress` (progress=0 "starting" → progress=1 "done") when the caller supplies `_meta.progressToken` via the SDK `onprogress` callback. Best-effort: notification failures never break the tool response. (GAP-MCP-11)
 
+#### Round 2 audit fixes — RAG (continued)
+- **Sparse vector rescue retrieval** — `computeSparseVector()` in `@fulcrum/memory/sparse` produces log-TF + L2-normalised sparse vectors stored in `memories.sparse_vector` (migration m048). Used as a rescue signal: when FTS5 + dense retrieval returns fewer candidates than needed, sparse dot-product retrieval supplements with documents that have term overlap but were missed by the main signals. Does NOT re-rank existing FTS5/dense candidates (preserves 0.874 Recall@5 baseline). `tokenise()`, `sparseDotProduct()`, and `sparseRank()` are all exported from `@fulcrum/memory`. (GAP-RAG-7)
+
+#### Round 2 audit fixes — Architecture (continued)
+- **In-process event bus** — `FulcrumEventBus` in `@fulcrum/core/event-bus`. Implements `on`/`off`/`once`/`onAny`/`offAny`/`fire` with subscriber error isolation. `emitEvent()` now fires the bus after each DB write, enabling reactive in-process coordination without polling. `setEventBus()`/`resetEventBus()` for dependency injection and test isolation. Exported from `@fulcrum/core`. (GAP-ARCH-8)
+
 ### Changed
 - `_configureDb` adds `synchronous = NORMAL` and `cache_size = -8000` pragmas (additive — no behavior regression).
 - `runJanitorCycle` runs `decayMemories` and `consolidateMemories` by default (opt-out with `runDecay: false` / `runConsolidate: false`).
