@@ -702,6 +702,104 @@ describe('evaluatePolicy — regex matcher', () => {
   })
 })
 
+describe('evaluatePolicy — invalid regex pattern', () => {
+  it('does not throw when regex pattern is invalid — rule is silently skipped', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'bad-regex-rule',
+      action: 'deny',
+      matchers: [{ matcher_type: 'regex', pattern: '[invalid regex(' }],
+    })
+    // Should not throw — matcherMatches catches the error and returns false
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'software_engineer',
+      actor_id: 'agent_1',
+      action: 'anything',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+})
+
+describe('evaluatePolicy — domain_network matcher', () => {
+  it('denies when resource_id matches domain_network pattern exactly', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'block-evil-domain',
+      action: 'deny',
+      matchers: [{ matcher_type: 'domain_network', pattern: 'evil.example.com' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'software_engineer',
+      actor_id: 'agent_1',
+      action: 'http_request',
+      resource_id: 'evil.example.com',
+    })
+    expect(decision.allowed).toBe(false)
+  })
+
+  it('does not match when resource_id differs from domain_network pattern', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'block-evil-domain',
+      action: 'deny',
+      matchers: [{ matcher_type: 'domain_network', pattern: 'evil.example.com' }],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'software_engineer',
+      actor_id: 'agent_1',
+      action: 'http_request',
+      resource_id: 'safe.example.com',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+})
+
+describe('evaluatePolicy — secret_content matcher', () => {
+  it('never auto-matches secret_content — rule is skipped (manual check required)', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'no-secrets-in-output',
+      action: 'deny',
+      matchers: [{ matcher_type: 'secret_content', pattern: 'API_KEY' }],
+    })
+    // secret_content cannot be auto-evaluated — evaluatePolicy always skips it
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'software_engineer',
+      actor_id: 'agent_1',
+      action: 'write_file',
+      resource_id: 'output.txt',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+})
+
+describe('evaluatePolicy — empty matchers', () => {
+  it('rule with empty matchers array never matches (always skipped)', async () => {
+    await createPolicyRule({
+      scope: 'workspace',
+      scope_id: 'ws_1',
+      name: 'empty-matchers-rule',
+      action: 'deny',
+      matchers: [],
+    })
+    const decision = await evaluatePolicy({
+      workspace_id: 'ws_1',
+      actor_role: 'software_engineer',
+      actor_id: 'agent_1',
+      action: 'do_anything',
+    })
+    expect(decision.allowed).toBe(true)
+  })
+})
+
 // --- L1_ROLES enforcement via evaluatePolicy ---
 
 describe('evaluatePolicy — L1_ROLES: invoke_team enforcement', () => {
