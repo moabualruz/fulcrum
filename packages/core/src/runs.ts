@@ -359,6 +359,7 @@ export async function completeAgentRun(input: CompleteRunInput, db: Db = getDb()
       kind: 'task_outcome',
       scope: 'task',
       tags: artifact_paths.slice(0, 10),
+      source: 'auto',
     })
   }
 
@@ -402,6 +403,7 @@ export async function blockAgentRun(input: BlockRunInput, db: Db = getDb()): Pro
       content: `Blocked: ${input.reason}`,
       kind: 'task_failure',
       scope: 'task',
+      source: 'auto',
     })
   }
 
@@ -462,6 +464,7 @@ export async function escalateRun(input: EscalateRunInput, db: Db = getDb()): Pr
       content: `Escalated to chief_of_staff: ${input.escalation_reason}`,
       kind: 'task_decision',
       scope: 'task',
+      source: 'auto',
     })
   }
 

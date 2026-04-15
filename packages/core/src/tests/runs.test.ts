@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb } from './helpers.js'
 import { getDb } from '../db/client.js'
+import { runMigrations } from '../db/migrations.js'
 import { createTask } from '../tasks.js'
 import { writeLifecycleMemory } from '../memory-insert.js'
 import { updateAgentDefinition } from '../agent-definitions.js'
@@ -622,6 +623,35 @@ describe('run lifecycle memory hooks (L-9, L-10)', () => {
     ).all(task.task_id) as Array<Record<string, unknown>>
     expect(memoryRows.length).toBeGreaterThanOrEqual(1)
     expect(memoryRows[0].content).toContain('requires architecture review')
+  })
+
+  it('completeAgentRun writes memory with source=auto (Unit 2)', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    await completeAgentRun({
+      run_id: run.run_id,
+      output_summary: 'Implemented OAuth callback and added integration tests.',
+    })
+    const row = getDb().prepare(
+      "SELECT source FROM memories WHERE task_id = ? AND kind = 'task_outcome' ORDER BY rowid DESC LIMIT 1"
+    ).get(task.task_id) as { source: string } | undefined
+    expect(row?.source).toBe('auto')
+  })
+
+  it('blockAgentRun writes memory with source=auto (Unit 2)', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    await blockAgentRun({ run_id: run.run_id, reason: 'waiting for external API access' })
+    const row = getDb().prepare(
+      "SELECT source FROM memories WHERE task_id = ? AND kind = 'task_failure' ORDER BY rowid DESC LIMIT 1"
+    ).get(task.task_id) as { source: string } | undefined
+    expect(row?.source).toBe('auto')
+  })
+
+  it('m052 migration is idempotent — runMigrations twice does not throw', () => {
+    const db = getDb()
+    // runMigrations includes m052; calling it again exercises the idempotency guard
+    expect(() => runMigrations(db)).not.toThrow()
   })
 
   it('recall failure never prevents startAgentRun (empty DB returns [])', async () => {

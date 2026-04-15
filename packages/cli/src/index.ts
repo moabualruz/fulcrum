@@ -727,12 +727,13 @@ async function runServeMcp(): Promise<void> {
         query_scope: (a['query_scope'] as 'session' | 'project' | 'workspace' | 'global' | undefined),
         session_id: a['session_id'] as string | undefined,
       } as Parameters<typeof recallMemory>[0])
-      return (memories as Array<{ id?: string; content?: string; tags?: string[]; recall_score?: number }>)
+      return (memories as Array<{ id?: string; content?: string; tags?: string[]; recall_score?: number; source?: string }>)
         .map(m => ({
           id: m.id,
           content: (m.content ?? '').slice(0, maxChars),
           score: m.recall_score ?? 0.0,
           tags: m.tags ?? [],
+          source: m.source ?? 'manual',
         }))
     }
 
@@ -1096,8 +1097,8 @@ async function runServeMcpHttp(): Promise<void> {
         offset: (a['offset'] as number | undefined) ?? 0,
         mode: 'full',
       } as Parameters<typeof recallMemory>[0])
-      return (memories as Array<{ id?: string; content?: string; tags?: string[]; recall_score?: number }>)
-        .map(m => ({ id: m.id, content: (m.content ?? '').slice(0, maxChars), score: m.recall_score ?? 0.0, tags: m.tags ?? [] }))
+      return (memories as Array<{ id?: string; content?: string; tags?: string[]; recall_score?: number; source?: string }>)
+        .map(m => ({ id: m.id, content: (m.content ?? '').slice(0, maxChars), score: m.recall_score ?? 0.0, tags: m.tags ?? [], source: m.source ?? 'manual' }))
     }
     if (name === 'build_cos_context') {
       return await buildCosContext({ workspace_id: a['workspace_id'] as string, project_id: a['project_id'] as string })

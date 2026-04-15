@@ -23,6 +23,9 @@ export interface LifecycleMemoryInput {
   tags?: string[]
   importance?: number
   confidence?: number
+  /** Provenance tag. 'auto' = written by run lifecycle hooks; 'setup' = written
+   *  during install; 'manual' = written by an agent or user explicitly. Default: 'manual'. */
+  source?: 'auto' | 'manual' | 'setup'
 }
 
 /**
@@ -68,6 +71,7 @@ export async function writeLifecycleMemory(
   const confidence = input.confidence ?? 1.0
   const importance = input.importance ?? 0.5
   const tags = JSON.stringify(input.tags ?? [])
+  const source = input.source ?? 'manual'
 
   db.prepare(`
     INSERT INTO memories (
@@ -76,14 +80,14 @@ export async function writeLifecycleMemory(
       content, tags, entities, confidence, freshness, importance,
       file_path, symbol_path, event_time, content_hash,
       task_id, issue_id, artifact_id, provenance_refs,
-      embedding, created_at, updated_at, last_accessed_at, access_count
+      embedding, source, created_at, updated_at, last_accessed_at, access_count
     ) VALUES (
       ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?,
-      ?, ?, ?, ?, 0
+      ?, ?, ?, ?, ?, 0
     )
   `).run(
     memory_id,
@@ -109,6 +113,7 @@ export async function writeLifecycleMemory(
     null, // artifact_id
     '[]', // provenance_refs
     null, // embedding
+    source,
     now,
     now,
     now,
