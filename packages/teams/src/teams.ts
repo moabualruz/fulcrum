@@ -140,8 +140,8 @@ export async function heartbeatTeam(input: HeartbeatTeamInput, db: Db = getDb())
 export async function completeTeam(input: CompleteTeamInput, db: Db = getDb()): Promise<TeamInstance> {
   const now = new Date().toISOString()
 
-  // failed → blocked; completed and cancelled → done
-  const status_category = input.final_status === 'failed' ? 'blocked' : 'done'
+  // All terminal statuses use 'done' category; distinguish by status field (MON-010)
+  const status_category = 'done'
 
   const result = db.prepare(
     `UPDATE team_instances
@@ -214,7 +214,8 @@ export async function getTeamStatus(input: GetTeamStatusInput, db: Db = getDb())
 
   const templateRow = db
     .prepare(`SELECT * FROM team_templates WHERE template_id = ?`)
-    .get(instance.template_id) as Record<string, unknown>
+    .get(instance.template_id) as Record<string, unknown> | undefined
+  if (!templateRow) throw new FulcrumError(`Team template not found: ${instance.template_id}`, 'not_found')
   const template = rowToTemplate(templateRow)
 
   const members = db

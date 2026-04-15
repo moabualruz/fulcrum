@@ -207,7 +207,7 @@ describe('completeTeam', () => {
     expect(completed.status_category).toBe('done')
   })
 
-  it('sets status_category to blocked when final_status is failed', async () => {
+  it('sets status_category to done when final_status is failed (MON-010)', async () => {
     const tmpl = await createTeamTemplate({ name: 'fail-squad', slots: SAMPLE_SLOTS })
     const instance = await invokeTeam({
       template_id: tmpl.template_id,
@@ -223,7 +223,7 @@ describe('completeTeam', () => {
     })
 
     expect(failed.status).toBe('failed')
-    expect(failed.status_category).toBe('blocked')
+    expect(failed.status_category).toBe('done') // terminal status; use status field to distinguish
   })
 
   it('sets status_category to done when final_status is cancelled', async () => {

@@ -27,17 +27,24 @@ const NEVER_SYNC: Set<string> = new Set([
   'ArtifactContract',
 ])
 
+/** Max attempts before a queue item is permanently failed (SYNC-005). */
+const MAX_QUEUE_ATTEMPTS = 3
+
 /**
  * Produce a stable SHA-256 hash for an arbitrary object by serialising
- * its keys in sorted order, preventing hash drift from key insertion order.
+ * keys in sorted order at every depth level, preventing hash drift from
+ * key insertion order in nested objects (SYNC-008).
  */
 function canonicalHash(obj: Record<string, unknown>): string {
-  const sorted = Object.fromEntries(
-    Object.keys(obj)
-      .sort()
-      .map((k) => [k, obj[k]]),
-  )
-  return createHash('sha256').update(JSON.stringify(sorted)).digest('hex')
+  return createHash('sha256')
+    .update(JSON.stringify(obj, (_, value: unknown) => {
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        const sorted = value as Record<string, unknown>
+        return Object.fromEntries(Object.keys(sorted).sort().map(k => [k, sorted[k]]))
+      }
+      return value
+    }))
+    .digest('hex')
 }
 
 /**
@@ -209,15 +216,9 @@ export class SyncManager {
             )
             .run(conflictId, sync_id, hash, remoteHash)
 
-          // Default resolution: local_wins — update conflict record immediately
-          this.db
-            .prepare(
-              `UPDATE sync_conflicts
-                  SET resolution = 'local_wins', resolved_at = datetime('now')
-                WHERE conflict_id = ?`,
-            )
-            .run(conflictId)
-
+          // SYNC-007: do NOT auto-populate resolution — leave NULL so the conflict
+          // appears in listConflicts(unresolved_only=true) until an operator calls
+          // resolveConflict().
           this.db
             .prepare(
               `UPDATE sync_states
@@ -327,6 +328,22 @@ export class SyncManager {
       this.db
         .prepare(`UPDATE sync_queue SET attempts = attempts + 1 WHERE queue_id = ?`)
         .run(item.queue_id)
+
+      // SYNC-005: enforce max retry cap; permanently fail items that have exhausted attempts
+      const newAttempts = item.attempts + 1
+      if (newAttempts > MAX_QUEUE_ATTEMPTS) {
+        const dlqMsg = `Exceeded max attempts (${MAX_QUEUE_ATTEMPTS}); item permanently failed`
+        this.db
+          .prepare(`UPDATE sync_queue SET last_error = ? WHERE queue_id = ?`)
+          .run(dlqMsg, item.queue_id)
+        this.db
+          .prepare(`UPDATE sync_states SET sync_status = 'failed', last_sync_error = ?, updated_at = datetime('now') WHERE sync_id = ?`)
+          .run(dlqMsg, item.sync_id)
+        this.db.prepare(`DELETE FROM sync_queue WHERE queue_id = ?`).run(item.queue_id)
+        result.failed++
+        result.errors.push(`${item.object_id}: ${dlqMsg}`)
+        continue
+      }
 
       try {
         if (item.operation === 'delete') {

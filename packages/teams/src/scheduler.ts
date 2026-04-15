@@ -8,8 +8,8 @@ const DEFAULTS: Required<SchedulerConfig> = {
   per_template_cap: 2,
 }
 
-// Active statuses: instances that are not yet terminal
-const ACTIVE_STATUSES = ["'created'", "'ready'", "'spawning'", "'running'", "'waiting'"].join(',')
+// Active statuses: instances that are not yet terminal (TEAM-003: literal constant, not interpolated)
+const ACTIVE_STATUSES = "'created','ready','spawning','running','waiting'"
 
 export function canStartTeam(
   db: Db,

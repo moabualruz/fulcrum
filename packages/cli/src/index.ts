@@ -334,6 +334,8 @@ export async function runSessionStartHook(): Promise<void> {
   }
 
   if (!sessionId) sessionId = `sess_${Date.now()}`
+  // CLI-002: sanitize session ID before use as filesystem path component
+  sessionId = sessionId.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 128)
 
   try {
     const { startAgentRun, getDb, runMigrations, loadConfig } = await import('@fulcrum/core')
@@ -351,8 +353,11 @@ export async function runSessionStartHook(): Promise<void> {
     db.prepare('INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at) VALUES (?, ?, ?, ?)')
       .run(projId, wsId, projId, now)
 
+    // CLI-012: read role from env var with software_engineer as fallback
+    const agentRole = process.env['FULCRUM_AGENT_ROLE'] ?? 'software_engineer'
+
     const run = await startAgentRun({
-      role: 'software_engineer',
+      role: agentRole,
       workspace_id: wsId,
       agent_id: `claude/${sessionId.slice(0, 12)}`,
       pi_profile: model ?? 'claude',
@@ -2100,7 +2105,7 @@ PLUGIN SEARCH PATH
 // a symlink so the bundled skills are discoverable without manual copying.
 
 async function runSkills(): Promise<void> {
-  const { symlinkSync, existsSync, mkdirSync, readdirSync, statSync } = await import('fs')
+  const { symlinkSync, existsSync, mkdirSync, readdirSync, lstatSync } = await import('fs')
   const { join, resolve } = await import('path')
 
   // Locate the bundled skills directory inside the Fulcrum repo.
@@ -2133,8 +2138,8 @@ async function runSkills(): Promise<void> {
       const targetLink = projectScope ? join(process.cwd(), '.claude', 'skills') : destLink
 
       if (existsSync(targetLink)) {
-        const stat = statSync(targetLink, { bigint: false })
-        if ((stat as unknown as { isSymbolicLink?: () => boolean }).isSymbolicLink?.()) {
+        const stat = lstatSync(targetLink)
+        if (stat.isSymbolicLink()) {
           console.log(`Skills already installed at ${targetLink} (symlink).`)
           console.log(`  → ${resolve(sourceDir)}`)
         } else {

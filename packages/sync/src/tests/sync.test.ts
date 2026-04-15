@@ -528,12 +528,12 @@ describe('@fulcrum/sync — SyncManager', () => {
     expect(second.sync_status).toBe('conflicted')
     expect(second.conflict_state).toBeTruthy()
 
-    // A conflict record should exist (auto-resolved to local_wins but still recorded)
+    // A conflict record should exist (unresolved — SYNC-007: no auto-resolution at detection time)
     const conflicts = manager.listConflicts({ workspace_id: 'ws-test', unresolved_only: false })
     const found = conflicts.find((c) => c.sync_id === second.sync_id)
     expect(found).toBeDefined()
     expect(found?.remote_hash).toBe(adapter.remoteHash)
-    expect(found?.resolution).toBe('local_wins')
+    expect(found?.resolution).toBeUndefined() // resolution stays unset until resolveConflict() is called
   })
 })
 

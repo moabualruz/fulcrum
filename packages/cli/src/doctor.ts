@@ -7,7 +7,6 @@
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { execSync } from 'child_process'
-import { homedir } from 'os'
 import { globalDataDir } from '@fulcrum/core'
 
 // ---------- Check result type ----------
@@ -31,17 +30,8 @@ function checkNodeVersion(): CheckResult {
   return { name: 'Node.js version', status: 'fail', message: `${version} — need Node.js ≥ 20` }
 }
 
-function getGlobalDataDir(): string {
-  if (process.env['FULCRUM_DATA_DIR']) return process.env['FULCRUM_DATA_DIR']
-  // macOS
-  if (process.platform === 'darwin') return join(homedir(), 'Library', 'Application Support', 'fulcrum')
-  // XDG
-  if (process.env['XDG_DATA_HOME']) return join(process.env['XDG_DATA_HOME'], 'fulcrum')
-  return join(homedir(), '.local', 'share', 'fulcrum')
-}
-
 function checkGlobalConfig(): CheckResult {
-  const configPath = join(getGlobalDataDir(), 'config.json')
+  const configPath = join(globalDataDir(), 'config.json')
   if (!existsSync(configPath)) {
     return {
       name: 'Global config',

@@ -4,7 +4,7 @@ import type { MiddlewareHandler } from 'hono'
 import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
 import { randomBytes, timingSafeEqual } from 'crypto'
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import {
   getDb,
@@ -34,9 +34,12 @@ function getOrCreateMonitorToken(): string {
   const dir = globalDataDir()
   const tokenPath = join(dir, 'token')
   mkdirSync(dir, { recursive: true })
-  if (existsSync(tokenPath)) {
-    return readFileSync(tokenPath, 'utf-8').trim()
-  }
+  // MON-006: avoid TOCTOU — attempt read first, create only if missing
+  try {
+    const existing = readFileSync(tokenPath, 'utf-8').trim()
+    // Validate it's a 64-char hex string before trusting it
+    if (/^[0-9a-f]{64}$/.test(existing)) return existing
+  } catch { /* file not found — create */ }
   const token = randomBytes(32).toString('hex')
   writeFileSync(tokenPath, token, { mode: 0o600 })
   return token
@@ -55,6 +58,13 @@ function requireAuth(token: string): MiddlewareHandler {
     }
     await next()
   }
+}
+
+// ---------- Validation helpers ----------
+
+/** Returns true if the string is a valid YYYY-MM-DD date (MON-005). */
+function isValidDate(s: unknown): s is string {
+  return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)
 }
 
 // ---------- Pagination helper ----------
@@ -133,11 +143,19 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
+    const start_date = c.req.query('start_date')
+    const end_date = c.req.query('end_date')
+    // MON-005: validate date format before passing to DB
+    if (start_date !== undefined && !isValidDate(start_date))
+      return c.json({ error: 'start_date must be YYYY-MM-DD' }, 400)
+    if (end_date !== undefined && !isValidDate(end_date))
+      return c.json({ error: 'end_date must be YYYY-MM-DD' }, 400)
+
     const result = await getMetrics({
       workspace_id: ws,
       project_id: c.req.query('project_id'),
-      start_date: c.req.query('start_date'),
-      end_date: c.req.query('end_date'),
+      start_date,
+      end_date,
     })
     return c.json(result)
   })
@@ -151,6 +169,9 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws || !project_id || !start_date || !end_date) {
       return c.json({ error: 'workspace_id, project_id, start_date, end_date are required' }, 400)
     }
+    // MON-005: validate date format
+    if (!isValidDate(start_date)) return c.json({ error: 'start_date must be YYYY-MM-DD' }, 400)
+    if (!isValidDate(end_date)) return c.json({ error: 'end_date must be YYYY-MM-DD' }, 400)
 
     const result = await getBurndown({ workspace_id: ws, project_id, start_date, end_date })
     return c.json(result)
@@ -741,9 +762,11 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         }
       }
 
-      // If actor_role is not provided, derive it from actor_id (legacy format: "pi/<role>")
+      // If actor_role is not provided, derive it from actor_id (expected format: "<prefix>/<role>")
+      // MON-009: reject unexpected formats by leaving role as empty string (deny by default)
       if (!actor_role) {
-        actor_role = (body.actor_id?.split('/')[1] ?? body.actor_id ?? '') as AgentRole
+        const parts = body.actor_id?.split('/')
+        actor_role = (parts && parts.length >= 2 ? parts[1] : '') as AgentRole
       }
 
       const input: EvaluatePolicyInput = {
@@ -773,13 +796,16 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       // Policy engine error — fall back to the simple invariant check so callers
       // still get the invoke_team guard even when the DB is unavailable.
       process.stderr.write(`[policy/check] evaluatePolicy error, falling back to stub: ${(err as Error).message}\n`)
-      const role = body.actor_id?.split('/')[1] ?? body.actor_id ?? ''
+      // MON-009: derive role strictly; deny on unexpected format rather than allowing
+      const parts = body.actor_id?.split('/')
+      const role = (parts && parts.length >= 2 ? parts[1] : '') as AgentRole
       const isTeamInvoke = body.action.includes('invoke_team') || body.action.includes('team_invoke')
-      const callerIsL1 = isL1(role as AgentRole)
+      const callerIsL1 = isL1(role)
       if (isTeamInvoke && !callerIsL1) {
         return c.json({ allowed: false, reason: 'Only chief_of_staff may invoke teams' })
       }
-      return c.json({ allowed: true, reason: '' })
+      // Fail-closed on engine error for any other action — deny until engine recovers
+      return c.json({ allowed: false, reason: 'policy engine unavailable' })
     }
   })
 
