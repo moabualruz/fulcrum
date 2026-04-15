@@ -9,6 +9,7 @@
 //  - _resetMonitorProbeCache(): clears cache so next call fetches fresh
 //  - _setMonitorStarted(): callable without error
 //  - MCP transport layer returns the readiness shape (via InMemoryTransport)
+//  - suggested_next_call heuristic: empty workspace → create_task, non-empty → list_tasks
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -19,6 +20,8 @@ import {
   probeMonitorForTest,
   _resetMonitorProbeCache,
   _setMonitorStarted,
+  _buildCurrentContextResponseForTest,
+  _setProjectIdsForTest,
 } from '../index.js'
 
 // ── probeMonitor unit tests ───────────────────────────────────────────────────
@@ -237,5 +240,57 @@ describe('_monitorStarted double-start guard', () => {
 
     if (prev === undefined) delete process.env['FULCRUM_NO_MONITOR']
     else process.env['FULCRUM_NO_MONITOR'] = prev
+  })
+})
+
+// ── suggested_next_call heuristic ─────────────────────────────────────────────
+// Stable indirection so the vi.mock factory (hoisted) can reference a variable
+// that each test can swap at runtime.
+const _listTasksControl = {
+  impl: vi.fn().mockResolvedValue([] as unknown[]),
+}
+
+vi.mock('@fulcrum/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@fulcrum/core')>()
+  return {
+    ...actual,
+    listTasks: (...args: unknown[]) => _listTasksControl.impl(...args),
+  }
+})
+
+describe('suggested_next_call heuristic', () => {
+  // We mock @fulcrum/core so the dynamic import inside buildCurrentContextResponse
+  // gets a controlled listTasks. We also stub fetch so probeMonitor doesn't hit
+  // the network, and set _projectIds via the test helper.
+
+  beforeEach(() => {
+    _resetMonitorProbeCache()
+    // Stub fetch so probeMonitor returns false without network access
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')))
+    // Set deterministic project IDs for the test
+    _setProjectIdsForTest({ workspace_id: 'ws_heuristic_test', project_id: 'proj_heuristic_test' })
+  })
+
+  afterEach(() => {
+    _setProjectIdsForTest(null)
+    vi.restoreAllMocks()
+  })
+
+  it('empty workspace → suggested_next_call is mcp__fulcrum__create_task', async () => {
+    _listTasksControl.impl = vi.fn().mockResolvedValue([])
+    const result = await _buildCurrentContextResponseForTest()
+    expect(result.readiness.suggested_next_call).toBe('mcp__fulcrum__create_task')
+  })
+
+  it('workspace with tasks → suggested_next_call is mcp__fulcrum__list_tasks', async () => {
+    _listTasksControl.impl = vi.fn().mockResolvedValue([{ id: 'task_1', title: 'A task' }])
+    const result = await _buildCurrentContextResponseForTest()
+    expect(result.readiness.suggested_next_call).toBe('mcp__fulcrum__list_tasks')
+  })
+
+  it('listTasks throws → falls back to mcp__fulcrum__list_tasks', async () => {
+    _listTasksControl.impl = vi.fn().mockRejectedValue(new Error('DB not ready'))
+    const result = await _buildCurrentContextResponseForTest()
+    expect(result.readiness.suggested_next_call).toBe('mcp__fulcrum__list_tasks')
   })
 })

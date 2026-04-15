@@ -613,6 +613,12 @@ export function _resetMonitorProbeCache(): void {
 export function _setMonitorStarted(val: boolean): void {
   _monitorStarted = val
 }
+export async function _buildCurrentContextResponseForTest(): ReturnType<typeof buildCurrentContextResponse> {
+  return buildCurrentContextResponse()
+}
+export function _setProjectIdsForTest(ids: { workspace_id: string; project_id: string } | null): void {
+  _projectIds = ids
+}
 
 // ── Shared get_current_context response builder ───────────────────────────────
 // Both the stdio MCP handler (runServeMcp) and the HTTP MCP handler
@@ -629,6 +635,18 @@ async function buildCurrentContextResponse(): Promise<{
   const monitorUrl = `http://localhost:${monitorPort}`
   const { TOOL_SCHEMAS } = await import('./mcp-tools.js')
   const monitorRunning = await probeMonitor(monitorUrl)
+
+  let suggestedNextCall = 'mcp__fulcrum__list_tasks'
+  try {
+    const { listTasks } = await import('@fulcrum/core')
+    const tasks = await listTasks({ workspace_id: ids.workspace_id, limit: 1 })
+    if (tasks.length === 0) {
+      suggestedNextCall = 'mcp__fulcrum__create_task'
+    }
+  } catch {
+    // DB not ready yet or no workspace — fall through to default
+  }
+
   return {
     workspace_id: ids.workspace_id,
     project_id: ids.project_id,
@@ -637,7 +655,7 @@ async function buildCurrentContextResponse(): Promise<{
       tools_available: TOOL_SCHEMAS.length,
       monitor_url: monitorUrl,
       monitor_running: monitorRunning,
-      suggested_next_call: 'mcp__fulcrum__list_tasks',
+      suggested_next_call: suggestedNextCall,
     },
   }
 }
