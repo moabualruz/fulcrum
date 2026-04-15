@@ -126,6 +126,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Round 2 audit fixes — Architecture (continued)
 - **In-process event bus** — `FulcrumEventBus` in `@fulcrum/core/event-bus`. Implements `on`/`off`/`once`/`onAny`/`offAny`/`fire` with subscriber error isolation. `emitEvent()` now fires the bus after each DB write, enabling reactive in-process coordination without polling. `setEventBus()`/`resetEventBus()` for dependency injection and test isolation. Exported from `@fulcrum/core`. (GAP-ARCH-8)
 
+#### AUDIT-2026-04-15 fixes
+- **`listTasks` batch queries** (M-3) — replaced N+1 query pattern (`hydrateTask` firing 2 queries per task row) with two batch `IN (...)` queries for labels and blockers, regardless of list size.
+- **L2 recall ordering preserved** (M-10) — after fetching memories from SQLite using `IN (...)` (non-deterministic order), rows are now reordered to match the L2 vector-similarity ranking from Kuzu.
+- **Reranker binary classifier support** (m-3) — `LocalRerankerProvider.rerank()` now validates logit output shape; models with `[n_pairs, 2]` output (relevance/irrelevance pairs) have their relevance column (index 1) extracted instead of using raw flat data.
+- **`PlaneAPIClient` singleton** (m-5) — `sync.ts` caches the client instance and recreates it only when env vars change, avoiding repeated construction on every `syncAll` / `syncObject` call.
+- **`complete_agent_run` parameter name corrected in skill** (m-6) — `complete-agent-run/SKILL.md` referred to `summary` but the MCP tool schema defines `output_summary`; all references updated.
+
 ### Changed
 - `_configureDb` adds `synchronous = NORMAL` and `cache_size = -8000` pragmas (additive — no behavior regression).
 - `runJanitorCycle` runs `decayMemories` and `consolidateMemories` by default (opt-out with `runDecay: false` / `runConsolidate: false`).
