@@ -4,6 +4,9 @@ import { resolveEntity, incrementMentionCount } from './entity-store.js'
 import { extractStructured } from '../extractors/structured.js'
 import type { FullMemory } from '../types.js'
 
+// MEM-012: Allowed Cypher relationship types — enforced at write time.
+const ALLOWED_EDGE_TYPES: ReadonlySet<string> = new Set(['MENTIONS', 'PRODUCED_IN'])
+
 export async function upsertMemoryToKuzu(
   client: KuzuClient,
   memory: FullMemory,
@@ -49,7 +52,7 @@ export async function upsertMemoryToKuzu(
       confidence: memory.confidence,
       created_at: memory.created_at,
       updated_at: memory.updated_at,
-      embedding: embeddingArray ?? new Array(1024).fill(0),
+      embedding: embeddingArray ?? new Array(client.dims).fill(0), // MEM-002
     }
   )
 
@@ -65,7 +68,9 @@ export async function upsertMemoryToKuzu(
     const entity = await resolveEntity(client, mention.raw, memory.workspace_id)
     await incrementMentionCount(client, entity.id)
 
-    const edgeTable = mention.edgeType  // 'MENTIONS' or 'PRODUCED_IN'
+    const edgeTable = mention.edgeType
+    // MEM-012: reject any edge type not in the allow-list before using in Cypher
+    if (!ALLOWED_EDGE_TYPES.has(edgeTable)) continue
     const weight = mention.confidence
 
     if (edgeTable === 'PRODUCED_IN') {

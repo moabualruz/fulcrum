@@ -25,12 +25,15 @@ export class KuzuClient {
 
   private constructor() {}
 
-  private dims: number = 1024
+  private _dims: number = 1024
+
+  /** Embedding dimension count — use instead of the hardcoded 1024 sentinel. */
+  get dims(): number { return this._dims }
 
   static async create(options: KuzuClientOptions): Promise<KuzuClient> {
     const kuzu = await getKuzuModule()
     const client = new KuzuClient()
-    client.dims = options.embeddingDimensions ?? 1024
+    client._dims = options.embeddingDimensions ?? 1024
     client.db = new kuzu.Database(options.dbPath)
     client.conn = new kuzu.Connection(client.db)
     await client.initSchema()

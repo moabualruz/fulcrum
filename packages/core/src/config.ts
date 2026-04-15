@@ -234,5 +234,6 @@ export function readRawConfig(): Record<string, unknown> {
 export function writeRawConfig(config: Record<string, unknown>): void {
   const dir = globalDataDir()
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'config.json'), JSON.stringify(config, null, 2), 'utf-8')
+  // MEM-011: restrict permissions — config may contain API keys
+  writeFileSync(join(dir, 'config.json'), JSON.stringify(config, null, 2), { encoding: 'utf-8', mode: 0o600 })
 }

@@ -26,7 +26,8 @@ interface RawMemoryRow {
 
 function recency(createdAt: string): number {
   const daysOld = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
-  return Math.exp(-daysOld / 30 * Math.log(2))  // half-life 30 days
+  // MEM-007: half-life ~90 days — matches L1 computeFreshness (exp(-ageDays/130))
+  return Math.exp(-daysOld / 130 * Math.log(2))
 }
 
 function workspaceAffinity(memWorkspaceId: string, queryWorkspaceId: string, relatedIds: Set<string>): number {

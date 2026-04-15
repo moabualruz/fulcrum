@@ -1,10 +1,8 @@
 import { createHash } from 'crypto'
 import type { KuzuClient } from './client.js'
-
-export type EntityType =
-  | 'technology' | 'concept' | 'pattern' | 'bug_class' | 'library'
-  | 'language_feature' | 'person' | 'tool' | 'organization'
-  | 'project' | 'file' | 'symbol' | 'task' | 'run'
+// MEM-009: EntityType is the single source of truth in structured.ts — import, don't redefine
+import type { EntityType } from '../extractors/structured.js'
+export type { EntityType }
 
 const WORKSPACE_SCOPED_TYPES: ReadonlySet<EntityType> = new Set<EntityType>([
   'project', 'file', 'symbol', 'task', 'run',
@@ -36,7 +34,7 @@ function inferType(mention: string): EntityType {
   if (mention.startsWith('tsk_')) return 'task'
   if (mention.startsWith('run_')) return 'run'
   if (mention.startsWith('ws_')) return 'project'
-  if (mention.startsWith('file_') || mention.includes('/') && mention.endsWith('.ts')) return 'file'
+  if (mention.startsWith('file_') || (mention.includes('/') && mention.endsWith('.ts'))) return 'file' // MEM-010: explicit precedence
   if (mention.startsWith('sym_')) return 'symbol'
   return 'concept'
 }

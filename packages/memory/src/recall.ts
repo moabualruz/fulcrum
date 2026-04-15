@@ -150,6 +150,10 @@ export async function recallMemory(
   // Fetch enough candidates to satisfy offset + limit pages.
   const fetchLimit = limit + offset
 
+  // MEM-004: build WHERE clause early — applied to both L2 (SQLite lookup) and L1 paths
+  const { clauses, params } = buildWhereClause(input)
+  const whereClause = clauses.join(' AND ')
+
   // ── L2 path: if KuzuClient active and embedder available ─────────────────
   const kuzuClient = getKuzuClient()
   if (kuzuClient?.isReady) {
@@ -177,30 +181,56 @@ export async function recallMemory(
         if (l2Results.length > 0) {
           const pagedResults = l2Results.slice(offset, offset + limit)
           const ids = pagedResults.map(r => r.id)
+          // MEM-006: build score map from L2 results before SQLite lookup
+          const l2ScoreMap = new Map(pagedResults.map(r => [r.id, r.score]))
           const placeholders = ids.map(() => '?').join(',')
+          // MEM-004: apply the same WHERE filters as L1 so workspace/project/scope/kind
+          // filters are honoured even when the vector index returns cross-boundary matches
           const rawRows = ids.length > 0
             ? db.prepare(
-                `SELECT m.* FROM memories m WHERE m.memory_id IN (${placeholders})`
-              ).all(...ids) as Record<string, unknown>[]
+                `SELECT m.* FROM memories m WHERE m.memory_id IN (${placeholders}) AND ${whereClause}`
+              ).all(...ids, ...params) as Record<string, unknown>[]
             : []
 
-          updateAccessCounts(db, ids)
+          updateAccessCounts(db, rawRows.map(r => r.memory_id as string))
 
-          // Restore L2 vector-similarity ordering (SQLite IN clause is non-deterministic — M-10).
+          // Restore L2 ordering (SQLite IN clause is non-deterministic)
           const rowById = new Map(rawRows.map(r => [r.memory_id as string, r]))
           const rows = ids.map(id => rowById.get(id)).filter(Boolean) as Record<string, unknown>[]
 
-          if (mode === 'compact') return rows.map(rowToCompact)
-          return rows.map(rowToFullMemory)
+          // MEM-005: apply reranker to L2 results (same logic as L1 path)
+          let sortedWithScores = rows.map(r => ({
+            row: r,
+            score: l2ScoreMap.get(r.memory_id as string) ?? 0,
+          }))
+
+          const rerankerL2 = getReranker()
+          if (rerankerL2 && sortedWithScores.length > 1) {
+            try {
+              const passages = sortedWithScores.map(s => (s.row.content as string) ?? '')
+              const rerankScores = await rerankerL2.rerank(input.query, passages)
+              sortedWithScores = sortedWithScores
+                .map((s, i) => {
+                  const rs = rerankScores[i]
+                  return {
+                    row: s.row,
+                    score: typeof rs === 'number' && Number.isFinite(rs)
+                      ? 1 / (1 + Math.exp(-rs))
+                      : s.score,
+                  }
+                })
+                .sort((a, b) => b.score - a.score)
+            } catch { /* reranker unavailable */ }
+          }
+
+          if (mode === 'compact') return sortedWithScores.map(s => rowToCompact(s.row, s.score)) // MEM-006
+          return sortedWithScores.map(s => rowToFullMemory(s.row))
         }
       } catch {
         // L2 unavailable — fall through to L1
       }
     }
   }
-
-  const { clauses, params } = buildWhereClause(input)
-  const whereClause = clauses.join(' AND ')
 
   // ── compact / total_ranked: RRF hybrid search ─────────────────────────────
   // Build FTS5 query: tokenise into terms and join with OR so any matching
