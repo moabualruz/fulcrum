@@ -17,7 +17,8 @@ describe('fulcrum-mcp package', () => {
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as Record<string, unknown>
     const bin = pkg['bin'] as Record<string, string> | undefined
     expect(bin).toBeDefined()
-    expect(bin?.['fulcrum-mcp']).toContain('index.ts')
+    expect(bin?.['fulcrum-mcp']).toBeDefined()
+    expect(bin?.['fulcrum-mcp']).toMatch(/index\.[jt]s$/)
   })
 
   it('package.json name is fulcrum-mcp', async () => {

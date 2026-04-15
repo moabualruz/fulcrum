@@ -576,6 +576,8 @@ writes a tool_trace operational memory for the call.
 // Tracks whether the in-process monitor was already started so runServeMcp()
 // and runServeAll() don't race to start it twice.
 let _monitorStarted = false
+// Stored so the SIGTERM/SIGINT handler can call stop() to close the HTTP socket.
+let _monitorServer: { stop(): void } | null = null
 
 // ── Monitor probe cache ───────────────────────────────────────────────────────
 // Caches monitor liveness per URL for 15 seconds to avoid hammering on every
@@ -599,6 +601,34 @@ async function probeMonitor(url: string): Promise<boolean> {
 
   _monitorProbeCache.set(url, { running, ts: now })
   return running
+}
+
+// ── Shared get_current_context response builder ───────────────────────────────
+// Both the stdio MCP handler (runServeMcp) and the HTTP MCP handler
+// (runServeMcpHttp) use identical logic. A single canonical builder avoids
+// divergence: the stdio handler uses currentProjectIds() (path-derived IDs)
+// which is the correct source of truth; the HTTP handler previously used
+// config.workspace_id (file-derived) and could return different values.
+async function buildCurrentContextResponse(): Promise<{
+  workspace_id: string; project_id: string; cwd: string
+  readiness: { tools_available: number; monitor_url: string; monitor_running: boolean; suggested_next_call: string }
+}> {
+  const ids = currentProjectIds()
+  const monitorPort = process.env['FULCRUM_MONITOR_PORT'] ?? '4721'
+  const monitorUrl = `http://localhost:${monitorPort}`
+  const { TOOL_SCHEMAS } = await import('./mcp-tools.js')
+  const monitorRunning = await probeMonitor(monitorUrl)
+  return {
+    workspace_id: ids.workspace_id,
+    project_id: ids.project_id,
+    cwd: process.cwd(),
+    readiness: {
+      tools_available: TOOL_SCHEMAS.length,
+      monitor_url: monitorUrl,
+      monitor_running: monitorRunning,
+      suggested_next_call: 'mcp__fulcrum__list_tasks',
+    },
+  }
 }
 
 // ── Serve commands ────────────────────────────────────────────────────────────
@@ -635,6 +665,7 @@ function registerOtelShutdown(): void {
   if (_otelShutdownRegistered) return
   _otelShutdownRegistered = true
   const handler = async () => {
+    try { _monitorServer?.stop() } catch { /* best-effort */ }
     try {
       const { shutdownOtel } = await import('@fulcrum/core')
       await shutdownOtel()
@@ -1005,24 +1036,7 @@ async function runServeMcp(): Promise<void> {
       )
     }
 
-    if (name === 'get_current_context') {
-      const ids = currentProjectIds()
-      const monitorPort = process.env['FULCRUM_MONITOR_PORT'] ?? '4721'
-      const monitorUrl = `http://localhost:${monitorPort}`
-      const { TOOL_SCHEMAS } = await import('./mcp-tools.js')
-      const monitorRunning = await probeMonitor(monitorUrl)
-      return {
-        workspace_id: ids.workspace_id,
-        project_id: ids.project_id,
-        cwd: process.cwd(),
-        readiness: {
-          tools_available: TOOL_SCHEMAS.length,
-          monitor_url: monitorUrl,
-          monitor_running: monitorRunning,
-          suggested_next_call: 'mcp__fulcrum__list_tasks',
-        },
-      }
-    }
+    if (name === 'get_current_context') return buildCurrentContextResponse()
 
     throw new Error(`Unknown tool: ${name}`)
   }
@@ -1065,6 +1079,7 @@ async function runServeMcp(): Promise<void> {
       })
       await monitorServer.start()
       _monitorStarted = true
+      _monitorServer = monitorServer
       process.stderr.write(`[fulcrum] Monitor running on http://127.0.0.1:${monitorPort}\n`)
     } catch (err) {
       // Non-fatal: MCP server still works without the monitor
@@ -1204,23 +1219,7 @@ async function runServeMcpHttp(): Promise<void> {
       const fn = ops[name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()) as keyof typeof ops] as ((args: Record<string, unknown>) => Promise<unknown>) | undefined
       if (fn) return await fn(a)
     }
-    if (name === 'get_current_context') {
-      const monitorPort = process.env['FULCRUM_MONITOR_PORT'] ?? '4721'
-      const monitorUrl = `http://localhost:${monitorPort}`
-      const { TOOL_SCHEMAS } = await import('./mcp-tools.js')
-      const monitorRunning = await probeMonitor(monitorUrl)
-      return {
-        workspace_id: config.workspace_id,
-        project_id: config.project_id,
-        cwd: process.cwd(),
-        readiness: {
-          tools_available: TOOL_SCHEMAS.length,
-          monitor_url: monitorUrl,
-          monitor_running: monitorRunning,
-          suggested_next_call: 'mcp__fulcrum__list_tasks',
-        },
-      }
-    }
+    if (name === 'get_current_context') return buildCurrentContextResponse()
     throw new Error(`Unknown tool: ${name}`)
   }
 
@@ -1285,6 +1284,7 @@ async function runServeAll(): Promise<void> {
   const server = startMonitorServer({ workspace_id: config.workspace_id || undefined })
   await server.start()
   _monitorStarted = true
+  _monitorServer = server
   console.error(`[fulcrum] Monitor running on http://127.0.0.1:${server.port}`)
 
   await runServeMcp()

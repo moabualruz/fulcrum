@@ -10,14 +10,17 @@ This file is auto-loaded by Claude Code. It configures your connection to the Fu
 The `fulcrum` MCP server exposes 23 tools for task management, memory, agent runs, and workspace context.
 <!-- GENERATED:tool-count-end -->
 It runs as a local stdio process via the `fulcrum serve mcp` command.
+The HTTP monitor auto-starts on port 4721 alongside the MCP server — no separate command needed.
 
-Start the HTTP monitor (optional, for dashboard/debugging):
+To suppress the monitor:
 ```
-fulcrum serve monitor
+FULCRUM_NO_MONITOR=1 fulcrum serve mcp
+# or: fulcrum serve mcp --no-monitor
 ```
-Or start both together:
+
+To use a different port:
 ```
-fulcrum serve all
+FULCRUM_MONITOR_PORT=5000 fulcrum serve mcp
 ```
 
 Monitor URLs (default port 4721):
@@ -387,11 +390,12 @@ Returns the workspace_id and project_id for the directory the MCP server was sta
 
 When operating as part of a Fulcrum-managed workflow:
 
-1. **On session start**: Call `mcp__fulcrum__get_workspace_status` to understand current state
-2. **Before working on a task**: Call `mcp__fulcrum__start_agent_run` with your role and task_id
-3. **During long tasks**: Call `mcp__fulcrum__heartbeat_agent_run` every few minutes
-4. **When blocked**: Call `mcp__fulcrum__block_agent_run` with a clear reason
-5. **On completion**: Call `mcp__fulcrum__complete_agent_run` with summary and artifact paths
+1. **On session start**: Call `mcp__fulcrum__get_current_context` (no parameters) to get `workspace_id` and `project_id` — these IDs are required by every other tool
+2. **Understand state**: Call `mcp__fulcrum__get_workspace_status` with the `workspace_id` from step 1
+3. **Before working on a task**: Call `mcp__fulcrum__start_agent_run` with your role and task_id
+4. **During long tasks**: Call `mcp__fulcrum__heartbeat_agent_run` every few minutes
+5. **When blocked**: Call `mcp__fulcrum__block_agent_run` with a clear reason
+6. **On completion**: Call `mcp__fulcrum__complete_agent_run` with summary and artifact paths
 
 ---
 
