@@ -5,6 +5,7 @@
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { globalDataDir } from '@fulcrum/core'
+import type { ToolSchema } from './mcp-tools.js'
 
 // ---------- Types ----------
 
@@ -29,6 +30,8 @@ export interface FulcrumPluginManifest {
   skills?: string
   /** Directory (relative to package root) containing agent MD files */
   agents?: string
+  /** Path (relative to package root) to a JSON file exporting ToolSchema[] */
+  tools?: string
   /** Settings/secrets this plugin requires. Shown during install; read from env vars at runtime. */
   settings?: PluginSetting[]
 }
@@ -123,6 +126,7 @@ export interface PluginRegistration {
   skills: Array<{ name: string; path: string }>
   agents: Array<{ name: string; path: string }>
   hookModules: string[]
+  additionalTools: ToolSchema[]
 }
 
 /**
@@ -130,7 +134,7 @@ export interface PluginRegistration {
  * Callers can then load the hook modules and merge skills/agents into the CLI context.
  */
 export function registerPlugins(plugins: DiscoveredPlugin[]): PluginRegistration {
-  const registration: PluginRegistration = { skills: [], agents: [], hookModules: [] }
+  const registration: PluginRegistration = { skills: [], agents: [], hookModules: [], additionalTools: [] }
 
   for (const plugin of plugins) {
     const { root, manifest } = plugin
@@ -164,6 +168,17 @@ export function registerPlugins(plugins: DiscoveredPlugin[]): PluginRegistration
             registration.agents.push({ name: `${plugin.name}:${entry.replace(/\.md$/, '')}`, path: join(agentsDir, entry) })
           }
         }
+      }
+    }
+
+    if (manifest.tools) {
+      const toolsPath = resolve(root, manifest.tools)
+      try {
+        const raw = readFileSync(toolsPath, 'utf8')
+        const parsed = JSON.parse(raw) as ToolSchema[]
+        registration.additionalTools.push(...parsed)
+      } catch (err) {
+        process.stderr.write(`[fulcrum] Plugin ${plugin.name}: failed to load tools from ${manifest.tools}: ${(err as Error).message}\n`)
       }
     }
   }

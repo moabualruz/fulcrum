@@ -298,9 +298,9 @@ fulcrum memory — memory vault commands
 // compatibility (tests import these from index.ts via the public barrel).
 
 export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO } from './hooks.js'
-export { normalizeHookEvent, runPreHook, runPostHook } from './hooks.js'
+export { normalizeHookEvent, runPreHook, runPostHook, detectHookCli } from './hooks.js'
 // Also import into local scope so runHook() can call them as functions.
-import { normalizeHookEvent, runPreHook, runPostHook } from './hooks.js'
+import { normalizeHookEvent, runPreHook, runPostHook, detectHookCli } from './hooks.js'
 import type { HookCli, HookPhase, HookContext, HookIO } from './hooks.js'
 
 // ── Session lifecycle hooks ───────────────────────────────────────────────────
@@ -514,6 +514,7 @@ async function runHook(cliName: string, phase: HookPhase = 'pre'): Promise<void>
     console.log(`
 fulcrum hook — tool-call policy hooks for coding agents
 
+  fulcrum hook auto   [pre|post]           Auto-detect runtime from stdin event shape
   fulcrum hook claude [pre|post]           Claude Code PreToolUse / PostToolUse hook
   fulcrum hook claude session-start        Claude Code SessionStart hook
   fulcrum hook claude session-stop         Claude Code Stop hook
@@ -525,6 +526,9 @@ Phase defaults to 'pre' when omitted (legacy). The pre hook normalises
 the event, scans for secrets, enforces the team-invoke policy, and
 recalls relevant task memories (surfaced via stderr). The post hook
 writes a tool_trace operational memory for the call.
+
+Use 'auto' as a single hook entry point for any supported runtime —
+the event shape is inspected at runtime to determine the correct handler.
 `)
     process.exit(0)
   }
@@ -547,6 +551,18 @@ writes a tool_trace operational memory for the call.
   } catch {
     // Can't parse hook event — fail open (allow)
     process.exit(0)
+  }
+
+  // If caller used 'auto', detect the runtime from the event shape now that
+  // stdin has been read.  Gracefully allow (continue: true) on unknown shapes.
+  if (cliName === 'auto') {
+    const detected = detectHookCli(event)
+    if (!detected) {
+      process.stdout.write(JSON.stringify({ continue: true }) + '\n')
+      process.exit(0)
+      return
+    }
+    cliName = detected
   }
 
   // Normalise to canonical shape based on CLI type
@@ -594,6 +610,11 @@ writes a tool_trace operational memory for the call.
     await runPostHook(ctx, io)
   }
 }
+
+// ── Plugin additional tools ───────────────────────────────────────────────────
+// Populated in main() after registerPlugins(); consumed by runServeMcp().
+import type { ToolSchema } from './mcp-tools.js'
+let _pluginAdditionalTools: ToolSchema[] = []
 
 // ── Monitor auto-start state ──────────────────────────────────────────────────
 // Tracks whether the in-process monitor was already started so runServeMcp()
@@ -881,6 +902,7 @@ async function runServeMcp(): Promise<void> {
     version: '0.0.1',
     handleToolCall: handleToolCallWithSpan,
     ...(profileFilter ? { filter: profileFilter } : {}),
+    additionalTools: _pluginAdditionalTools,
   })
 }
 
@@ -1826,9 +1848,10 @@ async function runPlugin(): Promise<void> {
       return
     }
 
+    case 'add':
     case 'install': {
       // Install an npm package as a globally-available Fulcrum plugin
-      const pkgArg = args.find(a => !a.startsWith('--') && a !== 'plugin' && a !== 'install')
+      const pkgArg = args.find(a => !a.startsWith('--') && a !== 'plugin' && a !== 'install' && a !== 'add')
       if (!pkgArg) {
         console.error('Usage: fulcrum plugin install <package-name-or-path>')
         process.exit(1)
@@ -2015,6 +2038,7 @@ async function main(): Promise<void> {
   try {
     const plugins = discoverPlugins(process.cwd())
     const registration = registerPlugins(plugins)
+    _pluginAdditionalTools = registration.additionalTools ?? []
     for (const hookModulePath of registration.hookModules) {
       await import(hookModulePath)
     }
