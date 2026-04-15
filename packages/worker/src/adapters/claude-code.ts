@@ -18,7 +18,7 @@ import { join } from 'path'
 import type { AgentAdapter, SpawnContext, WorkerResult } from '../types.js'
 
 /** Locate the `claude` binary. Respects $FULCRUM_CLAUDE_BIN override. */
-function findClaudeBin(): string | null {
+export function findClaudeBin(): string | null {
   const override = process.env['FULCRUM_CLAUDE_BIN']
   if (override) return override
   try {
@@ -50,6 +50,75 @@ function buildPrompt(ctx: SpawnContext): string {
   }
   lines.push(``, `## Instructions`, `Complete the task, then exit.`)
   return lines.join('\n')
+}
+
+// ---------- Detached dispatch (fire-and-forget) ----------
+
+export interface DispatchClaudeCodeInput {
+  run_id: string
+  task_id?: string
+  workspace_id: string
+  project_id?: string
+  agent_role: string
+  model?: string
+}
+
+/**
+ * Spawn a Claude Code subprocess for a run in a detached, fire-and-forget
+ * manner. The subprocess inherits no file descriptors, is fully detached from
+ * the parent process, and is unreffed so the parent can exit independently.
+ *
+ * Returns `{ pid }` or throws if the spawn fails or the `claude` binary is
+ * not found.
+ */
+export function dispatchClaudeCode(input: DispatchClaudeCodeInput): { pid: number } {
+  const claudeBin = findClaudeBin()
+  if (!claudeBin) {
+    throw new Error('claude binary not found — install Claude Code CLI or set $FULCRUM_CLAUDE_BIN')
+  }
+
+  // Write a minimal prompt to a temp file
+  const tmpDir = join(tmpdir(), 'fulcrum-claude-code')
+  mkdirSync(tmpDir, { recursive: true })
+  const promptFile = join(tmpDir, `${input.run_id}.txt`)
+
+  const promptLines: string[] = [
+    `You are a Fulcrum agent running as role: ${input.agent_role}`,
+    `Your run ID is: ${input.run_id}`,
+    `Workspace: ${input.workspace_id}`,
+  ]
+  if (input.project_id) promptLines.push(`Project: ${input.project_id}`)
+  if (input.task_id) promptLines.push(`Task: ${input.task_id}`)
+  promptLines.push('', 'Complete the task, then exit.')
+
+  writeFileSync(promptFile, promptLines.join('\n'), { encoding: 'utf8', mode: 0o600 })
+
+  const args = ['--print', '--prompt-file', promptFile]
+  if (input.model) args.push('--model', input.model)
+
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    FULCRUM_RUN_ID: input.run_id,
+    FULCRUM_WORKSPACE_ID: input.workspace_id,
+    FULCRUM_AGENT_ROLE: input.agent_role,
+  }
+  if (input.project_id) env['FULCRUM_PROJECT_ID'] = input.project_id
+  if (input.task_id) env['FULCRUM_TASK_ID'] = input.task_id
+
+  const proc = spawn(claudeBin, args, {
+    env,
+    detached: true,
+    stdio: 'ignore',
+  })
+
+  if (!proc.pid) {
+    throw new Error('Failed to spawn claude subprocess — no pid returned')
+  }
+
+  // Unref so the parent process can exit without waiting for this child
+  proc.unref()
+
+  return { pid: proc.pid }
 }
 
 export const claudeCodeAdapter: AgentAdapter = {

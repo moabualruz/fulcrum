@@ -133,6 +133,38 @@ describe('tools/call happy path', () => {
     const parsed = JSON.parse((result.content[0] as { text: string }).text)
     expect(parsed.args.agent_role).toBe('software_engineer')
   })
+
+  it('start_agent_run with dispatch:true passes boolean through schema validation', async () => {
+    // The custom handler captures the args passed through — verifies the boolean
+    // survives JSON Schema validation and reaches the handler.
+    let capturedArgs: Record<string, unknown> = {}
+    const { client } = await makeConnectedPair(async (_name, args) => {
+      capturedArgs = args
+      return { tool: _name, args, ok: true }
+    })
+    const result = await callRaw(client, 'start_agent_run', {
+      workspace_id: 'ws_test',
+      agent_role: 'software_engineer',
+      dispatch: true,
+    })
+    expect(result.isError).toBeFalsy()
+    expect(capturedArgs['dispatch']).toBe(true)
+  })
+
+  it('start_agent_run without dispatch behaves as before (no dispatch key)', async () => {
+    let capturedArgs: Record<string, unknown> = {}
+    const { client } = await makeConnectedPair(async (_name, args) => {
+      capturedArgs = args
+      return { tool: _name, args, ok: true }
+    })
+    const result = await callRaw(client, 'start_agent_run', {
+      workspace_id: 'ws_test',
+      agent_role: 'software_engineer',
+    })
+    expect(result.isError).toBeFalsy()
+    // dispatch not present or undefined — handler treats as non-dispatch path
+    expect(capturedArgs['dispatch']).toBeUndefined()
+  })
 })
 
 // ---------- tools/call — invalid args ----------

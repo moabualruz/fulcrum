@@ -981,6 +981,21 @@ async function runServeMcp(): Promise<void> {
         agent_id: `pi/${role}`,
         pi_profile: role,
       })
+
+      // Dispatch path: spawn a detached Claude Code subprocess when requested
+      if (a['dispatch'] === true) {
+        const { dispatchClaudeCode } = await import('@fulcrum/worker')
+        const { pid } = dispatchClaudeCode({
+          run_id: run.run_id,
+          task_id,
+          workspace_id: wsId,
+          project_id: projId,
+          agent_role: role,
+          model: a['model'] as string | undefined,
+        })
+        return { run_id: run.run_id, status: run.status, dispatched: true, pid }
+      }
+
       return { run_id: run.run_id, status: run.status }
     }
 

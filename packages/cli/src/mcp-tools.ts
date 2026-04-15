@@ -158,6 +158,8 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         project_id: { type: 'string', description: 'Optional project ID (defaults to workspace_id)' },
         worktree_path: { type: 'string', description: 'Optional git worktree path for code-writing roles' },
         pi_run_id: { type: 'string', description: 'Optional custom run ID for external tracking' },
+        model: { type: 'string', description: 'Optional model override (e.g. "claude-sonnet-4-6")' },
+        dispatch: { type: 'boolean', description: 'If true, spawn a Claude Code subprocess for this run (fire-and-forget)' },
       },
       required: ['agent_role', 'workspace_id'],
     },
