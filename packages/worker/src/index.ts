@@ -2,7 +2,7 @@
 // Public surface of @fulcrum/worker — see types.ts for the adapter
 // contract and lifecycle.ts for the driver.
 
-export { spawnAgent } from './lifecycle.js'
+export { spawnAgent, waitForDrain, isDraining } from './lifecycle.js'
 export {
   registerAgentAdapter,
   getAgentAdapter,

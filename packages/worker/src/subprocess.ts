@@ -12,6 +12,12 @@ import type { AgentAdapter, SpawnContext, WorkerResult } from './types.js'
 
 const execFileAsync = promisify(execFile)
 
+/** WORK-005: Default subprocess timeout — 5 minutes. Override via env. */
+const SUBPROCESS_TIMEOUT_MS = parseInt(
+  process.env['FULCRUM_SUBPROCESS_TIMEOUT_MS'] ?? '300000',
+  10,
+)
+
 export const subprocessAdapter: AgentAdapter = {
   name: 'subprocess',
   async spawn(ctx: SpawnContext): Promise<WorkerResult> {
@@ -40,6 +46,8 @@ export const subprocessAdapter: AgentAdapter = {
           FULCRUM_WORKTREE_PATH: ctx.worktree_path ?? '',
         },
         maxBuffer: 16 * 1024 * 1024,
+        timeout: SUBPROCESS_TIMEOUT_MS, // WORK-005
+        killSignal: 'SIGTERM',
       })
       await ctx.heartbeat('subprocess_finished', 100)
       try {

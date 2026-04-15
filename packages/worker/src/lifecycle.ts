@@ -27,6 +27,68 @@ import { subprocessAdapter } from './subprocess.js'
 import { claudeCodeAdapter } from './adapters/claude-code.js'
 import type { SpawnAgentInput, SpawnContext, WorkerResult } from './types.js'
 
+// ---------------------------------------------------------------------------
+// WORK-004: Concurrency semaphore — prevents unbounded parallel agent spawns.
+// ---------------------------------------------------------------------------
+const MAX_CONCURRENT = Math.max(
+  1,
+  parseInt(process.env['FULCRUM_MAX_CONCURRENT_AGENTS'] ?? '10', 10),
+)
+
+class Semaphore {
+  private _available: number
+  private _queue: Array<() => void> = []
+  constructor(max: number) { this._available = max }
+  acquire(): Promise<void> {
+    if (this._available > 0) { this._available--; return Promise.resolve() }
+    return new Promise(resolve => this._queue.push(resolve))
+  }
+  release(): void {
+    if (this._queue.length > 0) {
+      this._queue.shift()!()
+    } else {
+      this._available++
+    }
+  }
+}
+
+const _sem = new Semaphore(MAX_CONCURRENT)
+
+// ---------------------------------------------------------------------------
+// WORK-003: Graceful shutdown — honour SIGTERM by draining in-flight runs.
+// ---------------------------------------------------------------------------
+let _inflightCount = 0
+let _draining = false
+let _drainResolve: (() => void) | null = null
+
+/** Resolves when all in-flight spawnAgent calls finish (or immediately if none). */
+export function waitForDrain(): Promise<void> {
+  if (_inflightCount === 0) return Promise.resolve()
+  return new Promise(resolve => { _drainResolve = resolve })
+}
+
+/** True once SIGTERM has been received. New spawnAgent calls will be rejected. */
+export function isDraining(): boolean { return _draining }
+
+// Register once; guard against double-registration in test environments.
+if (typeof process !== 'undefined' && !process.listenerCount('SIGTERM')) {
+  process.once('SIGTERM', () => {
+    _draining = true
+    if (_inflightCount === 0) _drainResolve?.()
+  })
+}
+
+// ---------------------------------------------------------------------------
+// WORK-008: Runtime input validation.
+// ---------------------------------------------------------------------------
+function validateSpawnAgentInput(input: SpawnAgentInput): void {
+  if (!input.workspace_id?.trim()) throw new FulcrumError('workspace_id is required', 'invalid_input')
+  if (!input.project_id?.trim()) throw new FulcrumError('project_id is required', 'invalid_input')
+  if (!input.task_id?.trim()) throw new FulcrumError('task_id is required', 'invalid_input')
+  if (!input.caller_role?.trim()) throw new FulcrumError('caller_role is required', 'invalid_input')
+  if (!input.target_role?.trim()) throw new FulcrumError('target_role is required', 'invalid_input')
+}
+
 // Register built-in adapters once at module load. Re-registering is
 // idempotent for these names — tests that need to override can call
 // `registerAgentAdapter` again with the same name.
@@ -51,6 +113,14 @@ function buildArtifacts(result: WorkerResult): RunArtifacts | undefined {
 export async function spawnAgent(
   input: SpawnAgentInput,
 ): Promise<{ run_id: string; result: WorkerResult }> {
+  // WORK-008: validate required fields before anything else
+  validateSpawnAgentInput(input)
+
+  // WORK-003: reject new work while draining
+  if (_draining) {
+    throw new FulcrumError('worker is draining — no new agent runs accepted', 'invalid_state')
+  }
+
   // 1. Policy check — only L1 may invoke subordinate agents (§15).
   if (!canInvokeTeams(input.caller_role)) {
     throw new FulcrumError(
@@ -86,6 +156,10 @@ export async function spawnAgent(
       caller_role: input.caller_role,
     },
   })
+
+  // WORK-004: acquire concurrency semaphore before starting the run
+  await _sem.acquire()
+  _inflightCount++
 
   // 4. Invoke the adapter with a heartbeat callback that writes through
   //    to the DB. Heartbeats default to 0% progress when an adapter
@@ -140,6 +214,10 @@ export async function spawnAgent(
         error: result.error,
       },
     })
+    // WORK-004: release semaphore slot; WORK-003: signal drain if needed
+    _sem.release()
+    _inflightCount--
+    if (_draining && _inflightCount === 0) _drainResolve?.()
   }
 
   return { run_id: run.run_id, result }

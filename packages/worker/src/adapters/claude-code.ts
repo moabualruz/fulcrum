@@ -12,10 +12,39 @@
 //   5. Returns a WorkerResult parsed from the process's exit code + stdout
 
 import { execFileSync, spawn } from 'child_process'
-import { writeFileSync, unlinkSync, existsSync, mkdirSync } from 'fs'
+import { writeFileSync, unlinkSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { AgentAdapter, SpawnContext, WorkerResult } from '../types.js'
+
+/** WORK-006: Default Claude Code subprocess timeout — 30 minutes. Override via env. */
+const CLAUDE_TIMEOUT_MS = parseInt(
+  process.env['FULCRUM_CLAUDE_TIMEOUT_MS'] ?? '1800000',
+  10,
+)
+
+/** WORK-002: Reject identifiers that could cause path traversal. */
+function assertSafeId(id: string, label: string): void {
+  if (!/^[\w-]+$/.test(id)) {
+    throw new Error(`${label} contains unsafe characters: ${JSON.stringify(id)}`)
+  }
+}
+
+/**
+ * WORK-007: Clean up temp prompt files older than 1 hour left by prior
+ * dispatchClaudeCode calls (fire-and-forget — no reliable cleanup path otherwise).
+ */
+function cleanupStalePromptFiles(dir: string): void {
+  try {
+    const now = Date.now()
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name)
+      try {
+        if (now - statSync(p).mtimeMs > 3_600_000) unlinkSync(p)
+      } catch { /* ignore per-file errors */ }
+    }
+  } catch { /* dir doesn't exist yet — ignore */ }
+}
 
 /** Locate the `claude` binary. Respects $FULCRUM_CLAUDE_BIN override. */
 export function findClaudeBin(): string | null {
@@ -72,6 +101,8 @@ export interface DispatchClaudeCodeInput {
  * not found.
  */
 export function dispatchClaudeCode(input: DispatchClaudeCodeInput): { pid: number } {
+  assertSafeId(input.run_id, 'run_id') // WORK-002
+
   const claudeBin = findClaudeBin()
   if (!claudeBin) {
     throw new Error('claude binary not found — install Claude Code CLI or set $FULCRUM_CLAUDE_BIN')
@@ -80,6 +111,7 @@ export function dispatchClaudeCode(input: DispatchClaudeCodeInput): { pid: numbe
   // Write a minimal prompt to a temp file
   const tmpDir = join(tmpdir(), 'fulcrum-claude-code')
   mkdirSync(tmpDir, { recursive: true })
+  cleanupStalePromptFiles(tmpDir) // WORK-007
   const promptFile = join(tmpDir, `${input.run_id}.txt`)
 
   const promptLines: string[] = [
@@ -125,6 +157,8 @@ export const claudeCodeAdapter: AgentAdapter = {
   name: 'claude-code',
 
   async spawn(ctx: SpawnContext): Promise<WorkerResult> {
+    assertSafeId(ctx.run_id, 'run_id') // WORK-002
+
     const claudeBin = findClaudeBin()
     if (!claudeBin) {
       return {
@@ -136,6 +170,7 @@ export const claudeCodeAdapter: AgentAdapter = {
     // Write prompt to a temp file
     const tmpDir = join(tmpdir(), 'fulcrum-claude-code')
     mkdirSync(tmpDir, { recursive: true })
+    cleanupStalePromptFiles(tmpDir) // WORK-007
     const promptFile = join(tmpDir, `${ctx.run_id}.txt`)
     writeFileSync(promptFile, buildPrompt(ctx), { encoding: 'utf8', mode: 0o600 })
 
@@ -169,12 +204,30 @@ export const claudeCodeAdapter: AgentAdapter = {
         void ctx.heartbeat('running', undefined)
       }, 30_000)
 
-      proc.on('close', (code) => {
+      // WORK-006: kill the child if it exceeds the configured timeout
+      let timedOut = false
+      const killTimer = setTimeout(() => {
+        timedOut = true
+        proc.kill('SIGTERM')
+        // Escalate to SIGKILL after 5 s if still alive
+        setTimeout(() => proc.kill('SIGKILL'), 5_000)
+      }, CLAUDE_TIMEOUT_MS)
+
+      const cleanup = () => {
         clearInterval(hb)
-
-        // Clean up temp file
+        clearTimeout(killTimer)
         try { if (existsSync(promptFile)) unlinkSync(promptFile) } catch { /* ignore */ }
+      }
 
+      proc.on('close', (code) => {
+        cleanup()
+        if (timedOut) {
+          resolve({
+            status: 'blocked',
+            error: `claude timed out after ${CLAUDE_TIMEOUT_MS}ms`,
+          })
+          return
+        }
         if (code === 0) {
           const output = Buffer.concat(stdout).toString('utf8').trim()
           resolve({
@@ -191,8 +244,7 @@ export const claudeCodeAdapter: AgentAdapter = {
       })
 
       proc.on('error', (err) => {
-        clearInterval(hb)
-        try { if (existsSync(promptFile)) unlinkSync(promptFile) } catch { /* ignore */ }
+        cleanup()
         resolve({
           status: 'blocked',
           error: `Failed to spawn claude: ${err.message}`,

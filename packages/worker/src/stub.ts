@@ -8,9 +8,17 @@ import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import type { AgentAdapter, SpawnContext, WorkerResult } from './types.js'
 
+/** WORK-002: Reject run_id values that could cause path traversal. */
+function assertSafeId(id: string, label: string): void {
+  if (!/^[\w-]+$/.test(id)) {
+    throw new Error(`${label} contains unsafe characters: ${JSON.stringify(id)}`)
+  }
+}
+
 export const stubAdapter: AgentAdapter = {
   name: 'stub',
   async spawn(ctx: SpawnContext): Promise<WorkerResult> {
+    assertSafeId(ctx.run_id, 'run_id') // WORK-002
     await ctx.heartbeat('stub_started', 0)
 
     const dir = process.env['FULCRUM_AGENT_STUB_DIR']
