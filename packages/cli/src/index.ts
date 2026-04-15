@@ -572,6 +572,11 @@ writes a tool_trace operational memory for the call.
   }
 }
 
+// ── Monitor auto-start state ──────────────────────────────────────────────────
+// Tracks whether the in-process monitor was already started so runServeMcp()
+// and runServeAll() don't race to start it twice.
+let _monitorStarted = false
+
 // ── Monitor probe cache ───────────────────────────────────────────────────────
 // Caches monitor liveness per URL for 15 seconds to avoid hammering on every
 // get_current_context call without introducing noticeable staleness.
@@ -1044,6 +1049,29 @@ async function runServeMcp(): Promise<void> {
     }
   }
 
+  // ── Auto-start monitor ────────────────────────────────────────────────────
+  // Start the HTTP monitor in-process alongside the MCP stdio server unless:
+  //   - FULCRUM_NO_MONITOR=1 env var is set
+  //   - --no-monitor flag is passed
+  //   - monitor was already started (e.g. called from runServeAll)
+  const NO_MONITOR = process.env['FULCRUM_NO_MONITOR'] === '1' || args.includes('--no-monitor')
+  if (!NO_MONITOR && !_monitorStarted) {
+    try {
+      const { startMonitorServer } = await import('@fulcrum/monitor')
+      const monitorPort = parseInt(process.env['FULCRUM_MONITOR_PORT'] ?? '4721', 10)
+      const monitorServer = startMonitorServer({
+        port: monitorPort,
+        workspace_id: config.workspace_id || undefined,
+      })
+      await monitorServer.start()
+      _monitorStarted = true
+      process.stderr.write(`[fulcrum] Monitor running on http://127.0.0.1:${monitorPort}\n`)
+    } catch (err) {
+      // Non-fatal: MCP server still works without the monitor
+      process.stderr.write(`[fulcrum] Monitor auto-start failed (non-fatal): ${(err as Error).message}\n`)
+    }
+  }
+
   await runFulcrumMcpServer({
     version: '0.0.1',
     handleToolCall: handleToolCallWithSpan,
@@ -1256,6 +1284,7 @@ async function runServeAll(): Promise<void> {
 
   const server = startMonitorServer({ workspace_id: config.workspace_id || undefined })
   await server.start()
+  _monitorStarted = true
   console.error(`[fulcrum] Monitor running on http://127.0.0.1:${server.port}`)
 
   await runServeMcp()
