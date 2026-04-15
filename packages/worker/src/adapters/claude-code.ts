@@ -68,7 +68,7 @@ export const claudeCodeAdapter: AgentAdapter = {
     const tmpDir = join(tmpdir(), 'fulcrum-claude-code')
     mkdirSync(tmpDir, { recursive: true })
     const promptFile = join(tmpDir, `${ctx.run_id}.txt`)
-    writeFileSync(promptFile, buildPrompt(ctx), 'utf8')
+    writeFileSync(promptFile, buildPrompt(ctx), { encoding: 'utf8', mode: 0o600 })
 
     const args = ['--print', '--prompt-file', promptFile]
     if (ctx.model) args.push('--model', ctx.model)
