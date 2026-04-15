@@ -269,7 +269,7 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
   // fulcrum://{workspace_id}/task/{task_id} — individual task
   server.registerResource(
     'task',
-    new ResourceTemplate('fulcrum://{workspace_id}/task/{task_id}', { list: undefined }),
+    new ResourceTemplate('fulcrum://{workspace_id}/task/{task_id}', {}),
     {
       title: 'Task detail',
       description: 'Details of a single Fulcrum task',
@@ -292,7 +292,7 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
   // fulcrum://{workspace_id}/memory/{project_id} — memory entries
   server.registerResource(
     'memory',
-    new ResourceTemplate('fulcrum://{workspace_id}/memory/{project_id}', { list: undefined }),
+    new ResourceTemplate('fulcrum://{workspace_id}/memory/{project_id}', {}),
     {
       title: 'Project memory',
       description: 'Recalled memory entries for a project',
@@ -320,7 +320,7 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
   // fulcrum://{workspace_id}/run/{run_id} — agent run status
   server.registerResource(
     'agent-run',
-    new ResourceTemplate('fulcrum://{workspace_id}/run/{run_id}', { list: undefined }),
+    new ResourceTemplate('fulcrum://{workspace_id}/run/{run_id}', {}),
     {
       title: 'Agent run',
       description: 'Status of a Fulcrum agent run',
