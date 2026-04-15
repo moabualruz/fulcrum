@@ -45,13 +45,16 @@ export interface McpServerOptions {
 
 // ---------- Zod shape builder ----------
 // Converts a JSON Schema-style properties object to a flat Zod shape.
-// Handles all types used in our 22 tool schemas.
+// Handles all types used in our tool schemas, including typed array items
+// and nested object items. (GAP-MCP-6: fix silent drop of items.properties)
 
 type JsonSchemaProp = {
   type?: string
   enum?: string[]
   description?: string
-  items?: Record<string, unknown>
+  items?: { type?: string; properties?: Record<string, JsonSchemaProp>; required?: string[] }
+  properties?: Record<string, JsonSchemaProp>
+  required?: string[]
 }
 
 function buildZodShape(
@@ -70,9 +73,27 @@ function buildZodShape(
     } else if (prop.type === 'boolean') {
       base = z.boolean()
     } else if (prop.type === 'array') {
-      base = z.array(z.unknown())
+      // Preserve item type information rather than silently using z.unknown()
+      const items = prop.items
+      if (items?.type === 'string') {
+        base = z.array(z.string())
+      } else if (items?.type === 'number') {
+        base = z.array(z.number())
+      } else if (items?.type === 'object' && items.properties) {
+        // Nested object array — build a typed item schema
+        const itemShape = buildZodShape(items.properties, items.required ?? [])
+        base = z.array(z.object(itemShape).passthrough())
+      } else {
+        base = z.array(z.unknown())
+      }
     } else if (prop.type === 'object') {
-      base = z.record(z.string(), z.unknown())
+      if (prop.properties) {
+        // Inline nested object — build typed schema
+        const nestedShape = buildZodShape(prop.properties, prop.required ?? [])
+        base = z.object(nestedShape).passthrough()
+      } else {
+        base = z.record(z.string(), z.unknown())
+      }
     } else {
       base = z.string()
     }
@@ -81,16 +102,31 @@ function buildZodShape(
   return shape
 }
 
-// ---------- Output schema (read tools) ----------
-// A passthrough Zod object accepts any additional fields — lets clients
-// that support structuredContent parse the result directly without
-// the client needing to know the exact shape of every tool response.
+// ---------- Output schema helpers ----------
+// GAP-MCP-5: Per-tool output contracts instead of a single passthrough.
+//
+// A passthrough Zod object is used as the fallback for read-only tools that
+// return arrays (which MCP spec says cannot be top-level outputSchema types)
+// and for any tool without an explicit outputSchema definition.
 const READ_OUTPUT_SCHEMA = z.object({}).passthrough()
 
-// Tools that carry structuredContent alongside text (all readOnly tools).
-// Built at server creation time once allTools is known (see inside factory fn).
-function buildReadOnlySet(tools: import('./mcp-tools.js').ToolSchema[]): Set<string> {
-  return new Set(tools.filter(t => t.annotations?.readOnlyHint === true).map(t => t.name))
+/**
+ * Build a Zod schema from a ToolSchema.outputSchema definition.
+ * Returns null when the schema is absent or not an object type.
+ *
+ * All output fields are made optional at the Zod level. The `required`
+ * array in the JSON Schema definition serves as documentation (what a
+ * successful response guarantees), but runtime enforcement would break
+ * test mock handlers and the error response path which returns different
+ * shapes. Passthrough allows extra fields (e.g. diagnostic keys).
+ */
+function buildToolOutputSchema(
+  outputSchema: import('./mcp-tools.js').ToolSchema['outputSchema'],
+): z.ZodObject<Record<string, z.ZodTypeAny>> | null {
+  if (!outputSchema || outputSchema.type !== 'object' || !outputSchema.properties) return null
+  // Pass [] as required so all fields are optional in the Zod schema.
+  const shape = buildZodShape(outputSchema.properties as Record<string, JsonSchemaProp>, [])
+  return z.object(shape).passthrough()
 }
 
 // ---------- Middleware chain runner ----------
@@ -128,7 +164,6 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
   )
 
   const allTools = [...TOOL_SCHEMAS, ...(options.additionalTools ?? [])]
-  const readOnlyTools = buildReadOnlySet(allTools)
 
   for (const tool of allTools) {
     const shape = buildZodShape(
@@ -141,7 +176,15 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
     // raw shape for capabilities negotiation while we enforce strictness.
     const strictSchema = z.object(shape).strict()
 
-    const isReadTool = readOnlyTools.has(tool.name)
+    // GAP-MCP-5: Per-tool output schema. When the tool declares an outputSchema,
+    // use a concrete Zod schema so clients can validate structuredContent.
+    // For read-only tools without an explicit outputSchema (e.g. list_ tools that
+    // return arrays — MCP outputSchema must be an object type at the top level),
+    // fall back to the passthrough schema so structuredContent is still present.
+    // Write tools without outputSchema get undefined (no structuredContent).
+    const isReadTool = tool.annotations?.readOnlyHint === true
+    const perToolOutputSchema = buildToolOutputSchema(tool.outputSchema)
+    const toolOutputSchema = perToolOutputSchema ?? (isReadTool ? READ_OUTPUT_SCHEMA : undefined)
 
     server.registerTool(
       tool.name,
@@ -149,7 +192,7 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
         title: tool.title,
         description: tool.description,
         inputSchema: shape,
-        outputSchema: isReadTool ? READ_OUTPUT_SCHEMA : undefined,
+        outputSchema: toolOutputSchema ?? undefined,
         annotations: tool.annotations ? {
           readOnlyHint: tool.annotations.readOnlyHint,
           idempotentHint: tool.annotations.idempotentHint,
@@ -185,7 +228,9 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
           if (ctx.error) throw ctx.error
           const result = ctx.result
           const textContent = { type: 'text' as const, text: JSON.stringify(result) }
-          if (isReadTool) {
+          // Return structuredContent for any tool that has an output schema
+          // (either per-tool or the read-only passthrough fallback).
+          if (toolOutputSchema !== undefined) {
             return {
               content: [textContent],
               structuredContent: result as Record<string, unknown>,

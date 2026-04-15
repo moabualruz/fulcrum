@@ -23,6 +23,20 @@ export interface ToolSchema {
     type: 'object'
     properties: Record<string, unknown>
     required?: string[]
+    additionalProperties?: boolean
+  }
+  /**
+   * JSON Schema (draft-07, object type) describing the shape of structuredContent
+   * returned by this tool. Must be an object schema (arrays are not supported as
+   * top-level schemas per MCP spec). When present, the server builds a per-tool
+   * Zod schema and returns structuredContent alongside the text content.
+   * When absent, read-only tools use a passthrough schema; write tools omit it.
+   * (GAP-MCP-5: per-tool output contracts)
+   */
+  outputSchema?: {
+    type: 'object'
+    properties: Record<string, unknown>
+    required?: string[]
   }
 }
 
@@ -61,6 +75,17 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       },
       required: ['title', 'project_id', 'workspace_id'],
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string' },
+        title: { type: 'string' },
+        status: { type: 'string' },
+        priority: { type: 'string' },
+        assigned_to: { type: 'string' },
+      },
+      required: ['task_id', 'title', 'status'],
+    },
   },
   {
     title: 'Update Task',
@@ -76,6 +101,15 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         assigned_to: { type: 'string', description: 'Reassign to this agent role slug' },
       },
       required: ['task_id'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string' },
+        updated: { type: 'boolean' },
+        changes: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['task_id', 'updated'],
     },
   },
   {
@@ -118,6 +152,16 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       },
       required: ['content', 'workspace_id', 'project_id'],
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        saved: { type: 'boolean' },
+        memory_id: { type: 'string' },
+        project_id: { type: 'string' },
+        tags: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['saved', 'memory_id'],
+    },
   },
   {
     title: 'List Agent Profiles',
@@ -144,6 +188,17 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       properties: { run_id: { type: 'string', description: 'Run ID returned by start_agent_run' } },
       required: ['run_id'],
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        run_id: { type: 'string' },
+        status: { type: 'string' },
+        role: { type: 'string' },
+        current_step: { type: 'string' },
+        progress_pct: { type: 'number' },
+      },
+      required: ['run_id', 'status', 'role'],
+    },
   },
   {
     title: 'Start Agent Run',
@@ -164,6 +219,16 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       },
       required: ['agent_role', 'workspace_id'],
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        run_id: { type: 'string' },
+        status: { type: 'string' },
+        dispatched: { type: 'boolean' },
+        pid: { type: 'number' },
+      },
+      required: ['run_id', 'status'],
+    },
   },
   {
     title: 'Heartbeat Agent Run',
@@ -179,6 +244,14 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         progress_pct: { type: 'number', description: 'Optional progress percentage (0–100)' },
       },
       required: ['run_id', 'workspace_id'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        run_id: { type: 'string' },
+        ok: { type: 'boolean' },
+      },
+      required: ['run_id', 'ok'],
     },
   },
   {
@@ -196,6 +269,14 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       },
       required: ['run_id', 'workspace_id'],
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        run_id: { type: 'string' },
+        status: { type: 'string' },
+      },
+      required: ['run_id', 'status'],
+    },
   },
   {
     title: 'Block Agent Run',
@@ -210,6 +291,15 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         reason: { type: 'string', description: 'Why the run is blocked (will surface in workspace status)' },
       },
       required: ['run_id', 'workspace_id', 'reason'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        run_id: { type: 'string' },
+        status: { type: 'string' },
+        reason: { type: 'string' },
+      },
+      required: ['run_id', 'status', 'reason'],
     },
   },
   {
@@ -228,6 +318,15 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       },
       required: ['project_id', 'workspace_id'],
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        context_markdown: { type: 'string' },
+        project_id: { type: 'string' },
+        workspace_id: { type: 'string' },
+      },
+      required: ['context_markdown', 'project_id', 'workspace_id'],
+    },
   },
   {
     title: 'Get Workspace Status',
@@ -238,6 +337,39 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       type: 'object',
       properties: { workspace_id: { type: 'string', description: 'Workspace ID' } },
       required: ['workspace_id'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        workspace_id: { type: 'string' },
+        active_runs: { type: 'number' },
+        blocked_runs: { type: 'number' },
+        wip_count: { type: 'number' },
+        queued_tasks: { type: 'number' },
+        runs: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              run_id: { type: 'string' },
+              role: { type: 'string' },
+              status: { type: 'string' },
+              task_id: { type: 'string' },
+            },
+          },
+        },
+        blockers: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              run_id: { type: 'string' },
+              reason: { type: 'string' },
+            },
+          },
+        },
+      },
+      required: ['workspace_id', 'active_runs', 'blocked_runs', 'wip_count', 'queued_tasks'],
     },
   },
   {
@@ -431,6 +563,15 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       type: 'object',
       properties: {},
       additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+        cwd: { type: 'string' },
+      },
+      required: ['workspace_id', 'project_id', 'cwd'],
     },
   },
 ]
