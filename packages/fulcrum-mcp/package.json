@@ -1,0 +1,41 @@
+{
+  "name": "fulcrum-mcp",
+  "version": "0.0.1",
+  "description": "Zero-install MCP server for Fulcrum agent OS — run with npx fulcrum-mcp or add to Claude Desktop config",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "agent-os",
+    "fulcrum",
+    "claude",
+    "ai"
+  ],
+  "type": "module",
+  "bin": {
+    "fulcrum-mcp": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "node --import tsx/esm src/index.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fulcrum/cli": "workspace:*",
+    "tsx": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "readme": "README.md"
+}

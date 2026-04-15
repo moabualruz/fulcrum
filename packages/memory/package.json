@@ -30,10 +30,12 @@
     "@fulcrum/core": "workspace:*",
     "chokidar": "^3.6.0",
     "gray-matter": "^4.0.3",
-    "kuzu": "^0.10.0",
     "simple-git": "^3.22.0",
     "ulidx": "^2.3.0",
     "web-tree-sitter": "^0.26.8"
+  },
+  "optionalDependencies": {
+    "kuzu": "^0.10.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",

@@ -1,0 +1,43 @@
+name: fulcrum-mcp smoke test
+
+on:
+  pull_request:
+    paths:
+      - 'packages/fulcrum-mcp/**'
+      - 'packages/cli/src/**'
+      - 'packages/core/src/**'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ['20', '22']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Smoke test — fulcrum-mcp initializes MCP server
+        timeout-minutes: 1
+        run: |
+          # Send a JSON-RPC initialize request and verify a valid response
+          INIT=$(printf '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}\n')
+          RESPONSE=$(echo "$INIT" | FULCRUM_NO_MONITOR=1 node --import tsx/esm packages/fulcrum-mcp/src/index.ts 2>/dev/null || true)
+          if echo "$RESPONSE" | grep -q '"id":1'; then
+            echo "✓ fulcrum-mcp MCP initialize round-trip passed"
+          else
+            echo "✗ No valid JSON-RPC response"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
