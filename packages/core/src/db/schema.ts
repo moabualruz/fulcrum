@@ -108,11 +108,32 @@ function rebuildMemoriesIfLegacy(db: Database.Database): void {
   }
 }
 
+/**
+ * v2a Task 3: detect a legacy agent_runs table missing context_type or
+ * parent_run_id and add them via ALTER TABLE. The CHECK constraint on
+ * context_type cannot be retrofitted via ALTER TABLE in SQLite, so legacy
+ * DBs accept any value at the DB level until a future full rebuild — but
+ * the application-layer fail-closed enforcement in startAgentRun() still
+ * binds. Idempotent.
+ */
+function addAgentRunsContextTypeIfMissing(db: Database.Database): void {
+  const tbl = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_runs'").get() as { name: string } | undefined
+  if (!tbl) return // fresh DB — schema CREATE handles
+  const cols = (db.prepare('PRAGMA table_info(agent_runs)').all() as { name: string }[]).map(c => c.name)
+  if (!cols.includes('context_type')) {
+    db.exec(`ALTER TABLE agent_runs ADD COLUMN context_type TEXT NOT NULL DEFAULT 'primary'`)
+  }
+  if (!cols.includes('parent_run_id')) {
+    db.exec(`ALTER TABLE agent_runs ADD COLUMN parent_run_id TEXT`)
+  }
+}
+
 export function applySchema(db: Database.Database): void {
   // v2a PR 1 Task 1: rebuild legacy memories table BEFORE the idempotent CREATE
   // statements run. CREATE IF NOT EXISTS would skip the legacy table and leave
   // it without the v2a columns. The rebuild is a no-op for fresh DBs.
   rebuildMemoriesIfLegacy(db)
+  addAgentRunsContextTypeIfMissing(db)
 
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -200,6 +221,14 @@ export function applySchema(db: Database.Database): void {
       worktree_id     TEXT,
       events          TEXT NOT NULL DEFAULT '[]',
       version         INTEGER NOT NULL DEFAULT 0,
+      -- v2a PR 1 Task 3: context_type categorizes the run for memory-write
+      -- gating. Non-primary runs silently drop writes (except delegation_summary)
+      -- in the hook-write rewrite (PR 6). NO DEFAULT at the API layer per
+      -- critical constraint #7; the DB-level DEFAULT 'primary' here is a
+      -- migration-compat backstop for the 29 direct-INSERT call sites — the
+      -- fail-closed enforcement lives in startAgentRun().
+      context_type    TEXT NOT NULL DEFAULT 'primary' CHECK(context_type IN ('primary','subagent','cron','heartbeat','flush')),
+      parent_run_id   TEXT,
       started_at      TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
       completed_at    TEXT,
@@ -207,6 +236,8 @@ export function applySchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_runs_workspace  ON agent_runs(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_runs_context_type ON agent_runs(context_type);
+    CREATE INDEX IF NOT EXISTS idx_runs_parent      ON agent_runs(parent_run_id) WHERE parent_run_id IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_runs_task       ON agent_runs(task_id);
     CREATE INDEX IF NOT EXISTS idx_runs_status     ON agent_runs(status);
     CREATE INDEX IF NOT EXISTS idx_runs_updated    ON agent_runs(updated_at);
@@ -281,6 +312,44 @@ export function applySchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_memories_ws_project_hash   ON memories(workspace_id, project_id, content_hash);
     CREATE INDEX IF NOT EXISTS idx_memories_importance_access ON memories(importance, last_accessed_at);
     CREATE INDEX IF NOT EXISTS idx_memories_session           ON memories(session_id) WHERE session_id IS NOT NULL;
+
+    -- v2a PR 1 Task 4: signal ledger feeding Dreaming promotion (v2b PR 11),
+    -- eviction, and utility scoring. Matches OpenClaw
+    -- short-term-promotion.recordShortTermRecalls.
+    CREATE TABLE IF NOT EXISTS memory_recall_events (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      memory_id       TEXT    NOT NULL,
+      query           TEXT    NOT NULL,
+      score           REAL    NOT NULL,
+      rank            INTEGER NOT NULL,
+      caller_run_id   TEXT,
+      caller_role     TEXT,
+      source          TEXT    NOT NULL,
+      created_at      INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_recall_events_memory ON memory_recall_events (memory_id);
+    CREATE INDEX IF NOT EXISTS idx_recall_events_query  ON memory_recall_events (query, created_at);
+
+    -- v2a PR 1 Task 4: O(log n) backlink traversal for query_memory(linked_to:).
+    -- Dangling links (dst_memory_id IS NULL) are first-class — Dreaming light
+    -- phase reports them in v2b PR 11.
+    CREATE TABLE IF NOT EXISTS memory_wikilinks (
+      src_memory_id TEXT NOT NULL,
+      dst_slug      TEXT NOT NULL,
+      dst_memory_id TEXT,
+      PRIMARY KEY (src_memory_id, dst_slug)
+    );
+    CREATE INDEX IF NOT EXISTS idx_wikilinks_dst    ON memory_wikilinks (dst_slug);
+    CREATE INDEX IF NOT EXISTS idx_wikilinks_dst_id ON memory_wikilinks (dst_memory_id);
+
+    -- v2a PR 1 Task 4: normalized tag store from frontmatter tags arrays.
+    -- Powers tag-filter queries.
+    CREATE TABLE IF NOT EXISTS memory_tags (
+      memory_id TEXT NOT NULL,
+      tag       TEXT NOT NULL,
+      PRIMARY KEY (memory_id, tag)
+    );
+    CREATE INDEX IF NOT EXISTS idx_tags_tag ON memory_tags (tag);
 
     CREATE TABLE IF NOT EXISTS memory_entities (
       memory_id     TEXT NOT NULL REFERENCES memories(memory_id) ON DELETE CASCADE,

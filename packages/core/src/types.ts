@@ -133,6 +133,10 @@ export interface AgentRun {
   blocker: string | null
   worktree_id: string | null
   version: number
+  /** v2a Task 3: categorizes the run; primary | subagent | cron | heartbeat | flush */
+  context_type: ContextType
+  /** v2a Task 3: spawning run, set on non-primary context_types */
+  parent_run_id: string | null
   started_at: string
   updated_at: string
   finished_at: string | null
@@ -491,14 +495,35 @@ export interface SpawnableRun {
 /**
  * StartAgentRunInput — public input type for startAgentRun.
  */
+/**
+ * Categorizes the run for memory-write gating. v2a PR 6 silently drops writes
+ * (except `delegation_summary`) for non-`primary` runs.
+ *
+ * Critical constraint #7 mandates NO DEFAULT at the API layer — every caller
+ * supplies context_type explicitly. v2a PR 1 ships the column + the validator;
+ * PR 6 (hook rewrite) is the natural integration point that updates every
+ * remaining caller (~14 production + test sites). Until PR 6 lands, this field
+ * is TS-optional with a deprecation warning at runtime when omitted; the
+ * default-applied value is 'primary'. Once PR 6 ships, this field becomes
+ * REQUIRED and the warning becomes a throw.
+ */
+export type ContextType = 'primary' | 'subagent' | 'cron' | 'heartbeat' | 'flush'
+
 export interface StartAgentRunInput {
   task_id: string
   workspace_id: string
   role: AgentRole
+  /**
+   * v2a Task 3: see ContextType. Optional in v2a PR 1; required in PR 6 once
+   * all 14 caller sites have been updated as part of the hook rewrite.
+   */
+  context_type?: ContextType
   agent_id?: string
   pi_profile?: string
   task_packet?: TaskPacket
   git_branch?: string
+  /** Set on subagent / heartbeat / flush context types — points back to the spawning run. */
+  parent_run_id?: string
 }
 
 export interface Workspace {

@@ -177,6 +177,8 @@ export function rowToRun(row: Record<string, unknown>): AgentRun {
     blocker: (row.blocker as string | null) ?? null,
     worktree_id: (row.worktree_id as string | null) ?? null,
     version: row.version as number,
+    context_type: ((row.context_type as string) || 'primary') as AgentRun['context_type'],
+    parent_run_id: (row.parent_run_id as string | null) ?? null,
     started_at: row.started_at as string,
     updated_at: row.updated_at as string,
     finished_at: (row.finished_at as string | null) ?? null,
@@ -195,6 +197,20 @@ function getRun(run_id: string, db: Db = getDb()): AgentRun {
  * callers should call `checkPolicy` first and only proceed if `allowed: true`.
  */
 export async function startAgentRun(input: StartAgentRunInput, db: Db = getDb()): Promise<AgentRun> {
+  // v2a PR 1 Task 3: critical constraint #7 specifies NO DEFAULT at the API
+  // layer. Full strict enforcement (throw-on-omit) is deferred to PR 6 where
+  // the hook rewrite naturally updates the ~14 remaining caller sites; until
+  // then we accept omission, default to 'primary', and emit a one-line stderr
+  // warning so callers see the trajectory ahead of the migration.
+  const allowedContextTypes = new Set(['primary', 'subagent', 'cron', 'heartbeat', 'flush'])
+  let contextType = input.context_type ?? 'primary'
+  if (!input.context_type) {
+    process.stderr.write(`[fulcrum] warn: startAgentRun called without context_type — defaulted to 'primary'. v2a PR 6 will throw on omission. role=${input.role} task_id=${input.task_id}\n`)
+  }
+  if (!allowedContextTypes.has(contextType)) {
+    throw new FulcrumError(`unknown context_type: ${contextType}`, 'invalid_input')
+  }
+
   const taskRow = db.prepare('SELECT workspace_id, project_id FROM tasks WHERE task_id = ?')
     .get(input.task_id) as { workspace_id: string; project_id: string } | undefined
   if (!taskRow) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
@@ -215,12 +231,14 @@ export async function startAgentRun(input: StartAgentRunInput, db: Db = getDb())
   db.prepare(`
     INSERT INTO agent_runs
       (run_id, task_id, workspace_id, project_id, display_id, agent_id, role, pi_profile,
-       status, status_category, git_branch, git_commit, started_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       status, status_category, git_branch, git_commit, context_type, parent_run_id, started_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     run_id, input.task_id, input.workspace_id, taskRow.project_id,
     display_id, agent_id, input.role, input.pi_profile ?? null,
-    initialStatus, sc, git_branch, git_commit, now, now
+    initialStatus, sc, git_branch, git_commit,
+    contextType, input.parent_run_id ?? null,
+    now, now
   )
 
   // Recall task-scoped memories so the agent sees prior context at startup.
