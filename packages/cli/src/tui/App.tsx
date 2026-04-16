@@ -44,9 +44,30 @@ interface EventLine {
   isPolicy?: boolean
 }
 
-type Pane = 'board' | 'agents' | 'events' | 'policy'
+interface PmOverview {
+  delivery_health?: {
+    active_work?: number
+    blocked_work?: number
+    blocked_pct?: number
+    open_reviews?: number
+  }
+  issues?: {
+    blocked?: number
+    in_review?: number
+  }
+  plans?: {
+    active?: number
+  }
+  focus?: {
+    blocked_issues?: Array<{ display_id?: string; title?: string }>
+    active_plans?: Array<{ display_id?: string; title?: string }>
+    pending_reviews?: Array<{ review_id?: string; target_type?: string; target_id?: string }>
+  }
+}
 
-const PANE_ORDER: Pane[] = ['board', 'agents', 'events', 'policy']
+type Pane = 'board' | 'agents' | 'events' | 'policy' | 'pm'
+
+const PANE_ORDER: Pane[] = ['board', 'agents', 'events', 'policy', 'pm']
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -255,6 +276,33 @@ function PolicyPane({ blocked, selected, focused }: {
   )
 }
 
+function PmPane({ overview, focused }: {
+  overview: PmOverview | null
+  focused: boolean
+}) {
+  const health = overview?.delivery_health ?? {}
+  const issues = overview?.issues ?? {}
+  const plans = overview?.plans ?? {}
+  const focus = overview?.focus ?? {}
+  const blockedIssues = focus.blocked_issues ?? []
+  const activePlans = focus.active_plans ?? []
+
+  return (
+    <Box borderStyle={focused ? 'double' : 'single'} borderColor={focused ? 'cyan' : 'gray'} flexDirection="column" flexGrow={1}>
+      <Text bold color="gray"> PM Overview</Text>
+      <Text color="cyan"> Active work: <Text color="white">{health.active_work ?? 0}</Text> <Text color="gray">| Blocked: {health.blocked_pct ?? 0}%</Text></Text>
+      <Text color="cyan"> Open reviews: <Text color="white">{health.open_reviews ?? 0}</Text> <Text color="gray">| Active plans: {plans.active ?? 0}</Text></Text>
+      <Text color="cyan"> Blocked issues: <Text color="white">{issues.blocked ?? 0}</Text> <Text color="gray">| In review: {issues.in_review ?? 0}</Text></Text>
+      {blockedIssues.slice(0, 2).map(issue => (
+        <Text key={`${issue.display_id}-${issue.title}`} color="yellow"> {issue.display_id ?? 'issue'} {issue.title ?? ''}</Text>
+      ))}
+      {activePlans.slice(0, 2).map(plan => (
+        <Text key={`${plan.display_id}-${plan.title}`} color="green"> {plan.display_id ?? 'plan'} {plan.title ?? ''}</Text>
+      ))}
+    </Box>
+  )
+}
+
 // ── Main App ───────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -264,6 +312,7 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [runs, setRuns] = useState<AgentRun[]>([])
   const [events, setEvents] = useState<EventLine[]>([])
+  const [pmOverview, setPmOverview] = useState<PmOverview | null>(null)
   const [wsId, setWsId] = useState<string | null>(null)
   const [lastEventTs, setLastEventTs] = useState<string | null>(null)
   const [monitorDown, setMonitorDown] = useState(false)
@@ -280,16 +329,25 @@ export default function App() {
   // Derived
   const blocked = runs.filter(r => r.status === 'blocked')
   const activeRuns = runs.filter(r => ['running', 'waiting', 'starting'].includes(r.status))
-  const paneItems = activePane === 'board' ? tasks : activePane === 'agents' ? runs : activePane === 'policy' ? blocked : events
+  const paneItems = activePane === 'board'
+    ? tasks
+    : activePane === 'agents'
+      ? runs
+      : activePane === 'policy'
+        ? blocked
+        : activePane === 'pm'
+          ? (pmOverview?.focus?.blocked_issues ?? [])
+          : events
   const paneLen = paneItems.length
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
   async function loadData() {
-    const [statusData, tasksData, agentsData] = await Promise.all([
+    const [statusData, tasksData, agentsData, pmData] = await Promise.all([
       fetchJson<{ workspace_id: string | null }>('/status'),
       fetchJson<{ data: Task[] }>('/tasks'),
       fetchJson<{ data: AgentRun[] }>('/agents'),
+      fetchJson<{ data: PmOverview }>('/pm/overview'),
     ])
 
     if (!statusData) {
@@ -309,6 +367,7 @@ export default function App() {
     if (statusData.workspace_id) setWsId(statusData.workspace_id)
     if (tasksData?.data) setTasks(tasksData.data)
     if (agentsData?.data) setRuns(agentsData.data)
+    if (pmData?.data) setPmOverview(pmData.data)
   }
 
   // ── SSE streaming ──────────────────────────────────────────────────────────
@@ -493,6 +552,7 @@ export default function App() {
         <Box flexDirection="column" flexGrow={1}>
           <AgentRuns runs={runs} selected={selected} focused={activePane === 'agents'} />
           <PolicyPane blocked={blocked} selected={selected} focused={activePane === 'policy'} />
+          <PmPane overview={pmOverview} focused={activePane === 'pm'} />
         </Box>
       </Box>
     </Box>

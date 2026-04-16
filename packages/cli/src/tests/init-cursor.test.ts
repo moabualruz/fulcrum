@@ -12,7 +12,7 @@ import * as os from 'os'
 // We import the functions directly (not via CLI spawn) so tests are fast.
 // install.ts exports installCursor / installWindsurf and guards main() with
 // an entry check, so the import side-effect is safe.
-import { installCursor, installWindsurf } from '../../../../agent-integration/install.js'
+import { installCursor, installWindsurf, installCodex, installOpencode } from '../../../../agent-integration/install.js'
 
 let tmpDir: string
 
@@ -161,5 +161,41 @@ describe('installWindsurf()', () => {
     const allOutput = logSpy.mock.calls.map(c => c.join(' ')).join('\n')
     logSpy.mockRestore()
     expect(allOutput).toContain('dry-run')
+  })
+})
+
+describe('installCodex()', () => {
+  it('creates .codex/config.json with correct content', async () => {
+    await installCodex({ dryRun: false, targetDir: tmpDir })
+
+    const configPath = path.join(tmpDir, '.codex', 'config.json')
+    expect(fs.existsSync(configPath)).toBe(true)
+
+    const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
+    const servers = parsed['mcpServers'] as Record<string, unknown>
+    expect(servers['fulcrum']).toMatchObject({
+      command: 'fulcrum',
+      args: ['serve', 'mcp', '--mode', 'filtered'],
+    })
+  })
+})
+
+describe('installOpencode()', () => {
+  it('creates .opencode/config.json and .opencode/opencode.md', async () => {
+    await installOpencode({ dryRun: false, targetDir: tmpDir })
+
+    const configPath = path.join(tmpDir, '.opencode', 'config.json')
+    const docPath = path.join(tmpDir, '.opencode', 'opencode.md')
+
+    expect(fs.existsSync(configPath)).toBe(true)
+    expect(fs.existsSync(docPath)).toBe(true)
+
+    const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
+    const mcp = parsed['mcp'] as Record<string, unknown>
+    expect(mcp['fulcrum']).toBeDefined()
+
+    const content = fs.readFileSync(docPath, 'utf8')
+    expect(content).toContain('Fulcrum Agent OS')
+    expect(content).toContain('opencode')
   })
 })

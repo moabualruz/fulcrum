@@ -373,6 +373,101 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     })
   })
 
+  app.get('/pm/overview', (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+
+    const db = getDb()
+    const count = (sql: string, ...params: unknown[]): number => {
+      const row = db.prepare(sql).get(...params) as { n: number } | undefined
+      return row?.n ?? 0
+    }
+
+    const epics = {
+      total: count(`SELECT COUNT(*) AS n FROM epics WHERE workspace_id = ?`, ws),
+      active: count(`SELECT COUNT(*) AS n FROM epics WHERE workspace_id = ? AND status_category = 'active'`, ws),
+      blocked: count(`SELECT COUNT(*) AS n FROM epics WHERE workspace_id = ? AND status_category = 'blocked'`, ws),
+      done: count(`SELECT COUNT(*) AS n FROM epics WHERE workspace_id = ? AND status_category = 'done'`, ws),
+    }
+
+    const issues = {
+      total: count(`SELECT COUNT(*) AS n FROM issues WHERE workspace_id = ?`, ws),
+      active: count(`SELECT COUNT(*) AS n FROM issues WHERE workspace_id = ? AND status_category = 'active'`, ws),
+      blocked: count(`SELECT COUNT(*) AS n FROM issues WHERE workspace_id = ? AND status_category = 'blocked'`, ws),
+      in_review: count(`SELECT COUNT(*) AS n FROM issues WHERE workspace_id = ? AND status = 'in_review'`, ws),
+      done: count(`SELECT COUNT(*) AS n FROM issues WHERE workspace_id = ? AND status_category = 'done'`, ws),
+    }
+
+    const plans = {
+      total: count(`SELECT COUNT(*) AS n FROM plans WHERE workspace_id = ?`, ws),
+      draft: count(`SELECT COUNT(*) AS n FROM plans WHERE workspace_id = ? AND status = 'draft'`, ws),
+      active: count(`SELECT COUNT(*) AS n FROM plans WHERE workspace_id = ? AND status = 'active'`, ws),
+      completed: count(`SELECT COUNT(*) AS n FROM plans WHERE workspace_id = ? AND status = 'completed'`, ws),
+    }
+
+    const reviews = {
+      pending: count(`SELECT COUNT(*) AS n FROM reviews WHERE workspace_id = ? AND status = 'pending'`, ws),
+      changes_requested: count(`SELECT COUNT(*) AS n FROM reviews WHERE workspace_id = ? AND status = 'changes_requested'`, ws),
+      approved: count(`SELECT COUNT(*) AS n FROM reviews WHERE workspace_id = ? AND status = 'approved'`, ws),
+      rejected: count(`SELECT COUNT(*) AS n FROM reviews WHERE workspace_id = ? AND status = 'rejected'`, ws),
+    }
+
+    const blockers = {
+      tasks: count(`SELECT COUNT(*) AS n FROM tasks WHERE workspace_id = ? AND status_category = 'blocked'`, ws),
+      issues: issues.blocked,
+      runs: count(`SELECT COUNT(*) AS n FROM agent_runs WHERE workspace_id = ? AND status = 'blocked'`, ws),
+    }
+
+    const blockedIssues = db.prepare(`
+      SELECT issue_id, display_id, title, assignee_agent_id, updated_at
+      FROM issues
+      WHERE workspace_id = ? AND status_category = 'blocked'
+      ORDER BY updated_at DESC
+      LIMIT 5
+    `).all(ws)
+
+    const activePlans = db.prepare(`
+      SELECT plan_id, display_id, title, file_path, updated_at
+      FROM plans
+      WHERE workspace_id = ? AND status = 'active'
+      ORDER BY updated_at DESC
+      LIMIT 5
+    `).all(ws)
+
+    const pendingReviews = db.prepare(`
+      SELECT review_id, display_id, target_type, target_id, updated_at
+      FROM reviews
+      WHERE workspace_id = ? AND status = 'pending'
+      ORDER BY updated_at DESC
+      LIMIT 5
+    `).all(ws)
+
+    const activeWork = issues.active + plans.active + epics.active
+    const blockedWork = blockers.tasks + blockers.issues + blockers.runs
+    const blockedPct = activeWork > 0 ? Math.round((blockedWork / (activeWork + blockedWork)) * 100) : 0
+
+    return c.json({
+      data: {
+        epics,
+        issues,
+        plans,
+        reviews,
+        blockers,
+        delivery_health: {
+          active_work: activeWork,
+          blocked_work: blockedWork,
+          blocked_pct: blockedPct,
+          open_reviews: reviews.pending + reviews.changes_requested,
+        },
+        focus: {
+          blocked_issues: blockedIssues,
+          active_plans: activePlans,
+          pending_reviews: pendingReviews,
+        },
+      },
+    })
+  })
+
   app.get('/policy/events', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)

@@ -19,7 +19,7 @@
     #connection-status { margin-left: auto; font-size: 11px; }
     #connection-status.connected { color: var(--green); }
     #connection-status.disconnected { color: var(--red); }
-    main { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; gap: 1px; flex: 1; overflow: hidden; background: var(--border); }
+    main { display: grid; grid-template-columns: 1.2fr 0.8fr; grid-template-rows: auto 1fr 1fr; gap: 1px; flex: 1; overflow: hidden; background: var(--border); }
     .panel { background: var(--bg); overflow: hidden; display: flex; flex-direction: column; }
     .panel-header { background: var(--surface); padding: 8px 12px; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
     .panel-header .count { background: var(--border); border-radius: 10px; padding: 1px 6px; font-size: 10px; }
@@ -69,6 +69,16 @@
     .action-label { flex: 1; font-size: 11px; }
     .action-label strong { color: var(--accent); display: block; }
     .action-label span { color: var(--muted); font-size: 10px; }
+    /* PM dashboard */
+    .pm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+    .pm-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+    .pm-card strong { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin-bottom: 6px; }
+    .pm-metric { font-size: 22px; font-weight: 700; }
+    .pm-sub { color: var(--muted); font-size: 10px; margin-top: 4px; }
+    .pm-list { display: flex; flex-direction: column; gap: 6px; }
+    .pm-row { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; }
+    .pm-row b { color: var(--accent); }
+    .pm-row small { color: var(--muted); display: block; margin-top: 2px; }
     /* Create task form */
     #create-task-form { display: none; padding: 8px; background: var(--surface); border-top: 1px solid var(--border); }
     #create-task-form.visible { display: block; }
@@ -136,6 +146,35 @@
           <button class="btn success" onclick="submitCreateTask()">Create</button>
           <button class="btn" onclick="hideCreateForm()">Cancel</button>
         </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">PM Dashboard</div>
+      <div class="panel-body">
+        <div class="pm-grid">
+          <div class="pm-card">
+            <strong>Active Delivery</strong>
+            <div class="pm-metric" id="pm-active-work">0</div>
+            <div class="pm-sub" id="pm-blocked-pct">0% blocked</div>
+          </div>
+          <div class="pm-card">
+            <strong>Open Reviews</strong>
+            <div class="pm-metric" id="pm-open-reviews">0</div>
+            <div class="pm-sub" id="pm-plans-active">0 active plans</div>
+          </div>
+          <div class="pm-card">
+            <strong>Issues</strong>
+            <div class="pm-metric" id="pm-issues-blocked">0</div>
+            <div class="pm-sub" id="pm-issues-meta">0 in review</div>
+          </div>
+          <div class="pm-card">
+            <strong>Epics</strong>
+            <div class="pm-metric" id="pm-epics-active">0</div>
+            <div class="pm-sub" id="pm-epics-meta">0 total</div>
+          </div>
+        </div>
+        <div class="pm-list" id="pm-focus-list"></div>
       </div>
     </div>
   </main>
@@ -254,6 +293,50 @@
       } catch {}
     }
 
+    // ── PM dashboard ──────────────────────────────────────────────────────────
+    async function refreshPmOverview() {
+      const qs = wsId ? `?workspace_id=${wsId}` : ''
+      try {
+        const r = await fetch(`${BASE}/pm/overview${qs}`)
+        if (!r.ok) return
+        const j = await r.json()
+        const d = j.data || {}
+        const health = d.delivery_health || {}
+        const issues = d.issues || {}
+        const epics = d.epics || {}
+        const plans = d.plans || {}
+        const focus = d.focus || {}
+
+        document.getElementById('pm-active-work').textContent = health.active_work ?? 0
+        document.getElementById('pm-blocked-pct').textContent = `${health.blocked_pct ?? 0}% blocked`
+        document.getElementById('pm-open-reviews').textContent = health.open_reviews ?? 0
+        document.getElementById('pm-plans-active').textContent = `${plans.active ?? 0} active plans`
+        document.getElementById('pm-issues-blocked').textContent = issues.blocked ?? 0
+        document.getElementById('pm-issues-meta').textContent = `${issues.in_review ?? 0} in review`
+        document.getElementById('pm-epics-active').textContent = epics.active ?? 0
+        document.getElementById('pm-epics-meta').textContent = `${epics.total ?? 0} total`
+
+        const blockedIssues = focus.blocked_issues || []
+        const activePlans = focus.active_plans || []
+        const pendingReviews = focus.pending_reviews || []
+        const rows = []
+
+        blockedIssues.slice(0, 2).forEach(issue => {
+          rows.push(`<div class="pm-row"><b>Blocked issue</b> ${esc(issue.title || issue.issue_id || '')}<small>${esc(issue.display_id || '')}</small></div>`)
+        })
+        activePlans.slice(0, 2).forEach(plan => {
+          rows.push(`<div class="pm-row"><b>Active plan</b> ${esc(plan.title || plan.plan_id || '')}<small>${esc(plan.file_path || '')}</small></div>`)
+        })
+        pendingReviews.slice(0, 2).forEach(review => {
+          rows.push(`<div class="pm-row"><b>Pending review</b> ${esc(review.review_id || '')}<small>${esc(review.target_type || '')} → ${esc(review.target_id || '')}</small></div>`)
+        })
+
+        document.getElementById('pm-focus-list').innerHTML = rows.length > 0
+          ? rows.join('')
+          : '<div style="color:var(--muted);padding:4px 0">No active PM hotspots</div>'
+      } catch {}
+    }
+
     // ── Actions ────────────────────────────────────────────────────────────────
     async function unblockRun(runId) {
       try {
@@ -349,6 +432,7 @@
             refreshBoard()
             refreshAgents()
             refreshBlocked()
+            refreshPmOverview()
           }
         } catch {}
       }
@@ -373,11 +457,11 @@
         }
       } catch {}
 
-      await Promise.all([ refreshBoard(), refreshAgents(), refreshBlocked() ])
+      await Promise.all([ refreshBoard(), refreshAgents(), refreshBlocked(), refreshPmOverview() ])
       connectSSE()
 
       // Refresh panels every 10s (for when SSE misses events)
-      setInterval(() => { refreshBoard(); refreshAgents(); refreshBlocked() }, 10000)
+      setInterval(() => { refreshBoard(); refreshAgents(); refreshBlocked(); refreshPmOverview() }, 10000)
     }
 
     // Enter key in create task input

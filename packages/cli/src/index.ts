@@ -6,6 +6,7 @@ import { activateL2 } from '@moabualruz/fulcrum-memory'
 import { runDoctor, printDoctorResults } from './doctor.js'
 import { globalDataDir } from '@moabualruz/fulcrum-core'
 import { discoverPlugins, registerPlugins } from './plugin-discovery.js'
+import { summarizeAdaptiveInstallPlan } from './integration-plan.js'
 
 const [, , ...args] = process.argv
 const [group, command] = args
@@ -90,6 +91,13 @@ PLUGINS
   plugin install <package>            Install plugin from npm registry
   plugin link <path>                  Link a local plugin directory (dev mode)
   plugin remove <package>             Remove a globally-installed plugin
+
+INSTALL
+  install plan                        Show adaptive plugin/extension install plan
+  install plan --json                 Same, as JSON
+  init --adaptive                     Alias for install plan
+  init --cursor | --windsurf          Write project-local rule/config scaffolding
+  init --codex | --opencode           Write project-local config scaffolding
 
 SKILLS
   skills install                      Install bundled skills to ~/.claude/skills/ (Claude Code auto-loads)
@@ -2205,21 +2213,73 @@ ABOUT
 
 async function runInit(): Promise<void> {
   const dryRun = args.includes('--dry-run')
+  const adaptive = args.includes('--adaptive')
   const cursor = args.includes('--cursor')
   const windsurf = args.includes('--windsurf')
+  const codex = args.includes('--codex')
+  const opencode = args.includes('--opencode')
   const global = args.includes('--global')
 
   const targetDir = global ? (process.env['HOME'] ?? process.cwd()) : process.cwd()
 
-  if (!cursor && !windsurf) {
-    console.error('Usage: fulcrum init --cursor | --windsurf [--global] [--dry-run]')
-    process.exit(1)
+  if (adaptive || (!cursor && !windsurf && !codex && !opencode)) {
+    const plan = summarizeAdaptiveInstallPlan({ cwd: process.cwd(), home: process.env['HOME'] })
+    if (args.includes('--json')) {
+      console.log(JSON.stringify(plan, null, 2))
+      return
+    }
+
+    console.log('Adaptive plugin/extension install plan')
+    console.log(`recommended path: ${plan.recommendedPath}`)
+    if (plan.detectedRuntimes.length === 0) {
+      console.log('detected runtimes: none')
+      console.log('fallback: use the CLI-only path, then add agent-specific integrations when you choose a runtime.')
+      return
+    }
+
+    console.log(`detected runtimes: ${plan.detectedRuntimes.join(', ')}`)
+    for (const runtime of plan.runtimes.filter(item => item.detected)) {
+      console.log(`\n- ${runtime.displayName}`)
+      console.log(`  path: ${runtime.installPath}`)
+      console.log(`  supports: ${runtime.supports.join(', ')}`)
+      console.log(`  rationale: ${runtime.rationale}`)
+      for (const step of runtime.nextSteps) console.log(`  next: ${step}`)
+    }
+    return
   }
 
-  const { installCursor, installWindsurf } = await import('../../../agent-integration/install.js')
+  const { installCursor, installWindsurf, installCodex, installOpencode } = await import('../../../agent-integration/install.js')
 
   if (cursor) await installCursor({ dryRun, targetDir })
   if (windsurf) await installWindsurf({ dryRun, targetDir })
+  if (codex) await installCodex({ dryRun, targetDir })
+  if (opencode) await installOpencode({ dryRun, targetDir })
+}
+
+async function runInstall(): Promise<void> {
+  if (command !== 'plan') {
+    console.error('Usage: fulcrum install plan [--json]')
+    process.exit(1)
+  }
+
+  const plan = summarizeAdaptiveInstallPlan({ cwd: process.cwd(), home: process.env['HOME'] })
+  if (args.includes('--json')) {
+    console.log(JSON.stringify(plan, null, 2))
+    return
+  }
+
+  console.log('Adaptive plugin/extension install plan')
+  console.log(`recommended path: ${plan.recommendedPath}`)
+  for (const runtime of plan.runtimes) {
+    console.log(`\n${runtime.detected ? '✓' : '○'} ${runtime.displayName}`)
+    console.log(`  install path: ${runtime.installPath}`)
+    console.log(`  supports: ${runtime.supports.join(', ')}`)
+    console.log(`  applyable here: ${runtime.applyable ? 'yes' : 'no'}`)
+    console.log(`  rationale: ${runtime.rationale}`)
+    if (runtime.detected) {
+      for (const step of runtime.nextSteps) console.log(`  next: ${step}`)
+    }
+  }
 }
 
 // ── Main dispatch ─────────────────────────────────────────────────────────────
@@ -2362,6 +2422,7 @@ OPTIONS (serve mcp-http)
   }
 
   if (group === 'mcp') { await runMcpPlanner(); return }
+  if (group === 'install') { await runInstall(); return }
   if (group === 'tool' || group === 'tools') { await runTool(); return }
   if (group === 'action' || group === 'actions') { await runAction(); return }
 

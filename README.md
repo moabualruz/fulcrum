@@ -48,6 +48,9 @@ npx fulcrum-mcp@latest init   # auto-detect Claude Code / Gemini CLI / Cursor / 
 pnpm run setup:claude     # Claude Code only
 pnpm run setup:gemini     # Gemini CLI only
 pnpm run setup:pi         # PI cockpit only
+fulcrum install plan      # detect plugin/extension/config path per runtime
+fulcrum init --cursor     # project-local Cursor rules + config
+fulcrum init --codex      # project-local Codex config
 pnpm run setup:dry        # Plan the install — show every action without touching disk
 pnpm run setup:check      # Verify an existing install
 ```
@@ -135,6 +138,7 @@ fulcrum doctor --fix             # health check + auto-repair
 | Guide | Contents |
 |-------|----------|
 | [Installation](docs/guides/installation.md) | Global setup, per-runtime install, what gets installed where |
+| [Plugins & Extensions](docs/guides/plugins-and-extensions.md) | Runtime packaging models, adaptive install paths, publishing guidance |
 | [CLI Reference](docs/guides/cli-reference.md) | Full command tree with all flags and examples |
 | [Core API](docs/guides/core-api.md) | Tasks, runs, policy, roles, memory, handoffs, events, locks, DB, janitor, embedding |
 | [Memory System](docs/guides/memory.md) | L0 vault structure, L1 FTS5/RRF scoring, L2 Kuzu graph + HNSW pipeline |
