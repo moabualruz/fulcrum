@@ -1,15 +1,13 @@
 ---
 name: write-decision
 description: Record an architectural or implementation decision to memory
-allowed-tools:
-  - mcp__fulcrum__write_memory
 ---
 
 # Write Decision
 
 When you make a non-obvious decision that future agents should know about:
 
-1. Call `mcp__fulcrum__write_memory` with:
+1. Call `fulcrum action exec write_memory` with:
    - `kind: "decision"`
    - `title`: short, searchable label (e.g. "Use RRF over pure vector search for recall")
    - `content`: full rationale — what options were considered, why this was chosen, what was rejected and why

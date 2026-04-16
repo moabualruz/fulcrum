@@ -103,6 +103,16 @@ TOOL REGISTRY
   tool exec <name> --json <payload>   Execute with JSON payload string
   cat payload.json | tool exec <name> Execute with JSON payload from stdin
 
+ACTION REGISTRY
+  action list                         List canonical actions with CLI/MCP mappings
+  action list --json                  Same, as JSON array
+  action exec <name>                  Execute canonical action with cwd context
+  action exec <name> --json <payload> Execute with inline JSON payload string
+
+MCP PLANNER
+  mcp plan                            Show MCP exposure decisions for a runtime/agent
+  mcp plan --json                     Same, as JSON array with reasons
+
 DIAGNOSTICS
   doctor              Run environment + configuration health checks
   doctor --json       Output checks as JSON
@@ -219,6 +229,28 @@ function optIntArg(flag: string): number | undefined {
   if (v === undefined) return undefined
   const n = parseInt(v, 10)
   return Number.isFinite(n) ? n : undefined
+}
+
+function optArgs(flag: string): string[] {
+  const values: string[] = []
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === flag && args[i + 1]) values.push(args[i + 1] as string)
+  }
+  return values
+}
+
+async function buildExposurePlanFromArgs(): Promise<import('./tool-registry.js').McpExposurePlan> {
+  const { buildMcpExposurePlan } = await import('./tool-registry.js')
+  const profile = optArg('--profile')
+  return buildMcpExposurePlan({
+    mode: (optArg('--mode') as 'full' | 'filtered' | 'minimal' | undefined) ?? 'filtered',
+    profile,
+    agentType: optArg('--agent-type') ?? profile,
+    platform: optArg('--platform'),
+    runtimeCapabilities: optArgs('--runtime-capability'),
+    includeActions: optArgs('--include-action'),
+    excludeActions: optArgs('--exclude-action'),
+  })
 }
 
 function featureNotImplemented(feature: string): never {
@@ -629,6 +661,7 @@ the event shape is inspected at runtime to determine the correct handler.
 // Populated in main() after registerPlugins(); consumed by runServeMcp().
 import type { ToolSchema } from './mcp-tools.js'
 let _pluginAdditionalTools: ToolSchema[] = []
+let _pluginAdditionalActions: Array<{ action_name: string; mcp: ToolSchema }> = []
 
 // ── Monitor auto-start state ──────────────────────────────────────────────────
 // Tracks whether the in-process monitor was already started so runServeMcp()
@@ -699,28 +732,26 @@ fulcrum tool — invoke MCP tools directly without a live MCP server
     return
   }
 
-  const { TOOL_REGISTRY, buildDeps } = await import('./tool-registry.js')
+  const { buildDeps, getRegistryEntry, listActionDefinitions } = await import('./tool-registry.js')
   const ids = currentProjectIds()
   const deps = buildDeps(ids.workspace_id, ids.project_id)
 
   if (sub === 'list') {
-    const { TOOL_SCHEMAS } = await import('./mcp-tools.js')
     const json = args.includes('--json')
+    const actions = listActionDefinitions()
     if (json) {
-      const rows = TOOL_SCHEMAS.map(t => {
-        const entry = TOOL_REGISTRY.get(t.name)
-        return {
-          name: t.name,
-          title: t.title,
-          readOnly: entry?.capabilities.readOnly ?? false,
-          hookEquivalent: entry?.capabilities.hookEquivalent ?? false,
-          destructive: entry?.capabilities.destructive ?? false,
-        }
-      })
+      const rows = actions.map(action => ({
+        name: action.action_name,
+        mcpTool: action.mcp.toolName ?? null,
+        primaryCommand: action.cli.primaryCommand.join(' '),
+        compatibilityCommand: action.cli.compatibilityCommand?.join(' ') ?? null,
+        hookCoverage: action.hooks.coverage,
+      }))
       console.log(JSON.stringify(rows, null, 2))
     } else {
-      const { TOOL_SCHEMAS: schemas } = await import('./mcp-tools.js')
-      const padded = schemas.map(t => `  ${t.name.padEnd(30)} ${t.description.slice(0, 70)}`)
+      const padded = actions.map(action =>
+        `  ${action.action_name.padEnd(30)} ${action.cli.primaryCommand.join(' ')}`,
+      )
       console.log('Available tools:\n' + padded.join('\n'))
     }
     return
@@ -733,7 +764,7 @@ fulcrum tool — invoke MCP tools directly without a live MCP server
       process.exit(1)
     }
 
-    const entry = TOOL_REGISTRY.get(toolName)
+    const entry = getRegistryEntry(toolName)
     if (!entry) {
       console.error(`Unknown tool: ${toolName}`)
       console.error('Run `fulcrum tool list` to see available tools.')
@@ -778,6 +809,93 @@ fulcrum tool — invoke MCP tools directly without a live MCP server
 
   console.error(`Unknown tool subcommand: ${sub}`)
   console.error('Usage: fulcrum tool list | fulcrum tool exec <name>')
+  process.exit(1)
+}
+
+export async function runAction(): Promise<void> {
+  const sub = command
+
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(`
+fulcrum action — invoke canonical Fulcrum actions directly
+
+  fulcrum action list [--json]           List canonical actions and mappings
+  fulcrum action exec <name>             Execute action with cwd context (reads stdin for payload)
+  fulcrum action exec <name> --json <p>  Execute with inline JSON payload string
+`)
+    return
+  }
+
+  const { buildDeps, getActionDefinition, getRegistryEntry, listActionDefinitions } = await import('./tool-registry.js')
+  const ids = currentProjectIds()
+  const deps = buildDeps(ids.workspace_id, ids.project_id)
+
+  if (sub === 'list') {
+    const actions = listActionDefinitions()
+    if (args.includes('--json')) {
+      console.log(JSON.stringify(actions, null, 2))
+    } else {
+      const rows = actions.map(action =>
+        `  ${action.action_name.padEnd(30)} ${action.cli.primaryCommand.join(' ')}`
+      )
+      console.log('Available actions:\n' + rows.join('\n'))
+    }
+    return
+  }
+
+  if (sub === 'exec') {
+    const actionName = args[2]
+    if (!actionName || actionName.startsWith('--')) {
+      console.error('Usage: fulcrum action exec <action-name> [--json <payload>]')
+      process.exit(1)
+    }
+
+    const action = getActionDefinition(actionName)
+    const entry = getRegistryEntry(actionName)
+    if (!action || !entry) {
+      console.error(`Unknown action: ${actionName}`)
+      console.error('Run `fulcrum action list` to see available actions.')
+      process.exit(1)
+    }
+
+    let actionArgs: Record<string, unknown> = {}
+    const jsonFlagIdx = args.indexOf('--json')
+    if (jsonFlagIdx !== -1 && jsonFlagIdx < args.length - 1) {
+      try {
+        actionArgs = JSON.parse(args[jsonFlagIdx + 1]!) as Record<string, unknown>
+      } catch (err) {
+        console.error(`Invalid JSON payload: ${(err as Error).message}`)
+        process.exit(1)
+      }
+    } else if (!process.stdin.isTTY) {
+      const chunks: Buffer[] = []
+      for await (const chunk of process.stdin) chunks.push(chunk as Buffer)
+      const raw = Buffer.concat(chunks).toString('utf8').trim()
+      if (raw) {
+        try {
+          actionArgs = JSON.parse(raw) as Record<string, unknown>
+        } catch (err) {
+          console.error(`Invalid JSON from stdin: ${(err as Error).message}`)
+          process.exit(1)
+        }
+      }
+    }
+
+    try {
+      const result = await entry.handler(actionArgs, deps)
+      console.log(JSON.stringify({
+        action: action.action_name,
+        result,
+      }, null, 2))
+    } catch (err) {
+      console.error(JSON.stringify({ error: (err as Error).message, action: action.action_name }))
+      process.exit(1)
+    }
+    return
+  }
+
+  console.error(`Unknown action subcommand: ${sub}`)
+  console.error('Usage: fulcrum action list | fulcrum action exec <name>')
   process.exit(1)
 }
 
@@ -832,7 +950,7 @@ function registerOtelShutdown(): void {
 
 async function runServeMcp(): Promise<void> {
   const { getDb, runMigrations, loadConfig, startSpan, endSpan } = await import('@moabualruz/fulcrum-core')
-  const { TOOL_REGISTRY, buildDeps, buildProfileFilter } = await import('./tool-registry.js')
+  const { TOOL_REGISTRY, buildDeps } = await import('./tool-registry.js')
 
   const config = loadConfig()
   const db = getDb()
@@ -877,12 +995,7 @@ async function runServeMcp(): Promise<void> {
   // Silence unused variable warning — config is used below for workspace auto-init
   void config
 
-  // ── Profile filter ────────────────────────────────────────────────────────
-  // --profile hook-only  → strip the 3 hookEquivalent tools (Claude Code hooks cover them)
-  // --profile <role>     → enforce agent_definitions tools_allow / tools_deny
-  const profileIdx = args.indexOf('--profile')
-  const profile = profileIdx !== -1 ? args[profileIdx + 1] : undefined
-  const profileFilter = profile ? await buildProfileFilter(profile) : undefined
+  const exposurePlan = await buildExposurePlanFromArgs()
 
   // ── Auto-start monitor ────────────────────────────────────────────────────
   // Start the HTTP monitor in-process alongside the MCP stdio server unless:
@@ -915,9 +1028,46 @@ async function runServeMcp(): Promise<void> {
   await runFulcrumMcpServer({
     version: '0.0.1',
     handleToolCall: handleToolCallWithSpan,
-    ...(profileFilter ? { filter: profileFilter } : {}),
+    filter: exposurePlan.filter,
     additionalTools: _pluginAdditionalTools,
   })
+}
+
+async function runMcpPlanner(): Promise<void> {
+  if (command === '--help' || command === '-h') {
+    console.log(`
+fulcrum mcp — MCP exposure planning and compatibility utilities
+
+  fulcrum mcp plan [--json]
+  fulcrum mcp plan --mode <full|filtered|minimal>
+  fulcrum mcp plan --profile <role|hook-only>
+  fulcrum mcp plan --agent-type <role>
+  fulcrum mcp plan --platform <platform>
+  fulcrum mcp plan --runtime-capability <cap>
+  fulcrum mcp plan --include-action <action>
+  fulcrum mcp plan --exclude-action <action>
+`)
+    return
+  }
+
+  if (command !== 'plan') {
+    console.error(`Unknown mcp command: ${command}`)
+    console.error('Usage: fulcrum mcp plan [--json]')
+    process.exit(1)
+  }
+
+  const plan = await buildExposurePlanFromArgs()
+
+  if (args.includes('--json')) {
+    console.log(JSON.stringify(plan.decisions, null, 2))
+    return
+  }
+
+  const lines = plan.decisions.map(decision => {
+    const status = decision.exposed ? 'expose' : 'hide'
+    return `${status.padEnd(7)} ${decision.toolName.padEnd(28)} ${decision.reasons.join(', ')}`
+  })
+  console.log(lines.join('\n'))
 }
 
 async function runServeMcpHttp(): Promise<void> {
@@ -936,6 +1086,7 @@ async function runServeMcpHttp(): Promise<void> {
   const ids = currentProjectIds()
   const deps = buildDeps(ids.workspace_id, ids.project_id)
   void db  // used via deps.db; suppress unused-var lint
+  const exposurePlan = await buildExposurePlanFromArgs()
 
   const portArg = args.find(a => a.startsWith('--port'))
   let port = 4722
@@ -965,7 +1116,13 @@ async function runServeMcpHttp(): Promise<void> {
     }
   }
 
-  await runFulcrumMcpHttpServer({ version: '0.0.1', handleToolCall: handleToolCallWithSpan, port })
+  await runFulcrumMcpHttpServer({
+    version: '0.0.1',
+    handleToolCall: handleToolCallWithSpan,
+    filter: exposurePlan.filter,
+    additionalTools: _pluginAdditionalTools,
+    port,
+  })
 }
 
 async function runServeMonitor(): Promise<void> {
@@ -2074,6 +2231,12 @@ async function main(): Promise<void> {
     const plugins = discoverPlugins(process.cwd())
     const registration = registerPlugins(plugins)
     _pluginAdditionalTools = registration.additionalTools ?? []
+    _pluginAdditionalActions = (registration.additionalActions ?? []).map(action => ({
+      action_name: action.action_name,
+      mcp: action.mcp,
+    }))
+    const { setAdditionalActionDefinitions } = await import('./tool-registry.js')
+    setAdditionalActionDefinitions(_pluginAdditionalActions)
     for (const hookModulePath of registration.hookModules) {
       await import(hookModulePath)
     }
@@ -2135,15 +2298,25 @@ async function main(): Promise<void> {
 fulcrum serve — long-running servers
 
   fulcrum serve mcp          Start MCP server (stdio JSON-RPC 2.0) — 23 control tools
-  fulcrum serve mcp-http     Start MCP server (StreamableHTTP, default port 4722) [--port <n>]
+  fulcrum serve mcp-http     Start MCP server (StreamableHTTP, default port 4722) [planner flags] [--port <n>]
   fulcrum serve monitor      Start HTTP monitor + control API [--port <n>]
   fulcrum serve all          Start both MCP and monitor servers
 
 OPTIONS (serve mcp)
-  --profile hook-only        Strip the 3 hook-equivalent tools (recall_memory, write_memory,
-                             get_current_context) — recommended for Claude Code with hooks
-  --profile <role>           Enforce agent_definitions tools_allow / tools_deny for <role>
+  --mode <full|filtered|minimal>
+                             Choose MCP exposure strategy (default: filtered)
+  --profile hook-only        Compatibility shortcut for hook-capable runtimes
+  --profile <role>           Apply role policy from agent_definitions
+  --agent-type <role>        Filter by agent type / min-role metadata
+  --platform <name>          Filter by runtime platform metadata
+  --runtime-capability <c>   Filter by runtime capability (repeatable, e.g. hooks)
+  --include-action <name>    Force-include a canonical action (repeatable)
+  --exclude-action <name>    Force-hide a canonical action (repeatable)
   --no-monitor               Skip auto-starting the HTTP monitor alongside the MCP server
+
+OPTIONS (serve mcp-http)
+  Same planner flags as serve mcp, plus:
+  --port <n>                 HTTP port for the StreamableHTTP endpoint (default: 4722)
 `)
       process.exit(0)
     }
@@ -2188,7 +2361,9 @@ OPTIONS (serve mcp)
     process.exit(1)
   }
 
+  if (group === 'mcp') { await runMcpPlanner(); return }
   if (group === 'tool' || group === 'tools') { await runTool(); return }
+  if (group === 'action' || group === 'actions') { await runAction(); return }
 
   if (group === 'workspaces') { await runWorkspaces(); return }
   if (group === 'projects') { await runProjects(); return }

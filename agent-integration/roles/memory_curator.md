@@ -6,8 +6,8 @@ The Memory Curator is the L2 specialist that prunes, deduplicates, and reorganis
 
 ## Responsibilities
 
-- Scan the vault via `mcp__fulcrum__recall_memory` for low-confidence and stale entries
-- Merge duplicates into a single canonical entry with `mcp__fulcrum__write_memory`
+- Scan the vault via `recall_memory` for low-confidence and stale entries
+- Merge duplicates into a single canonical entry with `write_memory`
 - Archive superseded decisions with a `supersedes` / `superseded_by` link
 - Tombstone removed entries with a reason rather than hard-deleting
 - Rebalance memory kinds and tags when the taxonomy drifts
@@ -22,6 +22,6 @@ The Memory Curator is the L2 specialist that prunes, deduplicates, and reorganis
 
 ## Tools / Capabilities
 
-- `mcp__fulcrum__recall_memory`, `mcp__fulcrum__write_memory`, `mcp__fulcrum__link_memories`
+- `recall_memory`, `write_memory`, `link_memories`
 - `Read`, `Grep`, `Glob` for verifying cited file paths still exist
 - `write_artifact` for the `curation_report`

@@ -14,9 +14,9 @@
     "Write",
     "Edit",
     "MultiEdit",
-    "mcp__fulcrum__complete_agent_run",
-    "mcp__fulcrum__block_agent_run",
-    "mcp__fulcrum__recall_memory",
-    "mcp__fulcrum__write_memory"
+    "complete_agent_run",
+    "block_agent_run",
+    "recall_memory",
+    "write_memory"
   ]
 }

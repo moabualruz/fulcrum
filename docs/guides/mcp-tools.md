@@ -1,37 +1,63 @@
 # MCP Tools Reference
 
-The MCP server (`fulcrum serve mcp`) exposes 23 tools over stdio JSON-RPC 2.0. All tool names are prefixed `mcp__fulcrum__` when used from Claude Code.
+Fulcrum is CLI-first: canonical actions are the primary contract, and MCP is a compatibility transport. Use `fulcrum action exec <action>` for skills, hooks, CI, and internal automation. Use `fulcrum serve mcp` or `fulcrum serve mcp-http` when a runtime needs an MCP tool surface.
+
+The built-in MCP compatibility catalog contains 23 tools. The active exposed subset depends on planner mode, runtime capabilities, platform, and agent type. In Claude Code these appear with the `mcp__fulcrum__` prefix.
 
 ```bash
-fulcrum serve mcp                              # all 23 tools (stdio)
-fulcrum serve mcp --profile hook-only          # 20 tools — strips hook-covered tools (recommended for Claude Code)
-fulcrum serve mcp --profile software_engineer  # role-gated surface
-fulcrum serve mcp-http                         # HTTP StreamableHTTP (default port 4722)
+fulcrum action exec list_tasks --json '{"status":"open"}'
+fulcrum serve mcp --mode filtered --runtime-capability hooks
+fulcrum serve mcp --profile software_engineer
+fulcrum serve mcp-http --mode minimal --agent-type software_engineer
 fulcrum serve all                              # MCP + HTTP monitor (default port 4721)
 ```
 
-### MCP filtering with `--profile`
+### MCP exposure planning
 
-Two filtering modes are available:
+MCP exposure is computed from the canonical action metadata. The default preference order is:
 
-| Profile | Effect |
-|---------|--------|
-| `hook-only` | Removes the 3 hook-equivalent tools (`recall_memory`, `write_memory`, `get_current_context`). Claude Code's hooks already handle these in-process — serving them via MCP wastes context. Serves 20 tools. |
-| `<role-slug>` | Enforces the role's `tools_allow` / `tools_deny` lists from `agent_definitions`. Falls back to all tools if the role definition is not found (warns to stderr). |
+1. native hooks
+2. CLI actions
+3. MCP compatibility tools
 
-**Recommendation for Claude Code:** add `--profile hook-only` to your MCP server config to eliminate ~3 redundant tools and reduce initial context overhead.
+Use `fulcrum mcp plan` to inspect the exact tool surface a runtime would receive:
+
+```bash
+fulcrum mcp plan --mode filtered --runtime-capability hooks
+fulcrum mcp plan --mode minimal --agent-type software_engineer --json
+```
+
+Key planner inputs:
+
+| Flag | Effect |
+|------|--------|
+| `--mode full` | Expose the full MCP compatibility surface |
+| `--mode filtered` | Hide tools ruled out by hooks, policy, runtime, and action metadata |
+| `--mode minimal` | Prefer hook/CLI paths and expose only the narrower compatibility subset still needed |
+| `--profile hook-only` | Compatibility shortcut for hook-capable runtimes |
+| `--profile <role>` | Apply role policy from `agent_definitions` |
+| `--agent-type <role>` | Filter by action availability metadata |
+| `--runtime-capability <cap>` | Add runtime capability facts such as `hooks` |
+| `--include-action <name>` | Force-include a canonical action |
+| `--exclude-action <name>` | Force-hide a canonical action |
+
+**Recommendation for Claude Code:** use `fulcrum serve mcp --mode filtered --runtime-capability hooks` or the compatibility shortcut `--profile hook-only` to remove the 3 hook-covered tools from the prompt surface.
+
+Hook coverage is platform-aware. Example: `get_current_context` is hook-covered for Claude session bootstrap, but not for every other runtime, so `fulcrum mcp plan --mode filtered --runtime-capability hooks --platform gemini` still exposes it.
 
 ### Calling tools without MCP
 
-Every tool implementation is also callable directly from the CLI (no live MCP server required):
+Every built-in action is callable directly from the CLI (no live MCP server required):
 
 ```bash
-fulcrum tool exec list_tasks --json '{"status":"open"}'
-fulcrum tool exec get_workspace_status
-echo '{"title":"Implement auth"}' | fulcrum tool exec create_task
+fulcrum action exec list_tasks --json '{"status":"open"}'
+fulcrum action exec get_workspace_status
+echo '{"title":"Implement auth"}' | fulcrum action exec create_task
 ```
 
-This is the recommended path for hooks, CI pipelines, and non-hook platforms (Gemini CLI, PI).
+`fulcrum tool exec <name>` remains available as a compatibility alias over the same handler path.
+
+The CLI path is the recommended execution path for hooks, CI pipelines, skills, and non-MCP platforms (Gemini CLI, PI, shell scripts).
 
 **Annotations**: every tool carries machine-readable hints.
 
@@ -335,7 +361,7 @@ Reads live status of an agent run.
 
 Returns the `workspace_id` and `project_id` for the directory the MCP server was started from. IDs are computed deterministically from the absolute path — no `.fulcrum.json` file is read, and two agents in the same checkout always get the same IDs.
 
-Also returns a `readiness` object that reports how many tools are available, whether the monitor HTTP server is reachable, and the suggested first call for an agent that has just started.
+Also returns a `readiness` object that reports how many tools are currently exposed, whether the monitor HTTP server is reachable, and the suggested first canonical action for an agent that has just started.
 
 **Annotations:** read-only, idempotent
 
@@ -349,13 +375,15 @@ No parameters.
   "project_id":   "proj_xyz456",
   "cwd":          "/home/user/myproject",
   "readiness": {
-    "tools_available":   23,
+    "tools_available":   12,
     "monitor_url":       "http://localhost:4721",
     "monitor_running":   true,
-    "suggested_next_call": "mcp__fulcrum__list_tasks"
+    "suggested_next_call": "list_tasks"
   }
 }
 ```
+
+When the MCP server is started in compatibility-heavy mode, `tools_available` may be larger. In planner-driven filtered mode, it reflects the active exposed subset for that runtime.
 
 `monitor_running` is probed with a 200 ms HTTP timeout and the result is cached for 15 seconds. Set `FULCRUM_MONITOR_PORT` to override the default port (4721). Set `FULCRUM_NO_MONITOR=1` to skip the probe entirely.
 

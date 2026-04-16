@@ -25,4 +25,4 @@ The ML Engineer is the L2 specialist that trains and evaluates machine learning 
 - `Read`, `Write`, `Edit`, `NotebookEdit`
 - `Bash` and `run_script` for training and evaluation jobs
 - `Grep`, `Glob`, `search_codebase`
-- `mcp__fulcrum__write_memory` for experiment notes
+- `write_memory` for experiment notes

@@ -30,8 +30,8 @@ export interface FulcrumPluginManifest {
   skills?: string
   /** Directory (relative to package root) containing agent MD files */
   agents?: string
-  /** Path (relative to package root) to a JSON file exporting ToolSchema[] */
-  tools?: string
+  /** Path (relative to package root) to a JSON file exporting PluginActionManifest[] */
+  actions?: string
   /** Settings/secrets this plugin requires. Shown during install; read from env vars at runtime. */
   settings?: PluginSetting[]
 }
@@ -40,6 +40,13 @@ export interface DiscoveredPlugin {
   name: string
   root: string
   manifest: FulcrumPluginManifest
+}
+
+export interface PluginActionManifest {
+  action_name: string
+  title: string
+  description: string
+  mcp: ToolSchema
 }
 
 // ---------- Discovery ----------
@@ -126,6 +133,7 @@ export interface PluginRegistration {
   skills: Array<{ name: string; path: string }>
   agents: Array<{ name: string; path: string }>
   hookModules: string[]
+  additionalActions: PluginActionManifest[]
   additionalTools: ToolSchema[]
 }
 
@@ -134,7 +142,7 @@ export interface PluginRegistration {
  * Callers can then load the hook modules and merge skills/agents into the CLI context.
  */
 export function registerPlugins(plugins: DiscoveredPlugin[]): PluginRegistration {
-  const registration: PluginRegistration = { skills: [], agents: [], hookModules: [], additionalTools: [] }
+  const registration: PluginRegistration = { skills: [], agents: [], hookModules: [], additionalActions: [], additionalTools: [] }
 
   for (const plugin of plugins) {
     const { root, manifest } = plugin
@@ -171,15 +179,22 @@ export function registerPlugins(plugins: DiscoveredPlugin[]): PluginRegistration
       }
     }
 
-    if (manifest.tools) {
-      const toolsPath = resolve(root, manifest.tools)
+    if (manifest.actions) {
+      const actionsPath = resolve(root, manifest.actions)
       try {
-        const raw = readFileSync(toolsPath, 'utf8')
-        const parsed = JSON.parse(raw) as ToolSchema[]
-        registration.additionalTools.push(...parsed)
+        const raw = readFileSync(actionsPath, 'utf8')
+        const parsed = JSON.parse(raw) as PluginActionManifest[]
+        for (const action of parsed) {
+          registration.additionalActions.push(action)
+          registration.additionalTools.push(action.mcp)
+        }
       } catch (err) {
-        process.stderr.write(`[fulcrum] Plugin ${plugin.name}: failed to load tools from ${manifest.tools}: ${(err as Error).message}\n`)
+        process.stderr.write(`[fulcrum] Plugin ${plugin.name}: failed to load actions from ${manifest.actions}: ${(err as Error).message}\n`)
       }
+    } else if ((manifest as { tools?: string }).tools) {
+      process.stderr.write(
+        `[fulcrum] Plugin ${plugin.name}: manifest.tools is no longer supported; register canonical actions via manifest.actions instead.\n`,
+      )
     }
   }
 

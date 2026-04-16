@@ -1,8 +1,6 @@
 ---
 name: recall-before-writing
 description: Query the Fulcrum memory layer before writing new code, docs, or architectural decisions. Applies whenever you are about to produce novel output on a topic the project may have prior context on.
-allowed-tools:
-  - mcp__fulcrum__recall_memory
 ---
 
 # Recall memory before writing
@@ -10,7 +8,7 @@ allowed-tools:
 Fulcrum's L2 memory layer stores prior decisions, task outcomes, and lessons
 learned. Skipping it means reinventing the wheel — or, worse, contradicting
 a decision a previous agent already made. Always call
-`mcp__fulcrum__recall_memory` before producing novel output.
+`fulcrum action exec recall_memory` before producing novel output.
 
 ## When to apply
 
@@ -27,7 +25,7 @@ a decision a previous agent already made. Always call
 Call the MCP tool with a short list of search terms drawn from the task goal:
 
 ```
-mcp__fulcrum__recall_memory
+fulcrum action exec recall_memory
   workspace_id: (same workspace as your run)
   query:        "plain english description of what you are about to do"
   limit:        5 or 10

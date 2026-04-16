@@ -1,13 +1,11 @@
 ---
 name: complete-agent-run
 description: Finalize an agent run with a meaningful summary and changed-file list. Applies whenever you finish work, hand off, or are about to stop responding on a run you started.
-allowed-tools:
-  - mcp__fulcrum__complete_agent_run
 ---
 
 # Complete agent runs with a real summary
 
-When you finish work, call `mcp__fulcrum__complete_agent_run` with the
+When you finish work, call `fulcrum action exec complete_agent_run` with the
 `run_id` returned by `start_agent_run`. Do not just say "done" and exit —
 the summary you pass is persisted as a `task_outcome` memory and is the
 primary signal the chief-of-staff uses to decide what happens next.
@@ -23,15 +21,14 @@ primary signal the chief-of-staff uses to decide what happens next.
 
 ## How
 
-```
-mcp__fulcrum__complete_agent_run
-  run_id:        (from start_agent_run)
-  output_summary: (1-3 paragraphs — see below)
-  files_changed: ["packages/core/src/memory/recall.ts", ...]
-  tests_passed:  91
-  tests_failed:  0
-  pr_url:        "https://github.com/.../pull/42" (if applicable)
-  artifacts:     [{ kind: "test_report", path: "..." }, ...]
+```bash
+fulcrum action exec complete_agent_run --json '{
+  "run_id": "run_123",
+  "output_summary": "What changed and why.",
+  "files_changed": ["packages/core/src/memory/recall.ts"],
+  "tests_passed": 91,
+  "tests_failed": 0
+}'
 ```
 
 ### What belongs in `output_summary`

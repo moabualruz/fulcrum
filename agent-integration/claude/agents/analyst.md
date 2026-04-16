@@ -10,18 +10,18 @@ tools:
     - Grep
     - Bash
     - LS
-    - mcp__fulcrum__list_tasks
-    - mcp__fulcrum__create_task
-    - mcp__fulcrum__update_task
-    - mcp__fulcrum__recall_memory
-    - mcp__fulcrum__write_memory
-    - mcp__fulcrum__start_agent_run
-    - mcp__fulcrum__heartbeat_agent_run
-    - mcp__fulcrum__complete_agent_run
-    - mcp__fulcrum__block_agent_run
-    - mcp__fulcrum__get_agent_run_status
-    - mcp__fulcrum__get_workspace_status
-    - mcp__fulcrum__build_cos_context
+    - list_tasks
+    - create_task
+    - update_task
+    - recall_memory
+    - write_memory
+    - start_agent_run
+    - heartbeat_agent_run
+    - complete_agent_run
+    - block_agent_run
+    - get_agent_run_status
+    - get_workspace_status
+    - build_cos_context
   denied:
     - Write
     - Edit
@@ -52,5 +52,5 @@ The Analyst is the L2 read-only specialist that turns raw workspace data — tas
 
 - `Read`, `Grep`, `Glob`
 - HTTP access to the monitor endpoints
-- `mcp__fulcrum__recall_memory`, `mcp__fulcrum__write_memory` (summary kind only)
+- `recall_memory`, `write_memory` (summary kind only)
 - `write_artifact` for comparison matrices and analysis reports

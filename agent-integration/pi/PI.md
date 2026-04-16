@@ -89,17 +89,30 @@ goal: string (required) — the planning goal for this CoS invocation
 
 ---
 
-## MCP Tools (fallback without cockpit)
+## CLI-First Execution
 
-If the cockpit is not installed, use MCP tools via the `fulcrum serve mcp` stdio server.
-In PI, MCP tool names use the `mcp__fulcrum__` prefix.
+Prefer native cockpit tools when installed. If a capability is not available through
+the cockpit, prefer the CLI contract:
 
-All 13 MCP tools are available: `mcp__fulcrum__list_tasks`, `mcp__fulcrum__create_task`,
-`mcp__fulcrum__update_task`, `mcp__fulcrum__recall_memory`, `mcp__fulcrum__write_memory`,
-`mcp__fulcrum__list_agent_profiles`, `mcp__fulcrum__get_agent_run_status`,
-`mcp__fulcrum__start_agent_run`, `mcp__fulcrum__heartbeat_agent_run`,
-`mcp__fulcrum__complete_agent_run`, `mcp__fulcrum__block_agent_run`,
-`mcp__fulcrum__build_cos_context`, `mcp__fulcrum__get_workspace_status`
+- `fulcrum action exec list_tasks`
+- `fulcrum action exec create_task`
+- `fulcrum action exec update_task`
+- `fulcrum action exec recall_memory`
+- `fulcrum action exec write_memory`
+- `fulcrum action exec list_agent_profiles`
+- `fulcrum action exec get_agent_run_status`
+- `fulcrum action exec start_agent_run`
+- `fulcrum action exec heartbeat_agent_run`
+- `fulcrum action exec complete_agent_run`
+- `fulcrum action exec block_agent_run`
+- `fulcrum action exec build_cos_context`
+- `fulcrum action exec get_workspace_status`
+
+## MCP Tools (compatibility fallback without cockpit or CLI integration)
+
+If the cockpit is not installed and the runtime requires MCP-native execution,
+use the `fulcrum serve mcp` stdio server. In PI, MCP tool names use the
+`mcp__fulcrum__` prefix as a transport-level compatibility detail.
 
 ---
 

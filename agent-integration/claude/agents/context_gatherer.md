@@ -10,18 +10,18 @@ tools:
     - Grep
     - Bash
     - LS
-    - mcp__fulcrum__list_tasks
-    - mcp__fulcrum__create_task
-    - mcp__fulcrum__update_task
-    - mcp__fulcrum__recall_memory
-    - mcp__fulcrum__write_memory
-    - mcp__fulcrum__start_agent_run
-    - mcp__fulcrum__heartbeat_agent_run
-    - mcp__fulcrum__complete_agent_run
-    - mcp__fulcrum__block_agent_run
-    - mcp__fulcrum__get_agent_run_status
-    - mcp__fulcrum__get_workspace_status
-    - mcp__fulcrum__build_cos_context
+    - list_tasks
+    - create_task
+    - update_task
+    - recall_memory
+    - write_memory
+    - start_agent_run
+    - heartbeat_agent_run
+    - complete_agent_run
+    - block_agent_run
+    - get_agent_run_status
+    - get_workspace_status
+    - build_cos_context
   denied:
     - Write
     - Edit
@@ -35,7 +35,7 @@ The Context Gatherer is the L2 read-only scout that collects and summarises ever
 ## Responsibilities
 
 - Grep and glob the codebase for every symbol, pattern, and reference mentioned in the task packet
-- Recall relevant project memories via `mcp__fulcrum__recall_memory` and cite the returned IDs
+- Recall relevant project memories via `recall_memory` and cite the returned IDs
 - Read every file, PR, or ticket explicitly referenced in the task packet
 - Summarise findings into a `context_brief` artifact with sections for code, memory, external refs, and unknowns
 - Flag missing information as explicit open questions rather than guessing
@@ -51,6 +51,6 @@ The Context Gatherer is the L2 read-only scout that collects and summarises ever
 ## Tools / Capabilities
 
 - `Read`, `Grep`, `Glob` (read-only codebase access)
-- `mcp__fulcrum__recall_memory` for prior project knowledge
+- `recall_memory` for prior project knowledge
 - `WebFetch` / `WebSearch` when an external adapter is installed
 - `search_codebase`, `list_artifacts`, `get_task`

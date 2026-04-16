@@ -6,7 +6,13 @@ This file is auto-loaded by Gemini CLI. It configures your connection to the Ful
 
 ## MCP Server
 
-The `fulcrum` MCP server exposes 13 tools for task management, memory, agent runs, and workspace context. It runs as a local stdio process via the `fulcrum serve mcp` command.
+Fulcrum is CLI-first. Use `fulcrum action exec <action>` as the standard path in skills and automation; use the `fulcrum` MCP server only when Gemini needs an MCP tool surface. It runs as a local stdio process via `fulcrum serve mcp`, and its exposed tool set can be filtered per runtime or agent.
+
+Recommended Gemini MCP command when the BeforeTool / AfterTool hooks are installed:
+
+```bash
+fulcrum serve mcp --mode filtered --runtime-capability hooks
+```
 
 Start the HTTP monitor (optional, for dashboard/debugging):
 ```
@@ -151,11 +157,13 @@ workspace_id: string (required)
 
 When operating as part of a Fulcrum-managed workflow:
 
-1. **On session start**: Call `mcp_fulcrum_get_workspace_status` to understand current state
-2. **Before working on a task**: Call `mcp_fulcrum_start_agent_run` with your role and task_id
-3. **During long tasks**: Call `mcp_fulcrum_heartbeat_agent_run` every few minutes
-4. **When blocked**: Call `mcp_fulcrum_block_agent_run` with a clear reason
-5. **On completion**: Call `mcp_fulcrum_complete_agent_run` with summary and artifact paths
+1. **On session start**: Call `fulcrum action exec get_workspace_status` to understand current state
+2. **Before working on a task**: Call `fulcrum action exec start_agent_run` with your role and task_id
+3. **During long tasks**: Call `fulcrum action exec heartbeat_agent_run` every few minutes
+4. **When blocked**: Call `fulcrum action exec block_agent_run` with a clear reason
+5. **On completion**: Call `fulcrum action exec complete_agent_run` with summary and artifact paths
+
+If Gemini is invoking Fulcrum through MCP-native tools instead of shell commands, use the equivalent `mcp_fulcrum_*` tools from the catalog above.
 
 ---
 
@@ -164,12 +172,12 @@ When operating as part of a Fulcrum-managed workflow:
 **`chief_of_staff`** (L1 — orchestration only):
 - MUST NOT write code, edit files, or run builds
 - Creates tasks, delegates to specialist roles, synthesizes results
-- Uses `mcp_fulcrum_build_cos_context` to orient before every session
+- Uses `fulcrum action exec build_cos_context` to orient before every session
 - Allowed to create and invoke teams (only L1 role with this permission)
 
 **All other roles** (L2 — implementation):
 - MUST NOT invoke teams or create sub-orchestration workflows
-- Focus on the assigned task; complete and report via `mcp_fulcrum_complete_agent_run`
+- Focus on the assigned task; complete and report via `fulcrum action exec complete_agent_run`
 
 ---
 

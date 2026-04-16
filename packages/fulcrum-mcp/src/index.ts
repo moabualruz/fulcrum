@@ -102,34 +102,43 @@ async function runInit(initArgs: string[]): Promise<void> {
     return
   }
 
-  // ── MCP config template ─────────────────────────────────────────────────────
-  const mcpEntry = {
+  // ── MCP config templates ────────────────────────────────────────────────────
+  const defaultMcpEntry = {
     mcpServers: {
       fulcrum: {
         command: 'npx',
-        args: ['-y', 'fulcrum-mcp'],
+        args: ['-y', 'fulcrum-mcp', 'serve', 'mcp', '--mode', 'filtered'],
+      },
+    },
+  }
+
+  const hookAwareMcpEntry = {
+    mcpServers: {
+      fulcrum: {
+        command: 'npx',
+        args: ['-y', 'fulcrum-mcp', 'serve', 'mcp', '--mode', 'filtered', '--runtime-capability', 'hooks'],
       },
     },
   }
 
   // ── Fulcrum context block (rules / CLAUDE.md) ───────────────────────────────
-  const fulcrumContextBlock = `
-# Fulcrum Agent OS — MCP Integration
+const fulcrumContextBlock = `
+# Fulcrum Agent OS — CLI-First Integration
 
-## Available Tools (fulcrum MCP server)
-- get_current_context — get workspace_id + project_id for this directory
-- list_tasks / create_task / update_task — task management
-- recall_memory / write_memory — semantic agent memory
-- start_agent_run / heartbeat_agent_run / complete_agent_run / block_agent_run — run lifecycle
-- get_workspace_status — workspace health and activity summary
-- build_cos_context — Chief-of-Staff context summary
+## Execution Preference
+- Native hooks when available
+- \`fulcrum action exec <action>\` as the standard execution path
+- MCP tools only when the runtime truly needs direct MCP exposure
 
 ## Agent Lifecycle
-1. Session start: call get_current_context to get workspace_id
-2. Before task: call start_agent_run with your role and task_id
-3. During long tasks: call heartbeat_agent_run every few minutes
-4. When blocked: call block_agent_run with a clear reason
-5. On completion: call complete_agent_run with summary and artifact paths
+1. Session start: call \`fulcrum action exec get_current_context\`
+2. Before task: call \`fulcrum action exec start_agent_run\` with your role and task_id
+3. During long tasks: call \`fulcrum action exec heartbeat_agent_run\`
+4. When blocked: call \`fulcrum action exec block_agent_run\`
+5. On completion: call \`fulcrum action exec complete_agent_run\`
+
+## MCP Compatibility
+When a client is MCP-native, the Fulcrum MCP server exposes a filtered compatibility surface for the same actions.
 
 ## Monitor Dashboard
 Start \`fulcrum serve monitor\` for web UI at http://localhost:4721
@@ -173,7 +182,7 @@ Start \`fulcrum serve monitor\` for web UI at http://localhost:4721
     const settingsPath = join(claudeDir, 'settings.json')
 
     step('Write MCP server to ~/.claude/settings.json', () => {
-      mergeJsonKey(settingsPath, 'mcpServers', mcpEntry.mcpServers)
+      mergeJsonKey(settingsPath, 'mcpServers', hookAwareMcpEntry.mcpServers)
     })
 
     const hookCmd = 'npx -y fulcrum-mcp hook auto'
@@ -216,7 +225,7 @@ Start \`fulcrum serve monitor\` for web UI at http://localhost:4721
     const geminiDir = join(home, '.gemini')
 
     step('Write MCP server to ~/.gemini/settings.json', () => {
-      mergeJsonKey(join(geminiDir, 'settings.json'), 'mcpServers', mcpEntry.mcpServers)
+      mergeJsonKey(join(geminiDir, 'settings.json'), 'mcpServers', hookAwareMcpEntry.mcpServers)
     })
 
     step('Write GEMINI.md context block to ~/.gemini/GEMINI.md', () => {
@@ -239,7 +248,7 @@ Start \`fulcrum serve monitor\` for web UI at http://localhost:4721
     const cursorDir = existsSync(join(home, '.cursor')) ? join(home, '.cursor') : join(process.cwd(), '.cursor')
 
     step('Write .cursor/mcp.json', () => {
-      writeJson(join(cursorDir, 'mcp.json'), mcpEntry)
+      writeJson(join(cursorDir, 'mcp.json'), defaultMcpEntry)
     })
 
     step('Write .cursor/rules/fulcrum.mdc', () => {
@@ -256,7 +265,7 @@ Start \`fulcrum serve monitor\` for web UI at http://localhost:4721
     const windsurfDir = existsSync(join(home, '.windsurf')) ? join(home, '.windsurf') : join(process.cwd(), '.windsurf')
 
     step('Write .windsurf/mcp.json', () => {
-      writeJson(join(windsurfDir, 'mcp.json'), mcpEntry)
+      writeJson(join(windsurfDir, 'mcp.json'), defaultMcpEntry)
     })
 
     step('Write .windsurf/rules/fulcrum.mdc', () => {

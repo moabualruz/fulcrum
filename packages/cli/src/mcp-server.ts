@@ -45,11 +45,9 @@ export interface McpServerOptions {
   middleware?: ToolMiddleware[]
   /**
    * Optional predicate to filter which tools are registered with the MCP server.
-   * Used by --profile <value> in `fulcrum serve mcp`:
-   *   - 'hook-only': removes hookEquivalent tools (recall_memory, write_memory, get_current_context)
-   *   - '<role>': enforces tools_allow / tools_deny from agent_definitions for the role
-   * When undefined, all tools are registered (default behaviour).
-   * Built by buildProfileFilter() in tool-registry.ts.
+   * Built by the MCP exposure planner in tool-registry.ts and used by both
+   * `fulcrum serve mcp` and `fulcrum serve mcp-http`.
+   * When undefined, all tools are registered.
    */
   filter?: (tool: import('./mcp-tools.js').ToolSchema) => boolean
 }

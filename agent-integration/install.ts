@@ -144,7 +144,7 @@ function recoveryHintFor(name: string): string | undefined {
     return `fix perms on ~/.local/bin, then: pnpm run setup:claude`;
   }
   if (name.includes("Claude Code: user-scope MCP")) {
-    return `manual: claude mcp add --scope user fulcrum -- fulcrum serve mcp`;
+    return `manual: claude mcp add --scope user fulcrum -- fulcrum ${CLAUDE_MCP_ARGS.join(" ")}`;
   }
   if (name.includes("Claude Code: PreToolUse")) {
     return `edit ~/.claude/settings.json manually, see agent-integration/claude/settings-hooks-snippet.json`;
@@ -253,7 +253,7 @@ function installClaudeMcp(): void {
   if (commandExists("claude")) {
     if (DRY_RUN) {
       dry(`would run: claude mcp remove --scope user fulcrum`);
-      dry(`would run: claude mcp add --scope user fulcrum -- fulcrum serve mcp`);
+      dry(`would run: claude mcp add --scope user fulcrum -- fulcrum ${CLAUDE_MCP_ARGS.join(" ")}`);
       ok(`(dry-run) Claude MCP registration`);
       return;
     }
@@ -263,7 +263,7 @@ function installClaudeMcp(): void {
     });
     const result = spawnSync(
       "claude",
-      ["mcp", "add", "--scope", "user", "fulcrum", "--", "fulcrum", "serve", "mcp"],
+      ["mcp", "add", "--scope", "user", "fulcrum", "--", "fulcrum", ...CLAUDE_MCP_ARGS],
       { stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
     );
     if (result.status === 0) {
@@ -287,7 +287,7 @@ function installClaudeMcp(): void {
     }
   }
   const mcpServers = (cfg["mcpServers"] as Record<string, unknown> | undefined) ?? {};
-  mcpServers["fulcrum"] = { command: "fulcrum", args: ["serve", "mcp"] };
+  mcpServers["fulcrum"] = { command: "fulcrum", args: CLAUDE_MCP_ARGS };
   cfg["mcpServers"] = mcpServers;
   writeJson(claudeJsonPath, cfg);
   ok(`wrote fulcrum MCP entry → ${claudeJsonPath}`);
@@ -301,6 +301,7 @@ const CLAUDE_POST_COMMANDS         = ["fulcrum hook claude post"];
 const CLAUDE_SESSION_START_COMMANDS = ["fulcrum hook claude session-start"];
 const CLAUDE_STOP_COMMANDS         = ["fulcrum hook claude session-stop"];
 const CLAUDE_PRE_COMPACT_COMMANDS  = ["fulcrum hook claude pre-compact"];
+const CLAUDE_MCP_ARGS = ["serve", "mcp", "--mode", "filtered", "--runtime-capability", "hooks"];
 
 function installClaudeHook(): void {
   const settingsPath = path.join(HOME, ".claude", "settings.json");
@@ -996,8 +997,8 @@ async function writeSeedData(): Promise<void> {
   }
 
   // ── Seed memory via MCP write_memory ──────────────────────────────────────
-  // Send a write_memory JSON-RPC call to `fulcrum serve mcp` to confirm memory
-  // writes work end-to-end. Uses the same pattern as the MCP smoke test.
+  // Send a write_memory JSON-RPC call to the planner-filtered MCP server to confirm
+  // memory writes work end-to-end. Uses the same pattern as the MCP smoke test.
   const TIMEOUT_MS = 5000;
   let memoryWritten = false;
 
@@ -1015,7 +1016,7 @@ async function writeSeedData(): Promise<void> {
   const seedMemoryContent = `Fulcrum setup completed successfully. MCP server is accessible and DB writes are functional.`;
 
   try {
-    const ctxChild = spawnSync("fulcrum", ["serve", "mcp"], {
+    const ctxChild = spawnSync("fulcrum", CLAUDE_MCP_ARGS, {
       input: initRequest + ctxRequest,
       timeout: TIMEOUT_MS,
       encoding: "utf8",
@@ -1056,7 +1057,7 @@ async function writeSeedData(): Promise<void> {
         },
       }) + "\n";
 
-      const writeChild = spawnSync("fulcrum", ["serve", "mcp"], {
+      const writeChild = spawnSync("fulcrum", CLAUDE_MCP_ARGS, {
         input: initRequest + writeRequest,
         timeout: TIMEOUT_MS,
         encoding: "utf8",
@@ -1086,12 +1087,12 @@ async function writeSeedData(): Promise<void> {
 }
 
 // ── Post-install MCP smoke test ───────────────────────────────────────────────
-// Spawns `fulcrum serve mcp`, sends JSON-RPC `initialize`, verifies a valid
+// Spawns the configured Claude MCP command, sends JSON-RPC `initialize`, verifies a valid
 // response within a 5-second timeout. Non-blocking: failure is a warning.
 
 async function smokeMcp(): Promise<void> {
   if (DRY_RUN) {
-    dry("would run MCP smoke test: fulcrum serve mcp + initialize request");
+    dry(`would run MCP smoke test: fulcrum ${CLAUDE_MCP_ARGS.join(" ")} + initialize request`);
     ok("(dry-run) smoke test skipped");
     return;
   }
@@ -1114,7 +1115,7 @@ async function smokeMcp(): Promise<void> {
   try {
     const child = spawnSync(
       "fulcrum",
-      ["serve", "mcp"],
+      CLAUDE_MCP_ARGS,
       {
         input: initRequest,
         timeout: TIMEOUT_MS,

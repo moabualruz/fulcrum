@@ -81,6 +81,11 @@ describe('CLI coverage groups (J-6)', () => {
     expect(typeof mod.runAgent).toBe('function')
   })
 
+  it('exports runAction dispatcher', async () => {
+    const mod = await import('../index.js')
+    expect(typeof mod.runAction).toBe('function')
+  })
+
   it('optArg returns the value after a flag, or undefined', async () => {
     const originalArgv = process.argv
     process.argv = ['node', 'cli', '--foo', 'bar']

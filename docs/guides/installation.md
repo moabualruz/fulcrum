@@ -46,7 +46,7 @@ pnpm run setup
 2. **Path verification** — runs `fulcrum --version` / `fulcrum memory --help` to confirm the binary resolves.
 3. **Claude MCP server** — registers Fulcrum as a **user-scope** Claude Code MCP server via:
    ```
-   claude mcp add --scope user fulcrum fulcrum serve mcp
+   claude mcp add --scope user fulcrum fulcrum serve mcp --mode filtered --runtime-capability hooks
    ```
    If the `claude` CLI is not present, the installer falls back to editing `~/.claude.json` directly and inserts the same server definition under `mcpServers.fulcrum`.
 4. **PreToolUse hook** — merges a PreToolUse hook entry into `~/.claude/settings.json` so every Claude tool call is intercepted by `fulcrum hook claude` for policy enforcement.
@@ -108,7 +108,7 @@ fulcrum --version
 
 # 2. Claude knows about the MCP server
 claude mcp list
-# → fulcrum   fulcrum serve mcp   user
+# → fulcrum   fulcrum serve mcp --mode filtered --runtime-capability hooks   user
 
 # 3. Gemini extension present
 ls ~/.gemini/extensions/fulcrum
@@ -234,7 +234,7 @@ You can always verify with `claude mcp list` and re-register manually:
 
 ```bash
 claude mcp remove fulcrum --scope user
-claude mcp add --scope user fulcrum fulcrum serve mcp
+claude mcp add --scope user fulcrum fulcrum serve mcp --mode filtered --runtime-capability hooks
 ```
 
 ### Kuzu native build errors on first `pnpm install`

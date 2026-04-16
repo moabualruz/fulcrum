@@ -2,13 +2,18 @@
 // Protocol conformance tests for the Fulcrum MCP server.
 // Uses SDK in-process transport so no stdio is involved.
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { CompatibilityCallToolResultSchema } from '@modelcontextprotocol/sdk/types.js'
 import { createFulcrumMcpServer } from '../mcp-server.js'
 import { TOOL_SCHEMAS } from '../mcp-tools.js'
-import { buildProfileFilter, TOOL_REGISTRY } from '../tool-registry.js'
+import { buildMcpExposurePlan, buildProfileFilter, TOOL_REGISTRY } from '../tool-registry.js'
+import * as core from '@moabualruz/fulcrum-core'
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 // ---------- Helpers ----------
 
@@ -254,7 +259,7 @@ describe('get_current_context readiness object', () => {
         tools_available: 27,
         monitor_url: 'http://localhost:4721',
         monitor_running: false,
-        suggested_next_call: 'mcp__fulcrum__list_tasks',
+        suggested_next_call: 'list_tasks',
       },
     }
     const { client } = await makeConnectedPair(async () => readinessPayload)
@@ -279,7 +284,7 @@ describe('get_current_context readiness object', () => {
         tools_available: 27,
         monitor_url: 'http://localhost:4721',
         monitor_running: false,
-        suggested_next_call: 'mcp__fulcrum__list_tasks',
+        suggested_next_call: 'list_tasks',
       },
     }))
     const result = await callRaw(client, 'get_current_context', {})
@@ -338,7 +343,26 @@ describe('--profile filter', () => {
     expect(filter).toBeUndefined()
   })
 
-  it('unknown role profile warns and returns undefined', async () => {
+  it('role profiles normalize legacy MCP-prefixed tools_allow/tool_deny names', async () => {
+    vi.spyOn(core, 'getAgentDefinition').mockReturnValue({
+      role: 'test_role',
+      display_name: 'Test Role',
+      description: 'test',
+      version: '1.0.0',
+      stability: 'experimental',
+      capabilities: [],
+      tools_allow: ['mcp__fulcrum__list_tasks', 'mcp__fulcrum__create_task'],
+      tools_deny: ['mcp__fulcrum__create_task'],
+    } as never)
+
+    const filter = await buildProfileFilter('test_role')
+    expect(filter).toBeDefined()
+    expect(filter!(TOOL_SCHEMAS.find(tool => tool.name === 'list_tasks')!)).toBe(true)
+    expect(filter!(TOOL_SCHEMAS.find(tool => tool.name === 'create_task')!)).toBe(false)
+    expect(filter!(TOOL_SCHEMAS.find(tool => tool.name === 'update_task')!)).toBe(false)
+  })
+
+  it('unknown role profile warns and falls back to an allow-all filter', async () => {
     const stderrWrites: string[] = []
     const origWrite = process.stderr.write.bind(process.stderr)
     process.stderr.write = (chunk: string | Uint8Array, ...rest: Parameters<typeof process.stderr.write>[1][]) => {
@@ -348,7 +372,8 @@ describe('--profile filter', () => {
 
     try {
       const filter = await buildProfileFilter('nonexistent_role_xyz')
-      expect(filter).toBeUndefined()
+      expect(filter).toBeDefined()
+      expect(filter!(TOOL_SCHEMAS.find(tool => tool.name === 'list_tasks')!)).toBe(true)
       expect(stderrWrites.some(w => w.includes('nonexistent_role_xyz'))).toBe(true)
     } finally {
       process.stderr.write = origWrite
@@ -362,6 +387,79 @@ describe('--profile filter', () => {
       .sort()
     expect(hookTools).toEqual([...HOOK_EQUIVALENT].sort())
   })
+})
+
+describe('MCP exposure planner', () => {
+  it('filtered mode with hooks hides full hook-covered actions', async () => {
+    const plan = await buildMcpExposurePlan({
+      mode: 'filtered',
+      runtimeCapabilities: ['hooks'],
+    })
+
+    const decisions = new Map(plan.decisions.map(decision => [decision.actionName, decision]))
+    expect(decisions.get('recall_memory')?.exposed).toBe(false)
+    expect(decisions.get('write_memory')?.exposed).toBe(false)
+    expect(decisions.get('get_current_context')?.exposed).toBe(false)
+    expect(decisions.get('list_tasks')?.exposed).toBe(true)
+  })
+
+  it('platform-aware hook coverage does not hide Claude-only hook actions on other runtimes', async () => {
+    const plan = await buildMcpExposurePlan({
+      mode: 'filtered',
+      runtimeCapabilities: ['hooks'],
+      platform: 'gemini',
+    })
+
+    const decisions = new Map(plan.decisions.map(decision => [decision.actionName, decision]))
+    expect(decisions.get('recall_memory')?.exposed).toBe(false)
+    expect(decisions.get('write_memory')?.exposed).toBe(false)
+    expect(decisions.get('get_current_context')?.exposed).toBe(true)
+  })
+
+  it('minimal mode also hides hook-covered actions without explicit include', async () => {
+    const plan = await buildMcpExposurePlan({
+      mode: 'minimal',
+      runtimeCapabilities: [],
+    })
+
+    const decisions = new Map(plan.decisions.map(decision => [decision.actionName, decision]))
+    expect(decisions.get('recall_memory')?.exposed).toBe(false)
+    expect(decisions.get('recall_memory')?.reasons).toContain('minimal_mode_prefers_hook_or_cli')
+    expect(decisions.get('list_tasks')?.exposed).toBe(true)
+  })
+
+  it('explicit include overrides minimal-mode default hiding', async () => {
+    const plan = await buildMcpExposurePlan({
+      mode: 'minimal',
+      includeActions: ['recall_memory'],
+    })
+
+    const decision = plan.decisions.find(item => item.actionName === 'recall_memory')
+    expect(decision?.exposed).toBe(true)
+  })
+
+  it('explicit exclude hides matching actions', async () => {
+    const plan = await buildMcpExposurePlan({
+      mode: 'filtered',
+      excludeActions: ['list_tasks'],
+    })
+
+    const decision = plan.decisions.find(item => item.actionName === 'list_tasks')
+    expect(decision?.exposed).toBe(false)
+    expect(decision?.reasons).toContain('explicitly_excluded')
+  })
+
+  it('agent-type filtering respects min-role metadata', async () => {
+    const plan = await buildMcpExposurePlan({
+      mode: 'filtered',
+      agentType: 'software_engineer',
+    })
+
+    const invokeTeam = plan.decisions.find(item => item.actionName === 'invoke_team')
+    expect(invokeTeam?.exposed).toBe(false)
+    expect(invokeTeam?.reasons).toContain('agent_type_filtered:software_engineer')
+  })
+
 })
 
 // ---------- GAP-MCP-11: progress notifications ----------

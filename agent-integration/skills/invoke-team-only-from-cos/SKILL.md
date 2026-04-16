@@ -1,13 +1,12 @@
 ---
 name: invoke-team-only-from-cos
-description: Only chief_of_staff may call invoke_team. Applies whenever a non-CoS role is about to call mcp__fulcrum__invoke_team — escalate instead of attempting the call.
-allowed-tools: []
+description: Only chief_of_staff may call invoke_team. Applies whenever a non-CoS role is about to call fulcrum action exec invoke_team — escalate instead of attempting the call.
 ---
 
 # invoke_team is chief-of-staff only
 
 The policy invariant `only_l1_invokes_teams` denies
-`mcp__fulcrum__invoke_team` from any role other than `chief_of_staff`.
+`fulcrum action exec invoke_team` from any role other than `chief_of_staff`.
 If you are not chief_of_staff, the call will be rejected with a clear
 error before it reaches the control plane. Don't attempt it.
 
@@ -23,7 +22,7 @@ would let a single specialist reshape the task board without visibility.
 If you are an L2 role (software_engineer, code_reviewer, tech_lead,
 integration_worker, etc.) and you have work that genuinely needs a team:
 
-1. Call `mcp__fulcrum__block_agent_run` on your current run with a clear
+1. Call `fulcrum action exec block_agent_run` on your current run with a clear
    `reason` describing:
    - What kind of team you need (roles)
    - Why your current role cannot finish the work alone

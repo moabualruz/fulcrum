@@ -1,6 +1,6 @@
 # Skill Authoring Guide
 
-Skills teach agent runtimes (Claude Code, Gemini, Codex) the right sequence of Fulcrum tool calls for common situations. Each skill fires when its trigger condition is met and guides the agent through the correct procedure.
+Skills teach agent runtimes (Claude Code, Gemini, Codex) the right sequence of Fulcrum actions for common situations. Each skill fires when its trigger condition is met and guides the agent through the correct procedure.
 
 ---
 
@@ -48,7 +48,7 @@ After frontmatter, the body is Markdown. A good skill body has:
 1. **Heading** — matches `name` in title case
 2. **Numbered procedure** — exactly what to do, in order
 3. **What not to do** — a brief callout with `**Never skip this.**` or similar
-4. **No ambiguity** — every step names a specific MCP tool call with exact parameters
+4. **No ambiguity** — every step names a specific canonical action or hook path with exact parameters
 
 ### Example
 
@@ -66,7 +66,7 @@ triggers:
 
 Before creating any new code, doc, or decision:
 
-1. Call `mcp__fulcrum__recall_memory` with the task's `workspace_id`, `project_id`, and a query describing what you're about to write.
+1. Call `fulcrum action exec recall_memory` with the task's `workspace_id`, `project_id`, and a query describing what you're about to write.
 2. Review the top 3–5 results for relevant prior decisions, architecture notes, and caveats.
 3. If a result has `importance >= 0.8`, treat it as a hard constraint unless you have a specific reason to deviate.
 
@@ -117,10 +117,10 @@ Policy skills exist for invariants like `invoke-team-only-from-cos`. They should
 
 Only `chief_of_staff` may call `invoke_team`. If you are any other role and
 feel the urge to invoke a team, **stop and escalate instead** using
-`mcp__fulcrum__block_agent_run`.
+`fulcrum action exec block_agent_run`.
 
 Calling `invoke_team` from a non-CoS role is a policy violation that is
-detected and blocked by the PreToolUse hook.
+detected and blocked by the hook layer.
 ```
 
 ---
@@ -147,7 +147,7 @@ There is no automated skill test runner yet. Manual verification:
 4. If Claude skips the skill or follows an outdated procedure, check that:
    - The trigger phrases match the scenario
    - The SKILL.md frontmatter `name` matches the directory name
-   - Claude Code has the skills directory indexed (check `.mcp.json` or run `fulcrum setup:claude`)
+   - Claude Code has the skills directory indexed (re-run `pnpm run setup:claude` if needed)
 
 ---
 
@@ -159,6 +159,6 @@ Skills are also compiled into a master `CLAUDE.md` file during build:
 pnpm run build:claude-md
 ```
 
-This runs `packages/cli/src/scripts/gen-claude-md.ts` which collects all `SKILL.md` files and the tool catalogue from the MCP server's `TOOL_REGISTRY` and emits a single Markdown file. The generated file is committed to `agent-integration/claude/CLAUDE.md`.
+This runs `packages/cli/src/scripts/gen-claude-md.ts` which collects all `SKILL.md` files and the compatibility tool catalogue derived from the canonical action registry, then emits a single Markdown file. The generated file is committed to `agent-integration/claude/CLAUDE.md`.
 
 When adding a skill, re-run this script and commit the updated `CLAUDE.md`.

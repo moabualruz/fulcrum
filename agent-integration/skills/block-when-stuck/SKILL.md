@@ -1,13 +1,11 @@
 ---
 name: block-when-stuck
 description: Call block_agent_run instead of guessing when you cannot proceed. Applies whenever you hit missing info, a failing dependency, ambiguous requirements, or a permission denial.
-allowed-tools:
-  - mcp__fulcrum__block_agent_run
 ---
 
 # Block when stuck — do not guess
 
-When you cannot proceed, call `mcp__fulcrum__block_agent_run` with a clear
+When you cannot proceed, call `fulcrum action exec block_agent_run` with a clear
 `reason`. A blocked run is a first-class signal the control plane knows how
 to handle. A run that silently invents an answer is a liability.
 
@@ -27,10 +25,11 @@ to handle. A run that silently invents an answer is a liability.
 
 ## How
 
-```
-mcp__fulcrum__block_agent_run
-  run_id: (from start_agent_run)
-  reason: (specific, actionable — see below)
+```bash
+fulcrum action exec block_agent_run --json '{
+  "run_id": "run_123",
+  "reason": "specific, actionable blocker"
+}'
 ```
 
 `reason` is not optional and not cosmetic. It determines how fast the

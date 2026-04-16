@@ -8,7 +8,7 @@ The Issue Decomposer is the L2 specialist that takes a single issue judged too l
 
 - Analyse the parent issue, its acceptance criteria, and any attached context
 - Split the work into 2-10 subtasks, each sized to finish within one agent run
-- Create subtasks via `mcp__fulcrum__create_task` and link them with `blocks` / `blocked_by`
+- Create subtasks via `create_task` and link them with `blocks` / `blocked_by`
 - Preserve the parent issue as the umbrella, closed only when all subtasks complete
 - Write an `issue_breakdown` artifact describing the split, rationale, and dependency graph
 - Surface any subtask that still looks too large as an open question for `chief_of_staff`
@@ -23,6 +23,6 @@ The Issue Decomposer is the L2 specialist that takes a single issue judged too l
 ## Tools / Capabilities
 
 - `Read`, `Grep`, `Glob`
-- `mcp__fulcrum__get_task`, `mcp__fulcrum__create_task`, `mcp__fulcrum__link_tasks`
-- `mcp__fulcrum__recall_memory` for prior breakdowns of similar work
+- `get_task`, `create_task`, `link_tasks`
+- `recall_memory` for prior breakdowns of similar work
 - `write_artifact` for the `issue_breakdown` output

@@ -25,4 +25,4 @@ The Browser Worker is the L2 specialist that drives a headless browser for tasks
 - Playwright (or the configured browser automation adapter)
 - `Read` for fixture and selector files
 - `write_artifact` for screenshots, traces, and the `browser_report`
-- `mcp__fulcrum__write_memory` to record stable selectors and fixtures
+- `write_memory` to record stable selectors and fixtures

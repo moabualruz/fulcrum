@@ -1,7 +1,6 @@
 ---
 name: integration-worker-merge-gate
 description: When operating as integration_worker, verify review and test artifacts exist before calling processMergeQueue. Applies to every merge attempt by the integration_worker role.
-allowed-tools: []
 ---
 
 # Integration worker merge gate
@@ -28,7 +27,7 @@ A worktree is mergeable if and only if ALL of the following are true:
 ## How to verify
 
 ```
-mcp__fulcrum__get_workspace_status
+fulcrum action exec get_workspace_status
   workspace_id: ...
 ```
 
@@ -40,7 +39,7 @@ summary or still `running` counts as absent — reject the merge.
 
 Do NOT skip the gate. Instead:
 
-- **Missing review**: call `mcp__fulcrum__start_agent_run` with `agent_role=code_reviewer` (or
+- **Missing review**: call `fulcrum action exec start_agent_run` with `agent_role=code_reviewer` (or
   block the run with reason `"review pending"` and let
   chief_of_staff schedule it).
 - **Missing test_report**: run the project's test script via `run_script`,

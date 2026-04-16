@@ -38,7 +38,7 @@ describe('installCursor()', () => {
     expect(servers).toBeDefined()
     expect(servers['fulcrum']).toMatchObject({
       command: 'fulcrum',
-      args: ['serve', 'mcp'],
+      args: ['serve', 'mcp', '--mode', 'filtered'],
     })
   })
 
@@ -111,7 +111,7 @@ describe('installWindsurf()', () => {
     expect(servers).toBeDefined()
     expect(servers['fulcrum']).toMatchObject({
       command: 'fulcrum',
-      args: ['serve', 'mcp'],
+      args: ['serve', 'mcp', '--mode', 'filtered'],
     })
   })
 

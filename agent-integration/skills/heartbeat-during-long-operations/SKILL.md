@@ -1,14 +1,12 @@
 ---
 name: heartbeat-during-long-operations
 description: Emit heartbeat_agent_run every ~30 seconds during any run that takes more than ~60 seconds. Applies to long script runs, large-file edits, and multi-step analysis.
-allowed-tools:
-  - mcp__fulcrum__heartbeat_agent_run
 ---
 
 # Heartbeat during long operations
 
 For any run that takes more than ~60 seconds, call
-`mcp__fulcrum__heartbeat_agent_run` every ~30 seconds with a
+`fulcrum action exec heartbeat_agent_run` every ~30 seconds with a
 `current_step` and `progress_pct`. The janitor marks runs as `stale`
 after 10 minutes of silence and a stale run has real costs:
 
@@ -32,7 +30,7 @@ after 10 minutes of silence and a stale run has real costs:
 ## How
 
 ```
-mcp__fulcrum__heartbeat_agent_run
+fulcrum action exec heartbeat_agent_run
   run_id:       (from start_agent_run)
   current_step: "refactoring auth module (3/5 files done)"
   progress_pct: 60

@@ -22,7 +22,7 @@ The Product Manager is the L2 specialist that maintains the roadmap, prioritises
 
 ## Tools / Capabilities
 
-- `mcp__fulcrum__create_task`, `mcp__fulcrum__update_task`, `mcp__fulcrum__link_tasks`
-- `mcp__fulcrum__recall_memory`, `mcp__fulcrum__write_memory`
+- `create_task`, `update_task`, `link_tasks`
+- `recall_memory`, `write_memory`
 - `Read`, `Grep`, `Glob` for backlog and doc review
 - `write_artifact` for roadmap and prioritisation artifacts

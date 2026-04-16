@@ -1,14 +1,12 @@
 ---
 name: write-memory-on-completion
 description: Persist a memory after completing any task that involved a decision, trade-off, or surprising finding. Applies after complete_agent_run when the work produced durable knowledge.
-allowed-tools:
-  - mcp__fulcrum__write_memory
 ---
 
 # Write memory on completion
 
 After completing a task — especially one that involved a decision, a
-trade-off, or a surprising finding — call `mcp__fulcrum__write_memory`.
+trade-off, or a surprising finding — call `fulcrum action exec write_memory`.
 This is what makes Fulcrum's L2 memory graph valuable over time. Every
 memory you write is a gift to the next agent (and often your future self).
 
@@ -25,14 +23,13 @@ reverts of work that happened in the same session.
 
 ## How
 
-```
-mcp__fulcrum__write_memory
-  workspace_id: (same workspace as your run)
-  kind:         "task_outcome" | "decision" | "lesson"
-  scope:        "task" | "project"
-  task_id:      (if scope=task)
-  content:      (1-3 paragraphs — see below)
-  tags:         ["packages/core/src/memory", "FTS5", "fallback"]
+```bash
+fulcrum action exec write_memory --json '{
+  "workspace_id": "ws_123",
+  "kind": "task_outcome",
+  "content": "What happened and why it matters.",
+  "tags": ["packages/core/src/memory", "FTS5", "fallback"]
+}'
 ```
 
 ### Choosing `kind`

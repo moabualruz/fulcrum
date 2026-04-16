@@ -130,7 +130,7 @@ describe('serve mcp: readiness shape via MCP transport', () => {
     const { server, client, clientTransport, serverTransport } = makeConnectedPair(
       async () => ({
         workspace_id: 'ws_test', project_id: 'proj_test', cwd: '/repo',
-        readiness: { tools_available: 23, monitor_url: 'http://localhost:49999', monitor_running: false, suggested_next_call: 'mcp__fulcrum__list_tasks' },
+        readiness: { tools_available: 23, monitor_url: 'http://localhost:49999', monitor_running: false, suggested_next_call: 'list_tasks' },
       })
     )
     await server.connect(serverTransport)
@@ -141,14 +141,14 @@ describe('serve mcp: readiness shape via MCP transport', () => {
     expect(readiness['monitor_running']).toBe(false)
     expect(typeof readiness['tools_available']).toBe('number')
     expect(readiness['tools_available']).toBeGreaterThan(0)
-    expect(readiness['suggested_next_call']).toBe('mcp__fulcrum__list_tasks')
+    expect(readiness['suggested_next_call']).toBe('list_tasks')
   })
 
   it('monitor_running: true when handler says running', async () => {
     const { server, client, clientTransport, serverTransport } = makeConnectedPair(
       async () => ({
         workspace_id: 'ws_test', project_id: 'proj_test', cwd: '/repo',
-        readiness: { tools_available: 23, monitor_url: 'http://localhost:4721', monitor_running: true, suggested_next_call: 'mcp__fulcrum__list_tasks' },
+        readiness: { tools_available: 23, monitor_url: 'http://localhost:4721', monitor_running: true, suggested_next_call: 'list_tasks' },
       })
     )
     await server.connect(serverTransport)
@@ -166,7 +166,7 @@ describe('serve mcp: readiness shape via MCP transport', () => {
     const { server, client, clientTransport, serverTransport } = makeConnectedPair(
       async () => ({
         workspace_id: 'ws_test', project_id: 'proj_test', cwd: '/repo',
-        readiness: { tools_available: 23, monitor_url: `http://localhost:${port}`, monitor_running: false, suggested_next_call: 'mcp__fulcrum__list_tasks' },
+        readiness: { tools_available: 23, monitor_url: `http://localhost:${port}`, monitor_running: false, suggested_next_call: 'list_tasks' },
       })
     )
     await server.connect(serverTransport)
@@ -229,7 +229,7 @@ describe('_monitorStarted double-start guard', () => {
     const { server, client, clientTransport, serverTransport } = makeConnectedPair(
       async () => ({
         workspace_id: 'ws_test', project_id: 'proj_test', cwd: '/repo',
-        readiness: { tools_available: 23, monitor_url: 'http://localhost:4721', monitor_running: false, suggested_next_call: 'mcp__fulcrum__list_tasks' },
+        readiness: { tools_available: 23, monitor_url: 'http://localhost:4721', monitor_running: false, suggested_next_call: 'list_tasks' },
       })
     )
     await server.connect(serverTransport)
@@ -276,21 +276,21 @@ describe('suggested_next_call heuristic', () => {
     vi.restoreAllMocks()
   })
 
-  it('empty workspace → suggested_next_call is mcp__fulcrum__create_task', async () => {
+  it('empty workspace → suggested_next_call is create_task', async () => {
     _listTasksControl.impl = vi.fn().mockResolvedValue([])
     const result = await _buildCurrentContextResponseForTest()
-    expect(result.readiness.suggested_next_call).toBe('mcp__fulcrum__create_task')
+    expect(result.readiness.suggested_next_call).toBe('create_task')
   })
 
-  it('workspace with tasks → suggested_next_call is mcp__fulcrum__list_tasks', async () => {
+  it('workspace with tasks → suggested_next_call is list_tasks', async () => {
     _listTasksControl.impl = vi.fn().mockResolvedValue([{ id: 'task_1', title: 'A task' }])
     const result = await _buildCurrentContextResponseForTest()
-    expect(result.readiness.suggested_next_call).toBe('mcp__fulcrum__list_tasks')
+    expect(result.readiness.suggested_next_call).toBe('list_tasks')
   })
 
-  it('listTasks throws → falls back to mcp__fulcrum__list_tasks', async () => {
+  it('listTasks throws → falls back to list_tasks', async () => {
     _listTasksControl.impl = vi.fn().mockRejectedValue(new Error('DB not ready'))
     const result = await _buildCurrentContextResponseForTest()
-    expect(result.readiness.suggested_next_call).toBe('mcp__fulcrum__list_tasks')
+    expect(result.readiness.suggested_next_call).toBe('list_tasks')
   })
 })

@@ -1,18 +1,12 @@
 ---
 name: start-every-task
 description: Register an agent run before touching any code. Applies whenever the agent is about to call Write / Edit / MultiEdit / Bash for the first time in a session, or is targeted by a team invocation.
-allowed-tools:
-  - mcp__fulcrum__get_current_context
-  - mcp__fulcrum__start_agent_run
-  - mcp__fulcrum__list_tasks
-  - mcp__fulcrum__create_task
-  - mcp__fulcrum__list_agent_profiles
 ---
 
 # Start every task with start_agent_run
 
 Before doing ANY work in a Fulcrum-managed project, call
-`mcp__fulcrum__start_agent_run` so the control plane knows you exist. This is
+`fulcrum action exec start_agent_run` so the control plane knows you exist. This is
 non-negotiable — the WIP limiter and the chief-of-staff context builder both
 read from the `agent_runs` table, and a run that was never started cannot be
 heartbeated, blocked, or completed.
@@ -28,17 +22,18 @@ heartbeated, blocked, or completed.
 
 ## How
 
-Call the MCP tool with the required fields:
+Call the canonical action through the CLI with the required fields:
 
-```
+```bash
 # Step 1: get workspace_id (no parameters needed)
-mcp__fulcrum__get_current_context
+fulcrum action exec get_current_context
 
 # Step 2: start your run
-mcp__fulcrum__start_agent_run
-  workspace_id: <from get_current_context result>
-  task_id:      (from the task you're working on)
-  agent_role:   (your canonical role — see list_agent_profiles)
+fulcrum action exec start_agent_run --json '{
+  "workspace_id": "ws_123",
+  "task_id": "task_123",
+  "agent_role": "software_engineer"
+}'
 ```
 
 The call returns a `run_id`. Keep it in scope for every subsequent
@@ -46,16 +41,16 @@ The call returns a `run_id`. Keep it in scope for every subsequent
 
 ### If you don't have a task_id
 
-1. Call `mcp__fulcrum__list_tasks` with a keyword from the user's request to
+1. Call `fulcrum action exec list_tasks` with a keyword from the user's request to
    check whether a matching task already exists.
-2. If none matches, call `mcp__fulcrum__create_task` with a clear title,
+2. If none matches, call `fulcrum action exec create_task` with a clear title,
    acceptance criteria, and the owning role. Use the returned `task_id`.
 3. Never guess a task_id — a run with a bogus task_id will be rejected by the
    policy layer.
 
 ### If you don't know your role
 
-Call `mcp__fulcrum__list_agent_profiles` and pick the one whose purpose
+Call `fulcrum action exec list_agent_profiles` and pick the one whose purpose
 matches what you are about to do. Default to `software_engineer` for generic
 implementation work; defer to `tech_lead` for architecture, `code_reviewer`
 for review, and `integration_worker` for merges.
@@ -77,17 +72,17 @@ for review, and `integration_worker` for merges.
 
 ```
 # 1. Discover workspace context
-mcp__fulcrum__get_current_context
+fulcrum action exec get_current_context
 → { workspace_id: "ws_abc123", project_id: "proj_xyz" }
 
 # 2. Find or create the task
-mcp__fulcrum__list_tasks
+fulcrum action exec list_tasks
   workspace_id: "ws_abc123"
   status: "open"
 → (search result includes) { task_id: "task_001", title: "Fix failing auth login test" }
 
 # 3. Start the run
-mcp__fulcrum__start_agent_run
+fulcrum action exec start_agent_run
   workspace_id: "ws_abc123"
   task_id: "task_001"
   agent_role: "software_engineer"

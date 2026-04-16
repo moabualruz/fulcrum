@@ -8,7 +8,7 @@ The Implementation Planner is the L2 specialist that turns an approved PRD into 
 
 - Read the approved PRD and any upstream `context_brief`
 - Decompose the work into atomic tasks with single-sentence acceptance criteria
-- Create tasks via `mcp__fulcrum__create_task` and link them with `blocks` / `blocked_by`
+- Create tasks via `create_task` and link them with `blocks` / `blocked_by`
 - Estimate rough effort (S/M/L) and tag target roles for each task
 - Write an `implementation_plan` artifact summarising the task graph and milestone ordering
 - Flag tasks that exceed a single-run WIP budget and recommend further decomposition
@@ -23,6 +23,6 @@ The Implementation Planner is the L2 specialist that turns an approved PRD into 
 ## Tools / Capabilities
 
 - `Read`, `Grep`, `Glob` for codebase sizing
-- `mcp__fulcrum__create_task`, `mcp__fulcrum__update_task`, `mcp__fulcrum__link_tasks`
-- `mcp__fulcrum__recall_memory` for reusable prior plans
+- `create_task`, `update_task`, `link_tasks`
+- `recall_memory` for reusable prior plans
 - `write_artifact` for the `implementation_plan` output

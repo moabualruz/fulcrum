@@ -24,5 +24,5 @@ The Analyst is the L2 read-only specialist that turns raw workspace data — tas
 
 - `Read`, `Grep`, `Glob`
 - HTTP access to the monitor endpoints
-- `mcp__fulcrum__recall_memory`, `mcp__fulcrum__write_memory` (summary kind only)
+- `recall_memory`, `write_memory` (summary kind only)
 - `write_artifact` for comparison matrices and analysis reports

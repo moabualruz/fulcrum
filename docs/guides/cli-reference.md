@@ -99,21 +99,28 @@ Output: five-line status block listing vault path and the state of L0/L1/L2.
 
 ### `fulcrum serve mcp`
 
-Start the MCP server (JSON-RPC 2.0 over stdio) exposing all 23 control tools. Also auto-starts the HTTP monitor on port 4721 in-process unless suppressed.
+Start the stdio MCP compatibility server. Fulcrum is CLI-first, so canonical actions remain the primary execution contract; this command exposes a filtered MCP tool surface for runtimes that need MCP.
 
 ```
-fulcrum serve mcp [--profile <value>] [--no-monitor]
+fulcrum serve mcp [planner flags] [--no-monitor]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--profile hook-only` | — | Strip the 3 hook-equivalent tools (`recall_memory`, `write_memory`, `get_current_context`) — serves 20 tools instead of 23. Recommended for Claude Code, which already calls these via hooks |
-| `--profile <role>` | — | Enforce the role's `tools_allow` / `tools_deny` lists from `agent_definitions`. If the role is not found, warns and serves all tools |
+| `--mode` | `filtered` | MCP exposure mode: `full`, `filtered`, or `minimal` |
+| `--profile hook-only` | — | Compatibility shortcut for hook-capable runtimes |
+| `--profile <role>` | — | Apply the role's `tools_allow` / `tools_deny` policy from `agent_definitions` |
+| `--agent-type <role>` | — | Filter by action availability metadata for a specific agent type |
+| `--platform <name>` | — | Filter by platform metadata |
+| `--runtime-capability <cap>` | — | Add runtime capability facts such as `hooks` (repeatable) |
+| `--include-action <name>` | — | Force-include a canonical action (repeatable) |
+| `--exclude-action <name>` | — | Force-hide a canonical action (repeatable) |
 | `--no-monitor` | — | Skip auto-starting the HTTP monitor alongside the MCP server |
 
 ```bash
-fulcrum serve mcp                              # all 23 tools + monitor on :4721
-fulcrum serve mcp --profile hook-only          # 20 tools (recommended for Claude Code)
+fulcrum serve mcp                              # filtered MCP surface + monitor on :4721
+fulcrum serve mcp --mode full                  # full MCP compatibility surface
+fulcrum serve mcp --runtime-capability hooks   # hide hook-covered tools
 fulcrum serve mcp --profile software_engineer  # role-gated surface
 FULCRUM_NO_MONITOR=1 fulcrum serve mcp         # MCP only, no monitor
 ```
@@ -121,6 +128,44 @@ FULCRUM_NO_MONITOR=1 fulcrum serve mcp         # MCP only, no monitor
 Runs until killed. Logs to stderr only (stdout is reserved for JSON-RPC).
 
 Output: handshake response and tool-call results on stdout (JSON-RPC), status lines on stderr.
+
+### `fulcrum serve mcp-http`
+
+Start the HTTP MCP compatibility server using StreamableHTTP. It uses the same planner-driven exposure model as `serve mcp`.
+
+```
+fulcrum serve mcp-http [planner flags] [--port <n>]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--mode` | `filtered` | MCP exposure mode: `full`, `filtered`, or `minimal` |
+| `--profile <value>` | — | Role / compatibility shortcut input to the exposure planner |
+| `--agent-type <role>` | — | Filter by action availability metadata |
+| `--platform <name>` | — | Filter by platform metadata |
+| `--runtime-capability <cap>` | — | Add runtime capability facts such as `hooks` (repeatable) |
+| `--include-action <name>` | — | Force-include a canonical action (repeatable) |
+| `--exclude-action <name>` | — | Force-hide a canonical action (repeatable) |
+| `--port` | `4722` | HTTP port for the `/mcp` endpoint |
+
+```bash
+fulcrum serve mcp-http
+fulcrum serve mcp-http --mode minimal --agent-type software_engineer
+fulcrum serve mcp-http --mode filtered --runtime-capability hooks --port 4800
+```
+
+### `fulcrum mcp plan`
+
+Show the exact MCP exposure decisions for a runtime/agent before starting a server.
+
+```
+fulcrum mcp plan [planner flags] [--json]
+```
+
+```bash
+fulcrum mcp plan --runtime-capability hooks
+fulcrum mcp plan --mode minimal --agent-type software_engineer --json
+```
 
 ### `fulcrum serve monitor`
 

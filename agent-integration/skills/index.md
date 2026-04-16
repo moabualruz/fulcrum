@@ -6,8 +6,8 @@ description: Table of contents for the Fulcrum Claude Skills directory. Browse t
 # Fulcrum Skills — Index
 
 These skills teach Claude Code agents how to interact with the Fulcrum
-control plane (MCP tools, CLI, and hooks) in the right order and at the
-right moments. Every skill is scoped to a specific trigger condition via
+control plane (hooks first, CLI actions second, MCP only when required) in the right order and at the
+right moments. When a skill needs to force a concrete path, it should use explicit shell commands like `fulcrum action exec ...`. Every skill is scoped to a specific trigger condition via
 its frontmatter `description`; Claude Code surfaces the relevant skill
 automatically when that condition is met.
 
@@ -42,12 +42,12 @@ The skills are most useful in roughly this order within a session:
 
 ## Quick reference
 
-- **Start** → `mcp__fulcrum__start_agent_run`
-- **Context** → `mcp__fulcrum__recall_memory` + `mcp__fulcrum__get_workspace_status`
-- **Long-running** → `mcp__fulcrum__heartbeat_agent_run`
-- **Stuck** → `mcp__fulcrum__block_agent_run`
-- **Done** → `mcp__fulcrum__complete_agent_run` + `mcp__fulcrum__write_memory`
-- **CoS only** → `mcp__fulcrum__invoke_team`, `mcp__fulcrum__build_cos_context`
+- **Start** → `fulcrum action exec start_agent_run`
+- **Context** → `fulcrum action exec recall_memory` + `fulcrum action exec get_workspace_status`
+- **Long-running** → `fulcrum action exec heartbeat_agent_run`
+- **Stuck** → `fulcrum action exec block_agent_run`
+- **Done** → `fulcrum action exec complete_agent_run` + `fulcrum action exec write_memory`
+- **CoS only** → `fulcrum action exec invoke_team`, `fulcrum action exec build_cos_context`
 - **Merge** → `integration_worker` only, after code review and tests pass
 
 ## Skill Frontmatter Reference
@@ -60,9 +60,7 @@ name: <kebab-case-id>          # required — unique, stable identifier
 description: <one-liner>       # required — Claude Code filters skills by this; be specific
 version: 1.0.0                 # required — semver; bump on breaking behaviour change
 author: fulcrum                # required — "fulcrum" for built-ins, your package name for plugins
-allowed-tools:                 # required — exhaustive list of MCP / built-in tools this skill uses
-  - mcp__fulcrum__some_tool
-user-invocable: true | false   # required — false = auto-trigger only; true = user can /invoke
+user-invocable: true | false   # optional — false = auto-trigger only; true = user can /invoke
 triggers:                      # optional — explicit conditions that activate this skill
   - before_tool_use            #   before_tool_use: fires on PreToolUse hook match
   - session_start              #   session_start: fires on SessionStart hook

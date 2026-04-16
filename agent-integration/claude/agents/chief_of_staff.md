@@ -8,24 +8,24 @@ tools:
     - Read
     - Glob
     - Grep
-    - mcp__fulcrum__list_tasks
-    - mcp__fulcrum__create_task
-    - mcp__fulcrum__update_task
-    - mcp__fulcrum__recall_memory
-    - mcp__fulcrum__write_memory
-    - mcp__fulcrum__start_agent_run
-    - mcp__fulcrum__heartbeat_agent_run
-    - mcp__fulcrum__complete_agent_run
-    - mcp__fulcrum__block_agent_run
-    - mcp__fulcrum__get_agent_run_status
-    - mcp__fulcrum__get_workspace_status
-    - mcp__fulcrum__build_cos_context
-    - mcp__fulcrum__create_team_template
-    - mcp__fulcrum__invoke_team
-    - mcp__fulcrum__list_team_templates
-    - mcp__fulcrum__list_team_instances
-    - mcp__fulcrum__list_agent_profiles
-    - mcp__fulcrum__create_agent_profile
+    - list_tasks
+    - create_task
+    - update_task
+    - recall_memory
+    - write_memory
+    - start_agent_run
+    - heartbeat_agent_run
+    - complete_agent_run
+    - block_agent_run
+    - get_agent_run_status
+    - get_workspace_status
+    - build_cos_context
+    - create_team_template
+    - invoke_team
+    - list_team_templates
+    - list_team_instances
+    - list_agent_profiles
+    - create_agent_profile
   denied:
     - Write
     - Edit

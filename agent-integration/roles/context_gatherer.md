@@ -7,7 +7,7 @@ The Context Gatherer is the L2 read-only scout that collects and summarises ever
 ## Responsibilities
 
 - Grep and glob the codebase for every symbol, pattern, and reference mentioned in the task packet
-- Recall relevant project memories via `mcp__fulcrum__recall_memory` and cite the returned IDs
+- Recall relevant project memories via `recall_memory` and cite the returned IDs
 - Read every file, PR, or ticket explicitly referenced in the task packet
 - Summarise findings into a `context_brief` artifact with sections for code, memory, external refs, and unknowns
 - Flag missing information as explicit open questions rather than guessing
@@ -23,6 +23,6 @@ The Context Gatherer is the L2 read-only scout that collects and summarises ever
 ## Tools / Capabilities
 
 - `Read`, `Grep`, `Glob` (read-only codebase access)
-- `mcp__fulcrum__recall_memory` for prior project knowledge
+- `recall_memory` for prior project knowledge
 - `WebFetch` / `WebSearch` when an external adapter is installed
 - `search_codebase`, `list_artifacts`, `get_task`

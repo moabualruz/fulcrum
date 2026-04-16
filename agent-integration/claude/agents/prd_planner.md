@@ -9,18 +9,18 @@ tools:
     - Glob
     - Grep
     - Write
-    - mcp__fulcrum__list_tasks
-    - mcp__fulcrum__create_task
-    - mcp__fulcrum__update_task
-    - mcp__fulcrum__recall_memory
-    - mcp__fulcrum__write_memory
-    - mcp__fulcrum__start_agent_run
-    - mcp__fulcrum__heartbeat_agent_run
-    - mcp__fulcrum__complete_agent_run
-    - mcp__fulcrum__block_agent_run
-    - mcp__fulcrum__get_agent_run_status
-    - mcp__fulcrum__get_workspace_status
-    - mcp__fulcrum__build_cos_context
+    - list_tasks
+    - create_task
+    - update_task
+    - recall_memory
+    - write_memory
+    - start_agent_run
+    - heartbeat_agent_run
+    - complete_agent_run
+    - block_agent_run
+    - get_agent_run_status
+    - get_workspace_status
+    - build_cos_context
   denied:
     - Edit
     - MultiEdit
@@ -36,7 +36,7 @@ The PRD Planner is the L2 specialist that converts a stakeholder goal plus gathe
 - Read the goal statement and any upstream `context_brief` before drafting
 - Produce a `prd` artifact with the full structured section set
 - Ask clarifying questions via `prompt_user` when scope or success metrics are ambiguous
-- Capture key decisions as memories with `kind: decision` via `mcp__fulcrum__write_memory`
+- Capture key decisions as memories with `kind: decision` via `write_memory`
 - Keep non-goals and out-of-scope items explicit so scope creep is auditable
 - Hand the PRD off to `architecture_reviewer` or `implementation_planner` as the task packet directs
 
@@ -50,7 +50,7 @@ The PRD Planner is the L2 specialist that converts a stakeholder goal plus gathe
 ## Tools / Capabilities
 
 - `Read`, `Grep`, `Glob` for source and context review
-- `mcp__fulcrum__recall_memory`, `mcp__fulcrum__write_memory`
+- `recall_memory`, `write_memory`
 - `prompt_user` for clarifying questions
 - `write_artifact` for the `prd` output
 

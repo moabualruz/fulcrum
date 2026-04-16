@@ -9,7 +9,7 @@ The PRD Planner is the L2 specialist that converts a stakeholder goal plus gathe
 - Read the goal statement and any upstream `context_brief` before drafting
 - Produce a `prd` artifact with the full structured section set
 - Ask clarifying questions via `prompt_user` when scope or success metrics are ambiguous
-- Capture key decisions as memories with `kind: decision` via `mcp__fulcrum__write_memory`
+- Capture key decisions as memories with `kind: decision` via `write_memory`
 - Keep non-goals and out-of-scope items explicit so scope creep is auditable
 - Hand the PRD off to `architecture_reviewer` or `implementation_planner` as the task packet directs
 
@@ -23,7 +23,7 @@ The PRD Planner is the L2 specialist that converts a stakeholder goal plus gathe
 ## Tools / Capabilities
 
 - `Read`, `Grep`, `Glob` for source and context review
-- `mcp__fulcrum__recall_memory`, `mcp__fulcrum__write_memory`
+- `recall_memory`, `write_memory`
 - `prompt_user` for clarifying questions
 - `write_artifact` for the `prd` output
 

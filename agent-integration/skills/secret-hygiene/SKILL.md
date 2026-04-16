@@ -1,7 +1,6 @@
 ---
 name: secret-hygiene
 description: Never include credentials, API keys, tokens, or passwords in tool inputs or memory writes. Applies to every tool call that accepts free-form text from the agent.
-allowed-tools: []
 ---
 
 # Secret hygiene
@@ -32,7 +31,7 @@ approximate location.
 
 When you need a secret to proceed:
 
-1. Call `mcp__fulcrum__block_agent_run` with reason
+1. Call `fulcrum action exec block_agent_run` with reason
    `"needs secret: <NAME>"` — e.g., `"needs secret: STRIPE_WEBHOOK_SECRET
    for integration tests in packages/billing"`.
 2. Chief_of_staff (or a human operator) supplies the value by setting an

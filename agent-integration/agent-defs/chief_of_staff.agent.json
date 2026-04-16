@@ -9,19 +9,19 @@
   "capabilities": ["create_teams", "dispatch_agents"],
   "allow_dispatch": true,
   "tools_allow": [
-    "mcp__fulcrum__get_current_context",
-    "mcp__fulcrum__get_workspace_status",
-    "mcp__fulcrum__build_cos_context",
-    "mcp__fulcrum__create_task",
-    "mcp__fulcrum__update_task",
-    "mcp__fulcrum__list_tasks",
-    "mcp__fulcrum__start_agent_run",
-    "mcp__fulcrum__heartbeat_agent_run",
-    "mcp__fulcrum__complete_agent_run",
-    "mcp__fulcrum__block_agent_run",
-    "mcp__fulcrum__recall_memory",
-    "mcp__fulcrum__write_memory",
-    "mcp__fulcrum__list_agent_profiles"
+    "get_current_context",
+    "get_workspace_status",
+    "build_cos_context",
+    "create_task",
+    "update_task",
+    "list_tasks",
+    "start_agent_run",
+    "heartbeat_agent_run",
+    "complete_agent_run",
+    "block_agent_run",
+    "recall_memory",
+    "write_memory",
+    "list_agent_profiles"
   ],
   "tools_deny": ["Write", "Edit", "MultiEdit", "NotebookEdit"]
 }

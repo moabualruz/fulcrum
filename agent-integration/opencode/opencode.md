@@ -6,7 +6,7 @@ This file configures your connection to the Fulcrum agent control plane when usi
 
 ## MCP Server
 
-The `fulcrum` MCP server exposes 22 tools for task management, memory, agent runs, and workspace context. It runs as a local stdio process via the `fulcrum serve mcp` command.
+Fulcrum is CLI-first. Prefer `fulcrum action exec <action>` for skills and automation; use the `fulcrum` MCP server as the compatibility surface when opencode needs MCP. It runs as a local stdio process via `fulcrum serve mcp`, and its exposed tool set can be filtered per runtime or agent.
 
 Start the HTTP monitor (optional, for dashboard/debugging):
 ```
@@ -88,11 +88,13 @@ All tools are available under the `fulcrum` MCP server namespace.
 
 When operating as part of a Fulcrum-managed workflow:
 
-1. **On session start**: Call `get_workspace_status` to understand current state
-2. **Before working on a task**: Call `start_agent_run` with your role and task_id
-3. **During long tasks**: Call `heartbeat_agent_run` every few minutes
-4. **When blocked**: Call `block_agent_run` with a clear reason
-5. **On completion**: Call `complete_agent_run` with summary and artifact paths
+1. **On session start**: Call `fulcrum action exec get_workspace_status` to understand current state
+2. **Before working on a task**: Call `fulcrum action exec start_agent_run` with your role and task_id
+3. **During long tasks**: Call `fulcrum action exec heartbeat_agent_run` every few minutes
+4. **When blocked**: Call `fulcrum action exec block_agent_run` with a clear reason
+5. **On completion**: Call `fulcrum action exec complete_agent_run` with summary and artifact paths
+
+If opencode is invoking Fulcrum through MCP rather than shell commands, use the equivalent compatibility tools from the catalog above.
 
 ---
 
@@ -100,7 +102,7 @@ When operating as part of a Fulcrum-managed workflow:
 
 **`chief_of_staff`** (orchestration only):
 - Creates tasks, delegates to specialist roles, synthesizes results
-- Uses `build_cos_context` to orient before every session
+- Uses `fulcrum action exec build_cos_context` to orient before every session
 
 **All other roles** (implementation):
-- Focus on the assigned task; complete and report via `complete_agent_run`
+- Focus on the assigned task; complete and report via `fulcrum action exec complete_agent_run`

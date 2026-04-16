@@ -6,7 +6,7 @@
   "mcpServers": {
     "fulcrum": {
       "command": "fulcrum",
-      "args": ["serve", "mcp"]
+      "args": ["serve", "mcp", "--mode", "filtered", "--runtime-capability", "hooks"]
     }
   }
 }

@@ -25,13 +25,19 @@ FULCRUM_MONITOR_PORT=5000 fulcrum serve mcp
 
 ### Recommended for Claude Code (hooks installed)
 
-Use `--profile hook-only` to strip the 3 hook-equivalent tools (`recall_memory`, `write_memory`, `get_current_context`) from the MCP surface. Claude Code's hooks already call these in-process, so removing them from MCP reduces context noise and avoids double-charging:
+Use the planner-driven filtered mode with hook capabilities enabled. Claude Code's hooks already cover `recall_memory`, `write_memory`, and `get_current_context` in-process, so the filtered surface removes them from MCP and reduces prompt noise:
+
+```
+fulcrum serve mcp --mode filtered --runtime-capability hooks
+```
+
+The compatibility shortcut remains available:
 
 ```
 fulcrum serve mcp --profile hook-only
 ```
 
-This serves 20 tools instead of 23. For role-based filtering (e.g. only expose tools a `software_engineer` may use):
+For role-based filtering (for example only expose tools a `software_engineer` may use):
 
 ```
 fulcrum serve mcp --profile software_engineer
@@ -404,12 +410,15 @@ Returns the workspace_id and project_id for the directory the MCP server was sta
 
 When operating as part of a Fulcrum-managed workflow:
 
-1. **On session start**: Call `mcp__fulcrum__get_current_context` (no parameters) to get `workspace_id` and `project_id` — these IDs are required by every other tool
-2. **Understand state**: Call `mcp__fulcrum__get_workspace_status` with the `workspace_id` from step 1
-3. **Before working on a task**: Call `mcp__fulcrum__start_agent_run` with your role and task_id
-4. **During long tasks**: Call `mcp__fulcrum__heartbeat_agent_run` every few minutes
-5. **When blocked**: Call `mcp__fulcrum__block_agent_run` with a clear reason
-6. **On completion**: Call `mcp__fulcrum__complete_agent_run` with summary and artifact paths
+1. **Preferred path**: use hooks when available, otherwise call `fulcrum action exec <action>` through the CLI
+2. **On session start**: call `fulcrum action exec get_current_context` to get `workspace_id` and `project_id`
+3. **Understand state**: call `fulcrum action exec get_workspace_status` with the `workspace_id`
+4. **Before working on a task**: call `fulcrum action exec start_agent_run` with your role and task_id
+5. **During long tasks**: call `fulcrum action exec heartbeat_agent_run`
+6. **When blocked**: call `fulcrum action exec block_agent_run` with a clear reason
+7. **On completion**: call `fulcrum action exec complete_agent_run` with summary and artifact paths
+
+Use the `mcp__fulcrum__*` tools directly only when the runtime requires MCP-native execution.
 
 ---
 
@@ -418,12 +427,12 @@ When operating as part of a Fulcrum-managed workflow:
 **`chief_of_staff`** (L1 — orchestration only):
 - MUST NOT write code, edit files, or run builds
 - Creates tasks, delegates to specialist roles, synthesizes results
-- Uses `mcp__fulcrum__build_cos_context` to orient before every session
+- Uses `fulcrum action exec build_cos_context` to orient before every session
 - Allowed to create and invoke teams (only L1 role with this permission)
 
 **All other roles** (L2 — implementation):
 - MUST NOT invoke teams or create sub-orchestration workflows
-- Focus on the assigned task; complete and report via `mcp__fulcrum__complete_agent_run`
+- Focus on the assigned task; complete and report via `fulcrum action exec complete_agent_run`
 
 ---
 

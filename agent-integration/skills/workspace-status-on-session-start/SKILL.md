@@ -1,15 +1,12 @@
 ---
 name: workspace-status-on-session-start
 description: Fetch workspace status at the start of every session to see running agents, WIP budget, and blocked runs. Applies before you start any new run or respond to a user request in a Fulcrum workspace.
-allowed-tools:
-  - mcp__fulcrum__get_current_context
-  - mcp__fulcrum__get_workspace_status
 ---
 
 # Check workspace status on session start
 
 At the very start of a session, before you call `start_agent_run`, call
-`mcp__fulcrum__get_workspace_status`. This is the cheapest way to avoid
+`fulcrum action exec get_workspace_status`. This is the cheapest way to avoid
 duplicate work, WIP-limit surprises, and stale context.
 
 ## When to apply
@@ -23,13 +20,12 @@ duplicate work, WIP-limit surprises, and stale context.
 
 ## How
 
-```
+```bash
 # Step 1: get workspace_id (no parameters needed)
-mcp__fulcrum__get_current_context
+fulcrum action exec get_current_context
 
 # Step 2: use the returned workspace_id
-mcp__fulcrum__get_workspace_status
-  workspace_id: <from get_current_context result>
+fulcrum action exec get_workspace_status --json '{"workspace_id":"ws_123"}'
 ```
 
 The response tells you:
@@ -48,7 +44,7 @@ The response tells you:
 ## Chief of staff extension
 
 For `chief_of_staff` specifically, also call
-`mcp__fulcrum__build_cos_context`. It returns a curated markdown block
+`fulcrum action exec build_cos_context`. It returns a curated markdown block
 (active runs, recent completions, pending blocks, WIP pressure) ready to
 prepend to your next response. Always call it at session start and before
 major planning turns — it is cheaper than re-deriving the state yourself.

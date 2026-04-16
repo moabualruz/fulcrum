@@ -56,9 +56,326 @@ export interface RegistryEntry {
   handler: (args: Record<string, unknown>, deps: HandlerDeps) => Promise<unknown>
 }
 
+export interface ActionCliContract {
+  /** Generic CLI execution path — stable for scripts, hooks, and automation. */
+  primaryCommand: string[]
+  /** Legacy compatibility path retained while `tool exec` remains supported. */
+  compatibilityCommand?: string[]
+  stdinJson: boolean
+}
+
+export interface ActionMcpContract {
+  /** MCP tool name exposed to compatibility clients. */
+  toolName?: string
+  /** True when MCP is a compatibility transport rather than the preferred path. */
+  compatibilityOnly: boolean
+}
+
+export interface ActionHookContract {
+  coverage: 'none' | 'partial' | 'full'
+  nativePoints: string[]
+  nativePlatforms: string[]
+  cliSubstitutable: boolean
+}
+
+export interface ActionAvailability {
+  platforms: string[]
+  agentTypes?: string[]
+  runtimeCapabilities: string[]
+}
+
+export interface ActionObservability {
+  traceName: string
+  eventName: string
+}
+
+export interface ActionDefinition {
+  action_name: string
+  cli: ActionCliContract
+  mcp: ActionMcpContract
+  hooks: ActionHookContract
+  availability: ActionAvailability
+  fallbackOrder: Array<'hook' | 'cli' | 'mcp'>
+  observability: ActionObservability
+}
+
+export type McpExposureMode = 'full' | 'filtered' | 'minimal'
+
+export interface McpExposureRequest {
+  mode?: McpExposureMode
+  profile?: string
+  agentType?: string
+  platform?: string
+  runtimeCapabilities?: string[]
+  includeActions?: string[]
+  excludeActions?: string[]
+}
+
+export interface McpExposureDecision {
+  toolName: string
+  actionName: string
+  exposed: boolean
+  reasons: string[]
+}
+
+export interface McpExposurePlan {
+  mode: McpExposureMode
+  decisions: McpExposureDecision[]
+  filter: (schema: import('./mcp-tools.js').ToolSchema) => boolean
+}
+
+export interface AdditionalActionDefinitionInput {
+  action_name: string
+  mcp: ToolSchema
+}
+
 // ─────────────────────────── Registry ────────────────────────────────────────
 
 export const TOOL_REGISTRY = new Map<string, RegistryEntry>()
+const ADDITIONAL_ACTIONS: AdditionalActionDefinitionInput[] = []
+
+const ACTION_PLATFORM_OVERRIDES = {
+  recall_memory: {
+    hooks: {
+      nativePoints: ['claude.pre_tool_use', 'gemini.before_tool', 'pi.before_tool'],
+      nativePlatforms: ['claude', 'gemini', 'pi'],
+    },
+  },
+  write_memory: {
+    hooks: {
+      nativePoints: ['claude.post_tool_use', 'claude.pre_compact', 'gemini.after_tool', 'pi.after_tool'],
+      nativePlatforms: ['claude', 'gemini', 'pi'],
+    },
+  },
+  get_current_context: {
+    hooks: {
+      nativePoints: ['claude.session_start', 'claude.pre_tool_use'],
+      nativePlatforms: ['claude'],
+    },
+  },
+} satisfies Record<string, Partial<Pick<ActionDefinition, 'hooks' | 'availability'>>>
+
+function normalizeActionName(name: string): string {
+  return name.replace(/^mcp__fulcrum__/, '')
+}
+
+function buildActionDefinition(name: string, entry: RegistryEntry): ActionDefinition {
+  const actionName = normalizeActionName(name)
+  const hookCoverage = entry.capabilities.hookEquivalent ? 'full' : 'none'
+  const overrides = ACTION_PLATFORM_OVERRIDES[actionName]
+  return {
+    action_name: actionName,
+    cli: {
+      primaryCommand: ['action', 'exec', actionName],
+      compatibilityCommand: ['tool', 'exec', entry.schema?.name ?? actionName],
+      stdinJson: true,
+    },
+    mcp: {
+      toolName: entry.schema?.name,
+      compatibilityOnly: entry.schema !== undefined,
+    },
+    hooks: {
+      coverage: overrides?.hooks?.coverage ?? hookCoverage,
+      nativePoints: overrides?.hooks?.nativePoints ?? (entry.capabilities.hookEquivalent ? ['fulcrum-hook'] : []),
+      nativePlatforms: overrides?.hooks?.nativePlatforms ?? (entry.capabilities.hookEquivalent ? ['any'] : []),
+      cliSubstitutable: true,
+    },
+    availability: {
+      platforms: overrides?.availability?.platforms ?? ['any'],
+      agentTypes: overrides?.availability?.agentTypes ?? (entry.capabilities.minRole ? [entry.capabilities.minRole] : undefined),
+      runtimeCapabilities: overrides?.availability?.runtimeCapabilities ?? [],
+    },
+    fallbackOrder: entry.capabilities.hookEquivalent ? ['hook', 'cli', 'mcp'] : ['cli', 'mcp'],
+    observability: {
+      traceName: `action.${actionName}`,
+      eventName: `${actionName}.executed`,
+    },
+  }
+}
+
+function buildAdditionalActionDefinition(action: AdditionalActionDefinitionInput): ActionDefinition {
+  const actionName = normalizeActionName(action.action_name)
+  return {
+    action_name: actionName,
+    cli: {
+      primaryCommand: ['action', 'exec', actionName],
+      compatibilityCommand: ['tool', 'exec', action.mcp.name],
+      stdinJson: true,
+    },
+    mcp: {
+      toolName: action.mcp.name,
+      compatibilityOnly: true,
+    },
+    hooks: {
+      coverage: 'none',
+      nativePoints: [],
+      nativePlatforms: [],
+      cliSubstitutable: true,
+    },
+    availability: {
+      platforms: ['any'],
+      runtimeCapabilities: [],
+    },
+    fallbackOrder: ['cli', 'mcp'],
+    observability: {
+      traceName: `action.${actionName}`,
+      eventName: `${actionName}.executed`,
+    },
+  }
+}
+
+export function getActionDefinition(name: string): ActionDefinition | undefined {
+  const actionName = normalizeActionName(name)
+  const entry = TOOL_REGISTRY.get(actionName)
+  if (entry) return buildActionDefinition(actionName, entry)
+  const additional = ADDITIONAL_ACTIONS.find(action => normalizeActionName(action.action_name) === actionName)
+  return additional ? buildAdditionalActionDefinition(additional) : undefined
+}
+
+export function getRegistryEntry(name: string): RegistryEntry | undefined {
+  return TOOL_REGISTRY.get(normalizeActionName(name))
+}
+
+export function listActionDefinitions(): ActionDefinition[] {
+  const builtIns = Array.from(TOOL_REGISTRY.entries())
+    .map(([name, entry]) => buildActionDefinition(name, entry))
+    .filter(action => action.mcp.toolName !== undefined)
+  const additional = ADDITIONAL_ACTIONS.map(action => buildAdditionalActionDefinition(action))
+  return [...builtIns, ...additional]
+}
+
+export function setAdditionalActionDefinitions(actions: AdditionalActionDefinitionInput[]): void {
+  ADDITIONAL_ACTIONS.length = 0
+  ADDITIONAL_ACTIONS.push(...actions)
+}
+
+function matchesPlatform(action: ActionDefinition, platform?: string): boolean {
+  if (!platform) return true
+  return action.availability.platforms.includes('any') || action.availability.platforms.includes(platform)
+}
+
+function matchesAgentType(action: ActionDefinition, agentType?: string): boolean {
+  if (!agentType) return true
+  if (!action.availability.agentTypes || action.availability.agentTypes.length === 0) return true
+  return action.availability.agentTypes.includes(agentType)
+}
+
+function matchesRuntimeCapabilities(
+  action: ActionDefinition,
+  platform: string | undefined,
+  mode: McpExposureMode,
+  runtimeCapabilities: Set<string>,
+): boolean {
+  if (mode === 'full') return true
+  if (runtimeCapabilities.has('hooks') && action.hooks.coverage === 'full') {
+    if (!platform) return false
+    if (
+      action.hooks.nativePlatforms.includes('any') ||
+      action.hooks.nativePlatforms.includes(platform)
+    ) {
+      return false
+    }
+  }
+  if (action.availability.runtimeCapabilities.length === 0) return true
+  return action.availability.runtimeCapabilities.every(cap => runtimeCapabilities.has(cap))
+}
+
+function matchesExplicitSets(actionName: string, includeActions: Set<string>, excludeActions: Set<string>): boolean {
+  if (excludeActions.has(actionName)) return false
+  if (includeActions.size === 0) return true
+  return includeActions.has(actionName)
+}
+
+async function resolveRolePolicy(profile?: string): Promise<{ allow: string[] | null; deny: Set<string>; warning?: string }> {
+  if (!profile) return { allow: null, deny: new Set<string>() }
+
+  const { getAgentDefinition } = await import('@moabualruz/fulcrum-core')
+  const def = getAgentDefinition(profile)
+  if (!def) {
+    return {
+      allow: null,
+      deny: new Set<string>(),
+      warning:
+        `[fulcrum/mcp] WARNING: --profile '${profile}' — no agent definition found for this role.\n` +
+        `  Role-based tool filtering is DISABLED; all tools matching other filters will be served.\n` +
+        `  Run: fulcrum agent definition list\n`,
+    }
+  }
+
+  return {
+    allow: def.tools_allow === null ? null : def.tools_allow.map(name => normalizeActionName(name)),
+    deny: new Set((def.tools_deny ?? []).map(name => normalizeActionName(name))),
+  }
+}
+
+export async function buildMcpExposurePlan(
+  request: McpExposureRequest = {},
+): Promise<McpExposurePlan> {
+  const mode = request.mode ?? 'filtered'
+  const runtimeCapabilities = new Set(request.runtimeCapabilities ?? [])
+  const includeActions = new Set((request.includeActions ?? []).map(name => normalizeActionName(name)))
+  const excludeActions = new Set((request.excludeActions ?? []).map(name => normalizeActionName(name)))
+  const rolePolicy = await resolveRolePolicy(request.profile ?? request.agentType)
+  if (rolePolicy.warning) process.stderr.write(rolePolicy.warning)
+
+  const decisions = listActionDefinitions().map((action): McpExposureDecision => {
+    const reasons: string[] = []
+    let exposed = true
+
+    if (!matchesExplicitSets(action.action_name, includeActions, excludeActions)) {
+      exposed = false
+      reasons.push(includeActions.size > 0 ? 'not_in_explicit_include_set' : 'explicitly_excluded')
+    }
+
+    if (exposed && !matchesPlatform(action, request.platform)) {
+      exposed = false
+      reasons.push(`platform_filtered:${request.platform}`)
+    }
+
+    if (exposed && !matchesAgentType(action, request.agentType)) {
+      exposed = false
+      reasons.push(`agent_type_filtered:${request.agentType}`)
+    }
+
+    if (exposed && !matchesRuntimeCapabilities(action, request.platform, mode, runtimeCapabilities)) {
+      exposed = false
+      reasons.push(runtimeCapabilities.has('hooks') && action.hooks.coverage === 'full'
+        ? 'hook_covered'
+        : 'runtime_capability_filtered')
+    }
+
+    if (exposed && rolePolicy.deny.has(action.action_name)) {
+      exposed = false
+      reasons.push('policy_deny')
+    }
+
+    if (exposed && rolePolicy.allow !== null && !rolePolicy.allow.includes(action.action_name)) {
+      exposed = false
+      reasons.push('policy_not_allowed')
+    }
+
+    if (exposed && mode === 'minimal' && includeActions.size === 0 && action.hooks.coverage === 'full') {
+      exposed = false
+      reasons.push('minimal_mode_prefers_hook_or_cli')
+    }
+
+    if (reasons.length === 0) reasons.push('exposed')
+
+    return {
+      toolName: action.mcp.toolName ?? action.action_name,
+      actionName: action.action_name,
+      exposed,
+      reasons,
+    }
+  })
+
+  const allowedToolNames = new Set(decisions.filter(decision => decision.exposed).map(decision => decision.toolName))
+  return {
+    mode,
+    decisions,
+    filter: (schema: import('./mcp-tools.js').ToolSchema) => allowedToolNames.has(schema.name),
+  }
+}
 
 // ─────────────────────────── Helpers ────────────────────────────────────────
 
@@ -129,35 +446,12 @@ export async function buildProfileFilter(
   profile: string,
 ): Promise<((schema: import('./mcp-tools.js').ToolSchema) => boolean) | undefined> {
   if (!profile) return undefined
-
-  if (profile === 'hook-only') {
-    return (schema: import('./mcp-tools.js').ToolSchema) => {
-      const entry = TOOL_REGISTRY.get(schema.name)
-      return !entry?.capabilities.hookEquivalent
-    }
-  }
-
-  // Role-based filter: load tools_allow / tools_deny from agent_definitions
-  const { getAgentDefinition } = await import('@moabualruz/fulcrum-core')
-  const def = getAgentDefinition(profile)
-  if (!def) {
-    process.stderr.write(
-      `[fulcrum/mcp] WARNING: --profile '${profile}' — no agent definition found for this role.\n` +
-      `  Role-based tool filtering is DISABLED; all 23 tools will be served.\n` +
-      `  To fix: verify CORE-001 is applied and the role exists in agent_definitions.\n` +
-      `  Run: fulcrum agent definition list\n`,
-    )
-    return undefined
-  }
-
-  const allow = def.tools_allow  // null = no restriction
-  const deny = new Set(def.tools_deny ?? [])
-
-  return (schema: import('./mcp-tools.js').ToolSchema) => {
-    if (deny.has(schema.name)) return false
-    if (allow !== null && !allow.includes(schema.name)) return false
-    return true
-  }
+  const plan = await buildMcpExposurePlan(
+    profile === 'hook-only'
+      ? { mode: 'filtered', runtimeCapabilities: ['hooks'] }
+      : { mode: 'filtered', profile, agentType: profile },
+  )
+  return plan.filter
 }
 
 // ─────────────────────────── Tool registrations ────────────────────────────
@@ -503,10 +797,10 @@ TOOL_REGISTRY.set('get_current_context', {
     const monitorUrl = `http://localhost:${monitorPort}`
     const monitorRunning = await probeMonitor(monitorUrl)
 
-    let suggestedNextCall = 'mcp__fulcrum__list_tasks'
+    let suggestedNextCall = 'list_tasks'
     try {
       const tasks = await listTasks({ workspace_id: deps.workspace_id, limit: 1 })
-      if (tasks.length === 0) suggestedNextCall = 'mcp__fulcrum__create_task'
+      if (tasks.length === 0) suggestedNextCall = 'create_task'
     } catch { /* DB not ready — fall through */ }
 
     return {

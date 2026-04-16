@@ -2,9 +2,13 @@
 // Phase 2 + Phase 4: verify registry structure, capability completeness, and
 // that all 23 public tool schemas have corresponding registry entries.
 
-import { describe, it, expect } from 'vitest'
-import { TOOL_REGISTRY } from '../tool-registry.js'
+import { describe, it, expect, afterEach } from 'vitest'
+import { TOOL_REGISTRY, getActionDefinition, getRegistryEntry, listActionDefinitions, setAdditionalActionDefinitions } from '../tool-registry.js'
 import { TOOL_SCHEMAS } from '../mcp-tools.js'
+
+afterEach(() => {
+  setAdditionalActionDefinitions([])
+})
 
 describe('TOOL_REGISTRY', () => {
   it('every public tool schema has a registry entry', () => {
@@ -70,5 +74,54 @@ describe('TOOL_REGISTRY', () => {
     expect(TOOL_REGISTRY.size).toBeGreaterThan(TOOL_SCHEMAS.length)
     // Specifically: 23 public tools + get_task internal = 24
     expect(TOOL_REGISTRY.size).toBe(TOOL_SCHEMAS.length + 1)
+  })
+
+  it('builds canonical action metadata for public actions', () => {
+    const action = getActionDefinition('list_tasks')
+    expect(action).toBeDefined()
+    expect(action?.action_name).toBe('list_tasks')
+    expect(action?.cli.primaryCommand).toEqual(['action', 'exec', 'list_tasks'])
+    expect(action?.cli.compatibilityCommand).toEqual(['tool', 'exec', 'list_tasks'])
+    expect(action?.mcp.toolName).toBe('list_tasks')
+    expect(action?.fallbackOrder).toEqual(['cli', 'mcp'])
+  })
+
+  it('builds richer hook metadata for hook-covered actions', () => {
+    const action = getActionDefinition('get_current_context')
+    expect(action?.hooks.coverage).toBe('full')
+    expect(action?.hooks.nativePoints).toContain('claude.session_start')
+    expect(action?.hooks.nativePlatforms).toEqual(['claude'])
+  })
+
+
+  it('resolves legacy MCP-prefixed action names to the same registry entry', () => {
+    const direct = getRegistryEntry('list_tasks')
+    const prefixed = getRegistryEntry('mcp__fulcrum__list_tasks')
+    expect(prefixed).toBe(direct)
+  })
+
+  it('lists action definitions for all public MCP-exposed actions', () => {
+    const actions = listActionDefinitions()
+    expect(actions).toHaveLength(TOOL_SCHEMAS.length)
+    expect(actions.some(action => action.action_name === 'list_tasks')).toBe(true)
+    expect(actions.every(action => action.mcp.toolName)).toBe(true)
+  })
+
+  it('includes additional plugin action definitions in the canonical action list', () => {
+    setAdditionalActionDefinitions([
+      {
+        action_name: 'plugin_sample',
+        mcp: {
+          title: 'Plugin Sample',
+          name: 'plugin_sample',
+          description: 'Plugin sample tool',
+          inputSchema: { type: 'object', properties: {} },
+        },
+      },
+    ])
+
+    const action = getActionDefinition('plugin_sample')
+    expect(action?.action_name).toBe('plugin_sample')
+    expect(listActionDefinitions().some(entry => entry.action_name === 'plugin_sample')).toBe(true)
   })
 })

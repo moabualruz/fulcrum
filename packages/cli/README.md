@@ -7,10 +7,14 @@ Command-line interface and MCP server for Fulcrum. Entry point for all agent run
 ```
 fulcrum
 ├── serve
-│   ├── mcp          stdio MCP server — 13 control-plane tools
-│   ├── mcp-http     HTTP MCP server (StreamableHTTP, default port 4722)
+│   ├── mcp          stdio MCP compatibility server + exposure planner
+│   ├── mcp-http     HTTP MCP compatibility server (StreamableHTTP, default port 4722)
 │   ├── monitor      HTTP monitor + control API (default port 4721)
 │   └── all          both MCP + monitor
+│
+├── mcp              inspect MCP exposure plans
+├── action           canonical action list / exec
+├── tool             compatibility alias over canonical action handlers
 │
 ├── doctor [--json]  environment health check — 8 checks, exits 1 on FAIL
 │
@@ -35,25 +39,25 @@ fulcrum
 └── --version / version
 ```
 
-All commands accept `--json` for machine-readable output.
+All commands accept `--json` for machine-readable output where applicable.
 
-## MCP tools (13)
+## Canonical actions and MCP compatibility
 
-| Tool | Description |
-|------|-------------|
-| `list_tasks` | List tasks in a workspace/project |
-| `create_task` | Create a task |
-| `update_task` | Update task status/title/assignment |
-| `recall_memory` | Hybrid semantic + keyword search (optional `max_chars`) |
-| `write_memory` | Store a memory entry |
-| `list_agent_profiles` | List 24 canonical role profiles |
-| `get_agent_run_status` | Get run status |
-| `start_agent_run` | Start an agent run |
-| `heartbeat_agent_run` | Heartbeat a run |
-| `complete_agent_run` | Complete a run with artifacts |
-| `block_agent_run` | Block a run for escalation |
-| `build_cos_context` | Build Chief-of-Staff context block |
-| `get_workspace_status` | Workspace health + recent activity |
+Fulcrum now standardizes platform capabilities behind canonical actions. The preferred execution path is:
+
+1. hooks when available
+2. `fulcrum action exec <action_name>`
+3. MCP compatibility exposure when a runtime needs an MCP tool surface
+
+Built-in actions remain accessible through:
+
+- `fulcrum action list`
+- `fulcrum action exec <action_name>`
+- `fulcrum tool list`
+- `fulcrum tool exec <name>` as a compatibility alias
+- `fulcrum mcp plan` to inspect the filtered MCP surface for a runtime or agent
+
+The built-in MCP compatibility catalog contains 23 tools. The active exposed subset is filtered at startup by the action metadata and planner flags.
 
 ## Auto-init
 
@@ -61,7 +65,7 @@ Every `fulcrum` command auto-initializes the current directory as a Fulcrum proj
 
 ## Plugin discovery
 
-Fulcrum discovers plugins via `package.json` manifest keys. Any installed npm package with `"fulcrum": { "type": "plugin" }` is loaded automatically on server start. Plugins can register additional MCP tools, adapters, and workflow step handlers.
+Fulcrum discovers plugins via `package.json` manifest keys. Any installed npm package with `"fulcrum": { "type": "plugin" }` is loaded automatically on server start. Plugins must register canonical actions via action manifests; MCP exposure for plugin capabilities is derived from that metadata. Plugins can also contribute adapters and workflow step handlers.
 
 ## Hook system
 

@@ -24,5 +24,5 @@ The Research Worker is the L2 specialist that conducts focused information-gathe
 
 - `WebSearch`, `WebFetch` (when an adapter is installed)
 - `Read`, `Grep`, `Glob` for in-repo cross-referencing
-- `mcp__fulcrum__recall_memory`, `mcp__fulcrum__write_memory`
+- `recall_memory`, `write_memory`
 - `write_artifact` for the `research_note` output

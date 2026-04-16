@@ -23,6 +23,6 @@ The Architecture Reviewer is the L2 read-only gate that reviews system designs, 
 ## Tools / Capabilities
 
 - `Read`, `Grep`, `Glob` (read-only access)
-- `mcp__fulcrum__recall_memory`, `mcp__fulcrum__write_memory`
+- `recall_memory`, `write_memory`
 - `search_codebase`
 - `write_artifact` for the `review_report` output
