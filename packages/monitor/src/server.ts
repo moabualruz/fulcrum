@@ -1,8 +1,15 @@
 // packages/monitor/src/server.ts
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
+import { readFileSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import { getDb, listAgentDefinitions, getEventBus, createTask, updateTask, blockAgentRun } from '@fulcrum/core'
 import type { EmitEventInput } from '@fulcrum/core'
+
+// Resolve the public directory relative to this file (works in both ts-node and compiled)
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const PUBLIC_DIR = join(__dirname, 'public')
 import { evaluatePolicy } from '@fulcrum/policy'
 import {
   getMetrics,
@@ -60,6 +67,16 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   const port = config.port ?? 7331
   const host = config.host ?? '127.0.0.1'
   const workspace_id = config.workspace_id
+
+  // ─── GET / — serve the web UI ───────────────────────────────────────────
+  app.get('/', (c) => {
+    try {
+      const html = readFileSync(join(PUBLIC_DIR, 'index.html'), 'utf-8')
+      return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+    } catch {
+      return c.json({ error: 'Web UI not found. Build or check packages/monitor/src/public/index.html' }, 404)
+    }
+  })
 
   app.get('/status', (c) => {
     return c.json({
