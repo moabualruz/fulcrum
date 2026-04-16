@@ -107,6 +107,12 @@ DIAGNOSTICS
   doctor              Run environment + configuration health checks
   doctor --json       Output checks as JSON
 
+COCKPIT
+  tui                         Open live terminal dashboard (Ink v4 TUI)
+                              Panes: task board, agent runs, event stream, blocked runs
+                              Keys: tab=cycle panes, arrows=navigate, q=quit
+                              Actions: u=unblock run, k=kill run, n=new task
+
 ACTIVITY LOG
   log                         Show last 50 agent events (human-readable)
   log --follow                Tail live SSE stream from monitor
@@ -2209,6 +2215,12 @@ OPTIONS (serve mcp)
   if (group === 'log') {
     const { runLog } = await import('./log.js')
     await runLog(args)
+    return
+  }
+
+  if (group === 'tui') {
+    const { runTui } = await import('./tui/index.js')
+    await runTui()
     return
   }
 
