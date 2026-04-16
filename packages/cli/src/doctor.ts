@@ -7,7 +7,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { execSync } from 'child_process'
+import { createRequire } from 'module'
 import { globalDataDir } from '@moabualruz/fulcrum-core'
+
+const require = createRequire(import.meta.url)
 
 // ---------- Check result type ----------
 
@@ -83,11 +86,13 @@ function checkSqliteBinary(): CheckResult {
   }
 }
 
-function checkDbLiveness(): CheckResult {
+async function checkDbLiveness(): Promise<CheckResult> {
+  const dataDir = process.env['FULCRUM_DATA_DIR'] ?? join(process.env['HOME'] ?? '~', '.local', 'share', 'fulcrum')
+  if (!existsSync(dataDir)) {
+    return { name: 'Database liveness', status: 'warn', message: 'Could not check DB — run a fulcrum command first to initialize' }
+  }
   try {
-    // Dynamic import to avoid top-level DB initialization on doctor runs
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { checkDbHealth } = require('@moabualruz/fulcrum-core') as { checkDbHealth: () => { ok: boolean; latencyMs?: number; error?: string } }
+    const { checkDbHealth } = await import('@moabualruz/fulcrum-core')
     const result = checkDbHealth()
     if (result.ok) {
       return { name: 'Database liveness', status: 'pass', message: `${result.latencyMs}ms round-trip` }
@@ -184,13 +189,13 @@ function checkMonitorToken(): CheckResult {
  * Performs a test INSERT + immediate DELETE — a round-trip that proves the
  * migration ran, the DB is writable, and the table exists.
  */
-function checkHookEventsWritable(): CheckResult {
+async function checkHookEventsWritable(): Promise<CheckResult> {
+  const dataDir = process.env['FULCRUM_DATA_DIR'] ?? join(process.env['HOME'] ?? '~', '.local', 'share', 'fulcrum')
+  if (!existsSync(dataDir)) {
+    return { name: 'Hook events writable', status: 'warn', message: 'Could not check DB — run a fulcrum command first to initialize' }
+  }
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getDb, newId } = require('@moabualruz/fulcrum-core') as {
-      getDb: () => import('better-sqlite3').Database
-      newId: (t: string) => string
-    }
+    const { getDb, newId } = await import('@moabualruz/fulcrum-core')
     const db = getDb()
     const testId = newId('hook_event')
     db.prepare(`
@@ -266,8 +271,8 @@ export interface DoctorOptions {
   dryRun?: boolean
 }
 
-function collectChecks(cwd: string): CheckResult[] {
-  return [
+async function collectChecks(cwd: string): Promise<CheckResult[]> {
+  return Promise.all([
     checkNodeVersion(),
     checkGlobalConfig(),
     checkDataDir(),
@@ -279,13 +284,13 @@ function collectChecks(cwd: string): CheckResult[] {
     checkAgentIntegration(cwd),
     checkMonitorToken(),
     checkOptionalPeerDeps(),
-  ]
+  ])
 }
 
 export async function runDoctor(options: DoctorOptions = {}): Promise<{ results: CheckResult[]; exitCode: number; fixesApplied: number }> {
   const cwd = options.cwd ?? process.cwd()
 
-  let results = collectChecks(cwd)
+  let results = await collectChecks(cwd)
   let fixesApplied = 0
 
   if (options.dryRun) {
@@ -310,7 +315,7 @@ export async function runDoctor(options: DoctorOptions = {}): Promise<{ results:
     }
     // Re-run checks to reflect post-fix state
     if (fixesApplied > 0) {
-      results = collectChecks(cwd)
+      results = await collectChecks(cwd)
     }
   }
 

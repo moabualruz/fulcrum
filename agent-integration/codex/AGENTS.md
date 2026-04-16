@@ -27,17 +27,18 @@ Monitor URLs (default port 4721):
 
 ## MCP Configuration
 
-Add the following to your Codex MCP configuration (`.codex/config.json` or pass via `--mcp-config`):
+Add the following to `~/.codex/config.toml` (the global Codex config), or run `fulcrum init --codex` to merge it automatically:
 
-```json
-{
-  "mcpServers": {
-    "fulcrum": {
-      "command": "fulcrum",
-      "args": ["serve", "mcp", "--mode", "filtered"]
-    }
-  }
-}
+```toml
+[mcp_servers.fulcrum]
+command = "fulcrum"
+args = ["serve", "mcp", "--mode", "filtered"]
+```
+
+To add via the Codex CLI:
+
+```bash
+codex mcp add fulcrum -- fulcrum serve mcp --mode filtered
 ```
 
 ---

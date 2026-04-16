@@ -22,6 +22,7 @@ CONTROL PLANE
   memory init          Initialize L0 vault + L1 SQLite (+ optional L2)
   memory accelerate    Enable L2 (Kuzu graph + HNSW vector search)
   memory rebuild       Rebuild L1 from L0 vault files
+  memory embed         Backfill vector embeddings for all memories missing them
   memory status        Show vault path and layer status
 
   serve mcp            Start MCP server (stdio JSON-RPC 2.0) + auto-starts monitor
@@ -320,6 +321,30 @@ fulcrum memory — memory vault commands
     return
   }
 
+  if (command === 'embed') {
+    // Backfill vec_memories for all memories that don't have embeddings yet
+    await warmEmbedding()
+    const { storeEmbeddingInVec } = await import('@moabualruz/fulcrum-memory')
+    const { getDb: _getDb, runMigrations: _rm, loadConfig: _lc2 } = await import('@moabualruz/fulcrum-core')
+    _rm(_getDb())
+    const db = _getDb()
+    const rows = db.prepare(
+      'SELECT memory_id, canonical_text, content FROM memories WHERE embedding IS NULL ORDER BY created_at'
+    ).all() as { memory_id: string; canonical_text: string | null; content: string }[]
+    console.log(`Embedding ${rows.length} memories without vectors...`)
+    let ok = 0, fail = 0
+    for (const row of rows) {
+      try {
+        await storeEmbeddingInVec(db, row.memory_id, row.canonical_text ?? row.content ?? '')
+        ok++
+      } catch {
+        fail++
+      }
+    }
+    console.log(`✓ Embedded ${ok} memories${fail > 0 ? `, ${fail} failed` : ''}`)
+    return
+  }
+
   if (command === 'status') {
     const { getVaultPath, vaultExists } = await import('@moabualruz/fulcrum-memory')
     const { readState } = await import('@moabualruz/fulcrum-memory')
@@ -563,10 +588,292 @@ export async function runPreCompactHook(): Promise<void> {
   process.exit(0)
 }
 
+// ── Shared lifecycle helpers ──────────────────────────────────────────────────
+
+/** Read all stdin, return trimmed string. */
+async function readStdinFully(): Promise<string> {
+  const chunks: Buffer[] = []
+  process.stdin.on('data', (c: Buffer) => chunks.push(c))
+  await new Promise<void>(r => process.stdin.on('end', r))
+  return Buffer.concat(chunks).toString('utf-8').trim()
+}
+
+/** Sanitize an arbitrary string for use as a filesystem path component. */
+function sanitizeId(id: string): string {
+  return id.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 128)
+}
+
+/**
+ * Common session initialization: ensure DB, start run, write session file.
+ * Returns session metadata. Throws on unrecoverable errors.
+ */
+async function initFulcrumSession(opts: {
+  sessionId: string
+  cliName: string
+  model?: string
+}): Promise<{ run_id: string; workspace_id: string; project_id: string }> {
+  const { startAgentRun, getDb, runMigrations, loadConfig } = await import('@moabualruz/fulcrum-core')
+  const config = loadConfig()
+  const db = getDb()
+  runMigrations(db)
+
+  const wsId = config.workspace_id ?? 'default'
+  const projId = config.project_id ?? wsId
+  const now = new Date().toISOString()
+
+  db.prepare('INSERT OR IGNORE INTO workspaces (workspace_id, name, status, created_at) VALUES (?, ?, ?, ?)')
+    .run(wsId, wsId, 'active', now)
+  db.prepare('INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at) VALUES (?, ?, ?, ?)')
+    .run(projId, wsId, projId, now)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const agentRole = (process.env['FULCRUM_AGENT_ROLE'] ?? 'software_engineer') as any
+  const run = await startAgentRun({
+    role: agentRole,
+    workspace_id: wsId,
+    agent_id: `${opts.cliName}/${opts.sessionId.slice(0, 12)}`,
+    pi_profile: opts.model ?? opts.cliName,
+  })
+
+  // Pre-fetch workspace snapshot (non-blocking)
+  let workspaceSnapshot: Record<string, unknown> | undefined
+  let fetchedAt: string | undefined
+  try {
+    const { TOOL_REGISTRY, buildDeps } = await import('./tool-registry.js')
+    const snapDeps = buildDeps(wsId, projId)
+    const [statusResult, tasksResult] = await Promise.all([
+      TOOL_REGISTRY.get('get_workspace_status')!.handler({ workspace_id: wsId }, snapDeps),
+      TOOL_REGISTRY.get('list_tasks')!.handler({ workspace_id: wsId, project_id: projId, status: 'open', limit: 10 }, snapDeps),
+    ])
+    workspaceSnapshot = { status: statusResult, tasks: tasksResult }
+    fetchedAt = new Date().toISOString()
+  } catch { /* non-fatal */ }
+
+  const sessionFile = getSessionFilePath(opts.sessionId)
+  writeFileSync(sessionFile, JSON.stringify({
+    session_id: opts.sessionId,
+    run_id: run.run_id,
+    workspace_id: wsId,
+    project_id: projId,
+    started_at: now,
+    ...(workspaceSnapshot ? { workspace_snapshot: workspaceSnapshot, fetched_at: fetchedAt } : {}),
+  }, null, 2))
+
+  return { run_id: run.run_id, workspace_id: wsId, project_id: projId }
+}
+
+/**
+ * Complete the run recorded in the session file and clean up.
+ */
+async function completeFulcrumSession(sessionId: string, summary = ''): Promise<void> {
+  const sessionFile = getSessionFilePath(sessionId)
+  if (!existsSync(sessionFile)) return
+
+  const { completeAgentRun, getDb, runMigrations, loadConfig } = await import('@moabualruz/fulcrum-core')
+  const config = loadConfig()
+  const db = getDb()
+  runMigrations(db)
+  void config
+
+  const session = JSON.parse(readFileSync(sessionFile, 'utf-8')) as { run_id: string }
+  await completeAgentRun({ run_id: session.run_id, output_summary: summary || 'Session ended' })
+  process.stderr.write(`[fulcrum/session] run completed: ${session.run_id}\n`)
+}
+
+// ── Gemini lifecycle hooks ────────────────────────────────────────────────────
+
+/**
+ * Gemini SessionStart hook.
+ * Stdin: JSON with { conversationId?, model? } or empty.
+ * Returns: Gemini hook response with { hookSpecificOutput: { additionalContext: "..." } }
+ */
+export async function runGeminiSessionStartHook(): Promise<void> {
+  const raw = await readStdinFully()
+  let sessionId = ''
+  let model: string | undefined
+
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['conversationId'] ?? evt['session_id'] ?? evt['sessionId']) as string ?? ''
+      model = evt['model'] as string | undefined
+    } catch { /* fallback */ }
+  }
+
+  if (!sessionId) sessionId = `gemini_${Date.now()}`
+  sessionId = sanitizeId(sessionId)
+
+  let additionalContext = ''
+  try {
+    const { run_id, workspace_id, project_id } = await initFulcrumSession({ sessionId, cliName: 'gemini', model })
+    process.stderr.write(`[fulcrum/session] gemini run started: ${run_id}\n`)
+    additionalContext = [
+      `Fulcrum workspace: ${workspace_id}  project: ${project_id}`,
+      `Run ID: ${run_id}  (use for heartbeat/complete/block calls)`,
+      `Type /fulcrum-status for live workspace state.`,
+    ].join('\n')
+  } catch (err) {
+    process.stderr.write(`[fulcrum/session-start] gemini error (non-fatal): ${(err as Error).message}\n`)
+  }
+
+  // Gemini hook response format
+  if (additionalContext) {
+    process.stdout.write(JSON.stringify({
+      hookSpecificOutput: { additionalContext },
+    }) + '\n')
+  }
+
+  process.exit(0)
+}
+
+/**
+ * Gemini BeforeAgent hook.
+ * Injects a fresh workspace snapshot as additionalContext before the LLM turn.
+ */
+export async function runGeminiBeforeAgentHook(): Promise<void> {
+  const raw = await readStdinFully()
+  let sessionId = ''
+
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['conversationId'] ?? evt['session_id']) as string ?? ''
+    } catch { /* fallback */ }
+  }
+
+  let additionalContext = ''
+  if (sessionId) {
+    const sid = sanitizeId(sessionId)
+    try {
+      const sessionFile = getSessionFilePath(sid)
+      if (existsSync(sessionFile)) {
+        const session = JSON.parse(readFileSync(sessionFile, 'utf-8')) as Record<string, unknown>
+        const fetchedAt = session['fetched_at'] as string | undefined
+        const snapshot = session['workspace_snapshot'] as Record<string, unknown> | undefined
+        if (snapshot && fetchedAt) {
+          const ageMs = Date.now() - new Date(fetchedAt).getTime()
+          if (ageMs < 5 * 60 * 1000) {
+            additionalContext = `[Fulcrum context — ${Math.round(ageMs / 1000)}s old]\n${JSON.stringify(snapshot).slice(0, 800)}`
+          }
+        }
+      }
+    } catch { /* best-effort */ }
+  }
+
+  if (additionalContext) {
+    process.stdout.write(JSON.stringify({
+      hookSpecificOutput: { additionalContext },
+    }) + '\n')
+  }
+
+  process.exit(0)
+}
+
+/**
+ * Gemini SessionEnd hook.
+ * Completes the run started by SessionStart.
+ */
+export async function runGeminiSessionEndHook(): Promise<void> {
+  const raw = await readStdinFully()
+  let sessionId = ''
+
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['conversationId'] ?? evt['session_id']) as string ?? ''
+    } catch { /* fallback */ }
+  }
+
+  if (sessionId) {
+    try {
+      await completeFulcrumSession(sanitizeId(sessionId), 'Gemini session ended')
+    } catch (err) {
+      process.stderr.write(`[fulcrum/session-end] gemini error (non-fatal): ${(err as Error).message}\n`)
+    }
+  }
+
+  process.exit(0)
+}
+
+// ── Codex lifecycle hooks ─────────────────────────────────────────────────────
+
+/**
+ * Codex SessionStart hook.
+ * Stdin: JSON with { hook_event_name: "SessionStart", session_id?, ... }
+ * Returns: { hook_specific_output: { hook_event_name: "SessionStart", additional_context: "..." } }
+ */
+export async function runCodexSessionStartHook(): Promise<void> {
+  const raw = await readStdinFully()
+  let sessionId = process.env['CODEX_SESSION_ID'] ?? ''
+  let model: string | undefined
+
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId || `codex_${Date.now()}`
+      model = evt['model'] as string | undefined
+    } catch { /* fallback */ }
+  }
+
+  if (!sessionId) sessionId = `codex_${Date.now()}`
+  sessionId = sanitizeId(sessionId)
+
+  let additionalContext = ''
+  try {
+    const { run_id, workspace_id, project_id } = await initFulcrumSession({ sessionId, cliName: 'codex', model })
+    process.stderr.write(`[fulcrum/session] codex run started: ${run_id}\n`)
+    additionalContext = [
+      `Fulcrum workspace: ${workspace_id}  project: ${project_id}`,
+      `Run ID: ${run_id}`,
+      `Use \`fulcrum action exec\` to interact with the control plane.`,
+    ].join('\n')
+  } catch (err) {
+    process.stderr.write(`[fulcrum/session-start] codex error (non-fatal): ${(err as Error).message}\n`)
+  }
+
+  // Codex hook response format
+  if (additionalContext) {
+    process.stdout.write(JSON.stringify({
+      hook_specific_output: {
+        hook_event_name: 'SessionStart',
+        additional_context: additionalContext,
+      },
+    }) + '\n')
+  }
+
+  process.exit(0)
+}
+
+/**
+ * Codex Stop hook.
+ * Completes the run started by SessionStart.
+ */
+export async function runCodexStopHook(): Promise<void> {
+  const raw = await readStdinFully()
+  let sessionId = process.env['CODEX_SESSION_ID'] ?? ''
+
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId
+    } catch { /* fallback */ }
+  }
+
+  if (sessionId) {
+    try {
+      await completeFulcrumSession(sanitizeId(sessionId), 'Codex session ended')
+    } catch (err) {
+      process.stderr.write(`[fulcrum/session-end] codex error (non-fatal): ${(err as Error).message}\n`)
+    }
+  }
+
+  process.exit(0)
+}
+
 async function runHook(cliName: string, phase: HookPhase = 'pre'): Promise<void> {
   if (cliName === '--help' || cliName === '-h' || !cliName) {
     console.log(`
-fulcrum hook — tool-call policy hooks for coding agents
+fulcrum hook — tool-call policy hooks and session lifecycle for coding agents
 
   fulcrum hook auto   [pre|post]           Auto-detect runtime from stdin event shape
   fulcrum hook claude [pre|post]           Claude Code PreToolUse / PostToolUse hook
@@ -574,6 +881,12 @@ fulcrum hook — tool-call policy hooks for coding agents
   fulcrum hook claude session-stop         Claude Code Stop hook
   fulcrum hook claude pre-compact          Claude Code PreCompact hook
   fulcrum hook gemini [pre|post]           Gemini CLI BeforeTool / AfterTool hook
+  fulcrum hook gemini session-start        Gemini CLI SessionStart hook (auto-starts run)
+  fulcrum hook gemini before-agent         Gemini CLI BeforeAgent hook (injects context)
+  fulcrum hook gemini session-end          Gemini CLI SessionEnd hook (completes run)
+  fulcrum hook codex  [pre|post]           Codex CLI PreToolUse / PostToolUse hook
+  fulcrum hook codex  session-start        Codex CLI SessionStart hook (auto-starts run)
+  fulcrum hook codex  session-end          Codex CLI Stop hook (completes run)
   fulcrum hook pi     [pre|post]           PI coding agent BeforeTool / AfterTool hook
 
 Phase defaults to 'pre' when omitted (legacy). The pre hook normalises
@@ -868,9 +1181,18 @@ fulcrum action — invoke canonical Fulcrum actions directly
 
     let actionArgs: Record<string, unknown> = {}
     const jsonFlagIdx = args.indexOf('--json')
+    // Also accept positional JSON as the 4th argument (args[3])
+    const positionalJson = args[3] && !args[3].startsWith('--') ? args[3] : undefined
     if (jsonFlagIdx !== -1 && jsonFlagIdx < args.length - 1) {
       try {
         actionArgs = JSON.parse(args[jsonFlagIdx + 1]!) as Record<string, unknown>
+      } catch (err) {
+        console.error(`Invalid JSON payload: ${(err as Error).message}`)
+        process.exit(1)
+      }
+    } else if (positionalJson) {
+      try {
+        actionArgs = JSON.parse(positionalJson) as Record<string, unknown>
       } catch (err) {
         console.error(`Invalid JSON payload: ${(err as Error).message}`)
         process.exit(1)
@@ -2395,29 +2717,42 @@ OPTIONS (serve mcp-http)
       await runHook(cli ?? '--help')
       return
     }
-    if (cli === 'claude' || cli === 'gemini' || cli === 'pi' || cli === 'auto') {
-      // Optional second-level arg: 'pre' | 'post' | 'session-start' | 'session-stop' | 'pre-compact'
+    if (cli === 'claude' || cli === 'gemini' || cli === 'codex' || cli === 'pi' || cli === 'auto') {
+      // Optional second-level arg: lifecycle phase or tool phase
       // Default 'pre' for backward compatibility with existing settings.json entries.
       const phaseArg = args[2] as string | undefined
 
-      // Session lifecycle hooks (claude-only)
+      // Claude lifecycle hooks
       if (cli === 'claude') {
         if (phaseArg === 'session-start') { await runSessionStartHook(); return }
         if (phaseArg === 'session-stop')  { await runSessionStopHook();  return }
         if (phaseArg === 'pre-compact')   { await runPreCompactHook();   return }
       }
 
+      // Gemini lifecycle hooks
+      if (cli === 'gemini') {
+        if (phaseArg === 'session-start') { await runGeminiSessionStartHook(); return }
+        if (phaseArg === 'before-agent')  { await runGeminiBeforeAgentHook();  return }
+        if (phaseArg === 'session-end')   { await runGeminiSessionEndHook();   return }
+      }
+
+      // Codex lifecycle hooks
+      if (cli === 'codex') {
+        if (phaseArg === 'session-start') { await runCodexSessionStartHook(); return }
+        if (phaseArg === 'session-end')   { await runCodexStopHook();         return }
+      }
+
       const phase: HookPhase = phaseArg === 'post' ? 'post' : 'pre'
       if (phaseArg && phaseArg !== 'pre' && phaseArg !== 'post') {
         console.error(`Unknown hook phase: ${phaseArg}`)
-        console.error('Usage: fulcrum hook auto|claude|gemini|pi [pre|post|session-start|session-stop|pre-compact]')
+        console.error('Usage: fulcrum hook auto|claude|gemini|codex|pi [pre|post|session-start|session-stop|pre-compact|before-agent|session-end]')
         process.exit(1)
       }
       await runHook(cli, phase)
       return
     }
     console.error(`Unknown hook: ${cli}`)
-    console.error('Usage: fulcrum hook auto|claude|gemini|pi [pre|post]')
+    console.error('Usage: fulcrum hook auto|claude|gemini|codex|pi [pre|post]')
     process.exit(1)
   }
 

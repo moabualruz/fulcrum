@@ -1,0 +1,26 @@
+{
+  "name": "fulcrum",
+  "version": "0.1.0",
+  "description": "Fulcrum agent control plane — task tracking, memory, agent lifecycle, and multi-agent coordination",
+  "author": { "name": "Mo Abualruz", "url": "https://github.com/moabualruz/fulcrum" },
+  "homepage": "https://github.com/moabualruz/fulcrum",
+  "repository": "https://github.com/moabualruz/fulcrum",
+  "license": "MIT",
+  "keywords": ["agent-os", "task-management", "memory", "multi-agent"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Fulcrum Agent OS",
+    "shortDescription": "Local-first agent control plane for task tracking, memory, and multi-agent coordination",
+    "longDescription": "Fulcrum gives Codex persistent task tracking, hybrid semantic memory (FTS5 + vector), and agent lifecycle management. All data stays on your machine in SQLite.",
+    "developerName": "Mo Abualruz",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/moabualruz/fulcrum",
+    "defaultPrompt": [
+      "Show the current workspace status",
+      "Create a task for the work I am about to do",
+      "Recall what I know about this codebase"
+    ]
+  }
+}

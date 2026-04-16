@@ -1,6 +1,6 @@
 // packages/memory/src/write.ts
 import { createHash } from 'crypto'
-import { getDb, FulcrumError, newId, Db} from '@moabualruz/fulcrum-core'
+import { getDb, FulcrumError, newId, Db, getTextEmbedder } from '@moabualruz/fulcrum-core'
 import { contentHash, isDuplicate } from './dedup.js'
 import { rowToFullMemory } from './mappers.js'
 import { getVaultPath, vaultExists, writeMemoryFile } from './vault/client.js'
@@ -9,6 +9,28 @@ import { appendToLog } from './vault/index-builder.js'
 import type { WriteMemoryInput, FullMemory } from './types.js'
 import { runExtractionPipeline } from './extractors/pipeline.js'
 import { computeSparseVector } from './sparse.js'
+
+/**
+ * Generate an embedding for `text` and store it in:
+ *   - vec_memories (rowid + float vector) for ANN search
+ *   - memories.embedding (blob) for inspection / rebuild
+ * Fire-and-forget: call inside setImmediate or as a detached async task.
+ * Non-fatal — if the embedder is unavailable the function returns silently.
+ * Exported so the rebuild path and CLI backfill can call it explicitly.
+ */
+export async function storeEmbeddingInVec(db: Db, memory_id: string, text: string): Promise<void> {
+  const embedder = getTextEmbedder()
+  if (!embedder) return
+  try {
+    const exists = db.prepare('SELECT 1 FROM memories WHERE memory_id = ?').get(memory_id)
+    if (!exists) return
+    const embedFn = (embedder.embedDocument ?? embedder.embed).bind(embedder)
+    const vec = await embedFn(text)
+    const buf = Buffer.from(vec.buffer)
+    db.prepare('INSERT OR REPLACE INTO vec_memories(memory_id, embedding) VALUES (?, ?)').run(memory_id, buf)
+    db.prepare('UPDATE memories SET embedding = ? WHERE memory_id = ?').run(buf, memory_id)
+  } catch { /* non-fatal: vec_memories is optional */ }
+}
 
 function bodyHash(text: string): string {
   return createHash('sha256').update(text).digest('hex')
@@ -85,6 +107,7 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
     symbol_path: input.symbol_path ?? null,
     title: input.title,
     summary: input.summary,
+    content: input.content,
     canonical_text: input.canonical_text ?? (
       CODE_KINDS.has(input.kind) ? normalizeCodeText(input.content) : input.content
     ),
@@ -162,6 +185,13 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
   const row = db.prepare('SELECT * FROM memories WHERE memory_id = ?').get(memory_id) as Record<string, unknown> | undefined
   if (!row) throw new FulcrumError(`Memory ${memory_id} not found after insert`, 'not_found')
 
+  // ── Vec embedding (fire-and-forget) ──────────────────────────────────────
+  // Populate vec_memories for ANN recall. Runs async so it never blocks the
+  // write response. Silently skips if no embedder is initialized.
+  setImmediate(() => {
+    storeEmbeddingInVec(db, memory_id, memoryForVault.canonical_text ?? input.content).catch(() => {})
+  })
+
   // ── L2 async enqueue (fire-and-forget when KuzuClient is active) ──────────
   const vaultRoot = getVaultPath()
   if (!input.skipVaultWrite) {
@@ -211,4 +241,9 @@ export function insertMemoryDirect(memory: FullMemory, db: Db = getDb()): void {
     memory.task_id ?? null, memory.issue_id ?? null, memory.artifact_id ?? null, JSON.stringify(memory.provenance_refs),
     embeddingBuffer, sparseVectorJson, memory.created_at, memory.updated_at, memory.last_accessed_at, memory.access_count
   )
+
+  // Populate vec_memories for ANN recall (fire-and-forget)
+  setImmediate(() => {
+    storeEmbeddingInVec(db, memory.memory_id, memory.canonical_text ?? '').catch(() => {})
+  })
 }

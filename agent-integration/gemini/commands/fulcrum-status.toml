@@ -1,0 +1,12 @@
+prompt = """
+Run these commands and report the results:
+
+```
+!{fulcrum action exec get_current_context 2>/dev/null}
+!{fulcrum action exec get_workspace_status 2>/dev/null}
+```
+
+Show: workspace_id, active agent runs, blocked runs, WIP count, and queued tasks.
+Highlight any blocked runs prominently with the block reason.
+If monitor_running is true, include the dashboard URL.
+"""

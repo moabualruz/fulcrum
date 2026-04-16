@@ -110,6 +110,17 @@ function commandExists(cmd: string): boolean {
   }
 }
 
+function resolveCliPath(): string {
+  // Try the symlink we install first, then fall back to PATH lookup
+  const symlink = path.join(HOME, ".local", "bin", "fulcrum");
+  if (fs.existsSync(symlink)) return symlink;
+  try {
+    return execSync("command -v fulcrum", { encoding: "utf8", shell: "/bin/sh" }).trim();
+  } catch {
+    return "fulcrum";
+  }
+}
+
 function mkdirp(dir: string): void {
   if (DRY_RUN) {
     if (!fs.existsSync(dir)) dry(`would mkdir -p ${dir}`);
@@ -573,29 +584,68 @@ function installClaudeCommands(): void {
 
 // ── 6. Gemini CLI: user extension (~/.gemini/extensions/fulcrum/) ─────────────
 
+/** Recursively copy all files from srcDir into destDir, preserving structure. */
+function copyDirContents(srcDir: string, destDir: string): number {
+  if (!fs.existsSync(srcDir)) return 0;
+  let count = 0;
+  for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const srcPath = path.join(srcDir, entry.name);
+    const destPath = path.join(destDir, entry.name);
+    if (entry.isDirectory()) {
+      fs.mkdirSync(destPath, { recursive: true });
+      count += copyDirContents(srcPath, destPath);
+    } else {
+      fs.mkdirSync(destDir, { recursive: true });
+      fs.copyFileSync(srcPath, destPath);
+      count++;
+    }
+  }
+  return count;
+}
+
 function installGeminiExtension(): void {
   const extDir = path.join(HOME, ".gemini", "extensions", "fulcrum");
   const srcDir = path.join(REPO_ROOT, "agent-integration", "gemini");
 
-  mkdirp(extDir);
-  // hooks/ subdirectory must exist inside the extension dir
-  mkdirp(path.join(extDir, "hooks"));
-
-  const files = [
+  // Flat files
+  const flatFiles = [
     ["gemini-extension.json", "gemini-extension.json"],
     ["GEMINI.md", "GEMINI.md"],
     [path.join("hooks", "hooks.json"), path.join("hooks", "hooks.json")],
   ];
-  for (const [src, dst] of files) {
+
+  // Subdirectories to copy wholesale: commands/, skills/, agents/
+  const subDirs = ["commands", "skills", "agents"];
+
+  if (DRY_RUN) {
+    for (const [src] of flatFiles) {
+      dry(`would copy ${path.join(srcDir, src)} → ${path.join(extDir, src)}`);
+    }
+    for (const d of subDirs) {
+      if (fs.existsSync(path.join(srcDir, d))) {
+        dry(`would copy ${path.join(srcDir, d)}/ → ${path.join(extDir, d)}/`);
+      }
+    }
+    ok(`(dry-run) Gemini extension`);
+    return;
+  }
+
+  mkdirp(extDir);
+
+  for (const [src, dst] of flatFiles) {
     const from = path.join(srcDir, src);
     const to = path.join(extDir, dst);
-    if (DRY_RUN) {
-      dry(`would copy ${from} → ${to}`);
-      continue;
-    }
+    fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(from, to);
   }
-  ok(`installed extension → ${extDir}`);
+
+  let dirCount = 0;
+  for (const d of subDirs) {
+    const copied = copyDirContents(path.join(srcDir, d), path.join(extDir, d));
+    if (copied > 0) dirCount++;
+  }
+
+  ok(`installed extension → ${extDir} (flat files + ${dirCount} dir(s): ${subDirs.filter(d => fs.existsSync(path.join(srcDir, d))).join(", ")})`);
   setRollback(`rm -rf ${extDir}  # removes entire Gemini extension`);
 }
 
@@ -843,9 +893,17 @@ function runCheck(): number {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-type Target = "all" | "claude" | "gemini" | "pi" | "check";
+type Target = "all" | "claude" | "gemini" | "pi" | "codex" | "opencode" | "check";
 
-const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
+async function installCodexGlobal(): Promise<void> {
+  await installCodex({ dryRun: DRY_RUN, globalHome: HOME });
+}
+
+async function installOpencodeGlobal(): Promise<void> {
+  await installOpencode({ dryRun: DRY_RUN });
+}
+
+const plans: Record<Exclude<Target, "check">, Array<[string, () => void | Promise<void>]>> = {
   all: [
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
     ["Verify fulcrum in PATH", verifyCliInPath],
@@ -858,6 +916,8 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["Claude Code: slash commands → ~/.claude/commands/", installClaudeCommands],
     ["Gemini CLI: user extension", installGeminiExtension],
     ["PI: cockpit extension", installPiCockpit],
+    ["Codex CLI: config + hooks + skills", installCodexGlobal],
+    ["opencode: plugin + hooks", installOpencodeGlobal],
     ["MCP smoke test", smokeMcp],
     ["Doctor gate", runDoctorGate],
     ["Seed task and memory", writeSeedData],
@@ -885,6 +945,16 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void]>> = {
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
     ["Verify fulcrum in PATH", verifyCliInPath],
     ["PI: cockpit extension", installPiCockpit],
+  ],
+  codex: [
+    ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
+    ["Verify fulcrum in PATH", verifyCliInPath],
+    ["Codex CLI: config + hooks + skills", installCodexGlobal],
+  ],
+  opencode: [
+    ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
+    ["Verify fulcrum in PATH", verifyCliInPath],
+    ["opencode: plugin + hooks", installOpencodeGlobal],
   ],
 };
 
@@ -1113,14 +1183,16 @@ async function smokeMcp(): Promise<void> {
   }) + "\n";
 
   try {
+    const fulcrumBin = resolveCliPath();
     const child = spawnSync(
-      "fulcrum",
+      fulcrumBin,
       CLAUDE_MCP_ARGS,
       {
         input: initRequest,
         timeout: TIMEOUT_MS,
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
+        env: { ...process.env, PATH: process.env["PATH"] ?? "", FULCRUM_NO_MONITOR: "1" },
       },
     );
 
@@ -1180,6 +1252,14 @@ function printSummary(target: Target): void {
   if (target === "all" || target === "pi") {
     rows.push(["PI cockpit", `pi install ${path.join(REPO_ROOT, "agent-integration", "pi", "cockpit")}`]);
   }
+  if (target === "all" || target === "codex") {
+    rows.push(["Codex MCP (native)", `codex mcp add fulcrum`]);
+    rows.push(["Codex skills", `~/.codex/skills/fulcrum-*/`]);
+    rows.push(["Codex hooks", `~/.codex/config.toml [[hooks]]`]);
+  }
+  if (target === "all" || target === "opencode") {
+    rows.push(["opencode plugin + hooks", `~/.opencode/ plugin`]);
+  }
   const max = Math.max(...rows.map((r) => r[0].length));
   for (const [k, v] of rows) {
     console.log(`  • ${k}${" ".repeat(max - k.length)}  ${v}`);
@@ -1237,7 +1317,7 @@ async function main(): Promise<void> {
 
   const plan = plans[target];
   if (!plan) {
-    fail(`Unknown target: ${target}. Use one of: all | claude | gemini | pi | check`);
+    fail(`Unknown target: ${target}. Use one of: all | claude | gemini | pi | codex | opencode | check`);
     process.exit(1);
   }
 
@@ -1311,66 +1391,183 @@ export async function installCursor(opts: { dryRun: boolean; targetDir?: string 
 }
 
 // ── Per-project init: Codex ───────────────────────────────────────────────────
-// Writes .codex/config.json into targetDir. AGENTS.md is intentionally not
-// written automatically because many repos already carry project-specific
-// instructions at the root and we do not want to overwrite them.
+// Uses Codex's native extension mechanisms:
+//   1. `codex mcp add` — registers MCP server via the official CLI (writes to config.toml)
+//   2. skills → ~/.codex/skills/fulcrum-*/  — global skills, always available
+//   3. [[hooks]] in config.toml — the only standard way to wire lifecycle hooks
+//   4. AGENTS.md → project root — project-level agent instructions
 
-export async function installCodex(opts: { dryRun: boolean; targetDir?: string }): Promise<void> {
+export async function installCodex(opts: { dryRun: boolean; targetDir?: string; globalHome?: string }): Promise<void> {
   const targetDir = opts.targetDir ?? process.cwd();
   const dryRun = opts.dryRun;
+  const homeDir = opts.globalHome ?? (process.env["HOME"] ?? process.env["USERPROFILE"] ?? "");
 
   const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
-  const templateConfigJson = path.join(REPO_ROOT_LOCAL, "codex", "mcp-config.json");
+  const templateAgentsMd = path.join(REPO_ROOT_LOCAL, "codex", "AGENTS.md");
+  const codexConfigDir = path.join(homeDir, ".codex");
+  const codexConfigToml = path.join(codexConfigDir, "config.toml");
+  const pluginSkillsDir = path.join(REPO_ROOT_LOCAL, "codex", "plugin", "skills");
 
-  const destDir = path.join(targetDir, ".codex");
-  const destConfigJson = path.join(destDir, "config.json");
-
-  await step("Codex: .codex/config.json", () => {
-    if (fs.existsSync(destConfigJson)) {
-      skip(`already exists: ${destConfigJson}`);
+  // 1. Register MCP server via `codex mcp add` (native CLI, not raw TOML edits)
+  await step("Codex: register fulcrum MCP via `codex mcp add`", () => {
+    // Check if already registered by looking in config.toml
+    const existing = fs.existsSync(codexConfigToml)
+      ? fs.readFileSync(codexConfigToml, "utf8")
+      : "";
+    if (existing.includes("[mcp_servers.fulcrum]")) {
+      skip(`fulcrum MCP already registered in ${codexConfigToml}`);
       return;
     }
     if (dryRun) {
-      console.log(`  [dry-run] would create ${destConfigJson}`);
-      ok(`(dry-run) .codex/config.json`);
+      console.log(`  [dry-run] would run: codex mcp add fulcrum -- fulcrum serve mcp --mode filtered`);
+      ok(`(dry-run) codex mcp add`);
       return;
     }
-    fs.mkdirSync(destDir, { recursive: true });
-    fs.copyFileSync(templateConfigJson, destConfigJson);
-    ok(`wrote ${destConfigJson}`);
-    setRollback(`rm -f ${destConfigJson}`);
+    if (!commandExists("codex")) {
+      warn("codex not in PATH — skipping MCP registration");
+      return;
+    }
+    const result = spawnSync(
+      "codex",
+      ["mcp", "add", "fulcrum", "--", "fulcrum", "serve", "mcp", "--mode", "filtered"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+    if (result.status !== 0) {
+      warn(`codex mcp add failed: ${(result.stderr ?? "").trim().slice(0, 200)}`);
+      return;
+    }
+    ok(`registered fulcrum MCP via codex mcp add`);
+    setRollback(`codex mcp remove fulcrum`);
+  });
+
+  // 2. Install skills into ~/.codex/skills/ (global, always available without plugin install)
+  const codexSkillsDir = path.join(codexConfigDir, "skills");
+
+  await step("Codex: install fulcrum skills → ~/.codex/skills/", () => {
+    if (!fs.existsSync(pluginSkillsDir)) {
+      skip(`plugin skills dir not found: ${pluginSkillsDir}`);
+      return;
+    }
+    if (dryRun) {
+      const skills = fs.readdirSync(pluginSkillsDir);
+      console.log(`  [dry-run] would install ${skills.length} skill(s) → ${codexSkillsDir}`);
+      ok(`(dry-run) ${skills.length} skill(s)`);
+      return;
+    }
+    fs.mkdirSync(codexSkillsDir, { recursive: true });
+    const skills = fs.readdirSync(pluginSkillsDir);
+    let installed = 0;
+    let skipped = 0;
+    for (const skill of skills) {
+      const srcSkillDir = path.join(pluginSkillsDir, skill);
+      const destSkillDir = path.join(codexSkillsDir, skill);
+      const srcSkillMd = path.join(srcSkillDir, "SKILL.md");
+      if (!fs.existsSync(srcSkillMd)) continue;
+      fs.mkdirSync(destSkillDir, { recursive: true });
+      const destSkillMd = path.join(destSkillDir, "SKILL.md");
+      fs.copyFileSync(srcSkillMd, destSkillMd);
+      installed++;
+    }
+    if (skipped > 0) {
+      ok(`installed ${installed} skill(s) → ${codexSkillsDir} (${skipped} already up-to-date)`);
+    } else {
+      ok(`installed ${installed} skill(s) → ${codexSkillsDir}`);
+    }
+    setRollback(`rm -rf ${skills.map(s => path.join(codexSkillsDir, s)).join(" ")}`);
+  });
+
+  // 3. Wire lifecycle hooks into config.toml (hooks are config-level — no plugin API for this)
+  const FULCRUM_HOOKS_MARKER = "fulcrum hook codex";
+  const FULCRUM_HOOKS_ENTRY = [
+    "",
+    "# Fulcrum lifecycle hooks",
+    "[[hooks]]",
+    'event = "SessionStart"',
+    'command = "fulcrum hook codex session-start"',
+    "",
+    "[[hooks]]",
+    'event = "PreToolUse"',
+    'command = "fulcrum hook codex"',
+    "",
+    "[[hooks]]",
+    'event = "PostToolUse"',
+    'command = "fulcrum hook codex post"',
+    "",
+    "[[hooks]]",
+    'event = "Stop"',
+    'command = "fulcrum hook codex session-end"',
+    "",
+  ].join("\n");
+
+  await step("Codex: lifecycle hooks → ~/.codex/config.toml", () => {
+    if (dryRun) {
+      console.log(`  [dry-run] would add SessionStart/PreToolUse/PostToolUse/Stop hooks`);
+      ok(`(dry-run) hooks`);
+      return;
+    }
+    fs.mkdirSync(codexConfigDir, { recursive: true });
+    const existing = fs.existsSync(codexConfigToml)
+      ? fs.readFileSync(codexConfigToml, "utf8")
+      : "";
+    if (existing.includes(FULCRUM_HOOKS_MARKER)) {
+      skip(`fulcrum hooks already in ${codexConfigToml}`);
+      return;
+    }
+    fs.writeFileSync(codexConfigToml, existing + FULCRUM_HOOKS_ENTRY, "utf8");
+    ok(`wired SessionStart/PreToolUse/PostToolUse/Stop hooks`);
+  });
+
+  // 4. Write AGENTS.md to targetDir (project-level agent instructions for Codex)
+  const destAgentsMd = path.join(targetDir, "AGENTS.md");
+
+  await step("Codex: AGENTS.md", () => {
+    if (fs.existsSync(destAgentsMd)) {
+      skip(`already exists: ${destAgentsMd}`);
+      return;
+    }
+    if (dryRun) {
+      console.log(`  [dry-run] would create ${destAgentsMd}`);
+      ok(`(dry-run) AGENTS.md`);
+      return;
+    }
+    fs.copyFileSync(templateAgentsMd, destAgentsMd);
+    ok(`wrote ${destAgentsMd}`);
+    setRollback(`rm -f ${destAgentsMd}`);
   });
 }
 
 // ── Per-project init: opencode ────────────────────────────────────────────────
-// Writes .opencode/config.json and .opencode/opencode.md into targetDir.
+// Writes .opencode/opencode.jsonc (JSONC config with MCP entry), the context
+// doc, and slash commands into .opencode/command/.
 
 export async function installOpencode(opts: { dryRun: boolean; targetDir?: string }): Promise<void> {
   const targetDir = opts.targetDir ?? process.cwd();
   const dryRun = opts.dryRun;
 
   const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
-  const templateConfigJson = path.join(REPO_ROOT_LOCAL, "opencode", "config.json");
+  const templateConfig = path.join(REPO_ROOT_LOCAL, "opencode", "opencode.jsonc");
   const templateDoc = path.join(REPO_ROOT_LOCAL, "opencode", "opencode.md");
+  const templateCmdDir = path.join(REPO_ROOT_LOCAL, "opencode", "command");
 
   const destDir = path.join(targetDir, ".opencode");
-  const destConfigJson = path.join(destDir, "config.json");
+  const destConfig = path.join(destDir, "opencode.jsonc");
   const destDoc = path.join(destDir, "opencode.md");
+  const destCmdDir = path.join(destDir, "command");
 
-  await step("opencode: .opencode/config.json", () => {
-    if (fs.existsSync(destConfigJson)) {
-      skip(`already exists: ${destConfigJson}`);
+  await step("opencode: .opencode/opencode.jsonc", () => {
+    if (fs.existsSync(destConfig)) {
+      skip(`already exists: ${destConfig}`);
       return;
     }
     if (dryRun) {
-      console.log(`  [dry-run] would create ${destConfigJson}`);
-      ok(`(dry-run) .opencode/config.json`);
+      console.log(`  [dry-run] would create ${destConfig}`);
+      ok(`(dry-run) .opencode/opencode.jsonc`);
       return;
     }
     fs.mkdirSync(destDir, { recursive: true });
-    fs.copyFileSync(templateConfigJson, destConfigJson);
-    ok(`wrote ${destConfigJson}`);
-    setRollback(`rm -f ${destConfigJson}`);
+    fs.copyFileSync(templateConfig, destConfig);
+    ok(`wrote ${destConfig}`);
+    setRollback(`rm -f ${destConfig}`);
   });
 
   await step("opencode: .opencode/opencode.md", () => {
@@ -1387,6 +1584,65 @@ export async function installOpencode(opts: { dryRun: boolean; targetDir?: strin
     fs.copyFileSync(templateDoc, destDoc);
     ok(`wrote ${destDoc}`);
     setRollback(`rm -f ${destDoc}`);
+  });
+
+  // Slash commands in .opencode/command/
+  await step("opencode: .opencode/command/ (slash commands)", () => {
+    if (!fs.existsSync(templateCmdDir)) {
+      skip(`no command templates in ${templateCmdDir}`);
+      return;
+    }
+    const cmdFiles = fs.readdirSync(templateCmdDir).filter((f) => f.endsWith(".md"));
+    if (cmdFiles.length === 0) {
+      skip(`no .md command templates found in ${templateCmdDir}`);
+      return;
+    }
+    if (dryRun) {
+      for (const f of cmdFiles) {
+        console.log(`  [dry-run] would create ${path.join(destCmdDir, f)}`);
+      }
+      ok(`(dry-run) .opencode/command/ (${cmdFiles.length} commands)`);
+      return;
+    }
+    fs.mkdirSync(destCmdDir, { recursive: true });
+    let copied = 0;
+    for (const f of cmdFiles) {
+      const dest = path.join(destCmdDir, f);
+      if (fs.existsSync(dest)) continue;
+      fs.copyFileSync(path.join(templateCmdDir, f), dest);
+      copied++;
+    }
+    if (copied === 0) {
+      skip(`all ${cmdFiles.length} command(s) already exist in ${destCmdDir}`);
+    } else {
+      ok(`wrote ${copied} slash command(s) → ${destCmdDir}`);
+      setRollback(`rm -f ${destCmdDir}/fulcrum-*.md`);
+    }
+  });
+
+  // Plugin file
+  const templatePluginDir = path.join(REPO_ROOT_LOCAL, "opencode", "plugins");
+  const destPluginDir = path.join(destDir, "plugins");
+  const destPlugin = path.join(destPluginDir, "fulcrum.ts");
+
+  await step("opencode: .opencode/plugins/fulcrum.ts", () => {
+    if (!fs.existsSync(path.join(templatePluginDir, "fulcrum.ts"))) {
+      skip(`no plugin template at ${templatePluginDir}`);
+      return;
+    }
+    if (fs.existsSync(destPlugin)) {
+      skip(`already exists: ${destPlugin}`);
+      return;
+    }
+    if (dryRun) {
+      console.log(`  [dry-run] would create ${destPlugin}`);
+      ok(`(dry-run) .opencode/plugins/fulcrum.ts`);
+      return;
+    }
+    fs.mkdirSync(destPluginDir, { recursive: true });
+    fs.copyFileSync(path.join(templatePluginDir, "fulcrum.ts"), destPlugin);
+    ok(`wrote ${destPlugin}`);
+    setRollback(`rm -f ${destPlugin}`);
   });
 }
 

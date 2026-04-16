@@ -1,0 +1,30 @@
+# Fulcrum integration for OpenAI Codex CLI
+# Merged into ~/.codex/config.toml by `fulcrum install --codex`
+
+[mcp_servers.fulcrum]
+command = "fulcrum"
+args = ["serve", "mcp", "--mode", "filtered"]
+
+# ── Lifecycle hooks ───────────────────────────────────────────────────────────
+# SessionStart: auto-registers an agent run and injects workspace context
+# before the first LLM turn. Returns additional_context so Codex sees the
+# workspace snapshot without the agent needing to call anything manually.
+[[hooks]]
+event = "SessionStart"
+command = "fulcrum hook codex session-start"
+
+# PreToolUse: secret scan, team-invoke policy guard, and task memory recall.
+# Returns {"decision":"approve"} (allow) or {"decision":"block","reason":"..."}
+[[hooks]]
+event = "PreToolUse"
+command = "fulcrum hook codex"
+
+# PostToolUse: write a tool_trace operational memory for the run.
+[[hooks]]
+event = "PostToolUse"
+command = "fulcrum hook codex post"
+
+# Stop: auto-complete the agent run when the session ends.
+[[hooks]]
+event = "Stop"
+command = "fulcrum hook codex session-end"

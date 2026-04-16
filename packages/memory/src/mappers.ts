@@ -18,6 +18,7 @@ export function rowToFullMemory(row: Record<string, unknown>): FullMemory {
     symbol_path: row.symbol_path as string | null,
     title: row.title as string,
     summary: row.summary as string,
+    content: (row.content as string) ?? '',
     canonical_text: row.canonical_text as string | null,
     tags: (() => { try { return JSON.parse(row.tags as string) as string[] } catch { return [] } })(),
     entities: (() => { try { return JSON.parse(row.entities as string) as string[] } catch { return [] } })(),

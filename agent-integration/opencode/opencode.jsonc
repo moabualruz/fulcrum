@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // Fulcrum MCP server — task management, memory, and agent run lifecycle
+  "mcp": {
+    "fulcrum": {
+      "type": "local",
+      "command": ["fulcrum", "serve", "mcp", "--mode", "filtered"],
+      "enabled": true
+    }
+  },
+  // Fulcrum plugin — lifecycle hooks (policy gate, env injection) and native tools
+  "plugin": ["./plugins/fulcrum.ts"]
+}

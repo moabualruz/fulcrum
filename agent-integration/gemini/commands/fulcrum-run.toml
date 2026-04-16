@@ -1,0 +1,33 @@
+prompt = """
+{{args}}
+
+Manage agent run lifecycle for the current task.
+
+Current runs:
+```
+!{fulcrum action exec get_workspace_status 2>/dev/null}
+```
+
+To START a run (call at the beginning of every task):
+```bash
+fulcrum action exec start_agent_run --json '{"agent_role":"software_engineer","task_id":"task_XXX"}'
+```
+Save the returned run_id.
+
+To send a HEARTBEAT during long work (every ~30 s):
+```bash
+fulcrum action exec heartbeat_agent_run --json '{"run_id":"run_XXX","current_step":"Running tests","progress_pct":60}'
+```
+
+To COMPLETE a run:
+```bash
+fulcrum action exec complete_agent_run --json '{"run_id":"run_XXX","output_summary":"What was done","artifact_paths":["path/to/file"]}'
+```
+
+To BLOCK a run (needs human input):
+```bash
+fulcrum action exec block_agent_run --json '{"run_id":"run_XXX","reason":"Need DB schema decision before proceeding"}'
+```
+
+If the user specified a run action above, execute it now.
+"""

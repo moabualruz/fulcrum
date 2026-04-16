@@ -143,8 +143,8 @@ export function sparseDotProduct(queryVec: SparseVector, docVec: SparseVector): 
  */
 export function sparseRank(
   query: string,
-  rows: Array<{ rowid: number; sparse_vector: string | null }>,
-): Map<number, number> {
+  rows: Array<{ memory_id: string; sparse_vector: string | null }>,
+): Map<string, number> {
   const queryVec = computeSparseVector(query)
   if (Object.keys(queryVec).length === 0) return new Map()
 
@@ -154,12 +154,12 @@ export function sparseRank(
       if (r.sparse_vector) {
         try { docVec = JSON.parse(r.sparse_vector) as SparseVector } catch { /* ignore */ }
       }
-      return { rowid: r.rowid, score: sparseDotProduct(queryVec, docVec) }
+      return { memory_id: r.memory_id, score: sparseDotProduct(queryVec, docVec) }
     })
     .filter(s => s.score > 0)
     .sort((a, b) => b.score - a.score)
 
-  const result = new Map<number, number>()
-  scored.forEach((s, i) => result.set(s.rowid, i + 1))
+  const result = new Map<string, number>()
+  scored.forEach((s, i) => result.set(s.memory_id, i + 1))
   return result
 }

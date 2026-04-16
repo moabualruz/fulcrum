@@ -18,12 +18,14 @@ export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, 
 /**
  * Detect which CLI runtime produced a raw hook event by inspecting the
  * fields present. Field sets are non-overlapping:
- *   Claude:  tool_name  + session_id
+ *   Claude:  tool_name  + session_id  (no hook_event_name)
  *   Gemini: (toolName or tool_name) + conversationId
+ *   Codex:   hook_event_name field present (OpenAI Codex CLI format)
  *   PI:      role       + runId
  * First match wins. Returns null for unrecognized shapes.
  */
 export function detectHookCli(event: Record<string, unknown>): HookCli | null {
+  if ('hook_event_name' in event) return 'codex'
   if ('tool_name' in event && 'session_id' in event) return 'claude'
   if (('toolName' in event || 'tool_name' in event) && 'conversationId' in event) return 'gemini'
   if ('role' in event && 'runId' in event) return 'pi'
@@ -54,6 +56,11 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
     toolName = (event['tool_name'] ?? event['toolName']) as string ?? ''
     toolInput = (event['tool_input'] ?? event['toolInput'] ?? event['args'] ?? {}) as Record<string, unknown>
     sessionId = (event['session_id'] ?? event['conversationId']) as string ?? 'unknown'
+  } else if (cliName === 'codex') {
+    // Codex CLI hook event shape: { hook_event_name, tool, tool_call_id, input, session_id }
+    toolName = (event['tool'] ?? event['tool_name']) as string ?? ''
+    toolInput = (event['input'] ?? event['tool_input'] ?? {}) as Record<string, unknown>
+    sessionId = (event['session_id'] as string) ?? process.env['CODEX_SESSION_ID'] ?? 'unknown'
   } else if (cliName === 'pi') {
     toolName = (event['toolName'] ?? event['tool_name']) as string ?? ''
     toolInput = (event['toolInput'] ?? event['tool_input'] ?? event['args'] ?? {}) as Record<string, unknown>
@@ -138,11 +145,16 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
       } catch { /* best-effort */ }
       io.stderr(`[fulcrum/pre] Tool call denied: secret detected in tool_input (${patterns.join(', ')})\n`)
       io.stderr(`[fulcrum/pre] Never include credentials in tool inputs. Use env vars or a secret store.\n`)
-      io.stdout(JSON.stringify({
-        continue: false,
-        stopReason: 'secret_detected',
-        message: `Tool call blocked: secret pattern(s) detected in tool input (${patterns.join(', ')}). Use env vars or a secret store instead.`,
-      } satisfies HookOutput))
+      const denyMsg = `Tool call blocked: secret pattern(s) detected in tool input (${patterns.join(', ')}). Use env vars or a secret store instead.`
+      if (ctx.cliName === 'codex') {
+        io.stdout(JSON.stringify({ decision: 'block', reason: denyMsg }))
+      } else {
+        io.stdout(JSON.stringify({
+          continue: false,
+          stopReason: 'secret_detected',
+          message: denyMsg,
+        } satisfies HookOutput))
+      }
       io.exit(2)
       return
     }
@@ -156,11 +168,16 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
       type AgentRole = Parameters<typeof canInvokeTeams>[0]
       if (!canInvokeTeams(ctx.agentRole as AgentRole)) {
         io.stderr(`[fulcrum/pre] Tool call denied: role '${ctx.agentRole}' lacks can_invoke_teams\n`)
-        io.stdout(JSON.stringify({
-          continue: false,
-          stopReason: 'policy_denied',
-          message: `Role '${ctx.agentRole}' is not permitted to invoke teams. Only chief_of_staff may use invoke_team.`,
-        } satisfies HookOutput))
+        const policyMsg = `Role '${ctx.agentRole}' is not permitted to invoke teams. Only chief_of_staff may use invoke_team.`
+        if (ctx.cliName === 'codex') {
+          io.stdout(JSON.stringify({ decision: 'block', reason: policyMsg }))
+        } else {
+          io.stdout(JSON.stringify({
+            continue: false,
+            stopReason: 'policy_denied',
+            message: policyMsg,
+          } satisfies HookOutput))
+        }
         io.exit(2)
         return
       }
@@ -226,7 +243,12 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
     }
   } catch { /* best-effort — never fail the hook */ }
 
-  io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
+  // Codex expects { "decision": "approve" } instead of { "continue": true }
+  if (ctx.cliName === 'codex') {
+    io.stdout(JSON.stringify({ decision: 'approve' }))
+  } else {
+    io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
+  }
   io.exit(0)
 }
 

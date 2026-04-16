@@ -33,10 +33,13 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-const { spawn, execSync } = require("child_process") as typeof import("child_process");
+const { spawn, spawnSync } = require("child_process") as typeof import("child_process");
 const { createHash } = require("crypto") as typeof import("crypto");
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
+
+const _dirPath = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -158,14 +161,26 @@ const CYAN   = (s: string) => rgb(80, 200, 220, s);
 const MUTED  = (s: string) => `${DIM}${s}${RESET}`;
 const BOLD_S = (s: string) => `${BOLD}${s}${RESET}`;
 
-// ── Fulcrum CLI check ──────────────────────────────────────────────────────────
+// ── Fulcrum CLI helpers ────────────────────────────────────────────────────────
 
 function isFulcrumInstalled(): boolean {
+  const r = spawnSync("fulcrum", ["--version"], { stdio: "ignore" });
+  return r.status === 0;
+}
+
+function execAction(name: string, actionArgs?: Record<string, unknown>): unknown {
+  const argv = ["action", "exec", name];
+  if (actionArgs && Object.keys(actionArgs).length > 0) {
+    argv.push("--json", JSON.stringify(actionArgs));
+  }
+  const r = spawnSync("fulcrum", argv, { encoding: "utf-8", timeout: 10_000 });
+  if (r.error || r.status !== 0) {
+    throw new Error((r.stderr as string)?.trim() || r.error?.message || `exit ${r.status}`);
+  }
   try {
-    execSync("fulcrum --version", { stdio: "ignore" });
-    return true;
+    return JSON.parse(r.stdout ?? "null");
   } catch {
-    return false;
+    return (r.stdout as string)?.trim() ?? null;
   }
 }
 
@@ -181,6 +196,7 @@ export default function (pi: ExtensionAPI) {
   let snapshot: WorkspaceSnapshot | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let uiRef: { setStatus: (id: string, s?: string) => void; notify: (msg: string, level: string) => void } | null = null;
+  let currentRunId: string | null = null;
 
   // ── Setup wizard ─────────────────────────────────────────────────────────────
 
@@ -225,7 +241,7 @@ export default function (pi: ExtensionAPI) {
 
     // Ensure workspace + project exist in the global DB via the CLI
     try {
-      execSync(`fulcrum task list --workspace ${workspace_id} --limit 1`, {
+      spawnSync("fulcrum", ["task", "list", "--workspace", workspace_id, "--limit", "1"], {
         encoding: "utf-8",
         stdio: "pipe",
       });
@@ -904,28 +920,105 @@ export default function (pi: ExtensionAPI) {
 
   function registerPolicyHook(): void {
     pi.on("tool_call", async (event, _ctx) => {
-      if (serverState !== "up") return;
       const toolName: string = (event as Record<string, unknown>)["toolName"] as string ?? "";
       // Skip our own tools to avoid infinite recursion
       if (!toolName || toolName.startsWith("fulcrum_") || toolName.startsWith("mcp__fulcrum__")) return;
 
       const input = (event as Record<string, unknown>)["input"] ?? {};
-      const check = await apiPost<{ allowed: boolean; reason: string }>(
-        baseUrl, "/policy/check",
-        {
-          action: `tool_use:${toolName}`,
-          resource: toolName,
-          actor_id: "pi",
-          workspace_id: cfg.workspace_id,
-          actor_type: "agent",
-          extra: input,
-        },
-      );
-      if (check && !check.allowed) {
-        return { block: true, reason: `[fulcrum policy] ${check.reason}` };
+      const hookEvent = JSON.stringify({
+        tool_name: toolName,
+        tool_input: input,
+        role: process.env["FULCRUM_AGENT_ROLE"] ?? "software_engineer",
+        runId: currentRunId ?? "",
+        session_id: cfg.workspace_id,
+      });
+
+      const result = spawnSync("fulcrum", ["hook", "pi"], {
+        input: hookEvent,
+        encoding: "utf-8",
+        timeout: 5_000,
+      });
+
+      if (result.status !== 0 && result.status !== null) {
+        let reason = "denied by Fulcrum policy";
+        try {
+          const out = JSON.parse((result.stdout as string) ?? "{}") as Record<string, unknown>;
+          if (typeof out["message"] === "string") reason = out["message"];
+        } catch { /* use default */ }
+        return { block: true, reason };
       }
     });
   }
+
+  // ── Agent lifecycle hooks ─────────────────────────────────────────────────────
+
+  function registerAgentLifecycle(): void {
+    // before_agent_start: auto-start a Fulcrum run on the first agent turn
+    pi.on("before_agent_start", async (_event, ctx) => {
+      // Only start once per session
+      if (currentRunId) return;
+      if (!cfg.workspace_id) return;
+
+      try {
+        const agentRole = process.env["FULCRUM_AGENT_ROLE"] ?? "software_engineer";
+        const result = execAction("start_agent_run", {
+          agent_role: agentRole,
+          workspace_id: cfg.workspace_id,
+          project_id: cfg.project_id,
+        }) as Record<string, unknown>;
+        currentRunId = result["run_id"] as string ?? null;
+        if (currentRunId) {
+          process.stderr.write(`[fulcrum/session] pi run started: ${currentRunId}\n`);
+        }
+      } catch (err) {
+        process.stderr.write(`[fulcrum/before-agent] run start failed (non-fatal): ${(err as Error).message}\n`);
+      }
+
+      // Inject workspace context as system prompt if fresh snapshot available
+      if (!snapshot) return;
+      const usage = (ctx as Record<string, unknown>)["getContextUsage"]?.();
+      if (usage && (usage as Record<string, unknown>)["tokens"] > 8000) return;
+
+      const r = snapshot.running_agents ?? [];
+      const b = snapshot.blocked_agents ?? [];
+      if (r.length === 0 && b.length === 0) return;
+
+      const lines: string[] = [`[Fulcrum] Workspace: ${cfg.workspace_id}`];
+      if (currentRunId) lines.push(`Run ID: ${currentRunId}`);
+      if (r.length > 0) lines.push(`Active runs: ${r.map(x => x.agent_role).join(", ")}`);
+      if (b.length > 0) lines.push(`⚠ Blocked: ${b.map(x => x.agent_role).join(", ")}`);
+
+      return { systemPrompt: lines.join("\n") };
+    });
+
+    // agent_end: auto-complete the run when the agent finishes
+    pi.on("agent_end", async (_event, _ctx) => {
+      if (!currentRunId) return;
+      const runId = currentRunId;
+      currentRunId = null;
+      try {
+        execAction("complete_agent_run", {
+          run_id: runId,
+          output_summary: "PI agent turn completed",
+        });
+        process.stderr.write(`[fulcrum/session] pi run completed: ${runId}\n`);
+      } catch (err) {
+        process.stderr.write(`[fulcrum/agent-end] complete failed (non-fatal): ${(err as Error).message}\n`);
+      }
+    });
+  }
+
+  // ── Skills contribution ───────────────────────────────────────────────────────
+  // Contribute Fulcrum agent skills to PI's skill discovery system.
+  // Skills are in agent-integration/skills/ (two levels up from cockpit/).
+
+  pi.on("resources_discover", async (_event, _ctx) => {
+    const skillsDir = path.join(_dirPath, "..", "..", "skills");
+    if (fs.existsSync(skillsDir)) {
+      return { skillPaths: [skillsDir] };
+    }
+    return {};
+  });
 
   // ── Session lifecycle ─────────────────────────────────────────────────────────
 
@@ -940,10 +1033,11 @@ export default function (pi: ExtensionAPI) {
     registerWidget(ctx as Parameters<typeof registerWidget>[0]);
     updateStatus();
 
-    // Register commands and tools (idempotent across reloads)
+    // Register commands, tools, hooks, and lifecycle handlers (idempotent across reloads)
     registerCommands();
     registerTools();
     registerPolicyHook();
+    registerAgentLifecycle();
 
     // First-run setup wizard: show on startup if no config file found
     const reason = (event as Record<string, unknown>)["reason"] as string ?? "";
@@ -965,6 +1059,17 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async () => {
+    // Complete any still-running agent run on shutdown
+    if (currentRunId) {
+      const runId = currentRunId;
+      currentRunId = null;
+      try {
+        execAction("complete_agent_run", {
+          run_id: runId,
+          output_summary: "PI session shutdown",
+        });
+      } catch { /* non-fatal */ }
+    }
     stopServer();
   });
 }

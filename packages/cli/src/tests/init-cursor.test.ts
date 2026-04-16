@@ -165,37 +165,146 @@ describe('installWindsurf()', () => {
 })
 
 describe('installCodex()', () => {
-  it('creates .codex/config.json with correct content', async () => {
-    await installCodex({ dryRun: false, targetDir: tmpDir })
+  it('merges [mcp_servers.fulcrum] into ~/.codex/config.toml', async () => {
+    const fakeHome = tmpDir
+    await installCodex({ dryRun: false, targetDir: tmpDir, globalHome: fakeHome })
 
-    const configPath = path.join(tmpDir, '.codex', 'config.json')
-    expect(fs.existsSync(configPath)).toBe(true)
+    const tomlPath = path.join(fakeHome, '.codex', 'config.toml')
+    expect(fs.existsSync(tomlPath)).toBe(true)
 
-    const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
-    const servers = parsed['mcpServers'] as Record<string, unknown>
-    expect(servers['fulcrum']).toMatchObject({
-      command: 'fulcrum',
-      args: ['serve', 'mcp', '--mode', 'filtered'],
-    })
+    const content = fs.readFileSync(tomlPath, 'utf8')
+    expect(content).toContain('[mcp_servers.fulcrum]')
+    expect(content).toContain('command = "fulcrum"')
+    expect(content).toContain('args = ["serve", "mcp", "--mode", "filtered"]')
+  })
+
+  it('writes AGENTS.md to targetDir', async () => {
+    const fakeHome = tmpDir
+    await installCodex({ dryRun: false, targetDir: tmpDir, globalHome: fakeHome })
+
+    const agentsPath = path.join(tmpDir, 'AGENTS.md')
+    expect(fs.existsSync(agentsPath)).toBe(true)
+
+    const content = fs.readFileSync(agentsPath, 'utf8')
+    expect(content).toContain('Fulcrum Agent OS')
+    expect(content).toContain('config.toml')
+  })
+
+  it('skips AGENTS.md if it already exists (idempotent)', async () => {
+    const fakeHome = tmpDir
+    const agentsPath = path.join(tmpDir, 'AGENTS.md')
+    fs.writeFileSync(agentsPath, 'SENTINEL', 'utf8')
+
+    await installCodex({ dryRun: false, targetDir: tmpDir, globalHome: fakeHome })
+
+    expect(fs.readFileSync(agentsPath, 'utf8')).toBe('SENTINEL')
+  })
+
+  it('skips toml merge if already present (idempotent)', async () => {
+    const fakeHome = tmpDir
+    const codexDir = path.join(fakeHome, '.codex')
+    fs.mkdirSync(codexDir, { recursive: true })
+    fs.writeFileSync(path.join(codexDir, 'config.toml'), '[mcp_servers.fulcrum]\ncommand = "fulcrum"\n', 'utf8')
+
+    await installCodex({ dryRun: false, targetDir: tmpDir, globalHome: fakeHome })
+
+    // Content unchanged (only one occurrence of the marker)
+    const content = fs.readFileSync(path.join(codexDir, 'config.toml'), 'utf8')
+    expect(content.split('[mcp_servers.fulcrum]').length - 1).toBe(1)
+  })
+
+  it('dry-run: prints actions but writes no files', async () => {
+    const fakeHome = tmpDir
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    await installCodex({ dryRun: true, targetDir: tmpDir, globalHome: fakeHome })
+
+    expect(fs.existsSync(path.join(fakeHome, '.codex', 'config.toml'))).toBe(false)
+    expect(fs.existsSync(path.join(tmpDir, 'AGENTS.md'))).toBe(false)
+
+    const allOutput = logSpy.mock.calls.map(c => c.join(' ')).join('\n')
+    logSpy.mockRestore()
+    expect(allOutput).toContain('dry-run')
+  })
+
+  it('registers fulcrum plugin in ~/.agents/plugins/marketplace.json', async () => {
+    const fakeHome = tmpDir
+    await installCodex({ dryRun: false, targetDir: tmpDir, globalHome: fakeHome })
+
+    const marketplacePath = path.join(fakeHome, '.agents', 'plugins', 'marketplace.json')
+    expect(fs.existsSync(marketplacePath)).toBe(true)
+
+    const parsed = JSON.parse(fs.readFileSync(marketplacePath, 'utf8')) as Record<string, unknown>
+    const plugins = parsed['plugins'] as Array<Record<string, unknown>>
+    expect(plugins.some(p => p['name'] === 'fulcrum')).toBe(true)
+  })
+
+  it('does not duplicate plugin entry on second run', async () => {
+    const fakeHome = tmpDir
+    await installCodex({ dryRun: false, targetDir: tmpDir, globalHome: fakeHome })
+    await installCodex({ dryRun: false, targetDir: tmpDir, globalHome: fakeHome })
+
+    const marketplacePath = path.join(fakeHome, '.agents', 'plugins', 'marketplace.json')
+    const parsed = JSON.parse(fs.readFileSync(marketplacePath, 'utf8')) as Record<string, unknown>
+    const plugins = parsed['plugins'] as Array<Record<string, unknown>>
+    const fulcrumEntries = plugins.filter(p => p['name'] === 'fulcrum')
+    expect(fulcrumEntries).toHaveLength(1)
   })
 })
 
 describe('installOpencode()', () => {
-  it('creates .opencode/config.json and .opencode/opencode.md', async () => {
+  it('creates .opencode/opencode.jsonc with correct MCP config', async () => {
     await installOpencode({ dryRun: false, targetDir: tmpDir })
 
-    const configPath = path.join(tmpDir, '.opencode', 'config.json')
-    const docPath = path.join(tmpDir, '.opencode', 'opencode.md')
-
+    const configPath = path.join(tmpDir, '.opencode', 'opencode.jsonc')
     expect(fs.existsSync(configPath)).toBe(true)
-    expect(fs.existsSync(docPath)).toBe(true)
 
-    const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
-    const mcp = parsed['mcp'] as Record<string, unknown>
-    expect(mcp['fulcrum']).toBeDefined()
+    const content = fs.readFileSync(configPath, 'utf8')
+    expect(content).toContain('"type": "local"')
+    expect(content).toContain('"fulcrum"')
+    expect(content).toContain('"serve", "mcp"')
+  })
+
+  it('creates .opencode/opencode.md context doc', async () => {
+    await installOpencode({ dryRun: false, targetDir: tmpDir })
+
+    const docPath = path.join(tmpDir, '.opencode', 'opencode.md')
+    expect(fs.existsSync(docPath)).toBe(true)
 
     const content = fs.readFileSync(docPath, 'utf8')
     expect(content).toContain('Fulcrum Agent OS')
     expect(content).toContain('opencode')
+  })
+
+  it('creates .opencode/command/ slash commands', async () => {
+    await installOpencode({ dryRun: false, targetDir: tmpDir })
+
+    const cmdDir = path.join(tmpDir, '.opencode', 'command')
+    expect(fs.existsSync(cmdDir)).toBe(true)
+
+    const files = fs.readdirSync(cmdDir)
+    expect(files.some(f => f.startsWith('fulcrum-') && f.endsWith('.md'))).toBe(true)
+  })
+
+  it('skips files that already exist (idempotent)', async () => {
+    await installOpencode({ dryRun: false, targetDir: tmpDir })
+
+    const configPath = path.join(tmpDir, '.opencode', 'opencode.jsonc')
+    fs.writeFileSync(configPath, '{"sentinel": true}', 'utf8')
+
+    await installOpencode({ dryRun: false, targetDir: tmpDir })
+
+    expect(fs.readFileSync(configPath, 'utf8')).toBe('{"sentinel": true}')
+  })
+
+  it('dry-run: prints actions but writes no files', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    await installOpencode({ dryRun: true, targetDir: tmpDir })
+
+    expect(fs.existsSync(path.join(tmpDir, '.opencode', 'opencode.jsonc'))).toBe(false)
+    expect(fs.existsSync(path.join(tmpDir, '.opencode', 'opencode.md'))).toBe(false)
+
+    const allOutput = logSpy.mock.calls.map(c => c.join(' ')).join('\n')
+    logSpy.mockRestore()
+    expect(allOutput).toContain('dry-run')
   })
 })

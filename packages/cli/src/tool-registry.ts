@@ -557,6 +557,15 @@ TOOL_REGISTRY.set('recall_memory', {
   capabilities: { readOnly: true, destructive: false, hookEquivalent: true },
   handler: async (args, deps) => {
     const { recallMemory } = await import('@moabualruz/fulcrum-memory')
+    // Ensure embedding is initialized — no-op if already warm (MCP server path),
+    // initializes on-demand when called via `fulcrum action exec`
+    const { getTextEmbedder, initEmbedding, loadConfig } = await import('@moabualruz/fulcrum-core')
+    if (!getTextEmbedder()) {
+      try {
+        const config = loadConfig()
+        await initEmbedding(config)
+      } catch { /* embedding init failures degrade gracefully to FTS5-only */ }
+    }
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const maxChars = (args['max_chars'] as number | undefined) ?? 500
     const memories = await recallMemory({
@@ -569,10 +578,10 @@ TOOL_REGISTRY.set('recall_memory', {
       query_scope: args['query_scope'] as 'session' | 'project' | 'workspace' | 'global' | undefined,
       session_id: args['session_id'] as string | undefined,
     } as Parameters<typeof recallMemory>[0])
-    return (memories as Array<{ id?: string; content?: string; tags?: string[]; recall_score?: number; source?: string }>)
+    return (memories as Array<{ memory_id?: string; content?: string; summary?: string; tags?: string[]; recall_score?: number; source?: string }>)
       .map(m => ({
-        id: m.id,
-        content: (m.content ?? '').slice(0, maxChars),
+        id: m.memory_id,
+        content: ((m.content ?? m.summary) ?? '').slice(0, maxChars),
         score: m.recall_score ?? 0.0,
         tags: m.tags ?? [],
         source: m.source ?? 'manual',
@@ -585,6 +594,11 @@ TOOL_REGISTRY.set('write_memory', {
   capabilities: { readOnly: false, destructive: false, hookEquivalent: true },
   handler: async (args, deps) => {
     const { writeMemory } = await import('@moabualruz/fulcrum-memory')
+    // Warm up embedding so vec_memories gets populated for future recall
+    const { getTextEmbedder: _gte, initEmbedding: _ie, loadConfig: _lc } = await import('@moabualruz/fulcrum-core')
+    if (!_gte()) {
+      try { await _ie(_lc()) } catch { /* non-fatal */ }
+    }
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const proj = (args['project_id'] as string | undefined) ?? deps.project_id
     ensureWorkspace(deps.db, ws)

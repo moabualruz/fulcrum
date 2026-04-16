@@ -1,0 +1,16 @@
+prompt = """
+Show Fulcrum agent log for: {{args}}
+
+Recent activity:
+```
+!{fulcrum log --limit 20 2>/dev/null}
+```
+
+Workspace status:
+```
+!{fulcrum action exec get_workspace_status 2>/dev/null}
+```
+
+Summarize the recent agent activity. If {{args}} specifies a run_id or task_id, filter for it.
+Show: timestamp, agent role, action taken, and any errors or blockers.
+"""

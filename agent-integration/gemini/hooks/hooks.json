@@ -1,4 +1,62 @@
 {
-  "BeforeTool": [{ "matcher": "*", "command": "fulcrum hook gemini pre" }],
-  "AfterTool":  [{ "matcher": "*", "command": "fulcrum hook gemini post" }]
+  "SessionStart": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-session-start",
+          "type": "command",
+          "command": "fulcrum hook gemini session-start"
+        }
+      ]
+    }
+  ],
+  "BeforeAgent": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-before-agent",
+          "type": "command",
+          "command": "fulcrum hook gemini before-agent"
+        }
+      ]
+    }
+  ],
+  "BeforeTool": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-before-tool",
+          "type": "command",
+          "command": "fulcrum hook gemini"
+        }
+      ]
+    }
+  ],
+  "AfterTool": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-after-tool",
+          "type": "command",
+          "command": "fulcrum hook gemini post"
+        }
+      ]
+    }
+  ],
+  "SessionEnd": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-session-end",
+          "type": "command",
+          "command": "fulcrum hook gemini session-end"
+        }
+      ]
+    }
+  ]
 }

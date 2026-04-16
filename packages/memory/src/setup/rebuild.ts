@@ -33,6 +33,7 @@ function frontmatterToFullMemory(fm: MemoryFileFrontmatter, body: string): FullM
     symbol_path: fm.symbol_path ?? null,
     title: fm.title,
     summary: fm.summary ?? '',
+    content: body,
     canonical_text: body,
     tags: fm.tags ?? [],
     entities: fm.entities ?? [],

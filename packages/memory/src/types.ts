@@ -91,12 +91,15 @@ export interface FullMemory {
   symbol_path: string | null
   title: string
   summary: string
+  content: string
   canonical_text: string | null
   tags: string[]
   entities: string[]
   confidence: number
   /** Freshness is computed at query time from updated_at (exponential decay). Not stored in DB. */
   freshness?: number
+  /** Recall quality score (0–1). Populated by recallMemory(); absent on direct getMemory() calls. */
+  recall_score?: number
   importance: number
   access_count: number
   event_time: string | null

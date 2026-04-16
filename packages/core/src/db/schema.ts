@@ -1,0 +1,1022 @@
+import type Database from 'better-sqlite3'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Complete database schema.
+// All tables use IF NOT EXISTS so this is safe to call on any database state.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function applySchema(db: Database.Database): void {
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA foreign_keys = ON;
+
+    -- ── Core entities ────────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS workspaces (
+      workspace_id TEXT PRIMARY KEY,
+      name         TEXT NOT NULL,
+      status       TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','archived')),
+      config_path  TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS projects (
+      project_id        TEXT PRIMARY KEY,
+      workspace_id      TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      name              TEXT NOT NULL,
+      project_type      TEXT,
+      root_path         TEXT,
+      default_branch    TEXT,
+      parent_project_id TEXT REFERENCES projects(project_id) ON DELETE SET NULL,
+      write_mode        TEXT NOT NULL DEFAULT 'worktree' CHECK(write_mode IN ('worktree','in_place','sequential')),
+      status            TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','archived','paused')),
+      type              TEXT NOT NULL DEFAULT 'git' CHECK(type IN ('git','non_git','submodule','logical')),
+      git_url           TEXT,
+      description       TEXT,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_projects_workspace ON projects(workspace_id);
+
+    CREATE TABLE IF NOT EXISTS tasks (
+      task_id         TEXT PRIMARY KEY,
+      workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id      TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      display_id      TEXT NOT NULL DEFAULT '',
+      issue_id        TEXT,
+      title           TEXT NOT NULL,
+      description     TEXT,
+      status          TEXT NOT NULL DEFAULT 'queued' CHECK(status IN ('queued','ready','claimed','running','blocked','failed','completed','cancelled')),
+      status_category TEXT NOT NULL DEFAULT 'backlog',
+      priority        TEXT NOT NULL DEFAULT 'medium',
+      estimate_type   TEXT,
+      estimate_value  REAL,
+      assigned_to     TEXT,
+      note            TEXT,
+      done_criteria   TEXT,
+      assigned_run_id TEXT REFERENCES agent_runs(run_id) ON DELETE SET NULL,
+      version         INTEGER NOT NULL DEFAULT 0,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      claimed_at      TEXT,
+      completed_at    TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tasks_workspace    ON tasks(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_project      ON tasks(project_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_status       ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_ws_status    ON tasks(workspace_id, status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_ws_category  ON tasks(workspace_id, status_category);
+    CREATE INDEX IF NOT EXISTS idx_tasks_assigned_run ON tasks(assigned_run_id);
+
+    CREATE TABLE IF NOT EXISTS agent_runs (
+      run_id          TEXT PRIMARY KEY,
+      task_id         TEXT NOT NULL REFERENCES tasks(task_id) ON DELETE CASCADE,
+      workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id      TEXT,
+      display_id      TEXT NOT NULL DEFAULT '',
+      agent_id        TEXT NOT NULL DEFAULT '',
+      role            TEXT NOT NULL CHECK(role IN ('chief_of_staff','context_gatherer','prd_planner','implementation_planner','issue_decomposer','software_engineer','research_worker','refactor_worker','browser_worker','data_engineer','ml_engineer','devops_engineer','architecture_reviewer','code_reviewer','qa_engineer','security_reviewer','integration_worker','documentation_writer','memory_curator','tech_lead','product_manager','analyst','orchestrator','custom')),
+      pi_profile      TEXT,
+      status          TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('created','starting','running','waiting','blocked','failed','finished','aborted','stale')),
+      status_category TEXT NOT NULL DEFAULT 'active',
+      current_step    TEXT,
+      current_path    TEXT,
+      progress_pct    INTEGER NOT NULL DEFAULT 0,
+      output_summary  TEXT,
+      artifacts       TEXT,
+      git_branch      TEXT,
+      git_commit      TEXT,
+      heartbeat_at    TEXT,
+      blocker         TEXT,
+      worktree_id     TEXT,
+      events          TEXT NOT NULL DEFAULT '[]',
+      version         INTEGER NOT NULL DEFAULT 0,
+      started_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      completed_at    TEXT,
+      finished_at     TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_runs_workspace  ON agent_runs(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_runs_task       ON agent_runs(task_id);
+    CREATE INDEX IF NOT EXISTS idx_runs_status     ON agent_runs(status);
+    CREATE INDEX IF NOT EXISTS idx_runs_updated    ON agent_runs(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_runs_ws_status  ON agent_runs(workspace_id, status);
+
+    -- ── Memory ───────────────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS memories (
+      memory_id       TEXT PRIMARY KEY,
+      workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id      TEXT REFERENCES projects(project_id) ON DELETE CASCADE,
+      scope           TEXT NOT NULL DEFAULT 'project' CHECK(scope IN ('global','project','file','task')),
+      kind            TEXT NOT NULL DEFAULT 'fact' CHECK(kind IN ('fact','summary','symbol','decision','procedure','error','diff','doc','code','task_goal','task_decision','task_failure','task_outcome','tool_trace','reasoning_step','lesson')),
+      title           TEXT NOT NULL DEFAULT '',
+      summary         TEXT NOT NULL DEFAULT '',
+      content         TEXT NOT NULL,
+      canonical_text  TEXT,
+      tags            TEXT NOT NULL DEFAULT '[]',
+      entities        TEXT NOT NULL DEFAULT '[]',
+      confidence      REAL NOT NULL DEFAULT 1.0,
+      importance      REAL NOT NULL DEFAULT 0.5,
+      freshness       REAL NOT NULL DEFAULT 1.0,
+      file_path       TEXT,
+      symbol_path     TEXT,
+      event_time      TEXT,
+      content_hash    TEXT,
+      task_id         TEXT,
+      issue_id        TEXT,
+      artifact_id     TEXT,
+      provenance_refs TEXT NOT NULL DEFAULT '[]',
+      session_id      TEXT,
+      content_type    TEXT NOT NULL DEFAULT 'text',
+      sparse_vector   TEXT,
+      source          TEXT NOT NULL DEFAULT 'manual',
+      embedding       BLOB,
+      access_count    INTEGER NOT NULL DEFAULT 0,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      last_accessed_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_memories_workspace         ON memories(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_memories_project           ON memories(project_id);
+    CREATE INDEX IF NOT EXISTS idx_memories_scope             ON memories(scope);
+    CREATE INDEX IF NOT EXISTS idx_memories_kind              ON memories(kind);
+    CREATE INDEX IF NOT EXISTS idx_memories_file              ON memories(file_path);
+    CREATE INDEX IF NOT EXISTS idx_memories_hash              ON memories(content_hash);
+    CREATE INDEX IF NOT EXISTS idx_memories_event_time        ON memories(event_time);
+    CREATE INDEX IF NOT EXISTS idx_memories_task              ON memories(task_id);
+    CREATE INDEX IF NOT EXISTS idx_memories_ws_project_hash   ON memories(workspace_id, project_id, content_hash);
+    CREATE INDEX IF NOT EXISTS idx_memories_importance_access ON memories(importance, last_accessed_at);
+    CREATE INDEX IF NOT EXISTS idx_memories_session           ON memories(session_id) WHERE session_id IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS memory_entities (
+      memory_id     TEXT NOT NULL REFERENCES memories(memory_id) ON DELETE CASCADE,
+      entity_type   TEXT NOT NULL,
+      entity_id     TEXT NOT NULL,
+      relation_type TEXT NOT NULL DEFAULT 'subject_of',
+      PRIMARY KEY (memory_id, entity_type, entity_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_memory_entities_entity ON memory_entities(entity_type, entity_id);
+
+    CREATE TABLE IF NOT EXISTS task_memory_links (
+      task_id   TEXT NOT NULL REFERENCES tasks(task_id) ON DELETE CASCADE,
+      memory_id TEXT NOT NULL REFERENCES memories(memory_id) ON DELETE CASCADE,
+      PRIMARY KEY (task_id, memory_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS artifact_memory_links (
+      artifact_id TEXT NOT NULL REFERENCES artifacts(artifact_id) ON DELETE CASCADE,
+      memory_id   TEXT NOT NULL REFERENCES memories(memory_id) ON DELETE CASCADE,
+      PRIMARY KEY (artifact_id, memory_id)
+    );
+
+    -- ── Issues / Epics / PRDs / Plans ────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS epics (
+      epic_id         TEXT PRIMARY KEY,
+      workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id      TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      display_id      TEXT NOT NULL,
+      title           TEXT NOT NULL,
+      description     TEXT,
+      status          TEXT NOT NULL DEFAULT 'backlog' CHECK(status IN ('backlog','in_progress','done','cancelled')),
+      status_category TEXT NOT NULL DEFAULT 'backlog' CHECK(status_category IN ('backlog','active','blocked','done')),
+      priority        TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('critical','high','medium','low','none')),
+      milestone_id    TEXT,
+      version         INTEGER NOT NULL DEFAULT 0,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_epics_workspace ON epics(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_epics_project   ON epics(project_id);
+    CREATE INDEX IF NOT EXISTS idx_epics_status    ON epics(status_category);
+
+    CREATE TABLE IF NOT EXISTS issues (
+      issue_id          TEXT PRIMARY KEY,
+      workspace_id      TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id        TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      epic_id           TEXT REFERENCES epics(epic_id),
+      parent_issue_id   TEXT REFERENCES issues(issue_id),
+      display_id        TEXT NOT NULL,
+      title             TEXT NOT NULL,
+      description       TEXT,
+      status            TEXT NOT NULL DEFAULT 'backlog' CHECK(status IN ('backlog','ready','in_progress','blocked','in_review','done','cancelled')),
+      status_category   TEXT NOT NULL DEFAULT 'backlog' CHECK(status_category IN ('backlog','active','blocked','done')),
+      priority          TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('critical','high','medium','low','none')),
+      assignee_agent_id TEXT,
+      estimate_type     TEXT CHECK(estimate_type IN ('story_points','hours')),
+      estimate_value    REAL,
+      blocking_task_id  TEXT REFERENCES tasks(task_id),
+      blocking_issue_id TEXT REFERENCES issues(issue_id),
+      version           INTEGER NOT NULL DEFAULT 0,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_issues_workspace ON issues(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_issues_project   ON issues(project_id);
+    CREATE INDEX IF NOT EXISTS idx_issues_epic      ON issues(epic_id);
+    CREATE INDEX IF NOT EXISTS idx_issues_status    ON issues(status_category);
+    CREATE INDEX IF NOT EXISTS idx_issues_parent    ON issues(parent_issue_id);
+    CREATE INDEX IF NOT EXISTS idx_issues_assignee  ON issues(assignee_agent_id);
+
+    CREATE TABLE IF NOT EXISTS issue_labels (
+      issue_id TEXT NOT NULL REFERENCES issues(issue_id) ON DELETE CASCADE,
+      label    TEXT NOT NULL,
+      added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (issue_id, label)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_issue_labels_label ON issue_labels(label);
+
+    CREATE TABLE IF NOT EXISTS prds (
+      prd_id          TEXT PRIMARY KEY,
+      workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id      TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      display_id      TEXT NOT NULL,
+      title           TEXT NOT NULL,
+      description     TEXT,
+      status          TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','review','approved','archived')),
+      status_category TEXT NOT NULL DEFAULT 'active' CHECK(status_category IN ('backlog','active','blocked','done')),
+      file_path       TEXT,
+      linked_epic_id  TEXT REFERENCES epics(epic_id),
+      version         INTEGER NOT NULL DEFAULT 0,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS plans (
+      plan_id         TEXT PRIMARY KEY,
+      workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id      TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      display_id      TEXT NOT NULL,
+      title           TEXT NOT NULL,
+      description     TEXT,
+      status          TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','active','completed','archived')),
+      status_category TEXT NOT NULL DEFAULT 'active' CHECK(status_category IN ('backlog','active','blocked','done')),
+      prd_id          TEXT REFERENCES prds(prd_id),
+      file_path       TEXT,
+      version         INTEGER NOT NULL DEFAULT 0,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS plan_issues (
+      plan_id  TEXT NOT NULL REFERENCES plans(plan_id) ON DELETE CASCADE,
+      issue_id TEXT NOT NULL REFERENCES issues(issue_id) ON DELETE CASCADE,
+      added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (plan_id, issue_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS prd_plans (
+      prd_id   TEXT NOT NULL REFERENCES prds(prd_id) ON DELETE CASCADE,
+      plan_id  TEXT NOT NULL REFERENCES plans(plan_id) ON DELETE CASCADE,
+      added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (prd_id, plan_id)
+    );
+
+    -- ── Task auxiliaries ─────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS task_relations (
+      task_id        TEXT NOT NULL REFERENCES tasks(task_id) ON DELETE CASCADE,
+      target_task_id TEXT NOT NULL REFERENCES tasks(task_id) ON DELETE CASCADE,
+      relation_type  TEXT NOT NULL,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (task_id, target_task_id, relation_type)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_task_relations_target ON task_relations(target_task_id);
+
+    CREATE TABLE IF NOT EXISTS task_labels (
+      task_id TEXT NOT NULL REFERENCES tasks(task_id) ON DELETE CASCADE,
+      label   TEXT NOT NULL,
+      PRIMARY KEY (task_id, label)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_task_labels_label ON task_labels(label);
+
+    CREATE TABLE IF NOT EXISTS display_id_sequences (
+      entity_type TEXT NOT NULL,
+      project_id  TEXT NOT NULL,
+      last_value  INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (entity_type, project_id)
+    );
+
+    -- ── Artifacts / Reviews / Worktrees ──────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS artifacts (
+      artifact_id  TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id   TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      display_id   TEXT NOT NULL,
+      artifact_type TEXT NOT NULL,
+      title        TEXT NOT NULL,
+      file_path    TEXT NOT NULL,
+      owner_type   TEXT NOT NULL,
+      owner_id     TEXT NOT NULL,
+      status       TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','final','archived')),
+      content_hash TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS agentrun_artifacts (
+      run_id      TEXT NOT NULL REFERENCES agent_runs(run_id) ON DELETE CASCADE,
+      artifact_id TEXT NOT NULL REFERENCES artifacts(artifact_id) ON DELETE CASCADE,
+      PRIMARY KEY (run_id, artifact_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS reviews (
+      review_id         TEXT PRIMARY KEY,
+      workspace_id      TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id        TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      display_id        TEXT NOT NULL,
+      target_type       TEXT NOT NULL CHECK(target_type IN ('task','artifact','worktree')),
+      target_id         TEXT NOT NULL,
+      status            TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','changes_requested','approved','rejected')),
+      reviewer_agent_id TEXT,
+      summary           TEXT,
+      file_path         TEXT,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS review_targets (
+      review_id   TEXT NOT NULL REFERENCES reviews(review_id) ON DELETE CASCADE,
+      artifact_id TEXT NOT NULL REFERENCES artifacts(artifact_id) ON DELETE CASCADE,
+      PRIMARY KEY (review_id, artifact_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS worktrees (
+      worktree_id  TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id   TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      status       TEXT NOT NULL DEFAULT 'allocated' CHECK(status IN ('allocated','dirty','ready_for_merge','merged','discarded','conflict')),
+      branch_name  TEXT NOT NULL,
+      path         TEXT NOT NULL,
+      base_branch  TEXT,
+      task_id      TEXT REFERENCES tasks(task_id),
+      run_id       TEXT REFERENCES agent_runs(run_id),
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      merged_at    TEXT,
+      discarded_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS artifact_contracts (
+      contract_id            TEXT PRIMARY KEY,
+      task_id                TEXT REFERENCES tasks(task_id),
+      required_artifacts     TEXT NOT NULL DEFAULT '[]',
+      optional_artifacts     TEXT NOT NULL DEFAULT '[]',
+      final_summary_artifact TEXT,
+      review_inputs          TEXT NOT NULL DEFAULT '[]',
+      merge_readiness_rules  TEXT NOT NULL DEFAULT '[]',
+      created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at             TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS handoffs (
+      handoff_id           TEXT PRIMARY KEY,
+      workspace_id         TEXT NOT NULL,
+      project_id           TEXT,
+      from_agent_id        TEXT,
+      to_agent_id          TEXT,
+      task_id              TEXT REFERENCES tasks(task_id),
+      issue_id             TEXT REFERENCES issues(issue_id),
+      goal                 TEXT NOT NULL,
+      task_type            TEXT,
+      priority             TEXT NOT NULL DEFAULT 'normal' CHECK(priority IN ('critical','high','normal','low')),
+      scope                TEXT NOT NULL DEFAULT 'task' CHECK(scope IN ('task','issue','project','workspace')),
+      inputs               TEXT NOT NULL DEFAULT '{}',
+      constraints          TEXT,
+      done_criteria        TEXT,
+      artifact_contract_id TEXT REFERENCES artifact_contracts(contract_id),
+      handoff_mode         TEXT NOT NULL DEFAULT 'artifact_first_brief' CHECK(handoff_mode IN ('brief','contextual','artifact_first_brief','branched_session')),
+      status               TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','claimed','completed','cancelled')),
+      claimed_at           TEXT,
+      created_at           TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_handoffs_ws_status ON handoffs(workspace_id, status);
+
+    -- ── Events / Audit ───────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS events (
+      evt_id         TEXT PRIMARY KEY,
+      workspace_id   TEXT NOT NULL,
+      project_id     TEXT,
+      evt_type       TEXT NOT NULL,
+      ts             TEXT NOT NULL DEFAULT (datetime('now')),
+      object_type    TEXT,
+      object_id      TEXT,
+      actor_type     TEXT NOT NULL,
+      actor_id       TEXT NOT NULL,
+      payload        TEXT NOT NULL DEFAULT '{}',
+      severity       TEXT NOT NULL DEFAULT 'info',
+      trace_id       TEXT,
+      span_id        TEXT,
+      correlation_id TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_events_workspace ON events(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_events_type      ON events(evt_type);
+    CREATE INDEX IF NOT EXISTS idx_events_ts        ON events(ts);
+    CREATE INDEX IF NOT EXISTS idx_events_object    ON events(object_type, object_id);
+    CREATE INDEX IF NOT EXISTS idx_events_ws_ts     ON events(workspace_id, ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_events_ws_type   ON events(workspace_id, evt_type);
+
+    CREATE TABLE IF NOT EXISTS run_events (
+      id         TEXT PRIMARY KEY,
+      run_id     TEXT NOT NULL REFERENCES agent_runs(run_id) ON DELETE CASCADE,
+      ts         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      event_type TEXT NOT NULL,
+      payload    TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_run_events_run ON run_events(run_id, ts);
+
+    CREATE TABLE IF NOT EXISTS hook_events (
+      hook_event_id TEXT PRIMARY KEY,
+      workspace_id  TEXT NOT NULL DEFAULT '',
+      session_id    TEXT NOT NULL,
+      tool_name     TEXT NOT NULL,
+      agent_role    TEXT NOT NULL DEFAULT '',
+      run_id        TEXT,
+      ts            TEXT NOT NULL,
+      cli_name      TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_hook_events_workspace_session_ts ON hook_events(workspace_id, session_id, ts);
+
+    CREATE TABLE IF NOT EXISTS trace_events (
+      span_id        TEXT PRIMARY KEY,
+      trace_id       TEXT NOT NULL,
+      parent_span_id TEXT,
+      name           TEXT NOT NULL,
+      workspace_id   TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      run_id         TEXT,
+      status         TEXT NOT NULL DEFAULT 'started' CHECK(status IN ('started','ok','error')),
+      started_at     TEXT NOT NULL,
+      ended_at       TEXT,
+      payload        TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_trace_events_trace     ON trace_events(trace_id);
+    CREATE INDEX IF NOT EXISTS idx_trace_events_workspace ON trace_events(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_trace_events_run       ON trace_events(run_id);
+
+    -- ── Locks / Sequences ────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS advisory_locks (
+      lock_id      TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      resource_path TEXT NOT NULL,
+      run_id       TEXT NOT NULL,
+      acquired_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at   TEXT NOT NULL,
+      UNIQUE(workspace_id, resource_path)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_locks_workspace ON advisory_locks(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_locks_expires   ON advisory_locks(expires_at);
+
+    -- ── Policy ───────────────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS policy_rules (
+      rule_id     TEXT PRIMARY KEY,
+      scope       TEXT NOT NULL CHECK(scope IN ('system','user','workspace','project','team_agent','workflow_step')),
+      scope_id    TEXT,
+      name        TEXT NOT NULL,
+      description TEXT,
+      action      TEXT NOT NULL CHECK(action IN ('allow','deny','audit_only')),
+      matchers    TEXT NOT NULL DEFAULT '[]',
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      priority    INTEGER NOT NULL DEFAULT 100,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_policy_rules_scope    ON policy_rules(scope, scope_id);
+    CREATE INDEX IF NOT EXISTS idx_policy_rules_priority ON policy_rules(priority DESC);
+    CREATE INDEX IF NOT EXISTS idx_policy_rules_enabled  ON policy_rules(enabled);
+
+    CREATE TABLE IF NOT EXISTS policy_events (
+      evt_id        TEXT PRIMARY KEY,
+      rule_id       TEXT,
+      workspace_id  TEXT NOT NULL,
+      action        TEXT NOT NULL,
+      matched       INTEGER NOT NULL DEFAULT 0,
+      actor_id      TEXT NOT NULL,
+      resource_type TEXT,
+      resource_id   TEXT,
+      payload       TEXT NOT NULL DEFAULT '{}',
+      ts            TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_policy_events_workspace ON policy_events(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_policy_events_ts        ON policy_events(ts);
+
+    -- ── Teams / Workflows ────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS team_templates (
+      template_id TEXT PRIMARY KEY,
+      name        TEXT NOT NULL UNIQUE,
+      description TEXT,
+      slots       TEXT NOT NULL DEFAULT '[]',
+      policy      TEXT NOT NULL DEFAULT '{}',
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS team_instances (
+      instance_id       TEXT PRIMARY KEY,
+      template_id       TEXT NOT NULL REFERENCES team_templates(template_id),
+      workspace_id      TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id        TEXT REFERENCES projects(project_id),
+      display_id        TEXT NOT NULL,
+      status            TEXT NOT NULL DEFAULT 'created' CHECK(status IN ('created','ready','spawning','running','waiting','blocked','completed','failed','cancelled')),
+      status_category   TEXT NOT NULL DEFAULT 'active' CHECK(status_category IN ('backlog','active','blocked','done')),
+      purpose           TEXT NOT NULL,
+      task_id           TEXT REFERENCES tasks(task_id),
+      created_by_agent_id TEXT NOT NULL,
+      resolved_slots    TEXT NOT NULL DEFAULT '{}',
+      version           INTEGER NOT NULL DEFAULT 0,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      heartbeat_at      TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_team_instances_workspace ON team_instances(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_team_instances_status    ON team_instances(status_category);
+
+    CREATE TABLE IF NOT EXISTS team_members (
+      instance_id TEXT NOT NULL REFERENCES team_instances(instance_id) ON DELETE CASCADE,
+      slot_id     TEXT NOT NULL,
+      agent_id    TEXT NOT NULL,
+      role        TEXT NOT NULL,
+      joined_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (instance_id, slot_id, agent_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS workflow_runs (
+      wf_id               TEXT PRIMARY KEY,
+      workspace_id        TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id          TEXT REFERENCES projects(project_id),
+      display_id          TEXT NOT NULL,
+      workflow_name       TEXT NOT NULL,
+      workflow_version    TEXT NOT NULL DEFAULT '1.0',
+      status              TEXT NOT NULL DEFAULT 'created' CHECK(status IN ('created','ready','running','waiting_input','waiting_dependency','blocked','failed','completed','cancelled')),
+      status_category     TEXT NOT NULL DEFAULT 'active' CHECK(status_category IN ('backlog','active','blocked','done')),
+      task_id             TEXT REFERENCES tasks(task_id),
+      issue_id            TEXT REFERENCES issues(issue_id),
+      steps               TEXT NOT NULL DEFAULT '[]',
+      current_step_id     TEXT,
+      handoff_refs        TEXT NOT NULL DEFAULT '[]',
+      artifact_refs       TEXT NOT NULL DEFAULT '[]',
+      error               TEXT,
+      version             INTEGER NOT NULL DEFAULT 0,
+      created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+      started_at          TEXT,
+      completed_at        TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_wf_runs_workspace ON workflow_runs(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_wf_runs_status    ON workflow_runs(status_category);
+    CREATE INDEX IF NOT EXISTS idx_wf_runs_project   ON workflow_runs(workspace_id, project_id) WHERE project_id IS NOT NULL;
+
+    -- ── Agent definitions / profiles ─────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS agent_profiles (
+      profile_id   TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      name         TEXT NOT NULL,
+      base_role    TEXT NOT NULL DEFAULT 'custom' CHECK(base_role IN ('chief_of_staff','context_gatherer','prd_planner','implementation_planner','issue_decomposer','software_engineer','research_worker','refactor_worker','browser_worker','data_engineer','ml_engineer','devops_engineer','architecture_reviewer','code_reviewer','qa_engineer','security_reviewer','integration_worker','documentation_writer','memory_curator','tech_lead','product_manager','analyst','orchestrator','custom')),
+      description  TEXT NOT NULL,
+      system_prompt TEXT,
+      capabilities TEXT NOT NULL DEFAULT '{}',
+      created_by   TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_profiles_ws_name ON agent_profiles(workspace_id, name);
+    CREATE INDEX IF NOT EXISTS idx_agent_profiles_workspace  ON agent_profiles(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_agent_profiles_base_role  ON agent_profiles(base_role);
+
+    CREATE TABLE IF NOT EXISTS agent_definitions (
+      id            TEXT PRIMARY KEY,
+      workspace_id  TEXT NOT NULL DEFAULT 'global',
+      role          TEXT NOT NULL,
+      display_name  TEXT NOT NULL,
+      description   TEXT NOT NULL,
+      version       TEXT NOT NULL DEFAULT '0.1.0',
+      stability     TEXT NOT NULL DEFAULT 'experimental' CHECK(stability IN ('stable','beta','experimental','deprecated')),
+      system_prompt TEXT,
+      model         TEXT,
+      provider      TEXT NOT NULL DEFAULT 'anthropic',
+      tools_allow   TEXT,
+      tools_deny    TEXT,
+      capabilities  TEXT NOT NULL DEFAULT '[]',
+      output_schema TEXT,
+      executor_uri  TEXT,
+      a2a_card      TEXT,
+      eval_suites   TEXT NOT NULL DEFAULT '[]',
+      allow_dispatch INTEGER NOT NULL DEFAULT 1,
+      icon_url      TEXT,
+      created_at    INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at    INTEGER NOT NULL DEFAULT (unixepoch()),
+      UNIQUE(workspace_id, role)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_agent_definitions_role      ON agent_definitions(role);
+    CREATE INDEX IF NOT EXISTS idx_agent_definitions_stability ON agent_definitions(stability);
+    CREATE INDEX IF NOT EXISTS idx_agent_definitions_ws_role   ON agent_definitions(workspace_id, role);
+
+    CREATE TABLE IF NOT EXISTS agent_state_projection (
+      run_id       TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      project_id   TEXT,
+      agent_id     TEXT,
+      agent_role   TEXT,
+      pi_profile   TEXT,
+      status       TEXT NOT NULL,
+      task_id      TEXT,
+      current_step TEXT,
+      current_path TEXT,
+      progress_pct REAL,
+      heartbeat_at TEXT,
+      blocker      TEXT,
+      worktree_id  TEXT,
+      updated_at   TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_asp_workspace ON agent_state_projection(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_asp_status    ON agent_state_projection(status);
+
+    -- ── Code chunks ──────────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS code_chunks (
+      chunk_id       TEXT PRIMARY KEY,
+      workspace_id   TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id     TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      file_path      TEXT NOT NULL,
+      language       TEXT,
+      chunk_strategy TEXT NOT NULL CHECK(chunk_strategy IN ('syntax','semantic','token')),
+      source_type    TEXT NOT NULL CHECK(source_type IN ('code','prose')),
+      content        TEXT NOT NULL,
+      start_line     INTEGER,
+      end_line       INTEGER,
+      symbol_path    TEXT,
+      embedding      BLOB,
+      content_hash   TEXT,
+      indexed_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_chunks_project    ON code_chunks(project_id);
+    CREATE INDEX IF NOT EXISTS idx_chunks_file       ON code_chunks(file_path);
+    CREATE INDEX IF NOT EXISTS idx_chunks_hash       ON code_chunks(content_hash);
+    CREATE INDEX IF NOT EXISTS idx_chunks_ws_project ON code_chunks(workspace_id, project_id);
+
+    -- ── Graph (knowledge graph) ───────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS graph_entities (
+      entity_id    TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      name         TEXT NOT NULL,
+      entity_type  TEXT NOT NULL,
+      properties   TEXT NOT NULL DEFAULT '{}',
+      valid_from   TEXT,
+      valid_until  TEXT,
+      created_at   TEXT NOT NULL,
+      updated_at   TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_graph_entities_workspace ON graph_entities(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_graph_entities_type      ON graph_entities(workspace_id, entity_type);
+
+    CREATE TABLE IF NOT EXISTS graph_edges (
+      edge_id      TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      source_id    TEXT NOT NULL REFERENCES graph_entities(entity_id),
+      target_id    TEXT NOT NULL REFERENCES graph_entities(entity_id),
+      relation     TEXT NOT NULL,
+      weight       REAL NOT NULL DEFAULT 1.0,
+      properties   TEXT NOT NULL DEFAULT '{}',
+      valid_from   TEXT,
+      valid_until  TEXT,
+      created_at   TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_graph_edges_source ON graph_edges(workspace_id, source_id);
+    CREATE INDEX IF NOT EXISTS idx_graph_edges_target ON graph_edges(workspace_id, target_id);
+
+    CREATE TABLE IF NOT EXISTS graph_episodes (
+      episode_id   TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      entity_id    TEXT NOT NULL REFERENCES graph_entities(entity_id),
+      content      TEXT NOT NULL,
+      episode_type TEXT NOT NULL DEFAULT 'observation',
+      valid_from   TEXT,
+      valid_until  TEXT,
+      created_at   TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_graph_episodes_entity ON graph_episodes(workspace_id, entity_id);
+
+    -- ── Sync ─────────────────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS sync_states (
+      sync_id         TEXT PRIMARY KEY,
+      object_type     TEXT NOT NULL,
+      object_id       TEXT NOT NULL,
+      workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      sync_target     TEXT NOT NULL DEFAULT 'plane',
+      external_id     TEXT,
+      last_synced_at  TEXT,
+      sync_status     TEXT NOT NULL DEFAULT 'never_synced' CHECK(sync_status IN ('never_synced','queued','syncing','synced','conflicted','failed','disabled')),
+      last_sync_hash  TEXT,
+      last_sync_error TEXT,
+      direction       TEXT NOT NULL DEFAULT 'bidirectional' CHECK(direction IN ('local_to_remote','remote_to_local','bidirectional')),
+      conflict_state  TEXT NOT NULL DEFAULT 'none' CHECK(conflict_state IN ('none','detected','resolving','resolved','unresolvable')),
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(object_id, sync_target)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sync_states_workspace ON sync_states(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_sync_states_object    ON sync_states(workspace_id, object_type, object_id);
+
+    CREATE TABLE IF NOT EXISTS sync_conflicts (
+      conflict_id  TEXT PRIMARY KEY,
+      sync_id      TEXT NOT NULL REFERENCES sync_states(sync_id),
+      local_hash   TEXT,
+      remote_hash  TEXT,
+      detected_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      resolution   TEXT CHECK(resolution IN ('local_wins','remote_wins','manual')),
+      resolved_at  TEXT,
+      resolved_by  TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS sync_queue (
+      queue_id     TEXT PRIMARY KEY,
+      sync_id      TEXT NOT NULL REFERENCES sync_states(sync_id),
+      operation    TEXT NOT NULL CHECK(operation IN ('upsert','delete')),
+      priority     INTEGER NOT NULL DEFAULT 100,
+      scheduled_at TEXT NOT NULL DEFAULT (datetime('now')),
+      attempts     INTEGER NOT NULL DEFAULT 0,
+      last_error   TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sync_queue_scheduled ON sync_queue(scheduled_at);
+    CREATE INDEX IF NOT EXISTS idx_sync_queue_priority  ON sync_queue(priority DESC);
+
+    -- ── Analytics ────────────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS analytics_daily (
+      id             TEXT PRIMARY KEY,
+      workspace_id   TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id     TEXT NOT NULL,
+      date           TEXT NOT NULL,
+      issues_created INTEGER NOT NULL DEFAULT 0,
+      issues_closed  INTEGER NOT NULL DEFAULT 0,
+      tasks_created  INTEGER NOT NULL DEFAULT 0,
+      tasks_completed INTEGER NOT NULL DEFAULT 0,
+      tasks_blocked  INTEGER NOT NULL DEFAULT 0,
+      runs_started   INTEGER NOT NULL DEFAULT 0,
+      runs_finished  INTEGER NOT NULL DEFAULT 0,
+      runs_failed    INTEGER NOT NULL DEFAULT 0,
+      memory_writes  INTEGER NOT NULL DEFAULT 0,
+      memory_recalls INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(workspace_id, project_id, date)
+    );
+
+    CREATE TABLE IF NOT EXISTS analytics_cycle (
+      id           TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id   TEXT NOT NULL,
+      cycle_id     TEXT NOT NULL,
+      committed    INTEGER NOT NULL DEFAULT 0,
+      completed    INTEGER NOT NULL DEFAULT 0,
+      scope_added  INTEGER NOT NULL DEFAULT 0,
+      rolled_over  INTEGER NOT NULL DEFAULT 0,
+      avg_cycle_time_h REAL
+    );
+
+    CREATE TABLE IF NOT EXISTS analytics_project (
+      id           TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id   TEXT NOT NULL,
+      date         TEXT NOT NULL,
+      wip_count    INTEGER NOT NULL DEFAULT 0,
+      throughput   INTEGER NOT NULL DEFAULT 0,
+      lead_time_h  REAL,
+      blocked_h    REAL,
+      UNIQUE(workspace_id, project_id, date)
+    );
+
+    CREATE TABLE IF NOT EXISTS analytics_agent (
+      id              TEXT PRIMARY KEY,
+      workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      agent_id        TEXT NOT NULL,
+      date            TEXT NOT NULL,
+      runs_started    INTEGER NOT NULL DEFAULT 0,
+      runs_completed  INTEGER NOT NULL DEFAULT 0,
+      runs_blocked    INTEGER NOT NULL DEFAULT 0,
+      runs_failed     INTEGER NOT NULL DEFAULT 0,
+      avg_duration_min REAL,
+      handoff_count   INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(workspace_id, agent_id, date)
+    );
+
+    CREATE TABLE IF NOT EXISTS analytics_team (
+      id                  TEXT PRIMARY KEY,
+      workspace_id        TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      instance_id         TEXT NOT NULL,
+      date                TEXT NOT NULL,
+      tasks_completed     INTEGER NOT NULL DEFAULT 0,
+      avg_slot_duration_min REAL,
+      concurrency_peak    INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(workspace_id, instance_id, date)
+    );
+
+    -- ── FTS5 full-text search ────────────────────────────────────────────────
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(
+      title, description,
+      content='tasks', content_rowid='rowid'
+    );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+      content, title, summary, canonical_text,
+      content='memories', content_rowid='rowid'
+    );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS epics_fts USING fts5(
+      title, description,
+      content='epics', content_rowid='rowid',
+      tokenize='porter unicode61'
+    );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS issues_fts USING fts5(
+      title, description,
+      content='issues', content_rowid='rowid',
+      tokenize='porter unicode61'
+    );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS prds_fts USING fts5(
+      title, description,
+      content='prds', content_rowid='rowid',
+      tokenize='porter unicode61'
+    );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS plans_fts USING fts5(
+      title, description,
+      content='plans', content_rowid='rowid',
+      tokenize='porter unicode61'
+    );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_fts USING fts5(
+      title,
+      content='artifacts', content_rowid='rowid',
+      tokenize='porter unicode61'
+    );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS code_chunks_fts USING fts5(
+      content, symbol_path,
+      content='code_chunks', content_rowid='rowid',
+      tokenize='unicode61 remove_diacritics 1 separators ''._-'''
+    );
+  `)
+
+  // sqlite-vec: optional, not available in all environments
+  try {
+    db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS vec_memories USING vec0(memory_id text primary key, embedding float[1024])`)
+  } catch { /* sqlite-vec not available */ }
+
+  try {
+    db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(chunk_id text primary key, embedding float[1024])`)
+  } catch { /* sqlite-vec not available */ }
+
+  // ── FTS5 triggers ─────────────────────────────────────────────────────────
+  // SQLite doesn't support CREATE TRIGGER IF NOT EXISTS, so drop first.
+
+  db.exec(`
+    DROP TRIGGER IF EXISTS tasks_ai;
+    DROP TRIGGER IF EXISTS tasks_ad;
+    DROP TRIGGER IF EXISTS tasks_au;
+    CREATE TRIGGER tasks_ai AFTER INSERT ON tasks BEGIN
+      INSERT INTO tasks_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
+    END;
+    CREATE TRIGGER tasks_ad AFTER DELETE ON tasks BEGIN
+      INSERT INTO tasks_fts(tasks_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
+    END;
+    CREATE TRIGGER tasks_au AFTER UPDATE ON tasks BEGIN
+      INSERT INTO tasks_fts(tasks_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
+      INSERT INTO tasks_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
+    END;
+
+    DROP TRIGGER IF EXISTS memories_ai;
+    DROP TRIGGER IF EXISTS memories_ad;
+    DROP TRIGGER IF EXISTS memories_au;
+    CREATE TRIGGER memories_ai AFTER INSERT ON memories BEGIN
+      INSERT INTO memories_fts(rowid, content, title, summary, canonical_text) VALUES (new.rowid, new.content, new.title, new.summary, new.canonical_text);
+    END;
+    CREATE TRIGGER memories_ad AFTER DELETE ON memories BEGIN
+      INSERT INTO memories_fts(memories_fts, rowid, content, title, summary, canonical_text) VALUES ('delete', old.rowid, old.content, old.title, old.summary, old.canonical_text);
+    END;
+    CREATE TRIGGER memories_au AFTER UPDATE ON memories BEGIN
+      INSERT INTO memories_fts(memories_fts, rowid, content, title, summary, canonical_text) VALUES ('delete', old.rowid, old.content, old.title, old.summary, old.canonical_text);
+      INSERT INTO memories_fts(rowid, content, title, summary, canonical_text) VALUES (new.rowid, new.content, new.title, new.summary, new.canonical_text);
+    END;
+
+    DROP TRIGGER IF EXISTS epics_ai;
+    DROP TRIGGER IF EXISTS epics_ad;
+    DROP TRIGGER IF EXISTS epics_au;
+    CREATE TRIGGER epics_ai AFTER INSERT ON epics BEGIN
+      INSERT INTO epics_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
+    END;
+    CREATE TRIGGER epics_ad AFTER DELETE ON epics BEGIN
+      INSERT INTO epics_fts(epics_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
+    END;
+    CREATE TRIGGER epics_au AFTER UPDATE ON epics BEGIN
+      INSERT INTO epics_fts(epics_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
+      INSERT INTO epics_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
+    END;
+
+    DROP TRIGGER IF EXISTS issues_ai;
+    DROP TRIGGER IF EXISTS issues_ad;
+    DROP TRIGGER IF EXISTS issues_au;
+    CREATE TRIGGER issues_ai AFTER INSERT ON issues BEGIN
+      INSERT INTO issues_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
+    END;
+    CREATE TRIGGER issues_ad AFTER DELETE ON issues BEGIN
+      INSERT INTO issues_fts(issues_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
+    END;
+    CREATE TRIGGER issues_au AFTER UPDATE ON issues BEGIN
+      INSERT INTO issues_fts(issues_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
+      INSERT INTO issues_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
+    END;
+
+    DROP TRIGGER IF EXISTS prds_ai;
+    DROP TRIGGER IF EXISTS prds_ad;
+    DROP TRIGGER IF EXISTS prds_au;
+    CREATE TRIGGER prds_ai AFTER INSERT ON prds BEGIN
+      INSERT INTO prds_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
+    END;
+    CREATE TRIGGER prds_ad AFTER DELETE ON prds BEGIN
+      INSERT INTO prds_fts(prds_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
+    END;
+    CREATE TRIGGER prds_au AFTER UPDATE ON prds BEGIN
+      INSERT INTO prds_fts(prds_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
+      INSERT INTO prds_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
+    END;
+
+    DROP TRIGGER IF EXISTS plans_ai;
+    DROP TRIGGER IF EXISTS plans_ad;
+    DROP TRIGGER IF EXISTS plans_au;
+    CREATE TRIGGER plans_ai AFTER INSERT ON plans BEGIN
+      INSERT INTO plans_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
+    END;
+    CREATE TRIGGER plans_ad AFTER DELETE ON plans BEGIN
+      INSERT INTO plans_fts(plans_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
+    END;
+    CREATE TRIGGER plans_au AFTER UPDATE ON plans BEGIN
+      INSERT INTO plans_fts(plans_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
+      INSERT INTO plans_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
+    END;
+
+    DROP TRIGGER IF EXISTS artifacts_ai;
+    DROP TRIGGER IF EXISTS artifacts_ad;
+    DROP TRIGGER IF EXISTS artifacts_au;
+    CREATE TRIGGER artifacts_ai AFTER INSERT ON artifacts BEGIN
+      INSERT INTO artifacts_fts(rowid, title) VALUES (new.rowid, new.title);
+    END;
+    CREATE TRIGGER artifacts_ad AFTER DELETE ON artifacts BEGIN
+      INSERT INTO artifacts_fts(artifacts_fts, rowid, title) VALUES ('delete', old.rowid, old.title);
+    END;
+    CREATE TRIGGER artifacts_au AFTER UPDATE ON artifacts BEGIN
+      INSERT INTO artifacts_fts(artifacts_fts, rowid, title) VALUES ('delete', old.rowid, old.title);
+      INSERT INTO artifacts_fts(rowid, title) VALUES (new.rowid, new.title);
+    END;
+
+    DROP TRIGGER IF EXISTS code_chunks_ai;
+    DROP TRIGGER IF EXISTS code_chunks_ad;
+    DROP TRIGGER IF EXISTS code_chunks_au;
+    CREATE TRIGGER code_chunks_ai AFTER INSERT ON code_chunks BEGIN
+      INSERT INTO code_chunks_fts(rowid, content, symbol_path) VALUES (new.rowid, new.content, new.symbol_path);
+    END;
+    CREATE TRIGGER code_chunks_ad AFTER DELETE ON code_chunks BEGIN
+      INSERT INTO code_chunks_fts(code_chunks_fts, rowid, content, symbol_path) VALUES ('delete', old.rowid, old.content, old.symbol_path);
+    END;
+    CREATE TRIGGER code_chunks_au AFTER UPDATE ON code_chunks BEGIN
+      INSERT INTO code_chunks_fts(code_chunks_fts, rowid, content, symbol_path) VALUES ('delete', old.rowid, old.content, old.symbol_path);
+      INSERT INTO code_chunks_fts(rowid, content, symbol_path) VALUES (new.rowid, new.content, new.symbol_path);
+    END;
+  `)
+}
