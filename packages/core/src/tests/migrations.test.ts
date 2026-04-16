@@ -467,15 +467,15 @@ describe('memories.kind CHECK alignment (J-4)', () => {
     }
   })
 
-  it('rejects unknown kind after migration', () => {
+  it('accepts unknown kind at the DB level — v2a PR 1 Task 1 dropped the CHECK; validation lives in @moabualruz/fulcrum-memory write.ts (Task 9)', () => {
     const db = freshDb()
     runMigrations(db)
     seedWsProj(db)
 
     expect(() => db.prepare(`
       INSERT INTO memories (memory_id, workspace_id, project_id, kind, scope, content, created_at, updated_at, last_accessed_at)
-      VALUES ('mem_bad', 'ws_1', 'proj_1', 'made_up_kind', 'project', 'x', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')
-    `).run()).toThrow()
+      VALUES ('mem_arbitrary', 'ws_1', 'proj_1', 'made_up_kind', 'project', 'x', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z', '2026-04-14T00:00:00Z')
+    `).run()).not.toThrow()
   })
 })
 

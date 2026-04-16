@@ -5,7 +5,115 @@ import type Database from 'better-sqlite3'
 // All tables use IF NOT EXISTS so this is safe to call on any database state.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * v2a Task 1: detect a legacy memories table (one without the v2a `slug` column)
+ * and rebuild it via the 12-step SQLite table-rebuild dance — preserving every
+ * row, synthesizing slug = memory_id and vault_path = 'legacy/' || memory_id || '.md'.
+ *
+ * Idempotent: skipped on fresh DBs (no table to rebuild) and on already-migrated
+ * tables (slug column present).
+ */
+function rebuildMemoriesIfLegacy(db: Database.Database): void {
+  const tbl = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='memories'").get() as { name: string } | undefined
+  if (!tbl) return // fresh DB — schema CREATE will handle
+  const cols = (db.prepare('PRAGMA table_info(memories)').all() as { name: string }[]).map(c => c.name)
+  if (cols.includes('slug')) return // already rebuilt
+
+  // 12-step rebuild — wrapped in a transaction so a failure leaves the legacy table intact.
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    // Drop dependent triggers first (they reference the old table by name).
+    for (const t of ['memories_ai', 'memories_ad', 'memories_au']) {
+      db.exec(`DROP TRIGGER IF EXISTS ${t}`)
+    }
+
+    db.exec(`
+      CREATE TABLE memories_new (
+        memory_id        TEXT PRIMARY KEY,
+        workspace_id     TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+        project_id       TEXT REFERENCES projects(project_id) ON DELETE CASCADE,
+        scope            TEXT NOT NULL DEFAULT 'project' CHECK(scope IN ('global','project','file','task')),
+        kind             TEXT NOT NULL DEFAULT 'fact',
+        title            TEXT NOT NULL DEFAULT '',
+        summary          TEXT NOT NULL DEFAULT '',
+        content          TEXT NOT NULL,
+        canonical_text   TEXT,
+        tags             TEXT NOT NULL DEFAULT '[]',
+        entities         TEXT NOT NULL DEFAULT '[]',
+        confidence       REAL NOT NULL DEFAULT 1.0,
+        importance       REAL NOT NULL DEFAULT 0.5,
+        freshness        REAL NOT NULL DEFAULT 1.0,
+        file_path        TEXT,
+        symbol_path      TEXT,
+        event_time       TEXT,
+        content_hash     TEXT,
+        task_id          TEXT,
+        issue_id         TEXT,
+        artifact_id      TEXT,
+        provenance_refs  TEXT NOT NULL DEFAULT '[]',
+        session_id       TEXT,
+        content_type     TEXT NOT NULL DEFAULT 'text',
+        sparse_vector    TEXT,
+        source           TEXT NOT NULL DEFAULT 'manual',
+        embedding        BLOB,
+        access_count     INTEGER NOT NULL DEFAULT 0,
+        tier             TEXT NOT NULL DEFAULT 'short_term',
+        slug             TEXT NOT NULL DEFAULT (lower(hex(randomblob(8)))),
+        vault_path       TEXT NOT NULL DEFAULT '',
+        provenance       TEXT NOT NULL DEFAULT '{}',
+        supersedes       TEXT,
+        recall_count     INTEGER NOT NULL DEFAULT 0,
+        unique_query_count INTEGER NOT NULL DEFAULT 0,
+        max_recall_score REAL NOT NULL DEFAULT 0.0,
+        last_recalled_at INTEGER,
+        embedded         INTEGER NOT NULL DEFAULT 0,
+        schema_version   INTEGER NOT NULL DEFAULT 1,
+        normalize_version INTEGER NOT NULL DEFAULT 1,
+        expires_at       INTEGER,
+        created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+        last_accessed_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `)
+
+    // Carry over every legacy column verbatim. Synthesize slug + vault_path; defaults
+    // cover the other v2a additions.
+    db.exec(`
+      INSERT INTO memories_new (
+        memory_id, workspace_id, project_id, scope, kind, title, summary, content,
+        canonical_text, tags, entities, confidence, importance, freshness,
+        file_path, symbol_path, event_time, content_hash, task_id, issue_id,
+        artifact_id, provenance_refs, session_id, content_type, sparse_vector,
+        source, embedding, access_count, slug, vault_path,
+        created_at, updated_at, last_accessed_at
+      )
+      SELECT
+        memory_id, workspace_id, project_id, scope, kind, title, summary, content,
+        canonical_text, tags, entities, confidence, importance, freshness,
+        file_path, symbol_path, event_time, content_hash, task_id, issue_id,
+        artifact_id, provenance_refs, session_id, content_type, sparse_vector,
+        source, embedding, access_count,
+        memory_id AS slug,
+        'legacy/' || memory_id || '.md' AS vault_path,
+        created_at, updated_at, last_accessed_at
+      FROM memories;
+    `)
+
+    db.exec('DROP TABLE memories')
+    db.exec('ALTER TABLE memories_new RENAME TO memories')
+    db.exec('COMMIT')
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+}
+
 export function applySchema(db: Database.Database): void {
+  // v2a PR 1 Task 1: rebuild legacy memories table BEFORE the idempotent CREATE
+  // statements run. CREATE IF NOT EXISTS would skip the legacy table and leave
+  // it without the v2a columns. The rebuild is a no-op for fresh DBs.
+  rebuildMemoriesIfLegacy(db)
+
   db.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
@@ -106,39 +214,61 @@ export function applySchema(db: Database.Database): void {
 
     -- ── Memory ───────────────────────────────────────────────────────────────
 
+    -- v2a PR 1 Task 1: kind CHECK constraint dropped; validation moves to
+    -- packages/memory/src/write.ts (Task 9). New v2a columns: tier, slug,
+    -- vault_path, provenance, supersedes, recall counters, embedded, schema/
+    -- normalize versioning, expires_at. Existing rows on legacy DBs are
+    -- migrated by rebuildMemoriesIfLegacy() before this CREATE runs.
     CREATE TABLE IF NOT EXISTS memories (
-      memory_id       TEXT PRIMARY KEY,
-      workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
-      project_id      TEXT REFERENCES projects(project_id) ON DELETE CASCADE,
-      scope           TEXT NOT NULL DEFAULT 'project' CHECK(scope IN ('global','project','file','task')),
-      kind            TEXT NOT NULL DEFAULT 'fact' CHECK(kind IN ('fact','summary','symbol','decision','procedure','error','diff','doc','code','task_goal','task_decision','task_failure','task_outcome','tool_trace','reasoning_step','lesson')),
-      title           TEXT NOT NULL DEFAULT '',
-      summary         TEXT NOT NULL DEFAULT '',
-      content         TEXT NOT NULL,
-      canonical_text  TEXT,
-      tags            TEXT NOT NULL DEFAULT '[]',
-      entities        TEXT NOT NULL DEFAULT '[]',
-      confidence      REAL NOT NULL DEFAULT 1.0,
-      importance      REAL NOT NULL DEFAULT 0.5,
-      freshness       REAL NOT NULL DEFAULT 1.0,
-      file_path       TEXT,
-      symbol_path     TEXT,
-      event_time      TEXT,
-      content_hash    TEXT,
-      task_id         TEXT,
-      issue_id        TEXT,
-      artifact_id     TEXT,
-      provenance_refs TEXT NOT NULL DEFAULT '[]',
-      session_id      TEXT,
-      content_type    TEXT NOT NULL DEFAULT 'text',
-      sparse_vector   TEXT,
-      source          TEXT NOT NULL DEFAULT 'manual',
-      embedding       BLOB,
-      access_count    INTEGER NOT NULL DEFAULT 0,
-      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      memory_id        TEXT PRIMARY KEY,
+      workspace_id     TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id       TEXT REFERENCES projects(project_id) ON DELETE CASCADE,
+      scope            TEXT NOT NULL DEFAULT 'project' CHECK(scope IN ('global','project','file','task')),
+      kind             TEXT NOT NULL DEFAULT 'fact',
+      title            TEXT NOT NULL DEFAULT '',
+      summary          TEXT NOT NULL DEFAULT '',
+      content          TEXT NOT NULL,
+      canonical_text   TEXT,
+      tags             TEXT NOT NULL DEFAULT '[]',
+      entities         TEXT NOT NULL DEFAULT '[]',
+      confidence       REAL NOT NULL DEFAULT 1.0,
+      importance       REAL NOT NULL DEFAULT 0.5,
+      freshness        REAL NOT NULL DEFAULT 1.0,
+      file_path        TEXT,
+      symbol_path      TEXT,
+      event_time       TEXT,
+      content_hash     TEXT,
+      task_id          TEXT,
+      issue_id         TEXT,
+      artifact_id      TEXT,
+      provenance_refs  TEXT NOT NULL DEFAULT '[]',
+      session_id       TEXT,
+      content_type     TEXT NOT NULL DEFAULT 'text',
+      sparse_vector    TEXT,
+      source           TEXT NOT NULL DEFAULT 'manual',
+      embedding        BLOB,
+      access_count     INTEGER NOT NULL DEFAULT 0,
+      tier             TEXT NOT NULL DEFAULT 'short_term',
+      slug             TEXT NOT NULL DEFAULT (lower(hex(randomblob(8)))),
+      vault_path       TEXT NOT NULL DEFAULT '',
+      provenance       TEXT NOT NULL DEFAULT '{}',
+      supersedes       TEXT,
+      recall_count     INTEGER NOT NULL DEFAULT 0,
+      unique_query_count INTEGER NOT NULL DEFAULT 0,
+      max_recall_score REAL NOT NULL DEFAULT 0.0,
+      last_recalled_at INTEGER,
+      embedded         INTEGER NOT NULL DEFAULT 0,
+      schema_version   INTEGER NOT NULL DEFAULT 1,
+      normalize_version INTEGER NOT NULL DEFAULT 1,
+      expires_at       INTEGER,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
       last_accessed_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_slug ON memories(slug);
+    CREATE INDEX IF NOT EXISTS idx_memories_tier ON memories(tier);
+    CREATE INDEX IF NOT EXISTS idx_memories_expires ON memories(expires_at) WHERE expires_at IS NOT NULL;
 
     CREATE INDEX IF NOT EXISTS idx_memories_workspace         ON memories(workspace_id);
     CREATE INDEX IF NOT EXISTS idx_memories_project           ON memories(project_id);

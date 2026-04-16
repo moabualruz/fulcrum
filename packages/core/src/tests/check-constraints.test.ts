@@ -60,17 +60,14 @@ const GUARDED_COLUMNS: EnumColumn[] = [
       'product_manager', 'analyst', 'orchestrator', 'custom',
     ],
   },
-  {
-    // MemoryKind — packages/core/src/types.ts (16-value superset)
-    table: 'memories',
-    column: 'kind',
-    expected: [
-      'fact', 'summary', 'symbol', 'decision', 'procedure',
-      'error', 'diff', 'doc', 'code',
-      'task_goal', 'task_decision', 'task_failure', 'task_outcome',
-      'tool_trace', 'reasoning_step', 'lesson',
-    ],
-  },
+  // memories.kind: CHECK constraint intentionally dropped by v2a PR 1 Task 1.
+  // Validation moves to packages/memory/src/write.ts (Task 9) which enforces
+  // the v2a kind enum + per-kind char caps from §3.4. The DB level accepts
+  // any TEXT so future kinds (file_patch, bash_trace, pre_compact_extract,
+  // session_summary, task_outcome, blocker_resolution, delegation_summary,
+  // decision, identity, persona, summary) can be added without further table
+  // rebuilds. See docs/plans/2026-04-16-memory-v2a-plan.md §"Architecture
+  // Decisions" → "memories.kind CHECK widening".
   {
     // MemoryScope — packages/core/src/types.ts
     table: 'memories',
