@@ -1,5 +1,5 @@
 {
-  "name": "@fulcrum/policy",
+  "name": "@moabualruz/fulcrum-policy",
   "version": "0.0.1",
   "description": "Policy engine \u2014 system invariants, custom rule evaluation, secret guard (detect and redact), and audit logging",
   "keywords": [
@@ -33,7 +33,7 @@
     "build": "tsup"
   },
   "dependencies": {
-    "@fulcrum/core": "workspace:*",
+    "@moabualruz/fulcrum-core": "workspace:*",
     "minimatch": "^10.2.5",
     "ulidx": "^2.3.0"
   },

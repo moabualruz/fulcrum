@@ -82,13 +82,13 @@ fulcrum doctor --fix             # health check + auto-repair
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
-│                      @fulcrum/worker                             │
+│                      @moabualruz/fulcrum-worker                             │
 │   spawnAgent → policy gate → adapter.spawn → run lifecycle       │
 │   Built-in: stub · subprocess    Pluggable: registerAgentAdapter │
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
-│                       @fulcrum/core                              │
+│                       @moabualruz/fulcrum-core                              │
 │   tasks · runs · policy · memory · handoffs · events · CoS       │
 │   roles · capabilities · telemetry spans · advisory locks        │
 │                  SQLite (WAL + FTS5)                             │
@@ -115,17 +115,17 @@ fulcrum doctor --fix             # health check + auto-repair
 
 | Package | Description |
 |---------|-------------|
-| [`@fulcrum/core`](packages/core) | Domain functions, SQLite schema (52 migrations), role capability helpers, telemetry spans + OTel exporter, embedding providers, handoff protocol, event stream |
-| [`@fulcrum/memory`](packages/memory) | Three-layer memory stack — L0 git vault, L1 FTS5 + scoring, L2 Kuzu graph + HNSW vector search |
-| [`@fulcrum/monitor`](packages/monitor) | Real-time metrics dashboard — daily/project/agent metrics, burndown, SSE event stream, HTTP control API, built-in web dashboard, bearer-token-gated write endpoints |
-| [`@fulcrum/planning`](packages/planning) | Project planning domain — epics, issues, PRDs, plans, dependency graph, code review workflows |
-| [`@fulcrum/policy`](packages/policy) | Policy engine — 5 system invariants, custom rules, secret guard (12 named patterns, range-based dedup, auto-redact), audit log |
-| [`@fulcrum/sync`](packages/sync) | Bidirectional sync — Plane integration with retry/backoff, conflict detection, secret scan before push, priority queue |
-| [`@fulcrum/teams`](packages/teams) | Agent team orchestration — typed templates, slot policies, communication/budget/quality/latency classes |
-| [`@fulcrum/worker`](packages/worker) | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess + claude-code adapters, `spawnAgent` lifecycle with policy gate and span instrumentation |
-| [`@fulcrum/workflows`](packages/workflows) | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers, run state machine |
-| [`@fulcrum/worktrees`](packages/worktrees) | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, integration merge queue with `git merge --no-ff` and conflict handling |
-| [`@fulcrum/cli`](packages/cli) | `fulcrum` binary — 16 command groups, 27 MCP tools, auto-init per project, hook handlers for Claude/Gemini/PI/Cursor/Windsurf, cockpit TUI, activity log |
+| [`@moabualruz/fulcrum-core`](packages/core) | Domain functions, SQLite schema (52 migrations), role capability helpers, telemetry spans + OTel exporter, embedding providers, handoff protocol, event stream |
+| [`@moabualruz/fulcrum-memory`](packages/memory) | Three-layer memory stack — L0 git vault, L1 FTS5 + scoring, L2 Kuzu graph + HNSW vector search |
+| [`@moabualruz/fulcrum-monitor`](packages/monitor) | Real-time metrics dashboard — daily/project/agent metrics, burndown, SSE event stream, HTTP control API, built-in web dashboard, bearer-token-gated write endpoints |
+| [`@moabualruz/fulcrum-planning`](packages/planning) | Project planning domain — epics, issues, PRDs, plans, dependency graph, code review workflows |
+| [`@moabualruz/fulcrum-policy`](packages/policy) | Policy engine — 5 system invariants, custom rules, secret guard (12 named patterns, range-based dedup, auto-redact), audit log |
+| [`@moabualruz/fulcrum-sync`](packages/sync) | Bidirectional sync — Plane integration with retry/backoff, conflict detection, secret scan before push, priority queue |
+| [`@moabualruz/fulcrum-teams`](packages/teams) | Agent team orchestration — typed templates, slot policies, communication/budget/quality/latency classes |
+| [`@moabualruz/fulcrum-worker`](packages/worker) | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess + claude-code adapters, `spawnAgent` lifecycle with policy gate and span instrumentation |
+| [`@moabualruz/fulcrum-workflows`](packages/workflows) | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers, run state machine |
+| [`@moabualruz/fulcrum-worktrees`](packages/worktrees) | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, integration merge queue with `git merge --no-ff` and conflict handling |
+| [`@moabualruz/fulcrum-cli`](packages/cli) | `fulcrum` binary — 16 command groups, 27 MCP tools, auto-init per project, hook handlers for Claude/Gemini/PI/Cursor/Windsurf, cockpit TUI, activity log |
 | [`fulcrum-mcp`](packages/fulcrum-mcp) | Zero-install MCP entry point — `npx fulcrum-mcp` starts the MCP server; `npx fulcrum-mcp init` auto-detects and configures all installed agent runtimes |
 
 ---
@@ -169,7 +169,7 @@ FULCRUM_EMBEDDING_TESTS=1 pnpm test  # embedding integration tests
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions welcome.
 
-> **Note for native module contributors:** `@fulcrum/memory` depends on `kuzu` (Rust native addon). pnpm 10 requires `onlyBuiltDependencies=kuzu` in `.npmrc` to allow the native build.
+> **Note for native module contributors:** `@moabualruz/fulcrum-memory` depends on `kuzu` (Rust native addon). pnpm 10 requires `onlyBuiltDependencies=kuzu` in `.npmrc` to allow the native build.
 
 ## Security
 

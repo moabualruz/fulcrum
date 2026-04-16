@@ -1,7 +1,7 @@
 // packages/planning/src/tests/prds.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seed } from './helpers.js'
-import { getDb } from '@fulcrum/core'
+import { getDb } from '@moabualruz/fulcrum-core'
 import { createEpic } from '../epics.js'
 import { createPRD, updatePRD, listPRDs } from '../prds.js'
 

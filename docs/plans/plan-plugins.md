@@ -40,7 +40,7 @@ export function discoverPlugins(startDir: string = process.cwd()): DiscoveredPlu
   if (nmDir) plugins.push(...scanNmDir(nmDir))
   
   // 2. User-global scan
-  const { globalDataDir } = await import('@fulcrum/core')
+  const { globalDataDir } = await import('@moabualruz/fulcrum-core')
   const globalPluginsDir = join(globalDataDir(), 'plugins')
   if (existsSync(globalPluginsDir)) plugins.push(...scanPluginDir(globalPluginsDir))
   

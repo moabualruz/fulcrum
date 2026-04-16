@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seed } from './helpers.js'
-import { getDb, getTrace, newId } from '@fulcrum/core'
+import { getDb, getTrace, newId } from '@moabualruz/fulcrum-core'
 import type Database from 'better-sqlite3'
 import { runWorkflow } from '../runner.js'
 import { executeStep, listStepHandlers } from '../step-executor.js'

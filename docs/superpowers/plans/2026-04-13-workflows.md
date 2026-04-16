@@ -1,10 +1,10 @@
-# @fulcrum/workflows Implementation Plan
+# @moabualruz/fulcrum-workflows Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the `@fulcrum/workflows` package — a DAG-based workflow engine with 17 step types, 4 hardcoded built-in workflow definitions, and a full run lifecycle (start → step → wait → resume → complete/cancel).
+**Goal:** Build the `@moabualruz/fulcrum-workflows` package — a DAG-based workflow engine with 17 step types, 4 hardcoded built-in workflow definitions, and a full run lifecycle (start → step → wait → resume → complete/cancel).
 
-**Architecture:** New `packages/workflows/` package depends on `@fulcrum/core` for DB access and `nextDisplayId()`. A `WorkflowRegistry` (registry.ts) holds the 4 built-in definitions plus any loaded custom YAML definitions. A pure DAG engine (engine.ts) computes `nextReadySteps()` from step dependency graphs with no side effects. The public API in `workflows.ts` orchestrates DB persistence, registry lookups, and engine calls. `steps` and `handoff_refs`/`artifact_refs` columns are JSON-serialised arrays.
+**Architecture:** New `packages/workflows/` package depends on `@moabualruz/fulcrum-core` for DB access and `nextDisplayId()`. A `WorkflowRegistry` (registry.ts) holds the 4 built-in definitions plus any loaded custom YAML definitions. A pure DAG engine (engine.ts) computes `nextReadySteps()` from step dependency graphs with no side effects. The public API in `workflows.ts` orchestrates DB persistence, registry lookups, and engine calls. `steps` and `handoff_refs`/`artifact_refs` columns are JSON-serialised arrays.
 
 **Tech Stack:** TypeScript ESM, better-sqlite3, ulidx, vitest (pool: 'forks')
 
@@ -43,7 +43,7 @@ packages/workflows/
 
 ```json
 {
-  "name": "@fulcrum/workflows",
+  "name": "@moabualruz/fulcrum-workflows",
   "version": "0.0.1",
   "type": "module",
   "main": "./src/index.ts",
@@ -56,7 +56,7 @@ packages/workflows/
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@fulcrum/core": "workspace:*",
+    "@moabualruz/fulcrum-core": "workspace:*",
     "ulidx": "^2.0.0"
   },
   "devDependencies": {
@@ -123,13 +123,13 @@ cd /home/mkh/workspace/pi-stack-plan
 pnpm install
 ```
 
-Expected: `@fulcrum/workflows` appears in workspace. No errors.
+Expected: `@moabualruz/fulcrum-workflows` appears in workspace. No errors.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add packages/workflows/package.json packages/workflows/tsconfig.json packages/workflows/vitest.config.ts packages/workflows/src/index.ts
-git commit -m "chore(workflows): scaffold @fulcrum/workflows package"
+git commit -m "chore(workflows): scaffold @moabualruz/fulcrum-workflows package"
 ```
 
 ---
@@ -490,7 +490,7 @@ git commit -m "feat(workflows): add DAG engine — nextReadySteps, computeStatus
 ```typescript
 // packages/workflows/src/tests/helpers.ts
 import Database from 'better-sqlite3'
-import { setDb, closeDb, runMigrations } from '@fulcrum/core'
+import { setDb, closeDb, runMigrations } from '@moabualruz/fulcrum-core'
 import { runMigration006Workflows } from '../schema.js'
 
 export function createTestDb(): Database.Database {
@@ -778,7 +778,7 @@ Save to `packages/workflows/src/tests/workflows.test.ts`.
 - [ ] **Step 2: Run the test to confirm it fails**
 
 ```bash
-pnpm --filter @fulcrum/workflows test
+pnpm --filter @moabualruz/fulcrum-workflows test
 ```
 
 Expected: import errors — `../workflows.js` does not exist yet.
@@ -788,7 +788,7 @@ Expected: import errors — `../workflows.js` does not exist yet.
 ```typescript
 // packages/workflows/src/workflows.ts
 import { ulid } from 'ulidx'
-import { getDb, nextDisplayId } from '@fulcrum/core'
+import { getDb, nextDisplayId } from '@moabualruz/fulcrum-core'
 import { registry } from './registry.js'
 import { nextReadySteps, initStepStates, computeStatusCategory } from './engine.js'
 import type {
@@ -1050,7 +1050,7 @@ Save to `packages/workflows/src/index.ts`.
 - [ ] **Step 5: Run tests and confirm they pass**
 
 ```bash
-pnpm --filter @fulcrum/workflows test
+pnpm --filter @moabualruz/fulcrum-workflows test
 ```
 
 Expected output:
@@ -1072,7 +1072,7 @@ Tests  16 passed (16)
 ```bash
 git add packages/workflows/src/workflows.ts packages/workflows/src/index.ts packages/workflows/src/tests/workflows.test.ts
 git commit -m "$(cat <<'EOF'
-feat(workflows): implement @fulcrum/workflows — DAG engine, registry, full run lifecycle
+feat(workflows): implement @moabualruz/fulcrum-workflows — DAG engine, registry, full run lifecycle
 
 Adds startWorkflow, stepWorkflow (prompt_user/wait_for_task pausing), resumeWorkflow,
 cancelWorkflow, listWorkflows, getWorkflowRun. WorkflowRegistry holds 4 built-in
@@ -1084,9 +1084,9 @@ EOF
 
 ---
 
-## Task 8: Integration with @fulcrum/core migrations
+## Task 8: Integration with @moabualruz/fulcrum-core migrations
 
-The workflows migration must run when @fulcrum/core's `runMigrations()` is called. Add the workflows SQL to `packages/core/src/db/migrations.ts`.
+The workflows migration must run when @moabualruz/fulcrum-core's `runMigrations()` is called. Add the workflows SQL to `packages/core/src/db/migrations.ts`.
 
 **Files:**
 - Modify: `packages/core/src/db/migrations.ts`
@@ -1133,7 +1133,7 @@ db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('006_workflows
 - [ ] **Step 2: Run core tests to confirm no regressions**
 
 ```bash
-pnpm --filter @fulcrum/core test
+pnpm --filter @moabualruz/fulcrum-core test
 ```
 
 Expected: All tests PASS.

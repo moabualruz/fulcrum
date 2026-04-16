@@ -1,5 +1,5 @@
 // packages/workflows/src/workflows.ts
-import { getDb, nextDisplayId, newId, Db} from '@fulcrum/core'
+import { getDb, nextDisplayId, newId, Db} from '@moabualruz/fulcrum-core'
 import { registry } from './registry.js'
 import { nextReadySteps, initStepStates, computeStatusCategory } from './engine.js'
 import type {

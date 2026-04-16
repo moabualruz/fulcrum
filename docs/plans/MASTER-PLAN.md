@@ -68,7 +68,7 @@ Commit as: `fix(core): Wave 0 — trivial bug fixes across MCP, RAG, arch`
 
 These must land first because they change package boundaries.
 
-**Step 1A**: Move hook types to `@fulcrum/core` (GAP-ARCH-3)
+**Step 1A**: Move hook types to `@moabualruz/fulcrum-core` (GAP-ARCH-3)
 - Create `packages/core/src/hooks.ts`
 - Update `packages/cli/src/index.ts` imports
 - Remove exports from CLI
@@ -81,13 +81,13 @@ These must land first because they change package boundaries.
 **Step 1C**: Policy layer violation fix (GAP-ARCH-2)
 - Add `TeamContext` interface to `packages/core/src/types.ts`
 - Update policy rules to accept data objects instead of importing teams
-- Remove `@fulcrum/teams` from `packages/policy/package.json`
+- Remove `@moabualruz/fulcrum-teams` from `packages/policy/package.json`
 
 **Step 1D**: Break core↔teams circular dependency (GAP-ARCH-1)
 - `packages/core/src/team-ops.ts` — add `setTeamOps()`/`getTeamOps()` pattern
 - `packages/teams` — export `createTeamOps()`
 - `packages/cli/src/index.ts` — call `setTeamOps(createTeamOps())` at startup
-- Remove dynamic `import('@fulcrum/teams')` from core
+- Remove dynamic `import('@moabualruz/fulcrum-teams')` from core
 
 **Step 1E**: Embedding registry as plugin registry (GAP-ARCH-6)
 - Replace switch/case with `registerEmbeddingProvider()` map

@@ -13,7 +13,7 @@ import {
   getDb,
   closeDb,
   runMigrations,
-} from '@fulcrum/core'
+} from '@moabualruz/fulcrum-core'
 import { runPreHook, runPostHook, type HookContext, type HookIO, type HookOutput } from '../index.js'
 
 // ── Test harness ──────────────────────────────────────────────────────────────

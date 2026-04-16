@@ -29,7 +29,7 @@ This spec defines a phased migration to a **CLI-first tool architecture** where:
 
 - TypeScript (strict), pnpm monorepo
 - `@modelcontextprotocol/sdk` 2025-11-25 — already in use
-- SQLite (better-sqlite3) via `@fulcrum/core`
+- SQLite (better-sqlite3) via `@moabualruz/fulcrum-core`
 - Node.js, no external HTTP dependencies
 - Tests: vitest
 
@@ -368,7 +368,7 @@ The `SessionStart` hook already calls `startAgentRun` and writes a session file.
 2. Pre-fetch `get_workspace_status` and `list_tasks` (open tasks, limit 10) via the registry directly (in-process, not via MCP round-trip)
 3. Serialize the snapshot to the session file alongside `run_id`
 
-**`PreToolUse` hook** already runs `recall_memory` via `@fulcrum/memory` import. Extend it to read the pre-fetched snapshot from the session file and inject it as a stderr note so Claude sees it before deciding whether to call `get_workspace_status` again.
+**`PreToolUse` hook** already runs `recall_memory` via `@moabualruz/fulcrum-memory` import. Extend it to read the pre-fetched snapshot from the session file and inject it as a stderr note so Claude sees it before deciding whether to call `get_workspace_status` again.
 
 **Important scoping:** This is a context *supplement*, not a replacement. Claude can still call `get_workspace_status` via MCP if it needs fresh data. The pre-fetch reduces the common case where Claude calls it at the start of every session just to orient itself.
 

@@ -8,10 +8,10 @@ Fulcrum's telemetry layer is a thin wrapper around a SQLite table and an opt-in 
 
 ## Local spans by default
 
-All span APIs are re-exported from `@fulcrum/core`. They're cheap enough that the runner and worker call them on every operation without asking the user to opt in.
+All span APIs are re-exported from `@moabualruz/fulcrum-core`. They're cheap enough that the runner and worker call them on every operation without asking the user to opt in.
 
 ```typescript
-import { startSpan, endSpan, getTrace } from '@fulcrum/core'
+import { startSpan, endSpan, getTrace } from '@moabualruz/fulcrum-core'
 
 const span = await startSpan({
   name:         'my.op',
@@ -42,10 +42,10 @@ Four call sites open spans for you automatically. You don't instrument the runne
 
 | Span name | Opened by | Key payload fields |
 |-----------|-----------|--------------------|
-| `workflow.run` | `runWorkflow` in `@fulcrum/workflows` | `wf_id`, `final_status`, `steps_executed`, `duration_ms` |
+| `workflow.run` | `runWorkflow` in `@moabualruz/fulcrum-workflows` | `wf_id`, `final_status`, `steps_executed`, `duration_ms` |
 | `workflow.step` | Per step inside `runWorkflow` | `step_id`, `step_type`, `attempts`, `result_status`, `error` |
-| `agent.run` | `spawnAgent` in `@fulcrum/worker` | `role`, `adapter`, `model`, `caller_role`, `status`, `summary`, `error` |
-| `janitor.cycle` | Janitor reaping cycle in `@fulcrum/core` | reaped run counts, duration |
+| `agent.run` | `spawnAgent` in `@moabualruz/fulcrum-worker` | `role`, `adapter`, `model`, `caller_role`, `status`, `summary`, `error` |
+| `janitor.cycle` | Janitor reaping cycle in `@moabualruz/fulcrum-core` | reaped run counts, duration |
 | `mcp.tool` | `fulcrum serve mcp` tool handler | `tool_name`, `request_id`, `error` |
 
 Span parenting is automatic. `workflow.step` spans pass `parent_span_id: runSpan.span_id`, so they nest under the `workflow.run` root. `agent.run` spans opened from inside a `spawn_agent` step inherit the workflow's `trace_id` via the normal parenting rules described below.
@@ -100,7 +100,7 @@ await endSpan({
 `getTrace(trace_id)` returns every span in a trace, ordered by `started_at` then `span_id`:
 
 ```typescript
-import { getTrace } from '@fulcrum/core'
+import { getTrace } from '@moabualruz/fulcrum-core'
 
 const spans = await getTrace('span_root_abc')
 for (const s of spans) {
@@ -113,7 +113,7 @@ for (const s of spans) {
 For trace IDs you don't already have, walk up from a known span:
 
 ```typescript
-import { getDb } from '@fulcrum/core'
+import { getDb } from '@moabualruz/fulcrum-core'
 
 const db = getDb()
 const row = db.prepare(
@@ -221,7 +221,7 @@ The `service.name` attribute comes from `OTEL_SERVICE_NAME` (default `fulcrum`) 
 Emitting a span from your own code — a custom adapter, a CLI plugin, a cron job — is straightforward:
 
 ```typescript
-import { startSpan, endSpan } from '@fulcrum/core'
+import { startSpan, endSpan } from '@moabualruz/fulcrum-core'
 
 async function doThing(workspace_id: string): Promise<void> {
   const span = await startSpan({
@@ -291,10 +291,10 @@ Root spans have `parent_span_id: null` and `trace_id === span_id`.
 
 `fulcrum serve mcp`, `fulcrum serve monitor`, and `fulcrum serve all` register SIGINT/SIGTERM handlers that call `shutdownOtel()` before exiting. That flushes the `BatchSpanProcessor` queue so any spans pending export aren't lost when you Ctrl-C the server.
 
-If you embed `@fulcrum/core` in a long-running process you wrote yourself, register the same handler:
+If you embed `@moabualruz/fulcrum-core` in a long-running process you wrote yourself, register the same handler:
 
 ```typescript
-import { shutdownOtel } from '@fulcrum/core'
+import { shutdownOtel } from '@moabualruz/fulcrum-core'
 
 async function shutdown() {
   try { await shutdownOtel() } catch { /* best-effort */ }

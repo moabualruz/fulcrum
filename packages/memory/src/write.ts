@@ -1,6 +1,6 @@
 // packages/memory/src/write.ts
 import { createHash } from 'crypto'
-import { getDb, FulcrumError, newId, Db} from '@fulcrum/core'
+import { getDb, FulcrumError, newId, Db} from '@moabualruz/fulcrum-core'
 import { contentHash, isDuplicate } from './dedup.js'
 import { rowToFullMemory } from './mappers.js'
 import { getVaultPath, vaultExists, writeMemoryFile } from './vault/client.js'

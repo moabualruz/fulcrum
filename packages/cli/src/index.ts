@@ -1,10 +1,10 @@
 #!/usr/bin/env tsx
 // packages/cli/src/index.ts — fulcrum CLI entry point
 
-import { runMemoryInit } from '@fulcrum/memory'
-import { activateL2 } from '@fulcrum/memory'
+import { runMemoryInit } from '@moabualruz/fulcrum-memory'
+import { activateL2 } from '@moabualruz/fulcrum-memory'
 import { runDoctor, printDoctorResults } from './doctor.js'
-import { globalDataDir } from '@fulcrum/core'
+import { globalDataDir } from '@moabualruz/fulcrum-core'
 import { discoverPlugins, registerPlugins } from './plugin-discovery.js'
 
 const [, , ...args] = process.argv
@@ -265,8 +265,8 @@ fulcrum memory — memory vault commands
   }
 
   if (command === 'rebuild') {
-    const { rebuildFromVault } = await import('@fulcrum/memory')
-    const { getVaultPath } = await import('@fulcrum/memory')
+    const { rebuildFromVault } = await import('@moabualruz/fulcrum-memory')
+    const { getVaultPath } = await import('@moabualruz/fulcrum-memory')
     const vaultPath = process.env['FULCRUM_VAULT_PATH'] ?? getVaultPath()
     const targetArg = args.find(a => a === '--l1' || a === '--l2' || a === '--both')
     const target = targetArg === '--l2' ? 'l2' : targetArg === '--both' ? 'both' : 'l1'
@@ -281,8 +281,8 @@ fulcrum memory — memory vault commands
   }
 
   if (command === 'status') {
-    const { getVaultPath, vaultExists } = await import('@fulcrum/memory')
-    const { readState } = await import('@fulcrum/memory')
+    const { getVaultPath, vaultExists } = await import('@moabualruz/fulcrum-memory')
+    const { readState } = await import('@moabualruz/fulcrum-memory')
     const vaultPath = process.env['FULCRUM_VAULT_PATH'] ?? getVaultPath()
     const exists = vaultExists(vaultPath)
     console.log(`\nFulcrum Memory Status`)
@@ -324,7 +324,7 @@ import type { HookCli, HookPhase, HookContext, HookIO } from './hooks.js'
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 
-// globalDataDir is imported from @fulcrum/core (single canonical implementation)
+// globalDataDir is imported from @moabualruz/fulcrum-core (single canonical implementation)
 
 function getSessionFilePath(sessionId: string): string {
   const dir = join(globalDataDir(), 'sessions')
@@ -359,7 +359,7 @@ export async function runSessionStartHook(): Promise<void> {
   sessionId = sessionId.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 128)
 
   try {
-    const { startAgentRun, getDb, runMigrations, loadConfig } = await import('@fulcrum/core')
+    const { startAgentRun, getDb, runMigrations, loadConfig } = await import('@moabualruz/fulcrum-core')
     const config = loadConfig()
     const db = getDb()
     runMigrations(db)
@@ -453,7 +453,7 @@ export async function runSessionStopHook(): Promise<void> {
       run_id: string; workspace_id: string
     }
 
-    const { completeAgentRun, getDb, runMigrations, loadConfig } = await import('@fulcrum/core')
+    const { completeAgentRun, getDb, runMigrations, loadConfig } = await import('@moabualruz/fulcrum-core')
     const config = loadConfig()
     const db = getDb()
     runMigrations(db)
@@ -496,8 +496,8 @@ export async function runPreCompactHook(): Promise<void> {
   if (!summary) { process.exit(0); return }
 
   try {
-    const { getDb, runMigrations, loadConfig } = await import('@fulcrum/core')
-    const { writeMemory } = await import('@fulcrum/memory')
+    const { getDb, runMigrations, loadConfig } = await import('@moabualruz/fulcrum-core')
+    const { writeMemory } = await import('@moabualruz/fulcrum-memory')
     const config = loadConfig()
     const db = getDb()
     runMigrations(db)
@@ -584,7 +584,7 @@ the event shape is inspected at runtime to determine the correct handler.
 
   // Log the tool call (best-effort) — attached to the auto-initialized workspace
   try {
-    const { emitEvent } = await import('@fulcrum/core')
+    const { emitEvent } = await import('@moabualruz/fulcrum-core')
     emitEvent({
       workspace_id,
       evt_type: 'hook_executed',
@@ -786,7 +786,7 @@ fulcrum tool — invoke MCP tools directly without a live MCP server
 let _embeddingWarmed = false
 async function warmEmbedding(): Promise<void> {
   if (_embeddingWarmed) return
-  const { initEmbedding, loadConfig } = await import('@fulcrum/core')
+  const { initEmbedding, loadConfig } = await import('@moabualruz/fulcrum-core')
   try {
     const config = loadConfig()
     await initEmbedding(config)
@@ -801,7 +801,7 @@ async function warmEmbedding(): Promise<void> {
 let _otelWarmed = false
 async function warmOtel(): Promise<void> {
   if (_otelWarmed) return
-  const { initOtel } = await import('@fulcrum/core')
+  const { initOtel } = await import('@moabualruz/fulcrum-core')
   try {
     await initOtel()
   } catch (err) {
@@ -818,7 +818,7 @@ function registerOtelShutdown(): void {
     try { _monitorServer?.stop() } catch { /* best-effort */ }
     _monitorServer = null
     try {
-      const { shutdownOtel } = await import('@fulcrum/core')
+      const { shutdownOtel } = await import('@moabualruz/fulcrum-core')
       await shutdownOtel()
     } catch { /* best-effort */ }
     process.exit(0)
@@ -831,7 +831,7 @@ function registerOtelShutdown(): void {
 }
 
 async function runServeMcp(): Promise<void> {
-  const { getDb, runMigrations, loadConfig, startSpan, endSpan } = await import('@fulcrum/core')
+  const { getDb, runMigrations, loadConfig, startSpan, endSpan } = await import('@moabualruz/fulcrum-core')
   const { TOOL_REGISTRY, buildDeps, buildProfileFilter } = await import('./tool-registry.js')
 
   const config = loadConfig()
@@ -892,7 +892,7 @@ async function runServeMcp(): Promise<void> {
   const NO_MONITOR = process.env['FULCRUM_NO_MONITOR'] === '1' || args.includes('--no-monitor')
   if (!NO_MONITOR && !_monitorStarted) {
     try {
-      const { startMonitorServer } = await import('@fulcrum/monitor')
+      const { startMonitorServer } = await import('@moabualruz/fulcrum-monitor')
       const monitorPort = parseInt(process.env['FULCRUM_MONITOR_PORT'] ?? '4721', 10) || 4721
       const monitorServer = startMonitorServer({
         port: monitorPort,
@@ -921,7 +921,7 @@ async function runServeMcp(): Promise<void> {
 }
 
 async function runServeMcpHttp(): Promise<void> {
-  const { getDb, runMigrations, loadConfig, startSpan, endSpan } = await import('@fulcrum/core')
+  const { getDb, runMigrations, loadConfig, startSpan, endSpan } = await import('@moabualruz/fulcrum-core')
   const { TOOL_REGISTRY, buildDeps } = await import('./tool-registry.js')
   const { runFulcrumMcpHttpServer } = await import('./mcp-server.js')
 
@@ -969,8 +969,8 @@ async function runServeMcpHttp(): Promise<void> {
 }
 
 async function runServeMonitor(): Promise<void> {
-  const { startMonitorServer } = await import('@fulcrum/monitor')
-  const { getDb, runMigrations, loadConfig } = await import('@fulcrum/core')
+  const { startMonitorServer } = await import('@moabualruz/fulcrum-monitor')
+  const { getDb, runMigrations, loadConfig } = await import('@moabualruz/fulcrum-core')
 
   const config = loadConfig()
   const db = getDb()
@@ -999,8 +999,8 @@ async function runServeMonitor(): Promise<void> {
 
 async function runServeAll(): Promise<void> {
   // Start monitor in background thread, MCP on stdio
-  const { startMonitorServer } = await import('@fulcrum/monitor')
-  const { getDb, runMigrations, loadConfig } = await import('@fulcrum/core')
+  const { startMonitorServer } = await import('@moabualruz/fulcrum-monitor')
+  const { getDb, runMigrations, loadConfig } = await import('@moabualruz/fulcrum-core')
 
   const config = loadConfig()
   const db = getDb()
@@ -1022,7 +1022,7 @@ async function runServeAll(): Promise<void> {
 // ── Workspace/project commands ────────────────────────────────────────────────
 
 async function runWorkspaces(): Promise<void> {
-  const { listWorkspaces, createWorkspace } = await import('@fulcrum/core')
+  const { listWorkspaces, createWorkspace } = await import('@moabualruz/fulcrum-core')
   const sub = command // e.g. 'list' or 'create'
 
   if (!sub || sub === '--help' || sub === '-h') {
@@ -1058,7 +1058,7 @@ fulcrum workspaces — workspace CRUD
 }
 
 async function runProjects(): Promise<void> {
-  const { listProjects, createProject } = await import('@fulcrum/core')
+  const { listProjects, createProject } = await import('@moabualruz/fulcrum-core')
   const sub = command
 
   if (!sub || sub === '--help' || sub === '-h') {
@@ -1102,7 +1102,7 @@ fulcrum projects — project CRUD
 // ── Task commands (J-6) ───────────────────────────────────────────────────────
 
 export async function runTasks(): Promise<void> {
-  const { listTasks, createTask, updateTask } = await import('@fulcrum/core')
+  const { listTasks, createTask, updateTask } = await import('@moabualruz/fulcrum-core')
   const sub = command
 
   if (!sub || sub === '--help' || sub === '-h') {
@@ -1137,7 +1137,7 @@ fulcrum task — task CRUD
 
   if (sub === 'get') {
     const task_id = requireArg('--id')
-    const { getDb } = await import('@fulcrum/core')
+    const { getDb } = await import('@moabualruz/fulcrum-core')
     const db = getDb()
     const row = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(task_id) as Record<string, unknown> | undefined
     if (!row) { console.error(`task not found: ${task_id}`); process.exit(1) }
@@ -1175,7 +1175,7 @@ fulcrum task — task CRUD
 // ── Issue commands (J-6) ──────────────────────────────────────────────────────
 
 export async function runIssues(): Promise<void> {
-  const { createIssue, updateIssue, listIssues } = await import('@fulcrum/planning')
+  const { createIssue, updateIssue, listIssues } = await import('@moabualruz/fulcrum-planning')
   const sub = command
 
   if (!sub || sub === '--help' || sub === '-h') {
@@ -1220,7 +1220,7 @@ fulcrum issue — issue CRUD
 
   if (sub === 'get') {
     const issue_id = requireArg('--id')
-    const { getDb } = await import('@fulcrum/core')
+    const { getDb } = await import('@moabualruz/fulcrum-core')
     const db = getDb()
     const row = db.prepare('SELECT * FROM issues WHERE issue_id = ?').get(issue_id) as Record<string, unknown> | undefined
     if (!row) { console.error(`issue not found: ${issue_id}`); process.exit(1) }
@@ -1247,7 +1247,7 @@ fulcrum issue — issue CRUD
 // ── Epic commands (J-6) ───────────────────────────────────────────────────────
 
 export async function runEpics(): Promise<void> {
-  const { createEpic, listEpics } = await import('@fulcrum/planning')
+  const { createEpic, listEpics } = await import('@moabualruz/fulcrum-planning')
   const sub = command
 
   if (!sub || sub === '--help' || sub === '-h') {
@@ -1290,7 +1290,7 @@ fulcrum epic — epic CRUD
 
   if (sub === 'get') {
     const epic_id = requireArg('--id')
-    const { getDb } = await import('@fulcrum/core')
+    const { getDb } = await import('@moabualruz/fulcrum-core')
     const db = getDb()
     const row = db.prepare('SELECT * FROM epics WHERE epic_id = ?').get(epic_id) as Record<string, unknown> | undefined
     if (!row) { console.error(`epic not found: ${epic_id}`); process.exit(1) }
@@ -1305,7 +1305,7 @@ fulcrum epic — epic CRUD
 // ── Board commands (J-6) ──────────────────────────────────────────────────────
 
 export async function runBoard(): Promise<void> {
-  const { listTasks } = await import('@fulcrum/core')
+  const { listTasks } = await import('@moabualruz/fulcrum-core')
   const sub = command ?? 'show'
 
   if (sub === '--help' || sub === '-h') {
@@ -1369,7 +1369,7 @@ fulcrum queue — integration and review queues
   if (sub === 'merge' && sub2 === 'list') {
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
-    const { getDb } = await import('@fulcrum/core')
+    const { getDb } = await import('@moabualruz/fulcrum-core')
     const db = getDb()
     const rows = db.prepare(
       `SELECT worktree_id, branch_name, status, project_id, updated_at
@@ -1382,7 +1382,7 @@ fulcrum queue — integration and review queues
   }
 
   if (sub === 'merge' && sub2 === 'process') {
-    const { processMergeQueue } = await import('@fulcrum/worktrees')
+    const { processMergeQueue } = await import('@moabualruz/fulcrum-worktrees')
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
     const project_id = optArg('--project-id') ?? ids.project_id
@@ -1401,7 +1401,7 @@ fulcrum queue — integration and review queues
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
     const project_id = optArg('--project-id')
-    const { getDb } = await import('@fulcrum/core')
+    const { getDb } = await import('@moabualruz/fulcrum-core')
     const db = getDb()
     let sql = `SELECT artifact_id, display_id, title, artifact_type, status, file_path, updated_at
                FROM artifacts
@@ -1435,12 +1435,12 @@ fulcrum sync — plane sync (push/pull to remote adapter)
     process.exit(0)
   }
 
-  const { syncAll, listConflicts } = await import('@fulcrum/sync')
+  const { syncAll, listConflicts } = await import('@moabualruz/fulcrum-sync')
 
   if (sub === 'status') {
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
-    const { getDb } = await import('@fulcrum/core')
+    const { getDb } = await import('@moabualruz/fulcrum-core')
     const db = getDb()
     const state = db.prepare(
       `SELECT object_type, sync_status, COUNT(*) as count
@@ -1511,15 +1511,15 @@ fulcrum team — team templates and instances
     process.exit(0)
   }
 
-  const { getTeamOps: _getTeamOpsForCli } = await import('@fulcrum/core')
+  const { getTeamOps: _getTeamOpsForCli } = await import('@moabualruz/fulcrum-core')
   const _cliTeamOps = _getTeamOpsForCli()
   if (!_cliTeamOps) {
-    console.error('team: @fulcrum/teams is not available')
+    console.error('team: @moabualruz/fulcrum-teams is not available')
     process.exit(1)
   }
 
   if (sub === 'list') {
-    const { getDb } = await import('@fulcrum/core')
+    const { getDb } = await import('@moabualruz/fulcrum-core')
     const db = getDb()
     const rows = db.prepare(
       `SELECT template_id, name, description, created_at FROM team_templates ORDER BY created_at DESC`,
@@ -1599,14 +1599,14 @@ fulcrum workflow — durable multi-step workflows
   }
 
   if (sub === 'list') {
-    const { listWorkflows } = await import('@fulcrum/workflows')
+    const { listWorkflows } = await import('@moabualruz/fulcrum-workflows')
     const defs = await listWorkflows()
     outputRows(defs.map(d => ({ name: d.name, version: d.version, steps: d.steps.length, description: d.description ?? '' })))
     return
   }
 
   if (sub === 'start') {
-    const { startWorkflow } = await import('@fulcrum/workflows')
+    const { startWorkflow } = await import('@moabualruz/fulcrum-workflows')
     const workflow_name = requireArg('--workflow-name')
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
@@ -1622,7 +1622,7 @@ fulcrum workflow — durable multi-step workflows
   }
 
   if (sub === 'run') {
-    const { runWorkflow } = await import('@fulcrum/workflows')
+    const { runWorkflow } = await import('@moabualruz/fulcrum-workflows')
     const wf_id = requireArg('--wf-id')
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
@@ -1637,7 +1637,7 @@ fulcrum workflow — durable multi-step workflows
   }
 
   if (sub === 'status') {
-    const { getWorkflowRun } = await import('@fulcrum/workflows')
+    const { getWorkflowRun } = await import('@moabualruz/fulcrum-workflows')
     const wf_id = requireArg('--wf-id')
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
@@ -1658,7 +1658,7 @@ fulcrum workflow — durable multi-step workflows
   }
 
   if (sub === 'resume') {
-    const { resumeWorkflow } = await import('@fulcrum/workflows')
+    const { resumeWorkflow } = await import('@moabualruz/fulcrum-workflows')
     const wf_id = requireArg('--wf-id')
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
@@ -1696,7 +1696,7 @@ fulcrum agent — agent runs and spawning
   if (sub === 'list') {
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
-    const { getDb } = await import('@fulcrum/core')
+    const { getDb } = await import('@moabualruz/fulcrum-core')
     const db = getDb()
     const rows = db.prepare(
       `SELECT run_id, role, status, task_id, current_step, progress_pct, started_at
@@ -1710,7 +1710,7 @@ fulcrum agent — agent runs and spawning
 
   if (sub === 'status') {
     const run_id = requireArg('--run-id')
-    const { getAgentRunStatus } = await import('@fulcrum/core')
+    const { getAgentRunStatus } = await import('@moabualruz/fulcrum-core')
     try {
       const run = await getAgentRunStatus({ run_id })
       outputObject({
@@ -1729,7 +1729,7 @@ fulcrum agent — agent runs and spawning
   }
 
   if (sub === 'spawn') {
-    const { spawnAgent } = await import('@fulcrum/worker')
+    const { spawnAgent } = await import('@moabualruz/fulcrum-worker')
     const ids = currentProjectIds()
     const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
     const project_id = optArg('--project-id') ?? ids.project_id
@@ -1764,7 +1764,7 @@ fulcrum agent — agent runs and spawning
       console.error('Usage: fulcrum agent versions <role>')
       process.exit(1)
     }
-    const { getAgentDefinition } = await import('@fulcrum/core')
+    const { getAgentDefinition } = await import('@moabualruz/fulcrum-core')
     const def = getAgentDefinition(role)
     if (!def) {
       console.error(`No agent definition found for role: ${role}`)
@@ -1806,7 +1806,7 @@ function currentProjectIds(): { workspace_id: string; project_id: string } {
 
 async function ensureProjectInitialized(opts: { silent?: boolean } = {}): Promise<{ workspace_id: string; project_id: string }> {
   if (_projectIds) return _projectIds
-  const { getDb, runMigrations, getWorkspace, getProject, createWorkspace, createProject, projectIdsFromPath } = await import('@fulcrum/core')
+  const { getDb, runMigrations, getWorkspace, getProject, createWorkspace, createProject, projectIdsFromPath } = await import('@moabualruz/fulcrum-core')
 
   // Initialize the global DB (data lives in globalDataDir(), NEVER in $CWD)
   const db = getDb()
@@ -2085,21 +2085,21 @@ async function main(): Promise<void> {
   // Reads .fulcrum/agent-defs/*.agent.json and globalDataDir()/agent-defs/*.agent.json.
   // Non-fatal — a missing directory or malformed file is silently skipped.
   try {
-    const { loadAgentDefsFromDir } = await import('@fulcrum/core')
+    const { loadAgentDefsFromDir } = await import('@moabualruz/fulcrum-core')
     loadAgentDefsFromDir(process.cwd())
   } catch {
     // DB not initialised yet at this point in some sub-commands — ignore
   }
 
-  // Wire @fulcrum/teams implementation into core's TeamOps registry.
+  // Wire @moabualruz/fulcrum-teams implementation into core's TeamOps registry.
   // GAP-ARCH-1 fix: breaks the core ↔ teams circular dependency — core never
   // imports teams; the CLI (which depends on both) registers the impl once.
   try {
-    const { createTeamOps } = await import('@fulcrum/teams')
-    const { setTeamOps } = await import('@fulcrum/core')
+    const { createTeamOps } = await import('@moabualruz/fulcrum-teams')
+    const { setTeamOps } = await import('@moabualruz/fulcrum-core')
     setTeamOps(createTeamOps())
   } catch {
-    // @fulcrum/teams may not be installed — team operations will return null
+    // @moabualruz/fulcrum-teams may not be installed — team operations will return null
   }
 
   if (!group || group === '--help' || group === '-h') usage()
@@ -2194,7 +2194,7 @@ OPTIONS (serve mcp)
   if (group === 'projects') { await runProjects(); return }
 
   // J-6: 10 top-level command groups mirroring the Python reference CLI.
-  // Each delegates to existing @fulcrum/* package APIs via dynamic imports
+  // Each delegates to existing @moabualruz/fulcrum-* package APIs via dynamic imports
   // so we don't pay the module load cost for unused groups.
   if (group === 'task' || group === 'tasks') { await runTasks(); return }
   if (group === 'issue' || group === 'issues') { await runIssues(); return }

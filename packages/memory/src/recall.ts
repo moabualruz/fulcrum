@@ -1,5 +1,5 @@
 // packages/memory/src/recall.ts
-import { getDb, FulcrumError, getTextEmbedder, getReranker, Db} from '@fulcrum/core'
+import { getDb, FulcrumError, getTextEmbedder, getReranker, Db} from '@moabualruz/fulcrum-core'
 import { rrfScore, rrfScoreWithSparse, recallScore, computeFreshness } from './scoring.js'
 import { sparseRank } from './sparse.js'
 import { rowToFullMemory } from './mappers.js'

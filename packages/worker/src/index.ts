@@ -1,5 +1,5 @@
 // packages/worker/src/index.ts
-// Public surface of @fulcrum/worker — see types.ts for the adapter
+// Public surface of @moabualruz/fulcrum-worker — see types.ts for the adapter
 // contract and lifecycle.ts for the driver.
 
 export { spawnAgent, waitForDrain, isDraining } from './lifecycle.js'

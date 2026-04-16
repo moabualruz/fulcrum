@@ -23,7 +23,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fulcrum/cli": "workspace:*",
+    "@moabualruz/fulcrum-cli": "workspace:*",
     "tsx": "^4.0.0"
   },
   "devDependencies": {

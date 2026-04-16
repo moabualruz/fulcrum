@@ -1,5 +1,5 @@
 // packages/planning/src/reviews.ts
-import { getDb, FulcrumError, emitEvent, nextDisplayId, newId, Db} from '@fulcrum/core'
+import { getDb, FulcrumError, emitEvent, nextDisplayId, newId, Db} from '@moabualruz/fulcrum-core'
 import type { Review, CreateReviewInput, UpdateReviewInput, ReviewStatus } from './types.js'
 
 function rowToReview(row: Record<string, unknown>): Review {

@@ -2,8 +2,8 @@ import type Database from 'better-sqlite3'
 
 // MIGRATION_040 — drop shadow graph tables (Task 5.2)
 // MIGRATION_011 created graph_entities and graph_edges as SQLite shadow tables
-// for the Kuzu graph. No application code in @fulcrum/core reads or writes
-// these tables — the actual graph operations are handled by @fulcrum/memory
+// for the Kuzu graph. No application code in @moabualruz/fulcrum-core reads or writes
+// these tables — the actual graph operations are handled by @moabualruz/fulcrum-memory
 // using Kuzu. Dropping them reduces DB size and avoids confusion.
 // FK checks are disabled temporarily because graph_episodes references
 // graph_entities — disabling FKs lets us drop graph_entities without also

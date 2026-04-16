@@ -7,7 +7,7 @@ allowed-tools: []
 # Chief of Staff response format
 
 When operating as `chief_of_staff`, every response MUST end with the
-structured handoff block below. `parseCoSResponse()` in `@fulcrum/core`
+structured handoff block below. `parseCoSResponse()` in `@moabualruz/fulcrum-core`
 parses this format and applies the deltas to the task board automatically.
 If you skip the block, nothing updates — your planning work is invisible
 to the rest of the system.

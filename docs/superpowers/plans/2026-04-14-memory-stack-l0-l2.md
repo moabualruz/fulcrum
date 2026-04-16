@@ -72,7 +72,7 @@ Open `packages/memory/package.json` and add the four new runtime deps to the `"d
 
 ```json
 {
-  "name": "@fulcrum/memory",
+  "name": "@moabualruz/fulcrum-memory",
   "version": "0.0.1",
   "type": "module",
   "main": "./src/index.ts",
@@ -85,7 +85,7 @@ Open `packages/memory/package.json` and add the four new runtime deps to the `"d
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@fulcrum/core": "workspace:*",
+    "@moabualruz/fulcrum-core": "workspace:*",
     "ulid": "^2.3.0",
     "gray-matter": "^4.0.3",
     "simple-git": "^3.22.0",
@@ -185,7 +185,7 @@ const merged: FulcrumConfig = {
 - [ ] **Step 3: Verify core tests still pass**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/core test
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-core test
 ```
 
 Expected: all core tests pass (no regressions).
@@ -253,7 +253,7 @@ export const OPERATIONAL_KINDS: ReadonlySet<MemoryKind> = new Set<MemoryKind>([
 - [ ] **Step 2: Run existing tests to confirm no regressions**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test
 ```
 
 Expected: all existing memory tests pass.
@@ -423,7 +423,7 @@ describe('parseFromFile', () => {
 - [ ] **Step 3: Run tests**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test vault-formatter
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test vault-formatter
 ```
 
 Expected: 6 tests pass.
@@ -772,7 +772,7 @@ describe('vaultExists', () => {
 - [ ] **Step 3: Run tests**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test vault-client
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test vault-client
 ```
 
 Expected: 10 tests pass.
@@ -929,7 +929,7 @@ describe('VaultGit', () => {
 - [ ] **Step 3: Run tests**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test vault-git
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test vault-git
 ```
 
 Expected: 5 tests pass.
@@ -1168,7 +1168,7 @@ describe('rebuildIndex', () => {
 - [ ] **Step 3: Run tests**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test vault-index
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test vault-index
 ```
 
 Expected: 5 tests pass.
@@ -1205,7 +1205,7 @@ Now replace `packages/memory/src/write.ts` entirely:
 // packages/memory/src/write.ts
 import { ulid } from 'ulid'
 import { createHash } from 'crypto'
-import { getDb, FulcrumError } from '@fulcrum/core'
+import { getDb, FulcrumError } from '@moabualruz/fulcrum-core'
 import { contentHash, isDuplicate } from './dedup.js'
 import { rowToFullMemory } from './mappers.js'
 import { getVaultPath, vaultExists, writeMemoryFile } from './vault/client.js'
@@ -1451,7 +1451,7 @@ describe('writeMemory with L0', () => {
 - [ ] **Step 3: Run tests**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test write-l0
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test write-l0
 ```
 
 Expected: 5 tests pass.
@@ -1459,7 +1459,7 @@ Expected: 5 tests pass.
 - [ ] **Step 4: Verify existing write tests still pass**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test write.test
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test write.test
 ```
 
 Expected: all pre-existing write tests pass.
@@ -1621,7 +1621,7 @@ describe('kuzu/schema', () => {
 - [ ] **Step 3: Run tests**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test kuzu-schema
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test kuzu-schema
 ```
 
 Expected: 5 tests pass.
@@ -1731,7 +1731,7 @@ export class KuzuClient {
   }
 }
 
-// ── Singleton management (mirrors getDb() pattern from @fulcrum/core) ────────
+// ── Singleton management (mirrors getDb() pattern from @moabualruz/fulcrum-core) ────────
 let _kuzuClient: KuzuClient | null = null
 
 export function getKuzuClient(): KuzuClient | null {
@@ -2115,7 +2115,7 @@ describe('extractStructured', () => {
 - [ ] **Step 3: Run tests**
 
 ```bash
-pnpm --filter @fulcrum/memory test extractor-structured
+pnpm --filter @moabualruz/fulcrum-memory test extractor-structured
 ```
 
 Expected: 9 tests pass.
@@ -2352,7 +2352,7 @@ describe('removeMemoryFromKuzu', () => {
 - [ ] **Step 3: Run tests**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test kuzu-upsert
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test kuzu-upsert
 ```
 
 Expected: 6 tests pass. If Kuzu native addon is not yet installed, `pnpm install` first.
@@ -2658,7 +2658,7 @@ describe('queryMemoriesL2', () => {
 - [ ] **Step 3: Run tests**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test kuzu-query
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test kuzu-query
 ```
 
 Expected: 3 tests pass.
@@ -2898,7 +2898,7 @@ describe('rebuildFromVault', () => {
 - [ ] **Step 3: Run tests**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test rebuild
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test rebuild
 ```
 
 Expected: 4 tests pass.
@@ -3305,7 +3305,7 @@ export type { RebuildOptions, RebuildResult } from './setup/rebuild.js'
 - [ ] **Step 3: Run full test suite**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test
 ```
 
 Expected: all tests pass (pre-existing + new). Failures are a signal to debug before committing.
@@ -3351,7 +3351,7 @@ export async function extractSemantic(
   _content: string,
   _workspaceId: string
 ): Promise<SemanticEdge[]> {
-  // TODO: integrate with @fulcrum/core LLM client
+  // TODO: integrate with @moabualruz/fulcrum-core LLM client
   // Kinds eligible: decision, fact, error, task_outcome
   // Extract primary entities (ABOUT), sentiment (CRITIQUES, RECOMMENDS, AVOIDS),
   // and causal relationships (CAUSES, PREVENTS) between entities.
@@ -3458,7 +3458,7 @@ Replace the L2 async enqueue comment in `writeMemory()` with the actual call. Af
 - [ ] **Step 4: Run all memory tests to confirm no regressions**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test
 ```
 
 Expected: all tests pass (existing + new).
@@ -3477,7 +3477,7 @@ git commit -m "feat(memory): add extractors/semantic.ts stub + pipeline.ts; wire
 - [ ] **Run full memory test suite**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/memory test
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-memory test
 ```
 
 Expected: all tests pass, no regressions in pre-existing tests.
@@ -3485,7 +3485,7 @@ Expected: all tests pass, no regressions in pre-existing tests.
 - [ ] **Run core test suite to confirm no regressions**
 
 ```bash
-cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @fulcrum/core test
+cd /home/mkh/workspace/pi-stack-plan && pnpm --filter @moabualruz/fulcrum-core test
 ```
 
 Expected: all core tests pass.

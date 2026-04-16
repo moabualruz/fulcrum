@@ -1,5 +1,5 @@
 {
-  "name": "@fulcrum/monitor",
+  "name": "@moabualruz/fulcrum-monitor",
   "version": "0.0.1",
   "description": "Real-time metrics dashboard \u2014 daily, project, and agent metrics, burndown data, HTTP monitoring server",
   "keywords": [
@@ -33,9 +33,9 @@
     "build": "tsup"
   },
   "dependencies": {
-    "@fulcrum/core": "workspace:*",
-    "@fulcrum/memory": "workspace:*",
-    "@fulcrum/policy": "workspace:*",
+    "@moabualruz/fulcrum-core": "workspace:*",
+    "@moabualruz/fulcrum-memory": "workspace:*",
+    "@moabualruz/fulcrum-policy": "workspace:*",
     "ulidx": "^2.3.0",
     "hono": "^4.4.0",
     "@hono/node-server": "^1.12.0"

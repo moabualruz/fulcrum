@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
-import { getDb, FulcrumError } from '@fulcrum/core'
+import { getDb, FulcrumError } from '@moabualruz/fulcrum-core'
 import { writeMemory } from '../write.js'
 import { recallMemory } from '../recall.js'
 

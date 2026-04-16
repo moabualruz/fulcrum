@@ -1,5 +1,5 @@
 {
-  "name": "@fulcrum/sync",
+  "name": "@moabualruz/fulcrum-sync",
   "version": "0.0.1",
   "description": "Bidirectional sync adapter \u2014 Plane project management integration, conflict detection, and sync state management",
   "keywords": [
@@ -33,8 +33,8 @@
     "build": "tsup"
   },
   "dependencies": {
-    "@fulcrum/core": "workspace:*",
-    "@fulcrum/policy": "workspace:*",
+    "@moabualruz/fulcrum-core": "workspace:*",
+    "@moabualruz/fulcrum-policy": "workspace:*",
     "ulidx": "^2.3.0"
   },
   "devDependencies": {

@@ -130,7 +130,7 @@ When `completeAgentRun` is called in `packages/core/src/runs.ts`, automatically 
 
 ### Behavior
 
-**Write trigger**: At the end of `completeAgentRun()`, after the DB update succeeds, call `writeMemory()` from `@fulcrum/memory` with:
+**Write trigger**: At the end of `completeAgentRun()`, after the DB update succeeds, call `writeMemory()` from `@moabualruz/fulcrum-memory` with:
 ```typescript
 {
   workspace_id: run.workspace_id,
@@ -159,7 +159,7 @@ Similarly, `blockAgentRun()` writes a memory with `kind: 'task_failure'` and `im
 
 **Opt-out**: `FULCRUM_NO_AUTO_MEMORY=1` env var skips the write. Checked at the top of the write path.
 
-**Circular dependency guard**: `packages/core` must not import `packages/memory` (circular). Solution: use a dynamic import inside `completeAgentRun` — `const { writeMemory } = await import('@fulcrum/memory')` — same pattern used by the hook today.
+**Circular dependency guard**: `packages/core` must not import `packages/memory` (circular). Solution: use a dynamic import inside `completeAgentRun` — `const { writeMemory } = await import('@moabualruz/fulcrum-memory')` — same pattern used by the hook today.
 
 ### Acceptance Criteria
 
@@ -175,7 +175,7 @@ Similarly, `blockAgentRun()` writes a memory with `kind: 'task_failure'` and `im
 - **Run without task_id**: Memory scoped to project, not task — still written
 - **Duplicate completion**: `completeAgentRun` throws `not_found` / `run_not_live` for re-completion — the memory write guard follows the same path (write only on first completion)
 - **Very long summaries**: Truncate content to 2000 chars before writing
-- **Tests**: Most core tests inject in-memory DB but don't have `@fulcrum/memory` available; the dynamic import + `FULCRUM_NO_AUTO_MEMORY=1` in test env handles this
+- **Tests**: Most core tests inject in-memory DB but don't have `@moabualruz/fulcrum-memory` available; the dynamic import + `FULCRUM_NO_AUTO_MEMORY=1` in test env handles this
 
 ### Smallest First Slice
 

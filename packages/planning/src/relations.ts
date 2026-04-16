@@ -1,6 +1,6 @@
 // packages/planning/src/relations.ts
-import { getDb, FulcrumError, rowToTaskBase, Db} from '@fulcrum/core'
-import type { Task } from '@fulcrum/core'
+import { getDb, FulcrumError, rowToTaskBase, Db} from '@moabualruz/fulcrum-core'
+import type { Task } from '@moabualruz/fulcrum-core'
 import type { TaskRelation, AddTaskRelationInput, RemoveTaskRelationInput, GetTaskRelationsInput } from './types.js'
 
 // PLAN-006: rowToTask builds on core's rowToTaskBase, adding labels/blockers

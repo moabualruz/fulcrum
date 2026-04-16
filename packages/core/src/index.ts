@@ -56,9 +56,9 @@ export { checkPolicy } from './policy.js'
 // Janitor
 export { runJanitorCycle, startJanitor, decayMemories, consolidateMemories, deleteOldHookEvents } from './janitor.js'
 
-// Memory (internal implementations — use @fulcrum/memory for external callers)
+// Memory (internal implementations — use @moabualruz/fulcrum-memory for external callers)
 // writeMemory and recallMemory are intentionally NOT re-exported here.
-// External packages should import from '@fulcrum/memory' to get the full
+// External packages should import from '@moabualruz/fulcrum-memory' to get the full
 // hybrid-search + RRF + Kuzu implementation instead of the core-only version.
 
 // Embedding
@@ -156,14 +156,14 @@ export {
   deleteAgentProfile,
 } from './agent-profiles.js'
 
-// Hook types (GAP-ARCH-3): pure types extracted from @fulcrum/cli so other
+// Hook types (GAP-ARCH-3): pure types extracted from @moabualruz/fulcrum-cli so other
 // packages can depend on them without pulling in policy/memory.
 export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO } from './hooks.js'
 
 // Team management — IoC registry.
-// @fulcrum/teams implements TeamOps and registers itself at startup via:
-//   import { createTeamOps } from '@fulcrum/teams'
-//   import { setTeamOps } from '@fulcrum/core'
+// @moabualruz/fulcrum-teams implements TeamOps and registers itself at startup via:
+//   import { createTeamOps } from '@moabualruz/fulcrum-teams'
+//   import { setTeamOps } from '@moabualruz/fulcrum-core'
 //   setTeamOps(createTeamOps())
 // This breaks the static circular dependency (teams → core is fine;
 // core must never import teams).

@@ -42,7 +42,7 @@ Before ordering tasks, here are the cross-plan conflicts resolved in this master
 ### Conflict 1: P5-Task-5.1 vs P6-Task-6.2 (same work)
 
 Both plans require consolidating the duplicate `writeMemory`/`recallMemory` in
-`@fulcrum/core`. **Resolution:** P6-Task-6.2 does this work; P5-Task-5.1 is
+`@moabualruz/fulcrum-core`. **Resolution:** P6-Task-6.2 does this work; P5-Task-5.1 is
 removed as a duplicate. P5 starts from Task 5.2 (Kuzu node creation).
 
 ### Conflict 2: P0-Task-0.7 vs P2-Task-2.3 (same work: subagent MDs)
@@ -184,7 +184,7 @@ Wave 6 (scale + polish):
 > See: [P6-Task-6.1](../../audit/plans/p6-modular-architecture.md#task-61----extract-fulcrumkernel-f6-issue-01-critical)
 
 - [ ] Create `packages/kernel/package.json` with zero internal deps
-- [ ] Move `ids.ts`, pure types, error classes, constants from `@fulcrum/core`
+- [ ] Move `ids.ts`, pure types, error classes, constants from `@moabualruz/fulcrum-core`
 - [ ] Update all internal imports to use `@fulcrum/kernel`
 - [ ] Run `pnpm test` — all green
 - [ ] Commit: `feat(kernel): extract @fulcrum/kernel leaf package`
@@ -194,10 +194,10 @@ Wave 6 (scale + polish):
 > Also covers: [P5-Task-5.1](../../audit/plans/p5-memory-rag.md#task-51----consolidate-writememory--recallmemory-f5-issue-10-critical)
 
 - [ ] Find all callers of `writeMemory`/`recallMemory` in `packages/core/`
-- [ ] Replace with re-exports from `@fulcrum/memory`
+- [ ] Replace with re-exports from `@moabualruz/fulcrum-memory`
 - [ ] Verify policy de-duplication similarly
 - [ ] Run `pnpm test` — all green
-- [ ] Commit: `refactor(core): remove duplicate memory/policy — re-export from @fulcrum/memory`
+- [ ] Commit: `refactor(core): remove duplicate memory/policy — re-export from @moabualruz/fulcrum-memory`
 
 #### Task 3 — Extract tool catalogue
 > See: [P1-Task-1.1](../../audit/plans/p1-mcp-server.md#task-11----extract-tool-catalogue-precursor-to-sdk-migration)
@@ -619,9 +619,9 @@ Wave 6 (scale + polish):
 #### Task 51 — Thread `Db` port (incremental — high risk)
 > See: [P6-Task-6.7](../../audit/plans/p6-modular-architecture.md#task-67----thread-db-port-f6-issue-11-high)
 
-- [ ] PR 1: `@fulcrum/memory` write/recall accept `db` param (already does? verify)
-- [ ] PR 2: `@fulcrum/core` tasks CRUD accepts `db` param
-- [ ] PR 3: `@fulcrum/teams` scheduler accepts `db` param
+- [ ] PR 1: `@moabualruz/fulcrum-memory` write/recall accept `db` param (already does? verify)
+- [ ] PR 2: `@moabualruz/fulcrum-core` tasks CRUD accepts `db` param
+- [ ] PR 3: `@moabualruz/fulcrum-teams` scheduler accepts `db` param
 - [ ] PR 4: CLI passes `db` explicitly; remove `getDb()` calls
 - [ ] PR 5: Delete `getDb()` singleton
 - [ ] Commit per PR: `refactor(core): thread Db port in <module>`

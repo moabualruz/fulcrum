@@ -183,7 +183,7 @@ So the real count is:
 - **PARTIAL: 2** (`spawn_agent` is only real insofar as the adapter
   beneath it is real; today the adapter is always stub → `spawn_agent`
   is effectively stub in practice. `invoke_team` depends on whether
-  `@fulcrum/teams` actually spawns agents; it currently creates DB rows
+  `@moabualruz/fulcrum-teams` actually spawns agents; it currently creates DB rows
   only.)
 
 **Impact:** The README says "runner + 29 step handlers with
@@ -281,7 +281,7 @@ done.
 
 ---
 
-### H2. The `@fulcrum/policy` `SYSTEM_INVARIANTS` are an allowlist, not an enforced guard on real call paths
+### H2. The `@moabualruz/fulcrum-policy` `SYSTEM_INVARIANTS` are an allowlist, not an enforced guard on real call paths
 - `packages/policy/src/engine.ts` exports `SYSTEM_INVARIANTS` (lines
   defining `only_integration_worker_merges`,
   `chief_of_staff_no_direct_writes`, `cos_must_spawn_teams_via_tool`,
@@ -341,7 +341,7 @@ customisation; adapters that ignore it stay compatible.
   call sites in other packages.**
 - `processMergeQueue` has one production caller:
   `packages/cli/src/index.ts:1642` (the CLI dispatcher).
-- Neither is referenced by `@fulcrum/worker`, `@fulcrum/workflows`, or
+- Neither is referenced by `@moabualruz/fulcrum-worker`, `@moabualruz/fulcrum-workflows`, or
   the janitor. The worker's `spawnAgent` does not allocate a worktree
   before spawning the adapter; `SpawnContext.worktree_path` is
   whatever the caller supplied.
@@ -460,7 +460,7 @@ Extracted from `packages/core/src/types.ts` + per-package types:
 | `scope` | `MemoryScope` (global/project/file/task) · `HandoffScope` (task/issue/project/workspace) · `PolicyScope` (system/user/workspace/project/team_agent/workflow_step) |
 | `profile` | `AgentProfile` (hardcoded descriptor from `listAgentProfiles`) · `AgentProfileRow` (DB row from L-3 table) · `pi_profile` (column on `agent_runs`) |
 | `role` | `AgentRole` (24 canonical) · `caller_role` (in workflow steps) · `actor_role` (in merge queue) · `target_role` (in spawnAgent) · role string in `policy_rules.scope='team_agent'` |
-| `context` | `CoSWorldState` / `CoS context` (from `buildCosContext`) · `session_context` (in hook events) · `SpawnContext` (in `@fulcrum/worker`) · OTel span context (in `trace_events`) |
+| `context` | `CoSWorldState` / `CoS context` (from `buildCosContext`) · `session_context` (in hook events) · `SpawnContext` (in `@moabualruz/fulcrum-worker`) · OTel span context (in `trace_events`) |
 
 **Impact:** A reader (human OR LLM) trying to understand the system
 must hold five separate mental models of "status" in their head.
@@ -551,7 +551,7 @@ imports them in order.
 
 ---
 
-### M3. `@fulcrum/sync` has 1 test file for 7 source files
+### M3. `@moabualruz/fulcrum-sync` has 1 test file for 7 source files
 - 15 tests passing (`packages/sync/src/tests/*.test.ts`).
 - Plane adapter, conflict detection, bidirectional sync are the
   advertised capabilities.
@@ -591,7 +591,7 @@ imports them in order.
   `startAgentRun` but only the stub adapter.
 - **There is no test that exercises a real subprocess adapter end to
   end.** The subprocess adapter is "defined, tested, untested."
-- `@fulcrum/memory` Kuzu tests are gated on `FULCRUM_EMBEDDING_TESTS`;
+- `@moabualruz/fulcrum-memory` Kuzu tests are gated on `FULCRUM_EMBEDDING_TESTS`;
   CI likely doesn't set that. So the L2 graph path has zero CI
   coverage.
 
@@ -624,7 +624,7 @@ present on PATH (i.e., the install is actually going to be used).
 
 ---
 
-### M8. `@fulcrum/sync` Plane adapter is scaffold
+### M8. `@moabualruz/fulcrum-sync` Plane adapter is scaffold
 Four env vars (`PLANE_BASE_URL`, `PLANE_API_KEY`, `PLANE_WORKSPACE_
 SLUG`, `PLANE_PROJECT_ID`) and a one-test file suggest production
 readiness. In reality the sync manager has scaffolding for bidirectional
@@ -679,7 +679,7 @@ Move to `docs/history/` or archive.
 
 ### L3. `docs/superpowers/` has a mix of "done" and "speculative" plans with no index distinguishing them.
 
-### L4. No per-package README except for `worktrees` and `core`. Contributors looking at the `@fulcrum/planning` package have to infer its purpose from type exports.
+### L4. No per-package README except for `worktrees` and `core`. Contributors looking at the `@moabualruz/fulcrum-planning` package have to infer its purpose from type exports.
 
 ### L5. README's install section describes `pnpm run setup` but doesn't describe `setup:check` as the "did it work" follow-up. First-time users guess.
 
@@ -699,7 +699,7 @@ Move to `docs/history/` or archive.
 
 | # | Capability (marketing) | Actual runtime path | Verdict |
 |---|---|---|---|
-| 1 | Multi-agent execution layer | `@fulcrum/worker.spawnAgent` → stub or subprocess adapter only. No real Claude/Gemini/PI adapter. Users cannot invoke a real L2 agent out of the box. | **PERFORMATIVE** — scaffolded, adapter missing |
+| 1 | Multi-agent execution layer | `@moabualruz/fulcrum-worker.spawnAgent` → stub or subprocess adapter only. No real Claude/Gemini/PI adapter. Users cannot invoke a real L2 agent out of the box. | **PERFORMATIVE** — scaffolded, adapter missing |
 | 2 | Workflow runner with 29 step handlers | 14 real + 6 control-flow + 7 stubbed + 2 partial. Documented as 29, true count is 14. | **PARTIAL** |
 | 3 | Real git worktree integration | Code is real. No production caller except the CLI. `spawnAgent` never allocates a worktree. | **PARTIAL** (real code, nobody calls it) |
 | 4 | Merge queue | Real `git merge --no-ff` logic, conflict detection, artifact gates. Only the CLI invokes it. Janitor doesn't. Nothing else does. | **PARTIAL** |
@@ -768,18 +768,18 @@ invisible to users.
 ## Zombie code inventory
 
 ### Packages with no production caller outside their own tests
-- `@fulcrum/sync` — one caller (CLI `runSync`) that is a thin wrapper.
+- `@moabualruz/fulcrum-sync` — one caller (CLI `runSync`) that is a thin wrapper.
   Not really zombie but close.
-- `@fulcrum/worktrees.allocateWorktree` — no cross-package caller; only
+- `@moabualruz/fulcrum-worktrees.allocateWorktree` — no cross-package caller; only
   its own tests use it. The merge pipeline uses the DB rows but nothing
   creates them outside direct CLI use.
 
 ### Exports nothing imports
-- `@fulcrum/core.buildWorldState` / `CoSWorldState` — exported from
+- `@moabualruz/fulcrum-core.buildWorldState` / `CoSWorldState` — exported from
   `cos-context.ts`; grep for imports shows only `buildCosContext` gets
   used, not `buildWorldState`. Probably remove.
-- `@fulcrum/core.reconcileMergedBranch` (memory/setup) — tests only.
-- `@fulcrum/memory.runExtractionPipeline` — fires in `setImmediate`
+- `@moabualruz/fulcrum-core.reconcileMergedBranch` (memory/setup) — tests only.
+- `@moabualruz/fulcrum-memory.runExtractionPipeline` — fires in `setImmediate`
   inside the memory writer, but only when L2 is active; untested for
   the default path.
 - `packages/core/src/graph.ts` / `graph_entities` / `graph_edges` /
@@ -789,7 +789,7 @@ invisible to users.
 
 ### Tables with no CRUD or CRUD but no caller
 - `graph_entities`, `graph_edges`, `graph_episodes` (M011) — no CRUD
-  module in `@fulcrum/core` or `@fulcrum/memory`. Zombie.
+  module in `@moabualruz/fulcrum-core` or `@moabualruz/fulcrum-memory`. Zombie.
 - `analytics_cycle`, `analytics_project`, `analytics_agent`,
   `analytics_team` (M009) — written by the monitor's metrics
   computation BUT the monitor's metrics endpoints only READ a subset.
@@ -1005,7 +1005,7 @@ confidence is actually "the happy path is green".
    writes files under `.fulcrum-worktrees/conflicts/`, but file path
    comes from worktree_id which is server-generated — OK. The
    `write_memory` path doesn't touch the filesystem (L1-only write),
-   but the L0 `writeMemoryFile` does, and only from `@fulcrum/memory`,
+   but the L0 `writeMemoryFile` does, and only from `@moabualruz/fulcrum-memory`,
    and that's vault-pathed.
 4. **`run_script` allowlist.** Good — only `run_tests`, `lint`,
    `typecheck`, `build`. But if the user has a malicious
@@ -1063,8 +1063,8 @@ untested under load" story.
 - `docs/guides/` is user-facing and correct, except CLI-reference
   claims drift from code (C4).
 - **No per-package READMEs except `worktrees` and `core`.** New
-  contributors don't know what `@fulcrum/planning` or
-  `@fulcrum/teams` provide without reading the source. Add per-
+  contributors don't know what `@moabualruz/fulcrum-planning` or
+  `@moabualruz/fulcrum-teams` provide without reading the source. Add per-
   package READMEs as a rule.
 
 **Severity:** MEDIUM.
@@ -1081,7 +1081,7 @@ work; most should be parallelisable.
   and `Stop` hooks, run-id stashing, pre/post pickup. Makes
   L-7/L-8/L-9/L-10 fire.
 - **F0-ISSUE-02: Real Claude Code agent adapter (C2).** Implement
-  `claudeCodeAdapter` in `@fulcrum/worker`. Register alongside stub
+  `claudeCodeAdapter` in `@moabualruz/fulcrum-worker`. Register alongside stub
   and subprocess. Requires decision on which command to spawn and how
   to pass prompt context — probably via `claude -p "..."` or the Claude
   Code subprocess CLI, whichever is stable. Unblocks `spawn_agent`.
@@ -1187,7 +1187,7 @@ sections. Below are my proxy verdicts based on the research docs
   endorses a hexagonal / modular-monolith pattern. We're mostly
   there.
   **Verdict: retrofit. The modular structure is fine. Splitting
-  `@fulcrum/cli` (L9) and `migrations` (M2) is clean-up, not a
+  `@moabualruz/fulcrum-cli` (L9) and `migrations` (M2) is clean-up, not a
   rebuild.**
 
 ### Top-level recommendation
@@ -1231,7 +1231,7 @@ finding whose fix requires a rewrite. The findings are a punch list.
 
 For completeness: the rebuild case is strongest for:
 - vocabulary drift (H9) — easier in a greenfield,
-- `@fulcrum/cli` monolith (L9) — easier in a greenfield,
+- `@moabualruz/fulcrum-cli` monolith (L9) — easier in a greenfield,
 - migrations file size (M2) — easier in a greenfield,
 - stub handlers in workflows (C3) — easier to build clean than to
   untangle.

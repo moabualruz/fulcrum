@@ -1,7 +1,7 @@
 // packages/sync/src/sync-manager.ts
 import { createHash } from 'node:crypto'
 import { ulid } from 'ulidx'
-import type { Db } from '@fulcrum/core'
+import type { Db } from '@moabualruz/fulcrum-core'
 import type {
   SyncState,
   SyncConflict,

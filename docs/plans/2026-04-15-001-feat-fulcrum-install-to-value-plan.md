@@ -71,7 +71,7 @@ The install cliff: native Kuzu + better-sqlite3 build, 8 manual steps, session r
 - `agent-integration/claude/CLAUDE.md` — has `<!-- GENERATED:tools-start -->` / `<!-- GENERATED:tools-end -->` markers; currently says "Total: 22 tools"; `pnpm gen:claude-md` script exists in root `package.json`
 - `agent-integration/install.ts` — `step(name, fn)` helper; continues on error (does not abort); `recoveryHintFor()` on failure; `StepResult` shape: `{ name, status: 'ok'|'skip'|'warn'|'fail', detail?, recovery?, rollback? }`
 - `packages/memory/src/kuzu/client.ts` — kuzu imported with `await import('kuzu')` (already lazy) — safe to move to optionalDependencies
-- `packages/core/src/index.ts` line 138 — existing dynamic import pattern: `await import('@fulcrum/teams')` inside `getTeamOps()`
+- `packages/core/src/index.ts` line 138 — existing dynamic import pattern: `await import('@moabualruz/fulcrum-teams')` inside `getTeamOps()`
 
 ### Institutional Learnings
 
@@ -85,8 +85,8 @@ The install cliff: native Kuzu + better-sqlite3 build, 8 manual steps, session r
 - **Feature 2: kuzu move is safe**: All kuzu calls in `packages/memory/src/kuzu/client.ts` are already behind `await import('kuzu')` — no static top-level import to convert. Moving to `optionalDependencies` is a one-line package.json change.
 - **Feature 4: gen:claude-md already exists**: The script generates the `<!-- GENERATED -->` block. The gap is the header ("exposes 13 tools" in the intro text) which lives outside the generated section. Fix requires extending the script to also update/replace the header, or extracting the intro into the template.
 - **Monitor spawn lifecycle**: Use `process.on('exit', () => monitorProcess.kill())` rather than `monitor.unref()` alone. `unref()` prevents the parent's event loop from waiting for the child but does NOT guarantee the child is killed when the parent exits. On SIGKILL the OS kills only the targeted process; the `exit` handler on the parent ensures explicit cleanup on normal exits.
-- **Feature 5 monitor entry point in npx context**: Committed to `import.meta.resolve('@fulcrum/cli/serve-monitor')` + `fileURLToPath()` from `node:url`. `require.resolve` is not available in a native-ESM package (`"type": "module"`). The `./serve-monitor` subpath export in `packages/cli/package.json` is a **blocking prerequisite** — `import.meta.resolve` throws `ERR_PACKAGE_PATH_NOT_EXPORTED` without it. The entry must map to `./dist/serve-monitor.js` (published) and `./src/serve-monitor.ts` (monorepo dev). See Unit 6 approach for full detail.
-- **Feature 7 workspace IDs in install.ts**: Use `currentProjectIds()` (already called by `get_current_context`; wraps `projectIdsFromPath(process.cwd())`). Import from `@fulcrum/core` — no new computation needed.
+- **Feature 5 monitor entry point in npx context**: Committed to `import.meta.resolve('@moabualruz/fulcrum-cli/serve-monitor')` + `fileURLToPath()` from `node:url`. `require.resolve` is not available in a native-ESM package (`"type": "module"`). The `./serve-monitor` subpath export in `packages/cli/package.json` is a **blocking prerequisite** — `import.meta.resolve` throws `ERR_PACKAGE_PATH_NOT_EXPORTED` without it. The entry must map to `./dist/serve-monitor.js` (published) and `./src/serve-monitor.ts` (monorepo dev). See Unit 6 approach for full detail.
+- **Feature 7 workspace IDs in install.ts**: Use `currentProjectIds()` (already called by `get_current_context`; wraps `projectIdsFromPath(process.cwd())`). Import from `@moabualruz/fulcrum-core` — no new computation needed.
 - **Feature 7 doctor gate abort**: The current `step()` helper continues on error and does not abort the install. The doctor gate step needs to call `fail()` within the step AND return early from install.ts when doctor reports FAIL-level checks. Either add an abort mechanism to `step()` or restructure the gate as a post-step check outside the `step()` wrapper. **PATH issue**: `spawnSync('fulcrum', ...)` resolves via `$PATH`, which may not include the freshly installed binary on a first-time setup (the binary is in `node_modules/.bin/` but not yet globally linked). Use an explicit path (e.g., `path.join(process.cwd(), 'node_modules/.bin/fulcrum')`) rather than the bare command name — an `ENOENT` from a missing PATH entry produces empty stdout, which the JSON-parse handler reports as "malformed JSON" instead of "fulcrum not found."
 - **Tool count**: `TOOL_SCHEMAS.length` is **27** (not 23 as in requirements doc). All generated content should read from the live array, not a hardcoded number.
 
@@ -102,7 +102,7 @@ The install cliff: native Kuzu + better-sqlite3 build, 8 manual steps, session r
 
 ### Deferred to Implementation
 
-- **Exact exports map entry for monitor entry point** (`@fulcrum/cli/serve-monitor`): verify exact path in compiled output and `package.json` exports field before implementing Feature 5 in npx context.
+- **Exact exports map entry for monitor entry point** (`@moabualruz/fulcrum-cli/serve-monitor`): verify exact path in compiled output and `package.json` exports field before implementing Feature 5 in npx context.
 - **Whether `step()` needs a new abort-on-fail option or Feature 7 gate should live outside the step wrapper**: assess the simplest mechanism during implementation.
 - **Prebuilt `better-sqlite3` matrix scope for Feature 2**: Confirm which Node.js ABI versions to precompile and which CI runner images cover the matrix. Defer to implementation discovery.
 - **Feature 6 `hook_active` and `doctor_warnings` implementation**: Deferred by explicit decision; implement in a follow-up PR after Feature 1 is deployed.
@@ -166,7 +166,7 @@ completeAgentRun(input)
 runFulcrumMcpServer()
   └─ server.connect(transport)
        └─ if (!noMonitor)
-            monitorProcess = spawn('@fulcrum/cli/serve-monitor', ['--port', '4721'])
+            monitorProcess = spawn('@moabualruz/fulcrum-cli/serve-monitor', ['--port', '4721'])
             process.on('exit', () => monitorProcess.kill())
             await probeMonitorReady(4721)   ← up to 2s
        └─ wait on stdin close
@@ -402,8 +402,8 @@ runFulcrumMcpServer()
 
 **Approach:**
 - After `server.connect(transport)` in `runFulcrumMcpServer`, check `options.noMonitor` flag and `process.env.FULCRUM_NO_MONITOR`. If neither is set, spawn the monitor.
-- Entry point resolution: Commit to `import.meta.resolve('@fulcrum/cli/serve-monitor')` — `packages/cli` is native ESM (`"type": "module"`, `moduleResolution: NodeNext`), so `require.resolve` is unavailable without a `createRequire` shim. `import.meta.resolve` returns a `file://` URL; wrap with `fileURLToPath()` from `node:url` before passing to `spawn`. Do NOT use `path.join(__dirname, '../../...')` — invalid in the npx cache.
-- The `./serve-monitor` subpath export is a **blocking prerequisite**: `import.meta.resolve('@fulcrum/cli/serve-monitor')` throws `ERR_PACKAGE_PATH_NOT_EXPORTED` until this entry exists in `packages/cli/package.json`'s `exports` map. The entry must point to `./dist/serve-monitor.js` (published package) and `./src/serve-monitor.ts` (monorepo dev via tsx).
+- Entry point resolution: Commit to `import.meta.resolve('@moabualruz/fulcrum-cli/serve-monitor')` — `packages/cli` is native ESM (`"type": "module"`, `moduleResolution: NodeNext`), so `require.resolve` is unavailable without a `createRequire` shim. `import.meta.resolve` returns a `file://` URL; wrap with `fileURLToPath()` from `node:url` before passing to `spawn`. Do NOT use `path.join(__dirname, '../../...')` — invalid in the npx cache.
+- The `./serve-monitor` subpath export is a **blocking prerequisite**: `import.meta.resolve('@moabualruz/fulcrum-cli/serve-monitor')` throws `ERR_PACKAGE_PATH_NOT_EXPORTED` until this entry exists in `packages/cli/package.json`'s `exports` map. The entry must point to `./dist/serve-monitor.js` (published package) and `./src/serve-monitor.ts` (monorepo dev via tsx).
 - **Compilation path (blocking pre-implementation decision)**: the CLI currently runs source via the `tsx` shebang. The monitor subprocess can either (a) use `node --import tsx/esm <path>` (tsx must be an explicit dep in `packages/fulcrum-mcp/package.json`) or (b) target compiled `dist/` output. **This decision must be made before writing the `./serve-monitor` export entry** — the entry maps to different paths (`./src/serve-monitor.ts` vs `./dist/serve-monitor.js`) depending on which path is chosen, and the exports field cannot be correct until this is resolved.
 - Subprocess SQLite isolation: monitor subprocess opens its own `better-sqlite3` connection. WAL mode is already active (`packages/core/src/db/client.ts` line 57 — `busy_timeout = 5000`); WAL supports concurrent readers + one writer, so read-heavy monitor queries are safe alongside the MCP server's writes.
 - Lifecycle: `const monitorProcess = spawn(...)`. Register `process.on('exit', () => monitorProcess.kill())` — this ensures the monitor is killed on normal exits. Do NOT use `monitor.unref()` alone, which does not guarantee cleanup on SIGKILL (document as best-effort).
@@ -447,8 +447,8 @@ runFulcrumMcpServer()
 - Modify: `docs/guides/installation.md` — add "npx (quick start)" as the primary section
 
 **Approach:**
-- `packages/fulcrum-mcp/package.json`: `"bin": { "fulcrum-mcp": "./dist/index.js" }`, `"name": "fulcrum-mcp"`, `"preferGlobal": false`. Dependencies: `@fulcrum/cli` (runtime). Peer dev dependency on `@fulcrum/memory` with `optionalDependencies` for kuzu.
-- `src/index.ts`: thin entry — imports and calls `runFulcrumMcpServer()` from `@fulcrum/cli/mcp-server`. The file has a shebang (`#!/usr/bin/env node`) for direct execution.
+- `packages/fulcrum-mcp/package.json`: `"bin": { "fulcrum-mcp": "./dist/index.js" }`, `"name": "fulcrum-mcp"`, `"preferGlobal": false`. Dependencies: `@moabualruz/fulcrum-cli` (runtime). Peer dev dependency on `@moabualruz/fulcrum-memory` with `optionalDependencies` for kuzu.
+- `src/index.ts`: thin entry — imports and calls `runFulcrumMcpServer()` from `@moabualruz/fulcrum-cli/mcp-server`. The file has a shebang (`#!/usr/bin/env node`) for direct execution.
 - **kuzu split**: Move `"kuzu": "^0.10.0"` in `packages/memory/package.json` from `dependencies` to `optionalDependencies`. The lazy import in `packages/memory/src/kuzu/client.ts` is already in place — this is the only required change.
 - **better-sqlite3 prebuilts**: Do not build new prebuild infrastructure. `better-sqlite3 ^12.0.0` already ships prebuilt binaries via its own `prebuild-install` mechanism for Node 20 (ABI 115) and Node 22 (ABI 127) on macOS arm64/x64 and Linux x64. Verify that a cold `npx -y fulcrum-mcp` on those platforms downloads the prebuilt without triggering `node-gyp` (cleared npm cache, `time npx -y fulcrum-mcp --version` ≤ 10s is the acceptance gate). If the cold install exceeds budget, the mitigation is bundling the `.node` binaries directly in the tarball via the `files` field — not introducing new prebuild tooling. ABI coverage matrix: Node 20 (ABI 115) + Node 22 (ABI 127) on macOS arm64, macOS x64, Linux x64.
 - **CI smoke job**: `npx -y fulcrum-mcp@latest &` → wait for MCP process to start → run a minimal MCP client that calls `get_current_context` via stdin/stdout → assert response includes `workspace_id`. Run on macOS arm64 and ubuntu-latest.
@@ -480,7 +480,7 @@ runFulcrumMcpServer()
 - **State lifecycle risks:** m051 and m052 are additive migrations — no column removed or renamed. ALTER TABLE for m052 is idempotent. Janitor TTL for hook_events (30 days) is the primary cleanup mechanism, but the janitor's `running` skip guard (`packages/core/src/janitor.ts` line 277: `if (running) return`) means cleanup can be deferred indefinitely when a long embedding-consolidation cycle keeps the janitor busy — precisely when `hook_events` is growing fastest. Consider a lightweight separate cleanup task for `hook_events` independent of the main janitor cycle, or a row-count cap enforced at INSERT time as a secondary guard. Seed data in Unit 4 must use `INSERT OR IGNORE` against a unique constraint — not a SELECT-then-INSERT check — to be safe under concurrent setup runs (follows existing codebase pattern).
 - **API surface parity:** The `recall_memory` MCP tool gains a `source` field in its response. Callers that destructure the response and ignore unknown fields are unaffected. The `readiness` field on `get_current_context` is additive.
 - **Integration coverage:** Hook write → DB row → monitor analytics is a three-layer integration that unit tests alone will not prove. Critically, a row written with `workspace_id = ''` (empty-string fallback when context is absent) satisfies the hook write criterion but is invisible to the monitor query (`WHERE workspace_id = ?`). The three-layer integration test must cover: (a) hook called with correct workspace_id → `/analytics/summary` `hook_event_count` increments; (b) hook called with empty workspace_id → count does not increment for the workspace. The existing test scenario "edge case: empty workspace_id → row inserted with workspace_id = ''" is necessary but not sufficient.
-- **Unchanged invariants:** The `run_id` flow for `start_agent_run` / `complete_agent_run` is unchanged. The five system invariants in `@fulcrum/policy` are unchanged. All 27 existing MCP tools are unchanged. The hook still exits 0 with `{ continue: true }` on every non-blocked call.
+- **Unchanged invariants:** The `run_id` flow for `start_agent_run` / `complete_agent_run` is unchanged. The five system invariants in `@moabualruz/fulcrum-policy` are unchanged. All 27 existing MCP tools are unchanged. The hook still exits 0 with `{ continue: true }` on every non-blocked call.
 
 ## Risks & Dependencies
 

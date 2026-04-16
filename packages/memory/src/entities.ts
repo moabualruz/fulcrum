@@ -1,5 +1,5 @@
 // packages/memory/src/entities.ts
-import { getDb, FulcrumError, Db} from '@fulcrum/core'
+import { getDb, FulcrumError, Db} from '@moabualruz/fulcrum-core'
 import type { MemoryEntity, LinkMemoryToEntityInput } from './types.js'
 
 export async function linkMemoryToEntity(input: LinkMemoryToEntityInput, db: Db = getDb()): Promise<MemoryEntity> {

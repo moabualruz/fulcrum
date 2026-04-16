@@ -1,10 +1,10 @@
 // packages/teams/src/factory.ts
 // Factory that bundles all team operations into a TeamOps implementation.
-// The CLI (or any host that depends on both @fulcrum/core and @fulcrum/teams)
+// The CLI (or any host that depends on both @moabualruz/fulcrum-core and @moabualruz/fulcrum-teams)
 // calls setTeamOps(createTeamOps()) once at startup to register the implementation.
 
-import type { TeamOps } from '@fulcrum/core'
-import { getDb } from '@fulcrum/core'
+import type { TeamOps } from '@moabualruz/fulcrum-core'
+import { getDb } from '@moabualruz/fulcrum-core'
 import {
   createTeamTemplate,
   invokeTeam,
@@ -18,7 +18,7 @@ import { canStartTeam } from './scheduler.js'
 
 export function createTeamOps(): TeamOps {
   // Type assertions bridge the IoC gap: TeamOps uses opaque Record<string,unknown>
-  // return types so @fulcrum/core stays free of a @fulcrum/teams dependency.
+  // return types so @moabualruz/fulcrum-core stays free of a @moabualruz/fulcrum-teams dependency.
   // The concrete types returned by each function ARE structurally compatible.
   return {
     createTeamTemplate: (input) => createTeamTemplate(input as never) as never,

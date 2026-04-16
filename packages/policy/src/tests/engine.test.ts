@@ -1,7 +1,7 @@
 // packages/policy/src/tests/engine.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seed } from './helpers.js'
-import { getDb, createAgentDefinition, L1_ROLES } from '@fulcrum/core'
+import { getDb, createAgentDefinition, L1_ROLES } from '@moabualruz/fulcrum-core'
 import {
   createPolicyRule,
   listPolicyRules,

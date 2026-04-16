@@ -216,12 +216,12 @@ export async function runJanitorCycle(input: JanitorCycleInput, db: Db = getDb()
     }
 
     // TTL-reap abandoned worktrees (H-10, spec §18.6).
-    // Dynamic import avoids circular dependency: @fulcrum/worktrees depends on @fulcrum/core.
-    // If @fulcrum/worktrees is not installed (e.g. core-only consumers), silently skip.
+    // Dynamic import avoids circular dependency: @moabualruz/fulcrum-worktrees depends on @moabualruz/fulcrum-core.
+    // If @moabualruz/fulcrum-worktrees is not installed (e.g. core-only consumers), silently skip.
     try {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore — optional peer dep; circular if listed as dep (@fulcrum/worktrees → @fulcrum/core)
-      const mod = await import('@fulcrum/worktrees').catch(() => null) as Record<string, unknown> | null
+      // @ts-ignore — optional peer dep; circular if listed as dep (@moabualruz/fulcrum-worktrees → @moabualruz/fulcrum-core)
+      const mod = await import('@moabualruz/fulcrum-worktrees').catch(() => null) as Record<string, unknown> | null
       if (mod && typeof mod.cleanupAbandonedWorktrees === 'function') {
         const n = await mod.cleanupAbandonedWorktrees()
         if (typeof n === 'number') cleanedWorktrees = n

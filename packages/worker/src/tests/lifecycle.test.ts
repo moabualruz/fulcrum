@@ -17,7 +17,7 @@ import {
   createTask,
   getAgentRunStatus,
   getTrace,
-} from '@fulcrum/core'
+} from '@moabualruz/fulcrum-core'
 import { spawnAgent, registerAgentAdapter } from '../index.js'
 
 let taskId: string

@@ -1,7 +1,7 @@
 // packages/planning/src/tests/issues.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seed } from './helpers.js'
-import { getDb } from '@fulcrum/core'
+import { getDb } from '@moabualruz/fulcrum-core'
 import { createEpic } from '../epics.js'
 import { createIssue, updateIssue, listIssues } from '../issues.js'
 

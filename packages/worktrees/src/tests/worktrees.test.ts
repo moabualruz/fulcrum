@@ -5,7 +5,7 @@ import { execFileSync } from 'child_process'
 import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { setDb } from '@fulcrum/core'
+import { setDb } from '@moabualruz/fulcrum-core'
 import { runMigration008 } from '../schema.js'
 import type { ArtifactType, HandoffMode } from '../types.js'
 import {

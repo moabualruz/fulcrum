@@ -1,7 +1,7 @@
 // packages/monitor/src/tests/monitor.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { setDb, _configureDb, runMigrations } from '@fulcrum/core'
+import { setDb, _configureDb, runMigrations } from '@moabualruz/fulcrum-core'
 import { runMigration009 } from '../schema.js'
 import {
   recordDailyMetrics,
@@ -527,11 +527,11 @@ describe('POST /policy/check — real evaluatePolicy engine (in-process)', () =>
     // denies invoke_team for non-L1 roles by checking the in-process stub fallback path
     // (which mirrors the SYSTEM_INVARIANT behavior for the case the engine is unavailable).
     // This is an indirect test of the wiring: the same logic runs in both paths.
-    const { evaluatePolicy: ep } = await import('@fulcrum/policy')
+    const { evaluatePolicy: ep } = await import('@moabualruz/fulcrum-policy')
     const decision = await ep({
       workspace_id: 'ws_policy',
       actor_id: 'pi/software_engineer',
-      actor_role: 'software_engineer' as import('@fulcrum/core').AgentRole,
+      actor_role: 'software_engineer' as import('@moabualruz/fulcrum-core').AgentRole,
       action: 'invoke_team',
     })
     expect(decision.allowed).toBe(false)
@@ -539,11 +539,11 @@ describe('POST /policy/check — real evaluatePolicy engine (in-process)', () =>
   })
 
   it('SYSTEM_INVARIANT: invoke_team allowed for chief_of_staff (L1)', async () => {
-    const { evaluatePolicy: ep } = await import('@fulcrum/policy')
+    const { evaluatePolicy: ep } = await import('@moabualruz/fulcrum-policy')
     const decision = await ep({
       workspace_id: 'ws_policy',
       actor_id: 'chief_of_staff',
-      actor_role: 'chief_of_staff' as import('@fulcrum/core').AgentRole,
+      actor_role: 'chief_of_staff' as import('@moabualruz/fulcrum-core').AgentRole,
       action: 'invoke_team',
     })
     expect(decision.allowed).toBe(true)
@@ -564,13 +564,13 @@ describe('POST /policy/check — real evaluatePolicy engine (in-process)', () =>
               datetime('now'), datetime('now'))
     `).run()
 
-    const { getAgentRunStatus: getStatus } = await import('@fulcrum/core')
+    const { getAgentRunStatus: getStatus } = await import('@moabualruz/fulcrum-core')
     const run = await getStatus({ run_id: 'run_pol_1' })
     // The run's authoritative role should be chief_of_staff regardless of what actor_role was passed
     expect(run.role).toBe('chief_of_staff')
 
     // Now verify that evaluatePolicy with the authoritative role allows invoke_team
-    const { evaluatePolicy: ep } = await import('@fulcrum/policy')
+    const { evaluatePolicy: ep } = await import('@moabualruz/fulcrum-policy')
     const decision = await ep({
       workspace_id: 'ws_policy',
       actor_id: run.agent_id || 'pi/chief_of_staff',
@@ -622,7 +622,7 @@ describe('GET /.well-known/agent.json — A2A Agent Card', () => {
   })
 
   it('skills array is populated from registered agent definitions', async () => {
-    const { createAgentDefinition } = await import('@fulcrum/core')
+    const { createAgentDefinition } = await import('@moabualruz/fulcrum-core')
     createAgentDefinition({
       workspace_id: 'ws_a2a',
       role: 'software_engineer',

@@ -41,7 +41,7 @@ Use these helpers instead of hardcoded string comparisons. The `role-string-guar
 import {
   isL1, canInvokeTeams, canMerge, canWriteCode, canEditFiles,
   roleCapabilities, L1_ROLES,
-} from '@fulcrum/core'
+} from '@moabualruz/fulcrum-core'
 
 if (!canInvokeTeams(caller_role)) throw new FulcrumError('policy_denied')
 if (!canMerge(actor_role))        throw new FulcrumError('policy_denied')
@@ -63,7 +63,7 @@ import {
   getAgentDefinition,
   updateAgentDefinition,
   listAgentDefinitions,
-} from '@fulcrum/core'
+} from '@moabualruz/fulcrum-core'
 
 await createAgentDefinition({
   role: 'software_engineer',
@@ -84,7 +84,7 @@ await createAgentDefinition({
 `buildA2ACard` produces a standard [A2A protocol](https://google.github.io/A2A/) `AgentCard` from an `AgentDefinition`:
 
 ```typescript
-import { buildA2ACard } from '@fulcrum/core'
+import { buildA2ACard } from '@moabualruz/fulcrum-core'
 
 const card = buildA2ACard(agentDefinition, 'https://agents.example.com/run')
 // → { name, description, url, version, capabilities, skills, ... }
@@ -99,7 +99,7 @@ The monitor server also serves `GET /.well-known/agent.json` dynamically — see
 Define a typed team template, then invoke it:
 
 ```typescript
-import { createTeamTemplate, invokeTeam } from '@fulcrum/teams'
+import { createTeamTemplate, invokeTeam } from '@moabualruz/fulcrum-teams'
 
 await createTeamTemplate({
   workspace_id: 'ws_1',

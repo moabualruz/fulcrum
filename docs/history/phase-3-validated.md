@@ -32,7 +32,7 @@ fixes.
 - **Impact**: Same as J-2. An `agent_runs.role` column accepts any string, so typos or drift between type and DB go undetected.
 - **Fix**: Same migration as J-2 can handle both: rebuild `agent_runs` with `CHECK(role IN (...all 24 AgentRole values...))`.
 
-### J-4. `MemoryKind` type drift between `@fulcrum/core` and `@fulcrum/memory`
+### J-4. `MemoryKind` type drift between `@moabualruz/fulcrum-core` and `@moabualruz/fulcrum-memory`
 - **Evidence**:
   - `packages/core/src/types.ts:49-51` — 13 values: `fact, summary, symbol, decision, procedure, error, diff, doc, code, task_goal, task_decision, task_failure, task_outcome`
   - `packages/memory/src/types.ts:5-9` — 16 values: the 13 above + `tool_trace, reasoning_step, lesson`

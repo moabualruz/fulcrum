@@ -5,7 +5,7 @@
 > can integrate tightly and seamlessly with other parts". Today's reality: no
 > Fulcrum package can be `npm install`-ed and used alone. They all transitively
 > pull in `better-sqlite3`, `kuzu`, `@huggingface/transformers`, OTel, and a
-> mutable global `getDb()` singleton via `@fulcrum/core`, and every `main`
+> mutable global `getDb()` singleton via `@moabualruz/fulcrum-core`, and every `main`
 > entry point is a raw `.ts` file that requires `tsx` at runtime.
 >
 > Target baseline: `docs/audit/research/r6-modular-architecture.md` §4 (dep
@@ -23,11 +23,11 @@
 - Fulcrum's current modularisation is **cosmetic**. Packages are folders with
   `package.json` files, but they share a single mutable SQLite singleton
   (`_db` in `packages/core/src/db/client.ts:5`), and every feature package
-  `import`s `getDb`, `FulcrumError`, `newId`, etc. from `@fulcrum/core`.
-  Remove `@fulcrum/core` and every other package stops compiling.
+  `import`s `getDb`, `FulcrumError`, `newId`, etc. from `@moabualruz/fulcrum-core`.
+  Remove `@moabualruz/fulcrum-core` and every other package stops compiling.
 - **Zero packages are publishable as-is.** `main`, `types`, and `exports` all
   point at `./src/index.ts`. There is no build step, no `dist/`, no `bin`
-  field anywhere except `@fulcrum/cli` (which also points at a `.ts` file).
+  field anywhere except `@moabualruz/fulcrum-cli` (which also points at a `.ts` file).
   `pnpm -r build` is a no-op (C1 §10, lines 1463–1466).
 - **One acknowledged cycle (core ↔ teams) and a second latent cycle
   (core ↔ worktrees)**, both resolved with dynamic `await import('@fulcrum/*')`
@@ -35,10 +35,10 @@
   `L1_ROLES` from `teams`, which re-exports it from `core`) — the contract
   lives in core, the test reaches through teams.
 - **No `@fulcrum/kernel` exists.** R6 §12's single most important
-  recommendation. Every package peer-depends (implicitly) on `@fulcrum/core`'s
+  recommendation. Every package peer-depends (implicitly) on `@moabualruz/fulcrum-core`'s
   runtime — SQLite migrations, `getDb()`, OTel, embeddings — instead of on a
   typed interfaces-only leaf.
-- **`@fulcrum/core` is a god package**: 21 top-level `.ts` files, ~3,275
+- **`@moabualruz/fulcrum-core` is a god package**: 21 top-level `.ts` files, ~3,275
   lines of source, 32 test files, 11,505 test lines (nearly half the
   codebase), and it owns persistence + embeddings + OTel + memory write/read
   + policy + handoffs + janitor + roles + cos-context + cos-parser +
@@ -49,8 +49,8 @@
   (`packages/worker/src/adapter.ts` — built-ins registered at module load via
   side-effect). R6 §10 #6 + #7.
 - **Duplicate exports with the same name across packages**:
-  `writeMemory` and `recallMemory` are exported **both** from `@fulcrum/core`
-  (via `packages/core/src/memory.ts:122, 211`) and from `@fulcrum/memory`
+  `writeMemory` and `recallMemory` are exported **both** from `@moabualruz/fulcrum-core`
+  (via `packages/core/src/memory.ts:122, 211`) and from `@moabualruz/fulcrum-memory`
   (`packages/memory/src/write.ts:16`, `recall.ts`). This is not just a smell
   — it is an ambiguous API. Which one is canonical?
 - **No subpath exports, no `"sideEffects"` flag, no `"bin"` per package, no
@@ -60,7 +60,7 @@
 - **CLI partially does the right thing.** `packages/cli/src/index.ts` uses
   `await import('@fulcrum/*')` for most subcommands (lines 228, 348, 396,
   435, 554, 569, 1231, 1318, 1362, 1435, 1565 …). But its two **top-level**
-  imports at lines 4–5 pull `@fulcrum/memory` eagerly, defeating the lazy
+  imports at lines 4–5 pull `@moabualruz/fulcrum-memory` eagerly, defeating the lazy
   discovery story. And it hard-lists all 10 sibling packages as
   `dependencies` in `packages/cli/package.json:19-29`, so there is no
   optional-peer story.
@@ -77,26 +77,26 @@ Not much, but not nothing.
 
 - **Workspace layout is correct at the coarse level.** `pnpm-workspace.yaml`
   lists `packages/*` and pnpm resolves `workspace:*` properly. R6 §2.9.
-- **`@fulcrum/workflows` correctly declares its sibling deps as
+- **`@moabualruz/fulcrum-workflows` correctly declares its sibling deps as
   `peerDependencies` with `peerDependenciesMeta.optional = true`** for
-  `@fulcrum/planning`, `@fulcrum/teams`, `@fulcrum/worker`
+  `@moabualruz/fulcrum-planning`, `@moabualruz/fulcrum-teams`, `@moabualruz/fulcrum-worker`
   (`packages/workflows/package.json:29-38`). This is exactly the R6 §4.1
   optional-peer-dep pattern. It is also the **only** package in the repo
   that does it.
-- **`@fulcrum/core` declares `@fulcrum/teams` as an optional peer dep** to
+- **`@moabualruz/fulcrum-core` declares `@moabualruz/fulcrum-teams` as an optional peer dep** to
   break the static cycle (`packages/core/package.json:31-38`). The lazy
   `getTeamOps()` getter (`packages/core/src/index.ts:125-129`) is a
   reasonable R6 §5.2 "lazy getter / function ref" workaround, but it leaks
   typing — the return type is `Record<string, unknown>` (see the inline
   comment on lines 120–124), which defeats IDE intellisense for everything
-  in `@fulcrum/teams`.
-- **`@fulcrum/worker` uses a registry pattern** for agent adapters:
+  in `@moabualruz/fulcrum-teams`.
+- **`@moabualruz/fulcrum-worker` uses a registry pattern** for agent adapters:
   `registerAgentAdapter(name, adapter)` + `getAgentAdapter(name)`
   (`packages/worker/src/adapter.ts`, exported via `index.ts:6-10`). R6 §4.1
   "registry pattern". This is the closest thing Fulcrum has to a plugin
   contribution point. Third-party adapters _can_ register at runtime.
-- **Every feature package has a `README.md`** except `@fulcrum/cli` and
-  `@fulcrum/worker` (confirmed by `ls packages/*/README.md`). R6 §11.2
+- **Every feature package has a `README.md`** except `@moabualruz/fulcrum-cli` and
+  `@moabualruz/fulcrum-worker` (confirmed by `ls packages/*/README.md`). R6 §11.2
   SHOULD item partially satisfied.
 - **Test isolation via `setDb(inMemoryDb)`** is used consistently in the
   `tests/helpers.ts` pattern across core, memory, monitor, planning, policy,
@@ -114,64 +114,64 @@ Not much, but not nothing.
 ### 2.1 Raw `dependencies + peerDependencies` from each package.json
 
 ```
-@fulcrum/core
+@moabualruz/fulcrum-core
   runtime deps:       better-sqlite3, sqlite-vec, @huggingface/transformers,
                       ulid, @opentelemetry/api, @opentelemetry/sdk-trace-node,
                       @opentelemetry/resources,
                       @opentelemetry/semantic-conventions,
                       @opentelemetry/exporter-trace-otlp-http
-  peer deps:          @fulcrum/teams (optional)
-  dev deps:           @fulcrum/teams, @types/better-sqlite3, @types/node,
+  peer deps:          @moabualruz/fulcrum-teams (optional)
+  dev deps:           @moabualruz/fulcrum-teams, @types/better-sqlite3, @types/node,
                       typescript, vitest
   sibling workspace:  teams (optional peer + dev)
 
-@fulcrum/memory
-  runtime deps:       @fulcrum/core, ulid, gray-matter, simple-git, chokidar,
+@moabualruz/fulcrum-memory
+  runtime deps:       @moabualruz/fulcrum-core, ulid, gray-matter, simple-git, chokidar,
                       kuzu
   dev deps:           better-sqlite3, @types/better-sqlite3, @types/node,
                       typescript, vitest
   sibling workspace:  core (hard)
 
-@fulcrum/monitor
-  runtime deps:       @fulcrum/core, ulidx, hono, @hono/node-server
+@moabualruz/fulcrum-monitor
+  runtime deps:       @moabualruz/fulcrum-core, ulidx, hono, @hono/node-server
   sibling workspace:  core (hard)
 
-@fulcrum/planning
-  runtime deps:       @fulcrum/core, ulid
+@moabualruz/fulcrum-planning
+  runtime deps:       @moabualruz/fulcrum-core, ulid
   sibling workspace:  core (hard)
 
-@fulcrum/policy
-  runtime deps:       @fulcrum/core, @fulcrum/teams, minimatch, ulid
+@moabualruz/fulcrum-policy
+  runtime deps:       @moabualruz/fulcrum-core, @moabualruz/fulcrum-teams, minimatch, ulid
   sibling workspace:  core (hard), teams (hard ← NEW cycle source)
 
-@fulcrum/sync
-  runtime deps:       @fulcrum/core, @fulcrum/policy, ulidx
+@moabualruz/fulcrum-sync
+  runtime deps:       @moabualruz/fulcrum-core, @moabualruz/fulcrum-policy, ulidx
   sibling workspace:  core (hard), policy (hard)
 
-@fulcrum/teams
-  runtime deps:       @fulcrum/core, ulidx
+@moabualruz/fulcrum-teams
+  runtime deps:       @moabualruz/fulcrum-core, ulidx
   sibling workspace:  core (hard ← static cycle source)
 
-@fulcrum/worker
-  runtime deps:       @fulcrum/core
+@moabualruz/fulcrum-worker
+  runtime deps:       @moabualruz/fulcrum-core
   sibling workspace:  core (hard)
 
-@fulcrum/workflows
-  runtime deps:       @fulcrum/core, ulidx
-  peer deps:          @fulcrum/planning, @fulcrum/teams, @fulcrum/worker
+@moabualruz/fulcrum-workflows
+  runtime deps:       @moabualruz/fulcrum-core, ulidx
+  peer deps:          @moabualruz/fulcrum-planning, @moabualruz/fulcrum-teams, @moabualruz/fulcrum-worker
                       (all optional)
   sibling workspace:  core (hard), planning/teams/worker (optional peer)
 
-@fulcrum/worktrees
-  runtime deps:       @fulcrum/core, ulidx
+@moabualruz/fulcrum-worktrees
+  runtime deps:       @moabualruz/fulcrum-core, ulidx
   sibling workspace:  core (hard)
-  dynamic import from core:  @fulcrum/worktrees (lurking cycle — see §4)
+  dynamic import from core:  @moabualruz/fulcrum-worktrees (lurking cycle — see §4)
 
-@fulcrum/cli
-  runtime deps:       @fulcrum/core, @fulcrum/memory, @fulcrum/monitor,
-                      @fulcrum/planning, @fulcrum/policy, @fulcrum/sync,
-                      @fulcrum/teams, @fulcrum/worker, @fulcrum/workflows,
-                      @fulcrum/worktrees, tsx
+@moabualruz/fulcrum-cli
+  runtime deps:       @moabualruz/fulcrum-core, @moabualruz/fulcrum-memory, @moabualruz/fulcrum-monitor,
+                      @moabualruz/fulcrum-planning, @moabualruz/fulcrum-policy, @moabualruz/fulcrum-sync,
+                      @moabualruz/fulcrum-teams, @moabualruz/fulcrum-worker, @moabualruz/fulcrum-workflows,
+                      @moabualruz/fulcrum-worktrees, tsx
   sibling workspace:  ALL 10 siblings, hard deps
 ```
 
@@ -180,19 +180,19 @@ Not much, but not nothing.
 ```mermaid
 graph LR
   subgraph "Leaf of sorts"
-    core[@fulcrum/core<br/>SQLite+OTel+embedding+memory<br/>21 source files, 3275 lines]
+    core[@moabualruz/fulcrum-core<br/>SQLite+OTel+embedding+memory<br/>21 source files, 3275 lines]
   end
 
-  memory[@fulcrum/memory] --> core
-  planning[@fulcrum/planning] --> core
-  monitor[@fulcrum/monitor] --> core
-  teams[@fulcrum/teams] --> core
-  worker[@fulcrum/worker] --> core
-  worktrees[@fulcrum/worktrees] --> core
-  workflows[@fulcrum/workflows] --> core
-  policy[@fulcrum/policy] --> core
+  memory[@moabualruz/fulcrum-memory] --> core
+  planning[@moabualruz/fulcrum-planning] --> core
+  monitor[@moabualruz/fulcrum-monitor] --> core
+  teams[@moabualruz/fulcrum-teams] --> core
+  worker[@moabualruz/fulcrum-worker] --> core
+  worktrees[@moabualruz/fulcrum-worktrees] --> core
+  workflows[@moabualruz/fulcrum-workflows] --> core
+  policy[@moabualruz/fulcrum-policy] --> core
   policy --> teams
-  sync[@fulcrum/sync] --> core
+  sync[@moabualruz/fulcrum-sync] --> core
   sync --> policy
   workflows -.-> planning
   workflows -.-> teams
@@ -200,7 +200,7 @@ graph LR
   core -.-> teams
   core -. "dynamic import()\n(janitor cleanup)" .-> worktrees
 
-  cli[@fulcrum/cli] --> core
+  cli[@moabualruz/fulcrum-cli] --> core
   cli --> memory
   cli --> monitor
   cli --> planning
@@ -221,30 +221,30 @@ Dotted arrows are `peerDependenciesMeta.optional = true` or runtime
 ### 2.3 Graph facts
 
 - **11 packages. Every non-cli package has at least one hard runtime
-  dependency on `@fulcrum/core`.** Core has no hard deps on any sibling —
+  dependency on `@moabualruz/fulcrum-core`.** Core has no hard deps on any sibling —
   but it _does_ have two dynamic imports back into siblings (see §4).
-- **`@fulcrum/cli` has 10 hard `dependencies`**, one per sibling. R6 §12.6
+- **`@moabualruz/fulcrum-cli` has 10 hard `dependencies`**, one per sibling. R6 §12.6
   calls for dynamic imports here with _optional peer deps_. Today it is the
   opposite: eager deps + dynamic usage.
-- **`@fulcrum/policy` depends on `@fulcrum/teams`** (`packages/policy/package.json:21`).
+- **`@moabualruz/fulcrum-policy` depends on `@moabualruz/fulcrum-teams`** (`packages/policy/package.json:21`).
   The only thing it actually uses from teams is `L1_ROLES`, and teams itself
   re-exports that symbol from core (`packages/teams/src/types.ts:14` —
-  `export { L1_ROLES } from '@fulcrum/core'`). This is a **fake dependency**
+  `export { L1_ROLES } from '@moabualruz/fulcrum-core'`). This is a **fake dependency**
   — policy could import `L1_ROLES` directly from core and delete the teams
   edge entirely. The test at `packages/policy/src/tests/engine.test.ts:5`
   imports it via teams; that's the only consumer.
-- **`@fulcrum/sync` depends on `@fulcrum/policy`** because `sync.ts:3` does
-  `import { checkSecrets } from '@fulcrum/policy'`. Legitimate, but it
+- **`@moabualruz/fulcrum-sync` depends on `@moabualruz/fulcrum-policy`** because `sync.ts:3` does
+  `import { checkSecrets } from '@moabualruz/fulcrum-policy'`. Legitimate, but it
   chains the cycle potential: `sync → policy → teams → core`.
 
-### 2.4 External dep bloat passed through `@fulcrum/core`
+### 2.4 External dep bloat passed through `@moabualruz/fulcrum-core`
 
-Any package that imports `@fulcrum/core` transitively gets:
+Any package that imports `@moabualruz/fulcrum-core` transitively gets:
 
 - `better-sqlite3` (native) — C++ SQLite binding
 - `sqlite-vec` — C extension
 - `@huggingface/transformers` — ONNX runtime + tokenizers, ~100MB installed
-- `kuzu` — C++ graph DB (but actually this comes via `@fulcrum/memory`)
+- `kuzu` — C++ graph DB (but actually this comes via `@moabualruz/fulcrum-memory`)
 - 5 × `@opentelemetry/*` packages
 - `ulid` (runtime)
 
@@ -271,31 +271,31 @@ Key questions, R6 §11 checklist:
 
 | Package | `private` | `main` → TS | `exports` map | `bin` | `sideEffects` | Workspace hard deps | Has README | Publishable today? | Useful standalone? |
 |---|---|---|---|---|---|---|---|---|---|
-| `@fulcrum/core`      | (root only) | `./src/index.ts` | single `"."` → TS | — | — | teams (optional peer) | yes | NO | NO — god package, opinionated SQLite |
-| `@fulcrum/memory`    | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard) | yes | NO | only via core |
-| `@fulcrum/monitor`   | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard) | yes | NO | only via core |
-| `@fulcrum/planning`  | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard) | yes | NO | only via core |
-| `@fulcrum/policy`    | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard), teams (hard, fake) | yes | NO | only via core |
-| `@fulcrum/sync`      | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core, policy (both hard) | yes | NO | only via core |
-| `@fulcrum/teams`     | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard; also cycle) | yes | NO | only via core |
-| `@fulcrum/worker`    | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard) | **NO** | NO | only via core |
-| `@fulcrum/workflows` | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard); planning/teams/worker (optional peer) | yes | NO | only via core |
-| `@fulcrum/worktrees` | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard) | yes | NO | only via core |
-| `@fulcrum/cli`       | (root only) | `./src/index.ts` | — | `./src/index.ts` (tsx) | — | all 10 siblings (hard) | **NO** | NO | NO — is the app |
+| `@moabualruz/fulcrum-core`      | (root only) | `./src/index.ts` | single `"."` → TS | — | — | teams (optional peer) | yes | NO | NO — god package, opinionated SQLite |
+| `@moabualruz/fulcrum-memory`    | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard) | yes | NO | only via core |
+| `@moabualruz/fulcrum-monitor`   | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard) | yes | NO | only via core |
+| `@moabualruz/fulcrum-planning`  | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard) | yes | NO | only via core |
+| `@moabualruz/fulcrum-policy`    | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard), teams (hard, fake) | yes | NO | only via core |
+| `@moabualruz/fulcrum-sync`      | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core, policy (both hard) | yes | NO | only via core |
+| `@moabualruz/fulcrum-teams`     | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard; also cycle) | yes | NO | only via core |
+| `@moabualruz/fulcrum-worker`    | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard) | **NO** | NO | only via core |
+| `@moabualruz/fulcrum-workflows` | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard); planning/teams/worker (optional peer) | yes | NO | only via core |
+| `@moabualruz/fulcrum-worktrees` | (root only) | `./src/index.ts` | single `"."` → TS | — | — | core (hard) | yes | NO | only via core |
+| `@moabualruz/fulcrum-cli`       | (root only) | `./src/index.ts` | — | `./src/index.ts` (tsx) | — | all 10 siblings (hard) | **NO** | NO | NO — is the app |
 
 > **Root `package.json`** is `"private": true`. Individual packages are not
 > marked private, but because their `main` fields point at TypeScript
 > source, they are functionally unpublishable. A user running `npm install
-> @fulcrum/memory` would import `./src/index.ts` and immediately fail
+> @moabualruz/fulcrum-memory` would import `./src/index.ts` and immediately fail
 > because their project has no `tsx` loader. **R6 §10 #10 anti-pattern**.
 
 ### 3.2 Per-package notes
 
-#### 3.2.1 `@fulcrum/core`
+#### 3.2.1 `@moabualruz/fulcrum-core`
 
 **Role today**: one package containing persistence, migrations, tasks,
 runs, roles, projects, workspaces, memory write/read (duplicated with
-`@fulcrum/memory`), policy (duplicated with `@fulcrum/policy`), handoffs,
+`@moabualruz/fulcrum-memory`), policy (duplicated with `@moabualruz/fulcrum-policy`), handoffs,
 events, locks, telemetry, janitor, config, ids, constants, CoS context
 builder, CoS parser, agent profiles, and embedding/reranker providers.
 
@@ -311,10 +311,10 @@ events.ts           43 LOC   DB
 handoffs.ts         222 LOC  DB
 ids.ts              66 LOC   — pure (ulid, counter)
 index.ts            129 LOC  — barrel
-janitor.ts          120 LOC  DB + dynamic import @fulcrum/worktrees
+janitor.ts          120 LOC  DB + dynamic import @moabualruz/fulcrum-worktrees
 locks.ts            117 LOC  DB
-memory.ts           371 LOC  DB + embedding (duplicate of @fulcrum/memory)
-policy.ts           64 LOC   DB (duplicate of @fulcrum/policy)
+memory.ts           371 LOC  DB + embedding (duplicate of @moabualruz/fulcrum-memory)
+policy.ts           64 LOC   DB (duplicate of @moabualruz/fulcrum-policy)
 projects.ts         188 LOC  DB
 roles.ts            60 LOC   — pure
 runs.ts             441 LOC  DB
@@ -350,28 +350,28 @@ none of which touch SQLite, OTel, or embeddings. **This is the de facto
   → `@fulcrum/db` (the real persistence package, uses kernel's types).
 - `embedding/*` → `@fulcrum/embedding` (separate native-deps cost).
 - `telemetry/*` → `@fulcrum/telemetry` (separate OTel cost).
-- `memory.ts` (the duplicate) → delete; keep the real one in `@fulcrum/memory`.
-- `policy.ts` (the duplicate) → delete; keep the real one in `@fulcrum/policy`.
+- `memory.ts` (the duplicate) → delete; keep the real one in `@moabualruz/fulcrum-memory`.
+- `policy.ts` (the duplicate) → delete; keep the real one in `@moabualruz/fulcrum-policy`.
 - `janitor.ts` → `@fulcrum/runtime` (the auto-init + daemon orchestrator).
 - `config.ts` → split between kernel (schema) and runtime (loader).
 
-**Standalone usability**: zero. Installing `@fulcrum/core` gives you SQLite
+**Standalone usability**: zero. Installing `@moabualruz/fulcrum-core` gives you SQLite
 + OTel + ONNX + Kuzu whether you want them or not, and its public API is
 the god barrel.
 
-#### 3.2.2 `@fulcrum/memory`
+#### 3.2.2 `@moabualruz/fulcrum-memory`
 
 - Depends on `getDb()` global singleton from core; cannot function without
   core's migrations having run first.
 - Re-exports ~50 names from a single barrel (`packages/memory/src/index.ts`)
   covering vault (L0), FTS5, Kuzu, graph, scoring, dedup, extractors,
   setup. This is a candidate for **subpath exports**:
-  `@fulcrum/memory/vault`, `@fulcrum/memory/kuzu`, `@fulcrum/memory/graph`,
-  `@fulcrum/memory/search`, `@fulcrum/memory/ingest`, `@fulcrum/memory/setup`.
+  `@moabualruz/fulcrum-memory/vault`, `@moabualruz/fulcrum-memory/kuzu`, `@moabualruz/fulcrum-memory/graph`,
+  `@moabualruz/fulcrum-memory/search`, `@moabualruz/fulcrum-memory/ingest`, `@moabualruz/fulcrum-memory/setup`.
   All present as folders; none exposed as exports (R6 §3.4).
 - **Name collision with core**: both export `writeMemory` and `recallMemory`.
-  The `@fulcrum/memory` version writes through the L0 vault first and then
-  into SQLite; the `@fulcrum/core` version writes directly to SQLite. A
+  The `@moabualruz/fulcrum-memory` version writes through the L0 vault first and then
+  into SQLite; the `@moabualruz/fulcrum-core` version writes directly to SQLite. A
   consumer that imports `writeMemory` from the wrong package gets subtly
   different semantics. R6 §10 #11 (private types leaking via public APIs)
   — here it's worse: **two competing canonical APIs with the same name**.
@@ -381,7 +381,7 @@ the god barrel.
 - `kuzu` is only used inside the package, but it's a hard dep, so a user
   who only wants L0+L1 pays the kuzu native-build cost.
 
-#### 3.2.3 `@fulcrum/monitor`
+#### 3.2.3 `@moabualruz/fulcrum-monitor`
 
 - HTTP metrics server. Uses hono + `@hono/node-server` on top of core's DB.
 - All routes are in `server.ts`; metrics aggregation in `metrics.ts`.
@@ -390,12 +390,12 @@ the god barrel.
 - Hard dep on core's SQLite schema and tables. If the monitor depended on
   a kernel `MetricsReader` port, it could run against any implementation.
 
-#### 3.2.4 `@fulcrum/planning`
+#### 3.2.4 `@moabualruz/fulcrum-planning`
 
 - Epics, issues, PRDs, plans, task relations, code reviews. Pure CRUD over
   SQLite tables owned by core's migrations.
 - **Cross-package DB access** (R6 §10 #9). Planning creates rows in tables
-  declared by `@fulcrum/core/db/migrations.ts`. Core could never migrate
+  declared by `@moabualruz/fulcrum-core/db/migrations.ts`. Core could never migrate
   those tables without coordinating with planning. The "clean" fix: planning
   owns its tables and runs its own migrations (modular-monolith pattern,
   R6 §1.5). The "easy" fix: planning depends on kernel's `DbPort` and core
@@ -403,10 +403,10 @@ the god barrel.
 - Standalone value: `fulcrum-plan list`, `fulcrum-plan new` — yes, users
   could run planning against their own SQLite file.
 
-#### 3.2.5 `@fulcrum/policy`
+#### 3.2.5 `@moabualruz/fulcrum-policy`
 
 - WIP limits, system invariants, secret guard, policy rules, audit log.
-- **Fake dep on `@fulcrum/teams`**. `package.json` lists it; only one test
+- **Fake dep on `@moabualruz/fulcrum-teams`**. `package.json` lists it; only one test
   file imports `L1_ROLES` via teams (`packages/policy/src/tests/engine.test.ts:5`),
   and `L1_ROLES` originates in core. R6 §10 #9 + §11.1 MUST "no hard
   runtime dep on another sibling".
@@ -419,7 +419,7 @@ the god barrel.
 - Registering rules (`createPolicyRule`) is side-effectful through the DB
   singleton — **R6 §10 #6**.
 
-#### 3.2.6 `@fulcrum/sync`
+#### 3.2.6 `@moabualruz/fulcrum-sync`
 
 - Plane.so adapter, conflict detection, sync state.
 - Depends on policy for `checkSecrets` (legit).
@@ -429,7 +429,7 @@ the god barrel.
   Fulcrum.
 - Currently untestable without core's migrations.
 
-#### 3.2.7 `@fulcrum/teams`
+#### 3.2.7 `@moabualruz/fulcrum-teams`
 
 - Team templates, role slots, scheduler.
 - **First half of the static cycle**: teams imports from core; core
@@ -440,7 +440,7 @@ the god barrel.
   places that did (MCP tool handlers) can depend on teams directly at the
   application edge.
 
-#### 3.2.8 `@fulcrum/worker`
+#### 3.2.8 `@moabualruz/fulcrum-worker`
 
 - Worker adapters, lifecycle driver (`spawnAgent`), stub + subprocess
   built-in adapters.
@@ -457,38 +457,38 @@ the god barrel.
 - Standalone value: `fulcrum-worker run task.json` against a subprocess
   adapter.
 
-#### 3.2.9 `@fulcrum/workflows`
+#### 3.2.9 `@moabualruz/fulcrum-workflows`
 
 - Best-behaved package in the repo w.r.t. dep declarations: uses optional
   peer deps for planning/teams/worker.
 - But still hard-depends on core.
-- Subpath-export candidates: `@fulcrum/workflows/engine`,
-  `@fulcrum/workflows/registry`, `@fulcrum/workflows/runner`,
-  `@fulcrum/workflows/step-executor`.
+- Subpath-export candidates: `@moabualruz/fulcrum-workflows/engine`,
+  `@moabualruz/fulcrum-workflows/registry`, `@moabualruz/fulcrum-workflows/runner`,
+  `@moabualruz/fulcrum-workflows/step-executor`.
 - Its registry pattern (`registry.register(workflow)`) is another good
   plugin seam that is untyped and undiscoverable today.
 
-#### 3.2.10 `@fulcrum/worktrees`
+#### 3.2.10 `@moabualruz/fulcrum-worktrees`
 
 - Git worktrees, artifact tracking.
 - **Second half of a latent cycle**: `packages/core/src/janitor.ts:77-80`
-  uses a dynamic `await import('@fulcrum/worktrees').catch(() => null)` to
+  uses a dynamic `await import('@moabualruz/fulcrum-worktrees').catch(() => null)` to
   call worktree cleanup. This cycle is not declared in package.json at all
   — it's a **hidden runtime dep** — which is worse than the declared
-  core↔teams cycle. A user who installs `@fulcrum/core` standalone will
+  core↔teams cycle. A user who installs `@moabualruz/fulcrum-core` standalone will
   lose worktree cleanup silently.
 - Standalone value: `fulcrum-worktree create`, `fulcrum-worktree gc`.
   Directly useful as a git helper.
 
-#### 3.2.11 `@fulcrum/cli`
+#### 3.2.11 `@moabualruz/fulcrum-cli`
 
-- The composition package. Imports `@fulcrum/memory` eagerly at lines 4–5
+- The composition package. Imports `@moabualruz/fulcrum-memory` eagerly at lines 4–5
   to run two specific commands (`memory init`, `memory accelerate`), and
   then uses `await import(...)` for everything else — including
-  `@fulcrum/memory` again at lines 228, 229, 244, 245.
+  `@moabualruz/fulcrum-memory` again at lines 228, 229, 244, 245.
 - **Has 10 hard `dependencies`** on siblings in `package.json:19-29`. R6
   §12.6 says these should be optional peer deps on everything except
-  `@fulcrum/kernel`. Today a user who installs `@fulcrum/cli` installs the
+  `@fulcrum/kernel`. Today a user who installs `@moabualruz/fulcrum-cli` installs the
   entire stack regardless of which subcommands they will run. Cold start
   is dominated by eager module resolution via pnpm.
 - Also missing `README.md`.
@@ -500,7 +500,7 @@ the god barrel.
 
 ### 4.1 Declared cycles
 
-- **`@fulcrum/core ↔ @fulcrum/teams`**. Declared. Resolved via
+- **`@moabualruz/fulcrum-core ↔ @moabualruz/fulcrum-teams`**. Declared. Resolved via
   optional peer dep (`packages/core/package.json:31-38`) + lazy getter
   (`packages/core/src/index.ts:125-129`).
   - Typing is lost on the core side: `getTeamOps(): Promise<Record<string, unknown>>`.
@@ -514,11 +514,11 @@ the god barrel.
 
 ### 4.2 Undeclared / lurking cycles
 
-- **`@fulcrum/core ↔ @fulcrum/worktrees`**. Undeclared in package.json.
+- **`@moabualruz/fulcrum-core ↔ @moabualruz/fulcrum-worktrees`**. Undeclared in package.json.
   `packages/core/src/janitor.ts:77-80` does
-  `const mod = await import('@fulcrum/worktrees').catch(() => null)`.
-  - Worktrees declares `@fulcrum/core` as a hard dep. Core declares
-    nothing about worktrees. If `@fulcrum/worktrees` ever tries to import
+  `const mod = await import('@moabualruz/fulcrum-worktrees').catch(() => null)`.
+  - Worktrees declares `@moabualruz/fulcrum-core` as a hard dep. Core declares
+    nothing about worktrees. If `@moabualruz/fulcrum-worktrees` ever tries to import
     core during its module load, and core is mid-import (e.g. during the
     janitor's first cycle), **you have an async import race** that Node
     may resolve to a partially-constructed module.
@@ -526,13 +526,13 @@ the god barrel.
     register at runtime via a `init(ctx)` hook; core's janitor calls
     `ctx.tryGet(WorktreePort).gc()`.
 
-- **`@fulcrum/policy → @fulcrum/teams → @fulcrum/core → @fulcrum/teams`**
+- **`@moabualruz/fulcrum-policy → @moabualruz/fulcrum-teams → @moabualruz/fulcrum-core → @moabualruz/fulcrum-teams`**
   Not a cycle per se (policy only depends on teams; core has _optional_
-  peer on teams), but because `@fulcrum/policy` hard-depends on
-  `@fulcrum/teams` to reach into `L1_ROLES`, any attempt to split policy
+  peer on teams), but because `@moabualruz/fulcrum-policy` hard-depends on
+  `@moabualruz/fulcrum-teams` to reach into `L1_ROLES`, any attempt to split policy
   from teams will fail until L1_ROLES moves to kernel.
 
-- **`@fulcrum/sync → @fulcrum/policy → @fulcrum/teams → @fulcrum/core`**:
+- **`@moabualruz/fulcrum-sync → @moabualruz/fulcrum-policy → @moabualruz/fulcrum-teams → @moabualruz/fulcrum-core`**:
   four-deep chain for `checkSecrets`. Not a cycle, but the longest chain
   in the graph. If any of these has a publishing problem, sync cannot
   ship.
@@ -552,16 +552,16 @@ the god barrel.
 
 | # | Anti-pattern | Status | Evidence |
 |---|---|---|---|
-| 1 | God package owning everything | **✗ fails hard** | `@fulcrum/core` is 21 top-level source files, 3275 LOC, 32 test files, 11,505 test LOC; owns persistence + embedding + telemetry + roles + cos + memory + policy + events + locks + janitor + handoffs + agent-profiles. Every other package depends on it. R6 §12.2 wants this split into kernel/db/embedding/telemetry/runtime. |
+| 1 | God package owning everything | **✗ fails hard** | `@moabualruz/fulcrum-core` is 21 top-level source files, 3275 LOC, 32 test files, 11,505 test LOC; owns persistence + embedding + telemetry + roles + cos + memory + policy + events + locks + janitor + handoffs + agent-profiles. Every other package depends on it. R6 §12.2 wants this split into kernel/db/embedding/telemetry/runtime. |
 | 2 | Barrel files importing half the monorepo | **⚠ partial** | `packages/core/src/index.ts` is 129 lines of explicit re-exports (not `export *`) — disciplined at the barrel level. BUT importing `{ newId }` from core also loads `db/client.ts` (which calls `require('sqlite-vec')` at module load), `embedding/registry.ts`, and everything else. No `sideEffects: false` anywhere. Teams, memory, workflows, sync, monitor, worktrees all use `export *` which pulls every type and every runtime export. |
 | 3 | Packages with no standalone utility | **✗ fails** | 11/11 packages are unpublishable and unusable without sibling core. Every package fails R6 §11.1 MUST #2. |
-| 4 | Hardcoded package names in `await import()` | **✗ fails** | `core/janitor.ts:80` `await import('@fulcrum/worktrees')`; `core/index.ts:127` `await import('@fulcrum/teams')`; `cli/index.ts` has 40+ hardcoded `await import('@fulcrum/*')` calls. No `kernel.resolve('worktrees')` indirection. R6 §10 #4. |
-| 5 | Untyped contribution points | **✗ fails** | `@fulcrum/worker.adapter.registerAgentAdapter()` takes an `AgentAdapter` interface (`packages/worker/src/types.ts`) — typed — but there is no schema validation, no versioning, no activation event model. `@fulcrum/workflows.registry` is a plain JS Map keyed by string. `L1_ROLES` and `roleCapabilities` are declared directly, not contribution points. No package-level manifest. R6 §1.7 + §10 #5. |
+| 4 | Hardcoded package names in `await import()` | **✗ fails** | `core/janitor.ts:80` `await import('@moabualruz/fulcrum-worktrees')`; `core/index.ts:127` `await import('@moabualruz/fulcrum-teams')`; `cli/index.ts` has 40+ hardcoded `await import('@fulcrum/*')` calls. No `kernel.resolve('worktrees')` indirection. R6 §10 #4. |
+| 5 | Untyped contribution points | **✗ fails** | `@moabualruz/fulcrum-worker.adapter.registerAgentAdapter()` takes an `AgentAdapter` interface (`packages/worker/src/types.ts`) — typed — but there is no schema validation, no versioning, no activation event model. `@moabualruz/fulcrum-workflows.registry` is a plain JS Map keyed by string. `L1_ROLES` and `roleCapabilities` are declared directly, not contribution points. No package-level manifest. R6 §1.7 + §10 #5. |
 | 6 | Mutable module state | **✗ fails** | `_db: Database \| null = null` at `packages/core/src/db/client.ts:5`. The entire test suite depends on `setDb()` injecting a `:memory:` database into this singleton. Changes are visible to all importers process-wide, so two parallel Vitest workers must be file-isolated (which they are, by Vitest default, but at cost). Also: `packages/core/src/embedding/registry.ts` with `_textEmbedder`, `_codeEmbedder`, `_reranker` fields. Also: `packages/worker/src/adapter.ts` registers `stub` + `subprocess` at module load as a side effect. R6 §10 #6. |
-| 7 | Relying on import order | **⚠ latent** | Same-file side effects at module load (embedding registry init, adapter registration) create implicit import-order requirements. Today nothing breaks because core is always imported first, but the next contributor who writes `import { subprocessAdapter } from '@fulcrum/worker'` directly will discover that the registration side effect fires in a different order. R6 §10 #7. |
-| 8 | Publishing internal files | **⚠ latent** | No `"files"` field and no `exports` map beyond `"."`. If a package were published today, consumers could reach into `@fulcrum/memory/src/vault/git.ts` with no restriction. R6 §10 #8. |
-| 9 | Cross-package DB access | **✗ fails** | Every feature package calls `getDb()` and issues raw SQL against tables declared by `@fulcrum/core/db/migrations.ts`. Memory writes to the `memory` table. Planning writes to `epics`, `issues`, `prds`, `plans`, `task_relations`, `reviews`. Policy writes to `policy_rules`, `audit_log`. Sync writes to `sync_state`. Teams writes to `team_templates`, `team_instances`. Workflows writes to `workflow_runs`. Worktrees writes to `worktrees`, `merge_queue`. **None of these tables are encapsulated by the owning package.** Core's migrations module knows about every table in the entire system. The modular-monolith "each module owns its schema" rule (R6 §1.5) is violated. R6 §10 #9. |
-| 10 | `file:` / workspace-only protocol | **✗ fails** | `"dependencies": { "@fulcrum/core": "workspace:*" }` everywhere. `workspace:*` does at least get rewritten by pnpm on publish, BUT because nothing is publishable, the rewrite never happens. R6 §10 #10. |
+| 7 | Relying on import order | **⚠ latent** | Same-file side effects at module load (embedding registry init, adapter registration) create implicit import-order requirements. Today nothing breaks because core is always imported first, but the next contributor who writes `import { subprocessAdapter } from '@moabualruz/fulcrum-worker'` directly will discover that the registration side effect fires in a different order. R6 §10 #7. |
+| 8 | Publishing internal files | **⚠ latent** | No `"files"` field and no `exports` map beyond `"."`. If a package were published today, consumers could reach into `@moabualruz/fulcrum-memory/src/vault/git.ts` with no restriction. R6 §10 #8. |
+| 9 | Cross-package DB access | **✗ fails** | Every feature package calls `getDb()` and issues raw SQL against tables declared by `@moabualruz/fulcrum-core/db/migrations.ts`. Memory writes to the `memory` table. Planning writes to `epics`, `issues`, `prds`, `plans`, `task_relations`, `reviews`. Policy writes to `policy_rules`, `audit_log`. Sync writes to `sync_state`. Teams writes to `team_templates`, `team_instances`. Workflows writes to `workflow_runs`. Worktrees writes to `worktrees`, `merge_queue`. **None of these tables are encapsulated by the owning package.** Core's migrations module knows about every table in the entire system. The modular-monolith "each module owns its schema" rule (R6 §1.5) is violated. R6 §10 #9. |
+| 10 | `file:` / workspace-only protocol | **✗ fails** | `"dependencies": { "@moabualruz/fulcrum-core": "workspace:*" }` everywhere. `workspace:*` does at least get rewritten by pnpm on publish, BUT because nothing is publishable, the rewrite never happens. R6 §10 #10. |
 | 11 | Private types leaking through public APIs | **⚠ partial** | Core exports `_configureDb` (leading underscore is the TS convention for "internal"). `getDb`/`setDb` expose a raw `better-sqlite3.Database` instance through the API — consumers can prepare arbitrary SQL statements against any table, bypassing any owning package. R6 §10 #11. |
 | 12 | Circular peer deps | **✓ ok** | Core declares teams as optional peer, teams declares core as hard dep. Not circular peer. |
 
@@ -579,10 +579,10 @@ the god barrel.
 | 2 | Every package installable / runnable standalone without siblings except kernel | ✗ no package works without core at runtime |
 | 3 | `@fulcrum/kernel` exists and contains only contracts | ✗ does not exist |
 | 4 | No hard runtime dep on sibling (use peer/optional/dynamic) | ✗ memory, monitor, planning, policy, sync, teams, worker, worktrees, workflows, cli all hard-dep core; policy hard-deps teams; sync hard-deps policy; cli hard-deps all 10 siblings |
-| 5 | Every package ships a CLI wrapper (`bin`) or documents why not | ✗ only `@fulcrum/cli` has `bin` and it points at TS |
+| 5 | Every package ships a CLI wrapper (`bin`) or documents why not | ✗ only `@moabualruz/fulcrum-cli` has `bin` and it points at TS |
 | 6 | Dependency graph is acyclic; enforced by `madge --circular` in CI | ✗ one declared cycle, one latent cycle, no CI check |
 | 7 | Every package passes contract tests against kernel ports it implements | ✗ no contract tests, no ports |
-| 8 | Each package's tests run without installing siblings | ✗ every test helper imports `setDb`/`closeDb` etc. from `@fulcrum/core` |
+| 8 | Each package's tests run without installing siblings | ✗ every test helper imports `setDb`/`closeDb` etc. from `@moabualruz/fulcrum-core` |
 | 9 | Each package publishes a changelog and bumps semver | ✗ all at `0.0.1`, no changesets, no release script |
 | 10 | `peerDependencies` + `peerDependenciesMeta` used correctly; `workspace:*` rewritten on publish | ✗ all deps are in `dependencies`, not peer |
 | 11 | No mutable top-level state; state lives in Context | ✗ `_db`, embedding registry, worker adapter registry |
@@ -671,10 +671,10 @@ mode where a package loads its own config without the root file.
 - Per-package `tests/helpers.ts` files construct an in-memory DB, run
   migrations via `runMigrations` from core, and call `setDb()` to install
   it into the module singleton.
-- **Every package's tests import at least `@fulcrum/core`** (see grep in
+- **Every package's tests import at least `@moabualruz/fulcrum-core`** (see grep in
   §2 data collection). No package's test suite can run without core
-  installed in `node_modules/@fulcrum/core`.
-- **No contract tests.** `@fulcrum/core` does not publish "a
+  installed in `node_modules/@moabualruz/fulcrum-core`.
+- **No contract tests.** `@moabualruz/fulcrum-core` does not publish "a
   `MemoryStore` implementation must satisfy these N assertions". Every
   consumer is free to implement its own.
 - **No `test/dummy/` hosts.** There is no minimal integration harness per
@@ -736,8 +736,8 @@ F6-ISSUE-03, 04:
 5. Add `"prepublishOnly": "pnpm build && pnpm test"`.
 6. Drop `"private": true` at the root (it's there today) **only for the
    subset of packages that make sense as libraries** — e.g. kernel,
-   memory, policy, worktrees, sync, monitor. Keep `@fulcrum/cli`
-   publishable as a bin, not a library. Keep `@fulcrum/core` NOT
+   memory, policy, worktrees, sync, monitor. Keep `@moabualruz/fulcrum-cli`
+   publishable as a bin, not a library. Keep `@moabualruz/fulcrum-core` NOT
    publishable until the god package is split.
 
 ### 9.3 Plugin discovery
@@ -745,8 +745,8 @@ F6-ISSUE-03, 04:
 - R6 §9 recommends: scan `node_modules` for packages with a `"fulcrum"`
   field in `package.json`; read their contribution table; activate on
   demand.
-- Fulcrum has: `@fulcrum/worker.adapter.registerAgentAdapter()` and
-  `@fulcrum/workflows.registry` — both imperative and both requiring an
+- Fulcrum has: `@moabualruz/fulcrum-worker.adapter.registerAgentAdapter()` and
+  `@moabualruz/fulcrum-workflows.registry` — both imperative and both requiring an
   explicit `import` to trigger the side effect of registration.
 - **No `package.json` field exists for contributing to Fulcrum.**
 - **No activation event model.** Nothing can say "load me when the user
@@ -792,7 +792,7 @@ packages/
 
 ### 10.2 `@fulcrum/kernel` contents (pure leaf, zero runtime deps except zod)
 
-Moved from `@fulcrum/core`:
+Moved from `@moabualruz/fulcrum-core`:
 
 - `types.ts` (432 lines) — all enums, interfaces, `FulcrumError`.
 - `ids.ts` (66 lines) — `newId`, prefixes, `nextDisplayId`.
@@ -840,7 +840,7 @@ Deps: `better-sqlite3`, `sqlite-vec`, kernel (peer).
   implicitly inside core's module loads + `getDb`.
 - Owns the janitor.
 - Owns the lifecycle "start daemon / stop daemon" logic.
-- `@fulcrum/cli` depends on runtime (peer); so do tests that want a real
+- `@moabualruz/fulcrum-cli` depends on runtime (peer); so do tests that want a real
   integrated context.
 
 ### 10.6 Migration order (R6 §12.10 adapted to this repo's reality)
@@ -849,7 +849,7 @@ Deps: `better-sqlite3`, `sqlite-vec`, kernel (peer).
    `constants.ts`, `roles.ts`, `status-category.ts`, `cos-parser.ts`
    verbatim. Add `zod`. Zero runtime code at this step; kernel is pure TS.
 2. **Reroute every package to import those types/enums from
-   `@fulcrum/kernel` instead of `@fulcrum/core`** via a codemod. Core
+   `@fulcrum/kernel` instead of `@moabualruz/fulcrum-core`** via a codemod. Core
    re-exports them for one release as backwards compat.
 3. **Extract `@fulcrum/db`**. Move `packages/core/src/db/*`, migrations,
    `getDb`/`setDb`. Replace the module singleton with `createDb(config): Db`
@@ -886,12 +886,12 @@ Deps: `better-sqlite3`, `sqlite-vec`, kernel (peer).
 
 ```
 # Standalone memory (no daemon)
-npm install -g @fulcrum/memory
+npm install -g @moabualruz/fulcrum-memory
 fulcrum-memory ingest ./notes
 fulcrum-memory search "agent handoff pattern"
 
 # Full control plane
-npm install -g @fulcrum/cli
+npm install -g @moabualruz/fulcrum-cli
 fulcrum memory init
 fulcrum serve mcp
 
@@ -909,7 +909,7 @@ fulcrum plugin list  # shows @acme/fulcrum-slack-notifier contributed an event l
 - **F6-C1 — No `@fulcrum/kernel`; every package transitively imports core's
   SQLite+OTel+embeddings runtime.** Consequence: zero packages are standalone.
   Root cause: no interface-only leaf exists. Fix: R6 §12.2 kernel extraction
-  (F6-ISSUE-01). Evidence: every `import ... from '@fulcrum/core'` in §2
+  (F6-ISSUE-01). Evidence: every `import ... from '@moabualruz/fulcrum-core'` in §2
   grep; `packages/core/src/db/client.ts:5-20` global singleton; every
   package.json runtime deps list.
 
@@ -921,8 +921,8 @@ fulcrum plugin list  # shows @acme/fulcrum-slack-notifier contributed an event l
   1458–1504.
 
 - **F6-C3 — Duplicate canonical APIs across core and feature packages.**
-  `writeMemory`/`recallMemory` are exported by **both** `@fulcrum/core`
-  (`packages/core/src/memory.ts:122,211`) and `@fulcrum/memory`
+  `writeMemory`/`recallMemory` are exported by **both** `@moabualruz/fulcrum-core`
+  (`packages/core/src/memory.ts:122,211`) and `@moabualruz/fulcrum-memory`
   (`packages/memory/src/write.ts:16, recall.ts`). A consumer picking the
   wrong one gets subtly different behaviour (vault-backed vs direct SQLite).
   Similarly, `checkPolicy` in core vs `evaluatePolicy` in policy. Fix:
@@ -951,13 +951,13 @@ fulcrum plugin list  # shows @acme/fulcrum-slack-notifier contributed an event l
   Fix: extract a `WorktreeMgr` port to kernel; worktrees registers during
   init; janitor calls through port.
 
-- **F6-H2 — `@fulcrum/policy` fake hard-dep on `@fulcrum/teams`.** Only for
+- **F6-H2 — `@moabualruz/fulcrum-policy` fake hard-dep on `@moabualruz/fulcrum-teams`.** Only for
   `L1_ROLES`, which originates in core. Policy should depend on kernel and
   import `L1_ROLES` from there. `packages/policy/package.json:21`,
   `packages/policy/src/tests/engine.test.ts:5`. Fix part of
   F6-ISSUE-01 kernel extraction.
 
-- **F6-H3 — `@fulcrum/cli` has 10 hard deps on siblings and two eager
+- **F6-H3 — `@moabualruz/fulcrum-cli` has 10 hard deps on siblings and two eager
   top-level imports** (`packages/cli/src/index.ts:4-5`). Defeats the
   partial lazy-import story. Fix: move to optional peer deps, convert the
   two eager imports to dynamic, and add `"fulcrum"` manifest discovery
@@ -965,8 +965,8 @@ fulcrum plugin list  # shows @acme/fulcrum-slack-notifier contributed an event l
 
 - **F6-H4 — No `exports` map, no subpath exports, no encapsulation, no
   `sideEffects: false`.** Today any consumer that does `import { foo }
-  from '@fulcrum/memory'` pulls in the entire barrel including
-  `@fulcrum/core` (and transitively SQLite, OTel, transformers). Fix: per
+  from '@moabualruz/fulcrum-memory'` pulls in the entire barrel including
+  `@moabualruz/fulcrum-core` (and transitively SQLite, OTel, transformers). Fix: per
   R6 §3.4 add subpath exports per package and narrow barrels. F6-ISSUE-02.
 
 - **F6-H5 — No CI cycle check.** The existing cycles were each found by
@@ -993,11 +993,11 @@ fulcrum plugin list  # shows @acme/fulcrum-slack-notifier contributed an event l
   `FULCRUM_AGENT_STUB_DIR`, etc. have inconsistent namespaces). Fix:
   adopt `FULCRUM_<MOD>_*` prefix per package, read via kernel config.
 
-- **F6-M4 — `@fulcrum/cli` missing `README.md`.** R6 §11.2.
+- **F6-M4 — `@moabualruz/fulcrum-cli` missing `README.md`.** R6 §11.2.
 
-- **F6-M5 — `@fulcrum/worker` missing `README.md`.** R6 §11.2.
+- **F6-M5 — `@moabualruz/fulcrum-worker` missing `README.md`.** R6 §11.2.
 
-- **F6-M6 — `@fulcrum/worker` built-in adapters registered as side effects
+- **F6-M6 — `@moabualruz/fulcrum-worker` built-in adapters registered as side effects
   at module load** (`packages/worker/src/adapter.ts` + `lifecycle.ts`
   comment lines 29–31). Creates implicit import-order requirement. Fix:
   explicit `init(ctx)` hook.
@@ -1047,7 +1047,7 @@ Each issue below maps 1:1 with a follow-up plan doc under
   Scope: create `packages/kernel`, move `types.ts`, `ids.ts`, `constants.ts`,
   `roles.ts`, `status-category.ts`, `cos-parser.ts`. Add ports directory
   with skeleton interfaces. Reroute every existing import of those symbols
-  from `@fulcrum/core` to `@fulcrum/kernel` via codemod. Keep core as a
+  from `@moabualruz/fulcrum-core` to `@fulcrum/kernel` via codemod. Keep core as a
   temporary re-export shim for one release. Acceptance: `@fulcrum/kernel`
   has zero runtime deps except `zod`; `madge --circular` reports zero
   cycles; all existing tests pass.
@@ -1063,7 +1063,7 @@ Each issue below maps 1:1 with a follow-up plan doc under
   Scope: add `tsup` + `"build": "tsup"` + `"prepublishOnly"` to every
   package. `tsup` produces ESM + d.ts. Wire into `pnpm -r build`.
   Acceptance: `pnpm -r build` produces `dist/` in every package; `import
-  '@fulcrum/memory'` resolves to `dist/esm/index.js` when consumed from
+  '@moabualruz/fulcrum-memory'` resolves to `dist/esm/index.js` when consumed from
   outside the workspace.
 
 - **F6-ISSUE-04 — publish plan for library packages.**
@@ -1106,7 +1106,7 @@ Each issue below maps 1:1 with a follow-up plan doc under
 - **F6-ISSUE-09 — delete duplicate `writeMemory`/`recallMemory`/policy in
   core.** Scope: remove `packages/core/src/memory.ts` and
   `packages/core/src/policy.ts`. Update consumers (core's own index
-  barrel, cli) to import from `@fulcrum/memory` / `@fulcrum/policy`
+  barrel, cli) to import from `@moabualruz/fulcrum-memory` / `@moabualruz/fulcrum-policy`
   directly. Acceptance: no duplicate exports in the workspace; tests
   pass.
 
@@ -1148,7 +1148,7 @@ Each issue below maps 1:1 with a follow-up plan doc under
   workflows, sync, monitor, worktrees) to explicit named re-exports.
   Acceptance: `grep 'export \*' packages/*/src/index.ts` returns nothing.
 
-- **F6-ISSUE-15 — READMEs for `@fulcrum/cli` and `@fulcrum/worker`.**
+- **F6-ISSUE-15 — READMEs for `@moabualruz/fulcrum-cli` and `@moabualruz/fulcrum-worker`.**
   Scope: write standalone usage docs for these two missing READMEs.
 
 - **F6-ISSUE-16 — unify `ulid`/`ulidx`.**
@@ -1176,21 +1176,21 @@ Each issue below maps 1:1 with a follow-up plan doc under
    files (§3.2.1). Moving it is a single-day job; no business logic changes.
 2. The mutable singleton `_db` is the one genuinely hard change. It touches
    ~3000 LOC of function signatures. That's a codemod, not a rebuild.
-3. 454 passing tests in `@fulcrum/core` alone are a net asset. A rebuild
+3. 454 passing tests in `@moabualruz/fulcrum-core` alone are a net asset. A rebuild
    would throw them away and rewrite them, losing accumulated invariants
    (check-constraints tests, handoffs tests, migrations tests).
 4. Every feature package already has a working internal API. The external
    shape is the problem, not the logic. R6 §12.10's 10-step migration is
    a retrofit by design.
-5. The user has already invested in `@fulcrum/workflows` doing the right
+5. The user has already invested in `@moabualruz/fulcrum-workflows` doing the right
    thing (optional peer deps). That approach can be copied to every other
    package without rewriting the engine.
 
 **Exceptions where rebuilding is the right call**:
 
 - `packages/core/src/memory.ts` and `packages/core/src/policy.ts`. These
-  are duplicates of the better-factored versions in `@fulcrum/memory` and
-  `@fulcrum/policy`. Delete, don't retrofit. **F6-ISSUE-09**.
+  are duplicates of the better-factored versions in `@moabualruz/fulcrum-memory` and
+  `@moabualruz/fulcrum-policy`. Delete, don't retrofit. **F6-ISSUE-09**.
 - The worker's built-in adapter registration side effect. Easier to
   rewrite as an explicit `init(ctx)` than to retrofit. **F6-M6**.
 - The global `_db` singleton. Rewrite the client module from scratch as a
@@ -1220,12 +1220,12 @@ parallel (kernel/db/embedding can move in parallel once kernel lands).
 ### 13.4 What the user gets
 
 - A user who wants local semantic notes runs
-  `npm install -g @fulcrum/memory && fulcrum-memory ingest ./notes`.
+  `npm install -g @moabualruz/fulcrum-memory && fulcrum-memory ingest ./notes`.
 - A user who wants policy-as-a-library runs
-  `npm install @fulcrum/policy` in a project of their choice and calls
+  `npm install @moabualruz/fulcrum-policy` in a project of their choice and calls
   `checkSecrets(file)` with no daemon.
 - A user who wants the full control plane runs
-  `npm install -g @fulcrum/cli` and gets everything wired via manifest
+  `npm install -g @moabualruz/fulcrum-cli` and gets everything wired via manifest
   discovery.
 - A contributor can ship a third-party
   `@acme/fulcrum-slack-notifier` that peer-depends on kernel, declares

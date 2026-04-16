@@ -4,7 +4,7 @@ import type Database from 'better-sqlite3'
 //
 // Adds a TEXT column `sparse_vector` to the memories table. The column stores
 // a JSON object mapping term strings to their L2-normalised log-TF weights
-// (produced by computeSparseVector() in @fulcrum/memory/sparse.ts).
+// (produced by computeSparseVector() in @moabualruz/fulcrum-memory/sparse.ts).
 //
 // The sparse vector acts as a 3rd retrieval signal in the L1 recall RRF fusion
 // alongside FTS5 BM25 and dense vector similarity.

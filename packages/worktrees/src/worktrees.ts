@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from 'fs'
 import { dirname, join } from 'path'
-import { getDb, FulcrumError, newId, canMerge, emitEvent, type AgentRole, Db} from '@fulcrum/core'
+import { getDb, FulcrumError, newId, canMerge, emitEvent, type AgentRole, Db} from '@moabualruz/fulcrum-core'
 import type {
   Worktree,
   MergeResult,
@@ -333,7 +333,7 @@ function gateArtifactsSatisfied(
 
 /**
  * Best-effort event emitter. The worktrees package is a leaf package that
- * may be used in environments where the `events` table (owned by @fulcrum/core
+ * may be used in environments where the `events` table (owned by @moabualruz/fulcrum-core
  * migrations) isn't present — e.g. the standalone worktrees test DB. Swallow
  * errors so callers never see an events-table failure bubble up from a merge.
  */

@@ -1,5 +1,5 @@
 // packages/teams/src/scheduler.ts
-import type { Db } from '@fulcrum/core'
+import type { Db } from '@moabualruz/fulcrum-core'
 import type { ScheduleDecision, SchedulerConfig } from './types.js'
 
 const DEFAULTS: Required<SchedulerConfig> = {

@@ -4,13 +4,13 @@ import { serve } from '@hono/node-server'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { getDb, listAgentDefinitions, getEventBus, createTask, updateTask, blockAgentRun } from '@fulcrum/core'
-import type { EmitEventInput } from '@fulcrum/core'
+import { getDb, listAgentDefinitions, getEventBus, createTask, updateTask, blockAgentRun } from '@moabualruz/fulcrum-core'
+import type { EmitEventInput } from '@moabualruz/fulcrum-core'
 
 // Resolve the public directory relative to this file (works in both ts-node and compiled)
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = join(__dirname, 'public')
-import { evaluatePolicy } from '@fulcrum/policy'
+import { evaluatePolicy } from '@moabualruz/fulcrum-policy'
 import {
   getMetrics,
   getBurndown,
@@ -659,7 +659,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const decision = await evaluatePolicy({
       workspace_id: ws,
       actor_id: body.actor_id,
-      actor_role: body.actor_role as import('@fulcrum/core').AgentRole,
+      actor_role: body.actor_role as import('@moabualruz/fulcrum-core').AgentRole,
       action: body.action,
       resource_id: body.resource_id,
     })

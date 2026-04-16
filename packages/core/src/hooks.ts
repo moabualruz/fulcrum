@@ -1,7 +1,7 @@
 // packages/core/src/hooks.ts
 // Pure hook type definitions shared across packages.
-// Functions (normalizeHookEvent, runPreHook, runPostHook) live in @fulcrum/cli
-// because they depend on @fulcrum/policy and @fulcrum/memory.
+// Functions (normalizeHookEvent, runPreHook, runPostHook) live in @moabualruz/fulcrum-cli
+// because they depend on @moabualruz/fulcrum-policy and @moabualruz/fulcrum-memory.
 
 /** The three supported CLI runtimes that can invoke Fulcrum hooks. */
 export type HookCli = 'claude' | 'gemini' | 'pi'

@@ -1,7 +1,7 @@
 // packages/memory/src/tests/entities.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
-import { getDb } from '@fulcrum/core'
+import { getDb } from '@moabualruz/fulcrum-core'
 import { writeMemory } from '../write.js'
 import { linkMemoryToEntity, getMemoryEntities } from '../entities.js'
 

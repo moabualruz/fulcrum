@@ -1,6 +1,6 @@
 # Core API
 
-`@fulcrum/core` is the foundation layer. Every other package depends on it.
+`@moabualruz/fulcrum-core` is the foundation layer. Every other package depends on it.
 
 ---
 
@@ -55,7 +55,7 @@ Central role → capability lookup. Use these helpers instead of hardcoded strin
 import {
   isL1, canInvokeTeams, canMerge, canWriteCode, canEditFiles,
   roleCapabilities, L1_ROLES,
-} from '@fulcrum/core'
+} from '@moabualruz/fulcrum-core'
 
 if (!canInvokeTeams(caller_role)) throw new FulcrumError('policy_denied')
 if (!canMerge(actor_role))        throw new FulcrumError('policy_denied')
@@ -129,7 +129,7 @@ emitEvent(event)  // Emit a typed domain event (task_created, run_started, memor
 An in-process publish/subscribe bus for cross-package coordination without polling or circular imports.
 
 ```typescript
-import { getEventBus, resetEventBus } from '@fulcrum/core'
+import { getEventBus, resetEventBus } from '@moabualruz/fulcrum-core'
 
 // Subscribe to a specific event type
 getEventBus().on('task_created', (evt) => {
@@ -180,7 +180,7 @@ resetEventBus()
 
 ## Hook Types
 
-The six hook interface types are exported from `@fulcrum/core` so non-CLI packages can reference the hook contract without depending on `@fulcrum/cli`:
+The six hook interface types are exported from `@moabualruz/fulcrum-core` so non-CLI packages can reference the hook contract without depending on `@moabualruz/fulcrum-cli`:
 
 ```typescript
 import type {
@@ -190,10 +190,10 @@ import type {
   HookContext,         // { cliName, phase, toolName, toolInput, sessionId, agentRole, runId, workspace_id }
   HookOutput,          // { continue, suppressOutput?, stopReason?, message? }
   HookIO,              // { stdout, stderr, exit } — injected I/O surface for testing
-} from '@fulcrum/core'
+} from '@moabualruz/fulcrum-core'
 ```
 
-The implementations (`normalizeHookEvent`, `runPreHook`, `runPostHook`) live in `@fulcrum/cli` because they depend on `@fulcrum/policy` and `@fulcrum/memory`. The types are in core so policy or monitoring code can check hook shapes without pulling in the CLI package.
+The implementations (`normalizeHookEvent`, `runPreHook`, `runPostHook`) live in `@moabualruz/fulcrum-cli` because they depend on `@moabualruz/fulcrum-policy` and `@moabualruz/fulcrum-memory`. The types are in core so policy or monitoring code can check hook shapes without pulling in the CLI package.
 
 ---
 
@@ -203,7 +203,7 @@ The implementations (`normalizeHookEvent`, `runPreHook`, `runPostHook`) live in 
 import {
   startSpan, endSpan, getTrace,
   initOtel, shutdownOtel, getOtelTracer,
-} from '@fulcrum/core'
+} from '@moabualruz/fulcrum-core'
 
 const span = await startSpan({
   name: 'workflow.run',
@@ -234,7 +234,7 @@ cleanupExpiredLocks(workspace_id)
 ## Database
 
 ```typescript
-import { getDb, runMigrations, _configureDb, setDb } from '@fulcrum/core'
+import { getDb, runMigrations, _configureDb, setDb } from '@moabualruz/fulcrum-core'
 
 // Production
 const db = getDb()    // Opens .fulcrum/fulcrum.db — WAL + FK + busy_timeout
@@ -255,7 +255,7 @@ setDb(db)
 **Transaction helper:**
 
 ```typescript
-import { withTransaction } from '@fulcrum/core'
+import { withTransaction } from '@moabualruz/fulcrum-core'
 
 const result = withTransaction(() => {
   getDb().prepare('INSERT INTO tasks ...').run(...)
@@ -268,7 +268,7 @@ const result = withTransaction(() => {
 **Liveness check:**
 
 ```typescript
-import { checkDbHealth } from '@fulcrum/core'
+import { checkDbHealth } from '@moabualruz/fulcrum-core'
 
 const health = checkDbHealth()
 // { ok: true, latencyMs: 1 }  or  { ok: false, error: '...' }
@@ -285,7 +285,7 @@ const health = checkDbHealth()
 The janitor runs as a background timer, marking stale runs and auto-escalating blocked ones:
 
 ```typescript
-import { startJanitor, loadConfig } from '@fulcrum/core'
+import { startJanitor, loadConfig } from '@moabualruz/fulcrum-core'
 
 const stop = startJanitor('ws_1', loadConfig().policy)
 // ...
@@ -301,7 +301,7 @@ The janitor also runs **memory decay** each cycle: memories with `importance < 0
 ## Embedding & Recall
 
 ```typescript
-import { initEmbedding, loadConfig } from '@fulcrum/core'
+import { initEmbedding, loadConfig } from '@moabualruz/fulcrum-core'
 
 await initEmbedding(loadConfig())   // downloads models on first run to .fulcrum/models/
 ```
@@ -325,10 +325,10 @@ await writeMemory({
 })
 ```
 
-**Repo map** — `@fulcrum/memory` ships an aider-style repo map builder for passing relevant symbol context to agents:
+**Repo map** — `@moabualruz/fulcrum-memory` ships an aider-style repo map builder for passing relevant symbol context to agents:
 
 ```typescript
-import { scanAndBuildRepoMap } from '@fulcrum/memory'
+import { scanAndBuildRepoMap } from '@moabualruz/fulcrum-memory'
 
 const map = await scanAndBuildRepoMap('/path/to/project')
 // map.summary — compact "path.ts  [funcName:1, ClassName:10]" per-file lines

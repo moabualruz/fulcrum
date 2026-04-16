@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { execSync } from 'child_process'
-import { globalDataDir } from '@fulcrum/core'
+import { globalDataDir } from '@moabualruz/fulcrum-core'
 
 // ---------- Check result type ----------
 
@@ -87,7 +87,7 @@ function checkDbLiveness(): CheckResult {
   try {
     // Dynamic import to avoid top-level DB initialization on doctor runs
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { checkDbHealth } = require('@fulcrum/core') as { checkDbHealth: () => { ok: boolean; latencyMs?: number; error?: string } }
+    const { checkDbHealth } = require('@moabualruz/fulcrum-core') as { checkDbHealth: () => { ok: boolean; latencyMs?: number; error?: string } }
     const result = checkDbHealth()
     if (result.ok) {
       return { name: 'Database liveness', status: 'pass', message: `${result.latencyMs}ms round-trip` }
@@ -187,7 +187,7 @@ function checkMonitorToken(): CheckResult {
 function checkHookEventsWritable(): CheckResult {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getDb, newId } = require('@fulcrum/core') as {
+    const { getDb, newId } = require('@moabualruz/fulcrum-core') as {
       getDb: () => import('better-sqlite3').Database
       newId: (t: string) => string
     }

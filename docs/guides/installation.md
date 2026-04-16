@@ -12,7 +12,7 @@ Fulcrum is a local-first control plane that lives in `~/.local/bin` and stores p
 |------|---------|--------------|
 | Node.js | 20 or newer | Running the CLI, MCP server, monitor, workers |
 | pnpm | 9+ | Installing workspace dependencies |
-| git | 2.40+ | Repo clone and `@fulcrum/worktrees` worktree management |
+| git | 2.40+ | Repo clone and `@moabualruz/fulcrum-worktrees` worktree management |
 | sqlite3 CLI | any | Optional — only needed to poke at `.fulcrum/fulcrum.db` by hand |
 
 Optional agent-runtime integrations (the installer silently skips anything that isn't on `PATH`):

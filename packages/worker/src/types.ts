@@ -5,9 +5,9 @@
 // subordinate agent given a `SpawnContext`, emit heartbeats during the run,
 // and return a terminal `WorkerResult`. The lifecycle driver in
 // `lifecycle.ts` is the thing that actually persists runs to the DB —
-// adapters never touch `@fulcrum/core` directly.
+// adapters never touch `@moabualruz/fulcrum-core` directly.
 
-import type { AgentRole, HandoffPacket } from '@fulcrum/core'
+import type { AgentRole, HandoffPacket } from '@moabualruz/fulcrum-core'
 
 /**
  * Context handed to an adapter's `spawn()` method. Everything the adapter

@@ -4,7 +4,7 @@
 
 import { rebuildFromVault, type RebuildResult } from './rebuild.js'
 import { getVaultPath, vaultExists } from '../vault/client.js'
-import { FulcrumError } from '@fulcrum/core'
+import { FulcrumError } from '@moabualruz/fulcrum-core'
 
 export async function activateL2(): Promise<RebuildResult> {
   const vaultPath = getVaultPath()

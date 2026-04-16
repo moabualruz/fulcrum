@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Rebuild `@fulcrum/core` to spec completeness and add 8 new packages covering the full original feature set — planning hierarchy, policy engine, enriched memory, teams, workflow engine, worktrees, monitor/analytics, and Plane sync.
+**Goal:** Rebuild `@moabualruz/fulcrum-core` to spec completeness and add 8 new packages covering the full original feature set — planning hierarchy, policy engine, enriched memory, teams, workflow engine, worktrees, monitor/analytics, and Plane sync.
 
 **Architecture:** Option A monorepo — domain-sliced packages, one SQLite file shared across all packages, plain async functions at every public API boundary, adapters only at external integration points (Plane REST API, SSE transport), strategies for decision logic (memory ranking, model routing), facades for orchestration (workflow coordination, team scheduling).
 
@@ -255,7 +255,7 @@ CREATE INDEX idx_events_ts        ON events(ts);
 CREATE INDEX idx_events_object    ON events(object_type, object_id);
 ```
 
-### MIGRATION_003 — planning (@fulcrum/planning)
+### MIGRATION_003 — planning (@moabualruz/fulcrum-planning)
 
 ```sql
 CREATE TABLE epics (
@@ -408,7 +408,7 @@ CREATE INDEX idx_issues_status     ON issues(status_category);
 CREATE INDEX idx_issues_parent     ON issues(parent_issue_id);
 ```
 
-### MIGRATION_004 — policy (@fulcrum/policy)
+### MIGRATION_004 — policy (@moabualruz/fulcrum-policy)
 
 ```sql
 CREATE TABLE policy_rules (
@@ -445,7 +445,7 @@ CREATE INDEX idx_policy_events_workspace ON policy_events(workspace_id);
 CREATE INDEX idx_policy_events_ts        ON policy_events(ts);
 ```
 
-### MIGRATION_005 — memory enrichment (@fulcrum/memory)
+### MIGRATION_005 — memory enrichment (@moabualruz/fulcrum-memory)
 
 Memory table extended (ALTER TABLE from MIGRATION_001 base) and `memory_entities` junction added:
 
@@ -484,7 +484,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks
   USING vec0(embedding float[1024]);
 ```
 
-### MIGRATION_006 — teams + workflows (@fulcrum/teams, @fulcrum/workflows)
+### MIGRATION_006 — teams + workflows (@moabualruz/fulcrum-teams, @moabualruz/fulcrum-workflows)
 
 ```sql
 CREATE TABLE team_templates (
@@ -557,7 +557,7 @@ CREATE INDEX idx_wf_runs_workspace ON workflow_runs(workspace_id);
 CREATE INDEX idx_wf_runs_status    ON workflow_runs(status_category);
 ```
 
-### MIGRATION_007 — worktrees + artifacts + reviews (@fulcrum/worktrees)
+### MIGRATION_007 — worktrees + artifacts + reviews (@moabualruz/fulcrum-worktrees)
 
 ```sql
 CREATE TABLE artifacts (
@@ -674,7 +674,7 @@ CREATE TABLE project_submodules (
 );
 ```
 
-### MIGRATION_008 — sync (@fulcrum/sync)
+### MIGRATION_008 — sync (@moabualruz/fulcrum-sync)
 
 ```sql
 CREATE TABLE sync_states (
@@ -723,7 +723,7 @@ CREATE INDEX idx_sync_queue_scheduled ON sync_queue(scheduled_at);
 CREATE INDEX idx_sync_queue_priority  ON sync_queue(priority DESC);
 ```
 
-### MIGRATION_009 — analytics (@fulcrum/monitor)
+### MIGRATION_009 — analytics (@moabualruz/fulcrum-monitor)
 
 ```sql
 CREATE TABLE analytics_daily (
@@ -798,7 +798,7 @@ CREATE TABLE analytics_team (
 
 ## Package API Shapes
 
-### @fulcrum/core (extended)
+### @moabualruz/fulcrum-core (extended)
 ```typescript
 // Existing 14 functions stay. New additions:
 export function emitEvent(input: EmitEventInput): void  // sync, fire-and-forget
@@ -810,7 +810,7 @@ export type { AgentRole, MemoryKind, MemoryScope, ArtifactType, EventType,
               TaskRelationType, StatusCategory, ... }
 ```
 
-### @fulcrum/planning
+### @moabualruz/fulcrum-planning
 ```typescript
 export async function createEpic(input: CreateEpicInput): Promise<Epic>
 export async function updateEpic(input: UpdateEpicInput): Promise<Epic>
@@ -828,7 +828,7 @@ export async function removeTaskRelation(input: RemoveTaskRelationInput): Promis
 export async function getBlockers(taskId: string): Promise<Task[]>
 ```
 
-### @fulcrum/policy
+### @moabualruz/fulcrum-policy
 ```typescript
 export async function evaluatePolicy(input: EvaluatePolicyInput): Promise<PolicyDecision>
 export async function createPolicyRule(input: CreatePolicyRuleInput): Promise<PolicyRule>
@@ -842,7 +842,7 @@ export async function getAuditLog(input: GetAuditLogInput): Promise<PolicyEvent[
 // - no agent writes to project root without task assignment
 ```
 
-### @fulcrum/memory (extends existing writeMemory/recallMemory)
+### @moabualruz/fulcrum-memory (extends existing writeMemory/recallMemory)
 ```typescript
 // Extended recall with modes:
 export async function recallMemory(input: RecallMemoryInput): Promise<Memory[]>
@@ -859,7 +859,7 @@ export async function linkMemoryToEntity(input: LinkMemoryInput): Promise<void>
 // freshness computed dynamically: 1.0 - (days_since_update / 90)
 ```
 
-### @fulcrum/teams
+### @moabualruz/fulcrum-teams
 ```typescript
 export async function createTeamTemplate(input: CreateTeamTemplateInput): Promise<TeamTemplate>
 export async function invokeTeam(input: InvokeTeamInput): Promise<TeamInstance>
@@ -871,7 +871,7 @@ export async function getTeamStatus(input: GetTeamStatusInput): Promise<TeamStat
 // TeamStatus includes slot occupancy, concurrency caps, active member count
 ```
 
-### @fulcrum/workflows
+### @moabualruz/fulcrum-workflows
 ```typescript
 export async function startWorkflow(input: StartWorkflowInput): Promise<WorkflowRun>
 export async function stepWorkflow(input: StepWorkflowInput): Promise<WorkflowRun>
@@ -885,7 +885,7 @@ export async function getWorkflowRun(input: GetWorkflowRunInput): Promise<Workfl
 // Custom workflows loaded from project .fulcrum/workflows/*.yaml
 ```
 
-### @fulcrum/worktrees
+### @moabualruz/fulcrum-worktrees
 ```typescript
 export async function allocateWorktree(input: AllocateWorktreeInput): Promise<Worktree>
 export async function markDirty(input: MarkDirtyInput): Promise<Worktree>
@@ -897,7 +897,7 @@ export async function discardWorktree(input: DiscardWorktreeInput): Promise<void
 export async function listMergeQueue(projectId: string): Promise<Worktree[]>
 ```
 
-### @fulcrum/monitor
+### @moabualruz/fulcrum-monitor
 ```typescript
 export async function getMetrics(input: GetMetricsInput): Promise<Metrics>
 export async function getBurndown(input: GetBurndownInput): Promise<BurndownData>
@@ -908,7 +908,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer
 export async function replayRun(input: ReplayRunInput): Promise<RunReplay>
 ```
 
-### @fulcrum/sync
+### @moabualruz/fulcrum-sync
 ```typescript
 export async function syncObject(input: SyncObjectInput): Promise<SyncState>
 export async function syncAll(input: SyncAllInput): Promise<SyncResult>
