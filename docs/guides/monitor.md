@@ -33,6 +33,7 @@ The dashboard shows:
 - **Active agents** — live agent run status with role and elapsed time
 - **Event stream** — real-time SSE feed of workspace events (auto-reconnects)
 - **Blocked runs** — runs waiting on human action, with one-click unblock
+- **PM dashboard** — epics/issues/plans/reviews counts, delivery health, and current planning hotspots
 
 **Quick actions** (require `FULCRUM_MONITOR_TOKEN` to be set):
 - Create a task — fills workspace/project from context
@@ -74,6 +75,7 @@ Read endpoints (`GET *`) are always unauthenticated.
 | `GET` | `/analytics/memory` | Memory write/recall metrics |
 | `GET` | `/analytics/forecast` | Trend forecasting (`?horizon_days=30`) |
 | `GET` | `/analytics/summary` | High-level analytics rollup |
+| `GET` | `/pm/overview` | PM-focused planning and delivery overview |
 | `GET` | `/` | Built-in web dashboard (HTML) |
 | `GET` | `/events/stream` | Server-Sent Events stream (SSE, resumable via `Last-Event-ID`) |
 | `GET` | `/board` | Kanban board snapshot (backlog/active/blocked/done counts) |

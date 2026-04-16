@@ -1310,6 +1310,86 @@ export async function installCursor(opts: { dryRun: boolean; targetDir?: string 
   });
 }
 
+// ── Per-project init: Codex ───────────────────────────────────────────────────
+// Writes .codex/config.json into targetDir. AGENTS.md is intentionally not
+// written automatically because many repos already carry project-specific
+// instructions at the root and we do not want to overwrite them.
+
+export async function installCodex(opts: { dryRun: boolean; targetDir?: string }): Promise<void> {
+  const targetDir = opts.targetDir ?? process.cwd();
+  const dryRun = opts.dryRun;
+
+  const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
+  const templateConfigJson = path.join(REPO_ROOT_LOCAL, "codex", "mcp-config.json");
+
+  const destDir = path.join(targetDir, ".codex");
+  const destConfigJson = path.join(destDir, "config.json");
+
+  await step("Codex: .codex/config.json", () => {
+    if (fs.existsSync(destConfigJson)) {
+      skip(`already exists: ${destConfigJson}`);
+      return;
+    }
+    if (dryRun) {
+      console.log(`  [dry-run] would create ${destConfigJson}`);
+      ok(`(dry-run) .codex/config.json`);
+      return;
+    }
+    fs.mkdirSync(destDir, { recursive: true });
+    fs.copyFileSync(templateConfigJson, destConfigJson);
+    ok(`wrote ${destConfigJson}`);
+    setRollback(`rm -f ${destConfigJson}`);
+  });
+}
+
+// ── Per-project init: opencode ────────────────────────────────────────────────
+// Writes .opencode/config.json and .opencode/opencode.md into targetDir.
+
+export async function installOpencode(opts: { dryRun: boolean; targetDir?: string }): Promise<void> {
+  const targetDir = opts.targetDir ?? process.cwd();
+  const dryRun = opts.dryRun;
+
+  const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
+  const templateConfigJson = path.join(REPO_ROOT_LOCAL, "opencode", "config.json");
+  const templateDoc = path.join(REPO_ROOT_LOCAL, "opencode", "opencode.md");
+
+  const destDir = path.join(targetDir, ".opencode");
+  const destConfigJson = path.join(destDir, "config.json");
+  const destDoc = path.join(destDir, "opencode.md");
+
+  await step("opencode: .opencode/config.json", () => {
+    if (fs.existsSync(destConfigJson)) {
+      skip(`already exists: ${destConfigJson}`);
+      return;
+    }
+    if (dryRun) {
+      console.log(`  [dry-run] would create ${destConfigJson}`);
+      ok(`(dry-run) .opencode/config.json`);
+      return;
+    }
+    fs.mkdirSync(destDir, { recursive: true });
+    fs.copyFileSync(templateConfigJson, destConfigJson);
+    ok(`wrote ${destConfigJson}`);
+    setRollback(`rm -f ${destConfigJson}`);
+  });
+
+  await step("opencode: .opencode/opencode.md", () => {
+    if (fs.existsSync(destDoc)) {
+      skip(`already exists: ${destDoc}`);
+      return;
+    }
+    if (dryRun) {
+      console.log(`  [dry-run] would create ${destDoc}`);
+      ok(`(dry-run) .opencode/opencode.md`);
+      return;
+    }
+    fs.mkdirSync(destDir, { recursive: true });
+    fs.copyFileSync(templateDoc, destDoc);
+    ok(`wrote ${destDoc}`);
+    setRollback(`rm -f ${destDoc}`);
+  });
+}
+
 // ── Per-project init: Windsurf ────────────────────────────────────────────────
 // Writes .windsurf/mcp.json and .windsurf/rules/fulcrum.mdc into targetDir.
 // Idempotent: skips files that already exist.

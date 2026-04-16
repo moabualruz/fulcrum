@@ -1,8 +1,22 @@
-# Installation
+# Plugin, Extension, and Installation Guide
 
-> Install Fulcrum once, use it from every project on your machine.
+> Install Fulcrum in the packaging model that matches the agent runtime you actually use.
 
-Fulcrum is a local-first control plane that lives in `~/.local/bin` and stores per-project state under `$CWD/.fulcrum/`. This guide walks through the one-shot installer, per-runtime installs, verification, environment variables, and the per-project auto-init behaviour.
+Fulcrum is a local-first control plane that lives in `~/.local/bin` and stores per-project state under `$CWD/.fulcrum/`. The right onboarding path depends on the runtime:
+
+- `plugin-first` for plugin-capable agents like Claude Code
+- `extension-first` for Gemini CLI and PI
+- `rules-first` for Cursor and Windsurf
+- `config-first` for Codex and opencode
+- `cli-only` for headless or bring-your-own-agent setups
+
+Use the adaptive planner first:
+
+```bash
+fulcrum install plan
+fulcrum install plan --json
+fulcrum init --adaptive
+```
 
 ---
 
@@ -22,6 +36,8 @@ Optional agent-runtime integrations (the installer silently skips anything that 
 - **PI** (`pi`) — for the PI cockpit + BeforeTool hook
 - **Cursor** — MCP via `.cursor/mcp.json` + always-applied rules via `.cursor/rules/fulcrum.mdc`
 - **Windsurf** — MCP via `.windsurf/mcp.json` + always-applied rules via `.windsurf/rules/fulcrum.mdc`
+- **Codex** — `.codex/config.json` + repo-level `AGENTS.md`
+- **opencode** — `.opencode/config.json` + `.opencode/opencode.md`
 
 Fulcrum itself never talks to the network. It runs the embedding model locally through `onnxruntime-node`, ships its own SQLite build, and optionally links against `kuzu` for the L2 graph layer.
 
@@ -83,6 +99,22 @@ npx fulcrum-mcp@latest init --dry-run
 
 After running `init`, restart your agent IDE to load the MCP server. The Fulcrum tools will appear in your next session automatically.
 
+## Adaptive compatibility matrix
+
+Fulcrum now distinguishes packaging models instead of treating every runtime as the same:
+
+| Runtime | Recommended path | Fulcrum mechanism |
+|---------|------------------|-------------------|
+| Claude Code | `plugin-first` | hooks, skills, rules, user-scope setup |
+| Gemini CLI | `extension-first` | extension bundle + hook wiring |
+| PI | `extension-first` | cockpit extension + native tools |
+| Cursor | `rules-first` | project rules + local config |
+| Windsurf | `rules-first` | rules + local config |
+| Codex | `config-first` | `.codex/config.json` + `AGENTS.md` |
+| opencode | `config-first` | `.opencode/config.json` + `.opencode/opencode.md` |
+
+The adaptive planner reports which runtimes are detected on the current machine and which install path Fulcrum recommends for each one.
+
 ---
 
 ## Global install (from source — current working path)
@@ -93,6 +125,10 @@ If you only want Fulcrum wired into one agent runtime, use the scoped scripts:
 pnpm run setup:claude   # ~/.local/bin symlink + Claude MCP + PreToolUse hook + CLAUDE.md
 pnpm run setup:gemini   # ~/.local/bin symlink + Gemini extension + BeforeTool hook
 pnpm run setup:pi       # ~/.local/bin symlink + pi install cockpit
+fulcrum init --cursor   # .cursor/mcp.json + .cursor/rules/fulcrum.mdc
+fulcrum init --windsurf # .windsurf/mcp.json + .windsurf/rules/fulcrum.mdc
+fulcrum init --codex    # .codex/config.json
+fulcrum init --opencode # .opencode/config.json + .opencode/opencode.md
 ```
 
 Each scoped script runs the CLI-bin step first (so `fulcrum` always ends up on `PATH`) and then only the runtime-specific integration.
@@ -123,6 +159,9 @@ fulcrum doctor
 
 # 6. Auto-fix any detected issues
 fulcrum doctor --fix
+
+# 7. Inspect the agent-aware install plan
+fulcrum install plan
 ```
 
 If any of these fail, jump to [Troubleshooting](#troubleshooting).
@@ -212,6 +251,10 @@ fulcrum memory status
 ---
 
 ## Troubleshooting
+
+### `fulcrum install plan` shows `cli-only`
+
+No supported runtime markers were detected. Fulcrum will still work as a local CLI. Install the target agent first, then re-run `fulcrum install plan` or `fulcrum init --adaptive`.
 
 ### `fulcrum: command not found`
 
