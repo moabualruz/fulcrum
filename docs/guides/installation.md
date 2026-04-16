@@ -60,7 +60,7 @@ The installer prints a `✓ / — / ⚠` marker on each step so you can see exac
 
 ## Zero-friction install via npx
 
-Once the packages are published to npm, no clone is required. If you already have one of the supported AI coding agents installed, run:
+No clone required. If you already have one of the supported AI coding agents installed, run:
 
 ```bash
 npx fulcrum-mcp@latest init

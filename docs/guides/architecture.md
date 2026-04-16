@@ -57,7 +57,7 @@
 | `@moabualruz/fulcrum-worker` | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess + claude-code adapters, `spawnAgent` lifecycle |
 | `@moabualruz/fulcrum-workflows` | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers |
 | `@moabualruz/fulcrum-worktrees` | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, merge queue |
-| `@moabualruz/fulcrum-cli` | `fulcrum` binary — 14 command groups, 23 MCP tools, auto-init per project, hook handlers |
+| `@moabualruz/fulcrum-cli` | `fulcrum` binary — 21 command groups, 23 MCP tools, auto-init per project, hook handlers |
 
 ---
 
@@ -180,7 +180,7 @@ fulcrum/
 │   │
 │   └── cli/                # @moabualruz/fulcrum-cli
 │       └── src/
-│           ├── index.ts          # 14 command groups, auto-init
+│           ├── index.ts          # 21 command groups, auto-init
 │           ├── hooks.ts          # normalizeHookEvent, runPreHook, runPostHook
 │           │                     # (types imported from @moabualruz/fulcrum-core)
 │           ├── mcp-server.ts     # JSON-RPC 2.0 MCP server; HTTP StreamableHTTP transport

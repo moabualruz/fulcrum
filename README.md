@@ -7,7 +7,7 @@ Fulcrum is the persistence, coordination, and execution layer that keeps agents 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20+%20FTS5-003B57?logo=sqlite)](https://sqlite.org/)
-[![Tests](https://img.shields.io/badge/tests-1505%20passing-brightgreen)](#running-tests)
+[![Tests](https://img.shields.io/badge/tests-1471%20passing-brightgreen)](#running-tests)
 [![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm)](https://pnpm.io/)
 
 ---
@@ -38,7 +38,7 @@ pnpm install && pnpm run setup
 
 `pnpm run setup` symlinks `fulcrum` to `~/.local/bin`, registers the Claude MCP server, merges the `PreToolUse` hook, installs the Gemini extension, and runs `pi install`.
 
-Once published to npm, the zero-friction path will be:
+The zero-friction install path (no clone required):
 
 ```bash
 npx fulcrum-mcp@latest init   # auto-detect Claude Code / Gemini CLI / Cursor / Windsurf
@@ -125,7 +125,7 @@ fulcrum doctor --fix             # health check + auto-repair
 | [`@moabualruz/fulcrum-worker`](packages/worker) | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess + claude-code adapters, `spawnAgent` lifecycle with policy gate and span instrumentation |
 | [`@moabualruz/fulcrum-workflows`](packages/workflows) | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers, run state machine |
 | [`@moabualruz/fulcrum-worktrees`](packages/worktrees) | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, integration merge queue with `git merge --no-ff` and conflict handling |
-| [`@moabualruz/fulcrum-cli`](packages/cli) | `fulcrum` binary — 16 command groups, 27 MCP tools, auto-init per project, hook handlers for Claude/Gemini/PI/Cursor/Windsurf, cockpit TUI, activity log |
+| [`@moabualruz/fulcrum-cli`](packages/cli) | `fulcrum` binary — 21 command groups, 23 MCP tools, auto-init per project, hook handlers for Claude/Gemini/PI, cockpit TUI, activity log |
 | [`fulcrum-mcp`](packages/fulcrum-mcp) | Zero-install MCP entry point — `npx fulcrum-mcp` starts the MCP server; `npx fulcrum-mcp init` auto-detects and configures all installed agent runtimes |
 
 ---
@@ -161,7 +161,7 @@ pnpm test:watch                    # watch mode
 FULCRUM_EMBEDDING_TESTS=1 pnpm test  # embedding integration tests
 ```
 
-**1505 tests passing across 13 packages** (6 skipped — integration tests requiring live servers).
+**1471 tests passing across 13 packages** (6 skipped — integration tests requiring live servers).
 
 ---
 
