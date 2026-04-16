@@ -20,6 +20,8 @@ Optional agent-runtime integrations (the installer silently skips anything that 
 - **Claude Code CLI** (`claude`) — for the user-scope MCP server and PreToolUse hook
 - **Gemini CLI** (`gemini`) — for the Gemini extension + BeforeTool hook
 - **PI** (`pi`) — for the PI cockpit + BeforeTool hook
+- **Cursor** — MCP via `.cursor/mcp.json` + always-applied rules via `.cursor/rules/fulcrum.mdc`
+- **Windsurf** — MCP via `.windsurf/mcp.json` + always-applied rules via `.windsurf/rules/fulcrum.mdc`
 
 Fulcrum itself never talks to the network. It runs the embedding model locally through `onnxruntime-node`, ships its own SQLite build, and optionally links against `kuzu` for the L2 graph layer.
 
@@ -56,7 +58,34 @@ The installer prints a `✓ / — / ⚠` marker on each step so you can see exac
 
 ---
 
-## Per-runtime install
+## Zero-friction install via npx (recommended)
+
+No clone required. If you already have one of the supported AI coding agents installed, run:
+
+```bash
+npx fulcrum-mcp@latest init
+```
+
+This detects which agents are present and configures them automatically:
+
+| Agent | Detection | What gets written |
+|-------|-----------|------------------|
+| Claude Code | `~/.claude/` exists | `~/.claude/settings.json` (MCP entry + PreToolUse hook), `~/.claude/CLAUDE.md` (context block) |
+| Gemini CLI | `~/.gemini/` exists | `~/.gemini/settings.json` (MCP entry), `~/.gemini/GEMINI.md` (context block) |
+| Cursor | `~/.cursor/` or `.cursor/` in CWD | `.cursor/mcp.json`, `.cursor/rules/fulcrum.mdc` (alwaysApply: true) |
+| Windsurf | `~/.windsurf/` or `.windsurf/` in CWD | `.windsurf/mcp.json`, `.windsurf/rules/fulcrum.mdc` (alwaysApply: true) |
+
+All writes are idempotent — re-running is safe. Use `--dry-run` to preview what would be written:
+
+```bash
+npx fulcrum-mcp@latest init --dry-run
+```
+
+After running `init`, restart your agent IDE to load the MCP server. The Fulcrum tools will appear in your next session automatically.
+
+---
+
+## Per-runtime install (from source)
 
 If you only want Fulcrum wired into one agent runtime, use the scoped scripts:
 
@@ -86,7 +115,14 @@ ls ~/.gemini/extensions/fulcrum
 # → extension.json   fulcrum.md   settings.json
 
 # 4. CLAUDE.md contains the Fulcrum block
-grep -A1 'fulcrum:begin' ~/.claude/CLAUDE.md
+grep -A1 'fulcrum-mcp' ~/.claude/CLAUDE.md
+
+# 5. Run the doctor
+fulcrum doctor
+# → ✓ green on every line
+
+# 6. Auto-fix any detected issues
+fulcrum doctor --fix
 ```
 
 If any of these fail, jump to [Troubleshooting](#troubleshooting).
@@ -131,6 +167,7 @@ Because the IDs are deterministic, the MCP server, the Gemini extension, and the
 | `FULCRUM_PROJECT_ID` | auto-derived | Overrides the project id resolved from `.fulcrum.json` |
 | `FULCRUM_PORT` | `4721` | Monitor HTTP port for `fulcrum serve monitor` / `serve all` |
 | `FULCRUM_VAULT_PATH` | `~/.fulcrum/vault` | L0 memory-vault directory |
+| `FULCRUM_MONITOR_TOKEN` | unset | Bearer token for monitor write endpoints and TUI mutation actions |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | unset (disabled) | When set, spans dual-emit to this OTLP/HTTP endpoint (see [telemetry](./telemetry.md)) |
 | `FULCRUM_AGENT_ADAPTER` | `stub` | Default adapter name for `spawnAgent()` (see [worker-adapters](./worker-adapters.md)) |
 | `FULCRUM_AGENT_STUB_DIR` | unset | Directory of canned `<run_id>.json` worker results for the stub adapter |
