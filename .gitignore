@@ -45,3 +45,6 @@ pnpm-debug.log*
 
 # Claude worktrees
 .claude/worktrees/
+
+# Compound Engineering local config
+.compound-engineering/*.local.yaml

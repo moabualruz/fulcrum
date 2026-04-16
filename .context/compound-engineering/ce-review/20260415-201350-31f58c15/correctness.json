@@ -1,0 +1,103 @@
+{
+  "reviewer": "correctness",
+  "run_id": "20260415-201350-31f58c15",
+  "findings": [
+    {
+      "title": "spliceSection corrupts file when END marker precedes START marker",
+      "severity": "P2",
+      "file": "scripts/gen-claude-md.ts",
+      "line": 41,
+      "confidence": 0.95,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "why_it_matters": "If a CLAUDE.md file has been manually edited such that END_MARKER appears before START_MARKER (e.g., due to a botched hand-edit or partial write), spliceSection will silently produce a doubly-corrupted output: before will span past END to START, and after will include the reversed END marker, resulting in markers appearing twice and generated content outside the intended region. The check `startIdx === -1 || endIdx === -1` does not catch this case.",
+      "evidence": "scripts/gen-claude-md.ts line 44-52: indexOf does not assert order. Verified with node: input `END\\n\\nSTART\\n\\nContent` produces output with END_MARKER duplicated and generated content between wrong markers.",
+      "suggested_fix": "After the -1 checks, add: `if (endIdx < startIdx) { return original.trimEnd() + '\\n\\n' + START_MARKER + '\\n\\n' + generated + '\\n\\n' + END_MARKER + '\\n' }` — treat reversed markers the same as missing markers (append/overwrite path)."
+    },
+    {
+      "title": "spliceToolCount corrupts file when COUNT_END precedes COUNT_START",
+      "severity": "P2",
+      "file": "scripts/gen-claude-md.ts",
+      "line": 55,
+      "confidence": 0.95,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "why_it_matters": "Same ordering issue as spliceSection. If COUNT_END appears before COUNT_START in the file, slicing produces: before = everything from start-of-file to COUNT_START (past COUNT_END), after = from COUNT_END onwards. The injected line is placed after COUNT_START but before COUNT_END, and COUNT_END appears twice in the result. All subsequent invocations compound the corruption.",
+      "evidence": "scripts/gen-claude-md.ts lines 57-63: no order assertion on startIdx vs endIdx. Verified: input `COUNT_END\\nold\\nCOUNT_START` produces doubled COUNT_END in output.",
+      "suggested_fix": "After the -1 checks on line 58, add: `if (endIdx < startIdx) return original` — returning unchanged is safer than corrupting further; a warning log would be a bonus."
+    },
+    {
+      "title": "probeMonitor returns true for any non-5xx HTTP response, including 4xx from unrelated servers",
+      "severity": "P2",
+      "file": "packages/cli/src/index.ts",
+      "line": 597,
+      "confidence": 0.90,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "why_it_matters": "If another HTTP service happens to be listening on the monitor port (default 4721) and returns a 404 or other 4xx, probeMonitor reports monitor_running: true. The get_current_context handler then tells the agent the monitor is running when it is not. Agents may rely on this to decide whether to use the monitor dashboard URL; a false positive wastes debugging time.",
+      "evidence": "packages/cli/src/index.ts line 597: `running = resp.status < 500`. A random nginx/service returning 404 on port 4721 would satisfy this condition.",
+      "suggested_fix": "Change to `running = resp.ok` (status 200-299) or check for a monitor-specific endpoint/header, e.g. `resp.status === 200` or `resp.headers.get('x-fulcrum-monitor') !== null`."
+    },
+    {
+      "title": "writeSeedData proceeds with write_memory when projectId is empty string",
+      "severity": "P2",
+      "file": "agent-integration/install.ts",
+      "line": 1038,
+      "confidence": 0.85,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "why_it_matters": "On line 1038-1039, projectId defaults to empty string via `?? ''`. If the get_current_context response doesn't include project_id (or the JSON parse path fails partially), workspaceId may be non-empty while projectId is ''. The guard on line 1044 only checks `if (workspaceId)` without also checking projectId. The subsequent write_memory call with project_id: '' passes a value that satisfies the required field check but may store the memory under an invalid/empty project, causing a write to the wrong scope.",
+      "evidence": "agent-integration/install.ts line 1038: `projectId = (ctx['project_id'] as string) ?? ''`. Line 1044: `if (workspaceId)` — no guard on projectId. write_memory schema at packages/cli/src/mcp-tools.ts:159 marks project_id as required but doesn't validate non-empty.",
+      "suggested_fix": "Change line 1044 to `if (workspaceId && projectId)` to ensure both IDs are non-empty before attempting the write."
+    },
+    {
+      "title": "spawnSync errors in writeSeedData ctxChild are silently ignored, masking timeout/spawn failures",
+      "severity": "P3",
+      "file": "agent-integration/install.ts",
+      "line": 1024,
+      "confidence": 0.80,
+      "autofix_class": "advisory",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "why_it_matters": "spawnSync does not throw on timeout or spawn errors — it returns result.error set to an Error object. ctxChild.error and writeChild.error are never checked. When TIMEOUT_MS (5000ms) is hit (e.g., slow embedding init), the process is killed and stdout is whatever was buffered. The code falls through silently with empty workspaceId and memoryWritten=false. This is best-effort (acceptable), but the ok() summary line at 1085 still prints 'seed memory skipped (best-effort)' without any indication that a timeout occurred, making it harder to diagnose failed installs.",
+      "evidence": "agent-integration/install.ts lines 1024-1025 and 1066: ctxChild.error and writeChild.error not checked. Line 1075: outer catch only catches thrown exceptions, not spawnSync error objects.",
+      "suggested_fix": "After line 1025, add: `if (ctxChild.error) { warn('seed memory: context fetch timed out or failed'); return; }` Similarly after writeChild on line 1066. This makes timeout failures visible in the install summary."
+    },
+    {
+      "title": "runDoctorGate calls fail() but continues execution — inconsistency with step() error handling",
+      "severity": "P3",
+      "file": "agent-integration/install.ts",
+      "line": 934,
+      "confidence": 0.75,
+      "autofix_class": "advisory",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "why_it_matters": "After calling fail() on line 934, the function returns immediately (line 935). However fail() only records the step result as 'fail' — it does not throw. The step() wrapper's .catch() handler also calls fail(), but since fail() is called inside the function before returning (not throwing), the step machinery does not see the error and does not print the recovery hint. The recovery hint for 'Doctor gate' at install.ts line 156 would be shown only if an exception propagates to step().catch(). Requires verification that fail() does or does not set an exception path.",
+      "evidence": "agent-integration/install.ts lines 63-90 (fail/warn/ok helpers needed for verification). Line 934 calls fail() and returns without throwing.",
+      "suggested_fix": "Review fail() implementation. If it doesn't throw, either make fail() throw or throw after calling it: `fail(...); throw new Error('doctor gate: failing checks found');` so that step().catch() records the recovery hint."
+    }
+  ],
+  "residual_risks": [
+    "probeMonitor cache is module-level — in a hypothetical multi-tenant or test environment where multiple instances share a process, stale monitor state could persist across test runs (low risk in production, relevant for test isolation).",
+    "_monitorStarted module-level flag means if @fulcrum/cli is ever imported in-process from another module that also calls runServeMcp, the monitor would not auto-start for the second caller. This is by design but fragile.",
+    "fulcrum-mcp argv splice mutates process.argv globally before the @fulcrum/cli import. If any other module imported before or after this reads process.argv at position 2+, it will see the injected 'serve mcp' args. Currently no such module, but future additions to the package entry point could be silently affected.",
+    "gen-claude-md CHECK_MODE compares original string to updated string for equality. On Windows, if the file has CRLF line endings but the generated content produces LF, the check always reports drift even when semantically up-to-date."
+  ],
+  "testing_gaps": [
+    "No test covers spliceSection or spliceToolCount with reversed/out-of-order markers — the existing idempotency test only checks the normal in-order case.",
+    "probeMonitor behavior with 4xx responses is not tested — the serve-mcp-monitor.test.ts tests mock the entire handler return value rather than testing the actual fetch probe logic.",
+    "writeSeedData is not tested with a real or mock MCP subprocess — install-checkpoint.test.ts only runs dry-run mode, so the spawnSync timeout path and the empty projectId edge case are untested.",
+    "runDoctorGate: no test verifies that the step summary shows the recovery hint when fail() is called inside the function (as opposed to via thrown exception).",
+    "fulcrum-mcp wrapper: no test verifies that user-supplied flags (e.g., --no-monitor) passed to npx fulcrum-mcp are correctly forwarded through the argv splice into @fulcrum/cli's args binding."
+  ]
+}

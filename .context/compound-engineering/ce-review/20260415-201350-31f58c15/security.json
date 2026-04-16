@@ -1,0 +1,75 @@
+{
+  "reviewer": "security",
+  "run_id": "20260415-201350-31f58c15",
+  "findings": [
+    {
+      "id": "SEC-1",
+      "severity": "low",
+      "title": "FULCRUM_MONITOR_PORT does not enable SSRF to non-localhost addresses",
+      "component": "packages/cli/src/index.ts — probeMonitor / get_current_context",
+      "description": "The monitor URL is always constructed as `http://localhost:${monitorPort}`. An attacker who can set FULCRUM_MONITOR_PORT can only redirect the probe to a different port on 127.0.0.1 — they cannot redirect it to an internal IP (e.g. 169.254.x.x, 10.x.x.x) because the host is hardcoded to `localhost`. The constructed URL is also returned verbatim in the get_current_context response as `monitor_url`, meaning a downstream consumer could follow it, but it still resolves to localhost. The outbound fetch from probeMonitor therefore cannot reach external or internal non-loopback addresses regardless of the env var value.",
+      "attack_path": "Attacker controls FULCRUM_MONITOR_PORT → URL becomes http://localhost:<attacker_port> → probe hits a local service the attacker already has access to (since they control the process environment) → no meaningful privilege escalation.",
+      "exploitable": false,
+      "note": "parseInt stops at non-numeric characters so values like '9200;evil' still produce a valid port number. A value of '0' or a very large number produces an invalid port and the fetch will fail benignly. Not a real attack surface."
+    },
+    {
+      "id": "SEC-2",
+      "severity": "low",
+      "title": "Unauthenticated monitor HTTP server auto-starts on 127.0.0.1:4721 (new exposure vs. prior design)",
+      "component": "packages/cli/src/index.ts ~line 1058, packages/monitor/src/server.ts line 34",
+      "description": "The monitor server binds to 127.0.0.1 (confirmed: `const host = config.host ?? '127.0.0.1'` in server.ts). It was previously opt-in via `fulcrum serve monitor`; it now auto-starts with the MCP server unless FULCRUM_NO_MONITOR=1 or --no-monitor is passed. Endpoints include /tasks, /runs, /memory/recall, /status, /metrics, /burndown, /events/stream — all unauthenticated. The new exposure is: any process running as the same user (or any process that can reach localhost) can read task, run, and memory data without credentials. On a shared multi-user machine, other users cannot reach 127.0.0.1 bound by another user's process, so the practical blast radius is limited to same-user processes. In a single-user dev environment this is acceptable. However, the auto-start represents a meaningful change in default posture.",
+      "attack_path": "On a single-user machine: malicious local process (e.g. compromised npm package, supply-chain attack) running as the same user can enumerate tasks, runs, and memory entries via unauthenticated GET to http://127.0.0.1:4721/tasks. No authentication bypass required.",
+      "exploitable": true,
+      "conditions": ["process runs as the same OS user", "attacker already has code execution on the local machine"],
+      "recommendation": "This is a pre-existing design gap that becomes slightly more exposed due to auto-start. Consider adding a CORS-equivalent origin check (reject requests not from localhost), or at minimum document the no-monitor opt-out prominently. For the current PR scope, the risk is accepted given the local-only binding."
+    },
+    {
+      "id": "SEC-3",
+      "severity": "medium",
+      "title": "PATH-resolution subprocess: bare 'fulcrum' command in writeSeedData and smokeMcp",
+      "component": "agent-integration/install.ts lines 968, 983, 1018, 1059, 1115",
+      "description": "All subprocess spawns use the bare command name 'fulcrum' resolved via PATH. Install.ts runs during developer setup (pnpm run setup or equivalent), not during normal MCP server operation. The scenario where this matters: if a developer's PATH is polluted (e.g., a malicious package places a `fulcrum` shim earlier in PATH than ~/.local/bin), that shim would be executed with the JSON-RPC input piped to it. The JSON-RPC input (initRequest + ctxRequest / writeRequest) contains only hardcoded strings — no user-supplied values — so there is no injection risk in the payload itself. The risk is specifically the hijacked binary receiving a connection and potentially exfiltrating the memory write payload (which contains only the fixed string 'Fulcrum setup completed successfully...'). commandExists() itself uses `execSync('command -v fulcrum', { shell: '/bin/sh' })` which also resolves via PATH — it provides no defense against a hijacked binary.",
+      "attack_path": "Attacker places a malicious 'fulcrum' binary earlier in PATH than the real one (e.g., via a compromised devDependency's postinstall script that writes to ./node_modules/.bin/) → pnpm run setup executes the malicious binary → binary receives JSON-RPC stdin and can respond with fabricated workspace_id/project_id → memory is written to attacker-controlled location.",
+      "exploitable": true,
+      "conditions": ["attacker can place a file earlier in PATH before install.ts runs", "most realistic vector: malicious devDependency postinstall script"],
+      "recommendation": "Resolve the fulcrum binary path once at startup using `which fulcrum` / `fs.realpathSync` and store it, then use the absolute path for all subsequent spawnSync calls. Alternatively, since install.ts knows REPO_ROOT, compute the expected binary path directly (e.g., path.join(HOME, '.local/bin/fulcrum')) and use that. This eliminates the PATH confusion attack for all subprocess calls."
+    },
+    {
+      "id": "SEC-4",
+      "severity": "info",
+      "title": "JSON-RPC payload injection via workspaceId/projectId from subprocess response",
+      "component": "agent-integration/install.ts lines 1037-1052",
+      "description": "workspaceId and projectId are parsed from the stdout of the first ctxChild subprocess and then embedded in writeRequest via JSON.stringify(). JSON.stringify() correctly escapes all special characters, so even if a malicious 'fulcrum' binary returned a workspace_id containing JSON metacharacters or newlines, the resulting writeRequest would be well-formed JSON with those characters properly escaped. No injection is possible through this path.",
+      "exploitable": false
+    }
+  ],
+  "residual_risks": [
+    {
+      "id": "RR-1",
+      "title": "Unauthenticated monitor endpoints as persistent local attack surface",
+      "description": "The auto-started monitor on 127.0.0.1:4721 persists for the lifetime of the MCP server process. Any same-user process — including future compromised dependencies or other tools — can read all task, run, and memory data without credentials. This is a standing information-disclosure surface that grows in sensitivity as users store more data. Mitigation path: token-based auth on the monitor endpoints, even a static token stored in the same config file."
+    },
+    {
+      "id": "RR-2",
+      "title": "No integrity check on the fulcrum binary before spawning",
+      "description": "install.ts has no mechanism to verify that the `fulcrum` binary it resolves is the expected one (e.g., via checksum). This is a standing gap for all spawnSync('fulcrum', ...) calls in the codebase, not just install.ts."
+    }
+  ],
+  "testing_gaps": [
+    {
+      "id": "TG-1",
+      "title": "No test for monitor server host-binding constraint",
+      "description": "There is no automated test verifying that startMonitorServer always binds to 127.0.0.1 and not 0.0.0.0. A future refactor that changes the default host would silently expose the monitor to the network. Add a test that asserts the listening address is loopback-only."
+    },
+    {
+      "id": "TG-2",
+      "title": "No test for FULCRUM_MONITOR_PORT boundary values",
+      "description": "No tests verify behavior when FULCRUM_MONITOR_PORT is set to 0, a port >65535, a non-numeric string, or a string with shell metacharacters. The parseInt behavior is safe, but a port of 0 or an invalid range may cause the monitor to bind to an unexpected port or fail silently. Add boundary tests."
+    },
+    {
+      "id": "TG-3",
+      "title": "writeSeedData PATH-confusion scenario is not tested",
+      "description": "There is no test that verifies writeSeedData uses an absolute or verified binary path. The current test suite likely only tests the happy path with the real fulcrum binary in PATH. A test with a mock binary injected earlier in PATH would confirm the PATH-confusion attack vector."
+    }
+  ]
+}

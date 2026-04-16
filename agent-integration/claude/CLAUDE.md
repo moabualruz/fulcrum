@@ -60,28 +60,28 @@ All tools are prefixed `mcp__fulcrum__` in Claude Code.
 
 `read-only` `idempotent`
 
-Reads tasks in a workspace/project. Returns id, title, status, priority, assigned_to, blockers. Filters by status when provided. Effect: read-only. Returns: array of task summaries. Requires workspace_id and project_id.
+Reads tasks in a workspace/project. Returns id, title, status, priority, assigned_to, blockers. Filters by status when provided. Effect: read-only. Returns: array of task summaries. workspace_id and project_id are optional — defaults to the server cwd context.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `project_id` | string | Yes | Project ID |
-| `workspace_id` | string | Yes | Workspace ID |
+| `project_id` | string | No | Project ID (optional — defaults to cwd project) |
+| `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
 | `status` | string | No | Filter by status (queued, running, blocked, completed) |
 | `limit` | number | No | Max results (default 40) |
 
 ### `mcp__fulcrum__create_task` — Create Task
 
-Creates a new task in the project. Auto-creates workspace and project if they do not exist. Effect: writes task row. Returns: task_id, title, status, priority, assigned_to. Requires title, project_id, workspace_id.
+Creates a new task in the project. Auto-creates workspace and project if they do not exist. Effect: writes task row. Returns: task_id, title, status, priority, assigned_to. Requires title. workspace_id and project_id are optional — defaults to cwd context.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `title` | string | Yes | Task title |
-| `project_id` | string | Yes | Project ID |
-| `workspace_id` | string | Yes | Workspace ID |
+| `project_id` | string | No | Project ID (optional — defaults to cwd project) |
+| `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
 | `description` | string | No | Optional task description |
 | `priority` | `critical` \| `high` \| `medium` \| `low` \| `none` | No | Priority level |
 | `assigned_to` | string | No | Agent role slug to assign the task to |
@@ -106,14 +106,14 @@ Updates a task's status, note, or assignment. Effect: updates task row in place.
 
 `read-only` `open-world`
 
-Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns the top-k most relevant memories for the given query in the specified scope. Requires workspace_id; project_id is optional (omit for workspace-wide recall). Returns: id, content (truncated to max_chars), score (0.0–1.0), tags.
+Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns the top-k most relevant memories for the given query in the specified scope. workspace_id is optional — defaults to cwd workspace. project_id is optional — omit for workspace-wide recall. Returns: id, content (truncated to max_chars), score (0.0–1.0), tags.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `query` | string | Yes | Natural language search query |
-| `workspace_id` | string | Yes | Workspace ID |
+| `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
 | `project_id` | string | No | Project ID (optional — omit for workspace-wide recall) |
 | `limit` | number | No | Max results (default 10) |
 | `offset` | number | No | Pagination offset — skip this many top results (default 0). Use for MemGPT-style context paging. |
@@ -123,15 +123,15 @@ Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns the t
 
 ### `mcp__fulcrum__write_memory` — Write Memory
 
-Persists a memory note to vault (L0), SQLite FTS5 (L1), and vector index (L2). Effect: writes memory row + vault file. Returns: saved=true, memory_id, project_id, tags. Requires content, workspace_id, project_id.
+Persists a memory note to vault (L0), SQLite FTS5 (L1), and vector index (L2). Effect: writes memory row + vault file. Returns: saved=true, memory_id, project_id, tags. Requires content. workspace_id and project_id are optional — defaults to cwd context.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `content` | string | Yes | Memory content (plain text) |
-| `workspace_id` | string | Yes | Workspace ID |
-| `project_id` | string | Yes | Project ID |
+| `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
+| `project_id` | string | No | Project ID (optional — defaults to cwd project) |
 | `title` | string | No | Optional title (defaults to first 80 chars of content) |
 | `tags` | array | No | Tag strings (e.g. ["decision","architecture"]) |
 
@@ -161,7 +161,7 @@ Reads live status of an agent run. Effect: read-only. Returns: run_id, status, r
 
 ### `mcp__fulcrum__start_agent_run` — Start Agent Run
 
-Registers the start of an agent run. Call at the beginning of every task. Auto-creates a stub task if task_id is not provided. Effect: inserts agent_runs row, sets task status to running. Returns: run_id, status. Requires agent_role, workspace_id.
+Registers the start of an agent run. Call at the beginning of every task. Auto-creates a stub task if task_id is not provided. Effect: inserts agent_runs row, sets task status to running. Returns: run_id, status. Requires agent_role. workspace_id is optional — defaults to cwd workspace.
 
 **Parameters:**
 
@@ -169,7 +169,7 @@ Registers the start of an agent run. Call at the beginning of every task. Auto-c
 |------|------|----------|-------------|
 | `task_id` | string | No | Task ID to associate (auto-creates stub if not found or not provided) |
 | `agent_role` | string | Yes | One of the 24 canonical role slugs (e.g. software_engineer) |
-| `workspace_id` | string | Yes | Workspace ID |
+| `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
 | `project_id` | string | No | Optional project ID (defaults to workspace_id) |
 | `worktree_path` | string | No | Optional git worktree path for code-writing roles |
 | `pi_run_id` | string | No | Optional custom run ID for external tracking |
@@ -180,14 +180,14 @@ Registers the start of an agent run. Call at the beginning of every task. Auto-c
 
 `idempotent`
 
-Sends a liveness heartbeat for a running agent to prevent it being marked stale. Call every ~30 seconds during long tasks. Effect: updates heartbeat_at and optional progress fields. Returns: run_id, ok=true. Requires run_id, workspace_id.
+Sends a liveness heartbeat for a running agent to prevent it being marked stale. Call every ~30 seconds during long tasks. Effect: updates heartbeat_at and optional progress fields. Returns: run_id, ok=true. Requires run_id. workspace_id is optional — defaults to cwd workspace.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `run_id` | string | Yes | Run ID from start_agent_run |
-| `workspace_id` | string | Yes | Workspace ID |
+| `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
 | `current_step` | string | No | Optional current step description |
 | `progress_pct` | number | No | Optional progress percentage (0–100) |
 
@@ -195,14 +195,14 @@ Sends a liveness heartbeat for a running agent to prevent it being marked stale.
 
 `destructive`
 
-Marks an agent run as finished with optional summary and artifact paths. Effect: sets agent_runs.status=finished, records artifacts. Returns: run_id, status. Requires run_id, workspace_id.
+Marks an agent run as finished with optional summary and artifact paths. Effect: sets agent_runs.status=finished, records artifacts. Returns: run_id, status. Requires run_id. workspace_id is optional — defaults to cwd workspace.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `run_id` | string | Yes | Run ID from start_agent_run |
-| `workspace_id` | string | Yes | Workspace ID |
+| `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
 | `output_summary` | string | No | Summary of what was accomplished |
 | `artifact_paths` | array | No | Artifact file paths changed or created |
 
@@ -210,29 +210,29 @@ Marks an agent run as finished with optional summary and artifact paths. Effect:
 
 `destructive`
 
-Marks an agent run as blocked with a reason. Use when work cannot continue without human input or a dependency resolving. Effect: sets status=blocked, records reason. Returns: run_id, status, reason. Requires run_id, workspace_id, reason.
+Marks an agent run as blocked with a reason. Use when work cannot continue without human input or a dependency resolving. Effect: sets status=blocked, records reason. Returns: run_id, status, reason. Requires run_id and reason. workspace_id is optional — defaults to cwd workspace.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `run_id` | string | Yes | Run ID from start_agent_run |
-| `workspace_id` | string | Yes | Workspace ID |
+| `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
 | `reason` | string | Yes | Why the run is blocked (will surface in workspace status) |
 
 ### `mcp__fulcrum__build_cos_context` — Build Chief-of-Staff Context
 
 `read-only` `idempotent`
 
-Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, blockers, recent events. Effect: read-only. Returns: context_markdown formatted for system prompt injection. Requires project_id, workspace_id.
+Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, blockers, recent events. Effect: read-only. Returns: context_markdown formatted for system prompt injection. workspace_id and project_id are optional — defaults to cwd context.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `goal` | string | No | Optional goal description (included in snapshot header) |
-| `project_id` | string | Yes | Project ID |
-| `workspace_id` | string | Yes | Workspace ID |
+| `project_id` | string | No | Project ID (optional — defaults to cwd project) |
+| `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
 | `max_tasks` | number | No | Max tasks to include (default 20) |
 | `max_events` | number | No | Max events to include (default 10) |
 
@@ -240,13 +240,13 @@ Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, bloc
 
 `read-only` `idempotent`
 
-Reads full workspace status: running agents, blockers, WIP count, queue depth, recent runs. Effect: read-only. Returns: workspace_id, active_runs, blocked_runs, wip_count, queued_tasks, runs array, blockers array. Requires workspace_id.
+Reads full workspace status: running agents, blockers, WIP count, queue depth, recent runs. Effect: read-only. Returns: workspace_id, active_runs, blocked_runs, wip_count, queued_tasks, runs array, blockers array. workspace_id is optional — defaults to cwd workspace.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `workspace_id` | string | Yes | Workspace ID |
+| `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
 
 ### `mcp__fulcrum__create_team_template` — Create Team Template
 

@@ -1,0 +1,116 @@
+{
+  "reviewer": "api-contract",
+  "findings": [
+    {
+      "id": "AC-1",
+      "severity": "medium",
+      "category": "backward-compatibility",
+      "title": "outputSchema marks `readiness` as required — breaking for strict schema validators",
+      "detail": "The previous outputSchema had `required: ['workspace_id', 'project_id', 'cwd']`. The new schema adds `readiness` to that required array. Clients that (a) receive the schema via MCP protocol introspection and (b) validate server responses against it will now see a contract change. Clients that merely destructure `{ workspace_id, project_id, cwd }` and ignore extra fields are unaffected — JavaScript/TypeScript destructuring is structurally tolerant of additive fields. The risk is real only for MCP hosts that use the advertised outputSchema as a strict response validator (e.g., typed clients generated from the schema). The MCP 2025-11-25 spec does not require hosts to validate server responses against outputSchema, but some do.",
+      "evidence": "packages/cli/src/mcp-tools.ts lines 577-595: `required: ['workspace_id', 'project_id', 'cwd', 'readiness']`",
+      "recommendation": "If any existing client is known to validate against outputSchema, treat this as a minor semver bump (0.x → 0.x+1 or, if already 1.x+, a patch with a changelog note). Add a CHANGELOG entry explicitly calling out the schema change. If no clients validate output schemas today, risk is low — document the change and proceed."
+    },
+    {
+      "id": "AC-2",
+      "severity": "low",
+      "category": "backward-compatibility",
+      "title": "CHANGELOG stated `All output fields are optional` but `readiness` is now required",
+      "detail": "CHANGELOG.md line 144 records the intent of GAP-MCP-5: 'All output fields are optional so mock handlers don't break validation.' The `readiness` field was then added as `required` in the outputSchema, directly contradicting that design note. This inconsistency can mislead future contributors who read the CHANGELOG to understand schema conventions. The actual implementation diverges from the documented rationale.",
+      "evidence": "CHANGELOG.md line 144 vs mcp-tools.ts line 594 `required: ['workspace_id', 'project_id', 'cwd', 'readiness']`",
+      "recommendation": "Either (a) make `readiness` optional in the outputSchema (aligning with the original GAP-MCP-5 intent and ensuring mock handlers work), or (b) update the CHANGELOG note to acknowledge that `get_current_context` intentionally makes `readiness` required as a deliberate exception. Option (a) is strongly preferred: making `readiness` optional in the schema but always present at runtime gives the same UX guarantees while keeping schema validators happy against mock/stub implementations."
+    },
+    {
+      "id": "AC-3",
+      "severity": "low",
+      "category": "documentation-staleness",
+      "title": "CLAUDE.md tool description is accurate — but the Agent Lifecycle section still references old sequence",
+      "detail": "The GENERATED tool description at agent-integration/claude/CLAUDE.md line 379 correctly describes the new response shape including `readiness`. However, the Agent Lifecycle section (line 390) now says 'On session start: Call `mcp__fulcrum__get_workspace_status` to understand current state', omitting any mention of calling `get_current_context` first. The user's own global CLAUDE.md (loaded by system-reminder) still says 'Call `get_current_context` first at session start'. This creates an inconsistency between the project CLAUDE.md and the user-global CLAUDE.md, which agents see simultaneously. Agents may skip `get_current_context` and miss the `readiness` orientation entirely.",
+      "evidence": "agent-integration/claude/CLAUDE.md line 390 (Agent Lifecycle step 1) vs user global CLAUDE.md 'Call this first at session start'",
+      "recommendation": "Restore step 1 in the Agent Lifecycle section to: 'On session start: Call `mcp__fulcrum__get_current_context` to get `workspace_id` and orient via `readiness`, then call `mcp__fulcrum__get_workspace_status` for full workspace state.' This also makes `readiness.suggested_next_call` actionable rather than ignored."
+    },
+    {
+      "id": "AC-4",
+      "severity": "medium",
+      "category": "schema-consistency",
+      "title": "`workspace_id` and `project_id` declared as required strings but can be empty strings in edge cases",
+      "detail": "`currentProjectIds()` delegates to `projectIdsFromPath(process.cwd())` from `@fulcrum/core`. The deterministic hash is computed from `process.cwd()`, which is always a non-empty absolute path, so in practice these IDs should always be non-empty. However, the outputSchema declares both as `{ type: 'string' }` with no `minLength` or `pattern` constraints. If `projectIdsFromPath` ever returns empty strings (e.g., due to a platform edge case or a future refactor), the schema would not catch it. More concretely: `ensureProjectInitialized()` must have been called before `currentProjectIds()` — if it throws, the handler propagates the error rather than returning a valid response. The schema makes no provision for error-shape responses, which is correct for MCP (errors surface via isError), but warrants a note.",
+      "evidence": "packages/cli/src/index.ts line 2074: throws if `_projectIds` is null; mcp-tools.ts line 580-581: `workspace_id` and `project_id` typed as plain `{ type: 'string' }` with no constraints",
+      "recommendation": "Add `minLength: 1` to `workspace_id` and `project_id` in the outputSchema. This makes the contract explicit and will catch regressions in ID generation."
+    },
+    {
+      "id": "AC-5",
+      "severity": "medium",
+      "category": "design",
+      "title": "`suggested_next_call` is unconditionally hardcoded to `mcp__fulcrum__list_tasks`",
+      "detail": "Both handler copies (index.ts lines 1022 and 1220) always return `suggested_next_call: 'mcp__fulcrum__list_tasks'`. The original ideation (ideation doc line 66) proposed `'build_cos_context'`; the requirements doc (line 334) said `'build_cos_context'` always for now; the plan (line 362) also specified `'build_cos_context'`. The implementation diverges from all three design documents by using `'list_tasks'` instead. Additionally, the value is context-free: an agent calling `get_current_context` as a `chief_of_staff` should logically be routed to `build_cos_context`, whereas a freshly-spawned `software_engineer` should be routed to `list_tasks`. A static value cannot serve both. The field name `suggested_next_call` implies contextual guidance but delivers a static default.",
+      "evidence": "index.ts line 1022, line 1220 both hardcode `'mcp__fulcrum__list_tasks'`; design docs all specify `'build_cos_context'` — docs/brainstorms/2026-04-15-fulcrum-ux-requirements.md line 334, docs/plans/2026-04-15-001-feat-fulcrum-install-to-value-plan.md line 362",
+      "recommendation": "Either (a) align with the spec and use `'mcp__fulcrum__build_cos_context'` as the default (the intent was to guide agents to build a world-state snapshot, not just list tasks), or (b) make it dynamic: probe `get_workspace_status` or check running tasks and return the most contextually appropriate next call. At minimum, update the CHANGELOG and/or design docs to record the deliberate deviation so it is not treated as a bug by future reviewers."
+    },
+    {
+      "id": "AC-6",
+      "severity": "low",
+      "category": "implementation",
+      "title": "Duplicate `get_current_context` handler paths with identical logic — divergence risk",
+      "detail": "There are two independent implementations of the `get_current_context` handler: one at index.ts line 1008 (primary MCP path via `handleToolCall`) and one at line 1207 (alternate MCP path, likely the SDK-based server path). Both are structurally identical today, but they are copy-paste duplicates. Any future change to the response shape (e.g., adding a `hook_active` field, changing the static `suggested_next_call`) must be applied in two places. The test suite mocks the handler rather than testing both paths, so a divergence between the two would not be caught by existing tests.",
+      "evidence": "index.ts lines 1008-1025 (primary handler) and lines 1207-1223 (SDK path handler) — identical return shapes",
+      "recommendation": "Extract the `get_current_context` response construction into a single shared async function (e.g., `buildCurrentContextResponse(ids)`) and call it from both handler sites. This is a refactoring concern, not a breaking-change concern, but the duplication is a latent correctness risk."
+    },
+    {
+      "id": "AC-7",
+      "severity": "low",
+      "category": "schema-consistency",
+      "title": "`readiness` sub-object properties have no `additionalProperties: false` — future fields unconstrained",
+      "detail": "The `readiness` object in the outputSchema does not set `additionalProperties: false`. This means the schema is open to any additional properties being added to the readiness sub-object in the future without a schema version bump. While this is usually desirable for forward-compatibility, the outer object also lacks `additionalProperties: false`, so the behavior is consistent. However, if the intent is that clients can rely on the exact shape of `readiness`, the schema should be explicit about closure.",
+      "evidence": "mcp-tools.ts lines 583-593: `readiness` object schema has no `additionalProperties` setting",
+      "recommendation": "Document the intentional openness with a comment. If the `readiness` shape is intended to be stable and enumerated, add `additionalProperties: false` to both the top-level object and the `readiness` sub-object."
+    }
+  ],
+  "residual_risks": [
+    {
+      "id": "RR-1",
+      "risk": "Schema validator clients that were previously passing with the 3-field response will now fail validation when `readiness` is absent (e.g., in test stubs or mock servers that haven't been updated). The existing test suite bypasses this by injecting a fully-formed response through the mock handler — it does not exercise schema validation of incomplete responses.",
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    {
+      "id": "RR-2",
+      "risk": "`suggested_next_call: 'mcp__fulcrum__list_tasks'` will direct all agents to list tasks as their first action, including agents (like `chief_of_staff`) for whom `build_cos_context` is the correct bootstrap call. This could cause suboptimal agent behavior in production workflows where agents follow `suggested_next_call` as an instruction.",
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    {
+      "id": "RR-3",
+      "risk": "The `probeMonitor` function adds up to 200ms latency on every uncached `get_current_context` call. The 15s TTL cache mitigates this for sustained sessions but not for the first call after a 15s idle period. This is not a correctness risk, but it means `get_current_context` is no longer truly idempotent in a timing sense — repeated calls may return different `monitor_running` values within the same session if the monitor starts or stops.",
+      "likelihood": "low",
+      "impact": "low"
+    },
+    {
+      "id": "RR-4",
+      "risk": "The duplicate handler at index.ts line 1207 uses `config.workspace_id` / `config.project_id` while the primary handler at line 1009 uses `currentProjectIds()`. These should be equivalent in practice, but any difference in how the two code paths initialize `config` vs `_projectIds` could cause the two paths to return different `workspace_id` / `project_id` values. This has not been tested.",
+      "likelihood": "low",
+      "impact": "high"
+    }
+  ],
+  "testing_gaps": [
+    {
+      "id": "TG-1",
+      "gap": "No test verifies that the outputSchema `required: ['readiness']` constraint is actually enforced — all existing tests inject a fully-formed response including `readiness`. A test using a handler that omits `readiness` would confirm the schema validator catches missing required fields."
+    },
+    {
+      "id": "TG-2",
+      "gap": "No test compares the responses from both `get_current_context` handler paths (primary at line 1008 and SDK path at line 1207) to confirm structural parity. The two paths are currently identical but untested for divergence."
+    },
+    {
+      "id": "TG-3",
+      "gap": "`suggested_next_call` is asserted only for type (`typeof === 'string'`) in mcp-server.test.ts line 269, never for value. A test asserting the specific value would both document the intended default and catch future unintentional changes."
+    },
+    {
+      "id": "TG-4",
+      "gap": "No test covers the `probeMonitor` TTL expiry path under the real implementation — the serve-mcp-monitor tests use a mock handler that bypasses the actual `probeMonitor` function. A test that manipulates `Date.now()` (via vi.useFakeTimers) to expire the 15s TTL and re-probe would give confidence the caching logic is correct."
+    },
+    {
+      "id": "TG-5",
+      "gap": "No contract/integration test validates the end-to-end response shape (including `readiness`) against a real `fulcrum serve mcp` process via stdio. The CI smoke job proposed in the plan docs (docs/plans/2026-04-15-001-feat-fulcrum-install-to-value-plan.md line 454) has not yet been implemented."
+    }
+  ]
+}

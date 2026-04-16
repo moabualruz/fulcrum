@@ -7,6 +7,7 @@ import { createTask } from './tasks.js'
 import { writeLifecycleMemory, type LifecycleMemoryInput } from './memory-insert.js'
 import { getAgentDefinition } from './agent-definitions.js'
 import { FulcrumError } from './types.js'
+import { notifyBlocked } from './notify.js'
 import type { AgentRun, AgentRole, AgentRunStatus, RunArtifacts, RunEvent, Task, TaskPacket, SpawnableRun, StartAgentRunInput } from './types.js'
 
 /**
@@ -74,7 +75,7 @@ interface CompleteRunInput {
   output_summary: string
   artifacts?: RunArtifacts
 }
-interface BlockRunInput { run_id: string; reason: string }
+interface BlockRunInput { run_id: string; reason: string; escalation_reason?: string }
 interface EscalateRunInput { run_id: string; escalation_reason: string }
 
 // Keep RunStatus as alias for backward compat
@@ -392,6 +393,17 @@ export async function blockAgentRun(input: BlockRunInput, db: Db = getDb()): Pro
     actor_type: 'agent',
     actor_id: run.agent_id || 'system',
     payload: { reason: input.reason },
+  })
+
+  // Fire-and-forget block notification (desktop, alerts.log, webhook). Non-blocking.
+  notifyBlocked({
+    run_id: input.run_id,
+    role: blockedRun.role,
+    workspace_id: blockedRun.workspace_id,
+    reason: input.reason,
+    escalation_reason: input.escalation_reason ?? null,
+  }).catch((err: Error) => {
+    process.stderr.write(`[fulcrum] notification error (non-fatal): ${err.message}\n`)
   })
 
   // Auto-write a task_failure memory when we have a reason. Non-blocking.

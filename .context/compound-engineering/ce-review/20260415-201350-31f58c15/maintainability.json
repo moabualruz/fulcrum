@@ -1,0 +1,91 @@
+{
+  "reviewer": "maintainability",
+  "findings": [
+    {
+      "id": "M-1",
+      "severity": "high",
+      "title": "Duplicated get_current_context handler with divergent workspace_id source",
+      "location": "packages/cli/src/index.ts:1008-1025 (runServeMcp) and 1207-1223 (runServeMcpHttp)",
+      "confirmed": true,
+      "description": "Two nearly identical get_current_context handlers exist, but they are NOT actually identical — they differ in how workspace_id/project_id are resolved. The stdio handler (runServeMcp, line 1009) calls `currentProjectIds()` which returns the globally-initialized `_projectIds` derived deterministically from process.cwd() via `projectIdsFromPath`. The HTTP handler (runServeMcpHttp, line 1212-1213) reads `config.workspace_id` and `config.project_id` from `loadConfig()` which reads config files. These two sources can return different values. This is not just a maintenance trap — it is a latent behavioral divergence: a client using the HTTP transport gets different workspace_id/project_id than one using the stdio transport in an environment where `loadConfig()` disagrees with `projectIdsFromPath(process.cwd())`. The correct fix is to extract a single `buildCurrentContextResponse()` helper that takes workspace_id and project_id as parameters, and call it from both handlers with their respective ID sources.",
+      "recommendation": "Extract a shared async helper:\n  async function buildCurrentContextResponse(workspaceId: string, projectId: string): Promise<object>\nCall it from both handlers, passing the appropriate ID source for each. This also makes the divergence explicit and reviewable."
+    },
+    {
+      "id": "M-2",
+      "severity": "medium",
+      "title": "Unsafe double-cast JSON extraction in writeSeedData",
+      "location": "agent-integration/install.ts:1037-1039",
+      "confirmed": true,
+      "description": "The pattern `JSON.parse(text) as Record<string, unknown>` followed immediately by `(ctx[\"workspace_id\"] as string) ?? \"\"` provides no runtime safety. TypeScript's `as string` is a compile-time assertion only — if `ctx[\"workspace_id\"]` is null, a number, or an object, the cast succeeds silently and the `?? \"\"` fallback only fires for `undefined` (not `null`). A null `workspace_id` would propagate as `null` into downstream MCP calls. The same pattern appears at line 1039 for project_id.",
+      "recommendation": "Use a runtime string check:\n  workspaceId = typeof ctx[\"workspace_id\"] === \"string\" ? ctx[\"workspace_id\"] : \"\";\n  projectId = typeof ctx[\"project_id\"] === \"string\" ? ctx[\"project_id\"] : \"\";\nAlternatively, use a small parse helper that validates shape. The existing `if (workspaceId)` guard at line 1044 is correct but only catches empty-string; it does not catch null propagation before that point."
+    },
+    {
+      "id": "M-3",
+      "severity": "low",
+      "title": "monitor_url uses localhost but log message uses 127.0.0.1",
+      "location": "packages/cli/src/index.ts:1068 (log) vs 1011 and 1209 (returned URL)",
+      "confirmed": true,
+      "description": "The monitor startup log at line 1068 emits `http://127.0.0.1:${monitorPort}`, while the readiness.monitor_url returned to clients at lines 1011 and 1209 uses `http://localhost:${monitorPort}`. The probe in probeMonitor() uses whatever URL is passed — so the probe target and the advertised URL are consistent with each other (both localhost), but inconsistent with the log. On Linux with IPv6-first resolution, `localhost` may resolve to `::1` while the server binds only to `127.0.0.1`, causing probeMonitor() to return false even when the monitor is running. The fix is to standardize on one form — `http://127.0.0.1:${monitorPort}` is safer because it bypasses DNS resolution entirely.",
+      "recommendation": "Change the monitorUrl construction in both get_current_context handlers to use `http://127.0.0.1:${monitorPort}` so the probe target, advertised URL, and log message are all consistent and IPv6-safe."
+    },
+    {
+      "id": "M-4",
+      "severity": "low",
+      "title": "_monitorStarted module-level flag is never reset; test isolation relies on handler injection",
+      "location": "packages/cli/src/index.ts:578",
+      "confirmed": true,
+      "description": "The `_monitorStarted` flag is module-level ESM state and is never reset. In production this is intentional. In tests, the serve-mcp-monitor.test.ts file avoids the issue entirely by passing a mock handler to `createFulcrumMcpServer()` — the tests never call `runServeMcp()` directly, so `_monitorStarted` is never set. This is a sound design choice. However, any future test that does call `runServeMcp()` directly (e.g., to test the auto-start path) will be silently affected by prior test runs in the same worker process because vi.resetModules() is not called between tests. The comment in serve-mcp-monitor.test.ts (line 7-9) acknowledges this by noting that the subprocess-spawning path is not tested in-process.",
+      "recommendation": "Add a brief comment to the `_monitorStarted` declaration noting it is intentionally not reset and that tests must use the handler-injection pattern (createFulcrumMcpServer with a mock handler) to avoid touching it. No code change required unless a future test needs to exercise the auto-start branch."
+    },
+    {
+      "id": "M-5",
+      "severity": "low",
+      "title": "spliceSection end marker inclusion is correct but subtly depends on slice semantics",
+      "location": "scripts/gen-claude-md.ts:51",
+      "confirmed": true,
+      "description": "`after = original.slice(endIdx)` starts at the position of END_MARKER itself, so the result is `before + '\\n\\n' + generated + '\\n\\n' + END_MARKER + rest`. This is intentional and correct: the generated content is sandwiched between START_MARKER (included in `before` via `slice(0, startIdx + START_MARKER.length)`) and END_MARKER (included in `after`). No bug. The idempotency property holds: applying spliceSection twice with the same generated content returns the same string. No change needed.",
+      "recommendation": "None. Add an inline comment `// after starts at END_MARKER, so it is included in output` for the next reader if desired, but this is purely optional."
+    },
+    {
+      "id": "M-6",
+      "severity": "info",
+      "title": "isMain guard in gen-claude-md.ts has a symlink edge case",
+      "location": "scripts/gen-claude-md.ts:68",
+      "confirmed": true,
+      "description": "`process.argv[1] === __filename` compares the raw argv[1] string with the realpath-resolved `fileURLToPath(import.meta.url)`. On Linux, `tsx` resolves the symlink before setting `import.meta.url`, but `process.argv[1]` retains the symlink path. If `scripts/gen-claude-md.ts` is invoked via a symlink (unlikely but possible in a monorepo bin setup), the guard would evaluate to false and the script would be silently a no-op when run directly. This is low risk given the script's usage pattern (`pnpm gen:claude-md` via a direct node invocation), but the pattern is fragile on Windows where path separator differences can also cause mismatches.",
+      "recommendation": "Use `import.meta.url === pathToFileURL(process.argv[1]).href` as a more robust guard, or simply restructure so the main block is always inside an exported `run()` function called explicitly from a thin entry wrapper. For the current usage this is acceptable as-is."
+    }
+  ],
+  "residual_risks": [
+    {
+      "id": "RR-1",
+      "description": "The workspace_id divergence between runServeMcp (currentProjectIds) and runServeMcpHttp (loadConfig) is active in production today. Any user who has a non-default config file where workspace_id differs from the deterministic path-based ID will silently get different workspace_id values from the same `get_current_context` call depending on which transport they use. This is a data integrity issue, not just a maintenance issue."
+    },
+    {
+      "id": "RR-2",
+      "description": "The localhost vs 127.0.0.1 inconsistency in probeMonitor means the readiness.monitor_running field can return false in IPv6-first environments even when the monitor is genuinely running, causing confusion for users who see the monitor log message but get monitor_running: false in the context response."
+    },
+    {
+      "id": "RR-3",
+      "description": "writeSeedData's null-propagation gap (M-2) means a malformed MCP response body where workspace_id is JSON null would result in a write_memory call with arguments `{workspace_id: null, ...}` being sent to fulcrum serve mcp, which may either silently fail or create a record with a null workspace_id depending on validation depth in the core layer."
+    }
+  ],
+  "testing_gaps": [
+    {
+      "id": "TG-1",
+      "description": "No test covers the behavioral divergence between runServeMcp and runServeMcpHttp for get_current_context. The serve-mcp-monitor tests use handler injection and never exercise the actual handler logic in either function, so the workspace_id source difference (M-1) is completely untested."
+    },
+    {
+      "id": "TG-2",
+      "description": "probeMonitor is not tested with localhost vs 127.0.0.1 under a mock server. The TTL cache behavior is mentioned in serve-mcp-monitor.test.ts comments (line 4) but no test actually exercises the 15-second cache window (the test title says 'TTL cache behavior' but the test bypasses the real probeMonitor via handler injection). The cache and timeout logic in probeMonitor() have zero direct test coverage."
+    },
+    {
+      "id": "TG-3",
+      "description": "writeSeedData has no unit tests. The null/non-string workspace_id case from a malformed MCP response (RR-3) is untested. Given that writeSeedData runs during install and failures are swallowed in a best-effort catch block, a silent data integrity failure would not surface during CI."
+    },
+    {
+      "id": "TG-4",
+      "description": "The _monitorStarted auto-start path (the actual subprocess spawn in runServeMcp lines 1058-1073) has no test coverage by design (acknowledged in serve-mcp-monitor.test.ts:7-9). This is acceptable for now but should be noted as a coverage gap if the auto-start logic becomes more complex."
+    }
+  ]
+}

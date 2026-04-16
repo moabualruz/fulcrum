@@ -1,0 +1,107 @@
+{
+  "reviewer": "cli-readiness",
+  "run_id": "20260415-201350-31f58c15",
+  "reviewed_at": "2026-04-15",
+  "findings": [
+    {
+      "id": "CLI-01",
+      "severity": "HIGH",
+      "area": "usage text — tool count mismatch",
+      "file": "packages/cli/src/index.ts",
+      "line": 26,
+      "description": "Usage string reads '13 control tools' but TOOL_SCHEMAS currently contains 23 tools (counted via top-level name entries). The plan doc states 27; the actual array has 23. All three numbers differ. The usage text is stale regardless of which count is canonical.",
+      "evidence": "grep -c \"^    name: '\" packages/cli/src/mcp-tools.ts → 23. Usage line: 'Start MCP server (stdio JSON-RPC 2.0) — 13 control tools'.",
+      "recommendation": "Either hard-code the correct current count (23) or, preferably, generate it from TOOL_SCHEMAS.length at build time via the same gen:claude-md pipeline so it stays in sync. At minimum, update the literal to 23 now and add a CI lint that greps usage text against TOOL_SCHEMAS.length."
+    },
+    {
+      "id": "CLI-02",
+      "severity": "LOW",
+      "area": "--no-monitor flag parsing via fulcrum-mcp wrapper",
+      "file": "packages/cli/src/index.ts",
+      "line": 1057,
+      "description": "The flag check uses the module-top-level `args` array: `const [, , ...args] = process.argv`. When `npx fulcrum-mcp --no-monitor` is run, splice inserts 'serve','mcp' before '--no-monitor', yielding args = ['serve','mcp','--no-monitor']. args.includes('--no-monitor') returns true — this works correctly. No bug, but the design relies on slice position semantics that are fragile if the wrapper splice position ever changes.",
+      "evidence": "fulcrum-mcp/src/index.ts line 29: process.argv.splice(2, 0, 'serve', 'mcp'). cli/src/index.ts line 10: const [, , ...args] = process.argv. Line 1057: args.includes('--no-monitor').",
+      "recommendation": "Works as-is. To harden: parse remaining positional args after the group/command pair rather than scanning the full args array. This prevents a hypothetical future subcommand named '--no-monitor' from accidentally matching. Document the invariant in a comment near the splice."
+    },
+    {
+      "id": "CLI-03",
+      "severity": "MEDIUM",
+      "area": "recovery hint for 'Regenerate CLAUDE.md' — command mismatch",
+      "file": "agent-integration/install.ts",
+      "line": 153,
+      "description": "The recovery hint reads: 'manual: node --import tsx/esm scripts/gen-claude-md.ts'. But regenerateClaudeMd() actually invokes `pnpm gen:claude-md` via spawnSync. The recovery hint should mirror the same command the step uses so users can reproduce manually.",
+      "evidence": "install.ts line 392: spawnSync('pnpm', ['gen:claude-md']). Line 153 hint: 'node --import tsx/esm scripts/gen-claude-md.ts'.",
+      "recommendation": "Change hint to: 'run: pnpm gen:claude-md  (or: node --import tsx/esm scripts/gen-claude-md.ts)'. Prefer the pnpm script as primary since it respects the workspace scripts section and any pre/post hooks."
+    },
+    {
+      "id": "CLI-04",
+      "severity": "LOW",
+      "area": "recovery hint for 'Seed task and memory' — overly minimal",
+      "file": "agent-integration/install.ts",
+      "line": 158,
+      "description": "The recovery hint suggests 'fulcrum task create --title ...' but gives no indication of how to verify the MCP server is accessible first, which is the actual precondition the step checks. The plan comment says it is best-effort, but a clearer sequence hint is more actionable.",
+      "evidence": "install.ts line 158-160: recovery hint only mentions task create, not MCP connectivity.",
+      "recommendation": "Expand hint to: 'verify MCP is up: fulcrum serve mcp --no-monitor &; then: fulcrum task create --title \"Fulcrum setup verified\"; this step is best-effort and safe to skip'."
+    },
+    {
+      "id": "CLI-05",
+      "severity": "LOW",
+      "area": "plan step ordering — CLAUDE.md regenerated before installClaudeContext in 'all' and 'claude' plans",
+      "file": "agent-integration/install.ts",
+      "line": 848,
+      "description": "Step ordering: installClaudeHook → regenerateClaudeMd → installClaudeContext. This is correct: the CLAUDE.md source file is regenerated in-repo before installClaudeContext copies it to ~/.claude/CLAUDE.md. No ordering issue.",
+      "evidence": "plans.all lines 851-854: installClaudeHook, then regenerateClaudeMd, then installClaudeContext.",
+      "recommendation": "No change needed. Ordering is correct. Worth adding a comment to installClaudeContext noting the dependency: 'Must run after regenerateClaudeMd so the installed file reflects the current tool list'."
+    },
+    {
+      "id": "CLI-06",
+      "severity": "MEDIUM",
+      "area": "doctor gate bypass flag uses different env var naming than --no-monitor pattern",
+      "file": "agent-integration/install.ts",
+      "line": 894,
+      "description": "Doctor gate bypass env var is FULCRUM_SETUP_NO_GATE; CLI flag is --no-doctor-gate. The recovery hint correctly shows both forms. However, there is no equivalent --no-seed-data or bypass for the 'Seed task and memory' step, yet that step's hint says 'best-effort'. If seed fails it logs a warn but does not fail the install — that is already correct. The inconsistency is only cosmetic (no bypass needed for a non-fatal step), but the recovery hint should explicitly note it is non-fatal.",
+      "evidence": "install.ts line 894-895: NO_DOCTOR_GATE. Line 158-160: seed hint has no 'non-fatal' callout.",
+      "recommendation": "Append '(non-fatal — install completes regardless)' to the Seed task and memory recovery hint so users know they don't need to fix it to proceed."
+    },
+    {
+      "id": "CLI-07",
+      "severity": "INFO",
+      "area": "TOOL_SCHEMAS count discrepancy across documentation",
+      "file": "docs/plans/2026-04-15-001-feat-fulcrum-install-to-value-plan.md",
+      "description": "Plan doc states 27 tools; global CLAUDE.md says 22; CLAUDE.md references 13 in usage. Actual TOOL_SCHEMAS has 23 (counted in source). The gen:claude-md script correctly reads TOOL_SCHEMAS.length at runtime, so the generated CLAUDE.md will reflect 23. But the plan doc's 27 and usage text's 13 are both stale, creating confusion during review.",
+      "recommendation": "After gen:claude-md runs, verify the output says 23. Update the plan doc comment. Update the usage text in index.ts to 23 (or make it dynamic)."
+    }
+  ],
+  "residual_risks": [
+    {
+      "id": "RR-01",
+      "description": "The `args` capture at module initialisation (`const [, , ...args] = process.argv`) is a module-level side-effect. Any future test that imports @fulcrum/cli in a Jest/Vitest environment with a synthetic argv will have its --no-monitor flag parsing affected by whatever argv was set at import time, not at call time. This is not a production bug but could cause false-passing tests."
+    },
+    {
+      "id": "RR-02",
+      "description": "regenerateClaudeMd() is non-fatal (calls warn, not fail). If pnpm gen:claude-md fails silently (e.g., tsx not in PATH in a stripped environment), installClaudeContext will copy a stale CLAUDE.md with the wrong tool count. There is no checksum/version assertion after the copy."
+    },
+    {
+      "id": "RR-03",
+      "description": "The 'gemini' and 'pi' plans do not include the regenerateClaudeMd, doctor gate, or seed steps. If a user runs `pnpm setup gemini` they get no doctor gate. This is probably intentional (those plans don't install Claude tooling) but means the doctor gate is only exercised for 'all' and 'claude' targets."
+    }
+  ],
+  "testing_gaps": [
+    {
+      "id": "TG-01",
+      "description": "No test verifies that `npx fulcrum-mcp --no-monitor` actually suppresses the monitor. The splice-then-import pattern is tricky to unit-test; an integration test that spawns `node packages/fulcrum-mcp/src/index.ts --no-monitor` and asserts no stderr line matching 'Monitor running' would close this gap."
+    },
+    {
+      "id": "TG-02",
+      "description": "No test asserts that the usage text tool count in index.ts matches TOOL_SCHEMAS.length. A simple CI step (grep '-- [0-9]* control tools' + compare to TOOL_SCHEMAS array size) would catch future drift."
+    },
+    {
+      "id": "TG-03",
+      "description": "The doctor gate bypass path (FULCRUM_SETUP_NO_GATE=1) is not covered by any install test. A test that runs the plan with a forced-failing doctor mock and FULCRUM_SETUP_NO_GATE=1 should verify the gate is skipped and the plan continues."
+    },
+    {
+      "id": "TG-04",
+      "description": "The recovery hint strings in recoveryHintFor() are not tested. A snapshot test or at least a smoke test asserting non-empty hints for each known step name would prevent silent hint regressions."
+    }
+  ]
+}
