@@ -35,11 +35,14 @@
     "@fulcrum/workflows": "workspace:*",
     "@fulcrum/worktrees": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "ink": "^7.0.0",
+    "react": "^19.2.5",
     "tsx": "^4.0.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/react": "^19.2.14",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
   }

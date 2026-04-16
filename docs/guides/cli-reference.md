@@ -182,6 +182,31 @@ fulcrum hook pi < event.json
 
 The Pi hook is the only one that extracts `role` and `runId` from the event — it's used for tighter policy enforcement on team-invocation tool calls.
 
+### `fulcrum hook auto`
+
+Auto-detect the agent runtime from environment variables and dispatch to the correct hook handler. Used in the universal PreToolUse hook entry written by `npx fulcrum-mcp init`.
+
+```bash
+fulcrum hook auto < event.json
+# Dispatches to claude / gemini / pi based on env vars
+```
+
+### `fulcrum hook cursor`
+
+Tool-call hook for Cursor (reads MCP tool events, logs and enforces policy).
+
+```bash
+fulcrum hook cursor < event.json
+```
+
+### `fulcrum hook windsurf`
+
+Tool-call hook for Windsurf.
+
+```bash
+fulcrum hook windsurf < event.json
+```
+
 ---
 
 ## `workspaces` — workspace CRUD
@@ -731,14 +756,118 @@ Output: JSON on stdout (same shape as the MCP tool response). Exit code `0` on s
 
 ---
 
+## `tui` — Cockpit terminal UI
+
+### `fulcrum tui`
+
+Launch a full-screen live terminal dashboard inside the running shell. Powered by Ink (React for terminals).
+
+```bash
+fulcrum tui
+```
+
+**Panes** (cycle with `Tab`):
+
+| Pane | Contents |
+|------|----------|
+| Tasks | Kanban columns — backlog / active / blocked / done |
+| Agents | Live agent run list with role, status, elapsed time |
+| Events | Real-time SSE event feed |
+| Policy | Recent policy decisions |
+
+**Key bindings:**
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Cycle panes |
+| `↑ / ↓` | Move selection |
+| `u` | Unblock selected agent run |
+| `k` | Kill (abort) selected agent run |
+| `n` | Create new task (opens inline input) |
+| `q` | Quit |
+
+Requires the monitor to be running (`fulcrum serve monitor`) for live SSE data. Falls back to direct DB reads (read-only) when the monitor is unreachable.
+
+Set `FULCRUM_MONITOR_TOKEN` to enable mutation actions (`u`, `k`, `n`).
+
+---
+
+## `log` — Activity event feed
+
+### `fulcrum log`
+
+Stream or show workspace activity events. Follows the live SSE stream by default; polls the database when the monitor is unreachable.
+
+```
+fulcrum log [--since <duration>] [--follow]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--since` | — | Show events from this far back (`30m`, `2h`, `1d`) |
+| `--follow` | auto | Follow the live SSE stream (default when monitor is reachable) |
+
+```bash
+fulcrum log                   # follow live events
+fulcrum log --since 1h        # last hour, then follow
+fulcrum log --since 30m       # last 30 min
+```
+
+Output format: `[HH:mm:ss] <role> <verb> <noun> — <detail>`
+
+---
+
+## `doctor` — Health check
+
+### `fulcrum doctor`
+
+Check that the Fulcrum installation is healthy — CLI binary, MCP server, hooks, and CLAUDE.md context block.
+
+```bash
+fulcrum doctor
+```
+
+Output: `✓ / ✗` marker per check with a one-line description.
+
+### `fulcrum doctor --fix`
+
+Run the same checks and automatically fix anything that's broken. Idempotent: safe to re-run at any time.
+
+```bash
+fulcrum doctor --fix
+```
+
+What `--fix` repairs:
+
+- Missing `~/.claude/settings.json` MCP entry → merges the `fulcrum` server
+- Missing PreToolUse hook → appends it to the hook list
+- Missing CLAUDE.md context block → writes the block between idempotency markers
+- Missing Gemini settings → creates `~/.gemini/settings.json`
+- Missing Cursor/Windsurf MCP or rules file → writes the missing files
+
+---
+
 ## Putting it together
 
 A realistic end-to-end session:
 
 ```bash
+# Zero-friction setup (once per machine)
+npx fulcrum-mcp@latest init    # detect agents, write MCP + rules + hooks
+
 # First time in a repo — everything auto-inits
 cd ~/code/my-project
 fulcrum task list                              # creates .fulcrum/
+
+# Start the monitor + MCP together
+fulcrum serve all &
+# Web dashboard: http://localhost:4721
+
+# Open the terminal cockpit
+fulcrum tui
+
+# Watch live events
+fulcrum log --since 30m
 
 # Plan some work
 fulcrum epic create --title "Billing v2"
@@ -760,6 +889,9 @@ fulcrum queue merge process --actor-role integration_worker
 
 # Mirror state to Plane
 fulcrum sync push
+
+# Health check + auto-fix
+fulcrum doctor --fix
 ```
 
 ---

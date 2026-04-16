@@ -13,6 +13,23 @@ import type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, 
 
 export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO }
 
+// ---------- Runtime detection ----------
+
+/**
+ * Detect which CLI runtime produced a raw hook event by inspecting the
+ * fields present. Field sets are non-overlapping:
+ *   Claude:  tool_name  + session_id
+ *   Gemini: (toolName or tool_name) + conversationId
+ *   PI:      role       + runId
+ * First match wins. Returns null for unrecognized shapes.
+ */
+export function detectHookCli(event: Record<string, unknown>): HookCli | null {
+  if ('tool_name' in event && 'session_id' in event) return 'claude'
+  if (('toolName' in event || 'tool_name' in event) && 'conversationId' in event) return 'gemini'
+  if ('role' in event && 'runId' in event) return 'pi'
+  return null
+}
+
 // ---------- Normalisation ----------
 
 /**

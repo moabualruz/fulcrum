@@ -27,6 +27,7 @@ CONTROL PLANE
   serve monitor        Start HTTP monitor + control API (default port 4721)
   serve all            Start both MCP and monitor servers
 
+  hook auto            Auto-detect runtime hook (stdin → policy check)
   hook claude          PreToolUse hook for Claude Code (stdin → policy check)
   hook gemini          BeforeTool hook for Gemini CLI
   hook pi              BeforeTool hook for PI coding agent
@@ -105,6 +106,19 @@ TOOL REGISTRY
 DIAGNOSTICS
   doctor              Run environment + configuration health checks
   doctor --json       Output checks as JSON
+
+COCKPIT
+  tui                         Open live terminal dashboard (Ink v4 TUI)
+                              Panes: task board, agent runs, event stream, blocked runs
+                              Keys: tab=cycle panes, arrows=navigate, q=quit
+                              Actions: u=unblock run, k=kill run, n=new task
+
+ACTIVITY LOG
+  log                         Show last 50 agent events (human-readable)
+  log --follow                Tail live SSE stream from monitor
+  log --run-id <id>           Filter to a single run
+  log --since <duration>      Filter by time (e.g. 30m, 2h, 1d)
+  log --limit <n>             Number of events to show (default 50)
 
 EXAMPLES
   fulcrum memory init
@@ -298,9 +312,9 @@ fulcrum memory — memory vault commands
 // compatibility (tests import these from index.ts via the public barrel).
 
 export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO } from './hooks.js'
-export { normalizeHookEvent, runPreHook, runPostHook } from './hooks.js'
+export { normalizeHookEvent, runPreHook, runPostHook, detectHookCli } from './hooks.js'
 // Also import into local scope so runHook() can call them as functions.
-import { normalizeHookEvent, runPreHook, runPostHook } from './hooks.js'
+import { normalizeHookEvent, runPreHook, runPostHook, detectHookCli } from './hooks.js'
 import type { HookCli, HookPhase, HookContext, HookIO } from './hooks.js'
 
 // ── Session lifecycle hooks ───────────────────────────────────────────────────
@@ -514,6 +528,7 @@ async function runHook(cliName: string, phase: HookPhase = 'pre'): Promise<void>
     console.log(`
 fulcrum hook — tool-call policy hooks for coding agents
 
+  fulcrum hook auto   [pre|post]           Auto-detect runtime from stdin event shape
   fulcrum hook claude [pre|post]           Claude Code PreToolUse / PostToolUse hook
   fulcrum hook claude session-start        Claude Code SessionStart hook
   fulcrum hook claude session-stop         Claude Code Stop hook
@@ -525,6 +540,9 @@ Phase defaults to 'pre' when omitted (legacy). The pre hook normalises
 the event, scans for secrets, enforces the team-invoke policy, and
 recalls relevant task memories (surfaced via stderr). The post hook
 writes a tool_trace operational memory for the call.
+
+Use 'auto' as a single hook entry point for any supported runtime —
+the event shape is inspected at runtime to determine the correct handler.
 `)
     process.exit(0)
   }
@@ -547,6 +565,18 @@ writes a tool_trace operational memory for the call.
   } catch {
     // Can't parse hook event — fail open (allow)
     process.exit(0)
+  }
+
+  // If caller used 'auto', detect the runtime from the event shape now that
+  // stdin has been read.  Gracefully allow (continue: true) on unknown shapes.
+  if (cliName === 'auto') {
+    const detected = detectHookCli(event)
+    if (!detected) {
+      process.stdout.write(JSON.stringify({ continue: true }) + '\n')
+      process.exit(0)
+      return
+    }
+    cliName = detected
   }
 
   // Normalise to canonical shape based on CLI type
@@ -594,6 +624,11 @@ writes a tool_trace operational memory for the call.
     await runPostHook(ctx, io)
   }
 }
+
+// ── Plugin additional tools ───────────────────────────────────────────────────
+// Populated in main() after registerPlugins(); consumed by runServeMcp().
+import type { ToolSchema } from './mcp-tools.js'
+let _pluginAdditionalTools: ToolSchema[] = []
 
 // ── Monitor auto-start state ──────────────────────────────────────────────────
 // Tracks whether the in-process monitor was already started so runServeMcp()
@@ -881,6 +916,7 @@ async function runServeMcp(): Promise<void> {
     version: '0.0.1',
     handleToolCall: handleToolCallWithSpan,
     ...(profileFilter ? { filter: profileFilter } : {}),
+    additionalTools: _pluginAdditionalTools,
   })
 }
 
@@ -1826,9 +1862,10 @@ async function runPlugin(): Promise<void> {
       return
     }
 
+    case 'add':
     case 'install': {
       // Install an npm package as a globally-available Fulcrum plugin
-      const pkgArg = args.find(a => !a.startsWith('--') && a !== 'plugin' && a !== 'install')
+      const pkgArg = args.find(a => !a.startsWith('--') && a !== 'plugin' && a !== 'install' && a !== 'add')
       if (!pkgArg) {
         console.error('Usage: fulcrum plugin install <package-name-or-path>')
         process.exit(1)
@@ -2007,6 +2044,27 @@ ABOUT
   }
 }
 
+// ── Init: Cursor / Windsurf per-project integration ──────────────────────────
+
+async function runInit(): Promise<void> {
+  const dryRun = args.includes('--dry-run')
+  const cursor = args.includes('--cursor')
+  const windsurf = args.includes('--windsurf')
+  const global = args.includes('--global')
+
+  const targetDir = global ? (process.env['HOME'] ?? process.cwd()) : process.cwd()
+
+  if (!cursor && !windsurf) {
+    console.error('Usage: fulcrum init --cursor | --windsurf [--global] [--dry-run]')
+    process.exit(1)
+  }
+
+  const { installCursor, installWindsurf } = await import('../../../agent-integration/install.js')
+
+  if (cursor) await installCursor({ dryRun, targetDir })
+  if (windsurf) await installWindsurf({ dryRun, targetDir })
+}
+
 // ── Main dispatch ─────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -2015,6 +2073,7 @@ async function main(): Promise<void> {
   try {
     const plugins = discoverPlugins(process.cwd())
     const registration = registerPlugins(plugins)
+    _pluginAdditionalTools = registration.additionalTools ?? []
     for (const hookModulePath of registration.hookModules) {
       await import(hookModulePath)
     }
@@ -2103,7 +2162,7 @@ OPTIONS (serve mcp)
       await runHook(cli ?? '--help')
       return
     }
-    if (cli === 'claude' || cli === 'gemini' || cli === 'pi') {
+    if (cli === 'claude' || cli === 'gemini' || cli === 'pi' || cli === 'auto') {
       // Optional second-level arg: 'pre' | 'post' | 'session-start' | 'session-stop' | 'pre-compact'
       // Default 'pre' for backward compatibility with existing settings.json entries.
       const phaseArg = args[2] as string | undefined
@@ -2118,14 +2177,14 @@ OPTIONS (serve mcp)
       const phase: HookPhase = phaseArg === 'post' ? 'post' : 'pre'
       if (phaseArg && phaseArg !== 'pre' && phaseArg !== 'post') {
         console.error(`Unknown hook phase: ${phaseArg}`)
-        console.error('Usage: fulcrum hook claude|gemini|pi [pre|post|session-start|session-stop|pre-compact]')
+        console.error('Usage: fulcrum hook auto|claude|gemini|pi [pre|post|session-start|session-stop|pre-compact]')
         process.exit(1)
       }
       await runHook(cli, phase)
       return
     }
     console.error(`Unknown hook: ${cli}`)
-    console.error('Usage: fulcrum hook claude|gemini|pi [pre|post]')
+    console.error('Usage: fulcrum hook auto|claude|gemini|pi [pre|post]')
     process.exit(1)
   }
 
@@ -2151,9 +2210,29 @@ OPTIONS (serve mcp)
 
   if (group === 'skills' || group === 'skill') { await runSkills(); return }
 
+  if (group === 'init') { await runInit(); return }
+
+  if (group === 'log') {
+    const { runLog } = await import('./log.js')
+    await runLog(args)
+    return
+  }
+
+  if (group === 'tui') {
+    const { runTui } = await import('./tui/index.js')
+    await runTui()
+    return
+  }
+
   if (group === 'doctor') {
-    const { results, exitCode } = runDoctor({ cwd: process.cwd(), json: args.includes('--json') })
-    printDoctorResults(results, args.includes('--json'))
+    const fix = args.includes('--fix')
+    const dryRun = args.includes('--dry-run')
+    const json = args.includes('--json')
+    const { results, exitCode, fixesApplied } = await runDoctor({ cwd: process.cwd(), json, fix, dryRun })
+    printDoctorResults(results, json)
+    if (fix && !dryRun) {
+      console.log(`\nApplied ${fixesApplied} fix(es). Re-run 'fulcrum doctor' to verify.`)
+    }
     process.exit(exitCode)
   }
 

@@ -1,6 +1,6 @@
 # Monitor Server
 
-`@fulcrum/monitor` is a Hono HTTP server that exposes metrics, analytics, event streams, and a control API.
+`@fulcrum/monitor` is a Hono HTTP server that exposes metrics, analytics, event streams, a control API, and a built-in web dashboard.
 
 ---
 
@@ -24,6 +24,45 @@ const res = await server.fetch(new Request('http://localhost/status'))
 
 ---
 
+## Web Dashboard
+
+Opening `http://localhost:4721` in a browser serves the built-in control room UI. No extra server or bundler required — the HTML is served directly from `@fulcrum/monitor`.
+
+The dashboard shows:
+- **Board summary** — task counts across backlog / active / blocked / done columns
+- **Active agents** — live agent run status with role and elapsed time
+- **Event stream** — real-time SSE feed of workspace events (auto-reconnects)
+- **Blocked runs** — runs waiting on human action, with one-click unblock
+
+**Quick actions** (require `FULCRUM_MONITOR_TOKEN` to be set):
+- Create a task — fills workspace/project from context
+- Unblock a run — sets status back to `running` and clears the blocker
+- Kill a run — marks status as `aborted`
+
+Set the bearer token in the browser's token input field; it is persisted to `localStorage`.
+
+---
+
+## Bearer Token Auth
+
+Write endpoints (`POST /tasks`, `POST /runs`, `POST /runs/:id/complete`, etc.) require a bearer token when `FULCRUM_MONITOR_TOKEN` is set:
+
+```bash
+export FULCRUM_MONITOR_TOKEN=my-secret-token
+fulcrum serve monitor
+```
+
+```bash
+curl -X POST http://localhost:4721/tasks \
+  -H 'Authorization: Bearer my-secret-token' \
+  -H 'Content-Type: application/json' \
+  -d '{"workspace_id":"ws_1","title":"Ship billing"}'
+```
+
+Read endpoints (`GET *`) are always unauthenticated.
+
+---
+
 ## Read Endpoints
 
 | Method | Path | Description |
@@ -35,6 +74,7 @@ const res = await server.fetch(new Request('http://localhost/status'))
 | `GET` | `/analytics/memory` | Memory write/recall metrics |
 | `GET` | `/analytics/forecast` | Trend forecasting (`?horizon_days=30`) |
 | `GET` | `/analytics/summary` | High-level analytics rollup |
+| `GET` | `/` | Built-in web dashboard (HTML) |
 | `GET` | `/events/stream` | Server-Sent Events stream (SSE, resumable via `Last-Event-ID`) |
 | `GET` | `/board` | Kanban board snapshot (backlog/active/blocked/done counts) |
 | `GET` | `/agents` | Agent run list (recent 50, ordered by `started_at DESC`) |
@@ -66,6 +106,8 @@ The `/tasks` endpoint also accepts `?status=<value>` to filter by status.
 
 ## Control Endpoints
 
+All write endpoints require `Authorization: Bearer <FULCRUM_MONITOR_TOKEN>` when the env var is set.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/tasks` | Create a task |
@@ -73,6 +115,10 @@ The `/tasks` endpoint also accepts `?status=<value>` to filter by status.
 | `POST` | `/runs/:id/heartbeat` | Heartbeat a run |
 | `POST` | `/runs/:id/complete` | Complete a run |
 | `POST` | `/runs/:id/block` | Block a run |
+| `POST` | `/runs/:id/unblock` | Unblock a run (sets status to `running`, clears blocker) |
+| `POST` | `/runs/:id/kill` | Abort a non-terminal run (sets status to `aborted`) |
+| `POST` | `/reviews/:id/approve` | Approve a pending review |
+| `POST` | `/reviews/:id/reject` | Reject a pending review |
 | `POST` | `/memory/recall` | Hybrid recall across L1/L2 |
 | `POST` | `/memory/write` | Write a memory |
 | `POST` | `/cos-context` | Build the CoS context block |

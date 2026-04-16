@@ -4,7 +4,7 @@
 // Runs a series of checks and prints a PASS/WARN/FAIL report.
 // Returns a non-zero exit code when any FAIL is found.
 
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { execSync } from 'child_process'
 import { globalDataDir } from '@fulcrum/core'
@@ -17,6 +17,10 @@ export interface CheckResult {
   name: string
   status: CheckStatus
   message: string
+  fix?: {
+    description: string
+    apply: () => Promise<void>
+  }
 }
 
 // ---------- Individual checks ----------
@@ -57,6 +61,12 @@ function checkDataDir(): CheckResult {
     name: 'Data directory',
     status: 'warn',
     message: `${dataDir} does not exist — will be created on first use`,
+    fix: {
+      description: `Create data directory: ${dataDir}`,
+      apply: async () => {
+        mkdirSync(dataDir, { recursive: true })
+      },
+    },
   }
 }
 
@@ -123,6 +133,20 @@ function checkEnvVars(): CheckResult {
   return { name: 'Environment variables', status: 'pass', message: 'OK' }
 }
 
+const CLAUDE_MD_STUB = `# Fulcrum Agent OS
+
+This project uses [Fulcrum](https://github.com/getfulcrum/fulcrum) for agent task management.
+
+## MCP Server
+
+Start the Fulcrum MCP server before starting Claude Code:
+\`\`\`
+fulcrum serve mcp
+\`\`\`
+
+See the Fulcrum documentation for full setup instructions.
+`
+
 function checkAgentIntegration(cwd: string): CheckResult {
   // Look for CLAUDE.md, AGENTS.md, or GEMINI.md in project
   const markers = ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md']
@@ -132,6 +156,12 @@ function checkAgentIntegration(cwd: string): CheckResult {
       name: 'Agent integration files',
       status: 'warn',
       message: `No agent integration files found — copy from agent-integration/ in the fulcrum repo`,
+      fix: {
+        description: `Create stub CLAUDE.md in ${cwd}`,
+        apply: async () => {
+          writeFileSync(join(cwd, 'CLAUDE.md'), CLAUDE_MD_STUB, 'utf8')
+        },
+      },
     }
   }
   return { name: 'Agent integration files', status: 'pass', message: `Found: ${found.join(', ')}` }
@@ -232,12 +262,12 @@ function checkOptionalPeerDeps(): CheckResult {
 export interface DoctorOptions {
   cwd?: string
   json?: boolean
+  fix?: boolean
+  dryRun?: boolean
 }
 
-export function runDoctor(options: DoctorOptions = {}): { results: CheckResult[]; exitCode: number } {
-  const cwd = options.cwd ?? process.cwd()
-
-  const results: CheckResult[] = [
+function collectChecks(cwd: string): CheckResult[] {
+  return [
     checkNodeVersion(),
     checkGlobalConfig(),
     checkDataDir(),
@@ -250,9 +280,42 @@ export function runDoctor(options: DoctorOptions = {}): { results: CheckResult[]
     checkMonitorToken(),
     checkOptionalPeerDeps(),
   ]
+}
+
+export async function runDoctor(options: DoctorOptions = {}): Promise<{ results: CheckResult[]; exitCode: number; fixesApplied: number }> {
+  const cwd = options.cwd ?? process.cwd()
+
+  let results = collectChecks(cwd)
+  let fixesApplied = 0
+
+  if (options.dryRun) {
+    // List what would be applied without calling apply()
+    for (const result of results) {
+      if (result.fix && (result.status === 'fail' || result.status === 'warn')) {
+        console.log(`Would apply: ${result.fix.description}`)
+      }
+    }
+  } else if (options.fix) {
+    // Apply fixes for FAIL/WARN results
+    for (const result of results) {
+      if (result.fix && (result.status === 'fail' || result.status === 'warn')) {
+        try {
+          await result.fix.apply()
+          fixesApplied++
+        } catch (err) {
+          const msg = (err as Error).message ?? String(err)
+          console.warn(`  ⚠ Fix failed for "${result.name}": ${msg}`)
+        }
+      }
+    }
+    // Re-run checks to reflect post-fix state
+    if (fixesApplied > 0) {
+      results = collectChecks(cwd)
+    }
+  }
 
   const exitCode = results.some(r => r.status === 'fail') ? 1 : 0
-  return { results, exitCode }
+  return { results, exitCode, fixesApplied }
 }
 
 const STATUS_ICONS: Record<CheckStatus, string> = {

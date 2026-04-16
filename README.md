@@ -32,10 +32,16 @@ Multi-agent systems fail in predictable ways: agents go rogue, pile up stale wor
 ## Quick Start
 
 ```bash
+# Zero-friction: detect agents and configure all of them
+npx fulcrum-mcp@latest init
+
+# Or from source
 pnpm install && pnpm run setup
 ```
 
-`setup` symlinks `fulcrum` to `~/.local/bin`, registers the Claude MCP server (23 tools), merges the `PreToolUse` hook, installs the Gemini extension, and runs `pi install`.
+`npx fulcrum-mcp init` probes for Claude Code, Gemini CLI, Cursor, and Windsurf, then writes the MCP server entry, rules/context file, and hook handler for each detected agent. Use `--dry-run` to preview.
+
+`pnpm run setup` (from source) symlinks `fulcrum` to `~/.local/bin`, registers the Claude MCP server (27 tools), merges the `PreToolUse` hook, installs the Gemini extension, and runs `pi install`.
 
 ```bash
 pnpm run setup:claude     # Claude Code only
@@ -51,13 +57,15 @@ No explicit init step — every `fulcrum` command auto-initializes `$CWD` on fir
 fulcrum task create --title "Implement OAuth callback"
 fulcrum task list --status running
 fulcrum board show
+fulcrum serve all --port 4721    # MCP + HTTP monitor + web dashboard at :4721
+fulcrum tui                      # full-screen terminal cockpit (Tab to switch panes)
+fulcrum log --since 30m          # live activity event feed
 fulcrum workflow start --workflow-name implement_feature --workspace-id ws_1
 fulcrum workflow run --wf-id wfr_01j...
 fulcrum queue merge process --workspace-id ws_1 --actor-role integration_worker
 fulcrum agent spawn --target-role software_engineer --caller-role chief_of_staff \
   --task-id task_01j... --workspace-id ws_1 --project-id proj_1 --adapter subprocess
-fulcrum serve all --port 4721
-fulcrum doctor
+fulcrum doctor --fix             # health check + auto-repair
 ```
 
 ---
@@ -107,7 +115,7 @@ fulcrum doctor
 |---------|-------------|
 | [`@fulcrum/core`](packages/core) | Domain functions, SQLite schema (52 migrations), role capability helpers, telemetry spans + OTel exporter, embedding providers, handoff protocol, event stream |
 | [`@fulcrum/memory`](packages/memory) | Three-layer memory stack — L0 git vault, L1 FTS5 + scoring, L2 Kuzu graph + HNSW vector search |
-| [`@fulcrum/monitor`](packages/monitor) | Real-time metrics dashboard — daily/project/agent metrics, burndown, SSE event stream, HTTP control API |
+| [`@fulcrum/monitor`](packages/monitor) | Real-time metrics dashboard — daily/project/agent metrics, burndown, SSE event stream, HTTP control API, built-in web dashboard, bearer-token-gated write endpoints |
 | [`@fulcrum/planning`](packages/planning) | Project planning domain — epics, issues, PRDs, plans, dependency graph, code review workflows |
 | [`@fulcrum/policy`](packages/policy) | Policy engine — 5 system invariants, custom rules, secret guard (12 named patterns, range-based dedup, auto-redact), audit log |
 | [`@fulcrum/sync`](packages/sync) | Bidirectional sync — Plane integration with retry/backoff, conflict detection, secret scan before push, priority queue |
@@ -115,7 +123,8 @@ fulcrum doctor
 | [`@fulcrum/worker`](packages/worker) | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess + claude-code adapters, `spawnAgent` lifecycle with policy gate and span instrumentation |
 | [`@fulcrum/workflows`](packages/workflows) | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers, run state machine |
 | [`@fulcrum/worktrees`](packages/worktrees) | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, integration merge queue with `git merge --no-ff` and conflict handling |
-| [`@fulcrum/cli`](packages/cli) | `fulcrum` binary — 14 command groups, 23 MCP tools, auto-init per project, hook handlers for Claude/Gemini/PI |
+| [`@fulcrum/cli`](packages/cli) | `fulcrum` binary — 16 command groups, 27 MCP tools, auto-init per project, hook handlers for Claude/Gemini/PI/Cursor/Windsurf, cockpit TUI, activity log |
+| [`fulcrum-mcp`](packages/fulcrum-mcp) | Zero-install MCP entry point — `npx fulcrum-mcp` starts the MCP server; `npx fulcrum-mcp init` auto-detects and configures all installed agent runtimes |
 
 ---
 

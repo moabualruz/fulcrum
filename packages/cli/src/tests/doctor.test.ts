@@ -27,8 +27,8 @@ describe('runDoctor', () => {
   beforeEach(setup)
   afterEach(teardown)
 
-  it('returns an array of check results', () => {
-    const { results } = runDoctor({ cwd: tmpDir })
+  it('returns an array of check results', async () => {
+    const { results } = await runDoctor({ cwd: tmpDir })
     expect(Array.isArray(results)).toBe(true)
     expect(results.length).toBeGreaterThan(0)
     for (const r of results) {
@@ -39,75 +39,75 @@ describe('runDoctor', () => {
     }
   })
 
-  it('returns exitCode 0 when no checks fail', () => {
-    const { exitCode, results } = runDoctor({ cwd: tmpDir })
+  it('returns exitCode 0 when no checks fail', async () => {
+    const { exitCode, results } = await runDoctor({ cwd: tmpDir })
     const hasFail = results.some(r => r.status === 'fail')
     expect(exitCode).toBe(hasFail ? 1 : 0)
   })
 
-  it('passes global config check when no config.json exists (uses defaults)', () => {
+  it('passes global config check when no config.json exists (uses defaults)', async () => {
     // No config.json in global data dir — that is fine, IDs are derived from CWD
-    const { results } = runDoctor({ cwd: tmpDir })
+    const { results } = await runDoctor({ cwd: tmpDir })
     const check = results.find(r => r.name === 'Global config')
     expect(check?.status).toBe('pass')
     expect(check?.message).toContain('defaults')
   })
 
-  it('passes global config check when config.json exists with valid JSON', () => {
+  it('passes global config check when config.json exists with valid JSON', async () => {
     writeFileSync(join(tmpDataDir, 'config.json'), JSON.stringify({ port: 4721 }))
-    const { results } = runDoctor({ cwd: tmpDir })
+    const { results } = await runDoctor({ cwd: tmpDir })
     const check = results.find(r => r.name === 'Global config')
     expect(check?.status).toBe('pass')
     expect(check?.message).toContain('port')
   })
 
-  it('fails global config check when config.json contains invalid JSON', () => {
+  it('fails global config check when config.json contains invalid JSON', async () => {
     writeFileSync(join(tmpDataDir, 'config.json'), '{ invalid json ]]]')
-    const { exitCode, results } = runDoctor({ cwd: tmpDir })
+    const { exitCode, results } = await runDoctor({ cwd: tmpDir })
     const check = results.find(r => r.name === 'Global config')
     expect(check?.status).toBe('fail')
     expect(exitCode).toBe(1)
   })
 
-  it('detects agent integration files', () => {
+  it('detects agent integration files', async () => {
     writeFileSync(join(tmpDir, 'CLAUDE.md'), '# Fulcrum')
-    const { results } = runDoctor({ cwd: tmpDir })
+    const { results } = await runDoctor({ cwd: tmpDir })
     const check = results.find(r => r.name === 'Agent integration files')
     expect(check?.status).toBe('pass')
     expect(check?.message).toContain('CLAUDE.md')
   })
 
-  it('warns when no agent integration files found', () => {
-    const { results } = runDoctor({ cwd: tmpDir })
+  it('warns when no agent integration files found', async () => {
+    const { results } = await runDoctor({ cwd: tmpDir })
     const check = results.find(r => r.name === 'Agent integration files')
     expect(check?.status).toBe('warn')
   })
 
-  it('includes Node.js version check', () => {
-    const { results } = runDoctor({ cwd: tmpDir })
+  it('includes Node.js version check', async () => {
+    const { results } = await runDoctor({ cwd: tmpDir })
     const check = results.find(r => r.name === 'Node.js version')
     expect(check).toBeDefined()
     expect(['pass', 'fail']).toContain(check?.status)
   })
 
-  it('includes data directory check', () => {
-    const { results } = runDoctor({ cwd: tmpDir })
+  it('includes data directory check', async () => {
+    const { results } = await runDoctor({ cwd: tmpDir })
     const check = results.find(r => r.name === 'Data directory')
     expect(check).toBeDefined()
   })
 
-  it('uses provided cwd for path checks', () => {
-    const { results: r1 } = runDoctor({ cwd: tmpDir })
-    const { results: r2 } = runDoctor({ cwd: '/nonexistent-dir-xyz' })
+  it('uses provided cwd for path checks', async () => {
+    const { results: r1 } = await runDoctor({ cwd: tmpDir })
+    const { results: r2 } = await runDoctor({ cwd: '/nonexistent-dir-xyz' })
     // Both run without throwing
     expect(r1.length).toBeGreaterThan(0)
     expect(r2.length).toBeGreaterThan(0)
   })
 
-  it('does not check for .fulcrum.json in project directory', () => {
+  it('does not check for .fulcrum.json in project directory', async () => {
     // Write a .fulcrum.json to the cwd — doctor should not look at it
     writeFileSync(join(tmpDir, '.fulcrum.json'), JSON.stringify({ workspace_id: 'ws_old' }))
-    const { results } = runDoctor({ cwd: tmpDir })
+    const { results } = await runDoctor({ cwd: tmpDir })
     const legacyCheck = results.find(r => r.name === '.fulcrum.json')
     expect(legacyCheck).toBeUndefined()
   })

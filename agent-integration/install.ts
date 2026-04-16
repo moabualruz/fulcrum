@@ -1257,4 +1257,122 @@ async function main(): Promise<void> {
   process.exit(failures > 0 ? 1 : 0);
 }
 
-main();
+// ── Per-project init: Cursor ──────────────────────────────────────────────────
+// Writes .cursor/mcp.json and .cursor/rules/fulcrum.mdc into targetDir.
+// Idempotent: skips files that already exist.
+
+export async function installCursor(opts: { dryRun: boolean; targetDir?: string }): Promise<void> {
+  const targetDir = opts.targetDir ?? process.cwd();
+  const dryRun = opts.dryRun;
+
+  const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
+  const templateMcpJson = path.join(REPO_ROOT_LOCAL, "cursor", "mcp.json");
+  const templateRulesMdc = path.join(REPO_ROOT_LOCAL, "cursor", "rules", "fulcrum.mdc");
+
+  const destMcpDir = path.join(targetDir, ".cursor");
+  const destMcpJson = path.join(destMcpDir, "mcp.json");
+  const destRulesDir = path.join(targetDir, ".cursor", "rules");
+  const destRulesMdc = path.join(destRulesDir, "fulcrum.mdc");
+
+  // Write .cursor/mcp.json
+  await step("Cursor: .cursor/mcp.json", () => {
+    if (fs.existsSync(destMcpJson)) {
+      skip(`already exists: ${destMcpJson}`);
+      return;
+    }
+    if (dryRun) {
+      console.log(`  [dry-run] would create ${destMcpJson}`);
+      ok(`(dry-run) .cursor/mcp.json`);
+      return;
+    }
+    fs.mkdirSync(destMcpDir, { recursive: true });
+    fs.copyFileSync(templateMcpJson, destMcpJson);
+    ok(`wrote ${destMcpJson}`);
+    setRollback(`rm -f ${destMcpJson}`);
+  });
+
+  // Write .cursor/rules/fulcrum.mdc
+  await step("Cursor: .cursor/rules/fulcrum.mdc", () => {
+    if (fs.existsSync(destRulesMdc)) {
+      skip(`already exists: ${destRulesMdc}`);
+      return;
+    }
+    if (dryRun) {
+      console.log(`  [dry-run] would create ${destRulesMdc}`);
+      ok(`(dry-run) .cursor/rules/fulcrum.mdc`);
+      return;
+    }
+    fs.mkdirSync(destRulesDir, { recursive: true });
+    fs.copyFileSync(templateRulesMdc, destRulesMdc);
+    ok(`wrote ${destRulesMdc}`);
+    setRollback(`rm -f ${destRulesMdc}`);
+  });
+}
+
+// ── Per-project init: Windsurf ────────────────────────────────────────────────
+// Writes .windsurf/mcp.json and .windsurf/rules/fulcrum.mdc into targetDir.
+// Idempotent: skips files that already exist.
+
+export async function installWindsurf(opts: { dryRun: boolean; targetDir?: string }): Promise<void> {
+  const targetDir = opts.targetDir ?? process.cwd();
+  const dryRun = opts.dryRun;
+
+  const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
+  const templateMcpJson = path.join(REPO_ROOT_LOCAL, "windsurf", "mcp.json");
+  const templateRulesMdc = path.join(REPO_ROOT_LOCAL, "windsurf", "rules", "fulcrum.mdc");
+
+  const destMcpDir = path.join(targetDir, ".windsurf");
+  const destMcpJson = path.join(destMcpDir, "mcp.json");
+  const destRulesDir = path.join(targetDir, ".windsurf", "rules");
+  const destRulesMdc = path.join(destRulesDir, "fulcrum.mdc");
+
+  // Write .windsurf/mcp.json
+  await step("Windsurf: .windsurf/mcp.json", () => {
+    if (fs.existsSync(destMcpJson)) {
+      skip(`already exists: ${destMcpJson}`);
+      return;
+    }
+    if (dryRun) {
+      console.log(`  [dry-run] would create ${destMcpJson}`);
+      ok(`(dry-run) .windsurf/mcp.json`);
+      return;
+    }
+    fs.mkdirSync(destMcpDir, { recursive: true });
+    fs.copyFileSync(templateMcpJson, destMcpJson);
+    ok(`wrote ${destMcpJson}`);
+    setRollback(`rm -f ${destMcpJson}`);
+  });
+
+  // Write .windsurf/rules/fulcrum.mdc
+  await step("Windsurf: .windsurf/rules/fulcrum.mdc", () => {
+    if (fs.existsSync(destRulesMdc)) {
+      skip(`already exists: ${destRulesMdc}`);
+      return;
+    }
+    if (dryRun) {
+      console.log(`  [dry-run] would create ${destRulesMdc}`);
+      ok(`(dry-run) .windsurf/rules/fulcrum.mdc`);
+      return;
+    }
+    fs.mkdirSync(destRulesDir, { recursive: true });
+    fs.copyFileSync(templateRulesMdc, destRulesMdc);
+    ok(`wrote ${destRulesMdc}`);
+    setRollback(`rm -f ${destRulesMdc}`);
+  });
+}
+
+// ── Entry guard ───────────────────────────────────────────────────────────────
+// Run main() only when executed as a script, not when imported as a module
+// (e.g. from `fulcrum init` which imports installCursor / installWindsurf).
+
+const _isEntry = (() => {
+  try {
+    const entry = process.argv[1];
+    if (!entry) return false;
+    const entryUrl = new URL(`file://${entry}`).href;
+    return import.meta.url === entryUrl;
+  } catch {
+    return false;
+  }
+})();
+if (_isEntry) main();

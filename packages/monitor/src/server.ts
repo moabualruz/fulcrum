@@ -1,7 +1,15 @@
 // packages/monitor/src/server.ts
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
-import { getDb, listAgentDefinitions } from '@fulcrum/core'
+import { readFileSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { getDb, listAgentDefinitions, getEventBus, createTask, updateTask, blockAgentRun } from '@fulcrum/core'
+import type { EmitEventInput } from '@fulcrum/core'
+
+// Resolve the public directory relative to this file (works in both ts-node and compiled)
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const PUBLIC_DIR = join(__dirname, 'public')
 import { evaluatePolicy } from '@fulcrum/policy'
 import {
   getMetrics,
@@ -12,6 +20,7 @@ import {
   replayRun,
 } from './metrics.js'
 import type { MonitorServer, MonitorServerConfig } from './types.js'
+
 
 const CAPABILITY_SKILL_MAP: Record<string, { name: string; description: string }> = {
   code_generation:    { name: 'Code Generation',    description: 'Generates code from specifications' },
@@ -29,10 +38,45 @@ const CAPABILITY_SKILL_MAP: Record<string, { name: string; description: string }
 }
 
 export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
+  // Per-instance set of active SSE controllers for event-bus push mode.
+  const sseControllers = new Set<ReadableStreamDefaultController>()
+
+  // Subscribe to the in-process event bus so events are pushed to SSE clients immediately.
+  let busHandler: ((event: EmitEventInput) => void) | null = null
+
+  if (!config.isSubprocess) {
+    busHandler = (event: EmitEventInput) => {
+      if (sseControllers.size === 0) return
+      const sseId = Date.now().toString()
+      const data = JSON.stringify(event)
+      const chunk = new TextEncoder().encode(`id: ${sseId}\ndata: ${data}\n\n`)
+
+      for (const controller of [...sseControllers]) {
+        try {
+          controller.enqueue(chunk)
+        } catch {
+          // Broken pipe or closed stream — remove and continue
+          sseControllers.delete(controller)
+        }
+      }
+    }
+    getEventBus().onAny(busHandler)
+  }
+
   const app = new Hono()
   const port = config.port ?? 7331
   const host = config.host ?? '127.0.0.1'
   const workspace_id = config.workspace_id
+
+  // ─── GET / — serve the web UI ───────────────────────────────────────────
+  app.get('/', (c) => {
+    try {
+      const html = readFileSync(join(PUBLIC_DIR, 'index.html'), 'utf-8')
+      return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+    } catch {
+      return c.json({ error: 'Web UI not found. Build or check packages/monitor/src/public/index.html' }, 404)
+    }
+  })
 
   app.get('/status', (c) => {
     return c.json({
@@ -74,49 +118,89 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
     const stream = new ReadableStream({
       start(controller) {
-        let lastId = c.req.header('Last-Event-ID') ?? ''
+        const lastEventId = c.req.header('Last-Event-ID') ?? ''
 
-        const poll = () => {
+        // ── Resume: replay missed events from DB ──────────────────────────────
+        if (lastEventId) {
           try {
             const db = getDb()
-            let query = `SELECT * FROM events WHERE workspace_id = ? AND event_id > ? ORDER BY event_id ASC LIMIT 100`
-            const params: unknown[] = [ws ?? '', lastId]
-
-            if (!ws) {
-              query = `SELECT * FROM events WHERE event_id > ? ORDER BY event_id ASC LIMIT 100`
-              params.splice(0, 1) // remove ws placeholder, keep only lastId
+            let query: string
+            let params: unknown[]
+            if (ws) {
+              query = `SELECT evt_id, evt_type, payload, ts FROM events WHERE workspace_id = ? AND evt_id > ? ORDER BY evt_id ASC LIMIT 100`
+              params = [ws, lastEventId]
+            } else {
+              query = `SELECT evt_id, evt_type, payload, ts FROM events WHERE evt_id > ? ORDER BY evt_id ASC LIMIT 100`
+              params = [lastEventId]
             }
-
             const rows = db.prepare(query).all(...params) as Array<{
-              event_id: string
-              event_type: string
+              evt_id: string
+              evt_type: string
               payload: string
               ts: string
             }>
-
             for (const row of rows) {
               const data = JSON.stringify({
-                event_id: row.event_id,
-                event_type: row.event_type,
+                event_id: row.evt_id,
+                event_type: row.evt_type,
                 payload: JSON.parse(row.payload) as unknown,
                 ts: row.ts,
               })
-              controller.enqueue(new TextEncoder().encode(`id: ${row.event_id}\ndata: ${data}\n\n`))
-              lastId = row.event_id
+              controller.enqueue(new TextEncoder().encode(`id: ${row.evt_id}\ndata: ${data}\n\n`))
             }
           } catch {
-            // DB not yet available — skip this tick
+            // DB not yet available — skip catchup
           }
         }
 
-        const interval = setInterval(poll, 2000)
-        poll() // immediate first tick
-
-        // Close stream cleanup (if client disconnects)
-        c.req.raw.signal.addEventListener('abort', () => {
-          clearInterval(interval)
-          controller.close()
-        })
+        if (config.isSubprocess) {
+          // ── Subprocess mode: poll every 500ms ────────────────────────────────
+          let lastId = lastEventId
+          const poll = () => {
+            try {
+              const db = getDb()
+              let query: string
+              let params: unknown[]
+              if (ws) {
+                query = `SELECT evt_id, evt_type, payload, ts FROM events WHERE workspace_id = ? AND evt_id > ? ORDER BY evt_id ASC LIMIT 100`
+                params = [ws, lastId]
+              } else {
+                query = `SELECT evt_id, evt_type, payload, ts FROM events WHERE evt_id > ? ORDER BY evt_id ASC LIMIT 100`
+                params = [lastId]
+              }
+              const rows = db.prepare(query).all(...params) as Array<{
+                evt_id: string
+                evt_type: string
+                payload: string
+                ts: string
+              }>
+              for (const row of rows) {
+                const data = JSON.stringify({
+                  event_id: row.evt_id,
+                  event_type: row.evt_type,
+                  payload: JSON.parse(row.payload) as unknown,
+                  ts: row.ts,
+                })
+                controller.enqueue(new TextEncoder().encode(`id: ${row.evt_id}\ndata: ${data}\n\n`))
+                lastId = row.evt_id
+              }
+            } catch {
+              // DB not yet available — skip this tick
+            }
+          }
+          const interval = setInterval(poll, 500)
+          c.req.raw.signal.addEventListener('abort', () => {
+            clearInterval(interval)
+            controller.close()
+          })
+        } else {
+          // ── Event-bus mode: in-process push, sub-50ms delivery ───────────────
+          sseControllers.add(controller)
+          c.req.raw.signal.addEventListener('abort', () => {
+            sseControllers.delete(controller)
+            try { controller.close() } catch { /* already closed */ }
+          })
+        }
       },
     })
 
@@ -407,6 +491,158 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     })
   })
 
+  // ─── Bearer token auth middleware (mutation endpoints) ───────────────────
+  // When FULCRUM_MONITOR_TOKEN is set (and bypass_auth is not set in config),
+  // all mutating endpoints require Authorization: Bearer <token>.
+  // In dev mode (no env var), auth is skipped.
+
+  const requireAuth = (c: Parameters<Parameters<typeof app.use>[0]>[0], next: () => Promise<Response | void>): Promise<Response | void> => {
+    const token = process.env['FULCRUM_MONITOR_TOKEN']
+    if (!token || config.bypass_auth) return next()
+    const authHeader = c.req.header('Authorization') ?? ''
+    if (authHeader !== `Bearer ${token}`) {
+      return Promise.resolve(c.json({ error: 'Unauthorized' }, 401))
+    }
+    return next()
+  }
+
+  // ─── POST /tasks — create a new task ─────────────────────────────────────
+
+  app.post('/tasks', requireAuth, async (c) => {
+    const body = await c.req.json() as {
+      title?: string
+      workspace_id?: string
+      project_id?: string
+      description?: string
+      priority?: 'critical' | 'high' | 'medium' | 'low'
+      assigned_to?: string
+    }
+    const ws = body.workspace_id ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    if (!body.title) return c.json({ error: 'title required' }, 400)
+
+    try {
+      const task = await createTask({
+        title: body.title,
+        workspace_id: ws,
+        project_id: body.project_id ?? '',
+        description: body.description,
+        priority: body.priority,
+        assigned_to: body.assigned_to,
+      })
+      return c.json({ data: task }, 201)
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500)
+    }
+  })
+
+  // ─── PATCH /tasks/:id — update task status or priority ───────────────────
+
+  app.patch('/tasks/:id', requireAuth, async (c) => {
+    const task_id = c.req.param('id')
+    const body = await c.req.json() as {
+      status?: 'open' | 'in_progress' | 'done' | 'blocked'
+      priority?: 'critical' | 'high' | 'medium' | 'low'
+      title?: string
+      assigned_to?: string
+      note?: string
+    }
+
+    try {
+      const task = await updateTask({ task_id, ...body })
+      return c.json({ data: task })
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500)
+    }
+  })
+
+  // ─── POST /runs/:id/unblock — unblock a blocked run ──────────────────────
+  // Marks the run as no longer blocked by completing it with a note.
+  // Agents polling for unblock should resume normally.
+
+  app.post('/runs/:id/unblock', requireAuth, async (c) => {
+    const run_id = c.req.param('id')
+    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as { summary?: string }
+    const db = getDb()
+
+    const run = db.prepare('SELECT * FROM agent_runs WHERE run_id = ?').get(run_id) as { status: string } | undefined
+    if (!run) return c.json({ error: 'run not found' }, 404)
+    if (run.status !== 'blocked') return c.json({ error: 'run is not blocked', status: run.status }, 409)
+
+    try {
+      db.prepare(`UPDATE agent_runs SET status = 'running', blocker = NULL, updated_at = ? WHERE run_id = ?`)
+        .run(new Date().toISOString(), run_id)
+      return c.json({ data: { run_id, status: 'running', summary: body.summary ?? 'Unblocked by operator' } })
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500)
+    }
+  })
+
+  // ─── POST /runs/:id/kill — terminate a running agent run ─────────────────
+
+  app.post('/runs/:id/kill', requireAuth, async (c) => {
+    const run_id = c.req.param('id')
+    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as { reason?: string }
+    const db = getDb()
+
+    const run = db.prepare('SELECT * FROM agent_runs WHERE run_id = ?').get(run_id) as { status: string } | undefined
+    if (!run) return c.json({ error: 'run not found' }, 404)
+    if (run.status === 'finished' || run.status === 'failed' || run.status === 'aborted') {
+      return c.json({ error: 'run is already terminal', status: run.status }, 409)
+    }
+
+    try {
+      await blockAgentRun({
+        run_id,
+        reason: body.reason ?? 'Killed by operator',
+        escalation_reason: 'Operator-initiated termination',
+      })
+      return c.json({ data: { run_id, status: 'blocked' } })
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500)
+    }
+  })
+
+  // ─── POST /reviews/:id/approve — approve a pending review ────────────────
+
+  app.post('/reviews/:id/approve', requireAuth, async (c) => {
+    const review_id = c.req.param('id')
+    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as { comment?: string }
+    const db = getDb()
+
+    const review = db.prepare('SELECT * FROM reviews WHERE review_id = ?').get(review_id) as { status: string } | undefined
+    if (!review) return c.json({ error: 'review not found' }, 404)
+    if (review.status !== 'pending') return c.json({ error: 'review is not pending', status: review.status }, 409)
+
+    try {
+      db.prepare(`UPDATE reviews SET status = 'approved', summary = ?, updated_at = ? WHERE review_id = ?`)
+        .run(body.comment ?? null, new Date().toISOString(), review_id)
+      return c.json({ data: { review_id, status: 'approved' } })
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500)
+    }
+  })
+
+  // ─── POST /reviews/:id/reject — reject a pending review ──────────────────
+
+  app.post('/reviews/:id/reject', requireAuth, async (c) => {
+    const review_id = c.req.param('id')
+    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as { comment?: string }
+    const db = getDb()
+
+    const review = db.prepare('SELECT * FROM reviews WHERE review_id = ?').get(review_id) as { status: string } | undefined
+    if (!review) return c.json({ error: 'review not found' }, 404)
+    if (review.status !== 'pending') return c.json({ error: 'review is not pending', status: review.status }, 409)
+
+    try {
+      db.prepare(`UPDATE reviews SET status = 'rejected', summary = ?, updated_at = ? WHERE review_id = ?`)
+        .run(body.comment ?? null, new Date().toISOString(), review_id)
+      return c.json({ data: { review_id, status: 'rejected' } })
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500)
+    }
+  })
+
   // ─── POST /policy/check ───────────────────────────────────────────────────
 
   app.post('/policy/check', async (c) => {
@@ -483,6 +719,15 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         serverInstance.close()
         serverInstance = null
       }
+      // Unsubscribe from event bus and close all active SSE controllers
+      if (busHandler) {
+        getEventBus().offAny(busHandler)
+        busHandler = null
+      }
+      for (const controller of [...sseControllers]) {
+        try { controller.close() } catch { /* already closed */ }
+      }
+      sseControllers.clear()
     },
   }
 }
