@@ -1,5 +1,5 @@
 // packages/monitor/src/server.ts
-import { Hono } from 'hono'
+import { Hono, type MiddlewareHandler } from 'hono'
 import { serve } from '@hono/node-server'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
@@ -496,7 +496,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   // all mutating endpoints require Authorization: Bearer <token>.
   // In dev mode (no env var), auth is skipped.
 
-  const requireAuth = (c: Parameters<Parameters<typeof app.use>[0]>[0], next: () => Promise<Response | void>): Promise<Response | void> => {
+  const requireAuth: MiddlewareHandler = async (c, next) => {
     const token = process.env['FULCRUM_MONITOR_TOKEN']
     if (!token || config.bypass_auth) return next()
     const authHeader = c.req.header('Authorization') ?? ''
@@ -541,7 +541,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.patch('/tasks/:id', requireAuth, async (c) => {
     const task_id = c.req.param('id')
     const body = await c.req.json() as {
-      status?: 'open' | 'in_progress' | 'done' | 'blocked'
+      status?: 'queued' | 'ready' | 'claimed' | 'running' | 'blocked' | 'failed' | 'completed' | 'cancelled'
       priority?: 'critical' | 'high' | 'medium' | 'low'
       title?: string
       assigned_to?: string

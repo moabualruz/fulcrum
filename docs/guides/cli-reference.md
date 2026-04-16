@@ -191,22 +191,6 @@ fulcrum hook auto < event.json
 # Dispatches to claude / gemini / pi based on env vars
 ```
 
-### `fulcrum hook cursor`
-
-Tool-call hook for Cursor (reads MCP tool events, logs and enforces policy).
-
-```bash
-fulcrum hook cursor < event.json
-```
-
-### `fulcrum hook windsurf`
-
-Tool-call hook for Windsurf.
-
-```bash
-fulcrum hook windsurf < event.json
-```
-
 ---
 
 ## `workspaces` — workspace CRUD
@@ -796,22 +780,28 @@ Set `FULCRUM_MONITOR_TOKEN` to enable mutation actions (`u`, `k`, `n`).
 
 ### `fulcrum log`
 
-Stream or show workspace activity events. Follows the live SSE stream by default; polls the database when the monitor is unreachable.
+Show recent workspace activity events from the database, or tail the live SSE stream.
 
 ```
-fulcrum log [--since <duration>] [--follow]
+fulcrum log [--follow] [--since <duration>] [--run-id <id>] [--limit <n>]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--since` | — | Show events from this far back (`30m`, `2h`, `1d`) |
-| `--follow` | auto | Follow the live SSE stream (default when monitor is reachable) |
+| `--follow` | off | Tail the live SSE stream from the monitor (requires `fulcrum serve monitor`) |
+| `--since` | — | Filter events from this far back (`30m`, `2h`, `1d`) |
+| `--run-id` | — | Filter to a single agent run |
+| `--limit` | `50` | Number of events to show (non-follow mode) |
 
 ```bash
-fulcrum log                   # follow live events
-fulcrum log --since 1h        # last hour, then follow
-fulcrum log --since 30m       # last 30 min
+fulcrum log                   # last 50 events from DB
+fulcrum log --follow          # tail live SSE stream
+fulcrum log --since 1h        # last hour from DB
+fulcrum log --follow --since 30m   # live stream, skip events older than 30m
+fulcrum log --run-id run_abc  # single run history
 ```
+
+Default (no `--follow`): reads the last N events from the database. Falls back to DB polling if `--follow` is requested but the monitor is unreachable.
 
 Output format: `[HH:mm:ss] <role> <verb> <noun> — <detail>`
 
@@ -821,29 +811,42 @@ Output format: `[HH:mm:ss] <role> <verb> <noun> — <detail>`
 
 ### `fulcrum doctor`
 
-Check that the Fulcrum installation is healthy — CLI binary, MCP server, hooks, and CLAUDE.md context block.
+Run environment and configuration health checks. Checks performed:
+
+| Check | What it verifies |
+|-------|-----------------|
+| Node.js version | ≥ 20 required |
+| Global config | `$FULCRUM_DATA_DIR/config.json` is valid JSON if present |
+| Data directory | `~/.local/share/fulcrum/` (or `$FULCRUM_DATA_DIR`) exists |
+| `better-sqlite3` | Native module loads correctly |
+| Database liveness | INSERT + DELETE round-trip on the global DB |
+| Hook events writable | `hook_events` table accepts writes |
+| `@modelcontextprotocol/sdk` | MCP SDK loads correctly |
+| Environment variables | Reports which of `FULCRUM_DATA_DIR`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` are set |
+| Agent integration files | `CLAUDE.md`, `AGENTS.md`, or `GEMINI.md` exists in CWD |
+| Monitor token | `$FULCRUM_DATA_DIR/token` file existence |
+| Optional peer deps | `kuzu`, `sqlite-vec` for L2 graph/vector search |
 
 ```bash
 fulcrum doctor
+fulcrum doctor --json    # machine-readable output
 ```
 
-Output: `✓ / ✗` marker per check with a one-line description.
+Output: `✓ / ✗ / ⚠` marker per check with a one-line description.
 
 ### `fulcrum doctor --fix`
 
-Run the same checks and automatically fix anything that's broken. Idempotent: safe to re-run at any time.
+Run the same checks and apply automated fixes where available.
 
 ```bash
 fulcrum doctor --fix
+fulcrum doctor --fix --dry-run    # show what would be fixed without writing
 ```
 
-What `--fix` repairs:
+Fixable items:
 
-- Missing `~/.claude/settings.json` MCP entry → merges the `fulcrum` server
-- Missing PreToolUse hook → appends it to the hook list
-- Missing CLAUDE.md context block → writes the block between idempotency markers
-- Missing Gemini settings → creates `~/.gemini/settings.json`
-- Missing Cursor/Windsurf MCP or rules file → writes the missing files
+- **Data directory missing** → creates `$FULCRUM_DATA_DIR`
+- **No agent integration files in CWD** → writes a stub `CLAUDE.md` in the current directory
 
 ---
 
@@ -852,9 +855,6 @@ What `--fix` repairs:
 A realistic end-to-end session:
 
 ```bash
-# Zero-friction setup (once per machine)
-npx fulcrum-mcp@latest init    # detect agents, write MCP + rules + hooks
-
 # First time in a repo — everything auto-inits
 cd ~/code/my-project
 fulcrum task list                              # creates .fulcrum/

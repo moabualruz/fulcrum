@@ -58,9 +58,9 @@ The installer prints a `✓ / — / ⚠` marker on each step so you can see exac
 
 ---
 
-## Zero-friction install via npx (recommended)
+## Zero-friction install via npx
 
-No clone required. If you already have one of the supported AI coding agents installed, run:
+Once the packages are published to npm, no clone is required. If you already have one of the supported AI coding agents installed, run:
 
 ```bash
 npx fulcrum-mcp@latest init
@@ -85,7 +85,7 @@ After running `init`, restart your agent IDE to load the MCP server. The Fulcrum
 
 ---
 
-## Per-runtime install (from source)
+## Global install (from source — current working path)
 
 If you only want Fulcrum wired into one agent runtime, use the scoped scripts:
 

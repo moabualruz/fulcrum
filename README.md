@@ -32,16 +32,17 @@ Multi-agent systems fail in predictable ways: agents go rogue, pile up stale wor
 ## Quick Start
 
 ```bash
-# Zero-friction: detect agents and configure all of them
-npx fulcrum-mcp@latest init
-
-# Or from source
+# From source
 pnpm install && pnpm run setup
 ```
 
-`npx fulcrum-mcp init` probes for Claude Code, Gemini CLI, Cursor, and Windsurf, then writes the MCP server entry, rules/context file, and hook handler for each detected agent. Use `--dry-run` to preview.
+`pnpm run setup` symlinks `fulcrum` to `~/.local/bin`, registers the Claude MCP server, merges the `PreToolUse` hook, installs the Gemini extension, and runs `pi install`.
 
-`pnpm run setup` (from source) symlinks `fulcrum` to `~/.local/bin`, registers the Claude MCP server (27 tools), merges the `PreToolUse` hook, installs the Gemini extension, and runs `pi install`.
+Once published to npm, the zero-friction path will be:
+
+```bash
+npx fulcrum-mcp@latest init   # auto-detect Claude Code / Gemini CLI / Cursor / Windsurf
+```
 
 ```bash
 pnpm run setup:claude     # Claude Code only
@@ -59,7 +60,8 @@ fulcrum task list --status running
 fulcrum board show
 fulcrum serve all --port 4721    # MCP + HTTP monitor + web dashboard at :4721
 fulcrum tui                      # full-screen terminal cockpit (Tab to switch panes)
-fulcrum log --since 30m          # live activity event feed
+fulcrum log                      # last 50 events from DB
+fulcrum log --follow             # tail live SSE stream
 fulcrum workflow start --workflow-name implement_feature --workspace-id ws_1
 fulcrum workflow run --wf-id wfr_01j...
 fulcrum queue merge process --workspace-id ws_1 --actor-role integration_worker

@@ -18,6 +18,12 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "start": "node --import tsx/esm src/index.ts",
     "test": "vitest run",
