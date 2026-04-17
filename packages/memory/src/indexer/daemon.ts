@@ -17,6 +17,9 @@ import { createConnection, createServer, type Server, type Socket } from 'node:n
 import { createDecoder, encode, type IndexerRequest, type IndexerErrorResponse, type IndexerSuccessResponse } from './protocol.js'
 import { indexerSocketPath, unlinkStaleSocket } from './socket-path.js'
 import { HANDLERS, HandlerError, hasHandler, type DaemonContext } from './handlers.js'
+import { createDaemonRegistry, type DaemonRegistry } from './registry.js'
+import { VaultOwnedPathError } from '../pci/singleton.js'
+import { projectIdsFromPath } from 'fulcrum-agent-core'
 
 const DAEMON_VERSION = '0.0.2'
 const PING_PROBE_TIMEOUT_MS = 500
@@ -25,6 +28,8 @@ export interface DaemonOptions {
   socketPath?: string
   /** Unused in PR 1; wired in PR 3 for the idle-exit timer. */
   idleTimeoutMs?: number
+  /** Test hook: override the registry's workspace/project id derivation. */
+  registry?: DaemonRegistry
 }
 
 export interface DaemonHandle {
@@ -51,10 +56,16 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<DaemonHandl
   let shuttingDown = false
   const openSockets = new Set<Socket>()
 
+  const registry: DaemonRegistry = opts.registry ?? createDaemonRegistry({
+    workspaceIdFor: (root) => projectIdsFromPath(root).workspace_id,
+    projectIdFor: (root) => projectIdsFromPath(root).project_id,
+  })
+
   const ctx: DaemonContext = {
     version: DAEMON_VERSION,
     startedAt,
-    activeWatches: () => 0, // PR 2 replaces this with the registry count.
+    registry,
+    activeWatches: () => registry.activeWatches(),
     requestShutdown: () => {
       if (shuttingDown) return
       shuttingDown = true
@@ -129,6 +140,7 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<DaemonHandl
     for (const s of openSockets) {
       try { s.destroy() } catch { /* already */ }
     }
+    try { registry.shutdownAll() } catch { /* best-effort */ }
     process.stderr.write(`[fulcrum-indexer] shutdown complete\n`)
   }
 
@@ -198,6 +210,9 @@ async function dispatch(
     const result = await HANDLERS[req.method]!(ctx, req.params ?? {})
     return { id: req.id, result }
   } catch (err) {
+    if (err instanceof VaultOwnedPathError) {
+      return { id: req.id, error: { code: 'vault_owned_path', message: err.message } }
+    }
     if (err instanceof HandlerError) {
       return { id: req.id, error: { code: err.code, message: err.message, detail: err.detail } }
     }

@@ -69,10 +69,23 @@ interface Pending {
   reject: (err: Error) => void
 }
 
+export interface EnsureWatchingResult {
+  watch: string
+  relative_path: string
+  already_watched: boolean
+}
+
+export interface ReleaseWatchingResult {
+  watch: string
+  refcount: number
+}
+
 export interface IndexerClient {
   ping(): Promise<{ ok: boolean; version: string; started_at: string; active_watches: number }>
   shutdown(): Promise<{ ok: boolean }>
-  /** Generic RPC for methods PR 2/3 add. */
+  ensureWatching(root: string): Promise<EnsureWatchingResult>
+  releaseWatching(root: string): Promise<ReleaseWatchingResult>
+  /** Generic RPC for methods PR 3 adds. */
   request<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>
   /** Close the underlying socket; the daemon itself is NOT stopped. */
   close(): void
@@ -244,6 +257,8 @@ export function createIndexerClient(opts: IndexerClientOptions = {}): IndexerCli
     request,
     ping: () => request('ping'),
     shutdown: () => request('shutdown'),
+    ensureWatching: (root: string) => request<EnsureWatchingResult>('ensureWatching', { root }),
+    releaseWatching: (root: string) => request<ReleaseWatchingResult>('releaseWatching', { root }),
     close: () => {
       if (sock && !sock.destroyed) sock.end()
       sock = null
