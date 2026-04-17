@@ -42,6 +42,7 @@ export {
   completeAgentRun,
   blockAgentRun,
   escalateRun,
+  sweepStaleRuns,
   buildSpawnableRun,
   getRunHistory,
 } from './runs.js'

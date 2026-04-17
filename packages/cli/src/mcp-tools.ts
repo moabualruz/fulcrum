@@ -311,6 +311,26 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Sweep Stale Agent Runs',
+    name: 'sweep_stale_runs',
+    description: 'Abort any agent runs still marked running but with no heartbeat for more than stale_minutes (default 10). Use on session start to reap zombies left by agents that crashed without firing their agent_end / session_shutdown hook. Effect: flips matching rows to status=aborted, status_category=done, and appends a run_event. Returns: list of reaped run_ids.',
+    annotations: { destructiveHint: true, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace_id: { type: 'string', description: 'Workspace ID (optional — omit to sweep every workspace)' },
+        stale_minutes: { type: 'number', description: 'Staleness threshold in minutes (default 10)' },
+      },
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        reaped: { type: 'array', items: { type: 'string' }, description: 'run_ids that were aborted' },
+      },
+      required: ['reaped'],
+    },
+  },
+  {
     title: 'Build Chief-of-Staff Context',
     name: 'build_cos_context',
     description: 'Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, blockers, recent events. Effect: read-only. Returns: context_markdown formatted for system prompt injection. workspace_id and project_id are optional — defaults to cwd context.',

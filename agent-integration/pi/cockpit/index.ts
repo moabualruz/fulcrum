@@ -195,6 +195,7 @@ export default function (pi: ExtensionAPI) {
   let serverState: "stopped" | "starting" | "up" | "error" = "stopped";
   let snapshot: WorkspaceSnapshot | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   let uiRef: { setStatus: (id: string, s?: string) => void; notify: (msg: string, level: string) => void } | null = null;
   let currentRunId: string | null = null;
 
@@ -966,28 +967,11 @@ export default function (pi: ExtensionAPI) {
   // ── Agent lifecycle hooks ─────────────────────────────────────────────────────
 
   function registerAgentLifecycle(): void {
-    // before_agent_start: auto-start a Fulcrum run on the first agent turn
+    // before_agent_start: inject workspace snapshot as a system prompt.
+    // Note: the agent run itself is started once per SESSION in session_start,
+    // not per agent turn — starting per turn is what caused zombie rows to
+    // accumulate when PI crashed between agent_end firings.
     pi.on("before_agent_start", async (_event, ctx) => {
-      // Only start once per session
-      if (currentRunId) return;
-      if (!cfg.workspace_id) return;
-
-      try {
-        const agentRole = process.env["FULCRUM_AGENT_ROLE"] ?? "software_engineer";
-        const result = execAction("start_agent_run", {
-          agent_role: agentRole,
-          workspace_id: cfg.workspace_id,
-          project_id: cfg.project_id,
-        }) as Record<string, unknown>;
-        currentRunId = result["run_id"] as string ?? null;
-        if (currentRunId) {
-          process.stderr.write(`[fulcrum/session] pi run started: ${currentRunId}\n`);
-        }
-      } catch (err) {
-        process.stderr.write(`[fulcrum/before-agent] run start failed (non-fatal): ${(err as Error).message}\n`);
-      }
-
-      // Inject workspace context as system prompt if fresh snapshot available
       if (!snapshot) return;
       const usage = (ctx as Record<string, unknown>)["getContextUsage"]?.();
       if (usage && (usage as Record<string, unknown>)["tokens"] > 8000) return;
@@ -1002,22 +986,6 @@ export default function (pi: ExtensionAPI) {
       if (b.length > 0) lines.push(`⚠ Blocked: ${b.map(x => x.role ?? "—").join(", ")}`);
 
       return { systemPrompt: lines.join("\n") };
-    });
-
-    // agent_end: auto-complete the run when the agent finishes
-    pi.on("agent_end", async (_event, _ctx) => {
-      if (!currentRunId) return;
-      const runId = currentRunId;
-      currentRunId = null;
-      try {
-        execAction("complete_agent_run", {
-          run_id: runId,
-          output_summary: "PI agent turn completed",
-        });
-        process.stderr.write(`[fulcrum/session] pi run completed: ${runId}\n`);
-      } catch (err) {
-        process.stderr.write(`[fulcrum/agent-end] complete failed (non-fatal): ${(err as Error).message}\n`);
-      }
     });
   }
 
@@ -1057,10 +1025,56 @@ export default function (pi: ExtensionAPI) {
     // a different monitor port they can run `/fulcrum-setup` on demand.
     await startServer();
     pollTimer = setInterval(() => { if (serverState === "up") refreshStatus(); }, 5000);
+
+    // Reap zombie runs from prior PI sessions that crashed before firing
+    // session_shutdown — else they linger at status='running' forever.
+    if (cfg.workspace_id) {
+      try {
+        const reaped = execAction("sweep_stale_runs", {
+          workspace_id: cfg.workspace_id,
+          stale_minutes: 10,
+        }) as { reaped: string[] };
+        if (reaped?.reaped?.length) {
+          process.stderr.write(`[fulcrum/session] reaped ${reaped.reaped.length} stale run(s) from prior PI sessions\n`);
+        }
+      } catch { /* non-fatal */ }
+    }
+
+    // One Fulcrum run per PI session (previously one per agent turn, which
+    // piled up `status=running` rows without heartbeats). We start it here
+    // and complete it on session_shutdown.
+    if (!currentRunId && cfg.workspace_id) {
+      try {
+        const agentRole = process.env["FULCRUM_AGENT_ROLE"] ?? "software_engineer";
+        const result = execAction("start_agent_run", {
+          agent_role: agentRole,
+          workspace_id: cfg.workspace_id,
+          project_id: cfg.project_id,
+          context_type: "primary",
+        }) as Record<string, unknown>;
+        currentRunId = (result?.["run_id"] as string | undefined) ?? null;
+        if (currentRunId) {
+          process.stderr.write(`[fulcrum/session] pi run started: ${currentRunId}\n`);
+        }
+      } catch (err) {
+        process.stderr.write(`[fulcrum/session] start_agent_run failed (non-fatal): ${(err as Error).message}\n`);
+      }
+    }
+
+    // 30 s heartbeat so the janitor / sweep_stale_runs never reaps the run
+    // while PI is still alive.
+    heartbeatTimer = setInterval(() => {
+      if (!currentRunId) return;
+      try {
+        execAction("heartbeat_agent_run", { run_id: currentRunId });
+      } catch { /* non-fatal */ }
+    }, 30_000);
   });
 
   pi.on("session_shutdown", async () => {
-    // Complete any still-running agent run on shutdown
+    if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+    if (pollTimer)      { clearInterval(pollTimer);      pollTimer = null; }
+
     if (currentRunId) {
       const runId = currentRunId;
       currentRunId = null;

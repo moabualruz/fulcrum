@@ -933,6 +933,17 @@ TOOL_REGISTRY.set('block_agent_run', {
   },
 })
 
+TOOL_REGISTRY.set('sweep_stale_runs', {
+  schema: TOOL_SCHEMA_MAP.get('sweep_stale_runs'),
+  capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { sweepStaleRuns } = await import('fulcrum-agent-core')
+    const ws = args['workspace_id'] as string | undefined ?? deps.workspace_id
+    const stale_minutes = args['stale_minutes'] as number | undefined
+    return sweepStaleRuns({ workspace_id: ws || undefined, stale_minutes }, deps.db)
+  },
+})
+
 // ── Workspace / context tools ───────────────────────────────────────────────
 
 TOOL_REGISTRY.set('build_cos_context', {

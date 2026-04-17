@@ -524,6 +524,59 @@ export function buildSpawnableRun(run: AgentRun, task_packet: TaskPacket): Spawn
   }
 }
 
+/**
+ * Abort any agent_run rows that claim status='running' but have gone stale
+ * (no heartbeat for more than `stale_minutes` — default 10).
+ *
+ * Agents that crash without firing their agent_end / session_shutdown hook
+ * leave rows stuck at status='running' forever. The cockpit widget then
+ * piles up "running" rows on every PI open. This sweep lets the cockpit
+ * reap zombies on startup — rows with:
+ *   heartbeat_at IS NULL AND started_at  < now - stale_minutes
+ *   heartbeat_at IS NOT NULL AND heartbeat_at < now - stale_minutes
+ * are flipped to status='aborted', status_category='done'.
+ *
+ * Returns the list of run_ids that were reaped.
+ */
+export function sweepStaleRuns(
+  input: { workspace_id?: string; stale_minutes?: number },
+  db: Db = getDb(),
+): { reaped: string[] } {
+  const staleMs = Math.max(1, input.stale_minutes ?? 10) * 60_000
+  const cutoff = new Date(Date.now() - staleMs).toISOString()
+  const now = new Date().toISOString()
+
+  const wsClause = input.workspace_id ? 'AND workspace_id = ?' : ''
+  const wsParams: unknown[] = input.workspace_id ? [input.workspace_id] : []
+
+  const selectSql = `
+    SELECT run_id FROM agent_runs
+    WHERE status = 'running'
+      AND (
+        (heartbeat_at IS NULL     AND started_at   < ?)
+        OR (heartbeat_at IS NOT NULL AND heartbeat_at < ?)
+      )
+      ${wsClause}
+  `
+  const rows = db.prepare(selectSql).all(cutoff, cutoff, ...wsParams) as Array<{ run_id: string }>
+
+  const update = db.prepare(`
+    UPDATE agent_runs
+    SET status = 'aborted', status_category = 'done', updated_at = ?, version = version + 1
+    WHERE run_id = ? AND status = 'running'
+  `)
+  const tx = db.transaction((ids: string[]) => {
+    for (const id of ids) update.run(now, id)
+  })
+  tx(rows.map(r => r.run_id))
+
+  for (const { run_id } of rows) {
+    try { appendRunEvent(run_id, 'aborted', { reason: `sweep_stale_runs: stale for >${input.stale_minutes ?? 10} min` }, db) } catch {}
+  }
+
+  return { reaped: rows.map(r => r.run_id) }
+}
+
 export async function escalateRun(input: EscalateRunInput, db: Db = getDb()): Promise<Task> {
   if (!input.escalation_reason.trim()) throw new FulcrumError('escalation_reason must not be empty', 'invalid_input')
   const run = getRun(input.run_id, db)
