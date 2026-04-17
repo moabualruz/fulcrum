@@ -2,3 +2,4 @@ packages:
   - 'packages/*'
   - 'scripts'
   - 'agent-integration/opencode'
+  - 'agent-integration/pi/cockpit'

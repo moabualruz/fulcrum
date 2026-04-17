@@ -69,7 +69,7 @@ interface WorkspaceSnapshot {
 // workspace_id / project_id are computed deterministically from the project
 // directory path — no .fulcrum.json file is written to or read from the project.
 
-function computeProjectIds(absPath: string): { workspace_id: string; project_id: string } {
+export function computeProjectIds(absPath: string): { workspace_id: string; project_id: string } {
   const hash = createHash("sha256").update(absPath).digest("hex").slice(0, 12);
   const sanitizedName = path.basename(absPath).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 24) || "project";
   return {
@@ -78,7 +78,7 @@ function computeProjectIds(absPath: string): { workspace_id: string; project_id:
   };
 }
 
-function loadCockpitConfig(cwd: string): CockpitConfig {
+export function loadCockpitConfig(cwd: string): CockpitConfig {
   const absPath = path.resolve(cwd);
   const { workspace_id: computedWs, project_id: computedProj } = computeProjectIds(absPath);
   return {

@@ -67,6 +67,11 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
     sessionId = (event['sessionId'] ?? event['session_id']) as string ?? 'unknown'
     agentRole = (event['role'] as string) ?? ''
     runId = (event['runId'] ?? event['run_id']) as string ?? ''
+  } else if (cliName === 'opencode' || cliName === 'cursor' || cliName === 'windsurf') {
+    // Same event shape as Claude Code (tool_name / tool_input / session_id)
+    toolName = (event['tool_name'] ?? event['tool'] ?? event['toolName']) as string ?? ''
+    toolInput = (event['tool_input'] ?? event['input'] ?? event['toolInput'] ?? {}) as unknown as Record<string, unknown>
+    sessionId = (event['session_id'] ?? event['sessionId']) as string ?? 'unknown'
   }
 
   return { toolName, toolInput, sessionId, agentRole, runId }

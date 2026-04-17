@@ -27,8 +27,14 @@
     "@mariozechner/pi-tui": "*",
     "@sinclair/typebox": "*"
   },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "devDependencies": {
-    "@sinclair/typebox": "^0.32.0"
+    "@sinclair/typebox": "^0.32.0",
+    "@types/node": "^20.0.0",
+    "vitest": "^1.4.0"
   },
   "repository": {
     "type": "git",

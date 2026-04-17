@@ -2805,7 +2805,7 @@ OPTIONS (serve mcp-http)
       await runHook(cli ?? '--help')
       return
     }
-    if (cli === 'claude' || cli === 'gemini' || cli === 'codex' || cli === 'pi' || cli === 'auto') {
+    if (cli === 'claude' || cli === 'gemini' || cli === 'codex' || cli === 'pi' || cli === 'opencode' || cli === 'cursor' || cli === 'windsurf' || cli === 'auto') {
       // Optional second-level arg: lifecycle phase or tool phase
       // Default 'pre' for backward compatibility with existing settings.json entries.
       const phaseArg = args[2] as string | undefined
@@ -2842,6 +2842,22 @@ OPTIONS (serve mcp-http)
         if (phaseArg === 'session-end')   { await runCodexStopHook();         return }
         // Codex [notify] section fires on run completion — same semantic as session-end
         if (phaseArg === 'notify')        { await runCodexStopHook();         return }
+      }
+
+      // Opencode / Cursor / Windsurf lifecycle hooks.
+      // The opencode plugin shells to `fulcrum hook opencode session-end` on
+      // session.idle and to `fulcrum hook opencode pre-compact` on
+      // session.compacted. Cursor + Windsurf only route through `hook auto`
+      // today but we accept the lifecycle phases so future configs don't error.
+      if (cli === 'opencode' || cli === 'cursor' || cli === 'windsurf') {
+        if (
+          phaseArg === 'session-start' ||
+          phaseArg === 'session-end' ||
+          phaseArg === 'pre-compact'
+        ) {
+          await runStubHook(cli, phaseArg)
+          return
+        }
       }
 
       const phase: HookPhase = phaseArg === 'post' ? 'post' : 'pre'

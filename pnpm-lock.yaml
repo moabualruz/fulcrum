@@ -40,6 +40,28 @@ importers:
         specifier: ^1.4.0
         version: 1.6.1(@types/node@20.19.39)
 
+  agent-integration/pi/cockpit:
+    dependencies:
+      '@mariozechner/pi-ai':
+        specifier: '*'
+        version: 0.66.1(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))(ws@8.20.0)(zod@4.3.6)
+      '@mariozechner/pi-coding-agent':
+        specifier: '*'
+        version: 0.66.1(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))(ws@8.20.0)(zod@4.3.6)
+      '@mariozechner/pi-tui':
+        specifier: '*'
+        version: 0.66.1
+    devDependencies:
+      '@sinclair/typebox':
+        specifier: ^0.32.0
+        version: 0.32.35
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.39
+      vitest:
+        specifier: ^1.4.0
+        version: 1.6.1(@types/node@20.19.39)
+
   packages/cli:
     dependencies:
       '@modelcontextprotocol/sdk':
@@ -1541,6 +1563,9 @@ packages:
 
   '@sinclair/typebox@0.27.10':
     resolution: {integrity: sha512-MTBk/3jGLNB2tVxv6uLlFh1iu64iYOQ2PbdOSK3NW8JZsmlaOh2q6sdtKowBhfw8QFLmYNzTW4/oK4uATIi6ZA==}
+
+  '@sinclair/typebox@0.32.35':
+    resolution: {integrity: sha512-Ul3YyOTU++to8cgNkttakC0dWvpERr6RYoHO2W47DLbFvrwBDJUY31B1sImH6JZSYc4Kt4PyHtoPNu+vL2r2dA==}
 
   '@sinclair/typebox@0.34.49':
     resolution: {integrity: sha512-brySQQs7Jtn0joV8Xh9ZV/hZb9Ozb0pmazDIASBkYKCjXrXU3mpcFahmK/z4YDhGkQvP9mWJbVyahdtU5wQA+A==}
@@ -5080,6 +5105,8 @@ snapshots:
       '@simple-git/args-pathspec': 1.0.3
 
   '@sinclair/typebox@0.27.10': {}
+
+  '@sinclair/typebox@0.32.35': {}
 
   '@sinclair/typebox@0.34.49': {}
 
