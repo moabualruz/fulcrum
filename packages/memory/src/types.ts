@@ -12,7 +12,9 @@ export type EntityType =
   | 'language_feature' | 'person' | 'tool' | 'organization'
   | 'project' | 'file' | 'symbol' | 'task' | 'run'
 
-export type MemoryScope = 'global' | 'project' | 'file' | 'task'
+// v2a Task 2: widened to include 'session' and 'workspace'; legacy 'file' and
+// 'task' kept as transition superset (PR 6 hook rewrite migrates them).
+export type MemoryScope = 'session' | 'project' | 'workspace' | 'global' | 'file' | 'task'
 
 export type RecallMode = 'compact' | 'total_ranked'
 
