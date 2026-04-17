@@ -15,16 +15,27 @@ command = "fulcrum hook codex session-start"
 
 # PreToolUse: secret scan, team-invoke policy guard, and task memory recall.
 # Returns {"decision":"approve"} (allow) or {"decision":"block","reason":"..."}
+# v2a Task 47: matcher narrowed to the mutating tool allowlist so Read/Glob/
+# Grep never shell out to `fulcrum hook codex`.
 [[hooks]]
 event = "PreToolUse"
 command = "fulcrum hook codex"
+allowed_tools = ["Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "Task"]
 
-# PostToolUse: write a tool_trace operational memory for the run.
+# PostToolUse: write a typed file_patch / bash_trace memory for the run.
+# v2a Task 29 + 47: emits kind='file_patch' or kind='bash_trace' instead of
+# the v1 tool_trace catch-all; matcher narrowed.
 [[hooks]]
 event = "PostToolUse"
 command = "fulcrum hook codex post"
+allowed_tools = ["Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "Task"]
 
 # Stop: auto-complete the agent run when the session ends.
 [[hooks]]
 event = "Stop"
 command = "fulcrum hook codex session-end"
+
+# v2a Task 48: notify migration for run-end (stable Codex hook surface
+# compared to [[hooks]] Stop which is still feature-flagged on some builds).
+[notify]
+command = "fulcrum hook codex notify"

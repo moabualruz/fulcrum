@@ -11,21 +11,10 @@
       ]
     }
   ],
-  "BeforeAgent": [
-    {
-      "matcher": "*",
-      "hooks": [
-        {
-          "name": "fulcrum-before-agent",
-          "type": "command",
-          "command": "fulcrum hook gemini before-agent"
-        }
-      ]
-    }
-  ],
   "BeforeTool": [
     {
-      "matcher": "*",
+      "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|Task",
+      "tools": ["Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "Task"],
       "hooks": [
         {
           "name": "fulcrum-before-tool",
@@ -37,12 +26,25 @@
   ],
   "AfterTool": [
     {
-      "matcher": "*",
+      "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|Task",
+      "tools": ["Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "Task"],
       "hooks": [
         {
           "name": "fulcrum-after-tool",
           "type": "command",
           "command": "fulcrum hook gemini post"
+        }
+      ]
+    }
+  ],
+  "AfterAgent": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-after-agent",
+          "type": "command",
+          "command": "fulcrum hook gemini after-agent"
         }
       ]
     }

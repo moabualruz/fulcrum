@@ -1,6 +1,11 @@
 import { type Plugin, tool } from "@opencode-ai/plugin"
 import { spawnSync } from "child_process"
 
+// v2a Task 50: in-plugin allowlist. Must match Task 29 / 30 write-side
+// allowlist (Write/Edit/MultiEdit/NotebookEdit/Bash/Task). Tools not here
+// never reach `fulcrum hook auto`.
+const FULCRUM_TOOL_ALLOWLIST = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "Task"])
+
 // ── CLI bridge ────────────────────────────────────────────────────────────────
 // All Fulcrum operations go through `fulcrum action exec <name> [--json '...']`
 // so the plugin works without the monitor server running.
@@ -79,9 +84,14 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
     },
 
     // ── Pre-tool policy check ──────────────────────────────────────────────
+    //
+    // v2a Task 50: in-plugin allowlist runs BEFORE shelling to `fulcrum hook
+    // auto`. Read / Glob / Grep (and everything else) never produce a hook
+    // shell-out — matches AC §11.64 / §11.68.
 
     "tool.execute.before": async (input) => {
       if (!input.tool || input.tool.startsWith("fulcrum_")) return
+      if (!FULCRUM_TOOL_ALLOWLIST.has(input.tool)) return
 
       const result = spawnSync("fulcrum", ["hook", "auto"], {
         input: JSON.stringify({
@@ -109,6 +119,7 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
 
     "tool.execute.after": async (input) => {
       if (!input.tool || input.tool.startsWith("fulcrum_")) return
+      if (!FULCRUM_TOOL_ALLOWLIST.has(input.tool)) return
       const sessionId = process.env["OPENCODE_SESSION_ID"] ?? "unknown"
       spawnSync("fulcrum", ["hook", "auto", "post"], {
         input: JSON.stringify({
@@ -143,6 +154,30 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
         return { approved: false, reason }
       }
       return { approved: true }
+    },
+
+    // ── v2a Task 48: run-lifecycle event subscriptions ─────────────────────
+    // session.idle fires when the agent finishes a turn with no pending work;
+    // session.compacted fires after context compression. Both trigger the
+    // session-summary / pre-compact writer paths. We intentionally do NOT
+    // subscribe to todo.updated — that's v2b territory.
+
+    "event": async (input) => {
+      if (!input || typeof input !== "object") return
+      const name = (input as Record<string, unknown>)["type"] as string | undefined
+      if (name === "session.idle") {
+        spawnSync("fulcrum", ["hook", "opencode", "session-end"], {
+          input: JSON.stringify({ session_id: process.env["OPENCODE_SESSION_ID"] ?? "unknown" }),
+          encoding: "utf-8",
+          timeout: 5_000,
+        })
+      } else if (name === "session.compacted") {
+        spawnSync("fulcrum", ["hook", "opencode", "pre-compact"], {
+          input: JSON.stringify({ session_id: process.env["OPENCODE_SESSION_ID"] ?? "unknown" }),
+          encoding: "utf-8",
+          timeout: 5_000,
+        })
+      }
     },
 
     // ── Custom tools ────────────────────────────────────────────────────────

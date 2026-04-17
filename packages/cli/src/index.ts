@@ -2824,6 +2824,18 @@ OPTIONS (serve mcp-http)
 
   if (group === 'skills' || group === 'skill') { await runSkills(); return }
 
+  // v2a per-host cluster Task 51 — `fulcrum pi cockpit start|stop|status`.
+  if (group === 'pi') {
+    if (command === 'cockpit') {
+      const { runPiCockpit } = await import('./pi-cockpit.js')
+      await runPiCockpit(args[2], args.slice(3))
+      return
+    }
+    console.error(`Unknown pi subcommand: ${command}`)
+    console.error('Usage: fulcrum pi cockpit start|stop|status')
+    process.exit(1)
+  }
+
   if (group === 'init') { await runInit(); return }
 
   if (group === 'log') {

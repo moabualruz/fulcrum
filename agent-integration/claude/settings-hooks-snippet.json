@@ -10,12 +10,42 @@
         ]
       }
     ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "fulcrum hook claude session-end"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "fulcrum hook claude session-stop"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "fulcrum hook claude subagent-start"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "fulcrum hook claude subagent-stop"
           }
         ]
       }
@@ -32,7 +62,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "*",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|Task",
         "hooks": [
           {
             "type": "command",
@@ -43,7 +73,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "*",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|Task",
         "hooks": [
           {
             "type": "command",
