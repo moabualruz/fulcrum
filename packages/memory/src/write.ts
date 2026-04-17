@@ -9,6 +9,7 @@ import { appendToLog } from './vault/index-builder.js'
 import type { WriteMemoryInput, FullMemory } from './types.js'
 import { runExtractionPipeline } from './extractors/pipeline.js'
 import { computeSparseVector } from './sparse.js'
+import { validateKind, applyKindCap } from './validate-kind.js'
 
 /**
  * Generate an embedding for `text` and store it in:
@@ -79,6 +80,14 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
   if (input.scope === 'task' && !input.task_id) {
     throw new FulcrumError('scope=task requires task_id', 'invalid_input')
   }
+
+  // v2a Task 9: kind validation + per-kind char cap. The DB-level CHECK was
+  // dropped in PR 1 Task 1; this is the single canonical policy point.
+  validateKind(input.kind)
+  const cappedContent = applyKindCap(input.kind, input.content)
+  // Mutate the input view that downstream uses; preserve the original behavior
+  // where content is the canonical bytes referenced by the hash.
+  input = { ...input, content: cappedContent }
 
   const now = new Date().toISOString()
   const hash = contentHash(input.content)
