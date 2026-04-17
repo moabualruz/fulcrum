@@ -90,6 +90,20 @@ export {
 export type { OnAgentRunStartInput } from './pci/lifecycle.js'
 export { pciStatus, isWatcherOwnedHere } from './pci/singleton.js'
 
+// Indexer daemon (PR 1 of the 2026-04-18 indexer-daemon plan).
+export { indexerSocketPath, unlinkStaleSocket } from './indexer/socket-path.js'
+export {
+  createIndexerClient,
+  indexerClient,
+  IndexerError,
+  IndexerUnreachableError,
+  IndexerDisconnectedError,
+  _resetIndexerClientForTest,
+} from './indexer/client.js'
+export type { IndexerClient, IndexerClientOptions } from './indexer/client.js'
+export { startDaemon, runDaemonMain, DaemonAlreadyRunningError } from './indexer/daemon.js'
+export type { DaemonHandle, DaemonOptions } from './indexer/daemon.js'
+
 // v2a PR 4 Task 21 — gitignore-respecting walker integration.
 export { enumerateProjectFiles, shouldIndexPath, MAX_FILE_SIZE_BYTES } from './pci/walker-integration.js'
 export type { WalkerResult } from './pci/walker-integration.js'

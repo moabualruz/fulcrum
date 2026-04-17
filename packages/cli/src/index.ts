@@ -2913,6 +2913,11 @@ OPTIONS (serve mcp-http)
 
   if (group === 'mcp') { await runMcpPlanner(); return }
   if (group === 'install') { await runInstall(); return }
+  if (group === 'daemon') {
+    const { runDaemon } = await import('./commands/daemon.js')
+    await runDaemon(args.slice(1))
+    return
+  }
   if (group === 'tool' || group === 'tools') { await runTool(); return }
   if (group === 'action' || group === 'actions') { await runAction(); return }
 
