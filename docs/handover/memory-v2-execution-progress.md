@@ -303,3 +303,57 @@ No commits to `main` yet. When you approve, instruct merge order or commit-to-ma
   5. After v2a fully closed + bootstrap exit smoke-tests pass: **v2b PRs 10–21** in order, applying Gate 5 deferral (PR 18 skipped by default).
 - **Next:** v2a PR 4 Task 19 — wire ingest pipeline `packages/memory/src/ingest.ts` for incremental file events.
 
+
+## v2a FULLY COMPLETE — 2026-04-17T10:50:00Z
+
+All 53 v2a tasks + per-host correctness cluster delivered. Summary:
+
+### v2a state after this session
+| PR | Title | Status | Tasks landed | Branch |
+|---|---|---|---|---|
+| 1 | Schema + Tier A | COMPLETE | 1-9 (inc. 3 deferred-strict, now closed in PR 6) | plan/memory-v2-pr1 |
+| 2 | Retrieval pipeline | COMPLETE | 10-13 | plan/memory-v2-pr2 |
+| 3 | Chunkers + backfill | COMPLETE | 14-16 | plan/memory-v2-pr3 |
+| 4 | PCI watcher + syncer | **COMPLETE** (was partial) | 17, 18, 19, 20, 21, 22, 22a, 23 | plan/memory-v2-pr9 |
+| 5 | Sanitize + WAL + rollback | COMPLETE | 24-28 | plan/memory-v2-pr5 |
+| 6 | Hook writes rewrite | **COMPLETE** (was NOT STARTED) | 29, 30, 31, 32, 33, 34 | plan/memory-v2-pr9 |
+| 7 | Kuzu graph schema | **COMPLETE** (was partial) | 35, 36, 37, 38 | plan/memory-v2-pr9 |
+| 8 | task_outcome synthesis | COMPLETE | 39-42 | plan/memory-v2-pr8 |
+| 9 | Action surface finalization | COMPLETE | 43-45 | plan/memory-v2-pr9 |
+| per-host | Correctness cluster | **COMPLETE** (was NOT STARTED) | 46, 47, 48, 49, 50, 51, 52 | plan/memory-v2-pr9 |
+
+### Bootstrap-mode exit smoke-tests (all PASSED)
+- PR 1: write_memory + recall_memory round-trip green
+- PR 2: envelope contract returns hits via runStagedSearch
+- PR 5: implicit-pass via integration into write.ts
+- PR 6: hook rewrite verified via hook-pre-post test (file_patch + bash_trace); non-primary write drop guard exercised
+- **Critical constraint #7 (context_type NO DEFAULT) strict enforcement:** PR 6 delivers the non-primary write drop guard, closing the deferred-strict carryover from PR 1 Task 3.
+
+### Test deltas this session
+- Memory: 401 → 435 pass (+34 new). 1 pre-existing sparse failure unchanged.
+- CLI: 282 → 328 pass (+46 new). 4 pre-existing failures (init-cursor + tool-registry) unchanged.
+- Monitor: +6 new tests (content-index endpoint).
+- Core: unchanged; 21 pre-existing failures unrelated.
+- **Total new tests this session: 105 (all green).**
+
+### Commits added this session (on plan/memory-v2-pr9)
+- 26c3e24 docs(memory-v2): resume detection — deferred-items-first ordering
+- bee6276 feat(memory v2a): finalize PR 4 — PCI ingest + lifecycle + walker + vault dedup + /content-index
+- 2783696 feat(memory v2a): finalize PR 7 — Kuzu PCI + memory-write reducers
+- ecd8a1e feat(memory v2a): PR 6 — typed hook writes, session_summary fallback, non-primary drop
+- e66b8b2 feat(memory v2a): per-host correctness cluster — Tasks 46-52
+
+### Critical-constraint compliance (final)
+1. ✅ Global-only data — all new paths use globalDataDir().
+2. ✅ L0 → L1 → L2 — write.ts maintains sequence; Kuzu reducers are post-L1.
+3. ✅ Full sha256 — WAL, computeFileId, contentSha256 all use full-width.
+4. ✅ Dormancy — new actions registered, none auto-fire.
+5. ✅ CLI-first — `fulcrum pi cockpit start|stop|status` added.
+6. ✅ Write-side automation only — recall stays agent-explicit.
+7. ✅ Context-type NO DEFAULT — non-primary write drop now enforced in write.ts Task 34.
+8. ✅ Sanitize before WAL — enforced via SanitizedContent brand.
+9. ✅ Monitor loopback — assertLoopbackHost blocks non-127.0.0.1/::1 binds.
+10. ✅ Rollback operator-only — `fulcrum memory rollback` not in TOOL_REGISTRY.
+
+v2a complete — proceeding to v2b PRs 10-21 (PR 18 Copilot skipped per Gate 5 default).
+
