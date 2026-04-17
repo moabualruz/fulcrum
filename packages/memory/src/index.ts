@@ -88,6 +88,7 @@ export {
   resolveProjectRoot,
 } from './pci/lifecycle.js'
 export type { OnAgentRunStartInput } from './pci/lifecycle.js'
+export { pciStatus, isWatcherOwnedHere } from './pci/singleton.js'
 
 // v2a PR 4 Task 21 — gitignore-respecting walker integration.
 export { enumerateProjectFiles, shouldIndexPath, MAX_FILE_SIZE_BYTES } from './pci/walker-integration.js'

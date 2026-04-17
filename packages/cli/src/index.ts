@@ -1450,14 +1450,16 @@ async function runServeMcp(): Promise<void> {
   }
 
   // ── Acquire long-lived PCI watcher ────────────────────────────────────────
-  // Chokidar mount for the cwd. Keeps code_chunks / code_files / code_symbols
-  // up to date as files change in this project. Opt out with FULCRUM_DISABLE_PCI=1.
+  // Chokidar mount for the cwd, singleton per project root. If another
+  // process already owns this project's lock we attach read-only (no second
+  // watcher is spawned). Opt out with FULCRUM_DISABLE_PCI=1.
   if (process.env['FULCRUM_DISABLE_PCI'] !== '1') {
     try {
-      const { acquireServerHandle } = await import('fulcrum-memory')
+      const { acquireServerHandle, isWatcherOwnedHere } = await import('fulcrum-memory')
       const handle = acquireServerHandle(process.cwd())
       if (handle) {
-        process.stderr.write(`[fulcrum] PCI watcher mounted on ${process.cwd()}\n`)
+        const verb = isWatcherOwnedHere?.(process.cwd()) ? 'mounted' : 'attached to existing'
+        process.stderr.write(`[fulcrum] PCI watcher ${verb} on ${process.cwd()}\n`)
       }
     } catch (err) {
       process.stderr.write(`[fulcrum] PCI watcher mount failed (non-fatal): ${(err as Error).message}\n`)
@@ -1585,6 +1587,20 @@ async function runServeMonitor(): Promise<void> {
   }
 
   const server = startMonitorServer({ port, workspace_id: config.workspace_id || projectIdsFromPath(process.cwd()).workspace_id })
+
+  // Mount the PCI watcher for the cwd if nobody else already owns it. The
+  // singleton's file lock does the cross-process dedup — same lock as
+  // `serve mcp` uses, so running both in parallel is safe.
+  if (process.env['FULCRUM_DISABLE_PCI'] !== '1') {
+    try {
+      const { acquireServerHandle, isWatcherOwnedHere } = await import('fulcrum-memory')
+      const handle = acquireServerHandle(process.cwd())
+      if (handle) {
+        const verb = isWatcherOwnedHere?.(process.cwd()) ? 'mounted' : 'attached to existing'
+        process.stderr.write(`[fulcrum monitor] PCI watcher ${verb} on ${process.cwd()}\n`)
+      }
+    } catch { /* non-fatal */ }
+  }
   await server.start()
   console.log(`[fulcrum monitor] Listening on http://127.0.0.1:${port}`)
   console.log(`[fulcrum monitor] API docs: http://127.0.0.1:${port}/status`)

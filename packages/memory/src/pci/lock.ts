@@ -41,6 +41,8 @@ export function acquireLock(lockPath: string, opts: { ttlMs?: number; pid?: numb
 
   if (existsSync(lockPath)) {
     let stale = false
+    let holderPid: number | undefined
+    try { holderPid = Number(readFileSync(lockPath, 'utf8').trim()) } catch { /* unreadable */ }
     try {
       const stat = statSync(lockPath)
       if (Date.now() - stat.mtimeMs > ttlMs) stale = true
@@ -48,11 +50,21 @@ export function acquireLock(lockPath: string, opts: { ttlMs?: number; pid?: numb
       stale = true
     }
 
+    // Liveness check: a dead holderPid makes the lock stale regardless of TTL.
+    // Without this, a crashed `fulcrum serve mcp` blocks the next boot for
+    // up to one minute.
+    if (!stale && holderPid && Number.isFinite(holderPid) && holderPid > 0) {
+      try {
+        process.kill(holderPid, 0) // signal 0 = liveness probe, does not actually signal
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException)?.code === 'ESRCH') stale = true
+        // EPERM → alive but not ours to signal; still held.
+      }
+    }
+
     if (stale) {
       try { unlinkSync(lockPath) } catch { /* race with another reclaimer */ }
     } else {
-      let holderPid: number | undefined
-      try { holderPid = Number(readFileSync(lockPath, 'utf8').trim()) } catch { /* unreadable */ }
       throw new LockError(`lock held: ${lockPath}`, holderPid)
     }
   }

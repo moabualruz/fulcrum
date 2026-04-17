@@ -165,3 +165,14 @@ export function pciStatus(): { entries: number; activeWatchers: number; refcount
     refcounts,
   }
 }
+
+/**
+ * True when the watcher for this project root was started in THIS process
+ * (i.e., we own the lock). False when we attached to an existing watcher
+ * held by another process, or the project isn't tracked here at all.
+ */
+export function isWatcherOwnedHere(projectRoot: string): boolean {
+  const realpath = (() => { try { return realpathSync(projectRoot) } catch { return projectRoot } })()
+  const entry = entries.get(realpath)
+  return !!entry && !!entry.lock
+}
