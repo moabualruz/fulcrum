@@ -11,7 +11,7 @@ Fulcrum workflows are small, resumable, DAG-shaped recipes for multi-agent work.
 The runner lives in `packages/workflows/src/runner.ts`. Its public entry point is:
 
 ```typescript
-import { runWorkflow } from '@moabualruz/fulcrum-workflows'
+import { runWorkflow } from 'fulcrum-workflows'
 
 const result = await runWorkflow({
   wf_id:         'wf_abc',
@@ -57,8 +57,8 @@ type StepResult =
 | Step type | Blocking? | Config | Output | Notes |
 |-----------|-----------|--------|--------|-------|
 | `create_task` | no | `{title, description?, priority?}` | `{task_id, display_id}` | Requires `ctx.project_id` |
-| `create_issue` | no | `{title, description?}` | `{issue_id}` | via `@moabualruz/fulcrum-planning` |
-| `create_epic` | no | `{title, description?}` | `{epic_id}` | via `@moabualruz/fulcrum-planning` |
+| `create_issue` | no | `{title, description?}` | `{issue_id}` | via `fulcrum-planning` |
+| `create_epic` | no | `{title, description?}` | `{epic_id}` | via `fulcrum-planning` |
 
 ### Memory
 
@@ -122,7 +122,7 @@ Both go through the usual policy gate (`canInvokeTeams`). See [worker-adapters](
 | Step type | Blocking? | Config | Output |
 |-----------|-----------|--------|--------|
 | `read_project` | no | `{}` | `{project: row}` |
-| `evaluate_policy` | no | `{rule, subject}` | `{policy: result}` — lazy-imports `checkPolicy` from `@moabualruz/fulcrum-core` |
+| `evaluate_policy` | no | `{rule, subject}` | `{policy: result}` — lazy-imports `checkPolicy` from `fulcrum-core` |
 | `gate` | no | `{open: boolean}` | Returns `completed` when `open !== false`, otherwise `skipped` |
 | `validate_schema` | no | `{schema}` | **Stubbed** — returns `{validated: true}` |
 
@@ -147,8 +147,8 @@ import {
   registry,
   runWorkflow,
   type WorkflowDefinition,
-} from '@moabualruz/fulcrum-workflows'
-import { startWorkflow } from '@moabualruz/fulcrum-workflows'
+} from 'fulcrum-workflows'
+import { startWorkflow } from 'fulcrum-workflows'
 
 const implementFeature: WorkflowDefinition = {
   name: 'implement_feature',
@@ -303,7 +303,7 @@ The runner wraps everything in OpenTelemetry spans automatically. You don't inst
 workflow.run                        (root span, workspace_id, wf_id, final_status, steps_executed, duration_ms)
 ├── workflow.step  step_id=s1_plan  step_type=create_task  attempts=0  result_status=completed
 ├── workflow.step  step_id=s2_engineer  step_type=spawn_agent  result_status=completed
-│   └── agent.run  role=software_engineer  adapter=stub     (opened by @moabualruz/fulcrum-worker)
+│   └── agent.run  role=software_engineer  adapter=stub     (opened by fulcrum-worker)
 ├── workflow.step  step_id=s3_review  step_type=wait_for_review  result_status=skipped
 ├── workflow.step  step_id=s4_record  step_type=write_memory  result_status=completed
 └── workflow.step  step_id=s5_halt  step_type=halt  result_status=completed

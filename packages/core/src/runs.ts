@@ -256,7 +256,7 @@ export async function startAgentRun(input: StartAgentRunInput, db: Db = getDb())
   const recalled = recallTaskContext({
     workspace_id: input.workspace_id,
     project_id: taskRow.project_id ?? null,
-    task_id: input.task_id,
+    task_id: input.task_id ?? null,
   })
 
   // Resolve agent definition for this role (non-blocking — missing definition is fine)

@@ -152,7 +152,7 @@ describe('constants', () => {
 - [ ] **Step 1.3: Run test — should PASS**
 
 ```
-pnpm --filter @moabualruz/fulcrum-core test constants
+pnpm --filter fulcrum-core test constants
 ```
 
 - [ ] **Step 1.4: Re-export from core index**
@@ -258,7 +258,7 @@ describe('round 1 migration', () => {
 - [ ] **Step 2.3: Run tests — should FAIL**
 
 ```
-pnpm --filter @moabualruz/fulcrum-core test migrations
+pnpm --filter fulcrum-core test migrations
 ```
 
 - [ ] **Step 2.4: Add the migration**
@@ -793,7 +793,7 @@ In `ensureProjectInitialized`, replace the raw INSERT OR IGNORE with `createWork
 
 - [ ] **Step 6.2: Replace raw SQL in monitor**
 
-`ensureWorkspace` and `ensureProject` in `packages/monitor/src/server.ts` become thin wrappers around `createWorkspace` / `createProject` imported from `@moabualruz/fulcrum-core`.
+`ensureWorkspace` and `ensureProject` in `packages/monitor/src/server.ts` become thin wrappers around `createWorkspace` / `createProject` imported from `fulcrum-core`.
 
 - [ ] **Step 6.3: Verify nothing broke**
 
@@ -1317,7 +1317,7 @@ git commit -m "feat(memory): §10.7 weighted hybrid ranking in recall (G-10)"
 At the top of each function (before the dispatch loop for MCP, before `startMonitorServer` for monitor):
 
 ```typescript
-const { initEmbedding } = await import('@moabualruz/fulcrum-core')
+const { initEmbedding } = await import('fulcrum-core')
 try {
   await initEmbedding()
   process.stderr.write('[fulcrum] embedding model ready\n')

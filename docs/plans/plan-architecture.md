@@ -6,11 +6,11 @@
 
 ---
 
-## Step 1 — Critical: Break `@moabualruz/fulcrum-core` ↔ `@moabualruz/fulcrum-teams` circular dependency (GAP-ARCH-1)
+## Step 1 — Critical: Break `fulcrum-core` ↔ `fulcrum-teams` circular dependency (GAP-ARCH-1)
 
 **Current situation**:
-- `packages/core/src/index.ts:138` — dynamic `await import('@moabualruz/fulcrum-teams')` inside `getTeamOps()`
-- `packages/teams/src/teams.ts:2` — static `import from '@moabualruz/fulcrum-core'`
+- `packages/core/src/index.ts:138` — dynamic `await import('fulcrum-teams')` inside `getTeamOps()`
+- `packages/teams/src/teams.ts:2` — static `import from 'fulcrum-core'`
 - madge confirms this forms 2 actual cycles
 
 **The fix**:
@@ -35,18 +35,18 @@ export function getTeamOps(): TeamOps {
 
 In `packages/cli/src/index.ts` startup, before serving:
 ```typescript
-import { createTeamOps } from '@moabualruz/fulcrum-teams'
-import { setTeamOps } from '@moabualruz/fulcrum-core'
+import { createTeamOps } from 'fulcrum-teams'
+import { setTeamOps } from 'fulcrum-core'
 setTeamOps(createTeamOps())
 ```
 
-`@moabualruz/fulcrum-teams` exports `createTeamOps(): TeamOps`. Core never imports teams. Cycle broken.
+`fulcrum-teams` exports `createTeamOps(): TeamOps`. Core never imports teams. Cycle broken.
 
 ---
 
-## Step 2 — Critical: Fix `@moabualruz/fulcrum-policy` depends on `@moabualruz/fulcrum-teams` (GAP-ARCH-2)
+## Step 2 — Critical: Fix `fulcrum-policy` depends on `fulcrum-teams` (GAP-ARCH-2)
 
-**Current situation**: `packages/policy/package.json` lists `@moabualruz/fulcrum-teams` as a direct dependency.
+**Current situation**: `packages/policy/package.json` lists `fulcrum-teams` as a direct dependency.
 
 **The fix**: Identify what policy needs from teams. Likely it's team membership data or team instance state to evaluate team-related rules. 
 
@@ -60,9 +60,9 @@ export interface TeamContext {
 }
 ```
 
-In the policy rule that currently imports from `@moabualruz/fulcrum-teams`, change the import to accept a `TeamContext` data object instead of calling team functions. The call site (CLI/monitor) is responsible for loading team data and passing it to policy evaluation.
+In the policy rule that currently imports from `fulcrum-teams`, change the import to accept a `TeamContext` data object instead of calling team functions. The call site (CLI/monitor) is responsible for loading team data and passing it to policy evaluation.
 
-Remove `@moabualruz/fulcrum-teams` from `packages/policy/package.json`.
+Remove `fulcrum-teams` from `packages/policy/package.json`.
 
 ---
 
@@ -75,7 +75,7 @@ The following types and functions in `packages/cli/src/index.ts` are library-lev
 
 **Move to**: `packages/core/src/hooks.ts` (new file) with full type exports.
 
-Update imports in `index.ts` to use `@moabualruz/fulcrum-core`. Remove exports from `index.ts`.
+Update imports in `index.ts` to use `fulcrum-core`. Remove exports from `index.ts`.
 
 ---
 
@@ -144,9 +144,9 @@ In `packages/memory/src/vault/client.ts`, replace the `process.env['FULCRUM_VAUL
 
 ## Step 7 — Minor: Remove duplicate `globalDataDir()` (GAP-ARCH-10)
 
-In `packages/cli/src/index.ts:509-516`, delete the local `globalDataDir()` implementation and import it from `@moabualruz/fulcrum-core`:
+In `packages/cli/src/index.ts:509-516`, delete the local `globalDataDir()` implementation and import it from `fulcrum-core`:
 ```typescript
-import { globalDataDir } from '@moabualruz/fulcrum-core'
+import { globalDataDir } from 'fulcrum-core'
 ```
 
 This is already exported from core — one line change.
@@ -192,7 +192,7 @@ Initial consumers: monitor can subscribe to `run.started`/`run.completed` for re
 Add `packages/workflows/src/check-peers.ts`:
 ```typescript
 export async function checkWorkflowPeers(): Promise<void> {
-  const peers = ['@moabualruz/fulcrum-planning', '@moabualruz/fulcrum-teams', '@moabualruz/fulcrum-worker']
+  const peers = ['fulcrum-planning', 'fulcrum-teams', 'fulcrum-worker']
   for (const peer of peers) {
     try {
       await import(peer)
@@ -226,7 +226,7 @@ Call `checkWorkflowPeers()` in `workflow start` and `workflow run` before procee
 ## Acceptance Criteria
 
 - [ ] madge reports 0 circular dependencies after Step 1
-- [ ] `@moabualruz/fulcrum-policy` package.json does not list `@moabualruz/fulcrum-teams` as dependency
+- [ ] `fulcrum-policy` package.json does not list `fulcrum-teams` as dependency
 - [ ] CLI `index.ts` exports no library types
 - [ ] No `export *` in teams, policy, or workflows `index.ts`
 - [ ] `createProvider()` in embedding registry uses the map, not switch/case

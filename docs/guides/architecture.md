@@ -12,13 +12,13 @@
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
-│                      @moabualruz/fulcrum-worker                             │
+│                      fulcrum-worker                             │
 │   spawnAgent → policy gate → adapter.spawn → run lifecycle       │
 │   Built-in: stub · subprocess    Pluggable: registerAgentAdapter │
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
-│                       @moabualruz/fulcrum-core                              │
+│                       fulcrum-core                              │
 │   tasks · runs · policy · memory · handoffs · events · CoS       │
 │   roles · capabilities · telemetry spans · advisory locks        │
 │                  SQLite (WAL + FTS5)                             │
@@ -39,7 +39,7 @@
 └──────────┘  └──────────────┘  └───────────────┘  └────────┘
 ```
 
-**Dependency rule:** all packages depend on `@moabualruz/fulcrum-core`; `@moabualruz/fulcrum-policy` must NOT depend on `@moabualruz/fulcrum-teams` (the teams package uses `setTeamOps`/`getTeamOps` inversion-of-control to avoid this cycle); `@moabualruz/fulcrum-worker` depends on `@moabualruz/fulcrum-core`; step handlers in `@moabualruz/fulcrum-workflows` use lazy imports to avoid cross-package cycles. Hook types (`HookCli`, `HookContext`, etc.) live in `@moabualruz/fulcrum-core` so non-CLI packages can reference the hook contract without pulling in the CLI.
+**Dependency rule:** all packages depend on `fulcrum-core`; `fulcrum-policy` must NOT depend on `fulcrum-teams` (the teams package uses `setTeamOps`/`getTeamOps` inversion-of-control to avoid this cycle); `fulcrum-worker` depends on `fulcrum-core`; step handlers in `fulcrum-workflows` use lazy imports to avoid cross-package cycles. Hook types (`HookCli`, `HookContext`, etc.) live in `fulcrum-core` so non-CLI packages can reference the hook contract without pulling in the CLI.
 
 ---
 
@@ -47,17 +47,17 @@
 
 | Package | Responsibility |
 |---------|---------------|
-| `@moabualruz/fulcrum-core` | Domain functions, SQLite schema (52 migrations), role capability helpers, telemetry spans + OTel exporter, embedding providers, handoff protocol, in-process event bus, hook types |
-| `@moabualruz/fulcrum-memory` | Three-layer memory stack — L0 git vault, L1 FTS5 + scoring, L2 Kuzu graph + HNSW vector search |
-| `@moabualruz/fulcrum-monitor` | Real-time metrics dashboard — daily/project/agent metrics, burndown, SSE event stream, HTTP control API |
-| `@moabualruz/fulcrum-planning` | Project planning domain — epics, issues, PRDs, plans, dependency graph, code review workflows |
-| `@moabualruz/fulcrum-policy` | Policy engine — 5 system invariants, custom rules, secret guard (12 named patterns), audit log |
-| `@moabualruz/fulcrum-sync` | Bidirectional sync — Plane integration with retry/backoff, conflict detection, secret scan before push |
-| `@moabualruz/fulcrum-teams` | Agent team orchestration — typed templates, slot policies, communication/budget/quality/latency classes |
-| `@moabualruz/fulcrum-worker` | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess + claude-code adapters, `spawnAgent` lifecycle |
-| `@moabualruz/fulcrum-workflows` | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers |
-| `@moabualruz/fulcrum-worktrees` | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, merge queue |
-| `@moabualruz/fulcrum-cli` | `fulcrum` binary — 21 command groups, 23 MCP tools, auto-init per project, hook handlers |
+| `fulcrum-core` | Domain functions, SQLite schema (52 migrations), role capability helpers, telemetry spans + OTel exporter, embedding providers, handoff protocol, in-process event bus, hook types |
+| `fulcrum-memory` | Three-layer memory stack — L0 git vault, L1 FTS5 + scoring, L2 Kuzu graph + HNSW vector search |
+| `fulcrum-monitor` | Real-time metrics dashboard — daily/project/agent metrics, burndown, SSE event stream, HTTP control API |
+| `fulcrum-planning` | Project planning domain — epics, issues, PRDs, plans, dependency graph, code review workflows |
+| `fulcrum-policy` | Policy engine — 5 system invariants, custom rules, secret guard (12 named patterns), audit log |
+| `fulcrum-sync` | Bidirectional sync — Plane integration with retry/backoff, conflict detection, secret scan before push |
+| `fulcrum-teams` | Agent team orchestration — typed templates, slot policies, communication/budget/quality/latency classes |
+| `fulcrum-worker` | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess + claude-code adapters, `spawnAgent` lifecycle |
+| `fulcrum-workflows` | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers |
+| `fulcrum-worktrees` | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, merge queue |
+| `fulcrum-cli` | `fulcrum` binary — 21 command groups, 23 MCP tools, auto-init per project, hook handlers |
 
 ---
 
@@ -90,7 +90,7 @@ Grep-based guard that forbids hardcoded role comparisons (e.g., `role === 'chief
 ```
 fulcrum/
 ├── packages/
-│   ├── core/               # @moabualruz/fulcrum-core
+│   ├── core/               # fulcrum-core
 │   │   └── src/
 │   │       ├── db/         # Schema migrations (52), WAL config, client
 │   │       ├── embedding/  # Local embedder, reranker, registry
@@ -115,7 +115,7 @@ fulcrum/
 │   │       ├── types.ts    # All shared types, FulcrumError, EmitEventInput
 │   │       └── index.ts    # Public API surface
 │   │
-│   ├── memory/             # @moabualruz/fulcrum-memory
+│   ├── memory/             # fulcrum-memory
 │   │   └── src/
 │   │       ├── vault/      # L0: client, watcher, git, formatter, state, index-builder
 │   │       ├── kuzu/       # L2: client, schema, upsert, query (7-stage pipeline)
@@ -131,33 +131,33 @@ fulcrum/
 │   │       ├── scoring.ts
 │   │       └── types.ts
 │   │
-│   ├── monitor/            # @moabualruz/fulcrum-monitor
+│   ├── monitor/            # fulcrum-monitor
 │   │   └── src/
 │   │       ├── metrics/
 │   │       ├── server.ts   # Hono HTTP server + SSE + control API
 │   │       └── types.ts
 │   │
-│   ├── planning/           # @moabualruz/fulcrum-planning
+│   ├── planning/           # fulcrum-planning
 │   │   └── src/
 │   │       ├── epics.ts · issues.ts · prds.ts · plans.ts · relations.ts · reviews.ts
 │   │
-│   ├── policy/             # @moabualruz/fulcrum-policy
+│   ├── policy/             # fulcrum-policy
 │   │   └── src/
 │   │       ├── engine.ts   # SYSTEM_INVARIANTS (5), evaluatePolicy
 │   │       ├── rules.ts
 │   │       ├── secrets.ts  # 12 patterns, range-based dedup
 │   │       └── audit.ts
 │   │
-│   ├── sync/               # @moabualruz/fulcrum-sync
+│   ├── sync/               # fulcrum-sync
 │   │   └── src/
 │   │       ├── manager.ts · conflicts.ts
 │   │       └── adapters/plane/
 │   │
-│   ├── teams/              # @moabualruz/fulcrum-teams
+│   ├── teams/              # fulcrum-teams
 │   │   └── src/
 │   │       ├── templates.ts · instances.ts · scheduler.ts
 │   │
-│   ├── worker/             # @moabualruz/fulcrum-worker
+│   ├── worker/             # fulcrum-worker
 │   │   └── src/
 │   │       ├── adapter.ts     # registerAgentAdapter, getAgentAdapter
 │   │       ├── lifecycle.ts   # spawnAgent — policy + run + adapter + spans
@@ -166,23 +166,23 @@ fulcrum/
 │   │       ├── claude-code.ts # claude-code adapter
 │   │       └── types.ts       # AgentAdapter, SpawnContext, WorkerResult
 │   │
-│   ├── workflows/          # @moabualruz/fulcrum-workflows
+│   ├── workflows/          # fulcrum-workflows
 │   │   └── src/
 │   │       ├── registry.ts
 │   │       ├── engine.ts         # nextReadySteps, step state machine
 │   │       ├── runner.ts         # runWorkflow — calls checkWorkflowPeers on entry
-│   │       ├── check-peers.ts    # advisory peer-dep check (@moabualruz/fulcrum-planning, teams, worker)
+│   │       ├── check-peers.ts    # advisory peer-dep check (fulcrum-planning, teams, worker)
 │   │       └── step-executor.ts  # 29 step handlers
 │   │
-│   ├── worktrees/          # @moabualruz/fulcrum-worktrees
+│   ├── worktrees/          # fulcrum-worktrees
 │   │   └── src/
 │   │       └── worktrees.ts      # allocateWorktree, processMergeQueue (real git)
 │   │
-│   └── cli/                # @moabualruz/fulcrum-cli
+│   └── cli/                # fulcrum-cli
 │       └── src/
 │           ├── index.ts          # 21 command groups, auto-init
 │           ├── hooks.ts          # normalizeHookEvent, runPreHook, runPostHook
-│           │                     # (types imported from @moabualruz/fulcrum-core)
+│           │                     # (types imported from fulcrum-core)
 │           ├── mcp-server.ts     # JSON-RPC 2.0 MCP server; HTTP StreamableHTTP transport
 │           └── mcp-tools.ts      # TOOL_SCHEMAS — single source of truth for all 23 tools
 │

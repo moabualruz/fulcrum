@@ -21,7 +21,7 @@ Housekeeping: `docs/brainstorms/` and `docs/ideation/` exist on disk but are unt
 ## Scope Boundaries
 
 - Do NOT rewrite `buildCurrentContextResponse` — the shared-builder architecture from GAP-MCP-11 is correct; only add test exports.
-- Do NOT change the monitor HTTP server implementation (`@moabualruz/fulcrum-monitor`).
+- Do NOT change the monitor HTTP server implementation (`fulcrum-monitor`).
 - Do NOT change JSON-RPC wire protocol or MCP tool schemas.
 - `spliceSection` fix is a 2-line guard change only.
 - `suggested_next_call` heuristic should be simple and fast — no new database queries.
@@ -201,7 +201,7 @@ For tests: check vitest root config to see if `scripts/` is included. If not, ad
 The existing tests check `package.json` fields only. Add a test that:
 1. Saves `process.argv`
 2. Sets `process.argv = ['node', '/fulcrum-mcp/src/index.ts']`
-3. Mocks `@moabualruz/fulcrum-cli` with `vi.mock('@moabualruz/fulcrum-cli', () => ({}))` to prevent actual CLI boot
+3. Mocks `fulcrum-cli` with `vi.mock('fulcrum-cli', () => ({}))` to prevent actual CLI boot
 4. Uses `vi.resetModules()` before import to get a fresh module
 5. Dynamically imports `'../index.js'`
 6. Asserts `process.argv[2] === 'serve'` and `process.argv[3] === 'mcp'`
@@ -230,7 +230,7 @@ After deriving `ids`, call `listTasks` with `workspace_id` and `limit: 1` to che
 ```typescript
 let suggested_next_call = 'mcp__fulcrum__list_tasks'
 try {
-  const { listTasks } = await import('@moabualruz/fulcrum-core')
+  const { listTasks } = await import('fulcrum-core')
   const tasks = listTasks({ workspace_id: ids.workspace_id, limit: 1 })
   if (tasks.length === 0) {
     suggested_next_call = 'mcp__fulcrum__create_task'

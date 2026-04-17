@@ -251,13 +251,13 @@ example `runTasks` (line 1361):
 
 ```ts
 export async function runTasks(): Promise<void> {
-  const { listTasks, createTask, updateTask } = await import('@moabualruz/fulcrum-core')
+  const { listTasks, createTask, updateTask } = await import('fulcrum-core')
   ...
 }
 ```
 
 This keeps cold-start cheap — e.g. `fulcrum task list` never pulls in
-`@moabualruz/fulcrum-workflows` or `@moabualruz/fulcrum-worktrees`.
+`fulcrum-workflows` or `fulcrum-worktrees`.
 
 ### Output: `outputRows` / `outputObject` (lines 118, 149)
 
@@ -271,7 +271,7 @@ table or `key: value` lines. Columns default to the keys of the first row.
 Handler: `runMemory` (line 191). Subcommands: `init`, `accelerate`,
 `rebuild`, `status`.
 
-- `init` → `runMemoryInit()` from `@moabualruz/fulcrum-memory` — initializes L0 vault + L1 SQLite.
+- `init` → `runMemoryInit()` from `fulcrum-memory` — initializes L0 vault + L1 SQLite.
 - `accelerate` → `activateL2()` — enables Kuzu graph + HNSW vector.
 - `rebuild` → `rebuildFromVault({ vaultPath, target: 'l1'|'l2'|'both' })`.
 - `status` → prints vault path + L0/L1/L2 presence.
@@ -293,7 +293,7 @@ Handler: inline dispatch in `main()`. Subcommands: `mcp`, `monitor`, `all`.
 
 - `mcp` → `runServeMcp()` (line 593) — JSON-RPC stdio server with 18 tools.
 - `monitor` → `runServeMonitor()` (line 1230) — HTTP monitor via
-  `startMonitorServer({port, workspace_id})` from `@moabualruz/fulcrum-monitor`.
+  `startMonitorServer({port, workspace_id})` from `fulcrum-monitor`.
 - `all` → `runServeAll()` (line 1259) — starts both (monitor in
   background, MCP on stdio).
 
@@ -314,7 +314,7 @@ details.)
 
 Handler: `runWorkspaces` (line 1281). Subcommands: `list`, `create`.
 Calls `listWorkspaces()` / `createWorkspace({name, workspace_id})` from
-`@moabualruz/fulcrum-core`. Plain text output:
+`fulcrum-core`. Plain text output:
 `${workspace_id}  ${name}  (${status})`.
 
 Help text quoted:
@@ -334,7 +334,7 @@ Handler: `runProjects` (line 1317). Subcommands: `list`, `create`.
 
 Handler: `runTasks` (line 1361). Subcommands: `list`, `get`, `create`,
 `update`. Lazy-imports `listTasks`, `createTask`, `updateTask` from
-`@moabualruz/fulcrum-core`. Uses `outputRows`/`outputObject`, supports `--json`.
+`fulcrum-core`. Uses `outputRows`/`outputObject`, supports `--json`.
 
 Column shape for `list`: `task_id, display_id, title, status, priority, assigned_to`.
 
@@ -356,14 +356,14 @@ Default workspace/project are sourced from `currentProjectIds()`
 #### 2.7 `fulcrum issue`
 
 Handler: `runIssues` (line 1434). Lazy-imports `createIssue`,
-`updateIssue`, `listIssues` from `@moabualruz/fulcrum-planning`. Subcommands:
+`updateIssue`, `listIssues` from `fulcrum-planning`. Subcommands:
 `list`, `create`, `get`, `update`. The `update` path supports optimistic
 concurrency via `--expected-version <n>` (passed to `updateIssue`).
 
 #### 2.8 `fulcrum epic`
 
 Handler: `runEpics` (line 1506). Lazy-imports `createEpic`, `listEpics`
-from `@moabualruz/fulcrum-planning`. Subcommands: `list`, `create`, `get`.
+from `fulcrum-planning`. Subcommands: `list`, `create`, `get`.
 
 #### 2.9 `fulcrum board`
 
@@ -380,7 +380,7 @@ the 3-token forms `queue merge list`, `queue merge process`,
 
 - `queue merge list` — direct SQL against `worktrees WHERE status IN ('ready_for_merge','conflict')`.
 - `queue merge process --actor-role <role>` — lazy-imports
-  `processMergeQueue` from `@moabualruz/fulcrum-worktrees` and passes
+  `processMergeQueue` from `fulcrum-worktrees` and passes
   `{ workspace_id, project_id, actor_role }`. Output has `merged`,
   `skipped`, `conflicts`, `results` counts (see [§10](#10-merge-queue-pipeline)).
 - `queue review list` — SQL against
@@ -389,7 +389,7 @@ the 3-token forms `queue merge list`, `queue merge process`,
 #### 2.11 `fulcrum sync`
 
 Handler: `runSync` (line 1681). Lazy-imports `syncAll`, `listConflicts`
-from `@moabualruz/fulcrum-sync`. Subcommands:
+from `fulcrum-sync`. Subcommands:
 
 - `status` — SQL group-count against `sync_states` per `(object_type, sync_status)` + unresolved conflicts count.
 - `push --object-type <type>` — calls `syncAll({workspace_id, object_type})`.
@@ -398,7 +398,7 @@ from `@moabualruz/fulcrum-sync`. Subcommands:
 #### 2.12 `fulcrum team`
 
 Handler: `runTeams` (line 1756). Lazy-imports `createTeamTemplate`,
-`invokeTeam`, `listTeamInstances` from `@moabualruz/fulcrum-teams`. Subcommands:
+`invokeTeam`, `listTeamInstances` from `fulcrum-teams`. Subcommands:
 `list`, `create`, `invoke`, `instances`.
 
 Invoke form:
@@ -411,7 +411,7 @@ only `chief_of_staff` may successfully invoke teams.
 
 #### 2.13 `fulcrum workflow`
 
-Handler: `runWorkflows` (line 1837). Lazy-imports from `@moabualruz/fulcrum-workflows`:
+Handler: `runWorkflows` (line 1837). Lazy-imports from `fulcrum-workflows`:
 `listWorkflows`, `startWorkflow`, `runWorkflow`, `getWorkflowRun`,
 `resumeWorkflow`. Subcommands: `list`, `start`, `run`, `status`, `resume`.
 
@@ -424,9 +424,9 @@ Handler: `runAgent` (line 1933). Subcommands:
 
 - `list` — direct SQL:
   `SELECT run_id, role, status, task_id, current_step, progress_pct, started_at FROM agent_runs WHERE workspace_id = ? ORDER BY started_at DESC LIMIT 50`.
-- `status --run-id <id>` — lazy-imports `getAgentRunStatus` from `@moabualruz/fulcrum-core`.
+- `status --run-id <id>` — lazy-imports `getAgentRunStatus` from `fulcrum-core`.
 - `spawn --target-role --caller-role --task-id [--adapter]` — lazy-imports
-  `spawnAgent` from `@moabualruz/fulcrum-worker`. Returns `{run_id, status, summary}`.
+  `spawnAgent` from `fulcrum-worker`. Returns `{run_id, status, summary}`.
 
 ---
 
@@ -690,7 +690,7 @@ Three phases, executed in order:
 **Phase 1 — secret scan** (line 347):
 
 ```ts
-const { checkSecrets } = await import('@moabualruz/fulcrum-policy')
+const { checkSecrets } = await import('fulcrum-policy')
 const inputStr = JSON.stringify(ctx.toolInput)
 const scan = checkSecrets(inputStr)
 if (scan.has_secrets) {
@@ -709,7 +709,7 @@ Exit 2 is the hard-deny signal Claude Code honours.
 ```ts
 const isTeamInvoke = ctx.toolName.includes('invoke_team') || ctx.toolName.includes('team_invoke')
 if (isTeamInvoke && ctx.agentRole) {
-  const { canInvokeTeams } = await import('@moabualruz/fulcrum-core')
+  const { canInvokeTeams } = await import('fulcrum-core')
   if (!canInvokeTeams(ctx.agentRole as AgentRole)) {
     io.stderr(`[fulcrum/pre] Tool call denied: role '${ctx.agentRole}' lacks can_invoke_teams\n`)
     io.exit(2)
@@ -728,7 +728,7 @@ no-op for Claude and the enforcement happens inside the MCP tool handler.
 const HOOK_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash'])
 
 if (HOOK_WRITE_TOOLS.has(ctx.toolName) && ctx.runId) {
-  const { getDb } = await import('@moabualruz/fulcrum-core')
+  const { getDb } = await import('fulcrum-core')
   const db = getDb()
   const runRow = db.prepare(
     `SELECT task_id, project_id FROM agent_runs WHERE run_id = ? AND workspace_id = ?`
@@ -763,7 +763,7 @@ Terminates with `io.exit(0)` (line 419).
 ```ts
 if (!ctx.runId) { io.exit(0); return }
 
-const { getDb, writeMemory } = await import('@moabualruz/fulcrum-core')
+const { getDb, writeMemory } = await import('fulcrum-core')
 const db = getDb()
 const runRow = db.prepare(
   `SELECT task_id, project_id FROM agent_runs WHERE run_id = ? AND workspace_id = ?`
@@ -985,16 +985,16 @@ line 486 looks up `HANDLERS[type]` where `type` comes from
 
 | # | Name | Description | Calls |
 |---|---|---|---|
-| 1 | `create_task` | Create a task in the workflow's project | `createTask({workspace_id, project_id, title, description, priority})` from `@moabualruz/fulcrum-core` |
-| 2 | `create_issue` | Create an issue | `planning.createIssue({...})` from `@moabualruz/fulcrum-planning` |
-| 3 | `create_epic` | Create an epic | `planning.createEpic({...})` from `@moabualruz/fulcrum-planning` |
+| 1 | `create_task` | Create a task in the workflow's project | `createTask({workspace_id, project_id, title, description, priority})` from `fulcrum-core` |
+| 2 | `create_issue` | Create an issue | `planning.createIssue({...})` from `fulcrum-planning` |
+| 3 | `create_epic` | Create an epic | `planning.createEpic({...})` from `fulcrum-planning` |
 | 4 | `write_artifact` | INSERT directly into `artifacts` with `status='draft'` and a computed `display_id` like `ART-0001` | Direct SQL |
 | 5 | `read_artifact` | `SELECT * FROM artifacts WHERE artifact_id = ?` | Direct SQL |
 | 6 | `review_artifact` | INSERT a row into `reviews` with `status='pending'` | Direct SQL |
-| 7 | `write_memory` | Persist a memory with `kind=fact, scope=project` by default | `writeMemory({...})` from `@moabualruz/fulcrum-core` |
-| 8 | `read_memory` | Semantic recall of memories for the project | `recallMemory({...})` from `@moabualruz/fulcrum-core` |
-| 9 | `invoke_team` | Instantiate a team from a template | `teams.invokeTeam({...})` from `@moabualruz/fulcrum-teams` |
-| 10 | `spawn_agent` | Spawn an agent run via the worker lifecycle | `worker.spawnAgent({...})` from `@moabualruz/fulcrum-worker` |
+| 7 | `write_memory` | Persist a memory with `kind=fact, scope=project` by default | `writeMemory({...})` from `fulcrum-core` |
+| 8 | `read_memory` | Semantic recall of memories for the project | `recallMemory({...})` from `fulcrum-core` |
+| 9 | `invoke_team` | Instantiate a team from a template | `teams.invokeTeam({...})` from `fulcrum-teams` |
+| 10 | `spawn_agent` | Spawn an agent run via the worker lifecycle | `worker.spawnAgent({...})` from `fulcrum-worker` |
 | 11 | `run_script` | Run one of `run_tests|lint|typecheck|build` via `npm run` | `execFile('npm', ['run', script])` |
 | 12 | `call_mcp_tool` | Stubbed — records intent, returns `{tool_name, args, note}` | (stub) |
 | 13 | `wait_for_task` | Check `tasks.status`; `skipped` if not yet `done` | Direct SQL |
@@ -1003,10 +1003,10 @@ line 486 looks up `HANDLERS[type]` where `type` comes from
 | 16 | `branch` | Dotted-path lookup in `ctx.outputs`, compare to `expected` | (pure) |
 | 17 | `loop` | Complete once `ctx.attempts+1 >= iterations` | (pure) |
 | 18 | `halt` | Returns `{output:{halt:true}}` → runner short-circuits | (pure) |
-| 19 | `escalate` | Create a `chief_of_staff` handoff | `createHandoff(getDb(), {...})` from `@moabualruz/fulcrum-core` |
+| 19 | `escalate` | Create a `chief_of_staff` handoff | `createHandoff(getDb(), {...})` from `fulcrum-core` |
 | 20 | `prompt_user` | No-op in runner mode; driven by `stepWorkflow` instead | (stub) |
 | 21 | `read_project` | `SELECT * FROM projects WHERE project_id = ?` | Direct SQL |
-| 22 | `evaluate_policy` | `checkPolicy({workspace_id, project_id, rule, subject})` | `@moabualruz/fulcrum-core` |
+| 22 | `evaluate_policy` | `checkPolicy({workspace_id, project_id, rule, subject})` | `fulcrum-core` |
 | 23 | `search_web` | Stubbed | (stub) |
 | 24 | `search_code` | Stubbed | (stub) |
 | 25 | `run_tool` | Stubbed | (stub) |
@@ -1020,7 +1020,7 @@ line 486 looks up `HANDLERS[type]` where `type` comes from
 ```ts
 HANDLERS['spawn_agent'] = async (ctx) => {
   try {
-    const worker = await import('@moabualruz/fulcrum-worker')
+    const worker = await import('fulcrum-worker')
     const c = cfg(ctx)
     if (!ctx.project_id) return { status: 'failed', error: 'spawn_agent requires project_id' }
     const result = await worker.spawnAgent({
@@ -1106,7 +1106,7 @@ if (!canInvokeTeams(input.caller_role)) {
 }
 ```
 
-`canInvokeTeams` lives in `@moabualruz/fulcrum-core` `roles.ts` line 46. Only
+`canInvokeTeams` lives in `fulcrum-core` `roles.ts` line 46. Only
 `chief_of_staff` passes.
 
 **Step 2 — adapter resolution**:
@@ -1255,7 +1255,7 @@ Two implementations share the `writeMemory` name:
 - `packages/memory/src/write.ts` — full L0→L1→L2 path for vault-enabled
   callers.
 
-### `@moabualruz/fulcrum-core` `writeMemory` (L1-only, line 122)
+### `fulcrum-core` `writeMemory` (L1-only, line 122)
 
 Validation:
 
@@ -1310,10 +1310,10 @@ db.prepare(`
 )
 ```
 
-ID generation: `memory_id = newId('memory')` — the `@moabualruz/fulcrum-core` ids
+ID generation: `memory_id = newId('memory')` — the `fulcrum-core` ids
 helper.
 
-### `@moabualruz/fulcrum-memory` `writeMemory` (full L0+L1+L2, line 16)
+### `fulcrum-memory` `writeMemory` (full L0+L1+L2, line 16)
 
 Additional validation for `freshness`/`importance` ranges.
 
@@ -1528,7 +1528,7 @@ if (!canMerge(input.actor_role as AgentRole)) {
 }
 ```
 
-`canMerge` lives in `@moabualruz/fulcrum-core` `roles.ts` line 50 — currently the
+`canMerge` lives in `fulcrum-core` `roles.ts` line 50 — currently the
 `integration_worker` role is the only one that passes.
 
 ### FIFO scan
@@ -1731,7 +1731,7 @@ async function ensureProjectInitialized(opts: { silent?: boolean } = {}) {
   const fs   = await import('fs')
   const crypto = await import('crypto')
   const { getDb, runMigrations, getWorkspace, getProject,
-          createWorkspace, createProject } = await import('@moabualruz/fulcrum-core')
+          createWorkspace, createProject } = await import('fulcrum-core')
 
   const cwd = process.cwd()
   fs.mkdirSync(path.join(cwd, '.fulcrum'), { recursive: true })
@@ -1878,7 +1878,7 @@ Found by grepping the `packages/` tree:
 
 **FULCRUM\_\***
 - `FULCRUM_WORKSPACE_ID`, `FULCRUM_PROJECT_ID`, `FULCRUM_PORT` — read by `loadConfig`.
-- `FULCRUM_VAULT_PATH` — read by `@moabualruz/fulcrum-memory` vault init and by `fulcrum memory rebuild`.
+- `FULCRUM_VAULT_PATH` — read by `fulcrum-memory` vault init and by `fulcrum memory rebuild`.
 - `FULCRUM_AGENT_ADAPTER` — selects the worker adapter in `spawnAgent`.
 - `FULCRUM_AGENT_STUB_DIR` — stub adapter fixtures directory.
 - `FULCRUM_AGENT_SUBPROCESS_CMD` — subprocess adapter command template.
@@ -1889,7 +1889,7 @@ Found by grepping the `packages/` tree:
 - `OTEL_EXPORTER_OTLP_ENDPOINT` — enables the OTel dual-emitter in `packages/core/src/telemetry/otel.ts`.
 - `OTEL_SERVICE_NAME` — service name attribute (default `fulcrum`).
 
-**PLANE\_\*** (used by `@moabualruz/fulcrum-sync` Plane adapter)
+**PLANE\_\*** (used by `fulcrum-sync` Plane adapter)
 - `PLANE_BASE_URL`, `PLANE_API_KEY`, `PLANE_WORKSPACE_SLUG`, `PLANE_PROJECT_ID`.
 
 ### `.fulcrum.json` example
@@ -2177,7 +2177,7 @@ const mcpSpan = await startSpan({
    - `getWorkspace/getProject` return undefined → `createWorkspace` + `createProject`.
    - Writes `./.fulcrum.json` with `{workspace_id, project_id, monitor_port: 4721}`.
    - Prints `[fulcrum] initialized project "${name}" (${workspace_id})` to stderr.
-4. Dispatch to `runTasks()` → lazy-imports `listTasks, createTask, updateTask` from `@moabualruz/fulcrum-core`.
+4. Dispatch to `runTasks()` → lazy-imports `listTasks, createTask, updateTask` from `fulcrum-core`.
 5. `sub='list'` branch → `currentProjectIds()` returns the deterministic IDs.
 6. `listTasks({workspace_id, project_id, status})` SELECTs from `tasks` ordered by created_at.
 7. `outputRows(rows.map(t => ({...})))` prints a TSV table, or JSON if `--json` is in `args`.

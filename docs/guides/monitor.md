@@ -1,6 +1,6 @@
 # Monitor Server
 
-`@moabualruz/fulcrum-monitor` is a Hono HTTP server that exposes metrics, analytics, event streams, a control API, and a built-in web dashboard.
+`fulcrum-monitor` is a Hono HTTP server that exposes metrics, analytics, event streams, a control API, and a built-in web dashboard.
 
 ---
 
@@ -12,7 +12,7 @@ fulcrum serve all --port 4721  # MCP + monitor together
 ```
 
 ```typescript
-import { startMonitorServer } from '@moabualruz/fulcrum-monitor'
+import { startMonitorServer } from 'fulcrum-monitor'
 
 const server = startMonitorServer({ workspace_id: 'ws_1', port: 7331 })
 await server.start()    // binds the HTTP port
@@ -26,7 +26,7 @@ const res = await server.fetch(new Request('http://localhost/status'))
 
 ## Web Dashboard
 
-Opening `http://localhost:4721` in a browser serves the built-in control room UI. No extra server or bundler required — the HTML is served directly from `@moabualruz/fulcrum-monitor`.
+Opening `http://localhost:4721` in a browser serves the built-in control room UI. No extra server or bundler required — the HTML is served directly from `fulcrum-monitor`.
 
 The dashboard shows:
 - **Board summary** — task counts across backlog / active / blocked / done columns

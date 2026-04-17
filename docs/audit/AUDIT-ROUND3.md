@@ -152,13 +152,13 @@ Create root `/tsconfig.json`:
 
 ### Architecture & Build
 
-**ARCH-002: `@moabualruz/fulcrum-cli` tsconfig missing `outDir`, `dist` not in exclude**  
+**ARCH-002: `fulcrum-cli` tsconfig missing `outDir`, `dist` not in exclude**  
 File: `packages/cli/tsconfig.json`  
 Fix: Add `"outDir": "./dist"`, add `"dist"` to exclude. Update `bin` to `./dist/index.js`.
 
-**ARCH-003: `@moabualruz/fulcrum-core` lists `@moabualruz/fulcrum-teams` as devDependency — circular dep at test time**  
+**ARCH-003: `fulcrum-core` lists `fulcrum-teams` as devDependency — circular dep at test time**  
 File: `packages/core/package.json:39`  
-Fix: Remove `@moabualruz/fulcrum-teams` from core's devDependencies. Core tests should mock `TeamOps`, not import the concrete implementation.
+Fix: Remove `fulcrum-teams` from core's devDependencies. Core tests should mock `TeamOps`, not import the concrete implementation.
 
 **ARCH-004 (all packages): No `engines` field in any package.json**  
 Fix: Add `"engines": {"node": ">=20"}` to all package.json files.
@@ -262,7 +262,7 @@ Fix: Normalize to `{states, defs}` from `startWorkflow` creation. Remove dual-fo
 
 **WORK-006: `write_artifact` display_id uses non-atomic `COUNT(*)+1`**  
 File: `packages/workflows/src/step-executor.ts:129`  
-Fix: Use `nextDisplayId('artifact', ctx.project_id, db)` from `@moabualruz/fulcrum-core`.
+Fix: Use `nextDisplayId('artifact', ctx.project_id, db)` from `fulcrum-core`.
 
 **WORK-007: `search_web` returns `status: 'completed'` on HTTP errors — failed search looks like empty results**  
 File: `packages/workflows/src/step-executor.ts:464-481`  
@@ -514,7 +514,7 @@ See WORK-003 above.
 - **Parameterized SQL is universal.** Every SQL query across all packages uses `?` placeholders with bound parameters. Zero string-interpolated SQL values found. This completely eliminates SQL injection.
 - **`VALID_TRANSITIONS` state machine** is clean, explicit, and correct (when not bypassed — see CORE-002).
 - **`listTasks()` batch hydration** (2 queries instead of 2×N) correctly eliminates the N+1 pattern.
-- **IoC pattern for `@moabualruz/fulcrum-teams`** (`setTeamOps`/`getTeamOps`) correctly breaks the circular dependency without dynamic import hacks.
+- **IoC pattern for `fulcrum-teams`** (`setTeamOps`/`getTeamOps`) correctly breaks the circular dependency without dynamic import hacks.
 - **Promise coalescing in `warmUp()`** (both `local.ts` and `reranker.ts`) prevents concurrent model loading races.
 - **`withTransaction()` uses `.immediate()` write-lock** — correct for SQLite under concurrent writers.
 - **`FulcrumError` typed-error pattern** with `code` discriminant gives callers clean error classification.

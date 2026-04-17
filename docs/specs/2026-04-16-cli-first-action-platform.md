@@ -35,10 +35,10 @@ Success means:
 Development and verification commands relevant to this feature:
 
 ```bash
-pnpm --filter @moabualruz/fulcrum-cli test
-pnpm --filter @moabualruz/fulcrum-cli vitest run src/tests/tool-registry.test.ts
-pnpm --filter @moabualruz/fulcrum-cli vitest run src/tests/mcp-server.test.ts
-pnpm --filter @moabualruz/fulcrum-cli vitest run src/tests/cli-coverage.test.ts
+pnpm --filter fulcrum-cli test
+pnpm --filter fulcrum-cli vitest run src/tests/tool-registry.test.ts
+pnpm --filter fulcrum-cli vitest run src/tests/mcp-server.test.ts
+pnpm --filter fulcrum-cli vitest run src/tests/cli-coverage.test.ts
 pnpm test
 ```
 

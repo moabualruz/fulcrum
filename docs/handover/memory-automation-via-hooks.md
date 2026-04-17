@@ -62,12 +62,12 @@ The user's framing: *"the extensions and plugins and hooks should automate the m
 
 ## Open questions for research (do this first in the new session)
 
-The user specifically asked: **"check how does openclaw and hermis go about their memory"** — these are likely:
+The user specifically asked: **"check how does prior-art and hermis go about their memory"** — these are likely:
 
-- **"openclaw"** → most likely **OpenCode** (sst/opencode), but could also mean the emerging "OpenClaude" OSS fork. Start with `https://github.com/sst/opencode` and grep their repo for `memory`, `recall`, `embedding`, `hook`.
-- **"hermis"** → most likely **Hermes** — ambiguous; could be:
-  - NousResearch/Hermes-series models (less likely — these are models, not memory systems).
-  - Hermes memory library if such exists.
+- **"prior-art"** → most likely **OpenCode** (sst/opencode), but could also mean the emerging "OpenClaude" OSS fork. Start with `https://github.com/sst/opencode` and grep their repo for `memory`, `recall`, `embedding`, `hook`.
+- **"hermis"** → most likely **prior art** — ambiguous; could be:
+  - NousResearch/prior art-series models (less likely — these are models, not memory systems).
+  - prior art memory library if such exists.
   - Some other agent framework the user has in mind.
   - Confirm with the user on session start if the identity is unclear.
 
@@ -78,7 +78,7 @@ What to extract from each:
 4. Do they distinguish generic project context from file-scoped context?
 5. How do they handle the "user hasn't spoken yet" problem at session start?
 
-Write up findings in `docs/research/memory-patterns-openclaw-hermis.md` and cross-reference with the plan before implementing — their patterns may change design choices.
+Write up findings in `docs/research/memory-patterns-hooks-and-scoring.md` and cross-reference with the plan before implementing — their patterns may change design choices.
 
 ---
 
@@ -113,9 +113,9 @@ Start here:
 1. Read docs/handover/memory-automation-via-hooks.md for full context.
 2. Read ~/.claude/plans/curried-dazzling-toucan.md for the implementation plan.
 3. FIRST TASK (research, before coding): the user previously said "check how does
-   openclaw and hermis go about their memory" — likely OpenCode (sst/opencode)
-   and Hermes (identity unclear, confirm if needed). Investigate their hook/memory
-   patterns, write findings to docs/research/memory-patterns-openclaw-hermis.md,
+   prior-art and hermis go about their memory" — likely OpenCode (sst/opencode)
+   and prior art (identity unclear, confirm if needed). Investigate their hook/memory
+   patterns, write findings to docs/research/memory-patterns-prior-art-hermis.md,
    and report back BEFORE touching code. Cross-check whether their approach
    changes our design.
 4. THEN implement the plan in this order:
@@ -127,7 +127,7 @@ Start here:
    d. Mirror PreToolUse pattern into Codex config.toml.
    e. Run the verification plan in the handover doc.
 5. Throughout: respect the "global-only data" hard rule — never write DB/vault
-   under the project dir. Use globalDataDir() from @fulcrum/core.
+   under the project dir. Use globalDataDir() from fulcrum-core.
 
 Constraints:
 - Claude Code PreToolUse CANNOT inject context. Don't try to make it work there.

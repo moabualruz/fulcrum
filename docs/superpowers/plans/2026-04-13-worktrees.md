@@ -1,10 +1,10 @@
-# @moabualruz/fulcrum-worktrees Implementation Plan
+# fulcrum-worktrees Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the `@moabualruz/fulcrum-worktrees` package — git worktree lifecycle management (allocate → dirty → ready_for_merge → merged/discarded), artifact and review records, handoffs, artifact contracts, and a policy-gated merge queue for integration workers.
+**Goal:** Build the `fulcrum-worktrees` package — git worktree lifecycle management (allocate → dirty → ready_for_merge → merged/discarded), artifact and review records, handoffs, artifact contracts, and a policy-gated merge queue for integration workers.
 
-**Architecture:** New `packages/worktrees/` package depends on `@moabualruz/fulcrum-core` for DB access (`getDb()`/`setDb()`). All tables are created in MIGRATION_007 which is added to `runMigrations()` in `@moabualruz/fulcrum-core`. The merge queue is FIFO by `created_at` and is gated by a `callerRole` check — only `integration_worker` may call `processMergeQueue`. Tests use an in-memory SQLite database via `setDb(db)`.
+**Architecture:** New `packages/worktrees/` package depends on `fulcrum-core` for DB access (`getDb()`/`setDb()`). All tables are created in MIGRATION_007 which is added to `runMigrations()` in `fulcrum-core`. The merge queue is FIFO by `created_at` and is gated by a `callerRole` check — only `integration_worker` may call `processMergeQueue`. Tests use an in-memory SQLite database via `setDb(db)`.
 
 **Tech Stack:** TypeScript ESM, better-sqlite3, ulidx, vitest (pool: 'forks')
 
@@ -14,7 +14,7 @@
 
 ```
 packages/worktrees/
-  package.json                     — name: @moabualruz/fulcrum-worktrees, dep: @moabualruz/fulcrum-core
+  package.json                     — name: fulcrum-worktrees, dep: fulcrum-core
   tsconfig.json                    — mirrors packages/core/tsconfig.json
   vitest.config.ts                 — pool: forks
   src/
@@ -40,7 +40,7 @@ packages/worktrees/
 
 ```json
 {
-  "name": "@moabualruz/fulcrum-worktrees",
+  "name": "fulcrum-worktrees",
   "version": "0.0.1",
   "type": "module",
   "main": "./src/index.ts",
@@ -53,7 +53,7 @@ packages/worktrees/
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@moabualruz/fulcrum-core": "workspace:*",
+    "fulcrum-core": "workspace:*",
     "ulidx": "^2.3.0"
   },
   "devDependencies": {
@@ -120,13 +120,13 @@ cd /home/mkh/workspace/pi-stack-plan
 pnpm install
 ```
 
-Expected: `@moabualruz/fulcrum-worktrees` appears in workspace. No errors.
+Expected: `fulcrum-worktrees` appears in workspace. No errors.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add packages/worktrees/package.json packages/worktrees/tsconfig.json packages/worktrees/vitest.config.ts packages/worktrees/src/index.ts
-git commit -m "chore(worktrees): scaffold @moabualruz/fulcrum-worktrees package"
+git commit -m "chore(worktrees): scaffold fulcrum-worktrees package"
 ```
 
 ---
@@ -432,7 +432,7 @@ git commit -m "feat(worktrees): add MIGRATION_007 schema"
 // packages/worktrees/src/tests/worktrees.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { setDb } from '@moabualruz/fulcrum-core'
+import { setDb } from 'fulcrum-core'
 import { runMigration007 } from '../schema.js'
 import {
   allocateWorktree,
@@ -718,7 +718,7 @@ git commit -m "test(worktrees): add failing tests for worktree lifecycle"
 ```typescript
 // packages/worktrees/src/worktrees.ts
 import { ulid } from 'ulidx'
-import { getDb } from '@moabualruz/fulcrum-core'
+import { getDb } from 'fulcrum-core'
 import type {
   Worktree,
   MergeResult,
@@ -958,7 +958,7 @@ cd /home/mkh/workspace/pi-stack-plan
 pnpm -r test 2>&1 | tail -30
 ```
 
-Expected: all packages pass. `@moabualruz/fulcrum-worktrees` shows 8 passing tests.
+Expected: all packages pass. `fulcrum-worktrees` shows 8 passing tests.
 
 - [ ] **Step 2: Final commit (if any cleanup needed)**
 

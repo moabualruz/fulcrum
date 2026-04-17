@@ -3,6 +3,7 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -10,8 +11,8 @@
     "declarationMap": true,
     "incremental": true,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "../.."
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../../agent-integration/install.ts"],
   "exclude": ["node_modules", "dist"]
 }

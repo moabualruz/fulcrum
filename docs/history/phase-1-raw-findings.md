@@ -38,7 +38,7 @@ Sources: `pi_local_first_agent_os_spec.md`, `SPEC_TRACEABILITY.md`,
 
 **[A1-004] Epic/Issue/PRD/Plan/Review/Artifact CRUD in wrong package**
 - Spec: §5.1-5.2 all 20 core object types need unified access
-- Evidence: Planning ops in `@moabualruz/fulcrum-planning`, no re-export from `@moabualruz/fulcrum-core`; no Artifact CRUD anywhere
+- Evidence: Planning ops in `fulcrum-planning`, no re-export from `fulcrum-core`; no Artifact CRUD anywhere
 - Fix: Re-export from core or add facade
 
 **[A1-005] Artifact object type missing entirely**
@@ -68,7 +68,7 @@ Sources: `pi_local_first_agent_os_spec.md`, `SPEC_TRACEABILITY.md`,
 
 **[A1-010] SyncState not accessible from core**
 - Spec: §22 Plane Adapter — 15 sync-allowed types, local-wins conflict
-- Evidence: `@moabualruz/fulcrum-sync` separate, no core facade for sync state queries
+- Evidence: `fulcrum-sync` separate, no core facade for sync state queries
 - Fix: Re-export sync state queries from core
 
 ### IMPORTANT
@@ -100,17 +100,17 @@ Sources: `pi_local_first_agent_os_spec.md`, `SPEC_TRACEABILITY.md`,
 
 **[A1-016] Workflow subsystem incomplete**
 - Spec: §12/§13/§23 — thin DAG runner with 15+ step types, handoff packets, resumability, 4 promoted workflows
-- Evidence: `@moabualruz/fulcrum-workflows` package may be stub; need to verify engine.ts/steps.ts/handoff
+- Evidence: `fulcrum-workflows` package may be stub; need to verify engine.ts/steps.ts/handoff
 - Fix: Audit + implement missing pieces
 
 **[A1-017] Teams subsystem not integrated with core**
 - Spec: §15 — only L1 creates/invokes teams
-- Evidence: `@moabualruz/fulcrum-teams` separate; no `invokeTeam` exported from core
+- Evidence: `fulcrum-teams` separate; no `invokeTeam` exported from core
 - Fix: Facade in core
 
 **[A1-018] Worktrees package separate from core**
 - Spec: §18 — merge queue, conflict handling, sequential fallback for non-git
-- Evidence: `@moabualruz/fulcrum-worktrees` separate; no core exports
+- Evidence: `fulcrum-worktrees` separate; no core exports
 - Fix: Re-export or facade
 
 **[A1-019] Memory scope 'task' missing**

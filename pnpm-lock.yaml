@@ -314,6 +314,9 @@ importers:
       fulcrum-core:
         specifier: workspace:*
         version: link:../core
+      fulcrum-memory:
+        specifier: workspace:*
+        version: link:../memory
       fulcrum-policy:
         specifier: workspace:*
         version: link:../policy
@@ -367,6 +370,9 @@ importers:
       fulcrum-core:
         specifier: workspace:*
         version: link:../core
+      fulcrum-memory:
+        specifier: workspace:*
+        version: link:../memory
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.12

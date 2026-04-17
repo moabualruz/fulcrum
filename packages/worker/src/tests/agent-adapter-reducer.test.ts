@@ -41,13 +41,13 @@ describe('reduceAgentAdapter', () => {
       version: '2.0.0',
       workspace_id: 'ws_1',
     }
-    await reduceAgentAdapter(client as Parameters<typeof reduceAgentAdapter>[0], input)
+    await reduceAgentAdapter(client as unknown as Parameters<typeof reduceAgentAdapter>[0], input)
     expect(client.query).toHaveBeenCalled()
   })
 
   it('is a no-op when client is not ready', async () => {
     const client = { ...mockClient(), isReady: false }
-    await reduceAgentAdapter(client as Parameters<typeof reduceAgentAdapter>[0], {
+    await reduceAgentAdapter(client as unknown as Parameters<typeof reduceAgentAdapter>[0], {
       executor_uri: 'pi://',
       model: 'claude-haiku-4-5',
       version: '1.0.0',

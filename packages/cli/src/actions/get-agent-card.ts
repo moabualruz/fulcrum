@@ -11,10 +11,10 @@ const BASE_URL = process.env['FULCRUM_BASE_URL'] ?? 'http://127.0.0.1:4721'
 export function getAgentCard(role: string, db: Db = getDb()): Record<string, unknown> | null {
   const def = getAgentDefinition(role, undefined, db)
   if (!def) return null
-  return buildA2ACard(def, `${BASE_URL}/agents/${role}`) as Record<string, unknown>
+  return buildA2ACard(def, `${BASE_URL}/agents/${role}`) as unknown as Record<string, unknown>
 }
 
 export function listAgentCards(db: Db = getDb()): Record<string, unknown>[] {
   const defs = listAgentDefinitions(undefined, undefined, db)
-  return defs.map(def => buildA2ACard(def, `${BASE_URL}/agents/${def.role}`) as Record<string, unknown>)
+  return defs.map(def => buildA2ACard(def, `${BASE_URL}/agents/${def.role}`) as unknown as Record<string, unknown>)
 }

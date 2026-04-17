@@ -1,6 +1,6 @@
 # Policy Engine
 
-`@moabualruz/fulcrum-policy` enforces role boundaries, custom rules, and secret detection.
+`fulcrum-policy` enforces role boundaries, custom rules, and secret detection.
 
 ---
 
@@ -23,7 +23,7 @@ Priority 1000, evaluated before any DB-defined rules. All five check capabilitie
 ## Custom Rules
 
 ```typescript
-import { createPolicyRule, evaluatePolicy } from '@moabualruz/fulcrum-policy'
+import { createPolicyRule, evaluatePolicy } from 'fulcrum-policy'
 
 await createPolicyRule({
   workspace_id: 'ws_1',
@@ -47,7 +47,7 @@ const decision = await evaluatePolicy({
 ## Secret Guard
 
 ```typescript
-import { checkSecrets, redactSecrets } from '@moabualruz/fulcrum-policy'
+import { checkSecrets, redactSecrets } from 'fulcrum-policy'
 
 const result = checkSecrets(text)
 // { has_secrets: true, matches: [{ pattern_name: 'anthropic_api_key', match: 'sk-ant-...', index: 22 }] }

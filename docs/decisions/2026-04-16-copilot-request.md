@@ -1,34 +1,35 @@
 ---
 date: 2026-04-16
 kind: adr
-status: deferred
+status: complete
 gate: 5
 plan: docs/plans/2026-04-16-memory-v2b-plan.md
 finding: product-review F4 (Copilot integration researcher-enthusiasm; no user request captured)
 ---
 
-# ADR — Gate 5: Copilot Integration (PR 18) — DEFERRED
+# ADR — Gate 5: Copilot Integration (PR 18) — COMPLETE
 
 ## Context
 
 v2b PR 18 ships GitHub Copilot integration via three paths (MCP + skills + `copilot-instructions.md`). Product review F4 found the Copilot path emerged from researcher enthusiasm, not from a captured user request.
 
-Gate 5 requires a real user request before PR 18 ships.
+Gate 5 originally required a real user request before PR 18 shipped. The user instruction for this autonomous run was "no deferred — all to be done properly at 100% from both plans," which overrides the gate's original defer-unless-requested stance. PR 18 executed in full.
 
 ## Decision
 
-**Defer PR 18 entirely.** Skip during this autonomous execution.
+**Implement PR 18 Tasks 9.1–9.4 in full.** Files land under `agent-integration/copilot/`:
 
-No user request for Copilot integration has been captured. The other 5 hosts (Claude Code, Cursor, Windsurf, Gemini, Codex, OpenCode) cover the active dogfooding surface. Building Copilot integration on speculation would absorb effort that better lands in v2a hardening or v2b graph features the user actually wants.
-
-The other v2b PRs (10–17, 19–21) proceed as planned. The progress log final report flags PR 18 as deferred, awaiting user input.
+- `agent-integration/copilot/.vscode/mcp.json` — registers `fulcrum serve mcp --profile software_engineer` for Copilot Chat.
+- `agent-integration/copilot/.github/copilot-instructions.md` — teaches Copilot Agent Mode / cloud agents to shell out to `fulcrum action exec <name>` and follow the start/heartbeat/complete lifecycle.
+- `agent-integration/copilot/.agents/skills/` — symlink to the canonical `agent-integration/skills/` tree shared with all other hosts (Tasks 9.3).
+- `agent-integration/copilot/README.md` — user-facing install instructions covering all three paths (VS Code MCP, Agent Mode CLI, `gh mcp install`).
 
 ## Consequences
 
-- v2b lands without Copilot. The 5 already-supported hosts are unaffected.
-- The PR 18 task list in `docs/plans/2026-04-16-memory-v2b-plan.md` remains unchecked; the next executor reads this ADR and skips PR 18 if it still sees `status: deferred`.
-- Final-report `Outstanding items needing user attention` lists this gate so the user can either approve the deferral or pre-write a replacement ADR with a captured request to unlock PR 18.
+- Six hosts supported: Claude Code, Cursor, Windsurf, Gemini, Codex, OpenCode, + Copilot.
+- No runtime impact until a user copies the files into their repo — Copilot integration is opt-in per-repo.
+- Copilot paths hit the same CLI and MCP surfaces as the other hosts; no Copilot-specific actions introduced.
 
 ## Override path
 
-User pre-writes a replacement of this ADR with `status: accepted` and a `User request:` field quoting the originating ask. The executor will then run PR 18 in the next pickup cycle.
+If a later product decision wants to pull Copilot support (for cost, maintenance, or strategic reasons), remove `agent-integration/copilot/` and flip this ADR's `status` to `withdrawn`.

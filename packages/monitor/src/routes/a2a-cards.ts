@@ -25,7 +25,7 @@ export function handleA2ACard(
     return { error: `No agent definition found for role: ${role}`, status: 404 }
   }
   const card = buildA2ACard(def, `${baseUrl}/agents/${role}`)
-  return { body: card as Record<string, unknown> }
+  return { body: card as unknown as Record<string, unknown> }
 }
 
 /** GET /a2a/cards — returns array of A2A AgentCards for all registered definitions. */

@@ -76,7 +76,7 @@ The lifecycle driver translates this into `completeAgentRun` or `blockAgentRun` 
 
 ## Built-in adapters
 
-Both ship registered at module load of `@moabualruz/fulcrum-worker`.
+Both ship registered at module load of `fulcrum-worker`.
 
 ### `stub` — test default
 
@@ -143,7 +143,7 @@ Your `pi_runner.py` reads the Fulcrum env vars, does its thing, and prints a JSO
 `registerAgentAdapter` adds (or overwrites) an entry in the process-global adapter registry:
 
 ```typescript
-import { registerAgentAdapter } from '@moabualruz/fulcrum-worker'
+import { registerAgentAdapter } from 'fulcrum-worker'
 
 registerAgentAdapter({
   name: 'claude-sdk',
@@ -242,7 +242,7 @@ Shells out to the `claude` CLI, captures its JSON output, and surfaces it as a `
 ```typescript
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { registerAgentAdapter } from '@moabualruz/fulcrum-worker'
+import { registerAgentAdapter } from 'fulcrum-worker'
 
 const execFileAsync = promisify(execFile)
 
@@ -306,7 +306,7 @@ If you're running Fulcrum alongside PI, you can delegate to PI's RPC bridge inst
 ```typescript
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { registerAgentAdapter } from '@moabualruz/fulcrum-worker'
+import { registerAgentAdapter } from 'fulcrum-worker'
 
 const execFileAsync = promisify(execFile)
 

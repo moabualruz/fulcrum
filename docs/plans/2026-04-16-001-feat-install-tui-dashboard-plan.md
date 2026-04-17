@@ -234,7 +234,7 @@ prompt: "Restart Claude Code to load the MCP server"
 - The `/events/stream` route handler creates a `ReadableStream`, adds its controller to the set, and removes it on `abort` signal close.
 - Preserve the `Last-Event-ID` resume path: when a client reconnects with `Last-Event-ID`, do a single DB query for events after that ID, stream them, then switch to live push.
 - Remove the `setInterval` poll loop from the live-push path. Keep a reduced-frequency poll (500ms) only for the subprocess-monitor case: detect subprocess vs in-process by whether `getEventBus().listenerCount('*') > 0` — or add an explicit `isInProcess: boolean` flag to `MonitorServerConfig`.
-- Import `getEventBus` from `@moabualruz/fulcrum-core`.
+- Import `getEventBus` from `fulcrum-core`.
 
 **Patterns to follow:**
 - `packages/monitor/src/server.ts` existing `/events/stream` route for SSE framing
@@ -467,7 +467,7 @@ prompt: "Restart Claude Code to load the MCP server"
 
 **Approach:**
 - Auth middleware: Hono middleware that reads `Authorization: Bearer <token>` header on POST/PATCH routes. If `FULCRUM_MONITOR_TOKEN` env var is set, enforce it. If absent (development mode), allow all requests. Middleware is applied only to mutation routes (not GET routes or SSE).
-- Each mutation endpoint is a thin proxy to the ToolRegistry: import `TOOL_REGISTRY` from `@moabualruz/fulcrum-cli` — wait, circular dep risk. Instead, import the domain function directly: `updateTask()` from `@moabualruz/fulcrum-core`, `blockAgentRun()`/`completeAgentRun()` from `@moabualruz/fulcrum-core`, `approveReview()` from the appropriate package.
+- Each mutation endpoint is a thin proxy to the ToolRegistry: import `TOOL_REGISTRY` from `fulcrum-cli` — wait, circular dep risk. Instead, import the domain function directly: `updateTask()` from `fulcrum-core`, `blockAgentRun()`/`completeAgentRun()` from `fulcrum-core`, `approveReview()` from the appropriate package.
 - Request body is parsed via `c.req.json()`. Validate required fields; return `{ error: '...' }` with 400 on validation failure.
 - Return `{ data: updatedObject }` on success, following the existing monitor response shape.
 - `POST /runs/:id/kill` — sets run status to `aborted` via `terminateAgentRun()` (or equivalent in `packages/core/src/runs.ts`).
@@ -627,7 +627,7 @@ prompt: "Restart Claude Code to load the MCP server"
 
 ## System-Wide Impact
 
-- **Interaction graph:** `blockAgentRun()` in `@moabualruz/fulcrum-core/src/runs.ts` gains a notification side-effect. All SSE consumers (TUI, browser web UI) benefit from the event bus bridge. `main()` in `packages/cli/src/index.ts` now stores plugin `additionalTools` at module level — test isolation may require resetting this between test cases.
+- **Interaction graph:** `blockAgentRun()` in `fulcrum-core/src/runs.ts` gains a notification side-effect. All SSE consumers (TUI, browser web UI) benefit from the event bus bridge. `main()` in `packages/cli/src/index.ts` now stores plugin `additionalTools` at module level — test isolation may require resetting this between test cases.
 - **Error propagation:** Notification errors in `notifyBlocked()` are swallowed after logging to stderr. SSE controller enqueue errors (e.g., connection reset) are caught per-controller — one broken connection doesn't affect others. Monitor write endpoint errors return structured JSON `{ error }` — never HTML 500s.
 - **State lifecycle risks:** The `_pluginAdditionalTools` module-level variable in `index.ts` is set once in `main()`. If `main()` is called multiple times (test context), it must be reset. Consider using a function-scoped approach or explicitly resetting in test setup.
 - **API surface parity:** The monitor write endpoints expose the same behavior as MCP tool calls — they must remain in sync if tool handler behavior changes. Adding a new tool that creates/modifies domain entities should prompt adding the corresponding monitor write endpoint.

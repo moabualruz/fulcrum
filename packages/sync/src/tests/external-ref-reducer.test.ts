@@ -25,7 +25,7 @@ describe('reduceExternalRef', () => {
       workspace_id: 'ws_1',
       fulcrum_task_id: 'tsk_001',
     }
-    await reduceExternalRef(client as Parameters<typeof reduceExternalRef>[0], input)
+    await reduceExternalRef(client as unknown as Parameters<typeof reduceExternalRef>[0], input)
     expect(client.query).toHaveBeenCalled()
   })
 
@@ -39,13 +39,13 @@ describe('reduceExternalRef', () => {
       workspace_id: 'ws_1',
       fulcrum_task_id: 'tsk_002',
     }
-    await reduceExternalRef(client as Parameters<typeof reduceExternalRef>[0], input)
+    await reduceExternalRef(client as unknown as Parameters<typeof reduceExternalRef>[0], input)
     expect(client.query).toHaveBeenCalled()
   })
 
   it('is a no-op when client is not ready', async () => {
     const client = { ...mockClient(), isReady: false }
-    await reduceExternalRef(client as Parameters<typeof reduceExternalRef>[0], {
+    await reduceExternalRef(client as unknown as Parameters<typeof reduceExternalRef>[0], {
       adapter: ADAPTER_JIRA,
       external_id: 'JIRA-001',
       title: 'test',

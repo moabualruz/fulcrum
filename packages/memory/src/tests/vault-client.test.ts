@@ -18,6 +18,7 @@ const baseMemory: FullMemory = {
   symbol_path: null,
   title: 'Use Kuzu for L2',
   summary: 'Chose Kuzu for embeddability',
+  content: 'Full body content here.',
   canonical_text: 'Full body content here.',
   tags: ['architecture'],
   entities: [],

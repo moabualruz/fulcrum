@@ -18,8 +18,8 @@ Fulcrum is structurally sound but diverges from industry standards at every inte
 The 7 Critical gaps are the ones that prevent Fulcrum from being a trustworthy, deployable reference:
 1. No CSRF (Origin) protection on MCP HTTP transport
 2. No authentication on MCP HTTP transport
-3. `@moabualruz/fulcrum-core` ↔ `@moabualruz/fulcrum-teams` circular dependency
-4. `@moabualruz/fulcrum-policy` depends on `@moabualruz/fulcrum-teams` (enforcement layer below domain)
+3. `fulcrum-core` ↔ `fulcrum-teams` circular dependency
+4. `fulcrum-policy` depends on `fulcrum-teams` (enforcement layer below domain)
 5. Plugin discovery is dead code — never wired into the CLI
 6. All 24 agent roles seeded with `system_prompt = NULL`
 7. Skill files exist in `agent-integration/skills/` but are not installed where Claude Code loads them from
@@ -236,23 +236,23 @@ Fix: Parse import declarations during ingest, emit `USES` edges between file-lev
 
 ### Critical
 
-**GAP-ARCH-1: Confirmed circular — `@moabualruz/fulcrum-core` ↔ `@moabualruz/fulcrum-teams`**  
-`packages/core/src/index.ts:138` — dynamic `await import('@moabualruz/fulcrum-teams')` workaround inside `getTeamOps()`.  
-`packages/teams/src/teams.ts:2` — static import from `@moabualruz/fulcrum-core`.  
+**GAP-ARCH-1: Confirmed circular — `fulcrum-core` ↔ `fulcrum-teams`**  
+`packages/core/src/index.ts:138` — dynamic `await import('fulcrum-teams')` workaround inside `getTeamOps()`.  
+`packages/teams/src/teams.ts:2` — static import from `fulcrum-core`.  
 madge confirms 2 cycles through `scheduler.ts` and `teams.ts`.  
-Fix: `TeamOps` interface (already in `core/team-ops.ts`) belongs in core or a zero-dep `@fulcrum/types` package; `@moabualruz/fulcrum-teams` implements it — no runtime dynamic import needed.
+Fix: `TeamOps` interface (already in `core/team-ops.ts`) belongs in core or a zero-dep `fulcrum-types` package; `fulcrum-teams` implements it — no runtime dynamic import needed.
 
-**GAP-ARCH-2: Layer violation — `@moabualruz/fulcrum-policy` depends on `@moabualruz/fulcrum-teams`**  
-`packages/policy/package.json` — `@moabualruz/fulcrum-teams` listed as direct dependency.  
+**GAP-ARCH-2: Layer violation — `fulcrum-policy` depends on `fulcrum-teams`**  
+`packages/policy/package.json` — `fulcrum-teams` listed as direct dependency.  
 Enforcement layer must sit below domain packages.  
-Fix: `TeamContext` interface in `@moabualruz/fulcrum-core`; policy accepts it as data, `@moabualruz/fulcrum-teams` satisfies it at call site.
+Fix: `TeamContext` interface in `fulcrum-core`; policy accepts it as data, `fulcrum-teams` satisfies it at call site.
 
 ### Major
 
 **GAP-ARCH-3: CLI `index.ts` exports library-level hook types**  
 `packages/cli/src/index.ts` — exports `HookCli`, `NormalizedHookEvent`, `HookContext`, `runPreHook`, `runPostHook`, etc.  
 Application entrypoints should not re-export business logic.  
-Fix: Move hook types to `@moabualruz/fulcrum-core`; CLI `index.ts` becomes a pure dispatch script.
+Fix: Move hook types to `fulcrum-core`; CLI `index.ts` becomes a pure dispatch script.
 
 **GAP-ARCH-4: Wildcard `export *` in teams, policy, workflows**  
 `packages/teams/src/index.ts`, `packages/policy/src/index.ts`, `packages/workflows/src/index.ts`.  
@@ -269,16 +269,16 @@ Fix: Accept optional `db` parameter on functions that need DB; singleton stays a
 Contrast with `WorkflowRegistry` which has `register(def)`.  
 Fix: `registerEmbeddingProvider(name, factory)` — built-ins self-register at module load.
 
-**GAP-ARCH-7: Config loading duplicated in `@moabualruz/fulcrum-memory`**  
+**GAP-ARCH-7: Config loading duplicated in `fulcrum-memory`**  
 `packages/memory/src/setup/wizard.ts:30-45` — reimplements `getFulcrumConfigPath()`/`readFulcrumConfig()`/`writeFulcrumConfig()`.  
 `packages/memory/src/vault/client.ts:20` — reads `FULCRUM_VAULT_PATH` directly instead of via `loadConfig`.  
-Fix: Expose `readRawConfig()`/`writeRawConfig()` from `@moabualruz/fulcrum-core`; delete duplicates.
+Fix: Expose `readRawConfig()`/`writeRawConfig()` from `fulcrum-core`; delete duplicates.
 
 ### Minor
 
 **GAP-ARCH-8**: No event bus — cross-package coordination uses direct imports (no loose coupling mechanism)  
 **GAP-ARCH-9**: Peer dependency presence not validated at runtime — missing peer gives opaque `Cannot find module`  
-**GAP-ARCH-10**: `globalDataDir()` duplicated in `packages/cli/src/index.ts:509-516` vs `@moabualruz/fulcrum-core`  
+**GAP-ARCH-10**: `globalDataDir()` duplicated in `packages/cli/src/index.ts:509-516` vs `fulcrum-core`  
 
 ---
 

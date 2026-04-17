@@ -42,7 +42,7 @@ Before ordering tasks, here are the cross-plan conflicts resolved in this master
 ### Conflict 1: P5-Task-5.1 vs P6-Task-6.2 (same work)
 
 Both plans require consolidating the duplicate `writeMemory`/`recallMemory` in
-`@moabualruz/fulcrum-core`. **Resolution:** P6-Task-6.2 does this work; P5-Task-5.1 is
+`fulcrum-core`. **Resolution:** P6-Task-6.2 does this work; P5-Task-5.1 is
 removed as a duplicate. P5 starts from Task 5.2 (Kuzu node creation).
 
 ### Conflict 2: P0-Task-0.7 vs P2-Task-2.3 (same work: subagent MDs)
@@ -81,7 +81,7 @@ one module per PR. Do not do it in the same PR as any other P6 task.
 
 ```
 Wave 1 (foundation — do first, blocks everything):
-  P6-T6.1  Extract @fulcrum/kernel
+  P6-T6.1  Extract fulcrum-kernel
   P6-T6.2  Delete duplicate implementations (memory/policy in core)
   P1-T1.1  Extract tool catalogue to mcp-tools.ts
   P6-T6.4  Per-package exports maps
@@ -140,7 +140,7 @@ Wave 5 (features + hardening):
   P5-T5.7  Instruction prefixes + Matryoshka (depends: P5-T5.6)
   P5-T5.8  Tree-sitter AST chunker (independent)
   P6-T6.9  Plugin discovery (depends: P6-T6.5 build)
-  P6-T6.10 @fulcrum/e2e workspace (depends: P0-T0.3 E2E test)
+  P6-T6.10 fulcrum-e2e workspace (depends: P0-T0.3 E2E test)
 
 Wave 6 (scale + polish):
   P0-T0.8  Stub-handler sweep (independent)
@@ -180,24 +180,24 @@ Wave 6 (scale + polish):
 
 ### Wave 1 — Foundation
 
-#### Task 1 — Extract `@fulcrum/kernel`
+#### Task 1 — Extract `fulcrum-kernel`
 > See: [P6-Task-6.1](../../audit/plans/p6-modular-architecture.md#task-61----extract-fulcrumkernel-f6-issue-01-critical)
 
 - [ ] Create `packages/kernel/package.json` with zero internal deps
-- [ ] Move `ids.ts`, pure types, error classes, constants from `@moabualruz/fulcrum-core`
-- [ ] Update all internal imports to use `@fulcrum/kernel`
+- [ ] Move `ids.ts`, pure types, error classes, constants from `fulcrum-core`
+- [ ] Update all internal imports to use `fulcrum-kernel`
 - [ ] Run `pnpm test` — all green
-- [ ] Commit: `feat(kernel): extract @fulcrum/kernel leaf package`
+- [ ] Commit: `feat(kernel): extract fulcrum-kernel leaf package`
 
 #### Task 2 — Delete duplicate implementations
 > See: [P6-Task-6.2](../../audit/plans/p6-modular-architecture.md#task-62----delete-duplicate-implementations-f6-issue-09-critical)
 > Also covers: [P5-Task-5.1](../../audit/plans/p5-memory-rag.md#task-51----consolidate-writememory--recallmemory-f5-issue-10-critical)
 
 - [ ] Find all callers of `writeMemory`/`recallMemory` in `packages/core/`
-- [ ] Replace with re-exports from `@moabualruz/fulcrum-memory`
+- [ ] Replace with re-exports from `fulcrum-memory`
 - [ ] Verify policy de-duplication similarly
 - [ ] Run `pnpm test` — all green
-- [ ] Commit: `refactor(core): remove duplicate memory/policy — re-export from @moabualruz/fulcrum-memory`
+- [ ] Commit: `refactor(core): remove duplicate memory/policy — re-export from fulcrum-memory`
 
 #### Task 3 — Extract tool catalogue
 > See: [P1-Task-1.1](../../audit/plans/p1-mcp-server.md#task-11----extract-tool-catalogue-precursor-to-sdk-migration)
@@ -349,7 +349,7 @@ Wave 6 (scale + polish):
 - [ ] Create `tests/e2e/claude-session.test.ts`
   — simulate SessionStart → PreToolUse → PostToolUse → Stop
   — assert: session.json created, trace_events rows, agent_runs.status = 'completed'
-- [ ] Add `@fulcrum/e2e` workspace (or place in root `tests/`)
+- [ ] Add `fulcrum-e2e` workspace (or place in root `tests/`)
 - [ ] Add to CI: `pnpm test:e2e`
 - [ ] Commit: `test(e2e): Claude session lifecycle — full hook sequence`
 
@@ -619,9 +619,9 @@ Wave 6 (scale + polish):
 #### Task 51 — Thread `Db` port (incremental — high risk)
 > See: [P6-Task-6.7](../../audit/plans/p6-modular-architecture.md#task-67----thread-db-port-f6-issue-11-high)
 
-- [ ] PR 1: `@moabualruz/fulcrum-memory` write/recall accept `db` param (already does? verify)
-- [ ] PR 2: `@moabualruz/fulcrum-core` tasks CRUD accepts `db` param
-- [ ] PR 3: `@moabualruz/fulcrum-teams` scheduler accepts `db` param
+- [ ] PR 1: `fulcrum-memory` write/recall accept `db` param (already does? verify)
+- [ ] PR 2: `fulcrum-core` tasks CRUD accepts `db` param
+- [ ] PR 3: `fulcrum-teams` scheduler accepts `db` param
 - [ ] PR 4: CLI passes `db` explicitly; remove `getDb()` calls
 - [ ] PR 5: Delete `getDb()` singleton
 - [ ] Commit per PR: `refactor(core): thread Db port in <module>`
@@ -705,10 +705,10 @@ parallel sessions or parallel subagents:
 
 ## Deeper Research (master level)
 
-1. **Ordering risk for Wave 1** — Verify that `@fulcrum/kernel` extraction doesn't
+1. **Ordering risk for Wave 1** — Verify that `fulcrum-kernel` extraction doesn't
    break the `pnpm onlyBuiltDependencies` list in root `package.json`. The native
    modules (`better-sqlite3`, `onnxruntime-node`, etc.) are in the root list;
-   `@fulcrum/kernel` must not accidentally capture any of them.
+   `fulcrum-kernel` must not accidentally capture any of them.
 
 2. **`@modelcontextprotocol/sdk` testing utilities** — Confirm the import path for
    `InMemoryTransport` before writing Task 34. It may be

@@ -24,7 +24,7 @@ describe('recallMemory — compact mode (default)', () => {
     const db = getDb()
     await seedMemories(db)
     const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite' })
-    expect(results.length).toBeGreaterThan(0)
+    expect(Array.isArray(results) ? results.length : 0).toBeGreaterThan(0)
     const first = results[0] as unknown as Record<string, unknown>
     // compact mode must have these fields
     expect(first).toHaveProperty('memory_id')
@@ -195,6 +195,6 @@ describe('recallMemory — hybrid graceful degradation', () => {
     await seedMemories(db)
     // No embedder registered in test environment — recall must still return FTS5 hits
     const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite' })
-    expect(results.length).toBeGreaterThan(0)
+    expect(Array.isArray(results) ? results.length : 0).toBeGreaterThan(0)
   })
 })

@@ -50,20 +50,20 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
 
   if (cliName === 'claude') {
     toolName = (event['tool_name'] as string) ?? ''
-    toolInput = (event['tool_input'] as Record<string, unknown>) ?? {}
+    toolInput = (event['tool_input'] as unknown as Record<string, unknown>) ?? {}
     sessionId = (event['session_id'] as string) ?? 'unknown'
   } else if (cliName === 'gemini') {
     toolName = (event['tool_name'] ?? event['toolName']) as string ?? ''
-    toolInput = (event['tool_input'] ?? event['toolInput'] ?? event['args'] ?? {}) as Record<string, unknown>
+    toolInput = (event['tool_input'] ?? event['toolInput'] ?? event['args'] ?? {}) as unknown as Record<string, unknown>
     sessionId = (event['session_id'] ?? event['conversationId']) as string ?? 'unknown'
   } else if (cliName === 'codex') {
     // Codex CLI hook event shape: { hook_event_name, tool, tool_call_id, input, session_id }
     toolName = (event['tool'] ?? event['tool_name']) as string ?? ''
-    toolInput = (event['input'] ?? event['tool_input'] ?? {}) as Record<string, unknown>
+    toolInput = (event['input'] ?? event['tool_input'] ?? {}) as unknown as Record<string, unknown>
     sessionId = (event['session_id'] as string) ?? process.env['CODEX_SESSION_ID'] ?? 'unknown'
   } else if (cliName === 'pi') {
     toolName = (event['toolName'] ?? event['tool_name']) as string ?? ''
-    toolInput = (event['toolInput'] ?? event['tool_input'] ?? event['args'] ?? {}) as Record<string, unknown>
+    toolInput = (event['toolInput'] ?? event['tool_input'] ?? event['args'] ?? {}) as unknown as Record<string, unknown>
     sessionId = (event['sessionId'] ?? event['session_id']) as string ?? 'unknown'
     agentRole = (event['role'] as string) ?? ''
     runId = (event['runId'] ?? event['run_id']) as string ?? ''
@@ -104,9 +104,9 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
       const { globalDataDir } = await import('fulcrum-core')
       const sessionFile = join(globalDataDir(), 'sessions', `${ctx.sessionId}.json`)
       if (existsSync(sessionFile)) {
-        const session = JSON.parse(readFileSync(sessionFile, 'utf-8')) as Record<string, unknown>
+        const session = JSON.parse(readFileSync(sessionFile, 'utf-8')) as unknown as Record<string, unknown>
         const fetchedAt = session['fetched_at'] as string | undefined
-        const snapshot = session['workspace_snapshot'] as Record<string, unknown> | undefined
+        const snapshot = session['workspace_snapshot'] as unknown as Record<string, unknown> | undefined
         if (snapshot && fetchedAt) {
           const ageMs = Date.now() - new Date(fetchedAt).getTime()
           if (ageMs < 5 * 60 * 1000) {

@@ -24,7 +24,7 @@ Eval design:
 - **Per-eval-row**: `(query, expected_top_memory_ids[], scope, observed_top_memory_ids[], rank_quality_metrics)`.
 - **Quality metrics**: nDCG@10 over expected-memory hits, MRR (mean reciprocal rank of first expected hit), recall@5, plus a per-`kind` slice (decisions, file_patches, task_outcomes separately).
 - **Eval target file**: `packages/memory/src/eval/fulcrum-recall/`.
-- **Build script**: `pnpm --filter @moabualruz/fulcrum-memory eval:fulcrum-recall` — runs the harness against the current `recall_memory` implementation, emits a per-metric report.
+- **Build script**: `pnpm --filter fulcrum-memory eval:fulcrum-recall` — runs the harness against the current `recall_memory` implementation, emits a per-metric report.
 - **CI integration**: regression job that fails the build if nDCG@10 drops by ≥3% from baseline; baseline pinned in `packages/memory/src/eval/fulcrum-recall/baseline.json`.
 
 Where corpus is empty (zero recall events): emit a synthetic seed from the planning ADRs themselves — query: ADR title; expected hit: ADR body. This bootstraps the eval until real data accumulates.

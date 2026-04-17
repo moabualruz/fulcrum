@@ -3,8 +3,8 @@
 // Functions (normalizeHookEvent, runPreHook, runPostHook) live in fulcrum-cli
 // because they depend on fulcrum-policy and fulcrum-memory.
 
-/** The three supported CLI runtimes that can invoke Fulcrum hooks. */
-export type HookCli = 'claude' | 'gemini' | 'pi'
+/** Supported CLI runtimes that can invoke Fulcrum hooks. */
+export type HookCli = 'claude' | 'gemini' | 'pi' | 'codex' | 'opencode' | 'cursor' | 'windsurf'
 
 /** Canonical internal shape of a tool-call event after normalization. */
 export interface NormalizedHookEvent {

@@ -59,25 +59,25 @@ chunking for code. Wire the reranker correctly.
 - `packages/core/src/memory.ts` (re-export or copy)
 
 **Files:**
-- Modify: `packages/core/src/memory.ts` — re-export from `@moabualruz/fulcrum-memory`
-- Modify: any consumers of the core copy — point to `@moabualruz/fulcrum-memory`
+- Modify: `packages/core/src/memory.ts` — re-export from `fulcrum-memory`
+- Modify: any consumers of the core copy — point to `fulcrum-memory`
 - Delete: duplicate implementation in core
 
 **Steps:**
 
 - [ ] `grep -r "writeMemory\|recallMemory" packages/ --include="*.ts"` to find all callers
 
-- [ ] Confirm which implementation is canonical (check `@moabualruz/fulcrum-memory/src/write.ts`
+- [ ] Confirm which implementation is canonical (check `fulcrum-memory/src/write.ts`
   for the one with FTS5 + vec + Kuzu logic)
 
 - [ ] In `packages/core/src/memory.ts`, replace the implementation with:
   ```ts
-  export { writeMemory, recallMemory } from '@moabualruz/fulcrum-memory';
+  export { writeMemory, recallMemory } from 'fulcrum-memory';
   ```
 
 - [ ] Run `pnpm test` — all callers should continue to work
 
-- [ ] Commit: `refactor(memory): consolidate writeMemory/recallMemory to @moabualruz/fulcrum-memory`
+- [ ] Commit: `refactor(memory): consolidate writeMemory/recallMemory to fulcrum-memory`
 
 ---
 
@@ -484,7 +484,7 @@ the final recall result (scores hardcoded to `0.0` — see F1-ISSUE-33).
 
 ## Acceptance criteria
 
-- Single canonical `writeMemory` + `recallMemory` implementation in `@moabualruz/fulcrum-memory`
+- Single canonical `writeMemory` + `recallMemory` implementation in `fulcrum-memory`
 - `writeMemory` creates a Kuzu `Memory` node on every call
 - Retrieval eval harness: recall@5 ≥ 0.7 on fixture dataset
 - RRF fusion in place of weighted sum

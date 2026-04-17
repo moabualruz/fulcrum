@@ -50,7 +50,7 @@ These three gaps form a funnel: users who can't install don't try; users who ins
 - R16. The SSE endpoint at `GET /events/stream` delivers events to connected clients within 50ms of the domain event firing (replacing the current 500ms–2s poll loop).
 - R17. The implementation subscribes the in-process `FulcrumEventBus` (`getEventBus().onAny()`) to the SSE writer set. The `setInterval` poll loop is removed from `packages/monitor/src/server.ts`.
 - R18. `Last-Event-ID` resume behavior is preserved: on reconnect, the monitor replays events from the DB starting after the provided ID before switching to live push.
-- R19. The monitor server must run in the same process as `@moabualruz/fulcrum-core` (already true for `fulcrum serve all`) for the event bus bridge to function.
+- R19. The monitor server must run in the same process as `fulcrum-core` (already true for `fulcrum serve all`) for the event bus bridge to function.
 
 **E. Cockpit TUI (`fulcrum tui`)**
 
@@ -58,7 +58,7 @@ These three gaps form a funnel: users who can't install don't try; users who ins
 - R21. The TUI updates in real time via the SSE event stream. No polling.
 - R22. Keyboard navigation: `tab` to cycle panes, arrow keys to move within a pane, `enter` to select an item, `q` to quit. Item selection shows a detail view (task description, run log, memory content, event payload).
 - R23. Keyboard actions on selected items: `u` on a blocked run → POST `/runs/:id/unblock`; `k` on a running run → POST `/runs/:id/kill`; `n` from the task pane → opens an inline form to create a task; `d` on a task → mark done.
-- R24. The TUI reads from `http://localhost:4721` (same Hono server). When the monitor is not running, it falls back to direct SQLite read via `@moabualruz/fulcrum-core`'s `getDb()` in read-only mode (no keyboard actions that require the monitor).
+- R24. The TUI reads from `http://localhost:4721` (same Hono server). When the monitor is not running, it falls back to direct SQLite read via `fulcrum-core`'s `getDb()` in read-only mode (no keyboard actions that require the monitor).
 - R25. The TUI is implemented in `packages/cli/src/tui/` using the Ink library (React for terminals). It is invoked as `fulcrum tui` via the existing CLI routing.
 - R26. The TUI starts in under 2 seconds on a machine with an active monitor server.
 
@@ -118,7 +118,7 @@ These three gaps form a funnel: users who can't install don't try; users who ins
 
 - **Ink v4 for TUI** (not Blessed or terminal-kit): React model, TypeScript-native, SSR to terminal — same mental model as React without browser. Active maintenance as of 2026.
 - **Vanilla HTML/CSS/JS for web UI** (not React or Svelte): avoids build toolchain; `EventSource` is native to browsers; the monitor is a local dev tool, not a production web app.
-- **Event bus bridge replaces SSE poll loop**: The monitor must run in-process with `@moabualruz/fulcrum-core` for real-time push. This is already true for `fulcrum serve all` (both start in the same Node process). Subprocess monitor mode (when monitor is a child process of MCP server) does not get real-time push — it continues to use DB poll with a reduced 500ms interval.
+- **Event bus bridge replaces SSE poll loop**: The monitor must run in-process with `fulcrum-core` for real-time push. This is already true for `fulcrum serve all` (both start in the same Node process). Subprocess monitor mode (when monitor is a child process of MCP server) does not get real-time push — it continues to use DB poll with a reduced 500ms interval.
 - **`fulcrum hook auto` unified entry point**: Auto-detect from event shape (non-overlapping field sets: Claude has `tool_name`+`session_id`, Gemini has `toolName`+`conversationId`, PI has `role`+`runId`). This collapses the three siloed hook commands into one.
 - **`node-notifier` for desktop notifications**: Cross-platform; gracefully returns on unsupported systems. Alternative (`@napi-rs/notify`) is more ergonomic but adds a native build dependency — rejected.
 - **Bearer token auth for mutation endpoints**: Simple, stateless, and sufficient for a local-only control plane. No session cookies, no CSRF concerns.
@@ -127,7 +127,7 @@ These three gaps form a funnel: users who can't install don't try; users who ins
 
 ## Dependencies / Assumptions
 
-- The monitor server runs in the same process as `@moabualruz/fulcrum-core` when `fulcrum serve all` is used. This is a prerequisite for R16–R19 (event bus bridge). The requirement is already met by the current architecture.
+- The monitor server runs in the same process as `fulcrum-core` when `fulcrum serve all` is used. This is a prerequisite for R16–R19 (event bus bridge). The requirement is already met by the current architecture.
 - `packages/monitor/src/server.ts` has `app.post('/policy/check')` as proof that Hono is wired for writes — all mutation endpoints (R28) follow this established pattern.
 - R1–R7 (init command) require the `fulcrum-mcp` package to be published to npm. The package already exists in the monorepo; publishing is a prerequisite.
 - R37–R40 (plugin activation) depend on `plugin-discovery.ts` already being fully implemented and correct — verified against the codebase; only the call site is missing.

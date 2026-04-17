@@ -55,7 +55,7 @@ describe('ContentChangeBus — v2a PR 4 Task 22a', () => {
   it('off() removes the handler', async () => {
     const bus = getContentChangeBus()
     const seen: ContentChangeEvent[] = []
-    const h = (evt: ContentChangeEvent) => seen.push(evt)
+    const h = (evt: ContentChangeEvent) => { seen.push(evt) }
     bus.on(h)
     bus.off(h)
     bus.emit({ kind: 'code', path: '/p/a', sha256: 'h', change_type: 'change' })

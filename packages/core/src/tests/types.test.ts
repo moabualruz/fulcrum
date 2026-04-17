@@ -67,6 +67,7 @@ describe('type exports — compile-time shape checks', () => {
       progress_pct: 0, output_summary: null, artifacts: null,
       git_branch: null, git_commit: null, heartbeat_at: null,
       blocker: null, worktree_id: null, version: 0,
+      context_type: 'primary', parent_run_id: null,
       started_at: '', updated_at: '', finished_at: null,
     }
     expect(r.display_id).toBe('RUN-1')
@@ -80,7 +81,7 @@ describe('type exports — compile-time shape checks', () => {
       memory_id: 'mem_01', scope: 'project', kind: 'fact',
       workspace_id: 'ws_01', project_id: 'proj_01', file_path: null,
       symbol_path: null, title: 'A fact', summary: 'Short summary',
-      content: 'A fact about the project', canonical_text: null,
+      content: 'A fact about the project', content_type: 'text', canonical_text: null,
       tags: [], entities: [], confidence: 1.0, freshness: 1.0, importance: 0.5,
       access_count: 0, event_time: null, content_hash: null,
       task_id: null, issue_id: null, artifact_id: null,

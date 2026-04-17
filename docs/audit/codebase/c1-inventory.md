@@ -62,17 +62,17 @@ exec "$DIR/node_modules/.bin/tsx" "$DIR/packages/cli/src/index.ts" "$@"
 ```
 /home/mkh/workspace/pi-stack-plan/
 ├── packages/              # 11 packages
-│   ├── core/             # @moabualruz/fulcrum-core (62 src files)
-│   ├── memory/           # @moabualruz/fulcrum-memory (29 src files)
-│   ├── monitor/          # @moabualruz/fulcrum-monitor (5 src files)
-│   ├── planning/         # @moabualruz/fulcrum-planning (8 src files)
-│   ├── policy/           # @moabualruz/fulcrum-policy (5 src files)
-│   ├── sync/             # @moabualruz/fulcrum-sync (7 src files)
-│   ├── teams/            # @moabualruz/fulcrum-teams (5 src files)
-│   ├── workflows/        # @moabualruz/fulcrum-workflows (8 src files)
-│   ├── worker/           # @moabualruz/fulcrum-worker (6 src files)
-│   ├── worktrees/        # @moabualruz/fulcrum-worktrees (4 src files)
-│   └── cli/              # @moabualruz/fulcrum-cli (1 src file: 2211 lines)
+│   ├── core/             # fulcrum-core (62 src files)
+│   ├── memory/           # fulcrum-memory (29 src files)
+│   ├── monitor/          # fulcrum-monitor (5 src files)
+│   ├── planning/         # fulcrum-planning (8 src files)
+│   ├── policy/           # fulcrum-policy (5 src files)
+│   ├── sync/             # fulcrum-sync (7 src files)
+│   ├── teams/            # fulcrum-teams (5 src files)
+│   ├── workflows/        # fulcrum-workflows (8 src files)
+│   ├── worker/           # fulcrum-worker (6 src files)
+│   ├── worktrees/        # fulcrum-worktrees (4 src files)
+│   └── cli/              # fulcrum-cli (1 src file: 2211 lines)
 ├── agent-integration/     # Agent runtime hookups + roles + skills
 │   ├── claude/           # Claude Code MCP + hooks
 │   ├── gemini/           # Gemini CLI extension
@@ -101,19 +101,19 @@ exec "$DIR/node_modules/.bin/tsx" "$DIR/packages/cli/src/index.ts" "$@"
 
 | Package | Files | Tests | Dependencies | Purpose |
 |---------|-------|-------|--------------|---------|
-| @moabualruz/fulcrum-core | 62 | 32 | better-sqlite3, sqlite-vec, @huggingface/transformers, @opentelemetry/* | Core persistence, orchestration, embeddings, telemetry |
-| @moabualruz/fulcrum-memory | 29 | 21 | @moabualruz/fulcrum-core, kuzu, gray-matter, simple-git, chokidar | Three-layer memory (vault L0, FTS5 L1, Kuzu L2) |
-| @moabualruz/fulcrum-monitor | 5 | 3 | @moabualruz/fulcrum-core, hono, @hono/node-server | HTTP dashboard + metrics |
-| @moabualruz/fulcrum-planning | 8 | 7 | @moabualruz/fulcrum-core, ulid | Epics, issues, PRDs, plans, code reviews |
-| @moabualruz/fulcrum-policy | 5 | 4 | @moabualruz/fulcrum-core, @moabualruz/fulcrum-teams, minimatch | Secret guard, audit logging, policy engine |
-| @moabualruz/fulcrum-sync | 7 | 1 | @moabualruz/fulcrum-core, @moabualruz/fulcrum-policy | Plane sync adapter, conflict detection |
-| @moabualruz/fulcrum-teams | 5 | 2 | @moabualruz/fulcrum-core, ulidx | Agent team orchestration, role slots, policies |
-| @moabualruz/fulcrum-workflows | 8 | 2 | @moabualruz/fulcrum-core, (opt: @moabualruz/fulcrum-planning, @moabualruz/fulcrum-teams, @moabualruz/fulcrum-worker), ulidx | Workflow engine, step handlers, runner |
-| @moabualruz/fulcrum-worker | 6 | 1 | @moabualruz/fulcrum-core | Pluggable agent executor, lifecycle, spawning |
-| @moabualruz/fulcrum-worktrees | 4 | 1 | @moabualruz/fulcrum-core, ulidx | Git worktree lifecycle, artifacts, reviews |
-| @moabualruz/fulcrum-cli | 1 | 3 | All others | CLI: 14 command groups, 2211 lines, MCP/monitor servers, hook handlers |
+| fulcrum-core | 62 | 32 | better-sqlite3, sqlite-vec, @huggingface/transformers, @opentelemetry/* | Core persistence, orchestration, embeddings, telemetry |
+| fulcrum-memory | 29 | 21 | fulcrum-core, kuzu, gray-matter, simple-git, chokidar | Three-layer memory (vault L0, FTS5 L1, Kuzu L2) |
+| fulcrum-monitor | 5 | 3 | fulcrum-core, hono, @hono/node-server | HTTP dashboard + metrics |
+| fulcrum-planning | 8 | 7 | fulcrum-core, ulid | Epics, issues, PRDs, plans, code reviews |
+| fulcrum-policy | 5 | 4 | fulcrum-core, fulcrum-teams, minimatch | Secret guard, audit logging, policy engine |
+| fulcrum-sync | 7 | 1 | fulcrum-core, fulcrum-policy | Plane sync adapter, conflict detection |
+| fulcrum-teams | 5 | 2 | fulcrum-core, ulidx | Agent team orchestration, role slots, policies |
+| fulcrum-workflows | 8 | 2 | fulcrum-core, (opt: fulcrum-planning, fulcrum-teams, fulcrum-worker), ulidx | Workflow engine, step handlers, runner |
+| fulcrum-worker | 6 | 1 | fulcrum-core | Pluggable agent executor, lifecycle, spawning |
+| fulcrum-worktrees | 4 | 1 | fulcrum-core, ulidx | Git worktree lifecycle, artifacts, reviews |
+| fulcrum-cli | 1 | 3 | All others | CLI: 14 command groups, 2211 lines, MCP/monitor servers, hook handlers |
 
-### 2.1 @moabualruz/fulcrum-core
+### 2.1 fulcrum-core
 
 **Version:** 0.0.1 | **Type:** ESM | **Private:** yes
 
@@ -125,7 +125,7 @@ exec "$DIR/node_modules/.bin/tsx" "$DIR/packages/cli/src/index.ts" "$@"
   - `@huggingface/transformers@^3.0.0` (embeddings)
   - `ulid@^2.3.0` (ID generation)
   - `@opentelemetry/*@^1.x` (4 deps: api, sdk-trace-node, resources, semantic-conventions, exporter-trace-otlp-http)
-- Peer: `@moabualruz/fulcrum-teams` (optional, lazy-loaded in exports)
+- Peer: `fulcrum-teams` (optional, lazy-loaded in exports)
 - Dev: types for better-sqlite3, typescript, vitest
 
 **Public API (from `src/index.ts`)**
@@ -222,7 +222,7 @@ exec "$DIR/node_modules/.bin/tsx" "$DIR/packages/cli/src/index.ts" "$@"
 - `createAgentProfile(input)`, `getAgentProfile(id)`, `listAgentProfileRows()`, `updateAgentProfile(input)`, `deleteAgentProfile(id)`
 
 *Team Ops (lazy getter)*
-- `getTeamOps(): Promise<Record<string, unknown>>` — dynamically imports `@moabualruz/fulcrum-teams` to avoid circular dependency
+- `getTeamOps(): Promise<Record<string, unknown>>` — dynamically imports `fulcrum-teams` to avoid circular dependency
 
 **Source Files (~31 .ts modules + 32 tests; core/src has the largest footprint at ~5,891 LOC non-test)**
 
@@ -392,14 +392,14 @@ See `tests/check-constraints.test.ts` for validation. Key constraints:
 
 ---
 
-### 2.2 @moabualruz/fulcrum-memory
+### 2.2 fulcrum-memory
 
 **Version:** 0.0.1 | **Type:** ESM | **Private:** yes
 
 **Package.json**
 - Main: `./src/index.ts`
 - Dependencies (6):
-  - `@moabualruz/fulcrum-core` (workspace)
+  - `fulcrum-core` (workspace)
   - `ulid@^2.3.0`
   - `gray-matter@^4.0.3` (YAML front-matter parsing)
   - `simple-git@^3.22.0` (git operations)
@@ -508,14 +508,14 @@ Tests (21 files: 175 passing):
 
 ---
 
-### 2.3 @moabualruz/fulcrum-monitor
+### 2.3 fulcrum-monitor
 
 **Version:** 0.0.1 | **Type:** ESM | **Private:** yes
 
 **Package.json**
 - Main: `./src/index.ts`
 - Dependencies (4):
-  - `@moabualruz/fulcrum-core`
+  - `fulcrum-core`
   - `ulidx@^2.3.0`
   - `hono@^4.4.0` (HTTP framework)
   - `@hono/node-server@^1.12.0` (Node.js adapter)
@@ -537,14 +537,14 @@ Tests (21 files: 175 passing):
 
 ---
 
-### 2.4 @moabualruz/fulcrum-planning
+### 2.4 fulcrum-planning
 
 **Version:** 0.0.1 | **Type:** ESM | **Private:** yes
 
 **Package.json**
 - Main: `./src/index.ts`
 - Dependencies (2):
-  - `@moabualruz/fulcrum-core`
+  - `fulcrum-core`
   - `ulid@^2.3.0`
 - Dev: better-sqlite3, types, vitest
 
@@ -566,15 +566,15 @@ Tests (21 files: 175 passing):
 
 ---
 
-### 2.5 @moabualruz/fulcrum-policy
+### 2.5 fulcrum-policy
 
 **Version:** 0.0.1 | **Type:** ESM | **Private:** yes
 
 **Package.json**
 - Main: `./src/index.ts`
 - Dependencies (3):
-  - `@moabualruz/fulcrum-core`
-  - `@moabualruz/fulcrum-teams`
+  - `fulcrum-core`
+  - `fulcrum-teams`
   - `minimatch@^10.2.5` (glob pattern matching)
   - `ulid@^2.3.0`
 - Dev: better-sqlite3, types, vitest
@@ -596,15 +596,15 @@ Tests (21 files: 175 passing):
 
 ---
 
-### 2.6 @moabualruz/fulcrum-sync
+### 2.6 fulcrum-sync
 
 **Version:** 0.0.1 | **Type:** ESM | **Private:** yes
 
 **Package.json**
 - Main: `./src/index.ts`
 - Dependencies (3):
-  - `@moabualruz/fulcrum-core`
-  - `@moabualruz/fulcrum-policy`
+  - `fulcrum-core`
+  - `fulcrum-policy`
   - `ulidx@^2.3.0`
 - Dev: better-sqlite3, types, vitest
 
@@ -622,14 +622,14 @@ Tests (21 files: 175 passing):
 
 ---
 
-### 2.7 @moabualruz/fulcrum-teams
+### 2.7 fulcrum-teams
 
 **Version:** 0.0.1 | **Type:** ESM | **Private:** yes
 
 **Package.json**
 - Main: `./src/index.ts`
 - Dependencies (2):
-  - `@moabualruz/fulcrum-core`
+  - `fulcrum-core`
   - `ulidx@^2.0.0`
 - Dev: better-sqlite3, types, vitest
 
@@ -645,16 +645,16 @@ Tests (21 files: 175 passing):
 
 ---
 
-### 2.8 @moabualruz/fulcrum-workflows
+### 2.8 fulcrum-workflows
 
 **Version:** 0.0.1 | **Type:** ESM | **Private:** yes
 
 **Package.json**
 - Main: `./src/index.ts`
 - Dependencies (2 required, 3 optional peer):
-  - `@moabualruz/fulcrum-core`
+  - `fulcrum-core`
   - `ulidx@^2.0.0`
-  - *Peer (optional):* `@moabualruz/fulcrum-planning`, `@moabualruz/fulcrum-teams`, `@moabualruz/fulcrum-worker`
+  - *Peer (optional):* `fulcrum-planning`, `fulcrum-teams`, `fulcrum-worker`
 
 **Public API**
 - All from: `types.ts`, `schema.ts`, `registry.ts`, `engine.ts`, `workflows.ts`
@@ -672,14 +672,14 @@ Tests (21 files: 175 passing):
 
 ---
 
-### 2.9 @moabualruz/fulcrum-worker
+### 2.9 fulcrum-worker
 
 **Version:** 0.0.1 | **Type:** ESM | **Private:** yes
 
 **Package.json**
 - Main: `./src/index.ts`
 - Dependencies (1):
-  - `@moabualruz/fulcrum-core`
+  - `fulcrum-core`
 - Dev: better-sqlite3, types, vitest
 
 **Public API**
@@ -697,14 +697,14 @@ Tests (21 files: 175 passing):
 
 ---
 
-### 2.10 @moabualruz/fulcrum-worktrees
+### 2.10 fulcrum-worktrees
 
 **Version:** 0.0.1 | **Type:** ESM | **Private:** yes
 
 **Package.json**
 - Main: `./src/index.ts`
 - Dependencies (2):
-  - `@moabualruz/fulcrum-core`
+  - `fulcrum-core`
   - `ulidx@^2.3.0`
 - Dev: better-sqlite3, types, vitest
 
@@ -719,7 +719,7 @@ Tests (21 files: 175 passing):
 
 ---
 
-### 2.11 @moabualruz/fulcrum-cli
+### 2.11 fulcrum-cli
 
 **Version:** 0.0.1 | **Type:** ESM | **Private:** yes | **Bin:** `fulcrum`
 
@@ -778,7 +778,7 @@ Standard JSON-RPC 2.0 stdio server with ~13 tools:
 
 ---
 
-## 3. @moabualruz/fulcrum-core Deep Dive
+## 3. fulcrum-core Deep Dive
 
 ### 3.1 Module List (62 files)
 
@@ -795,7 +795,7 @@ Standard JSON-RPC 2.0 stdio server with ~13 tools:
 | `runs.ts` | Agent run lifecycle |
 | `workspaces.ts` | Workspace CRUD |
 | `projects.ts` | Project CRUD |
-| `memory.ts` | Delegation to @moabualruz/fulcrum-memory |
+| `memory.ts` | Delegation to fulcrum-memory |
 | `handoffs.ts` | Handoff lifecycle |
 | `events.ts` | Event emission |
 | `policy.ts` | Policy check delegation |
@@ -1061,7 +1061,7 @@ Each skill is a prompt/instruction for AI agents using Fulcrum tools.
 
 ---
 
-## 5. CLI Surface (@moabualruz/fulcrum-cli)
+## 5. CLI Surface (fulcrum-cli)
 
 **File: `packages/cli/src/index.ts` (2211 lines)**
 
@@ -1277,7 +1277,7 @@ JSON-RPC server loop (rl.on('line')) handles these methods:
 
 **Test framework:** Vitest 1.6.1 (one vitest.config.ts per package)
 **Coverage:** No explicit coverage tool configured
-**Skipped tests:** 5 total (4 in `@moabualruz/fulcrum-core`, 1 in `@moabualruz/fulcrum-monitor` — from vitest output `454 passed | 4 skipped` and `30 passed | 1 skipped`)
+**Skipped tests:** 5 total (4 in `fulcrum-core`, 1 in `fulcrum-monitor` — from vitest output `454 passed | 4 skipped` and `30 passed | 1 skipped`)
 
 ### Guard tests (intentional drift detection)
 
@@ -1348,10 +1348,10 @@ No explicit env var parsing in code; all config via .fulcrum.json and command-li
 
 ### Per-Package Config
 
-- **@moabualruz/fulcrum-core:** Embedding provider config (init via API)
-- **@moabualruz/fulcrum-memory:** Vault path, git operations (read from core config)
-- **@moabualruz/fulcrum-monitor:** Port, host, workspace_id (MonitorServerConfig)
-- **@moabualruz/fulcrum-cli:** Global flags: --vault, --port, --json, --version, --help
+- **fulcrum-core:** Embedding provider config (init via API)
+- **fulcrum-memory:** Vault path, git operations (read from core config)
+- **fulcrum-monitor:** Port, host, workspace_id (MonitorServerConfig)
+- **fulcrum-cli:** Global flags: --vault, --port, --json, --version, --help
 
 ---
 
@@ -1360,57 +1360,57 @@ No explicit env var parsing in code; all config via .fulcrum.json and command-li
 ### Static Dependencies (Workspace Packages)
 
 ```
-@moabualruz/fulcrum-core
-  ├─ (peer: @moabualruz/fulcrum-teams, optional)
+fulcrum-core
+  ├─ (peer: fulcrum-teams, optional)
 
-@moabualruz/fulcrum-memory
-  └─ @moabualruz/fulcrum-core
+fulcrum-memory
+  └─ fulcrum-core
 
-@moabualruz/fulcrum-monitor
-  └─ @moabualruz/fulcrum-core
+fulcrum-monitor
+  └─ fulcrum-core
 
-@moabualruz/fulcrum-planning
-  └─ @moabualruz/fulcrum-core
+fulcrum-planning
+  └─ fulcrum-core
 
-@moabualruz/fulcrum-policy
-  ├─ @moabualruz/fulcrum-core
-  └─ @moabualruz/fulcrum-teams
+fulcrum-policy
+  ├─ fulcrum-core
+  └─ fulcrum-teams
 
-@moabualruz/fulcrum-sync
-  ├─ @moabualruz/fulcrum-core
-  └─ @moabualruz/fulcrum-policy
+fulcrum-sync
+  ├─ fulcrum-core
+  └─ fulcrum-policy
 
-@moabualruz/fulcrum-teams
-  └─ @moabualruz/fulcrum-core
+fulcrum-teams
+  └─ fulcrum-core
 
-@moabualruz/fulcrum-workflows
-  ├─ @moabualruz/fulcrum-core
-  └─ (peer: @moabualruz/fulcrum-planning, @moabualruz/fulcrum-teams, @moabualruz/fulcrum-worker, optional)
+fulcrum-workflows
+  ├─ fulcrum-core
+  └─ (peer: fulcrum-planning, fulcrum-teams, fulcrum-worker, optional)
 
-@moabualruz/fulcrum-worker
-  └─ @moabualruz/fulcrum-core
+fulcrum-worker
+  └─ fulcrum-core
 
-@moabualruz/fulcrum-worktrees
-  └─ @moabualruz/fulcrum-core
+fulcrum-worktrees
+  └─ fulcrum-core
 
-@moabualruz/fulcrum-cli
-  ├─ @moabualruz/fulcrum-core
-  ├─ @moabualruz/fulcrum-memory
-  ├─ @moabualruz/fulcrum-monitor
-  ├─ @moabualruz/fulcrum-planning
-  ├─ @moabualruz/fulcrum-policy
-  ├─ @moabualruz/fulcrum-sync
-  ├─ @moabualruz/fulcrum-teams
-  ├─ @moabualruz/fulcrum-worker
-  ├─ @moabualruz/fulcrum-workflows
-  └─ @moabualruz/fulcrum-worktrees
+fulcrum-cli
+  ├─ fulcrum-core
+  ├─ fulcrum-memory
+  ├─ fulcrum-monitor
+  ├─ fulcrum-planning
+  ├─ fulcrum-policy
+  ├─ fulcrum-sync
+  ├─ fulcrum-teams
+  ├─ fulcrum-worker
+  ├─ fulcrum-workflows
+  └─ fulcrum-worktrees
 ```
 
 ### Cycles
 
 - **Known cycle: core ↔ teams**
-  - @moabualruz/fulcrum-teams depends on @moabualruz/fulcrum-core
-  - @moabualruz/fulcrum-core uses lazy getter `getTeamOps()` to avoid static import
+  - fulcrum-teams depends on fulcrum-core
+  - fulcrum-core uses lazy getter `getTeamOps()` to avoid static import
   - Resolution: dynamic import at runtime (see core/src/index.ts line 125)
 
 ### External Dependencies
@@ -1521,13 +1521,13 @@ No packages can be published to npm. Would require:
 | 01dd627 | docs(readme): rewrite for round 5 — worker, runner, merge queue, telemetry, CLI, guards | Docs | Readme |
 | 565008f | feat(setup): audit + polish install flow — dry-run, --check, clearer errors, better summary | Feature | Setup |
 | fb762f4 | docs(cli): comprehensive --help for all 14 command groups + per-group help | Docs | CLI |
-| 922c7ec | docs(agents): update for @moabualruz/fulcrum-worker, capability helpers, guard tests, 24 roles | Docs | Agents |
+| 922c7ec | docs(agents): update for fulcrum-worker, capability helpers, guard tests, 24 roles | Docs | Agents |
 | 4f7eaa4 | docs(changelog): add 0.1.0 entry covering rounds 1-5 | Docs | Changelog |
 | 2f33ffd | feat(cli): add 9 subcommand groups for task/issue/epic/board/queue/sync/team/workflow/agent (J-6) | Feature | CLI |
 | 39a59fd | feat(telemetry): opt-in OTLP exporter for spans (J-7) | Feature | Telemetry |
 | b5bc93d | feat(telemetry): wire startSpan/endSpan into runner, worker, janitor, MCP (K-5) | Feature | Telemetry |
 | 13c016d | feat(workflows): runner + 16 step handlers with retries/timeouts (H-1, H-5) | Feature | Workflows |
-| a37853a | feat(worker): add @moabualruz/fulcrum-worker package with pluggable agent adapter (H-2) | Feature | Worker |
+| a37853a | feat(worker): add fulcrum-worker package with pluggable agent adapter (H-2) | Feature | Worker |
 | 238afb5 | feat(worktrees): processMergeQueue executes real git merge with gate checks (H-4) | Feature | Worktrees |
 | 7dd7e4b | feat(worktrees): git worktree add/remove subprocess integration (H-3) | Feature | Worktrees |
 

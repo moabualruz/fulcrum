@@ -16,7 +16,7 @@ Dreaming light/REM/deep promotion fires at thresholds:
 - `minUniqueQueries = 2`
 - `minScore = 0.75`
 
-These come verbatim from copy-file manifest §B.4 (OpenClaw adoption). Adversarial review F3 + product review F6 raised the concern that without an offline sweep on real data, these thresholds may produce zero promotions on Fulcrum's actual access patterns.
+These come verbatim from source inventory §B.4 (prior art adoption). Adversarial review F3 + product review F6 raised the concern that without an offline sweep on real data, these thresholds may produce zero promotions on Fulcrum's actual access patterns.
 
 The v2b plan's prerequisite Gate 3 calls for running the §12.2 sweep on 249 imported Claude Code / Codex sessions before v2b PR 11 ships Dreaming.
 

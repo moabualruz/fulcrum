@@ -1,13 +1,13 @@
 # Worktrees
 
-`@moabualruz/fulcrum-worktrees` is **not** a stub. It runs real `git` subprocesses and maintains a real merge queue with conflict detection and rollback.
+`fulcrum-worktrees` is **not** a stub. It runs real `git` subprocesses and maintains a real merge queue with conflict detection and rollback.
 
 ---
 
 ## Allocation
 
 ```typescript
-import { allocateWorktree } from '@moabualruz/fulcrum-worktrees'
+import { allocateWorktree } from 'fulcrum-worktrees'
 
 const wt = await allocateWorktree({
   workspace_id: 'ws_1',
@@ -32,7 +32,7 @@ Behavior:
 ## Marking Ready + Queuing
 
 ```typescript
-import { markReady, enqueueMerge } from '@moabualruz/fulcrum-worktrees'
+import { markReady, enqueueMerge } from 'fulcrum-worktrees'
 
 await markReady({ worktree_id: wt.worktree_id })
 await enqueueMerge({ worktree_id: wt.worktree_id, priority: 10 })
@@ -43,7 +43,7 @@ await enqueueMerge({ worktree_id: wt.worktree_id, priority: 10 })
 ## Processing the Merge Queue
 
 ```typescript
-import { processMergeQueue } from '@moabualruz/fulcrum-worktrees'
+import { processMergeQueue } from 'fulcrum-worktrees'
 
 const result = await processMergeQueue({
   workspace_id: 'ws_1',

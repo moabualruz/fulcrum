@@ -9,7 +9,7 @@ status: complete
 
 ## Codebase Context
 
-**Project shape:** TypeScript pnpm monorepo (12 packages, @fulcrum/*), SQLite WAL+FTS5, 1505 tests. Local-first AI agent OS with task management, 3-layer memory, policy enforcement, team orchestration, unified ToolRegistry (27 tools, CLI+MCP from one source), Hono HTTP monitor (port 4721) with extensive JSON API + SSE.
+**Project shape:** TypeScript pnpm monorepo (12 packages, fulcrum-*), SQLite WAL+FTS5, 1505 tests. Local-first AI agent OS with task management, 3-layer memory, policy enforcement, team orchestration, unified ToolRegistry (27 tools, CLI+MCP from one source), Hono HTTP monitor (port 4721) with extensive JSON API + SSE.
 
 **Completed recent work:**
 - Unified ToolRegistry (all 27 tools, CLI+MCP from one source) ✅
@@ -66,7 +66,7 @@ status: complete
 **Implementation notes:**
 - Use `ink` (v4+) for React-based terminal rendering — same API as React, no browser build step
 - TUI reads from `http://localhost:4721` (same Hono server) via fetch + EventSource polyfill
-- Falls back to direct SQLite read if monitor not running (via `@moabualruz/fulcrum-core`'s `getDb()`)
+- Falls back to direct SQLite read if monitor not running (via `fulcrum-core`'s `getDb()`)
 - Keyboard controls map to HTTP POST endpoints on the monitor (Idea #3 prerequisite for writes)
 - Lives in `packages/cli/src/tui/` — new subcommand `fulcrum tui`
 - Panels are fixed layout initially; plugin panels (agent-specific widgets) as v2
@@ -159,7 +159,7 @@ A CLI command that renders the event stream as human-readable text: `[14:22:01] 
 **Rationale:** Blocked runs that nobody notices are productivity black holes. Block notification converts a silent failure into an interruption that gets human attention. `fulcrum log` gives operators the equivalent of `git log` for agent activity — a clear historical record without requiring a TUI or browser. Both are high-value, low-complexity additions that make Fulcrum observable without new infrastructure.
 
 **Implementation notes:**
-- Block notification: hook into `blockAgentRun()` in `@moabualruz/fulcrum-core/src/runs.ts` — after DB write, fire async notification (fire-and-forget, never blocks the run)
+- Block notification: hook into `blockAgentRun()` in `fulcrum-core/src/runs.ts` — after DB write, fire async notification (fire-and-forget, never blocks the run)
 - `node-notifier` is cross-platform; fall back gracefully on unsupported systems
 - Webhook: `fetch(FULCRUM_ALERT_WEBHOOK, { method: 'POST', body: JSON.stringify(slackPayload) })` — async, no retry needed (best-effort)
 - `fulcrum log`: reads `/events/stream` SSE when monitor is running; falls back to DB query on `events` + `hook_events` tables
@@ -209,7 +209,7 @@ A CLI command that renders the event stream as human-readable text: `[14:22:01] 
 | Policy as installation unit (signed certs) | Philosophical reframe without clear deliverable; approval workflow not designed |
 | Agent definitions as self-amending living contracts | Requires full approval workflow; large scope; defer |
 | P2P Fulcrum sync fabric | Very large scope; single-machine assumption holds for MVP |
-| CLI as agent shell (subprocess-first) | Already implemented via `@moabualruz/fulcrum-worker` subprocess adapter; not new |
+| CLI as agent shell (subprocess-first) | Already implemented via `fulcrum-worker` subprocess adapter; not new |
 | Schema-derived TUI auto-generated from HTTP routes | HTTP routes aren't typed enough to infer layout decisions; TUI still requires manual panel design |
 
 ---

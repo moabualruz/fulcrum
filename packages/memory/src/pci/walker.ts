@@ -9,8 +9,16 @@
 import type { Dirent } from 'node:fs'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import ignore, { type Ignore } from 'ignore'
+import ignoreModule from 'ignore'
+import type { Ignore } from 'ignore'
 import { DEFAULT_IGNORE_PATTERNS } from './ignore-patterns.js'
+
+// esm/cjs interop: some bundler configs resolve the default export as the
+// namespace object rather than the callable factory. Unwrap if that happened.
+type IgnoreFactory = (options?: object) => Ignore
+const ignore: IgnoreFactory = (
+  (typeof ignoreModule === 'function' ? ignoreModule : (ignoreModule as unknown as { default: IgnoreFactory }).default) as IgnoreFactory
+)
 
 interface WalkOptions {
   ignoreFiles?: string[]

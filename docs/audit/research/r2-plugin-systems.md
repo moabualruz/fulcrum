@@ -1160,7 +1160,7 @@ If Fulcrum wants to integrate with all five deeply:
   `gemini-extension.json` + a `GEMINI.md` pointing at a minimal set of skills.
 - **For PI:** write a TS extension that registers a command entry point, subscribes
   to `tool_call` for policy, and mounts the MCP server via settings. Distribute as an
-  npm package so `pi install npm:@fulcrum/pi-ext` works.
+  npm package so `pi install npm:fulcrum-pi-ext` works.
 - **For Codex:** MCP server only. Nothing else is installable.
 - **For opencode:** a TS plugin that registers `tool.execute.before`/`after` handlers
   + a `SKILL.md` that also lives in `.claude/skills/` (opencode reads both).

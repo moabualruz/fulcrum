@@ -395,7 +395,7 @@ Observability: OK via the events pipeline.
 Confirmed by searching `createAgentProfile` / `listAgentProfileRows` /
 `getAgentProfile` / `profile_id` usage across the monorepo.
 
-- `createAgentProfile` is imported from `@moabualruz/fulcrum-core` into **only one**
+- `createAgentProfile` is imported from `fulcrum-core` into **only one**
   non-test file: `packages/cli/src/index.ts:598, 1128-1132`, which wires it
   to the `mcp__fulcrum__create_agent_profile` MCP tool for external callers.
 - `listAgentProfileRows` is called from `status.ts:194` and from tests.

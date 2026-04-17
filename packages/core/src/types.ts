@@ -524,7 +524,10 @@ export interface SpawnableRun {
 export type ContextType = 'primary' | 'subagent' | 'cron' | 'heartbeat' | 'flush'
 
 export interface StartAgentRunInput {
-  task_id: string
+  // Optional for session-level auto-starts (hooks create a stub task).
+  // Required for task-scoped starts; startAgentRun throws not_found at runtime
+  // when task_id is missing and no stub is created.
+  task_id?: string
   workspace_id: string
   role: AgentRole
   /**

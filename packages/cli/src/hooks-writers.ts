@@ -166,6 +166,7 @@ export interface WriteProvenance {
   parent_memory_id?: string
   context_type: PrimaryContextType
   confidence: number
+  [k: string]: unknown
 }
 
 export function buildProvenance(ctx: HookContext, hook_point: WriteProvenance['hook_point'], context_type: PrimaryContextType): WriteProvenance {

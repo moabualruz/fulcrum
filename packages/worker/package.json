@@ -32,7 +32,8 @@
     "build": "tsup"
   },
   "dependencies": {
-    "fulcrum-core": "workspace:*"
+    "fulcrum-core": "workspace:*",
+    "fulcrum-memory": "workspace:*"
   },
   "devDependencies": {
     "better-sqlite3": "^12.0.0",

@@ -1,8 +1,8 @@
-# @moabualruz/fulcrum-core Extension Implementation Plan
+# fulcrum-core Extension Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Extend @moabualruz/fulcrum-core with complete domain types, event emission, display IDs, status categories, task relations table, and enriched memory fields — the foundation all other packages depend on.
+**Goal:** Extend fulcrum-core with complete domain types, event emission, display IDs, status categories, task relations table, and enriched memory fields — the foundation all other packages depend on.
 
 **Architecture:** Additive migrations only (ALTER TABLE + new tables). All changes backward-compatible. New utility modules (ids.ts, events.ts, status-category.ts) are thin functions with no dependencies. Existing function signatures extended with new optional fields where possible.
 

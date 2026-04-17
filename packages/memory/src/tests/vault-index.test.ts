@@ -19,6 +19,7 @@ const baseMemory: FullMemory = {
   symbol_path: null,
   title: 'Test Memory',
   summary: 'A test memory',
+  content: 'Test body content.',
   canonical_text: 'Test body content.',
   tags: ['test', 'vitest'],
   entities: ['[[concept/testing]]'],

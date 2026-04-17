@@ -20,7 +20,7 @@ async function setup(): Promise<void> {
   await createTeamTemplate({
     name: 'heartbeat-test-template',
     description: 'Template for heartbeat tests',
-    slots: [{ slot_id: 'worker', role: 'software_engineer' as AgentRole, min_count: 1, max_count: 1, concurrency_cap: 1 }],
+    slots: [{ slot_id: 'worker', role: 'software_engineer' as AgentRole, required: true, min_count: 1, max_count: 1, concurrency_cap: 1 }],
   })
 
   const template = getDb().prepare("SELECT template_id FROM team_templates WHERE name = 'heartbeat-test-template'").get() as { template_id: string }

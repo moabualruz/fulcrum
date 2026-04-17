@@ -9,9 +9,9 @@
 
 ## Goal
 
-Make `@moabualruz/fulcrum-core`, `@moabualruz/fulcrum-memory`, and `@moabualruz/fulcrum-worker` publishable to npm.
+Make `fulcrum-core`, `fulcrum-memory`, and `fulcrum-worker` publishable to npm.
 Add proper `exports` maps, a build step, Zod config schemas, and CI cycle guards.
-Extract `@fulcrum/kernel` as a leaf package. Replace the `getDb()` singleton with
+Extract `fulcrum-kernel` as a leaf package. Replace the `getDb()` singleton with
 a `Db` port threaded via Context.
 
 ---
@@ -20,8 +20,8 @@ a `Db` port threaded via Context.
 
 | ID | Title | Severity | Priority |
 |----|-------|----------|----------|
-| F6-ISSUE-01 | Extract `@fulcrum/kernel` leaf package | CRITICAL | P0 |
-| F6-ISSUE-09 | Delete duplicate `writeMemory`/`recallMemory`/policy in `@moabualruz/fulcrum-core` | CRITICAL | P0 |
+| F6-ISSUE-01 | Extract `fulcrum-kernel` leaf package | CRITICAL | P0 |
+| F6-ISSUE-09 | Delete duplicate `writeMemory`/`recallMemory`/policy in `fulcrum-core` | CRITICAL | P0 |
 | F6-ISSUE-10 | Modular-monolith schema ownership | CRITICAL | P0 |
 | F6-ISSUE-02 | Per-package `exports` map + subpath exports + `sideEffects: false` | HIGH | P1 |
 | F6-ISSUE-03 | Build step emitting `dist/` | HIGH | P1 |
@@ -30,11 +30,11 @@ a `Db` port threaded via Context.
 | F6-ISSUE-04 | Publish plan for library packages | MEDIUM | P2 |
 | F6-ISSUE-05 | Zod config schemas + per-package config | MEDIUM | P2 |
 | F6-ISSUE-06 | Plugin discovery via `"fulcrum"` manifest | MEDIUM | P2 |
-| F6-ISSUE-08 | `@fulcrum/e2e` + contract test kit | MEDIUM | P2 |
+| F6-ISSUE-08 | `fulcrum-e2e` + contract test kit | MEDIUM | P2 |
 | F6-ISSUE-12 | Per-package `bin` CLIs | MEDIUM | P2 |
 | F6-ISSUE-13 | `test/dummy/` standalone host per package | MEDIUM | P2 |
 | F6-ISSUE-14 | Barrel-file audit | LOW | P3 |
-| F6-ISSUE-15 | READMEs for `@moabualruz/fulcrum-cli` and `@moabualruz/fulcrum-worker` | LOW | P3 |
+| F6-ISSUE-15 | READMEs for `fulcrum-cli` and `fulcrum-worker` | LOW | P3 |
 | F6-ISSUE-16 | Unify `ulid`/`ulidx` | LOW | P3 |
 
 ---
@@ -42,19 +42,19 @@ a `Db` port threaded via Context.
 ## Package dependency graph (target state)
 
 ```
-@fulcrum/kernel          ← leaf: types, constants, newId, error classes
+fulcrum-kernel          ← leaf: types, constants, newId, error classes
        ↑
-@moabualruz/fulcrum-core            ← schema, migrations, roles, policy, DB setup
+fulcrum-core            ← schema, migrations, roles, policy, DB setup
        ↑                 ← also owns: task CRUD, workspace CRUD
-@moabualruz/fulcrum-memory          ← write, recall, embed, chunk, rerank
-@moabualruz/fulcrum-planning        ← workflow runner, step handlers
-@moabualruz/fulcrum-policy          ← WIP enforcement, role guards
-@moabualruz/fulcrum-teams           ← team templates, instances, scheduler
-@moabualruz/fulcrum-worker          ← agent adapters, lifecycle, worktrees ref
-@moabualruz/fulcrum-worktrees       ← git worktree management
-@moabualruz/fulcrum-sync            ← export/import, changelog
-@moabualruz/fulcrum-monitor         ← HTTP monitor server
-@moabualruz/fulcrum-cli             ← CLI commands, MCP server (depends on all above)
+fulcrum-memory          ← write, recall, embed, chunk, rerank
+fulcrum-planning        ← workflow runner, step handlers
+fulcrum-policy          ← WIP enforcement, role guards
+fulcrum-teams           ← team templates, instances, scheduler
+fulcrum-worker          ← agent adapters, lifecycle, worktrees ref
+fulcrum-worktrees       ← git worktree management
+fulcrum-sync            ← export/import, changelog
+fulcrum-monitor         ← HTTP monitor server
+fulcrum-cli             ← CLI commands, MCP server (depends on all above)
 ```
 
 No cycles. Each package depends only on packages above it in this list.
@@ -63,13 +63,13 @@ No cycles. Each package depends only on packages above it in this list.
 
 ## Task breakdown
 
-### Task 6.1 — Extract `@fulcrum/kernel` (F6-ISSUE-01) [CRITICAL]
+### Task 6.1 — Extract `fulcrum-kernel` (F6-ISSUE-01) [CRITICAL]
 
-**Goal:** Create a leaf package (`@fulcrum/kernel`) that has zero internal
-dependencies. Everything that is currently in `@moabualruz/fulcrum-core` but needed
+**Goal:** Create a leaf package (`fulcrum-kernel`) that has zero internal
+dependencies. Everything that is currently in `fulcrum-core` but needed
 by ALL other packages moves here.
 
-**Files to move to `@fulcrum/kernel`:**
+**Files to move to `fulcrum-kernel`:**
 - `packages/core/src/ids.ts` → `packages/kernel/src/ids.ts` (`newId`, `ulid`)
 - `packages/core/src/types.ts` (pure type definitions only)
 - `packages/core/src/errors.ts` (error classes)
@@ -80,7 +80,7 @@ by ALL other packages moves here.
 - [ ] Create `packages/kernel/package.json`:
   ```json
   {
-    "name": "@fulcrum/kernel",
+    "name": "fulcrum-kernel",
     "version": "0.1.0",
     "type": "module",
     "exports": { ".": "./src/index.ts" },
@@ -91,36 +91,36 @@ by ALL other packages moves here.
 
 - [ ] Create `packages/kernel/src/index.ts` with re-exports of moved files
 
-- [ ] Update `@moabualruz/fulcrum-core` and all other packages to import from `@fulcrum/kernel`
+- [ ] Update `fulcrum-core` and all other packages to import from `fulcrum-kernel`
   instead of `../../core/src/ids`
 
 - [ ] Run `pnpm test` to confirm no breakage
 
-- [ ] Commit: `feat(kernel): extract @fulcrum/kernel leaf package`
+- [ ] Commit: `feat(kernel): extract fulcrum-kernel leaf package`
 
 ---
 
 ### Task 6.2 — Delete duplicate implementations (F6-ISSUE-09) [CRITICAL]
 
 **Current duplicates:**
-- `@moabualruz/fulcrum-core/src/memory.ts` duplicates `@moabualruz/fulcrum-memory/src/write.ts` + `recall.ts`
-- `@moabualruz/fulcrum-core/src/policy.ts` may duplicate `@moabualruz/fulcrum-policy/src/`
+- `fulcrum-core/src/memory.ts` duplicates `fulcrum-memory/src/write.ts` + `recall.ts`
+- `fulcrum-core/src/policy.ts` may duplicate `fulcrum-policy/src/`
 
 **Steps:**
 
 - [ ] `grep -r "writeMemory\|recallMemory" packages/core/ --include="*.ts"`
   Identify the duplicate
 
-- [ ] Replace with re-export from `@moabualruz/fulcrum-memory`:
+- [ ] Replace with re-export from `fulcrum-memory`:
   ```ts
   // packages/core/src/memory.ts — REMOVED
-  // Use @moabualruz/fulcrum-memory directly
-  export { writeMemory, recallMemory } from '@moabualruz/fulcrum-memory';
+  // Use fulcrum-memory directly
+  export { writeMemory, recallMemory } from 'fulcrum-memory';
   ```
   (This is the same as P5-Task-5.1 — coordinate so it's done once)
 
-- [ ] Same for policy: confirm `@moabualruz/fulcrum-policy` owns the canonical
-  implementation; `@moabualruz/fulcrum-core` re-exports or doesn't import it
+- [ ] Same for policy: confirm `fulcrum-policy` owns the canonical
+  implementation; `fulcrum-core` re-exports or doesn't import it
 
 - [ ] Commit: `refactor(core): remove duplicate memory/policy — re-export from canonical packages`
 
@@ -134,14 +134,14 @@ by ALL other packages moves here.
 
 | Table | Owner Package |
 |-------|---------------|
-| `workspaces`, `projects` | `@moabualruz/fulcrum-core` |
-| `tasks` | `@moabualruz/fulcrum-core` |
-| `agent_runs`, `trace_events` | `@moabualruz/fulcrum-core` |
-| `memories`, `vec_memories`, `memory_tags` | `@moabualruz/fulcrum-memory` |
-| `team_templates`, `team_instances` | `@moabualruz/fulcrum-teams` |
-| `worktrees`, `merge_queue` | `@moabualruz/fulcrum-worktrees` |
-| `workflows`, `workflow_runs` | `@moabualruz/fulcrum-planning` |
-| `agent_definitions` | `@moabualruz/fulcrum-core` |
+| `workspaces`, `projects` | `fulcrum-core` |
+| `tasks` | `fulcrum-core` |
+| `agent_runs`, `trace_events` | `fulcrum-core` |
+| `memories`, `vec_memories`, `memory_tags` | `fulcrum-memory` |
+| `team_templates`, `team_instances` | `fulcrum-teams` |
+| `worktrees`, `merge_queue` | `fulcrum-worktrees` |
+| `workflows`, `workflow_runs` | `fulcrum-planning` |
+| `agent_definitions` | `fulcrum-core` |
 
 **Steps:**
 
@@ -267,10 +267,10 @@ export function createTask(db: Database, input: CreateTaskInput): Task { ... }
 
 **Steps:**
 
-- [ ] Start with `@moabualruz/fulcrum-memory/src/write.ts` — it already accepts `db` parameter
+- [ ] Start with `fulcrum-memory/src/write.ts` — it already accepts `db` parameter
   (verify). Add test that passes a test DB.
 
-- [ ] Move `@moabualruz/fulcrum-core/src/tasks.ts` to accept `db` parameter
+- [ ] Move `fulcrum-core/src/tasks.ts` to accept `db` parameter
 
 - [ ] Update callers (CLI, MCP handler) to pass `db` explicitly:
   ```ts
@@ -346,7 +346,7 @@ export function createTask(db: Database, input: CreateTaskInput): Task { ... }
 
 ---
 
-### Task 6.10 — `@fulcrum/e2e` workspace (F6-ISSUE-08) [MEDIUM]
+### Task 6.10 — `fulcrum-e2e` workspace (F6-ISSUE-08) [MEDIUM]
 
 **Files:**
 - Create: `packages/e2e/` workspace
@@ -356,7 +356,7 @@ export function createTask(db: Database, input: CreateTaskInput): Task { ... }
 - [ ] Create `packages/e2e/package.json`:
   ```json
   {
-    "name": "@fulcrum/e2e",
+    "name": "fulcrum-e2e",
     "version": "0.1.0",
     "private": true,
     "scripts": { "test": "vitest" },
@@ -367,10 +367,10 @@ export function createTask(db: Database, input: CreateTaskInput): Task { ... }
 - [ ] Move `tests/e2e/claude-session.test.ts` (from P0-Task-0.3) into this package
 
 - [ ] Add contract tests between packages:
-  - `@moabualruz/fulcrum-memory` API contract (write → recall round-trip)
-  - `@moabualruz/fulcrum-core` + `@moabualruz/fulcrum-teams` integration (task → team → complete)
+  - `fulcrum-memory` API contract (write → recall round-trip)
+  - `fulcrum-core` + `fulcrum-teams` integration (task → team → complete)
 
-- [ ] Commit: `feat(e2e): @fulcrum/e2e workspace with contract tests`
+- [ ] Commit: `feat(e2e): fulcrum-e2e workspace with contract tests`
 
 ---
 
@@ -423,10 +423,10 @@ export function createTask(db: Database, input: CreateTaskInput): Task { ... }
 
 ## Acceptance criteria
 
-- `@fulcrum/kernel` exists as a leaf package with zero internal deps
+- `fulcrum-kernel` exists as a leaf package with zero internal deps
 - `pnpm build` succeeds for all 9 library packages
 - `pnpm check:cycles` exits 0 (no circular dependencies)
 - `getDb()` singleton deleted; all callers receive `db` via DI
 - Each package has a valid `exports` map
-- `@fulcrum/e2e` workspace runs integration + contract tests
+- `fulcrum-e2e` workspace runs integration + contract tests
 - `pnpm test` green across all packages

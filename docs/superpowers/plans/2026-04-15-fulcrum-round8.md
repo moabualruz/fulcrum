@@ -4,7 +4,7 @@
 
 **Goal:** Address all 32 issues found in the Round 8 gap analysis: implement workflow step stubs (search_code, validate_schema), add missing DB indices, improve test coverage across sync/policy/monitor, and do type safety cleanup.
 
-**Architecture:** All changes are contained to their respective packages. No new packages. `search_code` uses a Node.js child_process ripgrep/grep fallback. `validate_schema` adds Ajv as a dep to `@moabualruz/fulcrum-workflows`. DB indices are a new migration (034). Test additions touch only `__tests__` files.
+**Architecture:** All changes are contained to their respective packages. No new packages. `search_code` uses a Node.js child_process ripgrep/grep fallback. `validate_schema` adds Ajv as a dep to `fulcrum-workflows`. DB indices are a new migration (034). Test additions touch only `__tests__` files.
 
 **Tech Stack:** TypeScript 5.4, vitest, better-sqlite3, Ajv 8 (new dep), child_process
 

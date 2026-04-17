@@ -3,7 +3,7 @@
 > Research brief: how mature projects structure code so each component works as
 > a standalone tool AND integrates seamlessly when composed.
 >
-> Audit target: Fulcrum's 10+ packages (`@moabualruz/fulcrum-core`, `memory`, `planning`,
+> Audit target: Fulcrum's 10+ packages (`fulcrum-core`, `memory`, `planning`,
 > `policy`, `sync`, `teams`, `worker`, `workflows`, `worktrees`, `monitor`,
 > `cli`) currently have hard `workspace:*` dependencies that prevent standalone
 > use. We want each to be usable alone (e.g. `fulcrum-memory` as a local CLI
@@ -109,7 +109,7 @@ boundaries**. Key principles (from Grzybek's primer and Brown's C4 talks):
 
 Grzybek's three independence factors: minimal dependencies, weak coupling,
 stable dependencies. Fulcrum today fails on stability — every package depends
-on `@moabualruz/fulcrum-core` which is the most volatile package.
+on `fulcrum-core` which is the most volatile package.
 
 ### 1.6 Plugin architectures (editors, IDEs)
 
@@ -379,7 +379,7 @@ the binary is a 20-line wrapper that calls into the library.
 
 ```json
 {
-  "name": "@moabualruz/fulcrum-memory",
+  "name": "fulcrum-memory",
   "exports": {
     ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" },
     "./store": { "import": "./dist/store/index.js", "types": "./dist/store/index.d.ts" },
@@ -393,9 +393,9 @@ the binary is a 20-line wrapper that calls into the library.
 
 Consumers can now:
 
-- `import { MemoryStore } from '@moabualruz/fulcrum-memory'` — main API.
-- `import { SqliteStore } from '@moabualruz/fulcrum-memory/store'` — just the store.
-- `import { bm25 } from '@moabualruz/fulcrum-memory/search'` — just search.
+- `import { MemoryStore } from 'fulcrum-memory'` — main API.
+- `import { SqliteStore } from 'fulcrum-memory/store'` — just the store.
+- `import { bm25 } from 'fulcrum-memory/search'` — just search.
 - Run `fulcrum-memory ingest ./notes` from the shell — standalone CLI.
 
 Subpath exports also **hide internals**: anything not listed cannot be
@@ -465,7 +465,7 @@ catch the `ERR_MODULE_NOT_FOUND` and continue. Works even if B is a
 regular dep — you still get the lazy-load benefit.
 
 **Registry pattern**. A publishes a mutable registry object:
-`import { registerProvider } from '@moabualruz/fulcrum-core'`. B calls
+`import { registerProvider } from 'fulcrum-core'`. B calls
 `registerProvider(myProvider)` at module load. Later, A iterates its
 registry. The dependency arrow points from B→A only, not A→B. Core has no
 compile-time knowledge of B, but B must be loaded for its side effects.
@@ -505,12 +505,12 @@ force a choice.
 
 For Fulcrum the recommended mix is:
 
-1. A tiny **`@fulcrum/kernel`** package that defines ports, contribution
+1. A tiny **`fulcrum-kernel`** package that defines ports, contribution
    points, and a shared `Context`. Every package peer-depends on it.
 2. Runtime **registries** inside the kernel for the things core needs to
    enumerate (agents, tools, memory providers, policies).
 3. **Dynamic imports** in the CLI's orchestrator for optional packages
-   (`@moabualruz/fulcrum-teams`, `@moabualruz/fulcrum-workflows`) — no hard dep.
+   (`fulcrum-teams`, `fulcrum-workflows`) — no hard dep.
 4. An **event bus** for cross-package notifications that do not need a
    return value.
 
@@ -529,7 +529,7 @@ For Fulcrum the recommended mix is:
 ### 5.2 Techniques to break cycles
 
 - **Interfaces-only package**: extract the shared contract into a leaf
-  package (`@fulcrum/contracts`) that has zero runtime code. Both cyclers
+  package (`fulcrum-contracts`) that has zero runtime code. Both cyclers
   depend on it; neither depends on the other.
 - **Dependency inversion**: the "higher" module defines an interface; the
   "lower" module implements it; composition happens at the app edge.
@@ -570,7 +570,7 @@ If package A and package B need each other, at least one of:
 
 ### 6.1 Semver discipline with inter-package deps
 
-- **MAJOR** = public API break. If `@moabualruz/fulcrum-core` goes from 0.x to 1.0 and
+- **MAJOR** = public API break. If `fulcrum-core` goes from 0.x to 1.0 and
   any package peer-depends on it, those packages must bump their
   `peerDependencies` range.
 - **MINOR** = additive changes. Adding a new export, a new optional
@@ -614,20 +614,20 @@ publishing overhead.
 ### 6.5 Type-only imports
 
 ```ts
-import type { NoteStore } from '@moabualruz/fulcrum-memory'
+import type { NoteStore } from 'fulcrum-memory'
 ```
 
-Compile-time type check; zero runtime emit. This lets `@moabualruz/fulcrum-planning`
+Compile-time type check; zero runtime emit. This lets `fulcrum-planning`
 reference a `NoteStore` shape for typing function parameters without
 creating a runtime edge in the import graph. Combined with dynamic
 imports, it gives you typed lazy loading:
 
 ```ts
-import type { NoteStore } from '@moabualruz/fulcrum-memory'
+import type { NoteStore } from 'fulcrum-memory'
 
 async function getStore(): Promise<NoteStore | null> {
   try {
-    const mod = await import('@moabualruz/fulcrum-memory')
+    const mod = await import('fulcrum-memory')
     return new mod.SqliteStore()
   } catch {
     return null
@@ -712,7 +712,7 @@ When package A defines a port and package B implements it:
 ### 8.3 Integration tests that compose multiple packages
 
 - Live in a top-level `tests/integration/` package or a dedicated
-  `@fulcrum/e2e` workspace.
+  `fulcrum-e2e` workspace.
 - Use the real kernel, real packages, real SQLite. No mocks.
 - Keep these slow tests out of the inner test loop; run on CI and before
   release.
@@ -739,7 +739,7 @@ When package A defines a port and package B implements it:
 - **A central registry** in the docs: `https://fulcrum.dev/plugins`, a
   simple markdown index + a JSON feed for programmatic consumption.
 - **Inside the CLI**: `fulcrum plugin search`, `fulcrum plugin install
-  @moabualruz/fulcrum-teams`. The CLI queries npm's registry API filtered by keyword.
+  fulcrum-teams`. The CLI queries npm's registry API filtered by keyword.
 - **Contribution metadata in manifest**: each package declares in its
   `package.json` under `"fulcrum"`:
 
@@ -762,16 +762,16 @@ When package A defines a port and package B implements it:
 ```json
 {
   "peerDependencies": {
-    "@fulcrum/kernel": "^1.0.0",
-    "@moabualruz/fulcrum-memory": "^1.0.0"
+    "fulcrum-kernel": "^1.0.0",
+    "fulcrum-memory": "^1.0.0"
   },
   "peerDependenciesMeta": {
-    "@moabualruz/fulcrum-memory": { "optional": true }
+    "fulcrum-memory": { "optional": true }
   }
 }
 ```
 
-`@moabualruz/fulcrum-memory` is optional; the package degrades if it is missing.
+`fulcrum-memory` is optional; the package degrades if it is missing.
 
 ### 9.3 How Rails engines, Django, Airflow advertise themselves
 
@@ -795,13 +795,13 @@ project graph. This is also how `oclif` and `hardhat` discover plugins.
 
 ## 10. Anti-patterns to avoid
 
-1. **God package owning everything**. A `@moabualruz/fulcrum-core` that exports the
+1. **God package owning everything**. A `fulcrum-core` that exports the
    kernel, every adapter, every use case, and every plugin's types. It
    becomes the single point of recompilation and breaks tree-shaking.
 2. **Barrel files that import half the monorepo at startup**. Prefer
    subpath exports and narrow barrels.
 3. **Packages with no standalone utility**. If
-   `@moabualruz/fulcrum-worktrees` is unusable without the full kernel + memory +
+   `fulcrum-worktrees` is unusable without the full kernel + memory +
    planning + policy, it is not a package; it is a subdirectory of the
    app.
 4. **Hardcoded package names in `await import()`**. If you will ever rename
@@ -818,7 +818,7 @@ project graph. This is also how `oclif` and `hardhat` discover plugins.
    latent ordering bug. Use an explicit `init(ctx)` hook and let the kernel
    run them in dependency order.
 8. **Publishing every internal file** via `"files": ["dist"]` + no
-   `exports` field. Consumers will reach into `@moabualruz/fulcrum-memory/dist/private/foo`
+   `exports` field. Consumers will reach into `fulcrum-memory/dist/private/foo`
    and your refactor will break them.
 9. **Cross-package DB access**. Package B reads a table owned by package
    A. Congratulations, A can never migrate that table without breaking B.
@@ -843,9 +843,9 @@ project graph. This is also how `oclif` and `hardhat` discover plugins.
 - [ ] Every package has a **single, documented public API** defined via
       `"exports"` in its `package.json`.
 - [ ] Every package can be installed and imported (or run as a CLI)
-      **without any sibling Fulcrum package** except `@fulcrum/kernel`
+      **without any sibling Fulcrum package** except `fulcrum-kernel`
       (leaf contracts).
-- [ ] `@fulcrum/kernel` contains **only contracts, ports, the service
+- [ ] `fulcrum-kernel` contains **only contracts, ports, the service
       locator, and the plugin manifest schema**. No runtime logic, no I/O.
 - [ ] No package has a **hard runtime dep** on another Fulcrum package;
       cross-package coupling is either peer (kernel), optional peer, or
@@ -871,10 +871,10 @@ project graph. This is also how `oclif` and `hardhat` discover plugins.
       kernel when integrated, via its own loader when standalone.
 - [ ] `"sideEffects": false` in every library package (or narrowed to the
       few files that do have side effects).
-- [ ] Subpath exports (`@moabualruz/fulcrum-memory/store`, `…/search`) for granular
+- [ ] Subpath exports (`fulcrum-memory/store`, `…/search`) for granular
       imports.
 - [ ] Barrel files kept small: only the facade API, not every file.
-- [ ] Integration tests live in a dedicated `@fulcrum/e2e` workspace,
+- [ ] Integration tests live in a dedicated `fulcrum-e2e` workspace,
       not scattered across packages.
 - [ ] Each package ships a **`test/dummy/`** or `examples/` directory
       showing a minimal standalone use.
@@ -887,11 +887,11 @@ project graph. This is also how `oclif` and `hardhat` discover plugins.
 ### 11.3 MAY
 
 - [ ] Optional peer deps for nice-to-have integrations
-      (`@moabualruz/fulcrum-memory` → `@fulcrum/embeddings`).
+      (`fulcrum-memory` → `fulcrum-embeddings`).
 - [ ] Cross-package events via a typed event bus in the kernel.
 - [ ] Feature-flagged exports for experimental APIs
-      (`@moabualruz/fulcrum-memory/unstable`).
-- [ ] An `@fulcrum/e2e` scenario runner that composes every package for
+      (`fulcrum-memory/unstable`).
+- [ ] An `fulcrum-e2e` scenario runner that composes every package for
       smoke tests.
 - [ ] A project-graph lint (Nx tags) to enforce architecture boundaries.
 - [ ] Plugin-of-plugin: a package may peer-depend (optionally) on
@@ -907,18 +907,18 @@ Group the packages by their role in the architecture:
 
 | Package | Role | Standalone CLI? | Depends on |
 |---|---|---|---|
-| `@fulcrum/kernel` (NEW) | contracts, ports, service locator, plugin manifest, event bus | no | nothing |
-| `@moabualruz/fulcrum-core` | use cases, orchestration, scheduler | `fulcrum run` | kernel (peer) |
-| `@moabualruz/fulcrum-memory` | notes, semantic search, eviction | `fulcrum-memory` | kernel (peer) |
-| `@moabualruz/fulcrum-planning` | plan synthesis, re-plan on failure | `fulcrum-plan` | kernel (peer), core (optional) |
-| `@moabualruz/fulcrum-policy` | WIP limits, gates, RBAC | `fulcrum-policy check` | kernel (peer) |
-| `@moabualruz/fulcrum-sync` | git sync, remote mirror | `fulcrum-sync` | kernel (peer) |
-| `@moabualruz/fulcrum-teams` | multi-agent orchestration | `fulcrum-teams` | kernel (peer), core (optional) |
-| `@moabualruz/fulcrum-worker` | task executor, shell, sandbox | `fulcrum-worker` | kernel (peer) |
-| `@moabualruz/fulcrum-workflows` | durable steps, retries | `fulcrum-workflow` | kernel (peer) |
-| `@moabualruz/fulcrum-worktrees` | git worktrees, branch rotation | `fulcrum-worktree` | kernel (peer) |
-| `@moabualruz/fulcrum-monitor` | logs, metrics, health | `fulcrum-monitor` | kernel (peer) |
-| `@moabualruz/fulcrum-cli` | top-level CLI binary, dispatches to others | `fulcrum` | kernel (peer), all others (dynamic) |
+| `fulcrum-kernel` (NEW) | contracts, ports, service locator, plugin manifest, event bus | no | nothing |
+| `fulcrum-core` | use cases, orchestration, scheduler | `fulcrum run` | kernel (peer) |
+| `fulcrum-memory` | notes, semantic search, eviction | `fulcrum-memory` | kernel (peer) |
+| `fulcrum-planning` | plan synthesis, re-plan on failure | `fulcrum-plan` | kernel (peer), core (optional) |
+| `fulcrum-policy` | WIP limits, gates, RBAC | `fulcrum-policy check` | kernel (peer) |
+| `fulcrum-sync` | git sync, remote mirror | `fulcrum-sync` | kernel (peer) |
+| `fulcrum-teams` | multi-agent orchestration | `fulcrum-teams` | kernel (peer), core (optional) |
+| `fulcrum-worker` | task executor, shell, sandbox | `fulcrum-worker` | kernel (peer) |
+| `fulcrum-workflows` | durable steps, retries | `fulcrum-workflow` | kernel (peer) |
+| `fulcrum-worktrees` | git worktrees, branch rotation | `fulcrum-worktree` | kernel (peer) |
+| `fulcrum-monitor` | logs, metrics, health | `fulcrum-monitor` | kernel (peer) |
+| `fulcrum-cli` | top-level CLI binary, dispatches to others | `fulcrum` | kernel (peer), all others (dynamic) |
 
 ### 12.2 The kernel
 
@@ -943,7 +943,7 @@ packages **peer-depend** on kernel with a range like `^1.0.0`.
 
 ```
                      ┌────────────────┐
-                     │  @moabualruz/fulcrum-cli  │  (binary, dynamic imports)
+                     │  fulcrum-cli  │  (binary, dynamic imports)
                      └────────┬───────┘
                               │ dynamic
         ┌──────────┬──────────┼──────────┬──────────┬──────────┐
@@ -954,7 +954,7 @@ packages **peer-depend** on kernel with a range like `^1.0.0`.
                               │ peer
                               ▼
                      ┌────────────────┐
-                     │ @fulcrum/kernel│
+                     │ fulcrum-kernel│
                      └────────────────┘
 ```
 
@@ -963,10 +963,10 @@ packages **peer-depend** on kernel with a range like `^1.0.0`.
   dynamic-imports them.
 - Feature packages **do not import each other**. If `planning` needs
   memory's search, it does so via the `NoteStore` port from kernel, which
-  the host has populated from a `@moabualruz/fulcrum-memory` implementation at
+  the host has populated from a `fulcrum-memory` implementation at
   runtime.
 
-### 12.4 Standalone entrypoint for `@moabualruz/fulcrum-memory`
+### 12.4 Standalone entrypoint for `fulcrum-memory`
 
 Layout:
 
@@ -988,7 +988,7 @@ packages/memory/
 
 ```json
 {
-  "name": "@moabualruz/fulcrum-memory",
+  "name": "fulcrum-memory",
   "version": "1.0.0",
   "type": "module",
   "exports": {
@@ -999,8 +999,8 @@ packages/memory/
     "./package.json": "./package.json"
   },
   "bin": { "fulcrum-memory": "./dist/cli.js" },
-  "peerDependencies": { "@fulcrum/kernel": "^1.0.0" },
-  "peerDependenciesMeta": { "@fulcrum/kernel": { "optional": false } },
+  "peerDependencies": { "fulcrum-kernel": "^1.0.0" },
+  "peerDependenciesMeta": { "fulcrum-kernel": { "optional": false } },
   "dependencies": {
     "better-sqlite3": "^11.0.0",
     "zod": "^3.22.0"
@@ -1030,8 +1030,8 @@ packages/memory/
 **Integrated mode** (CLI runs the daemon):
 
 1. Kernel reads root config, finds the memory section.
-2. Kernel discovers `@moabualruz/fulcrum-memory` via `package.json` scan.
-3. Kernel dynamic-imports `@moabualruz/fulcrum-memory/init` and calls `init(ctx)`.
+2. Kernel discovers `fulcrum-memory` via `package.json` scan.
+3. Kernel dynamic-imports `fulcrum-memory/init` and calls `init(ctx)`.
 4. `init` registers the `SqliteStore` as the `NoteStore` port in `ctx`.
 5. Planning/teams/etc. pull `NoteStore` out of `ctx` and use it.
 
@@ -1039,8 +1039,8 @@ packages/memory/
 
 Packages whose standalone CLI has no end-user value may skip the `bin`:
 
-- `@fulcrum/kernel` — library only. No CLI.
-- Possibly `@moabualruz/fulcrum-workflows` if it is a pure engine with no
+- `fulcrum-kernel` — library only. No CLI.
+- Possibly `fulcrum-workflows` if it is a pure engine with no
   human-facing commands. Still publishable and importable.
 
 Everything else should ship a `bin` that does something useful:
@@ -1054,15 +1054,15 @@ Everything else should ship a `bin` that does something useful:
 - `fulcrum-worker run <task.json>`.
 - `fulcrum-teams spawn`, `fulcrum-teams list`.
 
-The top-level `fulcrum` binary (from `@moabualruz/fulcrum-cli`) is a **composition
+The top-level `fulcrum` binary (from `fulcrum-cli`) is a **composition
 point only**: it loads the kernel, resolves plugins, and dispatches to
 subcommands. It is intentionally thin — no business logic in the binary.
 
-### 12.6 How integration is composed by `@moabualruz/fulcrum-cli`
+### 12.6 How integration is composed by `fulcrum-cli`
 
 ```ts
 // packages/cli/src/main.ts
-import { createKernel, loadConfig, ActivationEngine } from '@fulcrum/kernel'
+import { createKernel, loadConfig, ActivationEngine } from 'fulcrum-kernel'
 
 async function main(argv: string[]) {
   const config = await loadConfig()
@@ -1080,7 +1080,7 @@ async function main(argv: string[]) {
 }
 ```
 
-The CLI has no top-level imports of `@moabualruz/fulcrum-memory`, `@moabualruz/fulcrum-planning`,
+The CLI has no top-level imports of `fulcrum-memory`, `fulcrum-planning`,
 etc. Everything is loaded via `await import(pkg)` inside the activation
 engine. Bundlers must not eagerly bundle them; we keep them as external.
 
@@ -1089,7 +1089,7 @@ engine. Bundlers must not eagerly bundle them; we keep them as external.
 Example: the `NoteStore` contract.
 
 ```ts
-// @fulcrum/kernel/src/ports/note-store.ts
+// fulcrum-kernel/src/ports/note-store.ts
 export interface NoteStore {
   put(note: Note): Promise<string>
   get(id: string): Promise<Note | null>
@@ -1102,8 +1102,8 @@ export const NoteStorePort = portKey<NoteStore>('NoteStore')
 Planning references the port by key, not the memory package:
 
 ```ts
-// @moabualruz/fulcrum-planning/src/use-cases/plan.ts
-import { Context, NoteStorePort } from '@fulcrum/kernel'
+// fulcrum-planning/src/use-cases/plan.ts
+import { Context, NoteStorePort } from 'fulcrum-kernel'
 
 export async function plan(ctx: Context, goal: Goal): Promise<Plan> {
   const store = ctx.tryGet(NoteStorePort) // may be null if memory absent
@@ -1132,18 +1132,18 @@ Standalone CLIs use the same schema with just the module's section.
 
 - Unit tests live in `packages/<name>/src/**/*.test.ts`. They only import
   from kernel and from the package's own modules. No sibling imports.
-- **Contract tests** live in `@fulcrum/kernel/test-kit/contracts/*.ts`.
-  `@moabualruz/fulcrum-memory` imports the `NoteStore` contract suite and runs it
+- **Contract tests** live in `fulcrum-kernel/test-kit/contracts/*.ts`.
+  `fulcrum-memory` imports the `NoteStore` contract suite and runs it
   against `SqliteStore`. This replaces most integration tests.
 - **`test/dummy/`** ships a minimal host the package can run inside.
   Rails-engine-style.
-- `@fulcrum/e2e` is a separate workspace package that depends on
+- `fulcrum-e2e` is a separate workspace package that depends on
   everything and runs scenarios against a real daemon.
 
 ### 12.10 Concrete migration steps for the current repo
 
-1. **Create `@fulcrum/kernel`** with ports extracted from today's
-   `@moabualruz/fulcrum-core`. Nothing else moves yet.
+1. **Create `fulcrum-kernel`** with ports extracted from today's
+   `fulcrum-core`. Nothing else moves yet.
 2. **Convert every workspace dep** from `dependencies` to
    `peerDependencies` on kernel, plus `peerDependenciesMeta` for
    cross-package optionality.
@@ -1153,7 +1153,7 @@ Standalone CLIs use the same schema with just the module's section.
    where the package has distinct module groups.
 5. **Add `"fulcrum"` manifest metadata** and build the kernel's plugin
    discovery.
-6. **Move `@moabualruz/fulcrum-cli`** to dynamic imports for feature packages; remove
+6. **Move `fulcrum-cli`** to dynamic imports for feature packages; remove
    top-level imports.
 7. **Add `madge --circular` + `eslint-plugin-import/no-cycle`** to CI.
    Fix cycles.
@@ -1166,16 +1166,16 @@ Standalone CLIs use the same schema with just the module's section.
 ### 12.11 What this buys us
 
 - A user who only wants a local semantic notes store runs
-  `npm i -g @moabualruz/fulcrum-memory && fulcrum-memory ingest ./notes`. Zero
+  `npm i -g fulcrum-memory && fulcrum-memory ingest ./notes`. Zero
   Fulcrum daemon. Small install.
-- A user who wants the full control plane runs `npm i -g @moabualruz/fulcrum-cli`
+- A user who wants the full control plane runs `npm i -g fulcrum-cli`
   and gets everything. Feature packages are optional peer deps.
 - Contributors can ship a third-party plugin
   `@acme/fulcrum-slack-notifier` that peer-depends on kernel and
   registers an event listener. No core changes needed.
 - Refactoring one package cannot break another as long as it does not
   change the kernel contract. Semver does the rest.
-- Tests run per-package in seconds, not minutes. `@fulcrum/e2e` stays
+- Tests run per-package in seconds, not minutes. `fulcrum-e2e` stays
   the heavy integration suite.
 
 ---

@@ -5,8 +5,8 @@
 > [R5 — RAG, Embeddings, Tree-sitter, Memory](../research/r5-rag-memory.md).
 >
 > Scope: the code that ships on `main` as of 2026-04-14 — packages
-> `@moabualruz/fulcrum-core` (embedding registry + recall/write at `packages/core/src/memory.ts`)
-> and `@moabualruz/fulcrum-memory` (vault + Kuzu + extractors + tree-sitter-less
+> `fulcrum-core` (embedding registry + recall/write at `packages/core/src/memory.ts`)
+> and `fulcrum-memory` (vault + Kuzu + extractors + tree-sitter-less
 > chunker at `packages/memory/src/*`). Config defaults live in
 > `packages/core/src/config.ts` and `packages/core/src/constants.ts`.
 >
@@ -38,10 +38,10 @@ and the production MCP server calls the wrong one.** The sophisticated
 L0-vault / L2-Kuzu / RRF path lives in `packages/memory/src/recall.ts`.
 The CLI MCP server (`packages/cli/src/index.ts:596`) and the HTTP
 monitor (`packages/monitor/src/server.ts:8`) both import
-`recallMemory` from `@moabualruz/fulcrum-core`, hitting
+`recallMemory` from `fulcrum-core`, hitting
 `packages/core/src/memory.ts:211` — the simpler, weighted-sum path
 that has no RRF, no vault write, no Kuzu query, no extraction, and no
-scope composition. The `@moabualruz/fulcrum-memory` package is effectively an
+scope composition. The `fulcrum-memory` package is effectively an
 advanced prototype that no user-facing surface actually calls.
 
 ---
@@ -127,7 +127,7 @@ path from `recall_memory` MCP tool call down to the returned rows.
 
 1. User calls the MCP tool `recall_memory`
    (`packages/cli/src/index.ts:958`).
-2. Handler destructures `recallMemory` from `@moabualruz/fulcrum-core`
+2. Handler destructures `recallMemory` from `fulcrum-core`
    (`packages/cli/src/index.ts:596`).
 3. That's `export { writeMemory, recallMemory } from './memory.js'`
    (`packages/core/src/index.ts:53`) — i.e.
@@ -229,10 +229,10 @@ Problems with this path, even if you were to call it:
   which re-reads markdown files from the L0 vault and upserts them
   into Kuzu. That is a setup-time operation, not a runtime path.
 
-The `@moabualruz/fulcrum-memory` package is, today, best described as
+The `fulcrum-memory` package is, today, best described as
 "scaffolding around an aspirational architecture that has never been
 end-to-end wired". The only consumers of `recallMemory` from
-`@moabualruz/fulcrum-memory` are its own tests.
+`fulcrum-memory` are its own tests.
 
 ### Reality check #1 — is `vec_memories` ever written?
 
@@ -278,10 +278,10 @@ eats a cross-encoder pass. No one has measured it under load.
 Yes: `packages/memory/src/write.ts:79–98` writes a markdown file
 under `.fulcrum/vault/memories/…` whenever the vault path exists,
 and appends a line to `log.md`. But only if the caller uses
-`@moabualruz/fulcrum-memory`'s `writeMemory`, *not* `@moabualruz/fulcrum-core`'s. Since
-the CLI calls `@moabualruz/fulcrum-core`'s, the vault stays empty for every
+`fulcrum-memory`'s `writeMemory`, *not* `fulcrum-core`'s. Since
+the CLI calls `fulcrum-core`'s, the vault stays empty for every
 memory that comes in via `write_memory` MCP tool. The post-tool hook
-at `packages/cli/src/index.ts:434` also uses `@moabualruz/fulcrum-core`, so
+at `packages/cli/src/index.ts:434` also uses `fulcrum-core`, so
 `tool_trace` memories also bypass the vault.
 
 ### Reality check #4 — is `recall_memory` actually semantic?
@@ -330,10 +330,10 @@ does semantic search when it does not.
     versions (vault write, L2 enqueue, extraction, RRF, L2 HNSW).
   - `packages/cli/src/index.ts:596,435,450` and
     `packages/monitor/src/server.ts:8,556,589` all import from
-    `@moabualruz/fulcrum-core`, not `@moabualruz/fulcrum-memory`.
-  - Tests for `@moabualruz/fulcrum-memory` exist but no production surface
+    `fulcrum-core`, not `fulcrum-memory`.
+  - Tests for `fulcrum-memory` exist but no production surface
     calls any of them.
-- **Impact:** Every design gain in `@moabualruz/fulcrum-memory` (L0 git-backed
+- **Impact:** Every design gain in `fulcrum-memory` (L0 git-backed
   vault, Kuzu graph, structured extraction, MMR, freshness, RRF,
   scope composition) is not reachable from end-user tools.
 - **R5 citation:** §8 memory architectures (tiered / scoped),
@@ -341,7 +341,7 @@ does semantic search when it does not.
   enforcement", "Provenance on every memory row").
 - **Status:** Blocker. We ship two APIs that claim to be one.
 - **Fix sketch:** delete `packages/core/src/memory.ts` and re-export
-  `@moabualruz/fulcrum-memory`'s versions from `@moabualruz/fulcrum-core`. This is a
+  `fulcrum-memory`'s versions from `fulcrum-core`. This is a
   breaking change for any internal caller that expects the core
   signature — but per C-1 they are already broken. Reconcile the
   interfaces first: the core version returns `Memory[]` while the
@@ -461,7 +461,7 @@ does semantic search when it does not.
 - **Note:** `packages/memory/src/scoring.ts` already implements RRF
   correctly — it just isn't used by the production path.
 - **Fix sketch:** delete `MEMORY_RANK_WEIGHTS`, port the RRF fusion
-  from `@moabualruz/fulcrum-memory` into the production path, and drop
+  from `fulcrum-memory` into the production path, and drop
   `confidence` / `recency` from the fusion stage into a post-RRF
   multiplier (à la `scoring.ts:recallScore`).
 
@@ -580,7 +580,7 @@ does semantic search when it does not.
 
 - **Evidence:** `packages/memory/src/extractors/semantic.ts:19` —
   `extractSemantic` always returns `[]` with a TODO comment:
-  "integrate with @moabualruz/fulcrum-core LLM client". The file is imported
+  "integrate with fulcrum-core LLM client". The file is imported
   by nothing (`rg extractSemantic packages/`).
 - **Impact:** Track 2 LLM extraction (R5 §7.2 LightRAG, §8.3 Mem0)
   is nominally supported but not implemented. Only Track 1 rules
@@ -768,7 +768,7 @@ does semantic search when it does not.
 
 ### L-1. `cosineSimilarity` at `memory.ts:110` is duplicated; exists nowhere else but is only used by dedup
 
-- Not wrong, just homeless. Move to a shared `@moabualruz/fulcrum-core/math.ts`
+- Not wrong, just homeless. Move to a shared `fulcrum-core/math.ts`
   and reuse.
 
 ### L-2. `Buffer.from(input.embedding.buffer)` is unsafe if the Float32Array is a view over a larger buffer
@@ -825,7 +825,7 @@ required but the function silently returns `[]` for invalid input
 
 - Updates the DB (line 365) but returns pre-bump row objects. Minor.
 
-### L-10. `graph.ts` in `@moabualruz/fulcrum-memory` is a plain SQLite adapter parallel to Kuzu
+### L-10. `graph.ts` in `fulcrum-memory` is a plain SQLite adapter parallel to Kuzu
 
 - 342 lines of CRUD on SQLite-backed `graph_entities`/`graph_edges`/
   `graph_episodes` tables. Nothing calls it from recall. Appears
@@ -975,8 +975,8 @@ Traced call graph:
 
 The wiring is correct in isolation. Problems:
 
-- **The reranker is only wired into `@moabualruz/fulcrum-core`'s `recallMemory`.**
-  `@moabualruz/fulcrum-memory`'s `recallMemory` never calls `getReranker()`
+- **The reranker is only wired into `fulcrum-core`'s `recallMemory`.**
+  `fulcrum-memory`'s `recallMemory` never calls `getReranker()`
   (`rg getReranker packages/memory/`). So the "advanced" path
   doesn't rerank at all. Given the core path is what the CLI
   actually uses (see C-2), the reranker ships — but into the
@@ -1256,7 +1256,7 @@ question — see below.
 implementations (→ plan)
 
 - **Scope:** delete `packages/core/src/memory.ts`; re-export
-  `@moabualruz/fulcrum-memory` versions from `@moabualruz/fulcrum-core`. Migrate CLI
+  `fulcrum-memory` versions from `fulcrum-core`. Migrate CLI
   and monitor imports. Reconcile the return type (`Memory[]` vs
   `CompactMemory[] | FullMemory[]`) with a migration note; bump
   the MCP tool schema accordingly.
@@ -1322,8 +1322,8 @@ around the R5-recommended stack is on the table."*
 
 ### Option A — Retrofit
 
-Keep `@moabualruz/fulcrum-memory` and the Kuzu integration; port everything
-to `@moabualruz/fulcrum-core`'s production path. Fix F5-ISSUE-01 through -15
+Keep `fulcrum-memory` and the Kuzu integration; port everything
+to `fulcrum-core`'s production path. Fix F5-ISSUE-01 through -15
 against the existing schema. Estimated effort: each issue is 0.5–5
 days, most in the 1–3 day band. Net ≈ 20–40 engineer-days.
 
@@ -1332,14 +1332,14 @@ Retrofit wins on:
   memory, matches R5 §9 audit-log expectations).
 - Preserves Kuzu HNSW + entity store scaffolding, which is
   good-quality code — it just needs to be called.
-- Consolidation into `@moabualruz/fulcrum-memory` is one of the 15 issues; not
+- Consolidation into `fulcrum-memory` is one of the 15 issues; not
   a full rebuild.
 
 Retrofit loses on:
 - Tree-sitter chunker, repo-map, code embedder path, eval harness,
   decay+consolidation jobs are all greenfield additions. 60% of the
   effort is new code, not refactoring.
-- The "two implementations" dead weight in `@moabualruz/fulcrum-core/memory.ts`
+- The "two implementations" dead weight in `fulcrum-core/memory.ts`
   is technical debt that deletes cleanly but requires a migration
   path for downstream consumers.
 - Retains the `MemoryKind`+16-variants taxonomy which has no
@@ -1347,12 +1347,12 @@ Retrofit loses on:
 
 ### Option B — Rebuild
 
-Delete `@moabualruz/fulcrum-core/memory.ts` and `@moabualruz/fulcrum-memory/` entirely.
-Create a single `@fulcrum/recall` package with:
+Delete `fulcrum-core/memory.ts` and `fulcrum-memory/` entirely.
+Create a single `fulcrum-recall` package with:
 
 - **Storage:** SQLite (L1) + `sqlite-vec` (dense, per-index tables)
   + FTS5 (lexical) + optional Kuzu (graph). L0 vault is optional
-  and lives under `@fulcrum/recall/vault`.
+  and lives under `fulcrum-recall/vault`.
 - **Indexes:** one per content class
   - `vec_text` — prose memories, Qwen3 1024-dim
   - `vec_code_chunks` — code chunks, jina-code 768-dim
@@ -1392,7 +1392,7 @@ Rebuild loses on:
 
 1. **Land F5-ISSUE-10 first.** Consolidate the two
    `recallMemory`/`writeMemory` implementations into
-   `@moabualruz/fulcrum-memory`, re-export from `@moabualruz/fulcrum-core`. This is the
+   `fulcrum-memory`, re-export from `fulcrum-core`. This is the
    single highest-leverage change — it unblocks every other issue
    because all improvements land in one code path.
 2. **Then F5-ISSUE-11** (Kuzu memory-node creation). Fixes the
@@ -1415,8 +1415,8 @@ Rebuild loses on:
    few days — ship before that point, not after.
 
 Rebuild is the right move only if step 1 turns out to be harder
-than expected. If reconciling `@moabualruz/fulcrum-core`'s thin `Memory`
-return type with `@moabualruz/fulcrum-memory`'s `CompactMemory`/`FullMemory`
+than expected. If reconciling `fulcrum-core`'s thin `Memory`
+return type with `fulcrum-memory`'s `CompactMemory`/`FullMemory`
 breaks more than 5 call sites badly, that's the signal to
 re-evaluate.
 
@@ -1425,7 +1425,7 @@ re-evaluate.
 ## Tangential: what C1/C2 already know and we should cross-reference
 
 - **C1 §2.2** is the memory package inventory — confirm the
-  `@moabualruz/fulcrum-memory` exports list at `packages/memory/src/index.ts`
+  `fulcrum-memory` exports list at `packages/memory/src/index.ts`
   and the two-package split. F5 uses this to make the "two
   implementations" argument.
 - **C2 §8** is the memory write pipeline — cross-referenced at

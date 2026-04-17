@@ -93,7 +93,7 @@ Seven-stage retrieval pipeline:
 ### Activation (via rebuild)
 
 ```typescript
-import { activateL2 } from '@moabualruz/fulcrum-memory/setup'
+import { activateL2 } from 'fulcrum-memory/setup'
 
 const result = await activateL2()
 // { l1Count, l2Count, errors }
@@ -102,7 +102,7 @@ const result = await activateL2()
 ### Vault ↔ L1/L2 sync after branch merge
 
 ```typescript
-import { reconcileMergedBranch } from '@moabualruz/fulcrum-memory/setup'
+import { reconcileMergedBranch } from 'fulcrum-memory/setup'
 
 await reconcileMergedBranch(vaultPath, taskId)
 // Diffs merge commit, upserts changed files to L1+L2, removes deleted, appends MERGE log entry
@@ -126,7 +126,7 @@ This means code-aware recall can answer questions like "what files import this m
 The edge write is best-effort — if Kuzu is not enabled or the write fails, ingest continues without error.
 
 ```typescript
-import { ingestFile } from '@moabualruz/fulcrum-memory'
+import { ingestFile } from 'fulcrum-memory'
 
 // Import edges are emitted automatically for .ts / .js / .tsx / .jsx files
 await ingestFile({

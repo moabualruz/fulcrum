@@ -223,7 +223,7 @@ Everything else is a gap. The rest of this document is the gap list.
   acceptance).
 - **Impact**: A misbehaving client (or a test harness) can send
   `tools/call` first; Fulcrum will happily open a span and call into
-  `@moabualruz/fulcrum-core` with no workspace resolution, producing inconsistent
+  `fulcrum-core` with no workspace resolution, producing inconsistent
   state. For `ping`, the behavior is accidentally correct.
 - **Fix direction**: Track `initialized: 'pending' | 'init_received' | 'ready'`
   and reject non-ping, non-initialize requests with `-32002` or `-32600`
@@ -302,7 +302,7 @@ Everything else is a gap. The rest of this document is the gap list.
   Fulcrum — has zero coverage.
 - **Impact**: Any refactor of the JSON-RPC loop is uncoverable by tests.
   Any protocol-version bump is uncoverable. The 18 tool handlers are
-  each indirectly covered by `@moabualruz/fulcrum-core` tests but not by any test
+  each indirectly covered by `fulcrum-core` tests but not by any test
   that sends a `tools/call` frame.
 - **Fix direction**: Add a test helper that spawns `runServeMcp()` with a
   fake stdin/stdout (or via `child_process.spawn('node', ['dist/cli.js',
@@ -581,7 +581,7 @@ Everything else is a gap. The rest of this document is the gap list.
   of non-idempotent tools (`create_task`, `invoke_team`).
 - **Fix direction**: Track in-flight requests by id; on
   `notifications/cancelled`, set an AbortController per request and
-  pass the signal into `@moabualruz/fulcrum-core` calls that accept one. Core
+  pass the signal into `fulcrum-core` calls that accept one. Core
   functions need the corresponding abort plumbing.
 
 ### [F1-HIGH-12] No progress notifications on long-running tools

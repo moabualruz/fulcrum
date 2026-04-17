@@ -1,13 +1,13 @@
 # Plane Sync
 
-`@moabualruz/fulcrum-sync` provides bidirectional synchronization with [Plane](https://plane.so/).
+`fulcrum-sync` provides bidirectional synchronization with [Plane](https://plane.so/).
 
 ---
 
 ## Usage
 
 ```typescript
-import { syncObject, resolveConflict } from '@moabualruz/fulcrum-sync'
+import { syncObject, resolveConflict } from 'fulcrum-sync'
 
 await syncObject({
   workspace_id: 'ws_1',
@@ -58,7 +58,7 @@ The client includes automatic retry:
 
 ## Conflict Detection
 
-When a local write conflicts with a remote update (both sides changed since last sync), `@moabualruz/fulcrum-sync` stores the conflict in the `sync_conflicts` table. Resolution strategies:
+When a local write conflicts with a remote update (both sides changed since last sync), `fulcrum-sync` stores the conflict in the `sync_conflicts` table. Resolution strategies:
 
 - `local_wins` — apply the local version to Plane
 - `remote_wins` — apply the Plane version locally

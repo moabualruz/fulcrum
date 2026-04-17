@@ -21,7 +21,7 @@ afterEach(() => {
 describe('on / fire', () => {
   it('calls registered handler when matching event is fired', () => {
     const received: EmitEventInput[] = []
-    getEventBus().on('task_created', (evt) => received.push(evt))
+    getEventBus().on('task_created', (evt) => { received.push(evt) })
     getEventBus().fire(makeEvent({ evt_type: 'task_created' }))
     expect(received).toHaveLength(1)
     expect(received[0].evt_type).toBe('task_created')
@@ -29,15 +29,15 @@ describe('on / fire', () => {
 
   it('does NOT call handler for a different event type', () => {
     const received: EmitEventInput[] = []
-    getEventBus().on('task_created', (evt) => received.push(evt))
+    getEventBus().on('task_created', (evt) => { received.push(evt) })
     getEventBus().fire(makeEvent({ evt_type: 'memory_written' }))
     expect(received).toHaveLength(0)
   })
 
   it('calls multiple handlers for the same event type', () => {
     const log: string[] = []
-    getEventBus().on('task_created', () => log.push('handler_a'))
-    getEventBus().on('task_created', () => log.push('handler_b'))
+    getEventBus().on('task_created', () => { log.push('handler_a') })
+    getEventBus().on('task_created', () => { log.push('handler_b') })
     getEventBus().fire(makeEvent())
     expect(log).toEqual(['handler_a', 'handler_b'])
   })
@@ -46,7 +46,7 @@ describe('on / fire', () => {
 describe('off', () => {
   it('stops calling a removed handler', () => {
     const received: EmitEventInput[] = []
-    const handler: EventHandler = (evt) => received.push(evt)
+    const handler: EventHandler = (evt) => { received.push(evt) }
     getEventBus().on('task_created', handler)
     getEventBus().fire(makeEvent())
     getEventBus().off('task_created', handler)
@@ -62,7 +62,7 @@ describe('off', () => {
 describe('once', () => {
   it('calls handler only once then removes it', () => {
     const received: EmitEventInput[] = []
-    getEventBus().once('task_created', (evt) => received.push(evt))
+    getEventBus().once('task_created', (evt) => { received.push(evt) })
     getEventBus().fire(makeEvent())
     getEventBus().fire(makeEvent())
     getEventBus().fire(makeEvent())
@@ -73,7 +73,7 @@ describe('once', () => {
 describe('onAny / offAny', () => {
   it('receives all event types', () => {
     const types: string[] = []
-    getEventBus().onAny((evt) => types.push(evt.evt_type))
+    getEventBus().onAny((evt) => { types.push(evt.evt_type) })
     getEventBus().fire(makeEvent({ evt_type: 'task_created' }))
     getEventBus().fire(makeEvent({ evt_type: 'memory_written' }))
     getEventBus().fire(makeEvent({ evt_type: 'agent_run_finished' }))
@@ -82,7 +82,7 @@ describe('onAny / offAny', () => {
 
   it('offAny stops global handler', () => {
     const types: string[] = []
-    const handler: EventHandler = (evt) => types.push(evt.evt_type)
+    const handler: EventHandler = (evt) => { types.push(evt.evt_type) }
     getEventBus().onAny(handler)
     getEventBus().fire(makeEvent({ evt_type: 'task_created' }))
     getEventBus().offAny(handler)
@@ -113,7 +113,7 @@ describe('error isolation', () => {
   it('a throwing handler does not prevent subsequent handlers from running', () => {
     const received: string[] = []
     getEventBus().on('task_created', () => { throw new Error('simulated crash') })
-    getEventBus().on('task_created', () => received.push('second'))
+    getEventBus().on('task_created', () => { received.push('second') })
     expect(() => getEventBus().fire(makeEvent())).not.toThrow()
     expect(received).toEqual(['second'])
   })
@@ -123,7 +123,7 @@ describe('setEventBus / resetEventBus', () => {
   it('setEventBus replaces the active bus', () => {
     const custom = getEventBus()
     const log: string[] = []
-    custom.on('task_created', () => log.push('custom'))
+    custom.on('task_created', () => { log.push('custom') })
     setEventBus(custom)
     getEventBus().fire(makeEvent())
     expect(log).toEqual(['custom'])
@@ -131,7 +131,7 @@ describe('setEventBus / resetEventBus', () => {
 
   it('resetEventBus starts fresh with no handlers', () => {
     const received: EmitEventInput[] = []
-    getEventBus().on('task_created', (evt) => received.push(evt))
+    getEventBus().on('task_created', (evt) => { received.push(evt) })
     resetEventBus()
     getEventBus().fire(makeEvent())
     expect(received).toHaveLength(0)

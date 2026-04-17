@@ -21,7 +21,7 @@
 
 ## Architecture Decisions
 
-1. **`core/src/memory.ts` is deleted.** `@moabualruz/fulcrum-core` owns types; `@moabualruz/fulcrum-memory` owns all memory I/O. No exceptions. `runs.ts` gets a lightweight direct INSERT for task_outcome writes.
+1. **`core/src/memory.ts` is deleted.** `fulcrum-core` owns types; `fulcrum-memory` owns all memory I/O. No exceptions. `runs.ts` gets a lightweight direct INSERT for task_outcome writes.
 
 2. **All IDs used in file paths are validated at the vault boundary.** ULID-safe regex `[a-zA-Z0-9_\-]{1,128}` enforced in `getMemoryFilePath` before any `path.join()` call.
 
@@ -55,7 +55,7 @@
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-memory test
+pnpm --filter fulcrum-memory test
 ```
 
 **Dependencies:** None
@@ -75,8 +75,8 @@ pnpm --filter @moabualruz/fulcrum-memory test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-memory test
-pnpm --filter @moabualruz/fulcrum-cli test
+pnpm --filter fulcrum-memory test
+pnpm --filter fulcrum-cli test
 ```
 
 **Dependencies:** None
@@ -99,7 +99,7 @@ pnpm --filter @moabualruz/fulcrum-cli test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-monitor test
+pnpm --filter fulcrum-monitor test
 ```
 
 **Dependencies:** None
@@ -155,7 +155,7 @@ pnpm --filter @moabualruz/fulcrum-monitor test
 
 ### Task 2.1: Wire `/policy/check` to Real Policy Engine
 **Size:** S — 1 file  
-**Description:** The `/policy/check` HTTP endpoint currently bypasses `evaluatePolicy()` entirely. Replace the hardcoded stub with a real call to `evaluatePolicy` from `@moabualruz/fulcrum-policy`. Include `logPolicyEvent` call for audit trail. Also implement run_id → role DB lookup: when `start_agent_run` creates a run, store `(run_id, workspace_id, role)`. The `/policy/check` endpoint looks up the authoritative role from DB using the run_id extracted from the bearer token or `X-Run-Id` header, rather than trusting caller-supplied `actor_id`.
+**Description:** The `/policy/check` HTTP endpoint currently bypasses `evaluatePolicy()` entirely. Replace the hardcoded stub with a real call to `evaluatePolicy` from `fulcrum-policy`. Include `logPolicyEvent` call for audit trail. Also implement run_id → role DB lookup: when `start_agent_run` creates a run, store `(run_id, workspace_id, role)`. The `/policy/check` endpoint looks up the authoritative role from DB using the run_id extracted from the bearer token or `X-Run-Id` header, rather than trusting caller-supplied `actor_id`.
 
 **Files:** `packages/monitor/src/server.ts`, `packages/core/src/runs.ts`
 
@@ -168,8 +168,8 @@ pnpm --filter @moabualruz/fulcrum-monitor test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-policy test
-pnpm --filter @moabualruz/fulcrum-monitor test
+pnpm --filter fulcrum-policy test
+pnpm --filter fulcrum-monitor test
 ```
 
 **Dependencies:** None
@@ -190,7 +190,7 @@ pnpm --filter @moabualruz/fulcrum-monitor test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-monitor test
+pnpm --filter fulcrum-monitor test
 ```
 
 **Dependencies:** None
@@ -205,14 +205,14 @@ pnpm --filter @moabualruz/fulcrum-monitor test
 
 **Acceptance criteria:**
 - [ ] `packages/core/src/memory.ts` no longer exists
-- [ ] `@moabualruz/fulcrum-core` exports no `recallMemory` or `writeMemory` functions
+- [ ] `fulcrum-core` exports no `recallMemory` or `writeMemory` functions
 - [ ] `runs.ts:completeAgentRun` still writes a `task_outcome` memory to SQLite
 - [ ] The task_outcome write uses content-hash dedup
 - [ ] All core tests pass
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-core test
+pnpm --filter fulcrum-core test
 pnpm build
 ```
 
@@ -233,7 +233,7 @@ pnpm build
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-cli test
+pnpm --filter fulcrum-cli test
 ```
 
 **Dependencies:** 2.3 (removes the broken recall path this currently tries to call)
@@ -254,7 +254,7 @@ pnpm --filter @moabualruz/fulcrum-cli test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-cli test
+pnpm --filter fulcrum-cli test
 ```
 
 **Dependencies:** None
@@ -275,7 +275,7 @@ pnpm --filter @moabualruz/fulcrum-cli test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-core test
+pnpm --filter fulcrum-core test
 ```
 
 **Dependencies:** None
@@ -295,7 +295,7 @@ pnpm --filter @moabualruz/fulcrum-core test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-memory test
+pnpm --filter fulcrum-memory test
 ```
 
 **Dependencies:** None
@@ -315,8 +315,8 @@ pnpm --filter @moabualruz/fulcrum-memory test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-memory test
-pnpm --filter @moabualruz/fulcrum-core test
+pnpm --filter fulcrum-memory test
+pnpm --filter fulcrum-core test
 ```
 
 **Dependencies:** None
@@ -370,7 +370,7 @@ idx_issues_assignee           ON issues(assignee_agent_id)
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-core test
+pnpm --filter fulcrum-core test
 ```
 
 **Dependencies:** Phase 2 checkpoint
@@ -391,7 +391,7 @@ pnpm --filter @moabualruz/fulcrum-core test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-core test
+pnpm --filter fulcrum-core test
 ```
 
 **Dependencies:** Phase 2 checkpoint
@@ -412,7 +412,7 @@ pnpm --filter @moabualruz/fulcrum-core test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-core test
+pnpm --filter fulcrum-core test
 ```
 
 **Dependencies:** 3.1
@@ -463,7 +463,7 @@ pnpm --filter @moabualruz/fulcrum-core test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-core test
+pnpm --filter fulcrum-core test
 ```
 
 **Dependencies:** Phase 2 checkpoint
@@ -484,7 +484,7 @@ pnpm --filter @moabualruz/fulcrum-core test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-core test
+pnpm --filter fulcrum-core test
 ```
 
 **Dependencies:** Phase 2 checkpoint
@@ -524,8 +524,8 @@ pnpm --filter @moabualruz/fulcrum-core test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-core test
-pnpm --filter @moabualruz/fulcrum-policy test
+pnpm --filter fulcrum-core test
+pnpm --filter fulcrum-policy test
 ```
 
 **Dependencies:** Phase 3 checkpoint
@@ -547,7 +547,7 @@ pnpm --filter @moabualruz/fulcrum-policy test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-memory test
+pnpm --filter fulcrum-memory test
 ```
 
 **Dependencies:** Phase 3 checkpoint
@@ -569,7 +569,7 @@ pnpm --filter @moabualruz/fulcrum-memory test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-core test
+pnpm --filter fulcrum-core test
 ```
 
 **Dependencies:** Phase 3 checkpoint, after 4.1/4.2 (to not conflict on migrations)
@@ -591,7 +591,7 @@ pnpm --filter @moabualruz/fulcrum-core test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-memory test
+pnpm --filter fulcrum-memory test
 ```
 
 **Dependencies:** Phase 3 checkpoint
@@ -613,8 +613,8 @@ pnpm --filter @moabualruz/fulcrum-memory test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-worker test
-pnpm --filter @moabualruz/fulcrum-cli test
+pnpm --filter fulcrum-worker test
+pnpm --filter fulcrum-cli test
 ```
 
 **Dependencies:** Phase 3 checkpoint, 2.1 (policy enforcement must work before dispatch)
@@ -628,7 +628,7 @@ pnpm --filter @moabualruz/fulcrum-cli test
 **Files:** `packages/memory/src/eval/runner.ts` (new), `packages/memory/src/eval/baseline.json` (new), `packages/memory/src/eval/queries.ts`, `packages/memory/src/eval/metrics.ts`
 
 **Acceptance criteria:**
-- [ ] `pnpm --filter @moabualruz/fulcrum-memory test` runs the eval harness as a Vitest test
+- [ ] `pnpm --filter fulcrum-memory test` runs the eval harness as a Vitest test
 - [ ] Eval fails if Recall@5 drops >5% below baseline
 - [ ] NDCG@5 is computed and reported
 - [ ] At least 10 paraphrastic query-document pairs exist (semantic match, no keyword overlap)
@@ -636,7 +636,7 @@ pnpm --filter @moabualruz/fulcrum-cli test
 
 **Verification:**
 ```bash
-pnpm --filter @moabualruz/fulcrum-memory test
+pnpm --filter fulcrum-memory test
 ```
 
 **Dependencies:** 4.2 (hybrid search improves recall quality before setting baseline)
@@ -662,7 +662,7 @@ pnpm --filter @moabualruz/fulcrum-memory test
 
 ### Task 5.1: `TeamOps` Interface — Kill `@ts-ignore`
 **Size:** S — 3 files  
-**Description:** `core/src/index.ts` exports `getTeamOps()` returning `Record<string, unknown>` with a `@ts-ignore`. Define a `TeamOps` interface in `core/src/team-ops.ts` (types only, zero imports). Update `getTeamOps()` to return `Promise<TeamOps>`. Have `@moabualruz/fulcrum-teams` implement it at registration. Remove the `@ts-ignore`.
+**Description:** `core/src/index.ts` exports `getTeamOps()` returning `Record<string, unknown>` with a `@ts-ignore`. Define a `TeamOps` interface in `core/src/team-ops.ts` (types only, zero imports). Update `getTeamOps()` to return `Promise<TeamOps>`. Have `fulcrum-teams` implement it at registration. Remove the `@ts-ignore`.
 
 **Files:** `packages/core/src/team-ops.ts` (new), `packages/core/src/index.ts`, `packages/teams/src/index.ts`
 
@@ -820,7 +820,7 @@ Extract `assertRunIsLive(run_id, db)` helper. Apply to `completeAgentRun`, `bloc
 **Size:** XS — 1 file  
 **File:** `packages/core/src/cos-parser.ts:3`
 
-Change import from `./memory.js` to `@moabualruz/fulcrum-memory`. Identical fix to `runs.ts`. Both can be done in the same PR as Task 2.3.
+Change import from `./memory.js` to `fulcrum-memory`. Identical fix to `runs.ts`. Both can be done in the same PR as Task 2.3.
 
 ---
 

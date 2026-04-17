@@ -19,7 +19,7 @@ downstream hook in the session has a real `runId`.
 | ID | Title | Severity | Priority |
 |----|-------|----------|----------|
 | F0-ISSUE-01 | Session lifecycle wiring (SessionStart + Stop hooks + runId) | CRITICAL | P0 |
-| F0-ISSUE-02 | Real Claude Code agent adapter in `@moabualruz/fulcrum-worker` | CRITICAL | P0 |
+| F0-ISSUE-02 | Real Claude Code agent adapter in `fulcrum-worker` | CRITICAL | P0 |
 | F0-ISSUE-10 | E2E session test (`tests/e2e/claude-session.test.ts`) | CRITICAL | P0 |
 | F0-ISSUE-04 | CLAUDE.md build-time codegen (`scripts/gen-claude-md.ts`) | HIGH | P1 |
 | F0-ISSUE-06 | Agent profile consumer — resolve `target_role` → DB profile | HIGH | P1 |
@@ -293,7 +293,7 @@ F4-ISSUE-01  ──→  F0-ISSUE-06 (agent_definitions schema must exist first)
   `graph_edges`, `graph_episodes` tables have zero production callers
   (grep for table names in `packages/` — exclude migrations and tests)
 
-- [ ] Delete them from `@moabualruz/fulcrum-core` if unused; add a migration to drop tables
+- [ ] Delete them from `fulcrum-core` if unused; add a migration to drop tables
 
 - [ ] Delete `buildWorldState` export if unused
 
@@ -348,7 +348,7 @@ Before implementing Task 0.1, verify:
    simultaneously (e.g., split panes), they'll race on the file. Use a
    per-session file at `.fulcrum/sessions/<session_id>.json` instead.
 
-4. **Worktree allocation API in `@moabualruz/fulcrum-worktrees`** — verify `allocateWorktree`
+4. **Worktree allocation API in `fulcrum-worktrees`** — verify `allocateWorktree`
    exists and its signature before Task 0.6. If it doesn't exist yet, that's
    a dependency on a P6 task.
 

@@ -371,7 +371,7 @@ Output: `{task_id, status, note, assigned_to}`.
 
 ---
 
-## `issue` — issue CRUD (from `@moabualruz/fulcrum-planning`)
+## `issue` — issue CRUD (from `fulcrum-planning`)
 
 ### `fulcrum issue list`
 
@@ -423,7 +423,7 @@ Output: `{issue_id, status, title, version}`.
 
 ---
 
-## `epic` — epic CRUD (from `@moabualruz/fulcrum-planning`)
+## `epic` — epic CRUD (from `fulcrum-planning`)
 
 ### `fulcrum epic list`
 
@@ -494,7 +494,7 @@ Output: rows of `{worktree_id, branch_name, status, project_id, updated_at}`.
 
 ### `fulcrum queue merge process`
 
-Drain the merge queue. Delegates to `@moabualruz/fulcrum-worktrees.processMergeQueue`.
+Drain the merge queue. Delegates to `fulcrum-worktrees.processMergeQueue`.
 
 ```
 fulcrum queue merge process --actor-role <role> [--workspace-id <id>] [--project-id <id>]
@@ -572,7 +572,7 @@ Output: full sync result object.
 
 ---
 
-## `team` — team templates and instances (`@moabualruz/fulcrum-teams`)
+## `team` — team templates and instances (`fulcrum-teams`)
 
 ### `fulcrum team list`
 
@@ -625,7 +625,7 @@ Output: rows of `{instance_id, display_id, template_id, status, purpose}`.
 
 ---
 
-## `workflow` — workflow engine (`@moabualruz/fulcrum-workflows`)
+## `workflow` — workflow engine (`fulcrum-workflows`)
 
 For writing workflow definitions, see the [workflow authoring guide](./workflow-authoring.md).
 
@@ -689,7 +689,7 @@ Output: `{wf_id, status}`.
 
 ---
 
-## `agent` — agent runs (`@moabualruz/fulcrum-worker`)
+## `agent` — agent runs (`fulcrum-worker`)
 
 For adapter authoring, see the [worker adapters guide](./worker-adapters.md).
 
