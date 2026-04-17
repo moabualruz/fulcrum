@@ -1,5 +1,5 @@
 // packages/worktrees/src/types.ts
-import type { ArtifactType } from 'fulcrum-core'
+import type { ArtifactType } from 'fulcrum-agent-core'
 export type { ArtifactType }
 
 export type ArtifactStatus = 'draft' | 'final' | 'archived'

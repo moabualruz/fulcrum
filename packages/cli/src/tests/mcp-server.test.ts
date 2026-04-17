@@ -9,7 +9,7 @@ import { CompatibilityCallToolResultSchema } from '@modelcontextprotocol/sdk/typ
 import { createFulcrumMcpServer } from '../mcp-server.js'
 import { TOOL_SCHEMAS } from '../mcp-tools.js'
 import { buildMcpExposurePlan, buildProfileFilter, TOOL_REGISTRY } from '../tool-registry.js'
-import * as core from 'fulcrum-core'
+import * as core from 'fulcrum-agent-core'
 
 afterEach(() => {
   vi.restoreAllMocks()

@@ -7,7 +7,7 @@ import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js
 import { initVault, writeMemoryFile } from '../vault/client.js'
 import { createVaultGit } from '../vault/git.js'
 import { reconcileMergedBranch } from '../setup/rebuild.js'
-import { getDb } from 'fulcrum-core'
+import { getDb } from 'fulcrum-agent-core'
 import type { FullMemory } from '../types.js'
 
 let vaultPath: string

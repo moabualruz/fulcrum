@@ -4,8 +4,8 @@
 // Same response shape; same workspace-id filtering enforced.
 // Empty groups are OMITTED per §11.40.
 
-import type { Db } from 'fulcrum-core'
-import { getDb } from 'fulcrum-core'
+import type { Db } from 'fulcrum-agent-core'
+import { getDb } from 'fulcrum-agent-core'
 import { runProjectContext } from 'fulcrum-memory'
 import type { ProjectContextInput } from 'fulcrum-memory'
 

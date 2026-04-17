@@ -160,14 +160,14 @@ export {
   deleteAgentProfile,
 } from './agent-profiles.js'
 
-// Hook types (GAP-ARCH-3): pure types extracted from fulcrum-cli so other
+// Hook types (GAP-ARCH-3): pure types extracted from fulcrum-agent-cli so other
 // packages can depend on them without pulling in policy/memory.
 export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO } from './hooks.js'
 
 // Team management — IoC registry.
 // fulcrum-teams implements TeamOps and registers itself at startup via:
 //   import { createTeamOps } from 'fulcrum-teams'
-//   import { setTeamOps } from 'fulcrum-core'
+//   import { setTeamOps } from 'fulcrum-agent-core'
 //   setTeamOps(createTeamOps())
 // This breaks the static circular dependency (teams → core is fine;
 // core must never import teams).

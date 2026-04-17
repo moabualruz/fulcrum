@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { _configureDb, runMigrations, setDb } from 'fulcrum-core'
+import { _configureDb, runMigrations, setDb } from 'fulcrum-agent-core'
 import { startMonitorServer } from '../server.js'
 
 let db: Database.Database

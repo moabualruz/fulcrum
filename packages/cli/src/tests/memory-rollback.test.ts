@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { _configureDb, setDb, closeDb, runMigrations } from 'fulcrum-core'
+import { _configureDb, setDb, closeDb, runMigrations } from 'fulcrum-agent-core'
 import { rollbackMemories } from '../commands/memory-rollback.js'
 
 function freshDb() {

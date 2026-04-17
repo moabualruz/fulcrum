@@ -154,7 +154,7 @@ describe('listReviews', () => {
   })
 
   it('does not return reviews from a different workspace', async () => {
-    const db = (await import('fulcrum-core')).getDb()
+    const db = (await import('fulcrum-agent-core')).getDb()
     db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_2','ws2')").run()
     db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2','ws_2','p2')").run()
     await createReview({ workspace_id: 'ws_1', project_id: 'proj_1', target_type: 'task', target_id: 't1' })

@@ -5,8 +5,8 @@
 // can surface the corresponding lifecycle hook with a single shell-out.
 
 import { createHash } from 'node:crypto'
-import type { Db } from 'fulcrum-core'
-import type { HookContext } from 'fulcrum-core'
+import type { Db } from 'fulcrum-agent-core'
+import type { HookContext } from 'fulcrum-agent-core'
 import { buildProvenance, sessionSummaryUniqueConstraintError, hasTaskOutcomeForRun, type PrimaryContextType } from './hooks-writers.js'
 
 export interface SessionSummaryInput {

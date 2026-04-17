@@ -10,8 +10,8 @@
 //      predicate-indexed DELETE bounds row accumulation between MCP
 //      restarts.
 
-import type { Db } from 'fulcrum-core'
-import { getDb } from 'fulcrum-core'
+import type { Db } from 'fulcrum-agent-core'
+import { getDb } from 'fulcrum-agent-core'
 
 const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000 // 24h
 

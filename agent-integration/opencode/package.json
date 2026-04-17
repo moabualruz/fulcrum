@@ -9,5 +9,18 @@
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
+  },
+  "author": "Mo Abualruz <moabualruz@github>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moabualruz/fulcrum.git"
+  },
+  "homepage": "https://github.com/moabualruz/fulcrum#readme",
+  "bugs": {
+    "url": "https://github.com/moabualruz/fulcrum/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

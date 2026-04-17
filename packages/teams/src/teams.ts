@@ -1,5 +1,5 @@
 // packages/teams/src/teams.ts
-import { getDb, nextDisplayId, FulcrumError, canInvokeTeams, newId , Db} from 'fulcrum-core'
+import { getDb, nextDisplayId, FulcrumError, canInvokeTeams, newId , Db} from 'fulcrum-agent-core'
 import type {
   TeamTemplate,
   TeamInstance,

@@ -6,7 +6,7 @@
 // table rebuilds. Validation, char caps per §3.4, and the truncation marker
 // move into this module so write.ts applies a single canonical policy.
 
-import { FulcrumError } from 'fulcrum-core'
+import { FulcrumError } from 'fulcrum-agent-core'
 
 /** v2a kinds from §3.4 — standard, written by hooks or agents. */
 const V2A_KINDS = [

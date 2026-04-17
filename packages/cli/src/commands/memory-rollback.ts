@@ -5,8 +5,8 @@
 // it. Triple-gated: --since, --yes-i-really-want-to-undo-N-writes, and
 // (for cross-workspace) --yes-cross-workspace.
 
-import type { Db } from 'fulcrum-core'
-import { getDb, loadConfig, runMigrations } from 'fulcrum-core'
+import type { Db } from 'fulcrum-agent-core'
+import { getDb, loadConfig, runMigrations } from 'fulcrum-agent-core'
 
 export interface RollbackInput {
   since: string

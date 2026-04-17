@@ -9,7 +9,7 @@
 // Strategy: import the functions directly and mock:
 //   - process.exit  → throw so we can assert the "happy exit"
 //   - process.stdin → a PassThrough stream we can write JSON into
-//   - fulcrum-core → stub startAgentRun / completeAgentRun / writeMemory
+//   - fulcrum-agent-core → stub startAgentRun / completeAgentRun / writeMemory
 //   - fs (readFileSync / writeFileSync / existsSync / mkdirSync) → in-memory stubs
 //     so no actual disk state is required
 
@@ -80,7 +80,7 @@ describe('runSessionStartHook', () => {
   })
 
   it('exits 0 on valid session-start payload and calls startAgentRun', async () => {
-    vi.doMock('fulcrum-core', () => coreModuleMock)
+    vi.doMock('fulcrum-agent-core', () => coreModuleMock)
     // Stub out fs helpers used by the session file writer
     vi.doMock('fs', async () => {
       const actual = await vi.importActual<typeof import('fs')>('fs')
@@ -102,7 +102,7 @@ describe('runSessionStartHook', () => {
   })
 
   it('exits 0 even with empty stdin (uses fallback session_id)', async () => {
-    vi.doMock('fulcrum-core', () => coreModuleMock)
+    vi.doMock('fulcrum-agent-core', () => coreModuleMock)
     vi.doMock('fs', async () => {
       const actual = await vi.importActual<typeof import('fs')>('fs')
       return { ...actual, mkdirSync: vi.fn(), writeFileSync: vi.fn(), existsSync: vi.fn().mockReturnValue(false) }
@@ -127,7 +127,7 @@ describe('runSessionStartHook', () => {
       TOOL_REGISTRY: fakeRegistryMap,
       buildDeps: vi.fn().mockReturnValue({ db: {}, workspace_id: 'ws_test', project_id: 'proj_test' }),
     }))
-    vi.doMock('fulcrum-core', () => coreModuleMock)
+    vi.doMock('fulcrum-agent-core', () => coreModuleMock)
 
     let capturedSessionData: Record<string, unknown> | null = null
     vi.doMock('fs', async () => {
@@ -168,7 +168,7 @@ describe('runSessionStartHook', () => {
       ]),
       buildDeps: vi.fn().mockReturnValue({ db: {}, workspace_id: 'ws_test', project_id: 'proj_test' }),
     }))
-    vi.doMock('fulcrum-core', () => coreModuleMock)
+    vi.doMock('fulcrum-agent-core', () => coreModuleMock)
 
     let capturedSessionData: Record<string, unknown> | null = null
     vi.doMock('fs', async () => {
@@ -248,7 +248,7 @@ describe('runSessionStopHook', () => {
 
   it('calls completeAgentRun when session file exists', async () => {
     const completeAgentRun = vi.fn().mockResolvedValue({})
-    vi.doMock('fulcrum-core', () => ({
+    vi.doMock('fulcrum-agent-core', () => ({
       completeAgentRun,
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),
@@ -316,7 +316,7 @@ describe('runPreCompactHook', () => {
 
   it('calls writeMemory with session-compact tag when summary is present', async () => {
     const writeMemory = vi.fn().mockResolvedValue({ memory_id: 'mem_compact' })
-    vi.doMock('fulcrum-core', () => ({
+    vi.doMock('fulcrum-agent-core', () => ({
       getDb:         vi.fn().mockReturnValue({}),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_compact', project_id: 'proj_compact', db_path: ':memory:' }),
@@ -340,7 +340,7 @@ describe('runPreCompactHook', () => {
 
   it('accepts compaction_summary as an alias for summary', async () => {
     const writeMemory = vi.fn().mockResolvedValue({ memory_id: 'mem_alias' })
-    vi.doMock('fulcrum-core', () => ({
+    vi.doMock('fulcrum-agent-core', () => ({
       getDb:         vi.fn().mockReturnValue({}),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_alias', project_id: 'proj_alias', db_path: ':memory:' }),

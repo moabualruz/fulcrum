@@ -12,7 +12,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'http'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { TOOL_SCHEMAS } from './mcp-tools.js'
-import { getDb, listWorkspaces } from 'fulcrum-core'
+import { getDb, listWorkspaces } from 'fulcrum-agent-core'
 
 // ---------- Types ----------
 

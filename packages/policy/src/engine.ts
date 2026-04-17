@@ -1,7 +1,7 @@
 // packages/policy/src/engine.ts
-import { getDb, FulcrumError, isL1, canMerge, newId, getAgentDefinition , Db} from 'fulcrum-core'
+import { getDb, FulcrumError, isL1, canMerge, newId, getAgentDefinition , Db} from 'fulcrum-agent-core'
 import { minimatch } from 'minimatch'
-import type { AgentRole } from 'fulcrum-core'
+import type { AgentRole } from 'fulcrum-agent-core'
 import type {
   PolicyRule, PolicyMatcher, EvaluatePolicyInput, PolicyDecision,
   CreatePolicyRuleInput, ListPolicyRulesInput, PolicyScope, PolicyAction, MatcherType,

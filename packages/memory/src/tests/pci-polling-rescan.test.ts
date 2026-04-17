@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, unlinkSync, rmSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { getContentChangeBus, type ContentChangeEvent } from 'fulcrum-core'
+import { getContentChangeBus, type ContentChangeEvent } from 'fulcrum-agent-core'
 import { pollingRescan } from '../pci/watcher.js'
 
 // Bus debounces by 100ms — tests must await at least that long after triggering

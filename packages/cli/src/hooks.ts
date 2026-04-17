@@ -1,6 +1,6 @@
 // packages/cli/src/hooks.ts
 // Normalisation logic and pre/post handler implementations.
-// Pure hook types have been moved to fulcrum-core (GAP-ARCH-3) and are
+// Pure hook types have been moved to fulcrum-agent-core (GAP-ARCH-3) and are
 // re-exported from here for backward-compat.
 //
 // Callers:
@@ -9,7 +9,7 @@
 
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
-import type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO } from 'fulcrum-core'
+import type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO } from 'fulcrum-agent-core'
 
 export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO }
 
@@ -101,7 +101,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
   //    Non-blocking — silently skipped on any error or missing file.
   if (ctx.sessionId && ctx.sessionId !== 'unknown') {
     try {
-      const { globalDataDir } = await import('fulcrum-core')
+      const { globalDataDir } = await import('fulcrum-agent-core')
       const sessionFile = join(globalDataDir(), 'sessions', `${ctx.sessionId}.json`)
       if (existsSync(sessionFile)) {
         const session = JSON.parse(readFileSync(sessionFile, 'utf-8')) as unknown as Record<string, unknown>
@@ -126,7 +126,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
     if (scan.has_secrets) {
       const patterns = Array.from(new Set(scan.matches.map(m => m.pattern_name)))
       try {
-        const { emitEvent } = await import('fulcrum-core')
+        const { emitEvent } = await import('fulcrum-agent-core')
         emitEvent({
           workspace_id: ctx.workspace_id,
           evt_type: 'policy_denied',
@@ -164,7 +164,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
   const isTeamInvoke = ctx.toolName.includes('invoke_team') || ctx.toolName.includes('team_invoke')
   if (isTeamInvoke && ctx.agentRole) {
     try {
-      const { canInvokeTeams } = await import('fulcrum-core')
+      const { canInvokeTeams } = await import('fulcrum-agent-core')
       type AgentRole = Parameters<typeof canInvokeTeams>[0]
       if (!canInvokeTeams(ctx.agentRole as AgentRole)) {
         io.stderr(`[fulcrum/pre] Tool call denied: role '${ctx.agentRole}' lacks can_invoke_teams\n`)
@@ -188,7 +188,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
   //    Non-blocking — never fail the hook if recall is unavailable.
   if (HOOK_WRITE_TOOLS.has(ctx.toolName) && ctx.runId) {
     try {
-      const { getDb } = await import('fulcrum-core')
+      const { getDb } = await import('fulcrum-agent-core')
       const db = getDb()
       const runRow = db.prepare(
         `SELECT task_id, project_id FROM agent_runs WHERE run_id = ? AND workspace_id = ?`
@@ -215,7 +215,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
   //    Captures every tool call regardless of run_id — makes normal Claude
   //    sessions visible in the monitor without requiring start_agent_run.
   try {
-    const { getDb, newId } = await import('fulcrum-core')
+    const { getDb, newId } = await import('fulcrum-agent-core')
     const db = getDb()
     const wsId = ctx.workspace_id || ''
 
@@ -272,7 +272,7 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
   }
 
   try {
-    const { getDb } = await import('fulcrum-core')
+    const { getDb } = await import('fulcrum-agent-core')
     const { writeMemory } = await import('fulcrum-memory')
     const { buildProvenance, dedupKey, markSeen, extractFilePatch, isMutatingBash } = await import('./hooks-writers.js')
     const db = getDb()

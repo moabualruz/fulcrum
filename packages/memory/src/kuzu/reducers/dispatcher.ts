@@ -1,6 +1,6 @@
 // v2b PR 10 Task 1.6 — reducer dispatcher batching + backpressure.
 
-import { type EmitEventInput } from 'fulcrum-core'
+import { type EmitEventInput } from 'fulcrum-agent-core'
 import { dispatchToGraphReducers } from './index.js'
 
 export interface ReducerDispatcher {

@@ -10,8 +10,8 @@
 // the envelope semantics + per-query min_score floor + the recall_events
 // ledger insertion that v2b PR 11's Dreaming consumes.
 
-import type { Db } from 'fulcrum-core'
-import { getDb } from 'fulcrum-core'
+import type { Db } from 'fulcrum-agent-core'
+import { getDb } from 'fulcrum-agent-core'
 import { recallMemory } from '../recall.js'
 import type { CompactMemory, FullMemory, RecallMemoryInput } from '../types.js'
 

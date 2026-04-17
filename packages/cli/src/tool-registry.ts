@@ -12,8 +12,8 @@
 //
 // Handlers default workspace_id and project_id from deps when args omit them.
 
-import { getDb } from 'fulcrum-core'
-import type { Db } from 'fulcrum-core'
+import { getDb } from 'fulcrum-agent-core'
+import type { Db } from 'fulcrum-agent-core'
 import { TOOL_SCHEMA_MAP } from './mcp-tools.js'
 import type { ToolSchema } from './mcp-tools.js'
 
@@ -289,7 +289,7 @@ function matchesExplicitSets(actionName: string, includeActions: Set<string>, ex
 async function resolveRolePolicy(profile?: string): Promise<{ allow: string[] | null; deny: Set<string>; warning?: string }> {
   if (!profile) return { allow: null, deny: new Set<string>() }
 
-  const { getAgentDefinition } = await import('fulcrum-core')
+  const { getAgentDefinition } = await import('fulcrum-agent-core')
   const def = getAgentDefinition(profile)
   if (!def) {
     return {
@@ -481,7 +481,7 @@ TOOL_REGISTRY.set('list_tasks', {
   schema: TOOL_SCHEMA_MAP.get('list_tasks'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args, deps) => {
-    const { listTasks } = await import('fulcrum-core')
+    const { listTasks } = await import('fulcrum-agent-core')
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const proj = (args['project_id'] as string | undefined) ?? deps.project_id
     const tasks = await listTasks({
@@ -506,7 +506,7 @@ TOOL_REGISTRY.set('create_task', {
   schema: TOOL_SCHEMA_MAP.get('create_task'),
   capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
   handler: async (args, deps) => {
-    const { createTask } = await import('fulcrum-core')
+    const { createTask } = await import('fulcrum-agent-core')
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const proj = (args['project_id'] as string | undefined) ?? deps.project_id
     ensureWorkspace(deps.db, ws)
@@ -534,7 +534,7 @@ TOOL_REGISTRY.set('update_task', {
   schema: TOOL_SCHEMA_MAP.get('update_task'),
   capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
   handler: async (args) => {
-    const { updateTask } = await import('fulcrum-core')
+    const { updateTask } = await import('fulcrum-agent-core')
     // updateTask doesn't need workspace_id — task_id is globally unique in the DB
     const task = await updateTask({
       task_id: args['task_id'] as string,
@@ -561,7 +561,7 @@ TOOL_REGISTRY.set('recall_memory', {
     // returned rows. min_score has a v2a-default of 0.35 for multi-token
     // queries / 0 for single-token queries; callers can override via args.
     const { runStagedSearch } = await import('fulcrum-memory')
-    const { getTextEmbedder, initEmbedding, loadConfig } = await import('fulcrum-core')
+    const { getTextEmbedder, initEmbedding, loadConfig } = await import('fulcrum-agent-core')
     if (!getTextEmbedder()) {
       try {
         const config = loadConfig()
@@ -602,7 +602,7 @@ TOOL_REGISTRY.set('write_memory', {
   handler: async (args, deps) => {
     const { writeMemory } = await import('fulcrum-memory')
     // Warm up embedding so vec_memories gets populated for future recall
-    const { getTextEmbedder: _gte, initEmbedding: _ie, loadConfig: _lc } = await import('fulcrum-core')
+    const { getTextEmbedder: _gte, initEmbedding: _ie, loadConfig: _lc } = await import('fulcrum-agent-core')
     if (!_gte()) {
       try { await _ie(_lc()) } catch { /* non-fatal */ }
     }
@@ -720,7 +720,7 @@ TOOL_REGISTRY.set('list_agent_profiles', {
   schema: TOOL_SCHEMA_MAP.get('list_agent_profiles'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args) => {
-    const { listAgentProfiles } = await import('fulcrum-core')
+    const { listAgentProfiles } = await import('fulcrum-agent-core')
     return await listAgentProfiles({ workspace_id: args['workspace_id'] as string | undefined })
   },
 })
@@ -729,7 +729,7 @@ TOOL_REGISTRY.set('create_agent_profile', {
   schema: TOOL_SCHEMA_MAP.get('create_agent_profile'),
   capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
   handler: async (args, deps) => {
-    const { createAgentProfile } = await import('fulcrum-core')
+    const { createAgentProfile } = await import('fulcrum-agent-core')
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     return await createAgentProfile({
       workspace_id: ws,
@@ -749,7 +749,7 @@ TOOL_REGISTRY.set('get_agent_run_status', {
   schema: TOOL_SCHEMA_MAP.get('get_agent_run_status'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args) => {
-    const { getAgentRunStatus } = await import('fulcrum-core')
+    const { getAgentRunStatus } = await import('fulcrum-agent-core')
     const run = await getAgentRunStatus({ run_id: args['run_id'] as string })
     return {
       run_id: run.run_id,
@@ -765,7 +765,7 @@ TOOL_REGISTRY.set('start_agent_run', {
   schema: TOOL_SCHEMA_MAP.get('start_agent_run'),
   capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
   handler: async (args, deps) => {
-    const { createTask, startAgentRun } = await import('fulcrum-core')
+    const { createTask, startAgentRun } = await import('fulcrum-agent-core')
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const proj = (args['project_id'] as string | undefined) ?? deps.project_id
     ensureWorkspace(deps.db, ws)
@@ -814,7 +814,7 @@ TOOL_REGISTRY.set('heartbeat_agent_run', {
   schema: TOOL_SCHEMA_MAP.get('heartbeat_agent_run'),
   capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
   handler: async (args) => {
-    const { heartbeatAgentRun } = await import('fulcrum-core')
+    const { heartbeatAgentRun } = await import('fulcrum-agent-core')
     await heartbeatAgentRun({
       run_id: args['run_id'] as string,
       current_step: (args['current_step'] as string | undefined) ?? '',
@@ -828,7 +828,7 @@ TOOL_REGISTRY.set('complete_agent_run', {
   schema: TOOL_SCHEMA_MAP.get('complete_agent_run'),
   capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
   handler: async (args) => {
-    const { completeAgentRun } = await import('fulcrum-core')
+    const { completeAgentRun } = await import('fulcrum-agent-core')
     const rawPaths = args['artifact_paths']
     const paths = Array.isArray(rawPaths)
       ? rawPaths.map(String).filter(Boolean)
@@ -846,7 +846,7 @@ TOOL_REGISTRY.set('block_agent_run', {
   schema: TOOL_SCHEMA_MAP.get('block_agent_run'),
   capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
   handler: async (args) => {
-    const { blockAgentRun } = await import('fulcrum-core')
+    const { blockAgentRun } = await import('fulcrum-agent-core')
     const run = await blockAgentRun({ run_id: args['run_id'] as string, reason: args['reason'] as string })
     return { run_id: run.run_id, status: run.status, reason: run.blocker }
   },
@@ -858,7 +858,7 @@ TOOL_REGISTRY.set('build_cos_context', {
   schema: TOOL_SCHEMA_MAP.get('build_cos_context'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args, deps) => {
-    const { buildCosContext } = await import('fulcrum-core')
+    const { buildCosContext } = await import('fulcrum-agent-core')
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const proj = (args['project_id'] as string | undefined) ?? deps.project_id
     const ctx = await buildCosContext({ workspace_id: ws, project_id: proj })
@@ -870,7 +870,7 @@ TOOL_REGISTRY.set('get_workspace_status', {
   schema: TOOL_SCHEMA_MAP.get('get_workspace_status'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args, deps) => {
-    const { getWorkspaceStatus } = await import('fulcrum-core')
+    const { getWorkspaceStatus } = await import('fulcrum-agent-core')
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const status = await getWorkspaceStatus({ workspace_id: ws })
     return {
@@ -898,7 +898,7 @@ TOOL_REGISTRY.set('get_current_context', {
   capabilities: { readOnly: true, destructive: false, hookEquivalent: true },
   handler: async (_args, deps) => {
     const { TOOL_SCHEMAS } = await import('./mcp-tools.js')
-    const { listTasks } = await import('fulcrum-core')
+    const { listTasks } = await import('fulcrum-agent-core')
     const monitorPort = process.env['FULCRUM_MONITOR_PORT'] ?? '4721'
     const monitorUrl = `http://localhost:${monitorPort}`
     const monitorRunning = await probeMonitor(monitorUrl)
@@ -929,7 +929,7 @@ TOOL_REGISTRY.set('create_team_template', {
   schema: TOOL_SCHEMA_MAP.get('create_team_template'),
   capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
   handler: async (args) => {
-    const { getTeamOps } = await import('fulcrum-core')
+    const { getTeamOps } = await import('fulcrum-agent-core')
     const fn = getTeamOps()['createTeamTemplate'] as (input: Record<string, unknown>) => Promise<unknown>
     return await fn({
       name: args['name'] as string,
@@ -944,7 +944,7 @@ TOOL_REGISTRY.set('invoke_team', {
   schema: TOOL_SCHEMA_MAP.get('invoke_team'),
   capabilities: { readOnly: false, destructive: true, hookEquivalent: false, minRole: 'chief_of_staff' },
   handler: async (args) => {
-    const { getTeamOps } = await import('fulcrum-core')
+    const { getTeamOps } = await import('fulcrum-agent-core')
     const fn = getTeamOps()['invokeTeam'] as (input: Record<string, unknown>) => Promise<unknown>
     return await fn({
       template_id: args['template_id'] as string,
@@ -963,7 +963,7 @@ TOOL_REGISTRY.set('list_team_templates', {
   schema: TOOL_SCHEMA_MAP.get('list_team_templates'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args) => {
-    const { getTeamOps } = await import('fulcrum-core')
+    const { getTeamOps } = await import('fulcrum-agent-core')
     const fn = getTeamOps()['listTeamTemplates'] as (input?: Record<string, unknown>) => Promise<unknown[]>
     return await fn({
       limit: (args['limit'] as number | undefined) ?? 50,
@@ -976,7 +976,7 @@ TOOL_REGISTRY.set('list_team_instances', {
   schema: TOOL_SCHEMA_MAP.get('list_team_instances'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args, deps) => {
-    const { getTeamOps } = await import('fulcrum-core')
+    const { getTeamOps } = await import('fulcrum-agent-core')
     const fn = getTeamOps()['listTeamInstances'] as (input: Record<string, unknown>) => Promise<unknown[]>
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     return await fn({
@@ -995,7 +995,7 @@ TOOL_REGISTRY.set('create_agent_definition', {
   schema: TOOL_SCHEMA_MAP.get('create_agent_definition'),
   capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
   handler: async (args) => {
-    const { createAgentDefinition } = await import('fulcrum-core')
+    const { createAgentDefinition } = await import('fulcrum-agent-core')
     return createAgentDefinition({
       role: args['role'] as Parameters<typeof createAgentDefinition>[0]['role'],
       display_name: args['display_name'] as string,
@@ -1017,7 +1017,7 @@ TOOL_REGISTRY.set('get_agent_definition', {
   schema: TOOL_SCHEMA_MAP.get('get_agent_definition'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args) => {
-    const { getAgentDefinition } = await import('fulcrum-core')
+    const { getAgentDefinition } = await import('fulcrum-agent-core')
     const def = getAgentDefinition(args['role'] as string)
     return def ?? { error: `No definition found for role '${args['role'] as string}'` }
   },
@@ -1027,7 +1027,7 @@ TOOL_REGISTRY.set('update_agent_definition', {
   schema: TOOL_SCHEMA_MAP.get('update_agent_definition'),
   capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
   handler: async (args) => {
-    const { updateAgentDefinition } = await import('fulcrum-core')
+    const { updateAgentDefinition } = await import('fulcrum-agent-core')
     return updateAgentDefinition({
       role: args['role'] as Parameters<typeof updateAgentDefinition>[0]['role'],
       display_name: args['display_name'] as string | undefined,
@@ -1057,7 +1057,7 @@ TOOL_REGISTRY.set('list_agent_definitions', {
   schema: TOOL_SCHEMA_MAP.get('list_agent_definitions'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args) => {
-    const { listAgentDefinitions } = await import('fulcrum-core')
+    const { listAgentDefinitions } = await import('fulcrum-agent-core')
     return listAgentDefinitions(args['stability'] as Parameters<typeof listAgentDefinitions>[0])
   },
 })

@@ -1,7 +1,7 @@
 // packages/memory/src/tests/write.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
-import { getDb } from 'fulcrum-core'
+import { getDb } from 'fulcrum-agent-core'
 import { writeMemory } from '../write.js'
 import { contentHash } from '../dedup.js'
 

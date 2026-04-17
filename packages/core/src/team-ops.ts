@@ -1,7 +1,7 @@
 // packages/core/src/team-ops.ts
 // Interface + registry for fulcrum-teams operations.
 // Zero imports from other workspace packages — safe to import from any package.
-// The CLI (which depends on both fulcrum-core and fulcrum-teams) wires the
+// The CLI (which depends on both fulcrum-agent-core and fulcrum-teams) wires the
 // implementation at startup via setTeamOps(createTeamOps()), breaking the
 // circular dependency without a dynamic import inside core.
 

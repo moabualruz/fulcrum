@@ -1,7 +1,7 @@
 {
   "name": "fulcrum-worker",
   "version": "0.0.1",
-  "description": "Worker \u2014 pluggable agent executor that spawns subordinate agents, tracks lifecycle, and persists results to the agent_runs table",
+  "description": "Worker — pluggable agent executor that spawns subordinate agents, tracks lifecycle, and persists results to the agent_runs table",
   "keywords": [
     "worker",
     "agent-executor",
@@ -20,8 +20,7 @@
     }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"
@@ -32,7 +31,7 @@
     "build": "tsup"
   },
   "dependencies": {
-    "fulcrum-core": "workspace:*",
+    "fulcrum-agent-core": "workspace:*",
     "fulcrum-memory": "workspace:*"
   },
   "devDependencies": {
@@ -41,5 +40,15 @@
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
+  },
+  "author": "Mo Abualruz <moabualruz@github>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moabualruz/fulcrum.git"
+  },
+  "homepage": "https://github.com/moabualruz/fulcrum#readme",
+  "bugs": {
+    "url": "https://github.com/moabualruz/fulcrum/issues"
   }
 }

@@ -13,7 +13,7 @@ export type MatcherType =
   | 'artifact'
   | 'secret_content'
 
-import type { AgentRole } from 'fulcrum-core'
+import type { AgentRole } from 'fulcrum-agent-core'
 export type { AgentRole }
 
 export interface PolicyMatcher {

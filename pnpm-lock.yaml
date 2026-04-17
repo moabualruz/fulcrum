@@ -45,7 +45,7 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.3.6)
-      fulcrum-core:
+      fulcrum-agent-core:
         specifier: workspace:*
         version: link:../core
       fulcrum-memory:
@@ -155,7 +155,7 @@ importers:
 
   packages/fulcrum-mcp:
     dependencies:
-      fulcrum-cli:
+      fulcrum-agent-cli:
         specifier: workspace:*
         version: link:../cli
       tsx:
@@ -177,7 +177,7 @@ importers:
       chokidar:
         specifier: ^3.6.0
         version: 3.6.0
-      fulcrum-core:
+      fulcrum-agent-core:
         specifier: workspace:*
         version: link:../core
       gray-matter:
@@ -224,7 +224,7 @@ importers:
       '@hono/node-server':
         specifier: ^1.12.0
         version: 1.19.14(hono@4.12.12)
-      fulcrum-core:
+      fulcrum-agent-core:
         specifier: workspace:*
         version: link:../core
       fulcrum-memory:
@@ -258,7 +258,7 @@ importers:
 
   packages/planning:
     dependencies:
-      fulcrum-core:
+      fulcrum-agent-core:
         specifier: workspace:*
         version: link:../core
       ulidx:
@@ -283,7 +283,7 @@ importers:
 
   packages/policy:
     dependencies:
-      fulcrum-core:
+      fulcrum-agent-core:
         specifier: workspace:*
         version: link:../core
       minimatch:
@@ -311,7 +311,7 @@ importers:
 
   packages/sync:
     dependencies:
-      fulcrum-core:
+      fulcrum-agent-core:
         specifier: workspace:*
         version: link:../core
       fulcrum-memory:
@@ -342,7 +342,7 @@ importers:
 
   packages/teams:
     dependencies:
-      fulcrum-core:
+      fulcrum-agent-core:
         specifier: workspace:*
         version: link:../core
       ulidx:
@@ -367,7 +367,7 @@ importers:
 
   packages/worker:
     dependencies:
-      fulcrum-core:
+      fulcrum-agent-core:
         specifier: workspace:*
         version: link:../core
       fulcrum-memory:
@@ -395,7 +395,7 @@ importers:
       ajv:
         specifier: ^8.18.0
         version: 8.18.0
-      fulcrum-core:
+      fulcrum-agent-core:
         specifier: workspace:*
         version: link:../core
       fulcrum-memory:
@@ -432,7 +432,7 @@ importers:
 
   packages/worktrees:
     dependencies:
-      fulcrum-core:
+      fulcrum-agent-core:
         specifier: workspace:*
         version: link:../core
       ulidx:

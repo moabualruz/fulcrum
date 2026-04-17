@@ -2,11 +2,11 @@
 // Build an aggregate A2A Agent Card for the Fulcrum monitor server.
 // Spec: https://google.github.io/A2A/specification/#agent-card
 //
-// Delegates per-definition card building to buildA2ACard() in fulcrum-core
+// Delegates per-definition card building to buildA2ACard() in fulcrum-agent-core
 // so both call-sites produce spec-compliant cards from a single builder.
 
-import { getDb, listAgentDefinitions, buildA2ACard, A2A_PROTOCOL_VERSION, GLOBAL_WORKSPACE_ID, Db} from 'fulcrum-core'
-import type { A2ASkill } from 'fulcrum-core'
+import { getDb, listAgentDefinitions, buildA2ACard, A2A_PROTOCOL_VERSION, GLOBAL_WORKSPACE_ID, Db} from 'fulcrum-agent-core'
+import type { A2ASkill } from 'fulcrum-agent-core'
 
 /**
  * Build a Fulcrum-level A2A Agent Card aggregating all registered agent

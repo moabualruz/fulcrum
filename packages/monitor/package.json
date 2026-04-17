@@ -1,7 +1,7 @@
 {
   "name": "fulcrum-monitor",
   "version": "0.0.1",
-  "description": "Real-time metrics dashboard \u2014 daily, project, and agent metrics, burndown data, HTTP monitoring server",
+  "description": "Real-time metrics dashboard — daily, project, and agent metrics, burndown data, HTTP monitoring server",
   "keywords": [
     "metrics",
     "monitoring",
@@ -21,8 +21,7 @@
     }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"
@@ -33,7 +32,7 @@
     "build": "tsup"
   },
   "dependencies": {
-    "fulcrum-core": "workspace:*",
+    "fulcrum-agent-core": "workspace:*",
     "fulcrum-memory": "workspace:*",
     "fulcrum-policy": "workspace:*",
     "ulidx": "^2.3.0",
@@ -46,5 +45,15 @@
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
+  },
+  "author": "Mo Abualruz <moabualruz@github>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moabualruz/fulcrum.git"
+  },
+  "homepage": "https://github.com/moabualruz/fulcrum#readme",
+  "bugs": {
+    "url": "https://github.com/moabualruz/fulcrum/issues"
   }
 }

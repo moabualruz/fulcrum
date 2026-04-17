@@ -119,7 +119,7 @@ describe('no hardcoded role string compares outside allowlist (P5-001..003 guard
         .join('\n')
       throw new Error(
         `Found hardcoded role string compares outside the allowlist:\n${msg}\n\n` +
-        `Use isL1 / canInvokeTeams / canMerge / canWriteCode / canEditFiles from fulcrum-core instead. ` +
+        `Use isL1 / canInvokeTeams / canMerge / canWriteCode / canEditFiles from fulcrum-agent-core instead. ` +
         `If a new case is legitimately descriptive-only, add it to ALLOWED_PATHS with a justification.`
       )
     }

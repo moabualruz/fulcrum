@@ -3,8 +3,8 @@
 // Renders Google A2A AgentCard JSON from agent_definitions row at query time
 // per Part 02 §"A2A agent cards".
 
-import type { Db } from 'fulcrum-core'
-import { getDb, getAgentDefinition, listAgentDefinitions, buildA2ACard } from 'fulcrum-core'
+import type { Db } from 'fulcrum-agent-core'
+import { getDb, getAgentDefinition, listAgentDefinitions, buildA2ACard } from 'fulcrum-agent-core'
 
 const BASE_URL = process.env['FULCRUM_BASE_URL'] ?? 'http://127.0.0.1:4721'
 

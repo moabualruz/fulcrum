@@ -43,7 +43,7 @@ export async function runDream(args: string[]): Promise<void> {
 }
 
 async function runLightPhaseCli(): Promise<void> {
-  const { getDb } = await import('fulcrum-core')
+  const { getDb } = await import('fulcrum-agent-core')
   const db = getDb()
 
   const memories = db.prepare(`

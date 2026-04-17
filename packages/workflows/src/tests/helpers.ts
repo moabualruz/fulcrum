@@ -1,6 +1,6 @@
 // packages/workflows/src/tests/helpers.ts
 import Database from 'better-sqlite3'
-import { setDb, closeDb, runMigrations } from 'fulcrum-core'
+import { setDb, closeDb, runMigrations } from 'fulcrum-agent-core'
 import { runMigration007Workflows } from '../schema.js'
 
 export function createTestDb(): Database.Database {

@@ -13,7 +13,7 @@ import {
   getDb,
   closeDb,
   runMigrations,
-} from 'fulcrum-core'
+} from 'fulcrum-agent-core'
 import { runPreHook, runPostHook, type HookContext, type HookIO, type HookOutput } from '../index.js'
 import { clearDedupCache } from '../hooks-writers.js'
 

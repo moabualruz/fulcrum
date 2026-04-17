@@ -12,8 +12,8 @@
 // is a no-op.
 
 import { realpathSync } from 'node:fs'
-import type { Db } from 'fulcrum-core'
-import { getDb } from 'fulcrum-core'
+import type { Db } from 'fulcrum-agent-core'
+import { getDb } from 'fulcrum-agent-core'
 import { ensure, VaultOwnedPathError, type PciHandle } from './singleton.js'
 
 /** run_id → PciHandle. stop() is called from complete/block/expire. */

@@ -1,10 +1,10 @@
 // packages/memory/src/types.ts
 
-// MemoryKind is the single source of truth in fulcrum-core — the memory
+// MemoryKind is the single source of truth in fulcrum-agent-core — the memory
 // package re-exports it here so consumers can keep importing from
 // 'fulcrum-memory' without reaching into core directly. See J-4.
-export type { MemoryKind } from 'fulcrum-core'
-import type { MemoryKind } from 'fulcrum-core'
+export type { MemoryKind } from 'fulcrum-agent-core'
+import type { MemoryKind } from 'fulcrum-agent-core'
 
 /** MEM-009: single definition used by both structured.ts and entity-store.ts */
 export type EntityType =

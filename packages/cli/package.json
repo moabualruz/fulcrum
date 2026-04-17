@@ -1,5 +1,5 @@
 {
-  "name": "fulcrum-cli",
+  "name": "fulcrum-agent-cli",
   "version": "0.0.1",
   "description": "CLI for Fulcrum — fulcrum memory init, accelerate, rebuild, status",
   "keywords": [
@@ -19,7 +19,11 @@
     ".": "./src/index.ts"
   },
   "files": [
-    "src"
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+    "!src/tests",
+    "!src/**/tests"
   ],
   "publishConfig": {
     "access": "public"
@@ -30,7 +34,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "fulcrum-core": "workspace:*",
+    "fulcrum-agent-core": "workspace:*",
     "fulcrum-memory": "workspace:*",
     "fulcrum-monitor": "workspace:*",
     "fulcrum-planning": "workspace:*",
@@ -53,5 +57,15 @@
     "better-sqlite3": "^12.9.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
+  },
+  "author": "Mo Abualruz <moabualruz@github>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moabualruz/fulcrum.git"
+  },
+  "homepage": "https://github.com/moabualruz/fulcrum#readme",
+  "bugs": {
+    "url": "https://github.com/moabualruz/fulcrum/issues"
   }
 }

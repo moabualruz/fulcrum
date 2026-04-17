@@ -1,6 +1,6 @@
 // packages/monitor/src/metrics.ts
 import { ulid } from 'ulidx'
-import { getDb } from 'fulcrum-core'
+import { getDb } from 'fulcrum-agent-core'
 import type {
   DailyMetrics,
   ProjectMetrics,

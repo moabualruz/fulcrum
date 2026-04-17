@@ -11,7 +11,7 @@
 // batching + backpressure. Individual reducers never call Kuzu directly;
 // they return UpsertNode[] | UpsertEdge[] which the dispatcher batches.
 
-import type { EventType, EmitEventInput } from 'fulcrum-core'
+import type { EventType, EmitEventInput } from 'fulcrum-agent-core'
 
 export interface UpsertNode {
   table: string

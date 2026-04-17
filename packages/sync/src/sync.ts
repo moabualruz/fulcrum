@@ -1,5 +1,5 @@
 // packages/sync/src/sync.ts
-import { getDb } from 'fulcrum-core'
+import { getDb } from 'fulcrum-agent-core'
 import { checkSecrets } from 'fulcrum-policy'
 import { PlaneAPIClient } from './plane/client.js'
 import { PlaneSyncAdapter } from './plane/adapter.js'

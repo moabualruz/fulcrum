@@ -1,7 +1,7 @@
 // packages/monitor/src/tests/metrics.rollup.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { setDb } from 'fulcrum-core'
+import { setDb } from 'fulcrum-agent-core'
 import { runMigration009 } from '../schema.js'
 import { rollupDaily } from '../metrics.js'
 

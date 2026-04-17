@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import Database from 'better-sqlite3'
-import { setDb, closeDb, _configureDb, runMigrations } from 'fulcrum-core'
+import { setDb, closeDb, _configureDb, runMigrations } from 'fulcrum-agent-core'
 import { writeMemory } from '../write.js'
 import { recallMemory } from '../recall.js'
 import { EVAL_FIXTURES } from './fixtures.js'

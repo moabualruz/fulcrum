@@ -1,7 +1,7 @@
 {
   "name": "fulcrum-teams",
   "version": "0.0.1",
-  "description": "Agent team orchestration \u2014 team templates, role slots, communication and budget policies, team spawning",
+  "description": "Agent team orchestration — team templates, role slots, communication and budget policies, team spawning",
   "keywords": [
     "teams",
     "agent-orchestration",
@@ -21,8 +21,7 @@
     }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"
@@ -33,7 +32,7 @@
     "build": "tsup"
   },
   "dependencies": {
-    "fulcrum-core": "workspace:*",
+    "fulcrum-agent-core": "workspace:*",
     "ulidx": "^2.0.0"
   },
   "devDependencies": {
@@ -42,5 +41,15 @@
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
+  },
+  "author": "Mo Abualruz <moabualruz@github>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moabualruz/fulcrum.git"
+  },
+  "homepage": "https://github.com/moabualruz/fulcrum#readme",
+  "bugs": {
+    "url": "https://github.com/moabualruz/fulcrum/issues"
   }
 }

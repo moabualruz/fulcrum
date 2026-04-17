@@ -1,5 +1,5 @@
 // packages/planning/src/issues.ts
-import { getDb, FulcrumError, emitEvent, nextDisplayId, statusCategory, newId, Db} from 'fulcrum-core'
+import { getDb, FulcrumError, emitEvent, nextDisplayId, statusCategory, newId, Db} from 'fulcrum-agent-core'
 import type { Issue, CreateIssueInput, UpdateIssueInput, ListIssuesInput, IssueStatus, StatusCategory, EstimateType } from './types.js'
 
 // PLAN-005: allowed status transitions — enforced in updateIssue

@@ -9,7 +9,7 @@
 // (L2 inactive), the reducer is a no-op — matches the failure-isolation
 // invariant from §8.1 "Population path".
 
-import type { Db } from 'fulcrum-core'
+import type { Db } from 'fulcrum-agent-core'
 import { getKuzuClient, type KuzuClient } from '../client.js'
 
 export interface ProjectFileInput {

@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createTestDb, resetTestDb, seed } from './helpers.js'
-import { getDb } from 'fulcrum-core'
+import { getDb } from 'fulcrum-agent-core'
 import { createTeamTemplate, invokeTeam, TeamInstanceHeartbeat } from '../teams.js'
 import type { AgentRole } from '../types.js'
 

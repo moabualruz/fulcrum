@@ -354,7 +354,7 @@ export default function App() {
       setMonitorDown(true)
       // Fall back to direct DB reads (read-only, no keyboard actions)
       try {
-        const { getDb, runMigrations } = await import('fulcrum-core')
+        const { getDb, runMigrations } = await import('fulcrum-agent-core')
         const db = getDb()
         runMigrations(db)
         const rows = db.prepare('SELECT * FROM tasks ORDER BY created_at DESC LIMIT 50').all() as Task[]

@@ -8,8 +8,8 @@
 // context_type='subagent' cannot write any other kind. This module is the
 // only sanctioned write path for non-primary runs.
 
-import type { Db } from 'fulcrum-core'
-import { getDb, newId } from 'fulcrum-core'
+import type { Db } from 'fulcrum-agent-core'
+import { getDb, newId } from 'fulcrum-agent-core'
 
 const SUMMARY_CAP = 800
 

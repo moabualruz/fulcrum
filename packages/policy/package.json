@@ -1,7 +1,7 @@
 {
   "name": "fulcrum-policy",
   "version": "0.0.1",
-  "description": "Policy engine \u2014 system invariants, custom rule evaluation, secret guard (detect and redact), and audit logging",
+  "description": "Policy engine — system invariants, custom rule evaluation, secret guard (detect and redact), and audit logging",
   "keywords": [
     "policy",
     "security",
@@ -21,8 +21,7 @@
     }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"
@@ -33,7 +32,7 @@
     "build": "tsup"
   },
   "dependencies": {
-    "fulcrum-core": "workspace:*",
+    "fulcrum-agent-core": "workspace:*",
     "minimatch": "^10.2.5",
     "ulidx": "^2.3.0"
   },
@@ -43,5 +42,15 @@
     "better-sqlite3": "^12.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
+  },
+  "author": "Mo Abualruz <moabualruz@github>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moabualruz/fulcrum.git"
+  },
+  "homepage": "https://github.com/moabualruz/fulcrum#readme",
+  "bugs": {
+    "url": "https://github.com/moabualruz/fulcrum/issues"
   }
 }

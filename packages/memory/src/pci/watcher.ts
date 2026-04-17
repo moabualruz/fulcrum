@@ -14,7 +14,7 @@
 
 import { watch, type FSWatcher, statSync, readdirSync } from 'node:fs'
 import { join, basename } from 'node:path'
-import { getContentChangeBus } from 'fulcrum-core'
+import { getContentChangeBus } from 'fulcrum-agent-core'
 import { detectFilesystem, shouldUsePollingFallback, type FsKind } from './detect-fs.js'
 
 export type WatcherMode = 'native' | 'polling'

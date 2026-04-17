@@ -1,7 +1,7 @@
 {
   "name": "fulcrum-memory",
   "version": "0.0.1",
-  "description": "Three-layer memory stack \u2014 git vault (L0), FTS5 full-text search (L1), Kuzu graph + HNSW vector search (L2) for agent memory and cross-project knowledge graphs",
+  "description": "Three-layer memory stack — git vault (L0), FTS5 full-text search (L1), Kuzu graph + HNSW vector search (L2) for agent memory and cross-project knowledge graphs",
   "keywords": [
     "memory",
     "vault",
@@ -25,8 +25,7 @@
     }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"
@@ -39,7 +38,7 @@
     "eval:longmemeval": "vitest run src/eval/longmemeval/tests/harness.test.ts"
   },
   "dependencies": {
-    "fulcrum-core": "workspace:*",
+    "fulcrum-agent-core": "workspace:*",
     "chokidar": "^3.6.0",
     "gray-matter": "^4.0.3",
     "simple-git": "^3.22.0",
@@ -57,5 +56,15 @@
     "better-sqlite3": "^12.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
+  },
+  "author": "Mo Abualruz <moabualruz@github>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moabualruz/fulcrum.git"
+  },
+  "homepage": "https://github.com/moabualruz/fulcrum#readme",
+  "bugs": {
+    "url": "https://github.com/moabualruz/fulcrum/issues"
   }
 }

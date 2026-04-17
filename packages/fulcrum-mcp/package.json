@@ -23,7 +23,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "fulcrum-cli": "workspace:*",
+    "fulcrum-agent-cli": "workspace:*",
     "tsx": "^4.0.0"
   },
   "devDependencies": {
@@ -32,7 +32,7 @@
     "vitest": "^1.4.0"
   },
   "files": [
-    "src"
+    "dist"
   ],
   "engines": {
     "node": ">=20"
@@ -40,5 +40,15 @@
   "publishConfig": {
     "access": "public"
   },
-  "readme": "README.md"
+  "readme": "README.md",
+  "author": "Mo Abualruz <moabualruz@github>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moabualruz/fulcrum.git"
+  },
+  "homepage": "https://github.com/moabualruz/fulcrum#readme",
+  "bugs": {
+    "url": "https://github.com/moabualruz/fulcrum/issues"
+  }
 }

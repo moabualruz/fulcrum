@@ -10,8 +10,8 @@
 // When neither signal is active (e.g., path-only search), score falls back
 // to the recency-ranked RRF score using position in the result set.
 
-import type { Db } from 'fulcrum-core'
-import { getDb } from 'fulcrum-core'
+import type { Db } from 'fulcrum-agent-core'
+import { getDb } from 'fulcrum-agent-core'
 import { rrfScore } from '../scoring.js'
 
 export interface SearchCodeInput {

@@ -1,7 +1,7 @@
 // v2b PR 12 Task 3.5 — list_activations action.
 // Read-only snapshot of workspace activation state.
 
-import { getDb, type Db } from 'fulcrum-core'
+import { getDb, type Db } from 'fulcrum-agent-core'
 
 export interface ListActivationsInput {
   workspace_id: string

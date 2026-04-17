@@ -9,8 +9,8 @@
 // diff focus on the writer contracts and the per-turn dedup map.
 
 import { createHash } from 'node:crypto'
-import type { Db } from 'fulcrum-core'
-import type { HookCli, HookContext } from 'fulcrum-core'
+import type { Db } from 'fulcrum-agent-core'
+import type { HookCli, HookContext } from 'fulcrum-agent-core'
 
 export type PrimaryContextType = 'primary' | 'subagent' | 'cron' | 'heartbeat' | 'flush'
 

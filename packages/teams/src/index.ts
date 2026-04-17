@@ -3,8 +3,8 @@
 // and internal symbols don't accidentally become public API surface.
 
 // Types
-export type { AgentRole } from 'fulcrum-core'
-export { L1_ROLES } from 'fulcrum-core'
+export type { AgentRole } from 'fulcrum-agent-core'
+export { L1_ROLES } from 'fulcrum-agent-core'
 export type {
   TeamSlot,
   CommunicationMode,

@@ -3,7 +3,7 @@
 // and internal symbols don't accidentally become public API surface.
 
 // Types
-export type { AgentRole } from 'fulcrum-core'
+export type { AgentRole } from 'fulcrum-agent-core'
 export type {
   PolicyScope,
   PolicyAction,

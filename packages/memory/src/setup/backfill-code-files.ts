@@ -6,8 +6,8 @@
 // safe to re-run.
 
 import { createHash } from 'node:crypto'
-import type { Db } from 'fulcrum-core'
-import { getDb } from 'fulcrum-core'
+import type { Db } from 'fulcrum-agent-core'
+import { getDb } from 'fulcrum-agent-core'
 
 export interface BackfillResult {
   filesBackfilled: number

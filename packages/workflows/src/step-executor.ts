@@ -19,8 +19,8 @@
 import { spawn } from 'node:child_process'
 import { realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { getDb, newId, Db} from 'fulcrum-core'
-import type { MemoryKind, MemoryScope } from 'fulcrum-core'
+import { getDb, newId, Db} from 'fulcrum-agent-core'
+import type { MemoryKind, MemoryScope } from 'fulcrum-agent-core'
 import type { StepContext, StepResult, StepHandler } from './types.js'
 
 /** Run a command with stdin ignored, collect stdout. Resolves on exit code 0 or 1 (grep/rg
@@ -66,7 +66,7 @@ function num(v: unknown, fallback: number): number {
 const HANDLERS: Record<string, StepHandler> = {}
 
 HANDLERS['create_task'] = async (ctx) => {
-  const { createTask } = await import('fulcrum-core')
+  const { createTask } = await import('fulcrum-agent-core')
   const c = cfg(ctx)
   if (!ctx.project_id) {
     return { status: 'failed', error: 'create_task requires project_id on the workflow run' }
@@ -365,7 +365,7 @@ HANDLERS['halt'] = async () => {
 }
 
 HANDLERS['escalate'] = async (ctx) => {
-  const { createHandoff, getDb: getDbCore } = await import('fulcrum-core')
+  const { createHandoff, getDb: getDbCore } = await import('fulcrum-agent-core')
   const c = cfg(ctx)
   try {
     const handoff = createHandoff(getDbCore(), {
@@ -433,7 +433,7 @@ HANDLERS['review_artifact'] = async (ctx) => {
 }
 
 HANDLERS['evaluate_policy'] = async (ctx) => {
-  const { checkPolicy } = await import('fulcrum-core')
+  const { checkPolicy } = await import('fulcrum-agent-core')
   const c = cfg(ctx)
   try {
     const result = (checkPolicy as unknown as (i: Record<string, unknown>) => Promise<unknown>)({

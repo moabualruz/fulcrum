@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import { mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { _configureDb, setDb, closeDb, runMigrations } from 'fulcrum-core'
+import { _configureDb, setDb, closeDb, runMigrations } from 'fulcrum-agent-core'
 import { replayWal } from '../commands/memory-replay-wal.js'
 
 function freshDb() {
