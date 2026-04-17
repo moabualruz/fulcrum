@@ -630,6 +630,33 @@ TOOL_REGISTRY.set('write_memory', {
   },
 })
 
+// v2a PR 9 Task 44 — code_context / project_context registered as
+// v2b-deferred but shape-stable. Calling them returns a structured response
+// with reason='deferred-v2b' so callers can branch without throwing.
+TOOL_REGISTRY.set('code_context', {
+  schema: TOOL_SCHEMA_MAP.get('code_context'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async () => {
+    return {
+      results: [],
+      reason: 'deferred-v2b',
+      message: 'code_context is a v2b feature; v2a degrades to recall_memory + query_memory + search_code.',
+    }
+  },
+})
+
+TOOL_REGISTRY.set('project_context', {
+  schema: TOOL_SCHEMA_MAP.get('project_context'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async () => {
+    return {
+      results: [],
+      reason: 'deferred-v2b',
+      message: 'project_context is a v2b feature; v2a degrades to recall_memory + query_memory + search_code.',
+    }
+  },
+})
+
 // v2a PR 2 Task 12 — query_memory action.
 TOOL_REGISTRY.set('query_memory', {
   schema: TOOL_SCHEMA_MAP.get('query_memory'),

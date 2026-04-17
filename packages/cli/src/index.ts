@@ -274,10 +274,12 @@ async function runMemory(): Promise<void> {
     console.log(`
 fulcrum memory — memory vault commands
 
-  init          Initialize vault (L0 + L1), optionally enable L2
-  accelerate    Enable L2 graph + vector search on existing vault
-  rebuild       Rebuild L1 SQLite from L0 vault files
-  status        Show vault info
+  init             Initialize vault (L0 + L1), optionally enable L2
+  accelerate       Enable L2 graph + vector search on existing vault
+  rebuild          Rebuild L1 SQLite from L0 vault files
+  status           Show vault info
+  sweep-expired    Delete session-scope memories whose expires_at has passed
+  rollback         Operator-only rollback (--since= + --yes-i-really-want-to-undo-N-writes)
 `)
     process.exit(0)
   }
@@ -364,6 +366,21 @@ fulcrum memory — memory vault commands
       console.log(`L2 Kuzu    : ${existsSync(kuzuPath) ? '✓ initialized' : '○ not enabled — run: fulcrum memory accelerate'}`)
     }
     console.log('')
+    return
+  }
+
+  // v2a PR 9 Task 45 — operator-invokable expiration sweep.
+  // Idempotent. Also runs on a 24h timer inside the MCP server lifecycle and
+  // opportunistically on every start_agent_run.
+  if (command === 'sweep-expired') {
+    const moduleName = '@moabualruz/fulcrum-memory'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const memoryPkg = (await import(/* @vite-ignore */ moduleName)) as any
+    const r = memoryPkg.sweepExpiredMemories?.()
+    console.log(`[sweep] removed ${r?.rowsDeleted ?? 0} expired memories at ${r?.ranAt ?? 'unknown'}`)
+    if (args.includes('--install')) {
+      console.log('[sweep] cron install: not yet implemented (ship a launchd / systemd timer in v2b)')
+    }
     return
   }
 

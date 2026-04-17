@@ -68,6 +68,10 @@ export type { SynthesisResult } from './extractors/task-outcome.js'
 export { onDelegation } from './hooks/on-delegation.js'
 export type { OnDelegationInput, OnDelegationResult } from './hooks/on-delegation.js'
 
+// v2a PR 9 Task 45 — session-scope expiration sweep.
+export { sweepExpiredMemories, startSweepTimer, opportunisticSweep } from './sweep.js'
+export type { SweepResult } from './sweep.js'
+
 // Ingestion pipeline
 export { ingestFile, ingestProject } from './ingest.js'
 

@@ -211,6 +211,16 @@ export async function startAgentRun(input: StartAgentRunInput, db: Db = getDb())
     throw new FulcrumError(`unknown context_type: ${contextType}`, 'invalid_input')
   }
 
+  // v2a PR 9 Task 45: opportunistic session-scope sweep — cheap predicate-
+  // indexed DELETE that bounds row accumulation between MCP restarts. Lazy
+  // string-import keeps the dep direction memory → core only.
+  try {
+    const moduleName = '@moabualruz/fulcrum-memory'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const memoryPkg = (await import(/* @vite-ignore */ moduleName)) as any
+    if (typeof memoryPkg?.opportunisticSweep === 'function') memoryPkg.opportunisticSweep(db)
+  } catch { /* sweep is best-effort */ }
+
   const taskRow = db.prepare('SELECT workspace_id, project_id FROM tasks WHERE task_id = ?')
     .get(input.task_id) as { workspace_id: string; project_id: string } | undefined
   if (!taskRow) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
