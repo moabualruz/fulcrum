@@ -100,6 +100,10 @@ export type { EmitEventInput } from './events.js'
 export { getEventBus, setEventBus, resetEventBus } from './event-bus.js'
 export type { FulcrumEventBus, EventHandler } from './event-bus.js'
 
+// v2a PR 4 Task 22a — content-change event contract.
+export { getContentChangeBus, setContentChangeBus, resetContentChangeBus } from './events/content-change.js'
+export type { ContentChangeBus, ContentChangeHandler, ContentChangeEvent, ContentChangeKind, ContentChangeType } from './events/content-change.js'
+
 // CoS Context Builder
 export { buildWorldState } from './cos-context.js'
 export type { CoSWorldState, BuildWorldStateInput } from './cos-context.js'
