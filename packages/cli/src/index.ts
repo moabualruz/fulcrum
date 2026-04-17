@@ -369,44 +369,38 @@ fulcrum memory — memory vault commands
     return
   }
 
-  // v2a PR 9 Task 45 — operator-invokable expiration sweep.
+  // v2a PR 9 Task 45 + v2b PR 9 follow-up — operator-invokable expiration sweep.
   // Idempotent. Also runs on a 24h timer inside the MCP server lifecycle and
-  // opportunistically on every start_agent_run.
+  // opportunistically on every start_agent_run. --install writes a per-user
+  // launchd plist (macOS) or systemd timer (Linux) so the sweep runs daily
+  // without the MCP server being resident.
   if (command === 'sweep-expired') {
+    if (args.includes('--install')) {
+      const { runSweepInstall } = await import('./commands/sweep-cron-install.js')
+      runSweepInstall()
+      return
+    }
     const moduleName = '@moabualruz/fulcrum-memory'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const memoryPkg = (await import(/* @vite-ignore */ moduleName)) as any
     const r = memoryPkg.sweepExpiredMemories?.()
     console.log(`[sweep] removed ${r?.rowsDeleted ?? 0} expired memories at ${r?.ranAt ?? 'unknown'}`)
-    if (args.includes('--install')) {
-      console.log('[sweep] cron install: not yet implemented (ship a launchd / systemd timer in v2b)')
-    }
     return
   }
 
-  // v2a PR 5 Task 28 — operator-only rollback. Intentionally NOT registered
-  // in TOOL_REGISTRY so a compromised agent with action-exec access cannot
-  // call it. Requires --since=<TIME> and --yes-i-really-want-to-undo-N-writes.
+  // v2a PR 5 Task 28 + v2b PR 15 completion — operator-only rollback.
+  // Intentionally NOT registered in TOOL_REGISTRY so a compromised agent
+  // with action-exec access cannot call it.
   if (command === 'rollback') {
-    const sinceArg = args.find(a => a.startsWith('--since='))
-    const consentArg = args.find(a => /^--yes-i-really-want-to-undo-\d+-writes$/.test(a))
-    if (!sinceArg) {
-      console.error('Usage: fulcrum memory rollback --since=<ISO-TIMESTAMP> --yes-i-really-want-to-undo-N-writes')
-      console.error('       --cross-workspace requires an additional confirmation flag.')
-      process.exit(2)
-    }
-    if (!consentArg) {
-      console.error('Refusing to rollback without --yes-i-really-want-to-undo-N-writes (operator-only command).')
-      process.exit(2)
-    }
-    const since = sinceArg.slice('--since='.length)
-    const crossWorkspace = args.includes('--cross-workspace')
-    if (crossWorkspace && !args.includes('--yes-cross-workspace')) {
-      console.error('--cross-workspace also requires --yes-cross-workspace.')
-      process.exit(2)
-    }
-    console.log(`[rollback] would undo writes since ${since}${crossWorkspace ? ' across all workspaces' : ' in current workspace'}.`)
-    console.log('[rollback] dry-run only in v2a — full implementation in v2b PR 15 (WAL replay).')
+    const { runMemoryRollback } = await import('./commands/memory-rollback.js')
+    await runMemoryRollback(args)
+    return
+  }
+
+  // v2b PR 15 Task 6.3 — operator-only WAL replay. NOT in TOOL_REGISTRY.
+  if (command === 'replay-wal') {
+    const { runMemoryReplayWal } = await import('./commands/memory-replay-wal.js')
+    await runMemoryReplayWal(args)
     return
   }
 
@@ -491,6 +485,7 @@ export async function runSessionStartHook(): Promise<void> {
       workspace_id: wsId,
       agent_id: `claude/${sessionId.slice(0, 12)}`,
       pi_profile: model ?? 'claude',
+      context_type: 'primary',
     })
 
     // Pre-fetch workspace snapshot for injection in PreToolUse hooks (non-blocking).
@@ -676,6 +671,7 @@ async function initFulcrumSession(opts: {
     workspace_id: wsId,
     agent_id: `${opts.cliName}/${opts.sessionId.slice(0, 12)}`,
     pi_profile: opts.model ?? opts.cliName,
+    context_type: 'primary',
   })
 
   // Pre-fetch workspace snapshot (non-blocking)
@@ -2834,6 +2830,12 @@ OPTIONS (serve mcp-http)
     console.error(`Unknown pi subcommand: ${command}`)
     console.error('Usage: fulcrum pi cockpit start|stop|status')
     process.exit(1)
+  }
+
+  if (group === 'dream') {
+    const { runDream } = await import('./dream.js')
+    await runDream(args.slice(1))
+    return
   }
 
   if (group === 'init') { await runInit(); return }

@@ -7,11 +7,10 @@ import {
 } from '../kuzu/schema.js'
 
 describe('kuzu/schema', () => {
-  it('buildAllDDL(1024) has 34 entries (v2a expansion: 5 nodes + 22 rels + 3 vec indexes)', () => {
-    // v2a PR 7 added 3 nodes (File, CodeChunk, Symbol), 8 rels (EDITS,
-    // ABOUT_FILE, ABOUT_SYMBOL, MENTIONS_SYMBOL, IMPORTS, CALLS, DEFINES,
-    // CONTAINED_IN), and 1 vector index (CodeChunk). Total grew from 22 → 34.
-    expect(buildAllDDL(1024)).toHaveLength(34)
+  it('buildAllDDL(1024) has more than 34 entries (v2b expanded to 81: +22 nodes + 25 rels)', () => {
+    // v2b PR 10 added 18 control-plane nodes, 4 git nodes, and 25 rel tables.
+    // Total grew from 34 → 81. Use the dedicated all-ddl-v2b.test.ts for exact assertions.
+    expect(buildAllDDL(1024).length).toBeGreaterThan(34)
   })
 
   it('buildMemoryNodeDDL uses the given dimensions', () => {

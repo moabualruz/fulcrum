@@ -34,7 +34,9 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsup"
+    "build": "tsup",
+    "eval:fulcrum-recall": "vitest run src/eval/fulcrum-recall/tests/harness.test.ts",
+    "eval:longmemeval": "vitest run src/eval/longmemeval/tests/harness.test.ts"
   },
   "dependencies": {
     "@moabualruz/fulcrum-core": "workspace:*",

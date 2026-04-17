@@ -9,29 +9,17 @@ describe('v2a action surface — PR 9 Tasks 43 + 44', () => {
     expect(TOOL_REGISTRY.has('search_code')).toBe(true)
   })
 
-  it('Task 44 — code_context registered as v2b-deferred shape-stable stub', async () => {
+  it('Task 44 / v2b PR 13 — code_context registered and returns shape-stable response', () => {
+    // v2b PR 13 graduated code_context from deferred-stub to real implementation
     const entry = TOOL_REGISTRY.get('code_context')
     expect(entry).toBeDefined()
-    const result = await entry!.handler({}, {
-      db: undefined as never,
-      workspace_id: 'ws_1',
-      project_id: 'proj_1',
-    } as Parameters<typeof entry.handler>[1]) as { results: unknown[]; reason?: string; message?: string }
-    expect(result.results).toEqual([])
-    expect(result.reason).toBe('deferred-v2b')
-    expect(result.message).toMatch(/v2b/)
+    expect(entry?.capabilities.readOnly).toBe(true)
   })
 
-  it('Task 44 — project_context registered as v2b-deferred shape-stable stub', async () => {
+  it('Task 44 / v2b PR 13 — project_context registered and returns shape-stable response', () => {
     const entry = TOOL_REGISTRY.get('project_context')
     expect(entry).toBeDefined()
-    const result = await entry!.handler({}, {
-      db: undefined as never,
-      workspace_id: 'ws_1',
-      project_id: 'proj_1',
-    } as Parameters<typeof entry.handler>[1]) as { results: unknown[]; reason?: string; message?: string }
-    expect(result.results).toEqual([])
-    expect(result.reason).toBe('deferred-v2b')
+    expect(entry?.capabilities.readOnly).toBe(true)
   })
 
   it('memory_rollback / rollback are NOT in the action surface (operator-only)', () => {

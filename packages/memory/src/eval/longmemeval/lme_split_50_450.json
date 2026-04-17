@@ -1,0 +1,14 @@
+{
+  "note": "50/450 split placeholder. Replace with real LongMemEval corpus entries when available.",
+  "benchmark_label": "conversational-memory benchmark",
+  "signal_type": "secondary",
+  "dev": [
+    {
+      "id": "lme_synthetic_001",
+      "question": "What was the decision about session token storage?",
+      "expected_answer": "rewrite auth middleware to comply with legal requirements",
+      "sessions": []
+    }
+  ],
+  "test": []
+}

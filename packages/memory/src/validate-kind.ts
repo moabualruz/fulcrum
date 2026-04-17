@@ -40,7 +40,23 @@ const LEGACY_KINDS = [
   'lesson',
 ] as const
 
-const ALLOWED_KINDS = new Set<string>([...V2A_KINDS, ...LEGACY_KINDS])
+/** v2b kinds — graph node/edge kinds for control-plane + git entities. */
+const V2B_KINDS = [
+  'entity',
+  'edge',
+  'agent_card',
+  'policy_event',
+  'external_ref',
+  'git_commit',
+  'git_branch',
+  'git_pr',
+  'git_tag',
+  'agent_adapter',
+  'artifact_contract',
+  'notification_event',
+] as const
+
+const ALLOWED_KINDS = new Set<string>([...V2A_KINDS, ...LEGACY_KINDS, ...V2B_KINDS])
 
 /**
  * Per-kind character cap in characters. Hermes convention: model-independent.
@@ -88,4 +104,4 @@ export function applyKindCap(kind: string, content: string): string {
   return `${content.slice(0, cap)} […truncated ${dropped} chars]`
 }
 
-export { V2A_KINDS, LEGACY_KINDS, ALLOWED_KINDS, KIND_CAPS }
+export { V2A_KINDS, LEGACY_KINDS, V2B_KINDS, ALLOWED_KINDS, KIND_CAPS }

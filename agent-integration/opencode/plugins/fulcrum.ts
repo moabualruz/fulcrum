@@ -156,27 +156,51 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
       return { approved: true }
     },
 
-    // ── v2a Task 48: run-lifecycle event subscriptions ─────────────────────
-    // session.idle fires when the agent finishes a turn with no pending work;
-    // session.compacted fires after context compression. Both trigger the
-    // session-summary / pre-compact writer paths. We intentionally do NOT
-    // subscribe to todo.updated — that's v2b territory.
+    // ── Event subscriptions ────────────────────────────────────────────────
+    // v2a Task 48 + v2b PR 17 Task 8.4:
+    // - session.idle → session-summary write
+    // - session.compacted → pre_compact_extract memory + graph reducer write
+    // - todo.updated (v2b) → mirror into Fulcrum tasks table
 
     "event": async (input) => {
       if (!input || typeof input !== "object") return
-      const name = (input as Record<string, unknown>)["type"] as string | undefined
+      const event = input as Record<string, unknown>
+      const name = event["type"] as string | undefined
+      const sessionId = process.env["OPENCODE_SESSION_ID"] ?? "unknown"
+
       if (name === "session.idle") {
         spawnSync("fulcrum", ["hook", "opencode", "session-end"], {
-          input: JSON.stringify({ session_id: process.env["OPENCODE_SESSION_ID"] ?? "unknown" }),
+          input: JSON.stringify({ session_id: sessionId }),
           encoding: "utf-8",
           timeout: 5_000,
         })
       } else if (name === "session.compacted") {
+        // Emit pre_compact_extract memory
         spawnSync("fulcrum", ["hook", "opencode", "pre-compact"], {
-          input: JSON.stringify({ session_id: process.env["OPENCODE_SESSION_ID"] ?? "unknown" }),
+          input: JSON.stringify({ session_id: sessionId }),
           encoding: "utf-8",
           timeout: 5_000,
         })
+        // Fire graph reducer write (team_instantiated-style event bus write)
+        try {
+          const ids = getContext()
+          spawnSync("fulcrum", ["action", "exec", "emit_graph_event", "--json", JSON.stringify({
+            event_type: "session_compacted",
+            session_id: sessionId,
+            workspace_id: ids.workspace_id,
+          })], { encoding: "utf-8", timeout: 5_000 })
+        } catch { /* best-effort */ }
+      } else if (name === "todo.updated") {
+        // v2b PR 17 Task 8.4: mirror todo changes into Fulcrum tasks table
+        const todo = event["todo"] as Record<string, unknown> | undefined
+        if (!todo) return
+        try {
+          spawnSync("fulcrum", ["action", "exec", "update_task", "--json", JSON.stringify({
+            task_id: todo["id"],
+            status: todo["status"],
+            note: `[opencode todo.updated] ${todo["title"] ?? ""}`,
+          })], { encoding: "utf-8", timeout: 5_000 })
+        } catch { /* best-effort */ }
       }
     },
 

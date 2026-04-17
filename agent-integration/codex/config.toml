@@ -5,6 +5,12 @@
 command = "fulcrum"
 args = ["serve", "mcp", "--mode", "filtered"]
 
+# v2b PR 17 Task 8.2: invoke_team approval_mode = "prompt" — Codex's native
+# confirmation UI fires before invoke_team executes. Hook-based denial is a
+# fallback for older Codex builds that do not support per-tool approval_mode.
+[tool_approval.invoke_team]
+approval_mode = "prompt"
+
 # ── Lifecycle hooks ───────────────────────────────────────────────────────────
 # SessionStart: auto-registers an agent run and injects workspace context
 # before the first LLM turn. Returns additional_context so Codex sees the

@@ -1,0 +1,38 @@
+name: Memory Eval
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # nightly at 02:00 UTC
+  pull_request:
+    paths:
+      - 'packages/memory/src/retrieval/**'
+      - 'packages/memory/src/recall.ts'
+      - 'packages/memory/src/scoring.ts'
+      - 'packages/memory/src/eval/**'
+
+jobs:
+  fulcrum-recall-eval:
+    name: Fulcrum Recall Eval (primary)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @moabualruz/fulcrum-memory eval:fulcrum-recall
+
+  longmemeval-harness:
+    name: LongMemEval Harness (secondary — conversational-memory benchmark)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @moabualruz/fulcrum-memory eval:longmemeval

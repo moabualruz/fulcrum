@@ -12,7 +12,7 @@
 // Emits ContentChangeEvent (kind='code') on the shared bus after a 100ms
 // debounce — see Task 22a contract.
 
-import { watch, type FSWatcher, statSync } from 'node:fs'
+import { watch, type FSWatcher, statSync, readdirSync } from 'node:fs'
 import { join, basename } from 'node:path'
 import { getContentChangeBus } from '@moabualruz/fulcrum-core'
 import { detectFilesystem, shouldUsePollingFallback, type FsKind } from './detect-fs.js'
@@ -108,12 +108,60 @@ export function watchDirectory(dir: string, opts: WatchDirectoryOpts = {}): Watc
   return handle
 }
 
+// Per-directory snapshot of file → mtime/size used by the polling rescan to
+// detect changes. The snapshot lives only in memory — if the process restarts,
+// every file looks new and we re-emit change events (idempotent downstream).
+const pollingSnapshots = new Map<string, Map<string, { mtime: number; size: number }>>()
+
+interface EntrySnapshot { mtime: number; size: number }
+
+function snapshotDir(dir: string): Map<string, EntrySnapshot> {
+  const out = new Map<string, EntrySnapshot>()
+  let entries: string[]
+  try {
+    entries = readdirSync(dir)
+  } catch {
+    return out
+  }
+  for (const name of entries) {
+    const full = join(dir, name)
+    try {
+      const s = statSync(full)
+      if (s.isFile()) out.set(name, { mtime: s.mtimeMs, size: s.size })
+    } catch { /* raced against unlink */ }
+  }
+  return out
+}
+
+/**
+ * Polling-mode rescan. Diffs the current dir state against the previous
+ * snapshot and emits add/change/unlink events on the shared bus. Exported so
+ * tests can drive the rescan deterministically.
+ */
+export function pollingRescan(dir: string): void {
+  const prev = pollingSnapshots.get(dir) ?? new Map<string, EntrySnapshot>()
+  const curr = snapshotDir(dir)
+
+  for (const [name, cur] of curr) {
+    const old = prev.get(name)
+    if (!old) {
+      handleFileEvent(dir, 'rename', name) // add
+    } else if (old.mtime !== cur.mtime || old.size !== cur.size) {
+      handleFileEvent(dir, 'change', name)
+    }
+  }
+  for (const [name] of prev) {
+    if (!curr.has(name)) handleFileEvent(dir, 'rename', name) // unlink (stat miss)
+  }
+  pollingSnapshots.set(dir, curr)
+}
+
 function startPollingWatch(dir: string, intervalMs: number, fsKind: FsKind): WatchHandle {
-  // Stub: emits no events. PR 4 Task 19 wires the syncer's mtime → hash
-  // → chunk-diff cascade through here on each tick. For PR 1 we ship the
-  // mode-detection + handle contract so PR 4 / 5 can build on top.
+  // Prime the snapshot so the first tick reports real diffs, not a synthetic
+  // "add all files" event storm.
+  pollingSnapshots.set(dir, snapshotDir(dir))
   const timer = setInterval(() => {
-    // periodic full-rescan would walk dir + emit events; deferred to syncer.
+    try { pollingRescan(dir) } catch { /* non-fatal, next tick retries */ }
   }, intervalMs)
   return {
     dir,
@@ -121,6 +169,7 @@ function startPollingWatch(dir: string, intervalMs: number, fsKind: FsKind): Wat
     fs: fsKind,
     close: () => {
       clearInterval(timer)
+      pollingSnapshots.delete(dir)
       watchers.delete(dir)
     },
   }

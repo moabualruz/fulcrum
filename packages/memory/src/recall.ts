@@ -3,7 +3,7 @@ import { getDb, FulcrumError, getTextEmbedder, getReranker, Db} from '@moabualru
 import { rrfScore, rrfScoreWithSparse, recallScore, computeFreshness } from './scoring.js'
 import { sparseRank } from './sparse.js'
 import { rowToFullMemory } from './mappers.js'
-import type { RecallMemoryInput, CompactMemory, FullMemory, RecallMode, QueryScope } from './types.js'
+import type { RecallMemoryInput, CompactMemory, FullMemory, RecallMode, QueryScope, PolicyDeniedResponse } from './types.js'
 import { getKuzuClient } from './kuzu/client.js'
 import { queryMemoriesL2 } from './kuzu/query.js'
 import { extractStructured } from './extractors/structured.js'
@@ -32,9 +32,10 @@ function buildWhereClause(input: RecallMemoryInput): { clauses: string[]; params
   // 'workspace': filter by workspace_id only
   const qs = input.query_scope ?? 'project'
 
-  // Explicitly block 'global' — cross-workspace queries are not permitted
+  // 'global' is handled in recallMemory() before calling buildWhereClause
   if ((qs as string) === 'global') {
-    throw new FulcrumError("query_scope 'global' is not permitted", 'invalid_input')
+    // No workspace filter — cross-workspace search
+    return { clauses: ['1=1'], params }
   }
 
   switch (qs) {
@@ -136,11 +137,31 @@ export async function getMemoriesForTask(task_id: string, db: Db = getDb()): Pro
   return rows.map(rowToFullMemory)
 }
 
+// Roles allowed for cross-workspace global recall (fail-closed for missing)
+const GLOBAL_ALLOWED_ROLES = new Set(['chief_of_staff'])
+
+function checkGlobalPolicy(callerRole: string | undefined): PolicyDeniedResponse | null {
+  if (!callerRole || !GLOBAL_ALLOWED_ROLES.has(callerRole)) {
+    // Emit policy_rule_missing telemetry for unknown roles
+    if (!callerRole || (!['software_engineer', 'test_engineer', 'reviewer'].includes(callerRole) && !GLOBAL_ALLOWED_ROLES.has(callerRole))) {
+      console.warn(`[fulcrum] policy_rule_missing role=${callerRole ?? 'none'} scope=global`)
+    }
+    return { results: [], reason: 'policy_denied' }
+  }
+  return null
+}
+
 export async function recallMemory(
   input: RecallMemoryInput,
   db: Db = getDb(),
-): Promise<CompactMemory[] | FullMemory[]> {
+): Promise<CompactMemory[] | FullMemory[] | PolicyDeniedResponse> {
   if (!input.query.trim()) throw new FulcrumError('query must not be empty', 'invalid_input')
+
+  // Global scope policy gate — before any query logic (security F1 placement: before-query)
+  if (input.query_scope === 'global') {
+    const denied = checkGlobalPolicy(input.caller_role)
+    if (denied) return denied
+  }
 
   const mode: RecallMode = input.mode ?? 'compact'
   const limit = input.limit ?? (mode === 'compact' ? 8 : 20)

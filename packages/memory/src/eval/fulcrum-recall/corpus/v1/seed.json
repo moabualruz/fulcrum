@@ -1,0 +1,72 @@
+[
+  {
+    "query": "auth middleware rewrite compliance session token storage",
+    "expected_ids": ["adr_auth_middleware_001"],
+    "scope": "project",
+    "kind": "decision",
+    "note": "synthetic seed — ADR: auth middleware rewrite driven by legal/compliance requirements"
+  },
+  {
+    "query": "memory write pipeline sanitize before WAL invariant",
+    "expected_ids": ["adr_wal_sanitize_002"],
+    "scope": "project",
+    "kind": "decision",
+    "note": "synthetic seed — ADR Gate 4: sanitize-before-WAL as security invariant"
+  },
+  {
+    "query": "kuzu graph reducer dispatcher batching backpressure overflow",
+    "expected_ids": ["adr_dispatcher_003"],
+    "scope": "project",
+    "kind": "file_patch",
+    "note": "synthetic seed — dispatcher batchSize/maxBuffer/lagThreshold design"
+  },
+  {
+    "query": "dreaming pipeline light phase dangling wikilink detection",
+    "expected_ids": ["adr_dreaming_004"],
+    "scope": "project",
+    "kind": "task_outcome",
+    "note": "synthetic seed — dreaming light/REM/deep phase architecture"
+  },
+  {
+    "query": "global scope recall policy gate chief_of_staff role allow",
+    "expected_ids": ["adr_global_policy_005"],
+    "scope": "project",
+    "kind": "decision",
+    "note": "synthetic seed — GLOBAL_ALLOWED_ROLES = chief_of_staff only; fail-closed semantics"
+  },
+  {
+    "query": "code context symbol traversal callers callees kuzu graceful degradation",
+    "expected_ids": ["adr_code_context_006"],
+    "scope": "project",
+    "kind": "file_patch",
+    "note": "synthetic seed — code_context Kuzu traversal with SQLite fallback"
+  },
+  {
+    "query": "memory kind validation v2b entity edge agent_card policy_event",
+    "expected_ids": ["adr_kinds_v2b_007"],
+    "scope": "project",
+    "kind": "decision",
+    "note": "synthetic seed — V2B_KINDS extension: 12 new kinds added to ALLOWED_KINDS"
+  },
+  {
+    "query": "vault L0 write gitignore walker incremental PCI syncer",
+    "expected_ids": ["adr_pci_syncer_008"],
+    "scope": "project",
+    "kind": "task_outcome",
+    "note": "synthetic seed — PCI incremental sync with gitignore-respecting walker"
+  },
+  {
+    "query": "session sweep expiration opportunistic expired memory cleanup",
+    "expected_ids": ["adr_sweep_009"],
+    "scope": "project",
+    "kind": "task_outcome",
+    "note": "synthetic seed — sweep.ts: sweepExpiredMemories + opportunisticSweep"
+  },
+  {
+    "query": "WAL replay operator command memory row restore sha256 hash match",
+    "expected_ids": ["adr_wal_replay_010"],
+    "scope": "project",
+    "kind": "decision",
+    "note": "synthetic seed — WAL replay for L1 row restoration from L0 vault"
+  }
+]

@@ -1,11 +1,18 @@
-// v2a PR 2 Task 13 — search_code action.
+// v2a PR 2 Task 13 + v2b PR 20 completion — search_code action.
 //
-// Targets the code_chunks table via FTS5 + symbol-name lookup + (optionally)
-// vector when a query embedding is provided. Returns the {results, reason?}
-// envelope. Recall events use source='search_code'.
+// Targets the code_chunks table via FTS5 + symbol-name lookup. Returns the
+// {results, reason?} envelope. Recall events use source='search_code'.
+//
+// Scoring uses two-signal RRF (k=60) over:
+//   (a) FTS5 rank position (bm25-ordered) — from the MATCH query.
+//   (b) Symbol-name prefix-rank — when a symbol filter was supplied, exact
+//       match takes rank 1, prefix matches take rank 2+.
+// When neither signal is active (e.g., path-only search), score falls back
+// to the recency-ranked RRF score using position in the result set.
 
 import type { Db } from '@moabualruz/fulcrum-core'
 import { getDb } from '@moabualruz/fulcrum-core'
+import { rrfScore } from '../scoring.js'
 
 export interface SearchCodeInput {
   workspace_id: string
@@ -68,10 +75,24 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
     params.push(input.symbol)
   }
 
-  // FTS5 — pre-filter rowids via subquery (more reliable than ON-MATCH JOIN).
+  // Rank map #1: FTS5 text-match rank by bm25 order.
+  const ftsRankByChunk = new Map<string, number>()
   if (input.text && input.text.trim()) {
     const safe = input.text.match(/[\p{L}\p{N}_]+/gu)?.map(t => `"${t}"`).join(' AND ') ?? ''
     if (!safe) return { results: [], reason: 'no_match' }
+    try {
+      const ftsRows = db.prepare(`
+        SELECT c.chunk_id, bm25(code_chunks_fts) AS bm25
+        FROM code_chunks c
+        JOIN code_chunks_fts ON c.rowid = code_chunks_fts.rowid
+        WHERE code_chunks_fts MATCH ? AND c.workspace_id = ?
+        ORDER BY bm25 ASC
+        LIMIT ?
+      `).all(safe, input.workspace_id, limit * 4) as Array<{ chunk_id: string; bm25: number }>
+      ftsRows.forEach((row, idx) => {
+        ftsRankByChunk.set(row.chunk_id, idx + 1)
+      })
+    } catch { /* FTS5 absent — non-fatal, RRF just uses symbol signal */ }
     where.push('c.rowid IN (SELECT rowid FROM code_chunks_fts WHERE code_chunks_fts MATCH ?)')
     params.push(safe)
   }
@@ -94,27 +115,54 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
 
   if (rows.length === 0) return { results: [], reason: 'no_match' }
 
-  // Score: 1.0 when text-match was used (FTS5 matched) — placeholder ranking.
-  // PR 4's full retrieval will plumb runStagedSearch + RRF; v2a PR 2 ships
-  // the surface so callers can wire to it.
-  const score = input.text ? 1.0 : 0.5
-  if (score < minScore) return { results: [], reason: 'below_floor' }
+  // Rank map #2: symbol signal. When input.symbol was supplied, exact-match
+  // chunks take rank 1, prefix matches take later ranks ordered by how close
+  // the symbol_path is to the query.
+  const symbolRankByChunk = new Map<string, number>()
+  if (input.symbol) {
+    const target = input.symbol
+    const scored = rows.map(r => {
+      const sp = r.symbol_path ?? ''
+      let priority: number
+      if (sp === target) priority = 0
+      else if (sp.endsWith('.' + target) || sp.endsWith(':' + target)) priority = 1
+      else if (sp.includes(target)) priority = 2
+      else priority = 3
+      return { chunk_id: r.chunk_id, priority }
+    })
+    scored.sort((a, b) => a.priority - b.priority)
+    scored.forEach((r, idx) => symbolRankByChunk.set(r.chunk_id, idx + 1))
+  }
 
-  const results: SearchCodeResultRow[] = rows.map(r => ({
-    chunk_id: r.chunk_id,
-    rel_path: r.rel_path,
-    start_line: r.start_line,
-    end_line: r.end_line,
-    symbol_path: r.symbol_path,
-    language: r.language,
-    content: r.content,
-    score,
-    project_id: r.project_id,
-  }))
+  // Two-signal RRF — the score floor comes from the same k=60 formula as
+  // recall_memory. Recency tie-breaker via the result-set order.
+  const results: SearchCodeResultRow[] = rows
+    .map(r => {
+      const ftsRank = ftsRankByChunk.get(r.chunk_id) ?? null
+      const symRank = symbolRankByChunk.get(r.chunk_id) ?? null
+      const score = rrfScore(ftsRank, symRank)
+      return {
+        chunk_id: r.chunk_id,
+        rel_path: r.rel_path,
+        start_line: r.start_line,
+        end_line: r.end_line,
+        symbol_path: r.symbol_path,
+        language: r.language,
+        content: r.content,
+        score,
+        project_id: r.project_id,
+      }
+    })
+    .sort((a, b) => b.score - a.score)
 
-  results.forEach((r, idx) => {
-    logRecallEvent(db, r.chunk_id, input.text ?? input.symbol ?? '', idx + 1, score, input.caller_run_id, input.caller_role)
+  // min_score floor: rrfScore with both ranks null = 2 / (60 + 1000) ≈ 0.00189.
+  // When a caller sets min_score > 0, filter below that.
+  const filtered = minScore > 0 ? results.filter(r => r.score >= minScore) : results
+  if (filtered.length === 0) return { results: [], reason: 'below_floor' }
+
+  filtered.forEach((r, idx) => {
+    logRecallEvent(db, r.chunk_id, input.text ?? input.symbol ?? '', idx + 1, r.score, input.caller_run_id, input.caller_role)
   })
 
-  return { results }
+  return { results: filtered }
 }

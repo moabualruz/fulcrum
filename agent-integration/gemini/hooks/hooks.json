@@ -1,4 +1,40 @@
 {
+  "BeforeModel": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-before-model",
+          "type": "command",
+          "command": "fulcrum hook gemini before-model"
+        }
+      ]
+    }
+  ],
+  "AfterModel": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-after-model",
+          "type": "command",
+          "command": "fulcrum hook gemini after-model"
+        }
+      ]
+    }
+  ],
+  "PreCompress": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-pre-compress",
+          "type": "command",
+          "command": "fulcrum hook gemini pre-compress"
+        }
+      ]
+    }
+  ],
   "SessionStart": [
     {
       "matcher": "*",

@@ -66,10 +66,11 @@ describe('searchCode — v2a PR 2 Task 13', () => {
 
   it('honors min_score floor', async () => {
     seedChunk({ chunk_id: 'c1', file_path: 'src/a.ts', content: 'authenticate' })
-    const out = await searchCode({ workspace_id: 'ws_1', project_id: 'proj_1', text: 'authenticate', min_score: 0.99 })
-    // FTS-matched score is 1.0 — should pass; floor at 1.5 would fail.
+    // RRF scores are ~1/(60+rank); rank-1 FTS match yields ~0.0164.
+    // A floor of 0.001 lets rank-1 hits through; a floor of 0.5 rejects them.
+    const out = await searchCode({ workspace_id: 'ws_1', project_id: 'proj_1', text: 'authenticate', min_score: 0.001 })
     expect(out.results.length).toBeGreaterThan(0)
-    const out2 = await searchCode({ workspace_id: 'ws_1', project_id: 'proj_1', text: 'authenticate', min_score: 1.5 })
+    const out2 = await searchCode({ workspace_id: 'ws_1', project_id: 'proj_1', text: 'authenticate', min_score: 0.5 })
     expect(out2.results).toEqual([])
     expect(out2.reason).toBe('below_floor')
   })

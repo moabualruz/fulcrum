@@ -85,8 +85,7 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
 
   // v2a PR 6 Task 34 — non-primary write drop (defense-in-depth).
   // Writes from runs with context_type ≠ 'primary' are silently dropped
-  // unless kind='delegation_summary'. Guard runs even when FULCRUM_MEMORY_V2
-  // is off. Telemetry goes to hook_events for auditability.
+  // unless kind='delegation_summary'. Telemetry goes to hook_events for auditability.
   const ctxType = input.provenance?.context_type
   if (ctxType && ctxType !== 'primary' && input.kind !== 'delegation_summary') {
     try {

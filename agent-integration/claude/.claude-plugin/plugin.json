@@ -1,0 +1,12 @@
+{
+  "name": "fulcrum",
+  "description": "Fulcrum Agent OS — task management, memory vault, multi-agent lifecycle, and policy hooks for Claude Code",
+  "version": "2.0.0",
+  "author": "Fulcrum / Mo Abualruz",
+  "license": "MIT",
+  "hooks": "./hooks/hooks.json",
+  "mcp": "../settings-hooks-snippet.json",
+  "skills": "../skills",
+  "commands": "../commands",
+  "agents": "../agents"
+}

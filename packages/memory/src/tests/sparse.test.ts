@@ -114,13 +114,12 @@ describe('sparseRank', () => {
     const docAVec = computeSparseVector('authentication token middleware pipeline security')
     const docBVec = computeSparseVector('database schema migration table column index')
     const rows = [
-      { rowid: 1, sparse_vector: JSON.stringify(docAVec) },
-      { rowid: 2, sparse_vector: JSON.stringify(docBVec) },
+      { memory_id: 'mem_a', sparse_vector: JSON.stringify(docAVec) },
+      { memory_id: 'mem_b', sparse_vector: JSON.stringify(docBVec) },
     ]
     const ranks = sparseRank(query, rows)
-    // doc_a should rank above doc_b (rank 1 vs rank 2)
-    const rankA = ranks.get(1)
-    const rankB = ranks.get(2)
+    const rankA = ranks.get('mem_a')
+    const rankB = ranks.get('mem_b')
     expect(rankA).toBeDefined()
     expect(rankB ?? Infinity).toBeGreaterThan(rankA!)
   })
@@ -128,7 +127,7 @@ describe('sparseRank', () => {
   it('excludes rows with no overlap (score=0) from results', () => {
     const query = 'authentication middleware'
     const rows = [
-      { rowid: 1, sparse_vector: JSON.stringify({ completely: 0.5, different: 0.5 }) },
+      { memory_id: 'mem_a', sparse_vector: JSON.stringify({ completely: 0.5, different: 0.5 }) },
     ]
     const ranks = sparseRank(query, rows)
     // No overlap → score=0 → excluded from map
@@ -137,11 +136,10 @@ describe('sparseRank', () => {
 
   it('handles null sparse_vector gracefully', () => {
     const rows = [
-      { rowid: 1, sparse_vector: null },
-      { rowid: 2, sparse_vector: JSON.stringify(computeSparseVector('authentication token')) },
+      { memory_id: 'mem_a', sparse_vector: null },
+      { memory_id: 'mem_b', sparse_vector: JSON.stringify(computeSparseVector('authentication token')) },
     ]
     const ranks = sparseRank('auth token', rows)
-    // rowid 1 with null vector should not appear
-    expect(ranks.has(1)).toBe(false)
+    expect(ranks.has('mem_a')).toBe(false)
   })
 })

@@ -141,6 +141,7 @@ export async function spawnAgent(
     workspace_id: input.workspace_id,
     task_id: input.task_id,
     role: input.target_role,
+    context_type: 'subagent',
   })
 
   // Telemetry: open a span for the agent run. Attaches to the new run_id

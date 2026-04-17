@@ -510,6 +510,14 @@ export async function runFulcrumMcpServer(options: McpServerOptions): Promise<vo
 
   process.stderr.write('[fulcrum mcp] fulcrum MCP server started (stdio, protocol 2025-11-25)\n')
 
+  // v2b PR 15: normalize_version sweep on server start (background, non-blocking)
+  import('@moabualruz/fulcrum-memory').then(m => {
+    if (typeof (m as Record<string, unknown>).startNormalizeVersionSweep === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(m as any).startNormalizeVersionSweep()
+    }
+  }).catch(() => { /* non-fatal */ })
+
   await server.connect(transport)
 
   // Keep alive until stdin closes (parent process died)

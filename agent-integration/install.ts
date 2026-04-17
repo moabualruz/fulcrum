@@ -1408,9 +1408,25 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
   const codexConfigToml = path.join(codexConfigDir, "config.toml");
   const pluginSkillsDir = path.join(REPO_ROOT_LOCAL, "codex", "plugin", "skills");
 
-  // 1. Register MCP server via `codex mcp add` (native CLI, not raw TOML edits)
-  await step("Codex: register fulcrum MCP via `codex mcp add`", () => {
-    // Check if already registered by looking in config.toml
+  // 1. Register MCP server by merging TOML into config.toml directly. Codex CLI
+  //    reads [mcp_servers.*] tables from this file on startup, so writing the
+  //    entry is equivalent to `codex mcp add` and works even when the codex
+  //    binary isn't installed (e.g. first-time install, test environments).
+  const FULCRUM_MCP_TOML = [
+    "",
+    "[mcp_servers.fulcrum]",
+    'command = "fulcrum"',
+    'args = ["serve", "mcp", "--mode", "filtered"]',
+    "",
+  ].join("\n");
+
+  await step("Codex: register fulcrum MCP → ~/.codex/config.toml", () => {
+    if (dryRun) {
+      console.log(`  [dry-run] would merge [mcp_servers.fulcrum] into ${codexConfigToml}`);
+      ok(`(dry-run) mcp register`);
+      return;
+    }
+    fs.mkdirSync(codexConfigDir, { recursive: true });
     const existing = fs.existsSync(codexConfigToml)
       ? fs.readFileSync(codexConfigToml, "utf8")
       : "";
@@ -1418,26 +1434,8 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
       skip(`fulcrum MCP already registered in ${codexConfigToml}`);
       return;
     }
-    if (dryRun) {
-      console.log(`  [dry-run] would run: codex mcp add fulcrum -- fulcrum serve mcp --mode filtered`);
-      ok(`(dry-run) codex mcp add`);
-      return;
-    }
-    if (!commandExists("codex")) {
-      warn("codex not in PATH — skipping MCP registration");
-      return;
-    }
-    const result = spawnSync(
-      "codex",
-      ["mcp", "add", "fulcrum", "--", "fulcrum", "serve", "mcp", "--mode", "filtered"],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-    );
-    if (result.status !== 0) {
-      warn(`codex mcp add failed: ${(result.stderr ?? "").trim().slice(0, 200)}`);
-      return;
-    }
-    ok(`registered fulcrum MCP via codex mcp add`);
-    setRollback(`codex mcp remove fulcrum`);
+    fs.writeFileSync(codexConfigToml, existing + FULCRUM_MCP_TOML, "utf8");
+    ok(`registered fulcrum MCP in ${codexConfigToml}`);
   });
 
   // 2. Install skills into ~/.codex/skills/ (global, always available without plugin install)
@@ -1533,6 +1531,47 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
     fs.copyFileSync(templateAgentsMd, destAgentsMd);
     ok(`wrote ${destAgentsMd}`);
     setRollback(`rm -f ${destAgentsMd}`);
+  });
+
+  // 5. Register in ~/.agents/plugins/marketplace.json (idempotent).
+  //    Tracks which agent hosts have fulcrum installed — used by the plugin
+  //    manifest to surface install status in the cockpit + for uninstall.
+  const marketplaceDir = path.join(homeDir, ".agents", "plugins");
+  const marketplacePath = path.join(marketplaceDir, "marketplace.json");
+
+  await step("Codex: register plugin → ~/.agents/plugins/marketplace.json", () => {
+    if (dryRun) {
+      console.log(`  [dry-run] would register fulcrum plugin in ${marketplacePath}`);
+      ok(`(dry-run) marketplace`);
+      return;
+    }
+    fs.mkdirSync(marketplaceDir, { recursive: true });
+    interface Marketplace {
+      version?: number;
+      plugins?: Array<{ name?: string; host?: string; version?: string; installed_at?: string }>;
+      [k: string]: unknown;
+    }
+    let parsed: Marketplace = { version: 1, plugins: [] };
+    if (fs.existsSync(marketplacePath)) {
+      try {
+        parsed = JSON.parse(fs.readFileSync(marketplacePath, "utf8")) as Marketplace;
+      } catch {
+        parsed = { version: 1, plugins: [] };
+      }
+    }
+    if (!Array.isArray(parsed.plugins)) parsed.plugins = [];
+    if (parsed.plugins.some(p => p?.name === "fulcrum" && p?.host === "codex")) {
+      skip(`fulcrum already registered for codex in ${marketplacePath}`);
+      return;
+    }
+    parsed.plugins.push({
+      name: "fulcrum",
+      host: "codex",
+      version: "0.0.1",
+      installed_at: new Date().toISOString(),
+    });
+    fs.writeFileSync(marketplacePath, JSON.stringify(parsed, null, 2), "utf8");
+    ok(`registered fulcrum plugin in ${marketplacePath}`);
   });
 }
 

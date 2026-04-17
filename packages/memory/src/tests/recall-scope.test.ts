@@ -87,25 +87,17 @@ describe('query_scope composition in recallMemory', () => {
     expect(allIds.length).toBeGreaterThanOrEqual(2)
   })
 
-  it("global scope throws FulcrumError — cross-workspace queries are not permitted", async () => {
+  it("global scope without caller_role returns policy_denied (v2b PR 12 — fail-closed)", async () => {
     seed()
-    await expect(
-      recallMemory({
-        query: 'global recall',
-        workspace_id: 'ws_1',
-        project_id: 'proj_a',
-        query_scope: 'global' as never,
-      })
-    ).rejects.toThrow(FulcrumError)
-
-    await expect(
-      recallMemory({
-        query: 'global recall',
-        workspace_id: 'ws_1',
-        project_id: 'proj_a',
-        query_scope: 'global' as never,
-      })
-    ).rejects.toMatchObject({ code: 'invalid_input', message: "query_scope 'global' is not permitted" })
+    const result = await recallMemory({
+      query: 'global recall',
+      workspace_id: 'ws_1',
+      project_id: 'proj_a',
+      query_scope: 'global',
+      // no caller_role → fail-closed deny
+    }) as { results: unknown[]; reason?: string }
+    expect(result.results).toEqual([])
+    expect(result.reason).toBe('policy_denied')
   })
 
   it('session scope returns only memories with matching session_id', async () => {

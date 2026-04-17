@@ -65,8 +65,9 @@ export interface WriteMemoryInput {
  * - 'session':   filter to memories from a specific agent session (requires session_id)
  * - 'project':   default — filter by workspace_id + project_id
  * - 'workspace': drop project_id filter — search all projects in the workspace
+ * - 'global':    cross-workspace — requires caller_role to pass the role-policy gate
  */
-export type QueryScope = 'session' | 'project' | 'workspace'
+export type QueryScope = 'session' | 'project' | 'workspace' | 'global'
 
 export interface RecallMemoryInput {
   workspace_id: string
@@ -79,8 +80,16 @@ export interface RecallMemoryInput {
   scope?: MemoryScope                 // filter by memory.scope column
   kind?: MemoryKind
   file_path?: string
-  query_scope?: QueryScope            // search breadth: project (default) | workspace | session
+  query_scope?: QueryScope            // search breadth: project (default) | workspace | session | global
   session_id?: string                 // required when query_scope = 'session'
+  caller_role?: string                // role for global-scope policy gate
+}
+
+/** Policy-denied response (returned instead of throwing for global scope denials). */
+export interface PolicyDeniedResponse {
+  results: []
+  reason: 'policy_denied'
+  policy_rule_id?: string
 }
 
 /** Compact recall result — minimal fields only */

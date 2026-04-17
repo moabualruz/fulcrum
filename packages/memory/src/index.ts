@@ -37,7 +37,7 @@ export { runStagedSearch } from './retrieval/search.js'
 export type { StagedSearchResponse, StagedSearchReason, RunStagedSearchInput } from './retrieval/search.js'
 
 // v2a PR 1 Task 9 — kind validation + per-kind char caps.
-export { validateKind, isAllowedKind, applyKindCap, V2A_KINDS, LEGACY_KINDS, KIND_CAPS } from './validate-kind.js'
+export { validateKind, isAllowedKind, applyKindCap, V2A_KINDS, LEGACY_KINDS, V2B_KINDS, KIND_CAPS } from './validate-kind.js'
 
 // v2a PR 2 Tasks 12 + 13 — query_memory + search_code action surfaces.
 export { queryMemory } from './query-memory.js'
@@ -130,6 +130,22 @@ export type { ResolvedEntity } from './kuzu/entity-store.js'
 export { extractStructured } from './extractors/structured.js'
 export type { ExtractedMention } from './extractors/structured.js'
 
+// v2b PR 13 — code_context + project_context
+export { runCodeContext } from './code-context.js'
+export type { CodeContextInput, CodeContextResult } from './code-context.js'
+export { runProjectContext } from './project-context.js'
+export type { ProjectContextInput, ProjectContextResult } from './project-context.js'
+
+// v2b PR 12 — Global pointer + activations
+export { listActivations } from './list-activations.js'
+export type { ListActivationsInput, ActivationsResponse } from './list-activations.js'
+export { checkGlobalPointer, parseGlobalPointerFile } from './recall-global-pointer.js'
+export type { GlobalPointerLine, PointerCheckResult } from './recall-global-pointer.js'
+
+// v2b PR 11 — Dreaming pipeline
+export { runLightPhase, THRESHOLDS as DREAMING_THRESHOLDS } from './dreaming/light-phase.js'
+export type { LightPhaseInput, LightPhaseResult, ScoreEntry, MemoryRow, WikilinkRow, RecallEventRow } from './dreaming/light-phase.js'
+
 // Setup
 export { rebuildFromVault, reconcileMergedBranch } from './setup/rebuild.js'
 export { runMemoryInit } from './setup/wizard.js'
@@ -143,3 +159,17 @@ export type { RepoMap, RepoFileEntry, RepoSymbol } from './repo-map.js'
 // Sparse vectors (GAP-RAG-7)
 export { computeSparseVector, sparseDotProduct, sparseRank, tokenise } from './sparse.js'
 export type { SparseVector } from './sparse.js'
+
+// v2b PR 15 — normalize_version re-processor
+export { CURRENT_VERSION, scanStaleRows, runNormalizeVersion, startNormalizeVersionSweep } from './db/normalize-version.js'
+export type { StaleRow, NormalizeResult } from './db/normalize-version.js'
+
+// v2b PR 20 — git reducers
+export { reduceGitCommit, reduceGitBranch, reduceGitPr, reduceGitTag } from './kuzu/reducers/git.js'
+export type { GitCommitInput, GitBranchInput, GitPrInput, GitTagInput } from './kuzu/reducers/git.js'
+
+// v2b PR 14 — Fulcrum-specific recall eval + LongMemEval harness
+export { runFulcrumEval, runFulcrumEvalFromFile, computeMrr, computeNdcg } from './eval/fulcrum-recall/harness.js'
+export type { EvalCorpusEntry, EvalRetriever, FulcrumEvalResult, KindMetrics } from './eval/fulcrum-recall/harness.js'
+export { runLongMemEval, splitCorpus } from './eval/longmemeval/harness.js'
+export type { LmeEntry, LmeAnswerer, LmeSplit, LmeEvalResult } from './eval/longmemeval/harness.js'

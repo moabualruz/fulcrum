@@ -630,30 +630,38 @@ TOOL_REGISTRY.set('write_memory', {
   },
 })
 
-// v2a PR 9 Task 44 — code_context / project_context registered as
-// v2b-deferred but shape-stable. Calling them returns a structured response
-// with reason='deferred-v2b' so callers can branch without throwing.
+// v2b PR 13 Task 4.3 — code_context and project_context graduate from v2b-deferred stubs
 TOOL_REGISTRY.set('code_context', {
   schema: TOOL_SCHEMA_MAP.get('code_context'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async () => {
-    return {
-      results: [],
-      reason: 'deferred-v2b',
-      message: 'code_context is a v2b feature; v2a degrades to recall_memory + query_memory + search_code.',
-    }
+  handler: async (args, deps) => {
+    const { runCodeContext } = await import('@moabualruz/fulcrum-memory')
+    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
+    return runCodeContext({
+      symbol: args['symbol'] as string | undefined,
+      file: args['file'] as string | undefined,
+      workspace_id: ws,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+      limit: args['limit'] as number | undefined,
+    })
   },
 })
 
 TOOL_REGISTRY.set('project_context', {
   schema: TOOL_SCHEMA_MAP.get('project_context'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async () => {
-    return {
-      results: [],
-      reason: 'deferred-v2b',
-      message: 'project_context is a v2b feature; v2a degrades to recall_memory + query_memory + search_code.',
-    }
+  handler: async (args, deps) => {
+    const { runProjectContext } = await import('@moabualruz/fulcrum-memory')
+    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
+    return runProjectContext({
+      task_id: args['task_id'] as string | undefined,
+      run_id: args['run_id'] as string | undefined,
+      file: args['file'] as string | undefined,
+      symbol: args['symbol'] as string | undefined,
+      workspace_id: ws,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+      limit: args['limit'] as number | undefined,
+    })
   },
 })
 
@@ -782,6 +790,7 @@ TOOL_REGISTRY.set('start_agent_run', {
       workspace_id: ws,
       agent_id: `pi/${role}`,
       pi_profile: role,
+      context_type: (args['context_type'] as Parameters<typeof startAgentRun>[0]['context_type']) ?? 'subagent',
     })
 
     if (args['dispatch'] === true) {
@@ -1029,6 +1038,18 @@ TOOL_REGISTRY.set('update_agent_definition', {
       model: args['model'] as string | undefined,
       executor_uri: args['executor_uri'] as string | undefined,
     })
+  },
+})
+
+// v2b PR 12 Task 3.5 — list_activations: read-only workspace activation snapshot
+TOOL_REGISTRY.set('list_activations', {
+  schema: TOOL_SCHEMA_MAP.get('list_activations'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { listActivations } = await import('@moabualruz/fulcrum-memory')
+    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
+    const proj = (args['project_id'] as string | undefined) ?? deps.project_id
+    return listActivations({ workspace_id: ws, project_id: proj })
   },
 })
 

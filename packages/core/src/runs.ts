@@ -411,6 +411,26 @@ export async function completeAgentRun(input: CompleteRunInput, db: Db = getDb()
     if (typeof mem?.onAgentRunEnd === 'function') mem.onAgentRunEnd(input.run_id)
   } catch { /* best-effort */ }
 
+  // v2b PR 8 follow-up — auto-fire on_delegation when a subagent completes.
+  // Reads parent_run_id off the completed row; the memory package walks the
+  // chain to the topmost primary run for attribution.
+  if (completedRun.context_type === 'subagent' && completedRun.parent_run_id && input.output_summary) {
+    try {
+      const moduleName = '@moabualruz/fulcrum-memory'
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mem = (await import(/* @vite-ignore */ moduleName)) as any
+      if (typeof mem?.onDelegation === 'function') {
+        await mem.onDelegation({
+          child_run_id: completedRun.run_id,
+          parent_run_id: completedRun.parent_run_id,
+          task: completedRun.task_id ?? 'unnamed',
+          result: input.output_summary,
+          artifacts: input.artifacts?.files_changed ?? [],
+        })
+      }
+    } catch { /* non-fatal; hook_invocation_error should surface separately */ }
+  }
+
   return getRun(input.run_id, db)
 }
 
