@@ -1424,10 +1424,16 @@ async function runServeMcp(): Promise<void> {
   if (!NO_MONITOR && !_monitorStarted) {
     try {
       const { startMonitorServer } = await import('fulcrum-monitor')
+      const { projectIdsFromPath } = await import('fulcrum-agent-core')
       const monitorPort = parseInt(process.env['FULCRUM_MONITOR_PORT'] ?? '4721', 10) || 4721
+      // Fall back to the deterministic cwd-derived workspace_id so the web UI
+      // and /agents|/board endpoints have a scope to filter on. Without this,
+      // /status returns workspace_id: null and every panel fetches without a
+      // query param → 400 "workspace_id required" → empty dashboard.
+      const monitorWorkspaceId = config.workspace_id || projectIdsFromPath(process.cwd()).workspace_id
       const monitorServer = startMonitorServer({
         port: monitorPort,
-        workspace_id: config.workspace_id || undefined,
+        workspace_id: monitorWorkspaceId,
       })
       await monitorServer.start()
       _monitorStarted = true
@@ -1545,7 +1551,7 @@ async function runServeMcpHttp(): Promise<void> {
 
 async function runServeMonitor(): Promise<void> {
   const { startMonitorServer } = await import('fulcrum-monitor')
-  const { getDb, runMigrations, loadConfig } = await import('fulcrum-agent-core')
+  const { getDb, runMigrations, loadConfig, projectIdsFromPath } = await import('fulcrum-agent-core')
 
   const config = loadConfig()
   const db = getDb()
@@ -1563,7 +1569,7 @@ async function runServeMonitor(): Promise<void> {
     if (val) port = parseInt(val, 10)
   }
 
-  const server = startMonitorServer({ port, workspace_id: config.workspace_id || undefined })
+  const server = startMonitorServer({ port, workspace_id: config.workspace_id || projectIdsFromPath(process.cwd()).workspace_id })
   await server.start()
   console.log(`[fulcrum monitor] Listening on http://127.0.0.1:${port}`)
   console.log(`[fulcrum monitor] API docs: http://127.0.0.1:${port}/status`)
