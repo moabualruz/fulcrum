@@ -671,6 +671,20 @@ async function readStdinFully(): Promise<string> {
   return Buffer.concat(chunks).toString('utf-8').trim()
 }
 
+/**
+ * Lifecycle phases referenced by shipped agent configs
+ * (claude/settings-hooks-snippet.json, gemini/hooks/hooks.json,
+ * codex/config.toml) but without bespoke handlers yet. Drain stdin so
+ * the parent doesn't see EPIPE, log at DEBUG only, and exit 0 so the
+ * invoking agent doesn't treat it as a failure.
+ */
+async function runStubHook(cli: string, phase: string): Promise<void> {
+  await readStdinFully()
+  if (process.env['FULCRUM_DEBUG'] === '1') {
+    process.stderr.write(`[fulcrum hook ${cli} ${phase}] no-op (not yet implemented)\n`)
+  }
+}
+
 /** Sanitize an arbitrary string for use as a filesystem path component. */
 function sanitizeId(id: string): string {
   return id.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 128)
@@ -2798,9 +2812,13 @@ OPTIONS (serve mcp-http)
 
       // Claude lifecycle hooks
       if (cli === 'claude') {
-        if (phaseArg === 'session-start') { await runSessionStartHook(); return }
-        if (phaseArg === 'session-stop')  { await runSessionStopHook();  return }
-        if (phaseArg === 'pre-compact')   { await runPreCompactHook();   return }
+        if (phaseArg === 'session-start')  { await runSessionStartHook(); return }
+        if (phaseArg === 'session-stop')   { await runSessionStopHook();  return }
+        if (phaseArg === 'session-end')    { await runSessionStopHook();  return }
+        if (phaseArg === 'pre-compact')    { await runPreCompactHook();   return }
+        if (phaseArg === 'subagent-start' || phaseArg === 'subagent-stop') {
+          await runStubHook('claude', phaseArg); return
+        }
       }
 
       // Gemini lifecycle hooks
@@ -2808,18 +2826,28 @@ OPTIONS (serve mcp-http)
         if (phaseArg === 'session-start') { await runGeminiSessionStartHook(); return }
         if (phaseArg === 'before-agent')  { await runGeminiBeforeAgentHook();  return }
         if (phaseArg === 'session-end')   { await runGeminiSessionEndHook();   return }
+        if (
+          phaseArg === 'before-model' ||
+          phaseArg === 'after-model' ||
+          phaseArg === 'pre-compress' ||
+          phaseArg === 'after-agent'
+        ) {
+          await runStubHook('gemini', phaseArg); return
+        }
       }
 
       // Codex lifecycle hooks
       if (cli === 'codex') {
         if (phaseArg === 'session-start') { await runCodexSessionStartHook(); return }
         if (phaseArg === 'session-end')   { await runCodexStopHook();         return }
+        // Codex [notify] section fires on run completion — same semantic as session-end
+        if (phaseArg === 'notify')        { await runCodexStopHook();         return }
       }
 
       const phase: HookPhase = phaseArg === 'post' ? 'post' : 'pre'
       if (phaseArg && phaseArg !== 'pre' && phaseArg !== 'post') {
         console.error(`Unknown hook phase: ${phaseArg}`)
-        console.error('Usage: fulcrum hook auto|claude|gemini|codex|pi [pre|post|session-start|session-stop|pre-compact|before-agent|session-end]')
+        console.error('Usage: fulcrum hook auto|claude|gemini|codex|pi [pre|post|session-start|session-stop|session-end|pre-compact|before-agent|subagent-start|subagent-stop|before-model|after-model|pre-compress|after-agent|notify]')
         process.exit(1)
       }
       await runHook(cli, phase)
