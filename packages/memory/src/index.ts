@@ -62,6 +62,12 @@ export type { RecallEntry, WrapOptions } from './sanitize/wrap-for-recall.js'
 export { appendWal, brandSanitized, walPathFor, WalDurabilityError } from './wal/writer.js'
 export type { WalRecord, AppendWalInput, SanitizedContent } from './wal/writer.js'
 
+// v2a PR 8 Tasks 39-41 — task synthesis + on_delegation pattern.
+export { synthesizeTaskOutcome, synthesizeBlockerResolution } from './extractors/task-outcome.js'
+export type { SynthesisResult } from './extractors/task-outcome.js'
+export { onDelegation } from './hooks/on-delegation.js'
+export type { OnDelegationInput, OnDelegationResult } from './hooks/on-delegation.js'
+
 // Ingestion pipeline
 export { ingestFile, ingestProject } from './ingest.js'
 

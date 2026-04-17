@@ -206,6 +206,25 @@ export async function updateTask(input: UpdateTaskInput, db: Db = getDb()): Prom
         to_category: statusCategory(input.status as string),
       },
     })
+
+    // v2a PR 8 Tasks 39 + 40: synthesize task_outcome / blocker_resolution
+    // memories on terminal status transitions. Non-blocking — synthesis errors
+    // never fail the update_task call (memory writes are an audit surface).
+    // Dynamic-string import keeps the dependency direction memory → core only;
+    // the synthesis modules in @moabualruz/fulcrum-memory call back via this
+    // hook without core formally depending on memory (avoiding the cycle).
+    if (input.status === 'completed' || input.status === 'blocked') {
+      try {
+        const moduleName = '@moabualruz/fulcrum-memory'
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const memoryPkg = (await import(/* @vite-ignore */ moduleName)) as any
+        if (input.status === 'completed' && typeof memoryPkg?.synthesizeTaskOutcome === 'function') {
+          await memoryPkg.synthesizeTaskOutcome(input.task_id, db)
+        } else if (input.status === 'blocked' && typeof memoryPkg?.synthesizeBlockerResolution === 'function') {
+          await memoryPkg.synthesizeBlockerResolution(input.task_id, db)
+        }
+      } catch { /* synthesis is non-fatal — memory writes are an audit surface */ }
+    }
   }
 
   const updated = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(input.task_id) as Record<string, unknown> | undefined
