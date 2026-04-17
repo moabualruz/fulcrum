@@ -93,6 +93,19 @@ export type { OnAgentRunStartInput } from './pci/lifecycle.js'
 export { enumerateProjectFiles, shouldIndexPath, MAX_FILE_SIZE_BYTES } from './pci/walker-integration.js'
 export type { WalkerResult } from './pci/walker-integration.js'
 
+// v2a PR 7 Tasks 37 + 38 — Kuzu reducers for PCI + memory-write events.
+export {
+  reduceFileToGraph,
+  reduceUnlinkToGraph,
+  upsertFileNode,
+  upsertCodeChunkNode,
+  upsertSymbolNode,
+  deleteFileNode,
+} from './kuzu/reducers/code.js'
+export type { ProjectFileInput, ProjectChunkInput, ProjectSymbolInput } from './kuzu/reducers/code.js'
+export { reduceMemoryWrite, extractWikilinkRefs } from './kuzu/reducers/memory.js'
+export type { MemoryReducerInput } from './kuzu/reducers/memory.js'
+
 
 // Vault (L0)
 export { getVaultPath, vaultExists, initVault, writeMemoryFile, readMemoryFile, listMemoryFiles } from './vault/client.js'

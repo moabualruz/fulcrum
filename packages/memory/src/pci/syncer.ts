@@ -23,6 +23,7 @@ import type { Db } from '@moabualruz/fulcrum-core'
 import { getDb, getContentChangeBus, type ContentChangeEvent } from '@moabualruz/fulcrum-core'
 import { computeFileId } from '../setup/backfill-code-files.js'
 import { ingestFile as fullIngest } from '../ingest.js'
+import { reduceFileToGraph, reduceUnlinkToGraph } from '../kuzu/reducers/code.js'
 
 const LANG_EXT_MAP: Record<string, string> = {
   '.ts': 'typescript', '.tsx': 'typescript',
@@ -132,6 +133,8 @@ export async function syncFile(
     // change: diff chunks by content_hash.
     await applyChunkDiff(db, { workspaceId, projectId, fileId, relPath, content, language })
     db.prepare('UPDATE code_files SET sha256 = ?, mtime_ns = ?, size_bytes = ?, indexed_at = ? WHERE file_id = ?').run(sha, mtimeNs(stats), stats.size, Date.now(), fileId)
+    // v2a PR 7 Task 37 — project updated rows into Kuzu; fire-and-forget.
+    void reduceFileToGraph(db, fileId).catch(() => { /* logged in reducer */ })
     return { action: 'updated', fileId }
   }
 
@@ -149,6 +152,9 @@ export async function syncFile(
   const count = db.prepare('SELECT COUNT(*) AS n FROM code_chunks WHERE file_id = ?').get(fileId) as { n: number }
   db.prepare('UPDATE code_files SET chunks_count = ? WHERE file_id = ?').run(count.n, fileId)
 
+  // v2a PR 7 Task 37 — project new rows into Kuzu.
+  void reduceFileToGraph(db, fileId).catch(() => { /* logged in reducer */ })
+
   return { action: 'indexed', fileId }
 }
 
@@ -163,6 +169,9 @@ function deleteFile(db: Db, fileId: string): void {
   catch { /* cascade clears chunks/symbols via FK */ }
   try { db.prepare('DELETE FROM code_chunks WHERE file_id = ?').run(fileId) }
   catch { /* some schema versions don't cascade, best-effort */ }
+  // v2a PR 7 Task 37 — drop the File node + its edges + chunks/symbols.
+  // Fire-and-forget; graph eventually converges.
+  void reduceUnlinkToGraph(fileId).catch(() => { /* logged inside reducer */ })
 }
 
 function sweepRenameWindow(): void {

@@ -232,6 +232,23 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
     })
   }
 
+  // ── v2a PR 7 Task 38 — Memory↔code edge reducer (fire-and-forget) ─────────
+  // Runs async after L1 insert per L0→L1→L2 ordering invariant. No blocking
+  // on Kuzu availability — the reducer itself is a no-op when KuzuClient is
+  // not wired.
+  setImmediate(() => {
+    void import('./kuzu/reducers/memory.js').then(({ reduceMemoryWrite }) =>
+      reduceMemoryWrite(db, {
+        memoryId: memory_id,
+        workspaceId: input.workspace_id,
+        projectId: input.project_id ?? null,
+        kind: input.kind,
+        content: input.content,
+        filePaths: input.file_path ? [input.file_path] : undefined,
+      }).catch(() => { /* logged in reducer */ })
+    ).catch(() => { /* module import failure; best-effort */ })
+  })
+
   return rowToFullMemory(row)
 }
 
