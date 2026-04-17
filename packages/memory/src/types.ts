@@ -42,6 +42,20 @@ export interface WriteMemoryInput {
   provenance_refs?: string[]
   embedding?: Float32Array
   skipVaultWrite?: boolean   // internal flag for rebuild path — skips L0 write
+  /**
+   * v2a PR 6 Task 29 + 34 — hook-side provenance.
+   * Any write originating from a hook carries this envelope so non-primary
+   * context_types (subagent/cron/heartbeat/flush) can be silently dropped
+   * (except kind='delegation_summary') without the caller having to guard.
+   */
+  provenance?: {
+    agent_role?: string
+    run_id?: string
+    hook_point?: 'PostToolUse' | 'Stop' | 'PreCompact' | 'SessionEnd' | 'write_memory'
+    source_kind?: string
+    context_type?: 'primary' | 'subagent' | 'cron' | 'heartbeat' | 'flush'
+    [k: string]: unknown
+  }
 }
 
 /**

@@ -253,13 +253,19 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
 }
 
 /**
- * PostToolUse handler: writes a `tool_trace` operational memory capturing
- * which tool was called, the input keys (NOT values — never re-log
- * secrets), session, and run. Non-blocking: failures go to stderr only.
+ * v2a PR 6 Task 29 — PostToolUse handler rewrite.
+ *
+ * Emits typed memories per tool:
+ *   Write / Edit / MultiEdit / NotebookEdit → kind='file_patch'
+ *   Bash (mutating verbs only, Task 30)     → kind='bash_trace'
+ *   Read / Glob / Grep / other read-only    → skipped silently
+ *
+ * Per-turn dedup via sha256(tool_name + normalized_args + cwd) — duplicates
+ * bump a counter instead of inserting a new row. Non-blocking: failures log
+ * to stderr only.
  */
 export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
   if (!ctx.runId) {
-    // No run = no task/project to scope the trace to; nothing useful to write.
     io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
     io.exit(0)
     return
@@ -268,35 +274,66 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
   try {
     const { getDb } = await import('@moabualruz/fulcrum-core')
     const { writeMemory } = await import('@moabualruz/fulcrum-memory')
+    const { buildProvenance, dedupKey, markSeen, extractFilePatch, isMutatingBash } = await import('./hooks-writers.js')
     const db = getDb()
     const runRow = db.prepare(
-      `SELECT task_id, project_id FROM agent_runs WHERE run_id = ? AND workspace_id = ?`
-    ).get(ctx.runId, ctx.workspace_id) as { task_id: string | null; project_id: string | null } | undefined
+      `SELECT task_id, project_id, context_type FROM agent_runs WHERE run_id = ? AND workspace_id = ?`,
+    ).get(ctx.runId, ctx.workspace_id) as { task_id: string | null; project_id: string | null; context_type: string | null } | undefined
 
-    // Redact: only log the *keys* of tool_input, never the values.
-    const tool_input_keys = Object.keys(ctx.toolInput).slice(0, 20)
-    const content = [
-      `Tool: ${ctx.toolName}`,
-      `Keys: ${tool_input_keys.join(', ') || '(none)'}`,
-      `Session: ${ctx.sessionId}`,
-      `Run: ${ctx.runId}`,
-    ].join('\n')
+    const contextType = (runRow?.context_type as 'primary' | 'subagent' | 'cron' | 'heartbeat' | 'flush' | undefined) ?? 'primary'
+    // Per-turn dedup key.
+    const cwd = String(ctx.toolInput['cwd'] ?? process.cwd())
+    const key = dedupKey(ctx.toolName, ctx.toolInput, cwd)
+    if (!markSeen(key)) {
+      io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
+      io.exit(0)
+      return
+    }
 
-    await writeMemory({
-      workspace_id: ctx.workspace_id,
-      project_id: runRow?.project_id ?? ctx.workspace_id,
-      task_id: runRow?.task_id ?? undefined,
-      content,
-      title: `Tool: ${ctx.toolName}`,
-      summary: `${ctx.toolName} called with keys: ${Object.keys(ctx.toolInput).join(', ') || '(none)'}`,
-      kind: 'tool_trace',
-      scope: runRow?.task_id ? 'task' : 'project',
-      tags: [ctx.toolName, ctx.cliName],
-      importance: 0.2,
-    } as Parameters<typeof writeMemory>[0])
+    // Route by tool_name. Read/Glob/Grep/etc fall through to "no-op".
+    const filePatch = extractFilePatch(ctx.toolName, ctx.toolInput)
+    if (filePatch) {
+      await writeMemory({
+        workspace_id: ctx.workspace_id,
+        project_id: runRow?.project_id ?? ctx.workspace_id,
+        task_id: runRow?.task_id ?? undefined,
+        kind: 'file_patch',
+        scope: runRow?.task_id ? 'task' : 'project',
+        title: `${ctx.toolName}: ${filePatch.filePath}`,
+        summary: filePatch.diffSummary.slice(0, 200),
+        content: filePatch.diffSummary,
+        file_path: filePatch.filePath,
+        tags: [ctx.toolName, ctx.cliName, filePatch.operation],
+        importance: 0.4,
+        provenance: buildProvenance(ctx, 'PostToolUse', contextType),
+      } as Parameters<typeof writeMemory>[0])
+    } else if (ctx.toolName === 'Bash') {
+      const command = String(ctx.toolInput['command'] ?? '')
+      if (!isMutatingBash(command)) {
+        // Read-only command — skip silently (Task 30 allowlist invert).
+        io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
+        io.exit(0)
+        return
+      }
+      const exitStatus = (ctx.toolInput['exit_status'] as number | undefined) ?? 0
+      await writeMemory({
+        workspace_id: ctx.workspace_id,
+        project_id: runRow?.project_id ?? ctx.workspace_id,
+        task_id: runRow?.task_id ?? undefined,
+        kind: 'bash_trace',
+        scope: runRow?.task_id ? 'task' : 'project',
+        title: `Bash: ${command.slice(0, 80)}`,
+        summary: `exit=${exitStatus}; cwd=${cwd}`,
+        content: command.slice(0, 400),
+        tags: ['Bash', ctx.cliName],
+        importance: 0.3,
+        provenance: buildProvenance(ctx, 'PostToolUse', contextType),
+      } as Parameters<typeof writeMemory>[0])
+    }
+    // else: read-only tool; no write.
   } catch (err) {
-    io.stderr(`[fulcrum/post] tool_trace write failed: ${(err as Error).message}\n`)
-    // Don't fail the hook.
+    io.stderr(`[fulcrum/post] typed-write failed: ${(err as Error).message}\n`)
+    // Non-blocking.
   }
   io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
   io.exit(0)

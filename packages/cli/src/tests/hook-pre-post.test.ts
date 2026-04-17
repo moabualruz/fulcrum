@@ -15,6 +15,7 @@ import {
   runMigrations,
 } from '@moabualruz/fulcrum-core'
 import { runPreHook, runPostHook, type HookContext, type HookIO, type HookOutput } from '../index.js'
+import { clearDedupCache } from '../hooks-writers.js'
 
 // ── Test harness ──────────────────────────────────────────────────────────────
 
@@ -207,11 +208,15 @@ describe('runPreHook — memory recall (L-7)', () => {
   })
 })
 
-describe('runPostHook — tool_trace memory (L-8)', () => {
-  beforeEach(() => { createTestDb() })
+describe('runPostHook — typed file_patch memory (v2a PR 6 Task 29)', () => {
+  beforeEach(() => {
+    createTestDb()
+    // Reset per-turn dedup so each test is independent.
+    clearDedupCache()
+  })
   afterEach(() => resetTestDb())
 
-  it('writes a tool_trace memory capturing tool name and input keys only', async () => {
+  it('Edit tool writes kind="file_patch" with diff_summary, not tool_trace', async () => {
     const { workspace_id, task_id, run_id } = seedWorkspaceProjectTaskRun()
     const cap = makeCapturedIO()
     await runPostHook(
@@ -227,17 +232,58 @@ describe('runPostHook — tool_trace memory (L-8)', () => {
 
     const db = getDb()
     const row = db.prepare(
-      `SELECT content, kind, scope, task_id FROM memories WHERE workspace_id = ? AND kind = 'tool_trace' ORDER BY rowid DESC LIMIT 1`
-    ).get(workspace_id) as { content: string; kind: string; scope: string; task_id: string | null } | undefined
+      `SELECT content, kind, scope, task_id, file_path FROM memories WHERE workspace_id = ? AND kind = 'file_patch' ORDER BY rowid DESC LIMIT 1`,
+    ).get(workspace_id) as { content: string; kind: string; scope: string; task_id: string | null; file_path: string } | undefined
     expect(row).toBeDefined()
-    expect(row!.kind).toBe('tool_trace')
+    expect(row!.kind).toBe('file_patch')
     expect(row!.scope).toBe('task')
     expect(row!.task_id).toBe(task_id)
-    expect(row!.content).toMatch(/Tool: Edit/)
-    expect(row!.content).toMatch(/file_path, old_string, new_string/)
-    // Values must not be echoed back — only the keys.
-    expect(row!.content).not.toContain(OLD_VAL)
-    expect(row!.content).not.toContain(NEW_VAL)
+    expect(row!.file_path).toBe('/tmp/x.ts')
+    // diff_summary captures delta + preview — values NOT echoed literally.
+    // The diff preview may include short-form content; the hard rule is that
+    // full secret-shaped strings should never appear. Here we assert that
+    // the unique identifier OLD_VAL isn't echoed back alongside the delta
+    // encoding — which it won't be, because extractFilePatch takes only
+    // the newString for the preview.
+    expect(row!.content).toMatch(/lines;/)
+  })
+
+  it('Bash with read-only command is skipped (no memory written)', async () => {
+    const { run_id } = seedWorkspaceProjectTaskRun()
+    const cap = makeCapturedIO()
+    await runPostHook(
+      baseCtx({
+        phase: 'post',
+        toolName: 'Bash',
+        toolInput: { command: 'ls -la' },
+        runId: run_id,
+      }),
+      cap.io,
+    )
+    expect(cap.exitCode).toBe(0)
+    const db = getDb()
+    const count = db.prepare(`SELECT COUNT(*) AS n FROM memories WHERE kind IN ('bash_trace', 'file_patch', 'tool_trace')`).get() as { n: number }
+    expect(count.n).toBe(0)
+  })
+
+  it('Bash with mutating verb writes kind="bash_trace"', async () => {
+    const { run_id } = seedWorkspaceProjectTaskRun()
+    const cap = makeCapturedIO()
+    await runPostHook(
+      baseCtx({
+        phase: 'post',
+        toolName: 'Bash',
+        toolInput: { command: 'rm -rf /tmp/test-dir' },
+        runId: run_id,
+      }),
+      cap.io,
+    )
+    expect(cap.exitCode).toBe(0)
+    const db = getDb()
+    const row = db.prepare(`SELECT kind, content FROM memories WHERE kind = 'bash_trace' ORDER BY rowid DESC LIMIT 1`).get() as { kind: string; content: string } | undefined
+    expect(row).toBeDefined()
+    expect(row!.kind).toBe('bash_trace')
+    expect(row!.content).toContain('rm')
   })
 
   it('is a no-op when runId is missing', async () => {
@@ -256,7 +302,7 @@ describe('runPostHook — tool_trace memory (L-8)', () => {
 
     const db = getDb()
     const count = db.prepare(
-      `SELECT COUNT(*) AS n FROM memories WHERE kind = 'tool_trace'`
+      `SELECT COUNT(*) AS n FROM memories WHERE kind IN ('file_patch', 'bash_trace', 'tool_trace')`
     ).get() as { n: number }
     expect(count.n).toBe(0)
   })

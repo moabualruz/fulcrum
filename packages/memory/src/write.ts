@@ -83,6 +83,50 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
     throw new FulcrumError('scope=task requires task_id', 'invalid_input')
   }
 
+  // v2a PR 6 Task 34 — non-primary write drop (defense-in-depth).
+  // Writes from runs with context_type ≠ 'primary' are silently dropped
+  // unless kind='delegation_summary'. Guard runs even when FULCRUM_MEMORY_V2
+  // is off. Telemetry goes to hook_events for auditability.
+  const ctxType = input.provenance?.context_type
+  if (ctxType && ctxType !== 'primary' && input.kind !== 'delegation_summary') {
+    try {
+      db.prepare(`INSERT INTO hook_events (workspace_id, event_type, payload, created_at)
+                  VALUES (?, 'non_primary_write_dropped', ?, datetime('now'))`)
+        .run(input.workspace_id, JSON.stringify({ kind: input.kind, context_type: ctxType, run_id: input.provenance?.run_id }))
+    } catch { /* telemetry is best-effort */ }
+    // Return a synthesized "skipped" memory — preserves caller expectations
+    // (most callers don't check) and keeps the contract non-throwing.
+    return {
+      memory_id: 'skip_' + newId('mem').slice(4),
+      workspace_id: input.workspace_id,
+      project_id: input.project_id,
+      scope: input.scope,
+      kind: input.kind,
+      title: input.title,
+      summary: input.summary,
+      content: '',
+      canonical_text: '',
+      tags: [],
+      entities: [],
+      confidence: 0,
+      importance: 0,
+      freshness: 0,
+      file_path: null,
+      symbol_path: null,
+      event_time: null,
+      content_hash: '',
+      task_id: null,
+      issue_id: null,
+      artifact_id: null,
+      provenance_refs: [],
+      embedding: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_accessed_at: new Date().toISOString(),
+      access_count: 0,
+    } as FullMemory
+  }
+
   // v2a Task 9: kind validation + per-kind char cap. The DB-level CHECK was
   // dropped in PR 1 Task 1; this is the single canonical policy point.
   validateKind(input.kind)

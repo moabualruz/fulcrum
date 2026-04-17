@@ -18,9 +18,8 @@
 import { readFileSync, statSync } from 'node:fs'
 import { relative, extname, join, isAbsolute } from 'node:path'
 import { createHash } from 'node:crypto'
-import { ulid } from 'ulidx'
 import type { Db } from '@moabualruz/fulcrum-core'
-import { getDb, getContentChangeBus, type ContentChangeEvent } from '@moabualruz/fulcrum-core'
+import { getDb, getContentChangeBus, newId, type ContentChangeEvent } from '@moabualruz/fulcrum-core'
 import { computeFileId } from '../setup/backfill-code-files.js'
 import { ingestFile as fullIngest } from '../ingest.js'
 import { reduceFileToGraph, reduceUnlinkToGraph } from '../kuzu/reducers/code.js'
@@ -212,7 +211,7 @@ async function applyChunkDiff(
     const h = contentSha256(chunk.text)
     if (existingByHash.has(h)) continue
     insert.run(
-      ulid(), workspaceId, projectId, relPath, fileId, language,
+      newId('chunk'), workspaceId, projectId, relPath, fileId, language,
       chunk.strategy, chunk.sourceType, chunk.text,
       chunk.startLine, chunk.endLine, chunk.symbolPath, h,
     )

@@ -53,11 +53,18 @@ export type TaskRelationType =
  */
 export type MemoryScope = 'session' | 'project' | 'workspace' | 'global' | 'file' | 'task'
 
+// v2a PR 1 Task 9 + PR 6 Task 29-34 — MemoryKind union kept in sync with
+// validate-kind.ts ALLOWED_KINDS. The DB-level CHECK was dropped in PR 1
+// Task 1 so additions are purely type-level.
 export type MemoryKind =
   | 'fact' | 'summary' | 'symbol' | 'decision' | 'procedure'
   | 'error' | 'diff' | 'doc' | 'code' | 'task_goal'
   | 'task_decision' | 'task_failure' | 'task_outcome'
   | 'tool_trace' | 'reasoning_step' | 'lesson'
+  // v2a kinds added in PR 1 / PR 6:
+  | 'file_patch' | 'bash_trace' | 'pre_compact_extract'
+  | 'session_summary' | 'blocker_resolution' | 'delegation_summary'
+  | 'identity' | 'persona'
 
 export type ArtifactType =
   | 'prd' | 'plan' | 'issue_breakdown' | 'context_gathering_report'
