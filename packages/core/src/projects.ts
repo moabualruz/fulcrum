@@ -86,14 +86,17 @@ export async function createProject(input: CreateProjectInput, db: Db = getDb())
   const now = new Date().toISOString()
 
   // PCI watcher gate: root_realpath is read by onAgentRunStart to decide
-  // whether to mount a code-index watcher for this project. When it's NULL,
-  // no file is ever indexed → code_chunks stays empty. Resolve it now from
-  // input.root_path or fall back to the server cwd so every project created
-  // from a concrete directory gets indexed.
-  const rawRoot = input.root_path ?? process.cwd()
-  let rootPath: string | null = rawRoot
-  let rootRealpath: string | null = rawRoot
-  try { rootRealpath = realpathSync(rawRoot) } catch { /* leave as rawRoot */ }
+  // whether to mount a code-index watcher for this project. We only set it
+  // when the caller explicitly passed root_path — implicit cwd fallback
+  // collides with the UNIQUE index on root_realpath when tests or batch
+  // code create multiple projects in one process. End-user auto-init paths
+  // (CLI, init command) are responsible for passing root_path explicitly.
+  let rootPath: string | null = null
+  let rootRealpath: string | null = null
+  if (input.root_path) {
+    rootPath = input.root_path
+    try { rootRealpath = realpathSync(input.root_path) } catch { rootRealpath = input.root_path }
+  }
 
   db.prepare(
     `INSERT INTO projects (project_id, workspace_id, name, description, type, status, write_mode, git_url, parent_project_id, created_at, root_path, root_realpath)

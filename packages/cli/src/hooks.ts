@@ -317,6 +317,38 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
         importance: 0.4,
         provenance: buildProvenance(ctx, 'PostToolUse', contextType),
       } as Parameters<typeof writeMemory>[0])
+
+      // Refresh the code index for the changed file. Hook-driven indexing is
+      // the primary mechanism (MCP's server watcher is just a fallback for
+      // hook-less clients). No-op when the file is outside the project root
+      // or the extension isn't in the ingest list.
+      try {
+        const { ingestFile } = await import('fulcrum-memory')
+        const { readFileSync, statSync } = await import('node:fs')
+        const { extname, isAbsolute, relative } = await import('node:path')
+        const abs = isAbsolute(filePatch.filePath) ? filePatch.filePath : `${process.cwd()}/${filePatch.filePath}`
+        const ext = extname(abs).toLowerCase()
+        if (new Set(['.ts', '.tsx', '.js', '.jsx', '.py', '.md']).has(ext)) {
+          const st = statSync(abs)
+          if (st.isFile() && st.size < 5_000_000) {
+            const content = readFileSync(abs, 'utf8')
+            const relPath = relative(process.cwd(), abs)
+            await ingestFile({
+              workspace_id: ctx.workspace_id,
+              project_id:   runRow?.project_id ?? ctx.workspace_id,
+              file_path:    relPath,
+              content,
+              language:     ext === '.ts' || ext === '.tsx' ? 'typescript'
+                          : ext === '.js' || ext === '.jsx' ? 'javascript'
+                          : ext === '.py'                    ? 'python'
+                          : ext === '.md'                    ? 'markdown'
+                          : undefined,
+            })
+          }
+        }
+      } catch (err) {
+        process.stderr.write(`[fulcrum hook] code-index refresh failed for ${filePatch.filePath}: ${(err as Error).message}\n`)
+      }
     } else if (ctx.toolName === 'Bash') {
       const command = String(ctx.toolInput['command'] ?? '')
       if (!isMutatingBash(command)) {

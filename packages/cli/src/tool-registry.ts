@@ -469,10 +469,20 @@ function ensureWorkspace(db: Db, wsId: string): void {
 }
 
 function ensureProject(db: Db, wsId: string, projId: string): void {
-  const existing = db.prepare('SELECT project_id FROM projects WHERE project_id = ?').get(projId)
+  const existing = db.prepare('SELECT project_id, root_realpath FROM projects WHERE project_id = ?').get(projId) as { project_id: string; root_realpath: string | null } | undefined
+  const cwd = process.cwd()
+  let rootRealpath: string | null = cwd
+  try { const { realpathSync } = require('fs') as typeof import('fs'); rootRealpath = realpathSync(cwd) } catch {}
   if (!existing) {
     const now = new Date().toISOString()
-    db.prepare('INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at) VALUES (?, ?, ?, ?)').run(projId, wsId, projId, now)
+    db.prepare(`INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at, root_path, root_realpath) VALUES (?, ?, ?, ?, ?, ?)`).run(projId, wsId, projId, now, cwd, rootRealpath)
+    return
+  }
+  // Back-fill root_realpath for projects created before the indexing fix.
+  if (!existing.root_realpath) {
+    try {
+      db.prepare(`UPDATE projects SET root_path = ?, root_realpath = ? WHERE project_id = ?`).run(cwd, rootRealpath, projId)
+    } catch { /* UNIQUE conflict — another project with same realpath already owns it */ }
   }
 }
 
