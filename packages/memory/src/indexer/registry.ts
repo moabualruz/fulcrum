@@ -45,6 +45,8 @@ export interface ReleaseResult {
 
 export interface ProjectStatus {
   root: string
+  workspace_id: string
+  project_id: string
   refcount: number
   watcher_active: boolean
 }
@@ -60,6 +62,8 @@ export interface DaemonRegistry {
 
 interface Entry {
   realpath: string
+  workspaceId: string
+  projectId: string
   refcount: number
   graceTimer: ReturnType<typeof setTimeout> | null
   syncer: PciSyncerHandle
@@ -101,13 +105,17 @@ export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
     }
 
     // Fresh mount.
+    const workspaceId = opts.workspaceIdFor(realpath)
+    const projectId = opts.projectIdFor(realpath)
     const syncer = startPciSyncer({
-      workspaceId: opts.workspaceIdFor(realpath),
-      projectId: opts.projectIdFor(realpath),
+      workspaceId,
+      projectId,
       projectRoot: realpath,
     })
     entries.set(realpath, {
       realpath,
+      workspaceId,
+      projectId,
       refcount: 1,
       graceTimer: null,
       syncer,
@@ -153,6 +161,8 @@ export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
     for (const entry of entries.values()) {
       projects.push({
         root: entry.realpath,
+        workspace_id: entry.workspaceId,
+        project_id: entry.projectId,
         refcount: entry.refcount,
         watcher_active: entry.graceTimer === null,
       })

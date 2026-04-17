@@ -80,12 +80,30 @@ export interface ReleaseWatchingResult {
   refcount: number
 }
 
+export interface IndexerProjectStatus {
+  root: string
+  workspace_id: string
+  project_id: string
+  refcount: number
+  watcher_active: boolean
+  code_chunks_count: number
+  memories_count: number
+}
+
+export interface IndexerStatus {
+  version: string
+  daemon_started_at: string
+  active_watches: number
+  projects: IndexerProjectStatus[]
+}
+
 export interface IndexerClient {
   ping(): Promise<{ ok: boolean; version: string; started_at: string; active_watches: number }>
   shutdown(): Promise<{ ok: boolean }>
   ensureWatching(root: string): Promise<EnsureWatchingResult>
   releaseWatching(root: string): Promise<ReleaseWatchingResult>
-  /** Generic RPC for methods PR 3 adds. */
+  getStatus(): Promise<IndexerStatus>
+  /** Generic RPC — escape hatch for methods not yet in the typed surface. */
   request<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>
   /** Close the underlying socket; the daemon itself is NOT stopped. */
   close(): void
@@ -259,6 +277,7 @@ export function createIndexerClient(opts: IndexerClientOptions = {}): IndexerCli
     shutdown: () => request('shutdown'),
     ensureWatching: (root: string) => request<EnsureWatchingResult>('ensureWatching', { root }),
     releaseWatching: (root: string) => request<ReleaseWatchingResult>('releaseWatching', { root }),
+    getStatus: () => request<IndexerStatus>('getStatus'),
     close: () => {
       if (sock && !sock.destroyed) sock.end()
       sock = null

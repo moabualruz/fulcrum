@@ -20,9 +20,11 @@ import { HANDLERS, HandlerError, hasHandler, type DaemonContext } from './handle
 import { createDaemonRegistry, type DaemonRegistry } from './registry.js'
 import { VaultOwnedPathError } from '../pci/singleton.js'
 import { projectIdsFromPath } from 'fulcrum-agent-core'
+import type { Db } from './types-db.js'
 
 const DAEMON_VERSION = '0.0.2'
 const PING_PROBE_TIMEOUT_MS = 500
+const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000 // 30 min
 
 export interface DaemonOptions {
   socketPath?: string
@@ -61,10 +63,53 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<DaemonHandl
     projectIdFor: (root) => projectIdsFromPath(root).project_id,
   })
 
+  // Lazy DB handle — loaded on first getStatus / triggerReindex call so a
+  // bootstrap daemon that never serves those methods doesn't open SQLite.
+  let cachedDb: Db | null | undefined
+  const getDb = (): Db | null => {
+    if (cachedDb !== undefined) return cachedDb
+    try {
+      // Dynamic import, synchronous pattern: we swallow failures so the daemon
+      // remains usable even when the DB cannot be opened (e.g., permission).
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const core = require('fulcrum-agent-core') as { getDb: () => Db }
+      cachedDb = core.getDb()
+    } catch {
+      cachedDb = null
+    }
+    return cachedDb
+  }
+
+  // ── Idle-timer state ────────────────────────────────────────────────────
+  // Rule: the daemon self-exits once active_watches === 0 AND
+  // `idleTimeoutMs` has elapsed since the last request OR watch acquisition.
+  // An active watch keeps the daemon alive indefinitely; every request resets
+  // the clock.
+  const idleMs = resolveIdleMs(opts.idleTimeoutMs)
+  let idleTimer: ReturnType<typeof setTimeout> | null = null
+
+  function armIdleTimer(): void {
+    if (idleTimer) clearTimeout(idleTimer)
+    if (registry.activeWatches() > 0) {
+      idleTimer = null
+      return
+    }
+    idleTimer = setTimeout(() => {
+      if (registry.activeWatches() > 0) { armIdleTimer(); return }
+      process.stderr.write(`[fulcrum-indexer] idle timeout reached; exiting\n`)
+      ctx.requestShutdown()
+    }, idleMs)
+    idleTimer.unref?.()
+  }
+
+  const bumpActivity = (): void => { armIdleTimer() }
+
   const ctx: DaemonContext = {
     version: DAEMON_VERSION,
     startedAt,
     registry,
+    getDb,
+    bumpActivity,
     activeWatches: () => registry.activeWatches(),
     requestShutdown: () => {
       if (shuttingDown) return
@@ -102,6 +147,7 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<DaemonHandl
     await bindOnce()
     logStart(socketPath)
     resolveReady()
+    armIdleTimer() // start the idle countdown once we're serving
   } catch (err) {
     const e = err as NodeJS.ErrnoException
     if (e.code === 'EADDRINUSE') {
@@ -131,6 +177,7 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<DaemonHandl
   process.once('SIGINT', onSignal)
 
   const gracefulClose = async (): Promise<void> => {
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
     try { server.close() } catch { /* already closed */ }
     for (const s of openSockets) {
       try { s.end() } catch { /* best-effort */ }
@@ -159,6 +206,16 @@ export class DaemonAlreadyRunningError extends Error {
   }
 }
 
+function resolveIdleMs(optValue: number | undefined): number {
+  if (typeof optValue === 'number' && optValue > 0) return optValue
+  const env = process.env['FULCRUM_INDEXER_IDLE_MS']
+  if (env) {
+    const n = Number(env)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return DEFAULT_IDLE_TIMEOUT_MS
+}
+
 function logStart(socketPath: string): void {
   process.stderr.write(`[fulcrum-indexer] listening on ${socketPath} (v${DAEMON_VERSION})\n`)
 }
@@ -175,7 +232,7 @@ function handleConnection(
   sock.on('error', () => { /* ECONNRESET etc — swallow; socket will close */ })
   sock.on('close', () => { getOpenSockets().delete(sock) })
 
-  sock.on('data', async (chunk: Buffer) => {
+  sock.on('data', (chunk: Buffer) => {
     let messages: ReturnType<typeof decoder.feed>
     try {
       messages = decoder.feed(chunk)
@@ -184,11 +241,16 @@ function handleConnection(
       sock.end()
       return
     }
+    // Dispatch each request concurrently — serial await would serialise every
+    // client request and defeat the in-flight dedup inside long-running
+    // handlers (e.g. triggerReindex). The client correlates responses by id,
+    // so out-of-order writes are fine.
     for (const msg of messages) {
-      // Only request messages are expected from clients.
       if (!isRequest(msg)) continue
-      const response = await dispatch(ctx, msg)
-      try { sock.write(encode(response)) } catch { /* peer closed */ }
+      dispatch(ctx, msg).then(
+        (response) => { try { sock.write(encode(response)) } catch { /* peer closed */ } },
+        () => { /* dispatch always resolves — handler errors become error responses */ },
+      )
     }
   })
 }
@@ -206,6 +268,7 @@ async function dispatch(
   if (!hasHandler(req.method)) {
     return { id: req.id, error: { code: 'unknown_method', message: `no handler for '${req.method}'` } }
   }
+  ctx.bumpActivity()
   try {
     const result = await HANDLERS[req.method]!(ctx, req.params ?? {})
     return { id: req.id, result }
