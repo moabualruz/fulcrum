@@ -18,7 +18,7 @@ import { createDecoder, encode, type IndexerRequest, type IndexerErrorResponse, 
 import { indexerSocketPath, unlinkStaleSocket } from './socket-path.js'
 import { HANDLERS, HandlerError, hasHandler, type DaemonContext } from './handlers.js'
 import { createDaemonRegistry, type DaemonRegistry } from './registry.js'
-import { VaultOwnedPathError } from '../pci/singleton.js'
+import { VaultOwnedPathError } from '../pci/vault-guard.js'
 import { projectIdsFromPath } from 'fulcrum-agent-core'
 import type { Db } from './types-db.js'
 

@@ -15,7 +15,7 @@
 import { realpathSync } from 'node:fs'
 import { relative } from 'node:path'
 import { startPciSyncer, type PciSyncerHandle } from '../pci/syncer.js'
-import { isVaultOwnedPath, VaultOwnedPathError } from '../pci/singleton.js'
+import { isVaultOwnedPath, VaultOwnedPathError } from '../pci/vault-guard.js'
 import { HandlerError } from './handlers.js'
 
 const DEFAULT_GRACE_MS = 30_000

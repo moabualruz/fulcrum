@@ -14,6 +14,7 @@ import { join, resolve } from 'node:path'
 import { globalDataDir } from 'fulcrum-agent-core'
 import { acquireLock, type LockHandle, LockError } from './lock.js'
 import { watchDirectory, closeWatcherSubtree, activeWatcherCount } from './watcher.js'
+import { isVaultOwnedPath, VaultOwnedPathError } from './vault-guard.js'
 
 /**
  * v2a PR 4 Task 22 — vault/PCI dedup. The vault watcher already owns
@@ -21,18 +22,12 @@ import { watchDirectory, closeWatcherSubtree, activeWatcherCount } from './watch
  * attach to any directory at or under that prefix so both watchers
  * don't produce duplicate events for the same file.
  */
-export function isVaultOwnedPath(p: string): boolean {
-  const abs = resolve(p)
-  const vaultPrefix = resolve(join(globalDataDir(), 'memory'))
-  return abs === vaultPrefix || abs.startsWith(vaultPrefix + '/')
-}
-
-export class VaultOwnedPathError extends Error {
-  constructor(path: string) {
-    super(`PCI refused to attach to vault-owned path: ${path}`)
-    this.name = 'VaultOwnedPathError'
-  }
-}
+// v2a/PR4 of the indexer-daemon plan extracted the vault guard into
+// packages/memory/src/pci/vault-guard.ts so the daemon registry and the
+// lifecycle wrappers share a single class. Re-exported here during the
+// commit-A window so callers that still import from singleton.js keep
+// working. Commit B removes this file entirely.
+export { isVaultOwnedPath, VaultOwnedPathError } from './vault-guard.js'
 
 export interface PciHandle {
   projectRoot: string

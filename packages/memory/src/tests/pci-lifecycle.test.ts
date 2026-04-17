@@ -13,7 +13,13 @@ import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js
 import { onAgentRunStart, onAgentRunEnd, _resetLifecycleState, _activeRunHandleCount, resolveProjectRoot } from '../pci/lifecycle.js'
 import { pciStatus, shutdownAll } from '../pci/singleton.js'
 
-describe('PCI lifecycle integration — v2a PR 4 Task 20', () => {
+// Daemon-era note: as of the 2026-04-18 indexer-daemon plan (PR 4 commit A),
+// onAgentRunStart / onAgentRunEnd route through the fulcrum-indexer daemon
+// instead of the in-process PCI singleton. The pciStatus() entries assertions
+// below inspect singleton state that no longer reflects what the daemon holds.
+// Commit B deletes pci/singleton.ts and this file along with it; coverage for
+// the daemon semantics lives in packages/memory/src/indexer/tests/.
+describe.skip('PCI lifecycle integration — v2a PR 4 Task 20', () => {
   let db: Database.Database
   let root: string
   const workspaceId = 'ws_1'

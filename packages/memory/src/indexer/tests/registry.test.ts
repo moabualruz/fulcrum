@@ -25,7 +25,7 @@ vi.mock('../../pci/syncer.js', () => ({
 
 // Import after the mock is registered.
 const { createDaemonRegistry } = await import('../registry.js')
-const { VaultOwnedPathError } = await import('../../pci/singleton.js')
+const { VaultOwnedPathError } = await import('../../pci/vault-guard.js')
 
 let tempRoot: string
 let subA: string
