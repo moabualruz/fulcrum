@@ -42,7 +42,8 @@
     "gray-matter": "^4.0.3",
     "simple-git": "^3.22.0",
     "ulidx": "^2.3.0",
-    "web-tree-sitter": "^0.26.8"
+    "web-tree-sitter": "^0.26.8",
+    "xxhash-wasm": "^1.0.2"
   },
   "optionalDependencies": {
     "kuzu": "^0.10.0"
