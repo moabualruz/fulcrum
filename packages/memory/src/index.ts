@@ -32,6 +32,19 @@ export { linkMemoryToEntity, getMemoryEntities } from './entities.js'
 // Recall
 export { recallMemory, getMemory, getMemoriesForTask } from './recall.js'
 
+// v2a PR 2 — staged retrieval pipeline + envelope contract.
+export { runStagedSearch } from './retrieval/search.js'
+export type { StagedSearchResponse, StagedSearchReason, RunStagedSearchInput } from './retrieval/search.js'
+
+// v2a PR 1 Task 9 — kind validation + per-kind char caps.
+export { validateKind, isAllowedKind, applyKindCap, V2A_KINDS, LEGACY_KINDS, KIND_CAPS } from './validate-kind.js'
+
+// v2a PR 2 Tasks 12 + 13 — query_memory + search_code action surfaces.
+export { queryMemory } from './query-memory.js'
+export type { QueryMemoryInput, QueryMemoryResponse, QueryMemoryResultRow } from './query-memory.js'
+export { searchCode } from './retrieval/search-code.js'
+export type { SearchCodeInput, SearchCodeResponse, SearchCodeResultRow } from './retrieval/search-code.js'
+
 // Ingestion pipeline
 export { ingestFile, ingestProject } from './ingest.js'
 

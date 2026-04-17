@@ -556,9 +556,11 @@ TOOL_REGISTRY.set('recall_memory', {
   schema: TOOL_SCHEMA_MAP.get('recall_memory'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: true },
   handler: async (args, deps) => {
-    const { recallMemory } = await import('@moabualruz/fulcrum-memory')
-    // Ensure embedding is initialized — no-op if already warm (MCP server path),
-    // initializes on-demand when called via `fulcrum action exec`
+    // v2a PR 2 Task 11: route through runStagedSearch so the response carries
+    // the {results, reason?} envelope and recall_events are inserted 1:1 with
+    // returned rows. min_score has a v2a-default of 0.35 for multi-token
+    // queries / 0 for single-token queries; callers can override via args.
+    const { runStagedSearch } = await import('@moabualruz/fulcrum-memory')
     const { getTextEmbedder, initEmbedding, loadConfig } = await import('@moabualruz/fulcrum-core')
     if (!getTextEmbedder()) {
       try {
@@ -568,7 +570,7 @@ TOOL_REGISTRY.set('recall_memory', {
     }
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const maxChars = (args['max_chars'] as number | undefined) ?? 500
-    const memories = await recallMemory({
+    const envelope = await runStagedSearch({
       query: args['query'] as string,
       workspace_id: ws,
       project_id: args['project_id'] as string | undefined,
@@ -577,8 +579,12 @@ TOOL_REGISTRY.set('recall_memory', {
       mode: 'full',
       query_scope: args['query_scope'] as 'session' | 'project' | 'workspace' | 'global' | undefined,
       session_id: args['session_id'] as string | undefined,
-    } as Parameters<typeof recallMemory>[0])
-    return (memories as Array<{ memory_id?: string; content?: string; summary?: string; tags?: string[]; recall_score?: number; source?: string }>)
+      min_score: args['min_score'] as number | undefined,
+      caller_run_id: args['caller_run_id'] as string | undefined,
+      caller_role: args['caller_role'] as string | undefined,
+      recall_source: 'recall_memory',
+    } as Parameters<typeof runStagedSearch>[0])
+    const results = (envelope.results as Array<{ memory_id?: string; content?: string; summary?: string; tags?: string[]; recall_score?: number; source?: string }>)
       .map(m => ({
         id: m.memory_id,
         content: ((m.content ?? m.summary) ?? '').slice(0, maxChars),
@@ -586,6 +592,7 @@ TOOL_REGISTRY.set('recall_memory', {
         tags: m.tags ?? [],
         source: m.source ?? 'manual',
       }))
+    return envelope.reason ? { results, reason: envelope.reason } : { results }
   },
 })
 
@@ -620,6 +627,55 @@ TOOL_REGISTRY.set('write_memory', {
       tags: tagList,
     } as Parameters<typeof writeMemory>[0])
     return { saved: true, memory_id: memory.memory_id, project_id: proj, tags: tagList }
+  },
+})
+
+// v2a PR 2 Task 12 — query_memory action.
+TOOL_REGISTRY.set('query_memory', {
+  schema: TOOL_SCHEMA_MAP.get('query_memory'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { queryMemory } = await import('@moabualruz/fulcrum-memory')
+    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
+    const envelope = await queryMemory({
+      workspace_id: ws,
+      project_id: args['project_id'] as string | undefined,
+      scope: args['scope'] as 'session' | 'project' | 'workspace' | 'global' | undefined,
+      text: args['text'] as string | undefined,
+      tags: args['tags'] as string[] | undefined,
+      linked_to: args['linked_to'] as string | undefined,
+      file_paths: args['file_paths'] as string[] | undefined,
+      kind: args['kind'] as string | undefined,
+      date_range: args['date_range'] as { from?: string; to?: string } | undefined,
+      limit: args['limit'] as number | undefined,
+      caller_run_id: args['caller_run_id'] as string | undefined,
+      caller_role: args['caller_role'] as string | undefined,
+    })
+    return envelope.reason ? envelope : { results: envelope.results }
+  },
+})
+
+// v2a PR 2 Task 13 — search_code action.
+TOOL_REGISTRY.set('search_code', {
+  schema: TOOL_SCHEMA_MAP.get('search_code'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { searchCode } = await import('@moabualruz/fulcrum-memory')
+    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
+    const envelope = await searchCode({
+      workspace_id: ws,
+      project_id: args['project_id'] as string | undefined,
+      text: args['text'] as string | undefined,
+      symbol: args['symbol'] as string | undefined,
+      lang: args['lang'] as string | undefined,
+      path: args['path'] as string | undefined,
+      scope: args['scope'] as 'session' | 'project' | 'workspace' | 'global' | undefined,
+      min_score: args['min_score'] as number | undefined,
+      limit: args['limit'] as number | undefined,
+      caller_run_id: args['caller_run_id'] as string | undefined,
+      caller_role: args['caller_role'] as string | undefined,
+    })
+    return envelope.reason ? envelope : { results: envelope.results }
   },
 })
 
