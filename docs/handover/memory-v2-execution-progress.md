@@ -50,6 +50,36 @@ Gate ADRs created in this same run (Step 2): see `docs/decisions/`.
 - Next: PR 2 — Retrieval pipeline (osgrep searcher.ts port — RRF + rerank + diversification under min_score envelope). Bootstrap mode: ON.
 - Timestamp: 2026-04-17T03:15:00Z
 
+## PR 2 — Retrieval pipeline — COMPLETE
+
+- Status: complete
+- Branch: plan/memory-v2-pr2
+- Bootstrap mode: ON; exit smoke-test PASSED (write_memory + recall_memory round-trip via new envelope returns hits, score 0.567)
+- Tasks completed: 10 (runStagedSearch + envelope + recall_events ledger), 11 (recall_memory re-routed), 12 (query_memory action), 13 (search_code action)
+- Verify results: Memory 307 pass / 1 pre-existing fail (sparse, unrelated) / 308. Core unchanged. Cross-package build clean.
+- Defers / deviations:
+  - **runStagedSearch is a wrapper, not a from-scratch port.** Delegates to existing recallMemory() so L1/L2 routing, RRF, and embedder reranker stay battle-tested; the new module owns the {results, reason?} envelope, min_score floor, and recall_events ledger. The full osgrep `searcher.ts` two-stage rerank + diversification pipeline can swap in by replacing the recallMemory() call here once PR 4 ships PCI infrastructure that justifies the extra rerank passes.
+  - **search_code score is a placeholder (1.0/0.5)** — full RRF + reranker plumb-through deferred to a later iteration when PR 4's PCI watcher populates code_files + code_symbols densely enough to make rerank meaningful.
+- ADRs: none new.
+- New test files (20 new tests, all green): retrieval-search.test.ts (7), query-memory.test.ts (7), search-code.test.ts (6).
+- Next: PR 3 — AST chunker extension + prose chunker + backfill code_files (Tasks 14–16).
+- Timestamp: 2026-04-17T03:25:00Z
+
+## PR 3 — AST chunker + prose chunker + code_files backfill — COMPLETE
+
+- Status: complete
+- Branch: plan/memory-v2-pr3
+- Bootstrap mode: OFF (PR 3 is non-bootstrap per plan; PR 4 is the next bootstrap)
+- Tasks completed: 14 (AST chunker enrichment + per-file anchor chunk), 15 (prose chunker — md / json / yaml / toml), 16 (backfillCodeFiles + computeFileId migration helper)
+- Verify results: Memory 325 pass / 1 pre-existing fail (sparse, unrelated). Build clean.
+- Defers / deviations:
+  - **AST chunker enrichment is heuristic-based** (regex symbol extraction, keyword complexity counting). PR 4 may rewrite with proper tree-sitter queries when chunker overhaul lands.
+  - **Existing ast-chunker tests updated** to account for the new prepended anchor chunk — chunk count for any non-empty source goes up by 1.
+- ADRs: none new.
+- New test files (18 new tests, all green): prose-chunker.test.ts (9), ast-chunker-fields.test.ts (5), backfill-code-files.test.ts (4).
+- Next: PR 4 — PCI watcher + syncer (Tasks 17–23). Bootstrap mode: ON for the watcher rewrite.
+- Timestamp: 2026-04-17T03:35:00Z
+
 ## PR 1 — earlier in-progress entry (superseded by COMPLETE above)
 
 
