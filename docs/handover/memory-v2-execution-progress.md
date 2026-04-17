@@ -101,6 +101,21 @@ Gate ADRs created in this same run (Step 2): see `docs/decisions/`.
 - Next: PR 5 — Sanitize + WAL + query sanitizer + rollback CLI (Tasks 24-28). Bootstrap mode: ON.
 - Timestamp: 2026-04-17T03:50:00Z
 
+## PR 5 — Sanitize + WAL + query sanitizer + operator-only rollback — COMPLETE
+
+- Status: complete
+- Branch: plan/memory-v2-pr5
+- Bootstrap mode: ON; exit smoke-test PASSED (write_memory hits the new sanitize→WAL→L0/L1 path; round-trip green)
+- Tasks completed: 24 (threat scanner — fence + injection + credentials + invisible Unicode), 25 (sanitizeOnWrite middleware wired into write.ts), 26 (WAL writer with SanitizedContent brand + ENOSPC/EROFS/EIO blocking + EAGAIN/EBUSY retry-once), 27 (4-step query sanitizer with role-label stripping), 28 (operator-only `fulcrum memory rollback` CLI; NOT in TOOL_REGISTRY)
+- Verify results: Memory 367 pass / 1 pre-existing sparse fail (unrelated). Core unchanged. Cross-package build clean.
+- Defers / deviations:
+  - **Rollback CLI is dry-run only in v2a** — full WAL replay execution lands in v2b PR 15 per scope-split. The CLI surface, the consent gate, and the operator-only invariant are in place.
+  - **Sanitize middleware is non-fatal** — sanitizer failures emit `sanitize.error` telemetry and let raw content through. This matches Hermes's failure-isolation pattern; a strict abort would block writes on any sanitizer regression which is worse than the marginal leakage risk.
+- ADRs: none new.
+- New test files (24 new tests, all green): threat-scanner.test.ts (9), on-write.test.ts (3), query.test.ts (6), wal/sanitize-before.test.ts (4), cli/memory-rollback-not-action.test.ts (2).
+- Next: PR 6 — Hook writes rewrite (Tasks 29-33). Bootstrap mode: ON. Note this is the largest remaining bootstrap PR — touches 14+ caller sites and is the natural integration point for the deferred strict enforcement from PR 1 Tasks 2 + 3.
+- Timestamp: 2026-04-17T04:00:00Z
+
 ## PR 1 — earlier in-progress entry (superseded by COMPLETE above)
 
 
