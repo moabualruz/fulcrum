@@ -53,6 +53,15 @@ export type { ProseFileKind } from './chunkers/prose-chunker.js'
 export { backfillCodeFiles, computeFileId } from './setup/backfill-code-files.js'
 export type { BackfillResult } from './setup/backfill-code-files.js'
 
+// v2a PR 5 Tasks 24-27 — sanitize middleware + query sanitizer + recall fence wrap.
+export { sanitizeOnWrite, scanForThreats, sanitizeQuery, wrapForRecall } from './sanitize/index.js'
+export type { SanitizeEvent, SanitizeMeta, SanitizeResult } from './sanitize/index.js'
+export type { RecallEntry, WrapOptions } from './sanitize/wrap-for-recall.js'
+
+// v2a PR 5 Task 26 — WAL writer with sanitize-before-WAL invariant.
+export { appendWal, brandSanitized, walPathFor, WalDurabilityError } from './wal/writer.js'
+export type { WalRecord, AppendWalInput, SanitizedContent } from './wal/writer.js'
+
 // Ingestion pipeline
 export { ingestFile, ingestProject } from './ingest.js'
 

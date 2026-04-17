@@ -367,6 +367,32 @@ fulcrum memory — memory vault commands
     return
   }
 
+  // v2a PR 5 Task 28 — operator-only rollback. Intentionally NOT registered
+  // in TOOL_REGISTRY so a compromised agent with action-exec access cannot
+  // call it. Requires --since=<TIME> and --yes-i-really-want-to-undo-N-writes.
+  if (command === 'rollback') {
+    const sinceArg = args.find(a => a.startsWith('--since='))
+    const consentArg = args.find(a => /^--yes-i-really-want-to-undo-\d+-writes$/.test(a))
+    if (!sinceArg) {
+      console.error('Usage: fulcrum memory rollback --since=<ISO-TIMESTAMP> --yes-i-really-want-to-undo-N-writes')
+      console.error('       --cross-workspace requires an additional confirmation flag.')
+      process.exit(2)
+    }
+    if (!consentArg) {
+      console.error('Refusing to rollback without --yes-i-really-want-to-undo-N-writes (operator-only command).')
+      process.exit(2)
+    }
+    const since = sinceArg.slice('--since='.length)
+    const crossWorkspace = args.includes('--cross-workspace')
+    if (crossWorkspace && !args.includes('--yes-cross-workspace')) {
+      console.error('--cross-workspace also requires --yes-cross-workspace.')
+      process.exit(2)
+    }
+    console.log(`[rollback] would undo writes since ${since}${crossWorkspace ? ' across all workspaces' : ' in current workspace'}.`)
+    console.log('[rollback] dry-run only in v2a — full implementation in v2b PR 15 (WAL replay).')
+    return
+  }
+
   console.error(`Unknown memory command: ${command}`)
   console.error('Run `fulcrum memory --help` for available commands.')
   process.exit(1)

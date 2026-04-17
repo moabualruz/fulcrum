@@ -10,6 +10,8 @@ import type { WriteMemoryInput, FullMemory } from './types.js'
 import { runExtractionPipeline } from './extractors/pipeline.js'
 import { computeSparseVector } from './sparse.js'
 import { validateKind, applyKindCap } from './validate-kind.js'
+import { sanitizeOnWrite } from './sanitize/index.js'
+import { appendWal, brandSanitized } from './wal/writer.js'
 
 /**
  * Generate an embedding for `text` and store it in:
@@ -85,9 +87,14 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
   // dropped in PR 1 Task 1; this is the single canonical policy point.
   validateKind(input.kind)
   const cappedContent = applyKindCap(input.kind, input.content)
-  // Mutate the input view that downstream uses; preserve the original behavior
-  // where content is the canonical bytes referenced by the hash.
-  input = { ...input, content: cappedContent }
+  // v2a PR 5 Tasks 24-26: sanitize-before-anything (constraint #8). Strip
+  // fence markers, redact prompt injection + credentials + invisible Unicode.
+  // Errors are non-fatal — content passes through with sanitize_event=error.
+  const sanitized = sanitizeOnWrite(cappedContent, {
+    workspace_id: input.workspace_id,
+    project_id: input.project_id,
+  })
+  input = { ...input, content: sanitized.content }
 
   const now = new Date().toISOString()
   const hash = contentHash(input.content)
@@ -103,6 +110,22 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
   }
 
   const memory_id = newId('memory')
+
+  // v2a PR 5 Task 26: WAL append BEFORE L0 / L1 / L2. content_sha256 only —
+  // never the body. Sync errno (ENOSPC, EROFS, EIO) blocks the write via
+  // WalDurabilityError; transient errors retry once then proceed-with-skip.
+  // sanitize_events from the middleware are recorded in the audit row.
+  appendWal({
+    op: 'WRITE',
+    memory_id,
+    kind: input.kind,
+    workspace_id: input.workspace_id,
+    project_id: input.project_id ?? null,
+    provenance: { hook_point: 'write_memory', errored: sanitized.errored },
+    content: brandSanitized(input.content),
+    sanitize_events: sanitized.events,
+  })
+
   const embeddingBuffer = input.embedding ? Buffer.from(input.embedding.buffer) : null
 
   // Build the FullMemory object we'll need for L0 write
