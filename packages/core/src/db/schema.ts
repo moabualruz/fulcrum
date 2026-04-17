@@ -32,7 +32,7 @@ function rebuildMemoriesIfLegacy(db: Database.Database): void {
         memory_id        TEXT PRIMARY KEY,
         workspace_id     TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
         project_id       TEXT REFERENCES projects(project_id) ON DELETE CASCADE,
-        scope            TEXT NOT NULL DEFAULT 'project' CHECK(scope IN ('global','project','file','task')),
+        scope            TEXT NOT NULL DEFAULT 'project' CHECK(scope IN ('session','project','workspace','global','file','task')),
         kind             TEXT NOT NULL DEFAULT 'fact',
         title            TEXT NOT NULL DEFAULT '',
         summary          TEXT NOT NULL DEFAULT '',
@@ -128,12 +128,46 @@ function addAgentRunsContextTypeIfMissing(db: Database.Database): void {
   }
 }
 
+/**
+ * v2a Task 6: add root_realpath + vcs_remote to legacy projects tables. Both
+ * are nullable in v2a PR 1; PR 4 (PCI watcher) populates root_realpath at
+ * watch-init via fs.realpath. The partial UNIQUE INDEX in applySchema()
+ * enforces uniqueness once values are present.
+ */
+function addProjectsRootRealpathIfMissing(db: Database.Database): void {
+  const tbl = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='projects'").get() as { name: string } | undefined
+  if (!tbl) return
+  const cols = (db.prepare('PRAGMA table_info(projects)').all() as { name: string }[]).map(c => c.name)
+  if (!cols.includes('root_realpath')) {
+    db.exec(`ALTER TABLE projects ADD COLUMN root_realpath TEXT`)
+  }
+  if (!cols.includes('vcs_remote')) {
+    db.exec(`ALTER TABLE projects ADD COLUMN vcs_remote TEXT`)
+  }
+}
+
+/**
+ * v2a Task 5: existing code_chunks predates code_files. Add file_id forward-
+ * compat column so PR 4's PCI watcher can link chunks to file rows during
+ * ingest. Nullable until full backfill in PR 4.
+ */
+function addCodeChunksFileIdIfMissing(db: Database.Database): void {
+  const tbl = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='code_chunks'").get() as { name: string } | undefined
+  if (!tbl) return
+  const cols = (db.prepare('PRAGMA table_info(code_chunks)').all() as { name: string }[]).map(c => c.name)
+  if (!cols.includes('file_id')) {
+    db.exec(`ALTER TABLE code_chunks ADD COLUMN file_id TEXT`)
+  }
+}
+
 export function applySchema(db: Database.Database): void {
   // v2a PR 1 Task 1: rebuild legacy memories table BEFORE the idempotent CREATE
   // statements run. CREATE IF NOT EXISTS would skip the legacy table and leave
   // it without the v2a columns. The rebuild is a no-op for fresh DBs.
   rebuildMemoriesIfLegacy(db)
   addAgentRunsContextTypeIfMissing(db)
+  addProjectsRootRealpathIfMissing(db)
+  addCodeChunksFileIdIfMissing(db)
 
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -155,6 +189,13 @@ export function applySchema(db: Database.Database): void {
       name              TEXT NOT NULL,
       project_type      TEXT,
       root_path         TEXT,
+      -- v2a Task 6: root_realpath is the symlink-resolved canonical sibling of
+      -- root_path. PR 4 populates it at PCI watch-init via fs.realpath; the
+      -- partial UNIQUE INDEX below enforces single-row-per-canonical-path so a
+      -- project move on disk updates one row and every code_files.rel_path
+      -- stays valid.
+      root_realpath     TEXT,
+      vcs_remote        TEXT,
       default_branch    TEXT,
       parent_project_id TEXT REFERENCES projects(project_id) ON DELETE SET NULL,
       write_mode        TEXT NOT NULL DEFAULT 'worktree' CHECK(write_mode IN ('worktree','in_place','sequential')),
@@ -166,6 +207,7 @@ export function applySchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_projects_workspace ON projects(workspace_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_realpath ON projects(root_realpath) WHERE root_realpath IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS tasks (
       task_id         TEXT PRIMARY KEY,
@@ -250,11 +292,19 @@ export function applySchema(db: Database.Database): void {
     -- vault_path, provenance, supersedes, recall counters, embedded, schema/
     -- normalize versioning, expires_at. Existing rows on legacy DBs are
     -- migrated by rebuildMemoriesIfLegacy() before this CREATE runs.
+    --
+    -- v2a PR 1 Task 2: scope CHECK widened to include 'session' and 'workspace'.
+    -- Plan calls for fully removing 'file' and 'task' (mapping existing rows to
+    -- 'project'), but ~15 caller sites still emit them; PR 6 (hook rewrite)
+    -- migrates those sites + tightens this CHECK. Until then we keep the legacy
+    -- values in CHECK as a transition superset so existing writes continue to
+    -- work. The application-layer write.ts (Task 9) emits a stderr warning when
+    -- 'file' or 'task' is observed, telegraphing the upcoming removal.
     CREATE TABLE IF NOT EXISTS memories (
       memory_id        TEXT PRIMARY KEY,
       workspace_id     TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
       project_id       TEXT REFERENCES projects(project_id) ON DELETE CASCADE,
-      scope            TEXT NOT NULL DEFAULT 'project' CHECK(scope IN ('global','project','file','task')),
+      scope            TEXT NOT NULL DEFAULT 'project' CHECK(scope IN ('session','project','workspace','global','file','task')),
       kind             TEXT NOT NULL DEFAULT 'fact',
       title            TEXT NOT NULL DEFAULT '',
       summary          TEXT NOT NULL DEFAULT '',
@@ -864,6 +914,8 @@ export function applySchema(db: Database.Database): void {
       workspace_id   TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
       project_id     TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
       file_path      TEXT NOT NULL,
+      -- v2a Task 5: file_id links to code_files; nullable until PR 4 backfills.
+      file_id        TEXT,
       language       TEXT,
       chunk_strategy TEXT NOT NULL CHECK(chunk_strategy IN ('syntax','semantic','token')),
       source_type    TEXT NOT NULL CHECK(source_type IN ('code','prose')),
@@ -880,6 +932,38 @@ export function applySchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_chunks_file       ON code_chunks(file_path);
     CREATE INDEX IF NOT EXISTS idx_chunks_hash       ON code_chunks(content_hash);
     CREATE INDEX IF NOT EXISTS idx_chunks_ws_project ON code_chunks(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_code_chunks_file  ON code_chunks(file_id) WHERE file_id IS NOT NULL;
+
+    -- v2a PR 1 Task 5: PCI tables. code_files is the file-level row with stable
+    -- file_id (sha256(project_id + ':' + rel_path)) — see PR 4 chunkers. The
+    -- existing code_chunks table stays (legacy file_path-based shape); a new
+    -- file_id column links chunks to code_files for forward-compat. PR 4's PCI
+    -- watcher populates file_id at ingest. code_chunks_fts already exists with
+    -- the §3.3c shape.
+    CREATE TABLE IF NOT EXISTS code_files (
+      file_id      TEXT NOT NULL PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      project_id   TEXT NOT NULL,
+      rel_path     TEXT NOT NULL,
+      language     TEXT NOT NULL DEFAULT 'unknown',
+      sha256       TEXT NOT NULL,
+      mtime_ns     INTEGER NOT NULL,
+      size_bytes   INTEGER NOT NULL,
+      chunks_count INTEGER NOT NULL DEFAULT 0,
+      indexed_at   INTEGER NOT NULL,
+      UNIQUE (project_id, rel_path)
+    );
+    CREATE INDEX IF NOT EXISTS idx_code_files_lang ON code_files (language);
+    CREATE INDEX IF NOT EXISTS idx_code_files_ws   ON code_files (workspace_id, project_id);
+
+    CREATE TABLE IF NOT EXISTS code_symbols (
+      file_id TEXT NOT NULL REFERENCES code_files(file_id) ON DELETE CASCADE,
+      name    TEXT NOT NULL,
+      kind    TEXT NOT NULL,
+      line    INTEGER NOT NULL,
+      PRIMARY KEY (file_id, name, line)
+    );
+    CREATE INDEX IF NOT EXISTS idx_code_symbols_name ON code_symbols (name);
 
     -- ── Graph (knowledge graph) ───────────────────────────────────────────────
 

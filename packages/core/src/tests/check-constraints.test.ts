@@ -69,10 +69,12 @@ const GUARDED_COLUMNS: EnumColumn[] = [
   // rebuilds. See docs/plans/2026-04-16-memory-v2a-plan.md §"Architecture
   // Decisions" → "memories.kind CHECK widening".
   {
-    // MemoryScope — packages/core/src/types.ts
+    // MemoryScope — packages/core/src/types.ts (v2a Task 2 widened to include
+    // session + workspace; legacy 'file' and 'task' kept as transition superset
+    // — PR 6 hook rewrite removes them).
     table: 'memories',
     column: 'scope',
-    expected: ['global', 'project', 'file', 'task'],
+    expected: ['session', 'project', 'workspace', 'global', 'file', 'task'],
   },
   {
     // HandoffMode — packages/core/src/types.ts

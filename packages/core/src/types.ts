@@ -44,7 +44,14 @@ export type TaskRelationType =
   | 'relates' | 'duplicates' | 'requires_context_from'
   | 'must_merge_before' | 'conflicts_with' | 'reviewed_by' | 'verifies'
 
-export type MemoryScope = 'global' | 'project' | 'file' | 'task'
+/**
+ * v2a Task 2: scope union widened to include 'session' (TTL-bounded sweep
+ * target) and 'workspace' (cross-project recall). Plan removes 'file' and
+ * 'task' — those become Kuzu edge metadata in v2b — but PR 1 keeps them in
+ * the union as a transition superset until PR 6 (hook rewrite) migrates the
+ * ~15 caller sites and tightens the CHECK.
+ */
+export type MemoryScope = 'session' | 'project' | 'workspace' | 'global' | 'file' | 'task'
 
 export type MemoryKind =
   | 'fact' | 'summary' | 'symbol' | 'decision' | 'procedure'

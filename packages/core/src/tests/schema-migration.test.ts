@@ -187,3 +187,46 @@ describe('v2a memories rebuild — existing DB with legacy shape', () => {
     expect(cols).toContain('vault_path')
   })
 })
+
+describe('v2a Task 2 — memories.scope CHECK widened', () => {
+  afterEach(() => closeDb())
+
+  function seed(db: Database.Database) {
+    db.prepare("INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1','w','active','2026-04-17T00:00:00Z')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_1','ws_1','p','git','active','worktree','2026-04-17T00:00:00Z')").run()
+  }
+
+  it('accepts session and workspace scopes (v2a additions)', () => {
+    const db = freshDb()
+    runMigrations(db)
+    seed(db)
+    for (const sc of ['session', 'workspace']) {
+      expect(() => db.prepare(`
+        INSERT INTO memories (memory_id, workspace_id, project_id, kind, scope, content, slug, vault_path, created_at, updated_at, last_accessed_at)
+        VALUES (?, 'ws_1', 'proj_1', 'fact', ?, 'x', ?, ?, '2026-04-17T00:00:00Z', '2026-04-17T00:00:00Z', '2026-04-17T00:00:00Z')
+      `).run(`mem_${sc}`, sc, `mem_${sc}`, `legacy/mem_${sc}.md`)).not.toThrow()
+    }
+  })
+
+  it('still accepts legacy file and task scopes (transition superset; tightened in PR 6)', () => {
+    const db = freshDb()
+    runMigrations(db)
+    seed(db)
+    for (const sc of ['file', 'task']) {
+      expect(() => db.prepare(`
+        INSERT INTO memories (memory_id, workspace_id, project_id, kind, scope, content, slug, vault_path, created_at, updated_at, last_accessed_at)
+        VALUES (?, 'ws_1', 'proj_1', 'fact', ?, 'x', ?, ?, '2026-04-17T00:00:00Z', '2026-04-17T00:00:00Z', '2026-04-17T00:00:00Z')
+      `).run(`mem_legacy_${sc}`, sc, `mem_legacy_${sc}`, `legacy/mem_legacy_${sc}.md`)).not.toThrow()
+    }
+  })
+
+  it('rejects scopes outside the v2a transition superset', () => {
+    const db = freshDb()
+    runMigrations(db)
+    seed(db)
+    expect(() => db.prepare(`
+      INSERT INTO memories (memory_id, workspace_id, project_id, kind, scope, content, slug, vault_path, created_at, updated_at, last_accessed_at)
+      VALUES ('mem_bogus', 'ws_1', 'proj_1', 'fact', 'galactic', 'x', 'mem_bogus', 'legacy/mem_bogus.md', '2026-04-17T00:00:00Z', '2026-04-17T00:00:00Z', '2026-04-17T00:00:00Z')
+    `).run()).toThrow()
+  })
+})
