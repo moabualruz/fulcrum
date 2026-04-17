@@ -284,3 +284,22 @@ No commits to `main` yet. When you approve, instruct merge order or commit-to-ma
   4. Bootstrap exit smoke-test (write_memory + recall_memory round-trip) runs at PR 1 merge.
 - Timestamp: 2026-04-17T02:11:00Z
 
+
+## Resume detection — 2026-04-17T10:30:00Z
+
+- Probed: progress log shows PRs 1, 2, 3, 5, 8, 9 COMPLETE; PRs 4, 7 PARTIAL; PR 6 NOT STARTED; per-host cluster NOT STARTED.
+- Probed: `git branch -a | grep plan/memory-v2-pr` → plan/memory-v2-pr{1,2,3,4,5,7,8,9} exist.
+- Probed: `git log --oneline -30` → 14 commits since prior resume (up to 4d7a3ae on plan/memory-v2-pr9).
+- Probed: `docs/decisions/` → all 5 gate ADRs + PR 1 bootstrap entry present.
+- Probed: `git status --short` → clean (only untracked planning artifacts unchanged).
+- Probed: currently checked out on `plan/memory-v2-pr9`.
+- **Detected scenario:** Mid-run resume with deferred items across multiple PRs.
+- **User override:** "Start with finishing the deferred items."
+- **Resume plan (deferred-item-first ordering):**
+  1. **PR 4 finalization** — Tasks 19, 20, 21, 22, 23 (branch: plan/memory-v2-pr4). Bootstrap mode: ON (touches lifecycle path). Then run PR 4 exit smoke-test.
+  2. **PR 7 finalization** — Tasks 37, 38 (branch: plan/memory-v2-pr7). Depends on PR 4 ingest pipeline (Task 19).
+  3. **PR 6** — Tasks 29, 30, 31, 32, 33, 34 (new branch: plan/memory-v2-pr6). Bootstrap mode: ON (rewrites runPostHook + run lifecycle). This is the natural integration point for the deferred-strict items from PR 1 Tasks 2/3 + PR 4 Task 20 (manager.ensure in start_agent_run).
+  4. **Per-host correctness cluster** — Tasks 46–52 (new branch: plan/memory-v2-prHost).
+  5. After v2a fully closed + bootstrap exit smoke-tests pass: **v2b PRs 10–21** in order, applying Gate 5 deferral (PR 18 skipped by default).
+- **Next:** v2a PR 4 Task 19 — wire ingest pipeline `packages/memory/src/ingest.ts` for incremental file events.
+
