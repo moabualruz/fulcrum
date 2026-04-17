@@ -1039,23 +1039,11 @@ export default function (pi: ExtensionAPI) {
     registerPolicyHook();
     registerAgentLifecycle();
 
-    // First-run setup wizard: show on startup if no config file found
-    const reason = (event as Record<string, unknown>)["reason"] as string ?? "";
-    if (reason === "startup" && !findConfigFile(cwd)) {
-      // Small delay so widget renders first
-      setTimeout(async () => {
-        const newCfg = await runSetupWizard(ctx as Parameters<typeof runSetupWizard>[0]);
-        if (newCfg) {
-          cfg = newCfg;
-          baseUrl = `http://127.0.0.1:${cfg.monitor_port}`;
-        }
-        await startServer();
-        pollTimer = setInterval(() => { if (serverState === "up") refreshStatus(); }, 5000);
-      }, 500);
-    } else {
-      await startServer();
-      pollTimer = setInterval(() => { if (serverState === "up") refreshStatus(); }, 5000);
-    }
+    // Workspace/project IDs are derived from the cwd in loadCockpitConfig —
+    // there is no project-local config file. If the user wants custom IDs or
+    // a different monitor port they can run `/fulcrum-setup` on demand.
+    await startServer();
+    pollTimer = setInterval(() => { if (serverState === "up") refreshStatus(); }, 5000);
   });
 
   pi.on("session_shutdown", async () => {

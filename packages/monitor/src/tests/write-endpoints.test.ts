@@ -237,7 +237,7 @@ describe('bearer token auth', () => {
     authDb.prepare(`INSERT OR IGNORE INTO workspaces (workspace_id, name, status) VALUES ('ws_auth', 'Auth Test', 'active')`).run()
     authDb.prepare(`INSERT OR IGNORE INTO projects (project_id, workspace_id, name, status, type) VALUES ('proj_auth', 'ws_auth', 'Auth', 'active', 'git')`).run()
     process.env['FULCRUM_MONITOR_TOKEN'] = 'test-secret-token'
-    // bypass_auth is NOT set here to actually test auth
+    process.env['FULCRUM_MONITOR_REQUIRE_AUTH'] = '1'
     authServer = startMonitorServer({ workspace_id: 'ws_auth' })
   })
 
@@ -245,6 +245,7 @@ describe('bearer token auth', () => {
     await authServer.stop()
     authDb.close()
     delete process.env['FULCRUM_MONITOR_TOKEN']
+    delete process.env['FULCRUM_MONITOR_REQUIRE_AUTH']
   })
 
   it('rejects POST /tasks without token', async () => {

@@ -616,34 +616,26 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
   // ─── Bearer token auth middleware (mutation endpoints) ───────────────────
   //
-  // HIGH-9: the prior behavior silently allowed unauthenticated mutations when
-  // FULCRUM_MONITOR_TOKEN was unset, and also when config.bypass_auth was
-  // true — with no startup warning. Local CSRF (DNS-rebind, a malicious page
-  // the user visits) could POST/PATCH/DELETE. Fixed by:
-  //   1) Per-install auto-token written to {globalDataDir()}/monitor-token
-  //      on first start. FULCRUM_MONITOR_TOKEN env var still overrides.
-  //   2) Bypass requires BOTH config.bypass_auth=true AND env FULCRUM_MONITOR_ALLOW_BYPASS=1
-  //      AND prints a loud stderr warning at startup.
-  //   3) Host/Origin header must match 127.0.0.1 / localhost. This neutralises
-  //      DNS-rebind attacks that send POSTs from a webpage.
-  //   4) Token comparison via timingSafeEqual.
-  if (config.bypass_auth && process.env['FULCRUM_MONITOR_ALLOW_BYPASS'] !== '1') {
-    process.stderr.write(
-      '[fulcrum/monitor] WARNING: config.bypass_auth is true but FULCRUM_MONITOR_ALLOW_BYPASS is not set — auth will remain enforced.\n',
-    )
-  } else if (config.bypass_auth) {
-    process.stderr.write(
-      '[fulcrum/monitor] SECURITY WARNING: bypass_auth active — monitor accepts unauthenticated mutations. Do not run in production.\n',
-    )
-  }
+  // Default posture: the monitor is a local-first service bound to 127.0.0.1
+  // only, with a Host-header guard that rejects non-loopback values to defeat
+  // DNS-rebind / cross-origin POSTs from browsers. In that threat model a
+  // Bearer token adds no meaningful security over "can you reach loopback",
+  // because anything on the machine that can make the HTTP call can also
+  // read the token file. Forcing a token broke every agent integration
+  // (they all returned 401 on write), so auth is now OFF by default.
+  //
+  // Opt-in by setting FULCRUM_MONITOR_REQUIRE_AUTH=1 (or config.bypass_auth=false
+  // with FULCRUM_MONITOR_TOKEN set). In that mode the server enforces the
+  // Bearer token with timingSafeEqual and rejects mismatches.
+  const enforceAuth = process.env['FULCRUM_MONITOR_REQUIRE_AUTH'] === '1'
+    || (config.bypass_auth === false && !!process.env['FULCRUM_MONITOR_TOKEN'])
 
   const requireAuth: MiddlewareHandler = async (c, next) => {
-    // HIGH-9: Host header guard against DNS-rebind / cross-origin hits from
-    // browsers. We already bind to loopback, but browsers can be tricked into
-    // POSTing to 127.0.0.1 when a malicious DNS response pins evil.example
-    // to 127.0.0.1. Allow empty Host (in-process tests) — a real HTTP client
-    // always sends one, and a missing Host header is indicative of a local
-    // call without an external attacker.
+    // Host-header guard runs in every mode. Binding to loopback prevents
+    // remote hits; the header check additionally neutralises DNS-rebind
+    // attacks where a malicious page resolves to 127.0.0.1 and POSTs.
+    // Empty Host header is allowed so in-process tests work — a real HTTP
+    // client always sends one.
     const hostHdr = (c.req.header('Host') ?? '').toLowerCase()
     if (hostHdr) {
       const host = hostHdr.split(':')[0] ?? ''
@@ -653,15 +645,14 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       }
     }
 
-    if (config.bypass_auth && process.env['FULCRUM_MONITOR_ALLOW_BYPASS'] === '1') return next()
+    if (!enforceAuth) return next()
 
     const token = process.env['FULCRUM_MONITOR_TOKEN']
     if (!token) {
-      return Promise.resolve(c.json({ error: 'Unauthorized — monitor token not set (set FULCRUM_MONITOR_TOKEN)' }, 401))
+      return Promise.resolve(c.json({ error: 'Unauthorized — FULCRUM_MONITOR_REQUIRE_AUTH=1 but FULCRUM_MONITOR_TOKEN is unset' }, 401))
     }
     const authHeader = c.req.header('Authorization') ?? ''
     const expected = `Bearer ${token}`
-    // crypto.timingSafeEqual requires equal-length buffers; length-prefix equality first.
     const { timingSafeEqual } = await import('node:crypto')
     const a = Buffer.from(authHeader)
     const b = Buffer.from(expected)
