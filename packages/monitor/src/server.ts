@@ -244,16 +244,13 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   // ─── Extended endpoints ─────────────────────────────────────────────────────
 
   app.get('/board', (c) => {
+    // workspace_id optional — absent means aggregate across every workspace
+    // (the "All workspaces" view in the dashboard).
     const ws = c.req.query('workspace_id') ?? workspace_id
-    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
-
     const db = getDb()
-    const rows = db.prepare(`
-      SELECT status_category, COUNT(*) AS count
-      FROM tasks
-      WHERE workspace_id = ?
-      GROUP BY status_category
-    `).all(ws) as Array<{ status_category: string; count: number }>
+    const rows = ws
+      ? db.prepare(`SELECT status_category, COUNT(*) AS count FROM tasks WHERE workspace_id = ? GROUP BY status_category`).all(ws) as Array<{ status_category: string; count: number }>
+      : db.prepare(`SELECT status_category, COUNT(*) AS count FROM tasks GROUP BY status_category`).all() as Array<{ status_category: string; count: number }>
 
     const board: Record<string, number> = { backlog: 0, active: 0, blocked: 0, done: 0 }
     for (const row of rows) {
@@ -265,16 +262,27 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
   app.get('/agents', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
-    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    const db = getDb()
+    const rows = ws
+      ? db.prepare(`SELECT * FROM agent_runs WHERE workspace_id = ? ORDER BY started_at DESC LIMIT 50`).all(ws)
+      : db.prepare(`SELECT * FROM agent_runs ORDER BY started_at DESC LIMIT 50`).all()
+    return c.json({ data: rows })
+  })
 
+  // ─── GET /workspaces — list workspaces with project + run counts ────────
+  app.get('/workspaces', (c) => {
     const db = getDb()
     const rows = db.prepare(`
-      SELECT * FROM agent_runs
-      WHERE workspace_id = ?
-      ORDER BY started_at DESC
-      LIMIT 50
-    `).all(ws)
-
+      SELECT
+        w.workspace_id,
+        w.name,
+        w.status,
+        (SELECT COUNT(*) FROM projects    p WHERE p.workspace_id = w.workspace_id) AS project_count,
+        (SELECT COUNT(*) FROM agent_runs  r WHERE r.workspace_id = w.workspace_id AND r.status = 'running') AS running_runs,
+        (SELECT COUNT(*) FROM tasks       t WHERE t.workspace_id = w.workspace_id AND t.status_category = 'active') AS active_tasks
+      FROM workspaces w
+      ORDER BY w.name
+    `).all()
     return c.json({ data: rows })
   })
 
@@ -402,73 +410,80 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   })
 
   app.get('/pm/overview', (c) => {
+    // workspace_id optional — absent means aggregate across all workspaces.
     const ws = c.req.query('workspace_id') ?? workspace_id
-    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
     const db = getDb()
+    // Shared WHERE fragment. When ws is set we filter by workspace_id; when
+    // omitted we include every workspace. Callers interpolate `${wsClause}`
+    // and append `...wsParams` as trailing SQL bind params.
+    const wsClause = ws ? `workspace_id = ?` : `1=1`
+    const wsParams: unknown[] = ws ? [ws] : []
+    const andWsClause = ws ? `AND workspace_id = ?` : ``
+
     const count = (sql: string, ...params: unknown[]): number => {
       const row = db.prepare(sql).get(...params) as { n: number } | undefined
       return row?.n ?? 0
     }
 
     const epics = {
-      total: count(`SELECT COUNT(*) AS n FROM epics WHERE workspace_id = ?`, ws),
-      active: count(`SELECT COUNT(*) AS n FROM epics WHERE workspace_id = ? AND status_category = 'active'`, ws),
-      blocked: count(`SELECT COUNT(*) AS n FROM epics WHERE workspace_id = ? AND status_category = 'blocked'`, ws),
-      done: count(`SELECT COUNT(*) AS n FROM epics WHERE workspace_id = ? AND status_category = 'done'`, ws),
+      total:   count(`SELECT COUNT(*) AS n FROM epics WHERE ${wsClause}`, ...wsParams),
+      active:  count(`SELECT COUNT(*) AS n FROM epics WHERE status_category = 'active'  ${andWsClause}`, ...wsParams),
+      blocked: count(`SELECT COUNT(*) AS n FROM epics WHERE status_category = 'blocked' ${andWsClause}`, ...wsParams),
+      done:    count(`SELECT COUNT(*) AS n FROM epics WHERE status_category = 'done'    ${andWsClause}`, ...wsParams),
     }
 
     const issues = {
-      total: count(`SELECT COUNT(*) AS n FROM issues WHERE workspace_id = ?`, ws),
-      active: count(`SELECT COUNT(*) AS n FROM issues WHERE workspace_id = ? AND status_category = 'active'`, ws),
-      blocked: count(`SELECT COUNT(*) AS n FROM issues WHERE workspace_id = ? AND status_category = 'blocked'`, ws),
-      in_review: count(`SELECT COUNT(*) AS n FROM issues WHERE workspace_id = ? AND status = 'in_review'`, ws),
-      done: count(`SELECT COUNT(*) AS n FROM issues WHERE workspace_id = ? AND status_category = 'done'`, ws),
+      total:     count(`SELECT COUNT(*) AS n FROM issues WHERE ${wsClause}`, ...wsParams),
+      active:    count(`SELECT COUNT(*) AS n FROM issues WHERE status_category = 'active'  ${andWsClause}`, ...wsParams),
+      blocked:   count(`SELECT COUNT(*) AS n FROM issues WHERE status_category = 'blocked' ${andWsClause}`, ...wsParams),
+      in_review: count(`SELECT COUNT(*) AS n FROM issues WHERE status = 'in_review'        ${andWsClause}`, ...wsParams),
+      done:      count(`SELECT COUNT(*) AS n FROM issues WHERE status_category = 'done'    ${andWsClause}`, ...wsParams),
     }
 
     const plans = {
-      total: count(`SELECT COUNT(*) AS n FROM plans WHERE workspace_id = ?`, ws),
-      draft: count(`SELECT COUNT(*) AS n FROM plans WHERE workspace_id = ? AND status = 'draft'`, ws),
-      active: count(`SELECT COUNT(*) AS n FROM plans WHERE workspace_id = ? AND status = 'active'`, ws),
-      completed: count(`SELECT COUNT(*) AS n FROM plans WHERE workspace_id = ? AND status = 'completed'`, ws),
+      total:     count(`SELECT COUNT(*) AS n FROM plans WHERE ${wsClause}`, ...wsParams),
+      draft:     count(`SELECT COUNT(*) AS n FROM plans WHERE status = 'draft'     ${andWsClause}`, ...wsParams),
+      active:    count(`SELECT COUNT(*) AS n FROM plans WHERE status = 'active'    ${andWsClause}`, ...wsParams),
+      completed: count(`SELECT COUNT(*) AS n FROM plans WHERE status = 'completed' ${andWsClause}`, ...wsParams),
     }
 
     const reviews = {
-      pending: count(`SELECT COUNT(*) AS n FROM reviews WHERE workspace_id = ? AND status = 'pending'`, ws),
-      changes_requested: count(`SELECT COUNT(*) AS n FROM reviews WHERE workspace_id = ? AND status = 'changes_requested'`, ws),
-      approved: count(`SELECT COUNT(*) AS n FROM reviews WHERE workspace_id = ? AND status = 'approved'`, ws),
-      rejected: count(`SELECT COUNT(*) AS n FROM reviews WHERE workspace_id = ? AND status = 'rejected'`, ws),
+      pending:            count(`SELECT COUNT(*) AS n FROM reviews WHERE status = 'pending'            ${andWsClause}`, ...wsParams),
+      changes_requested:  count(`SELECT COUNT(*) AS n FROM reviews WHERE status = 'changes_requested'  ${andWsClause}`, ...wsParams),
+      approved:           count(`SELECT COUNT(*) AS n FROM reviews WHERE status = 'approved'           ${andWsClause}`, ...wsParams),
+      rejected:           count(`SELECT COUNT(*) AS n FROM reviews WHERE status = 'rejected'           ${andWsClause}`, ...wsParams),
     }
 
     const blockers = {
-      tasks: count(`SELECT COUNT(*) AS n FROM tasks WHERE workspace_id = ? AND status_category = 'blocked'`, ws),
+      tasks:  count(`SELECT COUNT(*) AS n FROM tasks      WHERE status_category = 'blocked' ${andWsClause}`, ...wsParams),
       issues: issues.blocked,
-      runs: count(`SELECT COUNT(*) AS n FROM agent_runs WHERE workspace_id = ? AND status = 'blocked'`, ws),
+      runs:   count(`SELECT COUNT(*) AS n FROM agent_runs WHERE status = 'blocked'          ${andWsClause}`, ...wsParams),
     }
 
     const blockedIssues = db.prepare(`
       SELECT issue_id, display_id, title, assignee_agent_id, updated_at
       FROM issues
-      WHERE workspace_id = ? AND status_category = 'blocked'
+      WHERE status_category = 'blocked' ${andWsClause}
       ORDER BY updated_at DESC
       LIMIT 5
-    `).all(ws)
+    `).all(...wsParams)
 
     const activePlans = db.prepare(`
       SELECT plan_id, display_id, title, file_path, updated_at
       FROM plans
-      WHERE workspace_id = ? AND status = 'active'
+      WHERE status = 'active' ${andWsClause}
       ORDER BY updated_at DESC
       LIMIT 5
-    `).all(ws)
+    `).all(...wsParams)
 
     const pendingReviews = db.prepare(`
       SELECT review_id, display_id, target_type, target_id, updated_at
       FROM reviews
-      WHERE workspace_id = ? AND status = 'pending'
+      WHERE status = 'pending' ${andWsClause}
       ORDER BY updated_at DESC
       LIMIT 5
-    `).all(ws)
+    `).all(...wsParams)
 
     const activeWork = issues.active + plans.active + epics.active
     const blockedWork = blockers.tasks + blockers.issues + blockers.runs

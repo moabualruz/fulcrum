@@ -93,7 +93,7 @@
 <body>
   <header>
     <h1>⬡ Fulcrum Monitor</h1>
-    <span id="ws-id"></span>
+    <select id="ws-picker" style="background:var(--panel);color:var(--fg);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:12px;min-width:220px"></select>
     <span id="last-event-ts" style="font-size:11px;color:var(--muted)"></span>
     <span id="connection-status" class="disconnected">● disconnected</span>
   </header>
@@ -447,21 +447,54 @@
     }
 
     // ── Init ───────────────────────────────────────────────────────────────────
+    async function loadWorkspacePicker() {
+      const picker = document.getElementById('ws-picker')
+      try {
+        const r = await fetch(`${BASE}/workspaces`)
+        if (!r.ok) return
+        const j = await r.json()
+        const rows = (j.data || []).filter(w => w.workspace_id)
+        // First option = aggregate view across all workspaces
+        const opts = ['<option value="">All workspaces</option>']
+        for (const w of rows) {
+          const label = `${w.name || w.workspace_id}  —  ${w.running_runs} running · ${w.active_tasks} active`
+          const sel = (wsId && wsId === w.workspace_id) ? ' selected' : ''
+          opts.push(`<option value="${w.workspace_id}"${sel}>${label}</option>`)
+        }
+        picker.innerHTML = opts.join('')
+      } catch {}
+    }
+
     async function init() {
+      // Seed wsId from the server's default (cwd-derived workspace). The user
+      // can flip to "All workspaces" or any other workspace via the picker.
       try {
         const r = await fetch(`${BASE}/status`)
         if (r.ok) {
           const j = await r.json()
           wsId = j.workspace_id || null
-          document.getElementById('ws-id').textContent = wsId ? `ws: ${wsId}` : ''
         }
       } catch {}
+
+      await loadWorkspacePicker()
+
+      document.getElementById('ws-picker').addEventListener('change', async (e) => {
+        wsId = e.target.value || null
+        // Reconnect SSE on the new scope and re-fetch every panel.
+        if (eventSource) { try { eventSource.close() } catch {} }
+        connectSSE()
+        await Promise.all([ refreshBoard(), refreshAgents(), refreshBlocked(), refreshPmOverview() ])
+      })
 
       await Promise.all([ refreshBoard(), refreshAgents(), refreshBlocked(), refreshPmOverview() ])
       connectSSE()
 
-      // Refresh panels every 10s (for when SSE misses events)
-      setInterval(() => { refreshBoard(); refreshAgents(); refreshBlocked(); refreshPmOverview() }, 10000)
+      // Refresh panels every 10s (for when SSE misses events) + refresh the
+      // workspace picker counts so "running/active" numbers stay live.
+      setInterval(() => {
+        refreshBoard(); refreshAgents(); refreshBlocked(); refreshPmOverview()
+        loadWorkspacePicker()
+      }, 10000)
     }
 
     // Enter key in create task input
