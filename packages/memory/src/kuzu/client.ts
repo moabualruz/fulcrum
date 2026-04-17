@@ -83,6 +83,18 @@ export class KuzuClient {
     }
   }
 
+  /** Execute a set of queries atomically inside a Kuzu manual transaction. */
+  async withTransaction(fn: () => Promise<void>): Promise<void> {
+    await this.conn.query('BEGIN TRANSACTION')
+    try {
+      await fn()
+      await this.conn.query('COMMIT')
+    } catch (err) {
+      await this.conn.query('ROLLBACK').catch(() => { /* best-effort */ })
+      throw err
+    }
+  }
+
   async close(): Promise<void> {
     if (this.db) {
       this.db.close()

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { createHash } from 'node:crypto'
 import { _configureDb, setDb, closeDb, runMigrations } from 'fulcrum-agent-core'
 import { replayWal } from '../commands/memory-replay-wal.js'
 
@@ -38,7 +39,7 @@ describe('replayWal', () => {
   it('replays a WAL record and restores memory row', async () => {
     const memId = 'mem_replay_001'
     const content = 'decision: auth middleware rewired for compliance'
-    const contentHash = Buffer.from(content).toString('base64') // simplified hash
+    const contentHash = createHash('sha256').update(content).digest('hex')
 
     // Write a WAL record
     const walRecord = {
@@ -67,7 +68,7 @@ describe('replayWal', () => {
   it('skips already-present rows (idempotent)', async () => {
     const memId = 'mem_existing'
     const content = 'existing memory content'
-    const contentHash = Buffer.from(content).toString('base64')
+    const contentHash = createHash('sha256').update(content).digest('hex')
 
     // Pre-insert the memory row
     db.prepare(`

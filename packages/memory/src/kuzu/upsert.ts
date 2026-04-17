@@ -14,47 +14,48 @@ export async function upsertMemoryToKuzu(
 ): Promise<void> {
   const now = new Date().toISOString()
 
-  // Step 1: Upsert Memory node (CREATE OR REPLACE semantics via MATCH DELETE + CREATE)
+  // Step 1: Upsert Memory node atomically — DELETE then CREATE inside a transaction
+  // so a failure between the two never leaves the graph without the node.
   const embeddingArray = embedding ? Array.from(embedding) : null
 
-  // Kuzu does not have MERGE like Neo4j; use DELETE + CREATE pattern for upsert
-  await client.query(
-    `MATCH (m:Memory {id: $id}) DETACH DELETE m`,
-    { id: memory.memory_id }
-  ).catch(() => { /* node may not exist yet */ })
-
-  await client.query(
-    `CREATE (m:Memory {
-      id: $id,
-      workspace_id: $workspace_id,
-      project_id: $project_id,
-      kind: $kind,
-      scope: $scope,
-      title: $title,
-      summary: $summary,
-      importance: $importance,
-      freshness: $freshness,
-      confidence: $confidence,
-      created_at: CAST($created_at AS TIMESTAMP),
-      updated_at: CAST($updated_at AS TIMESTAMP),
-      embedding: $embedding
-    })`,
-    {
-      id: memory.memory_id,
-      workspace_id: memory.workspace_id,
-      project_id: memory.project_id ?? '',
-      kind: memory.kind,
-      scope: memory.scope,
-      title: memory.title,
-      summary: memory.summary,
-      importance: memory.importance,
-      freshness: memory.freshness,
-      confidence: memory.confidence,
-      created_at: memory.created_at,
-      updated_at: memory.updated_at,
-      embedding: embeddingArray ?? new Array(client.dims).fill(0), // MEM-002
-    }
-  )
+  await client.withTransaction(async () => {
+    await client.query(
+      `MATCH (m:Memory {id: $id}) DETACH DELETE m`,
+      { id: memory.memory_id }
+    )
+    await client.query(
+      `CREATE (m:Memory {
+        id: $id,
+        workspace_id: $workspace_id,
+        project_id: $project_id,
+        kind: $kind,
+        scope: $scope,
+        title: $title,
+        summary: $summary,
+        importance: $importance,
+        freshness: $freshness,
+        confidence: $confidence,
+        created_at: CAST($created_at AS TIMESTAMP),
+        updated_at: CAST($updated_at AS TIMESTAMP),
+        embedding: $embedding
+      })`,
+      {
+        id: memory.memory_id,
+        workspace_id: memory.workspace_id,
+        project_id: memory.project_id ?? '',
+        kind: memory.kind,
+        scope: memory.scope,
+        title: memory.title,
+        summary: memory.summary,
+        importance: memory.importance,
+        freshness: memory.freshness,
+        confidence: memory.confidence,
+        created_at: memory.created_at,
+        updated_at: memory.updated_at,
+        embedding: embeddingArray ?? new Array(client.dims).fill(0), // MEM-002
+      }
+    )
+  })
 
   // Step 2: Run structured extraction on content
   const bodyText = memory.canonical_text ?? memory.title
@@ -78,13 +79,17 @@ export async function upsertMemoryToKuzu(
         `MATCH (m:Memory {id: $mid}), (e:Entity {id: $eid})
          CREATE (m)-[:PRODUCED_IN {weight: $weight, source: 'rule', created_at: CAST($now AS TIMESTAMP)}]->(e)`,
         { mid: memory.memory_id, eid: entity.id, weight, now }
-      ).catch(() => { /* edge may already exist */ })
+      ).catch((err: Error) => {
+        process.stderr.write(`[kuzu/upsert] PRODUCED_IN edge failed mem=${memory.memory_id} entity=${entity.id}: ${err.message}\n`)
+      })
     } else {
       await client.query(
         `MATCH (m:Memory {id: $mid}), (e:Entity {id: $eid})
          CREATE (m)-[:MENTIONS {weight: $weight, confidence: $confidence, source: 'rule', created_at: CAST($now AS TIMESTAMP)}]->(e)`,
         { mid: memory.memory_id, eid: entity.id, weight, confidence: mention.confidence, now }
-      ).catch(() => { /* edge may already exist */ })
+      ).catch((err: Error) => {
+        process.stderr.write(`[kuzu/upsert] MENTIONS edge failed mem=${memory.memory_id} entity=${entity.id}: ${err.message}\n`)
+      })
     }
   }
 }

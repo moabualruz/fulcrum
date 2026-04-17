@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 import { getDb, FulcrumError, newId, Db, getTextEmbedder } from 'fulcrum-agent-core'
 import { contentHash, isDuplicate } from './dedup.js'
 import { rowToFullMemory } from './mappers.js'
-import { getVaultPath, vaultExists, writeMemoryFile } from './vault/client.js'
+import { getVaultPath, vaultExists, writeMemoryFile, getMemoryFilePath } from './vault/client.js'
 import { upsertStateEntry } from './vault/state.js'
 import { appendToLog } from './vault/index-builder.js'
 import type { WriteMemoryInput, FullMemory } from './types.js'
@@ -11,7 +11,7 @@ import { runExtractionPipeline } from './extractors/pipeline.js'
 import { computeSparseVector } from './sparse.js'
 import { validateKind, applyKindCap } from './validate-kind.js'
 import { sanitizeOnWrite } from './sanitize/index.js'
-import { appendWal, brandSanitized } from './wal/writer.js'
+import { appendWal } from './wal/writer.js'
 
 /**
  * Generate an embedding for `text` and store it in:
@@ -177,7 +177,7 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
         workspace_id: input.workspace_id,
         project_id: input.project_id ?? null,
         provenance: { hook_point: 'write_memory', errored: true, reason: 'sanitize_error' },
-        content: brandSanitized(''),
+        content: '',
         sanitize_events: sanitized.events,
       })
     } catch { /* WAL append is best-effort on the error path */ }
@@ -198,7 +198,22 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
       created_at: nowIso, updated_at: nowIso, last_accessed_at: nowIso,
     } as FullMemory
   }
-  input = { ...input, content: sanitized.content }
+  // Sanitize title, summary, and tags — they appear in FTS5 indexes and recall
+  // output, so injection via these fields is equivalent to injection via content.
+  const sanitizedTitle = sanitizeOnWrite(input.title.slice(0, 500))
+  const sanitizedSummary = input.summary ? sanitizeOnWrite(input.summary.slice(0, 1000)) : null
+  const sanitizedTags = (input.tags ?? []).map(t => {
+    const r = sanitizeOnWrite(t.slice(0, 100))
+    return r.errored ? '' : r.content
+  }).filter(Boolean)
+
+  input = {
+    ...input,
+    content: sanitized.content,
+    title: sanitizedTitle.errored ? input.title.slice(0, 500) : sanitizedTitle.content,
+    summary: sanitizedSummary ? (sanitizedSummary.errored ? input.summary : sanitizedSummary.content) : input.summary,
+    tags: sanitizedTags,
+  }
 
   const now = new Date().toISOString()
   const hash = contentHash(input.content)
@@ -226,7 +241,7 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
     workspace_id: input.workspace_id,
     project_id: input.project_id ?? null,
     provenance: { hook_point: 'write_memory', errored: sanitized.errored },
-    content: brandSanitized(input.content),
+    content: input.content,
     sanitize_events: sanitized.events,
   })
 
@@ -267,7 +282,10 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
   if (!input.skipVaultWrite) {
     const vaultPath = getVaultPath()
     if (vaultExists(vaultPath)) {
-      const filePath = await writeMemoryFile(vaultPath, memoryForVault)
+      // Constraint #2: upsertStateEntry BEFORE writeMemoryFile so the vault
+      // watcher's echo-suppression path sees the state entry before the file
+      // hits disk — prevents self-writes being classified as human edits.
+      const filePath = getMemoryFilePath(vaultPath, memoryForVault)
       const relPath = filePath.replace(vaultPath + '/', '')
       const bodyContent = memoryForVault.canonical_text
       upsertStateEntry(vaultPath, {
@@ -276,6 +294,7 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
         mtime: Date.now(),
         sha256: bodyHash(bodyContent ?? ''),
       })
+      await writeMemoryFile(vaultPath, memoryForVault)
       appendToLog(vaultPath, {
         ts: now,
         op: 'WRITE',
@@ -293,6 +312,7 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
 
   // ── L1 SQLite insert (synchronous) ────────────────────────────────────────
   // freshness is NOT written here — it is computed at query time from updated_at
+  const provenanceJson = input.provenance ? JSON.stringify(input.provenance) : '{}'
   db.prepare(`
     INSERT INTO memories (
       memory_id, workspace_id, project_id,
@@ -300,14 +320,14 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
       content, tags, entities, confidence, importance,
       file_path, symbol_path, event_time, content_hash,
       task_id, issue_id, artifact_id, provenance_refs,
-      embedding, sparse_vector, created_at, updated_at, last_accessed_at, access_count
+      provenance, embedding, sparse_vector, created_at, updated_at, last_accessed_at, access_count
     ) VALUES (
       ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, 0
+      ?, ?, ?, ?, ?, ?, 0
     )
   `).run(
     memory_id, input.workspace_id, input.project_id ?? null,
@@ -315,7 +335,7 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
     input.content, JSON.stringify(input.tags ?? []), JSON.stringify(input.entities ?? []), input.confidence ?? 1.0, input.importance ?? 0.5,
     input.file_path ?? null, input.symbol_path ?? null, input.event_time ?? null, hash,
     input.task_id ?? null, input.issue_id ?? null, input.artifact_id ?? null, JSON.stringify(input.provenance_refs ?? []),
-    embeddingBuffer, sparseVectorJson, now, now, now
+    provenanceJson, embeddingBuffer, sparseVectorJson, now, now, now
   )
 
   const row = db.prepare('SELECT * FROM memories WHERE memory_id = ?').get(memory_id) as Record<string, unknown> | undefined

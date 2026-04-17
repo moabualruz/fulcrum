@@ -102,4 +102,5 @@ export interface RunReplay {
 
 export interface ReplayRunInput {
   run_id: string
+  workspace_id?: string
 }

@@ -32,10 +32,14 @@ export async function writeSessionSummary(input: SessionSummaryInput): Promise<'
   if (hasTaskOutcomeForRun(input.db, input.ctx.runId)) return 'skipped-race'
 
   try {
+    const projectId = input.ctx.project_id
+      ?? (input.ctx.runId
+        ? (input.db.prepare('SELECT project_id FROM agent_runs WHERE run_id = ?').get(input.ctx.runId) as { project_id: string | null } | undefined)?.project_id ?? input.ctx.workspace_id
+        : input.ctx.workspace_id)
     const { writeMemory } = await import('fulcrum-memory')
     await writeMemory({
       workspace_id: input.ctx.workspace_id,
-      project_id: input.ctx.workspace_id,
+      project_id: projectId,
       kind: 'session_summary',
       scope: 'project',
       title: `Session: ${input.ctx.sessionId}`,
@@ -87,11 +91,18 @@ export async function runPreCompactExtract(input: PreCompactInput): Promise<numb
   if (items.length === 0) return 0
   const { writeMemory } = await import('fulcrum-memory')
   let written = 0
+  const projectId = input.ctx.project_id
+    ?? (input.ctx.runId
+      ? (await import('fulcrum-agent-core').then(m => {
+          const row = m.getDb().prepare('SELECT project_id FROM agent_runs WHERE run_id = ?').get(input.ctx.runId) as { project_id: string | null } | undefined
+          return row?.project_id ?? input.ctx.workspace_id
+        }).catch(() => input.ctx.workspace_id))
+      : input.ctx.workspace_id)
   for (const item of items) {
     try {
       await writeMemory({
         workspace_id: input.ctx.workspace_id,
-        project_id: input.ctx.workspace_id,
+        project_id: projectId,
         kind: 'pre_compact_extract',
         scope: 'project',
         title: `${item.kind}: ${item.content.slice(0, 60)}`,

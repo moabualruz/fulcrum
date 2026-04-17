@@ -28,6 +28,8 @@ export interface HookContext {
   agentRole: string
   runId: string
   workspace_id: string
+  /** Resolved from agent_runs.project_id when a run is active; otherwise undefined. */
+  project_id?: string
 }
 
 /**

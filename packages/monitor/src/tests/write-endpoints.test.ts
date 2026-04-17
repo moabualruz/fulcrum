@@ -112,7 +112,7 @@ describe('PATCH /tasks/:id', () => {
 describe('POST /runs/:id/unblock', () => {
   it('unblocks a blocked run', async () => {
     const task = await createTask({ title: 'Task to unblock', workspace_id: 'ws_1', project_id: 'proj_1' })
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     // Block directly via SQL to avoid notification side-effects in tests
     db.prepare(`UPDATE agent_runs SET status = 'blocked' WHERE run_id = ?`).run(run.run_id)
 
@@ -132,7 +132,7 @@ describe('POST /runs/:id/unblock', () => {
 
   it('returns 409 when run is not blocked', async () => {
     const task = await createTask({ title: 'Active task', workspace_id: 'ws_1', project_id: 'proj_1' })
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     const res = await post(`/runs/${run.run_id}/unblock`, {})
     expect(res.status).toBe(409)
   })
@@ -143,7 +143,7 @@ describe('POST /runs/:id/unblock', () => {
 describe('POST /runs/:id/kill', () => {
   it('kills a running agent run', async () => {
     const task = await createTask({ title: 'Task to kill', workspace_id: 'ws_1', project_id: 'proj_1' })
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
 
     const res = await post(`/runs/${run.run_id}/kill`, { reason: 'operator request' })
     expect(res.status).toBe(200)
@@ -158,7 +158,7 @@ describe('POST /runs/:id/kill', () => {
 
   it('returns 409 when run is already finished', async () => {
     const task = await createTask({ title: 'Done task', workspace_id: 'ws_1', project_id: 'proj_1' })
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     db.prepare(`UPDATE agent_runs SET status = 'finished' WHERE run_id = ?`).run(run.run_id)
 
     const res = await post(`/runs/${run.run_id}/kill`, {})

@@ -21,7 +21,7 @@ async function seedTask() {
 describe('agent_state_projection', () => {
   it('inserts a projection row on startAgentRun with correct status', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
 
     const db = getDb()
     const row = db.prepare('SELECT * FROM agent_state_projection WHERE run_id = ?').get(run.run_id) as Record<string, unknown> | undefined
@@ -33,7 +33,7 @@ describe('agent_state_projection', () => {
 
   it('updates projection row status after completeAgentRun', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
 
     await completeAgentRun({ run_id: run.run_id, output_summary: 'done' })
 
@@ -45,7 +45,7 @@ describe('agent_state_projection', () => {
 
   it('updates projection row status after blockAgentRun', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
 
     await blockAgentRun({ run_id: run.run_id, reason: 'waiting on something' })
 
@@ -58,7 +58,7 @@ describe('agent_state_projection', () => {
 
   it('updates projection row heartbeat fields after heartbeatAgentRun', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
 
     await heartbeatAgentRun({ run_id: run.run_id, current_step: 'building', progress_pct: 50 })
 
@@ -72,7 +72,7 @@ describe('agent_state_projection', () => {
 
   it('INSERT OR REPLACE keeps exactly one row per run (no duplicates)', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
 
     await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step1', progress_pct: 10 })
     await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step2', progress_pct: 20 })
@@ -92,8 +92,8 @@ describe('agent_state_projection', () => {
     const task1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Task 1' })
     const task2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Task 2' })
 
-    await startAgentRun({ workspace_id: 'ws_1', task_id: task1.task_id, role: 'software_engineer' })
-    await startAgentRun({ workspace_id: 'ws_1', task_id: task2.task_id, role: 'software_engineer' })
+    await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task1.task_id, role: 'software_engineer' })
+    await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task2.task_id, role: 'software_engineer' })
 
     const db = getDb()
     const runCount = (db.prepare('SELECT COUNT(*) as cnt FROM agent_runs').get() as { cnt: number }).cnt

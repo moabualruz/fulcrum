@@ -79,29 +79,34 @@ export async function notifyBlocked(n: BlockedNotification): Promise<void> {
 
 function desktopNotify(title: string, body: string): void {
   const platform = process.platform
+  // Pass user-controlled values via environment, never via script interpolation,
+  // to prevent osascript/PowerShell injection.
+  const notifyEnv = { ...process.env, FULCRUM_NOTIFY_TITLE: title, FULCRUM_NOTIFY_BODY: body }
 
   if (platform === 'darwin') {
-    // macOS: osascript (always available)
+    // macOS: osascript with argv — title/body never interpolated into AppleScript source
     spawnSync('osascript', [
-      '-e',
-      `display notification ${JSON.stringify(body)} with title ${JSON.stringify(title)}`,
+      '-e', 'on run argv',
+      '-e', 'display notification (item 2 of argv) with title (item 1 of argv)',
+      '-e', 'end run',
+      '--', title, body,
     ], { timeout: 3000, stdio: 'pipe' })
   } else if (platform === 'linux') {
-    // Linux: notify-send (libnotify)
+    // Linux: notify-send receives title and body as separate argv — already safe
     spawnSync('notify-send', [title, body, '--urgency=normal', '--expire-time=10000'], {
       timeout: 3000,
       stdio: 'pipe',
     })
   } else if (platform === 'win32') {
-    // Windows: PowerShell toast notification
+    // Windows: PowerShell reads from $env: — never interpolated into script source
     const script = [
       `[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null`,
       `$xml = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)`,
-      `$xml.GetElementsByTagName('text')[0].AppendChild($xml.CreateTextNode(${JSON.stringify(title)})) | Out-Null`,
-      `$xml.GetElementsByTagName('text')[1].AppendChild($xml.CreateTextNode(${JSON.stringify(body)})) | Out-Null`,
+      `$xml.GetElementsByTagName('text')[0].AppendChild($xml.CreateTextNode($env:FULCRUM_NOTIFY_TITLE)) | Out-Null`,
+      `$xml.GetElementsByTagName('text')[1].AppendChild($xml.CreateTextNode($env:FULCRUM_NOTIFY_BODY)) | Out-Null`,
       `[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Fulcrum').Show((New-Object Windows.UI.Notifications.ToastNotification($xml)))`,
     ].join('; ')
-    spawnSync('powershell.exe', ['-Command', script], { timeout: 5000, stdio: 'pipe' })
+    spawnSync('powershell.exe', ['-Command', script], { timeout: 5000, stdio: 'pipe', env: notifyEnv })
   }
   // Other platforms: silently skip
 }

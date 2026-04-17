@@ -185,17 +185,18 @@ HANDLERS['write_memory'] = async (ctx) => {
 }
 
 HANDLERS['read_memory'] = async (ctx) => {
-  const { recallMemory } = await import('fulcrum-memory')
+  const { runStagedSearch } = await import('fulcrum-memory')
   const c = cfg(ctx)
   if (!ctx.project_id) return { status: 'failed', error: 'read_memory requires project_id' }
   try {
-    const memories = await (recallMemory as unknown as (i: Record<string, unknown>) => Promise<unknown[]>)({
+    const out = await runStagedSearch({
       workspace_id: ctx.workspace_id,
       project_id: ctx.project_id,
       query: str(c['query'], ''),
       limit: num(c['limit'], 10),
+      min_score: 0,
     })
-    return { status: 'completed', output: { count: memories.length, memories } }
+    return { status: 'completed', output: { count: out.results.length, memories: out.results, reason: out.reason } }
   } catch (err) {
     return { status: 'failed', error: `read_memory: ${(err as Error).message}` }
   }

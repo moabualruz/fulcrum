@@ -1,5 +1,5 @@
 // v2b PR 10 Task 1.1 — control-plane node DDL tests.
-// Verifies buildControlPlaneDDL() returns valid DDL for all 18 node types
+// Verifies buildControlPlaneDDL() returns valid DDL for all 19 node types
 // (not team_members — that is modeled as a rel table per the plan).
 
 import { describe, it, expect } from 'vitest'
@@ -24,12 +24,13 @@ const CONTROL_PLANE_NODE_TYPES = [
   'artifact_contract',
   'notification_event',
   'policy_event',
+  'agent_profile',
 ] as const
 
 describe('buildControlPlaneDDL — v2b PR 10 Task 1.1', () => {
-  it('returns an array of 18 DDL strings', () => {
+  it('returns an array of 19 DDL strings', () => {
     const ddls = buildControlPlaneDDL(1024)
-    expect(ddls).toHaveLength(18)
+    expect(ddls).toHaveLength(19)
   })
 
   it('every DDL is a CREATE NODE TABLE IF NOT EXISTS statement', () => {
@@ -44,7 +45,7 @@ describe('buildControlPlaneDDL — v2b PR 10 Task 1.1', () => {
     }
   })
 
-  it('covers all 18 node types', () => {
+  it('covers all 19 node types', () => {
     const ddls = buildControlPlaneDDL(1024)
     for (const nodeType of CONTROL_PLANE_NODE_TYPES) {
       const tableName = nodeType.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('')

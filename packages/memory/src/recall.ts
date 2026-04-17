@@ -137,15 +137,64 @@ export async function getMemoriesForTask(task_id: string, db: Db = getDb()): Pro
   return rows.map(rowToFullMemory)
 }
 
-// Roles allowed for cross-workspace global recall (fail-closed for missing)
-const GLOBAL_ALLOWED_ROLES = new Set(['chief_of_staff'])
+// Fallback: built-in allow list when policy_rules table has no matching row.
+const GLOBAL_ALLOW_ROLES_FALLBACK = new Set(['chief_of_staff'])
 
-function checkGlobalPolicy(callerRole: string | undefined): PolicyDeniedResponse | null {
-  if (!callerRole || !GLOBAL_ALLOWED_ROLES.has(callerRole)) {
-    // Emit policy_rule_missing telemetry for unknown roles
-    if (!callerRole || (!['software_engineer', 'test_engineer', 'reviewer'].includes(callerRole) && !GLOBAL_ALLOWED_ROLES.has(callerRole))) {
-      console.warn(`[fulcrum] policy_rule_missing role=${callerRole ?? 'none'} scope=global`)
+/**
+ * Table-driven global-recall policy check (Fix #27).
+ *
+ * Looks up policy_rules WHERE scope='system' AND name='global_recall_allowed_roles'
+ * AND enabled=1 (ordered by priority DESC). The first matching row's matchers JSON
+ * array is treated as the allowed-role list. Falls back to GLOBAL_ALLOW_ROLES_FALLBACK
+ * when no rule exists so existing behaviour is preserved.
+ *
+ * Telemetry: emits a policy_events row for every evaluation (allow or deny) so
+ * Dreaming / analytics can surface recall-gate patterns.
+ */
+function checkGlobalPolicy(callerRole: string | undefined, db: Db): PolicyDeniedResponse | null {
+  let allowedRoles: Set<string> = GLOBAL_ALLOW_ROLES_FALLBACK
+  let matchedRuleId: string | null = null
+
+  try {
+    const rule = db.prepare(
+      `SELECT rule_id, matchers FROM policy_rules
+       WHERE scope = 'system' AND name = 'global_recall_allowed_roles' AND enabled = 1
+       ORDER BY priority DESC LIMIT 1`
+    ).get() as { rule_id: string; matchers: string } | undefined
+    if (rule) {
+      const parsed: unknown = JSON.parse(rule.matchers)
+      if (Array.isArray(parsed)) {
+        allowedRoles = new Set(parsed.filter((v): v is string => typeof v === 'string'))
+        matchedRuleId = rule.rule_id
+      }
     }
+  } catch {
+    // policy_rules table unavailable (pre-migration DB) — use fallback
+  }
+
+  const allowed = !!callerRole && allowedRoles.has(callerRole)
+
+  // Emit policy_events telemetry row (best-effort)
+  try {
+    const evtId = `pe_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    db.prepare(
+      `INSERT INTO policy_events (evt_id, rule_id, workspace_id, action, matched, actor_id, resource_type, payload, ts)
+       VALUES (?, ?, 'global', ?, ?, ?, 'recall', ?, datetime('now'))`
+    ).run(
+      evtId,
+      matchedRuleId ?? null,
+      allowed ? 'allow' : 'deny',
+      allowed ? 1 : 0,
+      callerRole ?? 'none',
+      JSON.stringify({ query_scope: 'global', caller_role: callerRole ?? null }),
+    )
+  } catch {
+    // policy_events absent — non-fatal
+  }
+
+  if (!allowed) {
+    // Emit warning for any denied caller — helps surface misconfigured roles in logs.
+    console.warn(`[fulcrum] policy_rule_missing role=${callerRole ?? 'none'} scope=global`)
     return { results: [], reason: 'policy_denied' }
   }
   return null
@@ -169,7 +218,7 @@ export async function recallMemory(
 
   // Global scope policy gate — before any query logic (security F1 placement: before-query)
   if (input.query_scope === 'global') {
-    const denied = checkGlobalPolicy(input.caller_role)
+    const denied = checkGlobalPolicy(input.caller_role, db)
     if (denied) return denied
   }
 

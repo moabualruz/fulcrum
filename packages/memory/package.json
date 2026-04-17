@@ -1,6 +1,6 @@
 {
   "name": "fulcrum-memory",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Three-layer memory stack — git vault (L0), FTS5 full-text search (L1), Kuzu graph + HNSW vector search (L2) for agent memory and cross-project knowledge graphs",
   "keywords": [
     "memory",

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2] — 2026-04-17
+
+Second release. Closes 33 findings from the four-axis code review (criticals, highs, mediums, tsc), promotes three previously-unpublished packages (`fulcrum-agent-cli`, `fulcrum-worker`, `fulcrum-workflows`), and bumps the published nine from `0.0.1`. All workspace dependencies now resolve to a single synchronized version.
+
 ### Added — Audit Round 3 (2026-04-15)
 
 Complete resolution of all findings from the third codebase audit across every package. 1308 tests pass (6 skipped).
@@ -429,6 +433,6 @@ Five rounds of gap-analysis + fixes against the Python spec. Test count grew fro
 - `Review`: code review request with status (pending → approved/rejected/changes_requested), reviewer tracking
 - Handoff mode: `auto` (merge on approval) vs `manual` (human review gate)
 
-[Unreleased]: https://github.com/moabualruz/fulcrum/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/moabualruz/fulcrum/compare/v0.0.1...v0.1.0
+[Unreleased]: https://github.com/moabualruz/fulcrum/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/moabualruz/fulcrum/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/moabualruz/fulcrum/releases/tag/v0.0.1

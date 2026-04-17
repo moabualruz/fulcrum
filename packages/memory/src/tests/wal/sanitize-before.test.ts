@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { appendWal, brandSanitized, walPathFor, WalDurabilityError } from '../../wal/writer.js'
+import { appendWal, walPathFor, WalDurabilityError } from '../../wal/writer.js'
 
 describe('WAL writer — v2a PR 5 Task 26', () => {
   let dataDir: string
@@ -23,7 +23,7 @@ describe('WAL writer — v2a PR 5 Task 26', () => {
       memory_id: 'mem_test',
       kind: 'fact',
       workspace_id: 'ws_1',
-      content: brandSanitized('clean content'),
+      content: 'clean content',
       sanitize_events: [],
     })
     expect(existsSync(path)).toBe(true)
@@ -44,7 +44,7 @@ describe('WAL writer — v2a PR 5 Task 26', () => {
       memory_id: 'mem_x',
       kind: 'fact',
       workspace_id: 'ws_1',
-      content: brandSanitized(body),
+      content: body,
       sanitize_events: [],
     })
     const raw = readFileSync(path, 'utf8')
@@ -59,7 +59,7 @@ describe('WAL writer — v2a PR 5 Task 26', () => {
       memory_id: 'mem_z',
       kind: 'fact',
       workspace_id: 'ws_1',
-      content: brandSanitized('x'),
+      content: 'x',
       sanitize_events: [{ rule: 'fence.strip', severity: 'info' }],
     })
     const record = JSON.parse(readFileSync(path, 'utf8').trim().split('\n')[0]!)

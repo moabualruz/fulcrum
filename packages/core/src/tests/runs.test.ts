@@ -33,7 +33,7 @@ async function seedTask() {
 describe('startAgentRun', () => {
   it('creates a running run and returns run_id', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     expect(run.status).toBe('running')
     expect(run.role).toBe('software_engineer')
     expect(run.run_id).toMatch(/^run_[0-9A-Z]{26}$|^[0-9A-Z]{26}$/)
@@ -42,7 +42,7 @@ describe('startAgentRun', () => {
 
   it('captures git context (branch/commit may be null in test env)', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
     // git_branch and git_commit are either strings or null — never undefined
     expect(run.git_branch === null || typeof run.git_branch === 'string').toBe(true)
     expect(run.git_commit === null || typeof run.git_commit === 'string').toBe(true)
@@ -52,7 +52,7 @@ describe('startAgentRun', () => {
 describe('heartbeatAgentRun', () => {
   it('updates current_step and progress_pct', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await heartbeatAgentRun({ run_id: run.run_id, current_step: 'parsing files', progress_pct: 42 })
     const updated = await getAgentRunStatus({ run_id: run.run_id })
     expect(updated.current_step).toBe('parsing files')
@@ -61,7 +61,7 @@ describe('heartbeatAgentRun', () => {
 
   it('increments version on each heartbeat', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     expect(run.version).toBe(0)
     await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step 1', progress_pct: 10 })
     const v1 = await getAgentRunStatus({ run_id: run.run_id })
@@ -75,7 +75,7 @@ describe('heartbeatAgentRun', () => {
 describe('completeAgentRun', () => {
   it('sets status to finished with summary and artifacts', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     const completed = await completeAgentRun({
       run_id: run.run_id,
       output_summary: 'Done!',
@@ -90,7 +90,7 @@ describe('completeAgentRun', () => {
 
   it('increments version on completion', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     expect(run.version).toBe(0)
     const completed = await completeAgentRun({ run_id: run.run_id, output_summary: 'done' })
     expect(completed.version).toBe(1)
@@ -100,7 +100,7 @@ describe('completeAgentRun', () => {
 describe('blockAgentRun', () => {
   it('sets status to blocked with reason in note', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
     const blocked = await blockAgentRun({ run_id: run.run_id, reason: 'waiting for upstream merge' })
     expect(blocked.status).toBe('blocked')
     expect(blocked.blocker).toBe('waiting for upstream merge')
@@ -110,7 +110,7 @@ describe('blockAgentRun', () => {
 describe('escalateRun', () => {
   it('creates a chief_of_staff task and sets run to escalated', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await blockAgentRun({ run_id: run.run_id, reason: 'stuck' })
     const cosTask = await escalateRun({ run_id: run.run_id, escalation_reason: 'blocked for too long' })
     expect(cosTask.title).toContain('Escalation')
@@ -122,7 +122,7 @@ describe('escalateRun', () => {
 
   it('creates CoS task in the same project as the original task', async () => {
     const task = await seedTask() // task is in proj_1
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     const cosTask = await escalateRun({ run_id: run.run_id, escalation_reason: 'needs attention' })
     expect(cosTask.project_id).toBe(task.project_id)
     expect(cosTask.workspace_id).toBe(task.workspace_id)
@@ -133,7 +133,7 @@ describe('not_found errors', () => {
   it('startAgentRun throws not_found for unknown task_id', async () => {
     seed()
     await expect(
-      startAgentRun({ task_id: 'NONEXISTENT', workspace_id: 'ws_1', role: 'software_engineer' })
+      startAgentRun({ context_type: 'primary', task_id: 'NONEXISTENT', workspace_id: 'ws_1', role: 'software_engineer' })
     ).rejects.toMatchObject({ code: 'not_found' })
   })
 
@@ -143,7 +143,7 @@ describe('not_found errors', () => {
     db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_2','other ws')").run()
     const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
     await expect(
-      startAgentRun({ task_id: task.task_id, workspace_id: 'ws_2', role: 'software_engineer' })
+      startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_2', role: 'software_engineer' })
     ).rejects.toMatchObject({ code: 'invalid_input' })
   })
 
@@ -186,7 +186,7 @@ describe('not_found errors', () => {
 describe('input validation', () => {
   it('heartbeatAgentRun throws invalid_input for progress_pct > 100', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await expect(
       heartbeatAgentRun({ run_id: run.run_id, current_step: 'step', progress_pct: 101 })
     ).rejects.toMatchObject({ code: 'invalid_input' })
@@ -194,7 +194,7 @@ describe('input validation', () => {
 
   it('heartbeatAgentRun throws invalid_input for progress_pct < 0', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await expect(
       heartbeatAgentRun({ run_id: run.run_id, current_step: 'step', progress_pct: -1 })
     ).rejects.toMatchObject({ code: 'invalid_input' })
@@ -202,7 +202,7 @@ describe('input validation', () => {
 
   it('heartbeatAgentRun accepts boundary values 0 and 100', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await expect(
       heartbeatAgentRun({ run_id: run.run_id, current_step: 'start', progress_pct: 0 })
     ).resolves.toBeUndefined()
@@ -213,7 +213,7 @@ describe('input validation', () => {
 
   it('blockAgentRun throws invalid_input for empty reason', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
     await expect(
       blockAgentRun({ run_id: run.run_id, reason: '' })
     ).rejects.toMatchObject({ code: 'invalid_input' })
@@ -224,7 +224,7 @@ describe('input validation', () => {
 
   it('escalateRun throws invalid_input for empty escalation_reason', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await expect(
       escalateRun({ run_id: run.run_id, escalation_reason: '' })
     ).rejects.toMatchObject({ code: 'invalid_input' })
@@ -237,25 +237,25 @@ describe('input validation', () => {
 describe('startAgentRun — display_id, agent_id, status_category, events', () => {
   it('generates a RUN- display_id', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'agent-abc' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'agent-abc' })
     expect(run.display_id).toMatch(/^RUN-\d+$/)
   })
 
   it('stores agent_id from input', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'agent-xyz' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'agent-xyz' })
     expect(run.agent_id).toBe('agent-xyz')
   })
 
   it('sets status_category to active', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'a1' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'a1' })
     expect(run.status_category).toBe('active')
   })
 
   it('emits agent_run_created and agent_run_started events', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'a1' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'a1' })
     const db = getDb()
     const created = db.prepare("SELECT * FROM events WHERE evt_type = 'agent_run_created' AND object_id = ?").get(run.run_id)
     const started = db.prepare("SELECT * FROM events WHERE evt_type = 'agent_run_started' AND object_id = ?").get(run.run_id)
@@ -267,7 +267,7 @@ describe('startAgentRun — display_id, agent_id, status_category, events', () =
 describe('heartbeatAgentRun — heartbeat_at', () => {
   it('updates heartbeat_at on each call', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'a1' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'a1' })
     await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step', progress_pct: 10 })
     const updated = await getAgentRunStatus({ run_id: run.run_id })
     expect(updated.heartbeat_at).toBeTruthy()
@@ -277,21 +277,21 @@ describe('heartbeatAgentRun — heartbeat_at', () => {
 describe('completeAgentRun — finished_at, status_category, event', () => {
   it('sets finished_at on completion', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'a1' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'a1' })
     const completed = await completeAgentRun({ run_id: run.run_id, output_summary: 'done' })
     expect(completed.finished_at).toBeTruthy()
   })
 
   it('sets status_category to done on completion', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'a1' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'a1' })
     const completed = await completeAgentRun({ run_id: run.run_id, output_summary: 'done' })
     expect(completed.status_category).toBe('done')
   })
 
   it('emits agent_run_finished event', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'a1' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer', agent_id: 'a1' })
     const completed = await completeAgentRun({ run_id: run.run_id, output_summary: 'done' })
     const db = getDb()
     const evt = db.prepare("SELECT * FROM events WHERE evt_type = 'agent_run_finished' AND object_id = ?").get(completed.run_id)
@@ -302,21 +302,21 @@ describe('completeAgentRun — finished_at, status_category, event', () => {
 describe('blockAgentRun — blocker field, status_category, event', () => {
   it('sets blocker field with the reason', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'code_reviewer', agent_id: 'a1' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'code_reviewer', agent_id: 'a1' })
     const blocked = await blockAgentRun({ run_id: run.run_id, reason: 'waiting for review' })
     expect(blocked.blocker).toBe('waiting for review')
   })
 
   it('sets status_category to blocked', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'code_reviewer', agent_id: 'a1' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'code_reviewer', agent_id: 'a1' })
     const blocked = await blockAgentRun({ run_id: run.run_id, reason: 'reason' })
     expect(blocked.status_category).toBe('blocked')
   })
 
   it('emits agent_run_blocked event', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'code_reviewer', agent_id: 'a1' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'code_reviewer', agent_id: 'a1' })
     const blocked = await blockAgentRun({ run_id: run.run_id, reason: 'reason' })
     const db = getDb()
     const evt = db.prepare("SELECT * FROM events WHERE evt_type = 'agent_run_blocked' AND object_id = ?").get(blocked.run_id)
@@ -327,7 +327,7 @@ describe('blockAgentRun — blocker field, status_category, event', () => {
 describe('startAgentRun — pi_profile', () => {
   it('stores and retrieves pi_profile when provided', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({
+    const run = await startAgentRun({ context_type: 'primary',
       task_id: task.task_id,
       workspace_id: 'ws_1',
       role: 'software_engineer',
@@ -338,13 +338,13 @@ describe('startAgentRun — pi_profile', () => {
 
   it('stores null pi_profile when not provided', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     expect(run.pi_profile).toBeNull()
   })
 
   it('retrieves pi_profile via getAgentRunStatus', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({
+    const run = await startAgentRun({ context_type: 'primary',
       task_id: task.task_id,
       workspace_id: 'ws_1',
       role: 'software_engineer',
@@ -358,7 +358,7 @@ describe('startAgentRun — pi_profile', () => {
 describe('buildSpawnableRun', () => {
   it('returns correct SpawnableRun shape', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({
+    const run = await startAgentRun({ context_type: 'primary',
       task_id: task.task_id,
       workspace_id: 'ws_1',
       role: 'software_engineer',
@@ -375,7 +375,7 @@ describe('buildSpawnableRun', () => {
 
   it('includes optional task_packet fields', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({
+    const run = await startAgentRun({ context_type: 'primary',
       task_id: task.task_id,
       workspace_id: 'ws_1',
       role: 'code_reviewer',
@@ -396,7 +396,7 @@ describe('buildSpawnableRun', () => {
 
   it('throws invalid_input if run has no pi_profile', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({
+    const run = await startAgentRun({ context_type: 'primary',
       task_id: task.task_id,
       workspace_id: 'ws_1',
       role: 'software_engineer',
@@ -416,7 +416,7 @@ describe('buildSpawnableRun', () => {
       tools_deny: ['invoke_team'],
       executor_uri: 'https://executor.example.com/run',
     })
-    const run = await startAgentRun({
+    const run = await startAgentRun({ context_type: 'primary',
       task_id: task.task_id,
       workspace_id: 'ws_1',
       role: 'software_engineer',
@@ -431,7 +431,7 @@ describe('buildSpawnableRun', () => {
 
   it('returns null definition fields when no agent_definition registered for the role', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({
+    const run = await startAgentRun({ context_type: 'primary',
       task_id: task.task_id,
       workspace_id: 'ws_1',
       role: 'data_engineer',
@@ -461,7 +461,7 @@ describe('agent run event journal (G-7)', () => {
 
   it('startAgentRun seeds events with a "started" entry', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     const events = readEvents(run.run_id)
     expect(events.length).toBe(1)
     expect(events[0].event_type).toBe('started')
@@ -472,7 +472,7 @@ describe('agent run event journal (G-7)', () => {
 
   it('heartbeatAgentRun appends a "heartbeat" event with current_step and progress_pct', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await heartbeatAgentRun({ run_id: run.run_id, current_step: 'editing', progress_pct: 25 })
     const events = readEvents(run.run_id)
     expect(events.length).toBe(2)
@@ -483,7 +483,7 @@ describe('agent run event journal (G-7)', () => {
 
   it('completeAgentRun appends a "completed" event with output_summary', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await completeAgentRun({ run_id: run.run_id, output_summary: 'all done' })
     const events = readEvents(run.run_id)
     const completed = events.find(e => e.event_type === 'completed')
@@ -493,7 +493,7 @@ describe('agent run event journal (G-7)', () => {
 
   it('blockAgentRun appends a "blocked" event with reason', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await blockAgentRun({ run_id: run.run_id, reason: 'waiting on API docs' })
     const events = readEvents(run.run_id)
     const blocked = events.find(e => e.event_type === 'blocked')
@@ -503,7 +503,7 @@ describe('agent run event journal (G-7)', () => {
 
   it('escalateRun appends an "escalated" event', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await escalateRun({ run_id: run.run_id, escalation_reason: 'out of scope' })
     const events = readEvents(run.run_id)
     const escalated = events.find(e => e.event_type === 'escalated')
@@ -513,7 +513,7 @@ describe('agent run event journal (G-7)', () => {
 
   it('multiple heartbeats accumulate in order', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step 1', progress_pct: 10 })
     await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step 2', progress_pct: 50 })
     await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step 3', progress_pct: 90 })
@@ -526,7 +526,7 @@ describe('agent run event journal (G-7)', () => {
 
   it('getRunHistory returns events ordered by ts ASC', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step 1', progress_pct: 10 })
     await heartbeatAgentRun({ run_id: run.run_id, current_step: 'step 2', progress_pct: 50 })
     const history = getRunHistory(run.run_id)
@@ -561,7 +561,7 @@ describe('run lifecycle memory hooks (L-9, L-10)', () => {
       scope: 'task',
     })
 
-    const run = await startAgentRun({
+    const run = await startAgentRun({ context_type: 'primary',
       workspace_id: 'ws_1',
       task_id: task.task_id,
       role: 'software_engineer',
@@ -580,7 +580,7 @@ describe('run lifecycle memory hooks (L-9, L-10)', () => {
 
   it('completeAgentRun auto-writes a task_outcome memory when summary is non-trivial', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
     await completeAgentRun({
       run_id: run.run_id,
       output_summary: 'Implemented the feature and added 5 tests, all passing.',
@@ -595,7 +595,7 @@ describe('run lifecycle memory hooks (L-9, L-10)', () => {
 
   it('completeAgentRun skips auto-memory when summary is trivial or missing', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
     await completeAgentRun({ run_id: run.run_id, output_summary: 'ok' })
     const memoryRows = getDb().prepare(
       "SELECT * FROM memories WHERE task_id = ? AND kind = 'task_outcome'"
@@ -605,7 +605,7 @@ describe('run lifecycle memory hooks (L-9, L-10)', () => {
 
   it('blockAgentRun auto-writes a task_failure memory', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
     await blockAgentRun({ run_id: run.run_id, reason: 'missing API credentials' })
     const memoryRows = getDb().prepare(
       "SELECT * FROM memories WHERE task_id = ? AND kind = 'task_failure'"
@@ -616,7 +616,7 @@ describe('run lifecycle memory hooks (L-9, L-10)', () => {
 
   it('escalateRun auto-writes a task_decision memory', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
     await escalateRun({ run_id: run.run_id, escalation_reason: 'requires architecture review' })
     const memoryRows = getDb().prepare(
       "SELECT * FROM memories WHERE task_id = ? AND kind = 'task_decision'"
@@ -627,7 +627,7 @@ describe('run lifecycle memory hooks (L-9, L-10)', () => {
 
   it('completeAgentRun writes memory with source=auto (Unit 2)', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
     await completeAgentRun({
       run_id: run.run_id,
       output_summary: 'Implemented OAuth callback and added integration tests.',
@@ -640,7 +640,7 @@ describe('run lifecycle memory hooks (L-9, L-10)', () => {
 
   it('blockAgentRun writes memory with source=auto (Unit 2)', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
     await blockAgentRun({ run_id: run.run_id, reason: 'waiting for external API access' })
     const row = getDb().prepare(
       "SELECT source FROM memories WHERE task_id = ? AND kind = 'task_failure' ORDER BY rowid DESC LIMIT 1"
@@ -656,7 +656,7 @@ describe('run lifecycle memory hooks (L-9, L-10)', () => {
 
   it('recall failure never prevents startAgentRun (empty DB returns [])', async () => {
     const task = await seedTask()
-    const run = await startAgentRun({ workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', workspace_id: 'ws_1', task_id: task.task_id, role: 'software_engineer' })
     const events = readRunEvents(run.run_id)
     const started = events.find(e => e.event_type === 'started')
     expect(started!.payload.recalled_memories).toEqual([])

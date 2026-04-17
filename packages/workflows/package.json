@@ -1,6 +1,6 @@
 {
   "name": "fulcrum-workflows",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Workflow engine — define, register, and execute multi-step agent workflows with typed step transitions and run state tracking",
   "keywords": [
     "workflows",

@@ -62,15 +62,19 @@ export async function reduceAgentAdapter(
   )
 }
 
-/** Write an EXECUTED_BY edge from an AgentRun to an AgentAdapter. */
+/** Write an EXECUTED_BY edge from an AgentRun to an AgentAdapter (idempotent). */
 export async function reduceExecutedBy(
   client: KuzuClient,
   runId: string,
   adapterId: string,
 ): Promise<void> {
   if (!client.isReady) return
+  // Create the edge only when it doesn't already exist — prevents duplicate edges on retry.
   await client.query(
     `MATCH (r:AgentRun {id: $run_id}), (a:AgentAdapter {id: $adapter_id})
+     OPTIONAL MATCH (r)-[e:EXECUTED_BY]->(a)
+     WITH r, a, e
+     WHERE e IS NULL
      CREATE (r)-[:EXECUTED_BY]->(a)`,
     { run_id: runId, adapter_id: adapterId },
   )

@@ -281,6 +281,15 @@ export function buildControlPlaneDDL(_dims: number): string[] {
   created_at TIMESTAMP,
   PRIMARY KEY (id)
 )`,
+    `CREATE NODE TABLE IF NOT EXISTS AgentProfile (
+  id STRING,
+  workspace_id STRING,
+  role STRING,
+  name STRING,
+  description STRING,
+  created_at TIMESTAMP,
+  PRIMARY KEY (id)
+)`,
     `CREATE NODE TABLE IF NOT EXISTS ArtifactContract (
   id STRING,
   workspace_id STRING,
@@ -372,7 +381,7 @@ export const PART_OF_RUN_DDL = `CREATE REL TABLE IF NOT EXISTS PART_OF_RUN (FROM
 export const HIT_DDL = `CREATE REL TABLE IF NOT EXISTS HIT (FROM AgentRun TO Memory, hook_point STRING, created_at TIMESTAMP)`
 export const INSTANTIATED_FROM_DDL = `CREATE REL TABLE IF NOT EXISTS INSTANTIATED_FROM (FROM TeamInstance TO TeamTemplate, created_at TIMESTAMP)`
 export const EXECUTED_BY_DDL = `CREATE REL TABLE IF NOT EXISTS EXECUTED_BY (FROM AgentRun TO AgentAdapter, created_at TIMESTAMP)`
-export const MEMBER_OF_DDL = `CREATE REL TABLE IF NOT EXISTS MEMBER_OF (FROM AgentRun TO TeamInstance, role_slot STRING)`
+export const MEMBER_OF_DDL = `CREATE REL TABLE IF NOT EXISTS MEMBER_OF (FROM AgentProfile TO TeamInstance, role_slot STRING)`
 export const LANDED_IN_DDL = `CREATE REL TABLE IF NOT EXISTS LANDED_IN (FROM File TO GitCommit, created_at TIMESTAMP)`
 export const ON_BRANCH_DDL = `CREATE REL TABLE IF NOT EXISTS ON_BRANCH (FROM GitCommit TO GitBranch, created_at TIMESTAMP)`
 export const INCLUDES_COMMIT_DDL = `CREATE REL TABLE IF NOT EXISTS INCLUDES_COMMIT (FROM GitPr TO GitCommit, created_at TIMESTAMP)`

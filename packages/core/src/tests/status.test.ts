@@ -18,7 +18,7 @@ describe('getWorkspaceStatus', () => {
   it('lists stale runs', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
-    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: t.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     const db = getDb()
     db.prepare("UPDATE agent_runs SET status = 'stale' WHERE run_id = ?").run(run.run_id)
     const status = await getWorkspaceStatus({ workspace_id: 'ws_1' })
@@ -31,8 +31,8 @@ describe('getWorkspaceStatus', () => {
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T2' })
     await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T3' })
-    const run1 = await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
-    const run2 = await startAgentRun({ task_id: t2.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
+    const run1 = await startAgentRun({ context_type: 'primary', task_id: t1.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run2 = await startAgentRun({ context_type: 'primary', task_id: t2.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
     await blockAgentRun({ run_id: run2.run_id, reason: 'waiting' })
 
     const status = await getWorkspaceStatus({ workspace_id: 'ws_1' })
@@ -48,7 +48,7 @@ describe('getWorkspaceStatus — completed count', () => {
   it('increments completed_tasks_today when a run is completed today', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
-    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: t.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     const { completeAgentRun } = await import('../runs.js')
     await completeAgentRun({ run_id: run.run_id, output_summary: 'done' })
     const status = await getWorkspaceStatus({ workspace_id: 'ws_1' })
@@ -82,7 +82,7 @@ describe('buildCosContext', () => {
   it('includes blocked runs for the project in context', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Blocked task' })
-    const run = await startAgentRun({ task_id: t.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: t.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
     await blockAgentRun({ run_id: run.run_id, reason: 'waiting for upstream' })
     const context = await buildCosContext({ workspace_id: 'ws_1', project_id: 'proj_1' })
     expect(context).toContain('Blocked')
@@ -97,8 +97,8 @@ describe('buildCosContext', () => {
 
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Task in P1' })
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_2', title: 'Task in P2' })
-    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
-    await startAgentRun({ task_id: t2.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
+    await startAgentRun({ context_type: 'primary', task_id: t1.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    await startAgentRun({ context_type: 'primary', task_id: t2.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
 
     const context = await buildCosContext({ workspace_id: 'ws_1', project_id: 'proj_1' })
     expect(context).toContain('software_engineer')
@@ -114,7 +114,7 @@ describe('getWorkspaceStatus — cross-workspace isolation', () => {
     db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_1','p1')").run()
     db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2','ws_2','p2')").run()
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
-    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
+    await startAgentRun({ context_type: 'primary', task_id: t1.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
     const status = await getWorkspaceStatus({ workspace_id: 'ws_2' })
     expect(status.running_runs).toHaveLength(0)
     expect(status.wip_count).toBe(0)

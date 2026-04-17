@@ -278,8 +278,9 @@ fulcrum memory — memory vault commands
   accelerate       Enable L2 graph + vector search on existing vault
   rebuild          Rebuild L1 SQLite from L0 vault files
   status           Show vault info
-  sweep-expired    Delete session-scope memories whose expires_at has passed
-  rollback         Operator-only rollback (--since= + --yes-i-really-want-to-undo-N-writes)
+  sweep-expired              Delete session-scope memories whose expires_at has passed
+  graph-consistency-check    Sample SQLite ↔ Kuzu and report drift (requires L2)
+  rollback                   Operator-only rollback (--since= + --yes-i-really-want-to-undo-N-writes)
 `)
     process.exit(0)
   }
@@ -404,6 +405,37 @@ fulcrum memory — memory vault commands
     return
   }
 
+  // Fix #24 — SQLite ↔ Kuzu graph consistency check.
+  if (command === 'graph-consistency-check') {
+    const { buildDeps, TOOL_REGISTRY } = await import('./tool-registry.js')
+    const { getDb, runMigrations, projectIdsFromPath } = await import('fulcrum-agent-core')
+    const db = getDb()
+    runMigrations(db)
+    const { workspace_id, project_id } = projectIdsFromPath(process.cwd())
+    const deps = buildDeps(workspace_id, project_id)
+    const entry = TOOL_REGISTRY.get('graph_consistency_check')
+    if (!entry) { console.error('graph_consistency_check not registered'); process.exit(1) }
+    const sampleSize = args.find(a => a.startsWith('--sample-size='))?.split('=')[1]
+    const alertThreshold = args.find(a => a.startsWith('--alert-threshold='))?.split('=')[1]
+    const result = await entry.handler({
+      ...(sampleSize ? { sample_size: Number(sampleSize) } : {}),
+      ...(alertThreshold ? { alert_threshold: Number(alertThreshold) } : {}),
+    }, deps) as { isDrifting: boolean; driftPct: number; totalChecked: number; missingInKuzu: number; missing?: Array<{ table: string; id: string }>; error?: string }
+    if (result.error) {
+      console.error(`[graph-consistency] ${result.error}`)
+      process.exit(1)
+    }
+    const pct = (result.driftPct * 100).toFixed(2)
+    const status = result.isDrifting ? '⚠ DRIFTING' : '✓ OK'
+    console.log(`[graph-consistency] ${status} — ${result.missingInKuzu}/${result.totalChecked} missing in Kuzu (${pct}%)`)
+    if (result.isDrifting && result.missing) {
+      for (const m of result.missing.slice(0, 20)) {
+        console.log(`  missing: ${m.table}/${m.id}`)
+      }
+    }
+    process.exit(result.isDrifting ? 1 : 0)
+  }
+
   console.error(`Unknown memory command: ${command}`)
   console.error('Run `fulcrum memory --help` for available commands.')
   process.exit(1)
@@ -429,9 +461,10 @@ import { join } from 'path'
 // globalDataDir is imported from fulcrum-agent-core (single canonical implementation)
 
 function getSessionFilePath(sessionId: string): string {
+  const safeId = sessionId.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 128)
   const dir = join(globalDataDir(), 'sessions')
   mkdirSync(dir, { recursive: true })
-  return join(dir, `${sessionId}.json`)
+  return join(dir, `${safeId}.json`)
 }
 
 /**

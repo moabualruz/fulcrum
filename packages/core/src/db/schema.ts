@@ -358,6 +358,11 @@ export function applySchema(db: Database.Database): void {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_slug ON memories(slug);
     CREATE INDEX IF NOT EXISTS idx_memories_tier ON memories(tier);
     CREATE INDEX IF NOT EXISTS idx_memories_expires ON memories(expires_at) WHERE expires_at IS NOT NULL;
+    -- At most one terminal memory (task_outcome/blocker_resolution/session_summary) per run.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_run_outcome
+      ON memories(json_extract(provenance, '$.run_id'))
+      WHERE kind IN ('task_outcome','blocker_resolution','session_summary')
+        AND json_extract(provenance, '$.run_id') IS NOT NULL;
 
     CREATE INDEX IF NOT EXISTS idx_memories_workspace         ON memories(workspace_id);
     CREATE INDEX IF NOT EXISTS idx_memories_project           ON memories(project_id);
@@ -1325,6 +1330,7 @@ export function applySchema(db: Database.Database): void {
   `)
 
   seedCanonicalAgentDefinitions(db)
+  seedDefaultPolicyRules(db)
   recordLegacyMigrationNames(db)
 }
 
@@ -1367,6 +1373,26 @@ function seedCanonicalAgentDefinitions(db: Database.Database): void {
   for (const b of builtins) {
     stmt.run(seedId(b.role), b.role, b.display_name, b.description, b.capabilities)
   }
+}
+
+// Default system policy rules. INSERT OR IGNORE — idempotent across schema runs.
+function seedDefaultPolicyRules(db: Database.Database): void {
+  db.prepare(`
+    INSERT OR IGNORE INTO policy_rules
+      (rule_id, scope, name, description, action, matchers, enabled, priority, created_at, updated_at)
+    VALUES (
+      'policy_builtin_global_recall_allowed_roles',
+      'system',
+      'global_recall_allowed_roles',
+      'Roles permitted to perform scope=global memory recall',
+      'allow',
+      '["chief_of_staff"]',
+      1,
+      1000,
+      datetime('now'),
+      datetime('now')
+    )
+  `).run()
 }
 
 // Record the historical migration names tests reference. applySchema is the

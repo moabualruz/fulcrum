@@ -59,7 +59,7 @@ export type { SanitizeEvent, SanitizeMeta, SanitizeResult } from './sanitize/ind
 export type { RecallEntry, WrapOptions } from './sanitize/wrap-for-recall.js'
 
 // v2a PR 5 Task 26 — WAL writer with sanitize-before-WAL invariant.
-export { appendWal, brandSanitized, walPathFor, WalDurabilityError } from './wal/writer.js'
+export { appendWal, walPathFor, WalDurabilityError } from './wal/writer.js'
 export type { WalRecord, AppendWalInput, SanitizedContent } from './wal/writer.js'
 
 // v2a PR 8 Tasks 39-41 — task synthesis + on_delegation pattern.
@@ -120,6 +120,8 @@ export type { LogEntry } from './vault/index-builder.js'
 export type { VaultWatcherOptions } from './vault/watcher.js'
 
 // Kuzu (L2)
+export { checkDivergence } from './kuzu/divergence-monitor.js'
+export type { DivergeReport, TableConfig, CheckOptions } from './kuzu/divergence-monitor.js'
 export { KuzuClient, getKuzuClient, setKuzuClient } from './kuzu/client.js'
 export { upsertMemoryToKuzu, removeMemoryFromKuzu } from './kuzu/upsert.js'
 export { queryMemoriesL2 } from './kuzu/query.js'

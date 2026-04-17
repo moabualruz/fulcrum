@@ -102,7 +102,8 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
   if (ctx.sessionId && ctx.sessionId !== 'unknown') {
     try {
       const { globalDataDir } = await import('fulcrum-agent-core')
-      const sessionFile = join(globalDataDir(), 'sessions', `${ctx.sessionId}.json`)
+      const safeSessionId = ctx.sessionId.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 128)
+      const sessionFile = join(globalDataDir(), 'sessions', `${safeSessionId}.json`)
       if (existsSync(sessionFile)) {
         const session = JSON.parse(readFileSync(sessionFile, 'utf-8')) as unknown as Record<string, unknown>
         const fetchedAt = session['fetched_at'] as string | undefined
@@ -202,10 +203,14 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
         ).all(ctx.workspace_id, runRow.task_id) as Array<{ memory_id: string; kind: string; content: string }>
         if (rows.length > 0) {
           io.stderr(`[fulcrum/pre] recalled ${rows.length} task memories:\n`)
+          // Wrap recalled content in an untrusted fence so the agent treats
+          // it as data, not instructions (prompt-injection mitigation).
+          io.stderr(`<fulcrum-recall trust="untrusted">\n`)
           for (const r of rows) {
             const summary = r.content.slice(0, 200).replace(/\s+/g, ' ')
-            io.stderr(`[fulcrum/pre]   ${r.kind}: ${summary}\n`)
+            io.stderr(`  ${r.kind}: ${summary}\n`)
           }
+          io.stderr(`</fulcrum-recall>\n`)
         }
       }
     } catch { /* best-effort — never block on recall failure */ }
@@ -298,7 +303,7 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
         project_id: runRow?.project_id ?? ctx.workspace_id,
         task_id: runRow?.task_id ?? undefined,
         kind: 'file_patch',
-        scope: runRow?.task_id ? 'task' : 'project',
+        scope: 'project',
         title: `${ctx.toolName}: ${filePatch.filePath}`,
         summary: filePatch.diffSummary.slice(0, 200),
         content: filePatch.diffSummary,
@@ -321,7 +326,7 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
         project_id: runRow?.project_id ?? ctx.workspace_id,
         task_id: runRow?.task_id ?? undefined,
         kind: 'bash_trace',
-        scope: runRow?.task_id ? 'task' : 'project',
+        scope: 'project',
         title: `Bash: ${command.slice(0, 80)}`,
         summary: `exit=${exitStatus}; cwd=${cwd}`,
         content: command.slice(0, 400),

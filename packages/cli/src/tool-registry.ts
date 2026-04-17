@@ -1152,3 +1152,50 @@ TOOL_REGISTRY.set('list_agent_definitions', {
     return listAgentDefinitions(args['stability'] as Parameters<typeof listAgentDefinitions>[0])
   },
 })
+
+// v2b PR 10 Fix #24 — graph consistency check: SQLite ↔ Kuzu cross-store divergence report.
+TOOL_REGISTRY.set('graph_consistency_check', {
+  schema: undefined, // internal action, not exposed to MCP clients
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { checkDivergence, getKuzuClient } = await import('fulcrum-memory')
+    const sampleSize = typeof args['sample_size'] === 'number' ? args['sample_size'] : 100
+    const alertThreshold = typeof args['alert_threshold'] === 'number' ? args['alert_threshold'] : 0.001
+    const db = deps.db
+
+    const sampler = {
+      sampleIds(sqliteTable: string, limit: number): string[] {
+        try {
+          const idCol = sqliteTable === 'memories' ? 'memory_id'
+            : sqliteTable === 'tasks' ? 'task_id'
+            : sqliteTable === 'agent_runs' ? 'run_id'
+            : 'id'
+          const rows = db.prepare(`SELECT ${idCol} AS id FROM ${sqliteTable} ORDER BY rowid DESC LIMIT ?`).all(limit) as Array<{ id: string }>
+          return rows.map(r => r.id)
+        } catch { return [] }
+      },
+    }
+
+    const kuzuClient = getKuzuClient()
+    if (!kuzuClient?.isReady) {
+      return { error: 'Kuzu not ready — run `fulcrum memory accelerate` first', totalChecked: 0, missingInKuzu: 0, driftPct: 0, isDrifting: false, missing: [] }
+    }
+
+    const checker = {
+      async hasNode(table: string, id: string): Promise<boolean> {
+        try {
+          const rows = await kuzuClient.query<{ found: number }>(`MATCH (n:${table} {id: $id}) RETURN count(n) AS found`, { id })
+          return (rows[0]?.found ?? 0) > 0
+        } catch { return false }
+      },
+    }
+
+    const tables = [
+      { table: 'Memory', sqliteTable: 'memories' },
+      { table: 'Task', sqliteTable: 'tasks' },
+      { table: 'AgentRun', sqliteTable: 'agent_runs' },
+    ]
+
+    return checkDivergence(tables, sampler, checker, { sampleSize, alertThreshold })
+  },
+})

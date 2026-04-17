@@ -5,6 +5,7 @@
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { createHash } from 'node:crypto'
 import type { Db } from 'fulcrum-agent-core'
 import { getDb } from 'fulcrum-agent-core'
 
@@ -57,6 +58,25 @@ export async function replayWal(input: WalReplayInput): Promise<WalReplayResult>
       try {
         const record: WalRecord = JSON.parse(line)
 
+        // Verify content integrity before inserting — reject tampered records
+        if (record.content_hash) {
+          const actual = createHash('sha256').update(record.content ?? '').digest('hex')
+          if (actual !== record.content_hash) {
+            result.errors.push(`${file}: hash mismatch for memory_id=${record.memory_id}; skipping`)
+            result.skipped++
+            continue
+          }
+        }
+
+        // Re-sanitize content on ingest — WAL may have been tampered or written
+        // before a sanitizer rule change. Failures are non-fatal but logged.
+        let sanitizedContent = record.content
+        try {
+          const { sanitizeOnWrite } = await import('fulcrum-memory')
+          const sanitized = sanitizeOnWrite(record.content)
+          if (!sanitized.errored) sanitizedContent = sanitized.content
+        } catch { /* fulcrum-memory unavailable — proceed with stored content */ }
+
         // Check if row already exists
         const existing = db.prepare('SELECT memory_id FROM memories WHERE memory_id = ?').get(record.memory_id)
         if (existing) {
@@ -74,7 +94,7 @@ export async function replayWal(input: WalReplayInput): Promise<WalReplayResult>
           record.memory_id,
           record.workspace_id,
           record.project_id,
-          record.content,
+          sanitizedContent,
           record.kind,
           record.scope,
           record.written_at ?? now,

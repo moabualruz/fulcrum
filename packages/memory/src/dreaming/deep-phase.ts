@@ -30,10 +30,12 @@ export async function runDeepPhase(
   sink: DeepPhaseSink
 ): Promise<void> {
   for (const candidate of input.candidates) {
-    // Re-sanitize per security review finding #5 — strip injections at promotion boundary
-    const { content: sanitized } = sanitizeOnWrite(candidate.content)
+    // Re-sanitize per security review finding #5 — strip injections at promotion boundary.
+    // If sanitization errors, skip this candidate entirely rather than appending empty/corrupt content.
+    const result = sanitizeOnWrite(candidate.content)
+    if (result.errored) continue
 
-    await sink.appendToHostFile(candidate.slug, sanitized)
+    await sink.appendToHostFile(candidate.slug, result.content)
     await sink.markEmbedded(candidate.memory_id)
   }
 }

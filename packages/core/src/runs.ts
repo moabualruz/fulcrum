@@ -197,16 +197,16 @@ function getRun(run_id: string, db: Db = getDb()): AgentRun {
  * callers should call `checkPolicy` first and only proceed if `allowed: true`.
  */
 export async function startAgentRun(input: StartAgentRunInput, db: Db = getDb()): Promise<AgentRun> {
-  // v2a PR 1 Task 3: critical constraint #7 specifies NO DEFAULT at the API
-  // layer. Full strict enforcement (throw-on-omit) is deferred to PR 6 where
-  // the hook rewrite naturally updates the ~14 remaining caller sites; until
-  // then we accept omission, default to 'primary', and emit a one-line stderr
-  // warning so callers see the trajectory ahead of the migration.
+  // v2a PR 1 Task 3 + PR 6: strict enforcement — context_type must be supplied.
+  // Callers must pass one of the allowed values; omission is an error.
   const allowedContextTypes = new Set(['primary', 'subagent', 'cron', 'heartbeat', 'flush'])
-  let contextType = input.context_type ?? 'primary'
   if (!input.context_type) {
-    process.stderr.write(`[fulcrum] warn: startAgentRun called without context_type — defaulted to 'primary'. v2a PR 6 will throw on omission. role=${input.role} task_id=${input.task_id}\n`)
+    throw new FulcrumError(
+      `startAgentRun requires context_type (one of: ${[...allowedContextTypes].join(', ')}). role=${input.role} task_id=${input.task_id}`,
+      'invalid_input',
+    )
   }
+  const contextType = input.context_type
   if (!allowedContextTypes.has(contextType)) {
     throw new FulcrumError(`unknown context_type: ${contextType}`, 'invalid_input')
   }

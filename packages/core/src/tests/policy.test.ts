@@ -40,8 +40,8 @@ describe('checkPolicy — WIP limits', () => {
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T2' })
     const t3 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T3' })
-    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
-    await startAgentRun({ task_id: t2.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
+    await startAgentRun({ context_type: 'primary', task_id: t1.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
+    await startAgentRun({ context_type: 'primary', task_id: t2.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
     const result = await checkPolicy({
       workspace_id: 'ws_1',
       task_id: t3.task_id,
@@ -58,7 +58,7 @@ describe('checkPolicy — WIP limits', () => {
     seed()
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T2' })
-    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    await startAgentRun({ context_type: 'primary', task_id: t1.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     const result = await checkPolicy({
       workspace_id: 'ws_1',
       task_id: t2.task_id,
@@ -138,8 +138,8 @@ describe('checkPolicy — stale runs excluded from WIP (G-8)', () => {
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T2' })
     const t3 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T3' })
-    await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
-    await startAgentRun({ task_id: t2.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
+    await startAgentRun({ context_type: 'primary', task_id: t1.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
+    await startAgentRun({ context_type: 'primary', task_id: t2.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
     const result = await checkPolicy({
       workspace_id: 'ws_1',
       task_id: t3.task_id,
@@ -155,8 +155,8 @@ describe('checkPolicy — stale runs excluded from WIP (G-8)', () => {
     const t1 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T2' })
     const t3 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T3' })
-    const run1 = await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
-    await startAgentRun({ task_id: t2.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
+    const run1 = await startAgentRun({ context_type: 'primary', task_id: t1.task_id, workspace_id: 'ws_1', role: 'qa_engineer' })
+    await startAgentRun({ context_type: 'primary', task_id: t2.task_id, workspace_id: 'ws_1', role: 'code_reviewer' })
 
     // Simulate what the janitor does when heartbeat times out
     getDb().prepare(`UPDATE agent_runs SET status = 'stale' WHERE run_id = ?`).run(run1.run_id)
@@ -177,7 +177,7 @@ describe('checkPolicy — stale runs excluded from WIP (G-8)', () => {
     const t2 = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T2' })
     // Per-role limit for software_engineer is 1. Start one, mark stale,
     // then a new software_engineer run must still be allowed.
-    const run1 = await startAgentRun({ task_id: t1.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const run1 = await startAgentRun({ context_type: 'primary', task_id: t1.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
     getDb().prepare(`UPDATE agent_runs SET status = 'stale' WHERE run_id = ?`).run(run1.run_id)
 
     const result = await checkPolicy({

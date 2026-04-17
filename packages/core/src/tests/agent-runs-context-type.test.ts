@@ -78,24 +78,12 @@ describe('startAgentRun + context_type — v2a PR 1 deferred-strict mode', () =>
     })).rejects.toThrow(/unknown context_type/i)
   })
 
-  it('warns + defaults to primary when context_type is omitted (PR 6 will throw)', async () => {
-    const writes: string[] = []
-    const original = process.stderr.write.bind(process.stderr)
-    process.stderr.write = ((chunk: string | Uint8Array): boolean => {
-      writes.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'))
-      return true
-    }) as typeof process.stderr.write
-    try {
-      const run = await startAgentRun({
-        task_id: 'task_1',
-        workspace_id: 'ws_1',
-        role: 'software_engineer',
-      })
-      expect(run.context_type).toBe('primary')
-      expect(writes.join('')).toMatch(/startAgentRun called without context_type/)
-    } finally {
-      process.stderr.write = original
-    }
+  it('throws when context_type is omitted (strict enforcement post-PR 6)', async () => {
+    await expect(startAgentRun({
+      task_id: 'task_1',
+      workspace_id: 'ws_1',
+      role: 'software_engineer',
+    })).rejects.toThrow(/context_type.*required|requires context_type/i)
   })
 
   it('persists context_type and parent_run_id when provided', async () => {

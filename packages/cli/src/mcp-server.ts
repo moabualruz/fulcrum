@@ -178,29 +178,26 @@ async function runMiddlewareChain(
   ctx: ToolContext,
   core: () => Promise<void>,
 ): Promise<void> {
-  // MED-16: per-invocation `called` flag detects a middleware that calls
-  // `next()` twice (intentional or via a retry branch). Without this guard,
-  // the shared `index` variable keeps advancing so the second next() invokes
-  // the NEXT middleware rather than re-entering the same position, eventually
-  // running the core handler twice — double DB writes / double memory writes.
+  // MED-16: the `nextCalled` flag is bound to the specific callback given to
+  // each middleware layer. Middleware calling its `next` twice is caught because
+  // both calls hit the same closure, not a fresh `runAt` invocation.
   const runAt = async (i: number): Promise<void> => {
-    let called = false
-    const next = async (): Promise<void> => {
-      if (called) {
-        throw Object.assign(
-          new Error(`middleware at index ${i} called next() more than once`),
-          { code: 'invalid_state' },
-        )
-      }
-      called = true
-      if (i < middleware.length) {
-        const mw = middleware[i]!
-        await mw(ctx, () => runAt(i + 1))
-      } else {
-        await core()
-      }
+    if (i < middleware.length) {
+      const mw = middleware[i]!
+      let nextCalled = false
+      await mw(ctx, async () => {
+        if (nextCalled) {
+          throw Object.assign(
+            new Error(`middleware at index ${i} called next() more than once`),
+            { code: 'invalid_state' },
+          )
+        }
+        nextCalled = true
+        await runAt(i + 1)
+      })
+    } else {
+      await core()
     }
-    await next()
   }
   await runAt(0)
 }

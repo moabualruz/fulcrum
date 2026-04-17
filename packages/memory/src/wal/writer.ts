@@ -48,12 +48,7 @@ export class WalDurabilityError extends Error {
 declare const __sanitized: unique symbol
 export type SanitizedContent = string & { readonly [__sanitized]: true }
 
-/**
- * Brand a string as sanitized. Internal — only sanitizeOnWrite should call
- * this once it has finished processing. Exported for tests + the sanitize
- * middleware module.
- */
-export function brandSanitized(s: string): SanitizedContent {
+function brandSanitized(s: string): SanitizedContent {
   return s as SanitizedContent
 }
 
@@ -80,8 +75,8 @@ export interface AppendWalInput {
   workspace_id: string
   project_id?: string | null
   provenance?: Record<string, unknown>
-  /** REQUIRED — content must already be sanitized. */
-  content: SanitizedContent
+  /** Content that has already been sanitized via sanitizeOnWrite. Only the sha256 is persisted. */
+  content: string
   sanitize_events: SanitizeEvent[]
 }
 
@@ -122,9 +117,11 @@ export function appendWal(input: AppendWalInput): WalRecord {
   // when the buffer is <= PIPE_BUF. Sanitize events can push serialized size
   // past 4 KiB — adding O_SYNC gives strong crash durability too.
   //
-  // The in-process mutex (`writeQueue`) serialises multiple concurrent calls
-  // from the same process even when the write > PIPE_BUF so the file stays
-  // line-oriented JSONL.
+  // Note: this implementation does not serialize concurrent in-process calls.
+  // Each call opens its own fd with O_APPEND | O_SYNC; kernel atomicity holds
+  // for writes up to PIPE_BUF (~4 KiB on Linux). For larger records, two
+  // simultaneous writes from the same process may interleave — acceptable for
+  // audit logs but not guaranteed to be strictly line-ordered under load.
   const writeOnce = (): void => {
     const impl = getFsImpl()
     impl.mkdirSync(dirname(target), { recursive: true })

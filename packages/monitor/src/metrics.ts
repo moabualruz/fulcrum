@@ -780,12 +780,20 @@ export async function replayRun(input: ReplayRunInput): Promise<RunReplay> {
 
   // Events table stores payload as JSON text; run_id is embedded in payload.
   // Column names in the schema are evt_id and evt_type (aliased for RunReplay contract).
-  const rows = db.prepare(`
-    SELECT evt_id AS event_id, evt_type AS event_type, payload, ts
-    FROM events
-    WHERE json_extract(payload, '$.run_id') = ?
-    ORDER BY ts ASC
-  `).all(input.run_id) as Array<{
+  const rows = (input.workspace_id
+    ? db.prepare(`
+        SELECT evt_id AS event_id, evt_type AS event_type, payload, ts
+        FROM events
+        WHERE workspace_id = ? AND json_extract(payload, '$.run_id') = ?
+        ORDER BY ts ASC
+      `).all(input.workspace_id, input.run_id)
+    : db.prepare(`
+        SELECT evt_id AS event_id, evt_type AS event_type, payload, ts
+        FROM events
+        WHERE json_extract(payload, '$.run_id') = ?
+        ORDER BY ts ASC
+      `).all(input.run_id)
+  ) as Array<{
     event_id: string
     event_type: string
     payload: string

@@ -43,7 +43,7 @@ const EDGE_CHECKS: Array<[string, string, string, string]> = [
   [HIT_DDL, 'HIT', 'FROM AgentRun TO', 'hit'],
   [INSTANTIATED_FROM_DDL, 'INSTANTIATED_FROM', 'FROM TeamInstance TO TeamTemplate', 'instantiated_from'],
   [EXECUTED_BY_DDL, 'EXECUTED_BY', 'FROM AgentRun TO AgentAdapter', 'executed_by'],
-  [MEMBER_OF_DDL, 'MEMBER_OF', 'FROM AgentRun TO TeamInstance', 'member_of'],
+  [MEMBER_OF_DDL, 'MEMBER_OF', 'FROM AgentProfile TO TeamInstance', 'member_of'],
   [LANDED_IN_DDL, 'LANDED_IN', 'FROM File TO GitCommit', 'landed_in'],
   [ON_BRANCH_DDL, 'ON_BRANCH', 'FROM GitCommit TO GitBranch', 'on_branch'],
   [INCLUDES_COMMIT_DDL, 'INCLUDES_COMMIT', 'FROM GitPr TO GitCommit', 'includes_commit'],

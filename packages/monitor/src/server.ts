@@ -152,6 +152,8 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
   app.get('/events/stream', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
+    // Always require workspace scope to prevent cross-workspace event leakage.
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
     const stream = new ReadableStream({
       start(controller) {
@@ -164,16 +166,9 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         if (lastEventId) {
           try {
             const db = getDb()
-            let query: string
-            let params: unknown[]
-            if (ws) {
-              query = `SELECT evt_id, evt_type, payload, ts FROM events WHERE workspace_id = ? AND evt_id > ? ORDER BY evt_id ASC LIMIT 100`
-              params = [ws, lastEventId]
-            } else {
-              query = `SELECT evt_id, evt_type, payload, ts FROM events WHERE evt_id > ? ORDER BY evt_id ASC LIMIT 100`
-              params = [lastEventId]
-            }
-            const rows = db.prepare(query).all(...params) as Array<{
+            const rows = db.prepare(
+              `SELECT evt_id, evt_type, payload, ts FROM events WHERE workspace_id = ? AND evt_id > ? ORDER BY evt_id ASC LIMIT 100`
+            ).all(ws, lastEventId) as Array<{
               evt_id: string
               evt_type: string
               payload: string
@@ -199,16 +194,9 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
           const poll = () => {
             try {
               const db = getDb()
-              let query: string
-              let params: unknown[]
-              if (ws) {
-                query = `SELECT evt_id, evt_type, payload, ts FROM events WHERE workspace_id = ? AND evt_id > ? ORDER BY evt_id ASC LIMIT 100`
-                params = [ws, lastId]
-              } else {
-                query = `SELECT evt_id, evt_type, payload, ts FROM events WHERE evt_id > ? ORDER BY evt_id ASC LIMIT 100`
-                params = [lastId]
-              }
-              const rows = db.prepare(query).all(...params) as Array<{
+              const rows = db.prepare(
+                `SELECT evt_id, evt_type, payload, ts FROM events WHERE workspace_id = ? AND evt_id > ? ORDER BY evt_id ASC LIMIT 100`
+              ).all(ws, lastId) as Array<{
                 evt_id: string
                 evt_type: string
                 payload: string
@@ -575,7 +563,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
     const run_id = c.req.param('run_id')
 
-    const result = await replayRun({ run_id })
+    const result = await replayRun({ run_id, workspace_id: ws })
 
     if (result.events.length === 0) {
       return c.json({ error: 'run not found' }, 404)
@@ -741,13 +729,13 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as { summary?: string }
     const db = getDb()
 
-    const run = db.prepare('SELECT * FROM agent_runs WHERE run_id = ?').get(run_id) as { status: string } | undefined
+    const run = db.prepare('SELECT * FROM agent_runs WHERE run_id = ? AND workspace_id = ?').get(run_id, workspace_id) as { status: string } | undefined
     if (!run) return c.json({ error: 'run not found' }, 404)
     if (run.status !== 'blocked') return c.json({ error: 'run is not blocked', status: run.status }, 409)
 
     try {
-      db.prepare(`UPDATE agent_runs SET status = 'running', blocker = NULL, updated_at = ? WHERE run_id = ?`)
-        .run(new Date().toISOString(), run_id)
+      db.prepare(`UPDATE agent_runs SET status = 'running', blocker = NULL, updated_at = ? WHERE run_id = ? AND workspace_id = ?`)
+        .run(new Date().toISOString(), run_id, workspace_id)
       return c.json({ data: { run_id, status: 'running', summary: body.summary ?? 'Unblocked by operator' } })
     } catch (err) {
       process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)
@@ -761,7 +749,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as { reason?: string }
     const db = getDb()
 
-    const run = db.prepare('SELECT * FROM agent_runs WHERE run_id = ?').get(run_id) as { status: string } | undefined
+    const run = db.prepare('SELECT * FROM agent_runs WHERE run_id = ? AND workspace_id = ?').get(run_id, workspace_id) as { status: string } | undefined
     if (!run) return c.json({ error: 'run not found' }, 404)
     if (run.status === 'finished' || run.status === 'failed' || run.status === 'aborted') {
       return c.json({ error: 'run is already terminal', status: run.status }, 409)
@@ -786,13 +774,13 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as { comment?: string }
     const db = getDb()
 
-    const review = db.prepare('SELECT * FROM reviews WHERE review_id = ?').get(review_id) as { status: string } | undefined
+    const review = db.prepare('SELECT * FROM reviews WHERE review_id = ? AND workspace_id = ?').get(review_id, workspace_id) as { status: string } | undefined
     if (!review) return c.json({ error: 'review not found' }, 404)
     if (review.status !== 'pending') return c.json({ error: 'review is not pending', status: review.status }, 409)
 
     try {
-      db.prepare(`UPDATE reviews SET status = 'approved', summary = ?, updated_at = ? WHERE review_id = ?`)
-        .run(body.comment ?? null, new Date().toISOString(), review_id)
+      db.prepare(`UPDATE reviews SET status = 'approved', summary = ?, updated_at = ? WHERE review_id = ? AND workspace_id = ?`)
+        .run(body.comment ?? null, new Date().toISOString(), review_id, workspace_id)
       return c.json({ data: { review_id, status: 'approved' } })
     } catch (err) {
       process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)
@@ -806,13 +794,13 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as { comment?: string }
     const db = getDb()
 
-    const review = db.prepare('SELECT * FROM reviews WHERE review_id = ?').get(review_id) as { status: string } | undefined
+    const review = db.prepare('SELECT * FROM reviews WHERE review_id = ? AND workspace_id = ?').get(review_id, workspace_id) as { status: string } | undefined
     if (!review) return c.json({ error: 'review not found' }, 404)
     if (review.status !== 'pending') return c.json({ error: 'review is not pending', status: review.status }, 409)
 
     try {
-      db.prepare(`UPDATE reviews SET status = 'rejected', summary = ?, updated_at = ? WHERE review_id = ?`)
-        .run(body.comment ?? null, new Date().toISOString(), review_id)
+      db.prepare(`UPDATE reviews SET status = 'rejected', summary = ?, updated_at = ? WHERE review_id = ? AND workspace_id = ?`)
+        .run(body.comment ?? null, new Date().toISOString(), review_id, workspace_id)
       return c.json({ data: { review_id, status: 'rejected' } })
     } catch (err) {
       process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)

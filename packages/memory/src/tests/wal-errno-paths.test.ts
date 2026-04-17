@@ -4,7 +4,7 @@
 // fs module.
 
 import { describe, it, expect, afterEach } from 'vitest'
-import { appendWal, brandSanitized, WalDurabilityError, __setWalFsImpl } from '../wal/writer.js'
+import { appendWal, WalDurabilityError, __setWalFsImpl } from '../wal/writer.js'
 import type { WalFsImpl } from '../wal/writer.js'
 
 function makeInput() {
@@ -15,7 +15,7 @@ function makeInput() {
     workspace_id: 'ws_1',
     project_id: 'proj_1',
     provenance: { hook_point: 'test' },
-    content: brandSanitized('hello'),
+    content: 'hello',
     sanitize_events: [],
   }
 }

@@ -3,7 +3,7 @@
 // package.json manifest, then register their hooks, skills, and agents.
 
 import { existsSync, readdirSync, readFileSync } from 'fs'
-import { join, resolve } from 'path'
+import { join, resolve, normalize } from 'path'
 import { globalDataDir } from 'fulcrum-agent-core'
 import type { ToolSchema } from './mcp-tools.js'
 
@@ -137,6 +137,12 @@ export interface PluginRegistration {
   additionalTools: ToolSchema[]
 }
 
+/** Returns true when `candidate` is strictly inside `root` (no path escape). */
+function isWithinRoot(root: string, candidate: string): boolean {
+  const safeRoot = normalize(root) + (root.endsWith('/') ? '' : '/')
+  return normalize(candidate).startsWith(safeRoot)
+}
+
 /**
  * Walk discovered plugins and collect their skills, agents, and hook module paths.
  * Callers can then load the hook modules and merge skills/agents into the CLI context.
@@ -149,12 +155,18 @@ export function registerPlugins(plugins: DiscoveredPlugin[]): PluginRegistration
 
     if (manifest.hooks) {
       const hookPath = resolve(root, manifest.hooks)
-      if (existsSync(hookPath)) registration.hookModules.push(hookPath)
+      if (isWithinRoot(root, hookPath) && existsSync(hookPath)) {
+        registration.hookModules.push(hookPath)
+      } else if (!isWithinRoot(root, hookPath)) {
+        process.stderr.write(`[fulcrum] Plugin ${plugin.name}: manifest.hooks escapes package root; skipping\n`)
+      }
     }
 
     if (manifest.skills) {
       const skillsDir = resolve(root, manifest.skills)
-      if (existsSync(skillsDir)) {
+      if (!isWithinRoot(root, skillsDir)) {
+        process.stderr.write(`[fulcrum] Plugin ${plugin.name}: manifest.skills escapes package root; skipping\n`)
+      } else if (existsSync(skillsDir)) {
         let skillEntries: string[]
         try { skillEntries = readdirSync(skillsDir) } catch { skillEntries = [] }
         for (const entry of skillEntries) {
@@ -168,7 +180,9 @@ export function registerPlugins(plugins: DiscoveredPlugin[]): PluginRegistration
 
     if (manifest.agents) {
       const agentsDir = resolve(root, manifest.agents)
-      if (existsSync(agentsDir)) {
+      if (!isWithinRoot(root, agentsDir)) {
+        process.stderr.write(`[fulcrum] Plugin ${plugin.name}: manifest.agents escapes package root; skipping\n`)
+      } else if (existsSync(agentsDir)) {
         let agentEntries: string[]
         try { agentEntries = readdirSync(agentsDir) } catch { agentEntries = [] }
         for (const entry of agentEntries) {
@@ -181,6 +195,10 @@ export function registerPlugins(plugins: DiscoveredPlugin[]): PluginRegistration
 
     if (manifest.actions) {
       const actionsPath = resolve(root, manifest.actions)
+      if (!isWithinRoot(root, actionsPath)) {
+        process.stderr.write(`[fulcrum] Plugin ${plugin.name}: manifest.actions escapes package root; skipping\n`)
+        continue
+      }
       try {
         const raw = readFileSync(actionsPath, 'utf8')
         const parsed = JSON.parse(raw) as PluginActionManifest[]

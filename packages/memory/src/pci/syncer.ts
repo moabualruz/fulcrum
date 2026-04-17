@@ -55,7 +55,10 @@ interface PendingUnlink {
   ts: number
 }
 
-const pendingUnlinks = new Map<string, PendingUnlink>() // keyed by sha256
+// Keyed by fileId so two identical-content files can both be pending simultaneously.
+// A separate sha256→fileId[] index enables rename detection without collision.
+const pendingUnlinks = new Map<string, PendingUnlink>() // keyed by fileId
+const pendingUnlinksBySha = new Map<string, string[]>() // sha256 → fileId[]
 
 export function contentSha256(content: string): string {
   return createHash('sha256').update(content).digest('hex')
@@ -80,16 +83,24 @@ export async function syncFile(
     // detection (which keys off body-hash) can find it.
     const row = db.prepare('SELECT sha256 FROM code_files WHERE file_id = ?').get(fileId) as { sha256: string } | undefined
     if (!row) return { action: 'skipped', fileId }
-    pendingUnlinks.set(row.sha256, { fileId, relPath, sha256: row.sha256, ts: Date.now() })
+    const pending: PendingUnlink = { fileId, relPath, sha256: row.sha256, ts: Date.now() }
+    pendingUnlinks.set(fileId, pending)
+    const shaList = pendingUnlinksBySha.get(row.sha256) ?? []
+    if (!shaList.includes(fileId)) shaList.push(fileId)
+    pendingUnlinksBySha.set(row.sha256, shaList)
     // Opportunistic GC — drop expired pending renames before inserting.
     sweepRenameWindow()
 
     // Defer actual deletion so rename can reclaim; if nothing reclaims
     // within RENAME_WINDOW_MS, a second unlink call or the sweep deletes.
     setTimeout(() => {
-      const still = pendingUnlinks.get(row.sha256)
-      if (still && still.fileId === fileId) {
-        pendingUnlinks.delete(row.sha256)
+      if (pendingUnlinks.has(fileId)) {
+        pendingUnlinks.delete(fileId)
+        const list = pendingUnlinksBySha.get(row.sha256) ?? []
+        const idx = list.indexOf(fileId)
+        if (idx !== -1) list.splice(idx, 1)
+        if (list.length === 0) pendingUnlinksBySha.delete(row.sha256)
+        else pendingUnlinksBySha.set(row.sha256, list)
         deleteFile(db, fileId)
       }
     }, RENAME_WINDOW_MS + 10).unref?.()
@@ -121,10 +132,18 @@ export async function syncFile(
 
   const sha = contentSha256(content)
   sweepRenameWindow()
-  const rename = pendingUnlinks.get(sha)
-  if (rename && rename.fileId !== fileId) {
+  // Pick the first pending unlink with a matching sha256 that isn't the current fileId.
+  const candidateFileIds = pendingUnlinksBySha.get(sha) ?? []
+  const renameSourceId = candidateFileIds.find(id => id !== fileId)
+  const rename = renameSourceId ? pendingUnlinks.get(renameSourceId) : undefined
+  if (rename) {
     // Body-hash matched a pending unlink → migrate file_id + rel_path.
-    pendingUnlinks.delete(sha)
+    pendingUnlinks.delete(rename.fileId)
+    const list = pendingUnlinksBySha.get(sha) ?? []
+    const idx = list.indexOf(rename.fileId)
+    if (idx !== -1) list.splice(idx, 1)
+    if (list.length === 0) pendingUnlinksBySha.delete(sha)
+    else pendingUnlinksBySha.set(sha, list)
     db.prepare('UPDATE code_files SET file_id = ?, rel_path = ? WHERE file_id = ?').run(fileId, relPath, rename.fileId)
     db.prepare('UPDATE code_chunks SET file_id = ?, file_path = ? WHERE file_id = ?').run(fileId, relPath, rename.fileId)
     return { action: 'renamed', fileId }
@@ -187,9 +206,14 @@ function deleteFile(db: Db, fileId: string): void {
 
 function sweepRenameWindow(): void {
   const now = Date.now()
-  for (const [sha, pending] of pendingUnlinks.entries()) {
+  for (const [fid, pending] of pendingUnlinks.entries()) {
     if (now - pending.ts > RENAME_WINDOW_MS * 4) {
-      pendingUnlinks.delete(sha)
+      pendingUnlinks.delete(fid)
+      const list = pendingUnlinksBySha.get(pending.sha256) ?? []
+      const idx = list.indexOf(fid)
+      if (idx !== -1) list.splice(idx, 1)
+      if (list.length === 0) pendingUnlinksBySha.delete(pending.sha256)
+      else pendingUnlinksBySha.set(pending.sha256, list)
     }
   }
 }

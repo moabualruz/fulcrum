@@ -26,8 +26,23 @@ export interface SweepResult {
  */
 export function sweepExpiredMemories(db: Db = getDb()): SweepResult {
   const ranAt = new Date().toISOString()
-  const result = db.prepare(`DELETE FROM memories WHERE expires_at IS NOT NULL AND expires_at < (unixepoch() * 1000)`).run()
-  return { rowsDeleted: result.changes, ranAt }
+  // Collect IDs first so we can clean vec_memories and memories_fts which have
+  // no ON DELETE CASCADE. Using a transaction ensures the three deletes are atomic.
+  const expiredIds = (db.prepare(
+    `SELECT memory_id FROM memories WHERE expires_at IS NOT NULL AND expires_at < (unixepoch() * 1000)`
+  ).all() as Array<{ memory_id: string }>).map(r => r.memory_id)
+
+  if (expiredIds.length === 0) return { rowsDeleted: 0, ranAt }
+
+  db.transaction(() => {
+    for (const id of expiredIds) {
+      db.prepare(`DELETE FROM vec_memories WHERE memory_id = ?`).run(id)
+    }
+    // memories_ad trigger handles FTS5 deletion when memories rows are deleted.
+    db.prepare(`DELETE FROM memories WHERE expires_at IS NOT NULL AND expires_at < (unixepoch() * 1000)`).run()
+  })()
+
+  return { rowsDeleted: expiredIds.length, ranAt }
 }
 
 let _timer: NodeJS.Timeout | null = null

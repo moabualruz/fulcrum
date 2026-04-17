@@ -236,7 +236,7 @@ describe('runPostHook — typed file_patch memory (v2a PR 6 Task 29)', () => {
     ).get(workspace_id) as { content: string; kind: string; scope: string; task_id: string | null; file_path: string } | undefined
     expect(row).toBeDefined()
     expect(row!.kind).toBe('file_patch')
-    expect(row!.scope).toBe('task')
+    expect(row!.scope).toBe('project')
     expect(row!.task_id).toBe(task_id)
     expect(row!.file_path).toBe('/tmp/x.ts')
     // diff_summary captures delta + preview — values NOT echoed literally.
