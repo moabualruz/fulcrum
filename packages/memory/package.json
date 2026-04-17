@@ -43,7 +43,8 @@
     "simple-git": "^3.22.0",
     "ulidx": "^2.3.0",
     "web-tree-sitter": "^0.26.8",
-    "xxhash-wasm": "^1.0.2"
+    "xxhash-wasm": "^1.0.2",
+    "ignore": "^5.3.1"
   },
   "optionalDependencies": {
     "kuzu": "^0.10.0"
