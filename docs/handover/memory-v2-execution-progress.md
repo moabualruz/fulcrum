@@ -80,6 +80,27 @@ Gate ADRs created in this same run (Step 2): see `docs/decisions/`.
 - Next: PR 4 — PCI watcher + syncer (Tasks 17–23). Bootstrap mode: ON for the watcher rewrite.
 - Timestamp: 2026-04-17T03:35:00Z
 
+## PR 4 — PCI watcher + syncer — PARTIAL (Tasks 17, 18, 22a done; 19, 20, 21, 22, 23 deferred)
+
+- Status: in_progress
+- Branch: plan/memory-v2-pr4
+- Bootstrap mode: ON
+- Tasks completed: 17 (watcher topology + FS-fallback), 18 (singleton + refcount + cross-process lock + 30s grace), 22a (ContentChangeBus event contract — debounce, coalesce, exception-isolated, exposed from @moabualruz/fulcrum-core)
+- Tasks deferred to follow-up:
+  - Task 19 — incremental ingest pipeline (mtime → hash → chunk-diff cascade per osgrep syncer.ts). The architectural primitives (watcher + bus) are in place; the ingest wiring belongs naturally with the chunker pipeline integration that's a separate unit.
+  - Task 20 — lifecycle integration (manager.ensure() in start_agent_run, stop() in complete/block/heartbeat-expiry). Touches packages/cli/src/index.ts and 14+ caller sites — same churn as PR 1's context_type strict enforcement; deferred to PR 6's hook rewrite which migrates those sites anyway.
+  - Task 21 — gitignore-respecting walker integration (git ls-files fast-path + ignore-package fallback). Tier A walker.ts already lifted in PR 1 Task 7; the integration with `getGitFiles()` is the missing wire-up.
+  - Task 22 — vault-watcher dedup. Trivially small but requires reading the existing vault watcher; deferred to keep PR 4 partial focused.
+  - Task 23 — monitor `/content-index` HTTP endpoint. Plumbing into packages/monitor; pciStatus() telemetry surface ready.
+- Verify results: Memory 345 pass / 1 pre-existing sparse fail (unrelated). Build clean across all 13 packages.
+- Defers / deviations:
+  - **Polling fallback is a stub** — the timer fires every 5 minutes but doesn't run a rescan; Task 19's syncer plugs the rescan logic in.
+  - **fs.watch on rename events** uses statSync to disambiguate add vs unlink — this is the standard Node pattern but not a true rename detector. Cross-FS rename (mv between filesystems) will appear as unlink+add, which is correct.
+- ADRs: none new.
+- New test files (20 new tests, all green): watcher-event-contract.test.ts (6), pci-watcher-topology.test.ts (9), pci-singleton.test.ts (5).
+- Next: PR 5 — Sanitize + WAL + query sanitizer + rollback CLI (Tasks 24-28). Bootstrap mode: ON.
+- Timestamp: 2026-04-17T03:50:00Z
+
 ## PR 1 — earlier in-progress entry (superseded by COMPLETE above)
 
 
