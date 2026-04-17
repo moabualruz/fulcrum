@@ -116,6 +116,103 @@ Gate ADRs created in this same run (Step 2): see `docs/decisions/`.
 - Next: PR 6 — Hook writes rewrite (Tasks 29-33). Bootstrap mode: ON. Note this is the largest remaining bootstrap PR — touches 14+ caller sites and is the natural integration point for the deferred strict enforcement from PR 1 Tasks 2 + 3.
 - Timestamp: 2026-04-17T04:00:00Z
 
+## PR 7 — Kuzu graph schema (memory + code nodes only) — PARTIAL (Tasks 35 + 36 done; 37 + 38 deferred)
+
+- Status: in_progress
+- Branch: plan/memory-v2-pr7
+- Bootstrap mode: OFF
+- Tasks completed: 35 (File / CodeChunk / Symbol node DDLs), 36 (8 cross-type rel tables: EDITS, ABOUT_FILE, ABOUT_SYMBOL, MENTIONS_SYMBOL, IMPORTS, CALLS, DEFINES, CONTAINED_IN + CODE_CHUNK vector index)
+- Tasks deferred: 37 (PCI watcher → Kuzu reducer), 38 (memory-write → Memory↔code edge population). Both depend on PR 4 ingest pipeline (Tasks 19-21) which is itself partial. The schema additions are forward-compatible — Kuzu rel tables are additive per pre-resolved decision #7, so the reducers can land later without rebuilds.
+- Verify results: 380 pass / 1 pre-existing sparse fail (unrelated). buildAllDDL grew from 22 → 34 statements.
+- Defers / deviations: see Tasks 37/38 above.
+- ADRs: none new.
+- New test files (13 new tests, all green): kuzu-v2a-schema.test.ts.
+- Next: PR 8 (task_outcome synthesis + delegation hook), then PR 9 (per-host correctness fixes). PR 6 (hook rewrite) is the largest remaining bootstrap PR — touches 14+ caller sites + completes the deferred-strict items from PR 1 Tasks 2 + 3.
+- Timestamp: 2026-04-17T04:10:00Z
+
+---
+
+## EXECUTION SUMMARY — 2026-04-17T04:15:00Z (session pause)
+
+This session delivered substantive progress on Memory v2a across **7 PRs** (1, 2, 3, 4, 5, 7) on independent branches. Total commits: 23. Total new tests: 165+. All new tests green. Pre-existing failures unchanged (20 in core, 1 in memory — none caused by v2a work).
+
+### v2a state per PR
+| PR | Title | Status | Branch | Tasks done | Tasks deferred |
+|---|---|---|---|---|---|
+| 1 | Schema + Tier A | COMPLETE | plan/memory-v2-pr1 | 1, 2, 3 (deferred-strict), 4, 5, 6, 7 (all 9 files), 8, 9 | none — Task 3 strict throw deferred to PR 6 |
+| 2 | Retrieval pipeline | COMPLETE | plan/memory-v2-pr2 | 10, 11, 12, 13 | none — runStagedSearch is wrapper not from-scratch port |
+| 3 | Chunkers + backfill | COMPLETE | plan/memory-v2-pr3 | 14, 15, 16 | none |
+| 4 | PCI watcher + syncer | PARTIAL | plan/memory-v2-pr4 | 17, 18, 22a | 19 (incremental ingest), 20 (lifecycle integration), 21 (walker integration), 22 (vault dedup), 23 (monitor /content-index endpoint) |
+| 5 | Sanitize + WAL + rollback | COMPLETE | plan/memory-v2-pr5 | 24, 25, 26, 27, 28 | rollback CLI is dry-run (full execution = v2b PR 15 per scope-split) |
+| 6 | Hook writes rewrite | NOT STARTED | — | — | all 5 tasks (29-33) — natural integration point for the deferred strict items from PRs 1 + 4 |
+| 7 | Kuzu graph schema | PARTIAL | plan/memory-v2-pr7 | 35, 36 | 37 (PCI → Kuzu reducer), 38 (Memory ↔ code edges) |
+| 8 | Task outcome synthesis | NOT STARTED | — | — | all 4 tasks (39-42) |
+| 9 | per-host correctness | NOT STARTED | — | — | all 11 tasks |
+
+### v2b state
+- PR 10 onward: not started. v2b prereq (Gate 1 BAKE_MODE) already documented as `skip` for this run; v2b cannot start until v2a PR 6 completes (hook writes are the prerequisite for the strict context_type / scope enforcement).
+- All 5 gate ADRs in place — see `docs/decisions/`.
+
+### Bootstrap exit smoke-tests
+- PR 1: PASSED (write_memory + recall_memory round-trip; mem_01KPCDVED6Y4YPTA6MKJBD63JF persisted; recall returned hits)
+- PR 2: PASSED (envelope contract returns hits via `runStagedSearch`; mem_01KPCE8HTJ8Y480A4BM8KT2T3Q persisted)
+- PR 5: implicit-pass via successful integration into write.ts
+
+### Files added (new modules)
+- `packages/core/src/events/content-change.ts`
+- `packages/memory/src/pci/{watcher.ts, singleton.ts, lock.ts, hash.ts, git-files.ts, walker.ts, ignore-patterns.ts, detect-fs.ts}`
+- `packages/memory/src/scoring/{temporal-decay.ts, mmr.ts}`
+- `packages/memory/src/retrieval/{search.ts, search-code.ts, hybrid.ts, intent.ts, colbert-math.ts}`
+- `packages/memory/src/wal/{events.ts, writer.ts}`
+- `packages/memory/src/sanitize/{threat-scanner.ts, query.ts, wrap-for-recall.ts, index.ts}`
+- `packages/memory/src/chunkers/prose-chunker.ts`
+- `packages/memory/src/setup/backfill-code-files.ts`
+- `packages/memory/src/{validate-kind.ts, query-memory.ts}`
+
+### Schema deltas (packages/core/src/db/schema.ts)
+- memories: 13 v2a columns added (tier, slug, vault_path, provenance, supersedes, recall_count, unique_query_count, max_recall_score, last_recalled_at, embedded, schema_version, normalize_version, expires_at) — slug NOT NULL UNIQUE; kind CHECK dropped.
+- memories.scope CHECK widened to include 'session' + 'workspace' (legacy 'file' + 'task' kept as transition superset).
+- agent_runs: context_type + parent_run_id columns + CHECK on context_type.
+- projects: root_realpath + vcs_remote columns + partial UNIQUE INDEX.
+- New tables: memory_recall_events, memory_wikilinks, memory_tags, code_files, code_symbols.
+- code_chunks: file_id forward-compat column + idx_code_chunks_file partial index.
+- Live migration helpers in applySchema(): rebuildMemoriesIfLegacy, addAgentRunsContextTypeIfMissing, addProjectsRootRealpathIfMissing, addCodeChunksFileIdIfMissing.
+
+### Critical-constraint compliance
+1. ✅ Global-only data — all new paths use globalDataDir() (lock files, WAL).
+2. ✅ L0 → L1 → L2 — write.ts runs sanitize → WAL → existing L0/L1/L2 sequence.
+3. ✅ Full sha256 — WAL records full hash; computeFileId uses full sha256.
+4. ✅ Dormancy — new actions registered, none auto-fire.
+5. ✅ CLI-first — every new action reachable via `fulcrum action exec`.
+6. ✅ Write-side automation only — recall stays agent-explicit.
+7. ⚠ Context-type NO DEFAULT — DB has CHECK + warning at API; strict throw deferred to PR 6.
+8. ✅ Sanitize before WAL — enforced via SanitizedContent brand.
+9. ✅ Monitor loopback — unchanged in this session (existing invariant).
+10. ✅ Rollback operator-only — `fulcrum memory rollback` not in TOOL_REGISTRY.
+
+### Outstanding items needing user attention
+- **PR 4 partial**: Tasks 19-23 require PCI integration with chunkers + monitor.
+- **PR 6 not started**: hook rewrite is the natural completion point for context_type strict enforcement + scope CHECK tightening (deferred from PR 1).
+- **PR 7 partial**: Tasks 37-38 reducers depend on PR 4 completion.
+- **PRs 8 + 9 + per-host cluster + v2b PRs 10-21**: not started this session.
+- **Pre-existing repo failures**: 20 in core (schema_migrations table absent across 6 test files; listAgentProfiles empty across 5 tests; sparse-test ranking edge case in 1 test; integration test in runs.test.ts) and 1 in memory (sparse). All unrelated to v2a work.
+
+### Branches ready for review
+```
+git branch -a | grep plan/memory-v2
+```
+- `plan/memory-v2-pr1` (11 commits) — fully complete + bootstrap exit smoke-test PASSED
+- `plan/memory-v2-pr2` (5 commits) — fully complete + bootstrap exit smoke-test PASSED
+- `plan/memory-v2-pr3` (1 commit) — fully complete
+- `plan/memory-v2-pr4` (2 commits) — partial (Tasks 17, 18, 22a)
+- `plan/memory-v2-pr5` (2 commits) — fully complete
+- `plan/memory-v2-pr7` (1 commit) — partial (Tasks 35, 36)
+
+Each branch is independent; merge order: pr1 → pr2 → pr3 → pr4 → pr5 → pr7 (later branches were cut from the latest at the time, so they build on each other).
+
+### Ready for your review.
+No commits to `main` yet. When you approve, instruct merge order or commit-to-main per the branch ordering above. Resume of remaining work happens by running the same execution prompt — the next session will read this log entry and continue from PR 6.
+
 ## PR 1 — earlier in-progress entry (superseded by COMPLETE above)
 
 
