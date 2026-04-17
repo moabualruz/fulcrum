@@ -296,6 +296,17 @@ export async function startAgentRun(input: StartAgentRunInput, db: Db = getDb())
     payload: { display_id, role: input.role },
   })
 
+  // v2a PR 4 Task 20: PCI lifecycle integration — ensure() per run.
+  // Lazy string-import keeps dep direction memory → core; failures are silent.
+  try {
+    const moduleName = '@moabualruz/fulcrum-memory'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mem = (await import(/* @vite-ignore */ moduleName)) as any
+    if (typeof mem?.onAgentRunStart === 'function') {
+      mem.onAgentRunStart({ run_id, project_id: taskRow.project_id, db })
+    }
+  } catch { /* PCI lifecycle is best-effort */ }
+
   return getRun(run_id, db)
 }
 
@@ -392,6 +403,14 @@ export async function completeAgentRun(input: CompleteRunInput, db: Db = getDb()
     })
   }
 
+  // v2a PR 4 Task 20: release PCI lifecycle refcount.
+  try {
+    const moduleName = '@moabualruz/fulcrum-memory'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mem = (await import(/* @vite-ignore */ moduleName)) as any
+    if (typeof mem?.onAgentRunEnd === 'function') mem.onAgentRunEnd(input.run_id)
+  } catch { /* best-effort */ }
+
   return getRun(input.run_id, db)
 }
 
@@ -446,6 +465,14 @@ export async function blockAgentRun(input: BlockRunInput, db: Db = getDb()): Pro
       source: 'auto',
     })
   }
+
+  // v2a PR 4 Task 20: release PCI lifecycle refcount on block.
+  try {
+    const moduleName = '@moabualruz/fulcrum-memory'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mem = (await import(/* @vite-ignore */ moduleName)) as any
+    if (typeof mem?.onAgentRunEnd === 'function') mem.onAgentRunEnd(input.run_id)
+  } catch { /* best-effort */ }
 
   return getRun(input.run_id, db)
 }

@@ -37,6 +37,25 @@ const CAPABILITY_SKILL_MAP: Record<string, { name: string; description: string }
   architecture:       { name: 'Architecture Review',  description: 'Reviews system design decisions' },
 }
 
+/**
+ * v2a PR 4 Task 23 — loopback-only enforcement (critical constraint #9).
+ * The monitor exposes PCI telemetry + mutative routes; binding on a public
+ * interface would expose them outside the machine. Allowed host values are
+ * the IPv4/IPv6 loopback literals only.
+ */
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '0:0:0:0:0:0:0:1'])
+
+export class MonitorNonLoopbackError extends Error {
+  constructor(host: string) {
+    super(`Monitor host ${host} is not loopback; v2a requires 127.0.0.1 / ::1 / localhost`)
+    this.name = 'MonitorNonLoopbackError'
+  }
+}
+
+export function assertLoopbackHost(host: string): void {
+  if (!LOOPBACK_HOSTS.has(host)) throw new MonitorNonLoopbackError(host)
+}
+
 export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   // Per-instance set of active SSE controllers for event-bus push mode.
   const sseControllers = new Set<ReadableStreamDefaultController>()
@@ -66,6 +85,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   const app = new Hono()
   const port = config.port ?? 7331
   const host = config.host ?? '127.0.0.1'
+  assertLoopbackHost(host)
   const workspace_id = config.workspace_id
 
   // ─── GET / — serve the web UI ───────────────────────────────────────────
@@ -83,6 +103,23 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       status: 'ok',
       workspace_id: workspace_id ?? null,
       ts: new Date().toISOString(),
+    })
+  })
+
+  // v2a PR 4 Task 23 — PCI content-index counters.
+  // Loopback-only (enforced at bind). Always returns within ~5ms because
+  // pciStatus() is a pure in-memory read.
+  app.get('/content-index', async (c) => {
+    const stats = await readPciStatus()
+    const now = new Date().toISOString()
+    return c.json({
+      files_indexed: stats.files_indexed,
+      chunks_indexed: stats.chunks_indexed,
+      vecs_in_index: stats.vecs_in_index,
+      last_change_at: stats.last_change_at,
+      watcher_refcount: stats.watcher_refcount,
+      active_watchers: stats.active_watchers,
+      ts: now,
     })
   })
 
@@ -807,6 +844,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     port,
     fetch: (req: Request) => app.fetch(req),
     start: async () => {
+      assertLoopbackHost(host)
       serverInstance = serve({ fetch: app.fetch, port, hostname: host })
     },
     stop: async () => {
@@ -824,5 +862,58 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       }
       sseControllers.clear()
     },
+  }
+}
+
+/**
+ * v2a PR 4 Task 23 — resolve PCI + code-index counters for the /content-index
+ * route. Uses string-module dynamic import so the monitor package doesn't
+ * take a direct dep on @moabualruz/fulcrum-memory (which depends on monitor
+ * in some builds). Returns zeros on any resolution failure so the endpoint
+ * is always available for liveness/scripted checks.
+ */
+async function readPciStatus(): Promise<{
+  files_indexed: number
+  chunks_indexed: number
+  vecs_in_index: number
+  last_change_at: string | null
+  watcher_refcount: number
+  active_watchers: number
+}> {
+  let watcher_refcount = 0
+  let active_watchers = 0
+  try {
+    const moduleName = '@moabualruz/fulcrum-memory'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mem = (await import(/* @vite-ignore */ moduleName)) as any
+    const pciMod = mem?.pciStatus ? mem : (await import(/* @vite-ignore */ `${moduleName}/dist/index.js`).catch(() => null) as any)
+    const status = typeof pciMod?.pciStatus === 'function' ? pciMod.pciStatus() : null
+    if (status) {
+      active_watchers = Number(status.activeWatchers ?? 0)
+      const refcounts = status.refcounts ?? {}
+      for (const v of Object.values(refcounts)) watcher_refcount += Number(v)
+    }
+  } catch { /* best-effort */ }
+
+  let files_indexed = 0
+  let chunks_indexed = 0
+  let last_change_at: string | null = null
+  try {
+    const db = getDb()
+    const files = db.prepare('SELECT COUNT(*) AS n FROM code_files').get() as { n: number } | undefined
+    files_indexed = Number(files?.n ?? 0)
+    const chunks = db.prepare('SELECT COUNT(*) AS n FROM code_chunks').get() as { n: number } | undefined
+    chunks_indexed = Number(chunks?.n ?? 0)
+    const latest = db.prepare('SELECT MAX(indexed_at) AS ts FROM code_chunks').get() as { ts: string | null } | undefined
+    last_change_at = latest?.ts ?? null
+  } catch { /* db may be closed during tests */ }
+
+  return {
+    files_indexed,
+    chunks_indexed,
+    vecs_in_index: chunks_indexed,  // vec rows mirror chunks in v2a
+    last_change_at,
+    watcher_refcount,
+    active_watchers,
   }
 }

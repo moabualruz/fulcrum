@@ -177,7 +177,16 @@ export async function runJanitorCycle(input: JanitorCycleInput, db: Db = getDb()
   let consolidatedMemories = 0
 
   try {
-    // Mark running runs stale when no heartbeat received within timeout
+    // Mark running runs stale when no heartbeat received within timeout.
+    // Collect their run_ids first so PCI lifecycle can drop refcounts — see v2a
+    // PR 4 Task 20. The UPDATE runs unconditionally; PCI release is best-effort.
+    const toStale = db.prepare(`
+      SELECT run_id FROM agent_runs
+      WHERE workspace_id = ?
+        AND status = 'running'
+        AND updated_at <= datetime('now', ? || ' minutes')
+    `).all(input.workspace_id, `-${heartbeat_timeout_minutes}`) as { run_id: string }[]
+
     const staleResult = db.prepare(`
       UPDATE agent_runs
       SET status = 'stale', updated_at = datetime('now')
@@ -186,6 +195,17 @@ export async function runJanitorCycle(input: JanitorCycleInput, db: Db = getDb()
         AND updated_at <= datetime('now', ? || ' minutes')
     `).run(input.workspace_id, `-${heartbeat_timeout_minutes}`)
     staleRuns = staleResult.changes ?? 0
+
+    if (toStale.length > 0) {
+      try {
+        const moduleName = '@moabualruz/fulcrum-memory'
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mem = (await import(/* @vite-ignore */ moduleName)) as any
+        if (typeof mem?.onAgentRunEnd === 'function') {
+          for (const { run_id } of toStale) mem.onAgentRunEnd(run_id)
+        }
+      } catch { /* PCI lifecycle is best-effort */ }
+    }
 
     // Auto-escalate blocked runs past escalation timeout
     const overdueBlocked = db.prepare(`

@@ -75,6 +75,24 @@ export type { SweepResult } from './sweep.js'
 // Ingestion pipeline
 export { ingestFile, ingestProject } from './ingest.js'
 
+// v2a PR 4 Task 19 — PCI incremental syncer: bus handler + one-shot file sync.
+export { syncFile, startPciSyncer, contentSha256 } from './pci/syncer.js'
+export type { PciSyncerOpts, PciSyncerHandle } from './pci/syncer.js'
+
+// v2a PR 4 Task 20 — PCI lifecycle integration hooks.
+export {
+  onAgentRunStart,
+  onAgentRunEnd,
+  acquireServerHandle,
+  releaseServerHandle,
+  resolveProjectRoot,
+} from './pci/lifecycle.js'
+export type { OnAgentRunStartInput } from './pci/lifecycle.js'
+
+// v2a PR 4 Task 21 — gitignore-respecting walker integration.
+export { enumerateProjectFiles, shouldIndexPath, MAX_FILE_SIZE_BYTES } from './pci/walker-integration.js'
+export type { WalkerResult } from './pci/walker-integration.js'
+
 
 // Vault (L0)
 export { getVaultPath, vaultExists, initVault, writeMemoryFile, readMemoryFile, listMemoryFiles } from './vault/client.js'

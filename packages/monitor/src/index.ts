@@ -24,4 +24,4 @@ export {
 } from './metrics.js'
 
 // HTTP server
-export { startMonitorServer } from './server.js'
+export { startMonitorServer, assertLoopbackHost, MonitorNonLoopbackError } from './server.js'

@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { watch } from 'chokidar'
 import { join } from 'path'
 import matter from 'gray-matter'
+import { getContentChangeBus } from '@moabualruz/fulcrum-core'
 import { parseFromFile } from './formatter.js'
 import { readState, upsertStateEntry, removeStateEntry } from './state.js'
 import { appendToLog } from './index-builder.js'
@@ -106,6 +107,13 @@ export function startVaultWatcher(options: VaultWatcherOptions): () => void {
         meta: 'by=human',
       })
 
+      // v2a PR 4 Task 22: emit unified ContentChangeEvent so v2b consumers
+      // (git reducer, REM extraction) can subscribe without per-watcher
+      // branching. Uses kind='memory' — disjoint from PCI's kind='code'.
+      try {
+        getContentChangeBus().emit({ kind: 'memory', path: filePath, sha256: currentHash, change_type: 'change' })
+      } catch { /* bus emit is best-effort */ }
+
       // Notify caller (triggers L1 upsert + L2 re-embed)
       await onHumanEdit(memoryId, filePath)
     } catch (err) {
@@ -139,6 +147,11 @@ export function startVaultWatcher(options: VaultWatcherOptions): () => void {
         id: entry.id,
         meta: 'by=human',
       })
+
+      // v2a PR 4 Task 22: unified content-change bus (memory kind).
+      try {
+        getContentChangeBus().emit({ kind: 'memory', path: filePath, sha256: '', change_type: 'unlink' })
+      } catch { /* best-effort */ }
 
       await onHumanDelete(entry.id, filePath)
     } catch {

@@ -10,10 +10,29 @@
 
 import { realpathSync, mkdirSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { globalDataDir } from '@moabualruz/fulcrum-core'
 import { acquireLock, type LockHandle, LockError } from './lock.js'
 import { watchDirectory, closeWatcherSubtree, activeWatcherCount } from './watcher.js'
+
+/**
+ * v2a PR 4 Task 22 — vault/PCI dedup. The vault watcher already owns
+ * {globalDataDir()}/memory/ via chokidar. The PCI watcher refuses to
+ * attach to any directory at or under that prefix so both watchers
+ * don't produce duplicate events for the same file.
+ */
+export function isVaultOwnedPath(p: string): boolean {
+  const abs = resolve(p)
+  const vaultPrefix = resolve(join(globalDataDir(), 'memory'))
+  return abs === vaultPrefix || abs.startsWith(vaultPrefix + '/')
+}
+
+export class VaultOwnedPathError extends Error {
+  constructor(path: string) {
+    super(`PCI refused to attach to vault-owned path: ${path}`)
+    this.name = 'VaultOwnedPathError'
+  }
+}
 
 export interface PciHandle {
   projectRoot: string
@@ -50,6 +69,9 @@ function lockPathFor(realpath: string): string {
  */
 export function ensure(projectRoot: string, opts: { force?: boolean } = {}): PciHandle {
   const realpath = (() => { try { return realpathSync(projectRoot) } catch { return projectRoot } })()
+  // v2a PR 4 Task 22: vault owns {globalDataDir()}/memory — PCI refuses the path
+  // to avoid double-emitting change events for vault-stored memory files.
+  if (isVaultOwnedPath(realpath)) throw new VaultOwnedPathError(realpath)
   const existing = entries.get(realpath)
   if (existing) {
     existing.refcount++
