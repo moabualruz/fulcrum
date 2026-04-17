@@ -4,13 +4,13 @@ import { serve } from '@hono/node-server'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { getDb, listAgentDefinitions, getEventBus, createTask, updateTask, blockAgentRun } from '@moabualruz/fulcrum-core'
-import type { EmitEventInput } from '@moabualruz/fulcrum-core'
+import { getDb, listAgentDefinitions, getEventBus, createTask, updateTask, blockAgentRun } from 'fulcrum-core'
+import type { EmitEventInput } from 'fulcrum-core'
 
 // Resolve the public directory relative to this file (works in both ts-node and compiled)
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = join(__dirname, 'public')
-import { evaluatePolicy } from '@moabualruz/fulcrum-policy'
+import { evaluatePolicy } from 'fulcrum-policy'
 import {
   getMetrics,
   getBurndown,
@@ -791,7 +791,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const decision = await evaluatePolicy({
       workspace_id: ws,
       actor_id: body.actor_id,
-      actor_role: body.actor_role as import('@moabualruz/fulcrum-core').AgentRole,
+      actor_role: body.actor_role as import('fulcrum-core').AgentRole,
       action: body.action,
       resource_id: body.resource_id,
     })
@@ -868,7 +868,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 /**
  * v2a PR 4 Task 23 — resolve PCI + code-index counters for the /content-index
  * route. Uses string-module dynamic import so the monitor package doesn't
- * take a direct dep on @moabualruz/fulcrum-memory (which depends on monitor
+ * take a direct dep on fulcrum-memory (which depends on monitor
  * in some builds). Returns zeros on any resolution failure so the endpoint
  * is always available for liveness/scripted checks.
  */
@@ -883,7 +883,7 @@ async function readPciStatus(): Promise<{
   let watcher_refcount = 0
   let active_watchers = 0
   try {
-    const moduleName = '@moabualruz/fulcrum-memory'
+    const moduleName = 'fulcrum-memory'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mem = (await import(/* @vite-ignore */ moduleName)) as any
     const pciMod = mem?.pciStatus ? mem : (await import(/* @vite-ignore */ `${moduleName}/dist/index.js`).catch(() => null) as any)

@@ -1,4 +1,4 @@
-// v2a PR 5 Task 27 — query sanitizer (4-step escalation, MemPalace pattern).
+// v2a PR 5 Task 27 — query sanitizer (4-step escalation, sanitizer-escalation pattern).
 //
 // Applied at every recall entry point. Goal: a recall query coming in from
 // an agent's chat may include the agent's whole prior turn or even an

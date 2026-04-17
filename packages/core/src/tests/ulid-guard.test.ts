@@ -117,7 +117,7 @@ describe('no bare ulid() calls outside allowlist (K-1/K-2/K-4 guard)', () => {
       const msg = violations.map((v) => `  ${v.file}:${v.lines.join(',')}`).join('\n')
       throw new Error(
         `Found ${violations.length} file(s) calling ulid() directly outside the allowlist:\n${msg}\n\n` +
-          `All first-class ID generation must go through newId(<type>) from @moabualruz/fulcrum-core. ` +
+          `All first-class ID generation must go through newId(<type>) from fulcrum-core. ` +
           `If a new case is legitimately internal, add it to ALLOWED_PATHS in packages/core/src/tests/ulid-guard.test.ts with a justification.`,
       )
     }

@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { execSync } from 'child_process'
 import { createRequire } from 'module'
-import { globalDataDir } from '@moabualruz/fulcrum-core'
+import { globalDataDir } from 'fulcrum-core'
 
 const require = createRequire(import.meta.url)
 
@@ -92,7 +92,7 @@ async function checkDbLiveness(): Promise<CheckResult> {
     return { name: 'Database liveness', status: 'warn', message: 'Could not check DB — run a fulcrum command first to initialize' }
   }
   try {
-    const { checkDbHealth } = await import('@moabualruz/fulcrum-core')
+    const { checkDbHealth } = await import('fulcrum-core')
     const result = checkDbHealth()
     if (result.ok) {
       return { name: 'Database liveness', status: 'pass', message: `${result.latencyMs}ms round-trip` }
@@ -195,7 +195,7 @@ async function checkHookEventsWritable(): Promise<CheckResult> {
     return { name: 'Hook events writable', status: 'warn', message: 'Could not check DB — run a fulcrum command first to initialize' }
   }
   try {
-    const { getDb, newId } = await import('@moabualruz/fulcrum-core')
+    const { getDb, newId } = await import('fulcrum-core')
     const db = getDb()
     const testId = newId('hook_event')
     db.prepare(`

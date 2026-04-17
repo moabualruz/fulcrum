@@ -3,7 +3,7 @@
 // Returns neighborhood subgraph for force-directed visualization.
 // Depth capped at 3 to prevent graph explosion.
 
-import { getKuzuClient } from '@moabualruz/fulcrum-memory'
+import { getKuzuClient } from 'fulcrum-memory'
 
 const MAX_DEPTH = 3
 

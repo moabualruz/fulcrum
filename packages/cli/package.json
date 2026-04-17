@@ -1,5 +1,5 @@
 {
-  "name": "@moabualruz/fulcrum-cli",
+  "name": "fulcrum-cli",
   "version": "0.0.1",
   "description": "CLI for Fulcrum — fulcrum memory init, accelerate, rebuild, status",
   "keywords": [
@@ -30,16 +30,16 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@moabualruz/fulcrum-core": "workspace:*",
-    "@moabualruz/fulcrum-memory": "workspace:*",
-    "@moabualruz/fulcrum-monitor": "workspace:*",
-    "@moabualruz/fulcrum-planning": "workspace:*",
-    "@moabualruz/fulcrum-policy": "workspace:*",
-    "@moabualruz/fulcrum-sync": "workspace:*",
-    "@moabualruz/fulcrum-teams": "workspace:*",
-    "@moabualruz/fulcrum-worker": "workspace:*",
-    "@moabualruz/fulcrum-workflows": "workspace:*",
-    "@moabualruz/fulcrum-worktrees": "workspace:*",
+    "fulcrum-core": "workspace:*",
+    "fulcrum-memory": "workspace:*",
+    "fulcrum-monitor": "workspace:*",
+    "fulcrum-planning": "workspace:*",
+    "fulcrum-policy": "workspace:*",
+    "fulcrum-sync": "workspace:*",
+    "fulcrum-teams": "workspace:*",
+    "fulcrum-worker": "workspace:*",
+    "fulcrum-workflows": "workspace:*",
+    "fulcrum-worktrees": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "ink": "^7.0.0",
     "react": "^19.2.5",

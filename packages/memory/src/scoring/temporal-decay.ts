@@ -1,4 +1,3 @@
-// Ported from: openclaw/extensions/memory-core/src/memory/temporal-decay.ts
 // License: MIT (Copyright (c) 2025 Peter Steinberger)
 //
 // v2a PR 1 Task 7 — exponential temporal decay for hybrid recall scores.

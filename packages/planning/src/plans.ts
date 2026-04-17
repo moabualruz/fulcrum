@@ -1,5 +1,5 @@
 // packages/planning/src/plans.ts
-import { getDb, FulcrumError, emitEvent, nextDisplayId, newId, Db} from '@moabualruz/fulcrum-core'
+import { getDb, FulcrumError, emitEvent, nextDisplayId, newId, Db} from 'fulcrum-core'
 import type { Plan, CreatePlanInput, UpdatePlanInput, ListPlansInput, LinkIssueToPlanInput, PlanStatus, StatusCategory } from './types.js'
 
 function planStatusCategory(status: PlanStatus): StatusCategory {

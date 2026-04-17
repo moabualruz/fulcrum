@@ -1,11 +1,10 @@
 // PR 15 Task 6.2 — normalize_version background re-processor.
 //
-// Port of MemPalace palace.py:313-343 NORMALIZE_VERSION pattern.
 // Scans rows where normalize_version < CURRENT_VERSION, re-runs sanitize + chunker,
 // updates rows. Triggered at MCP server start.
 
-import type { Db } from '@moabualruz/fulcrum-core'
-import { getDb } from '@moabualruz/fulcrum-core'
+import type { Db } from 'fulcrum-core'
+import { getDb } from 'fulcrum-core'
 import { sanitizeOnWrite } from '../sanitize/index.js'
 
 /** Bump this when sanitizer or chunker rules change. Old rows will be reprocessed. */

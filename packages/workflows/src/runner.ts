@@ -18,7 +18,7 @@
 // function has its own pause semantics for prompt_user etc. The runner
 // writes directly to the JSON blob instead.
 
-import { getDb, startSpan, endSpan, Db} from '@moabualruz/fulcrum-core'
+import { getDb, startSpan, endSpan, Db} from 'fulcrum-core'
 import { nextReadySteps } from './engine.js'
 import { executeStep } from './step-executor.js'
 import { registry } from './registry.js'

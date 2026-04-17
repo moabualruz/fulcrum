@@ -168,7 +168,7 @@ describe('dispatchClaudeCode', () => {
     }
   })
 
-  it('is exported from @moabualruz/fulcrum-worker index', async () => {
+  it('is exported from fulcrum-worker index', async () => {
     const mod = await import('../index.js')
     expect(typeof mod.dispatchClaudeCode).toBe('function')
   })

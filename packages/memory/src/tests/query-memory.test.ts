@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { setDb, closeDb, _configureDb } from '@moabualruz/fulcrum-core'
-import { runMigrations } from '@moabualruz/fulcrum-core'
+import { setDb, closeDb, _configureDb } from 'fulcrum-core'
+import { runMigrations } from 'fulcrum-core'
 import { writeMemory } from '../write.js'
 import { queryMemory } from '../query-memory.js'
 

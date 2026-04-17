@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatEvent, parseSince } from '../log.js'
-import type { FulcrumEvent } from '@moabualruz/fulcrum-core'
+import type { FulcrumEvent } from 'fulcrum-core'
 
 function makeEvent(overrides: Partial<FulcrumEvent>): FulcrumEvent {
   return {

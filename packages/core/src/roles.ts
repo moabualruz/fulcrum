@@ -9,7 +9,7 @@
 // governed solely by this module (roleCapabilities / canInvokeTeams / etc.) — it
 // is intentionally hardcoded rather than DB-driven to keep the critical path
 // free of runtime DB reads.  If a custom workspace role requires different
-// enforcement semantics, deploy a custom policy rule via @moabualruz/fulcrum-policy.
+// enforcement semantics, deploy a custom policy rule via fulcrum-policy.
 
 import type { AgentRole } from './types.js'
 

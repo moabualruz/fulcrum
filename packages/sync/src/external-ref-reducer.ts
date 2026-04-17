@@ -4,7 +4,7 @@
 // Plane + GitHub: webhook adapters (real-time).
 // Jira: 5-min poll cadence per architecture decision §12.27.
 
-import type { KuzuClient } from '@moabualruz/fulcrum-memory'
+import type { KuzuClient } from 'fulcrum-memory'
 
 export const ADAPTER_PLANE = 'plane'
 export const ADAPTER_GITHUB = 'github'

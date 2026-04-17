@@ -4,7 +4,7 @@
 // Format: [HH:mm:ss] <role> <verb> <noun> — <detail>
 // Sources: monitor SSE stream (--follow) or events table (default, last 50)
 
-import type { FulcrumEvent } from '@moabualruz/fulcrum-core'
+import type { FulcrumEvent } from 'fulcrum-core'
 
 // ── Event formatting ──────────────────────────────────────────────────────────
 
@@ -255,7 +255,7 @@ async function followSse(runId?: string, sinceDate?: Date): Promise<void> {
 // ── DB poll (fallback for --follow when monitor is down) ──────────────────────
 
 async function pollDb(runId?: string, sinceDate?: Date): Promise<void> {
-  const { getDb, runMigrations } = await import('@moabualruz/fulcrum-core')
+  const { getDb, runMigrations } = await import('fulcrum-core')
   const db = getDb()
   runMigrations(db)
 
@@ -277,7 +277,7 @@ async function pollDb(runId?: string, sinceDate?: Date): Promise<void> {
 }
 
 async function printDbEvents(
-  db: ReturnType<typeof import('@moabualruz/fulcrum-core').getDb>,
+  db: ReturnType<typeof import('fulcrum-core').getDb>,
   runId: string | undefined,
   since: string | undefined,
   afterId: number,
@@ -300,7 +300,7 @@ async function printDbEvents(
 // ── DB read (non-follow) ──────────────────────────────────────────────────────
 
 async function readFromDb(limit: number, runId?: string, sinceDate?: Date): Promise<void> {
-  const { getDb, runMigrations } = await import('@moabualruz/fulcrum-core')
+  const { getDb, runMigrations } = await import('fulcrum-core')
   const db = getDb()
   runMigrations(db)
 

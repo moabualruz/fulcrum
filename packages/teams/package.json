@@ -1,5 +1,5 @@
 {
-  "name": "@moabualruz/fulcrum-teams",
+  "name": "fulcrum-teams",
   "version": "0.0.1",
   "description": "Agent team orchestration \u2014 team templates, role slots, communication and budget policies, team spawning",
   "keywords": [
@@ -33,7 +33,7 @@
     "build": "tsup"
   },
   "dependencies": {
-    "@moabualruz/fulcrum-core": "workspace:*",
+    "fulcrum-core": "workspace:*",
     "ulidx": "^2.0.0"
   },
   "devDependencies": {

@@ -3,8 +3,8 @@
 // Returns rollup rows per Part 02 §"Analytics rollups" lines 302-310.
 // Cold install returns []. Rollups produced only when analytics-enabled rule is toggled.
 
-import type { Db } from '@moabualruz/fulcrum-core'
-import { getDb } from '@moabualruz/fulcrum-core'
+import type { Db } from 'fulcrum-core'
+import { getDb } from 'fulcrum-core'
 
 export type AnalyticsDimension = 'daily' | 'cycle' | 'project' | 'agent' | 'team'
 

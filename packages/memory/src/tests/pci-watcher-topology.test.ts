@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { watchDirectory, closeWatcherSubtree, isMissingPathError, getPathStats, activeWatcherCount } from '../pci/watcher.js'
-import { resetContentChangeBus, getContentChangeBus, type ContentChangeEvent } from '@moabualruz/fulcrum-core'
+import { resetContentChangeBus, getContentChangeBus, type ContentChangeEvent } from 'fulcrum-core'
 
 describe('watchDirectory — v2a PR 4 Task 17 (native mode)', () => {
   let root: string

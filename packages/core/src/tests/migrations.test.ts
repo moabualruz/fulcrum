@@ -467,7 +467,7 @@ describe('memories.kind CHECK alignment (J-4)', () => {
     }
   })
 
-  it('accepts unknown kind at the DB level — v2a PR 1 Task 1 dropped the CHECK; validation lives in @moabualruz/fulcrum-memory write.ts (Task 9)', () => {
+  it('accepts unknown kind at the DB level — v2a PR 1 Task 1 dropped the CHECK; validation lives in fulcrum-memory write.ts (Task 9)', () => {
     const db = freshDb()
     runMigrations(db)
     seedWsProj(db)

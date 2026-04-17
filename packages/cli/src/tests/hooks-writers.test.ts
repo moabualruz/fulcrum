@@ -10,7 +10,7 @@ import {
   hasTaskOutcomeForRun, sessionSummaryUniqueConstraintError,
 } from '../hooks-writers.js'
 import { renderRecallEnvelope } from '../hooks-session.js'
-import { getDb, closeDb, runMigrations, type Db } from '@moabualruz/fulcrum-core'
+import { getDb, closeDb, runMigrations, type Db } from 'fulcrum-core'
 
 describe('dedup (v2a PR 6 Task 29 — per-turn dedup)', () => {
   beforeEach(() => { clearDedupCache() })

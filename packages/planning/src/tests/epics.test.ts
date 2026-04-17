@@ -1,7 +1,7 @@
 // packages/planning/src/tests/epics.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seed } from './helpers.js'
-import { getDb } from '@moabualruz/fulcrum-core'
+import { getDb } from 'fulcrum-core'
 import { createEpic, updateEpic, listEpics } from '../epics.js'
 
 beforeEach(() => { const db = createTestDb(); seed(db) })

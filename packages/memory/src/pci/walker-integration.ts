@@ -1,7 +1,7 @@
 // v2a PR 4 Task 21 — gitignore-respecting walker integration.
 //
 // In git repos:   `getGitFiles()` is the source-of-truth file list.
-// Outside git:    hierarchical walker from osgrep `walker.ts` applies
+// Outside git:    hierarchical walker from the hierarchical walker applies
 //                 .gitignore + .fulcrumignore + DEFAULT_IGNORE_PATTERNS.
 //
 // Always:

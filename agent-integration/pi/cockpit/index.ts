@@ -213,7 +213,7 @@ export default function (pi: ExtensionAPI) {
     if (!isFulcrumInstalled()) {
       ui.notify(
         "⚠ fulcrum CLI is not installed.\n" +
-        "Run: npm install -g @moabualruz/fulcrum-cli\n" +
+        "Run: npm install -g fulcrum-cli\n" +
         "Or from repo: npm install && npm run build && npm link\n" +
         "Then reload with /reload",
         "error",
@@ -295,7 +295,7 @@ export default function (pi: ExtensionAPI) {
     proc.on("error", () => {
       serverState = "error";
       updateStatus();
-      uiRef?.notify("Failed to start Fulcrum monitor — is fulcrum installed? (npm install -g @moabualruz/fulcrum-cli)", "error");
+      uiRef?.notify("Failed to start Fulcrum monitor — is fulcrum installed? (npm install -g fulcrum-cli)", "error");
     });
 
     proc.on("close", (code: number | null) => {

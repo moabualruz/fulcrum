@@ -21,7 +21,7 @@
  * Or, if installed globally (npm install -g fulcrum-mcp):
  *   fulcrum-mcp
  *
- * This thin wrapper delegates to @moabualruz/fulcrum-cli's `serve mcp` command so that
+ * This thin wrapper delegates to fulcrum-cli's `serve mcp` command so that
  * the full Fulcrum tool set is available without a separate `fulcrum` binary
  * install. The monitor HTTP server auto-starts on port 4721 by default.
  */
@@ -35,12 +35,12 @@ if (argv[0] === 'init') {
 }
 
 // ── Default: start the MCP server ────────────────────────────────────────────
-// Inject the subcommand into argv so @moabualruz/fulcrum-cli's dispatch hits `serve mcp`
-// before @moabualruz/fulcrum-cli processes process.argv.
+// Inject the subcommand into argv so fulcrum-cli's dispatch hits `serve mcp`
+// before fulcrum-cli processes process.argv.
 process.argv.splice(2, 0, 'serve', 'mcp')
 
-// Delegate to @moabualruz/fulcrum-cli — all tool logic lives there.
-await import('@moabualruz/fulcrum-cli')
+// Delegate to fulcrum-cli — all tool logic lives there.
+await import('fulcrum-cli')
 
 // ── Init implementation ───────────────────────────────────────────────────────
 

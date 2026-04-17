@@ -1,4 +1,3 @@
-// Adapted from: osgrep/src/lib/workers/colbert-math.ts
 // License: Apache-2.0
 //
 // v2a PR 1 Task 7 — ColBERT MaxSim and cosine similarity primitives. PR 2

@@ -1,5 +1,5 @@
 // packages/planning/src/epics.ts
-import { getDb, FulcrumError, emitEvent, nextDisplayId, statusCategory, newId, Db} from '@moabualruz/fulcrum-core'
+import { getDb, FulcrumError, emitEvent, nextDisplayId, statusCategory, newId, Db} from 'fulcrum-core'
 import type { Epic, CreateEpicInput, UpdateEpicInput, ListEpicsInput, EpicStatus, StatusCategory } from './types.js'
 
 // PLAN-005: allowed epic status transitions

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { detectIntent } from '../retrieval/intent.js'
 import { DEFAULT_IGNORE_PATTERNS } from '../pci/ignore-patterns.js'
 
-describe('intent classifier — v2a Task 7 (osgrep lift)', () => {
+describe('intent classifier — v2a Task 7 (Tier A algorithm)', () => {
   it('classifies definition queries', () => {
     expect(detectIntent('where is the parser').type).toBe('DEFINITION')
     expect(detectIntent('what is FullMemory').type).toBe('DEFINITION')
@@ -29,7 +29,7 @@ describe('intent classifier — v2a Task 7 (osgrep lift)', () => {
   })
 })
 
-describe('ignore-patterns — v2a Task 7 (osgrep lift)', () => {
+describe('ignore-patterns — v2a Task 7 (Tier A algorithm)', () => {
   it('keeps the security-sensitive set', () => {
     for (const p of ['.env', '*.key', '*.pem', '**/.ssh/**', 'secrets.*']) {
       expect(DEFAULT_IGNORE_PATTERNS, `missing security pattern: ${p}`).toContain(p)

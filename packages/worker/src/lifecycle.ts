@@ -19,8 +19,8 @@ import {
   FulcrumError,
   startSpan,
   endSpan,
-} from '@moabualruz/fulcrum-core'
-import type { RunArtifacts } from '@moabualruz/fulcrum-core'
+} from 'fulcrum-core'
+import type { RunArtifacts } from 'fulcrum-core'
 import { getAgentAdapter, registerAgentAdapter } from './adapter.js'
 import { stubAdapter } from './stub.js'
 import { subprocessAdapter } from './subprocess.js'

@@ -1,5 +1,5 @@
 {
-  "name": "@fulcrum/opencode-plugin",
+  "name": "fulcrum-opencode-plugin",
   "version": "0.0.1",
   "type": "module",
   "scripts": {

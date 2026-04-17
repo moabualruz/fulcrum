@@ -1,10 +1,9 @@
-// Ported from: mgrep/src/lib/git.ts (commit 2026-04, NodeGit.getGitFiles)
 // License: Apache-2.0
 //
 // v2a PR 1 Task 8 — fast file enumeration via `git ls-files` for git repos.
 // Returns project-root-relative paths (string[]). Caller decides what to do
 // with non-git roots — the PR 4 walker falls back to the `ignore`-package
-// hierarchical walker (osgrep `walker.ts` — Task 7 lift).
+// hierarchical walker (the hierarchical walker — Task 7 lift).
 
 import { spawnSync } from 'node:child_process'
 

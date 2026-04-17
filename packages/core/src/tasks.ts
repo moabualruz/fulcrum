@@ -211,11 +211,11 @@ export async function updateTask(input: UpdateTaskInput, db: Db = getDb()): Prom
     // memories on terminal status transitions. Non-blocking — synthesis errors
     // never fail the update_task call (memory writes are an audit surface).
     // Dynamic-string import keeps the dependency direction memory → core only;
-    // the synthesis modules in @moabualruz/fulcrum-memory call back via this
+    // the synthesis modules in fulcrum-memory call back via this
     // hook without core formally depending on memory (avoiding the cycle).
     if (input.status === 'completed' || input.status === 'blocked') {
       try {
-        const moduleName = '@moabualruz/fulcrum-memory'
+        const moduleName = 'fulcrum-memory'
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const memoryPkg = (await import(/* @vite-ignore */ moduleName)) as any
         if (input.status === 'completed' && typeof memoryPkg?.synthesizeTaskOutcome === 'function') {

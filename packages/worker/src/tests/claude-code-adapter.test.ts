@@ -25,7 +25,7 @@ describe('claudeCodeAdapter', () => {
     expect(claudeCodeAdapter.name).toBe('claude-code')
   })
 
-  it('is exported from @moabualruz/fulcrum-worker index', async () => {
+  it('is exported from fulcrum-worker index', async () => {
     const mod = await import('../index.js')
     expect(mod.claudeCodeAdapter).toBe(claudeCodeAdapter)
   })

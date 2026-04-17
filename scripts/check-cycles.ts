@@ -56,13 +56,13 @@ async function main(): Promise<void> {
   let hasFailure = false
   for (const { pkg, cycles } of results) {
     if (cycles.length > 0) {
-      console.error(`\n❌  @fulcrum/${pkg}: ${cycles.length} circular dependency cycle(s)`)
+      console.error(`\n❌  fulcrum-${pkg}: ${cycles.length} circular dependency cycle(s)`)
       for (const cycle of cycles) {
         console.error(`   ${cycle.join(' → ')} → ${cycle[0]}`)
       }
       hasFailure = true
     } else {
-      console.log(`✓  @fulcrum/${pkg}: no cycles`)
+      console.log(`✓  fulcrum-${pkg}: no cycles`)
     }
   }
 

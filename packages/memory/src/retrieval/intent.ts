@@ -1,4 +1,3 @@
-// Ported from: osgrep/src/lib/search/intent.ts
 // License: Apache-2.0
 //
 // v2a PR 1 Task 7 — query-intent classifier. PR 2's runStagedSearch routes

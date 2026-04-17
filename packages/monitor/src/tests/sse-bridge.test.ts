@@ -5,8 +5,8 @@
 // immediately pushes an SSE chunk to all active /events/stream consumers.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { setDb, getEventBus, resetEventBus } from '@moabualruz/fulcrum-core'
-import type { EmitEventInput } from '@moabualruz/fulcrum-core'
+import { setDb, getEventBus, resetEventBus } from 'fulcrum-core'
+import type { EmitEventInput } from 'fulcrum-core'
 import { startMonitorServer } from '../server.js'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

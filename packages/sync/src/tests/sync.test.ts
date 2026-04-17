@@ -10,7 +10,7 @@ import type { SyncAdapter, ExternalPayload } from '../types.js'
 // ---------------------------------------------------------------------------
 // Minimal stub database: creates only what MIGRATION_010 needs.
 // We fake the workspaces table and skip FK enforcement so the tests are
-// self-contained without pulling in the full @moabualruz/fulcrum-core migration chain.
+// self-contained without pulling in the full fulcrum-core migration chain.
 // ---------------------------------------------------------------------------
 
 function createTestDb(): DB {
@@ -80,7 +80,7 @@ function makeManager(db: DB): { manager: SyncManager; adapter: StubAdapter } {
 // Test suite
 // ---------------------------------------------------------------------------
 
-describe('@moabualruz/fulcrum-sync — SyncManager', () => {
+describe('fulcrum-sync — SyncManager', () => {
   let db: DB
 
   beforeEach(() => {

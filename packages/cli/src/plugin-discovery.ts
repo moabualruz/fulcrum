@@ -4,7 +4,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join, resolve } from 'path'
-import { globalDataDir } from '@moabualruz/fulcrum-core'
+import { globalDataDir } from 'fulcrum-core'
 import type { ToolSchema } from './mcp-tools.js'
 
 // ---------- Types ----------

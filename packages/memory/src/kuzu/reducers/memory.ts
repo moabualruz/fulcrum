@@ -7,7 +7,7 @@
 //   kind='decision' / prose → parse [[symbol:X]] and [[file:Y]] wikilinks →
 //                             ABOUT_FILE / ABOUT_SYMBOL / MENTIONS_SYMBOL edges
 
-import type { Db } from '@moabualruz/fulcrum-core'
+import type { Db } from 'fulcrum-core'
 import { getKuzuClient, type KuzuClient } from '../client.js'
 
 const WIKILINK_RE = /\[\[(file|symbol):([^\]]+)\]\]/g

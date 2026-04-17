@@ -4,7 +4,7 @@
 // callees, imports, nearest-neighbor chunks, and reachable memories via
 // about/mentions/edits edges. Gracefully degrades when Kuzu is not ready.
 
-import { getDb, type Db } from '@moabualruz/fulcrum-core'
+import { getDb, type Db } from 'fulcrum-core'
 import { getKuzuClient } from './kuzu/client.js'
 
 export interface CodeContextInput {

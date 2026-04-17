@@ -4,10 +4,10 @@
 // Same response shape; same workspace-id filtering enforced.
 // Empty groups are OMITTED per §11.40.
 
-import type { Db } from '@moabualruz/fulcrum-core'
-import { getDb } from '@moabualruz/fulcrum-core'
-import { runProjectContext } from '@moabualruz/fulcrum-memory'
-import type { ProjectContextInput } from '@moabualruz/fulcrum-memory'
+import type { Db } from 'fulcrum-core'
+import { getDb } from 'fulcrum-core'
+import { runProjectContext } from 'fulcrum-memory'
+import type { ProjectContextInput } from 'fulcrum-memory'
 
 export interface ProjectContextHttpInput {
   workspace_id: string

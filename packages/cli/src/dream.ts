@@ -3,7 +3,7 @@
 // Operator-only: NOT registered in TOOL_REGISTRY. Invoked as `fulcrum dream`.
 // Dreaming is a maintenance operation, not an agent-callable action.
 
-import { runLightPhase } from '@moabualruz/fulcrum-memory'
+import { runLightPhase } from 'fulcrum-memory'
 
 const VALID_PHASES = ['light', 'REM', 'deep', 'all'] as const
 type Phase = (typeof VALID_PHASES)[number]
@@ -43,7 +43,7 @@ export async function runDream(args: string[]): Promise<void> {
 }
 
 async function runLightPhaseCli(): Promise<void> {
-  const { getDb } = await import('@moabualruz/fulcrum-core')
+  const { getDb } = await import('fulcrum-core')
   const db = getDb()
 
   const memories = db.prepare(`

@@ -5,8 +5,8 @@
 // can surface the corresponding lifecycle hook with a single shell-out.
 
 import { createHash } from 'node:crypto'
-import type { Db } from '@moabualruz/fulcrum-core'
-import type { HookContext } from '@moabualruz/fulcrum-core'
+import type { Db } from 'fulcrum-core'
+import type { HookContext } from 'fulcrum-core'
 import { buildProvenance, sessionSummaryUniqueConstraintError, hasTaskOutcomeForRun, type PrimaryContextType } from './hooks-writers.js'
 
 export interface SessionSummaryInput {
@@ -32,7 +32,7 @@ export async function writeSessionSummary(input: SessionSummaryInput): Promise<'
   if (hasTaskOutcomeForRun(input.db, input.ctx.runId)) return 'skipped-race'
 
   try {
-    const { writeMemory } = await import('@moabualruz/fulcrum-memory')
+    const { writeMemory } = await import('fulcrum-memory')
     await writeMemory({
       workspace_id: input.ctx.workspace_id,
       project_id: input.ctx.workspace_id,
@@ -72,7 +72,7 @@ export interface PreCompactInput {
  * PreCompact handler. Runs the extractor (default: Haiku with 5s timeout,
  * fallback chain per §12.1). Each extracted item becomes one
  * kind='pre_compact_extract' memory. Fire-and-forget eviction — the
- * "merge insights into preamble" branch was dropped per Hermes B.8.
+ * "merge insights into preamble" branch was dropped per spec B.8.
  */
 export async function runPreCompactExtract(input: PreCompactInput): Promise<number> {
   const extractor = input.extractor ?? defaultExtractor
@@ -85,7 +85,7 @@ export async function runPreCompactExtract(input: PreCompactInput): Promise<numb
   }
 
   if (items.length === 0) return 0
-  const { writeMemory } = await import('@moabualruz/fulcrum-memory')
+  const { writeMemory } = await import('fulcrum-memory')
   let written = 0
   for (const item of items) {
     try {

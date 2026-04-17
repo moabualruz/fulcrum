@@ -1,7 +1,7 @@
 // packages/memory/src/tests/getmemory.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
-import { getDb } from '@moabualruz/fulcrum-core'
+import { getDb } from 'fulcrum-core'
 import { writeMemory } from '../write.js'
 import { getMemory, getMemoriesForTask } from '../recall.js'
 

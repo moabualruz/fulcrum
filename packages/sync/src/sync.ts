@@ -1,6 +1,6 @@
 // packages/sync/src/sync.ts
-import { getDb } from '@moabualruz/fulcrum-core'
-import { checkSecrets } from '@moabualruz/fulcrum-policy'
+import { getDb } from 'fulcrum-core'
+import { checkSecrets } from 'fulcrum-policy'
 import { PlaneAPIClient } from './plane/client.js'
 import { PlaneSyncAdapter } from './plane/adapter.js'
 import { SyncManager } from './sync-manager.js'
@@ -46,7 +46,7 @@ function buildManager(): SyncManager {
  * Steps:
  *  1. Reject never-sync object types (Memory, PolicyRule, etc.)
  *  2. Compute SHA-256 hash of canonical local_data — return early if unchanged.
- *  3. Scan local_data for secrets via @moabualruz/fulcrum-policy checkSecrets — throw on match.
+ *  3. Scan local_data for secrets via fulcrum-policy checkSecrets — throw on match.
  *  4. If PLANE_API_KEY not set → enqueue and return queued SyncState.
  *  5. Otherwise push via adapter, store external_id, mark synced.
  *  6. On detected remote conflict: record sync_conflict, set status='conflicted'.

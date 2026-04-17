@@ -1,5 +1,5 @@
 {
-  "name": "@moabualruz/fulcrum-workflows",
+  "name": "fulcrum-workflows",
   "version": "0.0.1",
   "description": "Workflow engine \u2014 define, register, and execute multi-step agent workflows with typed step transitions and run state tracking",
   "keywords": [
@@ -33,31 +33,31 @@
     "build": "tsup"
   },
   "dependencies": {
-    "@moabualruz/fulcrum-core": "workspace:*",
-    "@moabualruz/fulcrum-memory": "workspace:*",
+    "fulcrum-core": "workspace:*",
+    "fulcrum-memory": "workspace:*",
     "ajv": "^8.18.0",
     "ulidx": "^2.0.0"
   },
   "peerDependencies": {
-    "@moabualruz/fulcrum-planning": "workspace:*",
-    "@moabualruz/fulcrum-teams": "workspace:*",
-    "@moabualruz/fulcrum-worker": "workspace:*"
+    "fulcrum-planning": "workspace:*",
+    "fulcrum-teams": "workspace:*",
+    "fulcrum-worker": "workspace:*"
   },
   "peerDependenciesMeta": {
-    "@moabualruz/fulcrum-planning": {
+    "fulcrum-planning": {
       "optional": true
     },
-    "@moabualruz/fulcrum-teams": {
+    "fulcrum-teams": {
       "optional": true
     },
-    "@moabualruz/fulcrum-worker": {
+    "fulcrum-worker": {
       "optional": true
     }
   },
   "devDependencies": {
-    "@moabualruz/fulcrum-planning": "workspace:*",
-    "@moabualruz/fulcrum-teams": "workspace:*",
-    "@moabualruz/fulcrum-worker": "workspace:*",
+    "fulcrum-planning": "workspace:*",
+    "fulcrum-teams": "workspace:*",
+    "fulcrum-worker": "workspace:*",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^20.0.0",
     "better-sqlite3": "^12.0.0",

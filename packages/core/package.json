@@ -1,5 +1,5 @@
 {
-  "name": "@moabualruz/fulcrum-core",
+  "name": "fulcrum-core",
   "version": "0.0.1",
   "description": "Core persistence and orchestration layer \u2014 SQLite tasks, agent runs, policy enforcement, workspace status, handoffs, events, and embedding providers",
   "keywords": [
@@ -46,7 +46,7 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.53.0"
   },
   "devDependencies": {
-    "@moabualruz/fulcrum-teams": "workspace:*",
+    "fulcrum-teams": "workspace:*",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0",

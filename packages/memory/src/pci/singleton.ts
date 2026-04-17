@@ -11,7 +11,7 @@
 import { realpathSync, mkdirSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join, resolve } from 'node:path'
-import { globalDataDir } from '@moabualruz/fulcrum-core'
+import { globalDataDir } from 'fulcrum-core'
 import { acquireLock, type LockHandle, LockError } from './lock.js'
 import { watchDirectory, closeWatcherSubtree, activeWatcherCount } from './watcher.js'
 

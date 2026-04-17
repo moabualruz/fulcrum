@@ -1,7 +1,7 @@
 // packages/memory/src/tests/ingest.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
-import { getDb } from '@moabualruz/fulcrum-core'
+import { getDb } from 'fulcrum-core'
 import { ingestFile, ingestProject } from '../ingest.js'
 import { mkdirSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
@@ -35,7 +35,7 @@ export async function fetchUser(id: string): Promise<{ id: string; name: string 
 const PROSE_SAMPLE = `
 The architecture uses a local-first SQLite database.
 
-All packages share a single database file through @moabualruz/fulcrum-core's getDb() accessor.
+All packages share a single database file through fulcrum-core's getDb() accessor.
 
 Migrations run idempotently at startup — each migration is wrapped in INSERT OR IGNORE
 to the schema_migrations table so it only executes once.

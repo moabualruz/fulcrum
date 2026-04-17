@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { getContentChangeBus, resetContentChangeBus, type ContentChangeEvent } from '@moabualruz/fulcrum-core'
+import { getContentChangeBus, resetContentChangeBus, type ContentChangeEvent } from 'fulcrum-core'
 
 describe('ContentChangeBus — v2a PR 4 Task 22a', () => {
   beforeEach(() => resetContentChangeBus())

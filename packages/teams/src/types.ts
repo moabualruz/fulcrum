@@ -1,17 +1,17 @@
 // packages/teams/src/types.ts
 
-import type { AgentRole } from '@moabualruz/fulcrum-core'
+import type { AgentRole } from 'fulcrum-core'
 export type { AgentRole }
 
 /**
  * L1 roles are the only roles allowed to invoke other teams.
  * Per spec §17.4: only chief_of_staff can spawn sub-teams.
  *
- * Re-exported from `@moabualruz/fulcrum-core` — see `roles.ts` for the single source
+ * Re-exported from `fulcrum-core` — see `roles.ts` for the single source
  * of truth (H-11). This re-export preserves backward-compat for existing
- * imports from `@moabualruz/fulcrum-teams`.
+ * imports from `fulcrum-teams`.
  */
-export { L1_ROLES } from '@moabualruz/fulcrum-core'
+export { L1_ROLES } from 'fulcrum-core'
 
 export interface TeamSlot {
   slot_id: string

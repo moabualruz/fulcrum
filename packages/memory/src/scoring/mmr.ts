@@ -1,4 +1,3 @@
-// Ported from: openclaw/extensions/memory-core/src/memory/mmr.ts
 // License: MIT (Copyright (c) 2025 Peter Steinberger)
 //
 // v2a PR 1 Task 7 — Maximal Marginal Relevance (MMR) re-ranking.
@@ -6,7 +5,6 @@
 // maximize: λ * relevance - (1-λ) * max_similarity_to_selected.
 // See Carbonell & Goldstein, "The Use of MMR, Diversity-Based Reranking" (1998).
 //
-// Inlines normalizeLowercaseStringOrEmpty from openclaw/plugin-sdk/text-runtime
 // to keep this module dependency-free (one tiny pure helper).
 
 export type MMRItem = {

@@ -250,8 +250,8 @@ const _listTasksControl = {
   impl: vi.fn().mockResolvedValue([] as unknown[]),
 }
 
-vi.mock('@moabualruz/fulcrum-core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@moabualruz/fulcrum-core')>()
+vi.mock('fulcrum-core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fulcrum-core')>()
   return {
     ...actual,
     listTasks: (...args: unknown[]) => _listTasksControl.impl(...args),
@@ -259,7 +259,7 @@ vi.mock('@moabualruz/fulcrum-core', async (importOriginal) => {
 })
 
 describe('suggested_next_call heuristic', () => {
-  // We mock @moabualruz/fulcrum-core so the dynamic import inside buildCurrentContextResponse
+  // We mock fulcrum-core so the dynamic import inside buildCurrentContextResponse
   // gets a controlled listTasks. We also stub fetch so probeMonitor doesn't hit
   // the network, and set _projectIds via the test helper.
 

@@ -1,5 +1,5 @@
 // packages/policy/src/audit.ts
-import { getDb, newId , Db} from '@moabualruz/fulcrum-core'
+import { getDb, newId , Db} from 'fulcrum-core'
 import type { PolicyEvent, LogPolicyEventInput, GetAuditLogInput } from './types.js'
 
 function rowToEvent(row: Record<string, unknown>): PolicyEvent {

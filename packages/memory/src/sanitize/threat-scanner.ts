@@ -1,4 +1,4 @@
-// v2a PR 5 Task 24 — threat-scanner port (Hermes pattern).
+// v2a PR 5 Task 24 — threat-scanner port (failure-isolation pattern).
 //
 // Detects and redacts:
 //   * Fence markers — `<fulcrum-recall>...</fulcrum-recall>` (strip)

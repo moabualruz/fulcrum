@@ -1,7 +1,7 @@
 // packages/memory/src/tests/dedup.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
-import { getDb } from '@moabualruz/fulcrum-core'
+import { getDb } from 'fulcrum-core'
 import { contentHash, isDuplicate } from '../dedup.js'
 
 beforeEach(() => { createTestDb() })

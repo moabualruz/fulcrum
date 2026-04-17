@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { setDb, closeDb, _configureDb, runMigrations } from '@moabualruz/fulcrum-core'
+import { setDb, closeDb, _configureDb, runMigrations } from 'fulcrum-core'
 import { sweepExpiredMemories, startSweepTimer, opportunisticSweep } from '../sweep.js'
 
 function freshDb() {

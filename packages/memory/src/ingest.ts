@@ -2,7 +2,7 @@
 import { ulid } from 'ulidx'
 import { readdirSync, readFileSync, statSync } from 'fs'
 import { join, extname, basename } from 'path'
-import { getDb, Db} from '@moabualruz/fulcrum-core'
+import { getDb, Db} from 'fulcrum-core'
 import { contentHash, isDuplicate } from './dedup.js'
 import { writeMemory } from './write.js'
 import type { IngestFileInput, IngestResult, IngestProjectInput } from './types.js'

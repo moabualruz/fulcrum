@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { startMonitorServer, assertLoopbackHost, MonitorNonLoopbackError } from '../server.js'
-import { closeDb, _configureDb, setDb, runMigrations } from '@moabualruz/fulcrum-core'
+import { closeDb, _configureDb, setDb, runMigrations } from 'fulcrum-core'
 import Database from 'better-sqlite3'
 
 describe('Monitor /content-index — v2a PR 4 Task 23', () => {
@@ -71,7 +71,7 @@ describe('Monitor /content-index — v2a PR 4 Task 23', () => {
 
   it('content-index populates file counts from code_files table', async () => {
     // Insert a code_files row via the live DB helper.
-    const { getDb } = await import('@moabualruz/fulcrum-core')
+    const { getDb } = await import('fulcrum-core')
     const db = getDb()
     db.prepare(`INSERT OR IGNORE INTO workspaces (workspace_id, name) VALUES ('ws_test','ws_test')`).run()
     db.prepare(`INSERT OR IGNORE INTO projects (project_id, workspace_id, name) VALUES ('proj_1','ws_test','proj_1')`).run()

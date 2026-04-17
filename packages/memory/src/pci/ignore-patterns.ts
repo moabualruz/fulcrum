@@ -1,9 +1,8 @@
-// Ported from: osgrep/src/lib/index/ignore-patterns.ts
 // License: Apache-2.0
 //
 // v2a PR 1 Task 7 — shared ignore patterns for filesystem walks. Keeps JSON
 // files (package.json, tsconfig.json, etc.) but skips lockfiles and obvious
-// binaries. Mirrors osgrep verbatim including the security-sensitive section
+// binaries. Mirrors prior-art reference verbatim including the security-sensitive section
 // — this is a defense-in-depth list, not the authoritative secret-scan source.
 export const DEFAULT_IGNORE_PATTERNS = [
   '*.lock',

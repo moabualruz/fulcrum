@@ -42,39 +42,39 @@ importers:
 
   packages/cli:
     dependencies:
-      '@moabualruz/fulcrum-core':
-        specifier: workspace:*
-        version: link:../core
-      '@moabualruz/fulcrum-memory':
-        specifier: workspace:*
-        version: link:../memory
-      '@moabualruz/fulcrum-monitor':
-        specifier: workspace:*
-        version: link:../monitor
-      '@moabualruz/fulcrum-planning':
-        specifier: workspace:*
-        version: link:../planning
-      '@moabualruz/fulcrum-policy':
-        specifier: workspace:*
-        version: link:../policy
-      '@moabualruz/fulcrum-sync':
-        specifier: workspace:*
-        version: link:../sync
-      '@moabualruz/fulcrum-teams':
-        specifier: workspace:*
-        version: link:../teams
-      '@moabualruz/fulcrum-worker':
-        specifier: workspace:*
-        version: link:../worker
-      '@moabualruz/fulcrum-workflows':
-        specifier: workspace:*
-        version: link:../workflows
-      '@moabualruz/fulcrum-worktrees':
-        specifier: workspace:*
-        version: link:../worktrees
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.3.6)
+      fulcrum-core:
+        specifier: workspace:*
+        version: link:../core
+      fulcrum-memory:
+        specifier: workspace:*
+        version: link:../memory
+      fulcrum-monitor:
+        specifier: workspace:*
+        version: link:../monitor
+      fulcrum-planning:
+        specifier: workspace:*
+        version: link:../planning
+      fulcrum-policy:
+        specifier: workspace:*
+        version: link:../policy
+      fulcrum-sync:
+        specifier: workspace:*
+        version: link:../sync
+      fulcrum-teams:
+        specifier: workspace:*
+        version: link:../teams
+      fulcrum-worker:
+        specifier: workspace:*
+        version: link:../worker
+      fulcrum-workflows:
+        specifier: workspace:*
+        version: link:../workflows
+      fulcrum-worktrees:
+        specifier: workspace:*
+        version: link:../worktrees
       ink:
         specifier: ^7.0.0
         version: 7.0.0(@types/react@19.2.14)(react@19.2.5)
@@ -137,15 +137,15 @@ importers:
         specifier: ^2.3.0
         version: 2.4.1
     devDependencies:
-      '@moabualruz/fulcrum-teams':
-        specifier: workspace:*
-        version: link:../teams
       '@types/better-sqlite3':
         specifier: ^7.6.12
         version: 7.6.13
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.39
+      fulcrum-teams:
+        specifier: workspace:*
+        version: link:../teams
       typescript:
         specifier: ^5.4.0
         version: 5.9.3
@@ -155,7 +155,7 @@ importers:
 
   packages/fulcrum-mcp:
     dependencies:
-      '@moabualruz/fulcrum-cli':
+      fulcrum-cli:
         specifier: workspace:*
         version: link:../cli
       tsx:
@@ -174,12 +174,12 @@ importers:
 
   packages/memory:
     dependencies:
-      '@moabualruz/fulcrum-core':
-        specifier: workspace:*
-        version: link:../core
       chokidar:
         specifier: ^3.6.0
         version: 3.6.0
+      fulcrum-core:
+        specifier: workspace:*
+        version: link:../core
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
@@ -224,13 +224,13 @@ importers:
       '@hono/node-server':
         specifier: ^1.12.0
         version: 1.19.14(hono@4.12.12)
-      '@moabualruz/fulcrum-core':
+      fulcrum-core:
         specifier: workspace:*
         version: link:../core
-      '@moabualruz/fulcrum-memory':
+      fulcrum-memory:
         specifier: workspace:*
         version: link:../memory
-      '@moabualruz/fulcrum-policy':
+      fulcrum-policy:
         specifier: workspace:*
         version: link:../policy
       hono:
@@ -258,7 +258,7 @@ importers:
 
   packages/planning:
     dependencies:
-      '@moabualruz/fulcrum-core':
+      fulcrum-core:
         specifier: workspace:*
         version: link:../core
       ulidx:
@@ -283,7 +283,7 @@ importers:
 
   packages/policy:
     dependencies:
-      '@moabualruz/fulcrum-core':
+      fulcrum-core:
         specifier: workspace:*
         version: link:../core
       minimatch:
@@ -311,10 +311,10 @@ importers:
 
   packages/sync:
     dependencies:
-      '@moabualruz/fulcrum-core':
+      fulcrum-core:
         specifier: workspace:*
         version: link:../core
-      '@moabualruz/fulcrum-policy':
+      fulcrum-policy:
         specifier: workspace:*
         version: link:../policy
       ulidx:
@@ -339,7 +339,7 @@ importers:
 
   packages/teams:
     dependencies:
-      '@moabualruz/fulcrum-core':
+      fulcrum-core:
         specifier: workspace:*
         version: link:../core
       ulidx:
@@ -364,7 +364,7 @@ importers:
 
   packages/worker:
     dependencies:
-      '@moabualruz/fulcrum-core':
+      fulcrum-core:
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -386,28 +386,19 @@ importers:
 
   packages/workflows:
     dependencies:
-      '@moabualruz/fulcrum-core':
-        specifier: workspace:*
-        version: link:../core
-      '@moabualruz/fulcrum-memory':
-        specifier: workspace:*
-        version: link:../memory
       ajv:
         specifier: ^8.18.0
         version: 8.18.0
+      fulcrum-core:
+        specifier: workspace:*
+        version: link:../core
+      fulcrum-memory:
+        specifier: workspace:*
+        version: link:../memory
       ulidx:
         specifier: ^2.0.0
         version: 2.4.1
     devDependencies:
-      '@moabualruz/fulcrum-planning':
-        specifier: workspace:*
-        version: link:../planning
-      '@moabualruz/fulcrum-teams':
-        specifier: workspace:*
-        version: link:../teams
-      '@moabualruz/fulcrum-worker':
-        specifier: workspace:*
-        version: link:../worker
       '@types/better-sqlite3':
         specifier: ^7.6.12
         version: 7.6.13
@@ -417,6 +408,15 @@ importers:
       better-sqlite3:
         specifier: ^12.0.0
         version: 12.9.0
+      fulcrum-planning:
+        specifier: workspace:*
+        version: link:../planning
+      fulcrum-teams:
+        specifier: workspace:*
+        version: link:../teams
+      fulcrum-worker:
+        specifier: workspace:*
+        version: link:../worker
       typescript:
         specifier: ^5.4.0
         version: 5.9.3
@@ -426,7 +426,7 @@ importers:
 
   packages/worktrees:
     dependencies:
-      '@moabualruz/fulcrum-core':
+      fulcrum-core:
         specifier: workspace:*
         version: link:../core
       ulidx:

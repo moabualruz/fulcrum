@@ -1,5 +1,5 @@
 {
-  "name": "@moabualruz/fulcrum-memory",
+  "name": "fulcrum-memory",
   "version": "0.0.1",
   "description": "Three-layer memory stack \u2014 git vault (L0), FTS5 full-text search (L1), Kuzu graph + HNSW vector search (L2) for agent memory and cross-project knowledge graphs",
   "keywords": [
@@ -39,7 +39,7 @@
     "eval:longmemeval": "vitest run src/eval/longmemeval/tests/harness.test.ts"
   },
   "dependencies": {
-    "@moabualruz/fulcrum-core": "workspace:*",
+    "fulcrum-core": "workspace:*",
     "chokidar": "^3.6.0",
     "gray-matter": "^4.0.3",
     "simple-git": "^3.22.0",

@@ -16,7 +16,7 @@
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { createHash } from 'node:crypto'
-import { globalDataDir } from '@moabualruz/fulcrum-core'
+import { globalDataDir } from 'fulcrum-core'
 import type { SanitizeEvent } from '../sanitize/index.js'
 
 export class WalDurabilityError extends Error {

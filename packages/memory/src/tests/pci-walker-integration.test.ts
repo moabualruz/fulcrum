@@ -66,7 +66,7 @@ describe('PCI walker integration — v2a PR 4 Task 21', () => {
     expect(result.files).toEqual(['small.ts'])
   })
 
-  it('respects .gitignore in non-git mode via osgrep walker', async () => {
+  it('respects .gitignore in non-git mode via prior-art reference walker', async () => {
     writeFileSync(join(root, '.gitignore'), 'ignored.ts\n')
     writeFileSync(join(root, 'ignored.ts'), 'nope')
     writeFileSync(join(root, 'kept.ts'), 'ok')

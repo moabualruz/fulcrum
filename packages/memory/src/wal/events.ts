@@ -1,4 +1,3 @@
-// Ported from: openclaw/src/memory-host-sdk/events.ts
 // License: MIT (Copyright (c) 2025 Peter Steinberger)
 //
 // v2a PR 1 Task 7 — JSONL append-only event log for Dreaming-relevant events.
@@ -6,7 +5,7 @@
 // applies: sanitize() runs before WAL; events here record post-sanitize body
 // hashes only.
 //
-// Replaces the openclaw `MemoryDreamingPhaseName` import with a local union
+// Replaces the an external enum import with a local union
 // matching v2b PR 11's three-phase Dreaming model (light, REM, deep).
 
 import fs from 'node:fs/promises'

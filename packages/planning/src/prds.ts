@@ -1,5 +1,5 @@
 // packages/planning/src/prds.ts
-import { getDb, FulcrumError, emitEvent, nextDisplayId, newId, Db} from '@moabualruz/fulcrum-core'
+import { getDb, FulcrumError, emitEvent, nextDisplayId, newId, Db} from 'fulcrum-core'
 import type { PRD, CreatePRDInput, UpdatePRDInput, ListPRDsInput, PRDStatus, StatusCategory } from './types.js'
 
 function prdStatusCategory(status: PRDStatus): StatusCategory {

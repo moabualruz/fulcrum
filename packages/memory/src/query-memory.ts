@@ -5,8 +5,8 @@
 // filters via SQL, and emits the {results, reason?} envelope. Never touches
 // L2 — see plan §"Excluded from v2a" → "no Kuzu in query_memory".
 
-import type { Db } from '@moabualruz/fulcrum-core'
-import { getDb } from '@moabualruz/fulcrum-core'
+import type { Db } from 'fulcrum-core'
+import { getDb } from 'fulcrum-core'
 
 export interface QueryMemoryInput {
   workspace_id: string

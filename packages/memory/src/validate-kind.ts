@@ -6,9 +6,9 @@
 // table rebuilds. Validation, char caps per §3.4, and the truncation marker
 // move into this module so write.ts applies a single canonical policy.
 
-import { FulcrumError } from '@moabualruz/fulcrum-core'
+import { FulcrumError } from 'fulcrum-core'
 
-/** v2a kinds from §3.4 — Hermes-derived, written by hooks or agents. */
+/** v2a kinds from §3.4 — standard, written by hooks or agents. */
 const V2A_KINDS = [
   'file_patch',
   'tool_trace',
@@ -59,7 +59,7 @@ const V2B_KINDS = [
 const ALLOWED_KINDS = new Set<string>([...V2A_KINDS, ...LEGACY_KINDS, ...V2B_KINDS])
 
 /**
- * Per-kind character cap in characters. Hermes convention: model-independent.
+ * Per-kind character cap in characters. established convention: model-independent.
  * Content above the cap is truncated with `[…truncated N chars]`. Kinds not
  * listed have no cap.
  */

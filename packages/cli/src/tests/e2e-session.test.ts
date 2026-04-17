@@ -5,7 +5,7 @@
 // Verifies the correct Fulcrum operations are invoked at each stage and that
 // the session file is used as state-passing mechanism between start and stop.
 //
-// Pattern mirrors hook-session-lifecycle.test.ts — mocks @moabualruz/fulcrum-core and fs
+// Pattern mirrors hook-session-lifecycle.test.ts — mocks fulcrum-core and fs
 // inline per test so vi.doMock + vi.resetModules() reliably picks up the right mock.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -51,7 +51,7 @@ afterEach(() => {
 describe('E2E session lifecycle — full hook sequence', () => {
   it('Phase 1 — SessionStart: calls startAgentRun and writes session file', async () => {
     const startAgentRun = vi.fn().mockResolvedValue({ run_id: 'run_e2e_001' })
-    vi.doMock('@moabualruz/fulcrum-core', () => ({
+    vi.doMock('fulcrum-core', () => ({
       startAgentRun,
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),
@@ -81,7 +81,7 @@ describe('E2E session lifecycle — full hook sequence', () => {
 
   it('Phase 2 — SessionStop: reads session file, calls completeAgentRun', async () => {
     const completeAgentRun = vi.fn().mockResolvedValue({})
-    vi.doMock('@moabualruz/fulcrum-core', () => ({
+    vi.doMock('fulcrum-core', () => ({
       completeAgentRun,
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),
@@ -117,8 +117,8 @@ describe('E2E session lifecycle — full hook sequence', () => {
 
   it('Phase 3 — PreCompact: writes a memory entry from compact summary', async () => {
     const writeMemory = vi.fn().mockResolvedValue({ memory_id: 'mem_compact_001' })
-    vi.doMock('@moabualruz/fulcrum-memory', () => ({ writeMemory }))
-    vi.doMock('@moabualruz/fulcrum-core', () => ({
+    vi.doMock('fulcrum-memory', () => ({ writeMemory }))
+    vi.doMock('fulcrum-core', () => ({
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_e2e', project_id: 'proj_e2e', db_path: ':memory:' }),
@@ -159,7 +159,7 @@ describe('E2E session lifecycle — full hook sequence', () => {
     let sessionFileData = ''
 
     const startAgentRun = vi.fn().mockResolvedValue({ run_id: CHAIN_RUN_ID })
-    vi.doMock('@moabualruz/fulcrum-core', () => ({
+    vi.doMock('fulcrum-core', () => ({
       startAgentRun,
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),
@@ -189,7 +189,7 @@ describe('E2E session lifecycle — full hook sequence', () => {
     // Phase 2: stop using the captured session data
     const completeAgentRun = vi.fn().mockResolvedValue({})
     vi.resetModules()
-    vi.doMock('@moabualruz/fulcrum-core', () => ({
+    vi.doMock('fulcrum-core', () => ({
       completeAgentRun,
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),

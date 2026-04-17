@@ -1,5 +1,5 @@
 {
-  "name": "@fulcrum/scripts",
+  "name": "fulcrum-scripts",
   "private": true,
   "type": "module",
   "scripts": {

@@ -10,17 +10,17 @@
 // Imports into other @fulcrum packages are lazy (`await import(...)`)
 // for two reasons:
 //  1. Circular-dep safety: several of these packages may eventually
-//     depend on @moabualruz/fulcrum-workflows, and lazy imports break the cycle.
+//     depend on fulcrum-workflows, and lazy imports break the cycle.
 //  2. Graceful degradation: if a package isn't installed in a particular
-//     consumer (e.g. a CLI that doesn't pull in @moabualruz/fulcrum-teams), the
+//     consumer (e.g. a CLI that doesn't pull in fulcrum-teams), the
 //     handler can catch ERR_MODULE_NOT_FOUND and return a structured
 //     failure instead of crashing at module load.
 
 import { spawn } from 'node:child_process'
 import { realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { getDb, newId, Db} from '@moabualruz/fulcrum-core'
-import type { MemoryKind, MemoryScope } from '@moabualruz/fulcrum-core'
+import { getDb, newId, Db} from 'fulcrum-core'
+import type { MemoryKind, MemoryScope } from 'fulcrum-core'
 import type { StepContext, StepResult, StepHandler } from './types.js'
 
 /** Run a command with stdin ignored, collect stdout. Resolves on exit code 0 or 1 (grep/rg
@@ -66,7 +66,7 @@ function num(v: unknown, fallback: number): number {
 const HANDLERS: Record<string, StepHandler> = {}
 
 HANDLERS['create_task'] = async (ctx) => {
-  const { createTask } = await import('@moabualruz/fulcrum-core')
+  const { createTask } = await import('fulcrum-core')
   const c = cfg(ctx)
   if (!ctx.project_id) {
     return { status: 'failed', error: 'create_task requires project_id on the workflow run' }
@@ -83,7 +83,7 @@ HANDLERS['create_task'] = async (ctx) => {
 
 HANDLERS['create_issue'] = async (ctx) => {
   try {
-    const planning = await import('@moabualruz/fulcrum-planning')
+    const planning = await import('fulcrum-planning')
     const c = cfg(ctx)
     if (!ctx.project_id) return { status: 'failed', error: 'create_issue requires project_id' }
     const issue = await planning.createIssue({
@@ -100,7 +100,7 @@ HANDLERS['create_issue'] = async (ctx) => {
 
 HANDLERS['create_epic'] = async (ctx) => {
   try {
-    const planning = await import('@moabualruz/fulcrum-planning')
+    const planning = await import('fulcrum-planning')
     const c = cfg(ctx)
     if (!ctx.project_id) return { status: 'failed', error: 'create_epic requires project_id' }
     const epic = await planning.createEpic({
@@ -167,7 +167,7 @@ HANDLERS['read_artifact'] = async (ctx) => {
 }
 
 HANDLERS['write_memory'] = async (ctx) => {
-  const { writeMemory } = await import('@moabualruz/fulcrum-memory')
+  const { writeMemory } = await import('fulcrum-memory')
   const c = cfg(ctx)
   if (!ctx.project_id) return { status: 'failed', error: 'write_memory requires project_id' }
   const content = str(c['content'], `workflow ${ctx.wf_id} step ${ctx.step_id}`)
@@ -185,7 +185,7 @@ HANDLERS['write_memory'] = async (ctx) => {
 }
 
 HANDLERS['read_memory'] = async (ctx) => {
-  const { recallMemory } = await import('@moabualruz/fulcrum-memory')
+  const { recallMemory } = await import('fulcrum-memory')
   const c = cfg(ctx)
   if (!ctx.project_id) return { status: 'failed', error: 'read_memory requires project_id' }
   try {
@@ -203,7 +203,7 @@ HANDLERS['read_memory'] = async (ctx) => {
 
 HANDLERS['invoke_team'] = async (ctx) => {
   try {
-    const teams = await import('@moabualruz/fulcrum-teams')
+    const teams = await import('fulcrum-teams')
     const c = cfg(ctx)
     const result = await teams.invokeTeam({
       workspace_id: ctx.workspace_id,
@@ -222,7 +222,7 @@ HANDLERS['invoke_team'] = async (ctx) => {
 
 HANDLERS['spawn_agent'] = async (ctx) => {
   try {
-    const worker = await import('@moabualruz/fulcrum-worker')
+    const worker = await import('fulcrum-worker')
     const c = cfg(ctx)
     if (!ctx.project_id) return { status: 'failed', error: 'spawn_agent requires project_id' }
     const result = await worker.spawnAgent({
@@ -365,7 +365,7 @@ HANDLERS['halt'] = async () => {
 }
 
 HANDLERS['escalate'] = async (ctx) => {
-  const { createHandoff, getDb: getDbCore } = await import('@moabualruz/fulcrum-core')
+  const { createHandoff, getDb: getDbCore } = await import('fulcrum-core')
   const c = cfg(ctx)
   try {
     const handoff = createHandoff(getDbCore(), {
@@ -433,7 +433,7 @@ HANDLERS['review_artifact'] = async (ctx) => {
 }
 
 HANDLERS['evaluate_policy'] = async (ctx) => {
-  const { checkPolicy } = await import('@moabualruz/fulcrum-core')
+  const { checkPolicy } = await import('fulcrum-core')
   const c = cfg(ctx)
   try {
     const result = (checkPolicy as unknown as (i: Record<string, unknown>) => Promise<unknown>)({

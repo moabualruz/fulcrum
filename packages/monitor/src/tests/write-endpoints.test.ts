@@ -4,7 +4,7 @@
 // POST /reviews/:id/reject — plus bearer token auth middleware.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { setDb, _configureDb, runMigrations, createTask, startAgentRun } from '@moabualruz/fulcrum-core'
+import { setDb, _configureDb, runMigrations, createTask, startAgentRun } from 'fulcrum-core'
 import { startMonitorServer } from '../server.js'
 import Database from 'better-sqlite3'
 

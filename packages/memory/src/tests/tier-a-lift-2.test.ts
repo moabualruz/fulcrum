@@ -10,7 +10,7 @@ import { walk } from '../pci/walker.js'
 import { maxSim, cosineSim } from '../retrieval/colbert-math.js'
 import { acquireLock, withLock, LockError } from '../pci/lock.js'
 
-describe('mmr — v2a Task 7 (openclaw lift)', () => {
+describe('mmr — v2a Task 7 (Tier A algorithm)', () => {
   it('tokenize returns ascii word tokens', () => {
     const t = tokenize('Hello, World — getUserById')
     expect(t.has('hello')).toBe(true)
@@ -77,7 +77,7 @@ describe('mmr — v2a Task 7 (openclaw lift)', () => {
   })
 })
 
-describe('hybrid — v2a Task 7 (openclaw lift)', () => {
+describe('hybrid — v2a Task 7 (Tier A algorithm)', () => {
   it('buildFtsQuery returns null for empty/whitespace input', () => {
     expect(buildFtsQuery('')).toBeNull()
     expect(buildFtsQuery('   ')).toBeNull()
@@ -107,7 +107,7 @@ describe('hybrid — v2a Task 7 (openclaw lift)', () => {
   })
 })
 
-describe('events (WAL JSONL) — v2a Task 7 (openclaw lift)', () => {
+describe('events (WAL JSONL) — v2a Task 7 (Tier A algorithm)', () => {
   let tmp: string
   let cleanup: string[] = []
   beforeEachReset()
@@ -151,7 +151,7 @@ describe('events (WAL JSONL) — v2a Task 7 (openclaw lift)', () => {
   }
 })
 
-describe('walker — v2a Task 7 (osgrep lift)', () => {
+describe('walker — v2a Task 7 (Tier A algorithm)', () => {
   let root: string
   beforeAllSetup()
   function beforeAllSetup() {
@@ -177,7 +177,7 @@ describe('walker — v2a Task 7 (osgrep lift)', () => {
   })
 })
 
-describe('colbert-math — v2a Task 7 (osgrep adaptation)', () => {
+describe('colbert-math — v2a Task 7 (adaptation)', () => {
   it('cosineSim of identical vectors is the squared norm', () => {
     const v = [1, 2, 3]
     expect(cosineSim(v, v)).toBeCloseTo(14, 5) // 1 + 4 + 9
@@ -209,7 +209,7 @@ describe('colbert-math — v2a Task 7 (osgrep adaptation)', () => {
   })
 })
 
-describe('lock — v2a Task 7 (mempalace-style)', () => {
+describe('lock — v2a Task 7 (cross-process)', () => {
   it('acquires + releases a lock cleanly', () => {
     const lockPath = join(tmpdir(), `fulcrum-lock-${Date.now()}-${Math.random().toString(36).slice(2)}.lock`)
     const handle = acquireLock(lockPath)

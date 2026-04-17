@@ -12,7 +12,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'http'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { TOOL_SCHEMAS } from './mcp-tools.js'
-import { getDb, listWorkspaces } from '@moabualruz/fulcrum-core'
+import { getDb, listWorkspaces } from 'fulcrum-core'
 
 // ---------- Types ----------
 
@@ -511,7 +511,7 @@ export async function runFulcrumMcpServer(options: McpServerOptions): Promise<vo
   process.stderr.write('[fulcrum mcp] fulcrum MCP server started (stdio, protocol 2025-11-25)\n')
 
   // v2b PR 15: normalize_version sweep on server start (background, non-blocking)
-  import('@moabualruz/fulcrum-memory').then(m => {
+  import('fulcrum-memory').then(m => {
     if (typeof (m as Record<string, unknown>).startNormalizeVersionSweep === 'function') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(m as any).startNormalizeVersionSweep()

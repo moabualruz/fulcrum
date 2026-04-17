@@ -8,7 +8,7 @@
 import { spawn } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { globalDataDir } from '@moabualruz/fulcrum-core'
+import { globalDataDir } from 'fulcrum-core'
 
 export interface CockpitStatus {
   running: boolean

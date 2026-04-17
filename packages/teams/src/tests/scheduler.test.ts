@@ -4,7 +4,7 @@ import { createTestDb, resetTestDb, seed } from './helpers.js'
 import type Database from 'better-sqlite3'
 import { canStartTeam } from '../scheduler.js'
 import { invokeTeam, createTeamTemplate, heartbeatTeam } from '../teams.js'
-import { FulcrumError } from '@moabualruz/fulcrum-core'
+import { FulcrumError } from 'fulcrum-core'
 import { ulid } from 'ulidx'
 
 let db: Database.Database

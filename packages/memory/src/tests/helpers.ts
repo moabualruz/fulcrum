@@ -1,6 +1,6 @@
 // packages/memory/src/tests/helpers.ts
 import Database from 'better-sqlite3'
-import { setDb, closeDb, _configureDb, runMigrations } from '@moabualruz/fulcrum-core'
+import { setDb, closeDb, _configureDb, runMigrations } from 'fulcrum-core'
 
 export function createTestDb(): Database.Database {
   const db = new Database(':memory:')

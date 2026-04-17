@@ -3,8 +3,8 @@
 // Returns Google A2A AgentCard JSON derived from agent_definitions row at request
 // time (not cached) per Part 02 §"A2A agent cards" lines 246-254.
 
-import type { Db } from '@moabualruz/fulcrum-core'
-import { getDb, getAgentDefinition, listAgentDefinitions, buildA2ACard } from '@moabualruz/fulcrum-core'
+import type { Db } from 'fulcrum-core'
+import { getDb, getAgentDefinition, listAgentDefinitions, buildA2ACard } from 'fulcrum-core'
 
 export type A2ACardResult =
   | { body: Record<string, unknown> }

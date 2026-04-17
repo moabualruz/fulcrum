@@ -1,9 +1,8 @@
-// Ported from: mgrep/src/lib/utils.ts (commit 2026-04, computeBufferHash)
 // License: Apache-2.0
 //
 // v2a PR 1 Task 8 — xxhash64 buffer hashing for PCI change detection.
 // Returns the hash prefixed with `xxh64:` so future format changes can fan in
-// alongside today's value via mgrep-style hashesMatch (forward-compat).
+// alongside today's value via mtime-hash-style hashesMatch (forward-compat).
 
 import xxhashWasm from 'xxhash-wasm'
 
@@ -26,7 +25,7 @@ export async function computeBufferHash(buffer: Buffer | Uint8Array): Promise<st
  * Forward-compat predicate: matches a stored hash against a buffer.
  * Today only `xxh64:` prefixes exist; if a sha256 (no prefix) is stored, this
  * returns false so the caller treats it as a cache miss and re-hashes — the
- * mgrep migration pattern.
+ * migration pattern.
  */
 export async function hashesMatch(storedHash: string, buffer: Buffer | Uint8Array): Promise<boolean> {
   if (!storedHash.startsWith(XXHASH_PREFIX)) return false

@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { resetContentChangeBus, getContentChangeBus, globalDataDir } from '@moabualruz/fulcrum-core'
+import { resetContentChangeBus, getContentChangeBus, globalDataDir } from 'fulcrum-core'
 import { ensure, shutdownAll, isVaultOwnedPath, VaultOwnedPathError } from '../pci/singleton.js'
 
 describe('PCI vault-dedup guard — v2a PR 4 Task 22', () => {

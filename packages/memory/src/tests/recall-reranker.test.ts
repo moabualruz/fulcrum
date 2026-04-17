@@ -7,14 +7,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
-import { getDb } from '@moabualruz/fulcrum-core'
+import { getDb } from 'fulcrum-core'
 import { writeMemory } from '../write.js'
 import { recallMemory } from '../recall.js'
 import type { CompactMemory } from '../types.js'
 
 // Mock the reranker so tests don't load ONNX model
-vi.mock('@moabualruz/fulcrum-core', async () => {
-  const actual = await vi.importActual<typeof import('@moabualruz/fulcrum-core')>('@moabualruz/fulcrum-core')
+vi.mock('fulcrum-core', async () => {
+  const actual = await vi.importActual<typeof import('fulcrum-core')>('fulcrum-core')
   return {
     ...actual,
     getReranker: vi.fn().mockReturnValue(null),  // default: no reranker
@@ -87,7 +87,7 @@ describe('reranker wiring in recallMemory (Task 24)', () => {
 
     // Mock reranker: passage 0 (as returned by FTS5 order) gets 0.95, passage 1 gets 0.05
     // After reranking, the 0.95 passage should be first
-    const { getReranker } = await import('@moabualruz/fulcrum-core')
+    const { getReranker } = await import('fulcrum-core')
     vi.mocked(getReranker).mockReturnValue({
       rerank: vi.fn().mockImplementation((_q: string, passages: string[]) => {
         // Return high score for the passage containing 'dog', low for 'quantum'
@@ -133,7 +133,7 @@ describe('reranker wiring in recallMemory (Task 24)', () => {
     })
 
     // Reranker returns NaN/Infinity — should fall back to RRF score
-    const { getReranker } = await import('@moabualruz/fulcrum-core')
+    const { getReranker } = await import('fulcrum-core')
     vi.mocked(getReranker).mockReturnValue({
       rerank: vi.fn().mockResolvedValue([NaN]),
       warmUp: vi.fn(),

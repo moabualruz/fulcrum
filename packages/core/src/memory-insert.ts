@@ -6,7 +6,7 @@
 //
 // Does NOT run the L0/L1/L2 extraction pipeline — that is intentional.
 // Internal lifecycle events are persisted as raw rows with SHA-256 dedup.
-// External callers should use @moabualruz/fulcrum-memory for full pipeline writes.
+// External callers should use fulcrum-memory for full pipeline writes.
 
 import { createHash } from 'crypto'
 import { getDb , Db} from './db/client.js'

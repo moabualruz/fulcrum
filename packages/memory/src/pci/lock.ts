@@ -1,4 +1,3 @@
-// Authored to match the mempalace cross-process lock pattern.
 // License: MIT (Fulcrum)
 //
 // v2a PR 1 Task 7 — cross-process advisory file lock for the PCI singleton.

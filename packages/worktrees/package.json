@@ -1,5 +1,5 @@
 {
-  "name": "@moabualruz/fulcrum-worktrees",
+  "name": "fulcrum-worktrees",
   "version": "0.0.1",
   "description": "Code worktree lifecycle management \u2014 worktree provisioning, artifact tracking, and code review workflows",
   "keywords": [
@@ -33,7 +33,7 @@
     "build": "tsup"
   },
   "dependencies": {
-    "@moabualruz/fulcrum-core": "workspace:*",
+    "fulcrum-core": "workspace:*",
     "ulidx": "^2.3.0"
   },
   "devDependencies": {

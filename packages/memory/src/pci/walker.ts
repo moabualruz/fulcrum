@@ -1,10 +1,9 @@
-// Ported from: osgrep/src/lib/index/walker.ts
 // License: Apache-2.0
 //
 // v2a PR 1 Task 7 — async hierarchical filesystem walker with stacked-scope
 // .gitignore semantics. PR 4's PCI uses this when getGitFiles() can't (non-
 // git directories). DEFAULT_IGNORE_PATTERNS from sibling ignore-patterns.ts
-// is always applied; per-directory .gitignore / .osgrepignore stacks add to
+// is always applied; per-directory .gitignore / .fulcrumignore stacks add to
 // it as the walker descends.
 
 import type { Dirent } from 'node:fs'
@@ -39,7 +38,7 @@ async function getIgnoreFilter(dir: string, ignoreFiles: string[]): Promise<Igno
 }
 
 export async function* walk(rootDir: string, options: WalkOptions = {}): AsyncGenerator<string> {
-  const ignoreFiles = options.ignoreFiles || ['.gitignore', '.osgrepignore']
+  const ignoreFiles = options.ignoreFiles || ['.gitignore', '.fulcrumignore']
   const rootParams = ignore().add(DEFAULT_IGNORE_PATTERNS)
   if (options.additionalPatterns) rootParams.add(options.additionalPatterns)
 

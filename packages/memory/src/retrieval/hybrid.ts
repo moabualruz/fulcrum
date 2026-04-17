@@ -1,4 +1,3 @@
-// Ported from: openclaw/extensions/memory-core/src/memory/hybrid.ts
 // License: MIT (Copyright (c) 2025 Peter Steinberger)
 //
 // v2a PR 1 Task 7 — hybrid (vector + keyword) result fusion with optional

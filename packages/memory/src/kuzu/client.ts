@@ -91,7 +91,7 @@ export class KuzuClient {
   }
 }
 
-// ── Singleton management (mirrors getDb() pattern from @moabualruz/fulcrum-core) ────────
+// ── Singleton management (mirrors getDb() pattern from fulcrum-core) ────────
 let _kuzuClient: KuzuClient | null = null
 
 export function getKuzuClient(): KuzuClient | null {

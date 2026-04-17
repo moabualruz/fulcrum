@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { _configureDb, setDb, closeDb } from '@moabualruz/fulcrum-core'
-import { runMigrations } from '@moabualruz/fulcrum-core'
+import { _configureDb, setDb, closeDb } from 'fulcrum-core'
+import { runMigrations } from 'fulcrum-core'
 import { CURRENT_VERSION, scanStaleRows, runNormalizeVersion } from '../normalize-version.js'
 
 function freshDb() {

@@ -4,7 +4,7 @@
 // Adapter ID: sha256({executor_uri}:{model}:{version})[:32] per architecture decision §12.28.
 
 import { createHash } from 'node:crypto'
-import type { KuzuClient } from '@moabualruz/fulcrum-memory'
+import type { KuzuClient } from 'fulcrum-memory'
 
 export interface AgentAdapterInput {
   executor_uri: string

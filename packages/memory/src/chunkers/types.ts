@@ -2,7 +2,7 @@
 // Shared types for all chunker implementations.
 
 /**
- * v2a PR 3 Task 14 — Chunk gains osgrep-derived semantic fields. All v2a
+ * v2a PR 3 Task 14 — Chunk gains semantic semantic fields. All v2a
  * additions are optional so existing callers (sliding-window, base AST
  * chunker emit) keep producing valid Chunk objects without changes.
  */
@@ -20,7 +20,7 @@ export interface Chunk {
   kind?: ChunkKind
   /** Name of the declaration, if extractable */
   name?: string
-  /** v2a Task 14 — semantic role from osgrep classifier */
+  /** v2a Task 14 — semantic role from classifier */
   role?: ChunkRole
   /** v2a Task 14 — coarse complexity proxy (e.g. cyclomatic-ish count) */
   complexity?: number

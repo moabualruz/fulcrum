@@ -1,7 +1,7 @@
 // v2a PR 4 Task 19 — PCI incremental ingest syncer.
 //
 // Subscribes to ContentChangeBus (code-kind events from PCI watcher). Turns
-// filesystem changes into mtime→hash→chunk-diff cascades per osgrep syncer.ts:
+// filesystem changes into mtime→hash→chunk-diff cascades per prior-art reference syncer.ts:
 //
 //   add    → read file, chunk, insert code_files row + code_chunks + memory
 //   change → diff chunks by content_hash; insert new, delete removed, preserve
@@ -18,8 +18,8 @@
 import { readFileSync, statSync } from 'node:fs'
 import { relative, extname, join, isAbsolute } from 'node:path'
 import { createHash } from 'node:crypto'
-import type { Db } from '@moabualruz/fulcrum-core'
-import { getDb, getContentChangeBus, newId, type ContentChangeEvent } from '@moabualruz/fulcrum-core'
+import type { Db } from 'fulcrum-core'
+import { getDb, getContentChangeBus, newId, type ContentChangeEvent } from 'fulcrum-core'
 import { computeFileId } from '../setup/backfill-code-files.js'
 import { ingestFile as fullIngest } from '../ingest.js'
 import { reduceFileToGraph, reduceUnlinkToGraph } from '../kuzu/reducers/code.js'

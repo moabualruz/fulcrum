@@ -3,7 +3,7 @@
 // Returns cross-entity bundle per Part 02 §"Control-plane unification" line 64.
 // Empty groups are OMITTED (no null fields, no error metadata) per §11.40.
 
-import { getDb, type Db } from '@moabualruz/fulcrum-core'
+import { getDb, type Db } from 'fulcrum-core'
 import { getKuzuClient } from './kuzu/client.js'
 
 export interface ProjectContextInput {

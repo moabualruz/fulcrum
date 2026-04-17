@@ -215,7 +215,7 @@ export async function startAgentRun(input: StartAgentRunInput, db: Db = getDb())
   // indexed DELETE that bounds row accumulation between MCP restarts. Lazy
   // string-import keeps the dep direction memory → core only.
   try {
-    const moduleName = '@moabualruz/fulcrum-memory'
+    const moduleName = 'fulcrum-memory'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const memoryPkg = (await import(/* @vite-ignore */ moduleName)) as any
     if (typeof memoryPkg?.opportunisticSweep === 'function') memoryPkg.opportunisticSweep(db)
@@ -299,7 +299,7 @@ export async function startAgentRun(input: StartAgentRunInput, db: Db = getDb())
   // v2a PR 4 Task 20: PCI lifecycle integration — ensure() per run.
   // Lazy string-import keeps dep direction memory → core; failures are silent.
   try {
-    const moduleName = '@moabualruz/fulcrum-memory'
+    const moduleName = 'fulcrum-memory'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mem = (await import(/* @vite-ignore */ moduleName)) as any
     if (typeof mem?.onAgentRunStart === 'function') {
@@ -405,7 +405,7 @@ export async function completeAgentRun(input: CompleteRunInput, db: Db = getDb()
 
   // v2a PR 4 Task 20: release PCI lifecycle refcount.
   try {
-    const moduleName = '@moabualruz/fulcrum-memory'
+    const moduleName = 'fulcrum-memory'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mem = (await import(/* @vite-ignore */ moduleName)) as any
     if (typeof mem?.onAgentRunEnd === 'function') mem.onAgentRunEnd(input.run_id)
@@ -416,7 +416,7 @@ export async function completeAgentRun(input: CompleteRunInput, db: Db = getDb()
   // chain to the topmost primary run for attribution.
   if (completedRun.context_type === 'subagent' && completedRun.parent_run_id && input.output_summary) {
     try {
-      const moduleName = '@moabualruz/fulcrum-memory'
+      const moduleName = 'fulcrum-memory'
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mem = (await import(/* @vite-ignore */ moduleName)) as any
       if (typeof mem?.onDelegation === 'function') {
@@ -488,7 +488,7 @@ export async function blockAgentRun(input: BlockRunInput, db: Db = getDb()): Pro
 
   // v2a PR 4 Task 20: release PCI lifecycle refcount on block.
   try {
-    const moduleName = '@moabualruz/fulcrum-memory'
+    const moduleName = 'fulcrum-memory'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mem = (await import(/* @vite-ignore */ moduleName)) as any
     if (typeof mem?.onAgentRunEnd === 'function') mem.onAgentRunEnd(input.run_id)

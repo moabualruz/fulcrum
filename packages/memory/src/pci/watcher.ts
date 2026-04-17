@@ -1,6 +1,6 @@
 // v2a PR 4 Task 17 — PCI watcher topology.
 //
-// Per-directory non-recursive fs.watch() — the mgrep pattern. fs.watch with
+// Per-directory non-recursive fs.watch() — the per-dir fs.watch pattern. fs.watch with
 // recursive:true pre-allocates inotify watches on every subdir before any
 // callback runs, blowing past kernel limits on large repos. Per-dir watches
 // scale linearly with dirs visited and let us skip ignored dirs entirely.
@@ -14,7 +14,7 @@
 
 import { watch, type FSWatcher, statSync, readdirSync } from 'node:fs'
 import { join, basename } from 'node:path'
-import { getContentChangeBus } from '@moabualruz/fulcrum-core'
+import { getContentChangeBus } from 'fulcrum-core'
 import { detectFilesystem, shouldUsePollingFallback, type FsKind } from './detect-fs.js'
 
 export type WatcherMode = 'native' | 'polling'

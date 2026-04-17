@@ -5,8 +5,8 @@
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Db } from '@moabualruz/fulcrum-core'
-import { getDb } from '@moabualruz/fulcrum-core'
+import type { Db } from 'fulcrum-core'
+import { getDb } from 'fulcrum-core'
 
 export interface WalReplayInput {
   walDir: string
@@ -92,7 +92,7 @@ export async function replayWal(input: WalReplayInput): Promise<WalReplayResult>
 
 /** CLI entry point — called from `fulcrum memory replay-wal`. */
 export async function runMemoryReplayWal(args: string[]): Promise<void> {
-  const { globalDataDir } = await import('@moabualruz/fulcrum-core')
+  const { globalDataDir } = await import('fulcrum-core')
   const walDir = join(globalDataDir(), 'db', 'wal')
   const dryRun = args.includes('--dry-run')
 

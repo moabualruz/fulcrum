@@ -1,5 +1,5 @@
 {
-  "name": "@moabualruz/fulcrum-planning",
+  "name": "fulcrum-planning",
   "version": "0.0.1",
   "description": "Project planning domain \u2014 epics, issues, PRDs, plans, task relations, and code review workflows",
   "keywords": [
@@ -34,7 +34,7 @@
     "build": "tsup"
   },
   "dependencies": {
-    "@moabualruz/fulcrum-core": "workspace:*",
+    "fulcrum-core": "workspace:*",
     "ulidx": "^2.3.0"
   },
   "devDependencies": {

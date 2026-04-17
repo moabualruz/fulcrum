@@ -1,8 +1,8 @@
 // packages/workflows/src/check-peers.ts
 //
-// Advisory peer-dependency check for @moabualruz/fulcrum-workflows.
+// Advisory peer-dependency check for fulcrum-workflows.
 //
-// The three peer deps (@moabualruz/fulcrum-planning, @moabualruz/fulcrum-teams, @moabualruz/fulcrum-worker) are
+// The three peer deps (fulcrum-planning, fulcrum-teams, fulcrum-worker) are
 // optional at install time but required at runtime for certain workflow step
 // handlers. This module detects missing peers and warns on stderr so callers
 // can fail fast with a useful message rather than a cryptic import error.
@@ -16,7 +16,7 @@
 
 import { createRequire } from 'module'
 
-const PEERS = ['@moabualruz/fulcrum-planning', '@moabualruz/fulcrum-teams', '@moabualruz/fulcrum-worker'] as const
+const PEERS = ['fulcrum-planning', 'fulcrum-teams', 'fulcrum-worker'] as const
 type PeerName = (typeof PEERS)[number]
 
 export interface CheckWorkflowPeersResult {
@@ -26,7 +26,7 @@ export interface CheckWorkflowPeersResult {
 let _cached: CheckWorkflowPeersResult | undefined
 
 /**
- * Check that the optional peer dependencies of @moabualruz/fulcrum-workflows are
+ * Check that the optional peer dependencies of fulcrum-workflows are
  * resolvable in the current environment. Logs a warning to stderr for each
  * missing peer and returns the list of missing packages.
  *

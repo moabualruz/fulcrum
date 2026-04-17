@@ -6,8 +6,8 @@
 // (PR 6 Task 31) checks for the synthesized row's presence and skips the
 // session_summary write if the outcome already exists.
 
-import type { Db } from '@moabualruz/fulcrum-core'
-import { getDb, newId } from '@moabualruz/fulcrum-core'
+import type { Db } from 'fulcrum-core'
+import { getDb, newId } from 'fulcrum-core'
 
 const SUMMARY_CAP = 1500
 const REASON_CAP = 1500

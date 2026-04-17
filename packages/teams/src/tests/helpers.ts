@@ -1,11 +1,11 @@
 // packages/teams/src/tests/helpers.ts
 import Database from 'better-sqlite3'
-import { setDb, closeDb, runMigrations } from '@moabualruz/fulcrum-core'
+import { setDb, closeDb, runMigrations } from 'fulcrum-core'
 import { runMigration006Teams } from '../schema.js'
 
 export function createTestDb(): Database.Database {
   const db = new Database(':memory:')
-  // @moabualruz/fulcrum-core configures WAL, pragmas
+  // fulcrum-core configures WAL, pragmas
   runMigrations(db)
   runMigration006Teams(db)
   setDb(db)

@@ -1,7 +1,7 @@
 // v2b PR 10 Task 1.5 — Graph reducer registry.
 //
 // Pure-function reducers transform Fulcrum event-bus events into Kuzu node/edge
-// upserts. Reducers are isolated: one throwing never blocks others (Hermes
+// upserts. Reducers are isolated: one throwing never blocks others (prior art
 // failure-isolation invariant). Errors emit `reducer_error` log lines.
 //
 // Registration pattern:
@@ -11,7 +11,7 @@
 // batching + backpressure. Individual reducers never call Kuzu directly;
 // they return UpsertNode[] | UpsertEdge[] which the dispatcher batches.
 
-import type { EventType, EmitEventInput } from '@moabualruz/fulcrum-core'
+import type { EventType, EmitEventInput } from 'fulcrum-core'
 
 export interface UpsertNode {
   table: string
@@ -59,7 +59,7 @@ export function dispatchToGraphReducers(event: EmitEventInput): GraphReducerResu
       const result = fn(event)
       if (result) results.push(result)
     } catch (err) {
-      // Hermes failure-isolation: log, never rethrow
+      // failure-isolation: log, never rethrow
       console.error(`[fulcrum] reducer_error event=${type} err=${err instanceof Error ? err.message : String(err)}`)
     }
   }

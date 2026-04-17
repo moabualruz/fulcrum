@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { _configureDb, setDb, closeDb, runMigrations } from '@moabualruz/fulcrum-core'
+import { _configureDb, setDb, closeDb, runMigrations } from 'fulcrum-core'
 import { handleA2ACard, handleA2ACardList } from '../a2a-cards.js'
 
 function freshDb() {

@@ -1,4 +1,4 @@
-// v2a PR 8 Task 41 — Hermes on_delegation pattern (parent-side subagent memory).
+// v2a PR 8 Task 41 — parent-side subagent memory pattern (parent-side subagent memory).
 //
 // When a child run completes (context_type='subagent') with a non-null
 // parent_run_id, this writes a `kind='delegation_summary'` memory attributed
@@ -8,8 +8,8 @@
 // context_type='subagent' cannot write any other kind. This module is the
 // only sanctioned write path for non-primary runs.
 
-import type { Db } from '@moabualruz/fulcrum-core'
-import { getDb, newId } from '@moabualruz/fulcrum-core'
+import type { Db } from 'fulcrum-core'
+import { getDb, newId } from 'fulcrum-core'
 
 const SUMMARY_CAP = 800
 

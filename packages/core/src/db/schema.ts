@@ -372,7 +372,7 @@ export function applySchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_memories_session           ON memories(session_id) WHERE session_id IS NOT NULL;
 
     -- v2a PR 1 Task 4: signal ledger feeding Dreaming promotion (v2b PR 11),
-    -- eviction, and utility scoring. Matches OpenClaw
+    -- eviction, and utility scoring. Matches prior art
     -- short-term-promotion.recordShortTermRecalls.
     CREATE TABLE IF NOT EXISTS memory_recall_events (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,

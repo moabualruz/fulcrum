@@ -1,7 +1,7 @@
 // packages/monitor/src/tests/metrics-extended.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { setDb } from '@moabualruz/fulcrum-core'
+import { setDb } from 'fulcrum-core'
 import { runMigration009 } from '../schema.js'
 import {
   getIssueBurndown,
