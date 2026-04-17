@@ -51,7 +51,7 @@ interface CockpitConfig {
 
 interface AgentRunRow {
   run_id: string;
-  agent_role: string;
+  role: string;
   status: string;
   heartbeat_at?: string;
   task_id?: string;
@@ -430,13 +430,13 @@ export default function (pi: ExtensionAPI) {
 
         // Running agents
         for (const run of running.slice(0, 5)) {
-          const role = run.agent_role.slice(0, 18).padEnd(18);
+          const role = (run.role ?? "—").slice(0, 18).padEnd(18);
           lines.push(`  ${GREEN("●")} ${CYAN(role)} ${MUTED(run.run_id.slice(-8))}`);
         }
 
         // Blocked agents
         for (const run of blocked.slice(0, 3)) {
-          const role = run.agent_role.slice(0, 18).padEnd(18);
+          const role = (run.role ?? "—").slice(0, 18).padEnd(18);
           lines.push(`  ${RED("⚠")} ${YELLOW(role)} ${MUTED(run.run_id.slice(-8))}`);
         }
 
@@ -486,8 +486,8 @@ export default function (pi: ExtensionAPI) {
         ctx.ui.notify(
           `Fulcrum — ${snapshot.workspace_id}\n` +
           `Running: ${r.length}  Blocked: ${b.length}  WIP: ${snapshot.wip_count}\n` +
-          r.map(a => `  ● ${a.agent_role} [${a.status}]`).join("\n") +
-          (b.length ? "\n" + b.map(a => `  ⚠ ${a.agent_role}: blocked`).join("\n") : ""),
+          r.map(a => `  ● ${a.role ?? "—"} [${a.status}]`).join("\n") +
+          (b.length ? "\n" + b.map(a => `  ⚠ ${a.role ?? "—"}: blocked`).join("\n") : ""),
           "info",
         );
       },
@@ -985,8 +985,8 @@ export default function (pi: ExtensionAPI) {
 
       const lines: string[] = [`[Fulcrum] Workspace: ${cfg.workspace_id}`];
       if (currentRunId) lines.push(`Run ID: ${currentRunId}`);
-      if (r.length > 0) lines.push(`Active runs: ${r.map(x => x.agent_role).join(", ")}`);
-      if (b.length > 0) lines.push(`⚠ Blocked: ${b.map(x => x.agent_role).join(", ")}`);
+      if (r.length > 0) lines.push(`Active runs: ${r.map(x => x.role ?? "—").join(", ")}`);
+      if (b.length > 0) lines.push(`⚠ Blocked: ${b.map(x => x.role ?? "—").join(", ")}`);
 
       return { systemPrompt: lines.join("\n") };
     });
