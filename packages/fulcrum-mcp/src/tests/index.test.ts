@@ -71,7 +71,7 @@ describe('argv injection', () => {
 
   it('injects serve mcp at index 2', async () => {
     process.argv = ['node', '/path/to/fulcrum-mcp/index.ts']
-    vi.doMock('fulcrum-agent-cli', () => ({}))
+    vi.doMock('fulcrum-agent-cli', () => ({ main: async () => {} }))
     await import('../index.js')
     expect(process.argv[2]).toBe('serve')
     expect(process.argv[3]).toBe('mcp')
@@ -79,7 +79,7 @@ describe('argv injection', () => {
 
   it('preserves existing args after the injection point', async () => {
     process.argv = ['node', '/path/to/fulcrum-mcp/index.ts', '--no-monitor']
-    vi.doMock('fulcrum-agent-cli', () => ({}))
+    vi.doMock('fulcrum-agent-cli', () => ({ main: async () => {} }))
     await import('../index.js')
     expect(process.argv[2]).toBe('serve')
     expect(process.argv[3]).toBe('mcp')

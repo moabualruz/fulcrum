@@ -1,6 +1,8 @@
 #!/usr/bin/env tsx
 // packages/cli/src/index.ts — fulcrum CLI entry point
 
+import { realpathSync } from 'fs'
+import { fileURLToPath } from 'url'
 import { runMemoryInit } from 'fulcrum-memory'
 import { activateL2 } from 'fulcrum-memory'
 import { runDoctor, printDoctorResults } from './doctor.js'
@@ -1428,7 +1430,7 @@ async function runServeMcp(): Promise<void> {
   }
 
   await runFulcrumMcpServer({
-    version: '0.0.1',
+    version: '0.0.2',
     handleToolCall: handleToolCallWithSpan,
     filter: exposurePlan.filter,
     additionalTools: _pluginAdditionalTools,
@@ -1519,7 +1521,7 @@ async function runServeMcpHttp(): Promise<void> {
   }
 
   await runFulcrumMcpHttpServer({
-    version: '0.0.1',
+    version: '0.0.2',
     handleToolCall: handleToolCallWithSpan,
     filter: exposurePlan.filter,
     additionalTools: _pluginAdditionalTools,
@@ -2678,7 +2680,7 @@ async function runInstall(): Promise<void> {
 
 // ── Main dispatch ─────────────────────────────────────────────────────────────
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   // Discover and wire plugins from project node_modules + globalDataDir()/plugins/
   // GAP-PLUGIN-1 fix: plugin-discovery.ts was fully implemented but never called.
   try {
@@ -2902,14 +2904,17 @@ OPTIONS (serve mcp-http)
 }
 
 // Only auto-run main() when executed as a script, not when imported as a
-// module (e.g. from unit tests importing `normalizeHookEvent`). import.meta.url
-// will equal the process entry path when run via `node --import tsx/esm src/index.ts`.
+// module (e.g. unit tests importing `normalizeHookEvent`). We compare the
+// process entry path to this module's path after resolving symlinks, so the
+// check still works when invoked through an npm-installed bin shim
+// (node_modules/.bin/fulcrum → ../fulcrum-agent-cli/src/index.ts).
 const isEntry = (() => {
   try {
     const entry = process.argv[1]
     if (!entry) return false
-    const entryUrl = new URL(`file://${entry}`).href
-    return import.meta.url === entryUrl
+    const entryReal = realpathSync(entry)
+    const selfReal = realpathSync(fileURLToPath(import.meta.url))
+    return entryReal === selfReal
   } catch {
     return false
   }

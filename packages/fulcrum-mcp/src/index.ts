@@ -40,7 +40,11 @@ if (argv[0] === 'init') {
 process.argv.splice(2, 0, 'serve', 'mcp')
 
 // Delegate to fulcrum-agent-cli — all tool logic lives there.
-await import('fulcrum-agent-cli')
+// We import and call `main` explicitly because the CLI's top-level `isEntry`
+// guard (which prevents auto-run during unit-test imports) would otherwise
+// swallow the invocation when fulcrum-mcp is the entry point.
+const { main } = await import('fulcrum-agent-cli')
+await main()
 
 // ── Init implementation ───────────────────────────────────────────────────────
 
