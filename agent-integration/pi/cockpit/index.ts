@@ -565,12 +565,17 @@ export default function (pi: ExtensionAPI) {
         const parts = (args ?? "").trim().split(/\s+/);
         if (parts.length < 2) { ctx.ui.notify("Usage: /fulcrum-run <task_id> <role>", "error"); return; }
         const [task_id, agent_role] = parts;
-        const result = await apiPost<Record<string, unknown>>(baseUrl, "/runs", {
-          task_id, agent_role, workspace_id: cfg.workspace_id, project_id: cfg.project_id,
-        });
-        if (result?.["error"]) { ctx.ui.notify(`Error: ${result["error"]}`, "error"); return; }
-        ctx.ui.notify(`Run started: ${result?.["run_id"]} (${agent_role})`, "success");
-        refreshStatus();
+        try {
+          const result = execAction("start_agent_run", {
+            task_id, agent_role,
+            workspace_id: cfg.workspace_id,
+            project_id: cfg.project_id,
+          }) as Record<string, unknown>;
+          ctx.ui.notify(`Run started: ${result?.["run_id"]} (${agent_role})`, "success");
+          refreshStatus();
+        } catch (err) {
+          ctx.ui.notify(`Error: ${(err as Error).message}`, "error");
+        }
       },
     });
 
@@ -583,9 +588,13 @@ export default function (pi: ExtensionAPI) {
         const run_id = sp === -1 ? str : str.slice(0, sp);
         const summary = sp === -1 ? "" : str.slice(sp + 1);
         if (!run_id) { ctx.ui.notify("Usage: /fulcrum-complete <run_id> [summary]", "error"); return; }
-        await apiPost(baseUrl, `/runs/${run_id}/complete`, { summary });
-        ctx.ui.notify(`Run ${run_id.slice(-8)} completed`, "success");
-        refreshStatus();
+        try {
+          execAction("complete_agent_run", { run_id, output_summary: summary });
+          ctx.ui.notify(`Run ${run_id.slice(-8)} completed`, "success");
+          refreshStatus();
+        } catch (err) {
+          ctx.ui.notify(`Error: ${(err as Error).message}`, "error");
+        }
       },
     });
 
@@ -598,9 +607,13 @@ export default function (pi: ExtensionAPI) {
         if (sp === -1) { ctx.ui.notify("Usage: /fulcrum-block <run_id> <reason>", "error"); return; }
         const run_id = str.slice(0, sp);
         const reason = str.slice(sp + 1);
-        await apiPost(baseUrl, `/runs/${run_id}/block`, { reason });
-        ctx.ui.notify(`Run ${run_id.slice(-8)} blocked: ${reason}`, "warning");
-        refreshStatus();
+        try {
+          execAction("block_agent_run", { run_id, reason });
+          ctx.ui.notify(`Run ${run_id.slice(-8)} blocked: ${reason}`, "warning");
+          refreshStatus();
+        } catch (err) {
+          ctx.ui.notify(`Error: ${(err as Error).message}`, "error");
+        }
       },
     });
 
@@ -801,11 +814,11 @@ export default function (pi: ExtensionAPI) {
         pi_run_id:     Type.Optional(Type.String({ description: "Supply a specific run ID" })),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
-        const result = await apiPost<Record<string, unknown>>(baseUrl, "/runs", {
+        const result = execAction("start_agent_run", {
           ...args,
           workspace_id: cfg.workspace_id,
           project_id: cfg.project_id,
-        });
+        }) as Record<string, unknown>;
         refreshStatus();
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result ?? {} };
       },
@@ -823,8 +836,7 @@ export default function (pi: ExtensionAPI) {
         progress_pct: Type.Optional(Type.Number({ description: "Estimated completion 0–100" })),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
-        const { run_id, ...body } = args;
-        const result = await apiPost(baseUrl, `/runs/${run_id}/heartbeat`, body);
+        const result = execAction("heartbeat_agent_run", args) as Record<string, unknown>;
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       },
     });
@@ -844,12 +856,14 @@ export default function (pi: ExtensionAPI) {
         pr_url:         Type.Optional(Type.String({ description: "Pull request URL if one was created" })),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
-        const { run_id, artifact_paths, ...body } = args;
+        const { run_id, artifact_paths, summary, ...body } = args;
         const paths = artifact_paths ? artifact_paths.split(",").map(p => p.trim()).filter(Boolean) : [];
-        const result = await apiPost(baseUrl, `/runs/${run_id}/complete`, {
+        const result = execAction("complete_agent_run", {
+          run_id,
           ...body,
+          ...(summary ? { output_summary: summary } : {}),
           ...(paths.length > 0 ? { artifact_paths: paths } : {}),
-        });
+        }) as Record<string, unknown>;
         refreshStatus();
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       },
@@ -867,8 +881,7 @@ export default function (pi: ExtensionAPI) {
         escalation_reason: Type.Optional(Type.String({ description: "Additional context for the Chief of Staff" })),
       }),
       execute: async (_id, args, _sig, _upd, _ctx) => {
-        const { run_id, ...body } = args;
-        const result = await apiPost(baseUrl, `/runs/${run_id}/block`, body);
+        const result = execAction("block_agent_run", args) as Record<string, unknown>;
         refreshStatus();
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       },
