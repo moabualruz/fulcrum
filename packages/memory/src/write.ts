@@ -36,7 +36,14 @@ export async function storeEmbeddingInVec(db: Db, memory_id: string, text: strin
 }
 
 function bodyHash(text: string): string {
-  return createHash('sha256').update(text).digest('hex')
+  const hex = createHash('sha256').update(text).digest('hex')
+  // PLAN-GAP-C: sha256 hex MUST be 64 chars. Truncation breaks echo-suppression
+  // and dedup. Defensive assertion catches any future refactor that tries to
+  // slice this.
+  if (hex.length !== 64) {
+    throw new Error(`bodyHash produced non-sha256 output of length ${hex.length}`)
+  }
+  return hex
 }
 
 // GAP-RAG-3: Normalize code identifiers for FTS5 recall.
@@ -85,14 +92,30 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
 
   // v2a PR 6 Task 34 — non-primary write drop (defense-in-depth).
   // Writes from runs with context_type ≠ 'primary' are silently dropped
-  // unless kind='delegation_summary'. Telemetry goes to hook_events for auditability.
+  // unless kind='delegation_summary'. Telemetry goes to memory_write_events.
+  //
+  // HIGH-5: the prior code used hook_events with columns (event_type, payload,
+  // created_at) that did not exist; every insert threw SILENTLY (swallowed by
+  // the catch) and the audit trail never landed. Fixed: memory_write_events
+  // table owns this audit log and the INSERT column list matches.
   const ctxType = input.provenance?.context_type
   if (ctxType && ctxType !== 'primary' && input.kind !== 'delegation_summary') {
     try {
-      db.prepare(`INSERT INTO hook_events (workspace_id, event_type, payload, created_at)
-                  VALUES (?, 'non_primary_write_dropped', ?, datetime('now'))`)
-        .run(input.workspace_id, JSON.stringify({ kind: input.kind, context_type: ctxType, run_id: input.provenance?.run_id }))
-    } catch { /* telemetry is best-effort */ }
+      db.prepare(`INSERT INTO memory_write_events (event_id, workspace_id, event_type, payload)
+                  VALUES (?, ?, 'non_primary_write_dropped', ?)`)
+        .run(
+          newId('memev'),
+          input.workspace_id,
+          JSON.stringify({ kind: input.kind, context_type: ctxType, run_id: input.provenance?.run_id }),
+        )
+    } catch (err) {
+      // HIGH-5: a genuine DB failure here is a real problem — schema drift,
+      // disk full, etc. Re-throw so it surfaces instead of silently hiding.
+      throw Object.assign(
+        new Error(`memory_write_events audit insert failed: ${(err as Error).message}`),
+        { code: 'audit_failure' },
+      )
+    }
     // Return a synthesized "skipped" memory — preserves caller expectations
     // (most callers don't check) and keeps the contract non-throwing.
     return {
@@ -132,11 +155,49 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
   const cappedContent = applyKindCap(input.kind, input.content)
   // v2a PR 5 Tasks 24-26: sanitize-before-anything (constraint #8). Strip
   // fence markers, redact prompt injection + credentials + invisible Unicode.
-  // Errors are non-fatal — content passes through with sanitize_event=error.
+  //
+  // CRIT-3: On sanitizer error, fail closed. The prior behaviour was to
+  // continue with raw content — that let pathological regex / RangeError
+  // leak credentials + injection into WAL + L0 + L1. Now: drop the write,
+  // emit sanitize.error telemetry via the WAL audit path, return a
+  // synthesized skipped-memory stub so callers don't crash.
   const sanitized = sanitizeOnWrite(cappedContent, {
     workspace_id: input.workspace_id,
     project_id: input.project_id,
   })
+  if (sanitized.errored) {
+    const skippedId = newId('memory')
+    const nowIso = new Date().toISOString()
+    // Fire-and-forget audit append — use the WAL with empty body + error events.
+    try {
+      appendWal({
+        op: 'SKIP',
+        memory_id: skippedId,
+        kind: input.kind,
+        workspace_id: input.workspace_id,
+        project_id: input.project_id ?? null,
+        provenance: { hook_point: 'write_memory', errored: true, reason: 'sanitize_error' },
+        content: brandSanitized(''),
+        sanitize_events: sanitized.events,
+      })
+    } catch { /* WAL append is best-effort on the error path */ }
+    return {
+      memory_id: skippedId,
+      scope: input.scope,
+      kind: input.kind,
+      workspace_id: input.workspace_id,
+      project_id: input.project_id ?? null,
+      file_path: null, symbol_path: null,
+      title: input.title, summary: input.summary,
+      content: '', canonical_text: null,
+      tags: [], entities: [],
+      confidence: 0, importance: 0, access_count: 0,
+      event_time: null, content_hash: null,
+      task_id: input.task_id ?? null, issue_id: null, artifact_id: null,
+      provenance_refs: [], embedding: null,
+      created_at: nowIso, updated_at: nowIso, last_accessed_at: nowIso,
+    } as FullMemory
+  }
   input = { ...input, content: sanitized.content }
 
   const now = new Date().toISOString()
@@ -299,7 +360,18 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
  * Insert a memory directly from a FullMemory object, preserving the original memory_id.
  * Used by the rebuild path to rehydrate L0→L1 without generating new ULIDs.
  * Bypasses: dedup, ULID generation, L0 write, L2 enqueue.
- * Uses INSERT OR REPLACE so it's idempotent.
+ *
+ * MED-15: prior version used INSERT OR REPLACE without supplying the NOT NULL
+ * columns session_id (defaulted), content_type, source, tier, vault_path,
+ * provenance, supersedes, recall_count, unique_query_count, max_recall_score,
+ * last_recalled_at, embedded, schema_version, normalize_version, expires_at,
+ * or slug (UNIQUE, default randomblob). On rebuild of an existing memory, the
+ * REPLACE deleted the existing row and re-inserted with default slug+session —
+ * destroying memory_wikilinks, session history, and random-slug refs.
+ *
+ * Fixed by upgrading to UPDATE-then-INSERT semantics: existing rows are
+ * updated in place (preserving slug/session_id/source/tier/provenance),
+ * missing rows are inserted with all required NOT NULL columns supplied.
  */
 export function insertMemoryDirect(memory: FullMemory, db: Db = getDb()): void {
   const embeddingBuffer = null  // embeddings are re-generated by L2 rebuild separately
@@ -308,31 +380,55 @@ export function insertMemoryDirect(memory: FullMemory, db: Db = getDb()): void {
   const sparseVec = computeSparseVector(memory.canonical_text ?? '')
   const sparseVectorJson = Object.keys(sparseVec).length > 0 ? JSON.stringify(sparseVec) : null
 
-  db.prepare(`
-    INSERT OR REPLACE INTO memories (
-      memory_id, workspace_id, project_id,
-      scope, kind, title, summary, canonical_text,
-      content, tags, entities, confidence, freshness, importance,
-      file_path, symbol_path, event_time, content_hash,
-      task_id, issue_id, artifact_id, provenance_refs,
-      embedding, sparse_vector, created_at, updated_at, last_accessed_at, access_count
-    ) VALUES (
-      ?, ?, ?,
-      ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?,
-      ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?
+  // MED-15: existence check — UPDATE-in-place preserves slug/session/source.
+  const existing = db.prepare('SELECT memory_id FROM memories WHERE memory_id = ?').get(memory.memory_id) as { memory_id: string } | undefined
+  if (existing) {
+    db.prepare(`
+      UPDATE memories SET
+        workspace_id = ?, project_id = ?,
+        scope = ?, kind = ?, title = ?, summary = ?, canonical_text = ?,
+        content = ?, tags = ?, entities = ?, confidence = ?, freshness = ?, importance = ?,
+        file_path = ?, symbol_path = ?, event_time = ?, content_hash = ?,
+        task_id = ?, issue_id = ?, artifact_id = ?, provenance_refs = ?,
+        embedding = ?, sparse_vector = ?, updated_at = ?, last_accessed_at = ?, access_count = ?
+      WHERE memory_id = ?
+    `).run(
+      memory.workspace_id, memory.project_id ?? null,
+      memory.scope, memory.kind, memory.title, memory.summary, memory.canonical_text ?? '',
+      memory.canonical_text ?? '', JSON.stringify(memory.tags), JSON.stringify(memory.entities),
+      memory.confidence, memory.freshness, memory.importance,
+      memory.file_path ?? null, memory.symbol_path ?? null, memory.event_time ?? null, memory.content_hash ?? null,
+      memory.task_id ?? null, memory.issue_id ?? null, memory.artifact_id ?? null, JSON.stringify(memory.provenance_refs),
+      embeddingBuffer, sparseVectorJson, memory.updated_at, memory.last_accessed_at, memory.access_count,
+      memory.memory_id,
     )
-  `).run(
-    memory.memory_id, memory.workspace_id, memory.project_id ?? null,
-    memory.scope, memory.kind, memory.title, memory.summary, memory.canonical_text ?? '',
-    memory.canonical_text ?? '', JSON.stringify(memory.tags), JSON.stringify(memory.entities),
-    memory.confidence, memory.freshness, memory.importance,
-    memory.file_path ?? null, memory.symbol_path ?? null, memory.event_time ?? null, memory.content_hash ?? null,
-    memory.task_id ?? null, memory.issue_id ?? null, memory.artifact_id ?? null, JSON.stringify(memory.provenance_refs),
-    embeddingBuffer, sparseVectorJson, memory.created_at, memory.updated_at, memory.last_accessed_at, memory.access_count
-  )
+  } else {
+    db.prepare(`
+      INSERT INTO memories (
+        memory_id, workspace_id, project_id,
+        scope, kind, title, summary, canonical_text,
+        content, tags, entities, confidence, freshness, importance,
+        file_path, symbol_path, event_time, content_hash,
+        task_id, issue_id, artifact_id, provenance_refs,
+        embedding, sparse_vector, created_at, updated_at, last_accessed_at, access_count
+      ) VALUES (
+        ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?,
+        ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?
+      )
+    `).run(
+      memory.memory_id, memory.workspace_id, memory.project_id ?? null,
+      memory.scope, memory.kind, memory.title, memory.summary, memory.canonical_text ?? '',
+      memory.canonical_text ?? '', JSON.stringify(memory.tags), JSON.stringify(memory.entities),
+      memory.confidence, memory.freshness, memory.importance,
+      memory.file_path ?? null, memory.symbol_path ?? null, memory.event_time ?? null, memory.content_hash ?? null,
+      memory.task_id ?? null, memory.issue_id ?? null, memory.artifact_id ?? null, JSON.stringify(memory.provenance_refs),
+      embeddingBuffer, sparseVectorJson, memory.created_at, memory.updated_at, memory.last_accessed_at, memory.access_count,
+    )
+  }
 
   // Populate vec_memories for ANN recall (fire-and-forget)
   setImmediate(() => {

@@ -22,7 +22,8 @@ function fakeStdin(payload: unknown): void {
   })
 }
 
-function mockExit(): ReturnType<typeof vi.spyOn> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockExit(): any {
   return vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
     throw new Error(`EXIT_${code ?? 0}`)
   }) as never)
@@ -30,8 +31,10 @@ function mockExit(): ReturnType<typeof vi.spyOn> {
 
 // ── Setup / Teardown ──────────────────────────────────────────────────────────
 
-let exitSpy: ReturnType<typeof vi.spyOn>
-let stderrSpy: ReturnType<typeof vi.spyOn>
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let exitSpy: any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let stderrSpy: any
 
 beforeEach(() => {
   exitSpy   = mockExit()

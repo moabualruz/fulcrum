@@ -23,14 +23,14 @@ describe('reduceGitCommit', () => {
       project_id: 'proj_1',
       changed_files: ['src/auth.ts', 'src/middleware.ts'],
     }
-    await reduceGitCommit(client as Parameters<typeof reduceGitCommit>[0], input)
+    await reduceGitCommit(client as unknown as Parameters<typeof reduceGitCommit>[0], input)
     // Should have called query for node upsert + landed_in edges
     expect(client.query).toHaveBeenCalled()
   })
 
   it('is a no-op when client is not ready', async () => {
     const client = { ...makeMockClient(), isReady: false }
-    await reduceGitCommit(client as Parameters<typeof reduceGitCommit>[0], {
+    await reduceGitCommit(client as unknown as Parameters<typeof reduceGitCommit>[0], {
       sha: 'abc123',
       message: 'test',
       author: 'Mo',
@@ -54,7 +54,7 @@ describe('reduceGitBranch', () => {
       project_id: 'proj_1',
       is_remote: false,
     }
-    await reduceGitBranch(client as Parameters<typeof reduceGitBranch>[0], input)
+    await reduceGitBranch(client as unknown as Parameters<typeof reduceGitBranch>[0], input)
     expect(client.query).toHaveBeenCalled()
   })
 })

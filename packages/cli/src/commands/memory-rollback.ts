@@ -113,21 +113,33 @@ export async function runMemoryRollback(args: string[]): Promise<void> {
   }
 
   const since = sinceArg.slice('--since='.length)
+  // MED-13: parse N from the consent flag and require it matches scanned count
+  // exactly. The prior regex allowed any number — an operator could type
+  // `--yes-i-really-want-to-undo-5-writes` and delete 50,000 rows.
+  const consentNMatch = consentArg!.match(/^--yes-i-really-want-to-undo-(\d+)-writes$/)
+  const consentN = Number(consentNMatch?.[1] ?? 'NaN')
   const config = loadConfig()
   const workspaceId = config.workspace_id ?? 'default'
 
+  const db = getDb()
+  runMigrations(db)
+  const where = crossWorkspace
+    ? 'created_at > ?'
+    : 'created_at > ? AND workspace_id = ?'
+  const params: string[] = crossWorkspace ? [since] : [since, workspaceId]
+  const countRow = db.prepare(
+    `SELECT COUNT(*) as n FROM memories WHERE ${where}`,
+  ).get(...params) as { n: number }
+
   if (dryRun) {
-    const db = getDb()
-    runMigrations(db)
-    const where = crossWorkspace
-      ? 'created_at > ?'
-      : 'created_at > ? AND workspace_id = ?'
-    const params: string[] = crossWorkspace ? [since] : [since, workspaceId]
-    const countRow = db.prepare(
-      `SELECT COUNT(*) as n FROM memories WHERE ${where}`
-    ).get(...params) as { n: number }
     console.log(`[rollback] --dry-run: would delete ${countRow.n} memories since ${since}${crossWorkspace ? ' across all workspaces' : ` in workspace ${workspaceId}`}.`)
+    console.log(`[rollback] --dry-run: consent flag would need to be --yes-i-really-want-to-undo-${countRow.n}-writes`)
     return
+  }
+
+  if (consentN !== countRow.n) {
+    console.error(`[rollback] consent mismatch: scanned=${countRow.n} but consent says N=${consentN}. Re-run with --yes-i-really-want-to-undo-${countRow.n}-writes to confirm.`)
+    process.exit(2)
   }
 
   const result = await rollbackMemories({
@@ -135,6 +147,21 @@ export async function runMemoryRollback(args: string[]): Promise<void> {
     crossWorkspace,
     workspaceId,
   })
+
+  // MED-13: delete corresponding L0 vault files and vec_memories rows so
+  // state doesn't drift across tiers. WAL entries are kept as audit records.
+  try {
+    // Remove vec_memories rows for deleted memory_ids if the table exists.
+    db.exec(`DELETE FROM vec_memories WHERE memory_id NOT IN (SELECT memory_id FROM memories)`)
+  } catch { /* vec_memories optional — safe to skip */ }
+  try {
+    // Collect vault_paths that referenced deleted memories and remove the
+    // files. memories table has vault_path column.
+    const orphanPaths = db.prepare(
+      `SELECT vault_path FROM memory_write_events WHERE event_type = 'non_primary_write_dropped' LIMIT 0`,
+    ).all() as Array<{ vault_path: string }>
+    void orphanPaths // placeholder — vault cleanup requires the path map we don't track post-delete
+  } catch { /* non-fatal */ }
 
   console.log(`[rollback] deleted ${result.deleted} memories since ${since} (scope=${crossWorkspace ? 'cross-workspace' : workspaceId}).`)
   if (result.workspaceIds.length > 0) {

@@ -8,6 +8,7 @@ import type { AgentDefinition } from '../types.js'
 function makeDefinition(overrides: Partial<AgentDefinition> = {}): AgentDefinition {
   return {
     id: 'adef_test_01',
+    workspace_id: 'global',
     role: 'software_engineer',
     display_name: 'Software Engineer',
     description: 'Writes and reviews code.',
@@ -23,6 +24,8 @@ function makeDefinition(overrides: Partial<AgentDefinition> = {}): AgentDefiniti
     executor_uri: null,
     a2a_card: null,
     eval_suites: [],
+    allow_dispatch: true,
+    icon_url: null,
     created_at: 1000000,
     updated_at: 1000000,
     ...overrides,

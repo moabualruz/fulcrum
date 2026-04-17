@@ -28,10 +28,14 @@ let server: ReturnType<typeof startMonitorServer>
 
 beforeEach(() => {
   db = createTestDb()
+  // HIGH-9: bypass_auth requires both config.bypass_auth AND env to take
+  // effect — the env guard prevents accidental production runs.
+  process.env['FULCRUM_MONITOR_ALLOW_BYPASS'] = '1'
   server = startMonitorServer({ workspace_id: 'ws_1', bypass_auth: true })
 })
 
 afterEach(async () => {
+  delete process.env['FULCRUM_MONITOR_ALLOW_BYPASS']
   await server.stop()
   db.close()
 })

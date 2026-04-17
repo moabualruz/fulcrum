@@ -58,13 +58,23 @@ const _sem = new Semaphore(MAX_CONCURRENT)
 // WORK-003: Graceful shutdown — honour SIGTERM by draining in-flight runs.
 // ---------------------------------------------------------------------------
 let _inflightCount = 0
+let _queuedCount = 0 // HIGH-8: callers awaiting the semaphore also count as "not yet drained"
 let _draining = false
-let _drainResolve: (() => void) | null = null
+const _drainResolvers: Array<() => void> = []
 
 /** Resolves when all in-flight spawnAgent calls finish (or immediately if none). */
 export function waitForDrain(): Promise<void> {
-  if (_inflightCount === 0) return Promise.resolve()
-  return new Promise(resolve => { _drainResolve = resolve })
+  // HIGH-8: count both in-flight AND queued callers. Draining is done only
+  // when the semaphore has zero active AND zero pending work.
+  if (_inflightCount === 0 && _queuedCount === 0) return Promise.resolve()
+  return new Promise(resolve => { _drainResolvers.push(resolve) })
+}
+
+function signalDrainIfQuiescent(): void {
+  if (!_draining) return
+  if (_inflightCount === 0 && _queuedCount === 0) {
+    for (const r of _drainResolvers.splice(0)) r()
+  }
 }
 
 /** True once SIGTERM has been received. New spawnAgent calls will be rejected. */
@@ -74,7 +84,7 @@ export function isDraining(): boolean { return _draining }
 if (typeof process !== 'undefined' && !process.listenerCount('SIGTERM')) {
   process.once('SIGTERM', () => {
     _draining = true
-    if (_inflightCount === 0) _drainResolve?.()
+    signalDrainIfQuiescent()
   })
 }
 
@@ -136,6 +146,24 @@ export async function spawnAgent(
     throw new FulcrumError(`unknown agent adapter: ${adapterName}`, 'not_found')
   }
 
+  // HIGH-8: acquire the semaphore BEFORE creating the agent_run row + span.
+  // The prior ordering created DB state for queued callers and left runs in
+  // 'running' status even though their adapter hadn't been invoked. It also
+  // let drain fire while queued callers still had pending work.
+  _queuedCount++
+  await _sem.acquire()
+  _queuedCount--
+  _inflightCount++
+
+  // HIGH-8: re-check _draining AFTER acquire — SIGTERM may have fired while
+  // this caller was queued. If so, back out cleanly without creating the run.
+  if (_draining) {
+    _inflightCount--
+    _sem.release()
+    signalDrainIfQuiescent()
+    throw new FulcrumError('worker is draining — queued call aborted', 'invalid_state')
+  }
+
   // 3. Create the agent_run row. startAgentRun requires a task_id.
   const run = await startAgentRun({
     workspace_id: input.workspace_id,
@@ -157,10 +185,6 @@ export async function spawnAgent(
       caller_role: input.caller_role,
     },
   })
-
-  // WORK-004: acquire concurrency semaphore before starting the run
-  await _sem.acquire()
-  _inflightCount++
 
   // 4. Invoke the adapter with a heartbeat callback that writes through
   //    to the DB. Heartbeats default to 0% progress when an adapter
@@ -218,7 +242,7 @@ export async function spawnAgent(
     // WORK-004: release semaphore slot; WORK-003: signal drain if needed
     _sem.release()
     _inflightCount--
-    if (_draining && _inflightCount === 0) _drainResolve?.()
+    signalDrainIfQuiescent()
   }
 
   return { run_id: run.run_id, result }

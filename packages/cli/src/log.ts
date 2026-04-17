@@ -23,12 +23,14 @@ type EventPayload = Record<string, unknown>
  * Format: [HH:mm:ss] <role> <verb> <noun> — <detail>
  */
 export function formatEvent(evt: FulcrumEvent): string {
-  const ts = formatTime(evt.created_at)
+  const ts = formatTime(evt.ts)
   const payload = (evt.payload ?? {}) as EventPayload
   const role = (payload['role'] as string | undefined) ?? (payload['agent_role'] as string | undefined) ?? 'system'
 
   let verb = 'emitted'
-  let noun = evt.evt_type
+  // TS narrows noun to EventType from the initialiser; widen to string so
+  // subsequent String(payload['x']) assignments typecheck.
+  let noun: string = evt.evt_type
   let detail = ''
 
   switch (evt.evt_type) {
@@ -236,9 +238,9 @@ async function followSse(runId?: string, sinceDate?: Date): Promise<void> {
         } else if (line === '' && dataLine) {
           // End of SSE event
           try {
-            const evt = JSON.parse(dataLine) as FulcrumEvent
+            const evt = JSON.parse(dataLine) as FulcrumEvent & { run_id?: string }
             if (runId && evt.run_id !== runId) { dataLine = ''; continue }
-            if (sinceDate && new Date(evt.created_at) < sinceDate) { dataLine = ''; continue }
+            if (sinceDate && new Date(evt.ts) < sinceDate) { dataLine = ''; continue }
             console.log(formatEvent(evt))
           } catch { /* skip malformed */ }
           dataLine = ''

@@ -31,7 +31,8 @@ function fakeStdin(payload: unknown): void {
 }
 
 /** Exit mock that turns process.exit(0) into a thrown sentinel so tests survive. */
-function mockExit(): ReturnType<typeof vi.spyOn> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockExit(): any {
   return vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
     throw new Error(`EXIT_${code ?? 0}`)
   }) as never)
@@ -40,13 +41,16 @@ function mockExit(): ReturnType<typeof vi.spyOn> {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('runSessionStartHook', () => {
-  let exitSpy: ReturnType<typeof vi.spyOn>
-  let stderrSpy: ReturnType<typeof vi.spyOn>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let exitSpy: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let stderrSpy: any
   let coreModuleMock: {
     startAgentRun: ReturnType<typeof vi.fn>
     getDb: ReturnType<typeof vi.fn>
     runMigrations: ReturnType<typeof vi.fn>
     loadConfig: ReturnType<typeof vi.fn>
+    globalDataDir: ReturnType<typeof vi.fn>
   }
 
   beforeEach(() => {
@@ -199,8 +203,10 @@ describe('runSessionStartHook', () => {
 })
 
 describe('runSessionStopHook', () => {
-  let exitSpy: ReturnType<typeof vi.spyOn>
-  let stderrSpy: ReturnType<typeof vi.spyOn>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let exitSpy: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let stderrSpy: any
 
   beforeEach(() => {
     exitSpy   = mockExit()
@@ -277,8 +283,10 @@ describe('runSessionStopHook', () => {
 })
 
 describe('runPreCompactHook', () => {
-  let exitSpy: ReturnType<typeof vi.spyOn>
-  let stderrSpy: ReturnType<typeof vi.spyOn>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let exitSpy: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let stderrSpy: any
 
   beforeEach(() => {
     exitSpy   = mockExit()
@@ -320,7 +328,7 @@ describe('runPreCompactHook', () => {
       getDb:         vi.fn().mockReturnValue({}),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_compact', project_id: 'proj_compact', db_path: ':memory:' }),
-      globalDataDir: vi.fn().mockReturnValue('/tmp/fulcrum-test'),
+      
     }))
     vi.doMock('fulcrum-memory', () => ({ writeMemory }))
 
@@ -344,7 +352,7 @@ describe('runPreCompactHook', () => {
       getDb:         vi.fn().mockReturnValue({}),
       runMigrations: vi.fn(),
       loadConfig:    vi.fn().mockReturnValue({ workspace_id: 'ws_alias', project_id: 'proj_alias', db_path: ':memory:' }),
-      globalDataDir: vi.fn().mockReturnValue('/tmp/fulcrum-test'),
+      
     }))
     vi.doMock('fulcrum-memory', () => ({ writeMemory }))
 

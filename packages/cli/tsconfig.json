@@ -13,6 +13,6 @@
     "outDir": "./dist",
     "rootDir": "../.."
   },
-  "include": ["src/**/*", "../../agent-integration/install.ts"],
+  "include": ["src/**/*", "../../agent-integration/install.ts", "../../scripts/gen-claude-md.ts"],
   "exclude": ["node_modules", "dist"]
 }

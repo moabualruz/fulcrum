@@ -710,6 +710,19 @@ export function applySchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_hook_events_workspace_session_ts ON hook_events(workspace_id, session_id, ts);
 
+    -- Audit log for write-path events that are not tool-call hooks (non-primary
+    -- write drops, sanitize errors, WAL skips, etc). HIGH-5: the prior code
+    -- tried to INSERT into hook_events with columns that did not exist —
+    -- silent catch hid the schema drift. This table owns those audit rows.
+    CREATE TABLE IF NOT EXISTS memory_write_events (
+      event_id     TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL DEFAULT '',
+      event_type   TEXT NOT NULL,
+      payload      TEXT NOT NULL DEFAULT '{}',
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_memory_write_events_ws_type_ts ON memory_write_events(workspace_id, event_type, created_at);
+
     CREATE TABLE IF NOT EXISTS trace_events (
       span_id        TEXT PRIMARY KEY,
       trace_id       TEXT NOT NULL,

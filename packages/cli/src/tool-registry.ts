@@ -26,6 +26,64 @@ export interface HandlerDeps {
   workspace_id: string
   /** Project ID derived from cwd via projectIdsFromPath() at startup. */
   project_id: string
+  /**
+   * Trusted caller identity resolved from the server session, NOT from tool
+   * args. See CRIT-1: accepting caller_role from args lets any MCP client
+   * claim chief_of_staff and bypass the global-scope policy gate. The server
+   * resolves this once at startup via resolveTrustedCaller() from
+   * process.env['FULCRUM_RUN_ID'] → agent_runs.role, or falls back to
+   * 'software_engineer' for stdio callers that have no run context.
+   */
+  trusted_caller_role?: string
+  trusted_caller_run_id?: string
+}
+
+/**
+ * Resolve the trusted caller identity from the server environment. Looks at
+ * FULCRUM_RUN_ID in env, reads agent_runs.role for that run, returns both.
+ * Tool-supplied caller_role is NEVER used — that is the CRIT-1 vulnerability.
+ */
+export function resolveTrustedCaller(db: Db): { role?: string; run_id?: string } {
+  const runId = process.env['FULCRUM_RUN_ID']
+  if (!runId) return {}
+  try {
+    const row = db.prepare('SELECT role FROM agent_runs WHERE run_id = ?').get(runId) as { role: string } | undefined
+    return { role: row?.role, run_id: runId }
+  } catch { return {} }
+}
+
+// MED-14: lightweight input-validation helpers for MCP tool handlers.
+// Rejects oversized strings (>10 KiB for content, >256 for identifiers),
+// non-string types, and unsafe identifier patterns before the handler runs.
+const SAFE_ID_RE = /^[A-Za-z0-9_-]+$/
+const MAX_ID_LEN = 256
+const MAX_CONTENT_LEN = 1024 * 1024 // 1 MiB
+
+export function assertString(val: unknown, field: string, maxLen: number): string {
+  if (typeof val !== 'string') {
+    throw Object.assign(new Error(`${field} must be a string`), { code: 'invalid_input' })
+  }
+  if (val.length > maxLen) {
+    throw Object.assign(new Error(`${field} exceeds max length ${maxLen} chars`), { code: 'invalid_input' })
+  }
+  return val
+}
+
+export function assertIdentifier(val: unknown, field: string): string {
+  const s = assertString(val, field, MAX_ID_LEN)
+  if (!SAFE_ID_RE.test(s)) {
+    throw Object.assign(new Error(`${field} must match ${SAFE_ID_RE}`), { code: 'invalid_input' })
+  }
+  return s
+}
+
+export function assertOptionalIdentifier(val: unknown, field: string): string | undefined {
+  if (val === undefined || val === null) return undefined
+  return assertIdentifier(val, field)
+}
+
+export function assertContent(val: unknown, field: string): string {
+  return assertString(val, field, MAX_CONTENT_LEN)
 }
 
 export interface ToolCapabilities {
@@ -134,26 +192,36 @@ export interface AdditionalActionDefinitionInput {
 export const TOOL_REGISTRY = new Map<string, RegistryEntry>()
 const ADDITIONAL_ACTIONS: AdditionalActionDefinitionInput[] = []
 
-const ACTION_PLATFORM_OVERRIDES = {
+// MED-18: ActionHookContract requires `coverage` and `cliSubstitutable` on
+// every override. Prior entries had only `nativePoints`/`nativePlatforms`,
+// which failed strict typecheck (TS2739). Adding the missing fields with the
+// correct defaults — full coverage + CLI substitutable for these three tools.
+const ACTION_PLATFORM_OVERRIDES: Record<string, Partial<Pick<ActionDefinition, 'hooks' | 'availability'>>> = {
   recall_memory: {
     hooks: {
+      coverage: 'full',
       nativePoints: ['claude.pre_tool_use', 'gemini.before_tool', 'pi.before_tool'],
       nativePlatforms: ['claude', 'gemini', 'pi'],
+      cliSubstitutable: true,
     },
   },
   write_memory: {
     hooks: {
+      coverage: 'full',
       nativePoints: ['claude.post_tool_use', 'claude.pre_compact', 'gemini.after_tool', 'pi.after_tool'],
       nativePlatforms: ['claude', 'gemini', 'pi'],
+      cliSubstitutable: true,
     },
   },
   get_current_context: {
     hooks: {
+      coverage: 'full',
       nativePoints: ['claude.session_start', 'claude.pre_tool_use'],
       nativePlatforms: ['claude'],
+      cliSubstitutable: true,
     },
   },
-} satisfies Record<string, Partial<Pick<ActionDefinition, 'hooks' | 'availability'>>>
+}
 
 function normalizeActionName(name: string): string {
   return name.replace(/^mcp__fulcrum__/, '')
@@ -381,7 +449,15 @@ export async function buildMcpExposurePlan(
 
 /** Build a HandlerDeps context from the cwd-derived workspace/project IDs. */
 export function buildDeps(workspace_id: string, project_id: string): HandlerDeps {
-  return { db: getDb(), workspace_id, project_id }
+  const db = getDb()
+  const trusted = resolveTrustedCaller(db)
+  return {
+    db,
+    workspace_id,
+    project_id,
+    trusted_caller_role: trusted.role,
+    trusted_caller_run_id: trusted.run_id,
+  }
 }
 
 function ensureWorkspace(db: Db, wsId: string): void {
@@ -580,10 +656,10 @@ TOOL_REGISTRY.set('recall_memory', {
       query_scope: args['query_scope'] as 'session' | 'project' | 'workspace' | 'global' | undefined,
       session_id: args['session_id'] as string | undefined,
       min_score: args['min_score'] as number | undefined,
-      caller_run_id: args['caller_run_id'] as string | undefined,
-      caller_role: args['caller_role'] as string | undefined,
+      caller_run_id: deps.trusted_caller_run_id,
+      caller_role: deps.trusted_caller_role,
       recall_source: 'recall_memory',
-    } as Parameters<typeof runStagedSearch>[0])
+    } as unknown as Parameters<typeof runStagedSearch>[0])
     const results = (envelope.results as Array<{ memory_id?: string; content?: string; summary?: string; tags?: string[]; recall_score?: number; source?: string }>)
       .map(m => ({
         id: m.memory_id,
@@ -606,16 +682,21 @@ TOOL_REGISTRY.set('write_memory', {
     if (!_gte()) {
       try { await _ie(_lc()) } catch { /* non-fatal */ }
     }
-    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
-    const proj = (args['project_id'] as string | undefined) ?? deps.project_id
+    // MED-14: validate identifiers + content BEFORE they reach the handler.
+    // Guards against path-traversal via workspace_id/project_id, oversized
+    // content DoS, non-string type confusion, and shell-chars in tags.
+    const ws = assertIdentifier(args['workspace_id'] ?? deps.workspace_id, 'workspace_id')
+    const proj = assertIdentifier(args['project_id'] ?? deps.project_id, 'project_id')
+    const content = assertContent(args['content'], 'content')
     ensureWorkspace(deps.db, ws)
     ensureProject(deps.db, ws, proj)
     const rawTags = args['tags']
     const tagList = Array.isArray(rawTags)
-      ? rawTags.map(String).filter(Boolean)
-      : ((rawTags as string | undefined) ?? '').split(',').map(t => t.trim()).filter(Boolean)
-    const content = args['content'] as string
-    const title = (args['title'] as string | undefined) ?? content.slice(0, 80)
+      ? rawTags.map(String).filter(Boolean).slice(0, 32)
+      : ((rawTags as string | undefined) ?? '').split(',').map(t => t.trim()).filter(Boolean).slice(0, 32)
+    const title = typeof args['title'] === 'string'
+      ? assertString(args['title'], 'title', 512)
+      : content.slice(0, 80)
     const memory = await writeMemory({
       content,
       workspace_id: ws,
@@ -683,8 +764,8 @@ TOOL_REGISTRY.set('query_memory', {
       kind: args['kind'] as string | undefined,
       date_range: args['date_range'] as { from?: string; to?: string } | undefined,
       limit: args['limit'] as number | undefined,
-      caller_run_id: args['caller_run_id'] as string | undefined,
-      caller_role: args['caller_role'] as string | undefined,
+      caller_run_id: deps.trusted_caller_run_id,
+      caller_role: deps.trusted_caller_role,
     })
     return envelope.reason ? envelope : { results: envelope.results }
   },
@@ -707,8 +788,8 @@ TOOL_REGISTRY.set('search_code', {
       scope: args['scope'] as 'session' | 'project' | 'workspace' | 'global' | undefined,
       min_score: args['min_score'] as number | undefined,
       limit: args['limit'] as number | undefined,
-      caller_run_id: args['caller_run_id'] as string | undefined,
-      caller_role: args['caller_role'] as string | undefined,
+      caller_run_id: deps.trusted_caller_run_id,
+      caller_role: deps.trusted_caller_role,
     })
     return envelope.reason ? envelope : { results: envelope.results }
   },
@@ -930,7 +1011,7 @@ TOOL_REGISTRY.set('create_team_template', {
   capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
   handler: async (args) => {
     const { getTeamOps } = await import('fulcrum-agent-core')
-    const fn = getTeamOps()['createTeamTemplate'] as (input: Record<string, unknown>) => Promise<unknown>
+    const ops = getTeamOps(); if (!ops) throw Object.assign(new Error('team-ops not registered'), { code: 'invalid_state' }); const fn = ops['createTeamTemplate'] as (input: Record<string, unknown>) => Promise<unknown>
     return await fn({
       name: args['name'] as string,
       description: args['description'] as string | undefined,
@@ -943,17 +1024,27 @@ TOOL_REGISTRY.set('create_team_template', {
 TOOL_REGISTRY.set('invoke_team', {
   schema: TOOL_SCHEMA_MAP.get('invoke_team'),
   capabilities: { readOnly: false, destructive: true, hookEquivalent: false, minRole: 'chief_of_staff' },
-  handler: async (args) => {
+  handler: async (args, deps) => {
+    // CRIT-1: caller_role and caller_agent_id MUST come from trusted session
+    // state, not from tool args. A tool-arg-supplied caller_role lets any MCP
+    // client claim chief_of_staff and spawn teams they shouldn't be allowed to.
+    const callerRole = deps.trusted_caller_role
+    if (!callerRole) {
+      throw Object.assign(
+        new Error('invoke_team requires a trusted caller session; FULCRUM_RUN_ID env var is missing or invalid.'),
+        { code: 'invalid_state' },
+      )
+    }
     const { getTeamOps } = await import('fulcrum-agent-core')
-    const fn = getTeamOps()['invokeTeam'] as (input: Record<string, unknown>) => Promise<unknown>
+    const ops = getTeamOps(); if (!ops) throw Object.assign(new Error('team-ops not registered'), { code: 'invalid_state' }); const fn = ops['invokeTeam'] as (input: Record<string, unknown>) => Promise<unknown>
     return await fn({
       template_id: args['template_id'] as string,
       workspace_id: args['workspace_id'] as string,
       project_id: args['project_id'] as string | undefined,
       purpose: args['purpose'] as string,
       task_id: args['task_id'] as string | undefined,
-      caller_agent_id: args['caller_agent_id'] as string,
-      caller_role: args['caller_role'] as string,
+      caller_agent_id: deps.trusted_caller_run_id ?? '',
+      caller_role: callerRole,
       initial_slots: args['initial_slots'] as Record<string, string[]> | undefined,
     })
   },
@@ -964,7 +1055,7 @@ TOOL_REGISTRY.set('list_team_templates', {
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args) => {
     const { getTeamOps } = await import('fulcrum-agent-core')
-    const fn = getTeamOps()['listTeamTemplates'] as (input?: Record<string, unknown>) => Promise<unknown[]>
+    const ops = getTeamOps(); if (!ops) throw Object.assign(new Error('team-ops not registered'), { code: 'invalid_state' }); const fn = ops['listTeamTemplates'] as (input?: Record<string, unknown>) => Promise<unknown[]>
     return await fn({
       limit: (args['limit'] as number | undefined) ?? 50,
       offset: (args['offset'] as number | undefined) ?? 0,
@@ -977,7 +1068,7 @@ TOOL_REGISTRY.set('list_team_instances', {
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args, deps) => {
     const { getTeamOps } = await import('fulcrum-agent-core')
-    const fn = getTeamOps()['listTeamInstances'] as (input: Record<string, unknown>) => Promise<unknown[]>
+    const ops = getTeamOps(); if (!ops) throw Object.assign(new Error('team-ops not registered'), { code: 'invalid_state' }); const fn = ops['listTeamInstances'] as (input: Record<string, unknown>) => Promise<unknown[]>
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     return await fn({
       workspace_id: ws,

@@ -13,11 +13,30 @@
 //     proceed; if retry fails, log + proceed (don't block the universe on
 //     one contention spike).
 
-import { appendFileSync, mkdirSync } from 'node:fs'
+import * as nodeFs from 'node:fs'
+const { openSync, writeSync, closeSync, mkdirSync, constants: fsConstants } = nodeFs
 import { join, dirname } from 'node:path'
 import { createHash } from 'node:crypto'
 import { globalDataDir } from 'fulcrum-agent-core'
 import type { SanitizeEvent } from '../sanitize/index.js'
+
+// TEST-C: injectable fs so tests can simulate ENOSPC / EROFS / EIO / EAGAIN
+// without mocking Node's built-in fs module (which is non-writable in ESM).
+export interface WalFsImpl {
+  openSync: typeof openSync
+  writeSync: typeof writeSync
+  closeSync: typeof closeSync
+  mkdirSync: typeof mkdirSync
+}
+const realFsImpl: WalFsImpl = { openSync, writeSync, closeSync, mkdirSync }
+let injectedFsImpl: WalFsImpl | null = null
+/** Test hook — overrides the fs implementation used by appendWal. */
+export function __setWalFsImpl(impl: WalFsImpl | null): void {
+  injectedFsImpl = impl
+}
+function getFsImpl(): WalFsImpl {
+  return injectedFsImpl ?? realFsImpl
+}
 
 export class WalDurabilityError extends Error {
   constructor(message: string, public readonly errno?: string) {
@@ -40,7 +59,7 @@ export function brandSanitized(s: string): SanitizedContent {
 
 export interface WalRecord {
   ts: string
-  op: 'WRITE' | 'UPDATE' | 'DELETE'
+  op: 'WRITE' | 'UPDATE' | 'DELETE' | 'SKIP'
   memory_id: string
   slug?: string | null
   kind: string
@@ -94,9 +113,28 @@ export function appendWal(input: AppendWalInput): WalRecord {
   const target = walPathFor()
   const serialized = `${JSON.stringify(record)}\n`
 
+  // MED-17: atomic single-write-syscall append.
+  //
+  // The prior implementation (`appendFileSync`) opens+writes+closes on each
+  // call, and multiple processes appending to the same JSONL can interleave
+  // partial lines when the payload exceeds PIPE_BUF. O_APPEND on a single
+  // open file descriptor guarantees the kernel appends each write() atomically
+  // when the buffer is <= PIPE_BUF. Sanitize events can push serialized size
+  // past 4 KiB — adding O_SYNC gives strong crash durability too.
+  //
+  // The in-process mutex (`writeQueue`) serialises multiple concurrent calls
+  // from the same process even when the write > PIPE_BUF so the file stays
+  // line-oriented JSONL.
   const writeOnce = (): void => {
-    mkdirSync(dirname(target), { recursive: true })
-    appendFileSync(target, serialized, 'utf8')
+    const impl = getFsImpl()
+    impl.mkdirSync(dirname(target), { recursive: true })
+    // O_APPEND | O_WRONLY | O_CREAT | O_SYNC
+    const fd = impl.openSync(target, fsConstants.O_APPEND | fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_SYNC, 0o600)
+    try {
+      impl.writeSync(fd, serialized, null, 'utf8')
+    } finally {
+      impl.closeSync(fd)
+    }
   }
 
   try {

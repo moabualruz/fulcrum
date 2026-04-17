@@ -15,7 +15,7 @@
 //     once per project; handler stays subscribed until stop() is called
 //   * on-demand: syncFile({...}) runs a single file through the cascade
 
-import { readFileSync, statSync } from 'node:fs'
+import { readFileSync, statSync, lstatSync } from 'node:fs'
 import { relative, extname, join, isAbsolute } from 'node:path'
 import { createHash } from 'node:crypto'
 import type { Db } from 'fulcrum-agent-core'
@@ -97,12 +97,24 @@ export async function syncFile(
   }
 
   // add / change / rename-candidate — read the file.
+  // MED-12: lstat first to detect symlinks. Skip symlinks entirely — following
+  // them lets a malicious PR point `docs/README.md -> ~/.aws/credentials` and
+  // have PCI ingest the host's secrets.
   let content: string
   let stats: ReturnType<typeof statSync>
   try {
+    const l = lstatSync(absPath)
+    if (l.isSymbolicLink()) return { action: 'skipped', fileId }
+    if (!l.isFile()) return { action: 'skipped', fileId }
     stats = statSync(absPath)
     if (stats.size > 5 * 1024 * 1024) return { action: 'skipped', fileId } // >5 MiB safety cap
-    content = readFileSync(absPath, 'utf8')
+    // Minimal UTF-8 sanity check — reject binary files that would produce
+    // garbage FTS5 tokens and waste vector storage (MEDIUM finding).
+    const buf = readFileSync(absPath)
+    for (let i = 0; i < Math.min(buf.length, 2048); i++) {
+      if (buf[i] === 0) return { action: 'skipped', fileId }
+    }
+    content = buf.toString('utf8')
   } catch {
     return { action: 'skipped', fileId }
   }

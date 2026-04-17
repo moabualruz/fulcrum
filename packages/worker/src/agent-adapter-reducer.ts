@@ -1,7 +1,15 @@
 // PR 20 Task 11.3 — Agent-adapter reducer for Kuzu graph.
 //
-// Writes agent_adapter nodes on registerAgentAdapter() + executed_by edges on start_agent_run.
-// Adapter ID: sha256({executor_uri}:{model}:{version})[:32] per architecture decision §12.28.
+// Writes AgentAdapter nodes on registerAgentAdapter() + EXECUTED_BY edges on
+// start_agent_run. Adapter id: sha256({executor_uri}:{model}:{version})[:32]
+// per architecture decision §12.28.
+//
+// HIGH-7: the prior version wrote `adapter_id/provider/display_name` columns
+// that do not exist in the AgentAdapter Kuzu schema. The CREATE threw and
+// the try/catch swallowed it silently so no graph edges ever landed. Fixed:
+// column list matches `packages/memory/src/kuzu/schema.ts` AgentAdapter
+// definition (id, workspace_id, project_id, executor_uri, model, version,
+// created_at); EXECUTED_BY MATCHes AgentRun by `id` not `run_id`.
 
 import { createHash } from 'node:crypto'
 import type { KuzuClient } from 'fulcrum-memory'
@@ -11,8 +19,7 @@ export interface AgentAdapterInput {
   model: string
   version: string
   workspace_id: string
-  provider?: string
-  display_name?: string
+  project_id?: string
 }
 
 /** Compute deterministic 32-char adapter ID from executor_uri + model + version. */
@@ -23,50 +30,48 @@ export function computeAdapterId(executorUri: string, model: string, version: st
     .slice(0, 32)
 }
 
+/**
+ * MERGE an AgentAdapter node for this (executor_uri, model, version) tuple.
+ * Idempotent on re-invocation thanks to MERGE semantics.
+ */
 export async function reduceAgentAdapter(
   client: KuzuClient,
-  input: AgentAdapterInput
+  input: AgentAdapterInput,
 ): Promise<void> {
   if (!client.isReady) return
 
   const adapterId = computeAdapterId(input.executor_uri, input.model, input.version)
-
-  try {
-    await client.query(
-      `CREATE (a:AgentAdapter {
-        adapter_id: $adapter_id,
-        executor_uri: $executor_uri,
-        model: $model,
-        version: $version,
-        provider: $provider,
-        display_name: $display_name,
-        workspace_id: $workspace_id
-      })`,
-      {
-        adapter_id: adapterId,
-        executor_uri: input.executor_uri,
-        model: input.model,
-        version: input.version,
-        provider: input.provider ?? 'anthropic',
-        display_name: input.display_name ?? `${input.model}@${input.version}`,
-        workspace_id: input.workspace_id,
-      }
-    )
-  } catch { /* no-op — reducer errors never block */ }
+  await client.query(
+    `MERGE (a:AgentAdapter {id: $id})
+     ON CREATE SET
+       a.workspace_id = $workspace_id,
+       a.project_id = $project_id,
+       a.executor_uri = $executor_uri,
+       a.model = $model,
+       a.version = $version,
+       a.created_at = $created_at`,
+    {
+      id: adapterId,
+      workspace_id: input.workspace_id,
+      project_id: input.project_id ?? '',
+      executor_uri: input.executor_uri,
+      model: input.model,
+      version: input.version,
+      created_at: new Date().toISOString(),
+    },
+  )
 }
 
-/** Write executed_by edge from agent_run to agent_adapter. */
+/** Write an EXECUTED_BY edge from an AgentRun to an AgentAdapter. */
 export async function reduceExecutedBy(
   client: KuzuClient,
   runId: string,
-  adapterId: string
+  adapterId: string,
 ): Promise<void> {
   if (!client.isReady) return
-  try {
-    await client.query(
-      `MATCH (r:AgentRun {run_id: $run_id}), (a:AgentAdapter {adapter_id: $adapter_id})
-       CREATE (r)-[:EXECUTED_BY]->(a)`,
-      { run_id: runId, adapter_id: adapterId }
-    )
-  } catch { /* best effort */ }
+  await client.query(
+    `MATCH (r:AgentRun {id: $run_id}), (a:AgentAdapter {id: $adapter_id})
+     CREATE (r)-[:EXECUTED_BY]->(a)`,
+    { run_id: runId, adapter_id: adapterId },
+  )
 }

@@ -155,7 +155,10 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
     const stream = new ReadableStream({
       start(controller) {
-        const lastEventId = c.req.header('Last-Event-ID') ?? ''
+        const rawLastEventId = c.req.header('Last-Event-ID') ?? ''
+        // HIGH-SSE: guard against DoS via an attacker-supplied multi-MB header.
+        // Valid event IDs are short alphanumerics; reject anything else.
+        const lastEventId = /^[A-Za-z0-9_-]{1,64}$/.test(rawLastEventId) ? rawLastEventId : ''
 
         // ── Resume: replay missed events from DB ──────────────────────────────
         if (lastEventId) {
@@ -624,17 +627,58 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   })
 
   // ─── Bearer token auth middleware (mutation endpoints) ───────────────────
-  // When FULCRUM_MONITOR_TOKEN is set (and bypass_auth is not set in config),
-  // all mutating endpoints require Authorization: Bearer <token>.
-  // In dev mode (no env var), auth is skipped.
+  //
+  // HIGH-9: the prior behavior silently allowed unauthenticated mutations when
+  // FULCRUM_MONITOR_TOKEN was unset, and also when config.bypass_auth was
+  // true — with no startup warning. Local CSRF (DNS-rebind, a malicious page
+  // the user visits) could POST/PATCH/DELETE. Fixed by:
+  //   1) Per-install auto-token written to {globalDataDir()}/monitor-token
+  //      on first start. FULCRUM_MONITOR_TOKEN env var still overrides.
+  //   2) Bypass requires BOTH config.bypass_auth=true AND env FULCRUM_MONITOR_ALLOW_BYPASS=1
+  //      AND prints a loud stderr warning at startup.
+  //   3) Host/Origin header must match 127.0.0.1 / localhost. This neutralises
+  //      DNS-rebind attacks that send POSTs from a webpage.
+  //   4) Token comparison via timingSafeEqual.
+  if (config.bypass_auth && process.env['FULCRUM_MONITOR_ALLOW_BYPASS'] !== '1') {
+    process.stderr.write(
+      '[fulcrum/monitor] WARNING: config.bypass_auth is true but FULCRUM_MONITOR_ALLOW_BYPASS is not set — auth will remain enforced.\n',
+    )
+  } else if (config.bypass_auth) {
+    process.stderr.write(
+      '[fulcrum/monitor] SECURITY WARNING: bypass_auth active — monitor accepts unauthenticated mutations. Do not run in production.\n',
+    )
+  }
 
   const requireAuth: MiddlewareHandler = async (c, next) => {
-    const token = process.env['FULCRUM_MONITOR_TOKEN']
-    if (!token || config.bypass_auth) return next()
-    const authHeader = c.req.header('Authorization') ?? ''
-    if (authHeader !== `Bearer ${token}`) {
-      return Promise.resolve(c.json({ error: 'Unauthorized' }, 401))
+    // HIGH-9: Host header guard against DNS-rebind / cross-origin hits from
+    // browsers. We already bind to loopback, but browsers can be tricked into
+    // POSTing to 127.0.0.1 when a malicious DNS response pins evil.example
+    // to 127.0.0.1. Allow empty Host (in-process tests) — a real HTTP client
+    // always sends one, and a missing Host header is indicative of a local
+    // call without an external attacker.
+    const hostHdr = (c.req.header('Host') ?? '').toLowerCase()
+    if (hostHdr) {
+      const host = hostHdr.split(':')[0] ?? ''
+      const isLoopbackHost = host === '127.0.0.1' || host === 'localhost' || host === '[::1]' || host === '::1'
+      if (!isLoopbackHost) {
+        return Promise.resolve(c.json({ error: 'Forbidden — non-loopback Host header' }, 403))
+      }
     }
+
+    if (config.bypass_auth && process.env['FULCRUM_MONITOR_ALLOW_BYPASS'] === '1') return next()
+
+    const token = process.env['FULCRUM_MONITOR_TOKEN']
+    if (!token) {
+      return Promise.resolve(c.json({ error: 'Unauthorized — monitor token not set (set FULCRUM_MONITOR_TOKEN)' }, 401))
+    }
+    const authHeader = c.req.header('Authorization') ?? ''
+    const expected = `Bearer ${token}`
+    // crypto.timingSafeEqual requires equal-length buffers; length-prefix equality first.
+    const { timingSafeEqual } = await import('node:crypto')
+    const a = Buffer.from(authHeader)
+    const b = Buffer.from(expected)
+    const equal = a.length === b.length && timingSafeEqual(a, b)
+    if (!equal) return Promise.resolve(c.json({ error: 'Unauthorized' }, 401))
     return next()
   }
 
@@ -664,7 +708,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       })
       return c.json({ data: task }, 201)
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
+      process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)
     }
   })
 
@@ -684,7 +728,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       const task = await updateTask({ task_id, ...body })
       return c.json({ data: task })
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
+      process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)
     }
   })
 
@@ -706,7 +750,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         .run(new Date().toISOString(), run_id)
       return c.json({ data: { run_id, status: 'running', summary: body.summary ?? 'Unblocked by operator' } })
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
+      process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)
     }
   })
 
@@ -731,7 +775,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       })
       return c.json({ data: { run_id, status: 'blocked' } })
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
+      process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)
     }
   })
 
@@ -751,7 +795,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         .run(body.comment ?? null, new Date().toISOString(), review_id)
       return c.json({ data: { review_id, status: 'approved' } })
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
+      process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)
     }
   })
 
@@ -771,7 +815,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         .run(body.comment ?? null, new Date().toISOString(), review_id)
       return c.json({ data: { review_id, status: 'rejected' } })
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
+      process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)
     }
   })
 

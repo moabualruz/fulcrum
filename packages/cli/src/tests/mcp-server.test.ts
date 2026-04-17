@@ -98,14 +98,14 @@ describe('tools/call happy path', () => {
     const result = await callRaw(client, 'list_tasks', { workspace_id: 'ws_test', project_id: 'proj_test' })
     expect(result.isError).toBeFalsy()
     expect(Array.isArray(result.content)).toBe(true)
-    expect(result.content[0].type).toBe('text')
+    expect((result.content as Array<{ text: string; type: string }>)[0].type).toBe('text')
   })
 
   it('create_task echoes back tool name', async () => {
     const { client } = await makeConnectedPair()
     const result = await callRaw(client, 'create_task', { title: 'Test task', workspace_id: 'ws_test', project_id: 'proj_test' })
     expect(result.isError).toBeFalsy()
-    const parsed = JSON.parse((result.content[0] as { text: string }).text)
+    const parsed = JSON.parse(((result.content as Array<{ text: string; type: string }>)[0] as { text: string }).text)
     expect(parsed.tool).toBe('create_task')
     expect(parsed.args.title).toBe('Test task')
   })
@@ -136,7 +136,7 @@ describe('tools/call happy path', () => {
     const { client } = await makeConnectedPair()
     const result = await callRaw(client, 'start_agent_run', { workspace_id: 'ws_test', agent_role: 'software_engineer' })
     expect(result.isError).toBeFalsy()
-    const parsed = JSON.parse((result.content[0] as { text: string }).text)
+    const parsed = JSON.parse(((result.content as Array<{ text: string; type: string }>)[0] as { text: string }).text)
     expect(parsed.args.agent_role).toBe('software_engineer')
   })
 
@@ -205,7 +205,7 @@ describe('tools/call invalid args', () => {
     })
     const result = await callRaw(client, 'list_tasks', { workspace_id: 'ws_test', project_id: 'proj_test' })
     expect(result.isError).toBe(true)
-    const parsed = JSON.parse((result.content[0] as { text: string }).text)
+    const parsed = JSON.parse(((result.content as Array<{ text: string; type: string }>)[0] as { text: string }).text)
     expect(parsed.error).toContain('db_error')
   })
 })
@@ -228,21 +228,21 @@ describe('resources/read', () => {
     const result = await client.readResource({ uri: 'fulcrum://ws_abc' })
     expect(Array.isArray(result.contents)).toBe(true)
     expect(result.contents.length).toBeGreaterThan(0)
-    const parsed = JSON.parse(result.contents[0].text as string)
+    const parsed = JSON.parse((result.contents[0] as { text: string }).text)
     expect(parsed.status).toBe('ok')
   })
 
   it('reads task list via workspace/tasks URI', async () => {
     const { client } = await makeConnectedPair(async () => ({ tasks: [{ id: 'task_1' }] }))
     const result = await client.readResource({ uri: 'fulcrum://ws_abc/tasks' })
-    const parsed = JSON.parse(result.contents[0].text as string)
+    const parsed = JSON.parse((result.contents[0] as { text: string }).text)
     expect(parsed.tasks).toHaveLength(1)
   })
 
   it('reads agent run via run URI', async () => {
     const { client } = await makeConnectedPair(async () => ({ run_id: 'run_1', status: 'running' }))
     const result = await client.readResource({ uri: 'fulcrum://ws_abc/run/run_1' })
-    const parsed = JSON.parse(result.contents[0].text as string)
+    const parsed = JSON.parse((result.contents[0] as { text: string }).text)
     expect(parsed.run_id).toBe('run_1')
   })
 })
@@ -265,7 +265,7 @@ describe('get_current_context readiness object', () => {
     const { client } = await makeConnectedPair(async () => readinessPayload)
     const result = await callRaw(client, 'get_current_context', {})
     expect(result.isError).toBeFalsy()
-    const parsed = JSON.parse((result.content[0] as { text: string }).text)
+    const parsed = JSON.parse(((result.content as Array<{ text: string; type: string }>)[0] as { text: string }).text)
     expect(parsed.workspace_id).toBe('ws_test')
     expect(parsed.readiness).toBeDefined()
     expect(typeof parsed.readiness.tools_available).toBe('number')
@@ -365,10 +365,10 @@ describe('--profile filter', () => {
   it('unknown role profile warns and falls back to an allow-all filter', async () => {
     const stderrWrites: string[] = []
     const origWrite = process.stderr.write.bind(process.stderr)
-    process.stderr.write = (chunk: string | Uint8Array, ...rest: Parameters<typeof process.stderr.write>[1][]) => {
+    process.stderr.write = ((chunk: string | Uint8Array, ...rest: Parameters<typeof process.stderr.write>[1][]) => {
       stderrWrites.push(typeof chunk === 'string' ? chunk : String(chunk))
       return origWrite(chunk, ...rest as [never])
-    }
+    }) as typeof process.stderr.write
 
     try {
       const filter = await buildProfileFilter('nonexistent_role_xyz')

@@ -10,7 +10,7 @@ function makeEvent(overrides: Partial<FulcrumEvent>): FulcrumEvent {
     run_id: null,
     evt_type: 'agent_run_started',
     payload: {},
-    created_at: '2026-04-16T10:30:00.000Z',
+    ts: '2026-04-16T10:30:00.000Z',
     ...overrides,
   } as unknown as FulcrumEvent
 }
@@ -113,7 +113,7 @@ describe('formatEvent', () => {
 
   describe('timestamp format', () => {
     it('renders timestamp as HH:mm:ss in brackets', () => {
-      const evt = makeEvent({ created_at: '2026-04-16T09:05:03.000Z' })
+      const evt = makeEvent({ ts: '2026-04-16T09:05:03.000Z' })
       const line = formatEvent(evt)
       // Expect HH:mm:ss format (exact hour depends on timezone, so just check pattern)
       expect(line).toMatch(/\[\d\d:\d\d:\d\d\]/)

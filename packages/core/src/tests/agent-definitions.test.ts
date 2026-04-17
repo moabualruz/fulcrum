@@ -9,6 +9,7 @@ import { getDb, closeDb, runMigrations } from '../index.js'
 import {
   createAgentDefinition, getAgentDefinition, updateAgentDefinition, listAgentDefinitions,
 } from '../agent-definitions.js'
+import type { AgentRole } from '../types.js'
 
 let tmpDir: string | null = null
 
@@ -55,12 +56,12 @@ describe('createAgentDefinition', () => {
   it('creates a new agent definition with defaults', () => {
     // Use a non-canonical role name to avoid conflict with seeded definitions
     const def = createAgentDefinition({
-      role: 'test_custom_role_a',
+      role: 'test_custom_role_a' as AgentRole,
       display_name: 'Test Custom Role A',
       description: 'Writes and reviews code',
     })
     expect(def.id).toMatch(/^adef_[0-9A-Z]+$/)
-    expect(def.role).toBe('test_custom_role_a')
+    expect(def.role).toBe('test_custom_role_a' as AgentRole)
     expect(def.display_name).toBe('Test Custom Role A')
     expect(def.description).toBe('Writes and reviews code')
     expect(def.version).toBe('0.1.0')
@@ -74,7 +75,7 @@ describe('createAgentDefinition', () => {
 
   it('creates a definition with all optional fields', () => {
     const def = createAgentDefinition({
-      role: 'test_custom_role_b',
+      role: 'test_custom_role_b' as AgentRole,
       display_name: 'Test Custom Role B',
       description: 'Reviews code for quality',
       version: '1.0.0',
@@ -164,7 +165,7 @@ describe('listAgentDefinitions', () => {
   })
 
   it('includes additional created definitions', () => {
-    createAgentDefinition({ role: 'test_extra_role', display_name: 'Extra', description: 'Extra role' })
+    createAgentDefinition({ role: 'test_extra_role' as AgentRole, display_name: 'Extra', description: 'Extra role' })
     const all = listAgentDefinitions()
     expect(all.length).toBe(25)
     expect(all.map(d => d.role)).toContain('test_extra_role')
@@ -178,10 +179,10 @@ describe('listAgentDefinitions', () => {
   })
 
   it('filters by stability — experimental returns only user-created ones', () => {
-    createAgentDefinition({ role: 'test_exp_role', display_name: 'Exp', description: 'Experimental', stability: 'experimental' })
+    createAgentDefinition({ role: 'test_exp_role' as AgentRole, display_name: 'Exp', description: 'Experimental', stability: 'experimental' })
     const exp = listAgentDefinitions('experimental')
     expect(exp.length).toBe(1)
-    expect(exp[0].role).toBe('test_exp_role')
+    expect(exp[0].role).toBe('test_exp_role' as AgentRole)
   })
 })
 
@@ -192,7 +193,7 @@ describe('tool name validation', () => {
   it('accepts valid tool names in tools_allow', () => {
     expect(() =>
       createAgentDefinition({
-        role: 'test_tool_valid',
+        role: 'test_tool_valid' as AgentRole,
         display_name: 'Test',
         description: 'Test',
         tools_allow: ['read_file', 'write_memory', 'list-tasks', '_internal'],
@@ -203,7 +204,7 @@ describe('tool name validation', () => {
   it('rejects tools_allow with invalid names', () => {
     expect(() =>
       createAgentDefinition({
-        role: 'test_tool_invalid_allow',
+        role: 'test_tool_invalid_allow' as AgentRole,
         display_name: 'Test',
         description: 'Test',
         tools_allow: ['read file', '123bad'],
@@ -214,7 +215,7 @@ describe('tool name validation', () => {
   it('rejects tools_deny with invalid names', () => {
     expect(() =>
       createAgentDefinition({
-        role: 'test_tool_invalid_deny',
+        role: 'test_tool_invalid_deny' as AgentRole,
         display_name: 'Test',
         description: 'Test',
         tools_deny: ['bad name!'],
@@ -223,9 +224,9 @@ describe('tool name validation', () => {
   })
 
   it('rejects tools_allow with invalid name on update', () => {
-    createAgentDefinition({ role: 'test_update_tool', display_name: 'T', description: 'T' })
+    createAgentDefinition({ role: 'test_update_tool' as AgentRole, display_name: 'T', description: 'T' })
     expect(() =>
-      updateAgentDefinition({ role: 'test_update_tool', tools_allow: ['bad name!'] })
+      updateAgentDefinition({ role: 'test_update_tool' as AgentRole, tools_allow: ['bad name!'] })
     ).toThrow(expect.objectContaining({ code: 'invalid_input' }))
   })
 })

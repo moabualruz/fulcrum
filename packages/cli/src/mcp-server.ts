@@ -178,16 +178,31 @@ async function runMiddlewareChain(
   ctx: ToolContext,
   core: () => Promise<void>,
 ): Promise<void> {
-  let index = 0
-  const dispatch = async (): Promise<void> => {
-    if (index < middleware.length) {
-      const mw = middleware[index++]
-      await mw(ctx, dispatch)
-    } else {
-      await core()
+  // MED-16: per-invocation `called` flag detects a middleware that calls
+  // `next()` twice (intentional or via a retry branch). Without this guard,
+  // the shared `index` variable keeps advancing so the second next() invokes
+  // the NEXT middleware rather than re-entering the same position, eventually
+  // running the core handler twice — double DB writes / double memory writes.
+  const runAt = async (i: number): Promise<void> => {
+    let called = false
+    const next = async (): Promise<void> => {
+      if (called) {
+        throw Object.assign(
+          new Error(`middleware at index ${i} called next() more than once`),
+          { code: 'invalid_state' },
+        )
+      }
+      called = true
+      if (i < middleware.length) {
+        const mw = middleware[i]!
+        await mw(ctx, () => runAt(i + 1))
+      } else {
+        await core()
+      }
     }
+    await next()
   }
-  await dispatch()
+  await runAt(0)
 }
 
 // ---------- Server factory ----------
@@ -199,7 +214,10 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
     // sampling: {} advertises that this server can make sampling requests to the
     // client (GAP-MCP-13). No active implementation yet — declaration is the
     // first step; callers that don't support sampling will ignore the capability.
-    { capabilities: { logging: {}, tools: {}, resources: {}, prompts: {}, sampling: {} } },
+    // MCP SDK typing no longer accepts `sampling` on the server capabilities
+    // map — that negotiation is driven by the client side. Cast keeps the
+    // intent (we DO support sampling requests) while complying with the SDK.
+    { capabilities: { logging: {}, tools: {}, resources: {}, prompts: {}, sampling: {} } as never },
   )
 
   const allTools = [...TOOL_SCHEMAS, ...(options.additionalTools ?? [])]
@@ -374,7 +392,7 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
   // fulcrum://{workspace_id}/task/{task_id} — individual task
   server.registerResource(
     'task',
-    new ResourceTemplate('fulcrum://{workspace_id}/task/{task_id}', {}),
+    new ResourceTemplate('fulcrum://{workspace_id}/task/{task_id}', { list: undefined } as never),
     {
       title: 'Task detail',
       description: 'Details of a single Fulcrum task',
@@ -393,7 +411,7 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
   // fulcrum://{workspace_id}/memory/{project_id} — memory entries
   server.registerResource(
     'memory',
-    new ResourceTemplate('fulcrum://{workspace_id}/memory/{project_id}', {}),
+    new ResourceTemplate('fulcrum://{workspace_id}/memory/{project_id}', { list: undefined } as never),
     {
       title: 'Project memory',
       description: 'Recalled memory entries for a project',
@@ -421,7 +439,7 @@ export function createFulcrumMcpServer(options: McpServerOptions): McpServer {
   // fulcrum://{workspace_id}/run/{run_id} — agent run status
   server.registerResource(
     'agent-run',
-    new ResourceTemplate('fulcrum://{workspace_id}/run/{run_id}', {}),
+    new ResourceTemplate('fulcrum://{workspace_id}/run/{run_id}', { list: undefined } as never),
     {
       title: 'Agent run',
       description: 'Status of a Fulcrum agent run',

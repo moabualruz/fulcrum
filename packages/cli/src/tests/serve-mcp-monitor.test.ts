@@ -136,7 +136,7 @@ describe('serve mcp: readiness shape via MCP transport', () => {
     await server.connect(serverTransport)
     await client.connect(clientTransport)
     const result = await client.callTool({ name: 'get_current_context', arguments: {} }, CompatibilityCallToolResultSchema)
-    const parsed = JSON.parse((result.content[0] as { text: string }).text) as Record<string, unknown>
+    const parsed = JSON.parse(((result.content as Array<{ text: string; type: string }>)[0] as { text: string }).text) as Record<string, unknown>
     const readiness = parsed['readiness'] as Record<string, unknown>
     expect(readiness['monitor_running']).toBe(false)
     expect(typeof readiness['tools_available']).toBe('number')
@@ -154,7 +154,7 @@ describe('serve mcp: readiness shape via MCP transport', () => {
     await server.connect(serverTransport)
     await client.connect(clientTransport)
     const result = await client.callTool({ name: 'get_current_context', arguments: {} }, CompatibilityCallToolResultSchema)
-    const parsed = JSON.parse((result.content[0] as { text: string }).text) as Record<string, unknown>
+    const parsed = JSON.parse(((result.content as Array<{ text: string; type: string }>)[0] as { text: string }).text) as Record<string, unknown>
     expect((parsed['readiness'] as Record<string, unknown>)['monitor_running']).toBe(true)
   })
 
@@ -172,7 +172,7 @@ describe('serve mcp: readiness shape via MCP transport', () => {
     await server.connect(serverTransport)
     await client.connect(clientTransport)
     const result = await client.callTool({ name: 'get_current_context', arguments: {} }, CompatibilityCallToolResultSchema)
-    const parsed = JSON.parse((result.content[0] as { text: string }).text) as Record<string, unknown>
+    const parsed = JSON.parse(((result.content as Array<{ text: string; type: string }>)[0] as { text: string }).text) as Record<string, unknown>
     expect((parsed['readiness'] as Record<string, unknown>)['monitor_url']).toBe('http://localhost:9999')
 
     if (prev === undefined) delete process.env['FULCRUM_MONITOR_PORT']
@@ -235,7 +235,7 @@ describe('_monitorStarted double-start guard', () => {
     await server.connect(serverTransport)
     await client.connect(clientTransport)
     const result = await client.callTool({ name: 'get_current_context', arguments: {} }, CompatibilityCallToolResultSchema)
-    const parsed = JSON.parse((result.content[0] as { text: string }).text) as Record<string, unknown>
+    const parsed = JSON.parse(((result.content as Array<{ text: string; type: string }>)[0] as { text: string }).text) as Record<string, unknown>
     expect((parsed['readiness'] as Record<string, unknown>)['monitor_running']).toBe(false)
 
     if (prev === undefined) delete process.env['FULCRUM_NO_MONITOR']

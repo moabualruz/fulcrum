@@ -217,16 +217,21 @@ export const claudeCodeAdapter: AgentAdapter = {
 
       // WORK-006: kill the child if it exceeds the configured timeout
       let timedOut = false
+      // CORR-MINOR-A: store the SIGKILL-escalation timer id so cleanup() can
+      // clear it. Prior version left the 5s timer live after a clean exit
+      // and kept the event loop alive (delayed graceful shutdown).
+      let sigkillTimer: NodeJS.Timeout | null = null
       const killTimer = setTimeout(() => {
         timedOut = true
         proc.kill('SIGTERM')
         // Escalate to SIGKILL after 5 s if still alive
-        setTimeout(() => proc.kill('SIGKILL'), 5_000)
+        sigkillTimer = setTimeout(() => proc.kill('SIGKILL'), 5_000)
       }, CLAUDE_TIMEOUT_MS)
 
       const cleanup = () => {
         clearInterval(hb)
         clearTimeout(killTimer)
+        if (sigkillTimer) { clearTimeout(sigkillTimer); sigkillTimer = null }
         try { if (existsSync(promptFile)) unlinkSync(promptFile) } catch { /* ignore */ }
       }
 

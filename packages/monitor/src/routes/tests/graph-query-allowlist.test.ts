@@ -51,4 +51,53 @@ describe('validateCypher', () => {
   it('rejects overly long queries (>2000 chars)', () => {
     expect(() => validateCypher('MATCH (n) RETURN n ' + 'x'.repeat(2000))).toThrow(CypherDeniedError)
   })
+
+  // TEST-E: red-team corpus. Prior allowlist missed these vectors.
+  describe('red-team (TEST-E)', () => {
+    it('rejects COPY FROM (filesystem read)', () => {
+      expect(() => validateCypher(`COPY mytable FROM '/etc/passwd' (HEADER=false)`)).toThrow(CypherDeniedError)
+    })
+    it('rejects COPY TO (filesystem write)', () => {
+      expect(() => validateCypher(`COPY (MATCH (n) RETURN n) TO '/tmp/leak.csv'`)).toThrow(CypherDeniedError)
+    })
+    it('rejects REMOVE (property removal)', () => {
+      expect(() => validateCypher(`MATCH (n) REMOVE n.secret RETURN n`)).toThrow(CypherDeniedError)
+    })
+    it('rejects DROP (schema wipe)', () => {
+      expect(() => validateCypher(`DROP TABLE Memory`)).toThrow(CypherDeniedError)
+    })
+    it('rejects DETACH DELETE', () => {
+      expect(() => validateCypher(`MATCH (n) DETACH DELETE n`)).toThrow(CypherDeniedError)
+    })
+    it('rejects LOAD EXTENSION', () => {
+      expect(() => validateCypher(`LOAD EXTENSION httpfs`)).toThrow(CypherDeniedError)
+    })
+    it('rejects INSTALL / IMPORT / EXPORT DATABASE', () => {
+      expect(() => validateCypher(`INSTALL httpfs`)).toThrow(CypherDeniedError)
+      expect(() => validateCypher(`IMPORT DATABASE '/tmp/x'`)).toThrow(CypherDeniedError)
+      expect(() => validateCypher(`EXPORT DATABASE '/tmp/x'`)).toThrow(CypherDeniedError)
+    })
+    it('rejects Unicode-fullwidth lookalike keywords', () => {
+      // NFKD folds ＣＲＥＡＴＥ → CREATE → deny.
+      expect(() => validateCypher('ＣＲＥＡＴＥ (n:Pwn)')).toThrow(CypherDeniedError)
+    })
+    it('rejects block-comment injection that buries CREATE', () => {
+      expect(() => validateCypher(`MATCH (n) /* harmless */ CREATE (m) RETURN n`)).toThrow(CypherDeniedError)
+    })
+    it('rejects line-comment injection', () => {
+      expect(() => validateCypher(`// decoy\nCREATE (n)`)).toThrow(CypherDeniedError)
+    })
+    it('rejects semicolon multi-statement', () => {
+      expect(() => validateCypher(`MATCH (n) RETURN n; DROP TABLE Memory`)).toThrow(CypherDeniedError)
+    })
+    it('rejects when query does not start with an allowlisted lead keyword', () => {
+      expect(() => validateCypher(`ORDER BY n RETURN n`)).toThrow(CypherDeniedError)
+      expect(() => validateCypher(`LIMIT 5`)).toThrow(CypherDeniedError)
+    })
+    it('accepts exactly 2000 chars', () => {
+      const q = 'MATCH (n) RETURN n ' + 'x'.repeat(2000 - 'MATCH (n) RETURN n '.length)
+      expect(q.length).toBe(2000)
+      expect(() => validateCypher(q)).not.toThrow()
+    })
+  })
 })

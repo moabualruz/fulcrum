@@ -93,7 +93,7 @@ export function mmrRerank<T extends MMRItem>(items: T[], config: Partial<MMRConf
   if (!enabled || items.length <= 1) return [...items]
 
   const clampedLambda = Math.max(0, Math.min(1, lambda))
-  if (clampedLambda === 1) return [...items].toSorted((a, b) => b.score - a.score)
+  if (clampedLambda === 1) return [...items].sort((a, b) => b.score - a.score)
 
   const tokenCache = new Map<string, Set<string>>()
   for (const item of items) tokenCache.set(item.id, tokenize(item.content))

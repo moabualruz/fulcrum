@@ -1,6 +1,6 @@
 // packages/memory/src/vault/client.ts
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'fs'
-import { join, dirname } from 'path'
+import { join, dirname, resolve, sep } from 'path'
 import { homedir } from 'os'
 import type { FullMemory } from '../types.js'
 import { CURATED_KINDS } from '../types.js'
@@ -97,17 +97,57 @@ SORT importance DESC
 
 /**
  * Encode a file path for use as a vault directory segment.
- * Replaces '/' with '--' so the full path becomes a single readable directory name.
- * e.g. "packages/memory/src/write.ts" → "packages--memory--src--write.ts"
+ * Replaces '/' with URL-percent-encoded '%2F' so the full path becomes a
+ * single directory name that round-trips losslessly back to the original.
+ * The prior '--' separator was ambiguous with legitimate filenames containing
+ * '--' (LOW-22).
  * Falls back to "_unknown" for empty paths.
  */
 function encodeFilePath(filePath: string): string {
   if (!filePath) return '_unknown'
   if (filePath.includes('\0')) throw new Error('path must not contain null bytes')
-  return filePath.replace(/\//g, '--').replace(/\\/g, '--')
+  return filePath.replace(/\//g, '%2F').replace(/\\/g, '%5C')
+}
+
+/**
+ * CRIT-2: path-safety check for ID segments that become vault directory names.
+ * Without this, a memory written with workspace_id='../../etc' would escape
+ * the vault root on the subsequent path.join + mkdirSync + writeFileSync.
+ * Allowed characters: alphanumerics, underscore, hyphen. Anything else
+ * (including '/' '\\' '..' null bytes) is rejected before the path is built.
+ */
+const SAFE_ID_RE = /^[A-Za-z0-9_-]+$/
+function assertSafeId(value: string, field: string): void {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 256 || !SAFE_ID_RE.test(value)) {
+    throw Object.assign(
+      new Error(`${field} must match ${SAFE_ID_RE} (got: ${JSON.stringify(value).slice(0, 80)})`),
+      { code: 'invalid_input' },
+    )
+  }
+}
+
+/**
+ * CRIT-2: after building filePath, verify the resolved absolute path still
+ * lives inside the vault root. Defense in depth — even if assertSafeId missed
+ * an edge case, containment check catches the escape.
+ */
+function assertInsideVault(vaultPath: string, filePath: string): void {
+  const vaultAbs = resolve(vaultPath) + sep
+  const fileAbs = resolve(filePath)
+  if (!fileAbs.startsWith(vaultAbs)) {
+    throw Object.assign(
+      new Error(`path escapes vault root: ${fileAbs} vs ${vaultAbs}`),
+      { code: 'invalid_input' },
+    )
+  }
 }
 
 export function getMemoryFilePath(vaultPath: string, memory: FullMemory): string {
+  // CRIT-2: validate every ID that becomes a path segment.
+  assertSafeId(memory.workspace_id, 'workspace_id')
+  assertSafeId(memory.memory_id, 'memory_id')
+  if (memory.project_id) assertSafeId(memory.project_id, 'project_id')
+  if (memory.task_id) assertSafeId(memory.task_id, 'task_id')
   const date = new Date(memory.created_at)
   const yyyy = date.getUTCFullYear().toString()
   const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
@@ -164,6 +204,11 @@ export async function writeMemoryFile(vaultPath: string, memory: FullMemory): Pr
   const body = memory.canonical_text ?? ''
   const content = serializeToFile(memory, body)
   const filePath = getMemoryFilePath(vaultPath, memory)
+
+  // CRIT-2 defense-in-depth: after getMemoryFilePath builds the path (with
+  // already-validated IDs), verify the resolved absolute path still lives
+  // inside the vault root before any mkdirSync / writeFileSync.
+  assertInsideVault(vaultPath, filePath)
 
   mkdirSync(dirname(filePath), { recursive: true })
   writeFileSync(filePath, content, 'utf-8')

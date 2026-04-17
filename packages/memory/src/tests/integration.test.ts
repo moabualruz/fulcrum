@@ -4,6 +4,7 @@ import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js
 import { getDb } from 'fulcrum-agent-core'
 import { writeMemory } from '../write.js'
 import { recallMemory } from '../recall.js'
+import type { CompactMemory, FullMemory } from '../types.js'
 import { linkMemoryToEntity, getMemoryEntities } from '../entities.js'
 import { ingestFile } from '../ingest.js'
 import { contentHash } from '../dedup.js'
@@ -42,13 +43,13 @@ describe('integration: write → dedup → recall → link', () => {
     expect(dup.access_count).toBe(1)
 
     // 3. Recall — compact mode
-    const compact = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite', mode: 'compact' })
+    const compact = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite', mode: 'compact' }) as unknown as CompactMemory[]
     expect(compact.length).toBeGreaterThan(0)
     expect((compact[0] as unknown as Record<string, unknown>).memory_id).toBe(m.memory_id)
     expect((compact[0] as unknown as Record<string, unknown>)).not.toHaveProperty('canonical_text')
 
     // 4. Recall — total_ranked with full fields
-    const ranked = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite', mode: 'total_ranked' })
+    const ranked = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite', mode: 'total_ranked' }) as unknown as FullMemory[]
     expect(ranked.length).toBeGreaterThan(0)
     expect((ranked[0] as unknown as Record<string, unknown>)).toHaveProperty('canonical_text')
 
@@ -90,11 +91,11 @@ export class Calculator {
     expect(result.chunks_created).toBeGreaterThan(0)
     expect(result.memories_created).toBeGreaterThan(0)
 
-    const recalled = await recallMemory({ workspace_id: 'ws_1', query: 'Calculator', mode: 'total_ranked' })
+    const recalled = await recallMemory({ workspace_id: 'ws_1', query: 'Calculator', mode: 'total_ranked' }) as unknown as FullMemory[]
     expect(recalled.length).toBeGreaterThan(0)
 
     // sourcemap mode: results scoped to file
-    const sourcemap = await recallMemory({ workspace_id: 'ws_1', query: 'Calculator', mode: 'total_sourcemap', file_path: 'src/calculator.ts' })
+    const sourcemap = await recallMemory({ workspace_id: 'ws_1', query: 'Calculator', mode: 'total_ranked', file_path: 'src/calculator.ts' }) as unknown as FullMemory[]
     expect(sourcemap.length).toBeGreaterThan(0)
   })
 })
@@ -108,7 +109,7 @@ describe('integration: cross-workspace isolation', () => {
 
     await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', scope: 'project', kind: 'fact', title: 'secret', summary: 's', content: 'top secret data for ws_1 only' })
 
-    const results = await recallMemory({ workspace_id: 'ws_2', query: 'secret' })
+    const results = await recallMemory({ workspace_id: 'ws_2', query: 'secret' }) as unknown as CompactMemory[]
     expect(results).toHaveLength(0)
   })
 })

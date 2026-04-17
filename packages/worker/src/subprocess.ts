@@ -27,7 +27,25 @@ export const subprocessAdapter: AgentAdapter = {
     }
     await ctx.heartbeat('subprocess_started', 0)
 
-    const parts = cmd.split(/\s+/).filter((p) => p.length > 0)
+    // CORR-MINOR-B: prefer JSON-array form via FULCRUM_AGENT_SUBPROCESS_CMD_JSON
+    // when quoted args matter. Falls back to whitespace split for simple
+    // commands. The whitespace split mangled quoted arguments in the prior
+    // implementation (`python -c "print(1)"` → kept quotes as literals).
+    let parts: string[]
+    const jsonForm = process.env['FULCRUM_AGENT_SUBPROCESS_CMD_JSON']
+    if (jsonForm) {
+      try {
+        const parsed = JSON.parse(jsonForm) as unknown
+        if (!Array.isArray(parsed) || !parsed.every(p => typeof p === 'string')) {
+          return { status: 'blocked', error: 'FULCRUM_AGENT_SUBPROCESS_CMD_JSON must be a JSON array of strings' }
+        }
+        parts = parsed
+      } catch (err) {
+        return { status: 'blocked', error: `FULCRUM_AGENT_SUBPROCESS_CMD_JSON parse error: ${(err as Error).message}` }
+      }
+    } else {
+      parts = cmd.split(/\s+/).filter((p) => p.length > 0)
+    }
     const [bin, ...args] = parts
     if (!bin) {
       return { status: 'blocked', error: 'FULCRUM_AGENT_SUBPROCESS_CMD is empty' }

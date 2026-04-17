@@ -5,5 +5,6 @@ export default defineConfig({
     environment: 'node',
     globals: false,
     pool: 'forks', // required: better-sqlite3 native addon is not thread-safe
+    setupFiles: ['./vitest.setup.ts'],
   },
 })

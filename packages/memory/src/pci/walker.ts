@@ -73,6 +73,12 @@ async function* _walk(
   }
 
   for (const entry of entries) {
+    // MED-12: skip symlinks entirely. Following symlinks lets a malicious
+    // postinstall or PR drop `docs/README.md -> ~/.aws/credentials` and have
+    // PCI ingest host secrets. Opt-in follow-symlinks would require realpath
+    // containment checks — simpler to refuse.
+    if (entry.isSymbolicLink()) continue
+
     const absPath = path.join(currentDir, entry.name)
     const relPathToRoot = path.relative(rootDir, absPath)
 
@@ -95,8 +101,9 @@ async function* _walk(
       } else {
         yield* _walk(absPath, rootDir, stack, ignoreFiles)
       }
-    } else {
+    } else if (entry.isFile()) {
       yield relPathToRoot
     }
+    // Ignore other entry types (block devs, char devs, sockets, FIFOs).
   }
 }

@@ -93,7 +93,7 @@ describe('getMemoryFilePath', () => {
       file_path: 'src/db/client.ts',
     }
     const p = getMemoryFilePath(vaultPath, fileMemory)
-    expect(p).toContain(join('file', 'proj_test', 'src--db--client.ts'))
+    expect(p).toContain(join('file', 'proj_test', 'src%2Fdb%2Fclient.ts'))
     expect(p).toContain('01JBXK7Z9T8QH0F3VRDE5W2NPM.md')
   })
 

@@ -157,6 +157,16 @@ export async function recallMemory(
 ): Promise<CompactMemory[] | FullMemory[] | PolicyDeniedResponse> {
   if (!input.query.trim()) throw new FulcrumError('query must not be empty', 'invalid_input')
 
+  // HIGH-11: sanitize the query BEFORE any downstream processing. The 4-step
+  // escalation strips role-label impersonation, injection phrases, and leaks
+  // from upstream assistant output that might otherwise end up in entity
+  // extraction or embedder prompts. The prior recall path consumed raw
+  // input.query into FTS5 + embedder + extractStructured + Kuzu — a
+  // persistent prompt-injection vector via recall.
+  const { sanitizeQuery } = await import('./sanitize/query.js')
+  const sanitizedQuery = sanitizeQuery(input.query)
+  input = { ...input, query: sanitizedQuery }
+
   // Global scope policy gate — before any query logic (security F1 placement: before-query)
   if (input.query_scope === 'global') {
     const denied = checkGlobalPolicy(input.caller_role)
@@ -198,7 +208,11 @@ export async function recallMemory(
           limit: fetchLimit,
         })
 
-        if (l2Results.length > 0) {
+        // CORR-MINOR-C: if offset exceeds what L2 returned, fall through to
+        // the L1 path instead of returning an empty envelope. Otherwise a
+        // caller paginating beyond the L2 fetch window silently terminates
+        // even when the L1 pool has more matches.
+        if (l2Results.length > 0 && offset < l2Results.length) {
           const pagedResults = l2Results.slice(offset, offset + limit)
           const ids = pagedResults.map(r => r.id)
           // MEM-006: build score map from L2 results before SQLite lookup

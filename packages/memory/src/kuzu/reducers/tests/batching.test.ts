@@ -9,7 +9,7 @@ function makeEvent(type: 'task_created' | 'memory_written' | 'agent_run_finished
   return {
     workspace_id: 'w1',
     project_id: 'p1',
-    evt_type: type as const,
+    evt_type: type,
     actor_type: 'agent',
     actor_id: 'a1',
     ts: new Date().toISOString(),
@@ -55,9 +55,17 @@ describe('reducer dispatcher batching — v2b PR 10 Task 1.6', () => {
   })
 
   it('logs reducer_lag warning when Kuzu stub delays beyond lag threshold', async () => {
+    // TEST-A: deterministic lag test. Use a long-enough sleep vs threshold so
+    // the warning path is guaranteed to fire; assert the warning text contains
+    // 'reducer_lag'. The prior test could never fail (only asserted slowFn was
+    // called) — that is strictly weaker than the behaviour the plan promised.
     const warnings: string[] = []
-    const slowFn = vi.fn().mockImplementation(async () => {
-      await new Promise(r => setTimeout(r, 20))
+    // The dispatcher measures elapsed time around a sync call (no await), so
+    // a truly sync-slow reducer is the only way to trigger the lag path.
+    // Busy-loop for 50 ms.
+    const slowFn = vi.fn().mockImplementation(() => {
+      const deadline = Date.now() + 50
+      while (Date.now() < deadline) { /* spin */ }
     })
     registerGraphReducer('memory_written', slowFn)
     const origWarn = console.warn
@@ -65,12 +73,12 @@ describe('reducer dispatcher batching — v2b PR 10 Task 1.6', () => {
     const disp = createReducerDispatcher({ batchSize: 2, flushIntervalMs: 5, lagThresholdMs: 10 })
     disp.enqueue(makeEvent('memory_written'))
     disp.enqueue(makeEvent('memory_written'))
-    // wait for flush
-    await new Promise(r => setTimeout(r, 60))
+    // Wait long enough for the slow reducer to exceed the lag threshold.
+    await new Promise(r => setTimeout(r, 150))
     console.warn = origWarn
     disp.stop()
-    // The slow reducer should have run; lag warning may or may not fire depending on timing
     expect(slowFn).toHaveBeenCalled()
+    expect(warnings.some(w => w.includes('reducer_lag'))).toBe(true)
   })
 
   it('overflow: drops oldest event and emits reducer_overflow error when buffer > maxBuffer', () => {

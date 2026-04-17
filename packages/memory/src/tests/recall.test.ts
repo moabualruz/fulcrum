@@ -5,7 +5,7 @@ import { getDb } from 'fulcrum-agent-core'
 import { writeMemory } from '../write.js'
 import { recallMemory } from '../recall.js'
 import { rrfFuse } from '../scoring.js'
-import type { FullMemory } from '../types.js'
+import type { FullMemory, CompactMemory } from '../types.js'
 
 beforeEach(() => { createTestDb() })
 afterEach(() => resetTestDb())
@@ -23,7 +23,7 @@ describe('recallMemory — compact mode (default)', () => {
   it('returns CompactMemory[] with only the slim fields', async () => {
     const db = getDb()
     await seedMemories(db)
-    const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite' })
+    const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite' }) as unknown as CompactMemory[]
     expect(Array.isArray(results) ? results.length : 0).toBeGreaterThan(0)
     const first = results[0] as unknown as Record<string, unknown>
     // compact mode must have these fields
@@ -44,7 +44,7 @@ describe('recallMemory — compact mode (default)', () => {
     for (let i = 1; i <= 12; i++) {
       await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', scope: 'project', kind: 'fact', title: `fact ${i}`, summary: 's', content: `SQLite fact number ${i}` })
     }
-    const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite' })
+    const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite' }) as unknown as CompactMemory[]
     expect(results.length).toBeLessThanOrEqual(8)
     expect(results.length).toBeGreaterThan(0)
   })
@@ -52,14 +52,14 @@ describe('recallMemory — compact mode (default)', () => {
   it('respects custom limit', async () => {
     const db = getDb()
     await seedMemories(db)
-    const results = await recallMemory({ workspace_id: 'ws_1', query: 'the', limit: 2 })
+    const results = await recallMemory({ workspace_id: 'ws_1', query: 'the', limit: 2 }) as unknown as CompactMemory[]
     expect(results.length).toBeLessThanOrEqual(2)
   })
 
   it('returns empty array for no matches', async () => {
     const db = getDb()
     await seedMemories(db)
-    const results = await recallMemory({ workspace_id: 'ws_1', query: 'zzznomatch_xyz' })
+    const results = await recallMemory({ workspace_id: 'ws_1', query: 'zzznomatch_xyz' }) as unknown as CompactMemory[]
     expect(results).toEqual([])
   })
 
@@ -76,14 +76,14 @@ describe('recallMemory — compact mode (default)', () => {
     db.prepare("INSERT OR IGNORE INTO workspaces(workspace_id,name) VALUES ('ws_2','ws2')").run()
     db.prepare("INSERT OR IGNORE INTO projects(project_id,workspace_id,name) VALUES ('proj_1','ws_1','p1')").run()
     await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', scope: 'project', kind: 'fact', title: 'secret', summary: 's', content: 'secret ws_1 data' })
-    const results = await recallMemory({ workspace_id: 'ws_2', query: 'secret' })
+    const results = await recallMemory({ workspace_id: 'ws_2', query: 'secret' }) as unknown as CompactMemory[]
     expect(results).toHaveLength(0)
   })
 
   it('filters by scope when provided', async () => {
     const db = getDb()
     await seedMemories(db)
-    const results = await recallMemory({ workspace_id: 'ws_1', query: 'the', scope: 'file' })
+    const results = await recallMemory({ workspace_id: 'ws_1', query: 'the', scope: 'file' }) as unknown as CompactMemory[]
     for (const r of results) {
       expect((r as unknown as Record<string, unknown>).scope).toBe('file')
     }
@@ -92,7 +92,7 @@ describe('recallMemory — compact mode (default)', () => {
   it('filters by kind when provided', async () => {
     const db = getDb()
     await seedMemories(db)
-    const results = await recallMemory({ workspace_id: 'ws_1', query: 'the', kind: 'decision' })
+    const results = await recallMemory({ workspace_id: 'ws_1', query: 'the', kind: 'decision' }) as unknown as CompactMemory[]
     for (const r of results) {
       expect((r as unknown as Record<string, unknown>).kind).toBe('decision')
     }
@@ -101,7 +101,7 @@ describe('recallMemory — compact mode (default)', () => {
   it('FTS5 fallback — does not throw for special characters, returns array', async () => {
     const db = getDb()
     await seedMemories(db)
-    const results = await recallMemory({ workspace_id: 'ws_1', query: '"SQLite' })
+    const results = await recallMemory({ workspace_id: 'ws_1', query: '"SQLite' }) as unknown as CompactMemory[]
     expect(Array.isArray(results)).toBe(true)
   })
 
@@ -121,7 +121,7 @@ describe('recallMemory — total_ranked mode', () => {
   it('returns FullMemory with canonical_text field present', async () => {
     const db = getDb()
     await seedMemories(db)
-    const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite', mode: 'total_ranked' })
+    const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite', mode: 'total_ranked' }) as unknown as CompactMemory[]
     expect(results.length).toBeGreaterThan(0)
     const first = results[0] as unknown as Record<string, unknown>
     expect(first).toHaveProperty('canonical_text')
@@ -137,7 +137,7 @@ describe('recallMemory — total_ranked mode', () => {
     for (let i = 1; i <= 25; i++) {
       await writeMemory({ workspace_id: 'ws_1', project_id: 'proj_1', scope: 'project', kind: 'fact', title: `f${i}`, summary: 's', content: `SQLite ranked fact ${i}` })
     }
-    const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite ranked', mode: 'total_ranked' })
+    const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite ranked', mode: 'total_ranked' }) as unknown as CompactMemory[]
     expect(results.length).toBeLessThanOrEqual(20)
     expect(results.length).toBeGreaterThan(0)
   })
@@ -194,7 +194,7 @@ describe('recallMemory — hybrid graceful degradation', () => {
     const db = getDb()
     await seedMemories(db)
     // No embedder registered in test environment — recall must still return FTS5 hits
-    const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite' })
+    const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite' }) as unknown as CompactMemory[]
     expect(Array.isArray(results) ? results.length : 0).toBeGreaterThan(0)
   })
 })
