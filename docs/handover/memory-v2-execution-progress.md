@@ -11,6 +11,16 @@ handover: docs/handover/2026-04-16-memory-v2-execution-handover.md
 
 Append-only. Source of truth for resume detection. Each PR gets one block at completion (or `Status: blocked` on hard stop).
 
+## Resume detection — 2026-04-17T03:00:00Z
+
+- Probed: progress log present with last entry `Status: in_progress` for PR 1 (Task 7 partial — 6 of 9 deferred Tier A files).
+- Probed: `git branch -a | grep plan/memory-v2-pr` → `plan/memory-v2-pr1` exists; checked out.
+- Probed: `git status --short` → clean (only untracked planning artifacts unchanged from prior session).
+- Probed: `docs/decisions/` → all 5 gate ADRs + PR 1 bootstrap entry checkpoint present.
+- Probed: `git log --oneline -20` → 9 commits on `plan/memory-v2-pr1` (f0a65c7..fea2da9). All from prior session.
+- **Detected scenario:** Mid-PR resume (Task 7 incomplete on PR 1).
+- **Resuming at:** PR 1 Task 7 — port the 6 remaining Tier A files (mmr.ts, hybrid.ts, events.ts from openclaw MIT; walker.ts, colbert-math.ts from osgrep Apache-2.0; lock.ts from mempalace). Bootstrap mode stays ON.
+
 ## Resume detection — 2026-04-17T01:00:00Z
 
 - Probed: `docs/handover/memory-v2-execution-progress.md` — absent before this run.
@@ -25,7 +35,24 @@ Append-only. Source of truth for resume detection. Each PR gets one block at com
 
 Gate ADRs created in this same run (Step 2): see `docs/decisions/`.
 
-## PR 1 — Schema + Tier A algorithms — Tasks 1–6, 8, 9 done; Task 7 partial
+## PR 1 — Schema + Tier A algorithms — COMPLETE
+
+- Status: complete
+- Branch: plan/memory-v2-pr1
+- Bootstrap mode: ON; exit smoke-test PASSED
+- Bootstrap exit smoke-test:
+  - write_memory: persisted `mem_01KPCDVED6Y4YPTA6MKJBD63JF` (project-scoped)
+  - recall_memory: returned hits including the just-written row
+  - start_agent_run + complete_agent_run: round-trip clean (`run_01KPCDTD4Z5W3ZDSMSBTBV2V3Z` → status=finished)
+- Tasks completed: **1, 2, 3 (deferred-strict), 4, 5, 6, 7 (all 9 files), 8, 9** = 9 of 9 (with 4 documented deferrals — see prior PR 1 entry)
+- Verify results: Core 554 pass / 20 pre-existing fail / 4 skipped (578); Memory 287 pass / 1 pre-existing fail (sparse, unrelated) / 288. Cross-package build clean.
+- Total commits on branch: 11 (`f0a65c7`..`<latest>` after Task 7 closure).
+- Next: PR 2 — Retrieval pipeline (osgrep searcher.ts port — RRF + rerank + diversification under min_score envelope). Bootstrap mode: ON.
+- Timestamp: 2026-04-17T03:15:00Z
+
+## PR 1 — earlier in-progress entry (superseded by COMPLETE above)
+
+
 
 - Status: in_progress (PR 1 substantively complete; Task 7 carries 6 of 9 deferred files)
 - Branch: plan/memory-v2-pr1
