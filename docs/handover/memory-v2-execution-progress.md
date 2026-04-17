@@ -132,6 +132,31 @@ Gate ADRs created in this same run (Step 2): see `docs/decisions/`.
 
 ---
 
+## PR 8 — task_outcome / blocker_resolution synthesis + on_delegation + task-tracking skill — COMPLETE
+
+- Status: complete
+- Branch: plan/memory-v2-pr8
+- Bootstrap mode: OFF
+- Tasks completed: 39 (synthesizeTaskOutcome on update_task=completed), 40 (synthesizeBlockerResolution on update_task=blocked), 41 (onDelegation parent-side delegation_summary), 42 (task-tracking SKILL.md)
+- Verify results: Memory 391 pass / 1 pre-existing sparse fail. Build clean.
+- Defers / deviations: synthesizers run only when terminal status fires through `updateTask()`; `complete_agent_run` doesn't yet trigger `onDelegation` automatically — that hook requires the run-lifecycle wiring deferred from PR 4 Task 20. Manual call works (CLI / direct import).
+- ADRs: none.
+- New test files (11 new tests, all green): extractors/task-outcome.test.ts (7), on-delegation.test.ts (4).
+- Cyclic-dep avoidance: tasks.ts uses lazy-string-import for @moabualruz/fulcrum-memory so dependency direction stays memory → core only.
+- Next: PR 9 — action surface finalization + sweep.
+
+## PR 9 — Action surface finalization + sweep + v2b-deferred stubs — COMPLETE
+
+- Status: complete
+- Branch: plan/memory-v2-pr9
+- Bootstrap mode: OFF
+- Tasks completed: 43 (action-surface verification — recall_memory / write_memory / query_memory / search_code present, rollback absent), 44 (code_context + project_context as deferred-v2b shape-stable stubs), 45 (sweepExpiredMemories + 24h timer + opportunistic-sweep on startAgentRun + `fulcrum memory sweep-expired` CLI)
+- Verify results: Memory 401 pass / 1 pre-existing sparse fail. Build clean.
+- Defers / deviations: `--install` cron flag is a stub (launchd/systemd timer install lands in v2b).
+- ADRs: none.
+- New test files (10 new tests, all green): sweep-expired.test.ts (5), cli/v2a-action-surface.test.ts (5).
+- Next: per-host correctness cluster (Tasks 46-52). PR 6 (hook rewrite) remains the largest deferred bootstrap PR.
+
 ## EXECUTION SUMMARY — 2026-04-17T04:15:00Z (session pause)
 
 This session delivered substantive progress on Memory v2a across **7 PRs** (1, 2, 3, 4, 5, 7) on independent branches. Total commits: 23. Total new tests: 165+. All new tests green. Pre-existing failures unchanged (20 in core, 1 in memory — none caused by v2a work).
