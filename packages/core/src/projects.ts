@@ -1,3 +1,4 @@
+import { realpathSync } from 'fs'
 import { getDb , Db} from './db/client.js'
 import { newId } from './ids.js'
 import { FulcrumError, type ProjectStatus, type ProjectType, type WriteMode } from './types.js'
@@ -25,6 +26,8 @@ export interface CreateProjectInput {
   write_mode?: WriteMode
   git_url?: string
   parent_project_id?: string
+  /** Absolute filesystem root the PCI watcher will index. Auto-resolves symlinks. */
+  root_path?: string
 }
 
 export interface UpdateProjectInput {
@@ -81,9 +84,20 @@ export async function createProject(input: CreateProjectInput, db: Db = getDb())
 
   const project_id = input.project_id ?? newId('project')
   const now = new Date().toISOString()
+
+  // PCI watcher gate: root_realpath is read by onAgentRunStart to decide
+  // whether to mount a code-index watcher for this project. When it's NULL,
+  // no file is ever indexed → code_chunks stays empty. Resolve it now from
+  // input.root_path or fall back to the server cwd so every project created
+  // from a concrete directory gets indexed.
+  const rawRoot = input.root_path ?? process.cwd()
+  let rootPath: string | null = rawRoot
+  let rootRealpath: string | null = rawRoot
+  try { rootRealpath = realpathSync(rawRoot) } catch { /* leave as rawRoot */ }
+
   db.prepare(
-    `INSERT INTO projects (project_id, workspace_id, name, description, type, status, write_mode, git_url, parent_project_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO projects (project_id, workspace_id, name, description, type, status, write_mode, git_url, parent_project_id, created_at, root_path, root_realpath)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     project_id,
     input.workspace_id,
@@ -95,6 +109,8 @@ export async function createProject(input: CreateProjectInput, db: Db = getDb())
     input.git_url ?? null,
     input.parent_project_id ?? null,
     now,
+    rootPath,
+    rootRealpath,
   )
   const row = db
     .prepare(`SELECT * FROM projects WHERE project_id = ?`)

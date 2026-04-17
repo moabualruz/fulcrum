@@ -1449,6 +1449,21 @@ async function runServeMcp(): Promise<void> {
     }
   }
 
+  // ── Acquire long-lived PCI watcher ────────────────────────────────────────
+  // Chokidar mount for the cwd. Keeps code_chunks / code_files / code_symbols
+  // up to date as files change in this project. Opt out with FULCRUM_DISABLE_PCI=1.
+  if (process.env['FULCRUM_DISABLE_PCI'] !== '1') {
+    try {
+      const { acquireServerHandle } = await import('fulcrum-memory')
+      const handle = acquireServerHandle(process.cwd())
+      if (handle) {
+        process.stderr.write(`[fulcrum] PCI watcher mounted on ${process.cwd()}\n`)
+      }
+    } catch (err) {
+      process.stderr.write(`[fulcrum] PCI watcher mount failed (non-fatal): ${(err as Error).message}\n`)
+    }
+  }
+
   await runFulcrumMcpServer({
     version: '0.0.2',
     handleToolCall: handleToolCallWithSpan,
