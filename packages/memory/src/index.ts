@@ -45,6 +45,14 @@ export type { QueryMemoryInput, QueryMemoryResponse, QueryMemoryResultRow } from
 export { searchCode } from './retrieval/search-code.js'
 export type { SearchCodeInput, SearchCodeResponse, SearchCodeResultRow } from './retrieval/search-code.js'
 
+// v2a PR 3 Task 15 — prose chunker for md/json/yaml/toml.
+export { ProseChunker, detectProseKind } from './chunkers/prose-chunker.js'
+export type { ProseFileKind } from './chunkers/prose-chunker.js'
+
+// v2a PR 3 Task 16 — backfill code_files rows for existing code_chunks.
+export { backfillCodeFiles, computeFileId } from './setup/backfill-code-files.js'
+export type { BackfillResult } from './setup/backfill-code-files.js'
+
 // Ingestion pipeline
 export { ingestFile, ingestProject } from './ingest.js'
 

@@ -96,11 +96,12 @@ export class ASTChunker implements Chunker {
     const chunks: Chunk[] = []
     this.walk(source, tree.rootNode, chunks)
 
-    // If no declaration boundaries found, fall back to sliding window
     if (chunks.length === 0) {
-      return this.fallback.chunk(source)
+      // Sliding-window fallback still gets enriched + an anchor chunk.
+      const fallback = this.fallback.chunk(source)
+      return [makeAnchorChunk(source), ...fallback.map(c => enrichChunk(c, source))]
     }
-    return chunks
+    return [makeAnchorChunk(source), ...chunks.map(c => enrichChunk(c, source))]
   }
 
   private walk(source: string, node: SyntaxNode, chunks: Chunk[]): void {
@@ -112,12 +113,96 @@ export class ASTChunker implements Chunker {
         kind: kindForType(node.type),
         name: extractName(node),
       })
-      // Do NOT recurse into the body — the declaration is the chunk unit
       return
     }
     for (const child of node.children) {
       this.walk(source, child, chunks)
     }
+  }
+}
+
+// v2a PR 3 Task 14 — semantic enrichment heuristics.
+//
+// These are shape-conservative: the upstream AST traversal stays unchanged;
+// we just decorate each chunk with role/complexity/symbols + emit an anchor
+// chunk per file. PR 4's chunker rewrite (when it lands) can replace these
+// heuristics with proper tree-sitter queries.
+
+const IDENTIFIER_RE = /\b([a-z_$][\w$]*)\b/gi
+const DEFINITION_KEYWORDS = /\b(?:function|class|const|let|var|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g
+const COMPLEXITY_RE = /\b(?:if|else|for|while|case|catch|switch|\?\?|\?\.|&&|\|\|)\b/g
+
+function detectRole(text: string, kind?: string): NonNullable<Chunk['role']> {
+  if (kind === 'anchor') return 'DEFINITION'
+  if (/^\s*\/\*\*|^\s*\/\/|^\s*#/m.test(text) && text.length < 200) return 'DOCS'
+  if (/(?:throw|await|fetch|spawn|emitEvent|publish)/.test(text)) return 'IMPLEMENTATION'
+  if (/^(?:export\s+)?(?:function|class|const|interface|type)\s/m.test(text)) return 'DEFINITION'
+  return 'ORCHESTRATION'
+}
+
+function extractDefinedSymbols(text: string): string[] {
+  const out = new Set<string>()
+  for (const m of text.matchAll(DEFINITION_KEYWORDS)) {
+    if (m[1]) out.add(m[1])
+  }
+  return [...out]
+}
+
+function extractReferencedSymbols(text: string, defined: Set<string>): string[] {
+  const out = new Set<string>()
+  for (const m of text.matchAll(IDENTIFIER_RE)) {
+    const id = m[1]!
+    if (id.length < 3) continue
+    if (defined.has(id)) continue
+    if (/^(?:if|else|for|while|return|const|let|var|new|true|false|null|void|this|self|class|function|interface|type|enum|export|import|from|as|in|of|do|case|switch|break|continue|throw|try|catch|finally|async|await|yield|extends|implements|static|public|private|protected)$/.test(id)) continue
+    out.add(id)
+  }
+  return [...out].slice(0, 32)
+}
+
+function complexity(text: string): number {
+  let count = 1
+  for (const _ of text.matchAll(COMPLEXITY_RE)) count++
+  return count
+}
+
+function enrichChunk(c: Chunk, _source: string): Chunk {
+  const defined = extractDefinedSymbols(c.text)
+  return {
+    ...c,
+    role: detectRole(c.text, c.kind),
+    complexity: complexity(c.text),
+    definedSymbols: defined,
+    referencedSymbols: extractReferencedSymbols(c.text, new Set(defined)),
+    parentSymbol: c.parentSymbol ?? null,
+  }
+}
+
+function makeAnchorChunk(source: string): Chunk {
+  // Top-of-file imports, exports, and leading comments form the anchor.
+  const lines = source.split(/\r?\n/)
+  const anchorLines: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!
+    if (/^\s*(?:\/\/|\/\*|\*|\*\/|import\s|export\s+\*|export\s+\{|from\s)/.test(line)) {
+      anchorLines.push(line)
+    } else if (anchorLines.length > 0 && !line.trim()) {
+      anchorLines.push(line)
+    } else if (anchorLines.length > 0) {
+      break
+    }
+  }
+  const text = anchorLines.join('\n')
+  return {
+    text: text || '/* (anchor) */',
+    start: 0,
+    end: text.length,
+    kind: 'anchor',
+    role: 'DEFINITION',
+    anchorPenalty: 0.99,
+    definedSymbols: [],
+    referencedSymbols: [],
+    parentSymbol: null,
   }
 }
 

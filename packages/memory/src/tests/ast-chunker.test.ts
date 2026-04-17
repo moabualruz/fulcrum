@@ -118,9 +118,10 @@ describe('ASTChunker with mock parser', () => {
     const chunker = new ASTChunker(parser)
 
     const chunks = chunker.chunk('just some text')
-    // Falls back to sliding window
-    expect(chunks.length).toBeGreaterThan(0)
-    expect(chunks[0].kind).toBe('window')
+    // v2a Task 14: anchor chunk emitted first, then sliding-window fallback chunks.
+    expect(chunks.length).toBeGreaterThan(1)
+    expect(chunks[0].kind).toBe('anchor')
+    expect(chunks.some(c => c.kind === 'window')).toBe(true)
   })
 
   it('falls back to SlidingWindowChunker for unsupported language', () => {
@@ -142,10 +143,12 @@ describe('ASTChunker with mock parser', () => {
     const chunker = new ASTChunker(parser)
 
     const chunks = chunker.chunk(source)
-    expect(chunks).toHaveLength(2)
-    expect(chunks[0].start).toBe(0)
-    expect(chunks[0].end).toBe(17)
-    expect(chunks[1].start).toBe(18)
-    expect(chunks[1].name).toBe('bar')
+    // v2a Task 14: anchor chunk + 2 declarations.
+    expect(chunks).toHaveLength(3)
+    expect(chunks[0].kind).toBe('anchor')
+    expect(chunks[1].start).toBe(0)
+    expect(chunks[1].end).toBe(17)
+    expect(chunks[2].start).toBe(18)
+    expect(chunks[2].name).toBe('bar')
   })
 })
