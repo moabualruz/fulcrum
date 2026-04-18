@@ -37,6 +37,8 @@ const PREFIXES: Record<string, string> = {
   hook_event: 'hev_',
   // Memory v3 additions.
   l0_source: 'l0src_',
+  graph_entity: 'ent_',
+  graph_edge: 'edg_',
 }
 
 const DISPLAY_PREFIXES: Record<string, string> = {
