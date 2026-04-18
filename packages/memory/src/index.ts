@@ -1,5 +1,8 @@
 // packages/memory/src/index.ts
 
+// Schema / migrations
+export { runMigration101MemoryV3Lifecycle } from './schema.js'
+
 // Types
 export type {
   MemoryScope,
