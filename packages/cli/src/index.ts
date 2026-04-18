@@ -383,6 +383,10 @@ fulcrum memory page — L1 curated-page template scaffolding (memory v3 PR 2)
   create --template <entity|concept|page|synthesis>
       Print the rendered template to stdout. Operator debugging only;
       curator pipeline (PR 3) is the production writer.
+
+  show <page_id>
+      Load an existing L1 curated page and print the serialized
+      frontmatter + body. Reads through readCuratedPage.
 `)
       process.exit(0)
     }
@@ -396,6 +400,21 @@ fulcrum memory page — L1 curated-page template scaffolding (memory v3 PR 2)
       }
       const { loadTemplate } = await import('fulcrum-memory')
       console.log(loadTemplate(templateName as (typeof allowed)[number]))
+      return
+    }
+    if (sub === 'show') {
+      const pageId = args[3]
+      if (!pageId) {
+        console.error('fulcrum memory page show <page_id>')
+        process.exit(1)
+      }
+      const { readCuratedPage, serializeCuratedPage } = await import('fulcrum-memory')
+      const page = readCuratedPage(pageId)
+      if (!page) {
+        console.error(`page '${pageId}' not found`)
+        process.exit(1)
+      }
+      console.log(serializeCuratedPage(page))
       return
     }
     console.error(`Unknown subcommand: memory page ${sub}`)
