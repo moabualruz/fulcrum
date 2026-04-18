@@ -103,14 +103,25 @@ origin: user-raised architectural feedback (https://gist.github.com/karpathy/442
 
 - **Inference backend — pluggable, reuses user's existing auth.** Curation is a stateless extraction task (given L0 body → structured JSON), so we push it through the user's already-paid LLM plan rather than requiring a separate OpenAI API key. Selection order:
   1. `FULCRUM_CURATOR_BACKEND` env override (`codex` | `pi` | `openai` | `anthropic`) — explicit.
-  2. `codex` CLI on PATH + authenticated → spawn `codex exec --json --output-schema=<schema.json>`. Uses the user's ChatGPT Plus/Pro subscription — zero marginal cost for subscribers.
-  3. `pi` CLI on PATH → spawn `pi run --json --output-schema=<schema.json>`. Same ChatGPT auth via pi's own handoff.
-  4. `OPENAI_API_KEY` set → direct API call with Structured Outputs (`response_format: { type: 'json_schema', strict: true }`), model `gpt-5-nano` (cheapest + explicitly recommended by OpenAI for classification/extraction workloads).
+  2. `codex` CLI on PATH + authenticated → spawn `codex exec --model <model> -c model_reasoning_effort=<effort> --json --output-schema=<schema.json>`. Uses the user's ChatGPT Plus/Pro subscription — zero marginal cost for subscribers.
+  3. `pi` CLI on PATH → spawn `pi run --model <model> --json --output-schema=<schema.json>`. Same ChatGPT auth via pi's own handoff.
+  4. `OPENAI_API_KEY` set → direct API call with Structured Outputs (`response_format: { type: 'json_schema', strict: true }`).
   5. `ANTHROPIC_API_KEY` set → Claude Haiku via API.
   6. None of the above → `fulcrum memory curate` fails loudly with install instructions; L0 ingestion continues to work so no data is lost — only curation is paused.
-- **Why subprocess over direct API when subscription is present:** A ChatGPT Pro plan's 20x multiplier makes backfilling 1k-10k historical memories cost nothing on top of the monthly fee. Direct API would bill separately (~$5-$10 for a one-time backfill, ~$0.0005/memory ongoing) — small absolute numbers, but it's a second billing relationship users must set up. Subscription reuse wins on UX even when the dollar delta is small.
-- **Why GPT-5 Nano for the API fallback:** $0.05/M input + $0.40/M output (cheapest in the lineup); OpenAI's docs explicitly route classification and extraction to Nano; Structured Outputs GUARANTEE schema conformance at the token-generation level via the CFG engine in GPT-5.2+. 2k-token L0 source with ~1k-token structured output ≈ $0.0005 per curation. Batch API cuts this in half (50% off, async within 24h) — used for Phase 6 one-time backfill.
-- **Backend abstraction:** `l1/curator-backend/{codex,pi,openai,anthropic}.ts` implement a common `curate(l0_source, schema) → ParsedCuratorOutput` interface. Tests stub the interface; integration tests rotate through real backends in a smoke matrix.
+
+- **Model + reasoning pinned per curator task** (applies to every backend; defaults to these values, env-overridable):
+
+  | Curator task | Model | Reasoning effort | Why |
+  |---|---|---|---|
+  | L0 → L1 extraction (the 95% case) | `gpt-5-mini` | `minimal` | Curator schema has multi-array shapes with conditional logic (contradiction → supersession) and L0 inputs are messy (raw bash output, diffs, session transcripts). Nano's documented sweet spot is 3-4 flat fields with clean inputs — it drops fields on complex schemas. Mini is documented as "high fidelity on messy/ambiguous inputs." Minimal reasoning skips chain-of-thought for a mechanical extraction task while preserving instruction-following. |
+  | Consolidation (merge already-structured L1 pages) | `gpt-5-nano` | `minimal` | Simpler task, clean inputs (the L1 page frontmatter + body). Nano fits. |
+  | Synthesis (cross-source analyses, multi-hop connections) | `gpt-5` | `medium` | Real reasoning needed. Rarely used; invoked explicitly via `fulcrum memory synthesize --pages <ids>`. |
+
+  Env overrides: `FULCRUM_CURATOR_MODEL`, `FULCRUM_CURATOR_REASONING`, with per-task variants `FULCRUM_CURATOR_MODEL_EXTRACTION`, `FULCRUM_CURATOR_MODEL_CONSOLIDATION`, `FULCRUM_CURATOR_MODEL_SYNTHESIS`.
+
+- **Why subprocess over direct API when subscription is present:** A ChatGPT Pro plan's 20x multiplier makes backfilling 1k-10k historical memories cost nothing on top of the monthly fee. Direct API would bill separately — small absolute numbers (~$5-$10 one-time backfill, ~$0.0005/memory ongoing at Nano rates), but it's a second billing relationship users must set up. Subscription reuse wins on UX even when the dollar delta is small.
+- **API fallback model choice:** same pinning as codex path. Structured Outputs (`strict: true`) GUARANTEE schema conformance at the token-generation level via GPT-5.2+'s CFG engine. Batch API (50% off, async within 24h) used for Phase 6 one-time backfill.
+- **Backend abstraction:** `l1/curator-backend/{codex,pi,openai,anthropic}.ts` implement a common `curate(l0_source, schema, task) → ParsedCuratorOutput` interface where `task` picks the model+reasoning row above. Tests stub the interface; integration tests rotate through real backends in a smoke matrix.
 
 ### Retrieval
 
@@ -314,9 +325,9 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 **Units:**
 
 - **3.1** `l1/curator.ts` — prompt template + structured-output parser + backend dispatcher. Selects inference backend per §L0→L1 curation pipeline rules (env override > codex > pi > openai > anthropic).
-- **3.2** `l1/curator-backend/codex.ts` — spawns `codex exec --json --output-schema=<path>` with L0 body on stdin, streams JSONL events, captures the final schema-constrained JSON. Handles exit codes + stderr propagation. Primary backend when user is on a ChatGPT Plus/Pro plan.
-- **3.3** `l1/curator-backend/pi.ts` — same interface for pi CLI (stub in PR 3, filled when pi's non-interactive mode stabilizes).
-- **3.4** `l1/curator-backend/openai.ts` — direct OpenAI API call with `response_format: { type: 'json_schema', strict: true }`, model `gpt-5-nano`. Used in CI / headless / users without codex.
+- **3.2** `l1/curator-backend/codex.ts` — spawns `codex exec --model <task_model> -c model_reasoning_effort=<task_effort> --json --output-schema=<path>` with L0 body on stdin, streams JSONL events, captures the final schema-constrained JSON. Handles exit codes + stderr propagation. Per-task defaults: extraction = `gpt-5-mini` + `minimal`; consolidation = `gpt-5-nano` + `minimal`; synthesis = `gpt-5` + `medium`. Primary backend when user is on a ChatGPT Plus/Pro plan.
+- **3.3** `l1/curator-backend/pi.ts` — same interface for pi CLI (stub in PR 3, filled when pi's non-interactive mode stabilizes). Same per-task model pinning.
+- **3.4** `l1/curator-backend/openai.ts` — direct OpenAI API call with `response_format: { type: 'json_schema', strict: true }`. Same per-task model pinning as codex backend. Used in CI / headless / users without codex.
 - **3.5** Deterministic apply-layer: takes the curator's JSON output `{ new_pages, updates, supersessions, new_edges }` and executes via `l1/page.ts` + `l1/entities.ts`. Atomic per-call (all-or-nothing).
 - **3.6** `packages/cli/src/commands/memory/curate.ts` — `fulcrum memory curate <l0_id> [--dry-run] [--backend codex|pi|openai]`.
 - **3.7** Curator telemetry: appends to `vault/curated/log.md` with `{l0_id, backend, affected_pages[], new_entities[], confidence_deltas[], duration_ms, prompt_version}`.
