@@ -680,6 +680,17 @@ TOOL_REGISTRY.set('trace_claim', {
   },
 })
 
+TOOL_REGISTRY.set('lint_memory', {
+  schema: TOOL_SCHEMA_MAP.get('lint_memory'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args) => {
+    const { lintMemory } = await import('./commands/memory-lint.js')
+    const input: Parameters<typeof lintMemory>[0] = {}
+    if (args['workspace_id'] !== undefined) input.workspace_id = args['workspace_id'] as string
+    return lintMemory(input)
+  },
+})
+
 TOOL_REGISTRY.set('mark_memory_wrong', {
   schema: TOOL_SCHEMA_MAP.get('mark_memory_wrong'),
   capabilities: { readOnly: false, destructive: false, hookEquivalent: false },

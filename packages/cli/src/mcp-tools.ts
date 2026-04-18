@@ -212,6 +212,18 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Lint Memory Vault',
+    name: 'lint_memory',
+    description: 'Verify the migrated memory vault: reports zero orphans, zero missing-source references, and zero supersession cycles. Migration stubs (pages with sources=[] + sources_via=[]) are tracked separately and do NOT count as orphans. Returns { ok, counts: { pages_checked, orphans, migration_stubs, missing_sources, supersession_cycles }, issues[] }.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace_id: { type: 'string', description: 'Scope to this workspace (optional; default scans all workspaces)' },
+      },
+    },
+  },
+  {
     title: 'Mark Memory Wrong',
     name: 'mark_memory_wrong',
     description: 'Flag an L1 page as incorrect. Writes a new L0 correction entry under `raw/correction/` capturing the reason and (optional) correction_body. Does NOT auto-run the curator — the operator or a scheduled pass triggers re-curation; the correction L0 entry is the input the curator will consume to supersede the flagged page.',

@@ -289,6 +289,7 @@ fulcrum memory — memory vault commands
   read-raw         Print an L0 source body (v3 PR 5)
   trace            Reverse lookup: find pages containing a claim (v3 PR 5)
   mark-wrong       Write a correction L0 entry (v3 PR 5)
+  lint             Verify migrated vault — orphans, missing sources, cycles (v3 PR 6)
   sweep-expired              Delete session-scope memories whose expires_at has passed
   graph-consistency-check    Sample SQLite ↔ Kuzu and report drift (requires L2)
   rollback                   Operator-only rollback (--since= + --yes-i-really-want-to-undo-N-writes)
@@ -544,6 +545,28 @@ Flags:
     }
     if (corrBody !== undefined) input.correction_body = corrBody
     console.log(JSON.stringify(markWrong(input), null, 2))
+    return
+  }
+
+  // Memory v3 PR 6 unit 6.5 — post-migration verification lint.
+  if (command === 'lint') {
+    if (args.includes('--help') || args.includes('-h')) {
+      console.log(`
+fulcrum memory lint
+
+Verifies the migrated memory vault:
+  * orphan pages (excluding legitimate migration stubs)
+  * missing-source references (sources[] → l0_sources resolution)
+  * supersession cycles
+
+Output is JSON. Exits 2 if any issue is found.
+`)
+      process.exit(0)
+    }
+    const { lintMemory } = await import('./commands/memory-lint.js')
+    const report = lintMemory()
+    console.log(JSON.stringify(report, null, 2))
+    if (!report.ok) process.exit(2)
     return
   }
 

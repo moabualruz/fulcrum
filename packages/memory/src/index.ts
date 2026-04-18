@@ -181,6 +181,13 @@ export type {
   BackfillOptions as MigrationBackfillOptions,
   BackfillStage as MigrationBackfillStage,
 } from './migration/backfill.js'
+export { lintMemoryVault } from './migration/lint.js'
+export type {
+  LintReport,
+  LintIssue,
+  LintIssueCode,
+  LintCounts,
+} from './migration/lint.js'
 
 // Entities
 export { linkMemoryToEntity, getMemoryEntities } from './entities.js'
