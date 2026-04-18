@@ -114,6 +114,30 @@ describe('curateMemory', () => {
     expect(result.apply.created_page_ids).toHaveLength(1)
   })
 
+  it('appends a telemetry line to vault/curated/log.md after a live run', async () => {
+    const { source_id } = seedL0()
+    registerBackend(stubBackend('codex', curatorOutputFor(source_id)))
+    await curateMemory({ l0_id: source_id, backend: 'codex' })
+    const { readFileSync, existsSync } = require('fs') as typeof import('fs')
+    const logPath = join(tmpVault, 'curated', 'log.md')
+    expect(existsSync(logPath)).toBe(true)
+    const line = readFileSync(logPath, 'utf-8').trim()
+    const parsed = JSON.parse(line) as { l0_id: string; backend: string; affected_pages: { created: string[] } }
+    expect(parsed.l0_id).toBe(source_id)
+    expect(parsed.backend).toBe('codex')
+    expect(parsed.affected_pages.created).toHaveLength(1)
+  })
+
+  it('also writes telemetry for --dry-run (with dry_run:true) so audit covers skipped runs', async () => {
+    const { source_id } = seedL0()
+    registerBackend(stubBackend('codex', curatorOutputFor(source_id)))
+    await curateMemory({ l0_id: source_id, backend: 'codex', dry_run: true })
+    const { readFileSync } = require('fs') as typeof import('fs')
+    const line = readFileSync(join(tmpVault, 'curated', 'log.md'), 'utf-8').trim()
+    const parsed = JSON.parse(line) as { dry_run: boolean }
+    expect(parsed.dry_run).toBe(true)
+  })
+
   it('--dry-run produces a diff-shaped ApplyResult without DB or vault writes', async () => {
     const { source_id } = seedL0()
     registerBackend(stubBackend('codex', curatorOutputFor(source_id)))

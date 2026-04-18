@@ -15,6 +15,7 @@ import { getDb } from 'fulcrum-agent-core'
 import {
   runCurator,
   applyCuratorOutput,
+  appendCuratorLog,
   registerBackend,
   getBackend,
   codexBackend,
@@ -27,6 +28,8 @@ import {
   type ApplyResult,
   type L0SourceForCurator,
   type CuratorBackend,
+  type CuratorOutput,
+  type CuratorLogEntry,
 } from 'fulcrum-memory'
 
 export interface MemoryCurateInput {
@@ -143,6 +146,19 @@ export async function curateMemory(input: MemoryCurateInput): Promise<MemoryCura
     dry_run: input.dry_run ?? false,
   })
 
+  writeCuratorTelemetry({
+    task: curatorInput.task,
+    l0_id: input.l0_id,
+    backend: run.backend,
+    model: run.model,
+    prompt_version: run.prompt_version,
+    duration_ms: run.duration_ms,
+    dry_run: Boolean(input.dry_run),
+    output: run.output,
+    apply,
+    usage: run.usage,
+  })
+
   return {
     l0_id: input.l0_id,
     backend: run.backend,
@@ -152,4 +168,45 @@ export async function curateMemory(input: MemoryCurateInput): Promise<MemoryCura
     dry_run: Boolean(input.dry_run),
     apply,
   }
+}
+
+function writeCuratorTelemetry(
+  args: {
+    task: CuratorTask
+    l0_id: string
+    backend: CuratorBackendName
+    model: string
+    prompt_version: string
+    duration_ms: number
+    dry_run: boolean
+    output: CuratorOutput
+    apply: ApplyResult
+    usage: Awaited<ReturnType<typeof runCurator>>['usage']
+  },
+): void {
+  const entry: CuratorLogEntry = {
+    ts: new Date().toISOString(),
+    l0_id: args.l0_id,
+    task: args.task,
+    backend: args.backend,
+    model: args.model,
+    prompt_version: args.prompt_version,
+    duration_ms: args.duration_ms,
+    dry_run: args.dry_run,
+    affected_pages: {
+      created: args.apply.created_page_ids,
+      updated: args.apply.updated_page_ids,
+      superseded: args.apply.superseded_pairs,
+    },
+    new_edges: args.apply.created_edge_ids,
+    confidence_deltas: {
+      created: args.output.new_pages.map((p) => p.confidence),
+      updated: args.output.updates
+        .map((u) => u.confidence)
+        .filter((x): x is number => typeof x === 'number'),
+      superseded: args.output.supersessions.map((s) => s.new_page.confidence),
+    },
+  }
+  if (args.usage) entry.usage = args.usage
+  appendCuratorLog(getVaultPath(), entry)
 }
