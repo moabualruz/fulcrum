@@ -135,6 +135,35 @@ origin: user-raised architectural feedback (https://gist.github.com/karpathy/442
   6. Supersession filter (default: skip `superseded_by ≠ null`)
   7. Per-page diversification + calibration (current)
 - **L0 is not recalled directly.** Callers that need raw traces use `fulcrum memory sources <page_id>` to follow L1 → L0 references.
+- **Every recall result carries L0 back-refs.** Each returned L1 page includes its `sources[]` (L0 IDs) and an `l0_wikilinks[]` array parsed from the body, so both CLI and MCP callers can drill straight into raw.
+
+### Guided templates + L0 traceability (HARD constraint)
+
+- **Every L1 page is written from a template.** Curator prompts include the template verbatim; post-curator validator rejects malformed output. Templates live at `packages/memory/src/l1/templates/{entity,concept,page,synthesis}.template.md` and are the single source of truth for page shape.
+- **Every L1 claim carries a wikilink back to its L0 source(s).** Obsidian-style `[[l0/raw/<source_type>/<yyyy>/<mm>/<dd>/<ULID>]]` inline in the body wherever a claim is grounded, PLUS a `sources:` array in frontmatter for the global list. Redundant by design — inline links show which sentence came from which dump; the frontmatter array is for O(1) enumeration + graph traversal.
+- **Why both formats:** inline wikilinks let humans click-through in Obsidian to audit any specific claim; the `sources:` array lets the system answer "give me all L0 dumps behind page X" without parsing markdown. Lint catches divergence (frontmatter lists a source not referenced inline, or vice versa).
+- **Filename discipline:** L0 files are ULID-named under `raw/<type>/<yyyy>/<mm>/<dd>/<ULID>.md`. L1 wikilinks reference the path-relative-to-vault form: `[[raw/bash_trace/2026/04/18/01KPGHE...]]`. Obsidian resolves via its vault config; CLI tooling resolves via `vaultRoot + '/' + linkTarget + '.md'`.
+- **Template-level guarantees (enforced by curator validator):**
+  1. Frontmatter `sources: [<L0_ULID>...]` non-empty (except for `type: concept` pages that can be cross-source syntheses — those carry `sources_via: [<L1_page_id>...]` instead, which transitively resolve to L0).
+  2. Body contains at least one `[[raw/...]]` wikilink that matches a `sources[]` entry.
+  3. `confidence` field present and in `[0.0, 1.0]`.
+  4. No placeholder text (`TODO`, `FIXME`, `...`, `XXX`) in the body.
+  5. `entities[]` in frontmatter references only existing `graph_entities` rows.
+
+- **Operator + agent inspection paths:**
+
+  | User / agent need | CLI | MCP tool |
+  |---|---|---|
+  | Show an L1 page with full body + frontmatter | `fulcrum memory inspect <page_id>` | `mcp__fulcrum__inspect_memory` |
+  | Walk L1 → L0 sources (returns L0 IDs + snippets) | `fulcrum memory sources <page_id>` | `mcp__fulcrum__get_memory_sources` |
+  | Read a specific L0 raw file | `fulcrum memory read-raw <l0_id>` | `mcp__fulcrum__read_raw_source` |
+  | Find which L1 page(s) contain a given claim | `fulcrum memory trace "<claim text>"` | `mcp__fulcrum__trace_claim` |
+  | Mark an L1 page wrong / request re-curation | `fulcrum memory mark-wrong <page_id> --reason "..."` | `mcp__fulcrum__mark_memory_wrong` |
+  | Edit an L1 page directly (manual correction) | Open the `.md` file; vault watcher re-indexes + optionally re-runs curator | (via filesystem; agents can use the Edit tool then call `mcp__fulcrum__reindex_memory`) |
+
+- **Mark-wrong workflow:** user hits a bad recall → `fulcrum memory mark-wrong <page_id> --reason "fact X is wrong, see L0 source Y"` → system appends a correction L0 entry under `raw/correction/...` → triggers curator re-run with a prompt that includes the correction → curator supersedes the old page with a corrected version. Audit chain preserved in `log.md`.
+
+- **Why this matters beyond theoretical correctness:** during the 2026-04-18 debugging session the user found a truncated vault file and had no path from "this page looks wrong" to "here's the raw source and here's the line in L0 that the extractor misread." This redesign makes that path a one-command operation for both humans and agents.
 
 ### Migration strategy
 
@@ -157,12 +186,14 @@ origin: user-raised architectural feedback (https://gist.github.com/karpathy/442
 2. **L0 is verbatim.** Zero truncation, zero normalization, zero sanitization rewrite-in-place (sanitization still RUNS, but it emits a separate sanitized copy at L1-curation time — L0 keeps the raw input for audit even when it contained credentials that needed redaction before exposure).
 3. **L1 is LLM-maintained only.** Humans edit via git + vault watcher; system never writes L1 bodies directly (only frontmatter metadata). Curator is the single writer.
 4. **Sanitize-before-WAL still applies.** The WAL audit row is populated at L0 ingest time with `content_sha256` only; no cleartext in WAL (existing invariant preserved).
-5. **CLI-first primary; MCP overlay.** `fulcrum memory ingest`, `fulcrum memory curate`, `fulcrum memory lint`, `fulcrum memory consolidate`, `fulcrum memory sources`, `fulcrum memory export` — every capability reachable via `fulcrum action exec`. MCP tools are thin shims.
+5. **CLI-first primary; MCP overlay.** `fulcrum memory ingest`, `fulcrum memory curate`, `fulcrum memory lint`, `fulcrum memory consolidate`, `fulcrum memory sources`, `fulcrum memory inspect`, `fulcrum memory read-raw`, `fulcrum memory trace`, `fulcrum memory mark-wrong`, `fulcrum memory export`, `fulcrum memory synthesize` — every capability reachable via `fulcrum action exec`. MCP tools are thin shims.
 6. **Control-plane features are dormant, not absent.** Curator auto-trigger and consolidation pass are opt-in (`FULCRUM_MEMORY_CURATE_AUTO=1`, `FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE=...`). Default install = manual operation.
 7. **No confidence hallucination.** Confidence values come from observed evidence (source counts, reinforcement, explicit caller overrides). Never LLM-generated without grounding in L0 sources.
-8. **Agent-native parity.** Every action a user can take (ingest, curate, lint, consolidate, query) an agent can also take via MCP / CLI.
-9. **Loopback-only** (existing).
-10. **Reversible migrations.** Every schema migration has a documented rollback SQL. The Phase 6 one-time data migration runs in a transaction with an abort-and-restore path.
+8. **Agent-native parity.** Every action a user can take (ingest, curate, lint, consolidate, query, inspect, trace, mark-wrong, read-raw) an agent can also take via MCP / CLI.
+9. **L0 traceability (HARD).** Every L1 page MUST have (a) a non-empty `sources[]` in frontmatter referencing one or more L0 ULIDs, AND (b) at least one inline `[[raw/...]]` wikilink in the body matching one of those sources. Synthesis pages that derive only from other L1 pages use `sources_via: [<l1_page_id>...]` which transitively resolve to L0. Validator enforces on every write. Lint catches drift in already-stored pages.
+10. **Guided templates (HARD).** All L1 pages are written from templates at `packages/memory/src/l1/templates/`. Curator prompts include the template verbatim; post-curator validator rejects malformed output with a structured `L1TemplateViolationError`. No free-form page writes.
+11. **Loopback-only** (existing).
+12. **Reversible migrations.** Every schema migration has a documented rollback SQL. The Phase 6 one-time data migration runs in a transaction with an abort-and-restore path.
 
 ---
 
@@ -233,7 +264,19 @@ packages/memory/src/
     types.ts                                — NEW: L0 source types, frontmatter schema
   l1/
     curator.ts                              — NEW: LLM-mediated L0→L1 pipeline
-    page.ts                                 — NEW: create/update/supersede curated pages
+    curator-backend/
+      codex.ts                              — NEW: codex exec subprocess backend
+      pi.ts                                 — NEW: pi CLI subprocess backend
+      openai.ts                             — NEW: OpenAI API Structured Outputs fallback
+      anthropic.ts                          — NEW: Anthropic API fallback
+    page.ts                                 — NEW: create/update/supersede curated pages (template-validated)
+    validator.ts                            — NEW: L1 template + wikilink + frontmatter rules
+    wikilinks.ts                            — NEW: parse/emit/resolve Obsidian-style [[path]] refs
+    templates/
+      entity.template.md                    — NEW: entity page template
+      concept.template.md                   — NEW: concept page template
+      page.template.md                      — NEW: source-summary page template
+      synthesis.template.md                 — NEW: cross-source synthesis template
     entities.ts                             — NEW: entity extraction + graph ops
     lifecycle.ts                            — NEW: confidence decay, consolidation tiers, archive
     retrieval.ts                            — REWORK: extends recall.ts with graph + confidence
@@ -259,7 +302,13 @@ packages/cli/src/commands/
     lint.ts                                 — NEW: fulcrum memory lint
     consolidate.ts                          — NEW: fulcrum memory consolidate
     sources.ts                              — NEW: fulcrum memory sources <l1_page_id>
+    inspect.ts                              — NEW: fulcrum memory inspect <l1_page_id>
+    read-raw.ts                             — NEW: fulcrum memory read-raw <l0_id>
+    trace.ts                                — NEW: fulcrum memory trace "<claim>"
+    mark-wrong.ts                           — NEW: fulcrum memory mark-wrong <l1_page_id> --reason
     export.ts                               — NEW: fulcrum memory export (audit dump)
+    page.ts                                 — NEW: fulcrum memory page create|show (template scaffolding)
+    synthesize.ts                           — NEW: fulcrum memory synthesize --pages <ids>...
 
 docs/plans/2026-04-18-002-memory-tiered-architecture-plan.md
                                             — this file
@@ -269,6 +318,188 @@ agent-integration/skills/fulcrum/
   l1-curate.md                              — NEW: curator prompt template + examples
   l1-lint.md                                — NEW: lint pass rubric
 ```
+
+---
+
+## Template reference (concrete shapes)
+
+These are the normative shapes validated by `l1/validator.ts`. Curator prompts include them verbatim. Placeholders in `{{...}}` are filled by the curator; the validator rejects any page with unfilled placeholders.
+
+### Entity template (`l1/templates/entity.template.md`)
+
+```markdown
+---
+id: {{ULID}}
+schema: fulcrum.memory/v3
+type: entity
+entity_type: {{library|person|project|file|symbol|decision|concept}}
+name: {{NAME}}
+aliases: {{ALIAS_ARRAY}}
+confidence: {{CONFIDENCE}}           # 0.0–1.0
+first_seen: {{ISO_TIMESTAMP}}
+last_confirmed: {{ISO_TIMESTAMP}}
+sources:                              # REQUIRED: ≥1 L0 ULID
+  - {{L0_ULID_1}}
+supersedes: []
+superseded_by: null
+retention_tier: working               # working|episodic|semantic|procedural
+access_count: 0
+workspace_id: {{WORKSPACE_ID}}
+project_id: {{PROJECT_ID}}
+---
+
+# {{NAME}}
+
+{{ONE_LINE_DESCRIPTION}}
+
+## Observed usage
+
+{{PROSE_DESCRIBING_HOW_THIS_ENTITY_APPEARS_IN_SOURCES}}
+
+Sources grounding the claims above:
+- [[raw/{{SOURCE_TYPE_1}}/{{YYYY}}/{{MM}}/{{DD}}/{{L0_ULID_1}}]]
+
+## Related
+
+- [[entity/{{RELATED_ENTITY_ULID}}]]
+```
+
+### Concept template (`l1/templates/concept.template.md`)
+
+```markdown
+---
+id: {{ULID}}
+schema: fulcrum.memory/v3
+type: concept
+name: {{NAME}}
+confidence: {{CONFIDENCE}}
+sources: {{L0_ULID_ARRAY}}            # REQUIRED (or sources_via for cross-L1)
+sources_via: []
+first_seen: {{ISO_TIMESTAMP}}
+last_confirmed: {{ISO_TIMESTAMP}}
+retention_tier: working
+access_count: 0
+supersedes: []
+superseded_by: null
+workspace_id: {{WORKSPACE_ID}}
+project_id: {{PROJECT_ID}}
+---
+
+# {{NAME}}
+
+{{ONE_PARAGRAPH_DEFINITION}}
+
+## Evidence
+
+{{PROSE_WITH_INLINE_WIKILINKS}}
+Example: "The invariant was established in [[raw/decision/2026/04/18/{{ULID}}]]
+after [[raw/session_transcript/2026/04/17/{{ULID}}]] showed a regression."
+
+## Implementation references
+
+- `{{FILE_PATH}}:{{LINE}}` — {{CONTEXT}}
+```
+
+### Source-summary page template (`l1/templates/page.template.md`)
+
+```markdown
+---
+id: {{ULID}}
+schema: fulcrum.memory/v3
+type: page
+title: {{TITLE}}
+source: {{L0_ULID}}                   # the primary L0 this page distills
+sources: [{{L0_ULID}}]                # same as above for consistency; may include ancillaries
+confidence: 1.0
+entities: {{ENTITY_ULID_ARRAY}}
+first_seen: {{ISO_TIMESTAMP}}
+last_confirmed: {{ISO_TIMESTAMP}}
+retention_tier: working
+access_count: 0
+workspace_id: {{WORKSPACE_ID}}
+project_id: {{PROJECT_ID}}
+---
+
+# {{TITLE}}
+
+Distilled from [[raw/{{SOURCE_TYPE}}/{{YYYY}}/{{MM}}/{{DD}}/{{L0_ULID}}]].
+
+## Summary
+
+{{2_4_SENTENCE_SUMMARY}}
+
+## Key points
+
+- {{POINT_1}} — see [[raw/.../{{L0_ULID}}]]
+- {{POINT_2}}
+
+## Entities mentioned
+
+- [[entity/{{ENTITY_ULID_1}}]]
+```
+
+### Synthesis template (`l1/templates/synthesis.template.md`)
+
+```markdown
+---
+id: {{ULID}}
+schema: fulcrum.memory/v3
+type: synthesis
+title: {{TITLE}}
+sources: []                           # may be empty
+sources_via:                          # REQUIRED when sources[] empty
+  - {{L1_PAGE_ULID_1}}
+  - {{L1_PAGE_ULID_2}}
+confidence: {{CONFIDENCE}}
+first_seen: {{ISO_TIMESTAMP}}
+last_confirmed: {{ISO_TIMESTAMP}}
+retention_tier: episodic
+access_count: 0
+supersedes: []
+superseded_by: null
+workspace_id: {{WORKSPACE_ID}}
+project_id: {{PROJECT_ID}}
+---
+
+# {{TITLE}}
+
+{{INTRODUCTION_TYING_SOURCES_TOGETHER}}
+
+## Pattern
+
+{{DISCOVERED_PATTERN}}
+
+## Evidence
+
+- [[page/{{L1_PAGE_ULID_1}}]] — {{CONTRIBUTION}}
+- [[page/{{L1_PAGE_ULID_2}}]] — {{CONTRIBUTION}}
+
+## Transitive L0 sources
+
+Followed from the L1 pages above:
+- [[raw/{{SOURCE_TYPE}}/{{YYYY}}/{{MM}}/{{DD}}/{{L0_ULID}}]]
+```
+
+### L0 raw-source frontmatter (minimal, set by `ingestRawSource`)
+
+```markdown
+---
+id: {{ULID}}
+schema: fulcrum.source/v3
+source_type: {{bash_trace|tool_trace|file_patch|session_transcript|prompt_attachment|web_capture|edit_diff|correction}}
+session_id: {{SESSION_ID}}
+workspace_id: {{WORKSPACE_ID}}
+project_id: {{PROJECT_ID}}
+cwd: {{ABS_PATH}}
+created_at: {{ISO_TIMESTAMP}}
+content_hash: {{SHA256_64_HEX}}
+size_bytes: {{N}}
+---
+
+{{FULL_VERBATIM_BODY}}
+```
+
+No truncation, no canonical_text, no normalization. Body = what was captured.
 
 ---
 
@@ -304,19 +535,29 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 
 **Verify:** `FULCRUM_MEMORY_V3=1 pnpm -F fulcrum-memory test src/tests/l0-ingest.test.ts`; manual e2e: `fulcrum hook claude post` with long heredoc → check vault/raw/bash_trace/ for verbatim body.
 
-### PR 2 — L1 curated page primitives (no curator yet)
+### PR 2 — L1 curated page primitives + templates + validator
 
-**Goal:** create/update/read L1 pages programmatically. Curator logic deferred to PR 3. No auto-curation yet.
+**Goal:** create/update/read L1 pages programmatically. Curator logic deferred to PR 3. Templates + validator land here so everything downstream consumes a validated page shape.
 
 **Units:**
 
-- **2.1** `l1/page.ts` — `createCuratedPage`, `updateCuratedPage`, `supersedeCuratedPage`, `readCuratedPage`. Each writes to `vault/curated/{type}/{ULID}.md` + `l1_pages` row.
-- **2.2** `l1/entities.ts` — `upsertEntity`, `addEdge`, `getEntityGraph(entity_id, depth)`. SQLite-backed. Kuzu optional mirror in later phase.
-- **2.3** Page frontmatter serializer: structured YAML with list fields (`sources`, `supersedes`, `entities`), preserves round-trip through `readMemoryFile`.
-- **2.4** CLI stub: `fulcrum memory page create|show|supersede` for operator debugging. Not surfaced in MCP until PR 3.
-- **2.5** Unit tests: page round-trip, supersession chain, graph traversal 2-hop.
+- **2.1** `l1/templates/{entity,concept,page,synthesis}.template.md` — canonical markdown templates with placeholder tokens (`{{ULID}}`, `{{NAME}}`, `{{SOURCE_ULID}}`, etc.). Templates are human-editable; the validator reads them at module load to derive required fields + structural rules.
+- **2.2** `l1/page.ts` — `createCuratedPage(template, vars)`, `updateCuratedPage`, `supersedeCuratedPage`, `readCuratedPage`. Every `create/update` runs through `validateL1Page(page)` before write; invalid pages throw `L1TemplateViolationError` listing each failed rule.
+- **2.3** `l1/validator.ts` — enforces the template-level guarantees from §Guided templates:
+  1. Required frontmatter fields present (`id`, `schema`, `type`, `confidence`, `sources` or `sources_via`, etc.)
+  2. `confidence ∈ [0.0, 1.0]`
+  3. For `type ∈ {entity, page, synthesis}`: `sources[]` non-empty
+  4. Body contains at least one `[[raw/...]]` wikilink matching a `sources[]` entry
+  5. No placeholder tokens (`TODO`, `FIXME`, `{{...}}`) remain
+  6. Every `entities[]` ULID exists in `graph_entities`
+  7. Every `supersedes[]` page_id exists in `l1_pages`
+- **2.4** `l1/wikilinks.ts` — parse + emit Obsidian-style `[[path]]` references. Functions: `extractWikilinks(body) → string[]`, `renderWikilink(l0_file) → string`, `resolveWikilink(link, vaultRoot) → absolute path`. Tests cover nested paths, special chars, escaping.
+- **2.5** `l1/entities.ts` — `upsertEntity`, `addEdge`, `getEntityGraph(entity_id, depth)`. SQLite-backed. Kuzu optional mirror in later phase.
+- **2.6** Page frontmatter serializer: structured YAML with list fields (`sources`, `supersedes`, `entities`), preserves round-trip through `readMemoryFile`.
+- **2.7** CLI stub: `fulcrum memory page create --template <name>` shows the rendered template for operator debugging + manual authoring. Not surfaced in MCP until PR 3.
+- **2.8** Unit tests: template → create → read round-trip; validator rejects each of the 7 failure modes; wikilink parser covers edge cases; supersession chain; graph traversal 2-hop.
 
-**Verify:** `pnpm -F fulcrum-memory test src/tests/l1-page.test.ts`; `fulcrum memory page create --type entity --name React → fulcrum memory page show <id>`.
+**Verify:** `pnpm -F fulcrum-memory test src/tests/l1-page.test.ts`; `fulcrum memory page create --template entity --name React → fulcrum memory page show <id>` displays the rendered page with live L0 wikilinks.
 
 ### PR 3 — Curator pipeline (manual trigger)
 
@@ -357,7 +598,13 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 - **5.1** Extend `retrieval/search.ts` with graph-traversal stage + confidence filter + supersession filter.
 - **5.2** Reciprocal rank fusion weights configurable via env (defaults `fts=1.0, vec=1.0, graph=0.5`).
 - **5.3** `recall_knowledge` new action; `recall_memory` aliased for back-compat.
-- **5.4** Agent-facing: `fulcrum memory sources <page_id>` walks `l1_pages.sources → l0_sources` → prints or pipes.
+- **5.4** Agent-facing inspection + correction surface:
+  - `fulcrum memory sources <page_id>` — walks L1 → L0 references via `sources[]` + inline `[[raw/...]]` wikilinks; prints { l0_id, source_type, snippet, file_path } per source.
+  - `fulcrum memory inspect <page_id>` — dumps full L1 page (frontmatter + body + all resolved wikilinks).
+  - `fulcrum memory read-raw <l0_id>` — prints the full L0 body (the audit-log entry point).
+  - `fulcrum memory trace "<claim>"` — reverse lookup: given a substring, find L1 pages containing it + their L0 provenance.
+  - `fulcrum memory mark-wrong <page_id> --reason "<why>"` — appends a `correction` L0 entry under `raw/correction/`, triggers curator re-run with correction hint, new page supersedes the flagged one.
+  - MCP parity: `mcp__fulcrum__get_memory_sources`, `mcp__fulcrum__inspect_memory`, `mcp__fulcrum__read_raw_source`, `mcp__fulcrum__trace_claim`, `mcp__fulcrum__mark_memory_wrong`. Every action a user can take via CLI is callable from agents.
 - **5.5** Flip default `FULCRUM_MEMORY_V3` to on. Old path callable via `FULCRUM_MEMORY_V3=0` for one release cycle.
 - **5.6** Integration tests: corpus of 20 L0 dumps → 10 L1 pages → recall a query that requires graph traversal → verify expected page ranks.
 
@@ -386,7 +633,7 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 
 - **7.1** `l1/lifecycle.ts` — `applyDecay()` (time-based confidence update), `promoteToTier(page_id, target_tier)`, `archivePage(page_id)`.
 - **7.2** Contradiction detector: curator output includes `{ contradicts: [old_page_id] }`; auto-applies supersession when confidence of new evidence ≥ old.
-- **7.3** `fulcrum memory lint` — orphan pages, broken wikilinks, cyclic supersession, stale claims (last_confirmed > 90d AND confidence > 0.5), missing source_ids.
+- **7.3** `fulcrum memory lint` — orphan pages, broken wikilinks (L1 → L0 link pointing to missing file), cyclic supersession, stale claims (last_confirmed > 90d AND confidence > 0.5), missing source_ids, `sources[]` vs inline wikilink divergence (frontmatter lists an L0 that's not referenced inline, or vice versa), template-validator violations retrospectively applied to existing pages.
 - **7.4** `fulcrum memory consolidate` — finds pages with same entity set + same `retention_tier` AND confidence ≥ threshold; proposes a merged page to curator.
 - **7.5** Tests: decay curve matches Ebbinghaus formula within 1%; consolidation dry-run prints proposed merges.
 
