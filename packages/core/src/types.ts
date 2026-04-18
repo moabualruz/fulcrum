@@ -87,6 +87,8 @@ export type EventType =
   | 'merge_conflicted' | 'merge_completed' | 'review_created' | 'review_updated'
   | 'validation_started' | 'validation_finished' | 'policy_denied'
   | 'hook_executed' | 'workflow_step_completed'
+  // Memory v3 additions (2026-04-18-002 plan §L0→L1 pipeline).
+  | 'l0_ingested'
 
 // Keep RunStatus as alias for backward compat with existing code
 export type RunStatus = AgentRunStatus

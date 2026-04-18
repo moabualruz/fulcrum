@@ -35,6 +35,8 @@ const PREFIXES: Record<string, string> = {
   agent_definition: 'adef_',
   run_event: 'revt_',
   hook_event: 'hev_',
+  // Memory v3 additions.
+  l0_source: 'l0src_',
 }
 
 const DISPLAY_PREFIXES: Record<string, string> = {

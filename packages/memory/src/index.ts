@@ -3,6 +3,18 @@
 // Schema / migrations
 export { runMigration101MemoryV3Lifecycle, runMigration102MemoryV3SourceIndex } from './schema.js'
 
+// L0 ingest (memory v3 PR 1 unit 1.1)
+export { ingestRawSource } from './l0/ingest.js'
+export type {
+  L0SourceType,
+  L0Frontmatter,
+  L0File,
+  L0IngestInput,
+  L0IngestMeta,
+  L0SourceRow,
+} from './l0/types.js'
+export { L0_SOURCE_TYPES } from './l0/types.js'
+
 // Types
 export type {
   MemoryScope,
