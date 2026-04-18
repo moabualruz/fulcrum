@@ -421,6 +421,49 @@ fulcrum memory page — L1 curated-page template scaffolding (memory v3 PR 2)
     process.exit(1)
   }
 
+  // Memory v3 PR 3 unit 3.6 — curator CLI.
+  if (command === 'curate') {
+    const l0_id = args[2]
+    if (!l0_id || l0_id === '--help' || l0_id === '-h') {
+      console.log(`
+fulcrum memory curate <l0_id> [--dry-run] [--backend codex|pi|openai|anthropic]
+
+Run the curator pipeline on a single L0 source. Reads the raw body,
+runs it through the configured LLM backend with Structured Outputs
+constrained to the CuratorOutput schema, and applies the parsed diff
+via the deterministic apply-layer.
+
+Flags:
+  --dry-run         Print the resulting diff without writing.
+  --backend <name>  Override backend selection (default order:
+                    codex → pi → openai → anthropic).
+  --task <name>     extraction (default) | consolidation | synthesis
+  --model <id>      Override model for this run.
+  --reasoning <e>   Override reasoning effort (minimal|medium|high|...).
+`)
+      process.exit(l0_id ? 0 : 1)
+    }
+    const dryRun = args.includes('--dry-run')
+    const backendIdx = args.indexOf('--backend')
+    const taskIdx = args.indexOf('--task')
+    const modelIdx = args.indexOf('--model')
+    const reasoningIdx = args.indexOf('--reasoning')
+    const backend = backendIdx >= 0 ? (args[backendIdx + 1] as 'codex' | 'pi' | 'openai' | 'anthropic') : undefined
+    const task = taskIdx >= 0 ? (args[taskIdx + 1] as 'extraction' | 'consolidation' | 'synthesis') : undefined
+    const model = modelIdx >= 0 ? args[modelIdx + 1] : undefined
+    const reasoning = reasoningIdx >= 0 ? args[reasoningIdx + 1] : undefined
+
+    const { curateMemory } = await import('./commands/memory-curate.js')
+    const params: Parameters<typeof curateMemory>[0] = { l0_id, dry_run: dryRun }
+    if (backend) params.backend = backend
+    if (task) params.task = task
+    if (model) params.model = model
+    if (reasoning) params.reasoning = reasoning
+    const result = await curateMemory(params)
+    console.log(JSON.stringify(result, null, 2))
+    return
+  }
+
   // v2a PR 9 Task 45 + v2b PR 9 follow-up — operator-invokable expiration sweep.
   // Idempotent. Also runs on a 24h timer inside the MCP server lifecycle and
   // opportunistically on every start_agent_run. --install writes a per-user
