@@ -144,6 +144,10 @@ export { writeMemory, insertMemoryDirect, normalizeCodeText, storeEmbeddingInVec
 // L2 — L1 page embedding (curator apply-layer entry point).
 export { recordL1Embedding } from './l2/embed.js'
 
+// v3 retrieval — graph + confidence + supersession filters (PR 5).
+export { runV3Search, v3DefaultWeights, resolveQueryEntities } from './retrieval/v3-search.js'
+export type { V3SearchInput, V3SearchWeights, V3RecallHit } from './retrieval/v3-search.js'
+
 // Entities
 export { linkMemoryToEntity, getMemoryEntities } from './entities.js'
 
