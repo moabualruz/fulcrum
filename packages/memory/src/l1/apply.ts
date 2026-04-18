@@ -33,6 +33,7 @@ import {
 } from './page.js'
 import { addEdge } from './entities.js'
 import { getVaultPath } from '../vault/client.js'
+import { recordL1Embedding } from '../l2/embed.js'
 import type { CuratedPage } from './frontmatter.js'
 import type {
   CuratorEdge,
@@ -205,6 +206,13 @@ export function applyCuratorOutput(output: CuratorOutput, ctx: ApplyContext): Ap
     }
     throw err
   }
+
+  // PR 4 unit 4.2 — embed every page whose memories row is now durable.
+  // Superseded old rows are NOT re-embedded; supersession is audit, not
+  // replacement. Fire-and-forget: flushPendingMemoryWrites drains before exit.
+  for (const id of created_page_ids) recordL1Embedding(db, id)
+  for (const id of updated_page_ids) recordL1Embedding(db, id)
+  for (const pair of superseded_pairs) recordL1Embedding(db, pair.new_id)
 
   return {
     created_page_ids,

@@ -141,6 +141,9 @@ export { contentHash, isDuplicate } from './dedup.js'
 // Write
 export { writeMemory, insertMemoryDirect, normalizeCodeText, storeEmbeddingInVec, storeChunkEmbedding, scheduleChunkEmbedding, flushPendingMemoryWrites, waitForEmbedHeadroom } from './write.js'
 
+// L2 — L1 page embedding (curator apply-layer entry point).
+export { recordL1Embedding } from './l2/embed.js'
+
 // Entities
 export { linkMemoryToEntity, getMemoryEntities } from './entities.js'
 
