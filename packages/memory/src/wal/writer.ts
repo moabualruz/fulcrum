@@ -13,8 +13,9 @@
 //     proceed; if retry fails, log + proceed (don't block the universe on
 //     one contention spike).
 
-import * as nodeFs from 'node:fs'
-const { openSync, writeSync, closeSync, mkdirSync, constants: fsConstants } = nodeFs
+// Direct named imports — rollup's DTS analyzer can't trace
+// `import * as nodeFs from 'node:fs'` + destructure through named builtins.
+import { openSync, writeSync, closeSync, mkdirSync, constants as fsConstants } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { createHash } from 'node:crypto'
 import { globalDataDir } from 'fulcrum-agent-core'
