@@ -88,7 +88,6 @@ export {
   resolveProjectRoot,
 } from './pci/lifecycle.js'
 export type { OnAgentRunStartInput } from './pci/lifecycle.js'
-export { pciStatus, isWatcherOwnedHere } from './pci/singleton.js'
 
 // Indexer daemon (PR 1 of the 2026-04-18 indexer-daemon plan).
 export { indexerSocketPath, unlinkStaleSocket } from './indexer/socket-path.js'

@@ -6,9 +6,10 @@
 // See docs/plans/2026-04-18-001-refactor-indexer-daemon-plan.md Unit 1.3.
 
 import { realpathSync } from 'node:fs'
-import type { IndexerErrorCode } from './protocol.js'
 import type { DaemonRegistry } from './registry.js'
 import type { Db } from './types-db.js'
+import { HandlerError } from './errors.js'
+export { HandlerError } from './errors.js'
 
 export interface DaemonContext {
   readonly version: string
@@ -30,16 +31,6 @@ export type HandlerFn = (
   params: Record<string, unknown>,
 ) => Promise<unknown> | unknown
 
-export class HandlerError extends Error {
-  constructor(
-    public readonly code: IndexerErrorCode,
-    message: string,
-    public readonly detail?: unknown,
-  ) {
-    super(message)
-    this.name = 'HandlerError'
-  }
-}
 
 // ── ping ───────────────────────────────────────────────────────────────────
 // Lightweight liveness + identity probe. Clients use it both as a health

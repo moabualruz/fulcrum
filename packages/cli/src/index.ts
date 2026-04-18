@@ -1455,14 +1455,12 @@ async function runServeMcp(): Promise<void> {
   // watcher is spawned). Opt out with FULCRUM_DISABLE_PCI=1.
   if (process.env['FULCRUM_DISABLE_PCI'] !== '1') {
     try {
-      const { acquireServerHandle, isWatcherOwnedHere } = await import('fulcrum-memory')
-      const handle = acquireServerHandle(process.cwd())
-      if (handle) {
-        const verb = isWatcherOwnedHere?.(process.cwd()) ? 'mounted' : 'attached to existing'
-        process.stderr.write(`[fulcrum] PCI watcher ${verb} on ${process.cwd()}\n`)
-      }
+      const { indexerClient } = await import('fulcrum-memory')
+      const r = await indexerClient().ensureWatching(process.cwd())
+      const verb = r.already_watched ? 'attached to existing' : 'mounted new'
+      process.stderr.write(`[fulcrum] PCI watcher ${verb} on ${process.cwd()}\n`)
     } catch (err) {
-      process.stderr.write(`[fulcrum] PCI watcher mount failed (non-fatal): ${(err as Error).message}\n`)
+      process.stderr.write(`[fulcrum] PCI watcher unavailable (non-fatal): ${(err as Error).message}\n`)
     }
   }
 
@@ -1593,12 +1591,10 @@ async function runServeMonitor(): Promise<void> {
   // `serve mcp` uses, so running both in parallel is safe.
   if (process.env['FULCRUM_DISABLE_PCI'] !== '1') {
     try {
-      const { acquireServerHandle, isWatcherOwnedHere } = await import('fulcrum-memory')
-      const handle = acquireServerHandle(process.cwd())
-      if (handle) {
-        const verb = isWatcherOwnedHere?.(process.cwd()) ? 'mounted' : 'attached to existing'
-        process.stderr.write(`[fulcrum monitor] PCI watcher ${verb} on ${process.cwd()}\n`)
-      }
+      const { indexerClient } = await import('fulcrum-memory')
+      const r = await indexerClient().ensureWatching(process.cwd())
+      const verb = r.already_watched ? 'attached to existing' : 'mounted new'
+      process.stderr.write(`[fulcrum monitor] PCI watcher ${verb} on ${process.cwd()}\n`)
     } catch { /* non-fatal */ }
   }
   await server.start()
