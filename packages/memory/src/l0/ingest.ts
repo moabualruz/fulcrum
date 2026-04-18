@@ -26,6 +26,7 @@ import { getDb, emitEvent, globalDataDir, newId } from 'fulcrum-agent-core'
 import { sanitizeOnWrite } from '../sanitize/index.js'
 import { appendWal } from '../wal/writer.js'
 import { writeRawFile } from '../vault/client.js'
+import { runMigration101MemoryV3Lifecycle } from '../schema.js'
 import {
   L0_SOURCE_TYPES,
   type L0File,
@@ -89,7 +90,22 @@ function serializeFrontmatter(fm: L0Frontmatter): string {
  *   - if `meta.workspace_id` is not provided.
  *   - if `sanitizeOnWrite` fails (fail-closed per v2a Constraint #4).
  */
+// Ensure the v3 migration has been applied before the first insert. Idempotent
+// via PRAGMA table_info + INSERT OR IGNORE INTO schema_migrations, so repeated
+// calls are cheap. Tracked per-db so the overhead is paid at most once per
+// process per DB handle.
+const _initializedDbs = new WeakSet<object>()
+function ensureV3SchemaApplied(): void {
+  const db = getDb() as unknown as object
+  if (_initializedDbs.has(db)) return
+  runMigration101MemoryV3Lifecycle(getDb())
+  _initializedDbs.add(db)
+}
+
 export function ingestRawSource(input: L0IngestInput): L0File {
+  // 0. Self-init: ensure v3 tables exist on this DB handle (idempotent).
+  ensureV3SchemaApplied()
+
   // 1. Validate source_type — DB has no CHECK constraint per v2a precedent.
   if (!L0_SOURCE_TYPES.includes(input.source_type as L0SourceType)) {
     throw new Error(`ingestRawSource: invalid source_type '${input.source_type}'`)

@@ -307,23 +307,42 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
       return
     }
 
+    // Memory v3 flag (plan §Migration strategy). When set, hook writes go
+    // directly to L0 via ingestRawSource with the full body; when unset,
+    // the v2a writeMemory path stays in charge (default through PR 4).
+    const v3Enabled = process.env['FULCRUM_MEMORY_V3'] === '1'
+
     // Route by tool_name. Read/Glob/Grep/etc fall through to "no-op".
     const filePatch = extractFilePatch(ctx.toolName, ctx.toolInput)
     if (filePatch) {
-      await writeMemory({
-        workspace_id: ctx.workspace_id,
-        project_id: resolvedProjectId,
-        task_id: runRow?.task_id ?? undefined,
-        kind: 'file_patch',
-        scope: 'project',
-        title: `${ctx.toolName}: ${filePatch.filePath}`,
-        summary: filePatch.diffSummary.slice(0, 200),
-        content: filePatch.diffSummary,
-        file_path: filePatch.filePath,
-        tags: [ctx.toolName, ctx.cliName, filePatch.operation],
-        importance: 0.4,
-        provenance: buildProvenance(ctx, 'PostToolUse', contextType),
-      } as Parameters<typeof writeMemory>[0])
+      if (v3Enabled) {
+        const { ingestRawSource } = await import('fulcrum-memory')
+        ingestRawSource({
+          source_type: 'file_patch',
+          body: filePatch.diffSummary,
+          meta: {
+            workspace_id: ctx.workspace_id,
+            project_id: resolvedProjectId,
+            session_id: ctx.runId ?? null,
+            cwd,
+          },
+        })
+      } else {
+        await writeMemory({
+          workspace_id: ctx.workspace_id,
+          project_id: resolvedProjectId,
+          task_id: runRow?.task_id ?? undefined,
+          kind: 'file_patch',
+          scope: 'project',
+          title: `${ctx.toolName}: ${filePatch.filePath}`,
+          summary: filePatch.diffSummary.slice(0, 200),
+          content: filePatch.diffSummary,
+          file_path: filePatch.filePath,
+          tags: [ctx.toolName, ctx.cliName, filePatch.operation],
+          importance: 0.4,
+          provenance: buildProvenance(ctx, 'PostToolUse', contextType),
+        } as Parameters<typeof writeMemory>[0])
+      }
 
       // Refresh the code index for the changed file. Hook-driven indexing is
       // the primary mechanism (MCP's server watcher is just a fallback for
@@ -365,19 +384,34 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
         return
       }
       const exitStatus = (ctx.toolInput['exit_status'] as number | undefined) ?? 0
-      await writeMemory({
-        workspace_id: ctx.workspace_id,
-        project_id: resolvedProjectId,
-        task_id: runRow?.task_id ?? undefined,
-        kind: 'bash_trace',
-        scope: 'project',
-        title: `Bash: ${command.slice(0, 80)}`,
-        summary: `exit=${exitStatus}; cwd=${cwd}`,
-        content: command.slice(0, 400),
-        tags: ['Bash', ctx.cliName],
-        importance: 0.3,
-        provenance: buildProvenance(ctx, 'PostToolUse', contextType),
-      } as Parameters<typeof writeMemory>[0])
+      if (v3Enabled) {
+        const { ingestRawSource } = await import('fulcrum-memory')
+        // Plan §PR 1 unit 1.4: full body, no slice — L0 captures verbatim.
+        ingestRawSource({
+          source_type: 'bash_trace',
+          body: `$ ${command}\nexit: ${exitStatus}\ncwd: ${cwd}\n`,
+          meta: {
+            workspace_id: ctx.workspace_id,
+            project_id: resolvedProjectId,
+            session_id: ctx.runId ?? null,
+            cwd,
+          },
+        })
+      } else {
+        await writeMemory({
+          workspace_id: ctx.workspace_id,
+          project_id: resolvedProjectId,
+          task_id: runRow?.task_id ?? undefined,
+          kind: 'bash_trace',
+          scope: 'project',
+          title: `Bash: ${command.slice(0, 80)}`,
+          summary: `exit=${exitStatus}; cwd=${cwd}`,
+          content: command.slice(0, 400),
+          tags: ['Bash', ctx.cliName],
+          importance: 0.3,
+          provenance: buildProvenance(ctx, 'PostToolUse', contextType),
+        } as Parameters<typeof writeMemory>[0])
+      }
     }
     // else: read-only tool; no write.
   } catch (err) {
