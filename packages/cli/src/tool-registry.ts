@@ -638,6 +638,31 @@ TOOL_REGISTRY.set('update_task', {
 
 // ── Memory tools ────────────────────────────────────────────────────────────
 
+TOOL_REGISTRY.set('recall_knowledge', {
+  schema: TOOL_SCHEMA_MAP.get('recall_knowledge'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { recallKnowledge } = await import('./commands/memory-recall.js')
+    const { getTextEmbedder, initEmbedding, loadConfig } = await import('fulcrum-agent-core')
+    if (!getTextEmbedder()) {
+      try { await initEmbedding(loadConfig()) } catch { /* FTS5 + graph still work */ }
+    }
+    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
+    const input: Parameters<typeof recallKnowledge>[0] = {
+      workspace_id: ws,
+      query: args['query'] as string,
+    }
+    if (args['project_id'] !== undefined) input.project_id = args['project_id'] as string | null
+    if (args['limit'] !== undefined) input.limit = args['limit'] as number
+    if (args['offset'] !== undefined) input.offset = args['offset'] as number
+    if (args['max_chars'] !== undefined) input.max_chars = args['max_chars'] as number
+    if (args['confidence_floor'] !== undefined) input.confidence_floor = args['confidence_floor'] as number
+    if (args['graph_hops'] !== undefined) input.graph_hops = args['graph_hops'] as number
+    if (args['include_superseded'] !== undefined) input.include_superseded = Boolean(args['include_superseded'])
+    return recallKnowledge(input)
+  },
+})
+
 TOOL_REGISTRY.set('recall_memory', {
   schema: TOOL_SCHEMA_MAP.get('recall_memory'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: true },

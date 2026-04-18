@@ -142,6 +142,27 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Recall Knowledge (v3)',
+    name: 'recall_knowledge',
+    description: 'Memory v3 retrieval: FTS5 + vector + graph traversal fused via weighted RRF, filtered by confidence floor + supersession. Returns L1 curated pages with L0 back-refs (sources[] + l0_wikilinks[]) so agents can follow any claim to the raw source via `read_raw_source`. `recall_memory` remains available as a back-compat alias. workspace_id defaults to cwd; project_id optional for workspace-wide recall.',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Natural language search query' },
+        workspace_id: { type: 'string', description: 'Workspace ID (optional — defaults to cwd workspace)' },
+        project_id: { type: 'string', description: 'Project ID (optional — omit for workspace-wide recall)' },
+        limit: { type: 'number', description: 'Max results (default 10)' },
+        offset: { type: 'number', description: 'Pagination offset (default 0)' },
+        max_chars: { type: 'number', description: 'Truncate content to this many characters (default 500)' },
+        confidence_floor: { type: 'number', description: 'Minimum confidence for a page to be returned (default 0.3)' },
+        graph_hops: { type: 'number', description: 'BFS depth from query-mentioned entities (default 2)' },
+        include_superseded: { type: 'boolean', description: 'Include pages whose superseded_by is non-null (default false)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
     title: 'Write Memory',
     name: 'write_memory',
     description: 'Persists a memory note to vault (L0), SQLite FTS5 (L1), and vector index (L2). Effect: writes memory row + vault file. Returns: saved=true, memory_id, project_id, tags. Requires content. workspace_id and project_id are optional — defaults to cwd context.',

@@ -283,6 +283,7 @@ fulcrum memory — memory vault commands
   page             L1 curated-page template scaffolding (v3 PR 2)
   curate           Run curator pipeline on a single L0 source (v3 PR 3)
   reindex-l2       Re-embed L1 pages and/or code chunks (v3 PR 4)
+  recall           FTS5 + vec + graph fused recall (v3 PR 5)
   sweep-expired              Delete session-scope memories whose expires_at has passed
   graph-consistency-check    Sample SQLite ↔ Kuzu and report drift (requires L2)
   rollback                   Operator-only rollback (--since= + --yes-i-really-want-to-undo-N-writes)
@@ -463,6 +464,60 @@ Flags:
     if (reasoning) params.reasoning = reasoning
     const result = await curateMemory(params)
     console.log(JSON.stringify(result, null, 2))
+    return
+  }
+
+  // Memory v3 PR 5 unit 5.3 — recall via the new pipeline.
+  if (command === 'recall') {
+    if (args.includes('--help') || args.includes('-h') || args.length < 3) {
+      console.log(`
+fulcrum memory recall "<query>" [flags]
+
+Run a v3 recall — FTS5 + vec + graph fused via RRF, filtered by confidence
+and supersession. Output is a JSON { results: [...] } envelope with L0
+back-refs (sources[] + l0_wikilinks[]) on every hit.
+
+Flags:
+  --limit <N>             Max results (default 10)
+  --offset <N>            Pagination offset (default 0)
+  --max-chars <N>         Truncate content per hit (default 500)
+  --confidence-floor <F>  Minimum confidence [0..1] (default 0.3)
+  --graph-hops <N>        BFS depth from query entities (default 2)
+  --include-superseded    Include pages whose superseded_by is non-null
+  --explain               Include per-stage ranks in each hit
+`)
+      process.exit(args.length < 3 ? 1 : 0)
+    }
+    await warmEmbedding()
+    const { recallKnowledge } = await import('./commands/memory-recall.js')
+    const query = args[2]!
+    const get = (flag: string): string | undefined => {
+      const i = args.indexOf(flag)
+      return i >= 0 ? args[i + 1] : undefined
+    }
+    const { projectIdsFromPath } = await import('fulcrum-agent-core')
+    const { workspace_id, project_id } = projectIdsFromPath(process.cwd())
+    const input: Parameters<typeof recallKnowledge>[0] = {
+      workspace_id,
+      project_id,
+      query,
+    }
+    const limit = get('--limit')
+    const offset = get('--offset')
+    const maxChars = get('--max-chars')
+    const floor = get('--confidence-floor')
+    const hops = get('--graph-hops')
+    if (limit) input.limit = Number(limit)
+    if (offset) input.offset = Number(offset)
+    if (maxChars) input.max_chars = Number(maxChars)
+    if (floor) input.confidence_floor = Number(floor)
+    if (hops) input.graph_hops = Number(hops)
+    if (args.includes('--include-superseded')) input.include_superseded = true
+    const out = await recallKnowledge(input)
+    if (!args.includes('--explain')) {
+      out.results = out.results.map((r) => ({ ...r, stage_ranks: undefined as unknown as typeof r.stage_ranks }))
+    }
+    console.log(JSON.stringify(out, null, 2))
     return
   }
 
