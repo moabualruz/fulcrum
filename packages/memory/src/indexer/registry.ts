@@ -18,6 +18,7 @@ import { startPciSyncer, syncFile, type PciSyncerHandle } from '../pci/syncer.js
 import { startProjectWatch, type ProjectWatchHandle } from '../pci/watcher.js'
 import { enumerateProjectFiles } from '../pci/walker-integration.js'
 import { isVaultOwnedPath, VaultOwnedPathError } from '../pci/vault-guard.js'
+import { waitForEmbedHeadroom } from '../write.js'
 import { HandlerError } from './errors.js'
 
 const DEFAULT_GRACE_MS = 30_000
@@ -233,7 +234,8 @@ async function performInitialScan(
 ): Promise<void> {
   try {
     const result = await enumerateProjectFiles(rootDir)
-    for (const rel of result.files) {
+    for (let i = 0; i < result.files.length; i++) {
+      const rel = result.files[i]!
       try {
         await syncFile({
           workspaceId,
@@ -244,6 +246,12 @@ async function performInitialScan(
       } catch (err) {
         process.stderr.write(`[initial-scan] ${rel}: ${err instanceof Error ? err.message : String(err)}\n`)
       }
+      // Apply backpressure against the embedding queue after every file. The
+      // scan is much faster than the embedder — without this, thousands of
+      // embeds queue up, memory pressure mounts, and ONNX deadlocks. The yield
+      // inside waitForEmbedHeadroom also ensures libuv worker callbacks get a
+      // chance to drain (the scan's microtask work otherwise starves them).
+      await waitForEmbedHeadroom()
     }
     if (process.env['FULCRUM_VERBOSE']) {
       process.stderr.write(`[initial-scan] ${rootDir}: indexed ${result.files.length} files (mode=${result.mode}, skipped=${result.skipped})\n`)
