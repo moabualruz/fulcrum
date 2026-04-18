@@ -201,7 +201,12 @@ export function getMemoryFilePath(vaultPath: string, memory: FullMemory): string
 }
 
 export async function writeMemoryFile(vaultPath: string, memory: FullMemory): Promise<string> {
-  const body = memory.canonical_text ?? ''
+  // L0 stores the ORIGINAL human-readable content — NOT canonical_text.
+  // canonical_text is the FTS5-tokenized form (e.g. "getUserById" → "get User By Id",
+  // "user_profile" → "user profile"); writing that to the vault mangles
+  // identifiers and defeats the "human-readable source of truth" invariant of
+  // L0. Rebuild derives canonical_text back from content at L1-insert time.
+  const body = memory.content ?? memory.canonical_text ?? ''
   const content = serializeToFile(memory, body)
   const filePath = getMemoryFilePath(vaultPath, memory)
 

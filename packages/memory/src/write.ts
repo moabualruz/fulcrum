@@ -578,7 +578,10 @@ export function insertMemoryDirect(memory: FullMemory, db: Db = getDb()): void {
     `).run(
       memory.workspace_id, memory.project_id ?? null,
       memory.scope, memory.kind, memory.title, memory.summary, memory.canonical_text ?? '',
-      memory.canonical_text ?? '', JSON.stringify(memory.tags), JSON.stringify(memory.entities),
+      // BUG-FIX: content column must hold the ORIGINAL text, not canonical_text
+      // (which is the FTS5-tokenized form). Prior code inserted canonical_text
+      // into both columns, losing the original on every rebuild from vault.
+      memory.content ?? memory.canonical_text ?? '', JSON.stringify(memory.tags), JSON.stringify(memory.entities),
       memory.confidence, memory.freshness, memory.importance,
       memory.file_path ?? null, memory.symbol_path ?? null, memory.event_time ?? null, memory.content_hash ?? null,
       memory.task_id ?? null, memory.issue_id ?? null, memory.artifact_id ?? null, JSON.stringify(memory.provenance_refs),
@@ -605,7 +608,9 @@ export function insertMemoryDirect(memory: FullMemory, db: Db = getDb()): void {
     `).run(
       memory.memory_id, memory.workspace_id, memory.project_id ?? null,
       memory.scope, memory.kind, memory.title, memory.summary, memory.canonical_text ?? '',
-      memory.canonical_text ?? '', JSON.stringify(memory.tags), JSON.stringify(memory.entities),
+      // BUG-FIX (see UPDATE branch above): content column takes memory.content,
+      // not canonical_text.
+      memory.content ?? memory.canonical_text ?? '', JSON.stringify(memory.tags), JSON.stringify(memory.entities),
       memory.confidence, memory.freshness, memory.importance,
       memory.file_path ?? null, memory.symbol_path ?? null, memory.event_time ?? null, memory.content_hash ?? null,
       memory.task_id ?? null, memory.issue_id ?? null, memory.artifact_id ?? null, JSON.stringify(memory.provenance_refs),

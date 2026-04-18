@@ -2,9 +2,11 @@
 /**
  * scripts/import-claude-sessions.ts
  *
- * Imports all Claude Code session JSONL files for this project into the
- * Fulcrum vault.  Handles three session patterns:
+ * Imports ALL Claude Code session JSONL files under ~/.claude/projects/* into
+ * the Fulcrum vault — one vault branch per project, derived deterministically
+ * from the session's real `cwd` via projectIdsFromPath().
  *
+ * Handles three session patterns:
  *   1. Summary sessions   — small sessions that just generate a <summary> block
  *   2. Interactive sessions — normal Claude Code conversations with real user messages
  *   3. Agentic sessions   — orchestrator sessions started from @prompt.md, no direct user input
@@ -14,16 +16,25 @@
  *   summary      — <summary>…</summary> blocks in assistant responses
  *   task_outcome — significant final assistant responses (when no summary block exists)
  *
- * Timestamps from JSONL `timestamp` field are preserved as `event_time`/`created_at`
- * so all memories are in canonical cross-session order.
+ * Canonical order preservation:
+ *   - Memories sort globally by event_time before write, so FTS5 rowid order
+ *     matches temporal order.
+ *   - Vault filenames are prefixed with ISO timestamp so filesystem `ls` shows
+ *     conversations in the order they happened.
+ *   - Vault subdirs are yyyy/mm/dd for finer temporal partitioning.
+ *   - DB created_at is set from each memory's event_time (insertMemoryDirect
+ *     reads it from frontmatter and passes it to the INSERT, not datetime('now')).
  *
  * Usage:
- *   npx tsx scripts/import-claude-sessions.ts [--dry-run] [--limit N]
+ *   npx tsx scripts/import-claude-sessions.ts [--dry-run] [--limit N] [--project DIR]
+ *     --dry-run   : parse + print breakdown, don't write vault files or rebuild
+ *     --limit N   : cap sessions per project (testing)
+ *     --project D : restrict to one ~/.claude/projects/<D> directory
  */
 
-import { createReadStream, mkdirSync, writeFileSync, existsSync } from 'fs'
+import { createReadStream, mkdirSync, writeFileSync, existsSync, readFileSync } from 'fs'
 import { createInterface } from 'readline'
-import { join, dirname, basename } from 'path'
+import { join, dirname, basename, resolve as resolvePath } from 'path'
 import { homedir } from 'os'
 import { createHash } from 'crypto'
 import { readdirSync, statSync } from 'fs'
@@ -31,14 +42,16 @@ import { execSync } from 'child_process'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const SESSIONS_DIR = join(homedir(), '.claude', 'projects', '-home-mkh-workspace-pi-stack-plan')
-const VAULT_PATH = join(homedir(), '.fulcrum', 'vault')
-const WORKSPACE_ID = 'ws_pi-stack-plan_2f091539c497'
-const PROJECT_ID = 'proj_pi-stack-plan_2f091539c497'
+const PROJECTS_ROOT = join(homedir(), '.claude', 'projects')
+// Vault = L0 markdown store. Kept at ~/.fulcrum/vault (NOT globalDataDir) to
+// match getVaultPath() in fulcrum-memory. Override via FULCRUM_VAULT_PATH.
+const VAULT_PATH = process.env['FULCRUM_VAULT_PATH'] ?? join(homedir(), '.fulcrum', 'vault')
 
 const DRY_RUN = process.argv.includes('--dry-run')
 const LIMIT_IDX = process.argv.indexOf('--limit')
 const LIMIT = LIMIT_IDX >= 0 ? parseInt(process.argv[LIMIT_IDX + 1] ?? '10', 10) : Infinity
+const PROJECT_IDX = process.argv.indexOf('--project')
+const ONLY_PROJECT = PROJECT_IDX >= 0 ? process.argv[PROJECT_IDX + 1] : null
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -73,6 +86,52 @@ interface ExtractedMemory {
   event_time: string
   created_at: string
   session_id: string
+  workspace_id: string
+  project_id: string
+  project_root: string
+}
+
+/**
+ * Read the first RawMessage that carries `cwd` and return that directory.
+ * Synchronous read to avoid an observed tsx/ESM race where readline's
+ * 'close' event can resolve the Promise with null before a 'line' event's
+ * resolve() is observed. The cwd is always within the first handful of
+ * lines (Claude Code's first user-bounded message), so reading a 64KB
+ * prefix is plenty and avoids loading multi-MB files.
+ */
+function readSessionCwd(filePath: string): string | null {
+  let buf: Buffer
+  try {
+    buf = readFileSync(filePath)
+  } catch {
+    return null
+  }
+  // Only scan the prefix — cwd always lands in the first few KB.
+  const prefix = buf.slice(0, Math.min(buf.length, 64 * 1024)).toString('utf-8')
+  for (const line of prefix.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    try {
+      const msg = JSON.parse(trimmed) as { cwd?: string }
+      if (typeof msg.cwd === 'string' && msg.cwd.length > 0) return msg.cwd
+    } catch { /* skip malformed */ }
+  }
+  return null
+}
+
+/**
+ * Replicates fulcrum-agent-core's projectIdsFromPath inline so this script
+ * runs without resolving workspace packages (scripts/ doesn't link to core).
+ * Keep in lockstep with packages/core/src/ids.ts.
+ */
+function getProjectIds(cwd: string): { workspace_id: string; project_id: string } {
+  const resolved = resolvePath(cwd)
+  const hash = createHash('sha256').update(resolved).digest('hex').slice(0, 12)
+  const sanitizedName = basename(resolved).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 24) || 'project'
+  return {
+    workspace_id: `ws_${sanitizedName}_${hash}`,
+    project_id: `proj_${sanitizedName}_${hash}`,
+  }
 }
 
 // ── ID generation (deterministic from session + kind + index) ─────────────────
@@ -160,7 +219,13 @@ function parseAttachment(raw: string | Record<string, unknown>): Record<string, 
 
 // ── Stream-parse one session file and extract memories ───────────────────────
 
-async function parseSession(filePath: string): Promise<ExtractedMemory[]> {
+interface SessionContext {
+  workspace_id: string
+  project_id: string
+  project_root: string
+}
+
+async function parseSession(filePath: string, ctx: SessionContext): Promise<ExtractedMemory[]> {
   return new Promise((resolve, reject) => {
     const rl = createInterface({ input: createReadStream(filePath), crlfDelay: Infinity })
     const messages: RawMessage[] = []
@@ -175,12 +240,12 @@ async function parseSession(filePath: string): Promise<ExtractedMemory[]> {
       }
     })
 
-    rl.on('close', () => resolve(extractMemoriesFromMessages(messages)))
+    rl.on('close', () => resolve(extractMemoriesFromMessages(messages, ctx)))
     rl.on('error', reject)
   })
 }
 
-function extractMemoriesFromMessages(messages: RawMessage[]): ExtractedMemory[] {
+function extractMemoriesFromMessages(messages: RawMessage[], ctx: SessionContext): ExtractedMemory[] {
   const memories: ExtractedMemory[] = []
 
   // Sort by timestamp for within-session canonical order; skip messages without timestamps
@@ -212,6 +277,9 @@ function extractMemoriesFromMessages(messages: RawMessage[]): ExtractedMemory[] 
         event_time: msg.timestamp!,
         created_at: msg.timestamp!,
         session_id: sessionId,
+        workspace_id: ctx.workspace_id,
+        project_id: ctx.project_id,
+        project_root: ctx.project_root,
       })
     }
   }
@@ -238,6 +306,9 @@ function extractMemoriesFromMessages(messages: RawMessage[]): ExtractedMemory[] 
       event_time: msg.timestamp!,
       created_at: msg.timestamp!,
       session_id: sessionId,
+      workspace_id: ctx.workspace_id,
+      project_id: ctx.project_id,
+      project_root: ctx.project_root,
     })
     break
   }
@@ -276,6 +347,9 @@ function extractMemoriesFromMessages(messages: RawMessage[]): ExtractedMemory[] 
               event_time: msg.timestamp ?? firstTs,
               created_at: msg.timestamp ?? firstTs,
               session_id: sessionId,
+              workspace_id: ctx.workspace_id,
+              project_id: ctx.project_id,
+              project_root: ctx.project_root,
             })
             break
           }
@@ -310,6 +384,9 @@ function extractMemoriesFromMessages(messages: RawMessage[]): ExtractedMemory[] 
           event_time: msg.timestamp ?? firstTs,
           created_at: msg.timestamp ?? firstTs,
           session_id: sessionId,
+          workspace_id: ctx.workspace_id,
+          project_id: ctx.project_id,
+          project_root: ctx.project_root,
         })
       }
     }
@@ -337,6 +414,9 @@ function extractMemoriesFromMessages(messages: RawMessage[]): ExtractedMemory[] 
         event_time: msg.timestamp!,
         created_at: msg.timestamp!,
         session_id: sessionId,
+        workspace_id: ctx.workspace_id,
+        project_id: ctx.project_id,
+        project_root: ctx.project_root,
       })
       break
     }
@@ -351,19 +431,37 @@ function contentHash(text: string): string {
   return createHash('sha256').update(text).digest('hex').slice(0, 16)
 }
 
-function writeVaultFile(memory: ExtractedMemory): string {
+/** Format a Date as YYYY-MM-DDTHH-MM-SS (filesystem-safe ISO for filename prefix). */
+function isoPrefix(date: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}` +
+         `T${pad(date.getUTCHours())}-${pad(date.getUTCMinutes())}-${pad(date.getUTCSeconds())}`
+}
+
+/**
+ * Compute the vault path for a memory. Filename is ISO-timestamp-prefixed so
+ * alphabetical sort = temporal sort; subdirs are yyyy/mm/dd for granular
+ * partitioning. Per-memory workspace_id/project_id branches the tree so
+ * different projects' memories never collide.
+ */
+function vaultPathFor(memory: ExtractedMemory): string {
   const date = new Date(memory.created_at)
   const yyyy = date.getUTCFullYear().toString()
   const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
-
-  const filePath = join(
+  const dd = String(date.getUTCDate()).padStart(2, '0')
+  const fileName = `${isoPrefix(date)}_${memory.memory_id}.md`
+  return join(
     VAULT_PATH,
     'memories', 'curated', 'workspaces',
-    WORKSPACE_ID,
-    'project', PROJECT_ID,
-    yyyy, mm,
-    `${memory.memory_id}.md`
+    memory.workspace_id,
+    'project', memory.project_id,
+    yyyy, mm, dd,
+    fileName,
   )
+}
+
+function writeVaultFile(memory: ExtractedMemory): string {
+  const filePath = vaultPathFor(memory)
 
   // Build frontmatter lines manually — no extra dep needed
   const yamlLines: string[] = ['---']
@@ -372,8 +470,8 @@ function writeVaultFile(memory: ExtractedMemory): string {
     ['schema', 'fulcrum.memory/v1'],
     ['kind', memory.kind],
     ['scope', memory.scope],
-    ['workspace_id', WORKSPACE_ID],
-    ['project_id', PROJECT_ID],
+    ['workspace_id', memory.workspace_id],
+    ['project_id', memory.project_id],
     ['title', memory.title],
     ['summary', memory.summary],
     ['tags', memory.tags],
@@ -415,37 +513,86 @@ function writeVaultFile(memory: ExtractedMemory): string {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  if (!existsSync(SESSIONS_DIR)) {
-    console.error(`Sessions dir not found: ${SESSIONS_DIR}`)
+  if (!existsSync(PROJECTS_ROOT)) {
+    console.error(`Projects root not found: ${PROJECTS_ROOT}`)
     process.exit(1)
   }
 
-  // Collect all JSONL files, sort by name (which is session UUID, stable ordering)
-  const allFiles = readdirSync(SESSIONS_DIR)
-    .filter(f => f.endsWith('.jsonl'))
-    .map(f => ({ name: f, path: join(SESSIONS_DIR, f), size: statSync(join(SESSIONS_DIR, f)).size }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+  // Enumerate project dirs under ~/.claude/projects.
+  const projectDirs = readdirSync(PROJECTS_ROOT)
+    .filter(name => {
+      const full = join(PROJECTS_ROOT, name)
+      try { return statSync(full).isDirectory() } catch { return false }
+    })
+    .filter(name => !ONLY_PROJECT || name === ONLY_PROJECT)
+    .sort()
 
-  const files = LIMIT < Infinity ? allFiles.slice(0, LIMIT) : allFiles
-  console.log(`Processing ${files.length} session files (${allFiles.length} total)...`)
-  if (DRY_RUN) console.log('[DRY RUN — no files will be written]')
-
-  // ── Parse all sessions ────────────────────────────────────────────────────
-  const allMemories: ExtractedMemory[] = []
-  let fileCount = 0
-
-  for (const file of files) {
-    fileCount++
-    process.stdout.write(`\r  ${fileCount}/${files.length} — ${file.name.slice(0, 8)} (${(file.size / 1024).toFixed(0)}KB)  `)
-    try {
-      const memories = await parseSession(file.path)
-      allMemories.push(...memories)
-    } catch (err) {
-      process.stderr.write(`\n  [warn] Failed to parse ${file.name}: ${(err as Error).message}\n`)
-    }
+  if (projectDirs.length === 0) {
+    console.error(`No project dirs found under ${PROJECTS_ROOT}`)
+    process.exit(1)
   }
 
-  console.log(`\n\nExtracted ${allMemories.length} memories from ${fileCount} sessions`)
+  console.log(`Processing ${projectDirs.length} project dir(s) under ${PROJECTS_ROOT}`)
+  if (DRY_RUN) console.log('[DRY RUN — no vault files will be written]')
+
+  const allMemories: ExtractedMemory[] = []
+  const projectSummary: Array<{ dir: string; root: string; sessions: number; memories: number }> = []
+
+  for (const projectDir of projectDirs) {
+    const dirPath = join(PROJECTS_ROOT, projectDir)
+    const jsonlFiles = readdirSync(dirPath)
+      .filter(f => f.endsWith('.jsonl'))
+      .map(f => ({ name: f, path: join(dirPath, f), size: statSync(join(dirPath, f)).size }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+
+    if (jsonlFiles.length === 0) continue
+
+    // Resolve the real project cwd. Some sessions start with a queue-operation
+    // row that has no cwd — scan the first few files until we find one.
+    let cwd: string | null = null
+    for (const file of jsonlFiles.slice(0, Math.min(5, jsonlFiles.length))) {
+      cwd = readSessionCwd(file.path)
+      if (cwd) break
+    }
+    if (!cwd) {
+      console.warn(`\n  [warn] Could not resolve cwd for ${projectDir} — skipping`)
+      continue
+    }
+
+    const { workspace_id, project_id } = getProjectIds(cwd)
+    const ctx: SessionContext = { workspace_id, project_id, project_root: cwd }
+
+    const files = LIMIT < Infinity ? jsonlFiles.slice(0, LIMIT) : jsonlFiles
+    console.log(`\n── ${projectDir}`)
+    console.log(`   cwd:           ${cwd}`)
+    console.log(`   workspace_id:  ${workspace_id}`)
+    console.log(`   project_id:    ${project_id}`)
+    console.log(`   sessions:      ${files.length} (of ${jsonlFiles.length})`)
+
+    const before = allMemories.length
+    let fileCount = 0
+    for (const file of files) {
+      fileCount++
+      if (fileCount % 20 === 0 || fileCount === files.length) {
+        process.stdout.write(`\r   parsed ${fileCount}/${files.length}...`)
+      }
+      try {
+        const memories = await parseSession(file.path, ctx)
+        allMemories.push(...memories)
+      } catch (err) {
+        process.stderr.write(`\n   [warn] ${file.name}: ${(err as Error).message}\n`)
+      }
+    }
+    projectSummary.push({
+      dir: projectDir,
+      root: cwd,
+      sessions: files.length,
+      memories: allMemories.length - before,
+    })
+    process.stdout.write(`\r   extracted ${allMemories.length - before} memories from ${files.length} sessions\n`)
+  }
+
+  console.log(`\n\nExtracted ${allMemories.length} total memories across ${projectSummary.length} project(s)`)
 
   // ── Sort globally by event_time (canonical cross-session temporal order) ──
   allMemories.sort((a, b) => (a.event_time < b.event_time ? -1 : 1))
@@ -459,40 +606,37 @@ async function main(): Promise<void> {
   })
   console.log(`After dedup: ${unique.length} unique memories`)
 
-  // Summary of what we'll write
+  // Breakdowns
   const kindCounts: Record<string, number> = {}
   for (const m of unique) kindCounts[m.kind] = (kindCounts[m.kind] ?? 0) + 1
-  console.log('Breakdown:', kindCounts)
+  console.log('By kind:', kindCounts)
+  console.log('By project:')
+  for (const p of projectSummary) {
+    console.log(`  ${p.root.padEnd(60)}  sessions=${String(p.sessions).padStart(4)}  extracted=${p.memories}`)
+  }
 
   if (DRY_RUN) {
-    // Print a sample of what we'd write
-    console.log('\nSample (first 10):')
+    console.log('\nSample (first 10 by event_time):')
     for (const m of unique.slice(0, 10)) {
-      console.log(`  [${m.event_time.slice(0, 19)}] ${m.kind.padEnd(12)} ${m.title.slice(0, 70)}`)
+      const ws = (m.workspace_id ?? '').replace(/^ws_/, '').slice(0, 20)
+      const ts = (m.event_time ?? '').slice(0, 19)
+      console.log(`  [${ts}] ${(m.kind ?? '').padEnd(12)} ${ws.padEnd(22)} ${(m.title ?? '').slice(0, 60)}`)
     }
     console.log('\n[DRY RUN complete — re-run without --dry-run to write files]')
     return
   }
 
   // ── Write vault files ─────────────────────────────────────────────────────
-  console.log(`\nWriting vault files...`)
+  console.log(`\nWriting vault files to ${VAULT_PATH}...`)
   let written = 0
   let skipped = 0
 
   for (const memory of unique) {
-    const filePath = join(
-      VAULT_PATH, 'memories', 'curated', 'workspaces', WORKSPACE_ID,
-      'project', PROJECT_ID,
-      new Date(memory.created_at).getUTCFullYear().toString(),
-      String(new Date(memory.created_at).getUTCMonth() + 1).padStart(2, '0'),
-      `${memory.memory_id}.md`
-    )
-
+    const filePath = vaultPathFor(memory)
     if (existsSync(filePath)) {
       skipped++
       continue
     }
-
     writeVaultFile(memory)
     written++
   }
