@@ -63,10 +63,27 @@ export interface V3RecallHit {
 const RRF_K = 60
 const PENALTY_RANK = 1000
 
-const DEFAULT_WEIGHTS: Required<V3SearchWeights> = Object.freeze({ fts: 1.0, vec: 1.0, graph: 0.5 })
+const HARDCODED_DEFAULT_WEIGHTS: Required<V3SearchWeights> = Object.freeze({ fts: 1.0, vec: 1.0, graph: 0.5 })
+
+/**
+ * Parse an RRF weight from an env var. Accepts any non-negative finite
+ * number (0 is valid — silences the stage). Unparseable / NaN / negative
+ * values fall back to `fallback` so a typo never crashes recall.
+ */
+function readWeightEnv(name: string, fallback: number): number {
+  const raw = process.env[name]
+  if (raw === undefined || raw === '') return fallback
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n < 0) return fallback
+  return n
+}
 
 export function v3DefaultWeights(): Required<V3SearchWeights> {
-  return { ...DEFAULT_WEIGHTS }
+  return {
+    fts: readWeightEnv('FULCRUM_RRF_WS_FTS', HARDCODED_DEFAULT_WEIGHTS.fts),
+    vec: readWeightEnv('FULCRUM_RRF_WS_VEC', HARDCODED_DEFAULT_WEIGHTS.vec),
+    graph: readWeightEnv('FULCRUM_RRF_WS_GRAPH', HARDCODED_DEFAULT_WEIGHTS.graph),
+  }
 }
 
 function baseWhere(
@@ -368,7 +385,7 @@ export async function runV3Search(
   const hops = input.graph_hops ?? 2
   const includeSuperseded = input.include_superseded ?? false
   const weights: Required<V3SearchWeights> = {
-    ...DEFAULT_WEIGHTS,
+    ...v3DefaultWeights(),
     ...(input.weights ?? {}),
   }
   const { sql: whereTail, leadingParams } = baseWhere(includeSuperseded, input.project_id)
