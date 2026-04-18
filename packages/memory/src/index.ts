@@ -69,6 +69,39 @@ export {
 } from './l1/page.js'
 export type { CreateCuratedPageOptions } from './l1/page.js'
 
+// L1 curator runtime (memory v3 PR 3 unit 3.1)
+export {
+  PROMPT_VERSION,
+  TASK_DEFAULTS,
+  composePrompt,
+  getOutputSchema,
+  parseCuratorOutput,
+  CuratorOutputParseError,
+  registerBackend,
+  getBackend,
+  listBackends,
+  clearBackendsForTest,
+  selectBackend,
+  runCurator,
+} from './l1/curator.js'
+export type {
+  CuratorTask,
+  CuratorBackendName,
+  CuratorBackend,
+  CuratorBackendInput,
+  CuratorBackendResult,
+  CuratorInput,
+  CuratorOutput,
+  CuratorNewPage,
+  CuratorPageUpdate,
+  CuratorSupersession,
+  CuratorEdge,
+  L0SourceForCurator,
+  CuratorPageContext,
+  CorrectionForCurator,
+  RunCuratorResult,
+} from './l1/curator.js'
+
 // Types
 export type {
   MemoryScope,
