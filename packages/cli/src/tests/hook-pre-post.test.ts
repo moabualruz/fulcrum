@@ -209,12 +209,21 @@ describe('runPreHook — memory recall (L-7)', () => {
 })
 
 describe('runPostHook — typed file_patch memory (v2a PR 6 Task 29)', () => {
+  let _prevV3: string | undefined
   beforeEach(() => {
     createTestDb()
     // Reset per-turn dedup so each test is independent.
     clearDedupCache()
+    // PR 5.5 flipped FULCRUM_MEMORY_V3 default on — these tests exercise the
+    // v2a writeMemory hook path explicitly, so pin the flag off.
+    _prevV3 = process.env['FULCRUM_MEMORY_V3']
+    process.env['FULCRUM_MEMORY_V3'] = '0'
   })
-  afterEach(() => resetTestDb())
+  afterEach(() => {
+    if (_prevV3 === undefined) delete process.env['FULCRUM_MEMORY_V3']
+    else process.env['FULCRUM_MEMORY_V3'] = _prevV3
+    resetTestDb()
+  })
 
   it('Edit tool writes kind="file_patch" with diff_summary, not tool_trace', async () => {
     const { workspace_id, task_id, run_id } = seedWorkspaceProjectTaskRun()

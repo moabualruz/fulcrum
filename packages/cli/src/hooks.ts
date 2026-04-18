@@ -307,10 +307,11 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
       return
     }
 
-    // Memory v3 flag (plan §Migration strategy). When set, hook writes go
-    // directly to L0 via ingestRawSource with the full body; when unset,
-    // the v2a writeMemory path stays in charge (default through PR 4).
-    const v3Enabled = process.env['FULCRUM_MEMORY_V3'] === '1'
+    // Memory v3 flag (plan §Migration strategy). Default flipped to ON in
+    // PR 5 unit 5.5; set FULCRUM_MEMORY_V3=0 to revert to the v2a path for
+    // one release cycle.
+    const { isMemoryV3Enabled } = await import('fulcrum-memory')
+    const v3Enabled = isMemoryV3Enabled()
 
     // Route by tool_name. Read/Glob/Grep/etc fall through to "no-op".
     const filePatch = extractFilePatch(ctx.toolName, ctx.toolInput)

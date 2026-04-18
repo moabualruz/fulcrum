@@ -148,6 +148,9 @@ export { recordL1Embedding } from './l2/embed.js'
 export { runV3Search, v3DefaultWeights, resolveQueryEntities } from './retrieval/v3-search.js'
 export type { V3SearchInput, V3SearchWeights, V3RecallHit } from './retrieval/v3-search.js'
 
+// v3 feature flag — plan §Migration strategy (PR 5.5 cutover: default ON).
+export { isMemoryV3Enabled } from './flags.js'
+
 // Entities
 export { linkMemoryToEntity, getMemoryEntities } from './entities.js'
 
