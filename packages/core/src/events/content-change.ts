@@ -4,7 +4,7 @@
 // this bus after a 100ms debounce. v2b consumers (git reducer, REM extraction)
 // subscribe to the unified stream without per-watcher branching.
 
-export type ContentChangeKind = 'memory' | 'code'
+export type ContentChangeKind = 'memory' | 'code' | 'l0_raw' | 'l1_curated'
 export type ContentChangeType = 'add' | 'change' | 'unlink' | 'rename'
 
 export interface ContentChangeEvent {

@@ -18,27 +18,89 @@ function sha256Body(body: string): string {
   return createHash('sha256').update(body).digest('hex')
 }
 
+/**
+ * Classify a vault path into its tier, based on the first directory segment
+ * under `vaultPath`. Memory v3 adds `raw/` (L0) and `curated/` (L1) as siblings
+ * of the v2a `memories/` tree; the watcher emits tier-tagged events so
+ * downstream subscribers can react without per-watcher branching.
+ */
+function classifyVaultPath(vaultPath: string, filePath: string): 'memories' | 'l0_raw' | 'l1_curated' | 'unknown' {
+  const rel = filePath.startsWith(vaultPath + '/') ? filePath.slice(vaultPath.length + 1) : filePath
+  if (rel.startsWith('memories/')) return 'memories'
+  if (rel.startsWith('raw/')) return 'l0_raw'
+  if (rel.startsWith('curated/')) return 'l1_curated'
+  return 'unknown'
+}
+
 export function startVaultWatcher(options: VaultWatcherOptions): () => void {
   const { vaultPath, onHumanEdit, onHumanDelete } = options
-  const memoriesGlob = join(vaultPath, 'memories', '**', '*.md')
+  // PR 1 unit 1.3 — watch memories/ (v2a), raw/ (L0), and curated/ (L1) roots.
+  const globs = [
+    join(vaultPath, 'memories', '**', '*.md'),
+    join(vaultPath, 'raw', '**', '*.md'),
+    join(vaultPath, 'curated', '**', '*.md'),
+  ]
 
-  const watcher = watch(memoriesGlob, {
+  const watcher = watch(globs, {
     persistent: true,
     ignoreInitial: true,
     awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
   })
 
   watcher.on('add', async (filePath: string) => {
-    await handleChange(filePath)
+    await routeChange(filePath, 'add')
   })
 
   watcher.on('change', async (filePath: string) => {
-    await handleChange(filePath)
+    await routeChange(filePath, 'change')
   })
 
   watcher.on('unlink', async (filePath: string) => {
-    await handleDelete(filePath)
+    await routeDelete(filePath)
   })
+
+  async function routeChange(filePath: string, change_type: 'add' | 'change'): Promise<void> {
+    const tier = classifyVaultPath(vaultPath, filePath)
+    if (tier === 'memories') {
+      await handleChange(filePath)
+      return
+    }
+    if (tier === 'l0_raw' || tier === 'l1_curated') {
+      // v3 tiers: emit a distinct event on the existing content-change bus.
+      // Frontmatter validation + state tracking land in PR 2 (l1/page.ts)
+      // and deferred (L0 is immutable per plan §Critical Constraint #2).
+      try {
+        if (!existsSync(filePath)) return
+        const content = readFileSync(filePath, 'utf-8')
+        getContentChangeBus().emit({
+          kind: tier,
+          path: filePath,
+          sha256: sha256Body(content),
+          change_type,
+        })
+      } catch { /* best-effort — watcher must never crash */ }
+      return
+    }
+    // 'unknown' — ignore (outside the watched tiers)
+  }
+
+  async function routeDelete(filePath: string): Promise<void> {
+    const tier = classifyVaultPath(vaultPath, filePath)
+    if (tier === 'memories') {
+      await handleDelete(filePath)
+      return
+    }
+    if (tier === 'l0_raw' || tier === 'l1_curated') {
+      try {
+        getContentChangeBus().emit({
+          kind: tier,
+          path: filePath,
+          sha256: '',
+          change_type: 'unlink',
+        })
+      } catch { /* best-effort */ }
+    }
+  }
 
   async function handleChange(filePath: string): Promise<void> {
     try {
