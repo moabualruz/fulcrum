@@ -707,14 +707,21 @@ TOOL_REGISTRY.set('write_memory', {
     const title = typeof args['title'] === 'string'
       ? assertString(args['title'], 'title', 512)
       : content.slice(0, 80)
+    // Accept caller-provided kind + summary + scope when present; fall back to
+    // sensible defaults. Prior version hardcoded kind='fact' which forced
+    // canonical_text = content (no FTS5 identifier tokenization) and locked
+    // MCP callers out of symbol/code/doc/decision/etc. writes.
+    const kindArg = typeof args['kind'] === 'string' ? args['kind'] : 'fact'
+    const summaryArg = typeof args['summary'] === 'string' ? args['summary'] : title
+    const scopeArg = typeof args['scope'] === 'string' ? args['scope'] : 'project'
     const memory = await writeMemory({
       content,
       workspace_id: ws,
       project_id: proj,
       title,
-      summary: title,
-      scope: 'project',
-      kind: 'fact',
+      summary: summaryArg,
+      scope: scopeArg,
+      kind: kindArg,
       tags: tagList,
     } as Parameters<typeof writeMemory>[0])
     return { saved: true, memory_id: memory.memory_id, project_id: proj, tags: tagList }

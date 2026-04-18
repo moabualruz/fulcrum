@@ -1309,6 +1309,14 @@ fulcrum action — invoke canonical Fulcrum actions directly
       console.error(JSON.stringify({ error: (err as Error).message, action: action.action_name }))
       process.exit(1)
     }
+    // Drain fire-and-forget embed/extract work before process exit — actions
+    // that write memories (e.g. write_memory) queue vec_memories embeds via
+    // bounded-concurrency. Without this flush, short-lived CLI invocations
+    // commit the L1 row but leave vec_memories empty.
+    try {
+      const { flushPendingMemoryWrites } = await import('fulcrum-memory')
+      await flushPendingMemoryWrites(30_000)
+    } catch { /* flush is best-effort */ }
     return
   }
 
@@ -2766,6 +2774,17 @@ export async function main(): Promise<void> {
     setTeamOps(createTeamOps())
   } catch {
     // fulcrum-teams may not be installed — team operations will return null
+  }
+
+  // Wire fulcrum-worktrees janitor ops into core's WorktreeOps registry.
+  // Same IoC pattern as teams — core never imports worktrees; the CLI registers
+  // the impl once so janitor can reap abandoned worktrees without a dynamic import.
+  try {
+    const { createWorktreeOps } = await import('fulcrum-worktrees')
+    const { setWorktreeOps } = await import('fulcrum-agent-core')
+    setWorktreeOps(createWorktreeOps())
+  } catch {
+    // fulcrum-worktrees may not be installed — janitor will skip worktree cleanup
   }
 
   if (!group || group === '--help' || group === '-h') usage()

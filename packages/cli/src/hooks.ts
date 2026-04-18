@@ -276,10 +276,16 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
  */
 export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
   try {
-    const { getDb, projectIdsFromPath } = await import('fulcrum-agent-core')
+    const { getDb, projectIdsFromPath, getTextEmbedder, initEmbedding, loadConfig } = await import('fulcrum-agent-core')
     const { writeMemory } = await import('fulcrum-memory')
     const { buildProvenance, dedupKey, markSeen, extractFilePatch, isMutatingBash } = await import('./hooks-writers.js')
     const db = getDb()
+    // Warm the embedder so writeMemory's enqueued vec_memories embed actually
+    // runs before flushPendingMemoryWrites drains below. Without this, hook
+    // writes commit L0 + L1 but leave vec_memories empty — breaking recall.
+    if (!getTextEmbedder()) {
+      try { await initEmbedding(loadConfig()) } catch { /* non-fatal */ }
+    }
     // runId may be absent (raw Claude Code sessions, opencode, etc). In that
     // case we still want file-patch memories and code-index refresh to fire —
     // fall back to project_id derived from cwd.
