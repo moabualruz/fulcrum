@@ -1,7 +1,7 @@
 // packages/memory/src/index.ts
 
 // Schema / migrations
-export { runMigration101MemoryV3Lifecycle, runMigration102MemoryV3SourceIndex } from './schema.js'
+export { runMigration101MemoryV3Lifecycle, runMigration102MemoryV3SourceIndex, runMigration103MemoryV3Cutover } from './schema.js'
 
 // Vault primitives (v3 path split — PR 1 unit 1.2)
 export { writeRawFile, writeCuratedFile } from './vault/client.js'

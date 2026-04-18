@@ -189,3 +189,186 @@ export function runMigration102MemoryV3SourceIndex(db: Database.Database): void 
   db.exec(V3_INDEXES_DDL)
   db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('102_memory_v3_source_index')`).run()
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 103_memory_v3_cutover
+//
+// Table-rebuild dance that flips retention_tier + confidence_decay_at to
+// NOT NULL. Follows the `rebuildMemoriesIfLegacy` pattern in core/src/db/
+// schema.ts — drop dependent FTS5 triggers + l1_pages view, create the new
+// table with NOT NULL constraints, copy every row explicitly by column
+// name, DROP + RENAME, recreate triggers + view + indexes. All inside one
+// BEGIN IMMEDIATE transaction so a failure leaves the legacy table intact.
+//
+// Pre-requisites:
+//   * runMigration101MemoryV3Lifecycle must have added the four v3 columns.
+//   * PR 6.3 backfill must have either bumped retention_tier on L1 rows or
+//     deleted L0-class rows — any remaining NULL retention_tier causes the
+//     INSERT INTO memories_new to violate NOT NULL and rolls the txn back.
+//
+// canonical_text stays (plan §6.4 explicitly defers its drop to 9.3 to
+// avoid coupling the cutover to FTS5 trigger rewiring).
+//
+// Rollback SQL:
+//
+//   -- Recreate memories with the pre-103 schema (retention_tier +
+//   -- confidence_decay_at nullable). Use the same table-rebuild dance.
+//   BEGIN IMMEDIATE;
+//   DROP VIEW IF EXISTS l1_pages;
+//   DROP TRIGGER IF EXISTS memories_ai;
+//   DROP TRIGGER IF EXISTS memories_ad;
+//   DROP TRIGGER IF EXISTS memories_au;
+//   ALTER TABLE memories RENAME TO memories_v3;
+//   -- CREATE TABLE memories (... retention_tier TEXT, confidence_decay_at TEXT ...);
+//   -- INSERT INTO memories SELECT <columns> FROM memories_v3;
+//   DROP TABLE memories_v3;
+//   -- Recreate triggers + view + indexes.
+//   DELETE FROM schema_migrations WHERE name = '103_memory_v3_cutover';
+//   COMMIT;
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Full v3 memories schema with retention_tier + confidence_decay_at flipped
+// NOT NULL. Mirrors core/src/db/schema.ts CREATE TABLE memories plus the four
+// columns added by runMigration101MemoryV3Lifecycle. Kept in sync with the
+// core DDL; schema drift is caught by schema-v3-cutover.test.ts.
+const MEMORIES_V3_DDL = `
+CREATE TABLE memories_new (
+  memory_id        TEXT PRIMARY KEY,
+  workspace_id     TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+  project_id       TEXT REFERENCES projects(project_id) ON DELETE CASCADE,
+  scope            TEXT NOT NULL DEFAULT 'project' CHECK(scope IN ('session','project','workspace','global','file','task')),
+  kind             TEXT NOT NULL DEFAULT 'fact',
+  title            TEXT NOT NULL DEFAULT '',
+  summary          TEXT NOT NULL DEFAULT '',
+  content          TEXT NOT NULL,
+  canonical_text   TEXT,
+  tags             TEXT NOT NULL DEFAULT '[]',
+  entities         TEXT NOT NULL DEFAULT '[]',
+  confidence       REAL NOT NULL DEFAULT 1.0,
+  importance       REAL NOT NULL DEFAULT 0.5,
+  freshness        REAL NOT NULL DEFAULT 1.0,
+  file_path        TEXT,
+  symbol_path      TEXT,
+  event_time       TEXT,
+  content_hash     TEXT,
+  task_id          TEXT,
+  issue_id         TEXT,
+  artifact_id      TEXT,
+  provenance_refs  TEXT NOT NULL DEFAULT '[]',
+  session_id       TEXT,
+  content_type     TEXT NOT NULL DEFAULT 'text',
+  sparse_vector    TEXT,
+  source           TEXT NOT NULL DEFAULT 'manual',
+  embedding        BLOB,
+  access_count     INTEGER NOT NULL DEFAULT 0,
+  tier             TEXT NOT NULL DEFAULT 'short_term',
+  slug             TEXT NOT NULL DEFAULT (lower(hex(randomblob(8)))),
+  vault_path       TEXT NOT NULL DEFAULT '',
+  provenance       TEXT NOT NULL DEFAULT '{}',
+  supersedes       TEXT,
+  recall_count     INTEGER NOT NULL DEFAULT 0,
+  unique_query_count INTEGER NOT NULL DEFAULT 0,
+  max_recall_score REAL NOT NULL DEFAULT 0.0,
+  last_recalled_at INTEGER,
+  embedded         INTEGER NOT NULL DEFAULT 0,
+  schema_version   INTEGER NOT NULL DEFAULT 1,
+  normalize_version INTEGER NOT NULL DEFAULT 1,
+  expires_at       INTEGER,
+  created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  last_accessed_at TEXT NOT NULL DEFAULT (datetime('now')),
+  retention_tier   TEXT NOT NULL,
+  confidence_decay_at TEXT NOT NULL,
+  superseded_by    TEXT,
+  consolidated_from_ids TEXT
+);
+`
+
+const MEMORIES_COLUMNS = [
+  'memory_id', 'workspace_id', 'project_id', 'scope', 'kind', 'title', 'summary', 'content',
+  'canonical_text', 'tags', 'entities', 'confidence', 'importance', 'freshness',
+  'file_path', 'symbol_path', 'event_time', 'content_hash', 'task_id', 'issue_id',
+  'artifact_id', 'provenance_refs', 'session_id', 'content_type', 'sparse_vector',
+  'source', 'embedding', 'access_count', 'tier', 'slug', 'vault_path',
+  'provenance', 'supersedes', 'recall_count', 'unique_query_count', 'max_recall_score',
+  'last_recalled_at', 'embedded', 'schema_version', 'normalize_version', 'expires_at',
+  'created_at', 'updated_at', 'last_accessed_at',
+  'retention_tier', 'confidence_decay_at', 'superseded_by', 'consolidated_from_ids',
+].join(', ')
+
+export function runMigration103MemoryV3Cutover(db: Database.Database): void {
+  // Idempotency guard 1 — ledger row already written.
+  const applied = db.prepare(
+    `SELECT 1 AS present FROM schema_migrations WHERE name = ?`,
+  ).get('103_memory_v3_cutover') as { present: number } | undefined
+  if (applied) return
+
+  // Idempotency guard 2 — schema already rebuilt (retention_tier is NOT NULL).
+  const retentionInfo = (db.prepare(`PRAGMA table_info(memories)`).all() as {
+    name: string
+    notnull: number
+  }[]).find(c => c.name === 'retention_tier')
+  if (!retentionInfo) return // fresh DB — 101 not applied, 103 has nothing to do
+  if (retentionInfo.notnull === 1) {
+    db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('103_memory_v3_cutover')`).run()
+    return
+  }
+
+  // Capture indexes on memories so we can recreate them after the swap.
+  // Partial-index WHERE clauses and UNIQUE modifiers survive verbatim via
+  // sqlite_master.sql. Auto-indexes (rowid PK) have sql=NULL and are skipped.
+  const indexRows = db.prepare(
+    `SELECT name, sql FROM sqlite_master
+     WHERE type='index' AND tbl_name='memories' AND sql IS NOT NULL`,
+  ).all() as { name: string; sql: string }[]
+  const viewRow = db.prepare(
+    `SELECT sql FROM sqlite_master WHERE type='view' AND name='l1_pages'`,
+  ).get() as { sql: string } | undefined
+
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    // Drop dependent objects first — triggers and views reference the old table.
+    db.exec(`DROP VIEW IF EXISTS l1_pages`)
+    for (const t of ['memories_ai', 'memories_ad', 'memories_au']) {
+      db.exec(`DROP TRIGGER IF EXISTS ${t}`)
+    }
+
+    // New table with NOT NULL on the two lifecycle columns.
+    db.exec(MEMORIES_V3_DDL)
+
+    // Column-by-column copy. If retention_tier is NULL on any row the NOT NULL
+    // constraint rejects it — we let the throw propagate so the outer catch
+    // rolls everything back and surfaces the failure.
+    db.exec(`INSERT INTO memories_new (${MEMORIES_COLUMNS}) SELECT ${MEMORIES_COLUMNS} FROM memories`)
+
+    db.exec('DROP TABLE memories')
+    db.exec('ALTER TABLE memories_new RENAME TO memories')
+
+    // Recreate indexes (DROP TABLE removed them implicitly).
+    for (const idx of indexRows) db.exec(idx.sql)
+
+    // Recreate l1_pages view.
+    if (viewRow?.sql) db.exec(viewRow.sql)
+
+    // Recreate FTS5 triggers. Same shape as core/src/db/schema.ts.
+    db.exec(`
+      CREATE TRIGGER memories_ai AFTER INSERT ON memories BEGIN
+        INSERT INTO memories_fts(rowid, content, title, summary, canonical_text) VALUES (new.rowid, new.content, new.title, new.summary, new.canonical_text);
+      END;
+      CREATE TRIGGER memories_ad AFTER DELETE ON memories BEGIN
+        INSERT INTO memories_fts(memories_fts, rowid, content, title, summary, canonical_text) VALUES ('delete', old.rowid, old.content, old.title, old.summary, old.canonical_text);
+      END;
+      CREATE TRIGGER memories_au AFTER UPDATE ON memories BEGIN
+        INSERT INTO memories_fts(memories_fts, rowid, content, title, summary, canonical_text) VALUES ('delete', old.rowid, old.content, old.title, old.summary, old.canonical_text);
+        INSERT INTO memories_fts(rowid, content, title, summary, canonical_text) VALUES (new.rowid, new.content, new.title, new.summary, new.canonical_text);
+      END;
+    `)
+
+    db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('103_memory_v3_cutover')`).run()
+
+    db.exec('COMMIT')
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+}
