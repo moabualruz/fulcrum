@@ -290,6 +290,7 @@ fulcrum memory — memory vault commands
   trace            Reverse lookup: find pages containing a claim (v3 PR 5)
   mark-wrong       Write a correction L0 entry (v3 PR 5)
   lint             Verify migrated vault — orphans, missing sources, cycles (v3 PR 6)
+  migrate          End-to-end v2a → v3 migration orchestrator (v3 PR 6)
   sweep-expired              Delete session-scope memories whose expires_at has passed
   graph-consistency-check    Sample SQLite ↔ Kuzu and report drift (requires L2)
   rollback                   Operator-only rollback (--since= + --yes-i-really-want-to-undo-N-writes)
@@ -545,6 +546,43 @@ Flags:
     }
     if (corrBody !== undefined) input.correction_body = corrBody
     console.log(JSON.stringify(markWrong(input), null, 2))
+    return
+  }
+
+  // Memory v3 PR 6 — end-to-end migrate orchestrator (plan §PR 6 Verify).
+  if (command === 'migrate') {
+    if (args.includes('--help') || args.includes('-h')) {
+      console.log(`
+fulcrum memory migrate [--dry-run] [--vault <root>] [--workspace <id>] [--skip-cutover]
+
+Run the v2a → v3 migration end-to-end:
+  classify → write vault/raw + vault/curated → backfill DB →
+  runMigration103 cutover → lint verification.
+
+Flags:
+  --dry-run         Report what would change; do not write anything.
+  --vault <root>    Vault root (default: $FULCRUM_VAULT_PATH or ~/.fulcrum/vault).
+  --workspace <id>  Scope classifier + migrator to this workspace.
+  --skip-cutover    Skip runMigration103 (leaves retention_tier nullable).
+
+Exits 2 when the final lint reports any issue.
+`)
+      process.exit(0)
+    }
+    const { runMemoryMigrate } = await import('./commands/memory-migrate.js')
+    const { getVaultPath } = await import('fulcrum-memory')
+    const vaultIdx = args.indexOf('--vault')
+    const wsIdx = args.indexOf('--workspace')
+    const vault_root = vaultIdx >= 0 ? args[vaultIdx + 1]! : (process.env['FULCRUM_VAULT_PATH'] ?? getVaultPath())
+    const input: Parameters<typeof runMemoryMigrate>[0] = {
+      vault_root,
+      dry_run: args.includes('--dry-run'),
+      skip_cutover: args.includes('--skip-cutover'),
+    }
+    if (wsIdx >= 0 && args[wsIdx + 1]) input.workspace_id = args[wsIdx + 1]
+    const result = runMemoryMigrate(input)
+    console.log(JSON.stringify(result, null, 2))
+    if (!result.ok) process.exit(2)
     return
   }
 
