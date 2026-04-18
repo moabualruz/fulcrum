@@ -73,6 +73,16 @@ Canonical source of truth for every plan doc in this repo. One row per plan. Upd
 - `2026-04-18-002-memory-tiered-architecture-progress.md` — append-only progress ledger for memory v3.
 - `2026-04-18-002-memory-tiered-architecture-prompt.md` — reusable resume prompt for memory v3.
 
+**Plan status values:**
+- `active` — PRs shipping; commits landing against this plan.
+- `draft` — plan written, approval pending; no PRs opened yet.
+- `partial` — some units shipped, remainder descoped or superseded; **must include a shipped-vs-plan diff listing per-unit commit SHAs or `descoped` markers** so downstream plans can check assumed state.
+- `completed` — all units shipped; shipped-vs-plan diff on file.
+- `superseded` — a later plan replaces this one; **must name the successor plan ID** in the registry row.
+- `archived` — reference-only; no further work; shipped-vs-plan diff required before move.
+- `needs triage` — status unknown; a §Open Questions entry covers the decision.
+- `likely abandoned` — draft with no commits for >14 days; candidate for archive pending owner decision.
+
 ---
 
 ## Coordination — Shared Resources
@@ -99,7 +109,11 @@ SQLite `schema_migrations(name TEXT PRIMARY KEY, applied_at TEXT)`. Names become
 | `214..299` | **reserved for worktrees v3+ follow-ups** | Future worktrees work |
 | `300+` | **unclaimed** | Next subsystem grabs 301, 401, 501… (blocks of 100) |
 
-**Rule:** Each new subsystem takes the next hundred block (`N01..N99`). If a subsystem needs more than 100, it wraps into the next available hundred and documents the jump here.
+**Claiming rules (strict):**
+1. Each new subsystem takes the next unclaimed hundred block (`N01..N99`).
+2. **Overflow forbids dipping into the follow-up reserve.** If a subsystem exceeds its declared cap mid-flight, it jumps to the next unclaimed hundred and documents the split here (e.g. "worktrees v2 = `201..213` + `301..305`"). Never consume a block reserved for a subsystem's future follow-ups — that range stays available for the owner subsystem to evolve into.
+3. **Claim row BEFORE writing DDL.** Opening a PR with a new `runMigrationNNN*` function requires a prior (or simultaneous) MASTER-PLAN.md edit reserving the number. CI enforces this — `packages/core/` includes a check that scans branches for duplicate migration names.
+4. **MASTER-PLAN.md merges are serialized.** No two PRs may merge MASTER-PLAN.md edits concurrently. This prevents two agents from racing on "next hundred" or "next unclaimed number within a block." Rebase and re-pick if your reservation was taken.
 
 ### Feature Flag Registry
 
@@ -165,6 +179,13 @@ Proposed additions (unshipped):
 | (worktrees v2 tools — TBC per PR) | worktrees v2 | See plan §AD-13: GraphQL + MCP parity |
 
 **Rule:** Add proposed tool names here before the introducing PR lands; otherwise hidden collisions are possible when two plans draft in parallel.
+
+**CLAUDE.md regeneration guard.** `agent-integration/claude/CLAUDE.md` is auto-generated from `TOOL_SCHEMAS` in `packages/cli/src/mcp-tools.ts` via `pnpm gen:claude-md`. Any PR adding/removing an MCP tool must:
+1. Run `pnpm gen:claude-md` as the LAST commit before merge.
+2. Rebase onto `main` after any other MCP-tool-touching PR lands (to pick up the correct tool count).
+3. CI enforces: `pnpm gen:claude-md && git diff --exit-code` must pass on every PR touching `packages/cli/src/mcp-tools.ts`.
+
+Without this guard, two concurrent MCP-tool PRs will both regenerate the tool count to different values (23→24 vs 23→25) and silently merge with the wrong count in the file humans + agents load at session start.
 
 ---
 
@@ -332,8 +353,8 @@ Points where two plans touch the same surface. When a plan is about to modify th
 
 1. **`schema_migrations` ledger.** Memory v3 uses `101..104`; worktrees v2 uses `201..213`. No overlap today, but any new plan must claim its block in the §Migration Number Registry above **before** writing DDL.
 2. **Agent roles + policy engine.** Memory v3 adds `curator`; worktrees v2 adds `lead_engineer`. Both need rows in `agent_definitions` + policy rules. Policy rule IDs namespaced by role slug avoid conflict.
-3. **Event stream.** Memory v3 emits vault/curator events; worktrees v2 emits `fulcrum.merge_candidate` + `worktree_events`. Both use the in-process pub-sub (`packages/worktrees/src/events.ts` today — factor up to `packages/core` if/when a third subsystem needs it; see §Open Questions #6).
-4. **Rule engine (worktrees v2 PR 5) consumes memory-v3 events?** Open question — currently worktrees v2 plan assumes `trigger_kind='fulcrum.merge_candidate'` and similar worktree-local events. If we want memory events (e.g. "when a curator rejects a page, spawn a review") to also drive rules, the trigger dispatcher needs cross-subsystem reach. Deferred decision.
+3. **Event stream.** `packages/core/src/event-bus.ts` (`FulcrumEventBus`) already exists as the canonical in-process pub-sub — it emits via `emitEvent()` in `packages/core/src/events.ts:32` and has a typed `EventType` union in `packages/core/src/types.ts:77-89` covering `worktree_allocated`, `merge_queued`, `merge_started`, `merge_completed`, `review_created`, `artifact_written`, etc. **Plans MUST reuse this bus; do not fork.** Memory v3 adds `l0.ingested`, `l1.page_written`, `curator.run_completed` to the existing `EventType` union. Worktrees v2 adds `fulcrum.merge_candidate` and rule-engine triggers likewise. No new per-subsystem events module is permitted.
+4. **Rule engine (worktrees v2 PR 5) cross-subsystem triggers.** The rule engine dispatcher subscribes directly to `FulcrumEventBus`, giving it visibility into every `EventType` namespace. To prevent privilege amplification (e.g. a worktree-scoped rule firing on every `l0.ingested`), rules declare an event namespace in their trigger spec. Subscriptions to `fulcrum.l0.*` / `fulcrum.l1.*` / `fulcrum.curator.*` require `chief_of_staff` authorship (see §Open Questions #6 resolution). Worktree-local subscriptions (`fulcrum.worktree.*`, `fulcrum.task.*`) follow the rule-authorship gate in worktrees v2 §Critical Constraints.
 5. **MCP tool surface.** Both plans propose new MCP tools (memory v3: inspect_memory, trace_claim, …; worktrees v2 may expose rule/intake/validator primitives). Must stay under `mcp__fulcrum__` prefix and register in `packages/cli/src/mcp-tools.ts` — this regenerates the counter in `agent-integration/claude/CLAUDE.md`.
 6. **CLAUDE.md / AGENTS.md memory + worktrees sections.** Both plans add orientation sections to these files. Memory v3's "Memory Tiers (v3 draft)" shipped in commit `368f9eb`. Worktrees v2's equivalent will land in PR 14 cutover (plan unit 14.5).
 
@@ -341,30 +362,46 @@ Points where two plans touch the same surface. When a plan is about to modify th
 
 ## Definition of "Project Complete" (as of 2026-04-18)
 
-The Fulcrum roadmap as currently known closes when **all six conditions** hold:
+The Fulcrum roadmap as currently known closes when **all seven conditions** hold:
 
-1. Memory v3 plan status = `completed` (all 10 PRs shipped; `FULCRUM_MEMORY_V3` flag removed).
-2. Worktrees v2 plan status = `completed` (all 14 PRs shipped; legacy `processMergeQueue` removed).
-3. Install TUI Dashboard plan status = `completed` **or** formally descoped.
-4. All domain plans (architecture, mcp, plugins, rag, skills-agents) either `completed` or retired + remaining scope re-packaged into dated feature plans.
-5. Indexer daemon refactor plan archived with shipped-PR outcomes documented.
-6. This master plan's §Open Questions section is empty.
+1. Memory v3 plan status = `completed` (all 10 PRs shipped; `FULCRUM_MEMORY_V3` flag removed; shipped-vs-plan diff on file).
+2. Worktrees v2 plan status = `completed` (all 14 PRs shipped; legacy `processMergeQueue` removed; shipped-vs-plan diff on file).
+3. Install TUI Dashboard plan status = `completed` **or** formally descoped (with a "what shipped / what didn't" note).
+4. All domain plans (architecture, mcp, plugins, rag, skills-agents) either `completed` or retired + remaining scope re-packaged into dated feature plans (each with a shipped-vs-plan diff).
+5. Indexer daemon refactor plan archived with shipped-PR outcomes documented (shipped-vs-plan diff required).
+6. Every Open Question is either closed (linked to a commit or ADR that resolves it) or explicitly reclassified as "future scope beyond v1 roadmap" with a new plan created. Unresolved questions may NOT be moved to a separate doc to satisfy this condition — the criterion is resolution, not absence.
+7. No plan in `partial`, `superseded`, or `archived` status has undocumented schema assumptions consumed by an `active` plan. (Prevents memory v2a/v2b type silent dependencies from corrupting downstream cutovers.)
 
 **New work beyond this set creates a new plan** and updates §Plan Registry + §Active Track Map.
+
+**Shipped-vs-plan diff requirement.** Before a plan moves to §Completed & Archived Plans, its author produces a short markdown checklist — one row per unit in the plan doc — linking each unit to a commit SHA **or** marking it `descoped` with rationale. The checklist lives inline in the plan doc's closing block. This prevents phantom-dependency failures (e.g. memory v3 PR 6 tripping over a v2a column it assumed was dropped).
 
 ---
 
 ## Open Questions (user decisions required — unblocks Plan Registry rows)
 
-1. **Memory v2a / v2b status.** Git log shows `fix(memory):` commits from 2026-04-17 but no `feat(memory): v2a PR N` or `v2b PR N` commit prefixes. Did v2a + v2b ship (and v3 is net-new next-wave) or were they abandoned in favor of v3? **Decision needed:** mark both `completed` (shipped), `superseded` (by v3), or `retired` (no further work).
-2. **Indexer daemon plan.** Commits `5d91ae1`, `c16e045`, `eb6fd3b`, `9eb9e97`, `c9c8ba2`, `89dfc7c` land `feat(indexer): PR 1..5`. Plan doc says 6 units with "PR structure deferred" — is PR 5 the exit, or does PR 6 remain? **Decision needed:** confirm completion + archive, or name PR 6's scope.
-3. **`2026-04-16-plugin-install-operator-surfaces-plan.md`.** 55-line stub, unreferenced elsewhere, no commits. **Decision needed:** archive as abandoned, or surface a single owner + complete.
-4. **Domain-plan format (plan-architecture, -mcp, -plugins, -rag, -skills-agents).** Wave 0 of the old MASTER-PLAN.md looks shipped per git. Waves 1–2 status is unaudited. **Decision needed:** one of — (a) run a gap-by-gap audit per plan and close each as shipped, (b) retire the `plan-<domain>.md` format entirely and fold residual gaps into dated feature plans, (c) keep as reference only.
-5. **Install TUI Dashboard (`2026-04-16-001`) progress.** 663 lines, 10 phases; progress unclear. **Decision needed:** audit phases 1–10 against current code and mark a clear resume point, or explicitly pause.
-6. **Event-bus factoring.** If worktrees v2 PR 5 (rule engine) wants to subscribe to memory-v3 events (`l0.ingested`, `l1.page_written`, `curator.run_completed`), the in-process pub-sub currently in `packages/worktrees/src/events.ts` must factor up to `packages/core` or a new `packages/events` package. **Decision needed:** scope this as a pre-req for worktrees v2 PR 5, or confine rule engine to worktree-local events for v2.0 and defer cross-subsystem triggers to v2.1.
-7. **Owners.** §Plan Registry has empty owner columns. For solo-dev operation this is fine (everything is "you"); for multi-agent operation, each track should name a canonical `chief_of_staff`-level coordinator agent plus per-PR execution agents. **Decision needed:** does this matrix map to explicit agent role assignments, or stay informal?
+Questions are triaged by **failure mode**: *silent-corrupt* (ships and breaks downstream invisibly) > *loud-block* (work halts with a clear error) > *cosmetic* (documentation noise only). Silent-corrupt questions must be resolved BEFORE the first affected PR starts.
 
-Every item above **should be resolved** before we start PR 1 of worktrees v2 (the highest-coordination track). Memory v3 PR 1 does not depend on any of them.
+### Silent-corrupt (must resolve before the listed PR)
+
+6. **Event-bus factoring.** ✅ **RESOLVED in §Cross-Plan Coordination Points #3 + #4 above**: use existing `packages/core/src/event-bus.ts` (`FulcrumEventBus`); memory v3 and worktrees v2 both extend the existing `EventType` union; rule-engine subscriptions to memory namespaces require `chief_of_staff` authorship. **No new per-subsystem events module permitted.** Decision date: 2026-04-18.
+1. **Memory v2a / v2b status.** Git log shows `fix(memory):` commits but no `feat(memory): v2a/v2b PR N` prefixes. Critical because memory v3 PR 6 (cutover) assumes v2a's `memories.canonical_text` column exists to drop — if v2a only partially shipped, PR 6 tries to drop a column that doesn't exist on some installs. **Decision needed BEFORE memory v3 PR 6 starts:** mark both `completed`, `partial` (with documented shipped-vs-plan diff listing which units shipped and which downstream plans depend on them), `superseded` by v3, or `retired`. A `partial` classification requires the shipped-vs-plan diff before memory v3 PR 6 proceeds.
+2. **Indexer daemon plan.** Commits `5d91ae1..89dfc7c` land `feat(indexer): PR 1..5`. Plan doc says 6 units. Critical because memory v3 PR 7 (lifecycle decay) may depend on daemon-emitted `last_accessed_at` updates. **Decision needed BEFORE memory v3 PR 7:** confirm completion + ship shipped-vs-plan diff, or name PR 6's scope and reopen.
+
+### Loud-block (will halt the affected PR with a clear error)
+
+5. **Install TUI Dashboard progress.** 663 lines, 10 phases; resume point unclear. **Decision needed:** audit phases against current code and mark a clear resume point, or explicitly pause.
+9. **Rule-engine YAML format (worktrees v2 PR 5).** GitHub Actions style vs Jira Automation style. PR 5 loader cannot be written before this is picked. **Decision needed BEFORE worktrees v2 PR 5a opens.**
+10. **Schema validator library (worktrees v2 PR 2).** `ajv` vs `zod` vs `typebox` vs hand-rolled. Affects column shape of `artifact_contracts.content_contract`. **Decision needed BEFORE worktrees v2 PR 2 opens.**
+11. **GraphQL server library (worktrees v2 PR 13).** `graphql-yoga` vs `apollo-server` vs `mercurius`. If PR 13 is deferred per scope guidance (see worktrees v2 plan), this question is also deferred. **Decision needed IF worktrees v2 PR 13 is kept in v2 scope.**
+
+### Cosmetic (doesn't block work; resolve when convenient)
+
+3. **`2026-04-16-plugin-install-operator-surfaces-plan.md`.** 55-line stub, unreferenced. **Decision:** archive as abandoned, or surface a single owner + complete.
+4. **Domain-plan format (plan-architecture/-mcp/-plugins/-rag/-skills-agents).** **Decision:** (a) gap-by-gap audit per plan, (b) retire the `plan-<domain>.md` format entirely and fold residual gaps into dated feature plans, or (c) keep as reference only. Pair with shipped-vs-plan diff requirement in §Definition of Project Complete.
+7. **Owners.** §Plan Registry has empty owner columns. **Decision:** formalize per-track agent-role coordinators, or stay informal.
+
+**Resolution precedence:** silent-corrupt questions block specific PRs as noted. Loud-block questions pause the affected PR with an obvious error so there's no silent corruption. Cosmetic questions can be resolved in parallel with any track.
 
 ---
 
