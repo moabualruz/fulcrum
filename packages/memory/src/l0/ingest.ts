@@ -20,12 +20,12 @@
 // sanitize-in-place. Curator at L1 time re-reads + re-sanitizes.
 
 import { createHash } from 'crypto'
-import { mkdirSync, writeFileSync } from 'fs'
-import { join, dirname } from 'path'
+import { join } from 'path'
 import { homedir } from 'os'
 import { getDb, emitEvent, globalDataDir, newId } from 'fulcrum-agent-core'
 import { sanitizeOnWrite } from '../sanitize/index.js'
 import { appendWal } from '../wal/writer.js'
+import { writeRawFile } from '../vault/client.js'
 import {
   L0_SOURCE_TYPES,
   type L0File,
@@ -142,14 +142,11 @@ export function ingestRawSource(input: L0IngestInput): L0File {
     size_bytes,
   }
 
-  // 6. Write the file with 0600 perms inside a 0700 directory tree.
-  //    L0 body is verbatim — frontmatter + single newline + raw body bytes.
-  const fullPath = join(getVaultRoot(), vault_path)
-  mkdirSync(dirname(fullPath), { recursive: true, mode: 0o700 })
-  writeFileSync(fullPath, serializeFrontmatter(frontmatter) + body, {
-    encoding: 'utf-8',
-    mode: 0o600,
-  })
+  // 6. Write the file. `writeRawFile` enforces the `raw/` prefix, vault
+  //    containment, 0600 file perms, and 0700 parent dirs — factored out
+  //    in PR 1 unit 1.2 so curator writes (PR 2) share the same pattern.
+  //    L0 body is verbatim: frontmatter + raw body bytes, no rewrite.
+  writeRawFile(getVaultRoot(), vault_path, serializeFrontmatter(frontmatter) + body)
 
   // 7. Insert the l0_sources row. (runMigration101MemoryV3Lifecycle created
   //    the table; callers must have run the migration before invoking this.)

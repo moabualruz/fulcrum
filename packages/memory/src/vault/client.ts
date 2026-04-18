@@ -200,6 +200,63 @@ export function getMemoryFilePath(vaultPath: string, memory: FullMemory): string
   }
 }
 
+/**
+ * Low-level raw-file writer for the new v3 `vault/raw/` layout (memory v3
+ * plan §L0). Writes `<vaultPath>/<relativePath>` with 0600 file perms inside
+ * 0700 parent directories, enforcing vault containment via `assertInsideVault`.
+ *
+ * `relativePath` must start with `raw/` (so L0 writes cannot accidentally
+ * land under `curated/` or `memories/`). Caller serializes frontmatter + body
+ * into a single string (`content`) — this primitive is filesystem-only.
+ *
+ * Returns the absolute filesystem path on success.
+ */
+export function writeRawFile(vaultPath: string, relativePath: string, content: string): string {
+  if (!relativePath.startsWith('raw/')) {
+    throw Object.assign(
+      new Error(`writeRawFile: relativePath must start with 'raw/' (got '${relativePath}')`),
+      { code: 'invalid_input' },
+    )
+  }
+  const filePath = join(vaultPath, relativePath)
+  assertInsideVault(vaultPath, filePath)
+  mkdirSync(dirname(filePath), { recursive: true, mode: 0o700 })
+  writeFileSync(filePath, content, { encoding: 'utf-8', mode: 0o600 })
+  return filePath
+}
+
+/**
+ * Low-level curated-file writer for the new v3 `vault/curated/` layout
+ * (memory v3 plan §L1). Writes `<vaultPath>/<relativePath>` with default
+ * perms (curated/ is git-versioned, so 0644 is fine).
+ *
+ * `relativePath` must start with `curated/`. The full `CuratedPage` type
+ * with frontmatter + validation lands in PR 2; this primitive handles only
+ * the filesystem layer so PR 2's `l1/page.ts` has one low-level dependency.
+ *
+ * Returns the absolute filesystem path on success.
+ */
+export function writeCuratedFile(vaultPath: string, relativePath: string, content: string): string {
+  if (!relativePath.startsWith('curated/')) {
+    throw Object.assign(
+      new Error(`writeCuratedFile: relativePath must start with 'curated/' (got '${relativePath}')`),
+      { code: 'invalid_input' },
+    )
+  }
+  const filePath = join(vaultPath, relativePath)
+  assertInsideVault(vaultPath, filePath)
+  mkdirSync(dirname(filePath), { recursive: true })
+  writeFileSync(filePath, content, 'utf-8')
+  return filePath
+}
+
+/**
+ * v2a back-compat: writes a v2a `FullMemory` into the legacy
+ * `vault/memories/curated/...` (CURATED_KINDS) or `vault/memories/operational/...`
+ * (everything else) layout. New v3 code paths should call `writeRawFile` for
+ * L0 or go through the PR 2 L1 page primitives for curated writes; this
+ * function stays for existing callers until PR 5 cutover.
+ */
 export async function writeMemoryFile(vaultPath: string, memory: FullMemory): Promise<string> {
   // L0 stores the ORIGINAL human-readable content — NOT canonical_text.
   // canonical_text is the FTS5-tokenized form (e.g. "getUserById" → "get User By Id",

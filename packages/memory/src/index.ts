@@ -3,6 +3,9 @@
 // Schema / migrations
 export { runMigration101MemoryV3Lifecycle, runMigration102MemoryV3SourceIndex } from './schema.js'
 
+// Vault primitives (v3 path split — PR 1 unit 1.2)
+export { writeRawFile, writeCuratedFile } from './vault/client.js'
+
 // L0 ingest (memory v3 PR 1 unit 1.1)
 export { ingestRawSource } from './l0/ingest.js'
 export type {
