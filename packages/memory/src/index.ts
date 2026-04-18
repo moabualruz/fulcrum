@@ -1,7 +1,7 @@
 // packages/memory/src/index.ts
 
 // Schema / migrations
-export { runMigration101MemoryV3Lifecycle } from './schema.js'
+export { runMigration101MemoryV3Lifecycle, runMigration102MemoryV3SourceIndex } from './schema.js'
 
 // Types
 export type {

@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type Database from 'better-sqlite3'
 import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
 import { getDb } from 'fulcrum-agent-core'
-import { runMigration101MemoryV3Lifecycle } from '../schema.js'
+import { runMigration101MemoryV3Lifecycle, runMigration102MemoryV3SourceIndex } from '../schema.js'
 
 function columnNames(db: Database.Database, table: string): string[] {
   return (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(c => c.name)
@@ -192,5 +192,89 @@ describe('runMigration101MemoryV3Lifecycle — ledger + idempotency', () => {
     expect(columnNames(db, 'memories')).toContain('retention_tier')
     const view = db.prepare("SELECT type FROM sqlite_master WHERE name='l1_pages'").get() as { type: string } | undefined
     expect(view?.type).toBe('view')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// unit 0.3 — runMigration102MemoryV3SourceIndex
+// ─────────────────────────────────────────────────────────────────────────────
+
+function indexSql(db: Database.Database, name: string): string | undefined {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND name = ?").get(name) as { sql: string | null } | undefined
+  return row?.sql ?? undefined
+}
+
+describe('runMigration102MemoryV3SourceIndex — l0_sources indexes', () => {
+  it('creates the five expected indexes on l0_sources', () => {
+    const db = getDb()
+    runMigration101MemoryV3Lifecycle(db)
+    runMigration102MemoryV3SourceIndex(db)
+
+    expect(indexSql(db, 'idx_l0_sources_ws_project')).toMatch(/l0_sources.*workspace_id.*project_id/is)
+    expect(indexSql(db, 'idx_l0_sources_type')).toMatch(/l0_sources.*source_type/is)
+    expect(indexSql(db, 'idx_l0_sources_hash')).toMatch(/l0_sources.*content_hash/is)
+    expect(indexSql(db, 'idx_l0_sources_created')).toMatch(/l0_sources.*created_at/is)
+
+    const sessionSql = indexSql(db, 'idx_l0_sources_session')
+    expect(sessionSql).toMatch(/l0_sources.*session_id/is)
+    expect(sessionSql, 'session index must be partial').toMatch(/WHERE\s+session_id\s+IS\s+NOT\s+NULL/i)
+  })
+})
+
+describe('runMigration102MemoryV3SourceIndex — memories indexes are partial', () => {
+  it('three partial indexes guard against sparse v3 columns', () => {
+    const db = getDb()
+    runMigration101MemoryV3Lifecycle(db)
+    runMigration102MemoryV3SourceIndex(db)
+
+    for (const [name, col] of [
+      ['idx_memories_retention_tier', 'retention_tier'],
+      ['idx_memories_superseded_by', 'superseded_by'],
+      ['idx_memories_decay', 'confidence_decay_at'],
+    ] as const) {
+      const sql = indexSql(db, name)
+      expect(sql, `${name} missing`).toBeDefined()
+      expect(sql).toMatch(new RegExp(`memories.*${col}`, 'is'))
+      expect(sql, `${name} must be partial`).toMatch(new RegExp(`WHERE\\s+${col}\\s+IS\\s+NOT\\s+NULL`, 'i'))
+    }
+  })
+})
+
+describe('runMigration102MemoryV3SourceIndex — graph indexes', () => {
+  it('creates confidence + last_confirmed indexes on graph_entities and confidence on graph_edges', () => {
+    const db = getDb()
+    runMigration101MemoryV3Lifecycle(db)
+    runMigration102MemoryV3SourceIndex(db)
+
+    expect(indexSql(db, 'idx_graph_entities_confidence')).toMatch(/graph_entities.*confidence/is)
+    expect(indexSql(db, 'idx_graph_edges_confidence')).toMatch(/graph_edges.*confidence/is)
+
+    const lastConfirmed = indexSql(db, 'idx_graph_entities_last_confirmed')
+    expect(lastConfirmed).toMatch(/graph_entities.*last_confirmed/is)
+    expect(lastConfirmed, 'last_confirmed index must be partial').toMatch(/WHERE\s+last_confirmed\s+IS\s+NOT\s+NULL/i)
+  })
+})
+
+describe('runMigration102MemoryV3SourceIndex — ledger + idempotency', () => {
+  it('records 102_memory_v3_source_index in schema_migrations', () => {
+    const db = getDb()
+    runMigration101MemoryV3Lifecycle(db)
+    runMigration102MemoryV3SourceIndex(db)
+    const row = db.prepare("SELECT name FROM schema_migrations WHERE name = '102_memory_v3_source_index'").get() as { name: string } | undefined
+    expect(row?.name).toBe('102_memory_v3_source_index')
+  })
+
+  it('is idempotent — safe to re-run, no duplicate ledger rows', () => {
+    const db = getDb()
+    runMigration101MemoryV3Lifecycle(db)
+    expect(() => runMigration102MemoryV3SourceIndex(db)).not.toThrow()
+    expect(() => runMigration102MemoryV3SourceIndex(db)).not.toThrow()
+
+    const count = db.prepare("SELECT COUNT(*) AS n FROM schema_migrations WHERE name = '102_memory_v3_source_index'").get() as { n: number }
+    expect(count.n).toBe(1)
+
+    // All 10 v3 indexes still present
+    const names = ['idx_l0_sources_ws_project','idx_l0_sources_type','idx_l0_sources_session','idx_l0_sources_hash','idx_l0_sources_created','idx_memories_retention_tier','idx_memories_superseded_by','idx_memories_decay','idx_graph_entities_confidence','idx_graph_entities_last_confirmed','idx_graph_edges_confidence']
+    for (const n of names) expect(indexSql(db, n), `${n} missing after re-run`).toBeDefined()
   })
 })

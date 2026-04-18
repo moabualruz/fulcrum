@@ -137,3 +137,55 @@ export function runMigration101MemoryV3Lifecycle(db: Database.Database): void {
   // 6. Ledger row.
   db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('101_memory_v3_lifecycle')`).run()
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 102_memory_v3_source_index
+//
+// Indexes on the columns introduced by 101. All use CREATE INDEX IF NOT EXISTS
+// so re-runs are no-ops. Partial indexes (WHERE … IS NOT NULL) keep the on-disk
+// footprint small while the v3 columns are still sparsely populated during
+// rollout — once the PR 6 cutover flips retention_tier / confidence_decay_at to
+// NOT NULL, the WHERE clauses become tautological but the index definitions
+// remain valid (SQLite just ignores the always-true filter).
+//
+// Rollback SQL:
+//
+//   DROP INDEX IF EXISTS idx_l0_sources_ws_project;
+//   DROP INDEX IF EXISTS idx_l0_sources_type;
+//   DROP INDEX IF EXISTS idx_l0_sources_session;
+//   DROP INDEX IF EXISTS idx_l0_sources_hash;
+//   DROP INDEX IF EXISTS idx_l0_sources_created;
+//   DROP INDEX IF EXISTS idx_memories_retention_tier;
+//   DROP INDEX IF EXISTS idx_memories_superseded_by;
+//   DROP INDEX IF EXISTS idx_memories_decay;
+//   DROP INDEX IF EXISTS idx_graph_entities_confidence;
+//   DROP INDEX IF EXISTS idx_graph_entities_last_confirmed;
+//   DROP INDEX IF EXISTS idx_graph_edges_confidence;
+//   DELETE FROM schema_migrations WHERE name = '102_memory_v3_source_index';
+// ─────────────────────────────────────────────────────────────────────────────
+
+const V3_INDEXES_DDL = `
+-- l0_sources
+CREATE INDEX IF NOT EXISTS idx_l0_sources_ws_project ON l0_sources(workspace_id, project_id);
+CREATE INDEX IF NOT EXISTS idx_l0_sources_type       ON l0_sources(source_type);
+CREATE INDEX IF NOT EXISTS idx_l0_sources_session    ON l0_sources(session_id)   WHERE session_id   IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_l0_sources_hash       ON l0_sources(content_hash);
+CREATE INDEX IF NOT EXISTS idx_l0_sources_created    ON l0_sources(created_at);
+
+-- memories (v3 lifecycle columns — all partial while rollout is in flight)
+CREATE INDEX IF NOT EXISTS idx_memories_retention_tier ON memories(retention_tier)      WHERE retention_tier      IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_memories_superseded_by  ON memories(superseded_by)       WHERE superseded_by       IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_memories_decay          ON memories(confidence_decay_at) WHERE confidence_decay_at IS NOT NULL;
+
+-- graph_entities (v3 columns)
+CREATE INDEX IF NOT EXISTS idx_graph_entities_confidence     ON graph_entities(confidence);
+CREATE INDEX IF NOT EXISTS idx_graph_entities_last_confirmed ON graph_entities(last_confirmed) WHERE last_confirmed IS NOT NULL;
+
+-- graph_edges (v3 columns)
+CREATE INDEX IF NOT EXISTS idx_graph_edges_confidence ON graph_edges(confidence);
+`
+
+export function runMigration102MemoryV3SourceIndex(db: Database.Database): void {
+  db.exec(V3_INDEXES_DDL)
+  db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('102_memory_v3_source_index')`).run()
+}
