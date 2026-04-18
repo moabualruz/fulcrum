@@ -228,6 +228,50 @@ deliberately suppressed.
 
 ---
 
+## Memory Tiers (v3 draft)
+
+> **Draft status.** The v3 schema + types have landed
+> (`packages/memory/src/schema.ts`, `packages/memory/src/l0/types.ts`) but no
+> runtime path invokes them yet. Keep writing memories via the v2a surface
+> (`writeMemory`, `ingestFile`, hooks) until PR 1 lights up L0 writes. Full
+> spec: [`docs/plans/2026-04-18-002-memory-tiered-architecture-plan.md`](docs/plans/2026-04-18-002-memory-tiered-architecture-plan.md).
+
+Memory v3 splits the single `memories` + `vault/memories/curated/` surface
+into three tiers:
+
+- **L0 — raw dumps.** `${vault}/raw/<source_type>/YYYY/MM/DD/<ULID>.md`.
+  Verbatim, zero truncation, immutable. Index row in `l0_sources`.
+  Source types: `bash_trace | tool_trace | file_patch | session_transcript | prompt_attachment | web_capture | edit_diff | correction`.
+- **L1 — curated wiki.** `${vault}/curated/{entities,concepts,pages,synthesis}/<ULID>.md`.
+  LLM-maintained markdown; every page carries `confidence`, `retention_tier`,
+  `sources[]` (→ L0 ULIDs), `supersedes[]`, and `entities[]`. The `memories`
+  table is the L1 index — extended with 4 lifecycle columns
+  (`retention_tier`, `confidence_decay_at`, `superseded_by`,
+  `consolidated_from_ids`). The `l1_pages` view projects v3-schema rows
+  (`schema_version >= 3`) under their v3 column names; the view is read-only
+  (writes still go to `memories`).
+- **L2 — vector on L1.** `vec_memories` embeds curated L1 bodies, not raw
+  L0 dumps. `vec_chunks` continues to embed code unchanged.
+
+**Feature flag:** `FULCRUM_MEMORY_V3` (default off through PR 4, default on
+from PR 5, removed in PR 9). Do not branch agent behavior on it yet.
+
+**Graph tables.** `graph_entities` and `graph_edges` were extended in place
+with v3 columns (`aliases`, `confidence`, `first_seen`, `last_confirmed`,
+`source_ids`) via `ALTER TABLE ADD COLUMN`. Plan-level names (`type`,
+`attributes`, `from_id`, `to_id`, `rel_type`) map to the pre-existing
+physical columns (`entity_type`, `properties`, `source_id`, `target_id`,
+`relation`); see §Knowledge graph in the plan for the full mapping table.
+
+**Migration mechanics.** Memory v3 follows the extension-package convention
+established by `packages/teams/src/schema.ts` / `packages/workflows/src/schema.ts`:
+TS function `runMigrationNNNName(db)`, idempotent DDL guarded by
+`PRAGMA table_info`, ledger row via `INSERT OR IGNORE INTO schema_migrations`.
+No `.sql` files — rollback SQL lives as comments above each forward block.
+Number block `101..104` is reserved for the v3 chain.
+
+---
+
 ## Policy Engine Patterns
 
 **System invariants live in `packages/policy/src/engine.ts` as `SYSTEM_INVARIANTS`.**

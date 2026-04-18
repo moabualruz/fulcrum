@@ -436,6 +436,25 @@ Use the `mcp__fulcrum__*` tools directly only when the runtime requires MCP-nati
 
 ---
 
+## Memory Tiers (v3 draft)
+
+> **Not live yet.** Schema + types have landed but no runtime path invokes them.
+> Keep writing via the v2a surface (`writeMemory`, `ingestFile`, `mcp__fulcrum__write_memory`)
+> until PR 1 flips L0 writes. Full spec:
+> [`docs/plans/2026-04-18-002-memory-tiered-architecture-plan.md`](../../docs/plans/2026-04-18-002-memory-tiered-architecture-plan.md).
+
+Three tiers:
+
+- **L0 — raw dumps** (`${vault}/raw/<type>/YYYY/MM/DD/<ULID>.md`): verbatim capture, zero truncation, immutable. Index in `l0_sources`. Source types: `bash_trace | tool_trace | file_patch | session_transcript | prompt_attachment | web_capture | edit_diff | correction`.
+- **L1 — curated wiki** (`${vault}/curated/…`): LLM-maintained markdown with `confidence`, `retention_tier`, `sources[]` back-refs to L0, `supersedes[]` lineage. Physical storage is still the `memories` table; the `l1_pages` view projects `schema_version >= 3` rows under v3 column names.
+- **L2 — vectors on L1**: embeddings over curated bodies, not raw dumps.
+
+**Feature flag:** `FULCRUM_MEMORY_V3` (default off through PR 4). Do not branch behavior on it yet.
+
+**If a user asks you to ingest raw dumps into L0:** the API (`ingestRawSource`) lands in PR 1. Until then, treat raw ingest requests as "captured for later curation" — save via the v2a path with `source: 'manual'` so PR 6 can classify and migrate it.
+
+---
+
 ## Chief-of-Staff Response Format
 
 When acting as `chief_of_staff`, structure your final response as:
