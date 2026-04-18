@@ -321,10 +321,19 @@ async function probeExistingDaemon(socketPath: string): Promise<boolean> {
 // Used by `fulcrum daemon indexer` (wired in Unit 1.5).
 
 export async function runDaemonMain(): Promise<void> {
+  // Install a single uncaughtException + unhandledRejection guard so anything
+  // the handlers miss lands in one consistent log line before we exit.
+  const onFatal = (err: unknown): void => {
+    process.stderr.write(`[fulcrum-indexer] uncaught: ${(err as Error)?.stack ?? String(err)}\n`)
+    process.exit(1)
+  }
+  process.once('uncaughtException', onFatal)
+  process.once('unhandledRejection', onFatal)
+
   try {
     const handle = await startDaemon()
-    // Keep the process alive until server.close() resolves.
     await new Promise<void>((resolve) => handle.server.on('close', resolve))
+    process.stderr.write(`[fulcrum-indexer] exited normally\n`)
     process.exit(0)
   } catch (err) {
     if (err instanceof DaemonAlreadyRunningError) {

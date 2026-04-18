@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Indexer Daemon (2026-04-18)
+
+Replaced the file-lock + per-process chokidar coordination in
+`packages/memory/src/pci/` with a single long-lived **fulcrum-indexer
+daemon** per user, modeled on Meta's Watchman. The socket bind is the
+cross-process lock (kernel-released on process death — no stale locks,
+no pid-liveness heuristics, no TTL). Cross-platform: unix socket on
+POSIX, named pipe on Windows, one platform branch in `socket-path.ts`.
+
+- `packages/memory/src/indexer/` — new module tree: NDJSON
+  `protocol.ts`, platform `socket-path.ts`, `daemon.ts` entrypoint,
+  `handlers.ts` request dispatch, `registry.ts` per-project refcount
+  map with Watchman-style `watch-project` consolidation, `client.ts`
+  with connect-and-autospawn + typed errors (`IndexerError`,
+  `IndexerUnreachableError`, `IndexerDisconnectedError`).
+- `fulcrum daemon indexer` / `fulcrum daemon sockname [--ensure]`
+  — new CLI subcommands.
+- Existing call sites keep their signatures — `onAgentRunStart`,
+  `onAgentRunEnd`, `acquireServerHandle`, `serve mcp`, `serve monitor`
+  all route through the daemon under the covers.
+- Daemon self-exits after 30 min of zero watches + zero requests
+  (override via `FULCRUM_INDEXER_IDLE_MS`).
+
+### Removed — Indexer Daemon (2026-04-18)
+
+- `packages/memory/src/pci/lock.ts` — file-lock with pid + mtime TTL.
+- `packages/memory/src/pci/singleton.ts` — in-process refcount map.
+- `packages/memory/src/tests/pci-lock.test.ts`, `pci-singleton.test.ts`,
+  `pci-lifecycle.test.ts`, `pci-vault-dedup.test.ts`, `tier-a-lift-2.test.ts`
+  — equivalent coverage now lives in `packages/memory/src/indexer/tests/`.
+
+Plan: `docs/plans/2026-04-18-001-refactor-indexer-daemon-plan.md`.
+
 ## [0.0.2] — 2026-04-17
 
 Second release. Closes 33 findings from the four-axis code review (criticals, highs, mediums, tsc), promotes three previously-unpublished packages (`fulcrum-agent-cli`, `fulcrum-worker`, `fulcrum-workflows`), and bumps the published nine from `0.0.1`. All workspace dependencies now resolve to a single synchronized version.

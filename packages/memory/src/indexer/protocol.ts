@@ -13,8 +13,17 @@ const MAX_MESSAGE_BYTES = 16 * 1024 * 1024 // 16 MB soft cap per line
 
 /**
  * Error codes surfaced back to clients via the `error.code` field of an
- * {@link IndexerErrorResponse}. Keep in sync with the table in the plan's
- * "High-Level Technical Design" section.
+ * {@link IndexerErrorResponse}. Stable wire contract — add new values via a
+ * follow-up PR rather than repurposing an existing code.
+ *
+ * | code              | meaning                                                              |
+ * |-------------------|----------------------------------------------------------------------|
+ * | `unknown_method`  | Method name has no handler on this daemon version.                   |
+ * | `invalid_params`  | Missing or malformed `params` (e.g., non-absolute path).             |
+ * | `vault_owned_path`| Requested root is under the memory vault; PCI refuses to watch it.   |
+ * | `not_watching`    | releaseWatching called for a root that has no active watch.          |
+ * | `busy`            | Handler rejected the call because a conflicting operation is active. |
+ * | `internal`        | Unexpected handler crash. Daemon logs a stack to stderr.             |
  */
 export type IndexerErrorCode =
   | 'unknown_method'
