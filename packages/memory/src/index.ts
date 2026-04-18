@@ -151,6 +151,20 @@ export type { V3SearchInput, V3SearchWeights, V3RecallHit } from './retrieval/v3
 // v3 feature flag — plan §Migration strategy (PR 5.5 cutover: default ON).
 export { isMemoryV3Enabled } from './flags.js'
 
+// v3 migration — plan §PR 6 (classifier + migrator + backfill + cutover).
+export {
+  classifyMemoryKind,
+  classifyMemoriesForMigration,
+  buildClassifierReport,
+} from './migration/classifier.js'
+export type {
+  MigrationClass,
+  MigrationClassification,
+  ClassifiedRow,
+  MigrationClassifierReport,
+  ClassifyOptions,
+} from './migration/classifier.js'
+
 // Entities
 export { linkMemoryToEntity, getMemoryEntities } from './entities.js'
 
