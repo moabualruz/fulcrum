@@ -104,6 +104,7 @@ export type {
 
 // L1 curator backends (memory v3 PR 3 units 3.2-3.4)
 export { codexBackend, invokeCodex, isCodexAvailable } from './l1/curator-backend/codex.js'
+export { piBackend } from './l1/curator-backend/pi.js'
 
 // Types
 export type {
