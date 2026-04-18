@@ -107,6 +107,10 @@ export { codexBackend, invokeCodex, isCodexAvailable } from './l1/curator-backen
 export { piBackend } from './l1/curator-backend/pi.js'
 export { openaiBackend, invokeOpenAI, isOpenAIAvailable } from './l1/curator-backend/openai.js'
 
+// L1 curator apply-layer (memory v3 PR 3 unit 3.5)
+export { applyCuratorOutput } from './l1/apply.js'
+export type { ApplyContext, ApplyResult } from './l1/apply.js'
+
 // Types
 export type {
   MemoryScope,
