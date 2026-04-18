@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import { loadTemplate as packageLoadTemplate, resetTemplateCache } from '../l1/templates/index.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const templatesDir = join(here, '..', 'l1', 'templates')
@@ -86,5 +87,22 @@ describe('L1 templates — no accidental non-curly placeholders', () => {
   it.each(TEMPLATE_NAMES)('%s has no TODO / FIXME / XXX markers', (name) => {
     const body = loadTemplate(name)
     expect(body).not.toMatch(/\b(TODO|FIXME|XXX)\b/)
+  })
+})
+
+describe('packageLoadTemplate — runtime loader parity', () => {
+  // The runtime loader resolves via `import.meta.url`; in vitest that's the
+  // source directory. Parity asserts the loader returns the same bytes as
+  // reading the .md directly, so a silent loader regression would fail.
+  it.each(TEMPLATE_NAMES)('loadTemplate(%s) matches the raw file', (name) => {
+    resetTemplateCache()
+    expect(packageLoadTemplate(name)).toBe(loadTemplate(name))
+  })
+
+  it('caches subsequent reads', () => {
+    resetTemplateCache()
+    const first = packageLoadTemplate('entity')
+    const second = packageLoadTemplate('entity')
+    expect(first).toBe(second)
   })
 })

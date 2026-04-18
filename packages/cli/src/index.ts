@@ -280,6 +280,7 @@ fulcrum memory — memory vault commands
   accelerate       Enable L2 graph + vector search on existing vault
   rebuild          Rebuild L1 SQLite from L0 vault files
   status           Show vault info
+  page             L1 curated-page template scaffolding (v3 PR 2)
   sweep-expired              Delete session-scope memories whose expires_at has passed
   graph-consistency-check    Sample SQLite ↔ Kuzu and report drift (requires L2)
   rollback                   Operator-only rollback (--since= + --yes-i-really-want-to-undo-N-writes)
@@ -370,6 +371,35 @@ fulcrum memory — memory vault commands
     }
     console.log('')
     return
+  }
+
+  // Memory v3 PR 2 unit 2.7 — operator-facing template stub.
+  if (command === 'page') {
+    const sub = args[2]
+    if (!sub || sub === '--help' || sub === '-h') {
+      console.log(`
+fulcrum memory page — L1 curated-page template scaffolding (memory v3 PR 2)
+
+  create --template <entity|concept|page|synthesis>
+      Print the rendered template to stdout. Operator debugging only;
+      curator pipeline (PR 3) is the production writer.
+`)
+      process.exit(0)
+    }
+    if (sub === 'create') {
+      const templateFlagIdx = args.indexOf('--template')
+      const templateName = templateFlagIdx >= 0 ? args[templateFlagIdx + 1] : undefined
+      const allowed = ['entity', 'concept', 'page', 'synthesis'] as const
+      if (!templateName || !(allowed as readonly string[]).includes(templateName)) {
+        console.error(`fulcrum memory page create: --template <${allowed.join('|')}> required`)
+        process.exit(1)
+      }
+      const { loadTemplate } = await import('fulcrum-memory')
+      console.log(loadTemplate(templateName as (typeof allowed)[number]))
+      return
+    }
+    console.error(`Unknown subcommand: memory page ${sub}`)
+    process.exit(1)
   }
 
   // v2a PR 9 Task 45 + v2b PR 9 follow-up — operator-invokable expiration sweep.

@@ -18,6 +18,57 @@ export type {
 } from './l0/types.js'
 export { L0_SOURCE_TYPES } from './l0/types.js'
 
+// L1 page primitives (memory v3 PR 2)
+export { loadTemplate, resetTemplateCache } from './l1/templates/index.js'
+export {
+  serializeCuratedPage,
+  parseCuratedPage,
+  L1_PAGE_TYPES,
+  L1_RETENTION_TIERS,
+} from './l1/frontmatter.js'
+export type {
+  CuratedPage,
+  L1PageType,
+  L1RetentionTier,
+} from './l1/frontmatter.js'
+export {
+  extractWikilinks,
+  renderRawWikilink,
+  resolveWikilink,
+} from './l1/wikilinks.js'
+export type { L0WikilinkParts } from './l1/wikilinks.js'
+export {
+  upsertEntity,
+  addEdge,
+  getEntityGraph,
+  entityExists,
+} from './l1/entities.js'
+export type {
+  EntityRow,
+  EdgeRow,
+  UpsertEntityInput,
+  AddEdgeInput,
+  EntityGraph,
+} from './l1/entities.js'
+export {
+  validateL1Page,
+  L1TemplateViolationError,
+} from './l1/validator.js'
+export type {
+  L1Violation,
+  L1ViolationCode,
+  L1ValidationResult,
+  L1ValidationContext,
+} from './l1/validator.js'
+export {
+  createCuratedPage,
+  readCuratedPage,
+  updateCuratedPage,
+  supersedeCuratedPage,
+  curatedRelativePath,
+} from './l1/page.js'
+export type { CreateCuratedPageOptions } from './l1/page.js'
+
 // Types
 export type {
   MemoryScope,
