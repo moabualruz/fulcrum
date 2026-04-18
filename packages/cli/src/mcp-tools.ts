@@ -163,6 +163,72 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Get Memory Sources',
+    name: 'get_memory_sources',
+    description: 'Walk an L1 curated page back to its L0 sources: both frontmatter `sources[]` entries and inline `[[raw/...]]` wikilinks are resolved. Returns per-source { l0_id, source_type, snippet, vault_path, created_at }. Missing sources are reported with source_type="missing" so callers never silently lose a reference.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: { page_id: { type: 'string', description: 'L1 curated page id' } },
+      required: ['page_id'],
+    },
+  },
+  {
+    title: 'Inspect Memory',
+    name: 'inspect_memory',
+    description: 'Dump a full L1 curated page — frontmatter, body, serialized form, and resolved wikilink absolute paths (exists flag per link). Use when an agent needs the full page text before deciding whether to mark it wrong or override a claim.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: { page_id: { type: 'string', description: 'L1 curated page id' } },
+      required: ['page_id'],
+    },
+  },
+  {
+    title: 'Read Raw Source',
+    name: 'read_raw_source',
+    description: 'Return the full body of an L0 raw source (the audit root). Strips the file frontmatter so only the captured bytes land in the response.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: { l0_id: { type: 'string', description: 'L0 source id (the ULID from l0_sources.source_id)' } },
+      required: ['l0_id'],
+    },
+  },
+  {
+    title: 'Trace Claim',
+    name: 'trace_claim',
+    description: 'Reverse lookup: given a substring, return every L1 page whose body contains it, ranked by confidence. Each hit carries a snippet around the match plus match_count + sources[] so the caller can jump to the L0 provenance.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        claim: { type: 'string', description: 'Substring to search for (case-insensitive)' },
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+        limit: { type: 'number', description: 'Max hits (default 20)' },
+      },
+      required: ['claim'],
+    },
+  },
+  {
+    title: 'Mark Memory Wrong',
+    name: 'mark_memory_wrong',
+    description: 'Flag an L1 page as incorrect. Writes a new L0 correction entry under `raw/correction/` capturing the reason and (optional) correction_body. Does NOT auto-run the curator — the operator or a scheduled pass triggers re-curation; the correction L0 entry is the input the curator will consume to supersede the flagged page.',
+    annotations: { idempotentHint: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page_id: { type: 'string', description: 'L1 page to flag' },
+        reason: { type: 'string', description: 'Why this page is wrong' },
+        correction_body: { type: 'string', description: 'Optional detailed correction text' },
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+      },
+      required: ['page_id', 'reason', 'workspace_id'],
+    },
+  },
+  {
     title: 'Write Memory',
     name: 'write_memory',
     description: 'Persists a memory note to vault (L0), SQLite FTS5 (L1), and vector index (L2). Effect: writes memory row + vault file. Returns: saved=true, memory_id, project_id, tags. Requires content. workspace_id and project_id are optional — defaults to cwd context.',

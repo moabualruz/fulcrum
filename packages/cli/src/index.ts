@@ -284,6 +284,11 @@ fulcrum memory — memory vault commands
   curate           Run curator pipeline on a single L0 source (v3 PR 3)
   reindex-l2       Re-embed L1 pages and/or code chunks (v3 PR 4)
   recall           FTS5 + vec + graph fused recall (v3 PR 5)
+  sources          Walk L1 page → L0 sources (v3 PR 5)
+  inspect          Dump a full L1 page (v3 PR 5)
+  read-raw         Print an L0 source body (v3 PR 5)
+  trace            Reverse lookup: find pages containing a claim (v3 PR 5)
+  mark-wrong       Write a correction L0 entry (v3 PR 5)
   sweep-expired              Delete session-scope memories whose expires_at has passed
   graph-consistency-check    Sample SQLite ↔ Kuzu and report drift (requires L2)
   rollback                   Operator-only rollback (--since= + --yes-i-really-want-to-undo-N-writes)
@@ -464,6 +469,81 @@ Flags:
     if (reasoning) params.reasoning = reasoning
     const result = await curateMemory(params)
     console.log(JSON.stringify(result, null, 2))
+    return
+  }
+
+  // Memory v3 PR 5 unit 5.4 — inspection + correction surface.
+  if (command === 'sources') {
+    const pageId = args[2]
+    if (!pageId || pageId === '--help' || pageId === '-h') {
+      console.log(`fulcrum memory sources <page_id>\n\nWalk L1 page → L0 sources (frontmatter + inline wikilinks).`)
+      process.exit(pageId ? 0 : 1)
+    }
+    const { sources } = await import('./commands/memory-inspection.js')
+    console.log(JSON.stringify(sources(pageId), null, 2))
+    return
+  }
+
+  if (command === 'inspect') {
+    const pageId = args[2]
+    if (!pageId || pageId === '--help' || pageId === '-h') {
+      console.log(`fulcrum memory inspect <page_id>\n\nDump the full L1 page (frontmatter + body + resolved wikilinks).`)
+      process.exit(pageId ? 0 : 1)
+    }
+    const { inspect } = await import('./commands/memory-inspection.js')
+    console.log(JSON.stringify(inspect(pageId), null, 2))
+    return
+  }
+
+  if (command === 'read-raw') {
+    const l0Id = args[2]
+    if (!l0Id || l0Id === '--help' || l0Id === '-h') {
+      console.log(`fulcrum memory read-raw <l0_id>\n\nPrint the full body of an L0 source.`)
+      process.exit(l0Id ? 0 : 1)
+    }
+    const { readRaw } = await import('./commands/memory-inspection.js')
+    console.log(JSON.stringify(readRaw(l0Id), null, 2))
+    return
+  }
+
+  if (command === 'trace') {
+    const claim = args[2]
+    if (!claim || claim === '--help' || claim === '-h') {
+      console.log(`fulcrum memory trace "<claim>"\n\nReverse lookup — L1 pages containing the claim substring.`)
+      process.exit(claim ? 0 : 1)
+    }
+    const { projectIdsFromPath } = await import('fulcrum-agent-core')
+    const ctx = projectIdsFromPath(process.cwd())
+    const { trace } = await import('./commands/memory-inspection.js')
+    const limitIdx = args.indexOf('--limit')
+    const limit = limitIdx >= 0 ? Number(args[limitIdx + 1]) : undefined
+    const opts: Parameters<typeof trace>[1] = { workspace_id: ctx.workspace_id, project_id: ctx.project_id }
+    if (limit !== undefined) opts.limit = limit
+    console.log(JSON.stringify(trace(claim, opts), null, 2))
+    return
+  }
+
+  if (command === 'mark-wrong') {
+    const pageId = args[2]
+    const reasonIdx = args.indexOf('--reason')
+    const reason = reasonIdx >= 0 ? args[reasonIdx + 1] : undefined
+    if (!pageId || !reason || pageId === '--help' || pageId === '-h') {
+      console.log(`fulcrum memory mark-wrong <page_id> --reason "<why>" [--correction "<detail>"]\n\nWrite a correction L0 entry. Curator re-run must be triggered separately.`)
+      process.exit(pageId && reason ? 0 : 1)
+    }
+    const { projectIdsFromPath } = await import('fulcrum-agent-core')
+    const ctx = projectIdsFromPath(process.cwd())
+    const { markWrong } = await import('./commands/memory-inspection.js')
+    const correctionIdx = args.indexOf('--correction')
+    const corrBody = correctionIdx >= 0 ? args[correctionIdx + 1] : undefined
+    const input: Parameters<typeof markWrong>[0] = {
+      page_id: pageId,
+      reason,
+      workspace_id: ctx.workspace_id,
+      project_id: ctx.project_id,
+    }
+    if (corrBody !== undefined) input.correction_body = corrBody
+    console.log(JSON.stringify(markWrong(input), null, 2))
     return
   }
 

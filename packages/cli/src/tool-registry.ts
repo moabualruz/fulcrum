@@ -638,6 +638,65 @@ TOOL_REGISTRY.set('update_task', {
 
 // ── Memory tools ────────────────────────────────────────────────────────────
 
+// Memory v3 PR 5 unit 5.4 — inspection + correction surface (MCP parity).
+TOOL_REGISTRY.set('get_memory_sources', {
+  schema: TOOL_SCHEMA_MAP.get('get_memory_sources'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args) => {
+    const { sources } = await import('./commands/memory-inspection.js')
+    return sources(args['page_id'] as string)
+  },
+})
+
+TOOL_REGISTRY.set('inspect_memory', {
+  schema: TOOL_SCHEMA_MAP.get('inspect_memory'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args) => {
+    const { inspect } = await import('./commands/memory-inspection.js')
+    return inspect(args['page_id'] as string)
+  },
+})
+
+TOOL_REGISTRY.set('read_raw_source', {
+  schema: TOOL_SCHEMA_MAP.get('read_raw_source'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args) => {
+    const { readRaw } = await import('./commands/memory-inspection.js')
+    return readRaw(args['l0_id'] as string)
+  },
+})
+
+TOOL_REGISTRY.set('trace_claim', {
+  schema: TOOL_SCHEMA_MAP.get('trace_claim'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { trace } = await import('./commands/memory-inspection.js')
+    const opts: Parameters<typeof trace>[1] = {}
+    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
+    if (ws) opts.workspace_id = ws
+    if (args['project_id'] !== undefined) opts.project_id = args['project_id'] as string
+    if (args['limit'] !== undefined) opts.limit = args['limit'] as number
+    return trace(args['claim'] as string, opts)
+  },
+})
+
+TOOL_REGISTRY.set('mark_memory_wrong', {
+  schema: TOOL_SCHEMA_MAP.get('mark_memory_wrong'),
+  capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { markWrong } = await import('./commands/memory-inspection.js')
+    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
+    const input: Parameters<typeof markWrong>[0] = {
+      page_id: args['page_id'] as string,
+      reason: args['reason'] as string,
+      workspace_id: ws,
+    }
+    if (args['correction_body'] !== undefined) input.correction_body = args['correction_body'] as string
+    if (args['project_id'] !== undefined) input.project_id = args['project_id'] as string
+    return markWrong(input)
+  },
+})
+
 TOOL_REGISTRY.set('recall_knowledge', {
   schema: TOOL_SCHEMA_MAP.get('recall_knowledge'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
