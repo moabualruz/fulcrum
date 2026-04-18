@@ -281,6 +281,8 @@ fulcrum memory — memory vault commands
   rebuild          Rebuild L1 SQLite from L0 vault files
   status           Show vault info
   page             L1 curated-page template scaffolding (v3 PR 2)
+  curate           Run curator pipeline on a single L0 source (v3 PR 3)
+  reindex-l2       Re-embed L1 pages and/or code chunks (v3 PR 4)
   sweep-expired              Delete session-scope memories whose expires_at has passed
   graph-consistency-check    Sample SQLite ↔ Kuzu and report drift (requires L2)
   rollback                   Operator-only rollback (--since= + --yes-i-really-want-to-undo-N-writes)
@@ -461,6 +463,34 @@ Flags:
     if (reasoning) params.reasoning = reasoning
     const result = await curateMemory(params)
     console.log(JSON.stringify(result, null, 2))
+    return
+  }
+
+  // Memory v3 PR 4 unit 4.3 — operator one-shot re-embedder.
+  if (command === 'reindex-l2') {
+    if (args.includes('--help') || args.includes('-h')) {
+      console.log(`
+fulcrum memory reindex-l2 [--pages] [--code]
+
+Unconditionally rewrite L2 vectors. Default (no flag) reindexes both scopes.
+
+Flags:
+  --pages    Walk memories (schema_version >= 3) and refill vec_memories.
+  --code     Walk code_chunks and refill vec_chunks.
+
+Exit 0 when every row embeds cleanly. Exit 2 if any row fails (see
+'failed' counter in the JSON output).
+`)
+      process.exit(0)
+    }
+    await warmEmbedding()
+    const { reindexL2 } = await import('./commands/memory-reindex-l2.js')
+    const input: Parameters<typeof reindexL2>[0] = {}
+    if (args.includes('--pages')) input.pages = true
+    if (args.includes('--code')) input.code = true
+    const result = await reindexL2(input)
+    console.log(JSON.stringify(result, null, 2))
+    if (result.pages.failed > 0 || result.code.failed > 0) process.exit(2)
     return
   }
 

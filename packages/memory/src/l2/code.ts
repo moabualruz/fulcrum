@@ -30,7 +30,11 @@ export async function storeChunkEmbedding(db: Db, chunk_id: string, text: string
     const embedFn = (embedder.embedDocument ?? embedder.embed).bind(embedder)
     const vec = await embedFn(text)
     const buf = Buffer.from(vec.buffer)
-    db.prepare('INSERT OR REPLACE INTO vec_chunks(chunk_id, embedding) VALUES (?, ?)').run(chunk_id, buf)
+    // vec0 virtual tables do not honour INSERT OR REPLACE — repeat inserts
+    // for the same chunk_id throw UNIQUE constraint. Explicit DELETE + INSERT
+    // gives upsert semantics and matches ./embed.ts + sweep.ts.
+    db.prepare('DELETE FROM vec_chunks WHERE chunk_id = ?').run(chunk_id)
+    db.prepare('INSERT INTO vec_chunks(chunk_id, embedding) VALUES (?, ?)').run(chunk_id, buf)
     db.prepare('UPDATE code_chunks SET embedding = ? WHERE chunk_id = ?').run(buf, chunk_id)
   } catch (err) {
     process.stderr.write(`[embed] chunk ${chunk_id} failed: ${err instanceof Error ? err.message : String(err)}\n`)
