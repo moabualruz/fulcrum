@@ -1,6 +1,6 @@
 // packages/memory/src/write.ts
 import { createHash } from 'crypto'
-import { getDb, FulcrumError, newId, Db, getTextEmbedder } from 'fulcrum-agent-core'
+import { getDb, FulcrumError, newId, Db } from 'fulcrum-agent-core'
 import { contentHash, isDuplicate } from './dedup.js'
 import { rowToFullMemory } from './mappers.js'
 import { getVaultPath, vaultExists, writeMemoryFile, getMemoryFilePath } from './vault/client.js'
@@ -12,189 +12,15 @@ import { computeSparseVector } from './sparse.js'
 import { validateKind, applyKindCap } from './validate-kind.js'
 import { sanitizeOnWrite } from './sanitize/index.js'
 import { appendWal } from './wal/writer.js'
+import { enqueueEmbed, trackAsyncWork } from './l2/queue.js'
+import { storeEmbeddingInVec } from './l2/embed.js'
 
-// ── Bounded-concurrency embedding queue ──────────────────────────────────
-// Firing thousands of embeddings simultaneously deadlocks ONNX: every request
-// queues against the single worker thread, pending promises pile up, memory
-// pressure mounts, and none resolve. At 2-100 concurrent chunks the pipeline
-// works; at 6000+ every POST-EMBEDFN stays pending indefinitely.
-//
-// The queue caps in-flight embeddings at EMBED_CONCURRENCY (default 4, tunable
-// via FULCRUM_EMBED_CONCURRENCY). Each enqueued promise resolves when its own
-// embedding completes. flushPendingMemoryWrites awaits the entire queue so
-// short-lived CLI processes land embeddings before process.exit.
-const EMBED_CONCURRENCY = Math.max(1, Number(process.env['FULCRUM_EMBED_CONCURRENCY'] ?? 4) || 4)
-
-interface QueueItem {
-  run: () => Promise<unknown>
-  resolve: () => void
-  reject: (err: unknown) => void
-}
-
-const embedQueue: QueueItem[] = []
-let embedInFlight = 0
-const embedIdleWaiters: Array<() => void> = []
-
-let _embedPumpLogCount = 0
-function pumpEmbedQueue(): void {
-  while (embedInFlight < EMBED_CONCURRENCY && embedQueue.length > 0) {
-    const item = embedQueue.shift()!
-    embedInFlight++
-    if (process.env['FULCRUM_DIAG_EMBED']) {
-      _embedPumpLogCount++
-      if (_embedPumpLogCount <= 20 || _embedPumpLogCount % 100 === 0) {
-        process.stderr.write(`[diag-queue] start #${_embedPumpLogCount} inflight=${embedInFlight} queue=${embedQueue.length}\n`)
-      }
-    }
-    item.run()
-      .then(() => item.resolve(), (err) => item.reject(err))
-      .finally(() => {
-        embedInFlight--
-        if (process.env['FULCRUM_DIAG_EMBED'] && (_embedPumpLogCount <= 20 || _embedPumpLogCount % 100 === 0)) {
-          process.stderr.write(`[diag-queue] done inflight=${embedInFlight} queue=${embedQueue.length}\n`)
-        }
-        if (embedInFlight === 0 && embedQueue.length === 0) {
-          const waiters = embedIdleWaiters.splice(0)
-          for (const w of waiters) w()
-        }
-        pumpEmbedQueue()
-      })
-  }
-}
-
-/** Enqueue an embedding task; returns a promise that resolves when it runs. */
-function enqueueEmbed(task: () => Promise<unknown>): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    embedQueue.push({ run: task, resolve, reject })
-    pumpEmbedQueue()
-  })
-}
-
-// Backpressure thresholds — bulk ingest paths await waitForEmbedHeadroom()
-// so the scan stays roughly in sync with the embedder. Without this the scan
-// buffers thousands of text strings and crowds the embedder's native thread.
-const EMBED_HIGH_WATER = Math.max(8, EMBED_CONCURRENCY * 4)
-const EMBED_LOW_WATER = Math.max(2, EMBED_CONCURRENCY)
-
-/**
- * Resolve once the in-flight + queued embed count is below the low-water
- * mark. Callers performing bulk ingest (initial scan, backfill) should await
- * this between batches so embeds drain alongside writes.
- */
-export async function waitForEmbedHeadroom(): Promise<void> {
-  if (embedQueue.length + embedInFlight <= EMBED_HIGH_WATER) return
-  while (embedQueue.length + embedInFlight > EMBED_LOW_WATER) {
-    await new Promise<void>((resolve) => setImmediate(resolve))
-  }
-}
-
-// Non-embed async work (L2 extraction, Kuzu reducers) still uses the
-// promise-tracker pattern since those are individually fast and independent.
-const pendingAsyncWork = new Set<Promise<unknown>>()
-
-function trackAsyncWork<T>(p: Promise<T>): Promise<T> {
-  pendingAsyncWork.add(p)
-  p.finally(() => pendingAsyncWork.delete(p))
-  return p
-}
-
-/**
- * Await every fire-and-forget embedding + extraction promise spawned by
- * writeMemory / scheduleChunkEmbedding. Intended for short-lived CLI entry
- * points about to call process.exit(). Returns once all pending work settles
- * or the timeout fires (default 30s for heavy backfill scenarios) — never
- * throws.
- */
-export async function flushPendingMemoryWrites(timeoutMs = 30_000): Promise<void> {
-  // Drain both the embed queue AND the untracked extraction work.
-  const queueDrained: Promise<void> = (embedQueue.length === 0 && embedInFlight === 0)
-    ? Promise.resolve()
-    : new Promise<void>((resolve) => embedIdleWaiters.push(resolve))
-  const otherWork = pendingAsyncWork.size === 0
-    ? Promise.resolve()
-    : Promise.allSettled([...pendingAsyncWork]).then(() => undefined)
-  const all = Promise.all([queueDrained, otherWork])
-  const timeout = new Promise<'timeout'>((r) => {
-    const t = setTimeout(() => r('timeout'), timeoutMs)
-    t.unref?.()
-  })
-  const result = await Promise.race([all, timeout])
-  if (result === 'timeout' && process.env['FULCRUM_VERBOSE']) {
-    process.stderr.write(`[write] flushPendingMemoryWrites: queue=${embedQueue.length} inflight=${embedInFlight} pending=${pendingAsyncWork.size} after ${timeoutMs}ms\n`)
-  }
-}
-
-/**
- * Generate an embedding for `text` and store it in:
- *   - vec_memories (rowid + float vector) for ANN search
- *   - memories.embedding (blob) for inspection / rebuild
- * Fire-and-forget: call inside setImmediate or as a detached async task.
- * Non-fatal — if the embedder is unavailable the function returns silently.
- * Exported so the rebuild path and CLI backfill can call it explicitly.
- */
-export async function storeEmbeddingInVec(db: Db, memory_id: string, text: string): Promise<void> {
-  const embedder = getTextEmbedder()
-  if (!embedder) {
-    if (process.env['FULCRUM_VERBOSE']) {
-      process.stderr.write(`[embed] skipped ${memory_id}: no embedder registered\n`)
-    }
-    return
-  }
-  try {
-    const exists = db.prepare('SELECT 1 FROM memories WHERE memory_id = ?').get(memory_id)
-    if (!exists) return
-    const embedFn = (embedder.embedDocument ?? embedder.embed).bind(embedder)
-    const vec = await embedFn(text)
-    const buf = Buffer.from(vec.buffer)
-    db.prepare('INSERT OR REPLACE INTO vec_memories(memory_id, embedding) VALUES (?, ?)').run(memory_id, buf)
-    db.prepare('UPDATE memories SET embedding = ? WHERE memory_id = ?').run(buf, memory_id)
-  } catch (err) {
-    // vec_memories is non-fatal but silent failures hide real bugs (missing
-    // sqlite-vec, dim mismatch, disk full). Log once per error.
-    process.stderr.write(`[embed] ${memory_id} failed: ${err instanceof Error ? err.message : String(err)}\n`)
-  }
-}
-
-/**
- * Embed a code chunk's text and store it in vec_chunks + code_chunks.embedding.
- * Parallel to storeEmbeddingInVec; kept here so the pending-write tracker and
- * telemetry path stays in one place. Silent when vec0 extension is missing.
- */
-let _chunkEmbedLoggedOnce = false
-export async function storeChunkEmbedding(db: Db, chunk_id: string, text: string): Promise<void> {
-  const embedder = getTextEmbedder()
-  if (!embedder) {
-    if (!_chunkEmbedLoggedOnce) {
-      _chunkEmbedLoggedOnce = true
-      process.stderr.write(`[embed] no embedder registered — chunk embeddings disabled (first chunk ${chunk_id})\n`)
-    }
-    return
-  }
-  try {
-    const exists = db.prepare('SELECT 1 FROM code_chunks WHERE chunk_id = ?').get(chunk_id)
-    if (!exists) return
-    const embedFn = (embedder.embedDocument ?? embedder.embed).bind(embedder)
-    const vec = await embedFn(text)
-    const buf = Buffer.from(vec.buffer)
-    db.prepare('INSERT OR REPLACE INTO vec_chunks(chunk_id, embedding) VALUES (?, ?)').run(chunk_id, buf)
-    db.prepare('UPDATE code_chunks SET embedding = ? WHERE chunk_id = ?').run(buf, chunk_id)
-  } catch (err) {
-    process.stderr.write(`[embed] chunk ${chunk_id} failed: ${err instanceof Error ? err.message : String(err)}\n`)
-  }
-}
-
-/**
- * Enqueue a chunk embedding — bounded concurrency (EMBED_CONCURRENCY).
- * Returns immediately; the embedding runs when a slot frees up. CLI callers
- * drain via flushPendingMemoryWrites before exit. Prevents the ONNX deadlock
- * observed when thousands of concurrent embeds pile up.
- */
-export function scheduleChunkEmbedding(db: Db, chunk_id: string, text: string): void {
-  void enqueueEmbed(() => storeChunkEmbedding(db, chunk_id, text))
-    .catch((err: unknown) => {
-      process.stderr.write(`[embed] chunk ${chunk_id}: ${err instanceof Error ? err.message : String(err)}\n`)
-    })
-}
+// The embed queue, chunk embedder, and flush/headroom helpers moved to
+// packages/memory/src/l2/ during PR 4 unit 4.1. Re-exported here so existing
+// callers (cli, pci, indexer) keep compiling against `./write.js`.
+export { flushPendingMemoryWrites, waitForEmbedHeadroom } from './l2/queue.js'
+export { storeEmbeddingInVec } from './l2/embed.js'
+export { storeChunkEmbedding, scheduleChunkEmbedding } from './l2/code.js'
 
 function bodyHash(text: string): string {
   const hex = createHash('sha256').update(text).digest('hex')
