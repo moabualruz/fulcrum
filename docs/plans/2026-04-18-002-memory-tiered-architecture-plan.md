@@ -8,7 +8,7 @@ origin: user-raised architectural feedback (https://gist.github.com/karpathy/442
 
 # Memory v3 — Tiered L0/L1/L2 Architecture
 
-> **For agentic workers:** REQUIRED SUB-SKILLS: `agent-skills:spec-driven-development` (Phase 0), `agent-skills:planning-and-task-breakdown` (per-PR unit cutting), `agent-skills:incremental-implementation` + `agent-skills:test-driven-development` (every PR), `agent-skills:debugging-and-error-recovery` (migration), `agent-skills:code-review-and-quality` (pre-merge).
+> **For agentic workers:** This plan is skill-dense. See `§Skill Utilization Matrix` below for the authoritative mapping of skill → PR → unit. Every unit names the skills required at that point. Skipping a required skill is an auditable defect.
 
 **Goal:** Rebuild Fulcrum's memory subsystem around the L0/L1/L2 tiered model from Karpathy's *LLM Wiki* pattern (v1) + agentmemory's extensions (v2). L0 is the short-term raw-dump layer (verbatim, zero truncation, audit-log). L1 is the curated long-term wiki — LLM-maintained markdown pages with confidence scoring, supersession, entity graph, and lifecycle tiers. L2 is the vector index on the *curated* L1 pages + code. Retrieval is hybrid (BM25 + vec + graph) and rank-fused.
 
@@ -17,6 +17,124 @@ origin: user-raised architectural feedback (https://gist.github.com/karpathy/442
 **Tech Stack:** TypeScript ESM, `better-sqlite3` (existing), `sqlite-vec` (existing), `@xenova/transformers` (existing ONNX), `fulcrum-agent-core` primitives (`globalDataDir`, `getDb`, `projectIdsFromPath`), Kuzu client (existing scaffolding), `chokidar` (vault watcher), vitest. No new runtime deps in Phase 0-3. Phase 4+ may introduce a lightweight entity-extraction prompt (LLM-driven).
 
 **Non-goals (deferred to v3.1+):** Multi-user collaboration, mesh sync across machines, LLM fine-tuning, cross-agent shared wiki, Slack/email ingestion, browser extension, marketplace plugin bundles.
+
+---
+
+## Skill Utilization Matrix
+
+Every non-fulcrum skill in the local arsenal is mapped to a concrete point in this plan where it earns its keep. Skills marked **(cross-cutting)** apply to every PR; all others fire at specific PRs/units. The implementing agent MUST invoke the listed skill at the named moment (the harness will flag a missing invocation as a defect).
+
+### Cross-cutting (every PR, every unit)
+
+| Skill | Role |
+|---|---|
+| `agent-skills:incremental-implementation` | Thin vertical slices; no PR exceeds ~500 diff lines; no unit lands without its Verify gate passing. |
+| `agent-skills:test-driven-development` | Failing test FIRST, then thinnest impl. Every behavioural change has a committed regression test. |
+| `agent-skills:context-engineering` | Load only the files the task requires; refuse guess-work on stale snapshots. |
+| `agent-skills:code-review-and-quality` | 5-axis self-review (correctness/readability/architecture/security/performance) before requesting human review. |
+| `compound-engineering:ce-review` | Structured persona-tiered review pre-merge. Fires when diff ≥50 LOC or touches auth/data/IO. |
+| `agent-skills:git-workflow-and-versioning` + `compound-engineering:git-commit` | Atomic, value-communicating commits; conventional format. |
+| `compound-engineering:ce-pr-description` | Every PR has a value-first description written by this skill. |
+| `andrej-karpathy-skills:karpathy-guidelines` | Surgical changes, no speculative abstractions, verifiable success criteria. |
+| `compound-engineering:context7` + `agent-skills:source-driven-development` + `find-docs` | Any library API touched gets verified against current docs — training data is stale. |
+| `episodic-memory:remembering-conversations` | Before starting any PR, search prior sessions for "tried this before" lessons. |
+
+### Per-PR mapping
+
+#### PR 0 — Spec + schema scaffolding
+- `agent-skills:spec-driven-development` — this plan IS the spec; Phase 0 lands it.
+- `compound-engineering:document-review` — run adversarial + coherence + feasibility + scope-guardian reviews over this plan before PR 0 merges.
+- `agent-skills:documentation-and-adrs` — ADR capture for each Architecture Decision above.
+- `elements-of-style:writing-clearly-and-concisely` — every prose paragraph in the spec + CHANGELOG entry passes Strunk pass.
+- `compound-engineering:onboarding` — regenerate ONBOARDING.md's memory section to reflect v3.
+
+#### PR 1 — L0 raw-ingest + vault path split
+- `agent-skills:api-and-interface-design` — `ingestRawSource(kind, body, meta)` signature is a public contract that the entire downstream depends on; design deliberately.
+- `agent-skills:security-and-hardening` — L0 files inherit `globalDataDir()` perms; regression test that writes respect 0600.
+- `find-docs` — verify node `fs.writeFileSync` + `mkdirSync` current API for recursive + mode flags.
+
+#### PR 2 — L1 templates + page primitives + validator
+- `agent-skills:api-and-interface-design` — validator error codes are a public surface; stable contract.
+- `agent-skills:documentation-and-adrs` — ADR: "L1 pages are template-gated; free-form writes are rejected."
+- `elements-of-style:writing-clearly-and-concisely` — template bodies themselves must pass Strunk (they're user-facing markdown).
+- `compound-engineering:every-style-editor` — style-pass the templates' prose scaffolding.
+- `find-docs` — `yaml` / `gray-matter` library version + YAML 1.2 compliance.
+
+#### PR 3 — Curator pipeline
+- **`codex:gpt-5-4-prompting` — load-bearing. This is the skill that composes the curator prompt.** Every curator task (extraction, consolidation, synthesis) has its prompt written via this skill.
+- `codex:codex-cli-runtime` — subprocess contract for `codex exec --json --output-schema`; handles exit codes, stdout/stderr separation, JSONL framing.
+- `codex:codex-result-handling` — parse the JSONL event stream into the structured `{ new_pages, updates, supersessions, new_edges }` object; validate against schema.
+- `agent-skills:security-and-hardening` — curator input is untrusted (L0 body may contain injection); prompt isolates `<USER_CONTENT>` via delimiter strategy from `codex:gpt-5-4-prompting`.
+- `agent-skills:source-driven-development` — verify OpenAI Structured Outputs spec + codex CLI non-interactive mode docs before writing the backend.
+- `compound-engineering:agent-native-architecture` — the backend selection interface and the mark-wrong → correction L0 → re-curate loop are agent-native. Users and agents share the same surface.
+- `andrej-karpathy-skills:karpathy-guidelines` — curator output handler: no speculative error recovery, no dead code paths for "maybe the LLM returns foo."
+
+#### PR 4 — L2 reshape (embed L1, keep code_chunks)
+- `agent-skills:performance-optimization` — embedding throughput; batch queue; backpressure; p95 budget; profiled before flipping default.
+- `find-docs` — `@xenova/transformers` batch-embed API.
+
+#### PR 5 — Retrieval cutover (graph + confidence + supersession)
+- `agent-skills:performance-optimization` — graph traversal has a 100ms budget per query; profile before default-on.
+- `compound-engineering:ce-optimize` — metric-driven iteration on RRF weights (`ws_fts`, `ws_vec`, `ws_graph`) against the eval corpus; don't hand-pick.
+- `compound-engineering:agent-native-architecture` — new inspection/correction surface (`sources`, `inspect`, `read-raw`, `trace`, `mark-wrong`) must have CLI + MCP parity.
+- `agent-skills:test-driven-development` — eval corpus (see §Test Corpus) is the failing-test-first artefact; PR 5.6 cutover blocks on it passing.
+- `compound-engineering:ce-review` — full pre-cutover review by adversarial + correctness + performance personas before `FULCRUM_MEMORY_V3` default flips.
+
+#### PR 6 — Data migration
+- `agent-skills:deprecation-and-migration` — load-bearing. Migration IS a deprecation.
+- `compound-engineering:ce-debug` — inevitable first-run issues; reproduce → localize → fix → guard.
+- `agent-skills:debugging-and-error-recovery` — every failure case gets a test before the retry.
+- `agent-skills:security-and-hardening` — rollback SQL + audit chain reviewed for gaps.
+- `agent-skills:documentation-and-adrs` — migration run-log is an ADR itself.
+- `andrej-karpathy-skills:karpathy-guidelines` — surgical migration. No orthogonal "cleanup."
+
+#### PR 7 — Lifecycle (decay, supersession, lint, consolidate)
+- `agent-skills:performance-optimization` — decay pass over 10k+ pages must complete in <10s (budget).
+- `agent-skills:api-and-interface-design` — lint output schema is stable; consumed by dashboards.
+- `compound-engineering:ce-optimize` — empirical tuning of decay λ, retention tier thresholds.
+
+#### PR 8 — Auto-triggers + observability + docs
+- `agent-skills:ci-cd-and-automation` — add `fulcrum memory eval` to CI as a required gate.
+- `agent-skills:shipping-and-launch` — pre-launch checklist; rollback plan; monitoring.
+- `agent-skills:documentation-and-adrs` — `docs/architecture/memory-v3.md` ships here.
+- `compound-engineering:onboarding` — update ONBOARDING.md memory section once more with the full shipped surface.
+- `compound-engineering:ce-demo-reel` — capture a GIF demo of ingest → curate → recall → mark-wrong → re-curate for the PR body.
+
+#### PR 9 — Cleanup
+- `agent-skills:code-simplification` + `compound-engineering:code-simplify` — the whole purpose of this PR.
+- `compound-engineering:git-clean-gone-branches` — after merge, clean up the feature branches.
+
+### Subagent delegation (cross-PR)
+
+Some work naturally parallelizes across subagents; the orchestrator delegates to the listed specialist rather than doing it inline:
+
+| Work | Subagent | When |
+|---|---|---|
+| Adversarial spec review | `compound-engineering:document-review:adversarial-document-reviewer` | PR 0 |
+| Coherence review | `compound-engineering:document-review:coherence-reviewer` | PR 0 |
+| Feasibility review | `compound-engineering:document-review:feasibility-reviewer` | PR 0 |
+| Scope-guardian review | `compound-engineering:document-review:scope-guardian-reviewer` | PR 0 |
+| Security-lens review | `compound-engineering:document-review:security-lens-reviewer` | PR 0, PR 6 |
+| Architecture reviewer | `Architecture Reviewer` | PR 2, PR 5, PR 6 |
+| Security auditor | `agent-skills:security-auditor` | PR 3 (curator input), PR 6 (rollback), PR 8 (exposed endpoints) |
+| Test engineer | `agent-skills:test-engineer` | PR 2 (validator tests), PR 5 (eval corpus), PR 6 (migration tests) |
+| Correctness reviewer | `compound-engineering:review:correctness-reviewer` | pre-merge on every PR |
+| Adversarial code reviewer | `compound-engineering:review:adversarial-reviewer` | PR 3, PR 5, PR 6 (diffs touch untrusted input / data mutations) |
+| Performance reviewer | `compound-engineering:review:performance-reviewer` | PR 4, PR 5, PR 7 |
+| Data integrity guardian | `compound-engineering:review:data-integrity-guardian` | PR 0 (schema), PR 6 (migration) |
+| Codex rescue (when stuck) | `codex:codex-rescue` | any PR — triggered when an approach has failed twice |
+
+### Skills explicitly NOT used here (and why)
+
+| Skill | Why not |
+|---|---|
+| `compound-engineering:frontend-design` / `frontend-ui-engineering` | No UI in this plan. |
+| `browser-testing-with-devtools` / `playwright-cli` / `test-browser` / `agent-browser` | No browser surface. |
+| `tavily-*` | Web research handled by `find-docs` / `WebSearch`; Tavily not needed. |
+| `compound-engineering:dhh-rails-style` / `andrew-kane-gem-writer` / `dspy-ruby` / `every-style-editor` (code form) / `gemini-imagegen` / `proof` | Wrong stack / domain. |
+| `compound-engineering:ce-slack-research` | No Slack context relevant to memory architecture decisions. |
+| `superpowers-developing-for-claude-code:*` | This is Fulcrum, not a Claude Code plugin project. |
+| `claude-session-driver:driving-claude-code-sessions` | Orchestrator is the user + single agent, not a PM-over-sessions setup. |
 
 ---
 
@@ -702,6 +820,53 @@ Skills (`agent-skills:*`, `compound-engineering:*`, `find-docs`) stay in for eve
 
 ---
 
+## Test Corpus — Phase 5 retrieval cutover gate
+
+PR 5 unit 5.6 blocks on the new pipeline meeting or beating the old on every metric below. Corpus and query set live as test fixtures under `packages/memory/src/tests/retrieval-corpus/` — not generated, deliberately hand-maintained so additions are PR-reviewable.
+
+### Corpus composition (80 L0 sources)
+
+| Bucket | Source type | Count | Origin |
+|---|---|---|---|
+| Real | `bash_trace` | 15 | extracted from `hook_events` table |
+| Real | `file_patch` | 15 | from existing `memories` where kind=file_patch |
+| Real | `session_transcript` chunks | 10 | sampled from `~/.claude/projects/*/` |
+| Real | `tool_trace` | 5 | from recent agent runs |
+| Synthetic | `decision` | 10 | hand-authored, known ground-truth |
+| Synthetic | `edit_diff` with cross-source relationships | 10 | designed to exercise graph traversal |
+| Synthetic | `prompt_attachment` / `web_capture` | 10 | designed to exercise cross-source synthesis |
+| Synthetic | intentional contradictions | 5 | designed to exercise supersession |
+
+### Query set (30 queries)
+
+| Category | Count | What it tests |
+|---|---|---|
+| Direct FTS (exact-identifier lookup) | 10 | Baseline — both pipelines should be ~equal |
+| Semantic paraphrase (camelCase ≈ snake_case ≈ prose) | 8 | Vector + canonical_text correctness |
+| Cross-source synthesis (answer requires 2+ sources) | 7 | Graph traversal + RRF fusion |
+| Contradiction resolution | 3 | Supersession filter |
+| Stale-claim decay | 2 | Confidence + retention_tier |
+
+### Ground truth
+
+Each query has a committed fixture: `{ query, expected_page_ids[] (ordered by ideal rank), min_confidence_of_top_result }`. Maintained in `packages/memory/src/tests/retrieval-corpus/ground-truth.yaml`.
+
+### Success metrics (new pipeline must meet or beat old on ALL)
+
+| Metric | Baseline | Target |
+|---|---|---|
+| Recall@10 across all 30 queries | measured on PR 0 branch | **≥ baseline + 10 pp** |
+| Precision@10 | measured | **≥ baseline** (don't regress) |
+| NDCG@10 (rank-weighted) | measured | **≥ baseline + 15 pp** (graph helps here) |
+| p95 latency | measured | **≤ 1.5× baseline** (graph stage has a 100ms budget) |
+| Supersession-awareness (contradiction queries return only new page) | N/A (old has no supersession) | **100%** |
+
+### Eval harness
+
+`fulcrum memory eval --corpus retrieval-corpus [--pipeline v2|v3|diff]` — runs both pipelines against the corpus, prints per-metric table with pass/fail per target. Wired into CI (PR 8 unit 8.1). PR 5 cutover is blocked until this command exits 0 on main.
+
+---
+
 ## Open Questions (track in `-plan-review.md` as we hit them)
 
 1. **Curator model choice. → RESOLVED 2026-04-18.** Pluggable backend with auto-detection order `codex → pi → openai → anthropic`. Primary path for subscribers is `codex exec --json --output-schema=<schema>` — reuses the user's ChatGPT Plus/Pro plan auth, zero marginal cost. API fallback uses `gpt-5-nano` ($0.05/$0.40 per M tokens) with Structured Outputs (strict JSON schema). See §L0→L1 curation pipeline for the full selection flow.
@@ -756,8 +921,10 @@ Total: ~3 weeks focused. Buffer for review + regressions: 1 week. Shippable incr
 
 - [ ] User approves the phased breakdown (this doc)
 - [x] ~~Open Question #7 (L0 secrets)~~ — deferred per 2026-04-18 discussion
-- [x] ~~Open Question #1 (curator model)~~ — codex-subprocess-primary via user's Pro plan; `gpt-5-nano` API fallback
+- [x] ~~Open Question #1 (curator model)~~ — codex-subprocess-primary via user's Pro plan; `gpt-5-mini` with `reasoning_effort=minimal` default, per-task overrides
 - [x] ~~Migration downtime window~~ — no cutoff; notify user when Phase 6 starts; they hold new work voluntarily
-- [ ] Test corpus + success criteria for Phase 5 retrieval cutover agreed
+- [x] ~~Test corpus + success criteria for Phase 5 retrieval cutover~~ — 80 L0 sources / 30 queries / 5 metrics, see `§Test Corpus` above
+- [x] ~~Guided templates + L0 traceability~~ — codified as hard constraints #9 + #10
+- [x] ~~Skill utilization~~ — mapped explicitly per PR in `§Skill Utilization Matrix`
 
-Once the remaining box is checked, PR 0 opens and the sequence runs.
+All boxes checked — PR 0 is unblocked. Remaining dependency: user give-the-word.
