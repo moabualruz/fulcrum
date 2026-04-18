@@ -164,6 +164,15 @@ export type {
   MigrationClassifierReport,
   ClassifyOptions,
 } from './migration/classifier.js'
+export { migrateMemoryRow, migrateAllMemories } from './migration/migrator.js'
+export type {
+  MigrationRecord,
+  MigrationResult,
+  MigrationBatch,
+  MigrationBatchError,
+  MigrationOptions,
+  MigrateMemoryRowOptions,
+} from './migration/migrator.js'
 
 // Entities
 export { linkMemoryToEntity, getMemoryEntities } from './entities.js'
