@@ -27,6 +27,22 @@ const BINARY_EXTS = new Set([
 
 const HARD_EXCLUDE_DIRS = new Set(['node_modules', '.fulcrum', 'dist', 'build', '.turbo', 'target'])
 
+/**
+ * Predicate: should we mount a watcher on this directory? Applied to directory
+ * paths before descending into them. Mirrors shouldIndexPath's rejection rules
+ * minus the isFile check.
+ */
+export function isIgnoredDirectory(rootDir: string, absDir: string): boolean {
+  const rel = relative(rootDir, absDir).replace(/\\/g, '/')
+  if (rel === '') return false
+  if (rel.startsWith('..')) return true
+  for (const seg of rel.split('/')) {
+    if (seg.startsWith('.') && seg !== '.' && seg !== '..') return true
+    if (HARD_EXCLUDE_DIRS.has(seg)) return true
+  }
+  return false
+}
+
 function hasHiddenSegment(relPath: string): boolean {
   // Reject any path component that starts with '.' (hidden).
   // Allow '.' / '..' themselves — never emitted by the walker.

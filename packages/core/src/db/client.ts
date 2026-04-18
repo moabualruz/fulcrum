@@ -63,8 +63,11 @@ export function _configureDb(db: Database.Database): void {
     const _require = createRequire(import.meta.url)
     const sqliteVec = _require('sqlite-vec') as { load: (db: Database.Database) => void }
     sqliteVec.load(db)
-  } catch {
-    // sqlite-vec optional — vector search degrades to FTS5-only if unavailable
+  } catch (err) {
+    // sqlite-vec optional — vector search degrades to FTS5-only if unavailable.
+    // Surface the error once so misconfiguration is visible (missing native
+    // binary, unsupported arch, etc.) rather than silently degrading.
+    process.stderr.write(`[db] sqlite-vec unavailable — vector search disabled (${err instanceof Error ? err.message : String(err)})\n`)
   }
 }
 

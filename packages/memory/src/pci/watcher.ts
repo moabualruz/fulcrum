@@ -12,10 +12,11 @@
 // Emits ContentChangeEvent (kind='code') on the shared bus after a 100ms
 // debounce — see Task 22a contract.
 
-import { watch, type FSWatcher, statSync, readdirSync } from 'node:fs'
+import { watch, type FSWatcher, type Dirent, statSync, readdirSync } from 'node:fs'
 import { join, basename } from 'node:path'
-import { getContentChangeBus } from 'fulcrum-agent-core'
+import { getContentChangeBus, type ContentChangeEvent } from 'fulcrum-agent-core'
 import { detectFilesystem, shouldUsePollingFallback, type FsKind } from './detect-fs.js'
+import { isIgnoredDirectory, shouldIndexPath } from './walker-integration.js'
 
 export type WatcherMode = 'native' | 'polling'
 
@@ -205,4 +206,77 @@ export function closeWatcherSubtree(dir: string): void {
 
 export function activeWatcherCount(): number {
   return watchers.size
+}
+
+export interface ProjectWatchHandle {
+  readonly rootDir: string
+  /** Snapshot of absolute dirs currently mounted. */
+  readonly watchedDirs: ReadonlySet<string>
+  close: () => void
+}
+
+/**
+ * Recursively mount a non-recursive fs.watch on every non-ignored subdir under
+ * rootDir and keep the mount set current as new dirs appear.
+ *
+ * This is the PRODUCER half of the content-change bus. Without it, startPciSyncer's
+ * subscriber never receives events and nothing gets indexed from filesystem changes.
+ *
+ * Ignore policy mirrors the walker: DEFAULT_IGNORE_PATTERNS + hidden dirs +
+ * HARD_EXCLUDE_DIRS. Symlinks are never followed (matches walker.ts MED-12).
+ */
+export function startProjectWatch(rootDir: string): ProjectWatchHandle {
+  const mounted = new Set<string>()
+
+  const shouldIgnoreChildPath = (childPath: string): boolean => {
+    // Return true → skip emitting the bus event. Applied to file-granular paths
+    // coming out of fs.watch; the directory-granular filter lives in mountTree.
+    return !shouldIndexPath(rootDir, childPath)
+  }
+
+  const mountTree = (dir: string): void => {
+    if (mounted.has(dir)) return
+    if (isIgnoredDirectory(rootDir, dir)) return
+    try {
+      watchDirectory(dir, { shouldIgnore: shouldIgnoreChildPath })
+    } catch (err) {
+      if (isMissingPathError(err)) return
+      // Out-of-budget / EACCES — log and keep going so one bad dir doesn't
+      // take down the whole mount.
+      process.stderr.write(`[project-watch] mount ${dir} failed: ${err instanceof Error ? err.message : String(err)}\n`)
+      return
+    }
+    mounted.add(dir)
+    let entries: Dirent[]
+    try { entries = readdirSync(dir, { withFileTypes: true }) }
+    catch { return }
+    for (const ent of entries) {
+      if (ent.isSymbolicLink()) continue
+      if (!ent.isDirectory()) continue
+      mountTree(join(dir, ent.name))
+    }
+  }
+
+  mountTree(rootDir)
+
+  // Mount new subdirectories as they're created. fs.watch on the parent
+  // emits an 'add' event for the new child; if it's a directory, mount it.
+  const bus = getContentChangeBus()
+  const onEvent = (evt: ContentChangeEvent): void => {
+    if (evt.kind !== 'code') return
+    if (evt.change_type !== 'add') return
+    const stats = getPathStats(evt.path)
+    if (stats?.isDirectory) mountTree(evt.path)
+  }
+  bus.on(onEvent)
+
+  return {
+    rootDir,
+    get watchedDirs() { return mounted as ReadonlySet<string> },
+    close: () => {
+      try { bus.off(onEvent) } catch { /* already off */ }
+      closeWatcherSubtree(rootDir)
+      mounted.clear()
+    },
+  }
 }

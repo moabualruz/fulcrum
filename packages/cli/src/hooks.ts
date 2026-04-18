@@ -275,20 +275,21 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
  * to stderr only.
  */
 export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
-  if (!ctx.runId) {
-    io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
-    io.exit(0)
-    return
-  }
-
   try {
-    const { getDb } = await import('fulcrum-agent-core')
+    const { getDb, projectIdsFromPath } = await import('fulcrum-agent-core')
     const { writeMemory } = await import('fulcrum-memory')
     const { buildProvenance, dedupKey, markSeen, extractFilePatch, isMutatingBash } = await import('./hooks-writers.js')
     const db = getDb()
-    const runRow = db.prepare(
-      `SELECT task_id, project_id, context_type FROM agent_runs WHERE run_id = ? AND workspace_id = ?`,
-    ).get(ctx.runId, ctx.workspace_id) as { task_id: string | null; project_id: string | null; context_type: string | null } | undefined
+    // runId may be absent (raw Claude Code sessions, opencode, etc). In that
+    // case we still want file-patch memories and code-index refresh to fire —
+    // fall back to project_id derived from cwd.
+    const runRow = ctx.runId
+      ? db.prepare(
+          `SELECT task_id, project_id, context_type FROM agent_runs WHERE run_id = ? AND workspace_id = ?`,
+        ).get(ctx.runId, ctx.workspace_id) as { task_id: string | null; project_id: string | null; context_type: string | null } | undefined
+      : undefined
+    const cwdForResolve = String(ctx.toolInput['cwd'] ?? process.cwd())
+    const resolvedProjectId = runRow?.project_id ?? projectIdsFromPath(cwdForResolve).project_id
 
     const contextType = (runRow?.context_type as 'primary' | 'subagent' | 'cron' | 'heartbeat' | 'flush' | undefined) ?? 'primary'
     // Per-turn dedup key.
@@ -305,7 +306,7 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
     if (filePatch) {
       await writeMemory({
         workspace_id: ctx.workspace_id,
-        project_id: runRow?.project_id ?? ctx.workspace_id,
+        project_id: resolvedProjectId,
         task_id: runRow?.task_id ?? undefined,
         kind: 'file_patch',
         scope: 'project',
@@ -335,7 +336,7 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
             const relPath = relative(process.cwd(), abs)
             await ingestFile({
               workspace_id: ctx.workspace_id,
-              project_id:   runRow?.project_id ?? ctx.workspace_id,
+              project_id:   resolvedProjectId,
               file_path:    relPath,
               content,
               language:     ext === '.ts' || ext === '.tsx' ? 'typescript'
@@ -360,7 +361,7 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
       const exitStatus = (ctx.toolInput['exit_status'] as number | undefined) ?? 0
       await writeMemory({
         workspace_id: ctx.workspace_id,
-        project_id: runRow?.project_id ?? ctx.workspace_id,
+        project_id: resolvedProjectId,
         task_id: runRow?.task_id ?? undefined,
         kind: 'bash_trace',
         scope: 'project',
@@ -377,6 +378,12 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
     io.stderr(`[fulcrum/post] typed-write failed: ${(err as Error).message}\n`)
     // Non-blocking.
   }
+  // Drain fire-and-forget embed/extract work before process exits so the
+  // short-lived hook CLI doesn't leave rows committed without embeddings.
+  try {
+    const { flushPendingMemoryWrites } = await import('fulcrum-memory')
+    await flushPendingMemoryWrites(8_000)
+  } catch { /* non-fatal — flush is best-effort */ }
   io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
   io.exit(0)
 }

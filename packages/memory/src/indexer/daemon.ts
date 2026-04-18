@@ -19,7 +19,7 @@ import { indexerSocketPath, unlinkStaleSocket } from './socket-path.js'
 import { HANDLERS, HandlerError, hasHandler, type DaemonContext } from './handlers.js'
 import { createDaemonRegistry, type DaemonRegistry } from './registry.js'
 import { VaultOwnedPathError } from '../pci/vault-guard.js'
-import { projectIdsFromPath } from 'fulcrum-agent-core'
+import { projectIdsFromPath, getDb as getCoreDb } from 'fulcrum-agent-core'
 import type { Db } from './types-db.js'
 
 const DAEMON_VERSION = '0.0.2'
@@ -61,6 +61,24 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<DaemonHandl
   const registry: DaemonRegistry = opts.registry ?? createDaemonRegistry({
     workspaceIdFor: (root) => projectIdsFromPath(root).workspace_id,
     projectIdFor: (root) => projectIdsFromPath(root).project_id,
+    ensureRows: (realpath, workspaceId, projectId) => {
+      // Auto-create workspace+project rows so code_chunks/memories FKs resolve.
+      // Daemon is long-lived and serves paths beyond its own cwd — the caller
+      // that invoked `fulcrum daemon indexer` only initialized its own cwd's
+      // project. Subsequent ensureWatching() calls would otherwise FK-fail on
+      // every insert during initial scan.
+      try {
+        const db = getCoreDb()
+        const basename = realpath.split('/').pop() || 'project'
+        const sanitized = basename.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 24) || 'project'
+        db.prepare('INSERT OR IGNORE INTO workspaces (workspace_id, name, status, created_at) VALUES (?, ?, ?, ?)')
+          .run(workspaceId, sanitized, 'active', new Date().toISOString())
+        db.prepare('INSERT OR IGNORE INTO projects (project_id, workspace_id, name, created_at, root_path, root_realpath) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(projectId, workspaceId, sanitized, new Date().toISOString(), realpath, realpath)
+      } catch (err) {
+        process.stderr.write(`[fulcrum-indexer] ensureRows failed for ${realpath}: ${err instanceof Error ? err.message : String(err)}\n`)
+      }
+    },
   })
 
   // Lazy DB handle — loaded on first getStatus / triggerReindex call so a
@@ -331,6 +349,20 @@ export async function runDaemonMain(): Promise<void> {
   process.once('unhandledRejection', onFatal)
 
   try {
+    // Warm the embedder BEFORE startDaemon so the first ensureWatching's initial
+    // scan can embed chunks + memories inline (vec_chunks / vec_memories were
+    // silently empty before this wiring). Embedding init downloads models on
+    // first run and is idempotent — safe to call every daemon start.
+    try {
+      const { initEmbedding, loadConfig, getTextEmbedder } = await import('fulcrum-agent-core')
+      await initEmbedding(loadConfig())
+      if (!getTextEmbedder()) {
+        process.stderr.write(`[fulcrum-indexer] embedder init returned but getTextEmbedder() is null — vec tables will not be populated\n`)
+      }
+    } catch (err) {
+      process.stderr.write(`[fulcrum-indexer] embedder init failed: ${err instanceof Error ? err.message : String(err)} — vec tables will not be populated\n`)
+    }
+
     const handle = await startDaemon()
     await new Promise<void>((resolve) => handle.server.on('close', resolve))
     process.stderr.write(`[fulcrum-indexer] exited normally\n`)

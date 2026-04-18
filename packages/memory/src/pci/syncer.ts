@@ -22,6 +22,7 @@ import type { Db } from 'fulcrum-agent-core'
 import { getDb, getContentChangeBus, newId, type ContentChangeEvent } from 'fulcrum-agent-core'
 import { computeFileId } from '../setup/backfill-code-files.js'
 import { ingestFile as fullIngest } from '../ingest.js'
+import { scheduleChunkEmbedding } from '../write.js'
 import { reduceFileToGraph, reduceUnlinkToGraph } from '../kuzu/reducers/code.js'
 
 const LANG_EXT_MAP: Record<string, string> = {
@@ -246,11 +247,13 @@ async function applyChunkDiff(
   for (const chunk of newChunks) {
     const h = contentSha256(chunk.text)
     if (existingByHash.has(h)) continue
+    const chunkId = newId('chunk')
     insert.run(
-      newId('chunk'), workspaceId, projectId, relPath, fileId, language,
+      chunkId, workspaceId, projectId, relPath, fileId, language,
       chunk.strategy, chunk.sourceType, chunk.text,
       chunk.startLine, chunk.endLine, chunk.symbolPath, h,
     )
+    scheduleChunkEmbedding(db, chunkId, chunk.text)
   }
 
   // Delete chunks whose content_hash is gone.

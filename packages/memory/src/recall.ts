@@ -309,8 +309,11 @@ export async function recallMemory(
           if (mode === 'compact') return sortedWithScores.map(s => rowToCompact(s.row, s.score)) // MEM-006
           return sortedWithScores.map(s => ({ ...rowToFullMemory(s.row), recall_score: s.score }))
         }
-      } catch {
-        // L2 unavailable — fall through to L1
+      } catch (err) {
+        // L2 unavailable — fall through to L1. Log so degradation is visible.
+        if (process.env['FULCRUM_VERBOSE']) {
+          process.stderr.write(`[recall] L2 path degraded: ${err instanceof Error ? err.message : String(err)}\n`)
+        }
       }
     }
   }
@@ -337,8 +340,10 @@ export async function recallMemory(
       vecRows = db.prepare(
         'SELECT memory_id, row_number() OVER (ORDER BY distance) AS vecRank FROM vec_memories WHERE embedding MATCH ? ORDER BY distance LIMIT ?'
       ).all(Buffer.from(queryVec.buffer), fetchLimit * 3) as { memory_id: string; vecRank: number }[]
-    } catch {
-      // vec_memories unavailable — FTS5 only
+    } catch (err) {
+      // vec_memories unavailable — FTS5 only. Log so missing extension / dim
+      // mismatch is visible.
+      process.stderr.write(`[recall] vec search degraded: ${err instanceof Error ? err.message : String(err)}\n`)
     }
   }
 
@@ -430,8 +435,11 @@ export async function recallMemory(
           }
         })
         .sort((a, b) => b.score - a.score)
-    } catch {
-      // Reranker unavailable — keep RRF scores
+    } catch (err) {
+      // Reranker unavailable — keep RRF scores. Log so missing ONNX model is visible.
+      if (process.env['FULCRUM_VERBOSE']) {
+        process.stderr.write(`[recall] reranker degraded: ${err instanceof Error ? err.message : String(err)}\n`)
+      }
     }
   }
 

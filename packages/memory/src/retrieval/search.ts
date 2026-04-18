@@ -210,6 +210,13 @@ function logRecallEvent(db: Db, params: {
 /**
  * Staged retrieval with the v2a envelope contract.
  *
+ * Code-vs-memory note: code chunks are indexed in BOTH `code_chunks` (for
+ * `search_code`) and as shadow `Memory` rows (kind=symbol|doc) via
+ * ingestFile → writeMemory. So `recall_memory` naturally finds code snippets
+ * through the Memory layer — the two tables aren't truly independent corpora
+ * at query time. The dedicated `search_code` tool is for callers that want
+ * chunk-shaped results (file_path + line numbers) rather than Memory rows.
+ *
  * Pipeline:
  *   1. recallMemory() — FTS5 + vec + sparse + RRF + optional L2 traversal.
  *   2. Pooled-cosine rerank over top-40 candidates (blended RRF + cosine).

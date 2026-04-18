@@ -20,7 +20,20 @@ vi.mock('../../pci/syncer.js', () => ({
     return { stop: () => { stoppedRoots.push(opts.projectRoot) } }
   }),
   contentSha256: vi.fn(() => 'stub'),
-  syncFile: vi.fn(),
+  syncFile: vi.fn(async () => ({ action: 'indexed', fileId: 'stub' })),
+}))
+
+const watchClosedRoots: string[] = []
+vi.mock('../../pci/watcher.js', () => ({
+  startProjectWatch: vi.fn((root: string) => ({
+    rootDir: root,
+    watchedDirs: new Set([root]),
+    close: () => { watchClosedRoots.push(root) },
+  })),
+}))
+
+vi.mock('../../pci/walker-integration.js', () => ({
+  enumerateProjectFiles: vi.fn(async () => ({ files: [], mode: 'fs-walk', skipped: 0 })),
 }))
 
 // Import after the mock is registered.
@@ -35,6 +48,7 @@ let registry: ReturnType<typeof createDaemonRegistry>
 beforeEach(() => {
   startedRoots.length = 0
   stoppedRoots.length = 0
+  watchClosedRoots.length = 0
   tempRoot = mkdtempSync(join(tmpdir(), 'fulcrum-registry-'))
   subA = join(tempRoot, 'a', 'b')
   subB = join(tempRoot, 'a', 'b', 'c')

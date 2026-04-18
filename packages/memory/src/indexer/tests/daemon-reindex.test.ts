@@ -23,7 +23,17 @@ vi.mock('../../ingest.js', () => ({
 vi.mock('../../pci/syncer.js', () => ({
   startPciSyncer: vi.fn(() => ({ stop: () => {} })),
   contentSha256: vi.fn(() => 'stub'),
-  syncFile: vi.fn(),
+  syncFile: vi.fn(async () => ({ action: 'indexed', fileId: 'stub' })),
+}))
+vi.mock('../../pci/watcher.js', () => ({
+  startProjectWatch: vi.fn((root: string) => ({
+    rootDir: root,
+    watchedDirs: new Set([root]),
+    close: () => {},
+  })),
+}))
+vi.mock('../../pci/walker-integration.js', () => ({
+  enumerateProjectFiles: vi.fn(async () => ({ files: [], mode: 'fs-walk', skipped: 0 })),
 }))
 
 const { startDaemon } = await import('../daemon.js')

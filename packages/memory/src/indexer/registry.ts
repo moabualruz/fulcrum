@@ -13,8 +13,10 @@
 // See docs/plans/2026-04-18-001-refactor-indexer-daemon-plan.md Unit 2.1.
 
 import { realpathSync } from 'node:fs'
-import { relative } from 'node:path'
-import { startPciSyncer, type PciSyncerHandle } from '../pci/syncer.js'
+import { join, relative } from 'node:path'
+import { startPciSyncer, syncFile, type PciSyncerHandle } from '../pci/syncer.js'
+import { startProjectWatch, type ProjectWatchHandle } from '../pci/watcher.js'
+import { enumerateProjectFiles } from '../pci/walker-integration.js'
 import { isVaultOwnedPath, VaultOwnedPathError } from '../pci/vault-guard.js'
 import { HandlerError } from './errors.js'
 
@@ -25,6 +27,12 @@ export interface RegistryOptions {
   workspaceIdFor: (realpath: string) => string
   /** Hook for tests to map a realpath to a project_id. */
   projectIdFor: (realpath: string) => string
+  /**
+   * Hook called on every fresh mount. Production wires this to ensure the
+   * workspaces/projects FK-parent rows exist before any writer dereferences
+   * them. Tests may leave this unset — the stub syncer never writes rows.
+   */
+  ensureRows?: (realpath: string, workspaceId: string, projectId: string) => void
   /** Grace period before teardown when refcount hits zero. */
   graceMs?: number
 }
@@ -67,6 +75,7 @@ interface Entry {
   refcount: number
   graceTimer: ReturnType<typeof setTimeout> | null
   syncer: PciSyncerHandle
+  watch: ProjectWatchHandle
 }
 
 export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
@@ -104,14 +113,33 @@ export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
       }
     }
 
-    // Fresh mount.
+    // Fresh mount. Order matters:
+    //   0. Ensure the workspace+project rows exist BEFORE any writer sees the
+    //      computed IDs — code_chunks.project_id is a FK and the initial scan
+    //      otherwise fails with "FOREIGN KEY constraint failed" for every
+    //      file when the caller watches a path whose project row hasn't been
+    //      created by `fulcrum`/MCP startup yet (daemon is long-lived and
+    //      processes paths across many projects).
+    //   1. Start the bus SUBSCRIBER (syncer) so events emitted during the
+    //      initial scan are picked up.
+    //   2. Start the PRODUCER (project watch) — this mounts fs.watch on every
+    //      subdir and begins emitting to the bus.
+    //   3. Kick off the initial scan so the DB is populated even for files
+    //      that existed before the watcher mounted.
     const workspaceId = opts.workspaceIdFor(realpath)
     const projectId = opts.projectIdFor(realpath)
+    opts.ensureRows?.(realpath, workspaceId, projectId)
     const syncer = startPciSyncer({
       workspaceId,
       projectId,
       projectRoot: realpath,
     })
+    const watch = startProjectWatch(realpath)
+    // Fire-and-forget initial scan — the watch is already live, so any edits
+    // during the scan will flow through the bus; syncFile is content-hash
+    // idempotent so double-processing is harmless.
+    void performInitialScan(workspaceId, projectId, realpath)
+
     entries.set(realpath, {
       realpath,
       workspaceId,
@@ -119,6 +147,7 @@ export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
       refcount: 1,
       graceTimer: null,
       syncer,
+      watch,
     })
     return { watch: realpath, relative_path: '', already_watched: false }
   }
@@ -144,6 +173,7 @@ export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
     if (!entry) return
     if (entry.refcount > 0) return // someone re-ensured during grace
     try { entry.syncer.stop() } catch { /* already stopped */ }
+    try { entry.watch.close() } catch { /* already closed */ }
     if (entry.graceTimer) clearTimeout(entry.graceTimer)
     entries.delete(realpath)
   }
@@ -152,6 +182,7 @@ export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
     for (const entry of entries.values()) {
       if (entry.graceTimer) clearTimeout(entry.graceTimer)
       try { entry.syncer.stop() } catch { /* already stopped */ }
+      try { entry.watch.close() } catch { /* already closed */ }
     }
     entries.clear()
   }
@@ -186,5 +217,38 @@ export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
     getRefcount,
     shutdownAll,
     activeWatches,
+  }
+}
+
+/**
+ * Walk the project tree and run each file through syncFile({change_type:'add'}).
+ * This populates code_files / code_chunks for files that existed before the
+ * watcher mounted. Idempotent — syncFile is sha256-keyed and skips unchanged
+ * files. Errors on individual files are logged and don't abort the scan.
+ */
+async function performInitialScan(
+  workspaceId: string,
+  projectId: string,
+  rootDir: string,
+): Promise<void> {
+  try {
+    const result = await enumerateProjectFiles(rootDir)
+    for (const rel of result.files) {
+      try {
+        await syncFile({
+          workspaceId,
+          projectId,
+          projectRoot: rootDir,
+          event: { change_type: 'add', path: join(rootDir, rel) },
+        })
+      } catch (err) {
+        process.stderr.write(`[initial-scan] ${rel}: ${err instanceof Error ? err.message : String(err)}\n`)
+      }
+    }
+    if (process.env['FULCRUM_VERBOSE']) {
+      process.stderr.write(`[initial-scan] ${rootDir}: indexed ${result.files.length} files (mode=${result.mode}, skipped=${result.skipped})\n`)
+    }
+  } catch (err) {
+    process.stderr.write(`[initial-scan] ${rootDir} failed: ${err instanceof Error ? err.message : String(err)}\n`)
   }
 }

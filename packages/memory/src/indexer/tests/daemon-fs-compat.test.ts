@@ -40,7 +40,7 @@ describe('FS compatibility — forced polling fallback', () => {
   it('local (ext4/btrfs/apfs) → native fs.watch mode', () => {
     const tree = mkdtempSync(join(tmpdir(), 'fulcrum-fs-local-'))
     try {
-      const h = watchDirectory(tree, { forcedFsKind: 'local', pollIntervalMs: 10 })
+      const h = watchDirectory(tree, { forcedFsKind: 'native', pollIntervalMs: 10 })
       expect(h).toBeDefined()
       closeWatcherSubtree(tree)
     } finally {

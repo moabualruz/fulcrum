@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, statSync } from 'fs'
 import { join, extname, basename } from 'path'
 import { getDb, Db} from 'fulcrum-agent-core'
 import { contentHash, isDuplicate } from './dedup.js'
-import { writeMemory } from './write.js'
+import { writeMemory, scheduleChunkEmbedding } from './write.js'
 import type { IngestFileInput, IngestResult, IngestProjectInput } from './types.js'
 import { createASTChunker } from './chunkers/ast-chunker.js'
 import { getKuzuClient } from './kuzu/client.js'
@@ -231,6 +231,10 @@ export async function ingestFile(input: IngestFileInput, db: Db = getDb()): Prom
         chunk.startLine, chunk.endLine, symbolPath, hash, now
       )
       chunks_created++
+      // Populate vec_chunks so semantic code search works (was silently missing —
+      // virtual table existed but nothing wrote to it). Tracked promise so CLI
+      // flushPendingMemoryWrites drains it before exit.
+      scheduleChunkEmbedding(db, chunk_id, chunk.text)
     }
 
     // Write a Memory for each new chunk (dedup handled inside writeMemory)

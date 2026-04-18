@@ -9,6 +9,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Memory + Embedding + Indexer end-to-end wiring (2026-04-18)
+
+Five independent silent failures were preventing the indexing pipeline from working
+end-to-end after the daemon refactor. Fixed in one sweep:
+
+1. **Daemon watcher had no producer** (the primary bug). `DaemonRegistry.ensureWatching`
+   called `startPciSyncer` (a content-change bus SUBSCRIBER) but never mounted a
+   filesystem producer. The `pci/watcher.ts` primitives (`watchDirectory`,
+   `handleFileEvent`) existed but were only referenced from tests. Result: `code_files`
+   stayed empty forever even with "watcher_active: true" in `getStatus`. When
+   `singleton.ts` was deleted in `c9c8ba2`, its `watchDirectory()` call went with it
+   and was never re-added to the registry.
+   - Added `startProjectWatch(rootDir)` in `pci/watcher.ts` — walks the tree,
+     mounts non-recursive `fs.watch` on every non-ignored subdir, subscribes to
+     the bus to mount new subdirs as they appear.
+   - Added `performInitialScan()` in `indexer/registry.ts` — walks the project via
+     `enumerateProjectFiles` (gitignore-aware) and runs `syncFile` per file so the
+     DB is populated even for files that existed before the watcher mounted.
+   - Added `isIgnoredDirectory` predicate in `walker-integration.ts`.
+   - `ensureWatching` now starts producer + subscriber + initial scan, and
+     `teardown` / `shutdownAll` close both handles.
+
+2. **Post-hook early-exit blocked Claude Code ingest.** `runPostHook` had
+   `if (!ctx.runId) return` at the top. `normalizeHookEvent` never populates `runId`
+   for raw Claude Code sessions (only PI/Gemini do), so every Edit/Write from Claude
+   Code skipped both the `file_patch` memory write AND the `ingestFile` refresh.
+   PreToolUse still fired (explaining non-zero `hook_events`), PostToolUse died
+   before any DB write.
+   - Removed the guard in `packages/cli/src/hooks.ts`. When `runId` is empty,
+     derives `project_id` from `cwd` via `projectIdsFromPath`.
+
+3. **vec_chunks virtual table had no producer.** Code chunks were indexed into FTS5
+   but nothing ever wrote to `vec_chunks`, so code semantic search degraded silently
+   to FTS-only. Added `scheduleChunkEmbedding` in `write.ts` and wired it into
+   `ingest.ts` and `pci/syncer.ts` so every new chunk fires a tracked
+   embedding+vec_chunks insert.
+
+4. **Daemon never initialized the embedder.** The daemon entry (`runDaemonMain`)
+   didn't call `initEmbedding`, so `getTextEmbedder()` returned null inside
+   daemon-driven ingest paths. `storeEmbeddingInVec` no-oped and every row
+   committed with `embedding = NULL`. Fixed by calling
+   `initEmbedding(loadConfig())` at daemon startup.
+
+5. **Short-lived CLI processes exited before fire-and-forget embed completed.**
+   `writeMemory` fires embedding via `setImmediate(...).catch(() => {})`. For a
+   long-lived process (daemon) this is fine, but for the CLI hook this means
+   Edit/Write events commit the row then exit before the embedding runs.
+   - Added `flushPendingMemoryWrites(timeoutMs)` in `write.ts` that tracks every
+     fire-and-forget embed promise in a Set and drains it.
+   - The hook's post-path calls it before `io.exit(0)` with an 8s timeout.
+
+Silent-failure telemetry: replaced bare `catch {}` in `storeEmbeddingInVec`,
+`core/db/client.ts` sqlite-vec loader, and `recall.ts` vec/reranker paths with
+stderr logs so misconfiguration is visible instead of silently degrading.
+
+Regression guard: new `packages/memory/src/pci/tests/project-watch.test.ts`
+exercises `startProjectWatch` with a real filesystem (no stubs), asserting
+events flow onto the bus when files change at the root and in nested subdirs,
+that `node_modules` is excluded, and that `close()` tears watchers down.
+The five daemon tests that stub `startPciSyncer` now also stub `startProjectWatch`
++ `enumerateProjectFiles` so their refcount/consolidation scenarios still pass
+without unintentionally hiding producer-side regressions.
+
 ### Added — Indexer Daemon (2026-04-18)
 
 Replaced the file-lock + per-process chokidar coordination in

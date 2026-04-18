@@ -13,6 +13,40 @@ import { validateKind, applyKindCap } from './validate-kind.js'
 import { sanitizeOnWrite } from './sanitize/index.js'
 import { appendWal } from './wal/writer.js'
 
+// ── Pending-write tracker ─────────────────────────────────────────────────
+// writeMemory fires embedding + extraction work through setImmediate so the
+// write response returns fast. Short-lived CLI processes (hook handlers,
+// one-shot `fulcrum action exec ...`) can exit before that async work runs,
+// leaving rows in memories without a vec_memories companion. Callers that
+// know they're about to exit should `await flushPendingMemoryWrites()` to
+// drain the tracker.
+const pendingAsyncWork = new Set<Promise<unknown>>()
+
+function trackAsyncWork<T>(p: Promise<T>): Promise<T> {
+  pendingAsyncWork.add(p)
+  p.finally(() => pendingAsyncWork.delete(p))
+  return p
+}
+
+/**
+ * Await every fire-and-forget embedding / extraction promise spawned by
+ * writeMemory. Intended for short-lived CLI entry points that are about to
+ * call process.exit(). Returns once all pending work settles or the timeout
+ * fires (default 10s) — never throws.
+ */
+export async function flushPendingMemoryWrites(timeoutMs = 10_000): Promise<void> {
+  if (pendingAsyncWork.size === 0) return
+  const all = Promise.allSettled([...pendingAsyncWork])
+  const timeout = new Promise<'timeout'>((r) => {
+    const t = setTimeout(() => r('timeout'), timeoutMs)
+    t.unref?.()
+  })
+  const result = await Promise.race([all, timeout])
+  if (result === 'timeout' && process.env['FULCRUM_VERBOSE']) {
+    process.stderr.write(`[write] flushPendingMemoryWrites: ${pendingAsyncWork.size} pending after ${timeoutMs}ms\n`)
+  }
+}
+
 /**
  * Generate an embedding for `text` and store it in:
  *   - vec_memories (rowid + float vector) for ANN search
@@ -23,7 +57,12 @@ import { appendWal } from './wal/writer.js'
  */
 export async function storeEmbeddingInVec(db: Db, memory_id: string, text: string): Promise<void> {
   const embedder = getTextEmbedder()
-  if (!embedder) return
+  if (!embedder) {
+    if (process.env['FULCRUM_VERBOSE']) {
+      process.stderr.write(`[embed] skipped ${memory_id}: no embedder registered\n`)
+    }
+    return
+  }
   try {
     const exists = db.prepare('SELECT 1 FROM memories WHERE memory_id = ?').get(memory_id)
     if (!exists) return
@@ -32,7 +71,64 @@ export async function storeEmbeddingInVec(db: Db, memory_id: string, text: strin
     const buf = Buffer.from(vec.buffer)
     db.prepare('INSERT OR REPLACE INTO vec_memories(memory_id, embedding) VALUES (?, ?)').run(memory_id, buf)
     db.prepare('UPDATE memories SET embedding = ? WHERE memory_id = ?').run(buf, memory_id)
-  } catch { /* non-fatal: vec_memories is optional */ }
+  } catch (err) {
+    // vec_memories is non-fatal but silent failures hide real bugs (missing
+    // sqlite-vec, dim mismatch, disk full). Log once per error.
+    process.stderr.write(`[embed] ${memory_id} failed: ${err instanceof Error ? err.message : String(err)}\n`)
+  }
+}
+
+/**
+ * Embed a code chunk's text and store it in vec_chunks + code_chunks.embedding.
+ * Parallel to storeEmbeddingInVec; kept here so the pending-write tracker and
+ * telemetry path stays in one place. Silent when vec0 extension is missing.
+ */
+let _chunkEmbedLoggedOnce = false
+export async function storeChunkEmbedding(db: Db, chunk_id: string, text: string): Promise<void> {
+  const embedder = getTextEmbedder()
+  if (!embedder) {
+    // Log once — a missing embedder means every chunk write is silently dropping
+    // its vec_chunks companion, which is a meaningful degradation.
+    if (!_chunkEmbedLoggedOnce) {
+      _chunkEmbedLoggedOnce = true
+      process.stderr.write(`[embed] no embedder registered — chunk embeddings disabled (first chunk ${chunk_id})\n`)
+    }
+    return
+  }
+  try {
+    const exists = db.prepare('SELECT 1 FROM code_chunks WHERE chunk_id = ?').get(chunk_id)
+    if (!exists) {
+      if (process.env['FULCRUM_VERBOSE']) {
+        process.stderr.write(`[embed] chunk ${chunk_id} not found in code_chunks — skipped\n`)
+      }
+      return
+    }
+    const embedFn = (embedder.embedDocument ?? embedder.embed).bind(embedder)
+    const vec = await embedFn(text)
+    const buf = Buffer.from(vec.buffer)
+    db.prepare('INSERT OR REPLACE INTO vec_chunks(chunk_id, embedding) VALUES (?, ?)').run(chunk_id, buf)
+    db.prepare('UPDATE code_chunks SET embedding = ? WHERE chunk_id = ?').run(buf, chunk_id)
+  } catch (err) {
+    process.stderr.write(`[embed] chunk ${chunk_id} failed: ${err instanceof Error ? err.message : String(err)}\n`)
+  }
+}
+
+/**
+ * Fire-and-forget chunk embedding that joins the pending-write tracker so CLI
+ * flush sees it. Call after inserting a chunk row — returns immediately.
+ */
+export function scheduleChunkEmbedding(db: Db, chunk_id: string, text: string): void {
+  // Fire the embedding PROMISE immediately (no setImmediate) so CPU-bound
+  // initial scans don't starve the macrotask queue — a tight
+  //   for await syncFile(...) { scheduleChunkEmbedding(...) }
+  // loop resolves microtasks without ticking setImmediate, which buffered
+  // thousands of pending embeds until the scan finished. Starting the promise
+  // eagerly lets the ONNX I/O yield naturally. trackAsyncWork still lets
+  // short-lived CLI processes flushPendingMemoryWrites before exit.
+  const p = storeChunkEmbedding(db, chunk_id, text).catch((err: unknown) => {
+    process.stderr.write(`[embed] chunk ${chunk_id}: ${err instanceof Error ? err.message : String(err)}\n`)
+  })
+  trackAsyncWork(p)
 }
 
 function bodyHash(text: string): string {
@@ -341,19 +437,24 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
   const row = db.prepare('SELECT * FROM memories WHERE memory_id = ?').get(memory_id) as Record<string, unknown> | undefined
   if (!row) throw new FulcrumError(`Memory ${memory_id} not found after insert`, 'not_found')
 
-  // ── Vec embedding (fire-and-forget) ──────────────────────────────────────
-  // Populate vec_memories for ANN recall. Runs async so it never blocks the
-  // write response. Silently skips if no embedder is initialized.
-  setImmediate(() => {
-    storeEmbeddingInVec(db, memory_id, memoryForVault.canonical_text ?? input.content).catch(() => {})
-  })
+  // ── Vec embedding (fire-and-forget, tracked) ─────────────────────────────
+  // Populate vec_memories for ANN recall. Started eagerly (no setImmediate) so
+  // CPU-heavy bulk-ingest loops don't starve the macrotask queue — the prior
+  // setImmediate-wrapped version buffered thousands of embeds during the
+  // daemon's initial scan and never ticked. storeEmbeddingInVec's internal
+  // awaits yield naturally on ONNX I/O.
+  const embedPromise = storeEmbeddingInVec(db, memory_id, memoryForVault.canonical_text ?? input.content)
+    .catch((err: unknown) => {
+      process.stderr.write(`[write] embed ${memory_id} failed: ${err instanceof Error ? err.message : String(err)}\n`)
+    })
+  trackAsyncWork(embedPromise)
 
   // ── L2 async enqueue (fire-and-forget when KuzuClient is active) ──────────
   const vaultRoot = getVaultPath()
   if (!input.skipVaultWrite) {
-    setImmediate(() => {
-      runExtractionPipeline(vaultRoot, rowToFullMemory(row!)).catch(() => {})
-    })
+    const extractionPromise = runExtractionPipeline(vaultRoot, rowToFullMemory(row!))
+      .catch(() => { /* non-fatal, L2 is optional */ })
+    trackAsyncWork(extractionPromise)
   }
 
   // ── v2a PR 7 Task 38 — Memory↔code edge reducer (fire-and-forget) ─────────
