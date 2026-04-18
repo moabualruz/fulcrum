@@ -173,6 +173,14 @@ export type {
   MigrationOptions,
   MigrateMemoryRowOptions,
 } from './migration/migrator.js'
+export { applyDbBackfill } from './migration/backfill.js'
+export type {
+  BackfillCounts as MigrationBackfillCounts,
+  BackfillError as MigrationBackfillError,
+  BackfillResult as MigrationBackfillResult,
+  BackfillOptions as MigrationBackfillOptions,
+  BackfillStage as MigrationBackfillStage,
+} from './migration/backfill.js'
 
 // Entities
 export { linkMemoryToEntity, getMemoryEntities } from './entities.js'
