@@ -104,15 +104,15 @@ appendCuratorLog(vault, {l0_id, backend, affected_pages, confidence_deltas,
 
 | Env var | Default | Effect |
 |---|---|---|
-| `FULCRUM_MEMORY_CURATE_AUTO` | off | `1` starts the vault watcher and auto-fires the curator 30s after a new L0 drops. Debounced per l0_id. |
-| `FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE` | unset | `hourly` or `daily` enables the scheduled consolidation scan. Logs to `vault/curated/consolidate.log.md`. Unknown values disable. |
+| `FULCRUM_MEMORY_CURATE_AUTO` | **on** | Vault watcher auto-fires the curator 30s after each new L0 drops (debounced per l0_id). Opt out with `0`/`false`/`off`/`no`. |
+| `FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE` | **daily** | Scheduled consolidation scan; logs to `vault/curated/consolidate.log.md`. Override with `hourly`; opt out with `never`/`off`/`0`/`false`/`no`. Unknown cadence strings also disable. |
 | `FULCRUM_CURATOR_BACKEND` | auto-select | Force a specific backend: `codex` \| `pi` \| `openai` \| `anthropic`. |
 | `FULCRUM_CURATOR_MODEL` | per-task | Global override for all curator tasks. Also `FULCRUM_CURATOR_MODEL_EXTRACTION`, `_CONSOLIDATION`, `_SYNTHESIS`. |
 | `FULCRUM_CURATOR_REASONING` | per-task | Reasoning effort — typically `minimal`, `medium`, or `high`. |
 | `FULCRUM_VAULT_PATH` | `~/.fulcrum/vault` | Override the vault root. Tests use this to redirect to a tmpdir. |
 | `FULCRUM_OPERATOR_CONFIRM` | unset | Required UUID token to run `fulcrum memory rollback --to v2` (operator-only). |
 
-Critical Constraint #6 in the plan says "control-plane features are dormant, not absent." Auto-trigger, consolidation cron, and auto-apply paths all ship behind flags.
+Critical Constraint #6 in the plan: control-plane features defaulted OFF during PRs 0-8 so the rollout didn't break in-flight sessions, then flipped to default-ON after PR 9. Operators opt OUT of the curator + consolidation cron, not in — matches the "dormant, not absent" spirit without the permanent-dormancy side effect.
 
 ---
 

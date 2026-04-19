@@ -74,14 +74,12 @@ afterEach(() => {
 // ── Tests ─────────────────────────────────────────────────────────────────
 
 describe('startAutoCurator — enablement', () => {
-  it('returns a no-op stop when FULCRUM_MEMORY_CURATE_AUTO is unset', () => {
+  it('subscribes when FULCRUM_MEMORY_CURATE_AUTO is unset (post-PR-9 default-on)', () => {
     const bus = makeFakeBus()
-    let called = 0
-    const stop = startAutoCurator({ bus, curate: async () => { called++ } })
-    expect(bus.listenerCount()).toBe(0)
-    bus.fire({ kind: 'l0_raw', change_type: 'add', path: PATH(`l0src_${ULID}`), sha256: 'a' })
-    expect(called).toBe(0)
+    const stop = startAutoCurator({ bus, curate: async () => {} })
+    expect(bus.listenerCount()).toBe(1)
     stop()
+    expect(bus.listenerCount()).toBe(0)
   })
 
   it('subscribes when enabled=true', () => {
@@ -100,7 +98,21 @@ describe('startAutoCurator — enablement', () => {
     stop()
   })
 
-  it('does NOT subscribe when env is set to 0 even if explicit enabled=false', () => {
+  it.each([['0'], ['false'], ['FALSE'], ['off'], ['no']])(
+    'does NOT subscribe when FULCRUM_MEMORY_CURATE_AUTO=%s (explicit opt-out)',
+    (value) => {
+      process.env['FULCRUM_MEMORY_CURATE_AUTO'] = value
+      const bus = makeFakeBus()
+      let called = 0
+      const stop = startAutoCurator({ bus, curate: async () => { called++ } })
+      expect(bus.listenerCount()).toBe(0)
+      bus.fire({ kind: 'l0_raw', change_type: 'add', path: PATH(`l0src_${ULID}`), sha256: 'a' })
+      expect(called).toBe(0)
+      stop()
+    },
+  )
+
+  it('explicit enabled=false wins over env (deterministic for tests)', () => {
     process.env['FULCRUM_MEMORY_CURATE_AUTO'] = '1'
     const bus = makeFakeBus()
     const stop = startAutoCurator({ bus, enabled: false, curate: async () => {} })

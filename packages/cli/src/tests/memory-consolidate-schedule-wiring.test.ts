@@ -31,14 +31,7 @@ afterEach(() => {
 })
 
 describe('startMemoryConsolidateScheduleIfEnabled', () => {
-  it('returns a no-op stop when FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE is unset', async () => {
-    const stop = await startMemoryConsolidateScheduleIfEnabled()
-    expect(typeof stop).toBe('function')
-    stop()
-  })
-
-  it('returns a no-op stop when cadence is "never"', async () => {
-    process.env['FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE'] = 'never'
+  it('mounts daily schedule when FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE is unset (post-PR-9 default-on)', async () => {
     const stop = await startMemoryConsolidateScheduleIfEnabled({
       workspace_id: 'ws_test',
       vaultPath: tmpVault,
@@ -46,6 +39,19 @@ describe('startMemoryConsolidateScheduleIfEnabled', () => {
     expect(typeof stop).toBe('function')
     stop()
   })
+
+  it.each([['never'], ['off'], ['0'], ['false'], ['no']])(
+    'returns a no-op stop when cadence is %s (explicit opt-out)',
+    async (value) => {
+      process.env['FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE'] = value
+      const stop = await startMemoryConsolidateScheduleIfEnabled({
+        workspace_id: 'ws_test',
+        vaultPath: tmpVault,
+      })
+      expect(typeof stop).toBe('function')
+      stop()
+    },
+  )
 
   it('returns a no-op stop on unknown cadence strings', async () => {
     process.env['FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE'] = 'fortnightly'

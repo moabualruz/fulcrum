@@ -4,8 +4,13 @@
 //
 // Subscribes to the ContentChangeBus and, when enabled, fires the curator
 // on each newly observed L0 raw file after a configurable debounce (default
-// 30s per plan §8.1). Opt-in via FULCRUM_MEMORY_CURATE_AUTO=1 so the default
-// install stays manual (Critical Constraint #6).
+// 30s per plan §8.1).
+//
+// Default post-PR-9 is ON — the "dormant during rollout" posture from
+// Critical Constraint #6 was a safety net for in-flight sessions during
+// PRs 0-8 and is no longer needed. Explicit opt-out values disable the
+// watcher: `FULCRUM_MEMORY_CURATE_AUTO=0`, `=false`, `=off`, `=no`. Any
+// other value (including unset) enables.
 //
 // Why a bus subscription and not a direct chokidar mount: the vault watcher
 // already emits `{ kind: 'l0_raw', change_type: 'add' }` on the unified bus
@@ -28,8 +33,10 @@ export interface AutoCurateScheduler {
 export interface AutoCurateOptions {
   /**
    * When true, subscribe unconditionally. When false, never subscribe. When
-   * undefined, fall back to `process.env.FULCRUM_MEMORY_CURATE_AUTO === '1'`.
-   * Explicit false wins over the env to keep tests deterministic.
+   * undefined, fall back to the env: `FULCRUM_MEMORY_CURATE_AUTO` default is
+   * ON (post-PR-9), disabled only by explicit opt-out values (`0`/`false`/
+   * `off`/`no`, case-insensitive). Explicit false wins over the env to keep
+   * tests deterministic.
    */
   enabled?: boolean
   /** Debounce per l0_id before the curator fires. Default 30_000. */
@@ -58,10 +65,14 @@ function extractL0Id(path: string): string | null {
   return id
 }
 
+const AUTO_CURATE_OFF_VALUES = new Set(['0', 'false', 'off', 'no'])
+
 function resolveEnabled(explicit: boolean | undefined): boolean {
   if (explicit === true) return true
   if (explicit === false) return false
-  return process.env['FULCRUM_MEMORY_CURATE_AUTO'] === '1'
+  const raw = process.env['FULCRUM_MEMORY_CURATE_AUTO']
+  if (raw === undefined || raw === '') return true
+  return !AUTO_CURATE_OFF_VALUES.has(raw.toLowerCase())
 }
 
 /**

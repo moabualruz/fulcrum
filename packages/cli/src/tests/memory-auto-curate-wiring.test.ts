@@ -1,9 +1,10 @@
 // packages/cli/src/tests/memory-auto-curate-wiring.test.ts
 //
 // Memory v3 PR 8 unit 8.1 — the cli-side wiring helper that mounts the vault
-// watcher + auto-curator when FULCRUM_MEMORY_CURATE_AUTO=1. Unit-level checks
-// of the env-gate contract; the watcher→curator end-to-end flow is covered
-// by the PR 8 integration gate.
+// watcher + auto-curator. Post-PR-9 the default is ON — the wiring mounts
+// unless FULCRUM_MEMORY_CURATE_AUTO is set to an opt-out value (0/false/
+// off/no). Unit-level checks of the env-gate contract; the watcher→curator
+// end-to-end flow is covered by the PR 8 integration gate.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, mkdirSync } from 'fs'
@@ -34,18 +35,22 @@ afterEach(() => {
 })
 
 describe('startMemoryAutoCurateIfEnabled', () => {
-  it('returns a no-op stop when FULCRUM_MEMORY_CURATE_AUTO is unset', async () => {
-    const stop = await startMemoryAutoCurateIfEnabled()
+  it('mounts watcher when FULCRUM_MEMORY_CURATE_AUTO is unset (post-PR-9 default-on, stop is idempotent)', async () => {
+    const stop = await startMemoryAutoCurateIfEnabled({ vaultPath: tmpVault })
     expect(typeof stop).toBe('function')
+    stop()
     stop()
   })
 
-  it('returns a no-op stop when FULCRUM_MEMORY_CURATE_AUTO=0', async () => {
-    process.env['FULCRUM_MEMORY_CURATE_AUTO'] = '0'
-    const stop = await startMemoryAutoCurateIfEnabled()
-    expect(typeof stop).toBe('function')
-    stop()
-  })
+  it.each([['0'], ['false'], ['off'], ['no']])(
+    'returns a no-op stop when FULCRUM_MEMORY_CURATE_AUTO=%s (explicit opt-out)',
+    async (value) => {
+      process.env['FULCRUM_MEMORY_CURATE_AUTO'] = value
+      const stop = await startMemoryAutoCurateIfEnabled()
+      expect(typeof stop).toBe('function')
+      stop()
+    },
+  )
 
   it('mounts watcher + subscription when FULCRUM_MEMORY_CURATE_AUTO=1 (stop is idempotent)', async () => {
     process.env['FULCRUM_MEMORY_CURATE_AUTO'] = '1'

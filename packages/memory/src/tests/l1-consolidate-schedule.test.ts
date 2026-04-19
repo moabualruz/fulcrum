@@ -56,28 +56,30 @@ afterEach(() => {
 })
 
 describe('startConsolidateSchedule — enablement', () => {
-  it('returns a no-op stop when cadence is unset', () => {
-    const sched = makeFakeScheduler()
-    let called = 0
-    const stop = startConsolidateSchedule({
-      runPass: async () => { called++ },
-      scheduler: sched,
-    })
-    expect(sched.pending()).toBe(0)
-    stop()
-    expect(called).toBe(0)
-  })
-
-  it('returns a no-op stop when cadence is "never"', () => {
+  it('defaults to daily cadence when FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE is unset (post-PR-9)', () => {
     const sched = makeFakeScheduler()
     const stop = startConsolidateSchedule({
-      cadence: 'never',
       runPass: async () => {},
       scheduler: sched,
     })
-    expect(sched.pending()).toBe(0)
+    expect(sched.pending()).toBe(1)
     stop()
+    expect(sched.pending()).toBe(0)
   })
+
+  it.each([['never'], ['off'], ['0'], ['false'], ['no'], ['NEVER']])(
+    'returns a no-op stop when cadence is %s (explicit opt-out)',
+    (value) => {
+      const sched = makeFakeScheduler()
+      const stop = startConsolidateSchedule({
+        cadence: value,
+        runPass: async () => {},
+        scheduler: sched,
+      })
+      expect(sched.pending()).toBe(0)
+      stop()
+    },
+  )
 
   it('returns a no-op stop on unknown cadence strings', () => {
     const sched = makeFakeScheduler()

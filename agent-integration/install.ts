@@ -1202,10 +1202,12 @@ async function smokeMcp(): Promise<void> {
   let stdoutBuf = "";
   let stderrBuf = "";
   let responseLine: string | null = null;
-  let spawnError: Error | null = null;
+  // Boxed so TS control-flow analysis doesn't narrow to `never` after the
+  // close-handler's null check (the spawn-error assignment lives in a callback).
+  const spawnError: { err: Error | null } = { err: null };
   const start = Date.now();
 
-  child.on("error", (err) => { spawnError = err; });
+  child.on("error", (err) => { spawnError.err = err; });
   child.stdout.on("data", (chunk: Buffer) => {
     stdoutBuf += chunk.toString("utf8");
     if (responseLine !== null) return;
@@ -1232,8 +1234,8 @@ async function smokeMcp(): Promise<void> {
   await new Promise<void>((resolve) => child.on("close", () => resolve()));
   clearTimeout(killTimer);
 
-  if (spawnError) {
-    warn(`MCP smoke test failed: ${spawnError.message}`);
+  if (spawnError.err) {
+    warn(`MCP smoke test failed: ${spawnError.err.message}`);
     return;
   }
   if (!responseLine) {
