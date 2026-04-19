@@ -1157,8 +1157,18 @@ async function writeSeedData(): Promise<void> {
 }
 
 // ── Post-install MCP smoke test ───────────────────────────────────────────────
-// Spawns the configured Claude MCP command, sends JSON-RPC `initialize`, verifies a valid
-// response within a 5-second timeout. Non-blocking: failure is a warning.
+// Spawns the configured Claude MCP command, sends a JSON-RPC `initialize`,
+// and waits for the matching response on stdout. Kills the server as soon as
+// the response arrives.
+//
+// Non-blocking: failure is a warning.
+//
+// Why not `spawnSync` with `input:` + `timeout:`? The fulcrum MCP server is a
+// long-lived stdio server — it does not exit on stdin EOF, so spawnSync would
+// always hit its timeout (ETIMEDOUT) regardless of whether the response
+// arrived. An async spawn that kills the child on first valid response is
+// the correct shape and matches how real MCP clients (Claude Code, Codex,
+// Gemini) actually drive the server.
 
 async function smokeMcp(): Promise<void> {
   if (DRY_RUN) {
@@ -1170,7 +1180,8 @@ async function smokeMcp(): Promise<void> {
     warn("smoke test skipped — fulcrum not in PATH");
     return;
   }
-  const TIMEOUT_MS = 5000;
+  const { spawn } = await import("node:child_process");
+  const TIMEOUT_MS = 30_000;
   const initRequest = JSON.stringify({
     jsonrpc: "2.0",
     method: "initialize",
@@ -1182,44 +1193,67 @@ async function smokeMcp(): Promise<void> {
     },
   }) + "\n";
 
-  try {
-    const fulcrumBin = resolveCliPath();
-    const child = spawnSync(
-      fulcrumBin,
-      CLAUDE_MCP_ARGS,
-      {
-        input: initRequest,
-        timeout: TIMEOUT_MS,
-        encoding: "utf8",
-        stdio: ["pipe", "pipe", "pipe"],
-        env: { ...process.env, PATH: process.env["PATH"] ?? "", FULCRUM_NO_MONITOR: "1" },
-      },
-    );
+  const fulcrumBin = resolveCliPath();
+  const child = spawn(fulcrumBin, CLAUDE_MCP_ARGS, {
+    stdio: ["pipe", "pipe", "pipe"],
+    env: { ...process.env, PATH: process.env["PATH"] ?? "", FULCRUM_NO_MONITOR: "1" },
+  });
 
-    if (child.error) throw child.error;
+  let stdoutBuf = "";
+  let stderrBuf = "";
+  let responseLine: string | null = null;
+  let spawnError: Error | null = null;
+  const start = Date.now();
 
-    const stdout = (child.stdout ?? "").trim();
-    // Find the first line that looks like a JSON-RPC response
-    const responseLine = stdout.split("\n").find((l) => {
-      try { const j = JSON.parse(l) as Record<string, unknown>; return j["jsonrpc"] === "2.0" && j["id"] === 1; }
-      catch { return false; }
-    });
-
-    if (!responseLine) {
-      warn(`MCP smoke test: no valid JSON-RPC response found (stdout: ${stdout.slice(0, 200)})`);
-      return;
+  child.on("error", (err) => { spawnError = err; });
+  child.stdout.on("data", (chunk: Buffer) => {
+    stdoutBuf += chunk.toString("utf8");
+    if (responseLine !== null) return;
+    for (const line of stdoutBuf.split("\n")) {
+      try {
+        const j = JSON.parse(line) as Record<string, unknown>;
+        if (j["jsonrpc"] === "2.0" && j["id"] === 1) {
+          responseLine = line;
+          child.kill("SIGTERM");
+          return;
+        }
+      } catch { /* not a complete JSON line yet */ }
     }
+  });
+  child.stderr.on("data", (chunk: Buffer) => { stderrBuf += chunk.toString("utf8"); });
 
+  child.stdin.write(initRequest);
+  child.stdin.end();
+
+  const killTimer = setTimeout(() => {
+    if (responseLine === null) child.kill("SIGKILL");
+  }, TIMEOUT_MS);
+
+  await new Promise<void>((resolve) => child.on("close", () => resolve()));
+  clearTimeout(killTimer);
+
+  if (spawnError) {
+    warn(`MCP smoke test failed: ${spawnError.message}`);
+    return;
+  }
+  if (!responseLine) {
+    const tail = stderrBuf.slice(-200).replace(/\s+$/, "");
+    warn(`MCP smoke test: no valid JSON-RPC response within ${TIMEOUT_MS}ms (stderr_tail: ${tail})`);
+    return;
+  }
+
+  const elapsed = Date.now() - start;
+  try {
     const resp = JSON.parse(responseLine) as Record<string, unknown>;
     if (resp["result"]) {
-      ok(`MCP smoke test passed — server responded to initialize`);
+      ok(`MCP smoke test passed — server responded to initialize in ${elapsed}ms`);
     } else if (resp["error"]) {
       warn(`MCP smoke test: server returned error: ${JSON.stringify(resp["error"])}`);
     } else {
       warn(`MCP smoke test: unexpected response shape`);
     }
   } catch (err) {
-    warn(`MCP smoke test failed: ${(err as Error).message}`);
+    warn(`MCP smoke test: could not parse response line: ${(err as Error).message}`);
   }
 }
 
