@@ -45,7 +45,6 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.53.0"
   },
   "devDependencies": {
-    "fulcrum-teams": "workspace:*",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0",

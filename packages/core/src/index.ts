@@ -174,3 +174,13 @@ export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, 
 // core must never import teams).
 export type { TeamOps } from './team-ops.js'
 export { setTeamOps, getTeamOps } from './team-ops.js'
+
+// Worktree janitor operations — IoC registry.
+// fulcrum-worktrees implements WorktreeOps and registers itself at startup via:
+//   import { createWorktreeOps } from 'fulcrum-worktrees'
+//   import { setWorktreeOps } from 'fulcrum-agent-core'
+//   setWorktreeOps(createWorktreeOps())
+// This breaks the static circular dependency (worktrees → core is fine;
+// core must never import worktrees).
+export type { WorktreeOps } from './worktree-ops.js'
+export { setWorktreeOps, getWorktreeOps } from './worktree-ops.js'

@@ -3,6 +3,7 @@ import { escalateRun } from './runs.js'
 import { cleanupExpiredLocks } from './locks.js'
 import { FulcrumError } from './types.js'
 import type { PolicyConfig } from './types.js'
+import { getWorktreeOps } from './worktree-ops.js'
 import {
   JANITOR_INTERVAL_SEC,
   MEMORY_DECAY_FACTOR,
@@ -236,14 +237,12 @@ export async function runJanitorCycle(input: JanitorCycleInput, db: Db = getDb()
     }
 
     // TTL-reap abandoned worktrees (H-10, spec §18.6).
-    // Dynamic import avoids circular dependency: fulcrum-worktrees depends on fulcrum-agent-core.
-    // If fulcrum-worktrees is not installed (e.g. core-only consumers), silently skip.
+    // WorktreeOps IoC registry avoids the circular dep (fulcrum-worktrees → core).
+    // If the host never called setWorktreeOps (e.g. core-only consumers), skip.
     try {
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore — optional peer dep; circular if listed as dep (fulcrum-worktrees → fulcrum-agent-core)
-      const mod = await import('fulcrum-worktrees').catch(() => null) as Record<string, unknown> | null
-      if (mod && typeof mod.cleanupAbandonedWorktrees === 'function') {
-        const n = await mod.cleanupAbandonedWorktrees()
+      const ops = getWorktreeOps()
+      if (ops) {
+        const n = await ops.cleanupAbandonedWorktrees()
         if (typeof n === 'number') cleanedWorktrees = n
       }
     } catch (err) {
