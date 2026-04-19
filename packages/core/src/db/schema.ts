@@ -1218,117 +1218,98 @@ export function applySchema(db: Database.Database): void {
   } catch { /* sqlite-vec not available */ }
 
   // ── FTS5 triggers ─────────────────────────────────────────────────────────
-  // SQLite doesn't support CREATE TRIGGER IF NOT EXISTS, so drop first.
+  // SQLite has supported `CREATE TRIGGER IF NOT EXISTS` since 3.6.5 (2008),
+  // so applySchema uses it for idempotency. Trigger *body* updates must go
+  // through explicit migrations (DROP + CREATE inside a migration function),
+  // not by editing applySchema — otherwise a concurrent applySchema call
+  // would race the migration's DROP+CREATE and emit
+  // `trigger X already exists` noise on the second process.
 
   db.exec(`
-    DROP TRIGGER IF EXISTS tasks_ai;
-    DROP TRIGGER IF EXISTS tasks_ad;
-    DROP TRIGGER IF EXISTS tasks_au;
-    CREATE TRIGGER tasks_ai AFTER INSERT ON tasks BEGIN
+    CREATE TRIGGER IF NOT EXISTS tasks_ai AFTER INSERT ON tasks BEGIN
       INSERT INTO tasks_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
     END;
-    CREATE TRIGGER tasks_ad AFTER DELETE ON tasks BEGIN
+    CREATE TRIGGER IF NOT EXISTS tasks_ad AFTER DELETE ON tasks BEGIN
       INSERT INTO tasks_fts(tasks_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
     END;
-    CREATE TRIGGER tasks_au AFTER UPDATE ON tasks BEGIN
+    CREATE TRIGGER IF NOT EXISTS tasks_au AFTER UPDATE ON tasks BEGIN
       INSERT INTO tasks_fts(tasks_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
       INSERT INTO tasks_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
     END;
 
-    DROP TRIGGER IF EXISTS memories_ai;
-    DROP TRIGGER IF EXISTS memories_ad;
-    DROP TRIGGER IF EXISTS memories_au;
-    CREATE TRIGGER memories_ai AFTER INSERT ON memories BEGIN
+    CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
       INSERT INTO memories_fts(rowid, content, title, summary, canonical_text) VALUES (new.rowid, new.content, new.title, new.summary, new.canonical_text);
     END;
-    CREATE TRIGGER memories_ad AFTER DELETE ON memories BEGIN
+    CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
       INSERT INTO memories_fts(memories_fts, rowid, content, title, summary, canonical_text) VALUES ('delete', old.rowid, old.content, old.title, old.summary, old.canonical_text);
     END;
-    CREATE TRIGGER memories_au AFTER UPDATE ON memories BEGIN
+    CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
       INSERT INTO memories_fts(memories_fts, rowid, content, title, summary, canonical_text) VALUES ('delete', old.rowid, old.content, old.title, old.summary, old.canonical_text);
       INSERT INTO memories_fts(rowid, content, title, summary, canonical_text) VALUES (new.rowid, new.content, new.title, new.summary, new.canonical_text);
     END;
 
-    DROP TRIGGER IF EXISTS epics_ai;
-    DROP TRIGGER IF EXISTS epics_ad;
-    DROP TRIGGER IF EXISTS epics_au;
-    CREATE TRIGGER epics_ai AFTER INSERT ON epics BEGIN
+    CREATE TRIGGER IF NOT EXISTS epics_ai AFTER INSERT ON epics BEGIN
       INSERT INTO epics_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
     END;
-    CREATE TRIGGER epics_ad AFTER DELETE ON epics BEGIN
+    CREATE TRIGGER IF NOT EXISTS epics_ad AFTER DELETE ON epics BEGIN
       INSERT INTO epics_fts(epics_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
     END;
-    CREATE TRIGGER epics_au AFTER UPDATE ON epics BEGIN
+    CREATE TRIGGER IF NOT EXISTS epics_au AFTER UPDATE ON epics BEGIN
       INSERT INTO epics_fts(epics_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
       INSERT INTO epics_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
     END;
 
-    DROP TRIGGER IF EXISTS issues_ai;
-    DROP TRIGGER IF EXISTS issues_ad;
-    DROP TRIGGER IF EXISTS issues_au;
-    CREATE TRIGGER issues_ai AFTER INSERT ON issues BEGIN
+    CREATE TRIGGER IF NOT EXISTS issues_ai AFTER INSERT ON issues BEGIN
       INSERT INTO issues_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
     END;
-    CREATE TRIGGER issues_ad AFTER DELETE ON issues BEGIN
+    CREATE TRIGGER IF NOT EXISTS issues_ad AFTER DELETE ON issues BEGIN
       INSERT INTO issues_fts(issues_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
     END;
-    CREATE TRIGGER issues_au AFTER UPDATE ON issues BEGIN
+    CREATE TRIGGER IF NOT EXISTS issues_au AFTER UPDATE ON issues BEGIN
       INSERT INTO issues_fts(issues_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
       INSERT INTO issues_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
     END;
 
-    DROP TRIGGER IF EXISTS prds_ai;
-    DROP TRIGGER IF EXISTS prds_ad;
-    DROP TRIGGER IF EXISTS prds_au;
-    CREATE TRIGGER prds_ai AFTER INSERT ON prds BEGIN
+    CREATE TRIGGER IF NOT EXISTS prds_ai AFTER INSERT ON prds BEGIN
       INSERT INTO prds_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
     END;
-    CREATE TRIGGER prds_ad AFTER DELETE ON prds BEGIN
+    CREATE TRIGGER IF NOT EXISTS prds_ad AFTER DELETE ON prds BEGIN
       INSERT INTO prds_fts(prds_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
     END;
-    CREATE TRIGGER prds_au AFTER UPDATE ON prds BEGIN
+    CREATE TRIGGER IF NOT EXISTS prds_au AFTER UPDATE ON prds BEGIN
       INSERT INTO prds_fts(prds_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
       INSERT INTO prds_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
     END;
 
-    DROP TRIGGER IF EXISTS plans_ai;
-    DROP TRIGGER IF EXISTS plans_ad;
-    DROP TRIGGER IF EXISTS plans_au;
-    CREATE TRIGGER plans_ai AFTER INSERT ON plans BEGIN
+    CREATE TRIGGER IF NOT EXISTS plans_ai AFTER INSERT ON plans BEGIN
       INSERT INTO plans_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
     END;
-    CREATE TRIGGER plans_ad AFTER DELETE ON plans BEGIN
+    CREATE TRIGGER IF NOT EXISTS plans_ad AFTER DELETE ON plans BEGIN
       INSERT INTO plans_fts(plans_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
     END;
-    CREATE TRIGGER plans_au AFTER UPDATE ON plans BEGIN
+    CREATE TRIGGER IF NOT EXISTS plans_au AFTER UPDATE ON plans BEGIN
       INSERT INTO plans_fts(plans_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
       INSERT INTO plans_fts(rowid, title, description) VALUES (new.rowid, new.title, new.description);
     END;
 
-    DROP TRIGGER IF EXISTS artifacts_ai;
-    DROP TRIGGER IF EXISTS artifacts_ad;
-    DROP TRIGGER IF EXISTS artifacts_au;
-    CREATE TRIGGER artifacts_ai AFTER INSERT ON artifacts BEGIN
+    CREATE TRIGGER IF NOT EXISTS artifacts_ai AFTER INSERT ON artifacts BEGIN
       INSERT INTO artifacts_fts(rowid, title) VALUES (new.rowid, new.title);
     END;
-    CREATE TRIGGER artifacts_ad AFTER DELETE ON artifacts BEGIN
+    CREATE TRIGGER IF NOT EXISTS artifacts_ad AFTER DELETE ON artifacts BEGIN
       INSERT INTO artifacts_fts(artifacts_fts, rowid, title) VALUES ('delete', old.rowid, old.title);
     END;
-    CREATE TRIGGER artifacts_au AFTER UPDATE ON artifacts BEGIN
+    CREATE TRIGGER IF NOT EXISTS artifacts_au AFTER UPDATE ON artifacts BEGIN
       INSERT INTO artifacts_fts(artifacts_fts, rowid, title) VALUES ('delete', old.rowid, old.title);
       INSERT INTO artifacts_fts(rowid, title) VALUES (new.rowid, new.title);
     END;
 
-    DROP TRIGGER IF EXISTS code_chunks_ai;
-    DROP TRIGGER IF EXISTS code_chunks_ad;
-    DROP TRIGGER IF EXISTS code_chunks_au;
-    CREATE TRIGGER code_chunks_ai AFTER INSERT ON code_chunks BEGIN
+    CREATE TRIGGER IF NOT EXISTS code_chunks_ai AFTER INSERT ON code_chunks BEGIN
       INSERT INTO code_chunks_fts(rowid, content, symbol_path) VALUES (new.rowid, new.content, new.symbol_path);
     END;
-    CREATE TRIGGER code_chunks_ad AFTER DELETE ON code_chunks BEGIN
+    CREATE TRIGGER IF NOT EXISTS code_chunks_ad AFTER DELETE ON code_chunks BEGIN
       INSERT INTO code_chunks_fts(code_chunks_fts, rowid, content, symbol_path) VALUES ('delete', old.rowid, old.content, old.symbol_path);
     END;
-    CREATE TRIGGER code_chunks_au AFTER UPDATE ON code_chunks BEGIN
+    CREATE TRIGGER IF NOT EXISTS code_chunks_au AFTER UPDATE ON code_chunks BEGIN
       INSERT INTO code_chunks_fts(code_chunks_fts, rowid, content, symbol_path) VALUES ('delete', old.rowid, old.content, old.symbol_path);
       INSERT INTO code_chunks_fts(rowid, content, symbol_path) VALUES (new.rowid, new.content, new.symbol_path);
     END;
