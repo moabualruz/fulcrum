@@ -135,6 +135,10 @@ export type { ApplyContext, ApplyResult } from './l1/apply.js'
 export { appendCuratorLog } from './l1/telemetry.js'
 export type { CuratorLogEntry } from './l1/telemetry.js'
 
+// L1 auto-curator — vault-watcher-driven debounced curation (memory v3 PR 8 unit 8.1)
+export { startAutoCurator, DEFAULT_AUTO_CURATE_DEBOUNCE_MS } from './l1/auto-curate.js'
+export type { AutoCurateOptions, AutoCurateScheduler } from './l1/auto-curate.js'
+
 // Types
 export type {
   MemoryScope,

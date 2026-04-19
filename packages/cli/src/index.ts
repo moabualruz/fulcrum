@@ -1829,6 +1829,15 @@ async function runServeMcp(): Promise<void> {
     }
   }
 
+  // Memory v3 PR 8.1 — vault-watcher-driven auto-curation (opt-in via
+  // FULCRUM_MEMORY_CURATE_AUTO=1). No-op when the env flag is unset.
+  try {
+    const { startMemoryAutoCurateIfEnabled } = await import('./commands/memory-auto-curate-wiring.js')
+    await startMemoryAutoCurateIfEnabled()
+  } catch (err) {
+    process.stderr.write(`[fulcrum] auto-curate wiring failed (non-fatal): ${(err as Error).message}\n`)
+  }
+
   await runFulcrumMcpServer({
     version: '0.0.2',
     handleToolCall: handleToolCallWithSpan,
@@ -1966,6 +1975,14 @@ async function runServeMonitor(): Promise<void> {
   console.log(`[fulcrum monitor] Listening on http://127.0.0.1:${port}`)
   console.log(`[fulcrum monitor] API docs: http://127.0.0.1:${port}/status`)
 
+  // Memory v3 PR 8.1 — vault-watcher-driven auto-curation (opt-in).
+  try {
+    const { startMemoryAutoCurateIfEnabled } = await import('./commands/memory-auto-curate-wiring.js')
+    await startMemoryAutoCurateIfEnabled()
+  } catch (err) {
+    process.stderr.write(`[fulcrum monitor] auto-curate wiring failed (non-fatal): ${(err as Error).message}\n`)
+  }
+
   // Keep alive
   await new Promise(() => {})
 }
@@ -1988,6 +2005,14 @@ async function runServeAll(): Promise<void> {
   _monitorStarted = true
   _monitorServer = server
   console.error(`[fulcrum] Monitor running on http://127.0.0.1:${server.port}`)
+
+  // Memory v3 PR 8.1 — vault-watcher-driven auto-curation (opt-in).
+  try {
+    const { startMemoryAutoCurateIfEnabled } = await import('./commands/memory-auto-curate-wiring.js')
+    await startMemoryAutoCurateIfEnabled()
+  } catch (err) {
+    process.stderr.write(`[fulcrum] auto-curate wiring failed (non-fatal): ${(err as Error).message}\n`)
+  }
 
   await runServeMcp()
 }
