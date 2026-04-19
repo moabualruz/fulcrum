@@ -212,6 +212,21 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Propose Memory Consolidation',
+    name: 'consolidate_memory',
+    description: 'Propose merge candidates across L1 pages sharing the same entity set and retention tier, whose lowest-confidence member clears the floor. Dry-run only in v3 PR 7.4 — the curator-driven apply path lands later. Returns { dry_run: true, candidates: [{entity_set, retention_tier, page_ids, min_confidence_in_group, workspace_id, project_id}] }.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace_id: { type: 'string', description: 'Scope to this workspace (optional; defaults to current cwd)' },
+        project_id: { type: 'string', description: 'Scope to a single project (optional)' },
+        min_confidence: { type: 'number', description: 'Floor on the lowest-confidence member (default 0.5)' },
+        retention_tier: { type: 'string', description: 'Only groups in this tier (working|episodic|semantic|procedural)' },
+      },
+    },
+  },
+  {
     title: 'Lint Memory Vault',
     name: 'lint_memory',
     description: 'Verify the migrated memory vault: reports zero orphans, zero missing-source references, and zero supersession cycles. Migration stubs (pages with sources=[] + sources_via=[]) are tracked separately and do NOT count as orphans. Returns { ok, counts: { pages_checked, orphans, migration_stubs, missing_sources, supersession_cycles }, issues[] }.',

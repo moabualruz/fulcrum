@@ -291,6 +291,7 @@ fulcrum memory — memory vault commands
   mark-wrong       Write a correction L0 entry (v3 PR 5)
   lint             Verify migrated vault — orphans, missing sources, cycles (v3 PR 6)
   migrate          End-to-end v2a → v3 migration orchestrator (v3 PR 6)
+  consolidate      Propose merge candidates across entity-set collisions (v3 PR 7)
   sweep-expired              Delete session-scope memories whose expires_at has passed
   graph-consistency-check    Sample SQLite ↔ Kuzu and report drift (requires L2)
   rollback                   Operator-only rollback (--since= + --yes-i-really-want-to-undo-N-writes)
@@ -605,6 +606,44 @@ Output is JSON. Exits 2 if any issue is found.
     const report = lintMemory()
     console.log(JSON.stringify(report, null, 2))
     if (!report.ok) process.exit(2)
+    return
+  }
+
+  // Memory v3 PR 7 unit 7.4 — consolidate (dry-run proposals).
+  if (command === 'consolidate') {
+    if (args.includes('--help') || args.includes('-h')) {
+      console.log(`
+fulcrum memory consolidate [--min-confidence <F>] [--retention-tier <tier>] [--workspace <id>] [--project <id>]
+
+Propose merge candidates — groups of L1 pages sharing the same entity set
+and retention tier whose lowest-confidence member clears the floor. Output
+is JSON; this is a dry-run only (plan §7.4). The apply mode (invoke the
+curator with a synthesis task) lands after the consolidation prompt stabilises.
+
+Flags:
+  --min-confidence <F>    Floor on the lowest-confidence member (default 0.5)
+  --retention-tier <tier> Only groups in this tier (working|episodic|semantic|procedural)
+  --workspace <id>        Override workspace (default: current cwd workspace)
+  --project <id>          Scope to a single project (default: every project in workspace)
+`)
+      process.exit(0)
+    }
+    const get = (flag: string): string | undefined => {
+      const i = args.indexOf(flag)
+      return i >= 0 ? args[i + 1] : undefined
+    }
+    const { consolidateMemory } = await import('./commands/memory-consolidate.js')
+    const input: Parameters<typeof consolidateMemory>[0] = {}
+    const workspaceFlag = get('--workspace')
+    const projectFlag = get('--project')
+    const tierFlag = get('--retention-tier')
+    const floorFlag = get('--min-confidence')
+    if (workspaceFlag) input.workspace_id = workspaceFlag
+    if (projectFlag) input.project_id = projectFlag
+    if (tierFlag) input.retention_tier = tierFlag as typeof input.retention_tier
+    if (floorFlag !== undefined) input.min_confidence = Number(floorFlag)
+    const result = consolidateMemory(input)
+    console.log(JSON.stringify(result, null, 2))
     return
   }
 

@@ -69,6 +69,13 @@ export {
 } from './l1/page.js'
 export type { CreateCuratedPageOptions } from './l1/page.js'
 
+// L1 consolidation (memory v3 PR 7 unit 7.4)
+export { findConsolidationCandidates } from './l1/consolidate.js'
+export type {
+  ConsolidationCandidate,
+  ConsolidationOptions,
+} from './l1/consolidate.js'
+
 // L1 lifecycle primitives (memory v3 PR 7 unit 7.1)
 export {
   applyDecay,

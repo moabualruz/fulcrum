@@ -680,6 +680,22 @@ TOOL_REGISTRY.set('trace_claim', {
   },
 })
 
+TOOL_REGISTRY.set('consolidate_memory', {
+  schema: TOOL_SCHEMA_MAP.get('consolidate_memory'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { consolidateMemory } = await import('./commands/memory-consolidate.js')
+    const input: Parameters<typeof consolidateMemory>[0] = {}
+    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
+    if (ws) input.workspace_id = ws
+    if (args['project_id'] !== undefined) input.project_id = args['project_id'] as string
+    if (args['min_confidence'] !== undefined) input.min_confidence = args['min_confidence'] as number
+    if (args['retention_tier'] !== undefined)
+      input.retention_tier = args['retention_tier'] as typeof input.retention_tier
+    return consolidateMemory(input)
+  },
+})
+
 TOOL_REGISTRY.set('lint_memory', {
   schema: TOOL_SCHEMA_MAP.get('lint_memory'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
