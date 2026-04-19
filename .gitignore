@@ -52,5 +52,8 @@ pnpm-debug.log*
 .opencode/
 .windsurf/
 
+# pi-lens local cache / index (large, machine-local)
+.pi-lens/
+
 # Compound Engineering local config
 .compound-engineering/*.local.yaml
