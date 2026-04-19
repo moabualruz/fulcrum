@@ -7,7 +7,7 @@ This file is auto-loaded by Claude Code. It configures your connection to the Fu
 ## MCP Server
 
 <!-- GENERATED:tool-count-start -->
-The `fulcrum` MCP server exposes 23 tools for task management, memory, agent runs, and workspace context.
+The `fulcrum` MCP server exposes 24 tools for task management, memory, agent runs, and workspace context.
 <!-- GENERATED:tool-count-end -->
 It runs as a local stdio process via the `fulcrum serve mcp` command.
 The HTTP monitor auto-starts on port 4721 alongside the MCP server — no separate command needed.
@@ -60,7 +60,7 @@ All tools are prefixed `mcp__fulcrum__` in Claude Code.
 > Auto-generated from `TOOL_SCHEMAS` in `packages/cli/src/mcp-tools.ts`.
 > Run `pnpm gen:claude-md` to regenerate after editing tools.
 
-**Total: 23 tools**
+**Total: 24 tools**
 
 ### `mcp__fulcrum__list_tasks` — List Tasks
 
@@ -225,6 +225,19 @@ Marks an agent run as blocked with a reason. Use when work cannot continue witho
 | `run_id` | string | Yes | Run ID from start_agent_run |
 | `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
 | `reason` | string | Yes | Why the run is blocked (will surface in workspace status) |
+
+### `mcp__fulcrum__sweep_stale_runs` — Sweep Stale Agent Runs
+
+`idempotent` `destructive`
+
+Abort any agent runs still marked running but with no heartbeat for more than stale_minutes (default 10). Use on session start to reap zombies left by agents that crashed without firing their agent_end / session_shutdown hook. Effect: flips matching rows to status=aborted, status_category=done, and appends a run_event. Returns: list of reaped run_ids.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspace_id` | string | No | Workspace ID (optional — omit to sweep every workspace) |
+| `stale_minutes` | number | No | Staleness threshold in minutes (default 10) |
 
 ### `mcp__fulcrum__build_cos_context` — Build Chief-of-Staff Context
 

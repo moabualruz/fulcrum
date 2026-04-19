@@ -1,5 +1,5 @@
 ---
-name: fulcrum-skills-index
+name: skills
 description: Table of contents for the Fulcrum Claude Skills directory. Browse this first when you land in a Fulcrum-managed workspace for the first time.
 ---
 
