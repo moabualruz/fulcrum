@@ -9,6 +9,15 @@ on:
       - 'packages/memory/src/recall.ts'
       - 'packages/memory/src/scoring.ts'
       - 'packages/memory/src/eval/**'
+      # memory v3 surfaces (PR 8 unit 8.3 widening — any path that can
+      # affect recall quality must run the eval gate before merge)
+      - 'packages/memory/src/l0/**'
+      - 'packages/memory/src/l1/**'
+      - 'packages/memory/src/l2/**'
+      - 'packages/memory/src/stats.ts'
+      - 'packages/memory/src/schema.ts'
+      - 'packages/memory/src/write.ts'
+      - 'packages/memory/src/migration/**'
 
 jobs:
   fulcrum-recall-eval:

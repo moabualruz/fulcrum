@@ -572,6 +572,23 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     return c.json({ data })
   })
 
+  // Memory v3 PR 8 unit 8.3 — observability surface. Counts live L1 pages by
+  // retention tier, L0 ingest rate, graph nodes/edges, confidence histogram,
+  // and curation latency percentiles parsed from `vault/curated/log.md`.
+  app.get('/memory/stats', async (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    try {
+      const { computeMemoryV3Stats, getVaultPath } = await import('fulcrum-memory')
+      const vaultPath = c.req.query('vault_path') ?? getVaultPath()
+      const db = getDb()
+      const data = computeMemoryV3Stats(db, { workspace_id: ws, vaultPath })
+      return c.json({ data })
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500)
+    }
+  })
+
   app.get('/replay/:run_id', async (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)

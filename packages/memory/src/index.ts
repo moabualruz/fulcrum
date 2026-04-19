@@ -145,6 +145,10 @@ export type { ConsolidateScheduleOptions } from './l1/consolidate-schedule.js'
 export { appendConsolidateLog } from './l1/consolidate-log.js'
 export type { ConsolidateLogEntry } from './l1/consolidate-log.js'
 
+// Memory v3 stats — observability surface (memory v3 PR 8 unit 8.3)
+export { computeMemoryV3Stats } from './stats.js'
+export type { MemoryV3Stats, MemoryV3StatsOptions } from './stats.js'
+
 // Types
 export type {
   MemoryScope,
