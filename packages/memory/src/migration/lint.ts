@@ -1,25 +1,41 @@
 // packages/memory/src/migration/lint.ts
 //
-// Memory v3 PR 6 unit 6.5 — `fulcrum memory lint` verification pass.
+// Memory v3 PR 6 unit 6.5 + PR 7 unit 7.3 — `fulcrum memory lint`.
 //
-// Scope (plan §6.5 — the minimum the PR 6 Verify gate needs):
-//   * orphan pages (sources[] AND sources_via[] both empty AND not a
-//     migration stub)
-//   * migration_stubs (sources=[] + sources_via=[] — plan §6.2 legitimate
-//     stubs; tracked separately so the post-migration vault lints clean)
-//   * missing-source references (sources[] entries with no l0_sources row)
-//   * supersession cycles (A→B→A, A→B→C→A, …)
+// PR 6 scope (the post-migration verify gate):
+//   * orphan pages (sources[] AND sources_via[] empty AND not a migration stub)
+//   * migration_stubs (plan §6.2 stubs tracked separately — NOT a failure)
+//   * missing_sources (sources[] entries with no l0_sources row)
+//   * supersession_cycles (A→B→A, A→B→C→A, …)
 //
-// Broader lint categories from plan §7.3 (broken wikilinks, stale claims,
-// template violations) land in PR 7.3 — the report schema is additive so
-// adding issue codes later is a non-breaking change.
+// PR 7.3 additions (vault-aware):
+//   * broken_wikilinks (body has [[raw/...]] whose l0_sources row exists but
+//     the underlying file is gone on disk)
+//   * stale_claims (last_confirmed > 90d AND confidence > 0.5)
+//   * sources_wikilink_divergence (frontmatter sources[] ≠ the set of inline
+//     [[raw/...]] ULIDs — one count per page)
+//   * template_violations (retrospective validateL1Page failure on an
+//     existing page — one count per page)
+//
+// LintIssueCode is additive — downstream dashboards (PR 8) consume the shape
+// `{code, detail, page_id?, source_id?, cycle?}` and can ignore unknown codes.
 
 import type Database from 'better-sqlite3'
+import { existsSync, readFileSync } from 'fs'
+import { join } from 'path'
+import { parseCuratedPage } from '../l1/frontmatter.js'
+import { validateL1Page } from '../l1/validator.js'
+import { extractWikilinks } from '../l1/wikilinks.js'
+import { getVaultPath } from '../vault/client.js'
 
 export type LintIssueCode =
   | 'ORPHAN_PAGE'
   | 'MISSING_SOURCE'
   | 'SUPERSESSION_CYCLE'
+  | 'BROKEN_WIKILINK'
+  | 'STALE_CLAIM'
+  | 'SOURCES_WIKILINK_DIVERGENCE'
+  | 'TEMPLATE_VIOLATION'
 
 export interface LintIssue {
   code: LintIssueCode
@@ -35,6 +51,10 @@ export interface LintCounts {
   migration_stubs: number
   missing_sources: number
   supersession_cycles: number
+  broken_wikilinks: number
+  stale_claims: number
+  sources_wikilink_divergence: number
+  template_violations: number
 }
 
 export interface LintReport {
@@ -43,12 +63,25 @@ export interface LintReport {
   issues: LintIssue[]
 }
 
+export interface LintOptions {
+  vaultPath?: string
+  /** Injected clock for deterministic stale-claim tests. Defaults to `new Date()`. */
+  now?: Date
+}
+
 interface L1Row {
   memory_id: string
   provenance: string
   supersedes: string | null
   superseded_by: string | null
+  vault_path: string | null
+  confidence: number
+  updated_at: string | null
 }
+
+const STALE_CLAIM_DAYS = 90
+const STALE_CLAIM_MIN_CONFIDENCE = 0.5
+const MS_PER_DAY = 86_400_000
 
 function parseSources(row: L1Row): { sources: string[]; sources_via: string[] } {
   try {
@@ -69,6 +102,12 @@ function parseSupersedes(row: L1Row): string[] {
   } catch {
     return []
   }
+}
+
+function wikilinkUlid(link: string): string | null {
+  if (!link.startsWith('raw/')) return null
+  const last = link.split('/').pop()
+  return last ?? null
 }
 
 function detectSupersessionCycles(rows: L1Row[]): string[][] {
@@ -103,7 +142,6 @@ function detectSupersessionCycles(rows: L1Row[]): string[][] {
     if ((color.get(id) ?? WHITE) === WHITE) visit(id)
   }
 
-  // Dedupe by canonical string representation so A→B→A and B→A→B count once.
   const seen = new Set<string>()
   const dedup: string[][] = []
   for (const cyc of cycles) {
@@ -118,11 +156,26 @@ function detectSupersessionCycles(rows: L1Row[]): string[][] {
   return dedup
 }
 
-export function lintMemoryVault(db: Database.Database): LintReport {
-  const rows = db.prepare(`
-    SELECT memory_id, provenance, supersedes, superseded_by
-    FROM memories WHERE schema_version >= 3
-  `).all() as L1Row[]
+export function lintMemoryVault(
+  db: Database.Database,
+  opts: LintOptions = {},
+): LintReport {
+  const vaultPath = opts.vaultPath ?? (() => {
+    try {
+      return getVaultPath()
+    } catch {
+      return null
+    }
+  })()
+  const now = opts.now ?? new Date()
+
+  const rows = db
+    .prepare(
+      `SELECT memory_id, provenance, supersedes, superseded_by,
+              vault_path, confidence, updated_at
+         FROM memories WHERE schema_version >= 3`,
+    )
+    .all() as L1Row[]
 
   const counts: LintCounts = {
     pages_checked: rows.length,
@@ -130,28 +183,25 @@ export function lintMemoryVault(db: Database.Database): LintReport {
     migration_stubs: 0,
     missing_sources: 0,
     supersession_cycles: 0,
+    broken_wikilinks: 0,
+    stale_claims: 0,
+    sources_wikilink_divergence: 0,
+    template_violations: 0,
   }
   const issues: LintIssue[] = []
 
-  // Pre-fetch l0_sources IDs for fast membership check.
-  const l0Ids = new Set(
-    (db.prepare('SELECT source_id FROM l0_sources').all() as { source_id: string }[])
-      .map(r => r.source_id),
-  )
+  const l0Rows = db
+    .prepare('SELECT source_id, vault_path FROM l0_sources')
+    .all() as Array<{ source_id: string; vault_path: string }>
+  const l0ById = new Map(l0Rows.map((r) => [r.source_id, r.vault_path]))
 
   for (const row of rows) {
     const { sources, sources_via } = parseSources(row)
-    const superseded_by_active = row.superseded_by !== null
-
-    if (sources.length === 0 && sources_via.length === 0) {
-      // Treat as a migration stub (plan §6.2). Orphan classification gets
-      // richer in PR 7.3 once we can distinguish intentional stubs from
-      // accidentally-empty pages.
-      counts.migration_stubs++
-    }
+    const isStub = sources.length === 0 && sources_via.length === 0
+    if (isStub) counts.migration_stubs++
 
     for (const src of sources) {
-      if (!l0Ids.has(src)) {
+      if (!l0ById.has(src)) {
         counts.missing_sources++
         issues.push({
           code: 'MISSING_SOURCE',
@@ -162,7 +212,94 @@ export function lintMemoryVault(db: Database.Database): LintReport {
       }
     }
 
-    void superseded_by_active // reserved for PR 7.3 orphan classification
+    // Stale-claim check — time + confidence gated. Uses `updated_at` as the
+    // base column (l1_pages view aliases it as last_confirmed).
+    if (row.updated_at && typeof row.confidence === 'number') {
+      const days = (now.getTime() - Date.parse(row.updated_at)) / MS_PER_DAY
+      if (days > STALE_CLAIM_DAYS && row.confidence > STALE_CLAIM_MIN_CONFIDENCE) {
+        counts.stale_claims++
+        issues.push({
+          code: 'STALE_CLAIM',
+          page_id: row.memory_id,
+          detail: `page '${row.memory_id}' last confirmed ${days.toFixed(1)}d ago at confidence ${row.confidence}`,
+        })
+      }
+    }
+
+    // Vault-aware checks. Skip migration stubs (body is a placeholder) and
+    // anything without a resolvable vault_path / file.
+    if (!vaultPath || !row.vault_path || isStub) continue
+    const abs = join(vaultPath, row.vault_path)
+    if (!existsSync(abs)) continue
+
+    let parsed
+    try {
+      parsed = parseCuratedPage(readFileSync(abs, 'utf8'))
+    } catch (e) {
+      counts.template_violations++
+      issues.push({
+        code: 'TEMPLATE_VIOLATION',
+        page_id: row.memory_id,
+        detail: `failed to parse vault file: ${e instanceof Error ? e.message : String(e)}`,
+      })
+      continue
+    }
+
+    // Retrospective validator pass. Migration phase waives rule 7 so pages
+    // that supersede rows not yet cut over don't false-alarm.
+    const v = validateL1Page(parsed, { phase: 'migration' })
+    if (!v.valid) {
+      counts.template_violations++
+      issues.push({
+        code: 'TEMPLATE_VIOLATION',
+        page_id: row.memory_id,
+        detail: `template violations: ${v.violations.map((x) => x.code).join(', ')}`,
+      })
+    }
+
+    // Wikilink analysis.
+    const bodyUlids = new Set<string>()
+    for (const link of extractWikilinks(parsed.body)) {
+      const ulid = wikilinkUlid(link)
+      if (ulid) bodyUlids.add(ulid)
+    }
+    const fmSources = new Set(sources)
+
+    // Divergence: per-page boolean, not per-element. One issue per page with
+    // any mismatch.
+    const fmMissingFromBody = sources.filter((s) => !bodyUlids.has(s))
+    const bodyMissingFromFm = [...bodyUlids].filter((u) => !fmSources.has(u))
+    if (fmMissingFromBody.length > 0 || bodyMissingFromFm.length > 0) {
+      counts.sources_wikilink_divergence++
+      issues.push({
+        code: 'SOURCES_WIKILINK_DIVERGENCE',
+        page_id: row.memory_id,
+        detail:
+          `frontmatter/body divergence — ` +
+          `fm-not-in-body: [${fmMissingFromBody.join(', ')}], ` +
+          `body-not-in-fm: [${bodyMissingFromFm.join(', ')}]`,
+      })
+    }
+
+    // Broken wikilinks: inline [[raw/...]] whose l0_sources row exists but
+    // the underlying vault file is missing. If the l0_sources row itself is
+    // missing we don't double-count — MISSING_SOURCE already covered that
+    // case when the ULID was in frontmatter.sources[], and body-only
+    // references are handled by the divergence counter above.
+    for (const ulid of bodyUlids) {
+      const l0Rel = l0ById.get(ulid)
+      if (!l0Rel) continue
+      const l0Abs = join(vaultPath, l0Rel)
+      if (!existsSync(l0Abs)) {
+        counts.broken_wikilinks++
+        issues.push({
+          code: 'BROKEN_WIKILINK',
+          page_id: row.memory_id,
+          source_id: ulid,
+          detail: `page '${row.memory_id}' links to raw/ for '${ulid}' but vault file ${l0Rel} is missing`,
+        })
+      }
+    }
   }
 
   const cycles = detectSupersessionCycles(rows)
@@ -175,6 +312,13 @@ export function lintMemoryVault(db: Database.Database): LintReport {
     })
   }
 
-  const ok = counts.orphans === 0 && counts.missing_sources === 0 && counts.supersession_cycles === 0
+  const ok =
+    counts.orphans === 0 &&
+    counts.missing_sources === 0 &&
+    counts.supersession_cycles === 0 &&
+    counts.broken_wikilinks === 0 &&
+    counts.stale_claims === 0 &&
+    counts.sources_wikilink_divergence === 0 &&
+    counts.template_violations === 0
   return { ok, counts, issues }
 }
