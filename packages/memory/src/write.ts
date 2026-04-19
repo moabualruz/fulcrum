@@ -15,12 +15,10 @@ import { appendWal } from './wal/writer.js'
 import { enqueueEmbed, trackAsyncWork } from './l2/queue.js'
 import { storeEmbeddingInVec } from './l2/embed.js'
 
-// The embed queue, chunk embedder, and flush/headroom helpers moved to
-// packages/memory/src/l2/ during PR 4 unit 4.1. Re-exported here so existing
-// callers (cli, pci, indexer) keep compiling against `./write.js`.
-export { flushPendingMemoryWrites, waitForEmbedHeadroom } from './l2/queue.js'
-export { storeEmbeddingInVec } from './l2/embed.js'
-export { storeChunkEmbedding, scheduleChunkEmbedding } from './l2/code.js'
+// The embed queue, chunk embedder, and flush/headroom helpers live under
+// packages/memory/src/l2/ since PR 4 unit 4.1. PR 9.2 retired the
+// back-compat re-export block here; the public barrel (src/index.ts)
+// sources those symbols from their canonical modules directly.
 
 function bodyHash(text: string): string {
   const hex = createHash('sha256').update(text).digest('hex')

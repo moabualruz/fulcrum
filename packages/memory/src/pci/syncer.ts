@@ -22,7 +22,7 @@ import type { Db } from 'fulcrum-agent-core'
 import { getDb, getContentChangeBus, newId, type ContentChangeEvent } from 'fulcrum-agent-core'
 import { computeFileId } from '../setup/backfill-code-files.js'
 import { ingestFile as fullIngest } from '../ingest.js'
-import { scheduleChunkEmbedding } from '../write.js'
+import { scheduleChunkEmbedding } from '../l2/code.js'
 import { reduceFileToGraph, reduceUnlinkToGraph } from '../kuzu/reducers/code.js'
 
 const LANG_EXT_MAP: Record<string, string> = {

@@ -172,11 +172,15 @@ export { computeImportance, computeFreshness, rrfScore } from './scoring.js'
 // Dedup utilities
 export { contentHash, isDuplicate } from './dedup.js'
 
-// Write
-export { writeMemory, insertMemoryDirect, normalizeCodeText, storeEmbeddingInVec, storeChunkEmbedding, scheduleChunkEmbedding, flushPendingMemoryWrites, waitForEmbedHeadroom } from './write.js'
+// Write — legacy v2a entry point + rebuild helper.
+export { writeMemory, insertMemoryDirect, normalizeCodeText } from './write.js'
 
-// L2 — L1 page embedding (curator apply-layer entry point).
-export { recordL1Embedding } from './l2/embed.js'
+// L2 — embedding queue + writers (public surface for cli, pci, indexer).
+// Prior to PR 9.2 these were re-exported by write.ts as a back-compat shim;
+// the barrel now sources them from their canonical l2/ modules directly.
+export { storeEmbeddingInVec, recordL1Embedding } from './l2/embed.js'
+export { storeChunkEmbedding, scheduleChunkEmbedding } from './l2/code.js'
+export { flushPendingMemoryWrites, waitForEmbedHeadroom } from './l2/queue.js'
 
 // v3 retrieval — graph + confidence + supersession filters (PR 5).
 export { runV3Search, v3DefaultWeights, resolveQueryEntities } from './retrieval/v3-search.js'

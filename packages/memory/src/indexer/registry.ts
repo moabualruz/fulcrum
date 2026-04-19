@@ -18,7 +18,7 @@ import { startPciSyncer, syncFile, type PciSyncerHandle } from '../pci/syncer.js
 import { startProjectWatch, type ProjectWatchHandle } from '../pci/watcher.js'
 import { enumerateProjectFiles } from '../pci/walker-integration.js'
 import { isVaultOwnedPath, VaultOwnedPathError } from '../pci/vault-guard.js'
-import { waitForEmbedHeadroom } from '../write.js'
+import { waitForEmbedHeadroom } from '../l2/queue.js'
 import { HandlerError } from './errors.js'
 
 const DEFAULT_GRACE_MS = 30_000

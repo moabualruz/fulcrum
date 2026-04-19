@@ -42,6 +42,18 @@ describe('PR 4.1 — l2 relocation', () => {
     expect((barrel as Record<string, unknown>)['trackAsyncWork']).toBeUndefined()
   })
 
+  // PR 9.2 — write.js no longer re-exports the l2 helpers. The shim that
+  // PR 4.1 left behind for cli/pci/indexer back-compat has been removed
+  // now that every internal import points at l2/ directly.
+  it('write.js does NOT re-export the l2 shim symbols (PR 9.2)', async () => {
+    const writeMod = (await import('../write.js')) as Record<string, unknown>
+    expect(writeMod['storeEmbeddingInVec']).toBeUndefined()
+    expect(writeMod['storeChunkEmbedding']).toBeUndefined()
+    expect(writeMod['scheduleChunkEmbedding']).toBeUndefined()
+    expect(writeMod['flushPendingMemoryWrites']).toBeUndefined()
+    expect(writeMod['waitForEmbedHeadroom']).toBeUndefined()
+  })
+
   it('batch queue respects FULCRUM_EMBED_CONCURRENCY (bounded parallelism)', async () => {
     // Run N > concurrency embed tasks; record peak in-flight. Must never
     // exceed EMBED_CONCURRENCY derived from process.env at import time (or
