@@ -233,8 +233,8 @@ export { recallMemory, getMemory, getMemoriesForTask } from './recall.js'
 export { runStagedSearch } from './retrieval/search.js'
 export type { StagedSearchResponse, StagedSearchReason, RunStagedSearchInput } from './retrieval/search.js'
 
-// v2a PR 1 Task 9 — kind validation + per-kind char caps.
-export { validateKind, isAllowedKind, applyKindCap, V2A_KINDS, LEGACY_KINDS, V2B_KINDS, KIND_CAPS } from './validate-kind.js'
+// v2a PR 1 Task 9 — kind validation. Per-kind char caps retired in PR 9.1.
+export { validateKind, isAllowedKind, V2A_KINDS, LEGACY_KINDS, V2B_KINDS } from './validate-kind.js'
 
 // v2a PR 2 Tasks 12 + 13 — query_memory + search_code action surfaces.
 export { queryMemory } from './query-memory.js'

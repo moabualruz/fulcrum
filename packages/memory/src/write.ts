@@ -9,7 +9,7 @@ import { appendToLog } from './vault/index-builder.js'
 import type { WriteMemoryInput, FullMemory } from './types.js'
 import { runExtractionPipeline } from './extractors/pipeline.js'
 import { computeSparseVector } from './sparse.js'
-import { validateKind, applyKindCap } from './validate-kind.js'
+import { validateKind } from './validate-kind.js'
 import { sanitizeOnWrite } from './sanitize/index.js'
 import { appendWal } from './wal/writer.js'
 import { enqueueEmbed, trackAsyncWork } from './l2/queue.js'
@@ -136,10 +136,10 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
     } as FullMemory
   }
 
-  // v2a Task 9: kind validation + per-kind char cap. The DB-level CHECK was
-  // dropped in PR 1 Task 1; this is the single canonical policy point.
+  // v2a Task 9: kind validation. The DB-level CHECK was dropped in PR 1
+  // Task 1; this is the single canonical policy point. Per-kind char caps
+  // retired in PR 9.1 — v3 L0 ingest is verbatim.
   validateKind(input.kind)
-  const cappedContent = applyKindCap(input.kind, input.content)
   // v2a PR 5 Tasks 24-26: sanitize-before-anything (constraint #8). Strip
   // fence markers, redact prompt injection + credentials + invisible Unicode.
   //
@@ -148,7 +148,7 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
   // leak credentials + injection into WAL + L0 + L1. Now: drop the write,
   // emit sanitize.error telemetry via the WAL audit path, return a
   // synthesized skipped-memory stub so callers don't crash.
-  const sanitized = sanitizeOnWrite(cappedContent, {
+  const sanitized = sanitizeOnWrite(input.content, {
     workspace_id: input.workspace_id,
     project_id: input.project_id,
   })

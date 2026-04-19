@@ -3,8 +3,11 @@
 // PR 1 Task 1 dropped the CHECK constraint on memories.kind so we can add
 // new kinds (file_patch, bash_trace, pre_compact_extract, session_summary,
 // blocker_resolution, delegation_summary, identity, persona) without further
-// table rebuilds. Validation, char caps per §3.4, and the truncation marker
-// move into this module so write.ts applies a single canonical policy.
+// table rebuilds. Validation moves into this module so write.ts applies a
+// single canonical policy.
+//
+// PR 9.1 retired the per-kind char cap (`applyKindCap` / `KIND_CAPS`). v3
+// L0 ingest is verbatim; the legacy v2a writer no longer truncates.
 
 import { FulcrumError } from 'fulcrum-agent-core'
 
@@ -58,26 +61,6 @@ const V2B_KINDS = [
 
 const ALLOWED_KINDS = new Set<string>([...V2A_KINDS, ...LEGACY_KINDS, ...V2B_KINDS])
 
-/**
- * Per-kind character cap in characters. established convention: model-independent.
- * Content above the cap is truncated with `[…truncated N chars]`. Kinds not
- * listed have no cap.
- */
-const KIND_CAPS: Record<string, number> = {
-  file_patch: 800,
-  tool_trace: 400,
-  bash_trace: 400,
-  pre_compact_extract: 1500,
-  session_summary: 2200,
-  task_outcome: 1500,
-  blocker_resolution: 1500,
-  delegation_summary: 800,
-  decision: 800,
-  identity: 1375,
-  persona: 1375,
-  summary: 2200,
-}
-
 export function isAllowedKind(kind: string): boolean {
   return ALLOWED_KINDS.has(kind)
 }
@@ -92,16 +75,4 @@ export function validateKind(kind: string): void {
   }
 }
 
-/**
- * Returns `content` unchanged if under (or equal to) the per-kind cap, or a
- * truncated string with the `[…truncated N chars]` marker otherwise. Kinds
- * without a cap pass through unchanged.
- */
-export function applyKindCap(kind: string, content: string): string {
-  const cap = KIND_CAPS[kind]
-  if (cap === undefined || content.length <= cap) return content
-  const dropped = content.length - cap
-  return `${content.slice(0, cap)} […truncated ${dropped} chars]`
-}
-
-export { V2A_KINDS, LEGACY_KINDS, V2B_KINDS, ALLOWED_KINDS, KIND_CAPS }
+export { V2A_KINDS, LEGACY_KINDS, V2B_KINDS, ALLOWED_KINDS }
