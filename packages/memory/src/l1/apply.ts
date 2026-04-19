@@ -149,11 +149,61 @@ export function applyCuratorOutput(output: CuratorOutput, ctx: ApplyContext): Ap
     curator_input_sources: ctx.curator_input_sources,
   }
 
+  // Track the draft index → created page id mapping so we can run 7.2
+  // auto-supersession after every new page is durable in the DB.
+  const newPageCreatedIds: Array<string | null> = []
+
   const applyNewPage = (draft: CuratorNewPage): void => {
     const page = buildCuratedPage(draft, ctx, nowIso)
     filesWritten.push(join(vaultRoot, curatedRelativePath(page)))
     createCuratedPage(page, { ctx: validatorCtx })
     created_page_ids.push(page.id)
+    newPageCreatedIds.push(page.id)
+  }
+
+  // Plan §7.2 — contradiction-driven auto-supersession. For each new page
+  // carrying `contradicts[old_id]`, flip superseded_by on the old row and
+  // append old_id to the new page's supersedes[] when the new evidence is at
+  // least as strong. Silently skips: missing old pages, already-superseded
+  // old pages, and weaker-confidence new pages. Runs inside the same txn as
+  // the createCuratedPage calls — the supersedes[] update re-validates the
+  // new page against validator rule 7 (target must be v3).
+  const applyContradictions = (): void => {
+    for (let i = 0; i < output.new_pages.length; i++) {
+      const draft = output.new_pages[i]!
+      const new_id = newPageCreatedIds[i]
+      if (!new_id) continue
+      if (!draft.contradicts || draft.contradicts.length === 0) continue
+      const freshSupersedes: string[] = []
+      for (const old_id of draft.contradicts) {
+        const oldRow = db
+          .prepare(
+            `SELECT memory_id, confidence, superseded_by, schema_version
+               FROM memories WHERE memory_id = ?`,
+          )
+          .get(old_id) as
+          | { memory_id: string; confidence: number; superseded_by: string | null; schema_version: number }
+          | undefined
+        if (!oldRow) continue
+        if (oldRow.schema_version < 3) continue
+        if (oldRow.superseded_by !== null) continue
+        if (draft.confidence < oldRow.confidence) continue
+        db.prepare(
+          `UPDATE memories SET superseded_by = ?, updated_at = ? WHERE memory_id = ?`,
+        ).run(new_id, nowIso, old_id)
+        superseded_pairs.push({ old_id, new_id })
+        freshSupersedes.push(old_id)
+      }
+      if (freshSupersedes.length > 0) {
+        const currentPage = readCuratedPage(new_id)
+        if (currentPage) {
+          const merged = Array.from(
+            new Set([...currentPage.supersedes, ...freshSupersedes]),
+          )
+          updateCuratedPage(new_id, { supersedes: merged }, { ctx: validatorCtx })
+        }
+      }
+    }
   }
 
   const applyUpdate = (u: CuratorPageUpdate): void => {
@@ -189,6 +239,7 @@ export function applyCuratorOutput(output: CuratorOutput, ctx: ApplyContext): Ap
 
   const txn = db.transaction(() => {
     for (const p of output.new_pages) applyNewPage(p)
+    applyContradictions()
     for (const u of output.updates) applyUpdate(u)
     for (const s of output.supersessions) applySupersession(s)
     for (const e of output.new_edges) applyEdge(e)

@@ -116,6 +116,11 @@ export interface CuratorNewPage {
   sources_via: string[]
   entities: string[]
   body: string
+  // Plan §7.2 — page IDs this new page contradicts. Apply-layer auto-emits a
+  // supersession when `confidence` ≥ the old page's confidence. Empty by
+  // default; backwards-compatible with pre-7.2 curator outputs (parser
+  // defaults missing to []).
+  contradicts: string[]
 }
 
 export interface CuratorPageUpdate {
@@ -307,6 +312,7 @@ const NEW_PAGE_SCHEMA = {
     'sources_via',
     'entities',
     'body',
+    'contradicts',
   ],
   properties: {
     type: enumType(L1_PAGE_TYPES),
@@ -320,6 +326,7 @@ const NEW_PAGE_SCHEMA = {
     sources_via: stringArray(),
     entities: stringArray(),
     body: { type: 'string' },
+    contradicts: stringArray(),
   },
 }
 
@@ -491,6 +498,9 @@ function parseNewPage(raw: unknown, path: string): CuratorNewPage {
     sources_via: requireStringArray(o['sources_via'] ?? [], `${path}.sources_via`),
     entities: requireStringArray(o['entities'] ?? [], `${path}.entities`),
     body: requireString(o['body'], `${path}.body`),
+    // Missing / absent contradicts is tolerated — older curator outputs may
+    // not know about 7.2; always coerce to [].
+    contradicts: requireStringArray(o['contradicts'] ?? [], `${path}.contradicts`),
   }
 }
 
