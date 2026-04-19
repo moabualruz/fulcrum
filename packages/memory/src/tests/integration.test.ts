@@ -48,10 +48,11 @@ describe('integration: write → dedup → recall → link', () => {
     expect((compact[0] as unknown as Record<string, unknown>).memory_id).toBe(m.memory_id)
     expect((compact[0] as unknown as Record<string, unknown>)).not.toHaveProperty('canonical_text')
 
-    // 4. Recall — total_ranked with full fields
+    // 4. Recall — total_ranked with full fields (PR 9.3 retired canonical_text)
     const ranked = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite', mode: 'total_ranked' }) as unknown as FullMemory[]
     expect(ranked.length).toBeGreaterThan(0)
-    expect((ranked[0] as unknown as Record<string, unknown>)).toHaveProperty('canonical_text')
+    expect((ranked[0] as unknown as Record<string, unknown>)).not.toHaveProperty('canonical_text')
+    expect((ranked[0] as unknown as Record<string, unknown>)).toHaveProperty('access_count')
 
     // 5. Link memory to entities
     await linkMemoryToEntity({ memory_id: m.memory_id, entity_type: 'project', entity_id: 'proj_1' })

@@ -58,7 +58,7 @@ export async function upsertMemoryToKuzu(
   })
 
   // Step 2: Run structured extraction on content
-  const bodyText = memory.canonical_text ?? memory.title
+  const bodyText = memory.content || memory.title
   const mentions = extractStructured(bodyText, {
     task_id: memory.task_id,
     run_id: null,

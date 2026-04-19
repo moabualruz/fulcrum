@@ -76,14 +76,14 @@ export async function writeLifecycleMemory(
   db.prepare(`
     INSERT INTO memories (
       memory_id, workspace_id, project_id,
-      scope, kind, title, summary, canonical_text,
+      scope, kind, title, summary,
       content, tags, entities, confidence, freshness, importance,
       file_path, symbol_path, event_time, content_hash,
       task_id, issue_id, artifact_id, provenance_refs,
       embedding, source, created_at, updated_at, last_accessed_at, access_count
     ) VALUES (
       ?, ?, ?,
-      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?,
@@ -97,8 +97,7 @@ export async function writeLifecycleMemory(
     kind,
     title,
     summary,
-    input.content, // canonical_text
-    input.content, // content
+    input.content, // content (memory v3 PR 9.3 retired canonical_text)
     tags,
     '[]', // entities
     confidence,

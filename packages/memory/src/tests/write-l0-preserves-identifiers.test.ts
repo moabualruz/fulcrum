@@ -1,8 +1,9 @@
-// Regression guard: L0 (vault markdown) must store the ORIGINAL content —
-// never the FTS5-tokenized canonical_text. Prior to the fix, writeMemoryFile
-// wrote memory.canonical_text as the body, which mangled identifiers like
-// `user_profile_service` → `user profile service` in the human-readable
-// source-of-truth vault. That meant the vault was not actually canonical.
+// Regression guard: L0 (vault markdown) must store the ORIGINAL content.
+// Pre-PR-9.3 this was a layered invariant vs a separate FTS5-tokenized
+// `canonical_text` column; after PR 9.3 the column is gone and L0 is simply
+// the verbatim source of truth for a memory's body. The tests here still
+// pin that the vault write is bit-for-bit identical to the caller's input —
+// no sanitization, no identifier splitting, no re-encoding.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
@@ -77,7 +78,7 @@ describe('L0 vault body — identifier preservation', () => {
     expect(parsed.body.trim()).toBe(original)
   })
 
-  it('L1 still gets tokenized canonical_text despite verbatim L0 body', async () => {
+  it('L1 content column preserves identifiers verbatim; writer no longer populates canonical_text', async () => {
     const original = 'class UserProfileService { get_user_by_id() {} }'
     const { memory_id } = await writeMemory({
       workspace_id: 'ws_test',
@@ -89,14 +90,16 @@ describe('L0 vault body — identifier preservation', () => {
       content: original,
     })
 
-    const row = getDb().prepare('SELECT content, canonical_text FROM memories WHERE memory_id = ?').get(memory_id) as { content: string; canonical_text: string }
+    const row = getDb().prepare('SELECT content, canonical_text FROM memories WHERE memory_id = ?').get(memory_id) as { content: string; canonical_text: string | null }
     expect(row.content).toBe(original)
-    // canonical_text splits identifiers for FTS5 tokenization.
-    expect(row.canonical_text).toContain('User Profile Service')
-    expect(row.canonical_text).toContain('get user by id')
+    // Post-9.3: writer stops populating canonical_text — the column (still
+    // present until migration 104 runs) is left NULL. Once the operator
+    // executes `fulcrum memory migrate` on an existing DB, 104 removes
+    // the column entirely; until then the value is guaranteed to be null.
+    expect(row.canonical_text).toBeNull()
   })
 
-  it('rebuildFromVault round-trip: body=original, rebuilt canonical_text=tokenized', async () => {
+  it('rebuildFromVault round-trip: body=original, content column mirrors body verbatim', async () => {
     const original = 'function fetch_api_key(client_id) { return api.get(client_id) }'
     await writeMemory({
       workspace_id: 'ws_test',
@@ -113,11 +116,8 @@ describe('L0 vault body — identifier preservation', () => {
 
     await rebuildFromVault({ vaultPath: join(tempDataDir, 'vault'), target: 'l1' })
 
-    const row = getDb().prepare('SELECT content, canonical_text FROM memories LIMIT 1').get() as { content: string; canonical_text: string } | undefined
+    const row = getDb().prepare('SELECT content FROM memories LIMIT 1').get() as { content: string } | undefined
     expect(row).toBeDefined()
     expect(row!.content).toBe(original)
-    // Rebuild re-derived canonical_text from the original body — identifiers tokenized.
-    expect(row!.canonical_text).toContain('fetch api key')
-    expect(row!.canonical_text).toContain('client id')
   })
 })

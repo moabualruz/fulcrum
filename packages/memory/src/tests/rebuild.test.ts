@@ -20,7 +20,6 @@ const factMemory: FullMemory = {
   symbol_path: null,
   title: 'Rebuild test fact',
   summary: 'Tests rebuild from vault',
-  canonical_text: 'This memory was written to L0 and should be rebuilt into L1.',
     content: typeof 'This memory was written to L0 and should be rebuilt into L1.' === 'string' ? 'This memory was written to L0 and should be rebuilt into L1.' : '',
   tags: ['rebuild', 'test'],
   entities: [],

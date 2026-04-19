@@ -23,7 +23,6 @@ const testMemory: FullMemory = {
   symbol_path: null,
   title: 'Pipeline test memory',
   summary: 'Tests that runExtractionPipeline upserts the Memory node',
-  canonical_text: 'A decision was made about [[technology/typescript]] usage.',
     content: typeof 'A decision was made about [[technology/typescript]] usage.' === 'string' ? 'A decision was made about [[technology/typescript]] usage.' : '',
   tags: ['pipeline'],
   entities: [],

@@ -150,12 +150,12 @@ describe('buildWorldState — recalled_memories', () => {
     db.prepare(`
       INSERT INTO memories
         (memory_id, workspace_id, project_id, scope, kind, title, summary, content,
-         canonical_text, tags, entities, confidence, embedding,
+         tags, entities, confidence, embedding,
          task_id, issue_id, artifact_id, provenance_refs,
          created_at, updated_at, last_accessed_at, access_count)
       VALUES ('mem_1', 'ws_1', 'proj_1', 'project', 'fact', 'test', 'test',
               'implement the authentication flow for the API',
-              'implement the authentication flow for the API', '[]', '[]', 1.0, NULL, NULL, NULL, NULL, '[]',
+              '[]', '[]', 1.0, NULL, NULL, NULL, NULL, '[]',
               ?, ?, ?, 0)
     `).run(now, now, now)
 
@@ -178,12 +178,12 @@ describe('buildWorldState — recalled_memories', () => {
     db.prepare(`
       INSERT INTO memories
         (memory_id, workspace_id, project_id, scope, kind, title, summary, content,
-         canonical_text, tags, entities, confidence, embedding,
+         tags, entities, confidence, embedding,
          task_id, issue_id, artifact_id, provenance_refs,
          created_at, updated_at, last_accessed_at, access_count)
       VALUES ('mem_ws2', 'ws_2', 'proj_ws2', 'project', 'fact', 'test', 'test',
               'deploy the service to production',
-              NULL, '[]', '[]', 1.0, NULL, NULL, NULL, NULL, '[]',
+              '[]', '[]', 1.0, NULL, NULL, NULL, NULL, '[]',
               ?, ?, ?, 0)
     `).run(now, now, now)
 
@@ -212,12 +212,12 @@ describe('buildWorldState — recalled_memories', () => {
       db.prepare(`
         INSERT INTO memories
           (memory_id, workspace_id, project_id, scope, kind, title, summary, content,
-           canonical_text, tags, entities, confidence, embedding,
+           tags, entities, confidence, embedding,
            task_id, issue_id, artifact_id, provenance_refs,
            created_at, updated_at, last_accessed_at, access_count)
         VALUES (?, 'ws_1', 'proj_1', 'project', 'fact', 'test', 'test',
                 'build authentication system part ' || ?,
-                NULL, '[]', '[]', 1.0, NULL, NULL, NULL, NULL, '[]',
+                '[]', '[]', 1.0, NULL, NULL, NULL, NULL, '[]',
                 ?, ?, ?, 0)
       `).run(`mem_${i}`, i, now, now, now)
     }

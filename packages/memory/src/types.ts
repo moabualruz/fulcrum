@@ -25,8 +25,7 @@ export interface WriteMemoryInput {
   kind: MemoryKind
   title: string
   summary: string
-  content: string                     // raw content; also used as canonical_text unless overridden
-  canonical_text?: string             // optional structured canonical form; defaults to content if omitted
+  content: string                     // raw content
   tags?: string[]
   confidence?: number                 // 0–1, default 1.0
   /** @deprecated freshness is computed at query time from updated_at — this field is ignored on write */
@@ -117,7 +116,6 @@ export interface FullMemory {
   title: string
   summary: string
   content: string
-  canonical_text: string | null
   tags: string[]
   entities: string[]
   confidence: number

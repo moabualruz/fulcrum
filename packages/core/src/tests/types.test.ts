@@ -76,12 +76,12 @@ describe('type exports — compile-time shape checks', () => {
     expect(r.finished_at).toBeNull()
   })
 
-  it('Memory interface has scope, kind, title, summary, canonical_text fields', () => {
+  it('Memory interface has scope, kind, title, summary fields (canonical_text retired in PR 9.3)', () => {
     const m: Memory = {
       memory_id: 'mem_01', scope: 'project', kind: 'fact',
       workspace_id: 'ws_01', project_id: 'proj_01', file_path: null,
       symbol_path: null, title: 'A fact', summary: 'Short summary',
-      content: 'A fact about the project', content_type: 'text', canonical_text: null,
+      content: 'A fact about the project', content_type: 'text',
       tags: [], entities: [], confidence: 1.0, freshness: 1.0, importance: 0.5,
       access_count: 0, event_time: null, content_hash: null,
       task_id: null, issue_id: null, artifact_id: null,
@@ -135,7 +135,7 @@ describe('type exports — compile-time shape checks', () => {
       content_type: 'code',
       workspace_id: 'ws_01', project_id: 'proj_01', file_path: null,
       symbol_path: null, title: 'Code snippet', summary: 'A code example',
-      content: 'function hello() {}', canonical_text: null,
+      content: 'function hello() {}',
       tags: [], entities: [], confidence: 1.0, freshness: 1.0, importance: 0.5,
       access_count: 0, event_time: null, content_hash: null,
       task_id: null, issue_id: null, artifact_id: null,

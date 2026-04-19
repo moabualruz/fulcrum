@@ -372,3 +372,190 @@ export function runMigration103MemoryV3Cutover(db: Database.Database): void {
     throw e
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 104_memory_v3_drop_canonical_text
+//
+// Table-rebuild dance that drops the legacy `memories.canonical_text` column
+// and rewires the FTS5 shadow table + triggers to index `content` / `title` /
+// `summary` only. v2a used canonical_text to pre-tokenize code identifiers
+// for FTS5 recall (camelCase → "camel Case"); v3 L0 ingest is verbatim and
+// the curator owns its own per-page body, so the extra column is dead weight.
+//
+// Unlike 103, this migration MUST rebuild the memories_fts virtual table —
+// SQLite cannot ALTER an FTS5 table's column list. Dropping it clears the
+// shadow tables (memories_fts_{data,idx,docsize,config,content}); the
+// recreated memories_fts is backfilled via `INSERT … VALUES ('rebuild')`
+// so every surviving row gets an up-to-date FTS5 index entry.
+//
+// Pre-requisites:
+//   * Migrations 101 and 103 must have run (the v3 lifecycle columns exist
+//     and retention_tier / confidence_decay_at are NOT NULL).
+//
+// Rollback SQL (sketch — pre-104 schema restoration):
+//
+//   BEGIN IMMEDIATE;
+//   DROP VIEW IF EXISTS l1_pages;
+//   DROP TRIGGER IF EXISTS memories_ai;
+//   DROP TRIGGER IF EXISTS memories_ad;
+//   DROP TRIGGER IF EXISTS memories_au;
+//   DROP TABLE IF EXISTS memories_fts;
+//   ALTER TABLE memories RENAME TO memories_v3;
+//   -- CREATE TABLE memories (... canonical_text TEXT, ...);  (pre-104 shape)
+//   -- INSERT INTO memories (<cols>, canonical_text) SELECT <cols>, content FROM memories_v3;
+//   DROP TABLE memories_v3;
+//   -- Recreate memories_fts with canonical_text column + matching triggers;
+//   -- then INSERT INTO memories_fts(memories_fts) VALUES ('rebuild');
+//   DELETE FROM schema_migrations WHERE name = '104_memory_v3_drop_canonical_text';
+//   COMMIT;
+//
+// The rollback restores the column but the historical tokenisation of each
+// row's canonical_text cannot be recovered without re-running normalizeCodeText;
+// for CODE_KINDS that's trivial, for prose it was always equal to content.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Full v3 memories schema matching MEMORIES_V3_DDL minus canonical_text.
+const MEMORIES_V3_NO_CANONICAL_DDL = `
+CREATE TABLE memories_new (
+  memory_id        TEXT PRIMARY KEY,
+  workspace_id     TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+  project_id       TEXT REFERENCES projects(project_id) ON DELETE CASCADE,
+  scope            TEXT NOT NULL DEFAULT 'project' CHECK(scope IN ('session','project','workspace','global','file','task')),
+  kind             TEXT NOT NULL DEFAULT 'fact',
+  title            TEXT NOT NULL DEFAULT '',
+  summary          TEXT NOT NULL DEFAULT '',
+  content          TEXT NOT NULL,
+  tags             TEXT NOT NULL DEFAULT '[]',
+  entities         TEXT NOT NULL DEFAULT '[]',
+  confidence       REAL NOT NULL DEFAULT 1.0,
+  importance       REAL NOT NULL DEFAULT 0.5,
+  freshness        REAL NOT NULL DEFAULT 1.0,
+  file_path        TEXT,
+  symbol_path      TEXT,
+  event_time       TEXT,
+  content_hash     TEXT,
+  task_id          TEXT,
+  issue_id         TEXT,
+  artifact_id      TEXT,
+  provenance_refs  TEXT NOT NULL DEFAULT '[]',
+  session_id       TEXT,
+  content_type     TEXT NOT NULL DEFAULT 'text',
+  sparse_vector    TEXT,
+  source           TEXT NOT NULL DEFAULT 'manual',
+  embedding        BLOB,
+  access_count     INTEGER NOT NULL DEFAULT 0,
+  tier             TEXT NOT NULL DEFAULT 'short_term',
+  slug             TEXT NOT NULL DEFAULT (lower(hex(randomblob(8)))),
+  vault_path       TEXT NOT NULL DEFAULT '',
+  provenance       TEXT NOT NULL DEFAULT '{}',
+  supersedes       TEXT,
+  recall_count     INTEGER NOT NULL DEFAULT 0,
+  unique_query_count INTEGER NOT NULL DEFAULT 0,
+  max_recall_score REAL NOT NULL DEFAULT 0.0,
+  last_recalled_at INTEGER,
+  embedded         INTEGER NOT NULL DEFAULT 0,
+  schema_version   INTEGER NOT NULL DEFAULT 1,
+  normalize_version INTEGER NOT NULL DEFAULT 1,
+  expires_at       INTEGER,
+  created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  last_accessed_at TEXT NOT NULL DEFAULT (datetime('now')),
+  retention_tier   TEXT NOT NULL,
+  confidence_decay_at TEXT NOT NULL,
+  superseded_by    TEXT,
+  consolidated_from_ids TEXT
+);
+`
+
+const MEMORIES_COLUMNS_NO_CANONICAL = [
+  'memory_id', 'workspace_id', 'project_id', 'scope', 'kind', 'title', 'summary', 'content',
+  'tags', 'entities', 'confidence', 'importance', 'freshness',
+  'file_path', 'symbol_path', 'event_time', 'content_hash', 'task_id', 'issue_id',
+  'artifact_id', 'provenance_refs', 'session_id', 'content_type', 'sparse_vector',
+  'source', 'embedding', 'access_count', 'tier', 'slug', 'vault_path',
+  'provenance', 'supersedes', 'recall_count', 'unique_query_count', 'max_recall_score',
+  'last_recalled_at', 'embedded', 'schema_version', 'normalize_version', 'expires_at',
+  'created_at', 'updated_at', 'last_accessed_at',
+  'retention_tier', 'confidence_decay_at', 'superseded_by', 'consolidated_from_ids',
+].join(', ')
+
+export function runMigration104MemoryV3DropCanonicalText(db: Database.Database): void {
+  // Idempotency guard 1 — ledger row already written.
+  const applied = db.prepare(
+    `SELECT 1 AS present FROM schema_migrations WHERE name = ?`,
+  ).get('104_memory_v3_drop_canonical_text') as { present: number } | undefined
+  if (applied) return
+
+  // Idempotency guard 2 — column already absent (fresh DB on post-9.3 code,
+  // or a prior partial rebuild). Record the ledger row so re-runs stay fast.
+  const memoryCols = tableColumns(db, 'memories')
+  if (memoryCols.size === 0) return // no memories table at all — nothing to do
+  if (!memoryCols.has('canonical_text')) {
+    db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('104_memory_v3_drop_canonical_text')`).run()
+    return
+  }
+
+  // Capture indexes + view so we can recreate them after the swap. 103's
+  // comment block documents why we read SQL straight from sqlite_master.
+  const indexRows = db.prepare(
+    `SELECT name, sql FROM sqlite_master
+     WHERE type='index' AND tbl_name='memories' AND sql IS NOT NULL`,
+  ).all() as { name: string; sql: string }[]
+  const viewRow = db.prepare(
+    `SELECT sql FROM sqlite_master WHERE type='view' AND name='l1_pages'`,
+  ).get() as { sql: string } | undefined
+
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    // Drop dependent objects. Triggers + view reference memories columns;
+    // memories_fts has a 4-column schema (content/title/summary/canonical_text)
+    // that we cannot ALTER — DROP + recreate with 3 columns below.
+    db.exec(`DROP VIEW IF EXISTS l1_pages`)
+    for (const t of ['memories_ai', 'memories_ad', 'memories_au']) {
+      db.exec(`DROP TRIGGER IF EXISTS ${t}`)
+    }
+    db.exec(`DROP TABLE IF EXISTS memories_fts`)
+
+    // New memories table — same as post-103 minus canonical_text.
+    db.exec(MEMORIES_V3_NO_CANONICAL_DDL)
+
+    db.exec(`INSERT INTO memories_new (${MEMORIES_COLUMNS_NO_CANONICAL}) SELECT ${MEMORIES_COLUMNS_NO_CANONICAL} FROM memories`)
+
+    db.exec('DROP TABLE memories')
+    db.exec('ALTER TABLE memories_new RENAME TO memories')
+
+    // Recreate indexes (DROP TABLE removed them implicitly).
+    for (const idx of indexRows) db.exec(idx.sql)
+
+    // Recreate l1_pages view.
+    if (viewRow?.sql) db.exec(viewRow.sql)
+
+    // Recreate memories_fts + FTS5 triggers without canonical_text.
+    db.exec(`
+      CREATE VIRTUAL TABLE memories_fts USING fts5(
+        content, title, summary,
+        content='memories', content_rowid='rowid'
+      );
+      CREATE TRIGGER memories_ai AFTER INSERT ON memories BEGIN
+        INSERT INTO memories_fts(rowid, content, title, summary) VALUES (new.rowid, new.content, new.title, new.summary);
+      END;
+      CREATE TRIGGER memories_ad AFTER DELETE ON memories BEGIN
+        INSERT INTO memories_fts(memories_fts, rowid, content, title, summary) VALUES ('delete', old.rowid, old.content, old.title, old.summary);
+      END;
+      CREATE TRIGGER memories_au AFTER UPDATE ON memories BEGIN
+        INSERT INTO memories_fts(memories_fts, rowid, content, title, summary) VALUES ('delete', old.rowid, old.content, old.title, old.summary);
+        INSERT INTO memories_fts(rowid, content, title, summary) VALUES (new.rowid, new.content, new.title, new.summary);
+      END;
+    `)
+
+    // Rebuild the FTS5 index from the memories rows that survived the swap.
+    db.exec(`INSERT INTO memories_fts(memories_fts) VALUES ('rebuild')`)
+
+    db.prepare(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('104_memory_v3_drop_canonical_text')`).run()
+
+    db.exec('COMMIT')
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+}

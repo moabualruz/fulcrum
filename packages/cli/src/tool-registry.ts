@@ -826,8 +826,7 @@ TOOL_REGISTRY.set('write_memory', {
       ? assertString(args['title'], 'title', 512)
       : content.slice(0, 80)
     // Accept caller-provided kind + summary + scope when present; fall back to
-    // sensible defaults. Prior version hardcoded kind='fact' which forced
-    // canonical_text = content (no FTS5 identifier tokenization) and locked
+    // sensible defaults. Prior version hardcoded kind='fact' which locked
     // MCP callers out of symbol/code/doc/decision/etc. writes.
     const kindArg = typeof args['kind'] === 'string' ? args['kind'] : 'fact'
     const summaryArg = typeof args['summary'] === 'string' ? args['summary'] : title

@@ -33,7 +33,8 @@ describe('recallMemory — compact mode (default)', () => {
     expect(first).toHaveProperty('scope')
     expect(first).toHaveProperty('kind')
     expect(first).toHaveProperty('confidence')
-    // compact mode must NOT have canonical_text
+    // compact mode must NOT have access_count (full-mode only). canonical_text
+    // was retired in PR 9.3 — absent from every mode now.
     expect(first).not.toHaveProperty('canonical_text')
     expect(first).not.toHaveProperty('access_count')
   })
@@ -118,13 +119,13 @@ describe('recallMemory — compact mode (default)', () => {
 // ── total_ranked mode ─────────────────────────────────────────────────────────
 
 describe('recallMemory — total_ranked mode', () => {
-  it('returns FullMemory with canonical_text field present', async () => {
+  it('returns FullMemory with full-mode fields present (PR 9.3 retired canonical_text)', async () => {
     const db = getDb()
     await seedMemories(db)
     const results = await recallMemory({ workspace_id: 'ws_1', query: 'SQLite', mode: 'total_ranked' }) as unknown as CompactMemory[]
     expect(results.length).toBeGreaterThan(0)
     const first = results[0] as unknown as Record<string, unknown>
-    expect(first).toHaveProperty('canonical_text')
+    expect(first).not.toHaveProperty('canonical_text')
     expect(first).toHaveProperty('access_count')
     expect(first).toHaveProperty('tags')
     expect(first).toHaveProperty('entities')

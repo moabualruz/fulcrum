@@ -346,13 +346,13 @@ fulcrum memory — memory vault commands
     _rm(_getDb())
     const db = _getDb()
     const rows = db.prepare(
-      'SELECT memory_id, canonical_text, content FROM memories WHERE embedding IS NULL ORDER BY created_at'
-    ).all() as { memory_id: string; canonical_text: string | null; content: string }[]
+      'SELECT memory_id, content FROM memories WHERE embedding IS NULL ORDER BY created_at'
+    ).all() as { memory_id: string; content: string }[]
     console.log(`Embedding ${rows.length} memories without vectors...`)
     let ok = 0, fail = 0
     for (const row of rows) {
       try {
-        await storeEmbeddingInVec(db, row.memory_id, row.canonical_text ?? row.content ?? '')
+        await storeEmbeddingInVec(db, row.memory_id, row.content ?? '')
         ok++
       } catch {
         fail++

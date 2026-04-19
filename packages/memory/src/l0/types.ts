@@ -85,8 +85,8 @@ export interface L0IngestMeta {
 }
 
 /**
- * The `ingestRawSource(input)` argument shape. `body` is taken verbatim — no
- * sanitization, truncation, or canonical_text tokenization at this layer.
+ * The `ingestRawSource(input)` argument shape. `body` is taken verbatim —
+ * no sanitization or truncation at this layer.
  */
 export interface L0IngestInput {
   source_type: L0SourceType

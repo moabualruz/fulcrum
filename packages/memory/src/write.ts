@@ -31,36 +31,9 @@ function bodyHash(text: string): string {
   return hex
 }
 
-// GAP-RAG-3: Normalize code identifiers for FTS5 recall.
-//
-// FTS5's default tokenizer (unicode61) splits on whitespace and punctuation
-// but does NOT split camelCase or snake_case identifiers. A query for "user"
-// will not match "getUserById" or "user_profile_service".
-//
-// This function expands identifiers into separate tokens so FTS5 can match
-// any word within a compound identifier:
-//   getUserById         → "get User By Id"
-//   UserProfileService  → "User Profile Service"
-//   user_profile_svc    → "user profile svc"
-//   SCREAMING_SNAKE     → "SCREAMING SNAKE"
-//
-// Only applied to code-type memories (symbol, code, doc, diff) — prose
-// memories like 'fact' and 'decision' should be indexed as written.
-const CODE_KINDS = new Set<string>(['symbol', 'code', 'doc', 'diff'])
-
-export function normalizeCodeText(text: string): string {
-  return text
-    // Insert space before an uppercase letter that follows a lowercase letter (camelCase)
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    // Insert space before an uppercase letter that starts a word in a sequence of caps followed by lower
-    // (e.g. "XMLParser" → "XML Parser", not "X M L Parser")
-    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
-    // Replace underscores with spaces (snake_case, SCREAMING_SNAKE_CASE)
-    .replace(/_+/g, ' ')
-    // Collapse multiple spaces
-    .replace(/  +/g, ' ')
-    .trim()
-}
+// normalizeCodeText was retired in memory v3 PR 9.3 alongside the
+// `memories.canonical_text` column — FTS5 now indexes `content` directly
+// and v3 recall uses the curator's body plus vec_memories / graph signals.
 
 export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Promise<FullMemory> {
   if (!input.title.trim()) throw new FulcrumError('title must not be empty', 'invalid_input')
@@ -112,7 +85,6 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
       title: input.title,
       summary: input.summary,
       content: '',
-      canonical_text: '',
       tags: [],
       entities: [],
       confidence: 0,
@@ -174,7 +146,7 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
       project_id: input.project_id ?? null,
       file_path: null, symbol_path: null,
       title: input.title, summary: input.summary,
-      content: '', canonical_text: null,
+      content: '',
       tags: [], entities: [],
       confidence: 0, importance: 0, access_count: 0,
       event_time: null, content_hash: null,
@@ -244,9 +216,6 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
     title: input.title,
     summary: input.summary,
     content: input.content,
-    canonical_text: input.canonical_text ?? (
-      CODE_KINDS.has(input.kind) ? normalizeCodeText(input.content) : input.content
-    ),
     tags: input.tags ?? [],
     entities: input.entities ?? [],
     confidence: input.confidence ?? 1.0,
@@ -272,12 +241,11 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
       // hits disk — prevents self-writes being classified as human edits.
       const filePath = getMemoryFilePath(vaultPath, memoryForVault)
       const relPath = filePath.replace(vaultPath + '/', '')
-      const bodyContent = memoryForVault.canonical_text
       upsertStateEntry(vaultPath, {
         id: memory_id,
         path: relPath,
         mtime: Date.now(),
-        sha256: bodyHash(bodyContent ?? ''),
+        sha256: bodyHash(memoryForVault.content ?? ''),
       })
       await writeMemoryFile(vaultPath, memoryForVault)
       appendToLog(vaultPath, {
@@ -290,9 +258,9 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
   }
 
   // ── Sparse vector (GAP-RAG-7) ─────────────────────────────────────────────
-  // Compute a BM25-style sparse vector from canonical_text for the 3rd RRF
-  // signal in recall. Stored as JSON; top-128 terms, L2-normalised.
-  const sparseVec = computeSparseVector(memoryForVault.canonical_text ?? input.content)
+  // BM25-style sparse vector over the memory body — 3rd RRF signal in recall.
+  // Stored as JSON; top-128 terms, L2-normalised.
+  const sparseVec = computeSparseVector(input.content)
   const sparseVectorJson = Object.keys(sparseVec).length > 0 ? JSON.stringify(sparseVec) : null
 
   // ── L1 SQLite insert (synchronous) ────────────────────────────────────────
@@ -301,14 +269,14 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
   db.prepare(`
     INSERT INTO memories (
       memory_id, workspace_id, project_id,
-      scope, kind, title, summary, canonical_text,
+      scope, kind, title, summary,
       content, tags, entities, confidence, importance,
       file_path, symbol_path, event_time, content_hash,
       task_id, issue_id, artifact_id, provenance_refs,
       provenance, embedding, sparse_vector, created_at, updated_at, last_accessed_at, access_count
     ) VALUES (
       ?, ?, ?,
-      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?,
@@ -316,7 +284,7 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
     )
   `).run(
     memory_id, input.workspace_id, input.project_id ?? null,
-    input.scope, input.kind, input.title, input.summary, memoryForVault.canonical_text,
+    input.scope, input.kind, input.title, input.summary,
     input.content, JSON.stringify(input.tags ?? []), JSON.stringify(input.entities ?? []), input.confidence ?? 1.0, input.importance ?? 0.5,
     input.file_path ?? null, input.symbol_path ?? null, input.event_time ?? null, hash,
     input.task_id ?? null, input.issue_id ?? null, input.artifact_id ?? null, JSON.stringify(input.provenance_refs ?? []),
@@ -330,7 +298,7 @@ export async function writeMemory(input: WriteMemoryInput, db: Db = getDb()): Pr
   // Populate vec_memories for ANN recall through the same queue that backs
   // scheduleChunkEmbedding — eager Promise.all at scale deadlocks ONNX.
   void enqueueEmbed(() =>
-    storeEmbeddingInVec(db, memory_id, memoryForVault.canonical_text ?? input.content),
+    storeEmbeddingInVec(db, memory_id, input.content),
   ).catch((err: unknown) => {
     process.stderr.write(`[write] embed ${memory_id} failed: ${err instanceof Error ? err.message : String(err)}\n`)
   })
@@ -384,7 +352,7 @@ export function insertMemoryDirect(memory: FullMemory, db: Db = getDb()): void {
   const embeddingBuffer = null  // embeddings are re-generated by L2 rebuild separately
 
   // MEM-008: compute sparse vector so L1 recall has the BM25 rescue signal
-  const sparseVec = computeSparseVector(memory.canonical_text ?? '')
+  const sparseVec = computeSparseVector(memory.content ?? '')
   const sparseVectorJson = Object.keys(sparseVec).length > 0 ? JSON.stringify(sparseVec) : null
 
   // MED-15: existence check — UPDATE-in-place preserves slug/session/source.
@@ -393,7 +361,7 @@ export function insertMemoryDirect(memory: FullMemory, db: Db = getDb()): void {
     db.prepare(`
       UPDATE memories SET
         workspace_id = ?, project_id = ?,
-        scope = ?, kind = ?, title = ?, summary = ?, canonical_text = ?,
+        scope = ?, kind = ?, title = ?, summary = ?,
         content = ?, tags = ?, entities = ?, confidence = ?, freshness = ?, importance = ?,
         file_path = ?, symbol_path = ?, event_time = ?, content_hash = ?,
         task_id = ?, issue_id = ?, artifact_id = ?, provenance_refs = ?,
@@ -401,11 +369,8 @@ export function insertMemoryDirect(memory: FullMemory, db: Db = getDb()): void {
       WHERE memory_id = ?
     `).run(
       memory.workspace_id, memory.project_id ?? null,
-      memory.scope, memory.kind, memory.title, memory.summary, memory.canonical_text ?? '',
-      // BUG-FIX: content column must hold the ORIGINAL text, not canonical_text
-      // (which is the FTS5-tokenized form). Prior code inserted canonical_text
-      // into both columns, losing the original on every rebuild from vault.
-      memory.content ?? memory.canonical_text ?? '', JSON.stringify(memory.tags), JSON.stringify(memory.entities),
+      memory.scope, memory.kind, memory.title, memory.summary,
+      memory.content ?? '', JSON.stringify(memory.tags), JSON.stringify(memory.entities),
       memory.confidence, memory.freshness, memory.importance,
       memory.file_path ?? null, memory.symbol_path ?? null, memory.event_time ?? null, memory.content_hash ?? null,
       memory.task_id ?? null, memory.issue_id ?? null, memory.artifact_id ?? null, JSON.stringify(memory.provenance_refs),
@@ -416,14 +381,14 @@ export function insertMemoryDirect(memory: FullMemory, db: Db = getDb()): void {
     db.prepare(`
       INSERT INTO memories (
         memory_id, workspace_id, project_id,
-        scope, kind, title, summary, canonical_text,
+        scope, kind, title, summary,
         content, tags, entities, confidence, freshness, importance,
         file_path, symbol_path, event_time, content_hash,
         task_id, issue_id, artifact_id, provenance_refs,
         embedding, sparse_vector, created_at, updated_at, last_accessed_at, access_count
       ) VALUES (
         ?, ?, ?,
-        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?,
@@ -431,10 +396,8 @@ export function insertMemoryDirect(memory: FullMemory, db: Db = getDb()): void {
       )
     `).run(
       memory.memory_id, memory.workspace_id, memory.project_id ?? null,
-      memory.scope, memory.kind, memory.title, memory.summary, memory.canonical_text ?? '',
-      // BUG-FIX (see UPDATE branch above): content column takes memory.content,
-      // not canonical_text.
-      memory.content ?? memory.canonical_text ?? '', JSON.stringify(memory.tags), JSON.stringify(memory.entities),
+      memory.scope, memory.kind, memory.title, memory.summary,
+      memory.content ?? '', JSON.stringify(memory.tags), JSON.stringify(memory.entities),
       memory.confidence, memory.freshness, memory.importance,
       memory.file_path ?? null, memory.symbol_path ?? null, memory.event_time ?? null, memory.content_hash ?? null,
       memory.task_id ?? null, memory.issue_id ?? null, memory.artifact_id ?? null, JSON.stringify(memory.provenance_refs),
@@ -444,6 +407,6 @@ export function insertMemoryDirect(memory: FullMemory, db: Db = getDb()): void {
 
   // Populate vec_memories for ANN recall (fire-and-forget)
   setImmediate(() => {
-    storeEmbeddingInVec(db, memory.memory_id, memory.canonical_text ?? '').catch(() => {})
+    storeEmbeddingInVec(db, memory.memory_id, memory.content ?? '').catch(() => {})
   })
 }

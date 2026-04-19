@@ -51,7 +51,7 @@ export async function runExtractionPipeline(
   // creates USES edges from the Memory node to Entity nodes for each local import.
   // Only runs for TypeScript/JavaScript source files.
   if (memory.file_path && TS_JS_EXTS.has(extname(memory.file_path).toLowerCase())) {
-    const chunkText = memory.canonical_text ?? ''
+    const chunkText = memory.content ?? ''
     const importPaths = parseLocalImports(chunkText)
     const now = new Date().toISOString()
     for (const importPath of importPaths) {
@@ -77,7 +77,7 @@ export async function runExtractionPipeline(
     enqueueForL2(vaultPath, memory.memory_id, memory.workspace_id)
 
     // Run semantic extraction inline if API key is available
-    const bodyText = memory.canonical_text ?? memory.title
+    const bodyText = memory.content || memory.title
     if (process.env.ANTHROPIC_API_KEY && bodyText.length > 50) {
       try {
         const edges = await extractSemantic(memory.memory_id, bodyText, memory.workspace_id)

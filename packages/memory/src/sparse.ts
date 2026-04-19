@@ -80,7 +80,7 @@ export function tokenise(text: string): string[] {
  *   4. L2-normalise
  *   5. Keep top maxTerms by weight
  *
- * @param text      Input text (typically canonical_text)
+ * @param text      Input text (the memory's body)
  * @param maxTerms  Max vocabulary size kept per vector (default 128)
  */
 export function computeSparseVector(text: string, maxTerms = 128): SparseVector {

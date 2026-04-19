@@ -20,7 +20,6 @@ const baseMemory: FullMemory = {
   symbol_path: null,
   title: 'Use [[technology/rust]] for performance',
   summary: 'Rust chosen for safety',
-  canonical_text: 'We decided to use [[technology/rust]]. See src/lib.ts for details. tsk_test123',
     content: typeof 'We decided to use [[technology/rust]]. See src/lib.ts for details. tsk_test123' === 'string' ? 'We decided to use [[technology/rust]]. See src/lib.ts for details. tsk_test123' : '',
   tags: ['architecture'],
   entities: [],

@@ -1,7 +1,7 @@
 // packages/memory/src/index.ts
 
 // Schema / migrations
-export { runMigration101MemoryV3Lifecycle, runMigration102MemoryV3SourceIndex, runMigration103MemoryV3Cutover } from './schema.js'
+export { runMigration101MemoryV3Lifecycle, runMigration102MemoryV3SourceIndex, runMigration103MemoryV3Cutover, runMigration104MemoryV3DropCanonicalText } from './schema.js'
 
 // Vault primitives (v3 path split — PR 1 unit 1.2)
 export { writeRawFile, writeCuratedFile } from './vault/client.js'
@@ -173,7 +173,7 @@ export { computeImportance, computeFreshness, rrfScore } from './scoring.js'
 export { contentHash, isDuplicate } from './dedup.js'
 
 // Write — legacy v2a entry point + rebuild helper.
-export { writeMemory, insertMemoryDirect, normalizeCodeText } from './write.js'
+export { writeMemory, insertMemoryDirect } from './write.js'
 
 // L2 — embedding queue + writers (public surface for cli, pci, indexer).
 // Prior to PR 9.2 these were re-exported by write.ts as a back-compat shim;

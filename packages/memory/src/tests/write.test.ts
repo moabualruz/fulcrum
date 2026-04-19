@@ -56,7 +56,7 @@ describe('writeMemory — insert', () => {
     expect(m.kind).toBe('decision')
     expect(m.title).toBe('Use SQLite')
     expect(m.summary).toBe('Local-first storage decision')
-    expect(m.canonical_text).toBe('We chose SQLite because it is local-first and has zero config.')
+    expect(m.content).toBe('We chose SQLite because it is local-first and has zero config.')
     expect(m.tags).toEqual(['architecture'])
     expect(m.confidence).toBeCloseTo(0.9)
     expect(m.access_count).toBe(0)

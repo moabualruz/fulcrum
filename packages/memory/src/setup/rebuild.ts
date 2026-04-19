@@ -1,6 +1,6 @@
 // packages/memory/src/setup/rebuild.ts
 import { listMemoryFiles, readMemoryFile } from '../vault/client.js'
-import { insertMemoryDirect, normalizeCodeText } from '../write.js'
+import { insertMemoryDirect } from '../write.js'
 import { getKuzuClient } from '../kuzu/client.js'
 import { upsertMemoryToKuzu, removeMemoryFromKuzu } from '../kuzu/upsert.js'
 import { getDb, Db} from 'fulcrum-agent-core'
@@ -9,10 +9,6 @@ import { readState } from '../vault/state.js'
 import { simpleGit } from 'simple-git'
 import type { FullMemory, MemoryKind, MemoryScope } from '../types.js'
 import type { MemoryFileFrontmatter } from '../types.js'
-
-// Must stay in sync with CODE_KINDS in write.ts — the kinds whose FTS5
-// tokenization benefits from underscore/camelCase splitting.
-const CODE_KINDS = new Set<string>(['symbol', 'code', 'doc', 'diff'])
 
 export interface RebuildOptions {
   vaultPath: string
@@ -28,10 +24,6 @@ export interface RebuildResult {
 
 function frontmatterToFullMemory(fm: MemoryFileFrontmatter, body: string): FullMemory {
   const kind = fm.kind as MemoryKind
-  // L0 stores the ORIGINAL content as body. Rebuild re-derives canonical_text
-  // (the FTS5-tokenized form) for code kinds so identifier-splitting works on
-  // recall. Prose kinds pass through unchanged.
-  const canonical_text = CODE_KINDS.has(kind) ? normalizeCodeText(body) : body
   return {
     memory_id: fm.id,
     scope: fm.scope as MemoryScope,
@@ -43,7 +35,6 @@ function frontmatterToFullMemory(fm: MemoryFileFrontmatter, body: string): FullM
     title: fm.title,
     summary: fm.summary ?? '',
     content: body,
-    canonical_text,
     tags: fm.tags ?? [],
     entities: fm.entities ?? [],
     confidence: fm.confidence ?? 1.0,

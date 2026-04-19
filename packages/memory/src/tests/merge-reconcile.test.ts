@@ -22,7 +22,6 @@ const testMemory: FullMemory = {
   symbol_path: null,
   title: 'Reconcile test memory',
   summary: 'Written on memory branch, reconciled post-merge',
-  canonical_text: 'This memory was written on a memory branch and should appear in L1 after reconcile.',
     content: typeof 'This memory was written on a memory branch and should appear in L1 after reconcile.' === 'string' ? 'This memory was written on a memory branch and should appear in L1 after reconcile.' : '',
   tags: ['reconcile', 'test'],
   entities: [],

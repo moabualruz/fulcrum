@@ -30,8 +30,9 @@ describe('getMemory', () => {
     expect(result!.title).toBe('Test memory')
     expect(result!.summary).toBe('A test memory')
     expect(result!.importance).toBe(0.8)
-    // Confirm it's a FullMemory (has canonical_text and access_count fields)
-    expect(result).toHaveProperty('canonical_text')
+    // Confirm it's a FullMemory (has access_count + tags + entities + provenance_refs).
+    // PR 9.3 retired canonical_text — the field is no longer on the shape.
+    expect(result).not.toHaveProperty('canonical_text')
     expect(result).toHaveProperty('access_count')
     expect(result).toHaveProperty('tags')
     expect(result).toHaveProperty('entities')

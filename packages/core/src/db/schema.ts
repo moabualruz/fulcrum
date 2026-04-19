@@ -317,6 +317,11 @@ export function applySchema(db: Database.Database): void {
       title            TEXT NOT NULL DEFAULT '',
       summary          TEXT NOT NULL DEFAULT '',
       content          TEXT NOT NULL,
+      -- canonical_text is a v2a legacy column. Memory v3 PR 9.3 stops
+      -- writing to it and drops it via migration 104
+      -- (runMigration104MemoryV3DropCanonicalText). Kept in the fresh
+      -- CREATE so migration 103 table-rebuild INSERT column lists match;
+      -- migration 104 deletes it on the next fulcrum memory migrate run.
       canonical_text   TEXT,
       tags             TEXT NOT NULL DEFAULT '[]',
       entities         TEXT NOT NULL DEFAULT '[]',

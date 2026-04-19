@@ -31,6 +31,7 @@ import {
   runMigration101MemoryV3Lifecycle,
   runMigration102MemoryV3SourceIndex,
   runMigration103MemoryV3Cutover,
+  runMigration104MemoryV3DropCanonicalText,
   lintMemoryVault,
   type MigrationBatch,
   type MigrationBackfillResult,
@@ -110,6 +111,11 @@ export function runMemoryMigrate(input: MigrateInput): MigrateResult {
       WHERE retention_tier IS NULL OR confidence_decay_at IS NULL
     `).run()
     runMigration103MemoryV3Cutover(db)
+    // PR 9.3 unit 104 — drop the legacy canonical_text column + rewire the
+    // FTS5 triggers. Piggy-backs on the live run's cutover window so existing
+    // installs converge on the post-v3 schema in one `fulcrum memory migrate`
+    // invocation. Idempotent on post-104 DBs (column already absent).
+    runMigration104MemoryV3DropCanonicalText(db)
     cutover = { applied: true }
   }
 
