@@ -9,9 +9,9 @@
 //   * Every hit carries sources[] + l0_wikilinks[] so `fulcrum memory sources`
 //     (PR 5.4) can render provenance without re-reading the row.
 //
-// The old `recall_memory` path is not touched here; unit 5.5 is the flag flip
-// that delegates `recall_memory` to this handler once FULCRUM_MEMORY_V3
-// defaults to on.
+// PR 5.5 flipped `recall_memory` to delegate here by default; PR 9.5 retired
+// the FULCRUM_MEMORY_V3 flag and removed the legacy fallback entirely — this
+// handler is now the only recall path for both names.
 
 import { runV3Search, type V3RecallHit, type V3SearchInput } from 'fulcrum-memory'
 

@@ -753,13 +753,12 @@ TOOL_REGISTRY.set('recall_memory', {
   schema: TOOL_SCHEMA_MAP.get('recall_memory'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: true },
   handler: async (args, deps) => {
-    // PR 5 unit 5.5 — when v3 is enabled (default on), delegate to the new
-    // pipeline. FULCRUM_MEMORY_V3=0 reverts to the v2a runStagedSearch path.
-    const { isMemoryV3Enabled } = await import('fulcrum-memory')
-    if (isMemoryV3Enabled()) {
-      const registryEntry = TOOL_REGISTRY.get('recall_knowledge')
-      if (registryEntry) return registryEntry.handler(args, deps)
-    }
+    // PR 9.5 retired the FULCRUM_MEMORY_V3 toggle — recall_memory is now an
+    // unconditional alias for recall_knowledge. The v2a runStagedSearch
+    // fallback below runs only when recall_knowledge is not registered
+    // (which never happens in production but keeps tests deterministic).
+    const registryEntry = TOOL_REGISTRY.get('recall_knowledge')
+    if (registryEntry) return registryEntry.handler(args, deps)
     // v2a PR 2 Task 11: route through runStagedSearch so the response carries
     // the {results, reason?} envelope and recall_events are inserted 1:1 with
     // returned rows. min_score has a v2a-default of 0.35 for multi-token

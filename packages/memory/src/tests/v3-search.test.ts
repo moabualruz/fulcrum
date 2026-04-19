@@ -2,7 +2,7 @@
 //
 // Memory v3 PR 5 unit 5.1 — graph traversal + confidence + supersession filters.
 //
-// runV3Search is the new recall entry point gated behind FULCRUM_MEMORY_V3.
+// runV3Search is the recall entry point (FULCRUM_MEMORY_V3 flag retired in PR 9.5).
 // This suite pins:
 //   * confidence filter (rows with confidence < floor are excluded)
 //   * supersession filter (rows with superseded_by NOT NULL are excluded

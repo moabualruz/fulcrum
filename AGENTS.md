@@ -185,7 +185,8 @@ Never change this to `threads`.
 
 ## Memory System Patterns
 
-**Current:** memory v3 is the default (`FULCRUM_MEMORY_V3` on since PR 5.5). See
+**Current:** memory v3 is the only memory path (PR 9.5 retired the
+`FULCRUM_MEMORY_V3` opt-out flag). See
 [`docs/architecture/memory-v3.md`](architecture/memory-v3.md) for the operator
 reference — layer glossary, curator pipeline, feature flags, `/memory/stats`
 schema, and end-to-end walkthrough.
@@ -263,8 +264,8 @@ into three tiers:
 - **L2 — vector on L1.** `vec_memories` embeds curated L1 bodies, not raw
   L0 dumps. `vec_chunks` continues to embed code unchanged.
 
-**Feature flag:** `FULCRUM_MEMORY_V3` (default off through PR 4, default on
-from PR 5, removed in PR 9). Do not branch agent behavior on it yet.
+**Feature flag:** `FULCRUM_MEMORY_V3` was retired in PR 9.5. v3 is now the
+only memory path — no flag, no fallback.
 
 **Graph tables.** `graph_entities` and `graph_edges` were extended in place
 with v3 columns (`aliases`, `confidence`, `first_seen`, `last_confirmed`,

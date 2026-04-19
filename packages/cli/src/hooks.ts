@@ -312,43 +312,22 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
       return
     }
 
-    // Memory v3 flag (plan §Migration strategy). Default flipped to ON in
-    // PR 5 unit 5.5; set FULCRUM_MEMORY_V3=0 to revert to the v2a path for
-    // one release cycle.
-    const { isMemoryV3Enabled } = await import('fulcrum-memory')
-    const v3Enabled = isMemoryV3Enabled()
-
-    // Route by tool_name. Read/Glob/Grep/etc fall through to "no-op".
+    // Memory v3 L0 ingest — FULCRUM_MEMORY_V3 flag retired in PR 9.5.
+    // Every hook-side write now goes through ingestRawSource; the v2a
+    // writeMemory fallback has been removed.
     const filePatch = extractFilePatch(ctx.toolName, ctx.toolInput)
     if (filePatch) {
-      if (v3Enabled) {
-        const { ingestRawSource } = await import('fulcrum-memory')
-        ingestRawSource({
-          source_type: 'file_patch',
-          body: filePatch.diffSummary,
-          meta: {
-            workspace_id: ctx.workspace_id,
-            project_id: resolvedProjectId,
-            session_id: ctx.runId ?? null,
-            cwd,
-          },
-        })
-      } else {
-        await writeMemory({
+      const { ingestRawSource } = await import('fulcrum-memory')
+      ingestRawSource({
+        source_type: 'file_patch',
+        body: filePatch.diffSummary,
+        meta: {
           workspace_id: ctx.workspace_id,
           project_id: resolvedProjectId,
-          task_id: runRow?.task_id ?? undefined,
-          kind: 'file_patch',
-          scope: 'project',
-          title: `${ctx.toolName}: ${filePatch.filePath}`,
-          summary: filePatch.diffSummary.slice(0, 200),
-          content: filePatch.diffSummary,
-          file_path: filePatch.filePath,
-          tags: [ctx.toolName, ctx.cliName, filePatch.operation],
-          importance: 0.4,
-          provenance: buildProvenance(ctx, 'PostToolUse', contextType),
-        } as Parameters<typeof writeMemory>[0])
-      }
+          session_id: ctx.runId ?? null,
+          cwd,
+        },
+      })
 
       // Refresh the code index for the changed file. Hook-driven indexing is
       // the primary mechanism (MCP's server watcher is just a fallback for
@@ -390,34 +369,18 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
         return
       }
       const exitStatus = (ctx.toolInput['exit_status'] as number | undefined) ?? 0
-      if (v3Enabled) {
-        const { ingestRawSource } = await import('fulcrum-memory')
-        // Plan §PR 1 unit 1.4: full body, no slice — L0 captures verbatim.
-        ingestRawSource({
-          source_type: 'bash_trace',
-          body: `$ ${command}\nexit: ${exitStatus}\ncwd: ${cwd}\n`,
-          meta: {
-            workspace_id: ctx.workspace_id,
-            project_id: resolvedProjectId,
-            session_id: ctx.runId ?? null,
-            cwd,
-          },
-        })
-      } else {
-        await writeMemory({
+      const { ingestRawSource } = await import('fulcrum-memory')
+      // Plan §PR 1 unit 1.4: full body, no slice — L0 captures verbatim.
+      ingestRawSource({
+        source_type: 'bash_trace',
+        body: `$ ${command}\nexit: ${exitStatus}\ncwd: ${cwd}\n`,
+        meta: {
           workspace_id: ctx.workspace_id,
           project_id: resolvedProjectId,
-          task_id: runRow?.task_id ?? undefined,
-          kind: 'bash_trace',
-          scope: 'project',
-          title: `Bash: ${command.slice(0, 80)}`,
-          summary: `exit=${exitStatus}; cwd=${cwd}`,
-          content: command.slice(0, 400),
-          tags: ['Bash', ctx.cliName],
-          importance: 0.3,
-          provenance: buildProvenance(ctx, 'PostToolUse', contextType),
-        } as Parameters<typeof writeMemory>[0])
-      }
+          session_id: ctx.runId ?? null,
+          cwd,
+        },
+      })
     }
     // else: read-only tool; no write.
   } catch (err) {

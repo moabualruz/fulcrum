@@ -187,7 +187,8 @@ export { runV3Search, v3DefaultWeights, resolveQueryEntities } from './retrieval
 export type { V3SearchInput, V3SearchWeights, V3RecallHit } from './retrieval/v3-search.js'
 
 // v3 feature flag — plan §Migration strategy (PR 5.5 cutover: default ON).
-export { isMemoryV3Enabled } from './flags.js'
+// Memory v3 feature flag retired in PR 9.5 — isMemoryV3Enabled is gone;
+// v3 is the only path. See packages/memory/src/flags.ts deletion commit.
 
 // v3 migration — plan §PR 6 (classifier + migrator + backfill + cutover).
 export {

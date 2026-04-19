@@ -6,8 +6,8 @@
 //       truncation, no normalization).
 //   (b) every L0 ingest writes a matching WAL audit row (content_sha256 only,
 //       no cleartext) — the sanitize-before-WAL invariant (plan Constraint #4).
-//   (c) with FULCRUM_MEMORY_V3 unset (old path), the v2a `writeMemory` flow
-//       still works unchanged.
+//   (c) v2a `writeMemory` still works unchanged alongside L0 ingest (the
+//       two paths co-exist for lifecycle-memory callers post-PR-9.5).
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
@@ -105,7 +105,7 @@ describe('memory v3 PR 1 — regression: v2a writeMemory path still works (flag 
       scope: 'project',
       title: 'v2a flag-off memory',
       summary: 'stays on old path',
-      content: 'the v2a write path must still work when FULCRUM_MEMORY_V3 is unset',
+      content: 'the v2a write path must still work alongside L0 ingest',
       tags: ['regression'],
       importance: 0.5,
     })

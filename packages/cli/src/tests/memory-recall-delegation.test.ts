@@ -1,13 +1,10 @@
 // packages/cli/src/tests/memory-recall-delegation.test.ts
 //
 // Memory v3 PR 5 unit 5.5 — `recall_memory` delegates to `recall_knowledge`
-// when FULCRUM_MEMORY_V3 is enabled (default as of this unit).
+// after the FULCRUM_MEMORY_V3 flag retirement in PR 9.5.
 //
-// Behaviour pins:
-//   * Default (no env) → recall_memory returns a recall_knowledge-shaped
-//     result (has `results` + each hit has `sources` + `stage_ranks`).
-//   * FULCRUM_MEMORY_V3=0 → recall_memory returns the legacy envelope
-//     (results without sources / stage_ranks).
+// Behaviour pin: recall_memory always delegates to recall_knowledge — the
+// result envelope has `results` with each hit carrying `sources` + `stage_ranks`.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
@@ -58,7 +55,6 @@ async function installStub(): Promise<void> {
 
 let tmpVault: string
 let prevVaultEnv: string | undefined
-let prevFlag: string | undefined
 
 beforeEach(async () => {
   const db = new Database(':memory:')
@@ -71,8 +67,6 @@ beforeEach(async () => {
   tmpVault = mkdtempSync(join(tmpdir(), 'fulcrum-delegate-'))
   prevVaultEnv = process.env['FULCRUM_VAULT_PATH']
   process.env['FULCRUM_VAULT_PATH'] = tmpVault
-  prevFlag = process.env['FULCRUM_MEMORY_V3']
-  delete process.env['FULCRUM_MEMORY_V3']
   await installStub()
 })
 
@@ -82,8 +76,6 @@ afterEach(() => {
   rmSync(tmpVault, { recursive: true, force: true })
   if (prevVaultEnv === undefined) delete process.env['FULCRUM_VAULT_PATH']
   else process.env['FULCRUM_VAULT_PATH'] = prevVaultEnv
-  if (prevFlag === undefined) delete process.env['FULCRUM_MEMORY_V3']
-  else process.env['FULCRUM_MEMORY_V3'] = prevFlag
 })
 
 function seedPage(id: string, body: string): CuratedPage {
@@ -99,8 +91,8 @@ function seedPage(id: string, body: string): CuratedPage {
   return createCuratedPage(page)
 }
 
-describe('recall_memory delegation (PR 5.5)', () => {
-  it('default (no env) routes through recall_knowledge — hits carry sources[]', async () => {
+describe('recall_memory delegation (PR 9.5 — unconditional v3 alias)', () => {
+  it('routes through recall_knowledge — hits carry sources[] + stage_ranks', async () => {
     seedPage('01DEL_A', '# Auth\n\nAuth middleware. [[raw/bash_trace/2026/04/18/01SRC]]\n')
     recordL1Embedding(getDb(), '01DEL_A')
     await flushPendingMemoryWrites(5_000)
@@ -111,22 +103,5 @@ describe('recall_memory delegation (PR 5.5)', () => {
     expect(result.results.length).toBeGreaterThan(0)
     expect(result.results[0]?.sources).toBeDefined()
     expect(result.results[0]?.stage_ranks).toBeDefined()
-  })
-
-  it('FULCRUM_MEMORY_V3=0 keeps the legacy envelope shape (no sources[] / stage_ranks)', async () => {
-    process.env['FULCRUM_MEMORY_V3'] = '0'
-    seedPage('01DEL_B', '# Auth\n\nAuth middleware. [[raw/bash_trace/2026/04/18/01SRC]]\n')
-    await flushPendingMemoryWrites(5_000)
-
-    const entry = TOOL_REGISTRY.get('recall_memory')!
-    const deps = buildDeps('ws_d', 'proj_d')
-    const result = await entry.handler({ query: 'auth middleware' }, deps) as { results: Array<Record<string, unknown>> }
-    // Legacy envelope may be empty (no indexing in this path) — the point is
-    // the shape: when present, entries have the legacy keys (id + content +
-    // score + tags + source) not the v3 keys (sources + stage_ranks).
-    for (const r of result.results) {
-      expect(r['sources']).toBeUndefined()
-      expect(r['stage_ranks']).toBeUndefined()
-    }
   })
 })

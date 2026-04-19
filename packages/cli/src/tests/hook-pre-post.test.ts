@@ -14,6 +14,7 @@ import {
   closeDb,
   runMigrations,
 } from 'fulcrum-agent-core'
+import { runMigration101MemoryV3Lifecycle } from 'fulcrum-memory'
 import { runPreHook, runPostHook, type HookContext, type HookIO, type HookOutput } from '../index.js'
 import { clearDedupCache } from '../hooks-writers.js'
 
@@ -33,6 +34,9 @@ function createTestDb(): void {
   tmpDbDir = mkdtempSync(join(tmpdir(), 'fulcrum-hook-test-'))
   const db = getDb(tmpDbDir)
   runMigrations(db)
+  // PR 9.5: hooks now ingest through the L0 path unconditionally, so
+  // runMigration101 is on the critical path for every post-hook test.
+  runMigration101MemoryV3Lifecycle(db)
 }
 
 function resetTestDb(): void {
@@ -234,25 +238,18 @@ describe('runPreHook — memory recall (L-7)', () => {
   })
 })
 
-describe('runPostHook — typed file_patch memory (v2a PR 6 Task 29)', () => {
-  let _prevV3: string | undefined
+describe('runPostHook — typed L0 ingest (PR 9.5 post-flag-retirement)', () => {
   beforeEach(() => {
     createTestDb()
     // Reset per-turn dedup so each test is independent.
     clearDedupCache()
-    // PR 5.5 flipped FULCRUM_MEMORY_V3 default on — these tests exercise the
-    // v2a writeMemory hook path explicitly, so pin the flag off.
-    _prevV3 = process.env['FULCRUM_MEMORY_V3']
-    process.env['FULCRUM_MEMORY_V3'] = '0'
   })
   afterEach(() => {
-    if (_prevV3 === undefined) delete process.env['FULCRUM_MEMORY_V3']
-    else process.env['FULCRUM_MEMORY_V3'] = _prevV3
     resetTestDb()
   })
 
-  it('Edit tool writes kind="file_patch" with diff_summary, not tool_trace', async () => {
-    const { workspace_id, task_id, run_id } = seedWorkspaceProjectTaskRun()
+  it('Edit tool writes an l0_sources row with source_type="file_patch"', async () => {
+    const { workspace_id, run_id } = seedWorkspaceProjectTaskRun()
     const cap = makeCapturedIO()
     await runPostHook(
       baseCtx({
@@ -267,23 +264,15 @@ describe('runPostHook — typed file_patch memory (v2a PR 6 Task 29)', () => {
 
     const db = getDb()
     const row = db.prepare(
-      `SELECT content, kind, scope, task_id, file_path FROM memories WHERE workspace_id = ? AND kind = 'file_patch' ORDER BY rowid DESC LIMIT 1`,
-    ).get(workspace_id) as { content: string; kind: string; scope: string; task_id: string | null; file_path: string } | undefined
+      `SELECT source_type, session_id, workspace_id FROM l0_sources WHERE workspace_id = ? AND source_type = 'file_patch' ORDER BY rowid DESC LIMIT 1`,
+    ).get(workspace_id) as { source_type: string; session_id: string | null; workspace_id: string } | undefined
     expect(row).toBeDefined()
-    expect(row!.kind).toBe('file_patch')
-    expect(row!.scope).toBe('project')
-    expect(row!.task_id).toBe(task_id)
-    expect(row!.file_path).toBe('/tmp/x.ts')
-    // diff_summary captures delta + preview — values NOT echoed literally.
-    // The diff preview may include short-form content; the hard rule is that
-    // full secret-shaped strings should never appear. Here we assert that
-    // the unique identifier OLD_VAL isn't echoed back alongside the delta
-    // encoding — which it won't be, because extractFilePatch takes only
-    // the newString for the preview.
-    expect(row!.content).toMatch(/lines;/)
+    expect(row!.source_type).toBe('file_patch')
+    expect(row!.workspace_id).toBe(workspace_id)
+    expect(row!.session_id).toBe(run_id)
   })
 
-  it('Bash with read-only command is skipped (no memory written)', async () => {
+  it('Bash with read-only command is skipped (no L0 ingest)', async () => {
     const { run_id } = seedWorkspaceProjectTaskRun()
     const cap = makeCapturedIO()
     await runPostHook(
@@ -297,11 +286,11 @@ describe('runPostHook — typed file_patch memory (v2a PR 6 Task 29)', () => {
     )
     expect(cap.exitCode).toBe(0)
     const db = getDb()
-    const count = db.prepare(`SELECT COUNT(*) AS n FROM memories WHERE kind IN ('bash_trace', 'file_patch', 'tool_trace')`).get() as { n: number }
+    const count = db.prepare(`SELECT COUNT(*) AS n FROM l0_sources WHERE source_type IN ('bash_trace', 'file_patch', 'tool_trace')`).get() as { n: number }
     expect(count.n).toBe(0)
   })
 
-  it('Bash with mutating verb writes kind="bash_trace"', async () => {
+  it('Bash with mutating verb writes source_type="bash_trace" into l0_sources', async () => {
     const { run_id } = seedWorkspaceProjectTaskRun()
     const cap = makeCapturedIO()
     await runPostHook(
@@ -315,10 +304,9 @@ describe('runPostHook — typed file_patch memory (v2a PR 6 Task 29)', () => {
     )
     expect(cap.exitCode).toBe(0)
     const db = getDb()
-    const row = db.prepare(`SELECT kind, content FROM memories WHERE kind = 'bash_trace' ORDER BY rowid DESC LIMIT 1`).get() as { kind: string; content: string } | undefined
+    const row = db.prepare(`SELECT source_type FROM l0_sources WHERE source_type = 'bash_trace' ORDER BY rowid DESC LIMIT 1`).get() as { source_type: string } | undefined
     expect(row).toBeDefined()
-    expect(row!.kind).toBe('bash_trace')
-    expect(row!.content).toContain('rm')
+    expect(row!.source_type).toBe('bash_trace')
   })
 
   it('is a no-op when runId is missing', async () => {
@@ -337,7 +325,7 @@ describe('runPostHook — typed file_patch memory (v2a PR 6 Task 29)', () => {
 
     const db = getDb()
     const count = db.prepare(
-      `SELECT COUNT(*) AS n FROM memories WHERE kind IN ('file_patch', 'bash_trace', 'tool_trace')`
+      `SELECT COUNT(*) AS n FROM l0_sources WHERE source_type IN ('file_patch', 'bash_trace', 'tool_trace')`
     ).get() as { n: number }
     expect(count.n).toBe(0)
   })

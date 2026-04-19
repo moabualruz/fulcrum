@@ -1,6 +1,6 @@
 # Memory v3 — Architecture
 
-_Status: shipped through PR 8. Default-on for new installs; legacy v2a code paths remain available behind `FULCRUM_MEMORY_V3=0` for one release cycle._
+_Status: shipped. PR 9.5 retired the `FULCRUM_MEMORY_V3` opt-out flag; v3 is now the only memory path. Legacy v2a writeMemory is still the lifecycle-memory writer (runs/cos-parser), but the hook-side fallback is gone._
 
 Fulcrum's memory subsystem stores what agents and users have seen, learned, and decided. v3 rebuilds the store around three explicit tiers — verbatim raw dumps, LLM-curated pages, and a vector index over the curated layer — so every recall carries a full audit trail back to the raw source.
 
@@ -104,7 +104,6 @@ appendCuratorLog(vault, {l0_id, backend, affected_pages, confidence_deltas,
 
 | Env var | Default | Effect |
 |---|---|---|
-| `FULCRUM_MEMORY_V3` | on (from PR 5.5) | `0` reverts hooks + recall to v2a paths. One-release deprecation window. |
 | `FULCRUM_MEMORY_CURATE_AUTO` | off | `1` starts the vault watcher and auto-fires the curator 30s after a new L0 drops. Debounced per l0_id. |
 | `FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE` | unset | `hourly` or `daily` enables the scheduled consolidation scan. Logs to `vault/curated/consolidate.log.md`. Unknown values disable. |
 | `FULCRUM_CURATOR_BACKEND` | auto-select | Force a specific backend: `codex` \| `pi` \| `openai` \| `anthropic`. |
