@@ -139,6 +139,12 @@ export type { CuratorLogEntry } from './l1/telemetry.js'
 export { startAutoCurator, DEFAULT_AUTO_CURATE_DEBOUNCE_MS } from './l1/auto-curate.js'
 export type { AutoCurateOptions, AutoCurateScheduler } from './l1/auto-curate.js'
 
+// L1 consolidation cron — scheduled dry-run scan (memory v3 PR 8 unit 8.2)
+export { startConsolidateSchedule, CADENCE_MS } from './l1/consolidate-schedule.js'
+export type { ConsolidateScheduleOptions } from './l1/consolidate-schedule.js'
+export { appendConsolidateLog } from './l1/consolidate-log.js'
+export type { ConsolidateLogEntry } from './l1/consolidate-log.js'
+
 // Types
 export type {
   MemoryScope,

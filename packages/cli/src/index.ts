@@ -1838,6 +1838,15 @@ async function runServeMcp(): Promise<void> {
     process.stderr.write(`[fulcrum] auto-curate wiring failed (non-fatal): ${(err as Error).message}\n`)
   }
 
+  // Memory v3 PR 8.2 — scheduled consolidation scan (opt-in via
+  // FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE={hourly|daily}). No-op when unset.
+  try {
+    const { startMemoryConsolidateScheduleIfEnabled } = await import('./commands/memory-consolidate-schedule-wiring.js')
+    await startMemoryConsolidateScheduleIfEnabled()
+  } catch (err) {
+    process.stderr.write(`[fulcrum] consolidate cron wiring failed (non-fatal): ${(err as Error).message}\n`)
+  }
+
   await runFulcrumMcpServer({
     version: '0.0.2',
     handleToolCall: handleToolCallWithSpan,
@@ -1983,6 +1992,14 @@ async function runServeMonitor(): Promise<void> {
     process.stderr.write(`[fulcrum monitor] auto-curate wiring failed (non-fatal): ${(err as Error).message}\n`)
   }
 
+  // Memory v3 PR 8.2 — scheduled consolidation scan (opt-in).
+  try {
+    const { startMemoryConsolidateScheduleIfEnabled } = await import('./commands/memory-consolidate-schedule-wiring.js')
+    await startMemoryConsolidateScheduleIfEnabled()
+  } catch (err) {
+    process.stderr.write(`[fulcrum monitor] consolidate cron wiring failed (non-fatal): ${(err as Error).message}\n`)
+  }
+
   // Keep alive
   await new Promise(() => {})
 }
@@ -2012,6 +2029,14 @@ async function runServeAll(): Promise<void> {
     await startMemoryAutoCurateIfEnabled()
   } catch (err) {
     process.stderr.write(`[fulcrum] auto-curate wiring failed (non-fatal): ${(err as Error).message}\n`)
+  }
+
+  // Memory v3 PR 8.2 — scheduled consolidation scan (opt-in).
+  try {
+    const { startMemoryConsolidateScheduleIfEnabled } = await import('./commands/memory-consolidate-schedule-wiring.js')
+    await startMemoryConsolidateScheduleIfEnabled()
+  } catch (err) {
+    process.stderr.write(`[fulcrum] consolidate cron wiring failed (non-fatal): ${(err as Error).message}\n`)
   }
 
   await runServeMcp()
