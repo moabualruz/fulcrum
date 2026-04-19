@@ -69,6 +69,19 @@ export {
 } from './l1/page.js'
 export type { CreateCuratedPageOptions } from './l1/page.js'
 
+// L1 lifecycle primitives (memory v3 PR 7 unit 7.1)
+export {
+  applyDecay,
+  promoteToTier,
+  archivePage,
+  DECAY_LAMBDA_PER_DAY,
+} from './l1/lifecycle.js'
+export type {
+  ApplyDecayOptions,
+  ApplyDecayResult,
+  ArchivePageResult,
+} from './l1/lifecycle.js'
+
 // L1 curator runtime (memory v3 PR 3 unit 3.1)
 export {
   PROMPT_VERSION,
