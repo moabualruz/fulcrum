@@ -97,11 +97,17 @@ function baseCtx(over: Partial<HookContext>): HookContext {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('runPreHook — secret scan (L-7)', () => {
-  beforeEach(() => { createTestDb() })
-  afterEach(() => resetTestDb())
+describe('runPreHook — secret scan (opt-in via FULCRUM_SECRET_SCAN)', () => {
+  beforeEach(() => {
+    createTestDb()
+    delete process.env['FULCRUM_SECRET_SCAN']
+  })
+  afterEach(() => {
+    delete process.env['FULCRUM_SECRET_SCAN']
+    resetTestDb()
+  })
 
-  it('denies tool calls when a credential pattern appears in tool_input', async () => {
+  it('does not block credential-shaped strings when the flag is unset (default)', async () => {
     seedWorkspaceProjectTaskRun()
     const cap = makeCapturedIO()
     await runPreHook(
@@ -113,15 +119,35 @@ describe('runPreHook — secret scan (L-7)', () => {
       }),
       cap.io,
     )
-    expect(cap.exitCode).toBe(2)
-    const stderrJoined = cap.stderr.join('')
-    expect(stderrJoined).toMatch(/detected/i)
+    expect(cap.exitCode).toBe(0)
 
-    // Should have emitted a policy_denied event
     const db = getDb()
     const row = db.prepare(
-      `SELECT evt_type, payload FROM events WHERE workspace_id = 'ws_hook' AND evt_type = 'policy_denied' ORDER BY rowid DESC LIMIT 1`
-    ).get() as { evt_type: string; payload: string } | undefined
+      `SELECT evt_type FROM events WHERE workspace_id = 'ws_hook' AND evt_type = 'policy_denied' AND json_extract(payload, '$.reason') = 'secret_scan_denied'`
+    ).get() as { evt_type: string } | undefined
+    expect(row).toBeUndefined()
+  })
+
+  it('denies credential-shaped strings when FULCRUM_SECRET_SCAN=1', async () => {
+    seedWorkspaceProjectTaskRun()
+    process.env['FULCRUM_SECRET_SCAN'] = '1'
+    const cap = makeCapturedIO()
+    await runPreHook(
+      baseCtx({
+        phase: 'pre',
+        toolName: 'Bash',
+        toolInput: { command: `curl -H "Authorization: Bearer ${CRED_A}"` },
+        runId: 'run_hook',
+      }),
+      cap.io,
+    )
+    expect(cap.exitCode).toBe(2)
+    expect(cap.stderr.join('')).toMatch(/detected/i)
+
+    const db = getDb()
+    const row = db.prepare(
+      `SELECT payload FROM events WHERE workspace_id = 'ws_hook' AND evt_type = 'policy_denied' ORDER BY rowid DESC LIMIT 1`
+    ).get() as { payload: string } | undefined
     expect(row).toBeDefined()
     const payload = JSON.parse(row!.payload) as { reason: string }
     expect(payload.reason).toBe('secret_scan_denied')
@@ -516,7 +542,7 @@ describe('hook JSON output shape (Task 29)', () => {
     expect(out!.continue).toBe(true)
   })
 
-  it('runPreHook emits { continue: false } JSON on stdout for blocked calls', async () => {
+  it('runPreHook does not block Bash commands that contain credential-shaped strings', async () => {
     seedWorkspaceProjectTaskRun()
     const cap = makeCapturedIO()
     await runPreHook(
@@ -527,12 +553,10 @@ describe('hook JSON output shape (Task 29)', () => {
       }),
       cap.io,
     )
-    expect(cap.exitCode).toBe(2)
+    expect(cap.exitCode).toBe(0)
     const out = parsedOutput(cap)
     expect(out).not.toBeNull()
-    expect(out!.continue).toBe(false)
-    expect(out!.stopReason).toBe('secret_detected')
-    expect(typeof out!.message).toBe('string')
+    expect(out!.continue).toBe(true)
   })
 
   it('runPostHook emits { continue: true } JSON on stdout', async () => {

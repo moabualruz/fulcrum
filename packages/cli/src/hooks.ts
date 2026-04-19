@@ -124,47 +124,52 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
     } catch { /* best-effort — never block on snapshot failure */ }
   }
 
-  // 1. Secret scan on tool_input — deny if any pattern matches
-  try {
-    const { checkSecrets } = await import('fulcrum-policy')
-    const inputStr = JSON.stringify(ctx.toolInput)
-    const scan = checkSecrets(inputStr)
-    if (scan.has_secrets) {
-      const patterns = Array.from(new Set(scan.matches.map(m => m.pattern_name)))
-      try {
-        const { emitEvent } = await import('fulcrum-agent-core')
-        emitEvent({
-          workspace_id: ctx.workspace_id,
-          evt_type: 'policy_denied',
-          object_type: 'tool_call',
-          object_id: ctx.runId || undefined,
-          actor_type: 'agent',
-          actor_id: ctx.cliName,
-          payload: {
-            reason: 'secret_scan_denied',
-            tool_name: ctx.toolName,
-            patterns,
-            phase: 'pre',
-          },
-          severity: 'warn',
-        })
-      } catch { /* best-effort */ }
-      io.stderr(`[fulcrum/pre] Tool call denied: secret detected in tool_input (${patterns.join(', ')})\n`)
-      io.stderr(`[fulcrum/pre] Never include credentials in tool inputs. Use env vars or a secret store.\n`)
-      const denyMsg = `Tool call blocked: secret pattern(s) detected in tool input (${patterns.join(', ')}). Use env vars or a secret store instead.`
-      if (ctx.cliName === 'codex') {
-        io.stdout(JSON.stringify({ decision: 'block', reason: denyMsg }))
-      } else {
-        io.stdout(JSON.stringify({
-          continue: false,
-          stopReason: 'secret_detected',
-          message: denyMsg,
-        } satisfies HookOutput))
+  // 1. Secret scan on tool_input — opt-in via FULCRUM_SECRET_SCAN=1.
+  //    Off by default: the patterns are heuristic and have a high false-positive rate
+  //    (e.g. bootstrap scripts with `password=` lines, CI env snippets, test fixtures).
+  //    Users who want scanning can set FULCRUM_SECRET_SCAN=1 in their shell or settings.
+  if (process.env['FULCRUM_SECRET_SCAN'] === '1') {
+    try {
+      const { checkSecrets } = await import('fulcrum-policy')
+      const inputStr = JSON.stringify(ctx.toolInput)
+      const scan = checkSecrets(inputStr)
+      if (scan.has_secrets) {
+        const patterns = Array.from(new Set(scan.matches.map(m => m.pattern_name)))
+        try {
+          const { emitEvent } = await import('fulcrum-agent-core')
+          emitEvent({
+            workspace_id: ctx.workspace_id,
+            evt_type: 'policy_denied',
+            object_type: 'tool_call',
+            object_id: ctx.runId || undefined,
+            actor_type: 'agent',
+            actor_id: ctx.cliName,
+            payload: {
+              reason: 'secret_scan_denied',
+              tool_name: ctx.toolName,
+              patterns,
+              phase: 'pre',
+            },
+            severity: 'warn',
+          })
+        } catch { /* best-effort */ }
+        io.stderr(`[fulcrum/pre] Tool call denied: secret detected in tool_input (${patterns.join(', ')})\n`)
+        io.stderr(`[fulcrum/pre] Never include credentials in tool inputs. Use env vars or a secret store. Set FULCRUM_SECRET_SCAN=0 to disable this check.\n`)
+        const denyMsg = `Tool call blocked: secret pattern(s) detected in tool input (${patterns.join(', ')}). Use env vars or a secret store, or set FULCRUM_SECRET_SCAN=0 to disable.`
+        if (ctx.cliName === 'codex') {
+          io.stdout(JSON.stringify({ decision: 'block', reason: denyMsg }))
+        } else {
+          io.stdout(JSON.stringify({
+            continue: false,
+            stopReason: 'secret_detected',
+            message: denyMsg,
+          } satisfies HookOutput))
+        }
+        io.exit(2)
+        return
       }
-      io.exit(2)
-      return
-    }
-  } catch { /* best-effort; secret scan unavailable means we don't block */ }
+    } catch { /* best-effort; secret scan unavailable means we don't block */ }
+  }
 
   // 2. Chief-of-staff no-direct-writes policy (existing behaviour)
   const isTeamInvoke = ctx.toolName.includes('invoke_team') || ctx.toolName.includes('team_invoke')
