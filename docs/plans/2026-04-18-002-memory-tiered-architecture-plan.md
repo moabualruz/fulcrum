@@ -174,28 +174,60 @@ Some work naturally parallelizes across subagents; the orchestrator delegates to
 
 ### Knowledge graph
 
-- **Entity/relationship tables in SQLite** (first-class, not a Kuzu afterthought):
+- **ADR — extend existing `graph_entities` / `graph_edges`, do not replace.** Both tables already exist in `packages/core/src/db/schema.ts` (lines 996–1025) with a superset-shape: `graph_entities(entity_id, workspace_id, name, entity_type, properties, valid_from, valid_until, created_at, updated_at)` and `graph_edges(edge_id, workspace_id, source_id, target_id, relation, weight, properties, valid_from, valid_until, created_at)`. Renaming columns in SQLite requires a full table rebuild; v3 adopts the existing names and adds the missing semantic columns via guarded `ALTER TABLE ADD COLUMN`. The mapping:
+
+  | v3 plan name | physical column | notes |
+  |---|---|---|
+  | `type` | `entity_type` | existing; no rename |
+  | `attributes` | `properties` | existing; no rename |
+  | `from_id` | `source_id` | existing; no rename |
+  | `to_id` | `target_id` | existing; no rename |
+  | `rel_type` | `relation` | existing; no rename |
+  | `aliases` | `aliases` | **NEW** — JSON array, nullable |
+  | `confidence` (entity) | `confidence` | **NEW** — `REAL NOT NULL DEFAULT 1.0` |
+  | `first_seen` | `first_seen` | **NEW** — ISO text, nullable initially; PR 6 backfills from `created_at` |
+  | `last_confirmed` | `last_confirmed` | **NEW** — ISO text, nullable initially |
+  | `confidence` (edge) | `confidence` | **NEW** — `REAL NOT NULL DEFAULT 1.0`; complements existing `weight` (kept for legacy callers) |
+  | `source_ids` | `source_ids` | **NEW** — JSON array of `l0_sources.source_id`, nullable |
+
+  Target shape **after** `runMigration101MemoryV3Lifecycle`:
   ```sql
-  CREATE TABLE graph_entities (
-    entity_id TEXT PRIMARY KEY,
-    type TEXT NOT NULL,           -- person|project|library|file|symbol|concept|decision
-    name TEXT NOT NULL,
-    aliases TEXT,                 -- JSON array
-    confidence REAL DEFAULT 1.0,
-    first_seen TEXT NOT NULL,
-    last_confirmed TEXT NOT NULL,
-    attributes TEXT               -- JSON bag
+  -- graph_entities (existing + 4 new columns)
+  graph_entities(
+    entity_id      TEXT PRIMARY KEY,
+    workspace_id   TEXT NOT NULL,
+    name           TEXT NOT NULL,
+    entity_type    TEXT NOT NULL,                 -- v3 "type"
+    properties     TEXT NOT NULL DEFAULT '{}',    -- v3 "attributes"
+    valid_from     TEXT,                          -- existing bitemporal
+    valid_until    TEXT,
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL,
+    -- v3 additions:
+    aliases        TEXT,                          -- JSON array
+    confidence     REAL NOT NULL DEFAULT 1.0,
+    first_seen     TEXT,                          -- ISO, nullable pre-cutover
+    last_confirmed TEXT                           -- ISO, nullable pre-cutover
   );
-  CREATE TABLE graph_edges (
-    edge_id TEXT PRIMARY KEY,
-    from_id TEXT NOT NULL REFERENCES graph_entities(entity_id),
-    to_id   TEXT NOT NULL REFERENCES graph_entities(entity_id),
-    rel_type TEXT NOT NULL,       -- uses|depends_on|contradicts|caused|fixed|supersedes|about|mentions
-    confidence REAL DEFAULT 1.0,
-    source_ids TEXT,              -- JSON array of L0 IDs
-    created_at TEXT NOT NULL
+
+  -- graph_edges (existing + 2 new columns)
+  graph_edges(
+    edge_id        TEXT PRIMARY KEY,
+    workspace_id   TEXT NOT NULL,
+    source_id      TEXT NOT NULL REFERENCES graph_entities(entity_id),  -- v3 "from_id"
+    target_id      TEXT NOT NULL REFERENCES graph_entities(entity_id),  -- v3 "to_id"
+    relation       TEXT NOT NULL,                                       -- v3 "rel_type"
+    weight         REAL NOT NULL DEFAULT 1.0,                           -- legacy, kept
+    properties     TEXT NOT NULL DEFAULT '{}',
+    valid_from     TEXT,
+    valid_until    TEXT,
+    created_at     TEXT NOT NULL,
+    -- v3 additions:
+    confidence     REAL NOT NULL DEFAULT 1.0,
+    source_ids     TEXT                                                 -- JSON array of l0_sources.source_id
   );
   ```
+
 - Kuzu client stays optional (v3.1 migration target). SQLite tables are authoritative for now.
 
 ### Lifecycle
@@ -286,7 +318,7 @@ Some work naturally parallelizes across subagents; the orchestrator delegates to
 ### Migration strategy
 
 - **No big-bang rewrite.** Each phase ships behind a feature flag and coexists with the current code path until verified.
-  - Phase 0 writes the spec + schema migration SQL (no code switch).
+  - Phase 0 writes the spec + schema migration functions (TS constants + ledger-guarded `runMigration10X*` functions; no runtime call sites wired until PR 1).
   - Phase 1 lights up `vault/raw/` for NEW writes; old `vault/memories/curated/` stays readable during transition.
   - Phase 2 adds `vault/curated/` with new schema columns (NULL-tolerant on existing rows).
   - Phase 3 introduces the curator as an opt-in CLI command.
@@ -312,6 +344,15 @@ Some work naturally parallelizes across subagents; the orchestrator delegates to
 10. **Guided templates (HARD).** All L1 pages are written from templates at `packages/memory/src/l1/templates/`. Curator prompts include the template verbatim; post-curator validator rejects malformed output with a structured `L1TemplateViolationError`. No free-form page writes.
 11. **Loopback-only** (existing).
 12. **Reversible migrations.** Every schema migration has a documented rollback SQL. The Phase 6 one-time data migration runs in a transaction with an abort-and-restore path.
+13. **Mark-wrong is role-gated (HARD).** `mcp__fulcrum__mark_memory_wrong` and `fulcrum memory mark-wrong` are restricted to role `chief_of_staff` (or a future `memory_curator` role). `software_engineer` / `test_engineer` / other implementation roles CANNOT mark pages wrong — they can only read via `inspect_memory`, `get_memory_sources`, `read_raw_source`, `trace_claim`. Rationale: the `correction` L0 entries are re-fed to the curator as trusted evidence; unrestricted mark-wrong is a curator-steering attack surface. Enforcement: policy rule checked in `mark_memory_wrong` action handler before the correction L0 is written.
+14. **Correction L0 entries carry a distinct trust tier.** `source_type='correction'` entries are delimited in the curator prompt as `<AGENT_CORRECTION>` (not `<USER_CONTENT>`) and the prompt instructs the model to treat them as *claims to be verified against the original L0*, not as ground truth. Curator output that supersedes a page based ONLY on a correction (no reinforcing evidence from other L0 sources) is flagged and routed to a human reviewer via a `Review` record.
+15. **Post-curator semantic allowlist (HARD).** Curator output is rejected by the validator if any `new_pages[].sources[]` entry references an L0 ULID not present in the current curation batch input. Delimiter isolation (`<USER_CONTENT>`) prevents prompt-level injection; this allowlist blocks schema-conformant injection attacks where a crafted L0 body biases the model into fabricating `sources[]` ULIDs that don't exist in the input. Enforcement lives in `l1/validator.ts`; curator output failing this check is rejected before any L1 write.
+16. **Secrets handling (HARD).** `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `codex` / `pi` subscription tokens are:
+    - Read from env or OS keychain only; never from project-local files.
+    - Never logged. Error paths from any backend (`l1/curator-backend/*.ts`) redact credential-shaped substrings before writing to `vault/curated/log.md`, `worktree_events`, or stderr.
+    - Never stored in any `*_json` column (curator run logs, provenance, event payloads).
+    - Rotation: subscribers are responsible; Fulcrum does not store credentials persistently.
+17. **Rollback binary is operator-only with technical enforcement (HARD).** `fulcrum memory rollback --to v2` refuses to run unless BOTH: (a) stdout is a TTY (`process.stdout.isTTY === true`), AND (b) `FULCRUM_OPERATOR_CONFIRM=<uuid>` env var is set to a UUID the operator generated and pasted. The UUID is consumed (marked used in a local record) so the same value can't be replayed. The command prints the consumed UUID on exit for audit. `fulcrum action exec` refuses to invoke `memory.rollback`; MCP surface does not register a rollback tool.
 
 ---
 
@@ -407,11 +448,18 @@ packages/memory/src/
   write.ts                                  — THIN WRAPPER: deprecated, re-exports l0/ingest + l1/page for back-compat
   read.ts                                   — NEW: recall_knowledge + get_sources + walk_graph
 
-packages/core/src/db/
-  migrations/
-    2026-04-19-001-memory-v3-lifecycle.sql  — NEW: alter memories, add graph tables
-    2026-04-19-002-memory-v3-source-index.sql — NEW: l0_sources table
-    2026-04-19-003-memory-v3-cutover.sql    — NEW: Phase 5 cutover (nullable → NOT NULL)
+packages/memory/src/
+  schema.ts                                 — NEW: memory v3 migration functions
+                                              (mirrors packages/teams/src/schema.ts +
+                                              packages/workflows/src/schema.ts pattern —
+                                              template-string DDL + ledger-guarded
+                                              `runMigration10X*` TS fns, no .sql files)
+    runMigration101MemoryV3Lifecycle()      — alter memories; update/extend graph tables;
+                                              add l0_sources, l1_pages
+    runMigration102MemoryV3SourceIndex()    — indexes on new columns
+    runMigration103MemoryV3Cutover()        — Phase 5 cutover (nullable → NOT NULL)
+    runMigration104MemoryV3DropCanonicalText() — drop memories.canonical_text; FTS5
+                                                 trigger reads content directly
 
 packages/cli/src/commands/
   memory/
@@ -627,17 +675,82 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 
 ### PR 0 — Spec + schema scaffolding
 
-**Goal:** land the spec doc (this file), write the migration SQL, update `CHANGELOG.md`. No code changes.
+**Goal:** land the spec doc (this file), write the migration functions, update `CHANGELOG.md`. No runtime call sites wired; the migration functions exist as code but nothing calls them yet (wiring happens in PR 1).
+
+**Migration convention (REQUIRED READING).** This repo has **no `.sql` files**. The live convention (see `packages/teams/src/schema.ts:runMigration006Teams()` and `packages/workflows/src/schema.ts:runMigration007Workflows()`) is:
+1. DDL lives as a template-string constant inside a `schema.ts` in the owning package.
+2. A `runMigrationNNNName(db)` function `db.exec()`s the DDL (idempotent — `CREATE TABLE IF NOT EXISTS`, `PRAGMA table_info` guards around `ALTER TABLE ADD COLUMN`).
+3. Function records a ledger row via `INSERT OR IGNORE INTO schema_migrations(name) VALUES ('NNN_name')`.
+4. Historical `m001..m052` core migrations were consolidated into `applySchema()`; `recordLegacyMigrationNames()` back-fills their names so old tests still match the ledger.
+5. Memory v3 takes numbers `101..104` to leave unambiguous headroom above both the consolidated block (≤ 052) and extension packages (teams=006, workflows=007).
+6. Rollback SQL for each migration is documented as a comment block **above** the forward DDL in the same TS file — not a separate artifact.
 
 **Units:**
 
 - **0.1** This plan doc committed to `docs/plans/`.
-- **0.2** `packages/core/src/db/migrations/2026-04-19-001-memory-v3-lifecycle.sql` — adds `graph_entities`, `graph_edges`, `l0_sources`, `l1_pages` tables. Existing `memories` gets nullable `retention_tier`, `confidence_decay_at`, `superseded_by`, `consolidated_from_ids` columns.
-- **0.3** `packages/core/src/db/migrations/2026-04-19-002-memory-v3-source-index.sql` — indexes on new columns.
+- **0.2** `packages/memory/src/schema.ts` — new file. Exports `runMigration101MemoryV3Lifecycle(db)` which performs, idempotently and in order:
+  1. **Extend `memories`** with 4 new columns via `PRAGMA table_info`-guarded `ALTER TABLE ADD COLUMN` (all nullable pre-cutover):
+     - `retention_tier TEXT` — app-validated: `working|episodic|semantic|procedural`
+     - `confidence_decay_at TEXT` — ISO timestamp, last time decay was computed
+     - `superseded_by TEXT` — `memory_id` of successor (scalar; existing `supersedes` column keeps its TEXT type and holds the JSON array of predecessors)
+     - `consolidated_from_ids TEXT` — JSON array of `memory_id`s merged into this row
+  2. **Extend `graph_entities`** with 4 new columns via the same guarded pattern (see §Knowledge graph for the full target shape):
+     - `aliases TEXT`, `confidence REAL NOT NULL DEFAULT 1.0`, `first_seen TEXT`, `last_confirmed TEXT`
+  3. **Extend `graph_edges`** with 2 new columns:
+     - `confidence REAL NOT NULL DEFAULT 1.0`, `source_ids TEXT`
+  4. **Create new table `l0_sources`**. No CHECK on `source_type` — app-layer validation per v2a precedent.
+     ```sql
+     CREATE TABLE IF NOT EXISTS l0_sources (
+       source_id     TEXT PRIMARY KEY,                                          -- ULID
+       source_type   TEXT NOT NULL,                                             -- bash_trace|tool_trace|file_patch|
+                                                                                --   session_transcript|prompt_attachment|
+                                                                                --   web_capture|edit_diff|correction
+       session_id    TEXT,                                                      -- agent_runs.run_id when known
+       workspace_id  TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+       project_id    TEXT REFERENCES projects(project_id) ON DELETE CASCADE,
+       cwd           TEXT,                                                      -- absolute path at ingest time
+       vault_path    TEXT NOT NULL,                                             -- 'raw/<type>/YYYY/MM/DD/<ULID>.md'
+       content_hash  TEXT NOT NULL,                                             -- sha256 hex
+       size_bytes    INTEGER NOT NULL,
+       created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+     );
+     ```
+  5. **Create view `l1_pages`** — read-only projection of `memories` filtered to v3 rows. Writes go directly to `memories`; the view is never written.
+     ```sql
+     CREATE VIEW IF NOT EXISTS l1_pages AS
+     SELECT
+       memory_id            AS page_id,
+       kind                 AS page_type,       -- entity|concept|page|synthesis (app-validated)
+       workspace_id, project_id, title, summary,
+       content              AS body,
+       confidence, retention_tier, access_count,
+       slug, vault_path,
+       content_hash         AS body_hash,
+       entities, provenance,                    -- provenance.sources[] carries L0 refs
+       supersedes, superseded_by, consolidated_from_ids,
+       confidence_decay_at, embedded, schema_version,
+       created_at           AS first_seen,
+       updated_at           AS last_confirmed,
+       last_accessed_at, last_recalled_at,
+       recall_count, unique_query_count, max_recall_score
+     FROM memories
+     WHERE schema_version >= 3;
+     ```
+  6. Writes ledger row `101_memory_v3_lifecycle` via `INSERT OR IGNORE INTO schema_migrations(name)`.
+
+  Rollback SQL lives as a comment block above the forward DDL in the same TS file. Does not wire a call site into any runtime path; that happens in PR 1 unit 1.1.
+
+- **0.3** Same file — exports `runMigration102MemoryV3SourceIndex(db)`: indexes on the new columns, all partial/guarded for sparse data. Minimum set:
+  - `idx_l0_sources_ws_project (workspace_id, project_id)`, `idx_l0_sources_type (source_type)`, `idx_l0_sources_session (session_id) WHERE session_id IS NOT NULL`, `idx_l0_sources_hash (content_hash)`, `idx_l0_sources_created (created_at)`
+  - `idx_memories_retention_tier (retention_tier) WHERE retention_tier IS NOT NULL`, `idx_memories_superseded_by (superseded_by) WHERE superseded_by IS NOT NULL`, `idx_memories_decay (confidence_decay_at) WHERE confidence_decay_at IS NOT NULL`
+  - `idx_graph_entities_confidence (confidence)`, `idx_graph_entities_last_confirmed (last_confirmed) WHERE last_confirmed IS NOT NULL`
+  - `idx_graph_edges_confidence (confidence)`
+
+  Writes ledger row `102_memory_v3_source_index`.
 - **0.4** `packages/memory/src/l0/types.ts` — TypeScript types only (no runtime code yet).
 - **0.5** Update `AGENTS.md` + `agent-integration/claude/CLAUDE.md` with a "Memory tiers (v3 draft)" section.
 
-**Verify:** `pnpm build` (no new source is required to typecheck yet); `pnpm test` (unchanged); `sqlite3 :memory: < migration.sql` runs clean.
+**Verify:** `pnpm build` typechecks clean; `pnpm -F @fulcrum/memory test` passes the new migration test (fresh in-memory DB → run 101 + 102 → assert new columns present via `PRAGMA table_info`, ledger rows present via `SELECT name FROM schema_migrations WHERE name IN (...)`); `pnpm test` at root unchanged; idempotency test re-runs both functions and confirms no throw + no duplicate ledger rows.
 
 ### PR 1 — L0 raw-ingest + vault path split
 
@@ -646,12 +759,16 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 **Units:**
 
 - **1.1** `l0/ingest.ts` exports `ingestRawSource({ source_type, body, meta }) → L0File`. Writes `vault/raw/{source_type}/yyyy/mm/dd/{ULID}.md`. Frontmatter minimal. Inserts `l0_sources` row. Emits bus event.
+  - **Skills:** `agent-skills:api-and-interface-design` (public contract — every downstream consumer depends on this signature), `agent-skills:source-driven-development` + `find-docs` (verify Node `fs.writeFileSync` / `mkdirSync` recursive + mode flags against current docs), `agent-skills:security-and-hardening` (0600 perm regression for L0 files; inherits `globalDataDir()` perms).
 - **1.2** `vault/client.ts` — split `writeMemoryFile` into `writeRawFile` + `writeCuratedFile`. Old function kept as back-compat wrapper routing to curated until PR 2 cutover.
+  - **Skills:** `agent-skills:api-and-interface-design` (keep v1 callers working via the shim).
 - **1.3** `vault/watcher.ts` — watch both `raw/` and `curated/` roots, emit distinct `raw-change` and `curated-change` events.
+  - **Skills:** `find-docs` on chokidar current API; `compound-engineering:review:reliability-reviewer` pre-merge (watcher lifecycle, rebinding on rename).
 - **1.4** `packages/cli/src/hooks.ts` — `runPostHook` file_patch / bash_trace branches call `ingestRawSource` (full body, no slice). Flag-gated on `FULCRUM_MEMORY_V3=1` so prod stays on the old path until PR 5.
 - **1.5** Regression tests: raw dump of 10 KB bash command lands verbatim; L0 file round-trips through WAL audit; old write path (flag off) unchanged.
 
 **Verify:** `FULCRUM_MEMORY_V3=1 pnpm -F fulcrum-memory test src/tests/l0-ingest.test.ts`; manual e2e: `fulcrum hook claude post` with long heredoc → check vault/raw/bash_trace/ for verbatim body.
+**Pre-merge skills:** `compound-engineering:review:correctness-reviewer`, `compound-engineering:review:security-reviewer` (file perms + hook surface), `compound-engineering:review:project-standards-reviewer`.
 
 ### PR 2 — L1 curated page primitives + templates + validator
 
@@ -668,7 +785,8 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
   4. Body contains at least one `[[raw/...]]` wikilink matching a `sources[]` entry
   5. No placeholder tokens (`TODO`, `FIXME`, `{{...}}`) remain
   6. Every `entities[]` ULID exists in `graph_entities`
-  7. Every `supersedes[]` page_id exists in `l1_pages`
+  7. Every `supersedes[]` page_id in a **v3 page** (schema_version ≥ 3) must exist in the `l1_pages` view (i.e. resolves to a `memories` row with `schema_version >= 3`). **This rule is waived during Phase 6 migration** (pre-cutover pages may supersede rows that haven't been bumped to schema_version 3 yet); the rule is enforced starting at Phase 6.5 lint pass.
+  - **Skills:** `agent-skills:api-and-interface-design` (error codes are a public surface — stable contract), `agent-skills:test-engineer` (subagent; exhaustive rule-violation test corpus), `compound-engineering:review:testing-reviewer` pre-merge.
 - **2.4** `l1/wikilinks.ts` — parse + emit Obsidian-style `[[path]]` references. Functions: `extractWikilinks(body) → string[]`, `renderWikilink(l0_file) → string`, `resolveWikilink(link, vaultRoot) → absolute path`. Tests cover nested paths, special chars, escaping.
 - **2.5** `l1/entities.ts` — `upsertEntity`, `addEdge`, `getEntityGraph(entity_id, depth)`. SQLite-backed. Kuzu optional mirror in later phase.
 - **2.6** Page frontmatter serializer: structured YAML with list fields (`sources`, `supersedes`, `entities`), preserves round-trip through `readMemoryFile`.
@@ -684,15 +802,19 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 **Units:**
 
 - **3.1** `l1/curator.ts` — prompt template + structured-output parser + backend dispatcher. Selects inference backend per §L0→L1 curation pipeline rules (env override > codex > pi > openai > anthropic).
+  - **Skills (load-bearing):** `codex:gpt-5-4-prompting` — composes every curator prompt before any code is written. Without this skill the prompt is guesswork. Also: `compound-engineering:agent-native-architecture` (backend selection is agent-facing), `agent-skills:security-and-hardening` (L0 body is untrusted — isolate via `<USER_CONTENT>` delimiter per `codex:gpt-5-4-prompting` guidance).
 - **3.2** `l1/curator-backend/codex.ts` — spawns `codex exec --model <task_model> -c model_reasoning_effort=<task_effort> --json --output-schema=<path>` with L0 body on stdin, streams JSONL events, captures the final schema-constrained JSON. Handles exit codes + stderr propagation. Per-task defaults: extraction = `gpt-5-mini` + `minimal`; consolidation = `gpt-5-nano` + `minimal`; synthesis = `gpt-5` + `medium`. Primary backend when user is on a ChatGPT Plus/Pro plan.
+  - **Skills:** `codex:codex-cli-runtime` (subprocess contract — handles exit codes, stdout/stderr separation, JSONL framing), `codex:codex-result-handling` (parse the JSONL event stream into `{new_pages, updates, supersessions, new_edges}`; validate against schema).
 - **3.3** `l1/curator-backend/pi.ts` — same interface for pi CLI (stub in PR 3, filled when pi's non-interactive mode stabilizes). Same per-task model pinning.
 - **3.4** `l1/curator-backend/openai.ts` — direct OpenAI API call with `response_format: { type: 'json_schema', strict: true }`. Same per-task model pinning as codex backend. Used in CI / headless / users without codex.
+  - **Skills:** `agent-skills:source-driven-development` + `find-docs` (verify Structured Outputs current spec + `strict: true` semantics), `agent-skills:security-and-hardening` (OPENAI_API_KEY handling — never logged).
 - **3.5** Deterministic apply-layer: takes the curator's JSON output `{ new_pages, updates, supersessions, new_edges }` and executes via `l1/page.ts` + `l1/entities.ts`. Atomic per-call (all-or-nothing).
 - **3.6** `packages/cli/src/commands/memory/curate.ts` — `fulcrum memory curate <l0_id> [--dry-run] [--backend codex|pi|openai]`.
 - **3.7** Curator telemetry: appends to `vault/curated/log.md` with `{l0_id, backend, affected_pages[], new_entities[], confidence_deltas[], duration_ms, prompt_version}`.
 - **3.8** Tests: stub curator backend → verify L1 + graph state mutations; dry-run prints diff without writing; backend rotation test covers codex / openai paths (pi skipped when not installed).
 
 **Verify:** `fulcrum memory curate <some_l0_id> --dry-run` prints the page diffs; without `--dry-run` they land; `cat vault/curated/log.md` shows the audit entry including selected backend; manual toggle `FULCRUM_CURATOR_BACKEND=openai fulcrum memory curate <id>` routes to API path.
+**Pre-merge skills:** `compound-engineering:review:adversarial-reviewer` (untrusted input + LLM output; construct failure scenarios), `agent-skills:security-auditor` (subagent — injection + prompt-extraction surface), `compound-engineering:review:correctness-reviewer`, `compound-engineering:ce-review` (persona panel — diff will be ≥50 LOC).
 
 ### PR 4 — L2 reshaping: embed L1 pages, keep code_chunks
 
@@ -701,6 +823,7 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 **Units:**
 
 - **4.1** Relocate `storeEmbeddingInVec` + `storeChunkEmbedding` into `packages/memory/src/l2/`.
+  - **Skills:** `agent-skills:performance-optimization` (embedding batch queue + p95 budget), `find-docs` on `@xenova/transformers` batch-embed current API, `compound-engineering:review:performance-reviewer` pre-merge.
 - **4.2** Curator (PR 3 output) now triggers `recordL1Embedding(page_id)` after each page write/update. Existing fire-and-forget flush semantics carry over (the `flushPendingMemoryWrites` story from the prior work).
 - **4.3** Add `fulcrum memory reindex-l2 [--pages|--code]` for operator one-shot re-embedding.
 - **4.4** Tests: create L1 page → vec_memories has row; update page → embedding replaced; supersede → old row marked (but kept — supersession is audit, not deletion).
@@ -714,7 +837,9 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 **Units:**
 
 - **5.1** Extend `retrieval/search.ts` with graph-traversal stage + confidence filter + supersession filter.
+  - **Skills:** `agent-skills:performance-optimization` (graph traversal 100ms budget), `compound-engineering:review:performance-reviewer` pre-merge.
 - **5.2** Reciprocal rank fusion weights configurable via env (defaults `fts=1.0, vec=1.0, graph=0.5`).
+  - **Skills:** `compound-engineering:ce-optimize` (metric-driven iteration against the eval corpus; do not hand-pick weights).
 - **5.3** `recall_knowledge` new action; `recall_memory` aliased for back-compat.
 - **5.4** Agent-facing inspection + correction surface:
   - `fulcrum memory sources <page_id>` — walks L1 → L0 references via `sources[]` + inline `[[raw/...]]` wikilinks; prints { l0_id, source_type, snippet, file_path } per source.
@@ -724,9 +849,12 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
   - `fulcrum memory mark-wrong <page_id> --reason "<why>"` — appends a `correction` L0 entry under `raw/correction/`, triggers curator re-run with correction hint, new page supersedes the flagged one.
   - MCP parity: `mcp__fulcrum__get_memory_sources`, `mcp__fulcrum__inspect_memory`, `mcp__fulcrum__read_raw_source`, `mcp__fulcrum__trace_claim`, `mcp__fulcrum__mark_memory_wrong`. Every action a user can take via CLI is callable from agents.
 - **5.5** Flip default `FULCRUM_MEMORY_V3` to on. Old path callable via `FULCRUM_MEMORY_V3=0` for one release cycle.
+  - **Skills:** `agent-skills:shipping-and-launch` / `agent-skills:ship` (pre-flip checklist), `compound-engineering:review:deployment-verification-agent` (Go/No-Go + SQL verify queries + rollback plan).
 - **5.6** Integration tests: corpus of 20 L0 dumps → 10 L1 pages → recall a query that requires graph traversal → verify expected page ranks.
+  - **Skills:** `agent-skills:test-engineer` (subagent — eval corpus design), `agent-skills:test-driven-development`.
 
 **Verify:** `fulcrum memory recall "auth middleware"` returns L1 pages ordered by fused score; `fulcrum memory recall "auth middleware" --explain` prints per-stage ranks.
+**Pre-merge skills:** full `compound-engineering:ce-review` persona panel — adversarial + correctness + performance — this is the cutover PR.
 
 ### PR 6 — Data migration: existing vault/memories/ → vault/raw + vault/curated
 
@@ -735,13 +863,17 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 **Units:**
 
 - **6.1** Classifier: maps each existing memory by `kind` to `L0_raw` (bash_trace, file_patch, tool_trace, session_summary) or `L1_curated_stub` (decision, identity, persona, concept, fact). Dry-run prints the mapping.
+  - **Skills:** `agent-skills:deprecation-and-migration` (load-bearing — migration IS the deprecation), `compound-engineering:review:data-migration-expert` (column rename + enum conversion sanity).
 - **6.2** Migrator: for L0-class, copy body verbatim to `vault/raw/{kind}/...`; for L1-class, create a stub curated page with `sources: []` (no original L0 exists) and confidence floor 0.5 (human-edited).
-- **6.3** Regenerate `l0_sources` + `l1_pages` rows; retain `memory_id` for back-compat so existing recall events don't break.
-- **6.4** DB migration `2026-04-19-003-memory-v3-cutover.sql` runs last: drops `memories.canonical_text`, flips nullable columns to NOT NULL, indexes.
+  - **Skills:** `compound-engineering:review:data-integrity-guardian` pre-merge, `compound-engineering:ce-debug` for first-run surprises.
+- **6.3** Populate `l0_sources` rows from the migrated `vault/raw/` files (one row per file; `source_id` = the ULID in the filename); for each migrated `memories` row classified L1-curated, bump `schema_version` to 3 and backfill `retention_tier` (default `working`), `confidence_decay_at` (`datetime('now')`), `first_seen`, `last_confirmed`, and `provenance.sources` (JSON array of `l0_sources.source_id` values) so the row passes the `l1_pages` view filter. No table-to-table row copy; `memory_id` is preserved so existing recall events and wikilinks don't break.
+- **6.4** `runMigration103MemoryV3Cutover(db)` runs last: flips nullable columns (`retention_tier`, `confidence_decay_at`) to NOT NULL via the SQLite table-rebuild dance (see `rebuildMemoriesIfLegacy()` for the pattern), rebuilds indexes. (Note: `canonical_text` drop is deferred to PR 9 unit 9.3 to avoid coupling the cutover to FTS5 trigger rewiring — a known plan-internal split; PR 6 does not touch `canonical_text`.) Writes ledger row `103_memory_v3_cutover`.
 - **6.5** Verification pass: `fulcrum memory lint` reports zero orphans, zero missing-source references, zero cycle in supersession graph.
 - **6.6** Rollback script `fulcrum memory rollback --to v2` (operator-only, not agent-exposed) restores from pre-migration snapshot.
+  - **Skills:** `agent-skills:security-and-hardening` (audit chain integrity), `agent-skills:security-auditor` (subagent — rollback gap hunt), `compound-engineering:review:adversarial-reviewer` (construct "what if migration half-failed" scenarios).
 
 **Verify:** Fresh vault + DB → seed 10 representative rows of each kind via the old path → run `fulcrum memory migrate` → all 10 land in the right tier with complete round-trip.
+**Pre-merge skills:** `compound-engineering:review:data-migration-expert` + `compound-engineering:review:data-integrity-guardian` + `compound-engineering:review:deployment-verification-agent` (this touches production data).
 
 ### PR 7 — Lifecycle: decay, supersession, consolidation, lint
 
@@ -752,7 +884,9 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 - **7.1** `l1/lifecycle.ts` — `applyDecay()` (time-based confidence update), `promoteToTier(page_id, target_tier)`, `archivePage(page_id)`.
 - **7.2** Contradiction detector: curator output includes `{ contradicts: [old_page_id] }`; auto-applies supersession when confidence of new evidence ≥ old.
 - **7.3** `fulcrum memory lint` — orphan pages, broken wikilinks (L1 → L0 link pointing to missing file), cyclic supersession, stale claims (last_confirmed > 90d AND confidence > 0.5), missing source_ids, `sources[]` vs inline wikilink divergence (frontmatter lists an L0 that's not referenced inline, or vice versa), template-validator violations retrospectively applied to existing pages.
+  - **Skills:** `agent-skills:api-and-interface-design` (lint output schema is a stable contract consumed by dashboards).
 - **7.4** `fulcrum memory consolidate` — finds pages with same entity set + same `retention_tier` AND confidence ≥ threshold; proposes a merged page to curator.
+  - **Skills:** `compound-engineering:ce-optimize` (empirical tuning of decay λ + retention-tier thresholds against the eval corpus).
 - **7.5** Tests: decay curve matches Ebbinghaus formula within 1%; consolidation dry-run prints proposed merges.
 
 **Verify:** `fulcrum memory lint` returns clean on the freshly-migrated vault; inject a contradiction source → `fulcrum memory curate` → old page marked superseded.
@@ -766,8 +900,11 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 - **8.1** Vault watcher fires L0 → curator (debounced 30s) when `FULCRUM_MEMORY_CURATE_AUTO=1`.
 - **8.2** Scheduled consolidation pass via `fulcrum serve monitor` cron when `FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE=daily`.
 - **8.3** Metrics: L0 ingest rate, L1 page count by tier, curation latency p50/p95, graph node + edge count, confidence distribution histogram. Surfaced at `GET /memory/stats`.
+  - **Skills:** `agent-skills:ci-cd-and-automation` (wire `fulcrum memory eval` as a required CI gate).
 - **8.4** `docs/architecture/memory-v3.md` — user-facing docs + examples.
+  - **Skills:** `agent-skills:documentation-and-adrs`, `elements-of-style:writing-clearly-and-concisely`, `compound-engineering:ce-demo-reel` (capture a GIF: ingest → curate → recall → mark-wrong → re-curate).
 - **8.5** Update `CLAUDE.md` + `AGENTS.md` skill docs; update `docs/plans/MASTER-PLAN.md`.
+  - **Skills:** `compound-engineering:onboarding` (regenerate ONBOARDING.md's memory section).
 
 **Verify:** Auto-flag on + `fulcrum hook claude post` with a file_patch → curator fires within 60s → L1 page appears; `GET /memory/stats` returns populated counts.
 
@@ -779,7 +916,8 @@ Every PR ends with CI-green tests + a one-line migration note in `CHANGELOG.md`.
 
 - **9.1** Remove `validate-kind.ts` cap logic.
 - **9.2** Remove `write.ts` back-compat shim (callers migrated in PR 5).
-- **9.3** Remove `canonical_text` column via migration `2026-04-19-004-drop-canonical-text.sql`. FTS5 trigger now reads `content`.
+- **9.3** Remove `canonical_text` column via `runMigration104MemoryV3DropCanonicalText(db)` (SQLite table-rebuild dance; rewires FTS5 triggers to read `content` directly). Writes ledger row `104_memory_v3_drop_canonical_text`.
+  - **Skills:** `compound-engineering:review:data-migration-expert` + `compound-engineering:review:schema-drift-detector` pre-merge.
 - **9.4** Delete empty `vault/memories/` directory + commit `.gitkeep` removal.
 - **9.5** Grep-clean any references to `MEMORY_V3` flag (now the default).
 
@@ -887,7 +1025,7 @@ Each query has a committed fixture: `{ query, expected_page_ids[] (ordered by id
 |---|---|
 | Curator LLM output non-deterministic → L1 drift across runs | Strict JSON schema validation on curator output; retry with temperature 0; dry-run mode for review |
 | 193k existing files migration → hours of IO | Migration runs in parallel batches of 1k, resumable via checkpoint file |
-| FTS5 index rebuild on column rename | PR 6 rebuilds fts triggers after content column refactor; tested on a copy of prod DB |
+| FTS5 trigger rewrite on `canonical_text` drop | PR 9 unit 9.3 rebuilds FTS5 triggers to read `content` directly after dropping `canonical_text`; tested on a copy of prod DB. **PR 6 does NOT touch FTS5 or `canonical_text` — those are decoupled from the cutover to keep the migration surface small.** |
 | User edits vault files between ingest and curation → conflict | Vault watcher on `curated/` detects human edits; curator merges (LLM prompt includes "respect human edits"); conflicts flagged in `log.md` |
 | Entity extraction quality low early → noisy graph | Confidence floor on graph edges; lint pass flags low-confidence entities; operator can purge via `fulcrum memory entity archive` |
 | L2 embedding cost balloon (every page update re-embeds) | Hash-based change detection: embed only when body_hash differs from last_embedded_hash |
