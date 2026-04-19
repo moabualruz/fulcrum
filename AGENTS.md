@@ -185,8 +185,18 @@ Never change this to `threads`.
 
 ## Memory System Patterns
 
+**Current:** memory v3 is the default (`FULCRUM_MEMORY_V3` on since PR 5.5). See
+[`docs/architecture/memory-v3.md`](architecture/memory-v3.md) for the operator
+reference — layer glossary, curator pipeline, feature flags, `/memory/stats`
+schema, and end-to-end walkthrough.
+
+The v2a invariants below (L0 canonical commit point, `MemoryKind` catalog, vault
+watcher echo suppression) still apply to the v2a code paths that remain in the
+tree during the PR 9 deprecation window. New code targets v3 primitives directly
+(`ingestRawSource`, `createCuratedPage`, `runCurator`, `applyDecay`).
+
 See [README.md#memory-system-three-layers](README.md#memory-system-three-layers) for the
-full architecture. Agent rules:
+v2a full architecture. Agent rules:
 
 `MemoryKind` currently has **16** values (`fact`, `summary`, `symbol`, `decision`,
 `procedure`, `error`, `diff`, `doc`, `code`, `task_goal`, `task_decision`, `task_failure`,

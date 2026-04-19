@@ -126,13 +126,13 @@ All user-visible flags live under the `FULCRUM_` prefix.
 | `FULCRUM_MONITOR_TOKEN` | TUI dashboard | unset | active |
 | `FULCRUM_ALERT_WEBHOOK` | TUI dashboard | unset | active |
 | `FULCRUM_SETUP_NO_GATE` | install-to-value | unset | shipped |
-| `FULCRUM_CURATOR_BACKEND` | memory v3 | auto-detect | draft |
-| `FULCRUM_CURATOR_MODEL` | memory v3 | `gpt-5-mini` | draft |
-| `FULCRUM_CURATOR_REASONING` | memory v3 | `minimal` | draft |
-| `FULCRUM_CURATOR_MODEL_{EXTRACTION\|CONSOLIDATION\|SYNTHESIS}` | memory v3 | per-task | draft |
-| `FULCRUM_MEMORY_V3` | memory v3 | off | active; on at PR 5; removed PR 9 |
-| `FULCRUM_MEMORY_CURATE_AUTO` | memory v3 | off | active |
-| `FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE` | memory v3 | unset | active |
+| `FULCRUM_CURATOR_BACKEND` | memory v3 | auto-detect | shipped (PR 3) |
+| `FULCRUM_CURATOR_MODEL` | memory v3 | `gpt-5-mini` | shipped (PR 3) |
+| `FULCRUM_CURATOR_REASONING` | memory v3 | `minimal` | shipped (PR 3) |
+| `FULCRUM_CURATOR_MODEL_{EXTRACTION\|CONSOLIDATION\|SYNTHESIS}` | memory v3 | per-task | shipped (PR 3) |
+| `FULCRUM_MEMORY_V3` | memory v3 | on (since PR 5) | shipped; removed PR 9 |
+| `FULCRUM_MEMORY_CURATE_AUTO` | memory v3 | off | shipped (PR 8.1) |
+| `FULCRUM_MEMORY_CONSOLIDATE_SCHEDULE` | memory v3 | unset | shipped (PR 8.2) |
 | `FULCRUM_WORKTREES_V2_FOUNDATIONS` | worktrees v2 | off | draft; per-PR subflags TBD |
 | `FULCRUM_WORKTREES_V2_<FEATURE>` | worktrees v2 | off | draft; flipped on in PR 14 |
 | `FULCRUM_MERGE_BATCHING`, `FULCRUM_MERGE_BATCH_SIZE`, `FULCRUM_MERGE_CANDIDATE_GATE_DISABLED` | worktrees v2 PR 8 | off/1/unset | draft |
