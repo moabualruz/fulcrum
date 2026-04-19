@@ -7,7 +7,7 @@ This file is auto-loaded by Claude Code. It configures your connection to the Fu
 ## MCP Server
 
 <!-- GENERATED:tool-count-start -->
-The `fulcrum` MCP server exposes 24 tools for task management, memory, agent runs, and workspace context.
+The `fulcrum` MCP server exposes 32 tools for task management, memory, agent runs, and workspace context.
 <!-- GENERATED:tool-count-end -->
 It runs as a local stdio process via the `fulcrum serve mcp` command.
 The HTTP monitor auto-starts on port 4721 alongside the MCP server — no separate command needed.
@@ -60,7 +60,7 @@ All tools are prefixed `mcp__fulcrum__` in Claude Code.
 > Auto-generated from `TOOL_SCHEMAS` in `packages/cli/src/mcp-tools.ts`.
 > Run `pnpm gen:claude-md` to regenerate after editing tools.
 
-**Total: 24 tools**
+**Total: 32 tools**
 
 ### `mcp__fulcrum__list_tasks` — List Tasks
 
@@ -126,6 +126,118 @@ Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns the t
 | `max_chars` | number | No | Truncate content to this many characters (default 500) |
 | `query_scope` | `session` \| `project` \| `workspace` | No | Search breadth: project (default) = workspace+project; workspace = all projects in workspace; session = specific agent session |
 | `session_id` | string | No | Session ID — required when query_scope=session |
+
+### `mcp__fulcrum__recall_knowledge` — Recall Knowledge (v3)
+
+`read-only` `open-world`
+
+Memory v3 retrieval: FTS5 + vector + graph traversal fused via weighted RRF, filtered by confidence floor + supersession. Returns L1 curated pages with L0 back-refs (sources[] + l0_wikilinks[]) so agents can follow any claim to the raw source via `read_raw_source`. `recall_memory` remains available as a back-compat alias. workspace_id defaults to cwd; project_id optional for workspace-wide recall.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `query` | string | Yes | Natural language search query |
+| `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
+| `project_id` | string | No | Project ID (optional — omit for workspace-wide recall) |
+| `limit` | number | No | Max results (default 10) |
+| `offset` | number | No | Pagination offset (default 0) |
+| `max_chars` | number | No | Truncate content to this many characters (default 500) |
+| `confidence_floor` | number | No | Minimum confidence for a page to be returned (default 0.3) |
+| `graph_hops` | number | No | BFS depth from query-mentioned entities (default 2) |
+| `include_superseded` | boolean | No | Include pages whose superseded_by is non-null (default false) |
+
+### `mcp__fulcrum__get_memory_sources` — Get Memory Sources
+
+`read-only`
+
+Walk an L1 curated page back to its L0 sources: both frontmatter `sources[]` entries and inline `[[raw/...]]` wikilinks are resolved. Returns per-source { l0_id, source_type, snippet, vault_path, created_at }. Missing sources are reported with source_type="missing" so callers never silently lose a reference.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `page_id` | string | Yes | L1 curated page id |
+
+### `mcp__fulcrum__inspect_memory` — Inspect Memory
+
+`read-only`
+
+Dump a full L1 curated page — frontmatter, body, serialized form, and resolved wikilink absolute paths (exists flag per link). Use when an agent needs the full page text before deciding whether to mark it wrong or override a claim.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `page_id` | string | Yes | L1 curated page id |
+
+### `mcp__fulcrum__read_raw_source` — Read Raw Source
+
+`read-only`
+
+Return the full body of an L0 raw source (the audit root). Strips the file frontmatter so only the captured bytes land in the response.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `l0_id` | string | Yes | L0 source id (the ULID from l0_sources.source_id) |
+
+### `mcp__fulcrum__trace_claim` — Trace Claim
+
+`read-only`
+
+Reverse lookup: given a substring, return every L1 page whose body contains it, ranked by confidence. Each hit carries a snippet around the match plus match_count + sources[] so the caller can jump to the L0 provenance.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `claim` | string | Yes | Substring to search for (case-insensitive) |
+| `workspace_id` | string | No |  |
+| `project_id` | string | No |  |
+| `limit` | number | No | Max hits (default 20) |
+
+### `mcp__fulcrum__consolidate_memory` — Propose Memory Consolidation
+
+`read-only`
+
+Propose merge candidates across L1 pages sharing the same entity set and retention tier, whose lowest-confidence member clears the floor. Dry-run only in v3 PR 7.4 — the curator-driven apply path lands later. Returns { dry_run: true, candidates: [{entity_set, retention_tier, page_ids, min_confidence_in_group, workspace_id, project_id}] }.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspace_id` | string | No | Scope to this workspace (optional; defaults to current cwd) |
+| `project_id` | string | No | Scope to a single project (optional) |
+| `min_confidence` | number | No | Floor on the lowest-confidence member (default 0.5) |
+| `retention_tier` | string | No | Only groups in this tier (working|episodic|semantic|procedural) |
+
+### `mcp__fulcrum__lint_memory` — Lint Memory Vault
+
+`read-only`
+
+Verify the migrated memory vault: reports zero orphans, zero missing-source references, and zero supersession cycles. Migration stubs (pages with sources=[] + sources_via=[]) are tracked separately and do NOT count as orphans. Returns { ok, counts: { pages_checked, orphans, migration_stubs, missing_sources, supersession_cycles }, issues[] }.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspace_id` | string | No | Scope to this workspace (optional; default scans all workspaces) |
+
+### `mcp__fulcrum__mark_memory_wrong` — Mark Memory Wrong
+
+Flag an L1 page as incorrect. Writes a new L0 correction entry under `raw/correction/` capturing the reason and (optional) correction_body. Does NOT auto-run the curator — the operator or a scheduled pass triggers re-curation; the correction L0 entry is the input the curator will consume to supersede the flagged page.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `page_id` | string | Yes | L1 page to flag |
+| `reason` | string | Yes | Why this page is wrong |
+| `correction_body` | string | No | Optional detailed correction text |
+| `workspace_id` | string | Yes |  |
+| `project_id` | string | No |  |
 
 ### `mcp__fulcrum__write_memory` — Write Memory
 
