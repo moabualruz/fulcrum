@@ -50,7 +50,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'List Tasks',
     name: 'list_tasks',
-    description: 'Reads tasks in a workspace/project. Returns id, title, status, priority, assigned_to, blockers. Filters by status when provided. Effect: read-only. Returns: array of task summaries. workspace_id and project_id are optional — defaults to the server cwd context.',
+    description: 'Read tasks in workspace/project. Returns id, title, status, priority, assigned_to, blockers. Filter by status optional. Read-only. workspace_id + project_id optional (default cwd).',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -65,7 +65,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Create Task',
     name: 'create_task',
-    description: 'Creates a new task in the project. Auto-creates workspace and project if they do not exist. Effect: writes task row. Returns: task_id, title, status, priority, assigned_to. Requires title. workspace_id and project_id are optional — defaults to cwd context.',
+    description: 'Create task. Auto-creates workspace + project if absent. Writes task row. Returns task_id, title, status, priority, assigned_to. Requires title. workspace_id + project_id optional (default cwd).',
     annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
@@ -95,7 +95,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Update Task',
     name: 'update_task',
-    description: "Updates a task's status, note, or assignment. Effect: updates task row in place. Returns: task_id, updated=true, list of changed fields. Requires task_id.",
+    description: "Update task status, note, or assignment. Updates task row in place. Returns task_id, updated=true, changed fields. Requires task_id.",
     annotations: { idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -120,7 +120,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Recall Memory',
     name: 'recall_memory',
-    description: 'Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns the top-k most relevant memories for the given query in the specified scope. workspace_id is optional — defaults to cwd workspace. project_id is optional — omit for workspace-wide recall. Returns: id, content (truncated to max_chars), score (0.0–1.0), tags.',
+    description: 'Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns top-k memories for query in scope. workspace_id optional (default cwd). project_id optional (omit for workspace-wide). Returns: id, content (truncated to max_chars), score 0.0–1.0, tags.',
     annotations: { readOnlyHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -144,7 +144,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Recall Knowledge (v3)',
     name: 'recall_knowledge',
-    description: 'Memory v3 retrieval: FTS5 + vector + graph traversal fused via weighted RRF, filtered by confidence floor + supersession. Returns L1 curated pages with L0 back-refs (sources[] + l0_wikilinks[]) so agents can follow any claim to the raw source via `read_raw_source`. `recall_memory` remains available as a back-compat alias. workspace_id defaults to cwd; project_id optional for workspace-wide recall.',
+    description: 'Memory v3 retrieval: FTS5 + vector + graph traversal fused via weighted RRF. Filtered by confidence floor + supersession. Returns L1 curated pages + L0 back-refs (sources[] + l0_wikilinks[]) — follow any claim to raw via `read_raw_source`. `recall_memory` remains back-compat alias. workspace_id defaults cwd; project_id optional.',
     annotations: { readOnlyHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -165,7 +165,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Get Memory Sources',
     name: 'get_memory_sources',
-    description: 'Walk an L1 curated page back to its L0 sources: both frontmatter `sources[]` entries and inline `[[raw/...]]` wikilinks are resolved. Returns per-source { l0_id, source_type, snippet, vault_path, created_at }. Missing sources are reported with source_type="missing" so callers never silently lose a reference.',
+    description: 'Walk L1 page back to L0 sources: frontmatter `sources[]` + inline `[[raw/...]]` wikilinks resolved. Returns per-source { l0_id, source_type, snippet, vault_path, created_at }. Missing sources reported as source_type="missing" — never silently lose reference.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -176,7 +176,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Inspect Memory',
     name: 'inspect_memory',
-    description: 'Dump a full L1 curated page — frontmatter, body, serialized form, and resolved wikilink absolute paths (exists flag per link). Use when an agent needs the full page text before deciding whether to mark it wrong or override a claim.',
+    description: 'Dump full L1 page — frontmatter, body, serialized form, resolved wikilink absolute paths (exists flag per link). Use before marking wrong or overriding a claim.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -187,7 +187,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Read Raw Source',
     name: 'read_raw_source',
-    description: 'Return the full body of an L0 raw source (the audit root). Strips the file frontmatter so only the captured bytes land in the response.',
+    description: 'Full body of L0 raw source (audit root). Strips file frontmatter — only captured bytes in response.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -198,7 +198,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Trace Claim',
     name: 'trace_claim',
-    description: 'Reverse lookup: given a substring, return every L1 page whose body contains it, ranked by confidence. Each hit carries a snippet around the match plus match_count + sources[] so the caller can jump to the L0 provenance.',
+    description: 'Reverse lookup: substring → every L1 page containing it, ranked by confidence. Each hit carries snippet + match_count + sources[] for jumping to L0 provenance.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -214,7 +214,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Propose Memory Consolidation',
     name: 'consolidate_memory',
-    description: 'Propose merge candidates across L1 pages sharing the same entity set and retention tier, whose lowest-confidence member clears the floor. Dry-run only in v3 PR 7.4 — the curator-driven apply path lands later. Returns { dry_run: true, candidates: [{entity_set, retention_tier, page_ids, min_confidence_in_group, workspace_id, project_id}] }.',
+    description: 'Propose merge candidates across L1 pages sharing entity set + retention tier, lowest-confidence member above floor. Dry-run only in v3 PR 7.4 — curator apply path lands later. Returns { dry_run: true, candidates: [{entity_set, retention_tier, page_ids, min_confidence_in_group, workspace_id, project_id}] }.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -229,7 +229,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Lint Memory Vault',
     name: 'lint_memory',
-    description: 'Verify the migrated memory vault: reports zero orphans, zero missing-source references, and zero supersession cycles. Migration stubs (pages with sources=[] + sources_via=[]) are tracked separately and do NOT count as orphans. Returns { ok, counts: { pages_checked, orphans, migration_stubs, missing_sources, supersession_cycles }, issues[] }.',
+    description: 'Verify migrated memory vault: zero orphans, zero missing-source refs, zero supersession cycles. Migration stubs (sources=[] + sources_via=[]) tracked separately, NOT counted as orphans. Returns { ok, counts: { pages_checked, orphans, migration_stubs, missing_sources, supersession_cycles }, issues[] }.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -241,7 +241,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Mark Memory Wrong',
     name: 'mark_memory_wrong',
-    description: 'Flag an L1 page as incorrect. Writes a new L0 correction entry under `raw/correction/` capturing the reason and (optional) correction_body. Does NOT auto-run the curator — the operator or a scheduled pass triggers re-curation; the correction L0 entry is the input the curator will consume to supersede the flagged page.',
+    description: 'Flag L1 page incorrect. Writes L0 correction entry under `raw/correction/` with reason + optional correction_body. Does NOT auto-run curator — operator or scheduled pass triggers re-curation; correction L0 entry = input curator consumes to supersede flagged page.',
     annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
@@ -258,7 +258,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Write Memory',
     name: 'write_memory',
-    description: 'Persists a memory note to vault (L0), SQLite FTS5 (L1), and vector index (L2). Effect: writes memory row + vault file. Returns: saved=true, memory_id, project_id, tags. Requires content. workspace_id and project_id are optional — defaults to cwd context.',
+    description: 'Persist memory note to vault (L0), SQLite FTS5 (L1), vector index (L2). Writes memory row + vault file. Returns saved=true, memory_id, project_id, tags. Requires content. workspace_id + project_id optional (default cwd).',
     annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
@@ -285,7 +285,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'List Agent Profiles',
     name: 'list_agent_profiles',
-    description: 'Reads all 24 canonical AgentRole profiles. When workspace_id is provided, also returns DB-backed custom profiles for that workspace. Effect: read-only. Returns: array of {role, name, description, capabilities}.',
+    description: 'Read all 24 canonical AgentRole profiles. workspace_id provided → also returns DB-backed custom profiles for that workspace. Read-only. Returns {role, name, description, capabilities}[].',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -300,7 +300,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Get Agent Run Status',
     name: 'get_agent_run_status',
-    description: 'Reads live status of an agent run. Effect: read-only. Returns: run_id, status, role, current_step, progress_pct. Requires run_id.',
+    description: 'Read live agent run status. Read-only. Returns run_id, status, role, current_step, progress_pct. Requires run_id.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -322,7 +322,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Start Agent Run',
     name: 'start_agent_run',
-    description: 'Registers the start of an agent run. Call at the beginning of every task. Auto-creates a stub task if task_id is not provided. Effect: inserts agent_runs row, sets task status to running. Returns: run_id, status. Requires agent_role. workspace_id is optional — defaults to cwd workspace.',
+    description: 'Register start of agent run. Call at start of every task. Auto-creates stub task if no task_id. Inserts agent_runs row, sets task status=running. Returns run_id, status. Requires agent_role. workspace_id optional (default cwd).',
     annotations: { idempotentHint: false },
     longRunningHint: true,
     inputSchema: {
@@ -353,7 +353,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Heartbeat Agent Run',
     name: 'heartbeat_agent_run',
-    description: 'Sends a liveness heartbeat for a running agent to prevent it being marked stale. Call every ~30 seconds during long tasks. Effect: updates heartbeat_at and optional progress fields. Returns: run_id, ok=true. Requires run_id. workspace_id is optional — defaults to cwd workspace.',
+    description: 'Liveness heartbeat to prevent stale-mark. Call ~30s during long tasks. Updates heartbeat_at + optional progress. Returns run_id, ok=true. Requires run_id. workspace_id optional (default cwd).',
     annotations: { idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -377,7 +377,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Complete Agent Run',
     name: 'complete_agent_run',
-    description: 'Marks an agent run as finished with optional summary and artifact paths. Effect: sets agent_runs.status=finished, records artifacts. Returns: run_id, status. Requires run_id. workspace_id is optional — defaults to cwd workspace.',
+    description: 'Mark agent run finished with optional summary + artifact paths. Sets status=finished, records artifacts. Returns run_id, status. Requires run_id. workspace_id optional (default cwd).',
     annotations: { destructiveHint: true },
     longRunningHint: true,
     inputSchema: {
@@ -402,7 +402,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Block Agent Run',
     name: 'block_agent_run',
-    description: 'Marks an agent run as blocked with a reason. Use when work cannot continue without human input or a dependency resolving. Effect: sets status=blocked, records reason. Returns: run_id, status, reason. Requires run_id and reason. workspace_id is optional — defaults to cwd workspace.',
+    description: 'Mark agent run blocked with reason. Use when cannot continue without human input or dependency resolving. Sets status=blocked, records reason. Returns run_id, status, reason. Requires run_id + reason. workspace_id optional (default cwd).',
     annotations: { destructiveHint: true },
     longRunningHint: true,
     inputSchema: {
@@ -427,7 +427,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Sweep Stale Agent Runs',
     name: 'sweep_stale_runs',
-    description: 'Abort any agent runs still marked running but with no heartbeat for more than stale_minutes (default 10). Use on session start to reap zombies left by agents that crashed without firing their agent_end / session_shutdown hook. Effect: flips matching rows to status=aborted, status_category=done, and appends a run_event. Returns: list of reaped run_ids.',
+    description: 'Abort runs still marked running with no heartbeat >stale_minutes (default 10). Use on session start to reap zombies from crashed agents that never fired agent_end/session_shutdown. Flips matching rows → status=aborted, status_category=done + appends run_event. Returns reaped run_ids.',
     annotations: { destructiveHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -447,7 +447,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Build Chief-of-Staff Context',
     name: 'build_cos_context',
-    description: 'Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, blockers, recent events. Effect: read-only. Returns: context_markdown formatted for system prompt injection. workspace_id and project_id are optional — defaults to cwd context.',
+    description: 'Build CoS world-state snapshot: active tasks, running agents, blockers, recent events. Read-only. Returns context_markdown formatted for system-prompt injection. workspace_id + project_id optional (default cwd).',
     annotations: { readOnlyHint: true, idempotentHint: true },
     longRunningHint: true,
     inputSchema: {
@@ -473,7 +473,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Get Workspace Status',
     name: 'get_workspace_status',
-    description: 'Reads full workspace status: running agents, blockers, WIP count, queue depth, recent runs. Effect: read-only. Returns: workspace_id, active_runs, blocked_runs, wip_count, queued_tasks, runs array, blockers array. workspace_id is optional — defaults to cwd workspace.',
+    description: 'Read full workspace status: running agents, blockers, WIP count, queue depth, recent runs. Read-only. Returns workspace_id, active_runs, blocked_runs, wip_count, queued_tasks, runs[], blockers[]. workspace_id optional (default cwd).',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -516,7 +516,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Create Team Template',
     name: 'create_team_template',
-    description: 'Creates a reusable team template with role slots and policy. Templates are global (not workspace-scoped). Effect: writes team_templates row. Returns: template object. Requires name and slots array.',
+    description: 'Create reusable team template with role slots + policy. Templates global (not workspace-scoped). Writes team_templates row. Returns template object. Requires name + slots array.',
     annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
@@ -553,7 +553,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Invoke Team',
     name: 'invoke_team',
-    description: 'Instantiates a team from a template and starts execution. Only chief_of_staff may invoke teams (enforced by canInvokeTeams check). Effect: creates team_instance row, spawns agents. Returns: team instance object. Requires template_id, workspace_id, purpose, caller_agent_id, caller_role.',
+    description: 'Instantiate team from template + start execution. Only chief_of_staff (canInvokeTeams gate). Creates team_instance row, spawns agents. Returns team instance. Requires template_id, workspace_id, purpose, caller_agent_id, caller_role.',
     annotations: { destructiveHint: true },
     inputSchema: {
       type: 'object',
@@ -576,7 +576,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'List Team Templates',
     name: 'list_team_templates',
-    description: 'Reads all team templates (global, not workspace-scoped). Effect: read-only. Returns: array of template objects with slots and policy.',
+    description: 'Read all team templates (global, not workspace-scoped). Read-only. Returns template objects[] with slots + policy.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -589,7 +589,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'List Team Instances',
     name: 'list_team_instances',
-    description: 'Reads team instances in a workspace, optionally filtered by status_category. Effect: read-only. Returns: array of team instance objects. Requires workspace_id.',
+    description: 'Read team instances in workspace. Optional status_category filter. Read-only. Returns team instance objects[]. Requires workspace_id.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -610,7 +610,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Create Agent Profile',
     name: 'create_agent_profile',
-    description: 'Creates a DB-backed agent profile for a workspace. Extends the 24 canonical AgentRole slugs with workspace-scoped specializations. Effect: writes agent_profiles row. Returns: profile object. Requires workspace_id, name, description.',
+    description: 'Create DB-backed agent profile for workspace. Extends 24 canonical AgentRole slugs with workspace-scoped specializations. Writes agent_profiles row. Returns profile object. Requires workspace_id, name, description.',
     annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
@@ -629,7 +629,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Create Agent Definition',
     name: 'create_agent_definition',
-    description: 'Creates a canonical definition for a role: model, tools_allow/deny, executor_uri, system prompt. Effect: writes agent_definitions row. Returns: definition object. Requires role, display_name, description.',
+    description: 'Create canonical role definition: model, tools_allow/deny, executor_uri, system prompt. Writes agent_definitions row. Returns definition object. Requires role, display_name, description.',
     annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
@@ -653,7 +653,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Get Agent Definition',
     name: 'get_agent_definition',
-    description: 'Reads the canonical definition for an AgentRole: model, tools, executor_uri, system_prompt. Effect: read-only. Returns: definition object or null. Requires role.',
+    description: 'Read canonical AgentRole definition: model, tools, executor_uri, system_prompt. Read-only. Returns definition object or null. Requires role.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -666,7 +666,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Update Agent Definition',
     name: 'update_agent_definition',
-    description: 'Updates fields on an existing agent definition. Effect: updates agent_definitions row in place. Returns: updated definition object. Requires role.',
+    description: 'Update existing agent definition fields. Updates agent_definitions row in place. Returns updated definition. Requires role.',
     annotations: { idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -686,7 +686,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'List Agent Definitions',
     name: 'list_agent_definitions',
-    description: 'Reads all agent definitions, optionally filtered by stability tier. Effect: read-only. Returns: array of definition objects.',
+    description: 'Read all agent definitions. Optional stability filter. Read-only. Returns definition objects[].',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -698,7 +698,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Get Current Context',
     name: 'get_current_context',
-    description: 'Returns the workspace_id and project_id for the directory the MCP server was started from (computed deterministically — no file needed). Use this at session start to discover the current workspace without reading .fulcrum.json or any project-local file. Also returns a readiness object with tools_available count, monitor_url, monitor_running (probed with 200ms timeout, cached 15s), and suggested_next_call. Effect: read-only. Returns: workspace_id, project_id, cwd, readiness.',
+    description: 'Returns workspace_id + project_id for MCP-server cwd (deterministic, no file). Use at session start to discover workspace without reading .fulcrum.json. Also returns readiness: tools_available, monitor_url, monitor_running (200ms probe, 15s cache), suggested_next_call. Read-only. Returns workspace_id, project_id, cwd, readiness.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',
