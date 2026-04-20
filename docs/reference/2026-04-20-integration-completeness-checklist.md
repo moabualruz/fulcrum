@@ -16,6 +16,97 @@ Source of truth: `docs/plans/2026-04-19-004-agent-parity-plan.md` **Audit table*
 - **Grep-able**: `grep -c '⬜' docs/reference/2026-04-20-integration-completeness-checklist.md` returns the remaining-work count.
 - **Failure to close a row** after claiming PR-complete is an auditable defect. See `docs/plans/2026-04-19-004-agent-parity-progress.md` for corrections.
 
+## Compliance-test gate (added 2026-04-20 after 2nd deep-research pass)
+
+Every future `✅` flip MUST be backed by a green compliance test in
+`packages/cli/src/tests/compliance/<agent>-compliance.test.ts`. Rows lacking a
+compliance test are **not** considered verified even if their `Verify:`
+command is green — file-presence greps catch only the coarsest drift.
+
+Run:
+```
+pnpm -F fulcrum-agent-cli test -- compliance
+```
+Every `GAP(<id>)` in the suite maps to a finding in the 2026-04-20 research
+pass (see `docs/plans/2026-04-19-004-agent-parity-progress.md` PR 7 expanded
+scope entry).
+
+## Overclaims flagged 2026-04-20 (compliance gate retroactively fails these ✅ rows)
+
+The second deep-research pass (framework-docs-researcher sweep across 8
+target CLIs) found that four already-"complete" PRs (4 opencode, 5 Claude,
+6 Codex, 7 Gemini) shipped with substantive correctness bugs that the
+original `Verify:` commands could not catch. The rows below were previously
+marked `✅` but fail their compliance test — treat them as `⚠️
+overclaimed` until the matching fix lands under PR 7 expanded scope.
+
+**Claude Code (PR 5 + 14.1):**
+- "24 sub-agent MDs embed fulcrum-first prologue" — ⚠️ `tools:` uses invalid
+  `{allowed, denied}` object schema; spec wants flat array; chief_of_staff
+  can Write/Edit. GAP(claude-M2) in `claude-compliance.test.ts`.
+- "`.claude-plugin/plugin.json`" — ⚠️ uses invalid `mcp:` field pointing at
+  DEPRECATED snippet; schema wants `mcpServers:`. GAP(claude-M1).
+- "PreToolUse hook handler" — ⚠️ emits deprecated `{continue}` shape
+  instead of `hookSpecificOutput.permissionDecision`; `updatedInput` surface
+  dead. GAP(claude-M5).
+- "SessionStart hook handler" — ⚠️ writes workspace snapshot to disk
+  sidecar, not `hookSpecificOutput.additionalContext`; injection surface
+  dead. GAP(claude-S4).
+- "UserPromptSubmit hook handler" — ⚠️ only bookkeeping; no `additionalContext`
+  from `recall_knowledge`. GAP(claude-S5/S6).
+- "Bundled hooks/hooks.json" — ⚠️ binds non-existent `SubagentStart` event.
+  GAP(claude-M3).
+- "Retire `settings-hooks-snippet.json`" — ⚠️ same `SubagentStart` defect.
+  GAP(claude-M4).
+
+**Codex CLI (PR 6):**
+- "SessionStart hook", "Stop/notify hook", "PreToolUse hook", "UserPromptSubmit
+  hook + rider content", "PermissionRequest hook" (5 rows) — ⚠️ Codex
+  discovery loads hooks from `hooks.json`, NOT `config.toml`. Our entire
+  `[[hooks]]` TOML block is dead code. GAP(codex-M1).
+- "Full plugin.json interface block" — ⚠️ capabilities strings
+  (`task_management`, …) are invented taxonomy; upstream expects
+  capitalized verbs (`Interactive`, `Write`). GAP(codex-S1).
+
+**Gemini CLI (PR 7 — current, uncommitted):**
+- `hooks.json` BeforeTool/AfterTool matchers use Claude tool names
+  (`Write|Edit|Bash`) — never fire against Gemini's `write_file|replace|
+  run_shell_command`. GAP(hooks-M1).
+- `hooks.json` SessionStart matcher `"*"` triggers fresh `start_agent_run`
+  on `/clear` → zombie runs. GAP(hooks-M3).
+- `policies/fulcrum-core.toml` uses `decision = "allow"` which is silently
+  dropped at extension tier (spec says "allow decisions are ignored for
+  security"). 24 rules are dead code. GAP(pol-M1).
+- Subagent MDs missing `mcpServers: { fulcrum: {...} }` inline; Gemini
+  subagent isolation drops inheritance — MCP tools not callable from
+  chief_of_staff etc. GAP(sub-M1).
+
+**opencode (PR 4):**
+- "Plugin shell.env + tool.execute.before + ... + event" — ⚠️ the `event`
+  handler reads `input["type"]` but SDK wraps it as `input.event.type`. All
+  3 event branches (`session.idle`, `session.compacted`, `todo.updated`)
+  are silently dead. GAP(oc-M1).
+- "Plugin `experimental.chat.system.transform` wired" — ⚠️ contract bug on
+  prior SDK versions; re-verify against @opencode-ai/plugin@1.14.19.
+- "`permission.ask` … supports deny with reason" — ⚠️ plugin returns
+  `{approved, reason}` but SDK expects `output.status` mutation. The return
+  value is discarded; permissions default to pre-populated value.
+  GAP(oc-M2).
+- "`session.compacted` handler" — ⚠️ dead branch (consequence of oc-M1).
+- "`session.idle` telemetry signal" — ⚠️ dead branch.
+- "Plugin loads OPENCODE_SYSTEM_RIDER" — ⚠️ env var is never set; claim is
+  a lie. GAP(oc-S2).
+- "Bias nudge / passive injection on opencode's `tool.execute.before`" — ⚠️
+  relies on bare `throw` as block mechanism, which is undocumented SDK
+  behavior. GAP(oc-M3).
+- "`todo.updated` handler" (cross-cut) — ⚠️ reads `event["todo"]` (singular)
+  but SDK sends `event.properties.todos: Todo[]` (plural array).
+  GAP(oc-M4).
+
+All overclaims will resolve under **PR 7 expanded scope** (see plan
+PR 7 units 7.11–7.27). Each fix attaches its green compliance test as
+evidence in the progress ledger.
+
 Status legend:
 - ✅ landed, verifier green
 - ⚠️ partial — landed in a form that does not fully meet spec; explained inline
@@ -89,12 +180,12 @@ Plan target: 9 layers. Audit: 6/11 events (BeforeAgent, BeforeToolSelection, Not
 | `gemini-extension.json` | ✅ | `ls agent-integration/gemini/gemini-extension.json` | pre-plan |
 | `mcpServers` in extension manifest | ✅ | `grep -c '"mcpServers"' agent-integration/gemini/gemini-extension.json` ≥ 1 | pre-plan |
 | SessionStart / BeforeModel / BeforeTool (partial) | ✅ | `grep -n 'runGeminiSessionStart\|runGeminiBeforeAgent' packages/cli/src/index.ts` | pre-plan |
-| **BeforeAgent, BeforeToolSelection, Notification, AfterModel-content handlers** | ⬜ | 4 new handler functions | **PR 7** |
-| **34 canonical skills installed at `agent-integration/gemini/skills/fulcrum-<name>/`** | ⬜ | `ls agent-integration/gemini/skills/ \| wc -l` ≥ 33 (today: 6) | **PR 7 / installer** |
-| **24 sub-agent MDs at `agent-integration/gemini/agents/`** | ⬜ | `ls agent-integration/gemini/agents/*.md \| wc -l` ≥ 24 (today: 2) | **PR 7** |
-| **`agent-integration/gemini/policies/` populated** | ⬜ | `ls agent-integration/gemini/policies/` non-empty | **PR 7** |
-| **GEMINI.md marker block with canonical rules** | ⬜ | `grep -c 'BEGIN FULCRUM managed-block' agent-integration/gemini/GEMINI.md` = 1 | **PR 7** |
-| **TOML slash commands regenerated from fanout** | ⬜ | `ls agent-integration/gemini/commands/*.toml \| wc -l` ≥ 6 with each matching canonical skill | PR 7 |
+| **BeforeAgent, BeforeToolSelection, Notification, AfterModel-content handlers** | ✅ | `runGeminiBeforeAgentHook` (hookEventName contract fix), `runGeminiBeforeToolSelectionHook`, `runGeminiNotificationHook`, `runGeminiAfterModelHook` — 4 real handlers. Dispatch in `packages/cli/src/index.ts` routes `before-tool-selection`, `notification`, `after-model`. `hooks.json` registers all 11 events. | PR 7.2 |
+| **34 canonical skills installed at `agent-integration/gemini/skills/fulcrum-<name>/`** | ✅ | `scripts/fanout-gemini-extension.ts` materializes `parseCanonicalSource + emitGemini` → 33 skill dirs committed at `agent-integration/gemini/skills/fulcrum-*/SKILL.md` (canonical source is 33 skills; `index.md` is a catalog). Verify: `ls agent-integration/gemini/skills/fulcrum-*/SKILL.md \| wc -l` = 33. | PR 7.3 |
+| **24 sub-agent MDs at `agent-integration/gemini/agents/`** | ✅ | Fanout script `translateRoleForGemini` emits 24 canonical role MDs (name + description + `kind: local` per `docs/core/subagents.md` schema) alongside 2 legacy shortcut files. Verify: canonical 24 + legacy 2 = 26 files. | PR 7.4 |
+| **`agent-integration/gemini/policies/` populated** | ✅ | `fulcrum-core.toml` (24 read-only + 8 lifecycle Fulcrum MCP tools → `allow`, priority 500) + `fulcrum-sensitive.toml` (`invoke_team`, `mark_memory_wrong`, definition edits → `ask_user`, priority 500). Schema per `docs/reference/policy-engine.md`. | PR 7.5 |
+| **GEMINI.md marker block with canonical rules** | ✅ | `replaceMarkerBlock` emits BEGIN/END FULCRUM managed-block v1 embedding all 3 canonical rules joined with `\n\n---\n\n`. User-owned prose outside markers survives regeneration. Verify: `grep -c 'BEGIN FULCRUM managed-block' agent-integration/gemini/GEMINI.md` = 1. | PR 7.6 |
+| **TOML slash commands regenerated from fanout** | ✅ | `emitGemini` now emits 6 TOML commands under `commands/fulcrum/<cos\|memory\|run\|status\|task\|log>.toml` derived from curated canonical skills. Schema per `docs/cli/custom-commands.md` (description + prompt + `{{args}}`). Hand-authored top-level TOMLs coexist. Verify: `find agent-integration/gemini/commands -name '*.toml' \| wc -l` = 12. | PR 7.7 |
 | **`gemini extensions update fulcrum` post-install message printed** | ⬜ | `grep -c "gemini extensions update" agent-integration/install.ts` ≥ 1 | **PR 14.5** |
 | **`gemini-extension.json` schema validated at install time via `find-docs`-verified schema** | ⬜ | installer validates the manifest | **PR 14.5** |
 | **`migratedTo` field scaffolding in `gemini-extension.json` (commented-out; documents future migration)** | ⬜ | `grep -c 'migratedTo' agent-integration/gemini/gemini-extension.json` ≥ 1 | PR 14.5 |
@@ -205,8 +296,8 @@ Plan target: 5 layers. Audit: no hooks; `.windsurf/rules/<skill>.md`; 0 skills t
 | **Installer (`agent-integration/install.ts`) consumes fanout output and writes to disk** | ⚠️ | `grep -c 'parseCanonicalSource\|emit(Claude\|Codex\|Gemini\|Opencode\|Copilot\|Cursor\|Windsurf)' agent-integration/install.ts` = 9 (opencode fan-out landed PR 4 c2); other installers (Claude / Codex / Gemini / Copilot / Cursor / Windsurf) still consume templates directly — full consolidation remains PR 13 scope | **PR 13** (opencode partial — PR 4 c2) |
 | `fulcrum install verify --agent <name>` CLI | ⬜ | `grep -c 'install verify' packages/cli/src/index.ts` ≥ 1 | **PR 13** |
 | `fulcrum bias stats` CLI for measurement | ✅ | `fulcrum bias stats` runs | PR 3 |
-| Fulcrum-first bias wired for **every hook-capable agent** (Claude, opencode, Gemini, PI, Codex Bash-only) | ⚠️ | Claude (PR 3) + opencode (PR 4 c4) wired — `cliName === 'opencode'` trust-checked alongside claude in hooks.ts §3a/§3b; Gemini + PI + Codex still pending | **PR 5-8 staggered** |
-| Fulcrum-first rule text lands in **canonical CLAUDE.md / AGENTS.md / GEMINI.md / PI.md / opencode.md** marker blocks | ⚠️ | 0 of 5 today | **PR 5-8** |
+| Fulcrum-first bias wired for **every hook-capable agent** (Claude, opencode, Gemini, PI, Codex Bash-only) | ⚠️ | Claude (PR 3) + opencode (PR 4 c4) + Gemini (PR 7 cross-cut) wired — `cliName === 'opencode' \|\| cliName === 'gemini'` trust-checked alongside claude in hooks.ts §3a/§3b/§3-opt-out; `HOOK_SEARCH_TOOLS` covers both `Grep/Glob/Read` and `grep_search/list_directory/read_file`; PI + Codex still pending | **PR 5-8 staggered** |
+| Fulcrum-first rule text lands in **canonical CLAUDE.md / AGENTS.md / GEMINI.md / PI.md / opencode.md** marker blocks | ⚠️ | 3 of 5 today — CLAUDE.md (PR 5), opencode.md (PR 4), GEMINI.md (PR 7.6); AGENTS.md (Codex) + PI.md still pending | **PR 5-8** |
 | Drift canary against committed `__fixtures__/golden/` | ✅ | `pnpm -F fulcrum-agent-fanout test drift-canary` | PR 1 |
 | Secret scan at parse | ✅ | `scanForSecrets` called in `parseCanonicalSource` | PR 1 |
 
