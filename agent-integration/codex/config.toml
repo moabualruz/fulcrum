@@ -1,77 +1,22 @@
 # Fulcrum integration for OpenAI Codex CLI
 # Merged into ~/.codex/config.toml by `fulcrum install --codex`
+#
+# PR 7 unit 7.25-7.26 correction (2026-04-20):
+#   - Hook bindings MOVED to agent-integration/codex/hooks.json. Per
+#     codex-rs/hooks/src/engine/discovery.rs, Codex reads hooks from
+#     `hooks.json` in each config-layer folder; config.toml has NO [hooks]
+#     key. The prior [[hooks]] blocks here were dead code.
+#   - The [notify] TABLE form was WRONG per codex-rs/config/src/config_toml.rs:
+#     `pub notify: Option<Vec<String>>` — `notify` is a root-level flat
+#     string array, not a table with `command = "..."`.
+#   - `[tool_approval.invoke_team]` is NOT a recognized TOML key in
+#     config_toml.rs. Removed.
+
+# Notify on run-end (stable across Codex builds). Flat string array form.
+# Must live above any section header — TOML binds subsequent top-level keys
+# to the most recently opened section.
+notify = ["fulcrum", "hook", "codex", "notify"]
 
 [mcp_servers.fulcrum]
 command = "fulcrum"
 args = ["serve", "mcp", "--mode", "filtered"]
-
-# v2b PR 17 Task 8.2: invoke_team approval_mode = "prompt" — Codex's native
-# confirmation UI fires before invoke_team executes. Hook-based denial is a
-# fallback for older Codex builds that do not support per-tool approval_mode.
-[tool_approval.invoke_team]
-approval_mode = "prompt"
-
-# ── Lifecycle hooks ───────────────────────────────────────────────────────────
-# PR 6.3 note: `handler_type = "prompt"` and `handler_type = "agent"` are
-# declared in Codex's protocol enum (HookHandlerType in
-# codex-rs/protocol/src/protocol.rs) but the engine config parser defines both
-# as empty-struct variants with no fields and the dispatcher hardcodes
-# HookHandlerType::Command in every run summary. Wiring `type = "prompt"`
-# today creates a no-op hook. Every entry below uses the implicit `command`
-# handler type (default when `type` is omitted) until upstream lands concrete
-# schema + execution paths for the other variants.
-#
-# SessionStart: auto-registers an agent run and injects workspace context
-# before the first LLM turn. Returns additional_context so Codex sees the
-# workspace snapshot without the agent needing to call anything manually.
-[[hooks]]
-event = "SessionStart"
-command = "fulcrum hook codex session-start"
-
-# UserPromptSubmit (PR 6.1): inject the canonical Fulcrum rider (3 rules from
-# agent-integration/rules/ fanout) into every user turn via additional_context.
-# PR 6.3 upgrades handler_type = "prompt" for direct model-path injection; this
-# line uses the default `command` handler until then.
-[[hooks]]
-event = "UserPromptSubmit"
-command = "fulcrum hook codex user-prompt-submit"
-
-# PermissionRequest (PR 6.2): Codex's all-tool approval interceptor (unlike
-# PreToolUse which is Bash-only). Runs Fulcrum's team-invoke guard + optional
-# secret scan on every tool approval. Returns camelCase:
-#   {"hookSpecificOutput":{"hookEventName":"PermissionRequest",
-#     "decision":{"behavior":"allow"|"deny","message":"..."}}}
-# Deny-wins fold; allow = fall-through to Codex's normal approval UI.
-[[hooks]]
-event = "PermissionRequest"
-command = "fulcrum hook codex permission-request"
-
-# PreToolUse: secret scan, team-invoke policy guard, and task memory recall.
-# Returns {"decision":"approve"} (allow) or {"decision":"block","reason":"..."}
-# v2a Task 47: matcher narrowed to the mutating tool allowlist so Read/Glob/
-# Grep never shell out to `fulcrum hook codex`.
-# NOTE: Codex PreToolUse is Bash-only regardless of matcher (source:
-# codex-rs/hooks/src/events/pre_tool_use.rs). PermissionRequest above covers
-# Write/Edit/MultiEdit/Task; PreToolUse stays for Bash secret-scan consistency.
-[[hooks]]
-event = "PreToolUse"
-command = "fulcrum hook codex"
-allowed_tools = ["Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "Task"]
-
-# PostToolUse: write a typed file_patch / bash_trace memory for the run.
-# v2a Task 29 + 47: emits kind='file_patch' or kind='bash_trace' instead of
-# the v1 tool_trace catch-all; matcher narrowed.
-[[hooks]]
-event = "PostToolUse"
-command = "fulcrum hook codex post"
-allowed_tools = ["Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "Task"]
-
-# Stop: auto-complete the agent run when the session ends.
-[[hooks]]
-event = "Stop"
-command = "fulcrum hook codex session-end"
-
-# v2a Task 48: notify migration for run-end (stable Codex hook surface
-# compared to [[hooks]] Stop which is still feature-flagged on some builds).
-[notify]
-command = "fulcrum hook codex notify"

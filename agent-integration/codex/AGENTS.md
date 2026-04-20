@@ -2,6 +2,37 @@
 
 This file is auto-loaded by OpenAI Codex CLI (`AGENTS.md`). It configures your connection to the Fulcrum agent control plane.
 
+<!-- BEGIN FULCRUM managed-block v1 — DO NOT EDIT. Fanout source:
+     agent-integration/rules/*.md. Content outside this block is user-owned. -->
+
+## Fulcrum-first (canonical)
+
+Before issuing a filesystem search (`Grep`/`Glob`/`Read`), call
+`recall_knowledge` with the same query. Only fall through to filesystem
+tools when recall returns nothing relevant. This keeps the model grounded
+in curated memory and avoids re-deriving knowledge every session.
+
+## Lifecycle (canonical)
+
+At the start of every non-trivial task:
+1. `mcp_fulcrum_get_current_context` to resolve workspace_id + project_id.
+2. `mcp_fulcrum_start_agent_run` with your role and (optional) task_id.
+3. `mcp_fulcrum_heartbeat_agent_run` every ~30s on long tasks.
+4. `mcp_fulcrum_block_agent_run` when human input is needed.
+5. `mcp_fulcrum_complete_agent_run` on finish with summary + artifact paths.
+
+## Role boundaries (canonical)
+
+`chief_of_staff` (L1 orchestrator): MUST NOT write code, edit files, or run
+builds. Allowed to create tasks, delegate to L2 specialists, and invoke
+teams (the only L1 with this permission).
+
+All other roles (L2 specialists): MUST NOT invoke teams or create
+sub-orchestration workflows. Focus on the assigned task; report via
+`complete_agent_run`.
+
+<!-- END FULCRUM managed-block v1 -->
+
 ---
 
 ## MCP Server
