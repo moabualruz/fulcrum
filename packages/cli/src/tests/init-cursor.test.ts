@@ -256,6 +256,48 @@ describe('installCodex()', () => {
     const fulcrumEntries = plugins.filter(p => p['name'] === 'fulcrum')
     expect(fulcrumEntries).toHaveLength(1)
   })
+
+  // PR 6.4 — Codex skill fanout (6→33). Installer uses parseCanonicalSource +
+  // emitCodex so ~/.codex/skills/ carries the full canonical skill set.
+  it('fans out 33 canonical skills to ~/.codex/skills/fulcrum-<name>/SKILL.md', async () => {
+    const fakeHome = tmpDir
+    await installCodex({ dryRun: false, targetDir: tmpDir, globalHome: fakeHome })
+    const skillsDir = path.join(fakeHome, '.codex', 'skills')
+    expect(fs.existsSync(skillsDir)).toBe(true)
+    const entries = fs.readdirSync(skillsDir).filter(n => n.startsWith('fulcrum-'))
+    expect(entries.length).toBeGreaterThanOrEqual(33)
+    // Spot-check a known canonical skill
+    const spot = path.join(skillsDir, 'fulcrum-start-every-task', 'SKILL.md')
+    expect(fs.existsSync(spot)).toBe(true)
+    const content = fs.readFileSync(spot, 'utf8')
+    expect(content).toMatch(/^---/)
+    expect(content).toContain('name: fulcrum-start-every-task')
+  })
+
+  it('installs canonical rules into ~/.codex/rules/ so the UserPromptSubmit hook can find them', async () => {
+    const fakeHome = tmpDir
+    await installCodex({ dryRun: false, targetDir: tmpDir, globalHome: fakeHome })
+    const rulesDir = path.join(fakeHome, '.codex', 'rules')
+    expect(fs.existsSync(rulesDir)).toBe(true)
+    const ruleFiles = fs.readdirSync(rulesDir).filter(n => n.endsWith('.md'))
+    expect(ruleFiles.length).toBeGreaterThanOrEqual(3)
+    // Rider hook reads with \n\n---\n\n join — individual rule files stay as raw .md
+    const someRule = fs.readFileSync(path.join(rulesDir, ruleFiles[0]!), 'utf8')
+    expect(someRule.length).toBeGreaterThan(10)
+  })
+
+  // PR 6.5 — openai.yaml sidecars accompany every SKILL.md.
+  it('emits openai.yaml sidecar at skills/fulcrum-<name>/agents/openai.yaml for each skill', async () => {
+    const fakeHome = tmpDir
+    await installCodex({ dryRun: false, targetDir: tmpDir, globalHome: fakeHome })
+    const sidecar = path.join(fakeHome, '.codex', 'skills', 'fulcrum-start-every-task', 'agents', 'openai.yaml')
+    expect(fs.existsSync(sidecar)).toBe(true)
+    const body = fs.readFileSync(sidecar, 'utf8')
+    expect(body).toContain('interface:')
+    expect(body).toContain('display_name: Start Every Task')
+    expect(body).toContain('policy:')
+    expect(body).toContain("brand_color: '#4F46E5'")
+  })
 })
 
 describe('installOpencode()', () => {

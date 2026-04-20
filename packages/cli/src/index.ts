@@ -814,7 +814,7 @@ import type { HookCli, HookPhase, HookContext, HookIO } from './hooks.js'
 // These are called by Claude Code's SessionStart / Stop hooks (not PreToolUse).
 // They establish the run_id for the session and complete it on stop.
 
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
+import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
 
 // globalDataDir is imported from fulcrum-agent-core (single canonical implementation)
@@ -1586,6 +1586,231 @@ export async function runOpencodeSessionEndHook(): Promise<void> {
 }
 
 /**
+ * Resolve the canonical rules directory for Codex rider injection.
+ * Order: FULCRUM_RULES_DIR env override → ~/.codex/rules/ (post-install) →
+ * agent-integration/rules/ (dogfood from repo cwd).
+ */
+function findCodexRulesDir(): string | null {
+  const env = process.env['FULCRUM_RULES_DIR']
+  if (env && existsSync(env)) return env
+  const home = process.env['HOME'] ?? process.env['USERPROFILE'] ?? ''
+  if (home) {
+    const installed = join(home, '.codex', 'rules')
+    if (existsSync(installed)) return installed
+  }
+  const cwdDogfood = join(process.cwd(), 'agent-integration', 'rules')
+  if (existsSync(cwdDogfood)) return cwdDogfood
+  return null
+}
+
+/**
+ * Load canonical rider from a rules directory: concatenate every `*.md` file
+ * alphabetically with the `\n\n---\n\n` separator (byte-for-byte match with
+ * opencode's loadRider). Returns empty string when the directory is missing
+ * or contains no rule files.
+ */
+function loadCodexRider(): { rider: string; ruleCount: number } {
+  const dir = findCodexRulesDir()
+  if (!dir) return { rider: '', ruleCount: 0 }
+  try {
+    const files = readdirSync(dir)
+      .filter((n) => n.endsWith('.md'))
+      .sort((a, b) => a.localeCompare(b))
+    const bodies: string[] = []
+    for (const name of files) {
+      const p = join(dir, name)
+      try {
+        if (!statSync(p).isFile()) continue
+      } catch { continue }
+      bodies.push(readFileSync(p, 'utf8'))
+    }
+    if (bodies.length === 0) return { rider: '', ruleCount: 0 }
+    return { rider: bodies.join('\n\n---\n\n'), ruleCount: bodies.length }
+  } catch {
+    return { rider: '', ruleCount: 0 }
+  }
+}
+
+/**
+ * Codex UserPromptSubmit hook (PR 6.1). Injects the canonical rider on every
+ * user turn via `hook_specific_output.additional_context`. Non-blocking: any
+ * rule-load failure falls back to an empty response so Codex never hangs.
+ * Writes a `hook_events` row so the monitor can see per-turn anchors.
+ */
+export async function runCodexUserPromptSubmitHook(): Promise<void> {
+  const raw = await readStdinFully()
+  let sessionId = process.env['CODEX_SESSION_ID'] ?? ''
+  let prompt = ''
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId
+      prompt = (evt['prompt'] as string) || (evt['user_prompt'] as string) || ''
+    } catch { /* fallback */ }
+  }
+  if (!sessionId) sessionId = `codex_${Date.now()}`
+  sessionId = sanitizeId(sessionId)
+
+  try {
+    const { getDb, newId, logRecallEvent } = await import('fulcrum-agent-core')
+    const db = getDb()
+    db.prepare(`
+      INSERT INTO hook_events (hook_event_id, workspace_id, session_id, tool_name, agent_role, run_id, ts, cli_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      newId('hook_event'),
+      '',
+      sessionId,
+      'UserPromptSubmit',
+      '',
+      null,
+      new Date().toISOString(),
+      'codex',
+    )
+    logRecallEvent({
+      kind: 'recall_called',
+      agent_type: 'codex',
+      session_id: sessionId,
+      tool_name: 'UserPromptSubmit',
+      extra: { prompt_length: prompt.length },
+    })
+  } catch { /* best-effort */ }
+
+  const { rider } = loadCodexRider()
+  if (rider) {
+    process.stdout.write(JSON.stringify({
+      hook_specific_output: {
+        hook_event_name: 'UserPromptSubmit',
+        additional_context: rider,
+      },
+    }) + '\n')
+  }
+  process.exit(0)
+}
+
+/**
+ * Codex PermissionRequest hook (PR 6.2). Fires for ALL tool approvals
+ * (Bash, Write, Edit, MultiEdit, Task, mcp tools — unlike PreToolUse which is
+ * Bash-only). This is Codex's write-class interceptor — parity with Claude's
+ * PreToolUse write-path. Deny-wins fold; otherwise last-Allow wins.
+ *
+ * Stdin (snake_case, Codex's PermissionRequestCommandInput):
+ *   { session_id, turn_id, cwd, hook_event_name: "PermissionRequest",
+ *     model, permission_mode, tool_name, tool_input: {command, description} }
+ *
+ * Stdout response contract (camelCase, Codex's PermissionRequestCommandOutputWire):
+ *   {"hookSpecificOutput":{"hookEventName":"PermissionRequest",
+ *     "decision":{"behavior":"allow"|"deny","message":"..."}}}
+ *
+ * Cannot rewrite tool_input (unlike PreToolUse). `updated_input`,
+ * `updated_permissions`, or `interrupt: true` in the response cause Codex to
+ * fail closed — we MUST NOT emit them.
+ */
+export async function runCodexPermissionRequestHook(): Promise<void> {
+  const raw = await readStdinFully()
+  let sessionId = process.env['CODEX_SESSION_ID'] ?? 'unknown'
+  let toolName = ''
+  let toolInput: Record<string, unknown> = {}
+
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId
+      toolName = (evt['tool_name'] as string) || ''
+      toolInput = (evt['tool_input'] as Record<string, unknown>) || {}
+    } catch { /* use defaults */ }
+  }
+
+  if (!toolName) {
+    // Nothing to evaluate — fall through to normal approval flow.
+    process.exit(0)
+  }
+
+  // Resolve agent role via session file → agent_runs (same trust path as
+  // the bias-nudge hook). Missing / stale = empty role = invoke_team guard
+  // falls through (fail open) — team-invoke is the only role-gated check.
+  let agentRole = ''
+  let workspaceId = ''
+  try {
+    const safeSid = sanitizeId(sessionId)
+    const sessionFile = getSessionFilePath(safeSid)
+    if (existsSync(sessionFile)) {
+      const session = JSON.parse(readFileSync(sessionFile, 'utf-8')) as {
+        run_id?: string; workspace_id?: string
+      }
+      if (session.run_id) {
+        const { getDb } = await import('fulcrum-agent-core')
+        const row = getDb()
+          .prepare(`SELECT role, workspace_id FROM agent_runs WHERE run_id = ?`)
+          .get(session.run_id) as { role?: string; workspace_id?: string } | undefined
+        agentRole = row?.role ?? ''
+        workspaceId = row?.workspace_id ?? session.workspace_id ?? ''
+      }
+    }
+  } catch { /* best-effort — empty role means no team-invoke gate */ }
+
+  let denyMessage: string | null = null
+
+  // 1. Secret scan on tool_input — opt-in via FULCRUM_SECRET_SCAN=1 (matches
+  //    existing runPreHook gate). Heuristic patterns have false positives, so
+  //    off by default.
+  if (process.env['FULCRUM_SECRET_SCAN'] === '1') {
+    try {
+      const { checkSecrets } = await import('fulcrum-policy')
+      const scan = checkSecrets(JSON.stringify(toolInput))
+      if (scan.has_secrets) {
+        const patterns = Array.from(new Set(scan.matches.map(m => m.pattern_name)))
+        try {
+          const { emitEvent } = await import('fulcrum-agent-core')
+          emitEvent({
+            workspace_id: workspaceId,
+            evt_type: 'policy_denied',
+            object_type: 'tool_call',
+            actor_type: 'agent',
+            actor_id: 'codex',
+            payload: { reason: 'secret_scan_denied', tool_name: toolName, patterns, phase: 'permission_request' },
+            severity: 'warn',
+          })
+        } catch { /* best-effort */ }
+        process.stderr.write(`[fulcrum/permission-request] denied: secret pattern(s) in tool_input (${patterns.join(', ')})\n`)
+        denyMessage = `Tool call blocked: secret pattern(s) detected in tool input (${patterns.join(', ')}). Use env vars or a secret store, or set FULCRUM_SECRET_SCAN=0 to disable.`
+      }
+    } catch { /* best-effort — don't block on scanner failure */ }
+  }
+
+  // 2. Chief-of-staff team-invoke guard. Any role without can_invoke_teams
+  //    capability may not call invoke_team-family tools.
+  if (!denyMessage) {
+    const isTeamInvoke = toolName.includes('invoke_team') || toolName.includes('team_invoke')
+    if (isTeamInvoke && agentRole) {
+      try {
+        const { canInvokeTeams } = await import('fulcrum-agent-core')
+        type AgentRole = Parameters<typeof canInvokeTeams>[0]
+        if (!canInvokeTeams(agentRole as AgentRole)) {
+          process.stderr.write(`[fulcrum/permission-request] denied: role '${agentRole}' lacks can_invoke_teams\n`)
+          denyMessage = `Role '${agentRole}' is not permitted to invoke teams. Only chief_of_staff may use invoke_team.`
+        }
+      } catch { /* best-effort */ }
+    }
+  }
+
+  if (denyMessage) {
+    process.stdout.write(JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PermissionRequest',
+        decision: { behavior: 'deny', message: denyMessage },
+      },
+    }) + '\n')
+    process.exit(2)
+  }
+
+  // Allow (no stdout, exit 0) — falls through to Codex's normal approval flow.
+  // Fulcrum does not short-circuit "allow" here; the user / guardian UI
+  // retains final say.
+  process.exit(0)
+}
+
+/**
  * Codex Stop hook.
  * Completes the run started by SessionStart.
  */
@@ -1628,6 +1853,8 @@ fulcrum hook — tool-call policy hooks and session lifecycle for coding agents
   fulcrum hook codex  [pre|post]           Codex CLI PreToolUse / PostToolUse hook
   fulcrum hook codex  session-start        Codex CLI SessionStart hook (auto-starts run)
   fulcrum hook codex  session-end          Codex CLI Stop hook (completes run)
+  fulcrum hook codex  user-prompt-submit   Codex CLI UserPromptSubmit hook (injects canonical rider)
+  fulcrum hook codex  permission-request   Codex CLI PermissionRequest hook (all-tool policy interceptor)
   fulcrum hook pi     [pre|post]           PI coding agent BeforeTool / AfterTool hook
 
 Phase defaults to 'pre' when omitted (legacy). The pre hook normalises
@@ -3596,10 +3823,12 @@ OPTIONS (serve mcp-http)
 
       // Codex lifecycle hooks
       if (cli === 'codex') {
-        if (phaseArg === 'session-start') { await runCodexSessionStartHook(); return }
-        if (phaseArg === 'session-end')   { await runCodexStopHook();         return }
+        if (phaseArg === 'session-start')      { await runCodexSessionStartHook();      return }
+        if (phaseArg === 'session-end')        { await runCodexStopHook();              return }
+        if (phaseArg === 'user-prompt-submit') { await runCodexUserPromptSubmitHook();  return }
+        if (phaseArg === 'permission-request') { await runCodexPermissionRequestHook(); return }
         // Codex [notify] section fires on run completion — same semantic as session-end
-        if (phaseArg === 'notify')        { await runCodexStopHook();         return }
+        if (phaseArg === 'notify')             { await runCodexStopHook();              return }
       }
 
       // Opencode lifecycle hooks — real handlers (session-start writes the

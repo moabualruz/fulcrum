@@ -12,6 +12,15 @@ args = ["serve", "mcp", "--mode", "filtered"]
 approval_mode = "prompt"
 
 # ── Lifecycle hooks ───────────────────────────────────────────────────────────
+# PR 6.3 note: `handler_type = "prompt"` and `handler_type = "agent"` are
+# declared in Codex's protocol enum (HookHandlerType in
+# codex-rs/protocol/src/protocol.rs) but the engine config parser defines both
+# as empty-struct variants with no fields and the dispatcher hardcodes
+# HookHandlerType::Command in every run summary. Wiring `type = "prompt"`
+# today creates a no-op hook. Every entry below uses the implicit `command`
+# handler type (default when `type` is omitted) until upstream lands concrete
+# schema + execution paths for the other variants.
+#
 # SessionStart: auto-registers an agent run and injects workspace context
 # before the first LLM turn. Returns additional_context so Codex sees the
 # workspace snapshot without the agent needing to call anything manually.
@@ -19,10 +28,31 @@ approval_mode = "prompt"
 event = "SessionStart"
 command = "fulcrum hook codex session-start"
 
+# UserPromptSubmit (PR 6.1): inject the canonical Fulcrum rider (3 rules from
+# agent-integration/rules/ fanout) into every user turn via additional_context.
+# PR 6.3 upgrades handler_type = "prompt" for direct model-path injection; this
+# line uses the default `command` handler until then.
+[[hooks]]
+event = "UserPromptSubmit"
+command = "fulcrum hook codex user-prompt-submit"
+
+# PermissionRequest (PR 6.2): Codex's all-tool approval interceptor (unlike
+# PreToolUse which is Bash-only). Runs Fulcrum's team-invoke guard + optional
+# secret scan on every tool approval. Returns camelCase:
+#   {"hookSpecificOutput":{"hookEventName":"PermissionRequest",
+#     "decision":{"behavior":"allow"|"deny","message":"..."}}}
+# Deny-wins fold; allow = fall-through to Codex's normal approval UI.
+[[hooks]]
+event = "PermissionRequest"
+command = "fulcrum hook codex permission-request"
+
 # PreToolUse: secret scan, team-invoke policy guard, and task memory recall.
 # Returns {"decision":"approve"} (allow) or {"decision":"block","reason":"..."}
 # v2a Task 47: matcher narrowed to the mutating tool allowlist so Read/Glob/
 # Grep never shell out to `fulcrum hook codex`.
+# NOTE: Codex PreToolUse is Bash-only regardless of matcher (source:
+# codex-rs/hooks/src/events/pre_tool_use.rs). PermissionRequest above covers
+# Write/Edit/MultiEdit/Task; PreToolUse stays for Bash secret-scan consistency.
 [[hooks]]
 event = "PreToolUse"
 command = "fulcrum hook codex"

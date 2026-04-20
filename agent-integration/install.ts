@@ -30,6 +30,7 @@ import { fileURLToPath } from "url";
 import {
   parseCanonicalSource,
   emitOpencode,
+  emitCodex,
   writeRidersum,
 } from "../packages/agent-fanout/src/index.js";
 
@@ -1561,40 +1562,72 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
     ok(`registered fulcrum MCP in ${codexConfigToml}`);
   });
 
-  // 2. Install skills into ~/.codex/skills/ (global, always available without plugin install)
+  // 2. Install skills into ~/.codex/skills/ via canonical source fanout (PR 6.4).
+  //    Previously read 6 hand-authored skills from codex/plugin/skills/; those
+  //    drifted from canonical so this step now invokes parseCanonicalSource +
+  //    emitCodex to write all 33 skills to ~/.codex/skills/fulcrum-<name>/SKILL.md.
+  //    The old plugin/skills/ directory is kept transiently for PR 14 plugin
+  //    packaging but will be a symlink / removed in a follow-up cleanup.
   const codexSkillsDir = path.join(codexConfigDir, "skills");
+  const agentIntegrationRoot = path.resolve(REPO_ROOT_LOCAL);
+  void pluginSkillsDir; // retained for reference; no longer read at install time
 
-  await step("Codex: install fulcrum skills → ~/.codex/skills/", () => {
-    if (!fs.existsSync(pluginSkillsDir)) {
-      skip(`plugin skills dir not found: ${pluginSkillsDir}`);
+  await step("Codex: install fulcrum skills → ~/.codex/skills/ (fanout)", () => {
+    if (!fs.existsSync(path.join(agentIntegrationRoot, "skills"))) {
+      skip(`no canonical skills dir at ${agentIntegrationRoot}/skills`);
+      return;
+    }
+    const source = parseCanonicalSource({ agentIntegrationRoot });
+    // emitCodex returns both skill + rule artifacts; skills land at
+    // `skills/fulcrum-<name>/SKILL.md`, rules at `rules/fulcrum-rule-<name>.md`.
+    // Split here so the rule-emit lands in its own step below.
+    const skillArts = emitCodex(source).artifacts.filter(a => a.sourceSkillName);
+    if (skillArts.length === 0) {
+      skip(`emitCodex produced zero skill artifacts`);
       return;
     }
     if (dryRun) {
-      const skills = fs.readdirSync(pluginSkillsDir);
-      console.log(`  [dry-run] would install ${skills.length} skill(s) → ${codexSkillsDir}`);
-      ok(`(dry-run) ${skills.length} skill(s)`);
+      ok(`(dry-run) ${skillArts.length} skill MDs → ${codexSkillsDir}`);
       return;
     }
     fs.mkdirSync(codexSkillsDir, { recursive: true });
-    const skills = fs.readdirSync(pluginSkillsDir);
-    let installed = 0;
-    let skipped = 0;
-    for (const skill of skills) {
-      const srcSkillDir = path.join(pluginSkillsDir, skill);
-      const destSkillDir = path.join(codexSkillsDir, skill);
-      const srcSkillMd = path.join(srcSkillDir, "SKILL.md");
-      if (!fs.existsSync(srcSkillMd)) continue;
-      fs.mkdirSync(destSkillDir, { recursive: true });
-      const destSkillMd = path.join(destSkillDir, "SKILL.md");
-      fs.copyFileSync(srcSkillMd, destSkillMd);
-      installed++;
+    for (const art of skillArts) {
+      // art.path is e.g. "skills/fulcrum-start-every-task/SKILL.md"; strip the
+      // leading "skills/" since codexSkillsDir is already the target skills dir.
+      const rel = art.path.startsWith("skills/") ? art.path.slice("skills/".length) : art.path;
+      const dest = path.join(codexSkillsDir, rel);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, art.contents, "utf8");
     }
-    if (skipped > 0) {
-      ok(`installed ${installed} skill(s) → ${codexSkillsDir} (${skipped} already up-to-date)`);
-    } else {
-      ok(`installed ${installed} skill(s) → ${codexSkillsDir}`);
+    ok(`wrote ${skillArts.length} skill MD(s) → ${codexSkillsDir}`);
+    setRollback(`rm -rf ${codexSkillsDir}`);
+  });
+
+  // 2b. Canonical rules → ~/.codex/rules/<name>.md. The UserPromptSubmit hook
+  //     (PR 6.1) reads these verbatim and injects them as additional_context
+  //     on every user turn. Filenames match loadCodexRider's lookup.
+  const codexRulesDir = path.join(codexConfigDir, "rules");
+  await step("Codex: install canonical rules → ~/.codex/rules/", () => {
+    const srcRulesDir = path.join(agentIntegrationRoot, "rules");
+    if (!fs.existsSync(srcRulesDir)) {
+      skip(`no canonical rules dir at ${srcRulesDir}`);
+      return;
     }
-    setRollback(`rm -rf ${skills.map(s => path.join(codexSkillsDir, s)).join(" ")}`);
+    const source = parseCanonicalSource({ agentIntegrationRoot });
+    if (source.rules.length === 0) {
+      skip(`canonical rules dir is empty`);
+      return;
+    }
+    if (dryRun) {
+      ok(`(dry-run) ${source.rules.length} rule(s) → ${codexRulesDir}`);
+      return;
+    }
+    fs.mkdirSync(codexRulesDir, { recursive: true });
+    for (const rule of source.rules) {
+      fs.writeFileSync(path.join(codexRulesDir, `${rule.name}.md`), rule.raw, "utf8");
+    }
+    ok(`wrote ${source.rules.length} rule(s) → ${codexRulesDir}`);
+    setRollback(`rm -rf ${codexRulesDir}`);
   });
 
   // 3. Wire lifecycle hooks into config.toml (hooks are config-level — no plugin API for this)
@@ -1605,6 +1638,17 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
     "[[hooks]]",
     'event = "SessionStart"',
     'command = "fulcrum hook codex session-start"',
+    "",
+    "# PR 6.1 — canonical rider injection on every user turn.",
+    "[[hooks]]",
+    'event = "UserPromptSubmit"',
+    'command = "fulcrum hook codex user-prompt-submit"',
+    "",
+    "# PR 6.2 — all-tool policy interceptor (PermissionRequest fires for",
+    "# Write/Edit/MultiEdit/Task/Bash — unlike PreToolUse which is Bash-only).",
+    "[[hooks]]",
+    'event = "PermissionRequest"',
+    'command = "fulcrum hook codex permission-request"',
     "",
     "[[hooks]]",
     'event = "PreToolUse"',

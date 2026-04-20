@@ -12,11 +12,17 @@
   "interface": {
     "displayName": "Fulcrum Agent OS",
     "shortDescription": "Local-first agent control plane for task tracking, memory, and multi-agent coordination",
-    "longDescription": "Fulcrum gives Codex persistent task tracking, hybrid semantic memory (FTS5 + vector), and agent lifecycle management. All data stays on your machine in SQLite.",
+    "longDescription": "Fulcrum gives Codex persistent task tracking, hybrid semantic memory (FTS5 + vector + graph), structured agent-run lifecycle with heartbeat, role-based agent profiles, team-invoke policy enforcement, and per-session hook-driven guardrails. All data stays on your machine in a local SQLite + vault layout; no cloud control plane.",
     "developerName": "Mo Abualruz",
-    "category": "Productivity",
-    "capabilities": ["Read", "Write"],
+    "category": "productivity",
+    "capabilities": [
+      "task_management",
+      "memory",
+      "multi_agent_lifecycle",
+      "policy_hooks"
+    ],
     "websiteURL": "https://github.com/moabualruz/fulcrum",
+    "brandColor": "#4F46E5",
     "defaultPrompt": [
       "Show the current workspace status",
       "Create a task for the work I am about to do",
