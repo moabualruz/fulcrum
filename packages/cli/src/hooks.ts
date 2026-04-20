@@ -348,9 +348,21 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
           extra: { run_id: runId },
         })
         if (count >= 1) {
-          const variant = (process.env['FULCRUM_BIAS_VARIANT'] ?? 'A').toUpperCase()
+          // Bias mode selection:
+          //   auto (default) — try passive injection (B) first; on miss /
+          //                    timeout / empty query, fall through to the
+          //                    rule-nudge (A). Explicit model-initiated
+          //                    recall_knowledge calls reset the counter in
+          //                    section 3a above, so a recall-aware turn
+          //                    produces no nudge at all.
+          //   A              — rule-nudge only; never call recallMemory from
+          //                    the hook.
+          //   B              — alias for auto (kept for back-compat with the
+          //                    measurement-window env flag).
+          const mode = (process.env['FULCRUM_BIAS_VARIANT'] ?? 'auto').toUpperCase()
+          const tryPassive = mode === 'AUTO' || mode === 'B'
           let variantBInjected = false
-          if (variant === 'B' && ctx.workspace_id) {
+          if (tryPassive && ctx.workspace_id) {
             // Variant B (passive injection): call recallMemory silently with
             // the extracted query, prepend top results to stderr so Claude
             // sees them before the tool executes. Falls back to Variant A
@@ -384,7 +396,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
                     variant: 'B',
                     tool_name: ctx.toolName,
                     grep_count_without_recall: count,
-                    extra: { hit_count: result.length, query_length: query.length },
+                    extra: { hit_count: result.length, query_length: query.length, mode },
                   })
                   variantBInjected = true
                 }
@@ -405,6 +417,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
               variant: 'A',
               tool_name: ctx.toolName,
               grep_count_without_recall: count,
+              extra: { mode, auto_fallback: mode === 'AUTO' && tryPassive },
             })
           }
         }

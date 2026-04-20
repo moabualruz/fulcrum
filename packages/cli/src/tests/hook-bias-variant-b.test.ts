@@ -126,14 +126,35 @@ describe('PreToolUse Variant B passive injection (PR 3 R1)', () => {
   beforeEach(() => { setupTmpDb() })
   afterEach(() => { tearDownTmpDb() })
 
-  it('falls through to Variant A when FULCRUM_BIAS_VARIANT is unset', async () => {
+  it('defaults to auto — tries Variant B first (unset env)', async () => {
+    // Auto is the default; with no memories seeded, B returns nothing and
+    // the hook falls through to the Variant A nudge. Telemetry records
+    // mode='AUTO' on both the grep event and the nudge event so analysis
+    // can attribute which nudges were strict-A vs auto-fallback.
     seedTrustedSession('c-sess-default', 'run_default')
     const io = makeCapturedIO()
-    await runPreHook(claudeCtx('Grep', 'c-sess-default', { pattern: 'recall_knowledge' }), io.io)
+    await runPreHook(claudeCtx('Grep', 'c-sess-default', { pattern: 'no-memories-match' }), io.io)
+    const telemetry = readTelemetry()
+    const kinds = telemetry.map((t) => t.kind)
+    expect(kinds).toContain('nudge_emitted')
+    const nudge = telemetry.find((t) => t.kind === 'nudge_emitted')!
+    expect((nudge.extra as { mode?: string }).mode).toBe('AUTO')
+    expect((nudge.extra as { auto_fallback?: boolean }).auto_fallback).toBe(true)
+  })
+
+  it('FULCRUM_BIAS_VARIANT=A skips passive injection entirely', async () => {
+    process.env.FULCRUM_BIAS_VARIANT = 'A'
+    seedTrustedSession('c-sess-a-only', 'run_a')
+    seedMemory('ws_varb', 'would-hit', 'would match but A forbids recall call', 'content')
+    const io = makeCapturedIO()
+    await runPreHook(claudeCtx('Grep', 'c-sess-a-only', { pattern: 'would-hit' }), io.io)
     const telemetry = readTelemetry()
     const kinds = telemetry.map((t) => t.kind)
     expect(kinds).toContain('nudge_emitted')
     expect(kinds).not.toContain('passive_injection')
+    const nudge = telemetry.find((t) => t.kind === 'nudge_emitted')!
+    expect((nudge.extra as { mode?: string }).mode).toBe('A')
+    expect((nudge.extra as { auto_fallback?: boolean }).auto_fallback).toBe(false)
   })
 
   it('injects recall results to stderr when FULCRUM_BIAS_VARIANT=B and memories exist', async () => {
