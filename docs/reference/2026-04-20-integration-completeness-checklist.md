@@ -56,7 +56,7 @@ Plan target: 7 layers per AD-2. Audit hit: 5/9 events wired; 34/34 skills ✓; 2
 
 ## Codex CLI
 
-Plan target: 5 layers. Audit: 6/34 skills; 4/5 events (UserPromptSubmit missing, Bash-only platform limit).
+Plan target: **8 layers (v3.3 rescoped 2026-04-20 per Codex research pass — was 5)**. Audit as of 2026-04-20 (post PR 6 closeout): 33/33 skills fanned out + 33 openai.yaml sidecars; 6/6 events wired (UserPromptSubmit + PermissionRequest added this PR).
 
 | Layer / requirement | Status | Verify | Fixed by |
 |---|---|---|---|
@@ -64,13 +64,18 @@ Plan target: 5 layers. Audit: 6/34 skills; 4/5 events (UserPromptSubmit missing,
 | SessionStart hook (Bash → `fulcrum hook codex session-start`) | ✅ | `grep -n 'runCodexSessionStartHook' packages/cli/src/index.ts` | pre-plan |
 | Stop / notify hook | ✅ | `grep -n 'runCodexStopHook' packages/cli/src/index.ts` | pre-plan |
 | PreToolUse hook (Bash-only platform) | ✅ | existing `fulcrum hook auto` covers | pre-plan |
-| **UserPromptSubmit hook + rider content** | ⬜ | `grep -c 'codex.*user-prompt\|CodexUserPrompt' packages/cli/src/index.ts` ≥ 1 | **PR 6** |
-| **34 canonical skills installed at `~/.codex/skills/` or `agent-integration/codex/plugin/skills/` sorted** | ⬜ | `ls agent-integration/codex/plugin/skills/ \| wc -l` ≥ 33 (today: 6) | PR 1 emit exists, installer wiring pending |
-| **Fanout emitCodex → skills directory on disk** | ⬜ | installer writes 33 artifacts from `emitCodex(source)` into the install root | PR 13 installer wiring |
+| **UserPromptSubmit hook + rider content** | ✅ | `grep -c 'runCodexUserPromptSubmitHook' packages/cli/src/index.ts` = 4; `fulcrum hook codex user-prompt-submit` dispatch + canonical rider injection via `loadCodexRider()` (reads `FULCRUM_RULES_DIR`, `~/.codex/rules/`, or dogfood `agent-integration/rules/`); 5 tests in `hook-codex-pr6.test.ts` | **PR 6 v3.3 unit 6.1** |
+| **PermissionRequest hook (write-class interceptor; all tool types)** | ✅ | `grep -c 'runCodexPermissionRequestHook' packages/cli/src/index.ts` = 4; all-tool approval interceptor (unlike Bash-only PreToolUse) with secret-scan + team-invoke guard; emits `{hookSpecificOutput:{hookEventName:"PermissionRequest",decision:{behavior:"allow\|deny",message}}}`; 5 tests cover Allow/Deny paths incl. deny-wins fold | **PR 6 v3.3 unit 6.2** |
+| **Hook handler types `prompt` + `agent` — investigated, NOT wired (upstream not ready)** | ✅ | Source-level verification (`codex-rs/hooks/src/engine/config.rs` `HookHandlerConfig` enum: `Prompt {}`, `Agent {}` are empty structs; `codex-rs/hooks/src/engine/dispatcher.rs` hardcodes `HookHandlerType::Command` in every `HookRunSummary`) — wiring `type = "prompt"` today creates a no-op hook. Guard tests prevent accidental future use. Ref doc updated 2026-04-20. | **PR 6 v3.3 unit 6.3** |
+| **33 canonical skills installed via fanout at `agent-integration/codex/plugin/skills/fulcrum-<name>/`** | ✅ | `ls agent-integration/codex/plugin/skills/fulcrum-*/SKILL.md \| wc -l` = 33 (regen via `pnpm tsx scripts/fanout-codex-plugin.ts`). Installer also writes to `~/.codex/skills/` via `parseCanonicalSource + emitCodex` — dual-path distribution (marketplace + local install). | **PR 6 v3.3 unit 6.4** |
+| **openai.yaml sidecars present for every canonical skill** | ✅ | `ls agent-integration/codex/plugin/skills/fulcrum-*/agents/openai.yaml \| wc -l` = 33. Each carries `interface.{display_name,short_description,brand_color:'#4F46E5'}`, `policy.allow_implicit_invocation` (false for write-class, true for read-only), and `dependencies.tools[]` populated by scanning skill body for `mcp__fulcrum__*` + `fulcrum action exec <name>` references. | **PR 6 v3.3 unit 6.5** |
+| **Full `.codex-plugin/plugin.json` `interface` block** (displayName, brandColor, capabilities[], etc.) | ✅ | `grep -c '"displayName"\|"brandColor"\|"capabilities"' agent-integration/codex/plugin/.codex-plugin/plugin.json` ≥ 3; `capabilities: [task_management, memory, multi_agent_lifecycle, policy_hooks]`; `category: "productivity"`; `brandColor: "#4F46E5"`; `developerName`, `websiteURL`, `defaultPrompt[]`, `longDescription` all set. Visual assets (logo/composerIcon/screenshots) deferred — loader tolerates absence. | **PR 6 v3.3 unit 6.6** |
+| **Shared `.claude-plugin/marketplace.json` lists Codex plugin entry** | ✅ | `grep -c 'codex/plugin' .claude-plugin/marketplace.json` ≥ 1; Codex entry `source: "./agent-integration/codex/plugin"` differentiated from Claude's `source: "./agent-integration/claude"`; `policy.installation: "AVAILABLE"`. Codex loader accepts bare-string source path per `codex-rs/core-plugins/src/marketplace.rs resolve_plugin_source`. | **PR 6 v3.3 unit 6.7** |
+| **App-server `config/mcpServer/reload` + `skills/list` stable RPCs available** | ✅ | `packages/cli/src/codex-app-server.ts` exports `buildMcpReloadRequest(id)` + `buildSkillsListRequest(id, params)` — pure JSON-RPC payload builders any transport can send. Guard test proves NO source-level call sites for unstable `plugin/{list,read,install,uninstall}`. | **PR 6 v3.3 unit 6.8** |
 | **AGENTS.md marker block with canonical rules** | ⬜ | `grep -c 'BEGIN FULCRUM managed-block' agent-integration/codex/AGENTS.md` = 1 | PR 6 / PR 13 |
-| **Codex `/plugins` TUI reads filesystem marketplace entries — verified end-to-end** | ⬜ | research: install pieces, run `codex` → `/plugins`, verify Fulcrum shows as AVAILABLE/INSTALLED. Install-state lives in `~/.codex/config.toml [plugins."<name>@<marketplace>"]` + cache. Ledger entry documents result | **PR 14.2 research** |
-| **Post-install message: `Fulcrum is installed for Codex. Run 'codex' then '/plugins' to verify/manage in the TUI.`** | ⬜ | `grep -c "Run 'codex' then '/plugins'" agent-integration/install.ts` ≥ 1 | PR 14.2 |
-| **`.codex-plugin/plugin.json` schema validated against current Codex plugin loader docs** | ⬜ | install-time validation passes | PR 14.2 |
+| **Native marketplace install path: `codex plugin marketplace add moabualruz/fulcrum`** | ⬜ | `grep -c 'codex plugin marketplace add' agent-integration/install.ts` ≥ 1 | **PR 14.2 v3.3 revised** (CLI shipped; was "TUI-only" in 2026-04-19 ref) |
+| **Post-install message: `Fulcrum marketplace registered with Codex. Run 'codex' then '/plugins' to install/manage via the TUI.`** | ⬜ | `grep -c "Run 'codex' then '/plugins'" agent-integration/install.ts` ≥ 1 | PR 14.2 |
+| **`.codex-plugin/plugin.json` schema validated against `core-plugins/manifest.rs`** | ⬜ | install-time validation passes | PR 14.2 |
 | **Malformed `~/.agents/plugins/marketplace.json` entry cleanup documented** (stray `{"host":"codex",...}` object discovered 2026-04-20) | ⬜ | cleanup step in installer or doc | PR 14.2 |
 
 ---
