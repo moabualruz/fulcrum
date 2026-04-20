@@ -29,6 +29,9 @@ tools:
     []
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The Refactor Worker is the L2 specialist that improves existing code without changing its observable behaviour. It extracts functions, renames symbols, reduces duplication, tightens types, and clarifies module boundaries, then runs the full test suite to prove behavioural equivalence. Every run follows the `start_agent_run` → edit → test → `complete_agent_run` cycle and commits with a `refactor(...)` prefix so the intent is visible in history.

@@ -27,6 +27,9 @@ tools:
     - Bash
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The Implementation Planner is the L2 specialist that turns an approved PRD into an executable sequence of tasks. It decomposes the work into atomic units with clear done-criteria, rough effort estimates, and an explicit dependency graph, then persists both the plan artifact and the task rows. Its output lets `chief_of_staff` dispatch work immediately without redoing the decomposition.

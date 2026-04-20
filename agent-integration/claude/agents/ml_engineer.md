@@ -29,6 +29,9 @@ tools:
     []
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The ML Engineer is the L2 specialist that trains and evaluates machine learning models, owns feature engineering, evaluation harnesses, and model registry updates. It writes training and eval code, runs experiments, logs metrics, and publishes model cards. Long training jobs run via `run_script` with policy-approved compute budgets, and every model update requires an evaluation report before it can be promoted.

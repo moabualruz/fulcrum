@@ -1,5 +1,72 @@
 # Fulcrum Agent OS — Claude Code Integration
 
+<!-- BEGIN FULCRUM managed-block v1 -->
+<!--
+  AUTO-GENERATED — do not edit inside this block.
+  The Fulcrum installer overwrites this region idempotently on every run.
+  Edit the canonical source at agent-integration/rules/ instead.
+  Anything outside the BEGIN/END markers is preserved verbatim.
+-->
+
+## Fulcrum-first — prefer recall before grep
+
+Before using `Grep`, `Glob`, or `Read` to search the codebase, try the Fulcrum
+recall and code-search tools first. Fulcrum stores prior decisions, task
+outcomes, and code relationships the filesystem does not.
+
+For any "where is X", "why was X done", or "does X exist" question, call in
+order:
+
+1. `fulcrum action exec recall_knowledge` — natural-language query over curated
+   memory (L1 pages with L0 provenance).
+2. `fulcrum action exec search_code` — symbol and structural search when the
+   question is about code shape.
+
+Fall through to `Grep` / `Glob` / `Read` only when both return nothing relevant.
+You may always use filesystem tools; the bias is about default ordering, not a
+gate. Opt out per session with `FULCRUM_NO_RECALL_NUDGE=1`.
+
+## Lifecycle — register every working session
+
+At session start, before the first task:
+
+1. `fulcrum action exec get_current_context` — returns `workspace_id` and
+   `project_id`.
+2. `fulcrum action exec get_workspace_status` — see running work, blockers,
+   queue.
+3. `fulcrum action exec start_agent_run` — pass your role and the task this
+   session addresses. Save the returned `run_id`.
+
+During any operation expected to take more than five minutes:
+
+4. `fulcrum action exec heartbeat_agent_run` with `run_id` every three to five
+   minutes. A run with no heartbeat for ten minutes is marked stale.
+
+At end of task, exactly one of:
+
+5. `fulcrum action exec complete_agent_run` with a summary and artifact paths
+   changed.
+6. `fulcrum action exec block_agent_run` with a reason, if you cannot proceed
+   without human input or an external unblock.
+
+## Role boundaries
+
+`chief_of_staff` (L1 — orchestration only):
+
+- Must not write code, edit files, run builds, or modify tests.
+- Creates tasks, delegates to specialist roles, synthesizes results.
+- The only role authorized to `invoke_team` or create sub-orchestration.
+
+Every other role (L2 — implementation):
+
+- Must not invoke teams or create sub-orchestration workflows.
+- Focus on the assigned task. Report completion via `complete_agent_run`.
+
+If operating as a specialist and orchestration is needed, block your run with a
+reason requesting coordination from Chief-of-Staff — do not spawn a team.
+
+<!-- END FULCRUM managed-block v1 -->
+
 This file is auto-loaded by Claude Code. It configures your connection to the Fulcrum agent control plane.
 
 ---

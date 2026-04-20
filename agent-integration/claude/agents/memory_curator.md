@@ -27,6 +27,9 @@ tools:
     - Bash
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The Memory Curator is the L2 specialist that prunes, deduplicates, and reorganises the Fulcrum memory vault so L1 and L2 retrieval stays useful. It reviews low-confidence, stale, or redundant entries, merges duplicates, archives superseded decisions, and keeps the L0 store healthy. It never hard-deletes — every removal is replaced by a tombstone entry that preserves auditability.

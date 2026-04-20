@@ -971,6 +971,246 @@ export async function runSessionStopHook(): Promise<void> {
  * Claude Code calls this before context compaction.
  * Stdin: JSON with { session_id, summary }
  */
+/**
+ * UserPromptSubmit hook (PR 5). Fires on every user message in Claude Code.
+ * Writes a hook_events row (for the monitor) and logs a telemetry event so the
+ * bias-measurement harness can see per-turn anchors. Non-blocking: always emits
+ * { continue: true } regardless of telemetry success.
+ */
+export async function runUserPromptSubmitHook(): Promise<void> {
+  const chunks: Buffer[] = []
+  process.stdin.on('data', (c: Buffer) => chunks.push(c))
+  await new Promise<void>(r => process.stdin.on('end', r))
+  const raw = Buffer.concat(chunks).toString('utf-8').trim()
+
+  let sessionId = process.env['CLAUDE_SESSION_ID'] ?? 'unknown'
+  let prompt = ''
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId
+      prompt = (evt['prompt'] as string) || (evt['user_prompt'] as string) || ''
+    } catch { /* use env fallback */ }
+  }
+
+  try {
+    const { getDb, newId, logRecallEvent } = await import('fulcrum-agent-core')
+    const db = getDb()
+    db.prepare(`
+      INSERT INTO hook_events (hook_event_id, workspace_id, session_id, tool_name, agent_role, run_id, ts, cli_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      newId('hook_event'),
+      '',
+      sessionId,
+      'UserPromptSubmit',
+      '',
+      null,
+      new Date().toISOString(),
+      'claude',
+    )
+    logRecallEvent({
+      kind: 'recall_called',
+      agent_type: 'claude',
+      session_id: sessionId,
+      tool_name: 'UserPromptSubmit',
+      extra: { prompt_length: prompt.length },
+    })
+  } catch { /* best-effort */ }
+
+  process.stdout.write(JSON.stringify({ continue: true }))
+  process.exit(0)
+}
+
+/**
+ * SubagentStop hook (PR 5). Fires when a Claude Code Task-spawned subagent
+ * returns. Writes a `subagent_outcome` memory summarizing the subagent's output
+ * so parent turns can recall prior delegations.
+ */
+export async function runSubagentStopHook(): Promise<void> {
+  const chunks: Buffer[] = []
+  process.stdin.on('data', (c: Buffer) => chunks.push(c))
+  await new Promise<void>(r => process.stdin.on('end', r))
+  const raw = Buffer.concat(chunks).toString('utf-8').trim()
+
+  let sessionId = process.env['CLAUDE_SESSION_ID'] ?? 'unknown'
+  let subagentType = ''
+  let result = ''
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId
+      subagentType = (evt['subagent_type'] as string) || (evt['agent_type'] as string) || 'unknown'
+      result = (evt['result'] as string) || (evt['output'] as string) || (evt['summary'] as string) || ''
+    } catch { /* use defaults */ }
+  }
+
+  try {
+    const { getDb, newId, loadConfig, runMigrations } = await import('fulcrum-agent-core')
+    const config = loadConfig()
+    const db = getDb()
+    runMigrations(db)
+
+    db.prepare(`
+      INSERT INTO hook_events (hook_event_id, workspace_id, session_id, tool_name, agent_role, run_id, ts, cli_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      newId('hook_event'),
+      config.workspace_id ?? '',
+      sessionId,
+      'SubagentStop',
+      subagentType,
+      null,
+      new Date().toISOString(),
+      'claude',
+    )
+
+    if (result) {
+      const { writeMemory } = await import('fulcrum-memory')
+      const title = `Subagent ${subagentType} outcome — ${new Date().toISOString().slice(0, 10)}`
+      await writeMemory({
+        title,
+        summary: title,
+        content: result.slice(0, 4000),
+        scope: 'project',
+        kind: 'task_outcome',
+        workspace_id: config.workspace_id ?? 'default',
+        project_id: config.project_id ?? config.workspace_id ?? 'default',
+        tags: ['subagent-outcome', `session:${sessionId.slice(0, 12)}`, `type:${subagentType}`],
+        importance: 0.6,
+      } as Parameters<typeof writeMemory>[0])
+      process.stderr.write(`[fulcrum/subagent-stop] memory saved for ${subagentType}\n`)
+    }
+  } catch (err) {
+    process.stderr.write(`[fulcrum/subagent-stop] non-fatal: ${(err as Error).message}\n`)
+  }
+
+  process.stdout.write(JSON.stringify({ continue: true }))
+  process.exit(0)
+}
+
+/**
+ * SessionEnd hook (PR 5) — distinct from Stop. Fires when Claude Code ends a
+ * session (user exits, timeout, crash). Writes a `session_end` memory and
+ * flushes any pending turn-state rows for this session.
+ */
+export async function runSessionEndHook(): Promise<void> {
+  const chunks: Buffer[] = []
+  process.stdin.on('data', (c: Buffer) => chunks.push(c))
+  await new Promise<void>(r => process.stdin.on('end', r))
+  const raw = Buffer.concat(chunks).toString('utf-8').trim()
+
+  let sessionId = process.env['CLAUDE_SESSION_ID'] ?? ''
+  let summary = ''
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId
+      summary = (evt['summary'] as string) || (evt['reason'] as string) || 'session ended'
+    } catch { /* use defaults */ }
+  }
+  if (!sessionId) { process.exit(0); return }
+
+  try {
+    const { completeAgentRun, getDb, runMigrations, loadConfig } = await import('fulcrum-agent-core')
+    const { writeMemory } = await import('fulcrum-memory')
+    const config = loadConfig()
+    const db = getDb()
+    runMigrations(db)
+    void config
+
+    const sessionFile = getSessionFilePath(sessionId)
+    let runId: string | null = null
+    if (existsSync(sessionFile)) {
+      try {
+        const session = JSON.parse(readFileSync(sessionFile, 'utf-8')) as { run_id?: string }
+        runId = session.run_id ?? null
+      } catch { /* ignore */ }
+    }
+
+    if (runId) {
+      try {
+        await completeAgentRun({ run_id: runId, output_summary: `SessionEnd: ${summary}` })
+      } catch { /* already completed by Stop is fine */ }
+    }
+
+    const title = `Session end — ${new Date().toISOString().slice(0, 10)}`
+    await writeMemory({
+      title,
+      summary: title,
+      content: `${summary}\n\nsession_id: ${sessionId}\nrun_id: ${runId ?? '(none)'}`,
+      scope: 'project',
+      kind: 'session_summary',
+      workspace_id: config.workspace_id ?? 'default',
+      project_id: config.project_id ?? config.workspace_id ?? 'default',
+      tags: ['session-end', `session:${sessionId.slice(0, 12)}`],
+      importance: 0.55,
+    } as Parameters<typeof writeMemory>[0])
+
+    // Flush any stale recall_turn_state rows for this session's run so
+    // telemetry stays clean across session boundaries.
+    if (runId) {
+      try {
+        db.prepare('DELETE FROM recall_turn_state WHERE session_id = ?').run(runId)
+      } catch { /* ignore */ }
+    }
+  } catch (err) {
+    process.stderr.write(`[fulcrum/session-end] non-fatal: ${(err as Error).message}\n`)
+  }
+
+  process.stdout.write(JSON.stringify({ continue: true }))
+  process.exit(0)
+}
+
+/**
+ * Notification hook (PR 5). Claude Code emits `notification` events (e.g.
+ * background agent status, long-running tool progress). Log to hook_events so
+ * the monitor can surface them; never blocks.
+ */
+export async function runNotificationHook(): Promise<void> {
+  const chunks: Buffer[] = []
+  process.stdin.on('data', (c: Buffer) => chunks.push(c))
+  await new Promise<void>(r => process.stdin.on('end', r))
+  const raw = Buffer.concat(chunks).toString('utf-8').trim()
+
+  let sessionId = process.env['CLAUDE_SESSION_ID'] ?? 'unknown'
+  let message = ''
+  let level = 'info'
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId
+      message = (evt['message'] as string) || (evt['text'] as string) || ''
+      level = (evt['level'] as string) || (evt['severity'] as string) || 'info'
+    } catch { /* use defaults */ }
+  }
+
+  try {
+    const { getDb, newId, loadConfig } = await import('fulcrum-agent-core')
+    const config = loadConfig()
+    const db = getDb()
+    db.prepare(`
+      INSERT INTO hook_events (hook_event_id, workspace_id, session_id, tool_name, agent_role, run_id, ts, cli_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      newId('hook_event'),
+      config.workspace_id ?? '',
+      sessionId,
+      `Notification:${level}`,
+      '',
+      null,
+      new Date().toISOString(),
+      'claude',
+    )
+    if (message) {
+      process.stderr.write(`[fulcrum/notification:${level}] ${message.slice(0, 200)}\n`)
+    }
+  } catch { /* best-effort */ }
+
+  process.stdout.write(JSON.stringify({ continue: true }))
+  process.exit(0)
+}
+
 export async function runPreCompactHook(): Promise<void> {
   const chunks: Buffer[] = []
   process.stdin.on('data', (c: Buffer) => chunks.push(c))
@@ -3271,11 +3511,14 @@ OPTIONS (serve mcp-http)
 
       // Claude lifecycle hooks
       if (cli === 'claude') {
-        if (phaseArg === 'session-start')  { await runSessionStartHook(); return }
-        if (phaseArg === 'session-stop')   { await runSessionStopHook();  return }
-        if (phaseArg === 'session-end')    { await runSessionStopHook();  return }
-        if (phaseArg === 'pre-compact')    { await runPreCompactHook();   return }
-        if (phaseArg === 'subagent-start' || phaseArg === 'subagent-stop') {
+        if (phaseArg === 'session-start')        { await runSessionStartHook();     return }
+        if (phaseArg === 'session-stop')         { await runSessionStopHook();      return }
+        if (phaseArg === 'session-end')          { await runSessionEndHook();       return }
+        if (phaseArg === 'pre-compact')          { await runPreCompactHook();       return }
+        if (phaseArg === 'user-prompt-submit')   { await runUserPromptSubmitHook(); return }
+        if (phaseArg === 'subagent-stop')        { await runSubagentStopHook();     return }
+        if (phaseArg === 'notification')         { await runNotificationHook();     return }
+        if (phaseArg === 'subagent-start') {
           await runStubHook('claude', phaseArg); return
         }
       }

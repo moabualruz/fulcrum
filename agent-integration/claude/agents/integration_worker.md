@@ -29,6 +29,9 @@ tools:
     []
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The Integration Worker is the L2 merge owner. It takes reviewed, tested implementation branches from individual agent worktrees and integrates them back into the main branch safely. It detects and resolves merge conflicts, runs the full integration test suite after merge, maintains the merge queue, and is the only L2 role exempt from the `chief_of_staff_no_direct_writes` invariant for `shell_exec:git` — merges belong exclusively to this role, enforced by the `only_integration_worker_merges` system invariant.

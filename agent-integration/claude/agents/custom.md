@@ -29,6 +29,9 @@ tools:
     []
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The Custom role is the escape hatch for user-defined agents that do not fit any canonical slot in the `AgentRole` union. It is always paired with a DB-backed `agent_profiles` row that provides the concrete description, system prompt, and capability overrides. `listAgentProfiles()` merges hardcoded profiles with DB profiles keyed on `custom`, so a single workspace can host many distinct custom agents sharing this slot. Use this role for domain-specific specialists the core taxonomy does not yet name.

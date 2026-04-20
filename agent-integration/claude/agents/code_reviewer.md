@@ -27,6 +27,9 @@ tools:
     - Bash
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The Code Reviewer is the L2 specialist responsible for reading diffs and assessing code quality, style compliance, correctness, and test coverage. It approves changes that meet project standards or requests changes with structured, actionable feedback. Reviewer verdicts gate `integration_worker` merges: a branch cannot be integrated without an APPROVED verdict from this role.

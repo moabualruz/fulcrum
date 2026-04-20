@@ -33,6 +33,9 @@ tools:
     - create_agent_profile
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The Orchestrator is a generic L2 sub-orchestrator for patterns that do not fit `chief_of_staff` — for example, a per-subsystem mini-CoS coordinating a bounded scope of work. It plans and dispatches within its assigned scope, tracks progress via `get_agent_run_status`, and escalates anything outside that scope to `chief_of_staff`. This role explicitly does NOT inherit L1 authority: only `chief_of_staff` is L1, and only `chief_of_staff` may invoke cross-scope teams.

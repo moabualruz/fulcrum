@@ -29,6 +29,9 @@ tools:
     []
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The DevOps Engineer is the L2 specialist that owns infrastructure, CI/CD, deployments, monitoring, and incident response. It writes infrastructure-as-code (Terraform or Pulumi), maintains GitHub Actions and other pipelines, configures observability, and runs on-call playbooks during incidents. Production deploys still flow through `integration_worker`; this role provides the machinery and signs off on the pipeline itself.

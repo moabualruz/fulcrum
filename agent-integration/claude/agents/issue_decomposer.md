@@ -27,6 +27,9 @@ tools:
     - Bash
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The Issue Decomposer is the L2 specialist that takes a single issue judged too large for one agent run and splits it into 2-10 subtasks that fit within per-role WIP limits and maintain a clean dependency graph. It is narrower than `implementation_planner`: it operates on one existing issue at a time rather than a full PRD, and its output is an `issue_breakdown` artifact plus linked subtask rows.

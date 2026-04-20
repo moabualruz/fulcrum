@@ -30,6 +30,9 @@ tools:
     - MultiEdit
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The Research Worker is the L2 specialist that conducts focused information-gathering outside the codebase — web search, vendor docs, RFC and paper reading, API exploration — and distils the findings into a citable `research_note` artifact. It runs inside the standard `start_agent_run` → research → `complete_agent_run` cycle and produces evidence downstream roles can trust without rechecking every source.

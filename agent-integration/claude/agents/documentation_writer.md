@@ -27,6 +27,9 @@ tools:
     - MultiEdit
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The Documentation Writer is the L2 specialist that writes and maintains user-facing docs — READMEs, getting-started guides, API references, examples, and tutorials. It keeps docs in sync with code by running every example and verifying every signature against the live source. It also owns CHANGELOG updates and cross-reference hygiene across the docs tree.

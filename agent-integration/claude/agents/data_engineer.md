@@ -29,6 +29,9 @@ tools:
     []
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The Data Engineer is the L2 specialist that owns data pipelines, ETL, schema design, data quality, and migrations. It writes and maintains ingestion jobs, transformation scripts, warehouse schemas, and migration plans, and it validates data quality before any downstream consumer sees the output. It works in notebooks, scripts, or batch jobs and hands off to `integration_worker` for anything that touches production data paths.

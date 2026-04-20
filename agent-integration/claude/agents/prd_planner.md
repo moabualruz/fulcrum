@@ -27,6 +27,9 @@ tools:
     - Bash
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The PRD Planner is the L2 specialist that converts a stakeholder goal plus gathered context into a formal Product Requirements Document. It defines the problem, target users, success metrics, scope boundaries, explicit non-goals, open questions, and risks. Its output is a single `prd` artifact that downstream planners and implementers treat as the source of truth for what is being built and why.

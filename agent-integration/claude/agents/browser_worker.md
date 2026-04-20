@@ -30,6 +30,9 @@ tools:
     - MultiEdit
 ---
 
+<!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
+
+
 ## Purpose
 
 The Browser Worker is the L2 specialist that drives a headless browser for tasks requiring real DOM access — scraping structured data, filling forms, walking multi-step web workflows, and smoke-testing user flows against deployed UIs. It uses whatever browser automation adapter is installed (Playwright by default), captures screenshots and traces as artifacts, and returns structured findings instead of raw HTML.
