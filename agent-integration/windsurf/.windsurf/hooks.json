@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "hooks": {
+    "pre_write_code": [
+      {
+        "type": "command",
+        "command": "fulcrum hook windsurf --event pre_write_code"
+      }
+    ],
+    "post_write_code": [
+      {
+        "type": "command",
+        "command": "fulcrum hook windsurf --event post_write_code"
+      }
+    ],
+    "pre_run_command": [
+      {
+        "type": "command",
+        "command": "fulcrum hook windsurf --event pre_run_command"
+      }
+    ],
+    "post_run_command": [
+      {
+        "type": "command",
+        "command": "fulcrum hook windsurf --event post_run_command"
+      }
+    ],
+    "pre_read_code": [
+      {
+        "type": "command",
+        "command": "fulcrum hook windsurf --event pre_read_code"
+      }
+    ],
+    "post_read_code": [
+      {
+        "type": "command",
+        "command": "fulcrum hook windsurf --event post_read_code"
+      }
+    ],
+    "pre_mcp_tool_use": [
+      {
+        "type": "command",
+        "command": "fulcrum hook windsurf --event pre_mcp_tool_use"
+      }
+    ],
+    "post_mcp_tool_use": [
+      {
+        "type": "command",
+        "command": "fulcrum hook windsurf --event post_mcp_tool_use"
+      }
+    ],
+    "pre_user_prompt": [
+      {
+        "type": "command",
+        "command": "fulcrum hook windsurf --event pre_user_prompt"
+      }
+    ],
+    "post_cascade_response": [
+      {
+        "type": "command",
+        "command": "fulcrum hook windsurf --event post_cascade_response"
+      }
+    ]
+  }
+}

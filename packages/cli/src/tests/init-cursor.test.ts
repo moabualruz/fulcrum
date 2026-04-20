@@ -122,16 +122,16 @@ describe('installWindsurf()', () => {
     })
   })
 
-  it('creates .windsurf/rules/fulcrum.mdc with alwaysApply frontmatter', async () => {
+  it('creates .windsurf/rules/fulcrum-core.md with trigger: always_on frontmatter', async () => {
     await installWindsurf({ dryRun: false, targetDir: tmpDir })
 
-    const mdcPath = path.join(tmpDir, '.windsurf', 'rules', 'fulcrum.mdc')
-    expect(fs.existsSync(mdcPath)).toBe(true)
+    const corePath = path.join(tmpDir, '.windsurf', 'rules', 'fulcrum-core.md')
+    expect(fs.existsSync(corePath)).toBe(true)
 
-    const content = fs.readFileSync(mdcPath, 'utf8')
-    expect(content).toContain('alwaysApply: true')
+    const content = fs.readFileSync(corePath, 'utf8')
+    expect(content).toContain('trigger: always_on')
     expect(content).toContain('Fulcrum Agent OS')
-    expect(content).toContain('Hook-based features')
+    expect(content).toContain('hooks.json')
   })
 
   it('auto-creates .windsurf/ directory when it does not exist', async () => {
@@ -147,15 +147,15 @@ describe('installWindsurf()', () => {
     await installWindsurf({ dryRun: false, targetDir: tmpDir })
 
     const mcpPath = path.join(tmpDir, '.windsurf', 'mcp.json')
-    const mdcPath = path.join(tmpDir, '.windsurf', 'rules', 'fulcrum.mdc')
+    const corePath = path.join(tmpDir, '.windsurf', 'rules', 'fulcrum-core.md')
 
     fs.writeFileSync(mcpPath, '{"sentinel": true}', 'utf8')
-    fs.writeFileSync(mdcPath, 'SENTINEL', 'utf8')
+    fs.writeFileSync(corePath, 'SENTINEL', 'utf8')
 
     await installWindsurf({ dryRun: false, targetDir: tmpDir })
 
     expect(fs.readFileSync(mcpPath, 'utf8')).toBe('{"sentinel": true}')
-    expect(fs.readFileSync(mdcPath, 'utf8')).toBe('SENTINEL')
+    expect(fs.readFileSync(corePath, 'utf8')).toBe('SENTINEL')
   })
 
   it('dry-run: prints actions but writes no files', async () => {
@@ -163,7 +163,7 @@ describe('installWindsurf()', () => {
     await installWindsurf({ dryRun: true, targetDir: tmpDir })
 
     expect(fs.existsSync(path.join(tmpDir, '.windsurf', 'mcp.json'))).toBe(false)
-    expect(fs.existsSync(path.join(tmpDir, '.windsurf', 'rules', 'fulcrum.mdc'))).toBe(false)
+    expect(fs.existsSync(path.join(tmpDir, '.windsurf', 'rules', 'fulcrum-core.md'))).toBe(false)
 
     const allOutput = logSpy.mock.calls.map(c => c.join(' ')).join('\n')
     logSpy.mockRestore()

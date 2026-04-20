@@ -1,0 +1,95 @@
+---
+trigger: model_decision
+description: "When + how to use Fulcrum task lifecycle (create_task / update_task)."
+---
+
+hosts: [claude, gemini, codex, opencode, pi]
+description: When + how to use Fulcrum task lifecycle (create_task / update_task).
+---
+
+# Task Tracking — create_task / update_task
+
+Task lifecycle = canonical record of agent work. Keep accurate or future agents + operator lose trail. System synthesizes `task_outcome` + `blocker_resolution` memories from `update_task` calls. Missing call = missing record.
+
+## `create_task` when
+
+- Multi-step request outlives current turn.
+- Work unit another agent might resume.
+- About to spawn subagent (parent task = delegation context).
+
+Not for: trivial single-step, formatting fixes, read-only exploration. Tasks = overhead. Only when audit trail matters.
+
+## `update_task` at end-of-work
+
+| Status | Use | Produces |
+|---|---|---|
+| `completed` | Work done, acceptance met | One `task_outcome` memory synthesized from file_patch + bash_trace + decision rows. |
+| `blocked` | Cannot proceed without external input | One `blocker_resolution` memory (what blocks + what was tried). Stop-hook race-guard skips `session_summary` if this fires first. |
+| `failed` | Attempted, could not succeed | No synthesis; status only. Prefer `blocked` if recoverable. |
+| `cancelled` | User pulled task | No synthesis. |
+
+## `task_outcome` synthesis output
+
+Reads all `file_patch`/`diff`/`code` memories for this task's runs + latest run's `output_summary`. Writes:
+
+```
+{
+  kind: 'task_outcome',
+  title: 'Task complete: <task title>',
+  summary: '<≤1500 chars: title + goal + run summary + file count>',
+  files_touched: string[],
+  task_id: '<task id>',
+  provenance: { hook_point: 'update_task:completed', run_id, files_touched }
+}
+```
+
+`blocker_resolution` = same shape, `hook_point:'update_task:blocked'`, carries task's `note` as blocker text.
+
+## Race conditions
+
+`update_task(completed)` + Stop-hook near-simultaneous (rare) → partial UNIQUE index on `(provenance.run_id) WHERE kind IN ('task_outcome','blocker_resolution','session_summary')` ensures one synthesis row per run. Winner inserts; loser gets `SQLITE_CONSTRAINT` + skips silently. No coordination needed.
+
+## Subagent delegation
+
+Delegate to subagent (`context_type='subagent'`) → child can only write `delegation_summary` (constraint #6). On child `complete_agent_run`, Fulcrum walks `parent_run_id` to topmost primary run + writes:
+
+```
+{
+  kind: 'delegation_summary',
+  workspace_id: <parent's workspace>,
+  project_id: <parent's project>,
+  title: 'Subagent: <task>',
+  summary: '<≤800 chars: task + result + artifacts>',
+  task_id: <parent's task>,
+  provenance: { hook_point: 'on_delegation', parent_run_id, child_run_id, artifacts }
+}
+```
+
+Parent learns subagent result; subagent cannot pollute memory tree with own files/decisions.
+
+## Pattern
+
+```ts
+const task = await create_task({
+  title: 'Fix the auth flow regression',
+  description: '<what you understand>',
+  done_criteria: '<acceptance>',
+})
+const run = await start_agent_run({
+  task_id: task.task_id,
+  agent_role: 'software_engineer',
+  context_type: 'primary',
+})
+
+try {
+  // ... work; hooks write file_patch/bash_trace/decision rows ...
+  await update_task({ task_id: task.task_id, status: 'completed' })
+} catch (err) {
+  await update_task({ task_id: task.task_id, status: 'blocked', note: String(err) })
+  throw err
+} finally {
+  await complete_agent_run({ run_id: run.run_id, output_summary: '<one-liner>' })
+}
+```
+
+`update_task` triggers synthesis. `complete_agent_run` releases run-lifecycle row + decrements PCI watcher refcount. Need both.

@@ -2177,51 +2177,66 @@ export function translateRoleForOpencode(raw: string, slug: string, primary: boo
 // Writes .windsurf/mcp.json and .windsurf/rules/fulcrum.mdc into targetDir.
 // Idempotent: skips files that already exist.
 
-export async function installWindsurf(opts: { dryRun: boolean; targetDir?: string }): Promise<void> {
+export async function installWindsurf(opts: {
+  dryRun: boolean;
+  targetDir?: string;
+  // Pass --global to also install ~/.codeium/windsurf/memories/global_rules.md.
+  // Global rules apply to EVERY workspace on this machine — not installed by default
+  // to avoid shared-machine leakage. Use only on single-user dev machines.
+  global?: boolean;
+}): Promise<void> {
   const targetDir = opts.targetDir ?? process.cwd();
   const dryRun = opts.dryRun;
 
   const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
-  const templateMcpJson = path.join(REPO_ROOT_LOCAL, "windsurf", "mcp.json");
-  const templateRulesMdc = path.join(REPO_ROOT_LOCAL, "windsurf", "rules", "fulcrum.mdc");
+  const src = path.join(REPO_ROOT_LOCAL, "windsurf", ".windsurf");
 
-  const destMcpDir = path.join(targetDir, ".windsurf");
-  const destMcpJson = path.join(destMcpDir, "mcp.json");
-  const destRulesDir = path.join(targetDir, ".windsurf", "rules");
-  const destRulesMdc = path.join(destRulesDir, "fulcrum.mdc");
-
-  // Write .windsurf/mcp.json
-  await step("Windsurf: .windsurf/mcp.json", () => {
-    if (fs.existsSync(destMcpJson)) {
-      skip(`already exists: ${destMcpJson}`);
+  function copyOne(srcRel: string, destRel: string): void {
+    const srcPath = path.join(src, srcRel);
+    const destPath = path.join(targetDir, ".windsurf", destRel);
+    if (fs.existsSync(destPath)) {
+      skip(`already exists: ${destPath}`);
       return;
     }
     if (dryRun) {
-      console.log(`  [dry-run] would create ${destMcpJson}`);
-      ok(`(dry-run) .windsurf/mcp.json`);
+      dry(`would create ${destPath}`);
+      ok(`(dry-run) .windsurf/${destRel}`);
       return;
     }
-    fs.mkdirSync(destMcpDir, { recursive: true });
-    fs.copyFileSync(templateMcpJson, destMcpJson);
-    ok(`wrote ${destMcpJson}`);
-    setRollback(`rm -f ${destMcpJson}`);
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    fs.copyFileSync(srcPath, destPath);
+    ok(`wrote ${destPath}`);
+    setRollback(`rm -f ${destPath}`);
+  }
+
+  function copyDir(srcSubdir: string, destSubdir: string, pattern: RegExp): void {
+    const srcDir = path.join(src, srcSubdir);
+    if (!fs.existsSync(srcDir)) return;
+    for (const f of fs.readdirSync(srcDir)) {
+      if (!pattern.test(f)) continue;
+      copyOne(path.join(srcSubdir, f), path.join(destSubdir, f));
+    }
+  }
+
+  // .windsurf/mcp.json — project-level MCP registration
+  await step("Windsurf: .windsurf/mcp.json", () => { copyOne("mcp.json", "mcp.json"); });
+
+  // .windsurf/rules/fulcrum-core.md — always_on canonical rules
+  await step("Windsurf: .windsurf/rules/fulcrum-core.md", () => {
+    copyOne("rules/fulcrum-core.md", "rules/fulcrum-core.md");
   });
 
-  // Write .windsurf/rules/fulcrum.mdc
-  await step("Windsurf: .windsurf/rules/fulcrum.mdc", () => {
-    if (fs.existsSync(destRulesMdc)) {
-      skip(`already exists: ${destRulesMdc}`);
-      return;
-    }
-    if (dryRun) {
-      console.log(`  [dry-run] would create ${destRulesMdc}`);
-      ok(`(dry-run) .windsurf/rules/fulcrum.mdc`);
-      return;
-    }
-    fs.mkdirSync(destRulesDir, { recursive: true });
-    fs.copyFileSync(templateRulesMdc, destRulesMdc);
-    ok(`wrote ${destRulesMdc}`);
-    setRollback(`rm -f ${destRulesMdc}`);
+  // .windsurf/rules/fulcrum-skill-*.md × 33 — model_decision skill rules
+  await step("Windsurf: .windsurf/rules/fulcrum-skill-*.md (33 skill rules)", () => {
+    copyDir("rules", "rules", /^fulcrum-skill-.*\.md$/);
+  });
+
+  // .windsurf/hooks.json — 10 hook events
+  await step("Windsurf: .windsurf/hooks.json", () => { copyOne("hooks.json", "hooks.json"); });
+
+  // .windsurf/workflows/*.md × 6 — user-invokable /slash workflows
+  await step("Windsurf: .windsurf/workflows/*.md (6 workflows)", () => {
+    copyDir("workflows", "workflows", /^fulcrum-.*\.md$/);
   });
 }
 
