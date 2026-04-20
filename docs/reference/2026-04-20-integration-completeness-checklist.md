@@ -177,15 +177,17 @@ Plan target: 9 layers. Audit: plugin wires 6 event classes + 10 custom tools (mo
 
 Plan target: 12+ layers. Audit: ~1/~20 events bound (session_start only); 34/34 skills ✓ (via symlink); roles implicit via MCP `--profile` — no role-switching UX.
 
+**Compliance gate:** `packages/cli/src/tests/compliance/pi-compliance.test.ts` — 11/11 green as of PR 8. Every `✅` row below is backed by at least one `GAP(pi-*)` assertion in that file.
+
 | Layer / requirement | Status | Verify | Fixed by |
 |---|---|---|---|
 | Symlink `agent-integration/pi/cockpit/skills -> ../../skills` intact | ✅ | `ls -la agent-integration/pi/cockpit/skills` shows `->` | pre-plan |
 | `session_start` event bound | ✅ | `grep -n 'session_start\|sessionStart' agent-integration/pi/cockpit/` | pre-plan |
-| **Remaining ~19 PI events bound (before_agent_start, before_provider_request, context, tool_call, tool_result, model_select, session_before_compact, agent_end, etc.)** | ⬜ | per-event handler count ≥ 15 | **PR 8** |
-| **`/fulcrum:role <slug>` role-switcher slash command** | ⬜ | `grep -c 'fulcrum:role' agent-integration/pi/cockpit/` ≥ 1 | **PR 8** |
-| **24 role MDs emitted under cockpit skill path** | ⬜ | per plan PR 8 scope | **PR 8** |
-| **PI.md marker block with canonical rules** | ⬜ | `grep -c 'BEGIN FULCRUM managed-block' agent-integration/pi/cockpit/PI.md 2>/dev/null \|\| echo 'file missing'` = 1 | **PR 8** |
-| **`agent-integration/pi/cockpit/package.json` name → `@fulcrum-agent-os/pi-cockpit`** | ⬜ | `grep '"name"' agent-integration/pi/cockpit/package.json` shows scoped name | **PR 14.4** |
+| **Remaining ~19 PI events bound (before_agent_start, before_provider_request, context, tool_call, tool_result, session_before_compact, agent_end, turn_start/end, user_bash, input, etc.)** | ✅ | 14 `pi.on(<event>, ...)` handlers in `agent-integration/pi/cockpit/index.ts` covering the GAP(pi-M1) required set: `session_start`, `session_shutdown`, `resources_discover`, `tool_call`, `before_agent_start`, `agent_end`, `tool_result`, `context`, `before_provider_request`, `turn_start`, `turn_end`, `session_before_compact`, `user_bash`, `input`. Observational handlers registered from session_start via `registerObservationalEvents()`. | **PR 8.1** |
+| **`/fulcrum:role <slug>` role-switcher slash command** | ✅ | `grep -c "fulcrum:role" agent-integration/pi/cockpit/index.ts` ≥ 2 (command registration + internal state). `pi.registerCommand("fulcrum:role", ...)` sets `activeRole` + loads `skills/roles/<slug>.md`; `before_agent_start` handler appends the role MD body to `systemPrompt` so every subsequent turn runs with role context. `/fulcrum:role clear` resets. | **PR 8.2** |
+| **24 role MDs emitted under cockpit skill path** | ✅ | `ls agent-integration/skills/roles/*.md \| wc -l` = 24. Flat layout at `agent-integration/pi/cockpit/skills/roles/<slug>.md` (via the `cockpit/skills → ../../skills` symlink). Emitted by `scripts/fanout-pi-cockpit.ts` which translates Claude role MDs for PI (drops Claude-specific `model:` + `tools:`; keeps name + description + body). parseCanonicalSource safely skips the `roles/` subdir (no top-level SKILL.md). | **PR 8.3** |
+| **AGENTS.md marker block with canonical rules (PI walks AGENTS.md up from cwd; PI.md not auto-loaded)** | ✅ | `grep -c 'BEGIN FULCRUM managed-block' AGENTS.md` = 1 at repo root. `scripts/fanout-pi-cockpit.ts` appends a BEGIN/END FULCRUM managed-block v1 embedding the 3 canonical rules joined with `\n\n---\n\n`. User-owned prose outside markers survives regeneration. Research 2026-04-20 confirmed PI walks `AGENTS.md`, not `PI.md` (per docs/skills.md:31 + docs/sdk.md). | **PR 8.4** |
+| **`agent-integration/pi/cockpit/package.json` name → `@fulcrum-agent-os/pi-cockpit`** | ✅ | `grep '"name"' agent-integration/pi/cockpit/package.json` → `"@fulcrum-agent-os/pi-cockpit"`. Workflow-file rename + npm publish + --auto probe remain PR 14.4 scope. | **PR 8.5** |
 | **`npm publish @fulcrum-agent-os/pi-cockpit` to npm registry** | ⬜ | `npm view @fulcrum-agent-os/pi-cockpit version` returns a version | **PR 14.4** |
 | **Rename `.github/workflows/publish-cockpit.yml` → `publish-pi-cockpit.yml` with `pi-cockpit/v*` tag namespace** | ⬜ | `ls .github/workflows/publish-pi-cockpit.yml` AND old file deleted | PR 14.4 |
 | **`@fulcrum/cockpit` npm history checked (legacy conflict)** | ⬜ | `npm view @fulcrum/cockpit time 2>&1` — documented result in ledger | PR 14.4 |
@@ -249,7 +251,7 @@ Plan target: 5 layers. Audit: no hooks; `.windsurf/rules/<skill>.md`; 0 skills t
 | `fulcrum install verify --agent <name>` CLI | ⬜ | `grep -c 'install verify' packages/cli/src/index.ts` ≥ 1 | **PR 13** |
 | `fulcrum bias stats` CLI for measurement | ✅ | `fulcrum bias stats` runs | PR 3 |
 | Fulcrum-first bias wired for **every hook-capable agent** (Claude, opencode, Gemini, PI, Codex Bash-only) | ⚠️ | Claude (PR 3) + opencode (PR 4 c4) + Gemini (PR 7 cross-cut) wired — `cliName === 'opencode' \|\| cliName === 'gemini'` trust-checked alongside claude in hooks.ts §3a/§3b/§3-opt-out; `HOOK_SEARCH_TOOLS` covers both `Grep/Glob/Read` and `grep_search/list_directory/read_file`; PI + Codex still pending | **PR 5-8 staggered** |
-| Fulcrum-first rule text lands in **canonical CLAUDE.md / AGENTS.md / GEMINI.md / PI.md / opencode.md** marker blocks | ⚠️ | 4 of 5 today — CLAUDE.md (PR 5), opencode.md (PR 4), GEMINI.md (PR 7.6), AGENTS.md (PR 7.25); PI.md still pending | **PR 8** |
+| Fulcrum-first rule text lands in **canonical CLAUDE.md / AGENTS.md (Codex + PI) / GEMINI.md / opencode.md** marker blocks | ✅ | CLAUDE.md (PR 5), opencode.md (PR 4), GEMINI.md (PR 7.6), Codex AGENTS.md (PR 7.25), repo-root AGENTS.md for PI (PR 8.4). Research 2026-04-20 confirmed PI walks `AGENTS.md` up from cwd, not `PI.md` (docs/skills.md:31 + docs/sdk.md) — `PI.md` row retired as a misnomer. | PR 4–8 |
 | Drift canary against committed `__fixtures__/golden/` | ✅ | `pnpm -F fulcrum-agent-fanout test drift-canary` | PR 1 |
 | Secret scan at parse | ✅ | `scanForSecrets` called in `parseCanonicalSource` | PR 1 |
 
