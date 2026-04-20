@@ -843,3 +843,18 @@ User directive (verbatim): **"did I allow you to defer any fucking items !?"** �
 - **Tests updated**: `init-cursor.test.ts` updated (`fulcrum.mdc` → `fulcrum-core.mdc`). All 12 cursor-compliance tests green. Total: 667/673 (6 Windsurf pre-existing failures).
 - **Compliance**: `cursor-compliance.test.ts` **12/12 green**. Down from 8 failures to 0 for Cursor.
 - **Next**: PR 12 — Windsurf installer expansion.
+
+### 2026-04-21 — PR 12 — Windsurf full integration (5 surfaces) — COMPLETE
+
+- **Units**: 12.1 (compliance test audit), 12.2 (source files), 12.3 (installWindsurf() expansion), 12.4 (init-cursor.test.ts update), 12.5 (checklist update).
+- **Summary**: Windsurf compliance had 6 failures (ws-M1 through ws-S2). Expanded Windsurf integration from 1 surface (stub rules only) to 5 surfaces:
+  - `.windsurf/rules/fulcrum-core.md` (trigger: always_on — Windsurf uses `trigger:` not `alwaysApply:`)
+  - `.windsurf/rules/fulcrum-skill-*.md` × 33 (trigger: model_decision + description)
+  - `.windsurf/hooks.json` (10 events: pre/post_write_code, pre/post_run_command, pre/post_read_code, pre/post_mcp_tool_use, pre_user_prompt, post_cascade_response)
+  - `.windsurf/workflows/*.md` × 6 (user-invokable /slash workflows)
+  - `.windsurf/mcp.json` (existing, preserved)
+  - `installWindsurf()` rewritten to copy from `.windsurf/` source tree; added `--global` flag for global_rules.md opt-in safety.
+- **Key finding**: `.windsurf/` source tree is gitignored — required force-add (`git add -f`), same pattern discovered in PR 11 for `.cursor/`. Windsurf frontmatter uses `trigger: always_on` / `trigger: model_decision`, not `alwaysApply`.
+- **Tests updated**: `init-cursor.test.ts` windsurf section updated (fulcrum.mdc → fulcrum-core.md, alwaysApply → trigger). All 6 Windsurf compliance failures resolved. Total: 673/673 green.
+- **Compliance**: `windsurf-compliance.test.ts` **10/10 green** (was 4/10). Total: 673/673.
+- **Next**: PR 13 — fanout consolidation or remaining cross-cutting work.

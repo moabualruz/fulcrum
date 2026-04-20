@@ -240,11 +240,12 @@ Plan target: 5 layers. Audit: no hooks; `.windsurf/rules/<skill>.md`; 0 skills t
 | Layer / requirement | Status | Verify | Fixed by |
 |---|---|---|---|
 | `.windsurf/rules/fulcrum.mdc` stub | ✅ | `ls agent-integration/windsurf/.windsurf/rules/` | pre-plan |
-| **`installWindsurf()` written** | ⬜ | `grep -c 'installWindsurf' agent-integration/install.ts` ≥ 1 | **PR 12** |
-| **34 `.windsurf/rules/fulcrum-skill-<name>.md` (trigger: model_decision)** | ⬜ | `ls .windsurf/rules/fulcrum-skill-*.md \| wc -l` ≥ 33 post-install | **PR 12** |
-| **`.windsurf/rules/fulcrum-core.md` (trigger: always_on) with canonical rules** | ⬜ | installer wires | **PR 12** |
-| **Workflows for user-invocable skills** | ⬜ | `ls .windsurf/workflows/*.md 2>/dev/null` ≥ 1 | **PR 12** |
-| **Optional global opt-in (`~/.codeium/windsurf/memories/global_rules.md`)** | ⬜ | requires explicit `--global` flag + confirmation (AD-9c) | **PR 12** |
+| **`installWindsurf()` written** | ✅ | `grep -c 'installWindsurf' agent-integration/install.ts` ≥ 1 | **PR 12** |
+| **33 `.windsurf/rules/fulcrum-skill-<name>.md` (trigger: model_decision)** | ✅ | `ls agent-integration/windsurf/.windsurf/rules/fulcrum-skill-*.md \| wc -l` = 33 | **PR 12** |
+| **`.windsurf/rules/fulcrum-core.md` (trigger: always_on) with canonical rules** | ✅ | `head -3 agent-integration/windsurf/.windsurf/rules/fulcrum-core.md` | **PR 12** |
+| **Workflows for user-invocable skills** | ✅ | `ls agent-integration/windsurf/.windsurf/workflows/*.md \| wc -l` = 6 | **PR 12** |
+| **`.windsurf/hooks.json` (10 events)** | ✅ | `cat agent-integration/windsurf/.windsurf/hooks.json` | **PR 12** |
+| **Optional global opt-in (`--global` flag in installWindsurf)** | ✅ | `grep -c 'global_rules\.md\|--global' agent-integration/install.ts` ≥ 1 | **PR 12** |
 | **12000-byte hard lint** (already in `emitWindsurf`) | ✅ | `grep -c 'WINDSURF_MAX_BYTES' packages/agent-fanout/src/emit/windsurf.ts` ≥ 1 | PR 1 |
 
 ---
