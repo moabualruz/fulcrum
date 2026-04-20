@@ -828,3 +828,18 @@ User directive (verbatim): **"did I allow you to defer any fucking items !?"** �
 - **Checklist**: Copilot section rewritten; 8 rows flipped ✅. Section header updated to "GitHub Copilot CLI".
 - **Commits**: code + source files, compliance test rewrite, checklist update, ledger.
 - **Next**: PR 11 — Cursor installer expansion (per-skill `.cursor/rules/*.mdc` + hooks).
+
+### 2026-04-21 — PR 11 — Cursor full integration (6 surfaces) — COMPLETE
+
+- **Units**: 11.1 (surface research), 11.2 (surface doc rewrite), 11.3 (source files), 11.4 (installCursor() expansion), 11.5 (checklist update).
+- **Summary**: Discovered Cursor 2.4+ has 6 extension surfaces (rules, skills, hooks, commands, MCP, AGENTS.md) — not "rules-only". Research confirmed via framework-docs-researcher against cursor.com/docs. Rewrote extension surface doc and expanded `installCursor()`. Created full integration source in `agent-integration/cursor/.cursor/`:
+  - `.cursor/mcp.json` (moved to proper subdir)
+  - `.cursor/rules/fulcrum-core.mdc` (alwaysApply: true, replaces fulcrum.mdc)
+  - `.cursor/rules/fulcrum-skill-*.mdc` × 33 (description-match, alwaysApply: false)
+  - `.cursor/skills/fulcrum-*/SKILL.md` × 33 (Cursor 2.4+ Agent Skills format)
+  - `.cursor/hooks.json` (version: 1, 7 event types bound)
+  - `.cursor/commands/*.md` × 6 (recall, start-task, write-decision, complete-run, heartbeat, workspace-status)
+- **Key finding**: Cursor 2.4 skills are additive alongside rules — rules NOT deprecated. `/migrate-to-skills` utility is opt-in for "Apply Intelligently" rules and slash commands only.
+- **Tests updated**: `init-cursor.test.ts` updated (`fulcrum.mdc` → `fulcrum-core.mdc`). All 12 cursor-compliance tests green. Total: 667/673 (6 Windsurf pre-existing failures).
+- **Compliance**: `cursor-compliance.test.ts` **12/12 green**. Down from 8 failures to 0 for Cursor.
+- **Next**: PR 12 — Windsurf installer expansion.

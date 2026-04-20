@@ -218,15 +218,18 @@ Plan target: 5 layers (MCP, instructions, agents, hooks, AGENTS.md). Compliance:
 
 ## Cursor
 
-Plan target: 3 layers. Audit: no hooks; per-skill `.cursor/rules/<skill>.mdc`; 0 skills today.
+**2026-04-21 surface correction:** Cursor 2.4+ has 6 surfaces (rules, skills, hooks, commands, MCP, AGENTS.md) — not "rules-only". Extension surface doc rewritten. Compliance: **12/12 green (PR 11)**.
 
 | Layer / requirement | Status | Verify | Fixed by |
 |---|---|---|---|
-| `.cursor/mcp.json` source | ✅ | `ls agent-integration/cursor/.cursor/mcp.json 2>/dev/null` | pre-plan |
-| **`.cursor/rules/fulcrum-core.mdc` (alwaysApply:true) with canonical rules** | ⬜ | installer writes it | **PR 11** |
-| **34 `.cursor/rules/fulcrum-skill-<name>.mdc` (alwaysApply:false)** | ⬜ | `ls .cursor/rules/fulcrum-skill-*.mdc \| wc -l` ≥ 33 post-install | **PR 11** |
-| **`installCursor()` expanded to wire all of the above** | ⬜ | `grep -c 'fulcrum-skill' agent-integration/install.ts` ≥ 1 | **PR 11** |
-| **AGENTS.md for Cursor (optional)** | ⬜ | per PR 11 scope | **PR 11** |
+| **`.cursor/mcp.json` source** | ✅ | `ls agent-integration/cursor/.cursor/mcp.json` | PR 11 (moved to .cursor/ prefix) |
+| **`.cursor/rules/fulcrum-core.mdc` (alwaysApply:true) with canonical rules** | ✅ | `grep alwaysApply agent-integration/cursor/.cursor/rules/fulcrum-core.mdc` | PR 11 |
+| **33 `.cursor/rules/fulcrum-skill-<name>.mdc` (description-match mode)** | ✅ | `ls agent-integration/cursor/.cursor/rules/fulcrum-skill-*.mdc \| wc -l` ≥ 33 | PR 11 |
+| **33 `.cursor/skills/fulcrum-*/SKILL.md` (Cursor 2.4+ Agent Skills format)** | ✅ | `find agent-integration/cursor/.cursor/skills -name SKILL.md \| wc -l` ≥ 33 | PR 11 |
+| **`.cursor/hooks.json` (16 events: preToolUse, postToolUse, sessionStart, …)** | ✅ | `grep preToolUse agent-integration/cursor/.cursor/hooks.json` | PR 11 |
+| **`.cursor/commands/*.md` × 6 user-invokable slash commands** | ✅ | `ls agent-integration/cursor/.cursor/commands/*.md \| wc -l` ≥ 5 | PR 11 |
+| **`installCursor()` expanded to emit all 6 surfaces** | ✅ | `grep -c 'fulcrum-skill\|hooks\.json\|commands' agent-integration/install.ts` ≥ 3 | PR 11 |
+| Extension surface doc updated (hooks/skills/commands confirmed) | ✅ | `grep '2026-04-21' docs/reference/2026-04-19-cursor-extension-surface.md` | PR 11 |
 
 ---
 
