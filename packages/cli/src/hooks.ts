@@ -122,6 +122,27 @@ async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | 'timeout'>
   }
 }
 
+// Claude-Code session_id (UUID) → Fulcrum agent_runs.run_id (ULID). The
+// SessionStart hook writes a session file at
+// ${globalDataDir()}/sessions/<safe_session_id>.json containing both. This
+// helper reads that file so the bias nudge / passive injection path can
+// authenticate against agent_runs instead of the untrusted Claude session_id.
+// Returns null if no session file exists (pre-SessionStart window, non-Claude
+// caller, or session not wired) — callers must fall through silently.
+async function resolveFulcrumRunId(sessionId: string): Promise<string | null> {
+  if (!sessionId || sessionId === 'unknown') return null
+  try {
+    const { globalDataDir } = await import('fulcrum-agent-core')
+    const safeId = sessionId.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 128)
+    const path = join(globalDataDir(), 'sessions', `${safeId}.json`)
+    if (!existsSync(path)) return null
+    const parsed = JSON.parse(readFileSync(path, 'utf-8')) as { run_id?: string }
+    return typeof parsed.run_id === 'string' && parsed.run_id ? parsed.run_id : null
+  } catch {
+    return null
+  }
+}
+
 /** Rate-limit the hook_events cap warning to once per hour per workspace. */
 const _hookCapWarnedAt = new Map<string, number>()
 
@@ -271,22 +292,27 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
   //     Any tool name containing "recall" (MCP `mcp__fulcrum__recall_knowledge`,
   //     `recall_memory`, `recall_turn_state`, etc.) signals an explicit recall
   //     happened — reset the counter so the next grep does not re-nudge.
+  //     Claude `session_id` (UUID) is resolved to Fulcrum `run_id` (ULID) via
+  //     the session file written by SessionStart hook before any SQLite write.
   if (
     ctx.cliName === 'claude'
     && /recall/i.test(ctx.toolName)
   ) {
     try {
-      const { getDb, recordRecall, isTrustedSession, logRecallEvent } =
-        await import('fulcrum-agent-core')
-      const db = getDb()
-      if (isTrustedSession(db, ctx.sessionId)) {
-        recordRecall(db, { sessionId: ctx.sessionId, agentType: 'claude' })
-        logRecallEvent({
-          kind: 'recall_called',
-          agent_type: 'claude',
-          session_id: ctx.sessionId,
-          tool_name: ctx.toolName,
-        })
+      const runId = await resolveFulcrumRunId(ctx.sessionId)
+      if (runId) {
+        const { getDb, recordRecall, isTrustedSession, logRecallEvent } =
+          await import('fulcrum-agent-core')
+        const db = getDb()
+        if (isTrustedSession(db, runId)) {
+          recordRecall(db, { sessionId: runId, agentType: 'claude' })
+          logRecallEvent({
+            kind: 'recall_called',
+            agent_type: 'claude',
+            session_id: ctx.sessionId,
+            tool_name: ctx.toolName,
+          })
+        }
       }
     } catch { /* best-effort */ }
   }
@@ -304,12 +330,13 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
     && process.env['FULCRUM_NO_RECALL_NUDGE'] !== '1'
   ) {
     try {
+      const runId = await resolveFulcrumRunId(ctx.sessionId)
       const { getDb, recordGrepWithoutRecall, isTrustedSession, logRecallEvent } =
         await import('fulcrum-agent-core')
       const db = getDb()
-      if (isTrustedSession(db, ctx.sessionId)) {
+      if (runId && isTrustedSession(db, runId)) {
         const count = recordGrepWithoutRecall(db, {
-          sessionId: ctx.sessionId,
+          sessionId: runId,
           agentType: 'claude',
         })
         logRecallEvent({
@@ -318,6 +345,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
           session_id: ctx.sessionId,
           tool_name: ctx.toolName,
           grep_count_without_recall: count,
+          extra: { run_id: runId },
         })
         if (count >= 1) {
           const variant = (process.env['FULCRUM_BIAS_VARIANT'] ?? 'A').toUpperCase()

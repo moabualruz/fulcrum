@@ -7,7 +7,7 @@
 // fires on trusted sessions.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'fs'
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import {
@@ -46,7 +46,7 @@ function tearDownTmpDb(): void {
   }
 }
 
-function seedTrustedRun(runId: string, workspaceId = 'ws_varb'): void {
+function seedTrustedSession(claudeSessionId: string, runId: string, workspaceId = 'ws_varb'): void {
   const db = getDb()
   db.prepare(
     `INSERT OR IGNORE INTO workspaces (workspace_id, name) VALUES (?, 'variant-b-test')`,
@@ -63,6 +63,18 @@ function seedTrustedRun(runId: string, workspaceId = 'ws_varb'): void {
     `INSERT INTO agent_runs (run_id, task_id, workspace_id, role)
      VALUES (?, 'task_varb', ?, 'software_engineer')`,
   ).run(runId, workspaceId)
+  const safeId = claudeSessionId.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 128)
+  const sessionsDir = join(tmpDir!, 'sessions')
+  mkdirSync(sessionsDir, { recursive: true })
+  writeFileSync(
+    join(sessionsDir, `${safeId}.json`),
+    JSON.stringify({
+      session_id: claudeSessionId,
+      run_id: runId,
+      workspace_id: workspaceId,
+      project_id: 'proj_varb',
+    }),
+  )
 }
 
 function seedMemory(workspaceId: string, title: string, summary: string, content: string): void {
@@ -115,9 +127,9 @@ describe('PreToolUse Variant B passive injection (PR 3 R1)', () => {
   afterEach(() => { tearDownTmpDb() })
 
   it('falls through to Variant A when FULCRUM_BIAS_VARIANT is unset', async () => {
-    seedTrustedRun('run_default')
+    seedTrustedSession('c-sess-default', 'run_default')
     const io = makeCapturedIO()
-    await runPreHook(claudeCtx('Grep', 'run_default', { pattern: 'recall_knowledge' }), io.io)
+    await runPreHook(claudeCtx('Grep', 'c-sess-default', { pattern: 'recall_knowledge' }), io.io)
     const telemetry = readTelemetry()
     const kinds = telemetry.map((t) => t.kind)
     expect(kinds).toContain('nudge_emitted')
@@ -126,7 +138,7 @@ describe('PreToolUse Variant B passive injection (PR 3 R1)', () => {
 
   it('injects recall results to stderr when FULCRUM_BIAS_VARIANT=B and memories exist', async () => {
     process.env.FULCRUM_BIAS_VARIANT = 'B'
-    seedTrustedRun('run_b')
+    seedTrustedSession('c-sess-b', 'run_b')
     seedMemory(
       'ws_varb',
       'Recall-first bias rationale',
@@ -134,7 +146,7 @@ describe('PreToolUse Variant B passive injection (PR 3 R1)', () => {
       'passive injection is the production pattern; the plan bets on an unfalsified premise',
     )
     const io = makeCapturedIO()
-    await runPreHook(claudeCtx('Grep', 'run_b', { pattern: 'recall passive injection' }), io.io)
+    await runPreHook(claudeCtx('Grep', 'c-sess-b', { pattern: 'recall passive injection' }), io.io)
     const injection = io.stderr.find((l) => l.includes('passive injection'))
     expect(injection).toBeDefined()
     expect(io.stderr.some((l) => l.includes('<fulcrum-recall'))).toBe(true)
@@ -146,10 +158,10 @@ describe('PreToolUse Variant B passive injection (PR 3 R1)', () => {
 
   it('falls through to Variant A nudge when Variant B recall returns no hits', async () => {
     process.env.FULCRUM_BIAS_VARIANT = 'B'
-    seedTrustedRun('run_b_empty')
+    seedTrustedSession('c-sess-b-empty', 'run_b_empty')
     // No memories seeded → recall returns []
     const io = makeCapturedIO()
-    await runPreHook(claudeCtx('Grep', 'run_b_empty', { pattern: 'nonexistent-thing-xyz' }), io.io)
+    await runPreHook(claudeCtx('Grep', 'c-sess-b-empty', { pattern: 'nonexistent-thing-xyz' }), io.io)
     const telemetry = readTelemetry()
     expect(telemetry.some((t) => t.kind === 'passive_injection')).toBe(false)
     expect(telemetry.some((t) => t.kind === 'nudge_emitted' && t.variant === 'A')).toBe(true)
@@ -157,7 +169,7 @@ describe('PreToolUse Variant B passive injection (PR 3 R1)', () => {
 
   it('extracts the Read query from file_path basename', async () => {
     process.env.FULCRUM_BIAS_VARIANT = 'B'
-    seedTrustedRun('run_read')
+    seedTrustedSession('c-sess-read', 'run_read')
     seedMemory(
       'ws_varb',
       'recall measurement harness',
@@ -166,7 +178,7 @@ describe('PreToolUse Variant B passive injection (PR 3 R1)', () => {
     )
     const io = makeCapturedIO()
     await runPreHook(
-      claudeCtx('Read', 'run_read', { file_path: '/tmp/some/deep/path/recall-measurement.ts' }),
+      claudeCtx('Read', 'c-sess-read', { file_path: '/tmp/some/deep/path/recall-measurement.ts' }),
       io.io,
     )
     const injection = io.stderr.find((l) => l.includes('passive injection'))
@@ -177,13 +189,13 @@ describe('PreToolUse Variant B passive injection (PR 3 R1)', () => {
 
   it('does not inject on an untrusted (forged) session (AD-9b)', async () => {
     process.env.FULCRUM_BIAS_VARIANT = 'B'
-    seedTrustedRun('run_real_but_different_id')
+    seedTrustedSession('c-sess-other', 'run_real_but_different_id')
     seedMemory('ws_varb', 'should not surface', 'because session is forged', 'test')
     const io = makeCapturedIO()
     // session_id is not in agent_runs — isTrustedSession returns false,
     // passive injection must NOT fire.
     await runPreHook(
-      claudeCtx('Grep', 'run_forged_abc', { pattern: 'anything' }),
+      claudeCtx('Grep', 'c-sess-forged-no-file', { pattern: 'anything' }),
       io.io,
     )
     expect(io.stderr.some((l) => l.includes('passive injection'))).toBe(false)
@@ -193,10 +205,10 @@ describe('PreToolUse Variant B passive injection (PR 3 R1)', () => {
 
   it('never blocks the tool call (Variant B is still nudge-only)', async () => {
     process.env.FULCRUM_BIAS_VARIANT = 'B'
-    seedTrustedRun('run_block_check')
+    seedTrustedSession('c-sess-block-check', 'run_block_check')
     seedMemory('ws_varb', 'hit', 'matches', 'match content here')
     const io = makeCapturedIO()
-    await runPreHook(claudeCtx('Grep', 'run_block_check', { pattern: 'hit' }), io.io)
+    await runPreHook(claudeCtx('Grep', 'c-sess-block-check', { pattern: 'hit' }), io.io)
     expect(io.exitCode).toBe(0)
     const decisions = io.stdout.map((s) => {
       try { return JSON.parse(s) as { continue?: boolean } } catch { return {} }

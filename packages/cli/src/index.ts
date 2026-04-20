@@ -3361,6 +3361,40 @@ OPTIONS (serve mcp-http)
 
   if (group === 'plugin' || group === 'plugins') { await runPlugin(); return }
 
+  if (group === 'bias') {
+    if (command === 'stats' || command === 'status' || !command) {
+      const { summarizeRecallTelemetry } = await import('fulcrum-agent-core')
+      const summary = summarizeRecallTelemetry()
+      if (args.includes('--json')) {
+        console.log(JSON.stringify(summary, null, 2))
+      } else {
+        const pp = (n: number) => `${(n * 100).toFixed(1)}pp`
+        console.log(`Fulcrum-first bias telemetry — recall_bias.jsonl`)
+        console.log(`  sessions: ${summary.sessions}`)
+        console.log(`  events:   ${summary.total_events}`)
+        console.log(`  grep w/o recall:   ${summary.grep_without_recall}`)
+        console.log(`  recall called:     ${summary.recall_called}`)
+        console.log(`  nudge emitted (A): ${summary.nudge_emitted}`)
+        console.log(`  passive inject(B): ${summary.passive_injection}`)
+        console.log(`  nudge opt-out:     ${summary.nudge_opt_out}`)
+        console.log(`  recall rate:       ${pp(summary.recall_rate)} of (recall + grep) calls`)
+        if (summary.per_session.length > 0 && args.includes('--verbose')) {
+          console.log(``)
+          console.log(`Per-session:`)
+          for (const s of summary.per_session) {
+            console.log(
+              `  ${s.session_id.slice(0, 16)}…  grep=${s.grep_without_recall}  recall=${s.recall_called}  nudge(A)=${s.nudge_emitted}  inject(B)=${s.passive_injection}`,
+            )
+          }
+        }
+      }
+      return
+    }
+    console.error(`Unknown bias subcommand: ${command}`)
+    console.error('Usage: fulcrum bias stats [--json] [--verbose]')
+    process.exit(1)
+  }
+
   if (group === 'skills' || group === 'skill') { await runSkills(); return }
 
   // v2a per-host cluster Task 51 — `fulcrum pi cockpit start|stop|status`.
