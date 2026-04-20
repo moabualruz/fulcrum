@@ -46,8 +46,11 @@ Plan target: 7 layers per AD-2. Audit hit: 5/9 events wired; 34/34 skills ✓; 2
 | **Notification hook handler** | ✅ | `grep -c 'runNotificationHook\|notification' packages/cli/src/index.ts` ≥ 1 | PR 5 |
 | **Canonical `agent-integration/claude/CLAUDE.md` contains BEGIN/END FULCRUM marker block with 3 canonical rules (fulcrum-first, lifecycle, role-boundaries)** | ✅ | `grep -c 'BEGIN FULCRUM managed-block' agent-integration/claude/CLAUDE.md` = 1 AND `grep -c 'recall_knowledge' agent-integration/claude/CLAUDE.md` ≥ 1 | PR 5 |
 | **24 sub-agent MD prologues embed Fulcrum-first rule reference** | ✅ | `ls agent-integration/claude/agents/*.md \| xargs grep -l 'fulcrum-first' \| wc -l` = 24 | PR 5 |
-| Claude marketplace `.claude-plugin/marketplace.json` at repo root | 🔒 | v4 / legacy PR 14.1 | v4 |
-| Native `claude plugin install` path in `installClaude()` | 🔒 | v4 / legacy PR 14.1 | v4 |
+| **Claude marketplace `.claude-plugin/marketplace.json` at repo root of `moabualruz/fulcrum`** | ⬜ | `ls .claude-plugin/marketplace.json` AND `grep -c '"source":\s*"./agent-integration/claude"' .claude-plugin/marketplace.json` ≥ 1 | **PR 14.1** |
+| **Claude marketplace `source:` schema verified against current Claude Code docs** | ⬜ | research confirmed: resolves relative to marketplace root dir (the one containing .claude-plugin/), `owner: {name, email?}` only, relative paths only via git-add not URL | PR 14.1 |
+| **Native `claude plugin install` path in `installClaude()` (dual-mode `--auto` / `--manual`)** | ⬜ | `grep -c 'claude plugin install\|claude plugin marketplace add' agent-integration/install.ts` ≥ 1; `pnpm setup:claude --auto` drives the native command when CLI supports it | **PR 14.1** |
+| **Bundled `hooks/hooks.json` inside plugin dir (for `/plugin install` path)** | ⬜ | `ls agent-integration/claude/hooks/hooks.json` | PR 14.1 |
+| **Retire `agent-integration/claude/settings-hooks-snippet.json`** (replaced by bundled hooks.json) | ⬜ | file removed or marked deprecated | PR 14.1 |
 
 ---
 
@@ -62,9 +65,13 @@ Plan target: 5 layers. Audit: 6/34 skills; 4/5 events (UserPromptSubmit missing,
 | Stop / notify hook | ✅ | `grep -n 'runCodexStopHook' packages/cli/src/index.ts` | pre-plan |
 | PreToolUse hook (Bash-only platform) | ✅ | existing `fulcrum hook auto` covers | pre-plan |
 | **UserPromptSubmit hook + rider content** | ⬜ | `grep -c 'codex.*user-prompt\|CodexUserPrompt' packages/cli/src/index.ts` ≥ 1 | **PR 6** |
-| **34 canonical skills installed at `~/.codex/skills/` or `agent-integration/codex/plugin/skills/` sorted** | ⬜ | `ls agent-integration/codex/plugin/skills/ \| wc -l` ≥ 33 (today: 6) | PR 1 emit exists, installer wiring deferred |
+| **34 canonical skills installed at `~/.codex/skills/` or `agent-integration/codex/plugin/skills/` sorted** | ⬜ | `ls agent-integration/codex/plugin/skills/ \| wc -l` ≥ 33 (today: 6) | PR 1 emit exists, installer wiring pending |
 | **Fanout emitCodex → skills directory on disk** | ⬜ | installer writes 33 artifacts from `emitCodex(source)` into the install root | PR 13 installer wiring |
 | **AGENTS.md marker block with canonical rules** | ⬜ | `grep -c 'BEGIN FULCRUM managed-block' agent-integration/codex/AGENTS.md` = 1 | PR 6 / PR 13 |
+| **Codex `/plugins` TUI reads filesystem marketplace entries — verified end-to-end** | ⬜ | research: install pieces, run `codex` → `/plugins`, verify Fulcrum shows as AVAILABLE/INSTALLED. Install-state lives in `~/.codex/config.toml [plugins."<name>@<marketplace>"]` + cache. Ledger entry documents result | **PR 14.2 research** |
+| **Post-install message: `Fulcrum is installed for Codex. Run 'codex' then '/plugins' to verify/manage in the TUI.`** | ⬜ | `grep -c "Run 'codex' then '/plugins'" agent-integration/install.ts` ≥ 1 | PR 14.2 |
+| **`.codex-plugin/plugin.json` schema validated against current Codex plugin loader docs** | ⬜ | install-time validation passes | PR 14.2 |
+| **Malformed `~/.agents/plugins/marketplace.json` entry cleanup documented** (stray `{"host":"codex",...}` object discovered 2026-04-20) | ⬜ | cleanup step in installer or doc | PR 14.2 |
 
 ---
 
@@ -83,6 +90,9 @@ Plan target: 9 layers. Audit: 6/11 events (BeforeAgent, BeforeToolSelection, Not
 | **`agent-integration/gemini/policies/` populated** | ⬜ | `ls agent-integration/gemini/policies/` non-empty | **PR 7** |
 | **GEMINI.md marker block with canonical rules** | ⬜ | `grep -c 'BEGIN FULCRUM managed-block' agent-integration/gemini/GEMINI.md` = 1 | **PR 7** |
 | **TOML slash commands regenerated from fanout** | ⬜ | `ls agent-integration/gemini/commands/*.toml \| wc -l` ≥ 6 with each matching canonical skill | PR 7 |
+| **`gemini extensions update fulcrum` post-install message printed** | ⬜ | `grep -c "gemini extensions update" agent-integration/install.ts` ≥ 1 | **PR 14.5** |
+| **`gemini-extension.json` schema validated at install time via `find-docs`-verified schema** | ⬜ | installer validates the manifest | **PR 14.5** |
+| **`migratedTo` field scaffolding in `gemini-extension.json` (commented-out; documents future migration)** | ⬜ | `grep -c 'migratedTo' agent-integration/gemini/gemini-extension.json` ≥ 1 | PR 14.5 |
 
 ---
 
@@ -109,7 +119,9 @@ Plan target: 9 layers. Audit: plugin wires 6 event classes + 10 custom tools (mo
 | **`.ridersum` GENERATION tool** (vs. just VERIFICATION) | ⬜ | installer / agent-fanout CLI writes `.ridersum` next to `.opencode/rules/` with the live SHA-256 | **next session** |
 | **`installOpencode()` consumes `emitOpencode(parseCanonicalSource(...))` output and writes to disk** | ⬜ | `grep -c 'emitOpencode\|agent-fanout' agent-integration/install.ts` ≥ 1 | **next session** |
 | **Post-session workspace write via `fulcrum hook opencode session-end` (already wired) — verify no regression** | ✅ | existing | pre-plan |
-| npm publish: actual publish to npm registry | 🔒 | gated on: npm org `@fulcrum-agent-os` registration + 2FA + CI token; v4 PR 14.9 tarball scan | v4 / user action |
+| **`npm publish @fulcrum-agent-os/opencode-plugin` to npm registry (first release)** | ⬜ | `npm view @fulcrum-agent-os/opencode-plugin version` returns a version; published from CI workflow (not laptop) | **PR 14.3 — requires npm org registration first** |
+| **`--auto` probe (`npm view @fulcrum-agent-os/opencode-plugin version`) in installOpencode** | ⬜ | `grep -c 'npm view @fulcrum-agent-os/opencode-plugin' agent-integration/install.ts` ≥ 1 | PR 14.3 |
+| **Error path `opencode-plugin-unresolved` when --auto falls to --local and local file absent** | ⬜ | `grep -c 'opencode-plugin-unresolved' agent-integration/install.ts` ≥ 1 | PR 14.3 |
 
 ---
 
@@ -125,7 +137,11 @@ Plan target: 12+ layers. Audit: ~1/~20 events bound (session_start only); 34/34 
 | **`/fulcrum:role <slug>` role-switcher slash command** | ⬜ | `grep -c 'fulcrum:role' agent-integration/pi/cockpit/` ≥ 1 | **PR 8** |
 | **24 role MDs emitted under cockpit skill path** | ⬜ | per plan PR 8 scope | **PR 8** |
 | **PI.md marker block with canonical rules** | ⬜ | `grep -c 'BEGIN FULCRUM managed-block' agent-integration/pi/cockpit/PI.md 2>/dev/null \|\| echo 'file missing'` = 1 | **PR 8** |
-| npm publish `@fulcrum-agent-os/pi-cockpit` | 🔒 | v4 / legacy PR 14.4 | v4 |
+| **`agent-integration/pi/cockpit/package.json` name → `@fulcrum-agent-os/pi-cockpit`** | ⬜ | `grep '"name"' agent-integration/pi/cockpit/package.json` shows scoped name | **PR 14.4** |
+| **`npm publish @fulcrum-agent-os/pi-cockpit` to npm registry** | ⬜ | `npm view @fulcrum-agent-os/pi-cockpit version` returns a version | **PR 14.4** |
+| **Rename `.github/workflows/publish-cockpit.yml` → `publish-pi-cockpit.yml` with `pi-cockpit/v*` tag namespace** | ⬜ | `ls .github/workflows/publish-pi-cockpit.yml` AND old file deleted | PR 14.4 |
+| **`@fulcrum/cockpit` npm history checked (legacy conflict)** | ⬜ | `npm view @fulcrum/cockpit time 2>&1` — documented result in ledger | PR 14.4 |
+| **`--auto` probe (`npm view @fulcrum-agent-os/pi-cockpit version`) in installPiCockpit** | ⬜ | `grep -c 'npm view @fulcrum-agent-os/pi-cockpit' agent-integration/install.ts` ≥ 1 | PR 14.4 |
 
 ---
 
