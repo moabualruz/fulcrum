@@ -1,70 +1,55 @@
 ---
 name: fulcrum-recall-before-writing
 description: >-
-  Query the Fulcrum memory layer before writing new code, docs, or architectural
-  decisions. Applies whenever you are about to produce novel output on a topic
-  the project may have prior context on.
+  Query Fulcrum memory before writing new code, docs, or architectural
+  decisions. Applies before producing novel output on a topic project may have
+  prior context on.
 ---
 # Recall memory before writing
 
-Fulcrum's L2 memory layer stores prior decisions, task outcomes, and lessons
-learned. Skipping it means reinventing the wheel — or, worse, contradicting
-a decision a previous agent already made. Always call
-`fulcrum action exec recall_memory` before producing novel output.
+Fulcrum L2 memory stores prior decisions, outcomes, lessons. Skipping = reinventing wheel, or worse, contradicting a prior agent's decision. Always call `fulcrum action exec recall_memory` before novel output.
 
-## When to apply
+## When
 
-- You are about to write a new module, file, or function
-- You are about to make an architectural decision (naming, schema, API shape,
-  dependency choice)
-- You are writing documentation that describes "how things work"
-- You encounter a term or convention you don't recognise — the memory layer
-  may have defined it
-- You are resuming a task after a break or handoff from another agent
+- About to write new module / file / function.
+- About to make architectural decision (naming, schema, API shape, dependency choice).
+- Writing docs describing "how things work".
+- Encountered term/convention you don't recognize — memory may have defined it.
+- Resuming task after break or handoff.
 
 ## How
 
-Call the MCP tool with a short list of search terms drawn from the task goal:
+Short list of search terms drawn from task goal:
 
 ```
 fulcrum action exec recall_memory
-  workspace_id: (same workspace as your run)
-  query:        "plain english description of what you are about to do"
+  workspace_id: (same as your run)
+  query:        "plain english what you are about to do"
   limit:        5 or 10
 ```
 
-Run two or three queries, not just one:
+Run 2-3 queries, not one:
 
-1. **Goal query**: `"{task goal in plain english}"` — e.g., `"reranker
-   tokenizer batching"`
-2. **Path query**: `"{file path or directory}"` — e.g.,
-   `"packages/core/src/memory"`
-3. **Concept query**: `"{component or pattern name}"` — e.g., `"FTS5
-   fallback"`, `"WIP limiter"`
+1. **Goal query**: `"{task goal plain english}"` — e.g., `"reranker tokenizer batching"`.
+2. **Path query**: `"{file path or dir}"` — e.g., `"packages/core/src/memory"`.
+3. **Concept query**: `"{component or pattern name}"` — e.g., `"FTS5 fallback"`, `"WIP limiter"`.
 
-Read every returned memory before you start typing. A single 200-word
-decision from a prior run can save you an hour.
+Read every returned memory before typing. Single 200-word decision from prior run can save an hour.
 
 ## Citing memories
 
-When a recalled memory changes your approach, cite it:
+Recalled memory changed your approach? Cite:
 
-- In your final response to the user: "based on prior decision M-0423, this
-  module uses text_pair tokenization..."
-- In your commit message: `Refs memory M-0423`
-- In the `complete_agent_run` summary: include the memory IDs you relied on
+- Final user response: "based on prior decision M-0423, this module uses text_pair tokenization..."
+- Commit message: `Refs memory M-0423`.
+- `complete_agent_run` summary: include memory IDs relied on.
 
-This creates a visible chain of reasoning the chief_of_staff can audit later.
+Creates visible reasoning chain CoS can audit.
 
 ## Red flags
 
-- You wrote a new file without a single `recall_memory` call → you're
-  probably contradicting something.
-- A memory said "don't do X" and you did X → stop, re-read, either justify
-  the divergence or revert.
-- You recalled zero memories on a mature project → broaden your query or
-  search by file path; zero results usually means a bad query, not an empty
-  memory store.
+- Wrote new file, zero `recall_memory` calls → probably contradicting something.
+- Memory said "don't do X" and you did X → stop, reread, justify divergence or revert.
+- Zero recalls on mature project → broaden query, search by path. Zero = bad query, not empty store.
 
-See also: [start-every-task](../start-every-task/SKILL.md),
-[write-memory-on-completion](../write-memory-on-completion/SKILL.md).
+See also: [start-every-task](../start-every-task/SKILL.md), [write-memory-on-completion](../write-memory-on-completion/SKILL.md).
