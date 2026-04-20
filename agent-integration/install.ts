@@ -2182,6 +2182,88 @@ export async function installWindsurf(opts: { dryRun: boolean; targetDir?: strin
   });
 }
 
+// ── Per-project init: Copilot CLI ─────────────────────────────────────────────
+// Writes the Fulcrum integration files for the GitHub Copilot CLI (the
+// standalone `copilot` binary, NOT the VS Code extension):
+//   1. .mcp.json          — MCP server registration (replaces .vscode/mcp.json)
+//   2. .github/copilot-instructions.md   — global workspace instructions
+//   3. .github/instructions/fulcrum-skill-*.instructions.md × 33
+//   4. .github/agents/<role>.agent.md × 24
+//   5. .github/hooks/fulcrum.json       — lifecycle hooks
+//   6. AGENTS.md                        — always-on managed block
+
+export async function installCopilot(opts: { dryRun: boolean; targetDir?: string }): Promise<void> {
+  const targetDir = opts.targetDir ?? process.cwd();
+  const dryRun = opts.dryRun;
+
+  const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
+  const src = path.join(REPO_ROOT_LOCAL, "copilot");
+
+  // Helper: copy a single file from src to dest, creating parent dirs.
+  function copyOne(srcRel: string, destRel: string): void {
+    const srcPath = path.join(src, srcRel);
+    const destPath = path.join(targetDir, destRel);
+    if (fs.existsSync(destPath)) {
+      skip(`already exists: ${destPath}`);
+      return;
+    }
+    if (dryRun) {
+      console.log(`  [dry-run] would create ${destPath}`);
+      ok(`(dry-run) ${destRel}`);
+      return;
+    }
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    fs.copyFileSync(srcPath, destPath);
+    ok(`wrote ${destPath}`);
+    setRollback(`rm -f ${destPath}`);
+  }
+
+  // Helper: copy all files matching pattern in a source dir.
+  function copyDir(srcSubdir: string, destSubdir: string, pattern: RegExp): void {
+    const srcDir = path.join(src, srcSubdir);
+    if (!fs.existsSync(srcDir)) return;
+    for (const name of fs.readdirSync(srcDir)) {
+      if (!pattern.test(name)) continue;
+      copyOne(path.join(srcSubdir, name), path.join(destSubdir, name));
+    }
+  }
+
+  await step("Copilot: .mcp.json", () => {
+    copyOne(".mcp.json", ".mcp.json");
+  });
+
+  await step("Copilot: .github/copilot-instructions.md", () => {
+    copyOne(".github/copilot-instructions.md", ".github/copilot-instructions.md");
+  });
+
+  await step("Copilot: .github/copilot-instructions.public.md", () => {
+    copyOne(
+      ".github/copilot-instructions.public.md",
+      ".github/copilot-instructions.public.md"
+    );
+  });
+
+  await step("Copilot: .github/instructions/ (33 skill files)", () => {
+    copyDir(
+      ".github/instructions",
+      ".github/instructions",
+      /fulcrum-skill-.*\.instructions\.md$/
+    );
+  });
+
+  await step("Copilot: .github/agents/ (24 role files)", () => {
+    copyDir(".github/agents", ".github/agents", /\.agent\.md$/);
+  });
+
+  await step("Copilot: .github/hooks/fulcrum.json", () => {
+    copyOne(".github/hooks/fulcrum.json", ".github/hooks/fulcrum.json");
+  });
+
+  await step("Copilot: AGENTS.md", () => {
+    copyOne("AGENTS.md", "AGENTS.md");
+  });
+}
+
 // ── Entry guard ───────────────────────────────────────────────────────────────
 // Run main() only when executed as a script, not when imported as a module
 // (e.g. from `fulcrum init` which imports installCursor / installWindsurf).

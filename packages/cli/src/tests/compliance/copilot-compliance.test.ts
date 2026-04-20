@@ -1,13 +1,18 @@
-// GitHub Copilot compliance — TDD spec gate for PR 10 (future).
+// GitHub Copilot CLI compliance — TDD spec gate for PR 10.
 //
-// Sources (framework-docs-researcher 2026-04-20; GitHub Copilot in VS Code):
-//   docs.github.com/en/copilot/customizing-copilot — surfaces + paths
-//   VS Code docs — Agent hooks (Preview), .agent.md, .prompt.md, .vscode/mcp.json
-//   code.visualstudio.com/docs/copilot/customization/* — each surface
+// Target: GitHub Copilot CLI (v1.0.x) — the standalone `copilot` binary,
+// NOT VS Code's Copilot extension. These surfaces differ significantly.
 //
-// "No hook layer" claim is WRONG as of 2026-04 — VS Code shipped Agent hooks
-// with the same 8 events Claude Code uses + Claude-format compat. Every test
-// here reflects the EXPANDED PR 10 scope per the research pass.
+// Sources (from CHANGELOG + live binary /usr/bin/copilot v1.0.32):
+//   CLI CHANGELOG /usr/share/doc/github-copilot-cli-bin/CHANGELOG.md
+//   `copilot --help`, `copilot help config`, `copilot mcp --help`
+//   Key facts:
+//     - MCP config: .mcp.json (not .vscode/mcp.json — removed v1.0.22)
+//     - Agents: .github/agents/*.agent.md — auto-discovered by CLI
+//     - Hooks: .github/hooks/*.json — Claude Code nested matcher format
+//     - Skills: .github/instructions/*.instructions.md (applyTo glob)
+//     - Hook event names: PreToolUse, PostToolUse (PascalCase)
+//     - Hook tool matchers: Write, Edit, Bash (Claude Code names)
 
 import { describe, it, expect } from 'vitest'
 import { existsSync } from 'fs'
@@ -43,27 +48,31 @@ describe('Copilot: global workspace instruction', () => {
   })
 })
 
-describe('Copilot: .vscode/mcp.json', () => {
-  const path = join(K, '.vscode/mcp.json')
+describe('Copilot: .mcp.json (CLI workspace MCP config)', () => {
+  // Copilot CLI v1.0.22 removed .vscode/mcp.json support.
+  // Workspace MCP config is now exclusively .mcp.json at the repo root.
+  const path = join(K, '.mcp.json')
   const doc = readJsonIfExists<any>(path)
 
-  it('.vscode/mcp.json exists', () => {
+  it('.mcp.json exists', () => {
     expect(doc).not.toBeNull()
   })
 
-  it('declares servers.fulcrum', () => {
-    expect(doc?.servers?.fulcrum).toBeDefined()
+  it('declares mcpServers.fulcrum', () => {
+    expect(doc?.mcpServers?.fulcrum).toBeDefined()
   })
 })
 
-describe('Copilot: path-scoped instructions', () => {
+describe('Copilot: path-scoped instructions (.github/instructions/)', () => {
+  // CLI loads *.instructions.md files from .github/instructions/ at every
+  // directory level up to git root. Files with applyTo globs are injected
+  // into context when a matching file is being edited.
   const dir = join(K, '.github/instructions')
   const files = existsSync(dir)
     ? listFilesRec(dir, /\.instructions\.md$/)
     : []
 
   it('GAP(cp-M2) emits 33 fulcrum-skill-<name>.instructions.md path-scoped files', () => {
-    // PR 10 scope: 33 canonical skills emitted as path-scoped instructions.
     const skillFiles = files.filter((f) => /fulcrum-skill-/.test(f))
     expect(skillFiles.length).toBeGreaterThanOrEqual(33)
   })
@@ -78,7 +87,9 @@ describe('Copilot: path-scoped instructions', () => {
   })
 })
 
-describe('Copilot: custom agents (.agent.md)', () => {
+describe('Copilot: custom agents (.github/agents/*.agent.md)', () => {
+  // CLI auto-discovers .github/agents/ in the repo. Each *.agent.md file
+  // is a custom agent with YAML frontmatter (name, description, model, skills).
   const dir = join(K, '.github/agents')
   const files = existsSync(dir) ? listDir(dir).filter((f) => f.endsWith('.agent.md')) : []
 
@@ -86,23 +97,14 @@ describe('Copilot: custom agents (.agent.md)', () => {
     expect(files.length).toBeGreaterThanOrEqual(24)
   })
 
-  it('GAP(cp-S2) chief_of_staff.agent.md lists handoffs/agents for delegation', () => {
+  it('GAP(cp-S2) chief_of_staff.agent.md lists agents for delegation', () => {
     const cos = files.find((f) => f.endsWith('chief_of_staff.agent.md'))
     if (!cos) return
     const fm = parseFrontmatter(readText(cos))
-    // At minimum `tools` + `model` + (`handoffs` OR `agents`) per VS Code schema
+    // CLI agent format: `agents` field lists sub-agents the CoS may delegate to
     const hasDelegation =
       'handoffs' in (fm ?? {}) || 'agents' in (fm ?? {})
     expect(hasDelegation).toBe(true)
-  })
-})
-
-describe('Copilot: prompt files (.prompt.md)', () => {
-  const dir = join(K, '.github/prompts')
-  const files = existsSync(dir) ? listDir(dir).filter((f) => f.endsWith('.prompt.md')) : []
-
-  it('GAP(cp-S3) emits fulcrum-* prompt files for user-invokable skills', () => {
-    expect(files.length).toBeGreaterThanOrEqual(6)
   })
 })
 
@@ -111,17 +113,18 @@ describe('Copilot: hooks (.github/hooks/*.json)', () => {
   const claudeCompatPath = join(K, '.claude/settings.json')
 
   it('GAP(cp-M4) emits .github/hooks/fulcrum.json OR .claude/settings.json with hook bindings', () => {
-    // VS Code Agent hooks read both paths per docs.
+    // CLI reads both paths; .github/hooks/*.json is the primary repo-level path.
     expect(existsSync(hooksPath) || existsSync(claudeCompatPath)).toBe(true)
   })
 
-  it('GAP(cp-M4b) hook tool-name matchers use VS Code names (create_file, replace_string_in_file)', () => {
-    // VS Code tools differ from Claude's: Write→create_file, Edit→replace_string_in_file.
+  it('GAP(cp-M4b) hook tool-name matchers use Copilot CLI tool names (Write, Edit, Bash)', () => {
+    // Copilot CLI uses Claude Code-compatible tool names (Write, Edit, Bash),
+    // NOT VS Code names (create_file, replace_string_in_file).
+    // See: CHANGELOG — "Hook config files now support Claude Code's nested matcher/hooks structure"
     const path = existsSync(hooksPath) ? hooksPath : claudeCompatPath
     if (!existsSync(path)) return
     const raw = readText(path)
-    // At least one matcher must reference the VS Code-native name.
-    expect(raw).toMatch(/create_file|replace_string_in_file|run_in_terminal/)
+    expect(raw).toMatch(/Write|Edit|Bash/)
   })
 })
 
@@ -137,7 +140,6 @@ describe('Copilot: AGENTS.md at root', () => {
 
 describe('Copilot: installer entry point', () => {
   it('GAP(cp-M5) installCopilot exported in agent-integration/install.ts', async () => {
-    // Installer must exist for PR 10 to ship.
     const installSrc = readText(installScriptPath())
     expect(installSrc).toMatch(/\binstallCopilot\b/)
   })

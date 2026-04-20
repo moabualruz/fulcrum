@@ -12,7 +12,7 @@ Every Fulcrum capability is reachable as a shell command. When Copilot runs in A
 - `fulcrum action exec heartbeat_agent_run --run_id <id> --progress_pct 40`
 - `fulcrum action exec complete_agent_run --run_id <id> --output_summary "…"`
 
-When Copilot runs inside VS Code Chat with MCP enabled (`.vscode/mcp.json` in this directory), the same capabilities appear as `mcp__fulcrum__*` tools. Either path is fine — pick whichever the session supports.
+When MCP is enabled (`.mcp.json` in this directory), the same capabilities appear as `mcp__fulcrum__*` tools. Either path is fine — pick whichever the session supports.
 
 ## Lifecycle expectations
 

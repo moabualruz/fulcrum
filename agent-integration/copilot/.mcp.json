@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "fulcrum": {
+      "command": "fulcrum",
+      "args": ["serve", "mcp", "--profile", "software_engineer"],
+      "type": "stdio"
+    }
+  }
+}
