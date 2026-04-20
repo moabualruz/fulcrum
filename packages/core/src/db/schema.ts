@@ -1159,6 +1159,24 @@ export function applySchema(db: Database.Database): void {
       UNIQUE(workspace_id, instance_id, date)
     );
 
+    -- ── recall_turn_state: cross-process coordination for PR 3 measurement spike ─
+    -- Tracks grep-without-recall per (session_id, turn_id, agent_type) so the
+    -- Claude PreToolUse hook can emit the Fulcrum-first nudge (Variant A) or
+    -- trigger passive-injection (Variant B). session_id is validated against
+    -- agent_runs.run_id before any write (AD-9b trust boundary). See AD-5 for
+    -- the cross-process rationale.
+    CREATE TABLE IF NOT EXISTS recall_turn_state (
+      session_id                TEXT NOT NULL,
+      turn_id                   TEXT NOT NULL DEFAULT '',
+      agent_type                TEXT NOT NULL,
+      last_recall_at            TEXT,
+      grep_count_without_recall INTEGER NOT NULL DEFAULT 0,
+      created_at                TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at                TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (session_id, turn_id, agent_type)
+    );
+    CREATE INDEX IF NOT EXISTS idx_recall_turn_state_session ON recall_turn_state(session_id);
+
     -- ── FTS5 full-text search ────────────────────────────────────────────────
 
     CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(

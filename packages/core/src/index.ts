@@ -18,6 +18,18 @@ export { FulcrumError } from './types.js'
 export { loadConfig, defaultConfig, validateFulcrumConfig, readRawConfig, writeRawConfig } from './config.js'
 export type { ValidationResult } from './config.js'
 
+// PR 3 — Fulcrum-first bias measurement spike
+export {
+  isTrustedSession,
+  recordRecall,
+  recordGrepWithoutRecall,
+  getTurnState,
+} from './recall-turn-state.js'
+export type { RecallTurnState } from './recall-turn-state.js'
+
+export { logRecallEvent, telemetryPath } from './recall-telemetry.js'
+export type { RecallEvent, RecallEventKind } from './recall-telemetry.js'
+
 // DB
 export { getDb, setDb, closeDb, _configureDb, globalDataDir, withTransaction, checkDbHealth } from './db/client.js'
 export type { Db } from './db/client.js'
