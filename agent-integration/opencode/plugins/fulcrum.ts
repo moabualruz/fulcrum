@@ -1,5 +1,6 @@
 import { type Plugin, tool } from "@opencode-ai/plugin"
 import { spawnSync } from "child_process"
+import { loadRider } from "./rider.js"
 
 // v2a Task 50: in-plugin allowlist. Must match Task 29 / 30 write-side
 // allowlist (Write/Edit/MultiEdit/NotebookEdit/Bash/Task). Tools not here
@@ -36,6 +37,11 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
   // Context from workspace — auto-detected from CWD at runtime
   let _cachedCtx: { workspace_id: string; project_id: string } | null = null
 
+  // Load the canonical rider + integrity check at plugin init. Logged once;
+  // subsequent injections reuse the same buffer.
+  const riderLoad = loadRider()
+  let experimentalFiredCount = 0
+
   function getContext(): { workspace_id: string; project_id: string } {
     if (_cachedCtx) return _cachedCtx
     try {
@@ -56,19 +62,35 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
     // needing to call status tools manually.
 
     "experimental.chat.system.transform": async (system) => {
+      // Prepend the canonical rider (fulcrum-first + lifecycle + role-boundaries).
+      // Fenced <fulcrum-system-rider> block so downstream model tooling can
+      // detect and parse it. Integrity status from the startup load is
+      // advisory — AD-3 says fail-open on mismatch so we continue with the
+      // best-effort rider regardless.
+      experimentalFiredCount++
+
+      let transformed = system
+      if (riderLoad.rider) {
+        const header = `<fulcrum-system-rider version="1" sha256="${riderLoad.sha256.slice(0, 12)}" integrity="${
+          riderLoad.integrityOk ? "ok" : "warn"
+        }">`
+        transformed = `${header}\n${riderLoad.rider}\n</fulcrum-system-rider>\n\n${system}`
+      }
+
+      // Append live workspace snapshot (existing behavior).
       try {
         const ids = getContext()
         const status = execAction("get_workspace_status", { workspace_id: ids.workspace_id }) as Record<string, unknown>
         const active = (status["active_runs"] as unknown[]) ?? []
         const blocked = (status["blocked_runs"] as unknown[]) ?? []
-        if (active.length === 0 && blocked.length === 0) return system
+        if (active.length === 0 && blocked.length === 0) return transformed
 
         const lines = [`\n<!-- Fulcrum workspace: ${ids.workspace_id} -->`]
         if (active.length > 0) lines.push(`Active agent runs: ${active.length}`)
         if (blocked.length > 0) lines.push(`⚠ Blocked runs: ${blocked.length}`)
-        return system + lines.join("\n")
+        return transformed + lines.join("\n")
       } catch {
-        return system
+        return transformed
       }
     },
 
@@ -174,6 +196,21 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
           encoding: "utf-8",
           timeout: 5_000,
         })
+        // AD-3 fallback signal: if experimental.chat.system.transform never
+        // fired this session, the rider didn't reach the model. Log a
+        // telemetry event so the measurement harness can detect silent
+        // primary-path failures and route through opencode.md (second ground
+        // truth) on the next session. Never throws; best-effort.
+        if (experimentalFiredCount === 0 && riderLoad.rider) {
+          try {
+            spawnSync("fulcrum", ["action", "exec", "emit_graph_event", "--json", JSON.stringify({
+              event_type: "opencode_rider_never_injected",
+              session_id: sessionId,
+              rider_sha256: riderLoad.sha256,
+              rule_count: riderLoad.ruleCount,
+            })], { encoding: "utf-8", timeout: 2_000 })
+          } catch { /* best-effort */ }
+        }
       } else if (name === "session.compacted") {
         // Emit pre_compact_extract memory
         spawnSync("fulcrum", ["hook", "opencode", "pre-compact"], {
