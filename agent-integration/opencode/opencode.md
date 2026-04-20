@@ -1,5 +1,15 @@
 # Fulcrum Agent OS — opencode Integration
 
+<!-- Content above this line is USER-OWNED and preserved across Fulcrum installer runs. -->
+
+<!-- BEGIN FULCRUM managed-block v1 -->
+<!--
+  AUTO-GENERATED — do not edit inside this block.
+  The Fulcrum installer overwrites this region idempotently on every run.
+  Edit the canonical source at agent-integration/rules/ + agent-integration/opencode/
+  instead. Anything outside the BEGIN/END markers is preserved verbatim.
+-->
+
 This file configures your connection to the Fulcrum agent control plane when using opencode.
 
 ---
@@ -106,3 +116,7 @@ If opencode is invoking Fulcrum through MCP rather than shell commands, use the 
 
 **All other roles** (implementation):
 - Focus on the assigned task; complete and report via `fulcrum action exec complete_agent_run`
+
+<!-- END FULCRUM managed-block v1 -->
+
+<!-- Content below this line is USER-OWNED and preserved across Fulcrum installer runs. -->

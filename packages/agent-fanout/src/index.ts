@@ -15,6 +15,9 @@ export { emitWindsurf, WindsurfSizeError, WINDSURF_MAX_BYTES } from './emit/wind
 export { scanForSecrets, SecretDetectedError } from './secret-scan.js'
 export type { SecretMatch } from './secret-scan.js'
 
+export { replaceMarkerBlock } from './marker-block.js'
+export type { MarkerReplaceOptions, MarkerReplaceResult } from './marker-block.js'
+
 export { ALL_TARGETS } from './types.js'
 export type {
   AgentTarget,
