@@ -1,0 +1,16 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/delegate-task/SKILL.md
+interface:
+  display_name: Delegate Task
+  short_description: Create and assign a task to another agent role
+  brand_color: '#4F46E5'
+dependencies:
+  tools:
+    - value: mcp__fulcrum__create_task
+      description: Fulcrum MCP tool (create_task)
+    - value: mcp__fulcrum__get_workspace_status
+      description: Fulcrum MCP tool (get_workspace_status)
+    - value: mcp__fulcrum__write_memory
+      description: Fulcrum MCP tool (write_memory)
+policy:
+  allow_implicit_invocation: false

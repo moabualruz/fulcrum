@@ -1,0 +1,14 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/policy-check/SKILL.md
+interface:
+  display_name: Policy Check
+  short_description: Verify an action is permitted by the current workspace policy before executing
+  brand_color: '#4F46E5'
+dependencies:
+  tools:
+    - value: mcp__fulcrum__block_agent_run
+      description: Fulcrum MCP tool (block_agent_run)
+    - value: mcp__fulcrum__get_workspace_status
+      description: Fulcrum MCP tool (get_workspace_status)
+policy:
+  allow_implicit_invocation: true

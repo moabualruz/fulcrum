@@ -1,0 +1,16 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/team-status/SKILL.md
+interface:
+  display_name: Team Status
+  short_description: Check the status of a running team instance
+  brand_color: '#4F46E5'
+dependencies:
+  tools:
+    - value: mcp__fulcrum__block_agent_run
+      description: Fulcrum MCP tool (block_agent_run)
+    - value: mcp__fulcrum__get_agent_run_status
+      description: Fulcrum MCP tool (get_agent_run_status)
+    - value: mcp__fulcrum__list_team_instances
+      description: Fulcrum MCP tool (list_team_instances)
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,16 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/session-end/SKILL.md
+interface:
+  display_name: Session End
+  short_description: Complete or hand off the Fulcrum agent run at end of session
+  brand_color: '#4F46E5'
+dependencies:
+  tools:
+    - value: mcp__fulcrum__block_agent_run
+      description: Fulcrum MCP tool (block_agent_run)
+    - value: mcp__fulcrum__complete_agent_run
+      description: Fulcrum MCP tool (complete_agent_run)
+    - value: mcp__fulcrum__write_memory
+      description: Fulcrum MCP tool (write_memory)
+policy:
+  allow_implicit_invocation: false

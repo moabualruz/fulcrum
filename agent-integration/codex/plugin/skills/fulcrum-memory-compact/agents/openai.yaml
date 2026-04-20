@@ -1,0 +1,14 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/memory-compact/SKILL.md
+interface:
+  display_name: Memory Compact
+  short_description: Compact and consolidate session memories before context window fills
+  brand_color: '#4F46E5'
+dependencies:
+  tools:
+    - value: mcp__fulcrum__recall_memory
+      description: Fulcrum MCP tool (recall_memory)
+    - value: mcp__fulcrum__write_memory
+      description: Fulcrum MCP tool (write_memory)
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,8 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/task-tracking/SKILL.md
+interface:
+  display_name: Task Tracking
+  short_description: 'Always-present guidance on when and how to use Fulcrum''s task lifecycle'
+  brand_color: '#4F46E5'
+policy:
+  allow_implicit_invocation: false

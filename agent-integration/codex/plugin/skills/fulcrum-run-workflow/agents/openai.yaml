@@ -1,0 +1,14 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/run-workflow/SKILL.md
+interface:
+  display_name: Run Workflow
+  short_description: Execute a named Fulcrum workflow rather than improvising a process
+  brand_color: '#4F46E5'
+dependencies:
+  tools:
+    - value: mcp__fulcrum__complete_agent_run
+      description: Fulcrum MCP tool (complete_agent_run)
+    - value: mcp__fulcrum__start_agent_run
+      description: Fulcrum MCP tool (start_agent_run)
+policy:
+  allow_implicit_invocation: false

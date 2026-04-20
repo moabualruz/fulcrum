@@ -1,0 +1,12 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/heartbeat-during-long-operations/SKILL.md
+interface:
+  display_name: Heartbeat During Long Operations
+  short_description: Emit heartbeat_agent_run every ~30 seconds during any run that takes more than ~60 seconds
+  brand_color: '#4F46E5'
+dependencies:
+  tools:
+    - value: mcp__fulcrum__heartbeat_agent_run
+      description: Fulcrum MCP tool (heartbeat_agent_run)
+policy:
+  allow_implicit_invocation: false

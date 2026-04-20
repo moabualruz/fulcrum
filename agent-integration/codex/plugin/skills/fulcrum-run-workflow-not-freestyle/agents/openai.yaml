@@ -1,0 +1,8 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/run-workflow-not-freestyle/SKILL.md
+interface:
+  display_name: Run Workflow Not Freestyle
+  short_description: 'Run multi-step repeatable processes as registered workflows, not ad-hoc'
+  brand_color: '#4F46E5'
+policy:
+  allow_implicit_invocation: false

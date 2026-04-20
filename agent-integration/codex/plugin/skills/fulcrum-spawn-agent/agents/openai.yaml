@@ -1,0 +1,18 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/spawn-agent/SKILL.md
+interface:
+  display_name: Spawn Agent
+  short_description: Start a new agent run for a specific role and task
+  brand_color: '#4F46E5'
+dependencies:
+  tools:
+    - value: mcp__fulcrum__get_agent_run_status
+      description: Fulcrum MCP tool (get_agent_run_status)
+    - value: mcp__fulcrum__get_workspace_status
+      description: Fulcrum MCP tool (get_workspace_status)
+    - value: mcp__fulcrum__list_tasks
+      description: Fulcrum MCP tool (list_tasks)
+    - value: mcp__fulcrum__start_agent_run
+      description: Fulcrum MCP tool (start_agent_run)
+policy:
+  allow_implicit_invocation: false

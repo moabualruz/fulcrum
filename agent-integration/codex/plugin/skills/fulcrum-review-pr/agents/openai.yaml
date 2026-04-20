@@ -1,0 +1,16 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/review-pr/SKILL.md
+interface:
+  display_name: Review Pr
+  short_description: Perform a structured code review of a pull request or diff
+  brand_color: '#4F46E5'
+dependencies:
+  tools:
+    - value: mcp__fulcrum__recall_memory
+      description: Fulcrum MCP tool (recall_memory)
+    - value: mcp__fulcrum__update_task
+      description: Fulcrum MCP tool (update_task)
+    - value: mcp__fulcrum__write_memory
+      description: Fulcrum MCP tool (write_memory)
+policy:
+  allow_implicit_invocation: true

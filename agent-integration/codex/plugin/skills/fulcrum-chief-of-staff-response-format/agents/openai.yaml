@@ -1,0 +1,14 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/chief-of-staff-response-format/SKILL.md
+interface:
+  display_name: Chief Of Staff Response Format
+  short_description: 'When operating as chief_of_staff, end every response with the structured Status / Work Completed / Next Steps / Risks block'
+  brand_color: '#4F46E5'
+dependencies:
+  tools:
+    - value: mcp__fulcrum__invoke_team
+      description: Fulcrum MCP tool (invoke_team)
+    - value: mcp__fulcrum__start_agent_run
+      description: Fulcrum MCP tool (start_agent_run)
+policy:
+  allow_implicit_invocation: true

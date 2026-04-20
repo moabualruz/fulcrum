@@ -1,0 +1,12 @@
+# Auto-emitted by Fulcrum agent-fanout (PR 6.5). Do not hand-edit.
+# Canonical source: agent-integration/skills/write-memory-on-completion/SKILL.md
+interface:
+  display_name: Write Memory On Completion
+  short_description: 'Persist a memory after completing any task that involved a decision, trade-off, or surprising finding'
+  brand_color: '#4F46E5'
+dependencies:
+  tools:
+    - value: mcp__fulcrum__write_memory
+      description: Fulcrum MCP tool (write_memory)
+policy:
+  allow_implicit_invocation: false
