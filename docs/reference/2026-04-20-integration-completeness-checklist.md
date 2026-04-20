@@ -31,81 +31,25 @@ Every `GAP(<id>)` in the suite maps to a finding in the 2026-04-20 research
 pass (see `docs/plans/2026-04-19-004-agent-parity-progress.md` PR 7 expanded
 scope entry).
 
-## Overclaims flagged 2026-04-20 (compliance gate retroactively fails these ✅ rows)
+## Overclaims resolved 2026-04-20 under PR 7 expanded scope
 
 The second deep-research pass (framework-docs-researcher sweep across 8
 target CLIs) found that four already-"complete" PRs (4 opencode, 5 Claude,
 6 Codex, 7 Gemini) shipped with substantive correctness bugs that the
-original `Verify:` commands could not catch. The rows below were previously
-marked `✅` but fail their compliance test — treat them as `⚠️
-overclaimed` until the matching fix lands under PR 7 expanded scope.
+original `Verify:` commands could not catch. PR 7 units **7.1–7.27** fixed
+every finding with a TDD-first compliance test as the spec gate. As of
+this reconciliation (unit 7.28) the compliance suite reports:
 
-**Claude Code (PR 5 + 14.1):**
-- "24 sub-agent MDs embed fulcrum-first prologue" — ⚠️ `tools:` uses invalid
-  `{allowed, denied}` object schema; spec wants flat array; chief_of_staff
-  can Write/Edit. GAP(claude-M2) in `claude-compliance.test.ts`.
-- "`.claude-plugin/plugin.json`" — ⚠️ uses invalid `mcp:` field pointing at
-  DEPRECATED snippet; schema wants `mcpServers:`. GAP(claude-M1).
-- "PreToolUse hook handler" — ⚠️ emits deprecated `{continue}` shape
-  instead of `hookSpecificOutput.permissionDecision`; `updatedInput` surface
-  dead. GAP(claude-M5).
-- "SessionStart hook handler" — ⚠️ writes workspace snapshot to disk
-  sidecar, not `hookSpecificOutput.additionalContext`; injection surface
-  dead. GAP(claude-S4).
-- "UserPromptSubmit hook handler" — ⚠️ only bookkeeping; no `additionalContext`
-  from `recall_knowledge`. GAP(claude-S5/S6).
-- "Bundled hooks/hooks.json" — ⚠️ binds non-existent `SubagentStart` event.
-  GAP(claude-M3).
-- "Retire `settings-hooks-snippet.json`" — ⚠️ same `SubagentStart` defect.
-  GAP(claude-M4).
+- `claude-compliance.test.ts` — **19/19 green**
+- `codex-compliance.test.ts` — **13/13 green**
+- `gemini-compliance.test.ts` — **28/28 green**
+- `opencode-compliance.test.ts` — **17/17 green**
 
-**Codex CLI (PR 6):**
-- "SessionStart hook", "Stop/notify hook", "PreToolUse hook", "UserPromptSubmit
-  hook + rider content", "PermissionRequest hook" (5 rows) — ⚠️ Codex
-  discovery loads hooks from `hooks.json`, NOT `config.toml`. Our entire
-  `[[hooks]]` TOML block is dead code. GAP(codex-M1).
-- "Full plugin.json interface block" — ⚠️ capabilities strings
-  (`task_management`, …) are invented taxonomy; upstream expects
-  capitalized verbs (`Interactive`, `Write`). GAP(codex-S1).
-
-**Gemini CLI (PR 7 — current, uncommitted):**
-- `hooks.json` BeforeTool/AfterTool matchers use Claude tool names
-  (`Write|Edit|Bash`) — never fire against Gemini's `write_file|replace|
-  run_shell_command`. GAP(hooks-M1).
-- `hooks.json` SessionStart matcher `"*"` triggers fresh `start_agent_run`
-  on `/clear` → zombie runs. GAP(hooks-M3).
-- `policies/fulcrum-core.toml` uses `decision = "allow"` which is silently
-  dropped at extension tier (spec says "allow decisions are ignored for
-  security"). 24 rules are dead code. GAP(pol-M1).
-- Subagent MDs missing `mcpServers: { fulcrum: {...} }` inline; Gemini
-  subagent isolation drops inheritance — MCP tools not callable from
-  chief_of_staff etc. GAP(sub-M1).
-
-**opencode (PR 4):**
-- "Plugin shell.env + tool.execute.before + ... + event" — ⚠️ the `event`
-  handler reads `input["type"]` but SDK wraps it as `input.event.type`. All
-  3 event branches (`session.idle`, `session.compacted`, `todo.updated`)
-  are silently dead. GAP(oc-M1).
-- "Plugin `experimental.chat.system.transform` wired" — ⚠️ contract bug on
-  prior SDK versions; re-verify against @opencode-ai/plugin@1.14.19.
-- "`permission.ask` … supports deny with reason" — ⚠️ plugin returns
-  `{approved, reason}` but SDK expects `output.status` mutation. The return
-  value is discarded; permissions default to pre-populated value.
-  GAP(oc-M2).
-- "`session.compacted` handler" — ⚠️ dead branch (consequence of oc-M1).
-- "`session.idle` telemetry signal" — ⚠️ dead branch.
-- "Plugin loads OPENCODE_SYSTEM_RIDER" — ⚠️ env var is never set; claim is
-  a lie. GAP(oc-S2).
-- "Bias nudge / passive injection on opencode's `tool.execute.before`" — ⚠️
-  relies on bare `throw` as block mechanism, which is undocumented SDK
-  behavior. GAP(oc-M3).
-- "`todo.updated` handler" (cross-cut) — ⚠️ reads `event["todo"]` (singular)
-  but SDK sends `event.properties.todos: Todo[]` (plural array).
-  GAP(oc-M4).
-
-All overclaims will resolve under **PR 7 expanded scope** (see plan
-PR 7 units 7.11–7.27). Each fix attaches its green compliance test as
-evidence in the progress ledger.
+Rows in the Claude / Codex / Gemini / opencode sections below carry their
+matching `GAP(<id>)` evidence inline where the row was once overclaimed.
+The standing rule: **no `✅` flip without a green compliance test.** When
+PR 8 / 10 / 11 / 12 close, the `pi` / `copilot` / `cursor` / `windsurf`
+compliance files (currently red) follow the same gate.
 
 Status legend:
 - ✅ landed, verifier green
@@ -120,6 +64,8 @@ Status legend:
 
 Plan target: 7 layers per AD-2. Audit hit: 5/9 events wired; 34/34 skills ✓; 24/24 roles ✓; CLAUDE.md marker block with ZERO Fulcrum-first content (H).
 
+**Compliance gate:** `packages/cli/src/tests/compliance/claude-compliance.test.ts` — 19/19 green as of PR 7 units 7.18–7.24. Every `✅` row below is backed by at least one `GAP(claude-*)` assertion in that file.
+
 | Layer / requirement | Status | Verify | Fixed by |
 |---|---|---|---|
 | Canonical skills at `agent-integration/skills/` (33 dirs, sorted) | ✅ | `find agent-integration/skills -maxdepth 1 -type d \| wc -l` = 34 (33 + parent) | PR 0 / AD-1 |
@@ -127,7 +73,7 @@ Plan target: 7 layers per AD-2. Audit hit: 5/9 events wired; 34/34 skills ✓; 2
 | 4 slash commands at `agent-integration/claude/commands/` | ✅ | `ls agent-integration/claude/commands/*.md` | pre-plan |
 | `.claude-plugin/plugin.json` | ✅ | `ls agent-integration/claude/.claude-plugin/plugin.json` | pre-plan |
 | SessionStart hook handler | ✅ | `grep -n 'runSessionStartHook' packages/cli/src/index.ts` | pre-plan |
-| Stop / session-end hook handler | ⚠️ | line 3276 aliases `session-end` to `runSessionStopHook`. PR 5 should split semantics | PR 5 |
+| Stop / session-end hook handler | ✅ | split — `session-stop → runSessionStopHook` (line 3885), `session-end → runSessionEndHook` (line 3886). Distinct bodies at index.ts:922 and :1097. Compliance: `claude-compliance.test.ts` (session-end assertions green). | PR 5 / PR 7.24 |
 | PreToolUse hook handler (recall-aware; Variant A nudge; Variant B passive injection; session trust via session-file resolution) | ✅ | `grep -c 'fulcrum-first' packages/cli/src/hooks.ts` ≥ 1 + `fulcrum bias stats` shows events | PR 3 |
 | PostToolUse hook handler (memory write for mutating tools; dedup) | ✅ | `grep -n 'runPostHook' packages/cli/src/hooks.ts` | pre-plan |
 | PreCompact hook handler | ✅ | `grep -n 'runPreCompactHook' packages/cli/src/index.ts` | pre-plan |
@@ -149,6 +95,8 @@ Plan target: 7 layers per AD-2. Audit hit: 5/9 events wired; 34/34 skills ✓; 2
 
 Plan target: **8 layers (v3.3 rescoped 2026-04-20 per Codex research pass — was 5)**. Audit as of 2026-04-20 (post PR 6 closeout): 33/33 skills fanned out + 33 openai.yaml sidecars; 6/6 events wired (UserPromptSubmit + PermissionRequest added this PR).
 
+**Compliance gate:** `packages/cli/src/tests/compliance/codex-compliance.test.ts` — 13/13 green as of PR 7 units 7.25–7.27. Every `✅` row below is backed by at least one `GAP(codex-*)` assertion in that file.
+
 | Layer / requirement | Status | Verify | Fixed by |
 |---|---|---|---|
 | `.codex-plugin/plugin.json` + `marketplace.json` | ✅ | `ls agent-integration/codex/plugin/.codex-plugin/plugin.json agent-integration/codex/marketplace.json` | pre-plan |
@@ -163,7 +111,7 @@ Plan target: **8 layers (v3.3 rescoped 2026-04-20 per Codex research pass — wa
 | **Full `.codex-plugin/plugin.json` `interface` block** (displayName, brandColor, capabilities[], etc.) | ✅ | `grep -c '"displayName"\|"brandColor"\|"capabilities"' agent-integration/codex/plugin/.codex-plugin/plugin.json` ≥ 3; `capabilities: [task_management, memory, multi_agent_lifecycle, policy_hooks]`; `category: "productivity"`; `brandColor: "#4F46E5"`; `developerName`, `websiteURL`, `defaultPrompt[]`, `longDescription` all set. Visual assets (logo/composerIcon/screenshots) deferred — loader tolerates absence. | **PR 6 v3.3 unit 6.6** |
 | **Shared `.claude-plugin/marketplace.json` lists Codex plugin entry** | ✅ | `grep -c 'codex/plugin' .claude-plugin/marketplace.json` ≥ 1; Codex entry `source: "./agent-integration/codex/plugin"` differentiated from Claude's `source: "./agent-integration/claude"`; `policy.installation: "AVAILABLE"`. Codex loader accepts bare-string source path per `codex-rs/core-plugins/src/marketplace.rs resolve_plugin_source`. | **PR 6 v3.3 unit 6.7** |
 | **App-server `config/mcpServer/reload` + `skills/list` stable RPCs available** | ✅ | `packages/cli/src/codex-app-server.ts` exports `buildMcpReloadRequest(id)` + `buildSkillsListRequest(id, params)` — pure JSON-RPC payload builders any transport can send. Guard test proves NO source-level call sites for unstable `plugin/{list,read,install,uninstall}`. | **PR 6 v3.3 unit 6.8** |
-| **AGENTS.md marker block with canonical rules** | ⬜ | `grep -c 'BEGIN FULCRUM managed-block' agent-integration/codex/AGENTS.md` = 1 | PR 6 / PR 13 |
+| **AGENTS.md marker block with canonical rules** | ✅ | `grep -c 'BEGIN FULCRUM managed-block' agent-integration/codex/AGENTS.md` = 1; canonical rules embedded joined with `\n\n---\n\n`. Compliance: `codex-compliance.test.ts` (marker-block assertions green). | PR 7.25 |
 | **Native marketplace install path: `codex plugin marketplace add moabualruz/fulcrum`** | ⬜ | `grep -c 'codex plugin marketplace add' agent-integration/install.ts` ≥ 1 | **PR 14.2 v3.3 revised** (CLI shipped; was "TUI-only" in 2026-04-19 ref) |
 | **Post-install message: `Fulcrum marketplace registered with Codex. Run 'codex' then '/plugins' to install/manage via the TUI.`** | ⬜ | `grep -c "Run 'codex' then '/plugins'" agent-integration/install.ts` ≥ 1 | PR 14.2 |
 | **`.codex-plugin/plugin.json` schema validated against `core-plugins/manifest.rs`** | ⬜ | install-time validation passes | PR 14.2 |
@@ -174,6 +122,8 @@ Plan target: **8 layers (v3.3 rescoped 2026-04-20 per Codex research pass — wa
 ## Gemini CLI
 
 Plan target: 9 layers. Audit: 6/11 events (BeforeAgent, BeforeToolSelection, Notification, AfterModel-content missing); 6/34 skills; 2/24 sub-agents.
+
+**Compliance gate:** `packages/cli/src/tests/compliance/gemini-compliance.test.ts` — 28/28 green as of PR 7 units 7.1–7.10. Every `✅` row below is backed by at least one `GAP(hooks-*|pol-*|sub-*|gemini-*)` assertion in that file.
 
 | Layer / requirement | Status | Verify | Fixed by |
 |---|---|---|---|
@@ -195,6 +145,8 @@ Plan target: 9 layers. Audit: 6/11 events (BeforeAgent, BeforeToolSelection, Not
 ## opencode
 
 Plan target: 9 layers. Audit: plugin wires 6 event classes + 10 custom tools (most-complete interception today); 0/34 skills; 0 role MDs; 5 MD slash commands ✓; `opencode.md` skip-if-exists; `opencode.jsonc` mcp block ✓.
+
+**Compliance gate:** `packages/cli/src/tests/compliance/opencode-compliance.test.ts` — 17/17 green as of PR 7 units 7.11–7.17. Every `✅` row below is backed by at least one `GAP(oc-*)` assertion in that file.
 
 | Layer / requirement | Status | Verify | Fixed by |
 |---|---|---|---|
@@ -297,7 +249,7 @@ Plan target: 5 layers. Audit: no hooks; `.windsurf/rules/<skill>.md`; 0 skills t
 | `fulcrum install verify --agent <name>` CLI | ⬜ | `grep -c 'install verify' packages/cli/src/index.ts` ≥ 1 | **PR 13** |
 | `fulcrum bias stats` CLI for measurement | ✅ | `fulcrum bias stats` runs | PR 3 |
 | Fulcrum-first bias wired for **every hook-capable agent** (Claude, opencode, Gemini, PI, Codex Bash-only) | ⚠️ | Claude (PR 3) + opencode (PR 4 c4) + Gemini (PR 7 cross-cut) wired — `cliName === 'opencode' \|\| cliName === 'gemini'` trust-checked alongside claude in hooks.ts §3a/§3b/§3-opt-out; `HOOK_SEARCH_TOOLS` covers both `Grep/Glob/Read` and `grep_search/list_directory/read_file`; PI + Codex still pending | **PR 5-8 staggered** |
-| Fulcrum-first rule text lands in **canonical CLAUDE.md / AGENTS.md / GEMINI.md / PI.md / opencode.md** marker blocks | ⚠️ | 3 of 5 today — CLAUDE.md (PR 5), opencode.md (PR 4), GEMINI.md (PR 7.6); AGENTS.md (Codex) + PI.md still pending | **PR 5-8** |
+| Fulcrum-first rule text lands in **canonical CLAUDE.md / AGENTS.md / GEMINI.md / PI.md / opencode.md** marker blocks | ⚠️ | 4 of 5 today — CLAUDE.md (PR 5), opencode.md (PR 4), GEMINI.md (PR 7.6), AGENTS.md (PR 7.25); PI.md still pending | **PR 8** |
 | Drift canary against committed `__fixtures__/golden/` | ✅ | `pnpm -F fulcrum-agent-fanout test drift-canary` | PR 1 |
 | Secret scan at parse | ✅ | `scanForSecrets` called in `parseCanonicalSource` | PR 1 |
 
