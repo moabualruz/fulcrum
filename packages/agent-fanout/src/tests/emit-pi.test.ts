@@ -9,20 +9,33 @@ const agentIntegrationRoot = join(here, '..', '..', '..', '..', 'agent-integrati
 
 describe('emitPi', () => {
   const source = parseCanonicalSource({ agentIntegrationRoot })
+  const result = emitPi(source)
+  const skillArtifacts = result.artifacts.filter((a) => a.sourceSkillName)
+  const ruleArtifacts = result.artifacts.filter((a) => a.sourceRuleName)
 
   it('targets pi', () => {
-    expect(emitPi(source).target).toBe('pi')
+    expect(result.target).toBe('pi')
   })
 
-  it('emits zero artifacts (PI consumes canonical via symlink; OQ #5)', () => {
-    expect(emitPi(source).artifacts).toEqual([])
+  it('emits zero skill artifacts (PI consumes canonical via symlink; OQ #5)', () => {
+    expect(skillArtifacts).toEqual([])
   })
 
-  it('is a deliberate no-op even with non-empty source (regression guard)', () => {
-    expect(emitPi({ skills: source.skills.slice(0, 5) }).artifacts).toEqual([])
+  it('emits one rule artifact per canonical rule', () => {
+    expect(ruleArtifacts.length).toBe(3)
+    expect(
+      ruleArtifacts.find((a) => a.sourceRuleName === 'role-boundaries')?.path,
+    ).toBe('rules/fulcrum-rule-role-boundaries.md')
+  })
+
+  it('preserves rule as raw bytes', () => {
+    for (const rule of source.rules) {
+      const artifact = ruleArtifacts.find((a) => a.sourceRuleName === rule.name)
+      expect(artifact?.contents).toBe(rule.raw)
+    }
   })
 
   it('returns empty artifacts for empty source', () => {
-    expect(emitPi({ skills: [] })).toEqual({ target: 'pi', artifacts: [] })
+    expect(emitPi({ skills: [], rules: [] })).toEqual({ target: 'pi', artifacts: [] })
   })
 })

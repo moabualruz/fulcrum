@@ -27,14 +27,24 @@ export interface CanonicalSkill {
   raw: string
 }
 
+export interface CanonicalRule {
+  name: string
+  path: string
+  frontmatter: Record<string, unknown>
+  body: string
+  raw: string
+}
+
 export interface CanonicalSource {
   skills: CanonicalSkill[]
+  rules: CanonicalRule[]
 }
 
 export interface EmitArtifact {
   path: string
   contents: string
   sourceSkillName?: string
+  sourceRuleName?: string
 }
 
 export interface EmitResult {

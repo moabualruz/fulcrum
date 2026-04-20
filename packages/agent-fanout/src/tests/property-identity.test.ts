@@ -19,15 +19,21 @@ const agentIntegrationRoot = join(here, '..', '..', '..', '..', 'agent-integrati
 
 type Emitter = (source: CanonicalSource) => EmitResult
 
-const emitters: Array<{ target: AgentTarget; emit: Emitter; preservesBody: boolean; expectArtifacts: (n: number) => number }> = [
-  { target: 'claude', emit: emitClaude, preservesBody: true, expectArtifacts: (n) => n },
-  { target: 'pi', emit: emitPi, preservesBody: false, expectArtifacts: () => 0 },
-  { target: 'codex', emit: emitCodex, preservesBody: true, expectArtifacts: (n) => n },
-  { target: 'gemini', emit: emitGemini, preservesBody: true, expectArtifacts: (n) => n },
-  { target: 'opencode', emit: emitOpencode, preservesBody: true, expectArtifacts: (n) => n },
-  { target: 'copilot', emit: emitCopilot, preservesBody: true, expectArtifacts: (n) => n },
-  { target: 'cursor', emit: emitCursor, preservesBody: true, expectArtifacts: (n) => n },
-  { target: 'windsurf', emit: emitWindsurf, preservesBody: true, expectArtifacts: (n) => n },
+const emitters: Array<{
+  target: AgentTarget
+  emit: Emitter
+  expectedSkillCount: (n: number) => number
+  expectedRuleCount: (n: number) => number
+  preservesSkillBody: boolean
+}> = [
+  { target: 'claude',   emit: emitClaude,   expectedSkillCount: (n) => n, expectedRuleCount: (n) => n, preservesSkillBody: true },
+  { target: 'pi',       emit: emitPi,       expectedSkillCount: () => 0, expectedRuleCount: (n) => n, preservesSkillBody: false },
+  { target: 'codex',    emit: emitCodex,    expectedSkillCount: (n) => n, expectedRuleCount: (n) => n, preservesSkillBody: true },
+  { target: 'gemini',   emit: emitGemini,   expectedSkillCount: (n) => n, expectedRuleCount: (n) => n, preservesSkillBody: true },
+  { target: 'opencode', emit: emitOpencode, expectedSkillCount: (n) => n, expectedRuleCount: (n) => n, preservesSkillBody: true },
+  { target: 'copilot',  emit: emitCopilot,  expectedSkillCount: (n) => n, expectedRuleCount: (n) => n, preservesSkillBody: true },
+  { target: 'cursor',   emit: emitCursor,   expectedSkillCount: (n) => n, expectedRuleCount: (n) => n, preservesSkillBody: true },
+  { target: 'windsurf', emit: emitWindsurf, expectedSkillCount: (n) => n, expectedRuleCount: (n) => n, preservesSkillBody: true },
 ]
 
 describe('emitters cover every AgentTarget', () => {
@@ -37,45 +43,58 @@ describe('emitters cover every AgentTarget', () => {
   })
 })
 
-describe('AD-6 per-skill identity property — unified across all 8 emit targets', () => {
+describe('AD-6 per-skill + per-rule identity — unified across all 8 emit targets', () => {
   const source = parseCanonicalSource({ agentIntegrationRoot })
 
-  for (const { target, emit, preservesBody, expectArtifacts } of emitters) {
+  for (const { target, emit, expectedSkillCount, expectedRuleCount, preservesSkillBody } of emitters) {
     describe(target, () => {
       const result = emit(source)
-      const expectedCount = expectArtifacts(source.skills.length)
+      const skillArtifacts = result.artifacts.filter((a) => a.sourceSkillName)
+      const ruleArtifacts = result.artifacts.filter((a) => a.sourceRuleName)
+      const expectedSkills = expectedSkillCount(source.skills.length)
+      const expectedRules = expectedRuleCount(source.rules.length)
 
-      it(`emits exactly ${expectedCount} skill artifacts (no drop, no concat)`, () => {
-        expect(result.artifacts.length).toBe(expectedCount)
+      it(`emits ${expectedSkills} skill + ${expectedRules} rule artifacts`, () => {
+        expect(skillArtifacts.length).toBe(expectedSkills)
+        expect(ruleArtifacts.length).toBe(expectedRules)
       })
 
-      it('maps artifacts 1:1 to canonical skills (if any emitted)', () => {
-        if (expectedCount === 0) return
-        const canonicalNames = source.skills.map((s) => s.name).sort()
-        const emittedNames = result.artifacts.map((a) => a.sourceSkillName!).sort()
-        expect(emittedNames).toEqual(canonicalNames)
+      it('maps skill artifacts 1:1 to canonical skills', () => {
+        if (expectedSkills === 0) return
+        expect(skillArtifacts.map((a) => a.sourceSkillName!).sort()).toEqual(
+          source.skills.map((s) => s.name).sort(),
+        )
+      })
+
+      it('maps rule artifacts 1:1 to canonical rules', () => {
+        if (expectedRules === 0) return
+        expect(ruleArtifacts.map((a) => a.sourceRuleName!).sort()).toEqual(
+          source.rules.map((r) => r.name).sort(),
+        )
       })
 
       it('every emitted sourceSkillName corresponds to a real canonical skill', () => {
-        for (const artifact of result.artifacts) {
-          if (!artifact.sourceSkillName) continue
-          const canonical = source.skills.find((s) => s.name === artifact.sourceSkillName)
-          expect(canonical, `ghost emit: ${target}:${artifact.sourceSkillName}`).toBeDefined()
+        for (const artifact of skillArtifacts) {
+          expect(source.skills.find((s) => s.name === artifact.sourceSkillName!)).toBeDefined()
         }
       })
 
-      it('artifact paths are unique within the target (no clobber)', () => {
+      it('every emitted sourceRuleName corresponds to a real canonical rule', () => {
+        for (const artifact of ruleArtifacts) {
+          expect(source.rules.find((r) => r.name === artifact.sourceRuleName!)).toBeDefined()
+        }
+      })
+
+      it('artifact paths are unique within the target', () => {
         const paths = result.artifacts.map((a) => a.path)
         expect(new Set(paths).size).toBe(paths.length)
       })
 
-      if (preservesBody) {
-        it('preserves canonical body byte-for-byte', () => {
+      if (preservesSkillBody) {
+        it('preserves canonical skill body byte-for-byte', () => {
           for (const skill of source.skills) {
-            const artifact = result.artifacts.find((a) => a.sourceSkillName === skill.name)
-            expect(artifact, `missing emit for ${target}:${skill.name}`).toBeDefined()
-            const body = matter(artifact!.contents).content.trim()
-            expect(body).toBe(skill.body)
+            const artifact = skillArtifacts.find((a) => a.sourceSkillName === skill.name)
+            expect(matter(artifact!.contents).content.trim()).toBe(skill.body)
           }
         })
       }
@@ -88,26 +107,30 @@ describe('determinism — same input yields the same output', () => {
 
   for (const { target, emit } of emitters) {
     it(`${target}: emit(source) is structurally equal across calls`, () => {
-      const first = emit(source)
-      const second = emit(source)
-      expect(second).toEqual(first)
+      expect(emit(source)).toEqual(emit(source))
     })
     it(`${target}: artifact contents are byte-identical across calls`, () => {
-      const first = emit(source).artifacts.map((a) => a.contents).join('\x00')
-      const second = emit(source).artifacts.map((a) => a.contents).join('\x00')
-      expect(second).toBe(first)
+      const a = emit(source).artifacts.map((x) => x.contents).join('\x00')
+      const b = emit(source).artifacts.map((x) => x.contents).join('\x00')
+      expect(b).toBe(a)
     })
   }
 })
 
-describe('emit(parse) is pure — emitter does not mutate the canonical source', () => {
+describe('emit does not mutate the canonical source', () => {
   const source = parseCanonicalSource({ agentIntegrationRoot })
-  const snapshot = JSON.stringify(source.skills.map((s) => ({ name: s.name, body: s.body, raw: s.raw })))
+  const snapshot = JSON.stringify({
+    skills: source.skills.map((s) => ({ name: s.name, body: s.body, raw: s.raw })),
+    rules: source.rules.map((r) => ({ name: r.name, body: r.body, raw: r.raw })),
+  })
   for (const { target, emit } of emitters) {
     it(`${target}`, () => {
       emit(source)
-      const after = JSON.stringify(source.skills.map((s) => ({ name: s.name, body: s.body, raw: s.raw })))
-      expect(after, `${target} mutated source`).toBe(snapshot)
+      const after = JSON.stringify({
+        skills: source.skills.map((s) => ({ name: s.name, body: s.body, raw: s.raw })),
+        rules: source.rules.map((r) => ({ name: r.name, body: r.body, raw: r.raw })),
+      })
+      expect(after).toBe(snapshot)
     })
   }
 })

@@ -11,36 +11,47 @@ const agentIntegrationRoot = join(here, '..', '..', '..', '..', 'agent-integrati
 describe('emitGemini', () => {
   const source = parseCanonicalSource({ agentIntegrationRoot })
   const result = emitGemini(source)
+  const skillArtifacts = result.artifacts.filter((a) => a.sourceSkillName)
+  const ruleArtifacts = result.artifacts.filter((a) => a.sourceRuleName)
 
   it('targets gemini', () => {
     expect(result.target).toBe('gemini')
   })
 
-  it('emits one artifact per canonical skill at skills/fulcrum-<name>/SKILL.md', () => {
-    expect(result.artifacts.length).toBe(33)
-    const heartbeat = result.artifacts.find((a) => a.sourceSkillName === 'heartbeat')
-    expect(heartbeat?.path).toBe('skills/fulcrum-heartbeat/SKILL.md')
+  it('emits one skill artifact per canonical skill at skills/fulcrum-<name>/SKILL.md', () => {
+    expect(skillArtifacts.length).toBe(33)
+    expect(
+      skillArtifacts.find((a) => a.sourceSkillName === 'heartbeat')?.path,
+    ).toBe('skills/fulcrum-heartbeat/SKILL.md')
   })
 
-  it('namespaces frontmatter.name to fulcrum-<canonical-name>', () => {
-    for (const artifact of result.artifacts) {
+  it('emits one rule artifact per canonical rule at rules/fulcrum-rule-<name>.md', () => {
+    expect(ruleArtifacts.length).toBe(3)
+    expect(
+      ruleArtifacts.find((a) => a.sourceRuleName === 'lifecycle')?.path,
+    ).toBe('rules/fulcrum-rule-lifecycle.md')
+  })
+
+  it('namespaces skill frontmatter.name to fulcrum-<canonical-name>', () => {
+    for (const artifact of skillArtifacts) {
       const parsed = matter(artifact.contents)
       expect(parsed.data.name).toBe(`fulcrum-${artifact.sourceSkillName}`)
     }
   })
 
-  it('preserves canonical body byte-for-byte (AD-6)', () => {
+  it('preserves canonical skill body byte-for-byte (AD-6)', () => {
     for (const skill of source.skills) {
-      const artifact = result.artifacts.find((a) => a.sourceSkillName === skill.name)
+      const artifact = skillArtifacts.find((a) => a.sourceSkillName === skill.name)
       const parsed = matter(artifact!.contents)
       expect(parsed.content.trim()).toBe(skill.body)
     }
   })
 
-  it('does not drop or concat any skill', () => {
-    const canonicalNames = source.skills.map((s) => s.name).sort()
-    const emittedNames = result.artifacts.map((a) => a.sourceSkillName!).sort()
-    expect(emittedNames).toEqual(canonicalNames)
+  it('preserves rule as raw bytes (installer injects into GEMINI.md)', () => {
+    for (const rule of source.rules) {
+      const artifact = ruleArtifacts.find((a) => a.sourceRuleName === rule.name)
+      expect(artifact?.contents).toBe(rule.raw)
+    }
   })
 
   it('is deterministic', () => {
@@ -48,6 +59,6 @@ describe('emitGemini', () => {
   })
 
   it('returns empty artifacts for empty source', () => {
-    expect(emitGemini({ skills: [] })).toEqual({ target: 'gemini', artifacts: [] })
+    expect(emitGemini({ skills: [], rules: [] })).toEqual({ target: 'gemini', artifacts: [] })
   })
 })

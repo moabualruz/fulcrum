@@ -19,6 +19,7 @@ export { ALL_TARGETS } from './types.js'
 export type {
   AgentTarget,
   CanonicalSkill,
+  CanonicalRule,
   CanonicalSource,
   EmitArtifact,
   EmitResult,

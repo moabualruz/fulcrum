@@ -15,6 +15,13 @@ describe('parseCanonicalSource', () => {
     expect(source.skills.length).toBe(33)
   })
 
+  it('reads every rule file under agent-integration/rules/', () => {
+    const source = parseCanonicalSource({ agentIntegrationRoot })
+    expect(source.rules.map((r) => r.name).sort()).toEqual(
+      ['fulcrum-first', 'lifecycle', 'role-boundaries'],
+    )
+  })
+
   it('populates name, path, frontmatter, body, raw for each skill', () => {
     const source = parseCanonicalSource({ agentIntegrationRoot })
     const heartbeat = source.skills.find((s) => s.name === 'heartbeat')
@@ -28,25 +35,38 @@ describe('parseCanonicalSource', () => {
     expect(heartbeat?.raw).toContain(heartbeat!.body)
   })
 
+  it('populates name, path, frontmatter, body, raw for each rule', () => {
+    const source = parseCanonicalSource({ agentIntegrationRoot })
+    const first = source.rules.find((r) => r.name === 'fulcrum-first')
+    expect(first).toBeDefined()
+    expect(first?.path.endsWith('fulcrum-first.md')).toBe(true)
+    expect(first?.frontmatter.name).toBe('fulcrum-first')
+    expect(first?.body).toMatch(/# Fulcrum-first/)
+    expect(first?.raw.startsWith('---\n')).toBe(true)
+  })
+
   it('skips index.md and any loose markdown at the skills root', () => {
     const source = parseCanonicalSource({ agentIntegrationRoot })
     expect(source.skills.find((s) => s.name === 'index')).toBeUndefined()
   })
 
-  it('returns empty when agent-integration/skills/ is absent', () => {
+  it('returns empty skills + rules when agent-integration/ is absent', () => {
     const tmp = mkdtempSync(join(tmpdir(), 'fanout-empty-'))
     try {
-      expect(parseCanonicalSource({ agentIntegrationRoot: tmp }).skills).toEqual([])
+      const source = parseCanonicalSource({ agentIntegrationRoot: tmp })
+      expect(source.skills).toEqual([])
+      expect(source.rules).toEqual([])
     } finally {
       rmSync(tmp, { recursive: true, force: true })
     }
   })
 
-  it('sorts skills by name for deterministic downstream emit', () => {
+  it('sorts skills and rules by name for deterministic downstream emit', () => {
     const source = parseCanonicalSource({ agentIntegrationRoot })
-    const names = source.skills.map((s) => s.name)
-    const sorted = [...names].sort()
-    expect(names).toEqual(sorted)
+    const skillNames = source.skills.map((s) => s.name)
+    expect(skillNames).toEqual([...skillNames].sort())
+    const ruleNames = source.rules.map((r) => r.name)
+    expect(ruleNames).toEqual([...ruleNames].sort())
   })
 
   it('fails the pipeline when a SKILL.md contains a secret (AD-9e integration)', () => {
@@ -56,6 +76,21 @@ describe('parseCanonicalSource', () => {
       writeFileSync(
         join(tmp, 'skills', 'bad-skill', 'SKILL.md'),
         '---\nname: bad-skill\ndescription: leaks a slack token\n---\n\ntoken=xoxb-1234567890-abcdefghij\n',
+        'utf8',
+      )
+      expect(() => parseCanonicalSource({ agentIntegrationRoot: tmp })).toThrow(SecretDetectedError)
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
+  it('fails the pipeline when a rule .md contains a secret', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'fanout-rule-secret-'))
+    try {
+      mkdirSync(join(tmp, 'rules'), { recursive: true })
+      writeFileSync(
+        join(tmp, 'rules', 'bad.md'),
+        '---\nname: bad\n---\n\nBearer eyJ0eXAiOiJKV1QiLCJhbGciOiJI000\n',
         'utf8',
       )
       expect(() => parseCanonicalSource({ agentIntegrationRoot: tmp })).toThrow(SecretDetectedError)

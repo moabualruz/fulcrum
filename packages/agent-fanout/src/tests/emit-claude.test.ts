@@ -11,34 +11,59 @@ const agentIntegrationRoot = join(here, '..', '..', '..', '..', 'agent-integrati
 describe('emitClaude', () => {
   const source = parseCanonicalSource({ agentIntegrationRoot })
   const result = emitClaude(source)
+  const skillArtifacts = result.artifacts.filter((a) => a.sourceSkillName)
+  const ruleArtifacts = result.artifacts.filter((a) => a.sourceRuleName)
 
   it('targets claude', () => {
     expect(result.target).toBe('claude')
   })
 
-  it('emits one artifact per canonical skill', () => {
-    expect(result.artifacts.length).toBe(source.skills.length)
-    expect(result.artifacts.length).toBe(33)
+  it('emits one skill artifact per canonical skill', () => {
+    expect(skillArtifacts.length).toBe(source.skills.length)
+    expect(skillArtifacts.length).toBe(33)
+  })
+
+  it('emits one rule artifact per canonical rule', () => {
+    expect(ruleArtifacts.length).toBe(source.rules.length)
+    expect(ruleArtifacts.length).toBe(3)
   })
 
   it('routes each skill to skills/<name>/SKILL.md', () => {
-    const heartbeat = result.artifacts.find((a) => a.sourceSkillName === 'heartbeat')
+    const heartbeat = skillArtifacts.find((a) => a.sourceSkillName === 'heartbeat')
     expect(heartbeat?.path).toBe('skills/heartbeat/SKILL.md')
   })
 
-  it('reconstructs byte-identical canonical source via skill.raw (no disk re-read)', () => {
+  it('routes each rule to rules/fulcrum-rule-<name>.md', () => {
+    const first = ruleArtifacts.find((a) => a.sourceRuleName === 'fulcrum-first')
+    expect(first?.path).toBe('rules/fulcrum-rule-fulcrum-first.md')
+  })
+
+  it('reconstructs byte-identical skill source via skill.raw (no disk re-read)', () => {
     for (const skill of source.skills) {
       const original = readFileSync(skill.path, 'utf8')
-      const emitted = result.artifacts.find((a) => a.sourceSkillName === skill.name)
-      expect(emitted, `missing emit for ${skill.name}`).toBeDefined()
+      const emitted = skillArtifacts.find((a) => a.sourceSkillName === skill.name)
+      expect(emitted?.contents).toBe(original)
+    }
+  })
+
+  it('reconstructs byte-identical rule source via rule.raw', () => {
+    for (const rule of source.rules) {
+      const original = readFileSync(rule.path, 'utf8')
+      const emitted = ruleArtifacts.find((a) => a.sourceRuleName === rule.name)
       expect(emitted?.contents).toBe(original)
     }
   })
 
   it('preserves per-skill identity — no drop, no concat (AD-6)', () => {
-    const names = source.skills.map((s) => s.name).sort()
-    const emittedNames = result.artifacts.map((a) => a.sourceSkillName!).sort()
-    expect(emittedNames).toEqual(names)
+    const canonicalNames = source.skills.map((s) => s.name).sort()
+    const emittedNames = skillArtifacts.map((a) => a.sourceSkillName!).sort()
+    expect(emittedNames).toEqual(canonicalNames)
+  })
+
+  it('preserves per-rule identity', () => {
+    const canonicalNames = source.rules.map((r) => r.name).sort()
+    const emittedNames = ruleArtifacts.map((a) => a.sourceRuleName!).sort()
+    expect(emittedNames).toEqual(canonicalNames)
   })
 
   it('is deterministic', () => {
@@ -46,6 +71,6 @@ describe('emitClaude', () => {
   })
 
   it('returns empty artifacts for empty source', () => {
-    expect(emitClaude({ skills: [] })).toEqual({ target: 'claude', artifacts: [] })
+    expect(emitClaude({ skills: [], rules: [] })).toEqual({ target: 'claude', artifacts: [] })
   })
 })
