@@ -1,55 +1,41 @@
 ---
 name: invoke-team-only-from-cos
-description: Only chief_of_staff may call invoke_team. Applies whenever a non-CoS role is about to call fulcrum action exec invoke_team — escalate instead of attempting the call.
+description: Only chief_of_staff may call invoke_team. Non-CoS roles escalate instead of attempting.
 ---
 
-# invoke_team is chief-of-staff only
+# invoke_team is CoS-only
 
-The policy invariant `only_l1_invokes_teams` denies
-`fulcrum action exec invoke_team` from any role other than `chief_of_staff`.
-If you are not chief_of_staff, the call will be rejected with a clear
-error before it reaches the control plane. Don't attempt it.
+Policy invariant `only_l1_invokes_teams` denies `fulcrum action exec invoke_team` from any role other than `chief_of_staff`. Call rejected with clear error before reaching control plane. Don't attempt.
 
 ## Why
 
-Team invocation spans multiple L2 roles, consumes multiple WIP slots
-simultaneously, and coordinates artifacts across workers. That kind of
-fan-out is L1 orchestration work, and allowing any L2 role to do it
-would let a single specialist reshape the task board without visibility.
+Team invocation spans multiple L2 roles, consumes multiple WIP slots, coordinates artifacts across workers. That fan-out = L1 orchestration. Letting any L2 do it = single specialist reshapes task board without visibility.
 
-## What to do instead
+## What to do
 
-If you are an L2 role (software_engineer, code_reviewer, tech_lead,
-integration_worker, etc.) and you have work that genuinely needs a team:
+L2 role (software_engineer, code_reviewer, tech_lead, integration_worker, etc.) with work that genuinely needs team:
 
-1. Call `fulcrum action exec block_agent_run` on your current run with a clear
-   `reason` describing:
-   - What kind of team you need (roles)
-   - Why your current role cannot finish the work alone
-   - What the success criteria for the team would be
-2. The blocked run is visible to `chief_of_staff` in `build_cos_context`,
-   who can then `invoke_team` on your behalf.
-3. Once the team completes, the CoS will unblock and resume your task.
+1. `fulcrum action exec block_agent_run` on current run with clear `reason`:
+   - Which team (roles).
+   - Why current role cannot finish alone.
+   - Success criteria for team.
+2. Blocked run visible to `chief_of_staff` in `build_cos_context`. CoS can `invoke_team` on your behalf.
+3. Team completes → CoS unblocks + resumes your task.
 
 ## Example escalation reason
 
 ```
 Need team: software_engineer + code_reviewer + security_reviewer.
-I can implement the auth middleware but the change touches the
-session storage layer (packages/core/src/session) which needs a
-security review I can't perform from my role. Success = middleware
-merged with both reviews passing and no new CVE surface.
+Can implement auth middleware but change touches session storage
+(packages/core/src/session) — security review I can't perform from
+my role. Success = middleware merged with both reviews passing + no
+new CVE surface.
 ```
 
 ## Red flags
 
-- You are `software_engineer` and you just called `invoke_team` → the
-  call failed; call `block_agent_run` with a team request instead.
-- You are `chief_of_staff` and you called `Write` or `Edit` to avoid
-  invoking a team → that's a different violation; see
-  [chief-of-staff-response-format](../chief-of-staff-response-format/SKILL.md).
-- You blocked without a clear `reason` → CoS has nothing to act on;
-  write the full context up front.
+- `software_engineer` just called `invoke_team` → call failed. `block_agent_run` with team request.
+- `chief_of_staff` called `Write`/`Edit` to avoid invoking team → different violation. See [chief-of-staff-response-format](../chief-of-staff-response-format/SKILL.md).
+- Blocked without clear `reason` → CoS has nothing to act on. Write full context up front.
 
-See also: [chief-of-staff-response-format](../chief-of-staff-response-format/SKILL.md),
-[block-when-stuck](../block-when-stuck/SKILL.md).
+See also: [chief-of-staff-response-format](../chief-of-staff-response-format/SKILL.md), [block-when-stuck](../block-when-stuck/SKILL.md).

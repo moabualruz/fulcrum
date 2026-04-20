@@ -1,23 +1,18 @@
 ---
 name: complete-agent-run
-description: Finalize an agent run with a meaningful summary and changed-file list. Applies whenever you finish work, hand off, or are about to stop responding on a run you started.
+description: Finalize agent run with meaningful summary + changed-file list. When work finishes, handoff, or stopping a run you started.
 ---
 
-# Complete agent runs with a real summary
+# Complete agent runs with real summary
 
-When you finish work, call `fulcrum action exec complete_agent_run` with the
-`run_id` returned by `start_agent_run`. Do not just say "done" and exit —
-the summary you pass is persisted as a `task_outcome` memory and is the
-primary signal the chief-of-staff uses to decide what happens next.
+Finished work → `fulcrum action exec complete_agent_run` with `run_id` from `start_agent_run`. Do not just say "done" + exit. Summary persists as `task_outcome` memory + is primary signal CoS uses for next decision.
 
-## When to apply
+## When
 
-- All acceptance criteria for the task are met and verified
-- Tests pass (or the failing tests are knowingly out-of-scope, documented)
-- You have committed and/or pushed, or produced the artifact the task asked
-  for
-- You are about to stop responding for any reason other than being blocked
-  (if blocked, see [block-when-stuck](../block-when-stuck/SKILL.md) instead)
+- All acceptance criteria met + verified.
+- Tests pass (or failing tests knowingly out-of-scope, documented).
+- Committed/pushed, or produced artifact task asked for.
+- About to stop responding for any reason other than blocked (blocked → see [block-when-stuck](../block-when-stuck/SKILL.md)).
 
 ## How
 
@@ -31,30 +26,21 @@ fulcrum action exec complete_agent_run --json '{
 }'
 ```
 
-### What belongs in `output_summary`
+### `output_summary`
 
-- What changed and why — one paragraph. Not "fixed bug", but "fixed the FTS5
-  fallback path so it catches any `SQLITE_ERROR` from a MATCH query, not just
-  the keyword-specific parse error."
-- Any decisions or trade-offs — a second paragraph, optional.
-- Follow-ups the next agent should know about — a third paragraph, optional.
+- What changed + why — one paragraph. Not "fixed bug", but "fixed FTS5 fallback path so it catches any `SQLITE_ERROR` from a MATCH query, not just keyword-specific parse error."
+- Decisions / trade-offs — second paragraph, optional.
+- Follow-ups for next agent — third paragraph, optional.
 
-### What belongs in `files_changed`
+### `files_changed`
 
-Every path you mutated, relative to the workspace root. This feeds the
-reviewer and the integration worker — an incomplete list produces incomplete
-reviews.
+Every path mutated, relative to workspace root. Feeds reviewer + integration worker. Incomplete list = incomplete reviews.
 
 ## Red flags
 
-- `output_summary` under 40 characters → almost certainly useless; expand it.
-- `files_changed` is empty but you called `Edit` or `Write` → bug in your
-  tracking; fix it before completing.
-- You completed without running tests on a code change → the next agent
-  will discover the regression; run tests first, or explicitly record the
-  gap in `output_summary`.
-- You completed a run that was never started → the call will fail; start
-  a new run, do the minimum to represent the state, then complete it.
+- `output_summary` <40 chars → almost certainly useless. Expand.
+- `files_changed` empty but called `Edit`/`Write` → tracking bug. Fix before completing.
+- Completed without running tests on code change → next agent discovers regression. Run tests, or explicitly record gap in `output_summary`.
+- Completed run never started → call fails. Start new run, do minimum to represent state, then complete.
 
-See also: [write-memory-on-completion](../write-memory-on-completion/SKILL.md),
-[start-every-task](../start-every-task/SKILL.md).
+See also: [write-memory-on-completion](../write-memory-on-completion/SKILL.md), [start-every-task](../start-every-task/SKILL.md).

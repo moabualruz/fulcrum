@@ -1,31 +1,24 @@
 ---
 name: heartbeat-during-long-operations
-description: Emit heartbeat_agent_run every ~30 seconds during any run that takes more than ~60 seconds. Applies to long script runs, large-file edits, and multi-step analysis.
+description: Emit heartbeat_agent_run every ~30s during any run >60s. Applies to long script runs, large-file edits, multi-step analysis.
 ---
 
 # Heartbeat during long operations
 
-For any run that takes more than ~60 seconds, call
-`fulcrum action exec heartbeat_agent_run` every ~30 seconds with a
-`current_step` and `progress_pct`. The janitor marks runs as `stale`
-after 10 minutes of silence and a stale run has real costs:
+Run >60s → call `fulcrum action exec heartbeat_agent_run` every ~30s with `current_step` + `progress_pct`. Janitor marks runs `stale` after 10 min silence. Stale run costs:
 
-- It stops counting toward WIP — another run may take its place and
-  silently supersede your work
-- If it was `blocked`, it is auto-escalated (possibly to the wrong
-  audience)
-- It loses its spot in any merge queue
-- The chief-of-staff context builder treats it as "probably dead"
+- Stops counting toward WIP → another run may take slot + silently supersede work.
+- If `blocked`, auto-escalated (possibly wrong audience).
+- Loses merge-queue spot.
+- CoS context builder treats as "probably dead".
 
-## When to apply
+## When
 
-- A `Bash` call you launched is still running (build, test suite,
-  long install)
-- You're about to do a multi-step refactor touching > 5 files
-- You're reading and analysing many files before producing output
-- You dispatched another agent via `start_agent_run` and are waiting for its
-  result
-- You issued a heartbeat more than ~30 seconds ago and are still alive
+- `Bash` you launched still running (build, test suite, long install).
+- About to refactor across >5 files.
+- Reading + analyzing many files before output.
+- Dispatched agent via `start_agent_run`, waiting on result.
+- Last heartbeat >30s ago, still alive.
 
 ## How
 
@@ -36,31 +29,23 @@ fulcrum action exec heartbeat_agent_run
   progress_pct: 60
 ```
 
-### What belongs in `current_step`
+### `current_step`
 
 Plain-english progress, not machine state:
 
-- GOOD: `"running test suite — 142/300 tests, 2 failures so far"`
-- GOOD: `"refactoring auth module (3/5 files done)"`
-- GOOD: `"waiting on spawned code_reviewer run R-0817"`
-- BAD: `"working"`, `"processing"`, `"ok"`
+- GOOD: `"running test suite — 142/300 tests, 2 failures"`.
+- GOOD: `"refactoring auth module (3/5 files)"`.
+- GOOD: `"waiting on code_reviewer run R-0817"`.
+- BAD: `"working"`, `"processing"`, `"ok"`.
 
-### Progress percentage
+### Progress
 
-Best-effort integer 0-100. Don't stall at 99 — if you're unsure,
-report 50 and move on; the heartbeat's real job is to say "still
-alive", not to be a perfect tracker.
+Best-effort 0-100 integer. Don't stall at 99. Unsure? Report 50, move on. Heartbeat's real job = "still alive", not perfect tracker.
 
 ## Red flags
 
-- A `Bash` command has been running for 5 minutes and you have emitted
-  zero heartbeats → the janitor is about to mark you stale; heartbeat
-  immediately with the current state.
-- Your heartbeat `current_step` hasn't changed in three calls → either
-  you are truly stuck (call `block_agent_run`) or your progress tracker
-  is broken.
-- You heartbeated a run you never started → the call will fail; fix
-  the missing `start_agent_run` upstream.
+- `Bash` running 5 min, zero heartbeats → janitor about to mark stale. Heartbeat now with current state.
+- `current_step` unchanged 3 calls → truly stuck (`block_agent_run`) or progress tracker broken.
+- Heartbeated run never started → call fails. Fix missing `start_agent_run` upstream.
 
-See also: [start-every-task](../start-every-task/SKILL.md),
-[block-when-stuck](../block-when-stuck/SKILL.md).
+See also: [start-every-task](../start-every-task/SKILL.md), [block-when-stuck](../block-when-stuck/SKILL.md).

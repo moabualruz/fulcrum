@@ -1,30 +1,23 @@
 ---
 name: lifecycle
-description: Register every working session as a Fulcrum agent run. Start, heartbeat during long operations, complete or block at the end.
+description: Register every session as Fulcrum agent run. Start, heartbeat, complete or block.
 ---
 
 # Lifecycle
 
-At the start of every session, before the first task:
+Session start, before first task:
 
-1. `fulcrum action exec get_current_context` — returns `workspace_id` and
-   `project_id`.
-2. `fulcrum action exec get_workspace_status` — see running work, blockers,
-   queue.
-3. `fulcrum action exec start_agent_run` — pass your role and the task this
-   session addresses. Save the returned `run_id`.
+1. `fulcrum action exec get_current_context` — returns `workspace_id`, `project_id`.
+2. `fulcrum action exec get_workspace_status` — running work, blockers, queue.
+3. `fulcrum action exec start_agent_run` — pass role + task. Save `run_id`.
 
-During any operation expected to take more than five minutes:
+Long ops (>5 min):
 
-4. `fulcrum action exec heartbeat_agent_run` with `run_id` every three to
-   five minutes. A run with no heartbeat for ten minutes is marked stale.
+4. `fulcrum action exec heartbeat_agent_run` every 3–5 min. No heartbeat 10 min = stale.
 
-At end of task, exactly one of:
+Task end, exactly one:
 
-5. `fulcrum action exec complete_agent_run` with a summary and artifact
-   paths changed.
-6. `fulcrum action exec block_agent_run` with a reason, if you cannot
-   proceed without human input or an external unblock.
+5. `fulcrum action exec complete_agent_run` — summary + artifact paths.
+6. `fulcrum action exec block_agent_run` — reason if stuck on human/external.
 
-A run that silently ends without `complete` or `block` leaves the task in
-`running` state and the janitor marks it stale.
+Silent end without complete/block = run stays `running`; janitor marks stale.

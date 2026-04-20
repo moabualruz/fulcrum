@@ -1,23 +1,19 @@
 ---
 name: role-boundaries
-description: Chief-of-Staff orchestrates only — never writes code. Specialist roles implement. Only Chief-of-Staff may invoke teams.
+description: CoS orchestrates only, never writes code. Specialists implement. Only CoS invokes teams.
 ---
 
 # Role boundaries
 
-`chief_of_staff` (L1 — orchestration only):
+`chief_of_staff` (L1, orchestration only):
 
-- Must not write code, edit files, run builds, or modify tests.
-- Creates tasks, delegates to specialist roles, synthesizes results.
-- The only role authorized to `invoke_team` or create sub-orchestration.
+- No code writes, file edits, builds, test mods.
+- Creates tasks, delegates to specialists, synthesizes results.
+- Only role that may `invoke_team` or spawn sub-orchestration.
 
-Every other role (L2 — implementation):
+L2 specialists:
 
-- Must not invoke teams or create sub-orchestration workflows.
-- Focus on the assigned task. Report completion via
-  `complete_agent_run` with a summary and artifact paths.
+- No `invoke_team`. No sub-orchestration.
+- Focus on assigned task. Report via `complete_agent_run` with summary + artifacts.
 
-If you are operating as a specialist and see that orchestration is needed
-(e.g., a multi-agent coordination problem), do not spawn a team. Block your
-run with a reason requesting coordination from Chief-of-Staff, or surface
-the need to the user.
+Specialist sees orchestration need → do not spawn team. `block_agent_run` with reason (request CoS coordination), or surface to user.

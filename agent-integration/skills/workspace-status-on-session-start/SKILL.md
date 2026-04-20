@@ -1,62 +1,44 @@
 ---
 name: workspace-status-on-session-start
-description: Fetch workspace status at the start of every session to see running agents, WIP budget, and blocked runs. Applies before you start any new run or respond to a user request in a Fulcrum workspace.
+description: Fetch workspace status at session start — running agents, WIP budget, blocked runs. Before starting new run or responding to user request.
 ---
 
 # Check workspace status on session start
 
-At the very start of a session, before you call `start_agent_run`, call
-`fulcrum action exec get_workspace_status`. This is the cheapest way to avoid
-duplicate work, WIP-limit surprises, and stale context.
+Session start, before `start_agent_run`, call `fulcrum action exec get_workspace_status`. Cheapest way to avoid duplicate work, WIP surprises, stale context.
 
-## When to apply
+## When
 
-- First MCP call of any new session in a Fulcrum workspace
-- You woke up after a long pause (> 10 minutes) and the world may have
-  moved on
-- You're about to spawn or invoke another agent and need to know how much
-  WIP budget is available
-- You suspect another agent may be working on the same task
+- First MCP call of new session in Fulcrum workspace.
+- Woke up after long pause (>10 min) — world may have moved.
+- About to spawn/invoke another agent — need WIP budget.
+- Suspect another agent on same task.
 
 ## How
 
 ```bash
-# Step 1: get workspace_id (no parameters needed)
+# Step 1: workspace_id (no params)
 fulcrum action exec get_current_context
 
-# Step 2: use the returned workspace_id
+# Step 2: use returned workspace_id
 fulcrum action exec get_workspace_status --json '{"workspace_id":"ws_123"}'
 ```
 
-The response tells you:
+Response:
 
-- **Active runs**: who else is running, in which role, on which task.
-  If someone is already on your task, coordinate or pick a different task.
-- **WIP by role**: current count vs limit. If your role is at limit,
-  `start_agent_run` will be denied — pick a different role or block with
-  reason "role at WIP limit".
-- **Blocked runs**: anything stuck. If a blocked run is on a dependency
-  you need, read its `reason` and consider resolving it first.
-- **Stale runs**: runs the janitor has marked as stale (> 10 minutes
-  silent). They are about to be freed from WIP; note the tasks they
-  touched.
+- **Active runs**: who, which role, which task. Someone on your task → coordinate or pick different task.
+- **WIP by role**: count vs limit. At limit → `start_agent_run` denied. Pick different role or block with reason "role at WIP limit".
+- **Blocked runs**: anything stuck. Block on your dependency → read `reason`, consider resolving first.
+- **Stale runs**: janitor-marked (>10 min silent). About to free WIP. Note touched tasks.
 
-## Chief of staff extension
+## CoS extension
 
-For `chief_of_staff` specifically, also call
-`fulcrum action exec build_cos_context`. It returns a curated markdown block
-(active runs, recent completions, pending blocks, WIP pressure) ready to
-prepend to your next response. Always call it at session start and before
-major planning turns — it is cheaper than re-deriving the state yourself.
+As `chief_of_staff`, also call `fulcrum action exec build_cos_context`. Returns curated markdown block (active runs, recent completions, pending blocks, WIP pressure) ready to prepend to next response. Call at session start + before major planning turns. Cheaper than re-deriving state.
 
 ## Red flags
 
-- You called `start_agent_run` without first calling `get_workspace_status`
-  → you're flying blind; collect context first next time.
-- You tried to start a role at the WIP ceiling → the call will be denied; check
-  status first with `get_workspace_status`.
-- You ignored a blocked run on the same task → it almost certainly explains
-  the problem you're about to hit; read the reason.
+- `start_agent_run` without prior `get_workspace_status` → flying blind. Collect context first next time.
+- Started role at WIP ceiling → denied. Check status first.
+- Ignored blocked run on same task → almost certainly explains the problem you'll hit. Read reason.
 
-See also: [start-every-task](../start-every-task/SKILL.md),
-[block-when-stuck](../block-when-stuck/SKILL.md).
+See also: [start-every-task](../start-every-task/SKILL.md), [block-when-stuck](../block-when-stuck/SKILL.md).
