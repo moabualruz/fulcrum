@@ -1,5 +1,6 @@
 ---
 description: show Fulcrum workspace status (active agents, blockers, WIP, queued tasks)
+agent: fulcrum-status
 ---
 
 Run via bash and report:

@@ -126,15 +126,41 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
       if (!riderLoad.rider || output.messages.length === 0) return
       const first = output.messages[0]
       if (!first) return
+      // PR 7 unit 7.15 correction (2026-04-20): use a fresh messageID so
+      // the synthetic Part does not collide with the existing first
+      // message's id. opencode's session persistence layer keys parts by
+      // messageID; reusing first.info.id created phantom parts under a
+      // real message that the storage layer would drop or error on.
+      const riderMessageId = `fulcrum-rider-msg-${Date.now()}`
       const riderPart = {
         id: `fulcrum-rider-${Date.now()}`,
         sessionID: first.info.sessionID,
-        messageID: first.info.id,
+        messageID: riderMessageId,
         type: "text" as const,
         text: `<fulcrum-system-rider fallback="messages.transform" sha256="${riderLoad.sha256.slice(0, 12)}">\n${riderLoad.rider}\n</fulcrum-system-rider>`,
         synthetic: true,
       }
       first.parts.unshift(riderPart)
+    },
+
+    // PR 7 unit 7.16 (2026-04-20): `experimental.session.compacting` is the
+    // DOCUMENTED pre-compaction injection surface per @opencode-ai/plugin.
+    // Before this, we relied on the `event: session.compacted` branch which
+    // fires AFTER compaction completes (too late to influence the summary)
+    // AND was dead-code due to the event-handler unwrap bug (see 7.11).
+    "experimental.session.compacting": async (_input, output) => {
+      try {
+        const ids = getContext()
+        const status = execAction("get_workspace_status", { workspace_id: ids.workspace_id }) as Record<string, unknown>
+        const active = (status["active_runs"] as unknown[]) ?? []
+        const blocked = (status["blocked_runs"] as unknown[]) ?? []
+        const lines: string[] = []
+        if (active.length > 0) lines.push(`Active agent runs at compact time: ${active.length}`)
+        if (blocked.length > 0) lines.push(`Blocked runs at compact time: ${blocked.length}`)
+        if (lines.length > 0) {
+          output.context.push(`<!-- Fulcrum compact context -->\n${lines.join("\n")}`)
+        }
+      } catch { /* best-effort */ }
     },
 
     // ── Shell environment ──────────────────────────────────────────────────
@@ -145,6 +171,14 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
         const ids = getContext()
         output.env["FULCRUM_WORKSPACE_ID"] = ids.workspace_id
         output.env["FULCRUM_PROJECT_ID"] = ids.project_id
+        // PR 7 unit 7.17: publish the rider contents under the documented
+        // env var so downstream helpers (CLI fanout, install verify, tests)
+        // can detect whether the rider actually loaded. Prior claim in the
+        // checklist said this env was set but no code path set it.
+        if (riderLoad.rider) {
+          output.env["OPENCODE_SYSTEM_RIDER"] = riderLoad.rider
+          output.env["OPENCODE_SYSTEM_RIDER_SHA256"] = riderLoad.sha256
+        }
       } catch { /* best-effort */ }
     },
 
@@ -154,7 +188,7 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
     // auto`. Read / Glob / Grep (and everything else) never produce a hook
     // shell-out — matches AC §11.64 / §11.68.
 
-    "tool.execute.before": async (input) => {
+    "tool.execute.before": async (input, output) => {
       // Always bootstrap the trust file on first observation so the bias
       // nudge has something to validate against. Cheap once per session.
       const sessionId = input.sessionID ?? process.env["OPENCODE_SESSION_ID"] ?? "unknown"
@@ -180,13 +214,23 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
       })
 
       if (result.status !== 0 && result.status !== null) {
-        // Hook returned non-zero → block
+        // PR 7 unit 7.13 correction (2026-04-20): bare `throw` is not the
+        // documented block mechanism for tool.execute.before. The SDK's
+        // documented path is to mutate `output.args` to neutralize the call.
+        // We belt-and-suspender both: neutralize args first (always honored),
+        // then throw for SDK consumers that surface the throw as a tool error.
         let reason = "denied by Fulcrum policy"
         try {
           const out = JSON.parse(result.stdout ?? "{}") as Record<string, unknown>
           if (typeof out["message"] === "string") reason = out["message"]
           else if (typeof out["reason"] === "string") reason = out["reason"]
         } catch { /* use default reason */ }
+        // Documented block path: neutralize the tool's arguments so even if
+        // the throw is swallowed, the call becomes a no-op.
+        output.args = {
+          __fulcrum_blocked: true,
+          __fulcrum_reason: reason,
+        } as Record<string, unknown>
         throw new Error(`[fulcrum policy] ${reason}`)
       }
     },
@@ -210,8 +254,12 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
 
     // ── Permission gate ────────────────────────────────────────────────────
 
-    "permission.ask": async (input) => {
-      // Use the same pre-hook policy check for permission gating
+    "permission.ask": async (input, output) => {
+      // PR 7 unit 7.12 correction (2026-04-20): the @opencode-ai/plugin SDK
+      // signature is `(input, output: { status: "ask" | "deny" | "allow" })`.
+      // The plugin MUST mutate output.status — returning an object with
+      // { approved, reason } was silently discarded; permissions defaulted
+      // to whatever opencode pre-populated.
       const result = spawnSync("fulcrum", ["hook", "auto"], {
         input: JSON.stringify({
           tool_name: input.tool ?? "unknown",
@@ -222,14 +270,10 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
         timeout: 5_000,
       })
       if (result.status !== 0 && result.status !== null) {
-        let reason = "denied by Fulcrum policy"
-        try {
-          const out = JSON.parse(result.stdout ?? "{}") as Record<string, unknown>
-          if (typeof out["message"] === "string") reason = out["message"]
-        } catch { /* use default */ }
-        return { approved: false, reason }
+        output.status = "deny"
+        return
       }
-      return { approved: true }
+      output.status = "allow"
     },
 
     // ── Event subscriptions ────────────────────────────────────────────────
@@ -239,9 +283,15 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
     // - todo.updated (v2b) → mirror into Fulcrum tasks table
 
     "event": async (input) => {
+      // PR 7 unit 7.11 correction (2026-04-20): the @opencode-ai/plugin SDK
+      // wraps event payloads as `{ event: Event }` — the plugin was reading
+      // the type field directly off the top-level input, which is always
+      // undefined. All 3 branches (session.idle / session.compacted /
+      // todo.updated) were silently dead.
       if (!input || typeof input !== "object") return
-      const event = input as Record<string, unknown>
-      const name = event["type"] as string | undefined
+      const evt = input.event.type as unknown
+      const name = typeof evt === "string" ? evt : undefined
+      const event = (input.event ?? {}) as Record<string, unknown>
       const sessionId = process.env["OPENCODE_SESSION_ID"] ?? "unknown"
 
       if (name === "session.idle") {
@@ -282,15 +332,21 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
           })], { encoding: "utf-8", timeout: 5_000 })
         } catch { /* best-effort */ }
       } else if (name === "todo.updated") {
-        // v2b PR 17 Task 8.4: mirror todo changes into Fulcrum tasks table
-        const todo = event["todo"] as Record<string, unknown> | undefined
-        if (!todo) return
+        // v2b PR 17 Task 8.4 / PR 7 unit 7.14: mirror todo changes into
+        // Fulcrum tasks table. SDK sends `event.properties.todos: Todo[]`
+        // (plural). The prior implementation read `event["todo"]` (singular)
+        // which was always undefined.
+        const properties = event["properties"] as Record<string, unknown> | undefined
+        const todos = (properties?.["todos"] ?? []) as Array<Record<string, unknown>>
+        if (!Array.isArray(todos) || todos.length === 0) return
         try {
-          spawnSync("fulcrum", ["action", "exec", "update_task", "--json", JSON.stringify({
-            task_id: todo["id"],
-            status: todo["status"],
-            note: `[opencode todo.updated] ${todo["title"] ?? ""}`,
-          })], { encoding: "utf-8", timeout: 5_000 })
+          for (const todo of todos) {
+            spawnSync("fulcrum", ["action", "exec", "update_task", "--json", JSON.stringify({
+              task_id: todo["id"],
+              status: todo["status"],
+              note: `[opencode todo.updated] ${todo["title"] ?? ""}`,
+            })], { encoding: "utf-8", timeout: 5_000 })
+          }
         } catch { /* best-effort */ }
       }
     },
