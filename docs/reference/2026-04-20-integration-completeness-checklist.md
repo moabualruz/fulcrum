@@ -195,19 +195,24 @@ Plan target: 12+ layers. Audit: ~1/~20 events bound (session_start only); 34/34 
 
 ---
 
-## Copilot (GitHub Copilot in VS Code)
+## Copilot (GitHub Copilot CLI — standalone `copilot` binary)
 
-Plan target: 3 layers. Audit: no hooks (platform N/A); 34 source exist in dead `.agents/skills/` symlink; no installer.
+**2026-04-21 surface correction:** target is the Copilot CLI (`/usr/bin/copilot` v1.0.x),
+NOT the VS Code extension. Extension surface doc rewritten — see
+`docs/reference/2026-04-19-copilot-extension-surface.md`.
+Plan target: 5 layers (MCP, instructions, agents, hooks, AGENTS.md). Compliance: **12/12 green (PR 10)**.
 
 | Layer / requirement | Status | Verify | Fixed by |
 |---|---|---|---|
-| Symlink `agent-integration/copilot/.agents/skills -> ../../skills` intact | ✅ | `ls -la agent-integration/copilot/.agents/skills` shows `->` | pre-plan |
-| `.vscode/mcp.json` source exists | ✅ | `ls agent-integration/copilot/.vscode/mcp.json 2>/dev/null` | pre-plan |
-| `.github/copilot-instructions.md` source | ✅ | `ls agent-integration/copilot/.github/copilot-instructions.md 2>/dev/null` | pre-plan |
-| **`installCopilot()` written** | ⬜ | `grep -c 'installCopilot' agent-integration/install.ts` ≥ 1 | **PR 10** |
-| **34 `.github/instructions/fulcrum-skill-<name>.instructions.md` + 3 rule files written by installer** | ⬜ | per PR 10 | **PR 10** |
-| **Public-repo detection + sanitized variant default (AD-8)** | ⬜ | `grep -c 'isPrivate\|--allow-public-content' agent-integration/install.ts` ≥ 1 | **PR 10** |
-| **Known limitation documented: no hook layer → rule reaches model only when VS Code renders** | ⬜ | note in install-paths doc (PR 10 scope) | **PR 10** |
+| `.github/copilot-instructions.md` source | ✅ | `ls agent-integration/copilot/.github/copilot-instructions.md` | pre-plan |
+| **`.mcp.json` source (replaces `.vscode/mcp.json` — removed from CLI v1.0.22)** | ✅ | `ls agent-integration/copilot/.mcp.json` | PR 10 |
+| **`.github/copilot-instructions.public.md` (sanitized public-repo variant, AD-8)** | ✅ | `grep FULCRUM_PUBLIC_REPO_VARIANT agent-integration/copilot/.github/copilot-instructions.public.md` | PR 10 |
+| **33 `.github/instructions/fulcrum-skill-<name>.instructions.md` path-scoped files** | ✅ | `ls agent-integration/copilot/.github/instructions/fulcrum-skill-*.instructions.md \| wc -l` ≥ 33 | PR 10 |
+| **24 `.github/agents/<role>.agent.md` custom agent files** | ✅ | `ls agent-integration/copilot/.github/agents/*.agent.md \| wc -l` ≥ 24 | PR 10 |
+| **`.github/hooks/fulcrum.json` with Claude Code-style matchers (Write/Edit/Bash)** | ✅ | `grep -c 'Write\|Edit\|Bash' agent-integration/copilot/.github/hooks/fulcrum.json` ≥ 1 | PR 10 |
+| **`AGENTS.md` with BEGIN FULCRUM managed-block** | ✅ | `grep 'BEGIN FULCRUM managed-block' agent-integration/copilot/AGENTS.md` | PR 10 |
+| **`installCopilot()` written in agent-integration/install.ts** | ✅ | `grep -c 'installCopilot' agent-integration/install.ts` ≥ 1 | PR 10 |
+| Extension surface doc updated for Copilot CLI (not VS Code) | ✅ | `grep 'standalone' docs/reference/2026-04-19-copilot-extension-surface.md` | PR 10 |
 
 ---
 

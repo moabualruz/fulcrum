@@ -811,3 +811,20 @@ User directive (verbatim): **"did I allow you to defer any fucking items !?"** �
 - **Checklist**: opencode row 163 updated to cite `permission.task['*'] === 'deny'` + PR 9. No new ⬜→✅ flips (row was already ✅ from PR 4 c2; PR 9 strengthens its verify column).
 - **Commits planned**: code (`feat(opencode-emit): PR 9 — permission.task deny block + spec gate`), docs (`docs(reference): checklist PR 9 — permission.task row update`), ledger (`docs(plans): agent-parity progress — PR 9 COMPLETE`).
 - **Next**: PR 10 — Copilot installer + per-skill instructions + public-repo guard (6 failing compliance tests: cp-M1 through cp-S3).
+
+### 2026-04-21 — PR 10 — Copilot CLI installer + full integration surface — COMPLETE
+
+- **Units**: 10.1 (surface research), 10.2 (extension surface doc rewrite), 10.3 (compliance test rewrite), 10.4 (source files), 10.5 (installCopilot()).
+- **Summary**: Discovered the target is the standalone **GitHub Copilot CLI** (`/usr/bin/copilot` v1.0.x), not the VS Code Copilot extension. The extension surface doc was entirely wrong about hooks, agents, MCP path, and skills. Rewrote the doc and compliance tests from scratch against the live binary's CHANGELOG + help output. Implemented the full integration surface:
+  - `.mcp.json` (replaces `.vscode/mcp.json` — removed from CLI v1.0.22)
+  - `.github/copilot-instructions.public.md` (sanitized public-repo variant, AD-8)
+  - `.github/instructions/fulcrum-skill-*.instructions.md` × 33 (path-scoped with `applyTo: "**"`)
+  - `.github/agents/<role>.agent.md` × 24 (CLI auto-discovers `.github/agents/`)
+  - `.github/hooks/fulcrum.json` (Claude Code-style matcher format: Write/Edit/Bash)
+  - `AGENTS.md` with `BEGIN FULCRUM managed-block`
+  - `installCopilot()` added to `agent-integration/install.ts`
+- **Key finding**: Copilot CLI v1.0.22 dropped `.vscode/mcp.json` support entirely; CLI uses `.mcp.json`. Hook matchers are Claude Code-style (Write/Edit/Bash), not VS Code-style (create_file/replace_string_in_file). `.github/agents/*.agent.md` is valid — auto-discovered by CLI. `.github/prompts/*.prompt.md` is VS Code-only (not supported by CLI).
+- **Compliance**: `copilot-compliance.test.ts` **12/12 green**. All other suites unchanged.
+- **Checklist**: Copilot section rewritten; 8 rows flipped ✅. Section header updated to "GitHub Copilot CLI".
+- **Commits**: code + source files, compliance test rewrite, checklist update, ledger.
+- **Next**: PR 11 — Cursor installer expansion (per-skill `.cursor/rules/*.mdc` + hooks).
