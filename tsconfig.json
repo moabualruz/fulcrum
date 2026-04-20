@@ -11,6 +11,7 @@
     { "path": "./packages/sync" },
     { "path": "./packages/workflows" },
     { "path": "./packages/worktrees" },
-    { "path": "./packages/cli" }
+    { "path": "./packages/cli" },
+    { "path": "./packages/agent-fanout" }
   ]
 }

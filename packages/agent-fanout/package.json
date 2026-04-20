@@ -1,0 +1,58 @@
+{
+  "name": "fulcrum-agent-fanout",
+  "version": "0.0.2",
+  "description": "Parse canonical Fulcrum skills + rules and emit per-agent artifacts (Claude, Codex, Gemini, opencode, PI, Copilot, Cursor, Windsurf) with per-skill identity preserved",
+  "keywords": [
+    "agent-os",
+    "fanout",
+    "skills",
+    "rules",
+    "claude-code",
+    "codex",
+    "gemini",
+    "opencode",
+    "pi-coding-agent",
+    "copilot",
+    "cursor",
+    "windsurf"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsup"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  },
+  "author": "Mo Abualruz <moabualruz@github>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moabualruz/fulcrum.git"
+  },
+  "homepage": "https://github.com/moabualruz/fulcrum#readme",
+  "bugs": {
+    "url": "https://github.com/moabualruz/fulcrum/issues"
+  }
+}
