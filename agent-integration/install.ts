@@ -1466,51 +1466,94 @@ async function main(): Promise<void> {
 // Writes .cursor/mcp.json and .cursor/rules/fulcrum.mdc into targetDir.
 // Idempotent: skips files that already exist.
 
+// ── Per-project init: Cursor ──────────────────────────────────────────────────
+// Writes Fulcrum integration files for Cursor IDE:
+//   1. .cursor/mcp.json              — MCP server registration
+//   2. .cursor/rules/fulcrum-core.mdc — always-apply canonical rules
+//   3. .cursor/rules/fulcrum-skill-*.mdc × 33 — description-match per-skill rules
+//   4. .cursor/skills/fulcrum-*/SKILL.md × 33 — Cursor 2.4+ Agent Skills format
+//   5. .cursor/hooks.json             — lifecycle hooks (16 events)
+//   6. .cursor/commands/*.md × 6     — user-invokable slash commands
+
 export async function installCursor(opts: { dryRun: boolean; targetDir?: string }): Promise<void> {
   const targetDir = opts.targetDir ?? process.cwd();
   const dryRun = opts.dryRun;
 
   const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
-  const templateMcpJson = path.join(REPO_ROOT_LOCAL, "cursor", "mcp.json");
-  const templateRulesMdc = path.join(REPO_ROOT_LOCAL, "cursor", "rules", "fulcrum.mdc");
+  const src = path.join(REPO_ROOT_LOCAL, "cursor", ".cursor");
 
-  const destMcpDir = path.join(targetDir, ".cursor");
-  const destMcpJson = path.join(destMcpDir, "mcp.json");
-  const destRulesDir = path.join(targetDir, ".cursor", "rules");
-  const destRulesMdc = path.join(destRulesDir, "fulcrum.mdc");
-
-  // Write .cursor/mcp.json
-  await step("Cursor: .cursor/mcp.json", () => {
-    if (fs.existsSync(destMcpJson)) {
-      skip(`already exists: ${destMcpJson}`);
+  function copyOne(srcRel: string, destRel: string): void {
+    const srcPath = path.join(src, srcRel);
+    const destPath = path.join(targetDir, ".cursor", destRel);
+    if (fs.existsSync(destPath)) {
+      skip(`already exists: ${destPath}`);
       return;
     }
     if (dryRun) {
-      console.log(`  [dry-run] would create ${destMcpJson}`);
-      ok(`(dry-run) .cursor/mcp.json`);
+      console.log(`  [dry-run] would create ${destPath}`);
+      ok(`(dry-run) .cursor/${destRel}`);
       return;
     }
-    fs.mkdirSync(destMcpDir, { recursive: true });
-    fs.copyFileSync(templateMcpJson, destMcpJson);
-    ok(`wrote ${destMcpJson}`);
-    setRollback(`rm -f ${destMcpJson}`);
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    fs.copyFileSync(srcPath, destPath);
+    ok(`wrote ${destPath}`);
+    setRollback(`rm -f ${destPath}`);
+  }
+
+  function copyDir(srcSubdir: string, destSubdir: string, pattern: RegExp): void {
+    const srcDir = path.join(src, srcSubdir);
+    if (!fs.existsSync(srcDir)) return;
+    for (const name of fs.readdirSync(srcDir)) {
+      if (!pattern.test(name)) continue;
+      copyOne(path.join(srcSubdir, name), path.join(destSubdir, name));
+    }
+  }
+
+  function copySkillsDir(): void {
+    const skillsDir = path.join(src, "skills");
+    if (!fs.existsSync(skillsDir)) return;
+    for (const skillName of fs.readdirSync(skillsDir)) {
+      const skillSrc = path.join(skillsDir, skillName, "SKILL.md");
+      if (!fs.existsSync(skillSrc)) continue;
+      const destPath = path.join(targetDir, ".cursor", "skills", skillName, "SKILL.md");
+      if (fs.existsSync(destPath)) {
+        skip(`already exists: ${destPath}`);
+        continue;
+      }
+      if (dryRun) {
+        console.log(`  [dry-run] would create ${destPath}`);
+        ok(`(dry-run) .cursor/skills/${skillName}/SKILL.md`);
+        continue;
+      }
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.copyFileSync(skillSrc, destPath);
+      ok(`wrote ${destPath}`);
+      setRollback(`rm -f ${destPath}`);
+    }
+  }
+
+  await step("Cursor: .cursor/mcp.json", () => {
+    copyOne("mcp.json", "mcp.json");
   });
 
-  // Write .cursor/rules/fulcrum.mdc
-  await step("Cursor: .cursor/rules/fulcrum.mdc", () => {
-    if (fs.existsSync(destRulesMdc)) {
-      skip(`already exists: ${destRulesMdc}`);
-      return;
-    }
-    if (dryRun) {
-      console.log(`  [dry-run] would create ${destRulesMdc}`);
-      ok(`(dry-run) .cursor/rules/fulcrum.mdc`);
-      return;
-    }
-    fs.mkdirSync(destRulesDir, { recursive: true });
-    fs.copyFileSync(templateRulesMdc, destRulesMdc);
-    ok(`wrote ${destRulesMdc}`);
-    setRollback(`rm -f ${destRulesMdc}`);
+  await step("Cursor: .cursor/rules/fulcrum-core.mdc", () => {
+    copyOne("rules/fulcrum-core.mdc", "rules/fulcrum-core.mdc");
+  });
+
+  await step("Cursor: .cursor/rules/ (33 per-skill .mdc files)", () => {
+    copyDir("rules", "rules", /fulcrum-skill-.*\.mdc$/);
+  });
+
+  await step("Cursor: .cursor/skills/ (33 SKILL.md files)", () => {
+    copySkillsDir();
+  });
+
+  await step("Cursor: .cursor/hooks.json", () => {
+    copyOne("hooks.json", "hooks.json");
+  });
+
+  await step("Cursor: .cursor/commands/ (slash commands)", () => {
+    copyDir("commands", "commands", /\.md$/);
   });
 }
 

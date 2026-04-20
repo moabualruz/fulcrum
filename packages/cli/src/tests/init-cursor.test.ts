@@ -49,10 +49,10 @@ describe('installCursor()', () => {
     })
   })
 
-  it('creates .cursor/rules/fulcrum.mdc with alwaysApply frontmatter', async () => {
+  it('creates .cursor/rules/fulcrum-core.mdc with alwaysApply frontmatter', async () => {
     await installCursor({ dryRun: false, targetDir: tmpDir })
 
-    const mdcPath = path.join(tmpDir, '.cursor', 'rules', 'fulcrum.mdc')
+    const mdcPath = path.join(tmpDir, '.cursor', 'rules', 'fulcrum-core.mdc')
     expect(fs.existsSync(mdcPath)).toBe(true)
 
     const content = fs.readFileSync(mdcPath, 'utf8')
@@ -76,7 +76,7 @@ describe('installCursor()', () => {
     await installCursor({ dryRun: false, targetDir: tmpDir })
 
     const mcpPath = path.join(tmpDir, '.cursor', 'mcp.json')
-    const mdcPath = path.join(tmpDir, '.cursor', 'rules', 'fulcrum.mdc')
+    const mdcPath = path.join(tmpDir, '.cursor', 'rules', 'fulcrum-core.mdc')
 
     // Overwrite with sentinel content
     fs.writeFileSync(mcpPath, '{"sentinel": true}', 'utf8')
@@ -95,7 +95,7 @@ describe('installCursor()', () => {
 
     // No files written
     expect(fs.existsSync(path.join(tmpDir, '.cursor', 'mcp.json'))).toBe(false)
-    expect(fs.existsSync(path.join(tmpDir, '.cursor', 'rules', 'fulcrum.mdc'))).toBe(false)
+    expect(fs.existsSync(path.join(tmpDir, '.cursor', 'rules', 'fulcrum-core.mdc'))).toBe(false)
 
     // Dry-run messages printed via console.log
     const allOutput = logSpy.mock.calls.map(c => c.join(' ')).join('\n')
