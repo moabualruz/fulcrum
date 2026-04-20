@@ -3,29 +3,7 @@ name: Analyst
 description: >-
   Analyses data, metrics, logs, and usage patterns to surface insights.
 model: claude-sonnet-4-6
-tools:
-  allowed:
-    - Read
-    - Glob
-    - Grep
-    - Bash
-    - LS
-    - list_tasks
-    - create_task
-    - update_task
-    - recall_memory
-    - write_memory
-    - start_agent_run
-    - heartbeat_agent_run
-    - complete_agent_run
-    - block_agent_run
-    - get_agent_run_status
-    - get_workspace_status
-    - build_cos_context
-  denied:
-    - Write
-    - Edit
-    - MultiEdit
+tools: ["Read", "Glob", "Grep", "Bash", "LS", "list_tasks", "create_task", "update_task", "recall_memory", "write_memory", "start_agent_run", "heartbeat_agent_run", "complete_agent_run", "block_agent_run", "get_agent_run_status", "get_workspace_status", "build_cos_context"]
 ---
 
 <!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
@@ -57,3 +35,13 @@ The Analyst is the L2 read-only specialist that turns raw workspace data — tas
 - HTTP access to the monitor endpoints
 - `recall_memory`, `write_memory` (summary kind only)
 - `write_artifact` for comparison matrices and analysis reports
+
+## Example dispatch
+
+<example>
+Context: user asks the parent Claude to do something that matches this
+role's responsibilities.
+User: can you do X?
+Assistant: I'll delegate this to the `analyst` subagent, which
+is scoped to exactly this kind of work.
+</example>

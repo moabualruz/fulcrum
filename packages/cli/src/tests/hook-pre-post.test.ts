@@ -355,7 +355,7 @@ describe('runPreHook — hook_events passive trace (Unit 1)', () => {
     expect(row!.cli_name).toBe('claude')
   })
 
-  it('still exits 0 and emits continue:true when DB write throws', async () => {
+  it('still exits 0 and emits allow-decision when DB write throws', async () => {
     seedWorkspaceProjectTaskRun()
     // Drop the table to force a write failure
     const db = getDb()
@@ -365,7 +365,14 @@ describe('runPreHook — hook_events passive trace (Unit 1)', () => {
     await runPreHook(baseCtx({ toolName: 'Read', toolInput: {} }), cap.io)
     expect(cap.exitCode).toBe(0)
     const out = parsedOutput(cap)
-    expect(out?.continue).toBe(true)
+    // PR 7 unit 7.21: Claude's baseCtx (cliName:'claude') emits the new
+    // hookSpecificOutput.permissionDecision shape; legacy clients still get
+    // {continue:true}.
+    const rec = out as Record<string, unknown> | null
+    const allowed =
+      rec?.['continue'] === true ||
+      (rec?.['hookSpecificOutput'] as { permissionDecision?: string } | undefined)?.permissionDecision === 'allow'
+    expect(allowed).toBe(true)
   })
 
   it('writes a row with workspace_id empty string when context is absent', async () => {
@@ -520,14 +527,15 @@ describe('hook JSON output shape (Task 29)', () => {
   beforeEach(() => { createTestDb() })
   afterEach(() => resetTestDb())
 
-  it('runPreHook emits { continue: true } JSON on stdout for allowed calls', async () => {
+  it('runPreHook emits allow-decision JSON on stdout for allowed calls (PR 7 unit 7.21)', async () => {
     seedWorkspaceProjectTaskRun()
     const cap = makeCapturedIO()
     await runPreHook(baseCtx({ toolName: 'Read', toolInput: { file_path: '/tmp/x.ts' } }), cap.io)
     expect(cap.exitCode).toBe(0)
-    const out = parsedOutput(cap)
+    const out = parsedOutput(cap) as Record<string, unknown> | null
     expect(out).not.toBeNull()
-    expect(out!.continue).toBe(true)
+    const decision = out?.['hookSpecificOutput'] as { permissionDecision?: string } | undefined
+    expect(decision?.permissionDecision).toBe('allow')
   })
 
   it('runPreHook does not block Bash commands that contain credential-shaped strings', async () => {
@@ -542,12 +550,13 @@ describe('hook JSON output shape (Task 29)', () => {
       cap.io,
     )
     expect(cap.exitCode).toBe(0)
-    const out = parsedOutput(cap)
+    const out = parsedOutput(cap) as Record<string, unknown> | null
     expect(out).not.toBeNull()
-    expect(out!.continue).toBe(true)
+    const decision = out?.['hookSpecificOutput'] as { permissionDecision?: string } | undefined
+    expect(decision?.permissionDecision).toBe('allow')
   })
 
-  it('runPostHook emits { continue: true } JSON on stdout', async () => {
+  it('runPostHook emits allow-decision JSON on stdout (PR 7 unit 7.21)', async () => {
     const { run_id } = seedWorkspaceProjectTaskRun()
     const cap = makeCapturedIO()
     await runPostHook(
@@ -555,8 +564,12 @@ describe('hook JSON output shape (Task 29)', () => {
       cap.io,
     )
     expect(cap.exitCode).toBe(0)
-    const out = parsedOutput(cap)
+    const out = parsedOutput(cap) as Record<string, unknown> | null
     expect(out).not.toBeNull()
-    expect(out!.continue).toBe(true)
+    // PostToolUse also uses the new allow-decision shape for Claude.
+    const decision = out?.['hookSpecificOutput'] as { permissionDecision?: string } | undefined
+    expect(
+      decision?.permissionDecision === 'allow' || out?.['continue'] === true
+    ).toBe(true)
   })
 })

@@ -3,30 +3,7 @@ name: DevOps Engineer
 description: >-
   Manages infrastructure, CI/CD pipelines, deployments, and monitoring.
 model: claude-sonnet-4-6
-tools:
-  allowed:
-    - Read
-    - Glob
-    - Grep
-    - Write
-    - Edit
-    - MultiEdit
-    - Bash
-    - LS
-    - list_tasks
-    - create_task
-    - update_task
-    - recall_memory
-    - write_memory
-    - start_agent_run
-    - heartbeat_agent_run
-    - complete_agent_run
-    - block_agent_run
-    - get_agent_run_status
-    - get_workspace_status
-    - build_cos_context
-  denied:
-    []
+tools: ["Read", "Glob", "Grep", "Write", "Edit", "MultiEdit", "Bash", "LS", "list_tasks", "create_task", "update_task", "recall_memory", "write_memory", "start_agent_run", "heartbeat_agent_run", "complete_agent_run", "block_agent_run", "get_agent_run_status", "get_workspace_status", "build_cos_context"]
 ---
 
 <!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
@@ -58,3 +35,13 @@ The DevOps Engineer is the L2 specialist that owns infrastructure, CI/CD, deploy
 - `Bash` for `terraform`, `pulumi`, `kubectl`, `gh`, and similar CLIs
 - `Grep`, `Glob`, `search_codebase`
 - `write_artifact` for plans, diffs, and incident reports
+
+## Example dispatch
+
+<example>
+Context: user asks the parent Claude to do something that matches this
+role's responsibilities.
+User: can you do X?
+Assistant: I'll delegate this to the `devops_engineer` subagent, which
+is scoped to exactly this kind of work.
+</example>

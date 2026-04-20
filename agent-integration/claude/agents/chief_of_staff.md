@@ -3,34 +3,7 @@ name: Chief of Staff
 description: >-
   L1 orchestrator. Plans work, delegates to specialist agents, tracks progress. MUST NOT write code or edit files.
 model: claude-opus-4-6
-tools:
-  allowed:
-    - Read
-    - Glob
-    - Grep
-    - list_tasks
-    - create_task
-    - update_task
-    - recall_memory
-    - write_memory
-    - start_agent_run
-    - heartbeat_agent_run
-    - complete_agent_run
-    - block_agent_run
-    - get_agent_run_status
-    - get_workspace_status
-    - build_cos_context
-    - create_team_template
-    - invoke_team
-    - list_team_templates
-    - list_team_instances
-    - list_agent_profiles
-    - create_agent_profile
-  denied:
-    - Write
-    - Edit
-    - MultiEdit
-    - Bash
+tools: ["Read", "Glob", "Grep", "list_tasks", "create_task", "update_task", "recall_memory", "write_memory", "start_agent_run", "heartbeat_agent_run", "complete_agent_run", "block_agent_run", "get_agent_run_status", "get_workspace_status", "build_cos_context", "create_team_template", "invoke_team", "list_team_templates", "list_team_instances", "list_agent_profiles", "create_agent_profile"]
 ---
 
 <!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
@@ -80,3 +53,13 @@ Chief of Staff handoffs follow the artifact-first brief structure:
 ## Risks / Blockers
 - {bullet per risk, with mitigation or escalation path}
 ```
+
+## Example dispatch
+
+<example>
+Context: user asks the parent Claude to do something that matches this
+role's responsibilities.
+User: can you do X?
+Assistant: I'll delegate this to the `chief_of_staff` subagent, which
+is scoped to exactly this kind of work.
+</example>

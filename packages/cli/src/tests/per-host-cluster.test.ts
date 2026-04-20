@@ -96,12 +96,16 @@ describe('Task 47 — hook matcher narrowing', () => {
 })
 
 describe('Task 48 — run-lifecycle signals', () => {
-  it('Claude: SessionEnd + SubagentStart + SubagentStop are registered', () => {
+  it('Claude: SessionEnd + SubagentStop are registered (PR 7 unit 7.20)', () => {
+    // Corrected 2026-04-20: SubagentStart is NOT a valid Claude Code event
+    // (only SubagentStop exists). The prior test encoded a wrong spec; the
+    // event was silently dropped at registration.
     const settings = JSON.parse(readFileSync(join(REPO_ROOT, 'agent-integration/claude/settings-hooks-snippet.json'), 'utf8')) as Record<string, unknown>
     const hooks = settings['hooks'] as Record<string, unknown>
     expect(hooks).toHaveProperty('SessionEnd')
-    expect(hooks).toHaveProperty('SubagentStart')
     expect(hooks).toHaveProperty('SubagentStop')
+    // SubagentStart should NOT be registered — it does not exist.
+    expect(hooks).not.toHaveProperty('SubagentStart')
   })
 
   it('Gemini: AfterAgent fires session_summary', () => {

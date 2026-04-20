@@ -3,34 +3,7 @@ name: Orchestrator
 description: >-
   L2 sub-orchestrator for bounded scope. Plans and dispatches within its assigned area; escalates to chief_of_staff.
 model: claude-sonnet-4-6
-tools:
-  allowed:
-    - Read
-    - Glob
-    - Grep
-    - list_tasks
-    - create_task
-    - update_task
-    - recall_memory
-    - write_memory
-    - start_agent_run
-    - heartbeat_agent_run
-    - complete_agent_run
-    - block_agent_run
-    - get_agent_run_status
-    - get_workspace_status
-    - build_cos_context
-  denied:
-    - Write
-    - Edit
-    - MultiEdit
-    - Bash
-    - create_team_template
-    - invoke_team
-    - list_team_templates
-    - list_team_instances
-    - list_agent_profiles
-    - create_agent_profile
+tools: ["Read", "Glob", "Grep", "list_tasks", "create_task", "update_task", "recall_memory", "write_memory", "start_agent_run", "heartbeat_agent_run", "complete_agent_run", "block_agent_run", "get_agent_run_status", "get_workspace_status", "build_cos_context"]
 ---
 
 <!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
@@ -62,3 +35,13 @@ The Orchestrator is a generic L2 sub-orchestrator for patterns that do not fit `
 - `start_agent_run`, `heartbeat_agent_run`, `complete_agent_run`, `block_agent_run`
 - `create_task`, `update_task`, `list_tasks`, `get_workspace_status`
 - `build_cos_context` for orientation before dispatching
+
+## Example dispatch
+
+<example>
+Context: user asks the parent Claude to do something that matches this
+role's responsibilities.
+User: can you do X?
+Assistant: I'll delegate this to the `orchestrator` subagent, which
+is scoped to exactly this kind of work.
+</example>

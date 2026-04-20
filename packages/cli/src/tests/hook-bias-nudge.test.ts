@@ -195,10 +195,17 @@ describe('PreToolUse Fulcrum-first bias nudge (Variant A, PR 3 R1)', () => {
     const io = makeCapturedIO()
     await runPreHook(claudeCtx('Grep', 'c-sess-real-uuid'), io.io)
     expect(io.exitCode).toBe(0)
-    const decision = io.stdout.map((s) => {
-      try { return JSON.parse(s) as { continue?: boolean } } catch { return {} }
+    // PR 7 unit 7.21: Claude emits hookSpecificOutput.permissionDecision:"allow"
+    // instead of the deprecated {continue:true} shape. The test stays robust
+    // by accepting either (opencode/gemini still use the legacy form).
+    const decisions = io.stdout.map((s) => {
+      try { return JSON.parse(s) as Record<string, unknown> } catch { return {} }
     })
-    expect(decision.some((d) => d.continue === true)).toBe(true)
+    const allowed = decisions.some((d) =>
+      d['continue'] === true ||
+      (d['hookSpecificOutput'] as { permissionDecision?: string } | undefined)?.permissionDecision === 'allow'
+    )
+    expect(allowed).toBe(true)
   })
 
   it('does not nudge on write-family tools (Grep/Glob/Read only)', async () => {

@@ -3,28 +3,7 @@ name: Memory Curator
 description: >-
   Consolidates, deduplicates, and improves agent memory quality.
 model: claude-sonnet-4-6
-tools:
-  allowed:
-    - Read
-    - Glob
-    - Grep
-    - list_tasks
-    - create_task
-    - update_task
-    - recall_memory
-    - write_memory
-    - start_agent_run
-    - heartbeat_agent_run
-    - complete_agent_run
-    - block_agent_run
-    - get_agent_run_status
-    - get_workspace_status
-    - build_cos_context
-  denied:
-    - Write
-    - Edit
-    - MultiEdit
-    - Bash
+tools: ["Read", "Glob", "Grep", "list_tasks", "create_task", "update_task", "recall_memory", "write_memory", "start_agent_run", "heartbeat_agent_run", "complete_agent_run", "block_agent_run", "get_agent_run_status", "get_workspace_status", "build_cos_context"]
 ---
 
 <!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
@@ -55,3 +34,13 @@ The Memory Curator is the L2 specialist that prunes, deduplicates, and reorganis
 - `recall_memory`, `write_memory`, `link_memories`
 - `Read`, `Grep`, `Glob` for verifying cited file paths still exist
 - `write_artifact` for the `curation_report`
+
+## Example dispatch
+
+<example>
+Context: user asks the parent Claude to do something that matches this
+role's responsibilities.
+User: can you do X?
+Assistant: I'll delegate this to the `memory_curator` subagent, which
+is scoped to exactly this kind of work.
+</example>

@@ -48,6 +48,10 @@ describe('Claude Code agent MD files', () => {
     })
 
     it(`${role}.md has valid YAML frontmatter with required fields`, () => {
+      // PR 7 unit 7.18 (2026-04-20): Claude Code's agent frontmatter `tools`
+      // field is a flat array per plugin-dev/skills/agent-development/SKILL.md
+      // — NOT a {allowed, denied} object. The prior schema silently ignored
+      // the restriction (chief_of_staff could still Write/Edit/Bash).
       const content = readFileSync(filePath, 'utf8')
       const fm = parseFrontmatter(content)
       expect(fm).not.toBeNull()
@@ -57,10 +61,11 @@ describe('Claude Code agent MD files', () => {
       expect((fm!['model'] as string).length).toBeGreaterThan(0)
       // description may span multiple lines (>-) — just verify the key exists
       expect(content).toMatch(/^description:/m)
-      // tools block must be present
-      expect(content).toMatch(/^tools:/m)
-      expect(content).toMatch(/allowed:/m)
-      expect(content).toMatch(/denied:/m)
+      // tools must be a flat inline array (spec schema).
+      expect(content).toMatch(/^tools:\s*\[/m)
+      // The old {allowed, denied} object form was wrong — must not reappear.
+      expect(content).not.toMatch(/^\s+allowed:/m)
+      expect(content).not.toMatch(/^\s+denied:/m)
     })
   }
 })

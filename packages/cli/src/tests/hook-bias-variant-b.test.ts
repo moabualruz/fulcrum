@@ -231,10 +231,16 @@ describe('PreToolUse Variant B passive injection (PR 3 R1)', () => {
     const io = makeCapturedIO()
     await runPreHook(claudeCtx('Grep', 'c-sess-block-check', { pattern: 'hit' }), io.io)
     expect(io.exitCode).toBe(0)
+    // PR 7 unit 7.21: accept both Claude's hookSpecificOutput.permissionDecision
+    // and the legacy {continue:true} shape so opencode/gemini paths keep working.
     const decisions = io.stdout.map((s) => {
-      try { return JSON.parse(s) as { continue?: boolean } } catch { return {} }
+      try { return JSON.parse(s) as Record<string, unknown> } catch { return {} }
     })
-    expect(decisions.some((d) => d.continue === true)).toBe(true)
+    const allowed = decisions.some((d) =>
+      d['continue'] === true ||
+      (d['hookSpecificOutput'] as { permissionDecision?: string } | undefined)?.permissionDecision === 'allow'
+    )
+    expect(allowed).toBe(true)
   })
 })
 

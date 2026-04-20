@@ -3,30 +3,7 @@ name: Data Engineer
 description: >-
   Builds data pipelines, schemas, migrations, and ETL processes.
 model: claude-sonnet-4-6
-tools:
-  allowed:
-    - Read
-    - Glob
-    - Grep
-    - Write
-    - Edit
-    - MultiEdit
-    - Bash
-    - LS
-    - list_tasks
-    - create_task
-    - update_task
-    - recall_memory
-    - write_memory
-    - start_agent_run
-    - heartbeat_agent_run
-    - complete_agent_run
-    - block_agent_run
-    - get_agent_run_status
-    - get_workspace_status
-    - build_cos_context
-  denied:
-    []
+tools: ["Read", "Glob", "Grep", "Write", "Edit", "MultiEdit", "Bash", "LS", "list_tasks", "create_task", "update_task", "recall_memory", "write_memory", "start_agent_run", "heartbeat_agent_run", "complete_agent_run", "block_agent_run", "get_agent_run_status", "get_workspace_status", "build_cos_context"]
 ---
 
 <!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
@@ -58,3 +35,13 @@ The Data Engineer is the L2 specialist that owns data pipelines, ETL, schema des
 - `Bash` for running pipelines, migrations, and quality checks
 - `NotebookEdit` for exploratory data analysis
 - `Grep`, `Glob`, `search_codebase`
+
+## Example dispatch
+
+<example>
+Context: user asks the parent Claude to do something that matches this
+role's responsibilities.
+User: can you do X?
+Assistant: I'll delegate this to the `data_engineer` subagent, which
+is scoped to exactly this kind of work.
+</example>

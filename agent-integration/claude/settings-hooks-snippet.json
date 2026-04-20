@@ -31,16 +31,6 @@
         ]
       }
     ],
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "fulcrum hook claude subagent-start"
-          }
-        ]
-      }
-    ],
     "SubagentStop": [
       {
         "hooks": [

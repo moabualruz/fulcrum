@@ -122,7 +122,7 @@ const HOOK_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 
 // served by a Fulcrum recall. Tracked per session by `recall_turn_state`.
 // Includes both Claude/opencode naming (Grep/Glob/Read) and Gemini naming
 // (grep_search/list_directory/read_file) per PR 7 cross-cut wiring.
-const HOOK_SEARCH_TOOLS = new Set([
+export const HOOK_SEARCH_TOOLS = new Set([
   'Grep', 'Glob', 'Read',
   'grep_search', 'list_directory', 'read_file',
 ])
@@ -203,6 +203,30 @@ function _emitHookCapWarning(workspaceId: string, io: HookIO): void {
   if (Date.now() - last > 3_600_000) {
     _hookCapWarnedAt.set(key, Date.now())
     io.stderr(`[fulcrum/pre] hook_events cap reached (50000 rows for workspace '${key}') — skipping write until janitor cleans up\n`)
+  }
+}
+
+/**
+ * PR 7 unit 7.21 — emit the correct allow-decision shape per CLI:
+ *   Claude Code: hookSpecificOutput.{hookEventName, permissionDecision:"allow"}
+ *   Codex:       decision:"approve"
+ *   others:      {continue:true} (legacy opencode / gemini fallback)
+ *
+ * Prior implementation emitted `{continue:true}` for every CLI including
+ * Claude. Claude's PreToolUse response spec is
+ * `hookSpecificOutput.permissionDecision`; the `{continue}` shape is
+ * deprecated and the `updatedInput` surface (for in-place tool-input
+ * rewrite) is unreachable without the new shape.
+ */
+function emitHookAllow(cliName: HookCli | null, io: HookIO, eventName = 'PreToolUse'): void {
+  if (cliName === 'claude') {
+    io.stdout(JSON.stringify({
+      hookSpecificOutput: { hookEventName: eventName, permissionDecision: 'allow' },
+    }))
+  } else if (cliName === 'codex') {
+    io.stdout(JSON.stringify({ decision: 'approve' }))
+  } else {
+    io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
   }
 }
 
@@ -524,12 +548,11 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
     }
   } catch { /* best-effort — never fail the hook */ }
 
-  // Codex expects { "decision": "approve" } instead of { "continue": true }
-  if (ctx.cliName === 'codex') {
-    io.stdout(JSON.stringify({ decision: 'approve' }))
-  } else {
-    io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
-  }
+  // Per-CLI allow-decision output shape:
+  //   Claude Code: hookSpecificOutput.permissionDecision (PR 7 unit 7.21)
+  //   Codex:       decision: "approve"
+  //   others:      {continue: true} (legacy opencode/gemini fallback)
+  emitHookAllow(ctx.cliName, io)
   io.exit(0)
 }
 
@@ -573,7 +596,7 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
     const cwd = String(ctx.toolInput['cwd'] ?? process.cwd())
     const key = dedupKey(ctx.toolName, ctx.toolInput, cwd)
     if (!markSeen(key)) {
-      io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
+      emitHookAllow(ctx.cliName, io)
       io.exit(0)
       return
     }
@@ -630,7 +653,7 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
       const command = String(ctx.toolInput['command'] ?? '')
       if (!isMutatingBash(command)) {
         // Read-only command — skip silently (Task 30 allowlist invert).
-        io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
+        emitHookAllow(ctx.cliName, io)
         io.exit(0)
         return
       }
@@ -659,6 +682,6 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
     const { flushPendingMemoryWrites } = await import('fulcrum-memory')
     await flushPendingMemoryWrites(8_000)
   } catch { /* non-fatal — flush is best-effort */ }
-  io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
+  emitHookAllow(ctx.cliName, io)
   io.exit(0)
 }

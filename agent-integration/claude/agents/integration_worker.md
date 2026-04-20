@@ -3,30 +3,7 @@ name: Integration Worker
 description: >-
   Merges branches, resolves conflicts, and validates integrated changes.
 model: claude-sonnet-4-6
-tools:
-  allowed:
-    - Read
-    - Glob
-    - Grep
-    - Write
-    - Edit
-    - MultiEdit
-    - Bash
-    - LS
-    - list_tasks
-    - create_task
-    - update_task
-    - recall_memory
-    - write_memory
-    - start_agent_run
-    - heartbeat_agent_run
-    - complete_agent_run
-    - block_agent_run
-    - get_agent_run_status
-    - get_workspace_status
-    - build_cos_context
-  denied:
-    []
+tools: ["Read", "Glob", "Grep", "Write", "Edit", "MultiEdit", "Bash", "LS", "list_tasks", "create_task", "update_task", "recall_memory", "write_memory", "start_agent_run", "heartbeat_agent_run", "complete_agent_run", "block_agent_run", "get_agent_run_status", "get_workspace_status", "build_cos_context"]
 ---
 
 <!-- fulcrum-first: prefer recall_knowledge + search_code before Grep/Glob/Read. At session start: start_agent_run; heartbeat during long ops; complete_agent_run or block_agent_run at end. See CLAUDE.md FULCRUM managed-block for the full canonical rules. -->
@@ -57,3 +34,13 @@ The Integration Worker is the L2 merge owner. It takes reviewed, tested implemen
 - `Read`, `Bash` (including `shell_exec:git` — uniquely permitted for this role)
 - `git_merge`, `git_push`, `run_tests`
 - `Grep`, `Glob` for conflict investigation
+
+## Example dispatch
+
+<example>
+Context: user asks the parent Claude to do something that matches this
+role's responsibilities.
+User: can you do X?
+Assistant: I'll delegate this to the `integration_worker` subagent, which
+is scoped to exactly this kind of work.
+</example>
