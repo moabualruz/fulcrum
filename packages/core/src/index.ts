@@ -30,6 +30,13 @@ export type { RecallTurnState } from './recall-turn-state.js'
 export { logRecallEvent, telemetryPath } from './recall-telemetry.js'
 export type { RecallEvent, RecallEventKind } from './recall-telemetry.js'
 
+export {
+  summarizeRecallTelemetry,
+  summarizeRecallEvents,
+  loadRecallEvents,
+} from './recall-measurement.js'
+export type { SessionStats, MeasurementSummary } from './recall-measurement.js'
+
 // DB
 export { getDb, setDb, closeDb, _configureDb, globalDataDir, withTransaction, checkDbHealth } from './db/client.js'
 export type { Db } from './db/client.js'

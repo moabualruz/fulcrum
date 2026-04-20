@@ -81,6 +81,10 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
 
 const HOOK_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash'])
 
+// PR 3 R1: tools that search the filesystem when the user might be better
+// served by a Fulcrum recall. Tracked per session by `recall_turn_state`.
+const HOOK_SEARCH_TOOLS = new Set(['Grep', 'Glob', 'Read'])
+
 /** Rate-limit the hook_events cap warning to once per hour per workspace. */
 const _hookCapWarnedAt = new Map<string, number>()
 
@@ -224,6 +228,92 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
         }
       }
     } catch { /* best-effort — never block on recall failure */ }
+  }
+
+  // 3a. PR 3 R1 — reset grep-without-recall counter on recall tool calls.
+  //     Any tool name containing "recall" (MCP `mcp__fulcrum__recall_knowledge`,
+  //     `recall_memory`, `recall_turn_state`, etc.) signals an explicit recall
+  //     happened — reset the counter so the next grep does not re-nudge.
+  if (
+    ctx.cliName === 'claude'
+    && /recall/i.test(ctx.toolName)
+  ) {
+    try {
+      const { getDb, recordRecall, isTrustedSession, logRecallEvent } =
+        await import('fulcrum-agent-core')
+      const db = getDb()
+      if (isTrustedSession(db, ctx.sessionId)) {
+        recordRecall(db, { sessionId: ctx.sessionId, agentType: 'claude' })
+        logRecallEvent({
+          kind: 'recall_called',
+          agent_type: 'claude',
+          session_id: ctx.sessionId,
+          tool_name: ctx.toolName,
+        })
+      }
+    } catch { /* best-effort */ }
+  }
+
+  // 3b. PR 3 R1 — Fulcrum-first bias nudge for search tools. Variant A: when
+  //     a session has called Grep/Glob/Read without a prior `recall_knowledge`,
+  //     emit an advisory stderr nudge. Never blocks. Opt out with
+  //     FULCRUM_NO_RECALL_NUDGE=1. Session_id is validated against agent_runs
+  //     before any SQLite write (AD-9b trust boundary). Telemetry appends to
+  //     ${globalDataDir()}/telemetry/recall_bias.jsonl for the 2-week
+  //     measurement gate.
+  if (
+    HOOK_SEARCH_TOOLS.has(ctx.toolName)
+    && ctx.cliName === 'claude'
+    && process.env['FULCRUM_NO_RECALL_NUDGE'] !== '1'
+  ) {
+    try {
+      const { getDb, recordGrepWithoutRecall, isTrustedSession, logRecallEvent } =
+        await import('fulcrum-agent-core')
+      const db = getDb()
+      if (isTrustedSession(db, ctx.sessionId)) {
+        const count = recordGrepWithoutRecall(db, {
+          sessionId: ctx.sessionId,
+          agentType: 'claude',
+        })
+        logRecallEvent({
+          kind: 'grep_called_without_recall',
+          agent_type: 'claude',
+          session_id: ctx.sessionId,
+          tool_name: ctx.toolName,
+          grep_count_without_recall: count,
+        })
+        if (count >= 1) {
+          io.stderr(
+            `[fulcrum/pre] fulcrum-first: you called ${ctx.toolName} without a recall this session. ` +
+              `Try \`fulcrum action exec recall_knowledge\` with your question first — ` +
+              `Fulcrum stores prior decisions and code relationships grep cannot see. ` +
+              `Set FULCRUM_NO_RECALL_NUDGE=1 to suppress.\n`,
+          )
+          logRecallEvent({
+            kind: 'nudge_emitted',
+            agent_type: 'claude',
+            session_id: ctx.sessionId,
+            variant: 'A',
+            tool_name: ctx.toolName,
+            grep_count_without_recall: count,
+          })
+        }
+      }
+    } catch { /* best-effort — never block on nudge failure */ }
+  } else if (
+    HOOK_SEARCH_TOOLS.has(ctx.toolName)
+    && ctx.cliName === 'claude'
+    && process.env['FULCRUM_NO_RECALL_NUDGE'] === '1'
+  ) {
+    try {
+      const { logRecallEvent } = await import('fulcrum-agent-core')
+      logRecallEvent({
+        kind: 'nudge_opt_out',
+        agent_type: 'claude',
+        session_id: ctx.sessionId,
+        tool_name: ctx.toolName,
+      })
+    } catch { /* best-effort */ }
   }
 
   // 4. Write hook_event row (best-effort, never blocks the hook).
