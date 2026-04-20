@@ -220,9 +220,18 @@ function _emitHookCapWarning(workspaceId: string, io: HookIO): void {
  */
 function emitHookAllow(cliName: HookCli | null, io: HookIO, eventName = 'PreToolUse'): void {
   if (cliName === 'claude') {
-    io.stdout(JSON.stringify({
-      hookSpecificOutput: { hookEventName: eventName, permissionDecision: 'allow' },
-    }))
+    // PreToolUse: emit permissionDecision per Claude Code hooks spec.
+    // PostToolUse: no permission gate exists (the tool already ran). The
+    // correct no-op response is `{continue: true}` — emitting
+    // permissionDecision here yields a "hook error" in Claude Code because
+    // the field is only defined on PreToolUse.
+    if (eventName === 'PreToolUse') {
+      io.stdout(JSON.stringify({
+        hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow' },
+      }))
+    } else {
+      io.stdout(JSON.stringify({ continue: true } satisfies HookOutput))
+    }
   } else if (cliName === 'codex') {
     io.stdout(JSON.stringify({ decision: 'approve' }))
   } else {
@@ -596,7 +605,7 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
     const cwd = String(ctx.toolInput['cwd'] ?? process.cwd())
     const key = dedupKey(ctx.toolName, ctx.toolInput, cwd)
     if (!markSeen(key)) {
-      emitHookAllow(ctx.cliName, io)
+      emitHookAllow(ctx.cliName, io, 'PostToolUse')
       io.exit(0)
       return
     }
@@ -653,7 +662,7 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
       const command = String(ctx.toolInput['command'] ?? '')
       if (!isMutatingBash(command)) {
         // Read-only command — skip silently (Task 30 allowlist invert).
-        emitHookAllow(ctx.cliName, io)
+        emitHookAllow(ctx.cliName, io, 'PostToolUse')
         io.exit(0)
         return
       }
@@ -682,6 +691,6 @@ export async function runPostHook(ctx: HookContext, io: HookIO): Promise<void> {
     const { flushPendingMemoryWrites } = await import('fulcrum-memory')
     await flushPendingMemoryWrites(8_000)
   } catch { /* non-fatal — flush is best-effort */ }
-  emitHookAllow(ctx.cliName, io)
+  emitHookAllow(ctx.cliName, io, 'PostToolUse')
   io.exit(0)
 }
