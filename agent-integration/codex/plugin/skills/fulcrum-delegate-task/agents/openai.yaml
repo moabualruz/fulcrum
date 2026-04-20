@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/delegate-task/SKILL.md
 interface:
   display_name: Delegate Task
-  short_description: Create and assign a task to another agent role
+  short_description: Create + assign task to another agent role
   brand_color: '#4F46E5'
 dependencies:
   tools:

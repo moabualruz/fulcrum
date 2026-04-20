@@ -1,17 +1,17 @@
 ---
 name: fulcrum-debug-session
-description: Structured approach to debugging a failing test or unexpected behavior
+description: Structured debugging of failing test or unexpected behavior.
 ---
 # Debug Session
 
-To debug systematically:
+Debug systematically:
 
-1. **Reproduce**: confirm the failure is deterministic. Run the failing test/command in isolation.
-2. **Recall**: `fulcrum action exec recall_memory` for the failing component — any known issues, prior fixes, or invariants.
-3. **Localize**: form a hypothesis. Check one assumption at a time; don't change multiple things simultaneously.
-4. **Instrument**: add minimal logging/assertions to confirm or refute the hypothesis.
-5. **Fix**: make the minimal change that addresses the root cause. Do not fix symptoms.
-6. **Guard**: add or update a test that would catch this regression.
-7. **Record**: write a memory with `fulcrum action exec write_memory` (`kind: "error"`) documenting the root cause and fix for future agents.
+1. **Reproduce**: confirm failure deterministic. Run failing test/command in isolation.
+2. **Recall**: `fulcrum action exec recall_memory` for failing component — known issues, prior fixes, invariants.
+3. **Localize**: form hypothesis. One assumption at a time. No multi-change swings.
+4. **Instrument**: minimal logging/assertions to confirm/refute.
+5. **Fix**: minimal change addressing root cause. No symptom fixes.
+6. **Guard**: add/update test to catch regression.
+7. **Record**: `fulcrum action exec write_memory` (`kind: "error"`) — root cause + fix for future agents.
 
-**Do not guess.** Each step must produce evidence. A fix without a confirmed root cause is a guess.
+**Do not guess.** Each step produces evidence. Fix without confirmed root cause = guess.

@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/daily-standup/SKILL.md
 interface:
   display_name: Daily Standup
-  short_description: Generate a concise status summary of workspace activity for standup
+  short_description: Concise status summary of workspace activity for standup
   brand_color: '#4F46E5'
 dependencies:
   tools:

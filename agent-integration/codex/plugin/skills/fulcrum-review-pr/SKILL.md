@@ -1,18 +1,18 @@
 ---
 name: fulcrum-review-pr
-description: Perform a structured code review of a pull request or diff
+description: Structured code review of pull request or diff.
 ---
 # Review PR
 
-To review a pull request or code change:
+Review PR/code change:
 
-1. Recall relevant context: `fulcrum action exec recall_memory` with the PR title, affected system, and author role.
-2. Review the diff against the task's done criteria (from the task description or memory).
-3. Check five axes:
-   - **Correctness**: does it solve the stated problem without introducing new bugs?
-   - **Security**: any secrets, injection vectors, or unsafe patterns (check against `checkSecrets` invariants)?
-   - **Test coverage**: are edge cases and failure modes tested?
-   - **Architecture**: does it follow established patterns recorded in memory?
-   - **Scope**: does it only touch what was required, or is there unrelated churn?
-4. Record the review outcome with `fulcrum action exec write_memory` (`kind: "task_outcome"` if approved, `kind: "error"` if issues found).
-5. Update the task status accordingly via `fulcrum action exec update_task`.
+1. Recall context: `fulcrum action exec recall_memory` with PR title, affected system, author role.
+2. Review diff against task done criteria (from task description or memory).
+3. Check 5 axes:
+   - **Correctness**: solves stated problem without new bugs?
+   - **Security**: secrets, injection vectors, unsafe patterns (check vs `checkSecrets` invariants)?
+   - **Test coverage**: edge cases + failure modes tested?
+   - **Architecture**: follows established patterns recorded in memory?
+   - **Scope**: only touches what was required, or unrelated churn?
+4. Record outcome: `fulcrum action exec write_memory` (`kind: "task_outcome"` if approved, `kind: "error"` if issues).
+5. Update task status via `fulcrum action exec update_task`.

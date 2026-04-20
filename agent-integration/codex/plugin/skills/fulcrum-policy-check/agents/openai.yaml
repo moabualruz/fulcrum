@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/policy-check/SKILL.md
 interface:
   display_name: Policy Check
-  short_description: Verify an action is permitted by the current workspace policy before executing
+  short_description: Verify action permitted by current workspace policy before executing
   brand_color: '#4F46E5'
 dependencies:
   tools:

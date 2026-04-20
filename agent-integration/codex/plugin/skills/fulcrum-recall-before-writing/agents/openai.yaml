@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/recall-before-writing/SKILL.md
 interface:
   display_name: Recall Before Writing
-  short_description: 'Query the Fulcrum memory layer before writing new code, docs, or architectural decisions'
+  short_description: 'Query Fulcrum memory before writing new code, docs, or architectural decisions'
   brand_color: '#4F46E5'
 dependencies:
   tools:

@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/review-pr/SKILL.md
 interface:
   display_name: Review Pr
-  short_description: Perform a structured code review of a pull request or diff
+  short_description: Structured code review of pull request or diff
   brand_color: '#4F46E5'
 dependencies:
   tools:

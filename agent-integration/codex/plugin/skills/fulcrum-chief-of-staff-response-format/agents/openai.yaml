@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/chief-of-staff-response-format/SKILL.md
 interface:
   display_name: Chief Of Staff Response Format
-  short_description: 'When operating as chief_of_staff, end every response with the structured Status / Work Completed / Next Steps / Risks block'
+  short_description: 'As chief_of_staff, end every response with structured Status / Work Completed / Next Steps / Risks block'
   brand_color: '#4F46E5'
 dependencies:
   tools:

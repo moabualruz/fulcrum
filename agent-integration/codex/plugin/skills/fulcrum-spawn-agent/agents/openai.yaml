@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/spawn-agent/SKILL.md
 interface:
   display_name: Spawn Agent
-  short_description: Start a new agent run for a specific role and task
+  short_description: Start new agent run for specific role + task
   brand_color: '#4F46E5'
 dependencies:
   tools:

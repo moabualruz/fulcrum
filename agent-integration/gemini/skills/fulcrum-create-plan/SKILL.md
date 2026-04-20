@@ -1,16 +1,16 @@
 ---
 name: fulcrum-create-plan
-description: Generate a structured implementation plan from a PRD or issue
+description: Generate structured implementation plan from PRD or issue.
 ---
 # Create Plan
 
-To generate an implementation plan:
+Implementation plan from PRD/issue:
 
-1. Recall relevant memories first: `fulcrum action exec recall_memory` with the PRD or issue title as query.
-2. Identify the PRD or issue: call `fulcrum action exec list_tasks` to find the parent issue or PRD ID.
-3. Decompose into concrete, testable tasks. Each task should:
-   - Be completable by one agent in one session
-   - Have a clear done criterion
-   - Reference the files or systems it touches
-4. Create each task with `fulcrum action exec create_task`, setting `assigned_to` to the appropriate role.
-5. Write a `summary` memory capturing the plan rationale with `fulcrum action exec write_memory` (`kind: "summary"`).
+1. Recall first: `fulcrum action exec recall_memory` with PRD/issue title as query.
+2. Identify PRD/issue: `fulcrum action exec list_tasks` → parent issue/PRD ID.
+3. Decompose into concrete, testable tasks. Each:
+   - Completable by one agent in one session.
+   - Clear done criterion.
+   - References files/systems touched.
+4. `fulcrum action exec create_task` for each, `assigned_to` = appropriate role.
+5. `fulcrum action exec write_memory` (`kind: "summary"`) capturing plan rationale.

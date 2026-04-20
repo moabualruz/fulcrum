@@ -1,14 +1,14 @@
 ---
 name: fulcrum-worktree-checkout
-description: Provision a git worktree for isolated branch-based development
+description: Provision git worktree for isolated branch-based development.
 ---
 # Worktree Checkout
 
-To provision a worktree for development:
+Provision worktree:
 
-1. Create a worktree entry: the worktree manager handles `git worktree add <path> -b <branch>` and records it in Fulcrum's `worktrees` table.
-2. The worktree is linked to a `task_id` and `run_id` — pass these when creating.
+1. Create worktree entry: worktree manager handles `git worktree add <path> -b <branch>` + records in Fulcrum `worktrees` table.
+2. Linked to `task_id` + `run_id` — pass when creating.
 3. Status transitions: `allocated` → `dirty` (after first write) → `ready_for_merge` (after work complete).
-4. Record the worktree path in a memory with `fulcrum action exec write_memory` so other agents can find it.
+4. `fulcrum action exec write_memory` recording worktree path so other agents find it.
 
-The branch name convention is `feat/<task-display-id>-<slug>` unless the task specifies otherwise.
+Branch convention: `feat/<task-display-id>-<slug>` unless task specifies otherwise.

@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/session-start/SKILL.md
 interface:
   display_name: Session Start
-  short_description: Initialize a Fulcrum agent run at the start of every working session
+  short_description: Initialize Fulcrum agent run at start of every working session
   brand_color: '#4F46E5'
 dependencies:
   tools:

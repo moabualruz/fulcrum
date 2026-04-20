@@ -1,19 +1,14 @@
 ---
 name: fulcrum-chief-of-staff-response-format
 description: >-
-  When operating as chief_of_staff, end every response with the structured
-  Status / Work Completed / Next Steps / Risks block. Applies to every
-  chief_of_staff turn, without exception.
+  As chief_of_staff, end every response with structured Status / Work Completed
+  / Next Steps / Risks block. Every CoS turn, no exceptions.
 ---
 # Chief of Staff response format
 
-When operating as `chief_of_staff`, every response MUST end with the
-structured handoff block below. `parseCoSResponse()` in `@moabualruz/fulcrum-core`
-parses this format and applies the deltas to the task board automatically.
-If you skip the block, nothing updates — your planning work is invisible
-to the rest of the system.
+As `chief_of_staff`, every response MUST end with the handoff block below. `parseCoSResponse()` in `@moabualruz/fulcrum-core` parses it + applies deltas to task board. Skip the block → nothing updates → planning invisible to rest of system.
 
-## The block
+## Block
 
 ```
 ## Status
@@ -29,42 +24,33 @@ to the rest of the system.
 - {bullet per risk, with mitigation or escalation path}
 ```
 
-All four headings are required, in that order. An empty section should be
-rendered as a single `- none` bullet rather than omitted — the parser
-treats missing headings as malformed and logs a policy event.
+All four headings required, in order. Empty section = single `- none` bullet, never omitted. Missing heading = malformed; parser logs policy event.
 
-## When to apply
+## When
 
-- Every single response while operating as `chief_of_staff`
-- Includes short confirmations, status checks, and even error responses
-- Even if the user asks a simple question, append the block — it is
-  structurally cheap and keeps the board consistent
+- Every response as `chief_of_staff`.
+- Short confirmations, status checks, error responses — still append.
+- Even simple user questions — structurally cheap, keeps board consistent.
 
-## Cannot-do list (reminder)
+## Cannot-do (reminder)
 
-CoS has `chief_of_staff_no_direct_writes` applied at the hook layer.
-These tool calls will be DENIED for your role:
+CoS has `chief_of_staff_no_direct_writes` at hook layer. These DENIED:
 
-- `Write`, `Edit`, `MultiEdit`, `NotebookEdit`
-- `Bash` calls that touch `git` (`shell_exec:git` is worker-only)
-- Direct file mutations of any kind
+- `Write`, `Edit`, `MultiEdit`, `NotebookEdit`.
+- `Bash` with `git` (`shell_exec:git` worker-only).
+- Direct file mutations.
 
-To get work done, delegate:
+Delegate:
 
-- `fulcrum action exec start_agent_run` with a specialist `agent_role` for a single worker run
-- `fulcrum action exec invoke_team` for a multi-role parallel workload (CoS only)
+- `fulcrum action exec start_agent_run` with specialist `agent_role` for single worker run.
+- `fulcrum action exec invoke_team` for multi-role parallel workload (CoS only).
 
-Each delegation should be mentioned in `## Work Completed` or `## Next
-Steps` with the returned `run_id`.
+Each delegation → mention in `## Work Completed` or `## Next Steps` with returned `run_id`.
 
 ## Red flags
 
-- You responded without the block → the parser will flag your turn as
-  malformed; re-send with the block appended.
-- You attempted `Edit` as chief_of_staff → the hook denied you; spawn a
-  `software_engineer` instead.
-- `## Status` says `DONE` but `## Next Steps` has real bullets → it's not
-  done; either mark `IN_PROGRESS` or move the items elsewhere.
+- Responded without block → parser flags malformed; resend with block.
+- Attempted `Edit` as CoS → denied. Spawn `software_engineer`.
+- `## Status` = `DONE` but `## Next Steps` has real bullets → not done. Mark `IN_PROGRESS` or move items.
 
-See also: [invoke-team-only-from-cos](../invoke-team-only-from-cos/SKILL.md),
-[workspace-status-on-session-start](../workspace-status-on-session-start/SKILL.md).
+See also: [invoke-team-only-from-cos](../invoke-team-only-from-cos/SKILL.md), [workspace-status-on-session-start](../workspace-status-on-session-start/SKILL.md).

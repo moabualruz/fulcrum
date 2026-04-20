@@ -133,7 +133,7 @@ All tools are prefixed `mcp__fulcrum__` in Claude Code.
 
 `read-only` `idempotent`
 
-Reads tasks in a workspace/project. Returns id, title, status, priority, assigned_to, blockers. Filters by status when provided. Effect: read-only. Returns: array of task summaries. workspace_id and project_id are optional — defaults to the server cwd context.
+Read tasks in workspace/project. Returns id, title, status, priority, assigned_to, blockers. Filter by status optional. Read-only. workspace_id + project_id optional (default cwd).
 
 **Parameters:**
 
@@ -146,7 +146,7 @@ Reads tasks in a workspace/project. Returns id, title, status, priority, assigne
 
 ### `mcp__fulcrum__create_task` — Create Task
 
-Creates a new task in the project. Auto-creates workspace and project if they do not exist. Effect: writes task row. Returns: task_id, title, status, priority, assigned_to. Requires title. workspace_id and project_id are optional — defaults to cwd context.
+Create task. Auto-creates workspace + project if absent. Writes task row. Returns task_id, title, status, priority, assigned_to. Requires title. workspace_id + project_id optional (default cwd).
 
 **Parameters:**
 
@@ -164,7 +164,7 @@ Creates a new task in the project. Auto-creates workspace and project if they do
 
 `idempotent`
 
-Updates a task's status, note, or assignment. Effect: updates task row in place. Returns: task_id, updated=true, list of changed fields. Requires task_id.
+Update task status, note, or assignment. Updates task row in place. Returns task_id, updated=true, changed fields. Requires task_id.
 
 **Parameters:**
 
@@ -179,7 +179,7 @@ Updates a task's status, note, or assignment. Effect: updates task row in place.
 
 `read-only` `open-world`
 
-Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns the top-k most relevant memories for the given query in the specified scope. workspace_id is optional — defaults to cwd workspace. project_id is optional — omit for workspace-wide recall. Returns: id, content (truncated to max_chars), score (0.0–1.0), tags.
+Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns top-k memories for query in scope. workspace_id optional (default cwd). project_id optional (omit for workspace-wide). Returns: id, content (truncated to max_chars), score 0.0–1.0, tags.
 
 **Parameters:**
 
@@ -198,7 +198,7 @@ Hybrid semantic search over agent memory (FTS5 + vector + rerank). Returns the t
 
 `read-only` `open-world`
 
-Memory v3 retrieval: FTS5 + vector + graph traversal fused via weighted RRF, filtered by confidence floor + supersession. Returns L1 curated pages with L0 back-refs (sources[] + l0_wikilinks[]) so agents can follow any claim to the raw source via `read_raw_source`. `recall_memory` remains available as a back-compat alias. workspace_id defaults to cwd; project_id optional for workspace-wide recall.
+Memory v3 retrieval: FTS5 + vector + graph traversal fused via weighted RRF. Filtered by confidence floor + supersession. Returns L1 curated pages + L0 back-refs (sources[] + l0_wikilinks[]) — follow any claim to raw via `read_raw_source`. `recall_memory` remains back-compat alias. workspace_id defaults cwd; project_id optional.
 
 **Parameters:**
 
@@ -218,7 +218,7 @@ Memory v3 retrieval: FTS5 + vector + graph traversal fused via weighted RRF, fil
 
 `read-only`
 
-Walk an L1 curated page back to its L0 sources: both frontmatter `sources[]` entries and inline `[[raw/...]]` wikilinks are resolved. Returns per-source { l0_id, source_type, snippet, vault_path, created_at }. Missing sources are reported with source_type="missing" so callers never silently lose a reference.
+Walk L1 page back to L0 sources: frontmatter `sources[]` + inline `[[raw/...]]` wikilinks resolved. Returns per-source { l0_id, source_type, snippet, vault_path, created_at }. Missing sources reported as source_type="missing" — never silently lose reference.
 
 **Parameters:**
 
@@ -230,7 +230,7 @@ Walk an L1 curated page back to its L0 sources: both frontmatter `sources[]` ent
 
 `read-only`
 
-Dump a full L1 curated page — frontmatter, body, serialized form, and resolved wikilink absolute paths (exists flag per link). Use when an agent needs the full page text before deciding whether to mark it wrong or override a claim.
+Dump full L1 page — frontmatter, body, serialized form, resolved wikilink absolute paths (exists flag per link). Use before marking wrong or overriding a claim.
 
 **Parameters:**
 
@@ -242,7 +242,7 @@ Dump a full L1 curated page — frontmatter, body, serialized form, and resolved
 
 `read-only`
 
-Return the full body of an L0 raw source (the audit root). Strips the file frontmatter so only the captured bytes land in the response.
+Full body of L0 raw source (audit root). Strips file frontmatter — only captured bytes in response.
 
 **Parameters:**
 
@@ -254,7 +254,7 @@ Return the full body of an L0 raw source (the audit root). Strips the file front
 
 `read-only`
 
-Reverse lookup: given a substring, return every L1 page whose body contains it, ranked by confidence. Each hit carries a snippet around the match plus match_count + sources[] so the caller can jump to the L0 provenance.
+Reverse lookup: substring → every L1 page containing it, ranked by confidence. Each hit carries snippet + match_count + sources[] for jumping to L0 provenance.
 
 **Parameters:**
 
@@ -269,7 +269,7 @@ Reverse lookup: given a substring, return every L1 page whose body contains it, 
 
 `read-only`
 
-Propose merge candidates across L1 pages sharing the same entity set and retention tier, whose lowest-confidence member clears the floor. Dry-run only in v3 PR 7.4 — the curator-driven apply path lands later. Returns { dry_run: true, candidates: [{entity_set, retention_tier, page_ids, min_confidence_in_group, workspace_id, project_id}] }.
+Propose merge candidates across L1 pages sharing entity set + retention tier, lowest-confidence member above floor. Dry-run only in v3 PR 7.4 — curator apply path lands later. Returns { dry_run: true, candidates: [{entity_set, retention_tier, page_ids, min_confidence_in_group, workspace_id, project_id}] }.
 
 **Parameters:**
 
@@ -284,7 +284,7 @@ Propose merge candidates across L1 pages sharing the same entity set and retenti
 
 `read-only`
 
-Verify the migrated memory vault: reports zero orphans, zero missing-source references, and zero supersession cycles. Migration stubs (pages with sources=[] + sources_via=[]) are tracked separately and do NOT count as orphans. Returns { ok, counts: { pages_checked, orphans, migration_stubs, missing_sources, supersession_cycles }, issues[] }.
+Verify migrated memory vault: zero orphans, zero missing-source refs, zero supersession cycles. Migration stubs (sources=[] + sources_via=[]) tracked separately, NOT counted as orphans. Returns { ok, counts: { pages_checked, orphans, migration_stubs, missing_sources, supersession_cycles }, issues[] }.
 
 **Parameters:**
 
@@ -294,7 +294,7 @@ Verify the migrated memory vault: reports zero orphans, zero missing-source refe
 
 ### `mcp__fulcrum__mark_memory_wrong` — Mark Memory Wrong
 
-Flag an L1 page as incorrect. Writes a new L0 correction entry under `raw/correction/` capturing the reason and (optional) correction_body. Does NOT auto-run the curator — the operator or a scheduled pass triggers re-curation; the correction L0 entry is the input the curator will consume to supersede the flagged page.
+Flag L1 page incorrect. Writes L0 correction entry under `raw/correction/` with reason + optional correction_body. Does NOT auto-run curator — operator or scheduled pass triggers re-curation; correction L0 entry = input curator consumes to supersede flagged page.
 
 **Parameters:**
 
@@ -308,7 +308,7 @@ Flag an L1 page as incorrect. Writes a new L0 correction entry under `raw/correc
 
 ### `mcp__fulcrum__write_memory` — Write Memory
 
-Persists a memory note to vault (L0), SQLite FTS5 (L1), and vector index (L2). Effect: writes memory row + vault file. Returns: saved=true, memory_id, project_id, tags. Requires content. workspace_id and project_id are optional — defaults to cwd context.
+Persist memory note to vault (L0), SQLite FTS5 (L1), vector index (L2). Writes memory row + vault file. Returns saved=true, memory_id, project_id, tags. Requires content. workspace_id + project_id optional (default cwd).
 
 **Parameters:**
 
@@ -324,7 +324,7 @@ Persists a memory note to vault (L0), SQLite FTS5 (L1), and vector index (L2). E
 
 `read-only` `idempotent`
 
-Reads all 24 canonical AgentRole profiles. When workspace_id is provided, also returns DB-backed custom profiles for that workspace. Effect: read-only. Returns: array of {role, name, description, capabilities}.
+Read all 24 canonical AgentRole profiles. workspace_id provided → also returns DB-backed custom profiles for that workspace. Read-only. Returns {role, name, description, capabilities}[].
 
 **Parameters:**
 
@@ -336,7 +336,7 @@ Reads all 24 canonical AgentRole profiles. When workspace_id is provided, also r
 
 `read-only` `idempotent`
 
-Reads live status of an agent run. Effect: read-only. Returns: run_id, status, role, current_step, progress_pct. Requires run_id.
+Read live agent run status. Read-only. Returns run_id, status, role, current_step, progress_pct. Requires run_id.
 
 **Parameters:**
 
@@ -346,7 +346,7 @@ Reads live status of an agent run. Effect: read-only. Returns: run_id, status, r
 
 ### `mcp__fulcrum__start_agent_run` — Start Agent Run
 
-Registers the start of an agent run. Call at the beginning of every task. Auto-creates a stub task if task_id is not provided. Effect: inserts agent_runs row, sets task status to running. Returns: run_id, status. Requires agent_role. workspace_id is optional — defaults to cwd workspace.
+Register start of agent run. Call at start of every task. Auto-creates stub task if no task_id. Inserts agent_runs row, sets task status=running. Returns run_id, status. Requires agent_role. workspace_id optional (default cwd).
 
 **Parameters:**
 
@@ -365,7 +365,7 @@ Registers the start of an agent run. Call at the beginning of every task. Auto-c
 
 `idempotent`
 
-Sends a liveness heartbeat for a running agent to prevent it being marked stale. Call every ~30 seconds during long tasks. Effect: updates heartbeat_at and optional progress fields. Returns: run_id, ok=true. Requires run_id. workspace_id is optional — defaults to cwd workspace.
+Liveness heartbeat to prevent stale-mark. Call ~30s during long tasks. Updates heartbeat_at + optional progress. Returns run_id, ok=true. Requires run_id. workspace_id optional (default cwd).
 
 **Parameters:**
 
@@ -380,7 +380,7 @@ Sends a liveness heartbeat for a running agent to prevent it being marked stale.
 
 `destructive`
 
-Marks an agent run as finished with optional summary and artifact paths. Effect: sets agent_runs.status=finished, records artifacts. Returns: run_id, status. Requires run_id. workspace_id is optional — defaults to cwd workspace.
+Mark agent run finished with optional summary + artifact paths. Sets status=finished, records artifacts. Returns run_id, status. Requires run_id. workspace_id optional (default cwd).
 
 **Parameters:**
 
@@ -395,7 +395,7 @@ Marks an agent run as finished with optional summary and artifact paths. Effect:
 
 `destructive`
 
-Marks an agent run as blocked with a reason. Use when work cannot continue without human input or a dependency resolving. Effect: sets status=blocked, records reason. Returns: run_id, status, reason. Requires run_id and reason. workspace_id is optional — defaults to cwd workspace.
+Mark agent run blocked with reason. Use when cannot continue without human input or dependency resolving. Sets status=blocked, records reason. Returns run_id, status, reason. Requires run_id + reason. workspace_id optional (default cwd).
 
 **Parameters:**
 
@@ -409,7 +409,7 @@ Marks an agent run as blocked with a reason. Use when work cannot continue witho
 
 `idempotent` `destructive`
 
-Abort any agent runs still marked running but with no heartbeat for more than stale_minutes (default 10). Use on session start to reap zombies left by agents that crashed without firing their agent_end / session_shutdown hook. Effect: flips matching rows to status=aborted, status_category=done, and appends a run_event. Returns: list of reaped run_ids.
+Abort runs still marked running with no heartbeat >stale_minutes (default 10). Use on session start to reap zombies from crashed agents that never fired agent_end/session_shutdown. Flips matching rows → status=aborted, status_category=done + appends run_event. Returns reaped run_ids.
 
 **Parameters:**
 
@@ -422,7 +422,7 @@ Abort any agent runs still marked running but with no heartbeat for more than st
 
 `read-only` `idempotent`
 
-Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, blockers, recent events. Effect: read-only. Returns: context_markdown formatted for system prompt injection. workspace_id and project_id are optional — defaults to cwd context.
+Build CoS world-state snapshot: active tasks, running agents, blockers, recent events. Read-only. Returns context_markdown formatted for system-prompt injection. workspace_id + project_id optional (default cwd).
 
 **Parameters:**
 
@@ -438,7 +438,7 @@ Builds a Chief-of-Staff world-state snapshot: active tasks, running agents, bloc
 
 `read-only` `idempotent`
 
-Reads full workspace status: running agents, blockers, WIP count, queue depth, recent runs. Effect: read-only. Returns: workspace_id, active_runs, blocked_runs, wip_count, queued_tasks, runs array, blockers array. workspace_id is optional — defaults to cwd workspace.
+Read full workspace status: running agents, blockers, WIP count, queue depth, recent runs. Read-only. Returns workspace_id, active_runs, blocked_runs, wip_count, queued_tasks, runs[], blockers[]. workspace_id optional (default cwd).
 
 **Parameters:**
 
@@ -448,7 +448,7 @@ Reads full workspace status: running agents, blockers, WIP count, queue depth, r
 
 ### `mcp__fulcrum__create_team_template` — Create Team Template
 
-Creates a reusable team template with role slots and policy. Templates are global (not workspace-scoped). Effect: writes team_templates row. Returns: template object. Requires name and slots array.
+Create reusable team template with role slots + policy. Templates global (not workspace-scoped). Writes team_templates row. Returns template object. Requires name + slots array.
 
 **Parameters:**
 
@@ -463,7 +463,7 @@ Creates a reusable team template with role slots and policy. Templates are globa
 
 `destructive`
 
-Instantiates a team from a template and starts execution. Only chief_of_staff may invoke teams (enforced by canInvokeTeams check). Effect: creates team_instance row, spawns agents. Returns: team instance object. Requires template_id, workspace_id, purpose, caller_agent_id, caller_role.
+Instantiate team from template + start execution. Only chief_of_staff (canInvokeTeams gate). Creates team_instance row, spawns agents. Returns team instance. Requires template_id, workspace_id, purpose, caller_agent_id, caller_role.
 
 **Parameters:**
 
@@ -482,7 +482,7 @@ Instantiates a team from a template and starts execution. Only chief_of_staff ma
 
 `read-only` `idempotent`
 
-Reads all team templates (global, not workspace-scoped). Effect: read-only. Returns: array of template objects with slots and policy.
+Read all team templates (global, not workspace-scoped). Read-only. Returns template objects[] with slots + policy.
 
 **Parameters:**
 
@@ -495,7 +495,7 @@ Reads all team templates (global, not workspace-scoped). Effect: read-only. Retu
 
 `read-only` `idempotent`
 
-Reads team instances in a workspace, optionally filtered by status_category. Effect: read-only. Returns: array of team instance objects. Requires workspace_id.
+Read team instances in workspace. Optional status_category filter. Read-only. Returns team instance objects[]. Requires workspace_id.
 
 **Parameters:**
 
@@ -509,7 +509,7 @@ Reads team instances in a workspace, optionally filtered by status_category. Eff
 
 ### `mcp__fulcrum__create_agent_profile` — Create Agent Profile
 
-Creates a DB-backed agent profile for a workspace. Extends the 24 canonical AgentRole slugs with workspace-scoped specializations. Effect: writes agent_profiles row. Returns: profile object. Requires workspace_id, name, description.
+Create DB-backed agent profile for workspace. Extends 24 canonical AgentRole slugs with workspace-scoped specializations. Writes agent_profiles row. Returns profile object. Requires workspace_id, name, description.
 
 **Parameters:**
 
@@ -525,7 +525,7 @@ Creates a DB-backed agent profile for a workspace. Extends the 24 canonical Agen
 
 ### `mcp__fulcrum__create_agent_definition` — Create Agent Definition
 
-Creates a canonical definition for a role: model, tools_allow/deny, executor_uri, system prompt. Effect: writes agent_definitions row. Returns: definition object. Requires role, display_name, description.
+Create canonical role definition: model, tools_allow/deny, executor_uri, system prompt. Writes agent_definitions row. Returns definition object. Requires role, display_name, description.
 
 **Parameters:**
 
@@ -548,7 +548,7 @@ Creates a canonical definition for a role: model, tools_allow/deny, executor_uri
 
 `read-only` `idempotent`
 
-Reads the canonical definition for an AgentRole: model, tools, executor_uri, system_prompt. Effect: read-only. Returns: definition object or null. Requires role.
+Read canonical AgentRole definition: model, tools, executor_uri, system_prompt. Read-only. Returns definition object or null. Requires role.
 
 **Parameters:**
 
@@ -560,7 +560,7 @@ Reads the canonical definition for an AgentRole: model, tools, executor_uri, sys
 
 `idempotent`
 
-Updates fields on an existing agent definition. Effect: updates agent_definitions row in place. Returns: updated definition object. Requires role.
+Update existing agent definition fields. Updates agent_definitions row in place. Returns updated definition. Requires role.
 
 **Parameters:**
 
@@ -579,7 +579,7 @@ Updates fields on an existing agent definition. Effect: updates agent_definition
 
 `read-only` `idempotent`
 
-Reads all agent definitions, optionally filtered by stability tier. Effect: read-only. Returns: array of definition objects.
+Read all agent definitions. Optional stability filter. Read-only. Returns definition objects[].
 
 **Parameters:**
 
@@ -591,7 +591,7 @@ Reads all agent definitions, optionally filtered by stability tier. Effect: read
 
 `read-only` `idempotent`
 
-Returns the workspace_id and project_id for the directory the MCP server was started from (computed deterministically — no file needed). Use this at session start to discover the current workspace without reading .fulcrum.json or any project-local file. Also returns a readiness object with tools_available count, monitor_url, monitor_running (probed with 200ms timeout, cached 15s), and suggested_next_call. Effect: read-only. Returns: workspace_id, project_id, cwd, readiness.
+Returns workspace_id + project_id for MCP-server cwd (deterministic, no file). Use at session start to discover workspace without reading .fulcrum.json. Also returns readiness: tools_available, monitor_url, monitor_running (200ms probe, 15s cache), suggested_next_call. Read-only. Returns workspace_id, project_id, cwd, readiness.
 
 
 <!-- GENERATED:tools-end -->

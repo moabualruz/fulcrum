@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/worktree-checkout/SKILL.md
 interface:
   display_name: Worktree Checkout
-  short_description: Provision a git worktree for isolated branch-based development
+  short_description: Provision git worktree for isolated branch-based development
   brand_color: '#4F46E5'
 dependencies:
   tools:

@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/task-tracking/SKILL.md
 interface:
   display_name: Task Tracking
-  short_description: 'Always-present guidance on when and how to use Fulcrum''s task lifecycle'
+  short_description: When + how to use Fulcrum task lifecycle (create_task / update_task)
   brand_color: '#4F46E5'
 policy:
   allow_implicit_invocation: false

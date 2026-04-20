@@ -226,85 +226,67 @@ The hook runs `fulcrum hook gemini` on every tool call and reads the tool event 
 
 ---
 name: fulcrum-first
-description: Prefer Fulcrum recall and code-search tools before filesystem grep. Nudges only — never blocks.
+description: Prefer Fulcrum recall + code-search before filesystem grep. Nudge, not gate.
 ---
 
 # Fulcrum-first
 
-Before using `Grep`, `Glob`, or `Read` to search the codebase, try the Fulcrum
-recall and code-search tools first. Fulcrum stores prior decisions, task
-outcomes, and code relationships the filesystem does not.
+Before `Grep`/`Glob`/`Read`, try Fulcrum. Fulcrum holds prior decisions, task outcomes, code relations. Filesystem does not.
 
-For any "where is X", "why was X done", or "does X exist" question, call in
-order:
+Questions "where is X", "why X done", "does X exist" — call in order:
 
-1. `fulcrum action exec recall_knowledge` — natural-language query over
-   curated memory (L1 pages with L0 provenance).
-2. `fulcrum action exec search_code` — symbol and structural search when the
-   question is about code shape.
+1. `fulcrum action exec recall_knowledge` — NL query over L1 curated memory (L0 provenance).
+2. `fulcrum action exec search_code` — symbol + structural search.
 
-Fall through to `Grep` / `Glob` / `Read` only when both return nothing
-relevant. You may always use filesystem tools; the bias is about default
-ordering, not a gate.
+Fall to `Grep`/`Glob`/`Read` only if both empty. Filesystem tools stay available. Bias = default ordering, not block.
 
-Opt out per session with `FULCRUM_NO_RECALL_NUDGE=1`.
+Opt out: `FULCRUM_NO_RECALL_NUDGE=1`.
 
 ---
 
 ---
 name: lifecycle
-description: Register every working session as a Fulcrum agent run. Start, heartbeat during long operations, complete or block at the end.
+description: Register every session as Fulcrum agent run. Start, heartbeat, complete or block.
 ---
 
 # Lifecycle
 
-At the start of every session, before the first task:
+Session start, before first task:
 
-1. `fulcrum action exec get_current_context` — returns `workspace_id` and
-   `project_id`.
-2. `fulcrum action exec get_workspace_status` — see running work, blockers,
-   queue.
-3. `fulcrum action exec start_agent_run` — pass your role and the task this
-   session addresses. Save the returned `run_id`.
+1. `fulcrum action exec get_current_context` — returns `workspace_id`, `project_id`.
+2. `fulcrum action exec get_workspace_status` — running work, blockers, queue.
+3. `fulcrum action exec start_agent_run` — pass role + task. Save `run_id`.
 
-During any operation expected to take more than five minutes:
+Long ops (>5 min):
 
-4. `fulcrum action exec heartbeat_agent_run` with `run_id` every three to
-   five minutes. A run with no heartbeat for ten minutes is marked stale.
+4. `fulcrum action exec heartbeat_agent_run` every 3–5 min. No heartbeat 10 min = stale.
 
-At end of task, exactly one of:
+Task end, exactly one:
 
-5. `fulcrum action exec complete_agent_run` with a summary and artifact
-   paths changed.
-6. `fulcrum action exec block_agent_run` with a reason, if you cannot
-   proceed without human input or an external unblock.
+5. `fulcrum action exec complete_agent_run` — summary + artifact paths.
+6. `fulcrum action exec block_agent_run` — reason if stuck on human/external.
 
-A run that silently ends without `complete` or `block` leaves the task in
-`running` state and the janitor marks it stale.
+Silent end without complete/block = run stays `running`; janitor marks stale.
 
 ---
 
 ---
 name: role-boundaries
-description: Chief-of-Staff orchestrates only — never writes code. Specialist roles implement. Only Chief-of-Staff may invoke teams.
+description: CoS orchestrates only, never writes code. Specialists implement. Only CoS invokes teams.
 ---
 
 # Role boundaries
 
-`chief_of_staff` (L1 — orchestration only):
+`chief_of_staff` (L1, orchestration only):
 
-- Must not write code, edit files, run builds, or modify tests.
-- Creates tasks, delegates to specialist roles, synthesizes results.
-- The only role authorized to `invoke_team` or create sub-orchestration.
+- No code writes, file edits, builds, test mods.
+- Creates tasks, delegates to specialists, synthesizes results.
+- Only role that may `invoke_team` or spawn sub-orchestration.
 
-Every other role (L2 — implementation):
+L2 specialists:
 
-- Must not invoke teams or create sub-orchestration workflows.
-- Focus on the assigned task. Report completion via
-  `complete_agent_run` with a summary and artifact paths.
+- No `invoke_team`. No sub-orchestration.
+- Focus on assigned task. Report via `complete_agent_run` with summary + artifacts.
 
-If you are operating as a specialist and see that orchestration is needed
-(e.g., a multi-agent coordination problem), do not spawn a team. Block your
-run with a reason requesting coordination from Chief-of-Staff, or surface
-the need to the user.
+Specialist sees orchestration need → do not spawn team. `block_agent_run` with reason (request CoS coordination), or surface to user.
 <!-- END FULCRUM managed-block v1 -->

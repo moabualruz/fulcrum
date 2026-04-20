@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/start-every-task/SKILL.md
 interface:
   display_name: Start Every Task
-  short_description: Register an agent run before touching any code
+  short_description: Register agent run before touching code
   brand_color: '#4F46E5'
 dependencies:
   tools:

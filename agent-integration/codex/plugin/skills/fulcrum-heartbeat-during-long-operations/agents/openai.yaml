@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/heartbeat-during-long-operations/SKILL.md
 interface:
   display_name: Heartbeat During Long Operations
-  short_description: Emit heartbeat_agent_run every ~30 seconds during any run that takes more than ~60 seconds
+  short_description: 'Emit heartbeat_agent_run every ~30s during any run >60s'
   brand_color: '#4F46E5'
 dependencies:
   tools:

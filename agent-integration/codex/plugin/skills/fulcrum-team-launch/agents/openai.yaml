@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/team-launch/SKILL.md
 interface:
   display_name: Team Launch
-  short_description: Invoke a team template to orchestrate a multi-agent workstream
+  short_description: Invoke team template to orchestrate multi-agent workstream
   brand_color: '#4F46E5'
 dependencies:
   tools:

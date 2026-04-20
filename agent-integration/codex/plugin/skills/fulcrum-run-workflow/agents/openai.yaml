@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/run-workflow/SKILL.md
 interface:
   display_name: Run Workflow
-  short_description: Execute a named Fulcrum workflow rather than improvising a process
+  short_description: Execute named Fulcrum workflow instead of improvising a process
   brand_color: '#4F46E5'
 dependencies:
   tools:

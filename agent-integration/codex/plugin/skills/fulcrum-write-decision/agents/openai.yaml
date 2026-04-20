@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/write-decision/SKILL.md
 interface:
   display_name: Write Decision
-  short_description: Record an architectural or implementation decision to memory
+  short_description: Record architectural or implementation decision to memory
   brand_color: '#4F46E5'
 dependencies:
   tools:

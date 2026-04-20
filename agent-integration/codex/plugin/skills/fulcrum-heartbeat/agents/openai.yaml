@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/heartbeat/SKILL.md
 interface:
   display_name: Heartbeat
-  short_description: Send regular heartbeats to keep long-running agent runs alive
+  short_description: Regular heartbeats keep long-running agent runs alive
   brand_color: '#4F46E5'
 dependencies:
   tools:

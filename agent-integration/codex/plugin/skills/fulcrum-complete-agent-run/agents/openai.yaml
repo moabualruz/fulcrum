@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/complete-agent-run/SKILL.md
 interface:
   display_name: Complete Agent Run
-  short_description: Finalize an agent run with a meaningful summary and changed-file list
+  short_description: Finalize agent run with meaningful summary + changed-file list
   brand_color: '#4F46E5'
 dependencies:
   tools:

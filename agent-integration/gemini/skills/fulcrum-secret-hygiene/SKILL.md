@@ -1,62 +1,46 @@
 ---
 name: fulcrum-secret-hygiene
 description: >-
-  Never include credentials, API keys, tokens, or passwords in tool inputs or
-  memory writes. Applies to every tool call that accepts free-form text from the
-  agent.
+  Never include credentials, API keys, tokens, passwords in tool inputs or
+  memory writes. Every tool call accepting free-form text.
 ---
 # Secret hygiene
 
-Never include credentials, API keys, tokens, or passwords in:
+Never include credentials / API keys / tokens / passwords in:
 
-- Tool inputs (especially `Bash`, `Write`, `Edit`, and any MCP call)
-- Memory writes (`write_memory` content or tags)
-- Commit messages or PR bodies
-- Block / escalate / complete reasons or summaries
+- Tool inputs (especially `Bash`, `Write`, `Edit`, any MCP call).
+- Memory writes (`write_memory` content or tags).
+- Commit messages / PR bodies.
+- Block / escalate / complete reasons or summaries.
 
-The PreToolUse hook scans tool inputs and will deny any that look like
-secrets (nine patterns currently: AWS keys, GitHub tokens, generic
-`API_KEY=...`, bearer tokens, private keys, Slack tokens, database
-URLs with inline creds, JWTs, and `password=...` forms). A denial is
-logged as a `secret_redacted` policy event with the tool name and
-approximate location.
+PreToolUse hook scans inputs, denies matches (9 patterns: AWS keys, GitHub tokens, `API_KEY=...`, bearer tokens, private keys, Slack tokens, DB URLs with inline creds, JWTs, `password=...`). Denial logged as `secret_redacted` policy event with tool name + approx location.
 
 ## When this applies
 
-- You need an API key to call an external service
-- A config file has `DATABASE_URL=postgres://user:pass@host/db`
-- A shell command would echo a token into logs
-- A test fixture contains a sample credential
-- You are summarising a file that contains secrets
+- Need API key for external service.
+- Config has `DATABASE_URL=postgres://user:pass@host/db`.
+- Shell command would echo token into logs.
+- Test fixture with sample credential.
+- Summarizing file containing secrets.
 
-## What to do instead
+## What to do
 
-When you need a secret to proceed:
+Need secret to proceed:
 
-1. Call `fulcrum action exec block_agent_run` with reason
-   `"needs secret: <NAME>"` — e.g., `"needs secret: STRIPE_WEBHOOK_SECRET
-   for integration tests in packages/billing"`.
-2. Chief_of_staff (or a human operator) supplies the value by setting an
-   env var on the worker adapter before the next run starts.
-3. You read it from `process.env.NAME` inside the code you're writing —
-   never from the prompt.
+1. `fulcrum action exec block_agent_run` with reason `"needs secret: <NAME>"` — e.g., `"needs secret: STRIPE_WEBHOOK_SECRET for integration tests in packages/billing"`.
+2. CoS (or human operator) sets env var on worker adapter before next run.
+3. Read from `process.env.NAME` inside code — never from prompt.
 
-## Handling files that contain secrets
+## Files containing secrets
 
-- Do not paste their contents into tool inputs or memories.
-- Reference them by path only: `"configured in .env.local"`.
-- If a secret is committed to the repo by accident, block the run with
-  reason `"secret committed: <path>"` and escalate — rotation is a
-  human decision.
+- Do not paste contents into tool inputs or memories.
+- Reference by path only: `"configured in .env.local"`.
+- Secret committed to repo by accident → block with reason `"secret committed: <path>"` + escalate. Rotation = human decision.
 
 ## Red flags
 
-- You pasted a key into a `Bash` command so you could "just test it" →
-  the hook denied it; the attempt is logged. Do not retry.
-- You wrote a memory whose content includes a literal token → delete
-  it (or ask CoS to) and redo with the secret removed.
-- You think the pattern scanner is wrong and want to bypass it → don't;
-  file it as feedback via a `lesson` memory.
+- Pasted key into `Bash` "just to test" → hook denied, attempt logged. Do not retry.
+- Wrote memory with literal token → delete (or ask CoS) + redo without secret.
+- Pattern scanner seems wrong, want to bypass → do not. File as feedback via `lesson` memory.
 
-See also: [block-when-stuck](../block-when-stuck/SKILL.md),
-[write-memory-on-completion](../write-memory-on-completion/SKILL.md).
+See also: [block-when-stuck](../block-when-stuck/SKILL.md), [write-memory-on-completion](../write-memory-on-completion/SKILL.md).

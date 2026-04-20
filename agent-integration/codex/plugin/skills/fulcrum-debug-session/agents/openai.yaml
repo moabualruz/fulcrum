@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/debug-session/SKILL.md
 interface:
   display_name: Debug Session
-  short_description: Structured approach to debugging a failing test or unexpected behavior
+  short_description: Structured debugging of failing test or unexpected behavior
   brand_color: '#4F46E5'
 dependencies:
   tools:

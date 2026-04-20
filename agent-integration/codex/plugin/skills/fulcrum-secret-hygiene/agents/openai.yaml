@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/secret-hygiene/SKILL.md
 interface:
   display_name: Secret Hygiene
-  short_description: 'Never include credentials, API keys, tokens, or passwords in tool inputs or memory writes'
+  short_description: 'Never include credentials, API keys, tokens, passwords in tool inputs or memory writes'
   brand_color: '#4F46E5'
 dependencies:
   tools:

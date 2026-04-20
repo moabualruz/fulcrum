@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/worktree-merge/SKILL.md
 interface:
   display_name: Worktree Merge
-  short_description: Merge a completed worktree branch back to the base branch
+  short_description: Merge completed worktree branch back to base branch
   brand_color: '#4F46E5'
 dependencies:
   tools:

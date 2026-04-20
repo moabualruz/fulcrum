@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/integration-worker-merge-gate/SKILL.md
 interface:
   display_name: Integration Worker Merge Gate
-  short_description: 'When operating as integration_worker, verify review and test artifacts exist before calling processMergeQueue'
+  short_description: 'As integration_worker, verify review + test artifacts exist before processMergeQueue'
   brand_color: '#4F46E5'
 dependencies:
   tools:

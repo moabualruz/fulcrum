@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/write-memory-on-completion/SKILL.md
 interface:
   display_name: Write Memory On Completion
-  short_description: 'Persist a memory after completing any task that involved a decision, trade-off, or surprising finding'
+  short_description: 'Persist memory after any task involving decision, trade-off, or surprising finding'
   brand_color: '#4F46E5'
 dependencies:
   tools:

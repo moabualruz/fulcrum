@@ -1,36 +1,27 @@
 ---
 name: fulcrum-start-every-task
 description: >-
-  Register an agent run before touching any code. Applies whenever the agent is
-  about to call Write / Edit / MultiEdit / Bash for the first time in a session,
-  or is targeted by a team invocation.
+  Register agent run before touching code. Applies before first
+  Write/Edit/MultiEdit/Bash in session, or when targeted by team invocation.
 ---
 # Start every task with start_agent_run
 
-Before doing ANY work in a Fulcrum-managed project, call
-`fulcrum action exec start_agent_run` so the control plane knows you exist. This is
-non-negotiable — the WIP limiter and the chief-of-staff context builder both
-read from the `agent_runs` table, and a run that was never started cannot be
-heartbeated, blocked, or completed.
+Before ANY work in Fulcrum-managed project, call `fulcrum action exec start_agent_run`. Control plane must know agent exists. Non-negotiable — WIP limiter + CoS context builder both read `agent_runs`; run never started cannot be heartbeated, blocked, or completed.
 
-## When to apply
+## When
 
-- The user asks you to "implement X", "fix Y", "refactor Z", or "investigate Q"
-- You are about to call `Write` / `Edit` / `MultiEdit` / `Bash` for the first
-  time in this session
-- You were invoked by a team (the PreToolUse hook has set `FULCRUM_RUN_ID` or
-  `FULCRUM_TASK_ID` in env — honor those values instead of creating new ones)
-- You transitioned from analysis/read-only mode into mutation mode
+- User says "implement X", "fix Y", "refactor Z", "investigate Q".
+- About to call `Write`/`Edit`/`MultiEdit`/`Bash` first time this session.
+- Invoked by team (PreToolUse hook set `FULCRUM_RUN_ID` / `FULCRUM_TASK_ID` in env — honor those, do not create new).
+- Transitioned from read-only to mutation mode.
 
 ## How
 
-Call the canonical action through the CLI with the required fields:
-
 ```bash
-# Step 1: get workspace_id (no parameters needed)
+# Step 1: workspace_id (no params)
 fulcrum action exec get_current_context
 
-# Step 2: start your run
+# Step 2: start run
 fulcrum action exec start_agent_run --json '{
   "workspace_id": "ws_123",
   "task_id": "task_123",
@@ -38,60 +29,47 @@ fulcrum action exec start_agent_run --json '{
 }'
 ```
 
-The call returns a `run_id`. Keep it in scope for every subsequent
-`heartbeat_agent_run`, `complete_agent_run`, or `block_agent_run` call.
+Returns `run_id`. Keep in scope for every `heartbeat_agent_run` / `complete_agent_run` / `block_agent_run`.
 
-### If you don't have a task_id
+### No task_id
 
-1. Call `fulcrum action exec list_tasks` with a keyword from the user's request to
-   check whether a matching task already exists.
-2. If none matches, call `fulcrum action exec create_task` with a clear title,
-   acceptance criteria, and the owning role. Use the returned `task_id`.
-3. Never guess a task_id — a run with a bogus task_id will be rejected by the
-   policy layer.
+1. `fulcrum action exec list_tasks` with keyword from user request — check for match.
+2. No match → `fulcrum action exec create_task` with title + acceptance + owning role. Use returned `task_id`.
+3. Never guess `task_id`. Bogus id = policy-layer reject.
 
-### If you don't know your role
+### Unknown role
 
-Call `fulcrum action exec list_agent_profiles` and pick the one whose purpose
-matches what you are about to do. Default to `software_engineer` for generic
-implementation work; defer to `tech_lead` for architecture, `code_reviewer`
-for review, and `integration_worker` for merges.
+`fulcrum action exec list_agent_profiles`, pick by purpose. Default `software_engineer` for generic impl; `tech_lead` for architecture; `code_reviewer` for review; `integration_worker` for merges.
 
 ## Red flags
 
-- You called `Write` / `Edit` without having started a run → stop, call
-  `start_agent_run`, then re-do the edit so the tool call is logged against
-  the correct run.
-- You have more than one `run_id` in flight in the same session → call
-  `block_agent_run` on the stale one before starting new work.
-- You hit a WIP-limit error → don't loop. See
-  [workspace-status-on-session-start](../workspace-status-on-session-start/SKILL.md)
-  to diagnose who else is holding the budget.
+- Called `Write`/`Edit` without starting run → stop, `start_agent_run`, redo edit so tool call logs against correct run.
+- Multiple `run_id` in flight same session → `block_agent_run` stale one before new work.
+- WIP-limit error → do not loop. See [workspace-status-on-session-start](../workspace-status-on-session-start/SKILL.md) to diagnose budget holder.
 
 ## Worked example
 
-**Scenario:** The user asks "fix the failing auth test in `packages/auth/src/tests/login.test.ts`".
+User: "fix the failing auth test in `packages/auth/src/tests/login.test.ts`".
 
 ```
 # 1. Discover workspace context
 fulcrum action exec get_current_context
 → { workspace_id: "ws_abc123", project_id: "proj_xyz" }
 
-# 2. Find or create the task
+# 2. Find or create task
 fulcrum action exec list_tasks
   workspace_id: "ws_abc123"
   status: "open"
-→ (search result includes) { task_id: "task_001", title: "Fix failing auth login test" }
+→ { task_id: "task_001", title: "Fix failing auth login test" }
 
-# 3. Start the run
+# 3. Start run
 fulcrum action exec start_agent_run
   workspace_id: "ws_abc123"
   task_id: "task_001"
   agent_role: "software_engineer"
 → { run_id: "run_999" }
 
-# 4. Proceed with the fix — run_id is now in scope for heartbeat/complete/block
+# 4. Proceed with fix — run_id in scope for heartbeat/complete/block
 ```
 
-See also: [recall-before-writing](../recall-before-writing/SKILL.md),
-[complete-agent-run](../complete-agent-run/SKILL.md).
+See also: [recall-before-writing](../recall-before-writing/SKILL.md), [complete-agent-run](../complete-agent-run/SKILL.md).

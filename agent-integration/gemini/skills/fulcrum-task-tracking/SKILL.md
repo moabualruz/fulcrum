@@ -1,71 +1,52 @@
 ---
 name: fulcrum-task-tracking
-description: Always-present guidance on when and how to use Fulcrum's task lifecycle.
+description: When + how to use Fulcrum task lifecycle (create_task / update_task).
 ---
-# Task Tracking — when to call create_task / update_task
+# Task Tracking — create_task / update_task
 
-Fulcrum's task lifecycle is the canonical record of what an agent is doing.
-You should keep it accurate so future agents (and the operator) can reconstruct
-the work. The system synthesizes `task_outcome` and `blocker_resolution`
-memories from `update_task` calls — a missing call means a missing record.
+Task lifecycle = canonical record of agent work. Keep accurate or future agents + operator lose trail. System synthesizes `task_outcome` + `blocker_resolution` memories from `update_task` calls. Missing call = missing record.
 
-## When to call `create_task`
+## `create_task` when
 
-Create a task when:
-- The user gives you a multi-step request that will outlive the current turn.
-- You're starting a unit of work that another agent might reasonably resume.
-- You're about to spawn a subagent (the parent task is the subagent's
-  delegation context).
+- Multi-step request outlives current turn.
+- Work unit another agent might resume.
+- About to spawn subagent (parent task = delegation context).
 
-Do NOT create a task for trivial single-step requests, formatting fixes, or
-read-only exploration. Tasks have overhead — only create them when the
-audit trail matters.
+Not for: trivial single-step, formatting fixes, read-only exploration. Tasks = overhead. Only when audit trail matters.
 
-## When to call `update_task`
+## `update_task` at end-of-work
 
-Always call `update_task` at end-of-work. The status transitions are:
-
-| Final status | When to use | What it produces |
+| Status | Use | Produces |
 |---|---|---|
-| `completed` | Work done; acceptance met | One `task_outcome` memory synthesized from your file_patch + bash_trace + decision rows. |
-| `blocked` | Cannot proceed without external input | One `blocker_resolution` memory describing what's blocking + what was attempted. Stop-hook race-guard skips its `session_summary` if this fires first. |
-| `failed` | Work attempted but couldn't succeed | No synthesis; status only. Use `blocked` if the failure is recoverable. |
-| `cancelled` | User pulled the task | No synthesis. |
+| `completed` | Work done, acceptance met | One `task_outcome` memory synthesized from file_patch + bash_trace + decision rows. |
+| `blocked` | Cannot proceed without external input | One `blocker_resolution` memory (what blocks + what was tried). Stop-hook race-guard skips `session_summary` if this fires first. |
+| `failed` | Attempted, could not succeed | No synthesis; status only. Prefer `blocked` if recoverable. |
+| `cancelled` | User pulled task | No synthesis. |
 
-## What `task_outcome` synthesis produces
+## `task_outcome` synthesis output
 
-The synthesis reads all `file_patch`, `diff`, `code` memories attributed to
-this task's runs, plus the latest run's `output_summary`, and writes:
+Reads all `file_patch`/`diff`/`code` memories for this task's runs + latest run's `output_summary`. Writes:
 
 ```
 {
   kind: 'task_outcome',
   title: 'Task complete: <task title>',
-  summary: '<≤1500 chars: task title + goal + run summary + file count>',
-  files_touched: string[],   // distinct file_paths
+  summary: '<≤1500 chars: title + goal + run summary + file count>',
+  files_touched: string[],
   task_id: '<task id>',
   provenance: { hook_point: 'update_task:completed', run_id, files_touched }
 }
 ```
 
-`blocker_resolution` is the same shape with `hook_point:'update_task:blocked'`
-and the task's `note` carried forward as the blocker text.
+`blocker_resolution` = same shape, `hook_point:'update_task:blocked'`, carries task's `note` as blocker text.
 
 ## Race conditions
 
-If both `update_task(status='completed')` and the Stop-hook fire near-
-simultaneously (rare; usually a session end during in-progress work), the
-race-guard via the partial UNIQUE index on `(provenance.run_id) WHERE kind IN
-('task_outcome', 'blocker_resolution', 'session_summary')` ensures exactly
-one synthesis row per run — whichever wins inserts; the other gets a
-SQLITE_CONSTRAINT and silently skips. You don't have to coordinate.
+`update_task(completed)` + Stop-hook near-simultaneous (rare) → partial UNIQUE index on `(provenance.run_id) WHERE kind IN ('task_outcome','blocker_resolution','session_summary')` ensures one synthesis row per run. Winner inserts; loser gets `SQLITE_CONSTRAINT` + skips silently. No coordination needed.
 
 ## Subagent delegation
 
-When you delegate to a subagent (`context_type='subagent'`), the child
-cannot write any kind other than `delegation_summary` (constraint #6).
-On the child's `complete_agent_run`, Fulcrum walks the `parent_run_id`
-chain to find the topmost primary run and writes:
+Delegate to subagent (`context_type='subagent'`) → child can only write `delegation_summary` (constraint #6). On child `complete_agent_run`, Fulcrum walks `parent_run_id` to topmost primary run + writes:
 
 ```
 {
@@ -79,13 +60,11 @@ chain to find the topmost primary run and writes:
 }
 ```
 
-The parent thus learns what the subagent did without the subagent polluting
-the memory tree with its own files / decisions.
+Parent learns subagent result; subagent cannot pollute memory tree with own files/decisions.
 
-## Practical pattern
+## Pattern
 
 ```ts
-// At the start of work
 const task = await create_task({
   title: 'Fix the auth flow regression',
   description: '<what you understand>',
@@ -98,7 +77,7 @@ const run = await start_agent_run({
 })
 
 try {
-  // ... do the work; hooks write file_patch/bash_trace/decision rows ...
+  // ... work; hooks write file_patch/bash_trace/decision rows ...
   await update_task({ task_id: task.task_id, status: 'completed' })
 } catch (err) {
   await update_task({ task_id: task.task_id, status: 'blocked', note: String(err) })
@@ -108,6 +87,4 @@ try {
 }
 ```
 
-The `update_task` call is what triggers the synthesis. The `complete_agent_run`
-call is what releases the run-lifecycle row + decrements the PCI watcher
-refcount. You need both.
+`update_task` triggers synthesis. `complete_agent_run` releases run-lifecycle row + decrements PCI watcher refcount. Need both.

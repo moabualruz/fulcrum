@@ -1,24 +1,17 @@
 ---
 name: fulcrum-first
-description: Prefer Fulcrum recall and code-search tools before filesystem grep. Nudges only — never blocks.
+description: Prefer Fulcrum recall + code-search before filesystem grep. Nudge, not gate.
 ---
 
 # Fulcrum-first
 
-Before using `Grep`, `Glob`, or `Read` to search the codebase, try the Fulcrum
-recall and code-search tools first. Fulcrum stores prior decisions, task
-outcomes, and code relationships the filesystem does not.
+Before `Grep`/`Glob`/`Read`, try Fulcrum. Fulcrum holds prior decisions, task outcomes, code relations. Filesystem does not.
 
-For any "where is X", "why was X done", or "does X exist" question, call in
-order:
+Questions "where is X", "why X done", "does X exist" — call in order:
 
-1. `fulcrum action exec recall_knowledge` — natural-language query over
-   curated memory (L1 pages with L0 provenance).
-2. `fulcrum action exec search_code` — symbol and structural search when the
-   question is about code shape.
+1. `fulcrum action exec recall_knowledge` — NL query over L1 curated memory (L0 provenance).
+2. `fulcrum action exec search_code` — symbol + structural search.
 
-Fall through to `Grep` / `Glob` / `Read` only when both return nothing
-relevant. You may always use filesystem tools; the bias is about default
-ordering, not a gate.
+Fall to `Grep`/`Glob`/`Read` only if both empty. Filesystem tools stay available. Bias = default ordering, not block.
 
-Opt out per session with `FULCRUM_NO_RECALL_NUDGE=1`.
+Opt out: `FULCRUM_NO_RECALL_NUDGE=1`.

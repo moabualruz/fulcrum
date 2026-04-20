@@ -2,7 +2,7 @@
 # Canonical source: agent-integration/skills/memory-compact/SKILL.md
 interface:
   display_name: Memory Compact
-  short_description: Compact and consolidate session memories before context window fills
+  short_description: Compact + consolidate session memories before context window fills
   brand_color: '#4F46E5'
 dependencies:
   tools:
