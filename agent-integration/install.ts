@@ -27,6 +27,11 @@ import * as fs from "fs";
 import * as path from "path";
 import { execSync, spawnSync } from "child_process";
 import { fileURLToPath } from "url";
+import {
+  parseCanonicalSource,
+  emitOpencode,
+  writeRidersum,
+} from "../packages/agent-fanout/src/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -1697,19 +1702,102 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
 // Writes .opencode/opencode.jsonc (JSONC config with MCP entry), the context
 // doc, and slash commands into .opencode/command/.
 
-export async function installOpencode(opts: { dryRun: boolean; targetDir?: string }): Promise<void> {
+export type OpencodeInstallMode = "auto" | "npm" | "local";
+
+export const OPENCODE_PLUGIN_PKG = "@fulcrum-agent-os/opencode-plugin";
+
+/**
+ * Probe npm for the scoped plugin package with a short timeout. Runs
+ * `npm view @fulcrum-agent-os/opencode-plugin version` 2s-bounded. Returns
+ * the resolved version string on success, or null on miss / timeout /
+ * unreachable registry. PR 4 c6 — feeds the dual-mode installOpencode
+ * auto-detection.
+ */
+export function probeOpencodePluginOnNpm(timeoutMs = 2_000): string | null {
+  const r = spawnSync("npm", ["view", OPENCODE_PLUGIN_PKG, "version"], {
+    stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
+    timeout: timeoutMs,
+  });
+  if (r.status !== 0) return null;
+  const v = (r.stdout ?? "").trim();
+  return v ? v : null;
+}
+
+/** Error thrown when --auto falls to --local AND local plugin file is absent. */
+export class OpencodePluginUnresolvedError extends Error {
+  readonly code = "opencode-plugin-unresolved";
+  constructor(reason: string) {
+    super(`opencode-plugin-unresolved: ${reason}`);
+    this.name = "OpencodePluginUnresolvedError";
+  }
+}
+
+export async function installOpencode(opts: {
+  dryRun: boolean;
+  targetDir?: string;
+  mode?: OpencodeInstallMode;
+}): Promise<void> {
   const targetDir = opts.targetDir ?? process.cwd();
   const dryRun = opts.dryRun;
+  const requestedMode: OpencodeInstallMode = opts.mode
+    ?? ((process.env["FULCRUM_OPENCODE_INSTALL_MODE"] as OpencodeInstallMode | undefined) ?? "auto");
 
   const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
   const templateConfig = path.join(REPO_ROOT_LOCAL, "opencode", "opencode.jsonc");
   const templateDoc = path.join(REPO_ROOT_LOCAL, "opencode", "opencode.md");
   const templateCmdDir = path.join(REPO_ROOT_LOCAL, "opencode", "command");
+  const templatePluginLocal = path.join(REPO_ROOT_LOCAL, "opencode", "plugins", "fulcrum.ts");
 
   const destDir = path.join(targetDir, ".opencode");
   const destConfig = path.join(destDir, "opencode.jsonc");
   const destDoc = path.join(destDir, "opencode.md");
   const destCmdDir = path.join(destDir, "command");
+
+  // Resolve opencode.jsonc plugin reference up-front so we know which
+  // template path to use and can fail loudly before mutating anything.
+  //   auto  — npm probe wins; fall back to local on miss/timeout; throw
+  //           opencode-plugin-unresolved if neither is reachable.
+  //   npm   — require npm probe; no fallback; throw on miss.
+  //   local — skip npm probe; require the local template file.
+  let pluginRef: string;   // the string that lands in `"plugin": [...]`
+  let resolvedVia: string; // human-readable diagnostic
+  if (requestedMode === "local") {
+    if (!fs.existsSync(templatePluginLocal)) {
+      throw new OpencodePluginUnresolvedError(
+        `mode=local but local plugin file missing at ${templatePluginLocal}`,
+      );
+    }
+    pluginRef = "./plugins/fulcrum.ts";
+    resolvedVia = "local (mode=local)";
+  } else if (requestedMode === "npm") {
+    const v = probeOpencodePluginOnNpm();
+    if (!v) {
+      throw new OpencodePluginUnresolvedError(
+        `mode=npm but \`npm view ${OPENCODE_PLUGIN_PKG} version\` returned no version`,
+      );
+    }
+    pluginRef = OPENCODE_PLUGIN_PKG;
+    resolvedVia = `npm ${OPENCODE_PLUGIN_PKG}@${v}`;
+  } else {
+    // auto
+    const v = probeOpencodePluginOnNpm();
+    if (v) {
+      pluginRef = OPENCODE_PLUGIN_PKG;
+      resolvedVia = `npm ${OPENCODE_PLUGIN_PKG}@${v} (auto)`;
+    } else if (fs.existsSync(templatePluginLocal)) {
+      pluginRef = "./plugins/fulcrum.ts";
+      resolvedVia = "local fallback (auto — npm probe missed)";
+    } else {
+      throw new OpencodePluginUnresolvedError(
+        `mode=auto: npm probe missed AND local plugin file missing at ${templatePluginLocal}`,
+      );
+    }
+  }
+
+  await step(`opencode: plugin source resolved via ${resolvedVia}`, () => {
+    ok(`plugin ref: ${pluginRef}`);
+  });
 
   await step("opencode: .opencode/opencode.jsonc", () => {
     if (fs.existsSync(destConfig)) {
@@ -1722,8 +1810,16 @@ export async function installOpencode(opts: { dryRun: boolean; targetDir?: strin
       return;
     }
     fs.mkdirSync(destDir, { recursive: true });
-    fs.copyFileSync(templateConfig, destConfig);
-    ok(`wrote ${destConfig}`);
+    // Rewrite the template's plugin line so the on-disk .opencode/opencode.jsonc
+    // reflects the resolved plugin ref (npm package name or local path).
+    // Preserves comments + other keys verbatim.
+    const template = fs.readFileSync(templateConfig, "utf8");
+    const rewritten = template.replace(
+      /"plugin"\s*:\s*\[[^\]]*\]/,
+      `"plugin": [${JSON.stringify(pluginRef)}]`,
+    );
+    fs.writeFileSync(destConfig, rewritten, "utf8");
+    ok(`wrote ${destConfig} (plugin=${pluginRef})`);
     setRollback(`rm -f ${destConfig}`);
   });
 
@@ -1777,12 +1873,20 @@ export async function installOpencode(opts: { dryRun: boolean; targetDir?: strin
     }
   });
 
-  // Plugin file
+  // Plugin file — only copy locally when the resolved plugin ref points at
+  // the in-repo `./plugins/fulcrum.ts`. When the ref is the npm package name
+  // (`@fulcrum-agent-os/opencode-plugin`), opencode resolves via Bun's npm
+  // cache at runtime and no local copy is needed.
   const templatePluginDir = path.join(REPO_ROOT_LOCAL, "opencode", "plugins");
   const destPluginDir = path.join(destDir, "plugins");
   const destPlugin = path.join(destPluginDir, "fulcrum.ts");
+  const pluginModeLocal = pluginRef === "./plugins/fulcrum.ts";
 
   await step("opencode: .opencode/plugins/fulcrum.ts", () => {
+    if (!pluginModeLocal) {
+      skip(`plugin resolved via npm (${pluginRef}); skipping local copy`);
+      return;
+    }
     if (!fs.existsSync(path.join(templatePluginDir, "fulcrum.ts"))) {
       skip(`no plugin template at ${templatePluginDir}`);
       return;
@@ -1801,6 +1905,185 @@ export async function installOpencode(opts: { dryRun: boolean; targetDir?: strin
     ok(`wrote ${destPlugin}`);
     setRollback(`rm -f ${destPlugin}`);
   });
+
+  // Also copy the rider.ts companion that fulcrum.ts imports.
+  const destRider = path.join(destPluginDir, "rider.ts");
+  await step("opencode: .opencode/plugins/rider.ts", () => {
+    if (!pluginModeLocal) {
+      skip(`plugin resolved via npm; rider.ts is bundled in the package`);
+      return;
+    }
+    const src = path.join(templatePluginDir, "rider.ts");
+    if (!fs.existsSync(src)) { skip(`no rider template at ${src}`); return; }
+    if (fs.existsSync(destRider)) { skip(`already exists: ${destRider}`); return; }
+    if (dryRun) { ok(`(dry-run) .opencode/plugins/rider.ts`); return; }
+    fs.mkdirSync(destPluginDir, { recursive: true });
+    fs.copyFileSync(src, destRider);
+    ok(`wrote ${destRider}`);
+    setRollback(`rm -f ${destRider}`);
+  });
+
+  // Canonical source fanout — AD-1 / AD-6. parseCanonicalSource reads every
+  // skill + rule from `agent-integration/` and emit{Opencode,...} produces the
+  // per-agent artifacts. installOpencode writes them to `.opencode/agents/` and
+  // `.opencode/rules/` respectively, then the rider integrity SHA (AD-9a).
+  const agentIntegrationRoot = REPO_ROOT_LOCAL;
+  const destAgentsDir = path.join(destDir, "agents");
+  const destRulesDir = path.join(destDir, "rules");
+
+  await step("opencode: .opencode/agents/fulcrum-skill-<name>.md (fanout)", () => {
+    if (!fs.existsSync(path.join(agentIntegrationRoot, "skills"))) {
+      skip(`no canonical skills dir at ${agentIntegrationRoot}/skills`);
+      return;
+    }
+    const source = parseCanonicalSource({ agentIntegrationRoot });
+    // emitOpencode returns both skill + rule artifacts; we only want skills
+    // here — rules land in the next step with canonical filenames so
+    // loadRider / writeRidersum see the expected on-disk shape.
+    const skillArts = emitOpencode(source).artifacts.filter((a) => a.sourceSkillName);
+    if (skillArts.length === 0) {
+      skip(`emitOpencode produced zero skill artifacts`);
+      return;
+    }
+    if (dryRun) {
+      ok(`(dry-run) ${skillArts.length} skill MDs → ${destAgentsDir}`);
+      return;
+    }
+    fs.mkdirSync(destAgentsDir, { recursive: true });
+    let written = 0;
+    for (const art of skillArts) {
+      // art.path is repo-relative (e.g. ".opencode/agents/fulcrum-skill-x.md");
+      // targetDir is the install root, so join there, not at destDir
+      // (destDir already includes the ".opencode" prefix).
+      const dest = path.join(targetDir, art.path);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, art.contents, "utf8");
+      written++;
+    }
+    ok(`wrote ${written} skill MD(s) → ${destAgentsDir}`);
+    setRollback(`rm -f ${destAgentsDir}/fulcrum-skill-*.md`);
+  });
+
+  // Canonical rules copied verbatim (raw bodies — including frontmatter) into
+  // .opencode/rules/. The plugin's loadRider (rider.ts) reads them raw and
+  // verifies against the sibling .ridersum SHA-256 written next.
+  await step("opencode: .opencode/rules/ (canonical rules)", () => {
+    const srcRulesDir = path.join(agentIntegrationRoot, "rules");
+    if (!fs.existsSync(srcRulesDir)) {
+      skip(`no canonical rules dir at ${srcRulesDir}`);
+      return;
+    }
+    const source = parseCanonicalSource({ agentIntegrationRoot });
+    if (source.rules.length === 0) {
+      skip(`canonical rules dir is empty`);
+      return;
+    }
+    if (dryRun) {
+      ok(`(dry-run) ${source.rules.length} rule(s) → ${destRulesDir}`);
+      return;
+    }
+    fs.mkdirSync(destRulesDir, { recursive: true });
+    for (const rule of source.rules) {
+      const dest = path.join(destRulesDir, `${rule.name}.md`);
+      fs.writeFileSync(dest, rule.raw, "utf8");
+    }
+    ok(`wrote ${source.rules.length} rule(s) → ${destRulesDir}`);
+    setRollback(`rm -rf ${destRulesDir}`);
+  });
+
+  // .ridersum — SHA-256 companion for integrity verification at plugin load
+  // (AD-9a). Must be computed over the same bytes loadRider reads.
+  await step("opencode: .opencode/.ridersum (integrity)", () => {
+    if (!fs.existsSync(destRulesDir)) {
+      skip(`no rules dir at ${destRulesDir}`);
+      return;
+    }
+    if (dryRun) {
+      ok(`(dry-run) would write .ridersum`);
+      return;
+    }
+    const result = writeRidersum(destRulesDir);
+    if (result.sha256 === "") {
+      skip(`rules dir has no .md files; .ridersum not written`);
+      return;
+    }
+    ok(`wrote ${result.path} (sha256 ${result.sha256.slice(0, 12)}…, ${result.ruleCount} rule(s))`);
+    setRollback(`rm -f ${result.path}`);
+  });
+
+  // 24 canonical role MDs — translate Claude frontmatter (name/description/model/
+  // tools) to opencode's agent schema (description/mode/hidden) and write one
+  // file per role at `.opencode/agents/<role>.md`. Chief_of_Staff + Orchestrator
+  // land as `mode: primary` (L1/L2 orchestration); every other role is a
+  // hidden subagent so Task() can dispatch to it without polluting @mention.
+  const PRIMARY_ROLES = new Set(["chief_of_staff", "orchestrator"]);
+  const sourceRolesDir = path.join(agentIntegrationRoot, "claude", "agents");
+  await step("opencode: .opencode/agents/<role>.md (24 canonical roles)", () => {
+    if (!fs.existsSync(sourceRolesDir)) {
+      skip(`no canonical roles dir at ${sourceRolesDir}`);
+      return;
+    }
+    const roleFiles = fs.readdirSync(sourceRolesDir)
+      .filter((f) => f.endsWith(".md"))
+      .sort((a, b) => a.localeCompare(b));
+    if (roleFiles.length === 0) {
+      skip(`canonical roles dir is empty`);
+      return;
+    }
+    if (dryRun) {
+      ok(`(dry-run) ${roleFiles.length} role MD(s) → ${destAgentsDir}`);
+      return;
+    }
+    fs.mkdirSync(destAgentsDir, { recursive: true });
+    let written = 0;
+    for (const file of roleFiles) {
+      const slug = file.replace(/\.md$/, "");
+      const raw = fs.readFileSync(path.join(sourceRolesDir, file), "utf8");
+      const translated = translateRoleForOpencode(raw, slug, PRIMARY_ROLES.has(slug));
+      fs.writeFileSync(path.join(destAgentsDir, file), translated, "utf8");
+      written++;
+    }
+    ok(`wrote ${written} role MD(s) → ${destAgentsDir}`);
+    setRollback(`rm -f ${destAgentsDir}/*.md`);
+  });
+}
+
+// Rewrite a Claude-flavored role MD to an opencode-flavored one. opencode's
+// agent frontmatter needs `description` + `mode`; Claude sources carry
+// `name`, `description`, `model`, `tools`. We keep `description` verbatim,
+// pick mode from the caller (primary for chief_of_staff / orchestrator, else
+// subagent + hidden), translate the `model` prefix, and drop the Claude-only
+// tools.allowed/denied block (opencode has a different permission schema).
+export function translateRoleForOpencode(raw: string, slug: string, primary: boolean): string {
+  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  const body = fmMatch ? fmMatch[2] ?? "" : raw;
+  const fm = fmMatch ? (fmMatch[1] ?? "") : "";
+
+  // Pull `description:` out of the YAML — accept both inline and `>-` folded
+  // multi-line forms. Keep it simple: match the key then consume following
+  // indented continuation lines until the next top-level key.
+  const descMatch = fm.match(/^description:\s*>[-+]?\s*\n((?:(?:[ \t]+[^\n]*)\n?)+)|^description:\s*(.+?)(?=\n[^ \t]|$)/m);
+  let description = "";
+  if (descMatch) {
+    if (descMatch[1]) {
+      description = descMatch[1].split("\n").map((l) => l.trim()).filter(Boolean).join(" ");
+    } else if (descMatch[2]) {
+      description = descMatch[2].trim();
+    }
+  }
+  // YAML-escape quotes so the string round-trips safely.
+  const descYaml = description.replace(/"/g, '\\"');
+
+  // Pull `model:` (Claude uses bare IDs like "claude-sonnet-4-6"; opencode
+  // uses provider-prefixed IDs like "anthropic/claude-sonnet-4-6").
+  const modelMatch = fm.match(/^model:\s*(\S+)/m);
+  const modelLine = modelMatch && modelMatch[1]
+    ? `\nmodel: ${modelMatch[1].includes("/") ? modelMatch[1] : `anthropic/${modelMatch[1]}`}`
+    : "";
+
+  const modeLine = primary ? "mode: primary" : "mode: subagent\nhidden: true";
+  const fmOut = `---\nname: ${slug}\ndescription: "${descYaml}"\n${modeLine}${modelLine}\n---\n`;
+  return `${fmOut}${body.startsWith("\n") ? body : "\n" + body}`;
 }
 
 // ── Per-project init: Windsurf ────────────────────────────────────────────────

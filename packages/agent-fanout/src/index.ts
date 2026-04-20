@@ -18,6 +18,9 @@ export type { SecretMatch } from './secret-scan.js'
 export { replaceMarkerBlock } from './marker-block.js'
 export type { MarkerReplaceOptions, MarkerReplaceResult } from './marker-block.js'
 
+export { computeRiderSha, writeRidersum } from './ridersum.js'
+export type { RiderShaResult, RidersumWriteResult } from './ridersum.js'
+
 export { ALL_TARGETS } from './types.js'
 export type {
   AgentTarget,

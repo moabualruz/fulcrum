@@ -12,7 +12,14 @@ import * as os from 'os'
 // We import the functions directly (not via CLI spawn) so tests are fast.
 // install.ts exports installCursor / installWindsurf and guards main() with
 // an entry check, so the import side-effect is safe.
-import { installCursor, installWindsurf, installCodex, installOpencode } from '../../../../agent-integration/install.js'
+import {
+  installCursor,
+  installWindsurf,
+  installCodex,
+  installOpencode,
+  OpencodePluginUnresolvedError,
+  OPENCODE_PLUGIN_PKG,
+} from '../../../../agent-integration/install.js'
 
 let tmpDir: string
 
@@ -306,5 +313,122 @@ describe('installOpencode()', () => {
     const allOutput = logSpy.mock.calls.map(c => c.join(' ')).join('\n')
     logSpy.mockRestore()
     expect(allOutput).toContain('dry-run')
+  })
+
+  it('fans out canonical skills to .opencode/agents/fulcrum-skill-<name>.md', async () => {
+    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    const agentsDir = path.join(tmpDir, '.opencode', 'agents')
+    expect(fs.existsSync(agentsDir)).toBe(true)
+    const files = fs.readdirSync(agentsDir).filter(f => f.startsWith('fulcrum-skill-') && f.endsWith('.md'))
+    // canonical source has 33 skills (PR 1 observation — index.md is a catalog, not a skill)
+    expect(files.length).toBeGreaterThanOrEqual(33)
+    const sample = fs.readFileSync(path.join(agentsDir, files[0]!), 'utf8')
+    // emitOpencode frontmatter contract: name, description, mode: subagent, hidden: true
+    expect(sample).toContain('mode: subagent')
+    expect(sample).toContain('hidden: true')
+  })
+
+  it('copies canonical rules verbatim to .opencode/rules/', async () => {
+    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    const rulesDir = path.join(tmpDir, '.opencode', 'rules')
+    expect(fs.existsSync(rulesDir)).toBe(true)
+    const files = fs.readdirSync(rulesDir).filter(f => f.endsWith('.md'))
+    expect(files).toContain('fulcrum-first.md')
+    expect(files).toContain('lifecycle.md')
+    expect(files).toContain('role-boundaries.md')
+  })
+
+  it('writes .opencode/.ridersum matching the SHA-256 of sorted rule bodies', async () => {
+    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    const ridersumPath = path.join(tmpDir, '.opencode', '.ridersum')
+    expect(fs.existsSync(ridersumPath)).toBe(true)
+    const content = fs.readFileSync(ridersumPath, 'utf8').trim()
+    expect(content).toMatch(/^[0-9a-f]{64}$/)
+
+    // Recompute independently and assert exact match — this is the integrity
+    // contract the plugin's loadRider verifies at runtime.
+    const { createHash } = await import('node:crypto')
+    const rulesDir = path.join(tmpDir, '.opencode', 'rules')
+    const bodies = fs.readdirSync(rulesDir)
+      .filter(f => f.endsWith('.md'))
+      .sort((a, b) => a.localeCompare(b))
+      .map(f => fs.readFileSync(path.join(rulesDir, f), 'utf8'))
+    const expected = createHash('sha256').update(bodies.join('\n\n---\n\n')).digest('hex')
+    expect(content).toBe(expected)
+  })
+
+  it('dry-run: skills/rules/.ridersum steps write nothing', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    await installOpencode({ dryRun: true, targetDir: tmpDir })
+    logSpy.mockRestore()
+    expect(fs.existsSync(path.join(tmpDir, '.opencode', 'agents'))).toBe(false)
+    expect(fs.existsSync(path.join(tmpDir, '.opencode', 'rules'))).toBe(false)
+    expect(fs.existsSync(path.join(tmpDir, '.opencode', '.ridersum'))).toBe(false)
+  })
+
+  it('writes 24 role MDs to .opencode/agents/<role>.md with opencode-flavored frontmatter', async () => {
+    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    const agentsDir = path.join(tmpDir, '.opencode', 'agents')
+    expect(fs.existsSync(agentsDir)).toBe(true)
+
+    // 24 canonical role MDs, filenames mirror agent-integration/claude/agents/.
+    const roleFiles = fs.readdirSync(agentsDir)
+      .filter(f => f.endsWith('.md') && !f.startsWith('fulcrum-skill-'))
+    expect(roleFiles.length).toBeGreaterThanOrEqual(24)
+
+    // chief_of_staff + orchestrator are L1/L2 orchestration → mode: primary.
+    const cos = fs.readFileSync(path.join(agentsDir, 'chief_of_staff.md'), 'utf8')
+    expect(cos).toContain('mode: primary')
+    expect(cos).toMatch(/^---\n/)
+
+    // Implementation roles land as mode: subagent, hidden: true.
+    const se = fs.readFileSync(path.join(agentsDir, 'software_engineer.md'), 'utf8')
+    expect(se).toContain('mode: subagent')
+    expect(se).toContain('hidden: true')
+
+    // Description is carried over from the canonical source.
+    expect(se.toLowerCase()).toContain('implements features')
+    // Body (responsibilities / purpose sections) survives the translation.
+    expect(se).toMatch(/##\s+Purpose/i)
+  })
+
+  // ── PR 4 c6 — dual-mode plugin resolution ──────────────────────────────────
+  it('mode=local writes opencode.jsonc with "plugin": ["./plugins/fulcrum.ts"]', async () => {
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'local' })
+    const config = fs.readFileSync(path.join(tmpDir, '.opencode', 'opencode.jsonc'), 'utf8')
+    expect(config).toMatch(/"plugin"\s*:\s*\["\.\/plugins\/fulcrum\.ts"\]/)
+    // Local mode also copies fulcrum.ts + rider.ts into .opencode/plugins/.
+    expect(fs.existsSync(path.join(tmpDir, '.opencode', 'plugins', 'fulcrum.ts'))).toBe(true)
+    expect(fs.existsSync(path.join(tmpDir, '.opencode', 'plugins', 'rider.ts'))).toBe(true)
+  })
+
+  it('mode=npm throws OpencodePluginUnresolvedError when npm probe cannot resolve the package', async () => {
+    // The scoped package does not exist on npm (PR 14.3 blocked on npm-org
+    // registration — v3.3 approval checklist). mode=npm MUST fail loudly; no
+    // silent fallback to local.
+    await expect(installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'npm' }))
+      .rejects.toMatchObject({
+        name: 'OpencodePluginUnresolvedError',
+        code: 'opencode-plugin-unresolved',
+      })
+  })
+
+  it('mode=auto (default) falls through to local when npm probe misses', async () => {
+    // Same conditions as above — the npm probe will miss — but mode=auto
+    // allows local fallback when the template file is present on disk.
+    await installOpencode({ dryRun: false, targetDir: tmpDir /* default mode */ })
+    const config = fs.readFileSync(path.join(tmpDir, '.opencode', 'opencode.jsonc'), 'utf8')
+    expect(config).toMatch(/"plugin"\s*:\s*\["\.\/plugins\/fulcrum\.ts"\]/)
+  })
+
+  it('exports OPENCODE_PLUGIN_PKG as the canonical scoped name', () => {
+    expect(OPENCODE_PLUGIN_PKG).toBe('@fulcrum-agent-os/opencode-plugin')
+  })
+
+  it('OpencodePluginUnresolvedError carries code="opencode-plugin-unresolved"', () => {
+    const err = new OpencodePluginUnresolvedError('test reason')
+    expect(err.code).toBe('opencode-plugin-unresolved')
+    expect(err.message).toContain('opencode-plugin-unresolved')
+    expect(err.message).toContain('test reason')
   })
 })

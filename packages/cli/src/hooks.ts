@@ -292,10 +292,12 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
   //     Any tool name containing "recall" (MCP `mcp__fulcrum__recall_knowledge`,
   //     `recall_memory`, `recall_turn_state`, etc.) signals an explicit recall
   //     happened — reset the counter so the next grep does not re-nudge.
-  //     Claude `session_id` (UUID) is resolved to Fulcrum `run_id` (ULID) via
-  //     the session file written by SessionStart hook before any SQLite write.
+  //     `session_id` is resolved to Fulcrum `run_id` via the session file
+  //     written by SessionStart (Claude) or runOpencodeSessionStartHook (PR 4
+  //     opencode close-out) before any SQLite write. Covers every hook-capable
+  //     agent whose plugin routes `fulcrum hook <cli> pre`.
   if (
-    ctx.cliName === 'claude'
+    (ctx.cliName === 'claude' || ctx.cliName === 'opencode')
     && /recall/i.test(ctx.toolName)
   ) {
     try {
@@ -305,10 +307,10 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
           await import('fulcrum-agent-core')
         const db = getDb()
         if (isTrustedSession(db, runId)) {
-          recordRecall(db, { sessionId: runId, agentType: 'claude' })
+          recordRecall(db, { sessionId: runId, agentType: ctx.cliName })
           logRecallEvent({
             kind: 'recall_called',
-            agent_type: 'claude',
+            agent_type: ctx.cliName,
             session_id: ctx.sessionId,
             tool_name: ctx.toolName,
           })
@@ -326,7 +328,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
   //     measurement gate.
   if (
     HOOK_SEARCH_TOOLS.has(ctx.toolName)
-    && ctx.cliName === 'claude'
+    && (ctx.cliName === 'claude' || ctx.cliName === 'opencode')
     && process.env['FULCRUM_NO_RECALL_NUDGE'] !== '1'
   ) {
     try {
@@ -337,11 +339,11 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
       if (runId && isTrustedSession(db, runId)) {
         const count = recordGrepWithoutRecall(db, {
           sessionId: runId,
-          agentType: 'claude',
+          agentType: ctx.cliName,
         })
         logRecallEvent({
           kind: 'grep_called_without_recall',
-          agent_type: 'claude',
+          agent_type: ctx.cliName,
           session_id: ctx.sessionId,
           tool_name: ctx.toolName,
           grep_count_without_recall: count,
@@ -391,7 +393,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
                   io.stderr(`</fulcrum-recall>\n`)
                   logRecallEvent({
                     kind: 'passive_injection',
-                    agent_type: 'claude',
+                    agent_type: ctx.cliName,
                     session_id: ctx.sessionId,
                     variant: 'B',
                     tool_name: ctx.toolName,
@@ -412,7 +414,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
             )
             logRecallEvent({
               kind: 'nudge_emitted',
-              agent_type: 'claude',
+              agent_type: ctx.cliName,
               session_id: ctx.sessionId,
               variant: 'A',
               tool_name: ctx.toolName,
@@ -425,14 +427,14 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
     } catch { /* best-effort — never block on nudge failure */ }
   } else if (
     HOOK_SEARCH_TOOLS.has(ctx.toolName)
-    && ctx.cliName === 'claude'
+    && (ctx.cliName === 'claude' || ctx.cliName === 'opencode')
     && process.env['FULCRUM_NO_RECALL_NUDGE'] === '1'
   ) {
     try {
       const { logRecallEvent } = await import('fulcrum-agent-core')
       logRecallEvent({
         kind: 'nudge_opt_out',
-        agent_type: 'claude',
+        agent_type: ctx.cliName,
         session_id: ctx.sessionId,
         tool_name: ctx.toolName,
       })

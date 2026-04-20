@@ -41,6 +41,23 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
   // subsequent injections reuse the same buffer.
   const riderLoad = loadRider()
   let experimentalFiredCount = 0
+  let messagesTransformFiredCount = 0
+
+  // PR 4 closeout c4 — track whether we've written the Fulcrum session-trust
+  // file for this opencode session. The bias nudge in `fulcrum hook opencode
+  // pre` validates session_id against agent_runs (AD-9b) before logging any
+  // counter, so we must start the run / write the trust file on the first
+  // tool.execute.before observation. Fire-and-forget; idempotent server-side.
+  const sessionStarted = new Set<string>()
+  function ensureSessionStart(sessionId: string): void {
+    if (!sessionId || sessionId === "unknown" || sessionStarted.has(sessionId)) return
+    sessionStarted.add(sessionId)
+    spawnSync("fulcrum", ["hook", "opencode", "session-start"], {
+      input: JSON.stringify({ session_id: sessionId }),
+      encoding: "utf-8",
+      timeout: 5_000,
+    })
+  }
 
   function getContext(): { workspace_id: string; project_id: string } {
     if (_cachedCtx) return _cachedCtx
@@ -61,37 +78,63 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
     // Injects workspace snapshot so the agent sees live state without
     // needing to call status tools manually.
 
-    "experimental.chat.system.transform": async (system) => {
+    "experimental.chat.system.transform": async (_input, output) => {
       // Prepend the canonical rider (fulcrum-first + lifecycle + role-boundaries).
       // Fenced <fulcrum-system-rider> block so downstream model tooling can
       // detect and parse it. Integrity status from the startup load is
       // advisory — AD-3 says fail-open on mismatch so we continue with the
-      // best-effort rider regardless.
+      // best-effort rider regardless. Signature follows @opencode-ai/plugin
+      // ≥1.14 — the hook receives (input, output) and mutates output.system[].
       experimentalFiredCount++
 
-      let transformed = system
       if (riderLoad.rider) {
         const header = `<fulcrum-system-rider version="1" sha256="${riderLoad.sha256.slice(0, 12)}" integrity="${
           riderLoad.integrityOk ? "ok" : "warn"
         }">`
-        transformed = `${header}\n${riderLoad.rider}\n</fulcrum-system-rider>\n\n${system}`
+        output.system.unshift(`${header}\n${riderLoad.rider}\n</fulcrum-system-rider>`)
       }
 
-      // Append live workspace snapshot (existing behavior).
+      // Append live workspace snapshot (existing behavior; pushed as a
+      // separate system-prompt segment now that output.system is string[]).
       try {
         const ids = getContext()
         const status = execAction("get_workspace_status", { workspace_id: ids.workspace_id }) as Record<string, unknown>
         const active = (status["active_runs"] as unknown[]) ?? []
         const blocked = (status["blocked_runs"] as unknown[]) ?? []
-        if (active.length === 0 && blocked.length === 0) return transformed
+        if (active.length === 0 && blocked.length === 0) return
 
-        const lines = [`\n<!-- Fulcrum workspace: ${ids.workspace_id} -->`]
+        const lines = [`<!-- Fulcrum workspace: ${ids.workspace_id} -->`]
         if (active.length > 0) lines.push(`Active agent runs: ${active.length}`)
         if (blocked.length > 0) lines.push(`⚠ Blocked runs: ${blocked.length}`)
-        return transformed + lines.join("\n")
-      } catch {
-        return transformed
+        output.system.push(lines.join("\n"))
+      } catch { /* best-effort */ }
+    },
+
+    // PR 4 closeout c5 — AD-3 belt-and-suspenders redundancy. Both
+    // experimental.* hooks register together and opencode fires both per
+    // LLM call; ordering between them is not guaranteed. If
+    // system.transform has already mutated output.system[] this turn
+    // (experimentalFiredCount > 0), we skip to avoid duplicating rider
+    // content in the prompt. If it hasn't (future SDK change silently
+    // drops system[] mutations, or messages.transform fires first with
+    // no system.transform yet this session), we prepend the rider as a
+    // synthetic TextPart on the first existing user message so the
+    // model still sees it via the conversation stream.
+    "experimental.chat.messages.transform": async (_input, output) => {
+      messagesTransformFiredCount++
+      if (experimentalFiredCount > 0) return
+      if (!riderLoad.rider || output.messages.length === 0) return
+      const first = output.messages[0]
+      if (!first) return
+      const riderPart = {
+        id: `fulcrum-rider-${Date.now()}`,
+        sessionID: first.info.sessionID,
+        messageID: first.info.id,
+        type: "text" as const,
+        text: `<fulcrum-system-rider fallback="messages.transform" sha256="${riderLoad.sha256.slice(0, 12)}">\n${riderLoad.rider}\n</fulcrum-system-rider>`,
+        synthetic: true,
       }
+      first.parts.unshift(riderPart)
     },
 
     // ── Shell environment ──────────────────────────────────────────────────
@@ -112,14 +155,25 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
     // shell-out — matches AC §11.64 / §11.68.
 
     "tool.execute.before": async (input) => {
-      if (!input.tool || input.tool.startsWith("fulcrum_")) return
-      if (!FULCRUM_TOOL_ALLOWLIST.has(input.tool)) return
+      // Always bootstrap the trust file on first observation so the bias
+      // nudge has something to validate against. Cheap once per session.
+      const sessionId = input.sessionID ?? process.env["OPENCODE_SESSION_ID"] ?? "unknown"
+      ensureSessionStart(sessionId)
 
-      const result = spawnSync("fulcrum", ["hook", "auto"], {
+      // Every tool call shells to `fulcrum hook opencode pre`. The CLI-side
+      // hook opens the bias nudge + recall-counter paths for opencode (see
+      // packages/cli/src/hooks.ts §3a/§3b). The allowlist below still applies
+      // to the write-side policy check, but search tools (Grep/Glob/Read) now
+      // route through the hook unconditionally so the nudge can fire.
+      const searchTool = input.tool === "Grep" || input.tool === "Glob" || input.tool === "Read"
+      if (!input.tool || input.tool.startsWith("fulcrum_")) return
+      if (!FULCRUM_TOOL_ALLOWLIST.has(input.tool) && !searchTool) return
+
+      const result = spawnSync("fulcrum", ["hook", "opencode", "pre"], {
         input: JSON.stringify({
           tool_name: input.tool,
           tool_input: input.input ?? {},
-          session_id: process.env["OPENCODE_SESSION_ID"] ?? "unknown",
+          session_id: sessionId,
         }),
         encoding: "utf-8",
         timeout: 5_000,
@@ -142,11 +196,11 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
     "tool.execute.after": async (input) => {
       if (!input.tool || input.tool.startsWith("fulcrum_")) return
       if (!FULCRUM_TOOL_ALLOWLIST.has(input.tool)) return
-      const sessionId = process.env["OPENCODE_SESSION_ID"] ?? "unknown"
-      spawnSync("fulcrum", ["hook", "auto", "post"], {
+      const sessionId = input.sessionID ?? process.env["OPENCODE_SESSION_ID"] ?? "unknown"
+      spawnSync("fulcrum", ["hook", "opencode", "post"], {
         input: JSON.stringify({
           tool_name: input.tool,
-          tool_input: input.input ?? {},
+          tool_input: input.args ?? {},
           session_id: sessionId,
         }),
         encoding: "utf-8",

@@ -210,4 +210,52 @@ describe('PreToolUse Fulcrum-first bias nudge (Variant A, PR 3 R1)', () => {
       expect(nudge, `unexpected nudge for ${tool}`).toBeUndefined()
     }
   })
+
+  // PR 4 closeout c4 — the bias gate now opens for opencode alongside claude.
+  // The plugin shells to `fulcrum hook opencode pre`, which lands as
+  // cliName === 'opencode' in runPreHook. Trust boundary + telemetry wiring
+  // mirror the Claude path; `agent_type` in telemetry is derived from
+  // ctx.cliName (not hard-coded 'claude'), so opencode events carry the
+  // correct label.
+  function opencodeCtx(toolName: string, sessionId: string): HookContext {
+    return {
+      cliName: 'opencode',
+      toolName,
+      toolInput: {},
+      sessionId,
+      agentRole: '',
+      runId: '',
+      workspace_id: 'ws_bias',
+    }
+  }
+
+  it('emits a nudge for opencode Grep on a trusted session (AD-9b trust honored)', async () => {
+    seedTrustedSession('oc-sess-real-uuid', 'run_01OPENCODE')
+    const io = makeCapturedIO()
+    await runPreHook(opencodeCtx('Grep', 'oc-sess-real-uuid'), io.io)
+    const nudge = io.stderr.find((l) => l.includes('fulcrum-first'))
+    expect(nudge).toBeDefined()
+    expect(nudge).toMatch(/Grep/)
+  })
+
+  it('does not nudge for opencode when no session file exists (AD-9b silent skip)', async () => {
+    const io = makeCapturedIO()
+    await runPreHook(opencodeCtx('Grep', 'oc-sess-no-file'), io.io)
+    const nudge = io.stderr.find((l) => l.includes('fulcrum-first'))
+    expect(nudge).toBeUndefined()
+  })
+
+  it('records opencode events with agent_type=opencode in telemetry', async () => {
+    seedTrustedSession('oc-sess-telem-uuid', 'run_01TELEM')
+    const io = makeCapturedIO()
+    await runPreHook(opencodeCtx('Grep', 'oc-sess-telem-uuid'), io.io)
+    const telemetryPath = join(tmpDir!, 'telemetry', 'recall_bias.jsonl')
+    expect(existsSync(telemetryPath)).toBe(true)
+    const events = readFileSync(telemetryPath, 'utf8').trim().split('\n')
+      .map((l) => JSON.parse(l) as { kind: string; agent_type: string; session_id: string })
+    const grep = events.find((e) => e.kind === 'grep_called_without_recall')
+    expect(grep).toBeDefined()
+    expect(grep!.agent_type).toBe('opencode')
+    expect(grep!.session_id).toBe('oc-sess-telem-uuid')
+  })
 })

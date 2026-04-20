@@ -1530,6 +1530,62 @@ export async function runCodexSessionStartHook(): Promise<void> {
 }
 
 /**
+ * opencode SessionStart hook.
+ * Writes the session trust file so PreToolUse's Fulcrum-first bias nudge can
+ * validate `session_id` against `agent_runs` (AD-9b). Called by the opencode
+ * plugin on first tool.execute.before observation per session, with
+ * `session_id` on stdin.
+ */
+export async function runOpencodeSessionStartHook(): Promise<void> {
+  const raw = await readStdinFully()
+  let sessionId = process.env['OPENCODE_SESSION_ID'] ?? ''
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId
+    } catch { /* fallback */ }
+  }
+  if (!sessionId) sessionId = `opencode_${Date.now()}`
+  sessionId = sanitizeId(sessionId)
+
+  // Idempotent: if a session file already exists for this id, skip re-init.
+  if (existsSync(getSessionFilePath(sessionId))) {
+    process.exit(0)
+  }
+
+  try {
+    const { run_id } = await initFulcrumSession({ sessionId, cliName: 'opencode' })
+    process.stderr.write(`[fulcrum/session] opencode run started: ${run_id}\n`)
+  } catch (err) {
+    process.stderr.write(`[fulcrum/session-start] opencode error (non-fatal): ${(err as Error).message}\n`)
+  }
+  process.exit(0)
+}
+
+/**
+ * opencode SessionEnd hook. Completes the run started at session-start.
+ * Called from the plugin's `event` handler on `session.idle`.
+ */
+export async function runOpencodeSessionEndHook(): Promise<void> {
+  const raw = await readStdinFully()
+  let sessionId = process.env['OPENCODE_SESSION_ID'] ?? ''
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId
+    } catch { /* fallback */ }
+  }
+  if (sessionId) {
+    try {
+      await completeFulcrumSession(sanitizeId(sessionId), 'opencode session ended')
+    } catch (err) {
+      process.stderr.write(`[fulcrum/session-end] opencode error (non-fatal): ${(err as Error).message}\n`)
+    }
+  }
+  process.exit(0)
+}
+
+/**
  * Codex Stop hook.
  * Completes the run started by SessionStart.
  */
@@ -3546,12 +3602,17 @@ OPTIONS (serve mcp-http)
         if (phaseArg === 'notify')        { await runCodexStopHook();         return }
       }
 
-      // Opencode / Cursor / Windsurf lifecycle hooks.
-      // The opencode plugin shells to `fulcrum hook opencode session-end` on
-      // session.idle and to `fulcrum hook opencode pre-compact` on
-      // session.compacted. Cursor + Windsurf only route through `hook auto`
+      // Opencode lifecycle hooks — real handlers (session-start writes the
+      // trust file; session-end completes the run).
+      if (cli === 'opencode') {
+        if (phaseArg === 'session-start') { await runOpencodeSessionStartHook(); return }
+        if (phaseArg === 'session-end')   { await runOpencodeSessionEndHook();   return }
+        if (phaseArg === 'pre-compact')   { await runStubHook(cli, phaseArg);    return }
+      }
+
+      // Cursor / Windsurf lifecycle hooks. They only route through `hook auto`
       // today but we accept the lifecycle phases so future configs don't error.
-      if (cli === 'opencode' || cli === 'cursor' || cli === 'windsurf') {
+      if (cli === 'cursor' || cli === 'windsurf') {
         if (
           phaseArg === 'session-start' ||
           phaseArg === 'session-end' ||
