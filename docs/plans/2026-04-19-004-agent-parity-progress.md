@@ -802,3 +802,12 @@ User directive (verbatim): **"did I allow you to defer any fucking items !?"** �
   - Not invoked from §Part 2 PR 8: full persona panel — pending commit authorization.
   - Subagents dispatched: `episodic-memory:search-conversations` (no prior PR 8 sessions — clean slate).
 - **Next**: on user "commit" → five commits land (code + regression + script-generated + checklist + ledger). On user "ship" → ce-review persona panel + push to origin/main. After merge, **PR 9 — opencode native skills: 33 hidden subagent MDs + Task permissions** (`.opencode/agents/fulcrum-skill-<name>.md` with `mode: subagent, hidden: true`).
+
+### 2026-04-20 — PR 9 — opencode Task permissions + emit spec gate — COMPLETE
+
+- **Units**: 9.1 (failing TDD tests), 9.2 (fix emitter), 9.3 (golden regen), 9.4 (checklist update).
+- **Summary**: Added `permission: { task: { '*': 'deny' } }` to `renderSkill()` in `packages/agent-fanout/src/emit/opencode.ts`. Every opencode skill subagent MD now carries the Task-tool deny block — prevents skill subagents from spawning nested tasks (AD-7 HOW-vs-WHO contract). TDD gate: `GAP(oc-agents-M4)` test added to `emit-new-shapes.test.ts` (fails red before fix, green after). Companion describe block `opencode: hidden skill subagents (.opencode/agents/)` added to `opencode-compliance.test.ts` (M1–M5; graceful skip when `.opencode/` not installed since it's gitignored). All 21 drift-canary golden files regenerated (`UPDATE_GOLDEN=1`) — opencode goldens now include `permission` block; non-opencode goldens updated from stale caveman-compress state. Full agent-fanout suite: **229/229 green**. CLI compliance suite: **22/22 green** (M1–M5 skipped gracefully = 5 soft passes).
+- **Key decision**: compliance test skips gracefully (not fails) when `.opencode/agents/` not present — gitignored dir can't be a hard CI gate. Emitter unit test is the authoritative CI spec gate.
+- **Checklist**: opencode row 163 updated to cite `permission.task['*'] === 'deny'` + PR 9. No new ⬜→✅ flips (row was already ✅ from PR 4 c2; PR 9 strengthens its verify column).
+- **Commits planned**: code (`feat(opencode-emit): PR 9 — permission.task deny block + spec gate`), docs (`docs(reference): checklist PR 9 — permission.task row update`), ledger (`docs(plans): agent-parity progress — PR 9 COMPLETE`).
+- **Next**: PR 10 — Copilot installer + per-skill instructions + public-repo guard (6 failing compliance tests: cp-M1 through cp-S3).
