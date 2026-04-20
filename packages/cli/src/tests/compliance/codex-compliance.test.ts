@@ -104,10 +104,9 @@ describe('Codex: plugin.json interface block', () => {
     // marketplace_tests.rs shows upstream uses capitalized verbs like
     // "Interactive", "Write", "Background". Our invented strings
     // ("task_management", "memory", ...) render verbatim in the Codex UI.
-    const caps = manifest?.capabilities as string[] | undefined
+    const iface = manifest?.interface as Record<string, unknown> | undefined
+    const caps = iface?.capabilities as string[] | undefined
     if (!caps) return
-    // Either empty, or at least one capitalized-word entry. Invented
-    // underscore_case strings fail this check.
     for (const c of caps) {
       expect(
         /^[A-Z][a-zA-Z]*$/.test(c),
@@ -117,7 +116,8 @@ describe('Codex: plugin.json interface block', () => {
   })
 
   it('GAP(codex-S2) category is capitalized per upstream convention', () => {
-    const cat = manifest?.category as string | undefined
+    const iface = manifest?.interface as Record<string, unknown> | undefined
+    const cat = iface?.category as string | undefined
     if (cat) {
       expect(/^[A-Z]/.test(cat)).toBe(true)
     }

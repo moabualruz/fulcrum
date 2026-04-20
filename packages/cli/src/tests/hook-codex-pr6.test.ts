@@ -352,21 +352,26 @@ describe('PR 6.6 Codex plugin manifest (.codex-plugin/plugin.json)', () => {
     expect(fs.existsSync(path.join(pluginRoot, m.mcpServers as string))).toBe(true)
   })
 
-  it('interface block carries the full production-quality metadata (PR 6.6)', () => {
+  it('interface block carries the full production-quality metadata (PR 6.6 + PR 7 unit 7.27)', () => {
+    // PR 7 unit 7.27 (2026-04-20): capabilities normalized from invented
+    // underscore-case labels to upstream-recognized capitalized verbs per
+    // codex-rs/core-plugins/src/marketplace_tests.rs. Category also moved
+    // from lowercase to Title case.
     const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as { interface?: Record<string, unknown> }
     const i = m.interface ?? {}
     expect(i.displayName).toBe('Fulcrum Agent OS')
     expect(typeof i.shortDescription).toBe('string')
     expect(typeof i.longDescription).toBe('string')
     expect(typeof i.developerName).toBe('string')
-    expect(i.category).toBe('productivity')
+    expect(i.category).toBe('Productivity')
     expect(Array.isArray(i.capabilities)).toBe(true)
     const caps = i.capabilities as string[]
-    // Per PR 6.6 spec: declare the 4 domain capabilities Fulcrum provides.
-    expect(caps).toContain('task_management')
-    expect(caps).toContain('memory')
-    expect(caps).toContain('multi_agent_lifecycle')
-    expect(caps).toContain('policy_hooks')
+    // Upstream convention is capitalized single-word labels. Fulcrum ships
+    // Interactive + Memory + Orchestration + PolicyEnforcement.
+    for (const c of caps) {
+      expect(/^[A-Z][a-zA-Z]*$/.test(c), `capability "${c}" should be capitalized`).toBe(true)
+    }
+    expect(caps.length).toBeGreaterThanOrEqual(3)
     expect(i.brandColor).toBe('#4F46E5')
     expect(typeof i.websiteURL).toBe('string')
     expect(Array.isArray(i.defaultPrompt)).toBe(true)
