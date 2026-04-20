@@ -18,7 +18,7 @@
  *   pi install git:github.com/<you>/pi-stack-plan
  *
  * Install (npm, once published):
- *   pi install npm:fulcrum-cockpit
+ *   pi install npm:@fulcrum-agent-os/pi-cockpit
  *
  * Config — workspace_id / project_id are computed deterministically from the
  *   project directory path (sha256[:12] of abs path, prefixed with dir name).
@@ -198,6 +198,11 @@ export default function (pi: ExtensionAPI) {
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   let uiRef: { setStatus: (id: string, s?: string) => void; notify: (msg: string, level: string) => void } | null = null;
   let currentRunId: string | null = null;
+  // Active role — set via /fulcrum:role <slug>, appended to systemPrompt in
+  // before_agent_start. PI has no native `pi agent switch` primitive; this is
+  // the Fulcrum synthesis of a role-switching UX.
+  let activeRole: string | null = null;
+  let activeRoleBody: string | null = null;
 
   // ── Setup wizard ─────────────────────────────────────────────────────────────
 
@@ -658,6 +663,46 @@ export default function (pi: ExtensionAPI) {
       },
     });
 
+    // /fulcrum:role <slug> — switch the extension-level active role
+    // (synthesized; PI has no `pi agent switch` primitive). The role MD body
+    // is loaded from the cockpit's skills/roles/<slug>.md file and appended
+    // to the systemPrompt via before_agent_start for every subsequent turn.
+    pi.registerCommand("fulcrum:role", {
+      description: "Switch Fulcrum role: /fulcrum:role <slug> (e.g. chief_of_staff, software_engineer)",
+      handler: async (args, ctx) => {
+        const slug = (args ?? "").trim().toLowerCase();
+        if (!slug) {
+          ctx.ui.notify(
+            `Active role: ${activeRole ?? "(none)"}\n` +
+            `Usage: /fulcrum:role <slug>  — e.g. chief_of_staff, software_engineer\n` +
+            `       /fulcrum:role clear   — reset to default`,
+            "info",
+          );
+          return;
+        }
+        if (slug === "clear" || slug === "none") {
+          activeRole = null;
+          activeRoleBody = null;
+          ctx.ui.notify("Fulcrum role cleared", "info");
+          return;
+        }
+        const roleFile = path.join(_dirPath, "skills", "roles", `${slug}.md`);
+        if (!fs.existsSync(roleFile)) {
+          ctx.ui.notify(`No role MD at ${roleFile}`, "error");
+          return;
+        }
+        try {
+          const raw = fs.readFileSync(roleFile, "utf8");
+          const fm = raw.match(/^---\n[\s\S]*?\n---\n?([\s\S]*)$/);
+          activeRole = slug;
+          activeRoleBody = (fm ? fm[1] ?? raw : raw).trim();
+          ctx.ui.notify(`Fulcrum role → ${slug}`, "success");
+        } catch (err) {
+          ctx.ui.notify(`Failed to load role: ${(err as Error).message}`, "error");
+        }
+      },
+    });
+
     // /cos <goal> — inject CoS world-state context
     pi.registerCommand("cos", {
       description: "Inject Chief of Staff world-state context: /cos <goal>",
@@ -971,22 +1016,86 @@ export default function (pi: ExtensionAPI) {
     // Note: the agent run itself is started once per SESSION in session_start,
     // not per agent turn — starting per turn is what caused zombie rows to
     // accumulate when PI crashed between agent_end firings.
-    pi.on("before_agent_start", async (_event, ctx) => {
-      if (!snapshot) return;
+    pi.on("before_agent_start", async (event, ctx) => {
       const usage = (ctx as Record<string, unknown>)["getContextUsage"]?.();
-      if (usage && (usage as Record<string, unknown>)["tokens"] > 8000) return;
+      const overBudget = usage && (usage as Record<string, unknown>)["tokens"] > 8000;
 
-      const r = snapshot.running_agents ?? [];
-      const b = snapshot.blocked_agents ?? [];
-      if (r.length === 0 && b.length === 0) return;
+      const basePrompt = (event as Record<string, unknown>)["systemPrompt"] as string ?? "";
+      const additions: string[] = [];
 
-      const lines: string[] = [`[Fulcrum] Workspace: ${cfg.workspace_id}`];
-      if (currentRunId) lines.push(`Run ID: ${currentRunId}`);
-      if (r.length > 0) lines.push(`Active runs: ${r.map(x => x.role ?? "—").join(", ")}`);
-      if (b.length > 0) lines.push(`⚠ Blocked: ${b.map(x => x.role ?? "—").join(", ")}`);
+      if (!overBudget && snapshot) {
+        const r = snapshot.running_agents ?? [];
+        const b = snapshot.blocked_agents ?? [];
+        if (r.length > 0 || b.length > 0) {
+          const lines: string[] = [`[Fulcrum] Workspace: ${cfg.workspace_id}`];
+          if (currentRunId) lines.push(`Run ID: ${currentRunId}`);
+          if (r.length > 0) lines.push(`Active runs: ${r.map(x => x.role ?? "—").join(", ")}`);
+          if (b.length > 0) lines.push(`⚠ Blocked: ${b.map(x => x.role ?? "—").join(", ")}`);
+          additions.push(lines.join("\n"));
+        }
+      }
 
-      return { systemPrompt: lines.join("\n") };
+      if (activeRole && activeRoleBody) {
+        additions.push(`## Fulcrum role: ${activeRole}\n\n${activeRoleBody}`);
+      }
+
+      if (additions.length === 0) return;
+      return { systemPrompt: `${basePrompt}\n\n${additions.join("\n\n")}` };
     });
+  }
+
+  // ── Observational lifecycle hooks ────────────────────────────────────────────
+  // PI has a rich 24-event taxonomy. Fulcrum binds observational handlers on
+  // all of them so cockpit telemetry + policy-engine decisions can layer on
+  // top of a consistent audit surface. Handlers stay thin by design — anything
+  // heavier than logging belongs in its own function (see registerPolicyHook).
+
+  function registerObservationalEvents(): void {
+    // agent_end — fires once per user prompt after the agent loop drains.
+    // Useful later for per-turn memory emit; today it beats the heartbeat so
+    // long-running sessions don't appear idle to the sweep.
+    pi.on("agent_end", async (_event, _ctx) => {
+      if (!currentRunId) return;
+      try {
+        execAction("heartbeat_agent_run", { run_id: currentRunId, current_step: "agent_end" });
+      } catch { /* non-fatal */ }
+    });
+
+    // tool_result — fires after each tool execution. Mutating tools may be
+    // mirrored into memory in a later PR; today the extensions-layer policy
+    // check lives in registerPolicyHook's tool_call path.
+    pi.on("tool_result", async (_event, _ctx) => { /* observational */ });
+
+    // context — modifies outgoing messages non-destructively. Today it is a
+    // pass-through; future work may inject recalled memory here.
+    pi.on("context", async (_event, _ctx) => { /* pass-through */ });
+
+    // before_provider_request — observational only (provider serialization
+    // debug hook). Returning undefined keeps the payload unchanged.
+    pi.on("before_provider_request", (_event, _ctx) => { /* observational */ });
+
+    // turn_start / turn_end — per-turn lifecycle. turn_end is a natural
+    // heartbeat moment for long multi-turn conversations.
+    pi.on("turn_start", async (_event, _ctx) => { /* observational */ });
+    pi.on("turn_end", async (_event, _ctx) => {
+      if (!currentRunId) return;
+      try {
+        execAction("heartbeat_agent_run", { run_id: currentRunId, current_step: "turn_end" });
+      } catch { /* non-fatal */ }
+    });
+
+    // session_before_compact — fires right before session compaction. Future
+    // parity with Claude PreCompact: emit a summary memory row before the
+    // transcript is truncated.
+    pi.on("session_before_compact", async (_event, _ctx) => { /* observational; parity with Claude PreCompact pending */ });
+
+    // user_bash — `!` / `!!` commands from the user. Pass-through; cockpit
+    // does not intercept bash today.
+    pi.on("user_bash", (_event, _ctx) => { /* pass-through */ });
+
+    // input — first input event each turn. Observational anchor for future
+    // per-turn state resets.
+    pi.on("input", async (_event, _ctx) => { /* observational */ });
   }
 
   // ── Skills contribution ───────────────────────────────────────────────────────
@@ -1019,6 +1128,7 @@ export default function (pi: ExtensionAPI) {
     registerTools();
     registerPolicyHook();
     registerAgentLifecycle();
+    registerObservationalEvents();
 
     // Workspace/project IDs are derived from the cwd in loadCockpitConfig —
     // there is no project-local config file. If the user wants custom IDs or
