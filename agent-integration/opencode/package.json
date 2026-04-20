@@ -1,11 +1,40 @@
 {
-  "name": "fulcrum-opencode-plugin",
+  "name": "@fulcrum-agent-os/opencode-plugin",
   "version": "0.0.1",
+  "description": "Fulcrum Agent OS — opencode plugin. Injects the canonical Fulcrum-first rider into every LLM turn via experimental.chat.system.transform, with SHA-256 integrity verification and session.idle telemetry for silent-failure detection.",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "fulcrum",
+    "agent-os",
+    "recall-before-grep",
+    "system-rider"
+  ],
   "type": "module",
+  "main": "./plugins/fulcrum.ts",
+  "exports": {
+    ".": {
+      "import": "./plugins/fulcrum.ts"
+    },
+    "./rider": {
+      "import": "./plugins/rider.ts"
+    }
+  },
+  "files": [
+    "plugins/fulcrum.ts",
+    "plugins/rider.ts",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run test"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": "*"
   },
   "devDependencies": {
+    "@opencode-ai/plugin": "*",
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
@@ -14,7 +43,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/moabualruz/fulcrum.git"
+    "url": "git+https://github.com/moabualruz/fulcrum.git",
+    "directory": "agent-integration/opencode"
   },
   "homepage": "https://github.com/moabualruz/fulcrum#readme",
   "bugs": {
