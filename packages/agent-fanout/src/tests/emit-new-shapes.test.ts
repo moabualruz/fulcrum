@@ -91,6 +91,16 @@ describe('emitOpencode', () => {
     })
     expect(matter(res.artifacts[0]!.contents).data.description).toBe('')
   })
+  it('GAP(oc-agents-M4) marks skills with permission.task: { "*": "deny" }', () => {
+    for (const artifact of skillArtifacts) {
+      const parsed = matter(artifact.contents)
+      const perm = parsed.data.permission as Record<string, unknown> | undefined
+      expect(perm, `${artifact.path}: permission block missing`).toBeDefined()
+      const task = perm?.['task'] as Record<string, unknown> | undefined
+      expect(task, `${artifact.path}: permission.task missing`).toBeDefined()
+      expect(task?.['*'], `${artifact.path}: permission.task['*'] should be 'deny'`).toBe('deny')
+    }
+  })
   commonAssertions('opencode', result, source)
 })
 

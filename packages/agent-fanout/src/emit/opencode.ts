@@ -21,6 +21,7 @@ function renderSkill(skill: CanonicalSkill): EmitArtifact {
     description: readDescription(skill.frontmatter),
     mode: 'subagent',
     hidden: true,
+    permission: { task: { '*': 'deny' } },
   }
   return {
     path: `.opencode/agents/${slug}.md`,

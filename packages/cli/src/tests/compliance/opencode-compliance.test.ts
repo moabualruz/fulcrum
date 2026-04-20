@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
-import { agentDir, readText, readJsonIfExists, listDir } from './helpers.js'
+import { agentDir, repoRoot, readText, readJsonIfExists, listDir, listFilesRec, parseFrontmatter } from './helpers.js'
 
 const O = agentDir('opencode')
 
@@ -196,6 +196,58 @@ describe('opencode: bias-nudge gate includes opencode tool names', () => {
     // Both claude-style and cross-CLI-style names should be covered.
     for (const t of ['Grep', 'Glob', 'Read']) {
       expect(list).toContain(t)
+    }
+  })
+})
+
+describe('opencode: hidden skill subagents (.opencode/agents/)', () => {
+  // PR 9 live-environment gate — GAP(oc-agents-M1..M5).
+  // Files are written by installOpencode() to <project-root>/.opencode/agents/.
+  // That dir is gitignored, so these tests are local-only (skip when not installed).
+  // CI gate is emit-new-shapes.test.ts in agent-fanout (checks emitter output directly).
+  const agentsDir = join(repoRoot, '.opencode', 'agents')
+  const skillFiles = listFilesRec(agentsDir, /^fulcrum-skill-.+\.md$/)
+  const installed = skillFiles.length > 0
+
+  it('GAP(oc-agents-M1) ≥33 fulcrum-skill-*.md artifacts installed (skip if not installed)', () => {
+    if (!installed) return // gitignored; skip in CI
+    expect(skillFiles.length).toBeGreaterThanOrEqual(33)
+  })
+
+  it('GAP(oc-agents-M2) every skill artifact has mode: subagent', () => {
+    if (!installed) return
+    for (const f of skillFiles) {
+      const data = parseFrontmatter(readText(f))
+      expect(data?.mode, f).toBe('subagent')
+    }
+  })
+
+  it('GAP(oc-agents-M3) every skill artifact has hidden: true', () => {
+    if (!installed) return
+    for (const f of skillFiles) {
+      const data = parseFrontmatter(readText(f))
+      expect(data?.hidden, f).toBe(true)
+    }
+  })
+
+  it('GAP(oc-agents-M4) every skill artifact has permission.task block', () => {
+    // parseFrontmatter parses one level of nesting; permission: { task: <any> } is
+    // sufficient to confirm the block is present. The emitter unit test
+    // (emit-new-shapes.test.ts) asserts the deeper task['*']='deny' value.
+    if (!installed) return
+    for (const f of skillFiles) {
+      const data = parseFrontmatter(readText(f))
+      expect(data?.permission, `${f}: permission block missing`).toBeDefined()
+      const task = (data?.permission as Record<string, unknown> | undefined)?.['task']
+      expect(task, `${f}: permission.task missing`).toBeDefined()
+    }
+  })
+
+  it('GAP(oc-agents-M5) every skill artifact has a non-empty description', () => {
+    if (!installed) return
+    for (const f of skillFiles) {
+      const data = parseFrontmatter(readText(f))
+      expect(typeof data?.description === 'string' && (data.description as string).length > 0, f).toBe(true)
     }
   })
 })
