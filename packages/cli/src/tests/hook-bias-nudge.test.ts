@@ -258,4 +258,48 @@ describe('PreToolUse Fulcrum-first bias nudge (Variant A, PR 3 R1)', () => {
     expect(grep!.agent_type).toBe('opencode')
     expect(grep!.session_id).toBe('oc-sess-telem-uuid')
   })
+
+  // PR 7 cross-cut — bias gate extends to gemini. Gemini tool names differ
+  // from Claude/opencode (grep_search / read_file / list_directory), so both
+  // naming conventions must be recognized.
+  function geminiCtx(toolName: string, sessionId: string): HookContext {
+    return {
+      cliName: 'gemini',
+      toolName,
+      toolInput: {},
+      sessionId,
+      agentRole: '',
+      runId: '',
+      workspace_id: 'ws_bias',
+    }
+  }
+
+  it('emits a nudge for gemini grep_search on a trusted session', async () => {
+    seedTrustedSession('gm-sess-real-uuid', 'run_01GEMINI')
+    const io = makeCapturedIO()
+    await runPreHook(geminiCtx('grep_search', 'gm-sess-real-uuid'), io.io)
+    const nudge = io.stderr.find((l) => l.includes('fulcrum-first'))
+    expect(nudge).toBeDefined()
+    expect(nudge).toMatch(/grep_search/)
+  })
+
+  it('does not nudge for gemini when no session file exists (AD-9b silent skip)', async () => {
+    const io = makeCapturedIO()
+    await runPreHook(geminiCtx('grep_search', 'gm-sess-no-file'), io.io)
+    const nudge = io.stderr.find((l) => l.includes('fulcrum-first'))
+    expect(nudge).toBeUndefined()
+  })
+
+  it('records gemini events with agent_type=gemini in telemetry', async () => {
+    seedTrustedSession('gm-sess-telem-uuid', 'run_01GMTELEM')
+    const io = makeCapturedIO()
+    await runPreHook(geminiCtx('grep_search', 'gm-sess-telem-uuid'), io.io)
+    const telemetryPath = join(tmpDir!, 'telemetry', 'recall_bias.jsonl')
+    expect(existsSync(telemetryPath)).toBe(true)
+    const events = readFileSync(telemetryPath, 'utf8').trim().split('\n')
+      .map((l) => JSON.parse(l) as { kind: string; agent_type: string; session_id: string })
+    const grep = events.find((e) => e.agent_type === 'gemini')
+    expect(grep).toBeDefined()
+    expect(grep!.session_id).toBe('gm-sess-telem-uuid')
+  })
 })

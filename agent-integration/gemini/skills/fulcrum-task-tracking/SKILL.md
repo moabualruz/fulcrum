@@ -1,0 +1,113 @@
+---
+name: fulcrum-task-tracking
+description: Always-present guidance on when and how to use Fulcrum's task lifecycle.
+---
+# Task Tracking — when to call create_task / update_task
+
+Fulcrum's task lifecycle is the canonical record of what an agent is doing.
+You should keep it accurate so future agents (and the operator) can reconstruct
+the work. The system synthesizes `task_outcome` and `blocker_resolution`
+memories from `update_task` calls — a missing call means a missing record.
+
+## When to call `create_task`
+
+Create a task when:
+- The user gives you a multi-step request that will outlive the current turn.
+- You're starting a unit of work that another agent might reasonably resume.
+- You're about to spawn a subagent (the parent task is the subagent's
+  delegation context).
+
+Do NOT create a task for trivial single-step requests, formatting fixes, or
+read-only exploration. Tasks have overhead — only create them when the
+audit trail matters.
+
+## When to call `update_task`
+
+Always call `update_task` at end-of-work. The status transitions are:
+
+| Final status | When to use | What it produces |
+|---|---|---|
+| `completed` | Work done; acceptance met | One `task_outcome` memory synthesized from your file_patch + bash_trace + decision rows. |
+| `blocked` | Cannot proceed without external input | One `blocker_resolution` memory describing what's blocking + what was attempted. Stop-hook race-guard skips its `session_summary` if this fires first. |
+| `failed` | Work attempted but couldn't succeed | No synthesis; status only. Use `blocked` if the failure is recoverable. |
+| `cancelled` | User pulled the task | No synthesis. |
+
+## What `task_outcome` synthesis produces
+
+The synthesis reads all `file_patch`, `diff`, `code` memories attributed to
+this task's runs, plus the latest run's `output_summary`, and writes:
+
+```
+{
+  kind: 'task_outcome',
+  title: 'Task complete: <task title>',
+  summary: '<≤1500 chars: task title + goal + run summary + file count>',
+  files_touched: string[],   // distinct file_paths
+  task_id: '<task id>',
+  provenance: { hook_point: 'update_task:completed', run_id, files_touched }
+}
+```
+
+`blocker_resolution` is the same shape with `hook_point:'update_task:blocked'`
+and the task's `note` carried forward as the blocker text.
+
+## Race conditions
+
+If both `update_task(status='completed')` and the Stop-hook fire near-
+simultaneously (rare; usually a session end during in-progress work), the
+race-guard via the partial UNIQUE index on `(provenance.run_id) WHERE kind IN
+('task_outcome', 'blocker_resolution', 'session_summary')` ensures exactly
+one synthesis row per run — whichever wins inserts; the other gets a
+SQLITE_CONSTRAINT and silently skips. You don't have to coordinate.
+
+## Subagent delegation
+
+When you delegate to a subagent (`context_type='subagent'`), the child
+cannot write any kind other than `delegation_summary` (constraint #6).
+On the child's `complete_agent_run`, Fulcrum walks the `parent_run_id`
+chain to find the topmost primary run and writes:
+
+```
+{
+  kind: 'delegation_summary',
+  workspace_id: <parent's workspace>,
+  project_id: <parent's project>,
+  title: 'Subagent: <task>',
+  summary: '<≤800 chars: task + result + artifacts>',
+  task_id: <parent's task>,
+  provenance: { hook_point: 'on_delegation', parent_run_id, child_run_id, artifacts }
+}
+```
+
+The parent thus learns what the subagent did without the subagent polluting
+the memory tree with its own files / decisions.
+
+## Practical pattern
+
+```ts
+// At the start of work
+const task = await create_task({
+  title: 'Fix the auth flow regression',
+  description: '<what you understand>',
+  done_criteria: '<acceptance>',
+})
+const run = await start_agent_run({
+  task_id: task.task_id,
+  agent_role: 'software_engineer',
+  context_type: 'primary',
+})
+
+try {
+  // ... do the work; hooks write file_patch/bash_trace/decision rows ...
+  await update_task({ task_id: task.task_id, status: 'completed' })
+} catch (err) {
+  await update_task({ task_id: task.task_id, status: 'blocked', note: String(err) })
+  throw err
+} finally {
+  await complete_agent_run({ run_id: run.run_id, output_summary: '<one-liner>' })
+}
+```
+
+The `update_task` call is what triggers the synthesis. The `complete_agent_run`
+call is what releases the run-lifecycle row + decrements the PCI watcher
+refcount. You need both.

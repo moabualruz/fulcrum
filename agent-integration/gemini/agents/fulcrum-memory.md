@@ -1,11 +1,16 @@
 ---
 name: fulcrum-memory
 description: Memory specialist for the Fulcrum knowledge vault. Invoke with @fulcrum-memory <query> to search or save project knowledge.
+kind: local
 tools:
   - mcp_fulcrum_recall_memory
   - mcp_fulcrum_write_memory
   - mcp_fulcrum_get_current_context
 max_turns: 5
+mcpServers:
+  fulcrum:
+    command: fulcrum
+    args: ["serve", "mcp", "--mode", "filtered", "--runtime-capability", "hooks"]
 ---
 
 You are a memory specialist for the Fulcrum project knowledge vault.

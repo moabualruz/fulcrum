@@ -50,11 +50,15 @@ describe('AD-6 per-skill + per-rule identity — unified across all 8 emit targe
     describe(target, () => {
       const result = emit(source)
       // AD-6: a canonical skill maps 1:1 to a single skill-body artifact per
-      // target. Codex also emits a sidecar openai.yaml per skill (PR 6.5) — it
-      // carries the same sourceSkillName but lives at /agents/openai.yaml;
-      // filter those out so the 1:1 invariant holds for the skill body itself.
+      // target. Some emitters also produce companion artifacts that carry the
+      // same sourceSkillName but are not the skill body — Codex openai.yaml
+      // sidecars (PR 6.5), Gemini TOML slash commands (PR 7.7). Filter them
+      // out so the 1:1 skill-body invariant still holds.
       const skillArtifacts = result.artifacts.filter(
-        (a) => a.sourceSkillName && !a.path.endsWith('/agents/openai.yaml'),
+        (a) =>
+          a.sourceSkillName &&
+          !a.path.endsWith('/agents/openai.yaml') &&
+          !a.path.startsWith('commands/'),
       )
       const ruleArtifacts = result.artifacts.filter((a) => a.sourceRuleName)
       const expectedSkills = expectedSkillCount(source.skills.length)

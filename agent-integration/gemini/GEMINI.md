@@ -2,6 +2,17 @@
 
 This file is auto-loaded by Gemini CLI. It configures your connection to the Fulcrum agent control plane.
 
+## Canonical rules (modular via `@./imports`)
+
+Gemini supports file-includes in context files per `docs/cli/gemini-md.md`
+§"Modularize context with imports". The three canonical Fulcrum rules live
+as separate files so each can be maintained independently and reused across
+other agents via the same fanout source.
+
+@./rules/fulcrum-rule-fulcrum-first.md
+@./rules/fulcrum-rule-lifecycle.md
+@./rules/fulcrum-rule-role-boundaries.md
+
 ---
 
 ## MCP Server
@@ -209,3 +220,91 @@ A `BeforeTool` hook is installed to notify Fulcrum of every tool call. This enab
 - Run heartbeat tracking
 
 The hook runs `fulcrum hook gemini` on every tool call and reads the tool event from stdin.
+
+<!-- BEGIN FULCRUM managed-block v1 -->
+## Fulcrum canonical rules (auto-generated)
+
+---
+name: fulcrum-first
+description: Prefer Fulcrum recall and code-search tools before filesystem grep. Nudges only — never blocks.
+---
+
+# Fulcrum-first
+
+Before using `Grep`, `Glob`, or `Read` to search the codebase, try the Fulcrum
+recall and code-search tools first. Fulcrum stores prior decisions, task
+outcomes, and code relationships the filesystem does not.
+
+For any "where is X", "why was X done", or "does X exist" question, call in
+order:
+
+1. `fulcrum action exec recall_knowledge` — natural-language query over
+   curated memory (L1 pages with L0 provenance).
+2. `fulcrum action exec search_code` — symbol and structural search when the
+   question is about code shape.
+
+Fall through to `Grep` / `Glob` / `Read` only when both return nothing
+relevant. You may always use filesystem tools; the bias is about default
+ordering, not a gate.
+
+Opt out per session with `FULCRUM_NO_RECALL_NUDGE=1`.
+
+---
+
+---
+name: lifecycle
+description: Register every working session as a Fulcrum agent run. Start, heartbeat during long operations, complete or block at the end.
+---
+
+# Lifecycle
+
+At the start of every session, before the first task:
+
+1. `fulcrum action exec get_current_context` — returns `workspace_id` and
+   `project_id`.
+2. `fulcrum action exec get_workspace_status` — see running work, blockers,
+   queue.
+3. `fulcrum action exec start_agent_run` — pass your role and the task this
+   session addresses. Save the returned `run_id`.
+
+During any operation expected to take more than five minutes:
+
+4. `fulcrum action exec heartbeat_agent_run` with `run_id` every three to
+   five minutes. A run with no heartbeat for ten minutes is marked stale.
+
+At end of task, exactly one of:
+
+5. `fulcrum action exec complete_agent_run` with a summary and artifact
+   paths changed.
+6. `fulcrum action exec block_agent_run` with a reason, if you cannot
+   proceed without human input or an external unblock.
+
+A run that silently ends without `complete` or `block` leaves the task in
+`running` state and the janitor marks it stale.
+
+---
+
+---
+name: role-boundaries
+description: Chief-of-Staff orchestrates only — never writes code. Specialist roles implement. Only Chief-of-Staff may invoke teams.
+---
+
+# Role boundaries
+
+`chief_of_staff` (L1 — orchestration only):
+
+- Must not write code, edit files, run builds, or modify tests.
+- Creates tasks, delegates to specialist roles, synthesizes results.
+- The only role authorized to `invoke_team` or create sub-orchestration.
+
+Every other role (L2 — implementation):
+
+- Must not invoke teams or create sub-orchestration workflows.
+- Focus on the assigned task. Report completion via
+  `complete_agent_run` with a summary and artifact paths.
+
+If you are operating as a specialist and see that orchestration is needed
+(e.g., a multi-agent coordination problem), do not spawn a team. Block your
+run with a reason requesting coordination from Chief-of-Staff, or surface
+the need to the user.
+<!-- END FULCRUM managed-block v1 -->

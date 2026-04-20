@@ -68,15 +68,24 @@ describe('Task 47 — hook matcher narrowing', () => {
     expect(post[0]!['matcher']).toBe('Write|Edit|MultiEdit|NotebookEdit|Bash|Task')
   })
 
-  it('Gemini: BeforeTool tools array is narrowed', () => {
+  it('Gemini: BeforeTool matcher uses Gemini-native tool names (PR 7 unit 7.1)', () => {
+    // Per docs/hooks/reference.md, Gemini matches tool events by regex against
+    // Gemini tool names (write_file, replace, run_shell_command, …). Claude
+    // tool names never fire. The Claude-only `tools: []` field is not part of
+    // the Gemini hooks schema and must not appear.
     const hooks = JSON.parse(readFileSync(join(REPO_ROOT, 'agent-integration/gemini/hooks/hooks.json'), 'utf8')) as Record<string, Array<Record<string, unknown>>>
     const before = hooks['BeforeTool']!
-    expect(before[0]!['tools']).toEqual(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash', 'Task'])
+    expect(before[0]!['matcher']).toMatch(/write_file|replace|run_shell_command/)
+    expect(before[0]!['tools']).toBeUndefined()
   })
 
-  it('Codex: config.toml includes allowed_tools on PostToolUse', () => {
-    const toml = readFileSync(join(REPO_ROOT, 'agent-integration/codex/config.toml'), 'utf8')
-    expect(toml).toContain('allowed_tools = ["Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "Task"]')
+  it('Codex: hooks.json PostToolUse matcher narrows to mutating tools (PR 7 unit 7.25)', () => {
+    // Corrected 2026-04-20: Codex loads hooks from hooks.json (JSON) per
+    // codex-rs/hooks/src/engine/discovery.rs. The prior config.toml
+    // `[[hooks]]` blocks + `allowed_tools` array were dead code.
+    const hooks = JSON.parse(readFileSync(join(REPO_ROOT, 'agent-integration/codex/hooks.json'), 'utf8')) as { hooks: Record<string, Array<{ matcher?: string }>> }
+    const post = hooks.hooks['PostToolUse']!
+    expect(post[0]!.matcher).toBe('Write|Edit|MultiEdit|NotebookEdit|Bash|Task')
   })
 
   it('OpenCode: plugin declares FULCRUM_TOOL_ALLOWLIST', () => {
@@ -100,9 +109,13 @@ describe('Task 48 — run-lifecycle signals', () => {
     expect(hooks).toHaveProperty('AfterAgent')
   })
 
-  it('Codex: [notify] block exists', () => {
+  it('Codex: notify is a root-level string array (PR 7 unit 7.26)', () => {
+    // Corrected 2026-04-20: config_toml.rs defines
+    // `pub notify: Option<Vec<String>>` — `notify` is a flat string array
+    // at root, NOT a `[notify] command = "..."` table.
     const toml = readFileSync(join(REPO_ROOT, 'agent-integration/codex/config.toml'), 'utf8')
-    expect(toml).toContain('[notify]')
+    expect(toml).toMatch(/^notify\s*=\s*\[/m)
+    expect(toml).not.toMatch(/^\[notify\]/m)
   })
 
   it('OpenCode: event handler subscribes to session.idle + session.compacted', () => {
@@ -151,9 +164,3 @@ describe('Task 51 — Pi cockpit CLI + dead JSON removed', () => {
   })
 })
 
-describe('Task 52 — Gemini BeforeAgent stub removed', () => {
-  it('BeforeAgent is no longer registered', () => {
-    const hooks = JSON.parse(readFileSync(join(REPO_ROOT, 'agent-integration/gemini/hooks/hooks.json'), 'utf8')) as Record<string, unknown>
-    expect(hooks).not.toHaveProperty('BeforeAgent')
-  })
-})

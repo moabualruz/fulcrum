@@ -11,7 +11,14 @@ const agentIntegrationRoot = join(here, '..', '..', '..', '..', 'agent-integrati
 describe('emitGemini', () => {
   const source = parseCanonicalSource({ agentIntegrationRoot })
   const result = emitGemini(source)
-  const skillArtifacts = result.artifacts.filter((a) => a.sourceSkillName)
+  // Skill artifacts = skill-body MDs at skills/fulcrum-<name>/SKILL.md.
+  // TOML slash commands (PR 7.7) also carry sourceSkillName since they
+  // derive from canonical skills, but they live under commands/ and are
+  // companion artifacts — filter them out for the 1:1 body invariant.
+  const skillArtifacts = result.artifacts.filter(
+    (a) => a.sourceSkillName && !a.path.startsWith('commands/'),
+  )
+  const commandArtifacts = result.artifacts.filter((a) => a.path.startsWith('commands/'))
   const ruleArtifacts = result.artifacts.filter((a) => a.sourceRuleName)
 
   it('targets gemini', () => {
@@ -60,5 +67,35 @@ describe('emitGemini', () => {
 
   it('returns empty artifacts for empty source', () => {
     expect(emitGemini({ skills: [], rules: [] })).toEqual({ target: 'gemini', artifacts: [] })
+  })
+
+  // PR 7.7 — TOML slash commands derived from curated canonical skills.
+  describe('PR 7.7 TOML slash commands', () => {
+    it('emits one TOML command per entry in the curated SLASH_COMMAND_MAP', () => {
+      expect(commandArtifacts.length).toBeGreaterThanOrEqual(6)
+    })
+
+    it('every TOML command carries description + prompt fields (Gemini custom-command schema)', () => {
+      for (const art of commandArtifacts) {
+        expect(art.contents, `${art.path} missing description`).toMatch(/^description\s*=/m)
+        expect(art.contents, `${art.path} missing prompt`).toMatch(/^prompt\s*=\s*"""/m)
+      }
+    })
+
+    it('commands land under commands/fulcrum/ subdir for /fulcrum:<name> namespacing', () => {
+      for (const art of commandArtifacts) {
+        expect(art.path).toMatch(/^commands\/fulcrum\/[\w-]+\.toml$/)
+      }
+    })
+
+    it('commands embed canonical skill body text for prompt reproducibility', () => {
+      for (const art of commandArtifacts) {
+        const canonical = source.skills.find(s => s.name === art.sourceSkillName)
+        expect(canonical, `${art.path} has no canonical source`).toBeDefined()
+        // The canonical body must appear verbatim inside the TOML prompt block.
+        const bodyFirstLine = canonical!.body.trim().split('\n')[0]!
+        expect(art.contents).toContain(bodyFirstLine)
+      }
+    })
   })
 })

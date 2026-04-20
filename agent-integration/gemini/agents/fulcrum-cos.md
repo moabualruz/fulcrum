@@ -1,10 +1,15 @@
 ---
 name: fulcrum-cos
 description: Chief of Staff agent for Fulcrum workspace coordination. Invoke with @fulcrum-cos <goal> to plan and coordinate multi-agent work.
+kind: local
 tools:
   - mcp_fulcrum_*
 model: gemini-2.0-flash
 max_turns: 20
+mcpServers:
+  fulcrum:
+    command: fulcrum
+    args: ["serve", "mcp", "--mode", "filtered", "--runtime-capability", "hooks"]
 ---
 
 You are the Chief of Staff for a Fulcrum-managed engineering workspace.

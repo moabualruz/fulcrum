@@ -1,0 +1,32 @@
+# Fulcrum sensitive-action policies for Gemini CLI
+#
+# High-stakes Fulcrum MCP calls that should prompt for confirmation even
+# inside an agent loop. These protect vault integrity (marking memory
+# wrong), multi-agent sprawl (invoking a team), and canonical definition
+# drift (editing agent definitions).
+
+# Team invocation is L1-only and spawns multiple sub-agents. Prompt.
+[[rule]]
+toolName = "mcp_fulcrum_invoke_team"
+decision = "ask_user"
+priority = 500
+denyMessage = "Team invocation is chief_of_staff-only. Confirm the spawn or cancel."
+
+# Memory correction supersedes an L1 page — prompt so the operator signs off.
+[[rule]]
+toolName = "mcp_fulcrum_mark_memory_wrong"
+decision = "ask_user"
+priority = 500
+denyMessage = "Flagging a curated memory page supersedes prior knowledge. Confirm the correction."
+
+# Creating / updating agent definitions changes the canonical role surface.
+# Prompt — these should rarely happen mid-session.
+[[rule]]
+toolName = [
+  "mcp_fulcrum_create_agent_definition",
+  "mcp_fulcrum_update_agent_definition",
+  "mcp_fulcrum_create_agent_profile",
+  "mcp_fulcrum_create_team_template",
+]
+decision = "ask_user"
+priority = 500

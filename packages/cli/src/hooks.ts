@@ -24,8 +24,45 @@ export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, 
  *   PI:      role       + runId
  * First match wins. Returns null for unrecognized shapes.
  */
+// Gemini CLI hook event names (docs/hooks/reference.md §events).
+const GEMINI_EVENTS = new Set([
+  'SessionStart', 'SessionEnd', 'BeforeAgent', 'AfterAgent',
+  'BeforeModel', 'AfterModel', 'BeforeToolSelection',
+  'BeforeTool', 'AfterTool', 'PreCompress', 'Notification',
+])
+
+// Codex CLI hook event names (codex-rs/hooks/src/engine/config.rs).
+// SessionStart is also a Gemini event — we disambiguate via the Gemini-only
+// `source` field when it appears, otherwise default to codex.
+const CODEX_EVENTS = new Set([
+  'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
+  'PermissionRequest', 'Stop',
+])
+
+const GEMINI_SESSIONSTART_SOURCES = new Set([
+  'startup', 'resume', 'clear', 'logout', 'prompt_input_exit', 'other',
+])
+
 export function detectHookCli(event: Record<string, unknown>): HookCli | null {
-  if ('hook_event_name' in event) return 'codex'
+  const hen = event['hook_event_name']
+  if (typeof hen === 'string' && hen) {
+    if (GEMINI_EVENTS.has(hen) && hen !== 'SessionStart' && hen !== 'SessionEnd') {
+      return 'gemini'
+    }
+    if (CODEX_EVENTS.has(hen)) return 'codex'
+    // SessionStart / SessionEnd are ambiguous — both Gemini and Codex define
+    // them. Gemini's stdin carries a `source` enum unique to Gemini; use it
+    // to disambiguate. Fall through to codex when no Gemini-only field.
+    if (hen === 'SessionStart' || hen === 'SessionEnd') {
+      const src = event['source']
+      if (typeof src === 'string' && GEMINI_SESSIONSTART_SOURCES.has(src)) {
+        return 'gemini'
+      }
+      return 'codex'
+    }
+    // Unknown hook_event_name — best-guess: codex (legacy behavior).
+    return 'codex'
+  }
   if ('tool_name' in event && 'session_id' in event) return 'claude'
   if (('toolName' in event || 'tool_name' in event) && 'conversationId' in event) return 'gemini'
   if ('role' in event && 'runId' in event) return 'pi'
@@ -83,7 +120,12 @@ const HOOK_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 
 
 // PR 3 R1: tools that search the filesystem when the user might be better
 // served by a Fulcrum recall. Tracked per session by `recall_turn_state`.
-const HOOK_SEARCH_TOOLS = new Set(['Grep', 'Glob', 'Read'])
+// Includes both Claude/opencode naming (Grep/Glob/Read) and Gemini naming
+// (grep_search/list_directory/read_file) per PR 7 cross-cut wiring.
+const HOOK_SEARCH_TOOLS = new Set([
+  'Grep', 'Glob', 'Read',
+  'grep_search', 'list_directory', 'read_file',
+])
 
 // PR 3 R1: Variant B timeout. Passive-injection must not slow the hook above
 // the p95 < 20ms budget materially; we cap the recall call at 500ms wall-clock
@@ -91,19 +133,28 @@ const HOOK_SEARCH_TOOLS = new Set(['Grep', 'Glob', 'Read'])
 const BIAS_RECALL_TIMEOUT_MS = 500
 const BIAS_RECALL_LIMIT = 3
 
-function extractRecallQuery(toolName: string, toolInput: Record<string, unknown>): string {
-  if (toolName === 'Grep' || toolName === 'Glob') {
+export function extractRecallQuery(toolName: string, toolInput: Record<string, unknown>): string {
+  if (toolName === 'Grep' || toolName === 'Glob' || toolName === 'grep_search') {
     const p = toolInput['pattern']
     return typeof p === 'string' ? p : ''
   }
-  if (toolName === 'Read') {
-    const f = toolInput['file_path']
+  if (toolName === 'Read' || toolName === 'read_file') {
+    // Gemini's read_file uses `absolute_path`; Claude's Read uses `file_path`.
+    const f = toolInput['absolute_path'] ?? toolInput['file_path']
     if (typeof f !== 'string') return ''
     // Reduce a filesystem path to a search-friendly query: trailing segment
     // without extension (e.g. "/a/b/recall-measurement.ts" → "recall measurement").
     const parts = f.split(/[\\/]/).filter(Boolean)
     const last = parts[parts.length - 1] ?? ''
     return last.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim()
+  }
+  if (toolName === 'list_directory') {
+    // Per docs/cli/built-in-tools.md, Gemini list_directory uses `absolute_path`.
+    const p = toolInput['absolute_path'] ?? toolInput['path']
+    if (typeof p !== 'string') return ''
+    const parts = p.split(/[\\/]/).filter(Boolean)
+    const last = parts[parts.length - 1] ?? ''
+    return last.replace(/[-_]+/g, ' ').trim()
   }
   return ''
 }
@@ -297,7 +348,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
   //     opencode close-out) before any SQLite write. Covers every hook-capable
   //     agent whose plugin routes `fulcrum hook <cli> pre`.
   if (
-    (ctx.cliName === 'claude' || ctx.cliName === 'opencode')
+    (ctx.cliName === 'claude' || ctx.cliName === 'opencode' || ctx.cliName === 'gemini')
     && /recall/i.test(ctx.toolName)
   ) {
     try {
@@ -328,7 +379,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
   //     measurement gate.
   if (
     HOOK_SEARCH_TOOLS.has(ctx.toolName)
-    && (ctx.cliName === 'claude' || ctx.cliName === 'opencode')
+    && (ctx.cliName === 'claude' || ctx.cliName === 'opencode' || ctx.cliName === 'gemini')
     && process.env['FULCRUM_NO_RECALL_NUDGE'] !== '1'
   ) {
     try {
@@ -427,7 +478,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
     } catch { /* best-effort — never block on nudge failure */ }
   } else if (
     HOOK_SEARCH_TOOLS.has(ctx.toolName)
-    && (ctx.cliName === 'claude' || ctx.cliName === 'opencode')
+    && (ctx.cliName === 'claude' || ctx.cliName === 'opencode' || ctx.cliName === 'gemini')
     && process.env['FULCRUM_NO_RECALL_NUDGE'] === '1'
   ) {
     try {

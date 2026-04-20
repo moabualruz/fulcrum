@@ -1,4 +1,41 @@
 {
+  "SessionStart": [
+    {
+      "matcher": "startup",
+      "hooks": [
+        {
+          "name": "fulcrum-session-start",
+          "type": "command",
+          "command": "fulcrum hook gemini session-start",
+          "timeout": 8000
+        }
+      ]
+    },
+    {
+      "matcher": "resume",
+      "hooks": [
+        {
+          "name": "fulcrum-session-start",
+          "type": "command",
+          "command": "fulcrum hook gemini session-start",
+          "timeout": 8000
+        }
+      ]
+    }
+  ],
+  "BeforeAgent": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-before-agent",
+          "type": "command",
+          "command": "fulcrum hook gemini before-agent",
+          "timeout": 8000
+        }
+      ]
+    }
+  ],
   "BeforeModel": [
     {
       "matcher": "*",
@@ -6,7 +43,47 @@
         {
           "name": "fulcrum-before-model",
           "type": "command",
-          "command": "fulcrum hook gemini before-model"
+          "command": "fulcrum hook gemini before-model",
+          "timeout": 5000
+        }
+      ]
+    }
+  ],
+  "BeforeToolSelection": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-before-tool-selection",
+          "type": "command",
+          "command": "fulcrum hook gemini before-tool-selection",
+          "timeout": 5000
+        }
+      ]
+    }
+  ],
+  "BeforeTool": [
+    {
+      "matcher": "write_file|replace|run_shell_command",
+      "hooks": [
+        {
+          "name": "fulcrum-before-tool",
+          "type": "command",
+          "command": "fulcrum hook gemini",
+          "timeout": 5000
+        }
+      ]
+    }
+  ],
+  "AfterTool": [
+    {
+      "matcher": "write_file|replace|run_shell_command",
+      "hooks": [
+        {
+          "name": "fulcrum-after-tool",
+          "type": "command",
+          "command": "fulcrum hook gemini post",
+          "timeout": 5000
         }
       ]
     }
@@ -18,57 +95,8 @@
         {
           "name": "fulcrum-after-model",
           "type": "command",
-          "command": "fulcrum hook gemini after-model"
-        }
-      ]
-    }
-  ],
-  "PreCompress": [
-    {
-      "matcher": "*",
-      "hooks": [
-        {
-          "name": "fulcrum-pre-compress",
-          "type": "command",
-          "command": "fulcrum hook gemini pre-compress"
-        }
-      ]
-    }
-  ],
-  "SessionStart": [
-    {
-      "matcher": "*",
-      "hooks": [
-        {
-          "name": "fulcrum-session-start",
-          "type": "command",
-          "command": "fulcrum hook gemini session-start"
-        }
-      ]
-    }
-  ],
-  "BeforeTool": [
-    {
-      "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|Task",
-      "tools": ["Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "Task"],
-      "hooks": [
-        {
-          "name": "fulcrum-before-tool",
-          "type": "command",
-          "command": "fulcrum hook gemini"
-        }
-      ]
-    }
-  ],
-  "AfterTool": [
-    {
-      "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|Task",
-      "tools": ["Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "Task"],
-      "hooks": [
-        {
-          "name": "fulcrum-after-tool",
-          "type": "command",
-          "command": "fulcrum hook gemini post"
+          "command": "fulcrum hook gemini after-model",
+          "timeout": 2000
         }
       ]
     }
@@ -80,19 +108,69 @@
         {
           "name": "fulcrum-after-agent",
           "type": "command",
-          "command": "fulcrum hook gemini after-agent"
+          "command": "fulcrum hook gemini after-agent",
+          "timeout": 8000
+        }
+      ]
+    }
+  ],
+  "Notification": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-notification",
+          "type": "command",
+          "command": "fulcrum hook gemini notification",
+          "timeout": 2000
+        }
+      ]
+    }
+  ],
+  "PreCompress": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "name": "fulcrum-pre-compress",
+          "type": "command",
+          "command": "fulcrum hook gemini pre-compress",
+          "timeout": 5000
         }
       ]
     }
   ],
   "SessionEnd": [
     {
-      "matcher": "*",
+      "matcher": "exit",
       "hooks": [
         {
           "name": "fulcrum-session-end",
           "type": "command",
-          "command": "fulcrum hook gemini session-end"
+          "command": "fulcrum hook gemini session-end",
+          "timeout": 8000
+        }
+      ]
+    },
+    {
+      "matcher": "logout",
+      "hooks": [
+        {
+          "name": "fulcrum-session-end",
+          "type": "command",
+          "command": "fulcrum hook gemini session-end",
+          "timeout": 8000
+        }
+      ]
+    },
+    {
+      "matcher": "prompt_input_exit",
+      "hooks": [
+        {
+          "name": "fulcrum-session-end",
+          "type": "command",
+          "command": "fulcrum hook gemini session-end",
+          "timeout": 8000
         }
       ]
     }

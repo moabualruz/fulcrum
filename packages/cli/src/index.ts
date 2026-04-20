@@ -1399,14 +1399,21 @@ export async function runGeminiSessionStartHook(): Promise<void> {
     ].join('\n')
   } catch (err) {
     process.stderr.write(`[fulcrum/session-start] gemini error (non-fatal): ${(err as Error).message}\n`)
+    // Even on init failure, advertise Fulcrum's presence so the model knows
+    // to try MCP tools. Empty additionalContext is a wasted injection slot.
+    additionalContext = 'Fulcrum MCP tools are available. Call `mcp_fulcrum_get_current_context` to join the workspace, then `mcp_fulcrum_start_agent_run` to register this session.'
   }
 
-  // Gemini hook response format
-  if (additionalContext) {
-    process.stdout.write(JSON.stringify({
-      hookSpecificOutput: { additionalContext },
-    }) + '\n')
+  // Gemini hook response format per docs/hooks/reference.md §SessionStart:
+  // every hookSpecificOutput MUST carry `hookEventName`. `additionalContext`
+  // lands as the first turn in history — the canonical session-prelude
+  // injection surface. If the context string is empty, still emit the event
+  // name so Gemini can confirm the hook fired.
+  const hookSpecificOutput: Record<string, unknown> = {
+    hookEventName: 'SessionStart',
   }
+  if (additionalContext) hookSpecificOutput['additionalContext'] = additionalContext
+  process.stdout.write(JSON.stringify({ hookSpecificOutput }) + '\n')
 
   process.exit(0)
 }
@@ -1422,7 +1429,9 @@ export async function runGeminiBeforeAgentHook(): Promise<void> {
   if (raw) {
     try {
       const evt = JSON.parse(raw) as Record<string, unknown>
-      sessionId = (evt['conversationId'] ?? evt['session_id']) as string ?? ''
+      // docs/hooks/reference.md base shape uses session_id (snake_case).
+      // conversationId kept as backward-compat for older Gemini releases.
+      sessionId = (evt['session_id'] ?? evt['conversationId']) as string ?? ''
     } catch { /* fallback */ }
   }
 
@@ -1445,11 +1454,14 @@ export async function runGeminiBeforeAgentHook(): Promise<void> {
     } catch { /* best-effort */ }
   }
 
-  if (additionalContext) {
-    process.stdout.write(JSON.stringify({
-      hookSpecificOutput: { additionalContext },
-    }) + '\n')
+  // Always emit hookEventName per docs/hooks/reference.md. additionalContext
+  // is always included (possibly empty) to advertise opt-in to the injection
+  // surface — downstream consumers can count missing-field vs empty-string.
+  const hookSpecificOutput: Record<string, unknown> = {
+    hookEventName: 'BeforeAgent',
+    additionalContext,
   }
+  process.stdout.write(JSON.stringify({ hookSpecificOutput }) + '\n')
 
   process.exit(0)
 }
@@ -1477,6 +1489,78 @@ export async function runGeminiSessionEndHook(): Promise<void> {
     }
   }
 
+  process.exit(0)
+}
+
+/**
+ * Gemini BeforeToolSelection hook (PR 7).
+ * Fires before the LLM picks tools. Fulcrum currently pass-through-allows every
+ * tool; this hook exists to (a) observe tool-selection turns for future policy
+ * work, (b) carry the `hookEventName` contract Gemini expects. Never restricts
+ * tools today — restrictions live in policies/*.toml.
+ */
+export async function runGeminiBeforeToolSelectionHook(): Promise<void> {
+  await readStdinFully()
+  process.stdout.write(JSON.stringify({
+    hookSpecificOutput: { hookEventName: 'BeforeToolSelection' },
+  }) + '\n')
+  process.exit(0)
+}
+
+/**
+ * Gemini Notification hook (PR 7).
+ * Fires on CLI-level alerts (e.g. ToolPermission prompts). Logs a hook_events
+ * row so the monitor can surface the alert. Never blocks; best-effort DB write.
+ */
+export async function runGeminiNotificationHook(): Promise<void> {
+  const raw = await readStdinFully()
+  let sessionId = process.env['GEMINI_SESSION_ID'] ?? 'unknown'
+  let notificationType = 'unknown'
+  let message = ''
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = (evt['session_id'] as string) || sessionId
+      notificationType = (evt['notification_type'] as string) || notificationType
+      message = (evt['message'] as string) || ''
+    } catch { /* use defaults */ }
+  }
+
+  try {
+    const { getDb, newId, loadConfig } = await import('fulcrum-agent-core')
+    const config = loadConfig()
+    const db = getDb()
+    db.prepare(`
+      INSERT INTO hook_events (hook_event_id, workspace_id, session_id, tool_name, agent_role, run_id, ts, cli_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      newId('hook_event'),
+      config.workspace_id ?? '',
+      sessionId,
+      `Notification:${notificationType}`,
+      '',
+      null,
+      new Date().toISOString(),
+      'gemini',
+    )
+    if (message) {
+      process.stderr.write(`[fulcrum/notification:${notificationType}] ${message.slice(0, 200)}\n`)
+    }
+  } catch { /* best-effort */ }
+
+  process.exit(0)
+}
+
+/**
+ * Gemini AfterModel hook (PR 7).
+ * Fires per LLM response chunk during streaming. Per plan AD-4 per-event
+ * budget (20ms), this handler drains stdin and exits without DB writes —
+ * per-chunk persistence would violate the hot-path budget. Surfacing real
+ * content-level work (PII redaction, memory append) stays out of scope until
+ * a sampling / batching strategy lands.
+ */
+export async function runGeminiAfterModelHook(): Promise<void> {
+  await readStdinFully()
   process.exit(0)
 }
 
@@ -1846,10 +1930,13 @@ fulcrum hook — tool-call policy hooks and session lifecycle for coding agents
   fulcrum hook claude session-start        Claude Code SessionStart hook
   fulcrum hook claude session-stop         Claude Code Stop hook
   fulcrum hook claude pre-compact          Claude Code PreCompact hook
-  fulcrum hook gemini [pre|post]           Gemini CLI BeforeTool / AfterTool hook
-  fulcrum hook gemini session-start        Gemini CLI SessionStart hook (auto-starts run)
-  fulcrum hook gemini before-agent         Gemini CLI BeforeAgent hook (injects context)
-  fulcrum hook gemini session-end          Gemini CLI SessionEnd hook (completes run)
+  fulcrum hook gemini [pre|post]              Gemini CLI BeforeTool / AfterTool hook
+  fulcrum hook gemini session-start           Gemini CLI SessionStart hook (auto-starts run)
+  fulcrum hook gemini before-agent            Gemini CLI BeforeAgent hook (injects context)
+  fulcrum hook gemini before-tool-selection   Gemini CLI BeforeToolSelection hook (pass-through today)
+  fulcrum hook gemini notification            Gemini CLI Notification hook (logs hook_events)
+  fulcrum hook gemini after-model             Gemini CLI AfterModel hook (per-chunk, no-op by budget)
+  fulcrum hook gemini session-end             Gemini CLI SessionEnd hook (completes run)
   fulcrum hook codex  [pre|post]           Codex CLI PreToolUse / PostToolUse hook
   fulcrum hook codex  session-start        Codex CLI SessionStart hook (auto-starts run)
   fulcrum hook codex  session-end          Codex CLI Stop hook (completes run)
@@ -3808,12 +3895,14 @@ OPTIONS (serve mcp-http)
 
       // Gemini lifecycle hooks
       if (cli === 'gemini') {
-        if (phaseArg === 'session-start') { await runGeminiSessionStartHook(); return }
-        if (phaseArg === 'before-agent')  { await runGeminiBeforeAgentHook();  return }
-        if (phaseArg === 'session-end')   { await runGeminiSessionEndHook();   return }
+        if (phaseArg === 'session-start')          { await runGeminiSessionStartHook();         return }
+        if (phaseArg === 'before-agent')           { await runGeminiBeforeAgentHook();          return }
+        if (phaseArg === 'before-tool-selection')  { await runGeminiBeforeToolSelectionHook();  return }
+        if (phaseArg === 'notification')           { await runGeminiNotificationHook();         return }
+        if (phaseArg === 'after-model')            { await runGeminiAfterModelHook();           return }
+        if (phaseArg === 'session-end')            { await runGeminiSessionEndHook();           return }
         if (
           phaseArg === 'before-model' ||
-          phaseArg === 'after-model' ||
           phaseArg === 'pre-compress' ||
           phaseArg === 'after-agent'
         ) {

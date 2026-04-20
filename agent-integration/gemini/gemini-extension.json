@@ -3,10 +3,36 @@
   "version": "1.0.0",
   "description": "Fulcrum agent control plane — task tracking, memory, and agent run lifecycle",
   "contextFileName": "GEMINI.md",
+
+  "_migratedTo_comment": "Scaffolding for PR 14.5. Populate with a fully-qualified new repo URL when migrating Fulcrum's Gemini extension to a different upstream. Per docs/extensions/releasing.md, `gemini extensions update` redirects installed instances to the new source.",
+  "migratedTo": null,
+
   "mcpServers": {
     "fulcrum": {
       "command": "fulcrum",
       "args": ["serve", "mcp", "--mode", "filtered", "--runtime-capability", "hooks"]
     }
-  }
+  },
+
+  "plan": {
+    "directory": ".fulcrum/plans"
+  },
+
+  "settings": [
+    {
+      "name": "FULCRUM_MEMORY_V3",
+      "description": "Enable Fulcrum memory v3 (tiered L0/L1/L2). Default off until rollout is complete.",
+      "envVar": "FULCRUM_MEMORY_V3"
+    },
+    {
+      "name": "FULCRUM_MONITOR_PORT",
+      "description": "TCP port for the Fulcrum HTTP monitor (dashboard + read-only JSON API). Default 4721.",
+      "envVar": "FULCRUM_MONITOR_PORT"
+    },
+    {
+      "name": "FULCRUM_NO_MONITOR",
+      "description": "Set to 1 to suppress the HTTP monitor (CI or when port 4721 is taken).",
+      "envVar": "FULCRUM_NO_MONITOR"
+    }
+  ]
 }
