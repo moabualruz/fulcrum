@@ -85,6 +85,43 @@ const HOOK_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 
 // served by a Fulcrum recall. Tracked per session by `recall_turn_state`.
 const HOOK_SEARCH_TOOLS = new Set(['Grep', 'Glob', 'Read'])
 
+// PR 3 R1: Variant B timeout. Passive-injection must not slow the hook above
+// the p95 < 20ms budget materially; we cap the recall call at 500ms wall-clock
+// and fall through to the rule-only nudge on timeout.
+const BIAS_RECALL_TIMEOUT_MS = 500
+const BIAS_RECALL_LIMIT = 3
+
+function extractRecallQuery(toolName: string, toolInput: Record<string, unknown>): string {
+  if (toolName === 'Grep' || toolName === 'Glob') {
+    const p = toolInput['pattern']
+    return typeof p === 'string' ? p : ''
+  }
+  if (toolName === 'Read') {
+    const f = toolInput['file_path']
+    if (typeof f !== 'string') return ''
+    // Reduce a filesystem path to a search-friendly query: trailing segment
+    // without extension (e.g. "/a/b/recall-measurement.ts" → "recall measurement").
+    const parts = f.split(/[\\/]/).filter(Boolean)
+    const last = parts[parts.length - 1] ?? ''
+    return last.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim()
+  }
+  return ''
+}
+
+async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | 'timeout'> {
+  let handle: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race<T | 'timeout'>([
+      p,
+      new Promise<'timeout'>((resolve) => {
+        handle = setTimeout(() => resolve('timeout'), ms)
+      }),
+    ])
+  } finally {
+    if (handle) clearTimeout(handle)
+  }
+}
+
 /** Rate-limit the hook_events cap warning to once per hour per workspace. */
 const _hookCapWarnedAt = new Map<string, number>()
 
@@ -283,20 +320,65 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
           grep_count_without_recall: count,
         })
         if (count >= 1) {
-          io.stderr(
-            `[fulcrum/pre] fulcrum-first: you called ${ctx.toolName} without a recall this session. ` +
-              `Try \`fulcrum action exec recall_knowledge\` with your question first — ` +
-              `Fulcrum stores prior decisions and code relationships grep cannot see. ` +
-              `Set FULCRUM_NO_RECALL_NUDGE=1 to suppress.\n`,
-          )
-          logRecallEvent({
-            kind: 'nudge_emitted',
-            agent_type: 'claude',
-            session_id: ctx.sessionId,
-            variant: 'A',
-            tool_name: ctx.toolName,
-            grep_count_without_recall: count,
-          })
+          const variant = (process.env['FULCRUM_BIAS_VARIANT'] ?? 'A').toUpperCase()
+          let variantBInjected = false
+          if (variant === 'B' && ctx.workspace_id) {
+            // Variant B (passive injection): call recallMemory silently with
+            // the extracted query, prepend top results to stderr so Claude
+            // sees them before the tool executes. Falls back to Variant A
+            // on timeout, empty result, or empty query.
+            const query = extractRecallQuery(ctx.toolName, ctx.toolInput)
+            if (query) {
+              try {
+                const { recallMemory } = await import('fulcrum-memory')
+                const recallPromise = recallMemory(
+                  { workspace_id: ctx.workspace_id, query, limit: BIAS_RECALL_LIMIT },
+                  db,
+                )
+                const result = await withTimeout(recallPromise, BIAS_RECALL_TIMEOUT_MS)
+                if (result !== 'timeout' && Array.isArray(result) && result.length > 0) {
+                  io.stderr(
+                    `[fulcrum/pre] fulcrum-first (passive injection) — top ${result.length} recall hits for "${query.slice(0, 80)}":\n`,
+                  )
+                  io.stderr(`<fulcrum-recall trust="untrusted">\n`)
+                  for (const row of result) {
+                    const title = 'title' in row ? row.title : ''
+                    const summary = ('summary' in row ? row.summary : '') ?? ''
+                    const kind = 'kind' in row ? row.kind : ''
+                    const snip = `${title || kind}: ${summary}`.slice(0, 240).replace(/\s+/g, ' ')
+                    io.stderr(`  - ${snip}\n`)
+                  }
+                  io.stderr(`</fulcrum-recall>\n`)
+                  logRecallEvent({
+                    kind: 'passive_injection',
+                    agent_type: 'claude',
+                    session_id: ctx.sessionId,
+                    variant: 'B',
+                    tool_name: ctx.toolName,
+                    grep_count_without_recall: count,
+                    extra: { hit_count: result.length, query_length: query.length },
+                  })
+                  variantBInjected = true
+                }
+              } catch { /* best-effort; fall through to Variant A nudge */ }
+            }
+          }
+          if (!variantBInjected) {
+            io.stderr(
+              `[fulcrum/pre] fulcrum-first: you called ${ctx.toolName} without a recall this session. ` +
+                `Try \`fulcrum action exec recall_knowledge\` with your question first — ` +
+                `Fulcrum stores prior decisions and code relationships grep cannot see. ` +
+                `Set FULCRUM_NO_RECALL_NUDGE=1 to suppress.\n`,
+            )
+            logRecallEvent({
+              kind: 'nudge_emitted',
+              agent_type: 'claude',
+              session_id: ctx.sessionId,
+              variant: 'A',
+              tool_name: ctx.toolName,
+              grep_count_without_recall: count,
+            })
+          }
         }
       }
     } catch { /* best-effort — never block on nudge failure */ }
