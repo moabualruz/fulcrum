@@ -26,7 +26,7 @@ const HOOK_PHASES_COMMON = new Set([
 ])
 
 const HOOK_PHASES_BY_CLI: Record<string, Set<string>> = {
-  claude:   new Set(['session-start', 'session-stop', 'session-end', 'pre-compact', 'subagent-start', 'subagent-stop']),
+  claude:   new Set(['session-start', 'session-stop', 'session-end', 'pre-compact', 'subagent-start', 'subagent-stop', 'user-prompt-submit', 'notification']),
   gemini:   new Set(['session-start', 'session-end', 'before-agent', 'before-model', 'after-model', 'pre-compress', 'after-agent']),
   codex:    new Set(['session-start', 'session-end', 'notify']),
   opencode: new Set(['session-start', 'session-end', 'pre-compact']),

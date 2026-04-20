@@ -1,0 +1,36 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/docs/schemas/claude-plugin/marketplace.schema.json",
+  "name": "fulcrum",
+  "owner": {
+    "name": "Mo Abualruz",
+    "email": "mkh.ruzz@gmail.com"
+  },
+  "metadata": {
+    "description": "Fulcrum Agent OS — task management, memory, multi-agent lifecycle, and Fulcrum-first policy hooks for Claude Code.",
+    "version": "2.0.0"
+  },
+  "plugins": [
+    {
+      "name": "fulcrum",
+      "source": "./agent-integration/claude",
+      "description": "Fulcrum Agent OS — task management, memory, multi-agent lifecycle, and Fulcrum-first policy hooks.",
+      "version": "2.0.0",
+      "category": "productivity",
+      "keywords": [
+        "agent-os",
+        "memory",
+        "task-management",
+        "recall-first",
+        "multi-agent"
+      ],
+      "author": {
+        "name": "Mo Abualruz",
+        "email": "mkh.ruzz@gmail.com"
+      },
+      "homepage": "https://github.com/moabualruz/fulcrum",
+      "repository": "https://github.com/moabualruz/fulcrum",
+      "license": "MIT",
+      "strict": true
+    }
+  ]
+}

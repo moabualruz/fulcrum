@@ -259,6 +259,86 @@ function verifyCliInPath(): void {
 
 // ── 2. Claude Code: user-scope MCP server ─────────────────────────────────────
 
+// ── Claude Code native plugin install (PR 14.1 / AD-10 dual-mode) ────────────
+//
+// FULCRUM_CLAUDE_INSTALL_MODE semantics:
+//   auto    (default) — probe `claude plugin` subcommand; on success drive
+//                       `claude plugin marketplace add moabualruz/fulcrum` +
+//                       `claude plugin install fulcrum@fulcrum`. On any
+//                       failure fall through to manual (idempotent).
+//   native            — mandatory native; throws if CLI or marketplace path
+//                       unavailable. Use in CI when you want to fail loudly.
+//   manual            — skip the native path entirely. Use for older Claude
+//                       CLI versions that don't support `claude plugin`.
+//
+// The marketplace manifest lives at the repo root
+// (`.claude-plugin/marketplace.json`) and references this plugin via
+// `source: "./agent-integration/claude"` (research 2026-04-20: `source:`
+// resolves relative to the directory containing .claude-plugin/, which is
+// the repo root; NOT relative to marketplace.json).
+function installClaudePluginNative(): boolean {
+  const mode = (process.env["FULCRUM_CLAUDE_INSTALL_MODE"] ?? "auto").toLowerCase();
+  if (mode === "manual") {
+    ok("skipped native plugin install (FULCRUM_CLAUDE_INSTALL_MODE=manual)");
+    return false;
+  }
+  if (!commandExists("claude")) {
+    if (mode === "native") throw new Error("`claude` CLI not found but FULCRUM_CLAUDE_INSTALL_MODE=native");
+    warn("`claude` CLI not found — will fall through to manual install");
+    return false;
+  }
+
+  // Probe `claude plugin` subcommand availability.
+  const probe = spawnSync("claude", ["plugin", "--help"], {
+    stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
+  });
+  if (probe.status !== 0) {
+    if (mode === "native") {
+      throw new Error(`\`claude plugin\` subcommand unavailable: ${probe.stderr?.trim() ?? "unknown"}`);
+    }
+    warn("`claude plugin` subcommand not available on this Claude Code version — falling through to manual");
+    return false;
+  }
+
+  if (DRY_RUN) {
+    dry(`would run: claude plugin marketplace add moabualruz/fulcrum`);
+    dry(`would run: claude plugin install fulcrum@fulcrum`);
+    ok(`(dry-run) native plugin install path`);
+    return true;
+  }
+
+  const mpResult = spawnSync("claude", ["plugin", "marketplace", "add", "moabualruz/fulcrum"], {
+    stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
+  });
+  if (mpResult.status !== 0) {
+    const msg = mpResult.stderr?.trim() ?? `exit ${mpResult.status}`;
+    if (mode === "native") throw new Error(`claude plugin marketplace add failed: ${msg}`);
+    warn(`\`claude plugin marketplace add\` failed: ${msg} — falling through to manual`);
+    return false;
+  }
+
+  const instResult = spawnSync("claude", ["plugin", "install", "fulcrum@fulcrum"], {
+    stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
+  });
+  if (instResult.status !== 0) {
+    const msg = instResult.stderr?.trim() ?? `exit ${instResult.status}`;
+    if (mode === "native") throw new Error(`claude plugin install failed: ${msg}`);
+    warn(`\`claude plugin install\` failed: ${msg} — falling through to manual`);
+    return false;
+  }
+
+  ok("installed via `claude plugin marketplace add moabualruz/fulcrum` + `claude plugin install fulcrum@fulcrum`");
+  // PR 14.1 caveat: Claude marketplace update mechanics have open issues as
+  // of Q2 2026 (anthropics/claude-code #46594, #46081, #38271, #37886).
+  // After install, users may need to run `claude plugin marketplace refresh`
+  // manually to pick up source changes. We surface this once per install.
+  warn("note: run `claude plugin marketplace refresh` periodically to pick up updates from the Fulcrum marketplace — Claude update mechanics have known delays (Claude Code issues #46594/#46081/#38271/#37886).");
+  return true;
+}
+
 function installClaudeMcp(): void {
   // Primary: use `claude mcp add --scope user` if available
   if (commandExists("claude")) {
@@ -907,6 +987,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void | Promis
   all: [
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
     ["Verify fulcrum in PATH", verifyCliInPath],
+    ["Claude Code: native plugin install (dual-mode; auto/native/manual)", installClaudePluginNative],
     ["Claude Code: user-scope MCP server", installClaudeMcp],
     ["Claude Code: PreToolUse hook", installClaudeHook],
     ["Regenerate CLAUDE.md from TOOL_SCHEMAS", regenerateClaudeMd],
@@ -925,6 +1006,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void | Promis
   claude: [
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
     ["Verify fulcrum in PATH", verifyCliInPath],
+    ["Claude Code: native plugin install (dual-mode; auto/native/manual)", installClaudePluginNative],
     ["Claude Code: user-scope MCP server", installClaudeMcp],
     ["Claude Code: PreToolUse hook", installClaudeHook],
     ["Regenerate CLAUDE.md from TOOL_SCHEMAS", regenerateClaudeMd],

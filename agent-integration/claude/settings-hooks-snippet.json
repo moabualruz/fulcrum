@@ -1,4 +1,5 @@
 {
+  "_deprecated": "DEPRECATED 2026-04-20 — PR 14.1. Hooks now ship via the Claude Code plugin at agent-integration/claude/hooks/hooks.json, which `claude plugin install fulcrum@fulcrum` registers automatically. This standalone snippet is kept only for the manual fallback path in install.ts (installClaudeHook). Edit agent-integration/claude/hooks/hooks.json as the source of truth — when changing hook wiring, update BOTH files so native-plugin and manual-fallback installs stay in sync.",
   "hooks": {
     "SessionStart": [
       {
