@@ -444,11 +444,11 @@ describe('installOpencode()', () => {
     expect(fs.existsSync(path.join(tmpDir, '.opencode', 'plugins', 'rider.ts'))).toBe(true)
   })
 
-  it('mode=npm throws OpencodePluginUnresolvedError when npm probe cannot resolve the package', async () => {
+  it('mode=native throws OpencodePluginUnresolvedError when npm probe cannot resolve the package', async () => {
     // The scoped package does not exist on npm (PR 14.3 blocked on npm-org
-    // registration — v3.3 approval checklist). mode=npm MUST fail loudly; no
-    // silent fallback to local.
-    await expect(installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'npm' }))
+    // registration — v3.3 approval checklist). mode=native MUST fail loudly; no
+    // silent fallback to manual.
+    await expect(installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'native' }))
       .rejects.toMatchObject({
         name: 'OpencodePluginUnresolvedError',
         code: 'opencode-plugin-unresolved',

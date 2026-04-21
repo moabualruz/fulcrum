@@ -95,7 +95,7 @@ describe('verifyInstall({ agent: "windsurf" })', () => {
 
 describe('verifyInstall({ agent: "opencode" })', () => {
   it('returns ok:true after installOpencode() in local mode', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'local' })
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
 
     const result = verifyInstall({ agent: 'opencode', targetDir: tmpDir })
 
@@ -109,7 +109,7 @@ describe('verifyInstall({ agent: "opencode" })', () => {
   })
 
   it('checks sentinel files: opencode.jsonc, opencode.md', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'local' })
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
 
     const result = verifyInstall({ agent: 'opencode', targetDir: tmpDir })
     const paths = result.checks.map(c => c.path)

@@ -1997,7 +1997,7 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
 // Writes .opencode/opencode.jsonc (JSONC config with MCP entry), the context
 // doc, and slash commands into .opencode/command/.
 
-export type OpencodeInstallMode = "auto" | "npm" | "local";
+export type OpencodeInstallMode = "auto" | "native" | "manual";
 
 export const OPENCODE_PLUGIN_PKG = "@fulcrum-agent-os/opencode-plugin";
 
@@ -2065,25 +2065,25 @@ export async function installOpencode(opts: {
 
   // Resolve opencode.jsonc plugin reference up-front so we know which
   // template path to use and can fail loudly before mutating anything.
-  //   auto  — npm probe wins; fall back to local on miss/timeout; throw
-  //           opencode-plugin-unresolved if neither is reachable.
-  //   npm   — require npm probe; no fallback; throw on miss.
-  //   local — skip npm probe; require the local template file.
+  //   auto   — npm probe wins; fall back to manual on miss/timeout; throw
+  //            opencode-plugin-unresolved if neither is reachable.
+  //   native — require npm probe; no fallback; throw on miss.
+  //   manual — skip npm probe; require the local template file.
   let pluginRef: string;   // the string that lands in `"plugin": [...]`
   let resolvedVia: string; // human-readable diagnostic
-  if (requestedMode === "local") {
+  if (requestedMode === "manual") {
     if (!fs.existsSync(templatePluginLocal)) {
       throw new OpencodePluginUnresolvedError(
-        `mode=local but local plugin file missing at ${templatePluginLocal}`,
+        `mode=manual but local plugin file missing at ${templatePluginLocal}`,
       );
     }
     pluginRef = "./plugins/fulcrum.ts";
-    resolvedVia = "local (mode=local)";
-  } else if (requestedMode === "npm") {
+    resolvedVia = "manual (mode=manual)";
+  } else if (requestedMode === "native") {
     const v = probeOpencodePluginOnNpm();
     if (!v) {
       throw new OpencodePluginUnresolvedError(
-        `mode=npm but \`npm view ${OPENCODE_PLUGIN_PKG} version\` returned no version`,
+        `mode=native but \`npm view ${OPENCODE_PLUGIN_PKG} version\` returned no version`,
       );
     }
     pluginRef = OPENCODE_PLUGIN_PKG;
@@ -2096,7 +2096,7 @@ export async function installOpencode(opts: {
       resolvedVia = `npm ${OPENCODE_PLUGIN_PKG}@${v} (auto)`;
     } else if (fs.existsSync(templatePluginLocal)) {
       pluginRef = "./plugins/fulcrum.ts";
-      resolvedVia = "local fallback (auto — npm probe missed)";
+      resolvedVia = "manual fallback (auto — npm probe missed)";
     } else {
       throw new OpencodePluginUnresolvedError(
         `mode=auto: npm probe missed AND local plugin file missing at ${templatePluginLocal}`,
@@ -2550,11 +2550,9 @@ export type AgentName = "cursor" | "windsurf" | "codex" | "opencode" | "copilot"
 
 // PR 14.8 — install mode reported by verifyInstall()
 export type InstallMode =
-  | "native"       // installed via agent-native plugin command (e.g. claude plugin install)
+  | "native"       // installed via agent-native plugin command or npm package
   | "marketplace"  // registered in marketplace only; no CLI install (Codex)
-  | "npm"          // installed via npm package
-  | "local"        // installed from local repo path
-  | "manual"       // direct file-copy; no plugin standard (Cursor, Windsurf, Copilot)
+  | "manual"       // direct file-copy or local-path install; no plugin standard
   | "auto"         // auto-resolved at install time (opencode auto mode)
   | "unknown";     // cannot determine from installed state
 
@@ -2593,8 +2591,8 @@ function detectOpencodeInstallMode(opencodejsoncPath: string): InstallMode {
     const match = /"plugin"\s*:\s*\[([^\]]*)\]/.exec(text);
     if (!match) return "unknown";
     const pluginRef = match[1].replace(/"/g, "").trim();
-    if (pluginRef.startsWith("@") || pluginRef.startsWith("http")) return "npm";
-    if (pluginRef.startsWith(".") || pluginRef.startsWith("/")) return "local";
+    if (pluginRef.startsWith("@") || pluginRef.startsWith("http")) return "native";
+    if (pluginRef.startsWith(".") || pluginRef.startsWith("/")) return "manual";
     return "unknown";
   } catch {
     return "unknown";

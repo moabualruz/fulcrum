@@ -83,10 +83,10 @@ describe('installMode for codex', () => {
 // ── opencode installMode ──────────────────────────────────────────────────────
 
 describe('installMode for opencode', () => {
-  it('opencode local → "local"', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'local' })
+  it('opencode manual → "manual"', async () => {
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
     const result = verifyInstall({ agent: 'opencode', targetDir: tmpDir })
-    expect(result.installMode).toBe('local')
+    expect(result.installMode).toBe('manual')
   })
 
   it('opencode without prior install → "unknown"', () => {
@@ -117,7 +117,7 @@ describe('VerifyResult.pluginVersion', () => {
 
 describe('VerifyResult.canonicalVersion', () => {
   it('opencode canonicalVersion matches source package.json version', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'local' })
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
     const result = verifyInstall({ agent: 'opencode', targetDir: tmpDir })
     expect(result.canonicalVersion).toBeTruthy()
     // Source version is 0.0.1 as of authoring time — any semver string is valid
