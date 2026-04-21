@@ -3818,7 +3818,56 @@ async function runInstall(): Promise<void> {
     return
   }
 
-  console.error('Usage: fulcrum install <plan|apply|verify> [options]')
+  if (command === 'wipe') {
+    const agentIdx = args.indexOf('--agent')
+    const agentName = agentIdx >= 0 ? args[agentIdx + 1] : undefined
+    const all = args.includes('--all')
+    const yes = args.includes('--yes')
+    const dryRun = args.includes('--dry-run')
+    const targetDir = process.cwd()
+    const home = process.env['HOME'] ?? ''
+
+    if (all && !yes) {
+      console.error('--all requires --yes (this wipes all 8 agents)')
+      process.exit(1)
+    }
+
+    const { wipeAgent } = await import('../../../agent-integration/wipe.js')
+
+    const ALL_AGENTS = ['cursor', 'windsurf', 'codex', 'opencode', 'copilot', 'claude', 'gemini', 'pi'] as const
+    const agents = all ? [...ALL_AGENTS] : agentName ? [agentName] : null
+
+    if (!agents) {
+      console.error('Usage: fulcrum install wipe --agent <name> [--dry-run]')
+      console.error('       fulcrum install wipe --all --yes [--dry-run]')
+      console.error('  agents: cursor, windsurf, codex, opencode, copilot, claude, gemini, pi')
+      process.exit(1)
+    }
+
+    for (const agent of agents) {
+      const validAgents: string[] = [...ALL_AGENTS]
+      if (!validAgents.includes(agent)) {
+        console.error(`Unknown agent: ${agent}`)
+        process.exit(1)
+      }
+      const result = wipeAgent({
+        agent: agent as Parameters<typeof wipeAgent>[0]['agent'],
+        dryRun,
+        targetDir,
+        home,
+      })
+      const icon = dryRun ? '○' : result.wiped > 0 ? '✓' : '—'
+      const label = dryRun ? ' (dry-run)' : ''
+      console.log(`${icon} ${result.agent}${label}: ${result.wiped} wiped, ${result.skipped} skipped`)
+      for (const action of result.actions) {
+        if (action.action === 'skip') continue
+        console.log(`  ${action.action}: ${action.path}`)
+      }
+    }
+    return
+  }
+
+  console.error('Usage: fulcrum install <plan|apply|verify|wipe> [options]')
   process.exit(1)
 }
 
