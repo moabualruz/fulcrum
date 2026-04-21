@@ -307,17 +307,14 @@ function verifyCliInPath(): void {
 
 // ── 2. Claude Code: user-scope MCP server ─────────────────────────────────────
 
-// ── Claude Code native plugin install (PR 14.1 / AD-10 dual-mode) ────────────
+// ── Claude Code native plugin install (PR 14.1 / AD-10 dual-mode, PR 16.5 simplified) ──
 //
-// FULCRUM_CLAUDE_INSTALL_MODE semantics:
-//   auto    (default) — probe `claude plugin` subcommand; on success drive
-//                       `claude plugin marketplace add moabualruz/fulcrum` +
-//                       `claude plugin install fulcrum@fulcrum`. On any
-//                       failure fall through to manual (idempotent).
-//   native            — mandatory native; throws if CLI or marketplace path
-//                       unavailable. Use in CI when you want to fail loudly.
-//   manual            — skip the native path entirely. Use for older Claude
-//                       CLI versions that don't support `claude plugin`.
+// FULCRUM_CLAUDE_INSTALL_MODE (optional):
+//   native  — mandatory native; throws if CLI or marketplace path unavailable.
+//             Use in CI when you want to fail loudly.
+//   manual  — skip the native path entirely. Use for older Claude CLI versions
+//             that don't support `claude plugin`.
+//   (unset) — default probe behavior: try native, fall through to manual on any failure.
 //
 // The marketplace manifest lives at the repo root
 // (`.claude-plugin/marketplace.json`) and references this plugin via
@@ -325,7 +322,9 @@ function verifyCliInPath(): void {
 // resolves relative to the directory containing .claude-plugin/, which is
 // the repo root; NOT relative to marketplace.json).
 function installClaudePluginNative(): boolean {
-  const mode = (process.env["FULCRUM_CLAUDE_INSTALL_MODE"] ?? "auto").toLowerCase();
+  const modeEnv = process.env["FULCRUM_CLAUDE_INSTALL_MODE"]?.toLowerCase();
+  const mode: "native" | "manual" | "default" =
+    modeEnv === "native" ? "native" : modeEnv === "manual" ? "manual" : "default";
   if (mode === "manual") {
     ok("skipped native plugin install (FULCRUM_CLAUDE_INSTALL_MODE=manual)");
     return false;
