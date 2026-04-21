@@ -1564,6 +1564,40 @@ export async function installCursor(opts: { dryRun: boolean; targetDir?: string 
 //   3. [[hooks]] in config.toml — the only standard way to wire lifecycle hooks
 //   4. AGENTS.md → project root — project-level agent instructions
 
+// PR 14.2 — Validate .codex-plugin/plugin.json against the required fields
+// documented in codex-rs/core-plugins/src/marketplace.rs PluginManifest struct.
+export interface CodexPluginManifestValidation {
+  ok: boolean;
+  errors: string[];
+}
+
+export function validateCodexPluginManifest(jsonPath: string): CodexPluginManifestValidation {
+  const errors: string[] = [];
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(fs.readFileSync(jsonPath, "utf8")) as Record<string, unknown>;
+  } catch (e) {
+    return { ok: false, errors: [`Cannot read or parse ${jsonPath}: ${String(e)}`] };
+  }
+  for (const field of ["name", "version", "description"] as const) {
+    if (typeof data[field] !== "string" || !data[field]) {
+      errors.push(`Missing or empty required field: ${field}`);
+    }
+  }
+  const iface = data["interface"];
+  if (!iface || typeof iface !== "object") {
+    errors.push("Missing required object: interface");
+  } else {
+    const ifaceObj = iface as Record<string, unknown>;
+    for (const field of ["displayName", "shortDescription"] as const) {
+      if (typeof ifaceObj[field] !== "string" || !ifaceObj[field]) {
+        errors.push(`Missing or empty required interface.${field}`);
+      }
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+
 export async function installCodex(opts: { dryRun: boolean; targetDir?: string; globalHome?: string }): Promise<void> {
   const targetDir = opts.targetDir ?? process.cwd();
   const dryRun = opts.dryRun;
@@ -1574,6 +1608,16 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
   const codexConfigDir = path.join(homeDir, ".codex");
   const codexConfigToml = path.join(codexConfigDir, "config.toml");
   const pluginSkillsDir = path.join(REPO_ROOT_LOCAL, "codex", "plugin", "skills");
+  const pluginJsonPath = path.join(REPO_ROOT_LOCAL, "codex", "plugin", ".codex-plugin", "plugin.json");
+
+  // 0. Validate .codex-plugin/plugin.json against required manifest fields.
+  await step("Codex: validate .codex-plugin/plugin.json schema", () => {
+    const validation = validateCodexPluginManifest(pluginJsonPath);
+    if (!validation.ok) {
+      throw new Error(`plugin.json schema errors:\n${validation.errors.join("\n")}`);
+    }
+    ok(`plugin.json schema valid`);
+  });
 
   // 1. Register MCP server by merging TOML into config.toml directly. Codex CLI
   //    reads [mcp_servers.*] tables from this file on startup, so writing the
@@ -1770,6 +1814,8 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
       }
     }
     if (!Array.isArray(parsed.plugins)) parsed.plugins = [];
+    // PR 14.2 — prune stray entries: old format wrote {host:"codex",...} with no name field.
+    parsed.plugins = parsed.plugins.filter(p => p?.name !== undefined && p?.name !== "");
     if (parsed.plugins.some(p => p?.name === "fulcrum" && p?.host === "codex")) {
       skip(`fulcrum already registered for codex in ${marketplacePath}`);
       return;
@@ -1782,6 +1828,31 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
     });
     fs.writeFileSync(marketplacePath, JSON.stringify(parsed, null, 2), "utf8");
     ok(`registered fulcrum plugin in ${marketplacePath}`);
+  });
+
+  // 6. Register fulcrum marketplace via `codex marketplace add moabualruz/fulcrum`.
+  //    Gracefully skips if `codex` binary is absent or returns non-zero (CI, first-time).
+  await step("Codex: register marketplace → codex marketplace add moabualruz/fulcrum", () => {
+    if (dryRun) {
+      console.log(`  [dry-run] would run: codex marketplace add moabualruz/fulcrum`);
+      ok(`(dry-run) marketplace add`);
+      return;
+    }
+    const r = spawnSync("codex", ["marketplace", "add", "moabualruz/fulcrum"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 30_000,
+    });
+    if (r.error) {
+      skip(`codex binary not found — run manually: codex marketplace add moabualruz/fulcrum`);
+    } else if (r.status !== 0) {
+      const stderr = (r.stderr?.toString() ?? "").trim();
+      skip(`codex marketplace add returned ${r.status ?? "?"}: ${stderr}`);
+    } else {
+      ok(`codex marketplace add moabualruz/fulcrum`);
+    }
+    console.log();
+    console.log("  Fulcrum marketplace registered with Codex.");
+    console.log("  Run 'codex' then '/plugins' to install/manage via the TUI.");
   });
 }
 
