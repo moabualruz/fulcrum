@@ -32,6 +32,10 @@ import {
   emitOpencode,
   emitCodex,
   writeRidersum,
+  appendJournal,
+  sha256File,
+  newRunId,
+  type InstallJournalEntry,
 } from "../packages/agent-fanout/src/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -42,6 +46,9 @@ const argv = process.argv.slice(2);
 const DRY_RUN = argv.includes("--dry-run");
 const VERBOSE = argv.includes("--verbose");
 
+// One run-id per install invocation; threads through every appendJournal call.
+const INSTALL_RUN_ID = newRunId();
+
 // Collected for end-of-run summary
 interface StepResult {
   name: string;
@@ -49,6 +56,7 @@ interface StepResult {
   detail?: string;
   recovery?: string;
   rollback?: string;   // how to undo this change if a later step fails
+  journalMeta?: StepJournalMeta;
 }
 const results: StepResult[] = [];
 let currentStep: StepResult | null = null;
@@ -56,6 +64,16 @@ let currentStep: StepResult | null = null;
 /** Record a rollback instruction for the current step (called after a change is made). */
 function setRollback(instruction: string): void {
   if (currentStep) currentStep.rollback = instruction;
+}
+
+interface StepJournalMeta extends Partial<InstallJournalEntry> {
+  /** For project-scoped agents: the project root dir passed to appendJournal(). */
+  targetDir?: string;
+}
+
+/** Record journal metadata for the current step; step() flushes it via appendJournal on ok. */
+function setJournalMeta(meta: StepJournalMeta): void {
+  if (currentStep) currentStep.journalMeta = meta;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -141,6 +159,30 @@ function step(name: string, fn: () => void | Promise<void>): Promise<void> {
   results.push(currentStep);
   return Promise.resolve()
     .then(fn)
+    .then(() => {
+      // Flush journal entry if step succeeded and metadata was provided.
+      if (currentStep && currentStep.status === "ok" && currentStep.journalMeta) {
+        const meta = currentStep.journalMeta;
+        if (meta.agent && meta.action && meta.target_path) {
+          try {
+            appendJournal({
+              ts: new Date().toISOString(),
+              agent: meta.agent,
+              step_name: name,
+              action: meta.action,
+              target_path: meta.target_path,
+              rollback: currentStep.rollback ?? meta.rollback ?? "",
+              mode: meta.mode ?? "native",
+              install_run_id: INSTALL_RUN_ID,
+              sha256_before: meta.sha256_before,
+              sha256_after: meta.sha256_after,
+            } as InstallJournalEntry, meta.targetDir);
+          } catch {
+            // Journal write failure is non-fatal
+          }
+        }
+      }
+    })
     .catch((err: Error) => {
       fail(`${name}: ${err.message}`);
       if (currentStep) {
@@ -337,6 +379,8 @@ function installClaudePluginNative(): boolean {
   }
 
   ok("installed via `claude plugin marketplace add moabualruz/fulcrum` + `claude plugin install fulcrum@fulcrum`");
+  setRollback("claude plugin uninstall fulcrum@fulcrum && claude plugin marketplace remove moabualruz/fulcrum");
+  setJournalMeta({ agent: "claude", action: "native_cli", target_path: "claude://plugin/fulcrum", mode: "native" });
   // PR 14.1 caveat: Claude marketplace update mechanics have open issues as
   // of Q2 2026 (anthropics/claude-code #46594, #46081, #38271, #37886).
   // After install, users may need to run `claude plugin marketplace refresh`
@@ -365,6 +409,8 @@ function installClaudeMcp(): void {
     );
     if (result.status === 0) {
       ok("registered via `claude mcp add --scope user fulcrum`");
+      setRollback("claude mcp remove --scope user fulcrum");
+      setJournalMeta({ agent: "claude", action: "native_cli", target_path: path.join(HOME, ".claude.json"), mode: "native" });
       return;
     }
     warn(`\`claude mcp add\` failed: ${result.stderr?.trim() ?? "unknown"}`);
@@ -383,11 +429,14 @@ function installClaudeMcp(): void {
       throw new Error(`~/.claude.json is not valid JSON: ${(err as Error).message}`);
     }
   }
+  const sha256BeforeMcp = sha256File(claudeJsonPath);
   const mcpServers = (cfg["mcpServers"] as Record<string, unknown> | undefined) ?? {};
   mcpServers["fulcrum"] = { command: "fulcrum", args: CLAUDE_MCP_ARGS };
   cfg["mcpServers"] = mcpServers;
   writeJson(claudeJsonPath, cfg);
   ok(`wrote fulcrum MCP entry → ${claudeJsonPath}`);
+  setRollback(`node -e "const f='${claudeJsonPath}',d=JSON.parse(require('fs').readFileSync(f,'utf8'));delete (d.mcpServers||{}).fulcrum;require('fs').writeFileSync(f,JSON.stringify(d,null,2)+'\\n')"`);
+  setJournalMeta({ agent: "claude", action: "merge_json", target_path: claudeJsonPath, mode: "manual", sha256_before: sha256BeforeMcp, sha256_after: sha256File(claudeJsonPath) });
 }
 
 // ── 3. Claude Code: hooks → ~/.claude/settings.json ──────────────────────────
@@ -467,6 +516,7 @@ function installClaudeHook(): void {
     return;
   }
 
+  const sha256Before = sha256File(settingsPath);
   writeJson(settingsPath, settings);
   const parts: string[] = [];
   if (preResult        === "added") parts.push("PreToolUse");
@@ -475,6 +525,8 @@ function installClaudeHook(): void {
   if (stopResult       === "added") parts.push("Stop");
   if (preCompactResult === "added") parts.push("PreCompact");
   ok(`added ${parts.join(" + ")} hook${parts.length > 1 ? "s" : ""} → ${settingsPath}`);
+  setRollback(`node -e "const f=require('os').homedir()+'/.claude/settings.json',d=JSON.parse(require('fs').readFileSync(f,'utf8'));['PreToolUse','PostToolUse','SessionStart','Stop','PreCompact'].forEach(k=>{if(!d.hooks?.[k])return;d.hooks[k]=d.hooks[k].filter(e=>!(e.hooks||[]).some(h=>h.command?.startsWith('fulcrum hook claude')));if(!d.hooks[k].length)delete d.hooks[k]});require('fs').writeFileSync(f,JSON.stringify(d,null,2)+'\\n')"`);
+  setJournalMeta({ agent: "claude", action: "merge_json", target_path: settingsPath, mode: "native", sha256_before: sha256Before, sha256_after: sha256File(settingsPath) });
 }
 
 // ── 3b. Regenerate CLAUDE.md from TOOL_SCHEMAS ───────────────────────────────
@@ -803,6 +855,8 @@ function installPiCockpit(): void {
     throw new Error(`\`pi install\` failed (status ${result.status ?? "unknown"})`);
   }
   ok("PI cockpit installed");
+  setRollback(`pi uninstall fulcrum-cockpit`);
+  setJournalMeta({ agent: "pi", action: "native_cli", target_path: cockpitDir, mode: "native" });
 }
 
 // ── 8. Non-destructive check mode ─────────────────────────────────────────────
@@ -1667,11 +1721,14 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
   //    reads [mcp_servers.*] tables from this file on startup, so writing the
   //    entry is equivalent to `codex mcp add` and works even when the codex
   //    binary isn't installed (e.g. first-time install, test environments).
+  const FULCRUM_MCP_TOML_MARKER = "# BEGIN FULCRUM MANAGED BLOCK — mcp";
   const FULCRUM_MCP_TOML = [
     "",
+    FULCRUM_MCP_TOML_MARKER,
     "[mcp_servers.fulcrum]",
     'command = "fulcrum"',
     'args = ["serve", "mcp", "--mode", "filtered"]',
+    "# END FULCRUM MANAGED BLOCK — mcp",
     "",
   ].join("\n");
 
@@ -1689,8 +1746,11 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
       skip(`fulcrum MCP already registered in ${codexConfigToml}`);
       return;
     }
+    const sha256Before = sha256File(codexConfigToml);
     fs.writeFileSync(codexConfigToml, existing + FULCRUM_MCP_TOML, "utf8");
     ok(`registered fulcrum MCP in ${codexConfigToml}`);
+    setRollback(`sed -i '/# BEGIN FULCRUM MANAGED BLOCK — mcp/,/# END FULCRUM MANAGED BLOCK — mcp/d' ${codexConfigToml}`);
+    setJournalMeta({ agent: "codex", action: "managed_marker", target_path: codexConfigToml, mode: "native", sha256_before: sha256Before, sha256_after: sha256File(codexConfigToml) });
   });
 
   // 2. Install skills into ~/.codex/skills/ via canonical source fanout (PR 6.4).
@@ -1763,8 +1823,10 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
 
   // 3. Wire lifecycle hooks into config.toml (hooks are config-level — no plugin API for this)
   const FULCRUM_HOOKS_MARKER = "fulcrum hook codex";
+  const FULCRUM_HOOKS_BLOCK_MARKER = "# BEGIN FULCRUM MANAGED BLOCK — hooks";
   const FULCRUM_HOOKS_ENTRY = [
     "",
+    FULCRUM_HOOKS_BLOCK_MARKER,
     "# Fulcrum lifecycle hooks",
     "[[hooks]]",
     'event = "SessionStart"',
@@ -1792,6 +1854,7 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
     "[[hooks]]",
     'event = "Stop"',
     'command = "fulcrum hook codex session-end"',
+    "# END FULCRUM MANAGED BLOCK — hooks",
     "",
   ].join("\n");
 
@@ -1809,8 +1872,11 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
       skip(`fulcrum hooks already in ${codexConfigToml}`);
       return;
     }
+    const sha256Before = sha256File(codexConfigToml);
     fs.writeFileSync(codexConfigToml, existing + FULCRUM_HOOKS_ENTRY, "utf8");
     ok(`wired SessionStart/PreToolUse/PostToolUse/Stop hooks`);
+    setRollback(`sed -i '/# BEGIN FULCRUM MANAGED BLOCK — hooks/,/# END FULCRUM MANAGED BLOCK — hooks/d' ${codexConfigToml}`);
+    setJournalMeta({ agent: "codex", action: "managed_marker", target_path: codexConfigToml, mode: "native", sha256_before: sha256Before, sha256_after: sha256File(codexConfigToml) });
   });
 
   // 4. Write AGENTS.md to targetDir (project-level agent instructions for Codex)
@@ -1870,8 +1936,11 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
       version: "0.0.1",
       installed_at: new Date().toISOString(),
     });
+    const sha256BeforeMarket = sha256File(marketplacePath);
     fs.writeFileSync(marketplacePath, JSON.stringify(parsed, null, 2), "utf8");
     ok(`registered fulcrum plugin in ${marketplacePath}`);
+    setRollback(`node -e "const f='${marketplacePath}',d=JSON.parse(require('fs').readFileSync(f,'utf8'));d.plugins=(d.plugins||[]).filter(p=>!(p.name==='fulcrum'&&p.host==='codex'));require('fs').writeFileSync(f,JSON.stringify(d,null,2))"`);
+    setJournalMeta({ agent: "codex", action: "merge_json", target_path: marketplacePath, mode: "native", sha256_before: sha256BeforeMarket, sha256_after: sha256File(marketplacePath) });
   });
 
   // 6. Register fulcrum marketplace via `codex marketplace add moabualruz/fulcrum`.
