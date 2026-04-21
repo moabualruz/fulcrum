@@ -1,6 +1,6 @@
 {
   "name": "fulcrum",
-  "version": "1.0.0",
+  "version": "0.0.3",
   "description": "Fulcrum agent control plane — task tracking, memory, and agent run lifecycle",
   "contextFileName": "GEMINI.md",
 

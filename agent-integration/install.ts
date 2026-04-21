@@ -355,7 +355,10 @@ function installClaudePluginNative(): boolean {
     return true;
   }
 
-  const mpResult = spawnSync("claude", ["plugin", "marketplace", "add", "moabualruz/fulcrum"], {
+  // Remove any stale marketplace registration (e.g. GitHub-cached copy from a previous run)
+  // then re-add from the local repo root so `plugin install` always reads current local files.
+  spawnSync("claude", ["plugin", "marketplace", "remove", "fulcrum"], { stdio: "ignore" });
+  const mpResult = spawnSync("claude", ["plugin", "marketplace", "add", REPO_ROOT], {
     stdio: ["ignore", "pipe", "pipe"],
     encoding: "utf8",
   });
@@ -377,8 +380,8 @@ function installClaudePluginNative(): boolean {
     return false;
   }
 
-  ok("installed via `claude plugin marketplace add moabualruz/fulcrum` + `claude plugin install fulcrum@fulcrum`");
-  setRollback("claude plugin uninstall fulcrum@fulcrum && claude plugin marketplace remove moabualruz/fulcrum");
+  ok(`installed via \`claude plugin marketplace add ${REPO_ROOT}\` + \`claude plugin install fulcrum@fulcrum\``);
+  setRollback("claude plugin uninstall fulcrum@fulcrum && claude plugin marketplace remove fulcrum");
   setJournalMeta({ agent: "claude", action: "native_cli", target_path: "claude://plugin/fulcrum", mode: "native" });
   // PR 14.1 caveat: Claude marketplace update mechanics have open issues as
   // of Q2 2026 (anthropics/claude-code #46594, #46081, #38271, #37886).
@@ -2683,7 +2686,7 @@ export function verifyInstall(opts: {
       installMode = detectOpencodeInstallMode(opencodeJsonc);
       canonicalVersion = readJsonVersion(OPENCODE_SRC_PKG);
       // pluginVersion: for local mode use canonical; for npm mode would need probe (keep null for now)
-      if (installMode === "local") pluginVersion = canonicalVersion;
+      if (installMode === "manual") pluginVersion = canonicalVersion;
       break;
     }
 

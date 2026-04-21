@@ -1,6 +1,6 @@
 {
   "name": "fulcrum-agent-cli",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "CLI for Fulcrum — fulcrum memory init, accelerate, rebuild, status",
   "keywords": [
     "cli",

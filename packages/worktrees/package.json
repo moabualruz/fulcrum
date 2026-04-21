@@ -1,6 +1,6 @@
 {
   "name": "fulcrum-worktrees",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Code worktree lifecycle management — worktree provisioning, artifact tracking, and code review workflows",
   "keywords": [
     "worktrees",

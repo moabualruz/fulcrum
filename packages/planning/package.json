@@ -1,6 +1,6 @@
 {
   "name": "fulcrum-planning",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Project planning domain — epics, issues, PRDs, plans, task relations, and code review workflows",
   "keywords": [
     "planning",

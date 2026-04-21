@@ -5,6 +5,104 @@ It covers invariants, patterns, and constraints — not package descriptions (th
 
 ---
 
+## Session Quickload
+
+Read this section first. Use later sections as authoritative detail when touching
+that surface.
+
+**Repo shape:** TypeScript ESM pnpm workspace for a local-first agent control
+plane. Core value: task/run state, policy, memory, worktrees, workflows,
+worker adapters, CLI/MCP/install surfaces, and agent integration artifacts.
+
+**Fast context order:**
+
+1. `fulcrum action exec get_current_context`
+2. `fulcrum action exec get_workspace_status --json '{"workspace_id":"...","project_id":"..."}'`
+3. `fulcrum action exec recall_knowledge --json '{"query":"...","workspace_id":"...","project_id":"..."}'`
+4. `fulcrum action exec search_code --json '{"text":"...","workspace_id":"...","project_id":"..."}'`
+5. Then use `rg`, `sed`, and source reads.
+
+**Lifecycle CLI gotcha:** `start_agent_run` action payload uses
+`agent_role`, not `role`; include `context_type`.
+
+```bash
+fulcrum action exec start_agent_run --json '{"workspace_id":"ws_...","project_id":"proj_...","task_id":"task_...","agent_role":"software_engineer","context_type":"primary"}'
+```
+
+For explicit work, prefer `create_task` first so the queue does not accumulate
+opaque `[auto] ... run` tasks. End every run with exactly one
+`complete_agent_run` or `block_agent_run`.
+
+**Command map:**
+
+| Need | Command |
+|------|---------|
+| All tests | `pnpm test` |
+| All builds | `pnpm build` |
+| Import cycle check | `pnpm run check:cycles` |
+| Install dry run | `pnpm run setup:dry` |
+| Install verification | `pnpm run setup:check` |
+| Single package tests | `cd packages/<pkg> && pnpm test` |
+| Single package build | `cd packages/<pkg> && pnpm build` when package has build script |
+| Fulcrum CLI from source | `pnpm run fulcrum -- <args>` or `./fulcrum <args>` |
+
+**Package/file map for first search:**
+
+| Surface | Start Here |
+|---------|------------|
+| SQLite schema, IDs, roles, runs, tasks, events, embeddings | `packages/core/src/` |
+| L0/L1/L2 memory, vault, curator, recall, Kuzu | `packages/memory/src/` |
+| Policy engine, invariants, secret scanning | `packages/policy/src/` |
+| CLI commands, MCP tools, action registry, hooks, TUI | `packages/cli/src/` |
+| Runtime install/uninstall artifacts for agent hosts | `agent-integration/` and `packages/agent-fanout/` |
+| Worker adapters and spawn lifecycle | `packages/worker/src/` |
+| Worktree allocation, artifacts, merge queue | `packages/worktrees/src/` |
+| Workflow definitions and runner | `packages/workflows/src/` |
+| Team templates and invocation state | `packages/teams/src/` |
+| Planning domain docs/issues/plans/reviews | `packages/planning/src/` |
+| Monitor HTTP/SSE/dashboard | `packages/monitor/src/` |
+| External sync/Plane/conflicts | `packages/sync/src/` |
+
+**Keep in short memory:**
+
+- Import specifiers in source need `.js` for relative imports.
+- Canonical shared types live in `packages/core/src/types.ts`; downstream packages re-export.
+- First-class IDs must use `newId(<type>)`; never bare `ulid()`.
+- Role checks must use capability helpers (`canInvokeTeams`, `canMerge`, `canWriteCode`, `canEditFiles`, etc.), never slug string comparisons.
+- Task-by-ID queries must include `AND workspace_id = ?`.
+- Persisted enum unions need matching SQLite `CHECK` constraints and guard-test entries.
+- Memory writes are L0 vault first, then L1 SQLite, then async L2. Never sync-write L2.
+- Vault self-write suppression depends on `upsertStateEntry()` before `writeFileSync()` and full 64-char body SHA-256.
+- `checkPolicy` belongs before `startAgentRun`; `startAgentRun` does not enforce WIP/dependency policy itself.
+- `wip_limit: 0` means fully blocked, not unlimited.
+- Tests use real in-memory SQLite via `setDb` / `_configureDb` / `runMigrations`; do not mock DB.
+- Vitest pool stays `forks`; `better-sqlite3` is not thread-safe.
+- `@fulcrum/worker` owns subprocess spawning and adapter contracts. Other packages should not grow executor-specific behavior.
+- Do not touch the `FULCRUM managed-block` at the bottom by hand.
+
+**Current docs/workflow map:**
+
+- User-facing guides: `docs/guides/`
+- Active/recent execution plans and progress: `docs/plans/`
+- Handoffs/pickup prompts: `docs/handover/`
+- Agent-host reference research: `docs/reference/`
+- Decisions/ADRs: `docs/decisions/`
+- README package map and quick-start: `README.md`
+
+**External library/API docs:** use Context7 before answering or coding against a
+library, framework, SDK, API, CLI tool, or cloud service:
+
+```bash
+npx ctx7@latest library <OfficialName> "<full user question>"
+npx ctx7@latest docs /org/project "<full user question>"
+```
+
+Pick the best `/org/project` match from the `library` result. If Context7 hits a
+quota error, tell the user and suggest `npx ctx7@latest login` or
+`CONTEXT7_API_KEY`.
+
+---
+
 ## What This Repo Is (and Is Not)
 
 **Fulcrum is control-plane-first.** Its center of gravity is state, policy, intent,

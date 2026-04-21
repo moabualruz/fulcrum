@@ -1,6 +1,6 @@
 {
   "name": "fulcrum-worker",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Worker — pluggable agent executor that spawns subordinate agents, tracks lifecycle, and persists results to the agent_runs table",
   "keywords": [
     "worker",

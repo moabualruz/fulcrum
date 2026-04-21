@@ -1,6 +1,6 @@
 {
   "name": "fulcrum-policy",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Policy engine — system invariants, custom rule evaluation, secret guard (detect and redact), and audit logging",
   "keywords": [
     "policy",

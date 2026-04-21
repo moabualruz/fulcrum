@@ -1,6 +1,6 @@
 {
   "name": "fulcrum-agent-fanout",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Parse canonical Fulcrum skills + rules and emit per-agent artifacts (Claude, Codex, Gemini, opencode, PI, Copilot, Cursor, Windsurf) with per-skill identity preserved",
   "keywords": [
     "agent-os",

@@ -1,6 +1,6 @@
 {
   "name": "fulcrum-agent-core",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Core persistence and orchestration layer — SQLite tasks, agent runs, policy enforcement, workspace status, handoffs, events, and embedding providers",
   "keywords": [
     "agent-os",

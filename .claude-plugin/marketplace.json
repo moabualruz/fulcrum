@@ -10,14 +10,14 @@
   },
   "metadata": {
     "description": "Fulcrum Agent OS — task management, memory, multi-agent lifecycle, and Fulcrum-first policy hooks. Shared marketplace serves both Claude Code (`.claude-plugin/marketplace.json`) and OpenAI Codex CLI (same file — Codex's marketplace loader reads `.claude-plugin/marketplace.json` as a fallback after `.agents/plugins/marketplace.json`).",
-    "version": "2.0.0"
+    "version": "0.0.3"
   },
   "plugins": [
     {
       "name": "fulcrum",
       "source": "./agent-integration/claude",
       "description": "Fulcrum Agent OS — task management, memory, multi-agent lifecycle, and Fulcrum-first policy hooks.",
-      "version": "2.0.0",
+      "version": "0.0.3",
       "category": "productivity",
       "keywords": [
         "agent-os",
@@ -40,7 +40,7 @@
       "name": "fulcrum",
       "source": "./agent-integration/codex/plugin",
       "description": "Fulcrum Agent OS — Codex variant (MCP filtered mode + 33 skills + openai.yaml sidecars + hooks for UserPromptSubmit / PermissionRequest / SessionStart / PostToolUse / Stop).",
-      "version": "0.1.0",
+      "version": "0.0.3",
       "category": "productivity",
       "keywords": [
         "agent-os",

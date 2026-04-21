@@ -1,6 +1,6 @@
 {
   "name": "fulcrum-mcp",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Zero-install MCP server for Fulcrum agent OS — run with npx fulcrum-mcp or add to Claude Desktop config",
   "keywords": [
     "mcp",

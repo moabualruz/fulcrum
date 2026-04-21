@@ -5,49 +5,49 @@
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT:-fulcrum} hook claude session-start", "timeout": 8 }
+          { "type": "command", "command": "fulcrum hook claude session-start", "timeout": 8 }
         ]
       }
     ],
     "SessionEnd": [
       {
         "hooks": [
-          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT:-fulcrum} hook claude session-end", "timeout": 8 }
+          { "type": "command", "command": "fulcrum hook claude session-end", "timeout": 8 }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT:-fulcrum} hook claude session-stop", "timeout": 8 }
+          { "type": "command", "command": "fulcrum hook claude session-stop", "timeout": 8 }
         ]
       }
     ],
     "SubagentStop": [
       {
         "hooks": [
-          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT:-fulcrum} hook claude subagent-stop", "timeout": 8 }
+          { "type": "command", "command": "fulcrum hook claude subagent-stop", "timeout": 8 }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT:-fulcrum} hook claude user-prompt-submit", "timeout": 5 }
+          { "type": "command", "command": "fulcrum hook claude user-prompt-submit", "timeout": 5 }
         ]
       }
     ],
     "PreCompact": [
       {
         "hooks": [
-          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT:-fulcrum} hook claude pre-compact", "timeout": 5 }
+          { "type": "command", "command": "fulcrum hook claude pre-compact", "timeout": 5 }
         ]
       }
     ],
     "Notification": [
       {
         "hooks": [
-          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT:-fulcrum} hook claude notification", "timeout": 2 }
+          { "type": "command", "command": "fulcrum hook claude notification", "timeout": 2 }
         ]
       }
     ],
@@ -55,7 +55,7 @@
       {
         "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|Task|Grep|Glob|Read",
         "hooks": [
-          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT:-fulcrum} hook auto", "timeout": 5 }
+          { "type": "command", "command": "fulcrum hook auto", "timeout": 5 }
         ]
       }
     ],
@@ -63,7 +63,7 @@
       {
         "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|Task",
         "hooks": [
-          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT:-fulcrum} hook claude post", "timeout": 5 }
+          { "type": "command", "command": "fulcrum hook claude post", "timeout": 5 }
         ]
       }
     ]

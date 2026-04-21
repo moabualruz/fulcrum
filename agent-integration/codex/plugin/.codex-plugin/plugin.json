@@ -1,6 +1,6 @@
 {
   "name": "fulcrum",
-  "version": "0.1.0",
+  "version": "0.0.3",
   "description": "Fulcrum agent control plane — task tracking, memory, agent lifecycle, and multi-agent coordination",
   "author": { "name": "Mo Abualruz", "url": "https://github.com/moabualruz/fulcrum" },
   "homepage": "https://github.com/moabualruz/fulcrum",

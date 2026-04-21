@@ -1,0 +1,27 @@
+---
+applyTo: "**"
+description: "Fulcrum skill: Initialize Fulcrum agent run at start of every working session."
+---
+
+---
+name: session-start
+description: Initialize Fulcrum agent run at start of every working session.
+---
+
+# Session Start
+
+Start of every working session:
+
+1. `fulcrum action exec get_current_context` (no params) → `workspace_id` + `project_id`. Then `fulcrum action exec get_workspace_status` with `workspace_id` → current state.
+2. Task assigned? `fulcrum action exec start_agent_run` with `agent_role`, `workspace_id`, `task_id`.
+3. Store returned `run_id` — pass to all heartbeats + completions.
+4. `fulcrum action exec recall_memory` for current task → surface prior decisions.
+
+```bash
+fulcrum action exec get_current_context
+fulcrum action exec get_workspace_status --json '{"workspace_id":"ws_123"}'
+fulcrum action exec start_agent_run --json '{"workspace_id":"ws_123","task_id":"task_123","agent_role":"software_engineer"}'
+fulcrum action exec recall_memory --json '{"workspace_id":"ws_123","query":"current task"}'
+```
+
+**Never skip.** No `run_id` = heartbeat, recall, completion all inert.

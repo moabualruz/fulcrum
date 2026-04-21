@@ -1,6 +1,6 @@
 {
   "name": "fulcrum-teams",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Agent team orchestration — team templates, role slots, communication and budget policies, team spawning",
   "keywords": [
     "teams",

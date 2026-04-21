@@ -1,6 +1,6 @@
 {
   "name": "fulcrum",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "Local-first agent control plane — task tracking, WIP enforcement, human-readable memory vault (L0) + hybrid recall (L1 FTS5 + L2 Kuzu graph), and CoS context for multi-agent TypeScript systems",
   "keywords": [
