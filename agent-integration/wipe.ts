@@ -52,6 +52,9 @@ export interface WipeOpts {
 
 const MARKER_START = "<!-- fulcrum:begin -->";
 const MARKER_END = "<!-- fulcrum:end -->";
+// replaceMarkerBlock format (used by AGENTS.md, opencode.md, etc.)
+const MANAGED_BLOCK_START_RE = /<!--\s*BEGIN\s+FULCRUM\s+managed-block\s+v1\s*-->/i;
+const MANAGED_BLOCK_END_RE = /<!--\s*END\s+FULCRUM\s+managed-block\s+v1\s*-->/i;
 
 function deleteFile(filePath: string, dryRun: boolean, actions: WipeAction[]): void {
   if (!fs.existsSync(filePath)) {
@@ -85,24 +88,40 @@ function deleteGlob(dir: string, pattern: RegExp, dryRun: boolean, actions: Wipe
   }
 }
 
-/** Strip all `<!-- fulcrum:begin --> … <!-- fulcrum:end -->` marker blocks from a file. */
+/**
+ * Strip all fulcrum-managed marker blocks from a file.
+ * Handles both formats:
+ *   1. `<!-- fulcrum:begin --> … <!-- fulcrum:end -->`
+ *   2. `<!-- BEGIN FULCRUM managed-block v1 --> … <!-- END FULCRUM managed-block v1 -->`
+ */
 function stripMarkerBlock(filePath: string, dryRun: boolean, actions: WipeAction[]): void {
   if (!fs.existsSync(filePath)) {
     actions.push({ path: filePath, action: "skip", reason: "not found" });
     return;
   }
   const content = fs.readFileSync(filePath, "utf8");
-  if (!content.includes(MARKER_START)) {
+  const hasSimple = content.includes(MARKER_START);
+  const hasManaged = MANAGED_BLOCK_START_RE.test(content);
+  if (!hasSimple && !hasManaged) {
     actions.push({ path: filePath, action: "skip", reason: "no marker block" });
     return;
   }
   actions.push({ path: filePath, action: "strip-marker" });
   if (dryRun) return;
-  // Remove all blocks including surrounding newlines
-  const stripped = content
-    .replace(new RegExp(`\\n?${escapeRe(MARKER_START)}[\\s\\S]*?${escapeRe(MARKER_END)}\\n?`, "g"), "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trimStart();
+  let stripped = content;
+  // Strip <!-- fulcrum:begin --> … <!-- fulcrum:end -->
+  if (hasSimple) {
+    stripped = stripped
+      .replace(new RegExp(`\\n?${escapeRe(MARKER_START)}[\\s\\S]*?${escapeRe(MARKER_END)}\\n?`, "g"), "\n");
+  }
+  // Strip <!-- BEGIN FULCRUM managed-block v1 --> … <!-- END FULCRUM managed-block v1 -->
+  if (hasManaged) {
+    stripped = stripped.replace(
+      /\n?<!--\s*BEGIN\s+FULCRUM\s+managed-block\s+v1\s*-->[\s\S]*?<!--\s*END\s+FULCRUM\s+managed-block\s+v1\s*-->\n?/gi,
+      "\n",
+    );
+  }
+  stripped = stripped.replace(/\n{3,}/g, "\n\n").trimStart();
   fs.writeFileSync(filePath, stripped, "utf8");
 }
 
@@ -333,14 +352,15 @@ function stripClaudeHooks(settingsPath: string, dryRun: boolean, actions: WipeAc
  * The file is treated as JSON (comments stripped for parse; written back as
  * plain JSON since we can't round-trip JSONC without a JSONC parser).
  */
-function stripOpencodePlugin(filePath: string, dryRun: boolean, actions: WipeAction[]): void {
+function stripOpencodeConfig(filePath: string, dryRun: boolean, actions: WipeAction[]): void {
   if (!fs.existsSync(filePath)) {
     actions.push({ path: filePath, action: "skip", reason: "not found" });
     return;
   }
-  let content = fs.readFileSync(filePath, "utf8");
-  // Strip single-line // comments before JSON.parse
-  const stripped = content.replace(/\/\/[^\n]*/g, "");
+  const raw = fs.readFileSync(filePath, "utf8");
+  // Strip single-line // comments before JSON.parse.
+  // Use byte-safe replacement to avoid issues with multi-byte chars (e.g. em-dash) in comments.
+  const stripped = raw.replace(/\/\/[^\n\r]*/g, "");
   let obj: Record<string, unknown>;
   try {
     obj = JSON.parse(stripped) as Record<string, unknown>;
@@ -348,23 +368,33 @@ function stripOpencodePlugin(filePath: string, dryRun: boolean, actions: WipeAct
     actions.push({ path: filePath, action: "skip", reason: "not valid JSONC" });
     return;
   }
+  let changed = false;
+
+  // Strip fulcrum from plugin[] array
   const plugin = obj["plugin"] as string[] | undefined;
-  if (!plugin) {
-    actions.push({ path: filePath, action: "skip", reason: "no plugin key" });
-    return;
+  if (plugin) {
+    const filtered = plugin.filter(p => !p.includes("fulcrum") && !p.includes("opencode-plugin"));
+    if (filtered.length !== plugin.length) {
+      changed = true;
+      if (filtered.length === 0) delete obj["plugin"];
+      else obj["plugin"] = filtered;
+    }
   }
-  const filtered = plugin.filter(p => !p.includes("fulcrum") && !p.includes("opencode-plugin"));
-  if (filtered.length === plugin.length) {
-    actions.push({ path: filePath, action: "skip", reason: "no fulcrum plugin entry" });
+
+  // Strip fulcrum from mcp{} object
+  const mcp = obj["mcp"] as Record<string, unknown> | undefined;
+  if (mcp && "fulcrum" in mcp) {
+    delete mcp["fulcrum"];
+    if (Object.keys(mcp).length === 0) delete obj["mcp"];
+    changed = true;
+  }
+
+  if (!changed) {
+    actions.push({ path: filePath, action: "skip", reason: "no fulcrum entries" });
     return;
   }
   actions.push({ path: filePath, action: "strip-mcp-entry" });
   if (dryRun) return;
-  if (filtered.length === 0) {
-    delete obj["plugin"];
-  } else {
-    obj["plugin"] = filtered;
-  }
   fs.writeFileSync(filePath, JSON.stringify(obj, null, 2) + "\n", "utf8");
 }
 
@@ -428,13 +458,14 @@ function wipeOpencode(targetDir: string, dryRun: boolean): WipeAction[] {
   const actions: WipeAction[] = [];
   const c = (rel: string) => path.join(targetDir, rel);
 
-  stripOpencodePlugin(c(".opencode/opencode.jsonc"), dryRun, actions);
+  stripOpencodeConfig(c(".opencode/opencode.jsonc"), dryRun, actions);
   deleteFile(c(".opencode/opencode.md"), dryRun, actions);
   deleteFile(c(".opencode/plugins/fulcrum.ts"), dryRun, actions);
   deleteFile(c(".opencode/plugins/rider.ts"), dryRun, actions);
   deleteGlob(c(".opencode/command"), /^fulcrum-.*\.md$/, dryRun, actions);
   deleteGlob(c(".opencode/agents"), /^fulcrum-/, dryRun, actions);
   deleteGlob(c(".opencode/rules"), /^fulcrum-/, dryRun, actions);
+  stripMarkerBlock(c("AGENTS.md"), dryRun, actions);
 
   return actions;
 }
