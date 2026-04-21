@@ -136,9 +136,9 @@ Plan target: 9 layers. Audit: 6/11 events (BeforeAgent, BeforeToolSelection, Not
 | **`agent-integration/gemini/policies/` populated** | ✅ | `fulcrum-core.toml` (24 read-only + 8 lifecycle Fulcrum MCP tools → `allow`, priority 500) + `fulcrum-sensitive.toml` (`invoke_team`, `mark_memory_wrong`, definition edits → `ask_user`, priority 500). Schema per `docs/reference/policy-engine.md`. | PR 7.5 |
 | **GEMINI.md marker block with canonical rules** | ✅ | `replaceMarkerBlock` emits BEGIN/END FULCRUM managed-block v1 embedding all 3 canonical rules joined with `\n\n---\n\n`. User-owned prose outside markers survives regeneration. Verify: `grep -c 'BEGIN FULCRUM managed-block' agent-integration/gemini/GEMINI.md` = 1. | PR 7.6 |
 | **TOML slash commands regenerated from fanout** | ✅ | `emitGemini` now emits 6 TOML commands under `commands/fulcrum/<cos\|memory\|run\|status\|task\|log>.toml` derived from curated canonical skills. Schema per `docs/cli/custom-commands.md` (description + prompt + `{{args}}`). Hand-authored top-level TOMLs coexist. Verify: `find agent-integration/gemini/commands -name '*.toml' \| wc -l` = 12. | PR 7.7 |
-| **`gemini extensions update fulcrum` post-install message printed** | ⬜ | `grep -c "gemini extensions update" agent-integration/install.ts` ≥ 1 | **PR 14.5** |
-| **`gemini-extension.json` schema validated at install time via `find-docs`-verified schema** | ⬜ | installer validates the manifest | **PR 14.5** |
-| **`migratedTo` field scaffolding in `gemini-extension.json` (commented-out; documents future migration)** | ⬜ | `grep -c 'migratedTo' agent-integration/gemini/gemini-extension.json` ≥ 1 | PR 14.5 |
+| **`gemini extensions update fulcrum` post-install message printed** | ✅ | `grep -c "gemini extensions update" agent-integration/install.ts` ≥ 1; printed in both dry-run and real install paths | **PR 14.5** |
+| **`gemini-extension.json` schema validated at install time** | ✅ | `validateGeminiExtensionManifest()` exported; checks name/version/mcpServers; called at top of `installGeminiExtension()`; 4 TDD tests green | **PR 14.5** |
+| **`migratedTo` field scaffolding in `gemini-extension.json` (commented-out; documents future migration)** | ✅ | `grep -c 'migratedTo' agent-integration/gemini/gemini-extension.json` = 2 — field + comment present since PR 7.6 scaffolding | PR 14.5 |
 
 ---
 
@@ -188,10 +188,10 @@ Plan target: 12+ layers. Audit: ~1/~20 events bound (session_start only); 34/34 
 | **24 role MDs emitted under cockpit skill path** | ✅ | `ls agent-integration/skills/roles/*.md \| wc -l` = 24. Flat layout at `agent-integration/pi/cockpit/skills/roles/<slug>.md` (via the `cockpit/skills → ../../skills` symlink). Emitted by `scripts/fanout-pi-cockpit.ts` which translates Claude role MDs for PI (drops Claude-specific `model:` + `tools:`; keeps name + description + body). parseCanonicalSource safely skips the `roles/` subdir (no top-level SKILL.md). | **PR 8.3** |
 | **AGENTS.md marker block with canonical rules (PI walks AGENTS.md up from cwd; PI.md not auto-loaded)** | ✅ | `grep -c 'BEGIN FULCRUM managed-block' AGENTS.md` = 1 at repo root. `scripts/fanout-pi-cockpit.ts` appends a BEGIN/END FULCRUM managed-block v1 embedding the 3 canonical rules joined with `\n\n---\n\n`. User-owned prose outside markers survives regeneration. Research 2026-04-20 confirmed PI walks `AGENTS.md`, not `PI.md` (per docs/skills.md:31 + docs/sdk.md). | **PR 8.4** |
 | **`agent-integration/pi/cockpit/package.json` name → `@fulcrum-agent-os/pi-cockpit`** | ✅ | `grep '"name"' agent-integration/pi/cockpit/package.json` → `"@fulcrum-agent-os/pi-cockpit"`. Workflow-file rename + npm publish + --auto probe remain PR 14.4 scope. | **PR 8.5** |
-| **`npm publish @fulcrum-agent-os/pi-cockpit` to npm registry** | ⬜ | `npm view @fulcrum-agent-os/pi-cockpit version` returns a version | **PR 14.4** |
-| **Rename `.github/workflows/publish-cockpit.yml` → `publish-pi-cockpit.yml` with `pi-cockpit/v*` tag namespace** | ⬜ | `ls .github/workflows/publish-pi-cockpit.yml` AND old file deleted | PR 14.4 |
-| **`@fulcrum/cockpit` npm history checked (legacy conflict)** | ⬜ | `npm view @fulcrum/cockpit time 2>&1` — documented result in ledger | PR 14.4 |
-| **`--auto` probe (`npm view @fulcrum-agent-os/pi-cockpit version`) in installPiCockpit** | ⬜ | `grep -c 'npm view @fulcrum-agent-os/pi-cockpit' agent-integration/install.ts` ≥ 1 | PR 14.4 |
+| **`npm publish @fulcrum-agent-os/pi-cockpit` to npm registry** | ⬜ | `npm view @fulcrum-agent-os/pi-cockpit version` returns a version | **PR 14.4 — operator step; requires npm org registration** |
+| **Rename `.github/workflows/publish-cockpit.yml` → `publish-pi-cockpit.yml` with `pi-cockpit/v*` tag namespace** | ✅ | `ls .github/workflows/publish-pi-cockpit.yml` (old file deleted via git mv) AND name/tag updated in YAML | PR 14.4 |
+| **`@fulcrum/cockpit` npm history checked (legacy conflict)** | ✅ | `npm view @fulcrum/cockpit time 2>&1` → HTTP 404 Not Found — no legacy package, no conflict. 2026-04-21 | PR 14.4 |
+| **`--auto` probe (`npm view @fulcrum-agent-os/pi-cockpit version`) in installPiCockpit** | ✅ | `probePiCockpitOnNpm()` exported; called in `installPiCockpit()` before `pi install`; prints npm version + install guidance when package is live | PR 14.4 |
 
 ---
 

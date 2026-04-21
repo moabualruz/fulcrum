@@ -901,3 +901,35 @@ User directive (verbatim): **"did I allow you to defer any fucking items !?"** �
 - validateCodexPluginManifest is a pure FS function (exported for testability); no spawnSync or network access.
 
 **Next**: PR 14.4 (PI cockpit), PR 14.5 (Gemini), PR 14.6 (install-paths.md).
+
+---
+
+## PR 14.4 — PI cockpit workflow rename + npm probe
+
+**Scope**: Publish workflow rename, npm history check, --auto probe in installPiCockpit.
+
+**Units completed**:
+- **14.4b** Rename `.github/workflows/publish-cockpit.yml` → `publish-pi-cockpit.yml`: name updated to `Publish @fulcrum-agent-os/pi-cockpit`, tag trigger updated to `pi-cockpit/v*`.
+- **14.4c** `@fulcrum/cockpit` npm history: `npm view @fulcrum/cockpit time 2>&1` → HTTP 404 Not Found. No legacy package, no conflict. Safe to publish under `@fulcrum-agent-os/pi-cockpit`.
+- **14.4d** `probePiCockpitOnNpm()` exported — 2s-bounded `npm view @fulcrum-agent-os/pi-cockpit version` probe. Called in `installPiCockpit()` before `pi install`; prints npm version + install guidance when published.
+
+**Test result**: 703/703 green (7 new tests in install-gemini-pi-pr145.test.ts).
+
+**Checklist**: rows 192–194 ⬜→✅. Row 191 (npm publish) remains ⬜ — operator step.
+
+---
+
+## PR 14.5 — Gemini extension schema validation + update message + migratedTo
+
+**Scope**: gemini-extension.json schema validation at install time, post-install update message, migratedTo field confirmation.
+
+**Units completed**:
+- **14.5a** `gemini extensions update fulcrum` printed in both dry-run and real install paths of `installGeminiExtension()`.
+- **14.5b** `validateGeminiExtensionManifest()` exported — checks name/version/mcpServers required fields. Called at top of `installGeminiExtension()` before file copy; throws on schema error.
+- **14.5c** `migratedTo` field already present in `gemini-extension.json` (2 matches: field + comment). Row 141 was ⬜ → ✅ (no new code needed).
+
+**Test result**: 703/703 green.
+
+**Checklist**: rows 139–141 all ⬜→✅.
+
+**Next**: PR 14.6 (install-paths.md architecture doc), PR 14.8 (verify mode/version), PR 14.9 (.npmignore + tarball scan scaffold).
