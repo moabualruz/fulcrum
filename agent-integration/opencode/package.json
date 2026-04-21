@@ -1,6 +1,6 @@
 {
   "name": "@fulcrum-agent-os/opencode-plugin",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Fulcrum Agent OS — opencode plugin. Injects the canonical Fulcrum-first rider into every LLM turn via experimental.chat.system.transform, with SHA-256 integrity verification and session.idle telemetry for silent-failure detection.",
   "keywords": [
     "opencode",

@@ -4,6 +4,15 @@ All notable changes to this package follow [Semantic Versioning](https://semver.
 
 ---
 
+## [0.0.6] — 2026-04-21
+
+CI release retry.
+
+### Fixed
+
+- Narrowed publish tarball secret scan so code references like `process.env`
+  do not block publishing as false positives.
+
 ## [0.0.5] — 2026-04-21
 
 CI release retry.
