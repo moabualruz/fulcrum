@@ -777,23 +777,25 @@ function installGeminiExtension(): void {
     throw new Error(`gemini-extension.json schema errors:\n${manifestValidation.errors.join("\n")}`);
   }
 
-  // Flat files
+  // Flat files and subdirectories used by the manual (file-copy) fallback.
   const flatFiles = [
     ["gemini-extension.json", "gemini-extension.json"],
     ["GEMINI.md", "GEMINI.md"],
     [path.join("hooks", "hooks.json"), path.join("hooks", "hooks.json")],
   ];
-
-  // Subdirectories to copy wholesale: commands/, skills/, agents/
   const subDirs = ["commands", "skills", "agents"];
 
   if (DRY_RUN) {
-    for (const [src] of flatFiles) {
-      dry(`would copy ${path.join(srcDir, src)} → ${path.join(extDir, src)}`);
-    }
-    for (const d of subDirs) {
-      if (fs.existsSync(path.join(srcDir, d))) {
-        dry(`would copy ${path.join(srcDir, d)}/ → ${path.join(extDir, d)}/`);
+    if (commandExists("gemini")) {
+      dry(`would run: gemini extensions install ${srcDir}`);
+    } else {
+      for (const [src] of flatFiles) {
+        dry(`would copy ${path.join(srcDir, src)} → ${path.join(extDir, src)}`);
+      }
+      for (const d of subDirs) {
+        if (fs.existsSync(path.join(srcDir, d))) {
+          dry(`would copy ${path.join(srcDir, d)}/ → ${path.join(extDir, d)}/`);
+        }
       }
     }
     ok(`(dry-run) Gemini extension`);
@@ -801,6 +803,27 @@ function installGeminiExtension(): void {
     return;
   }
 
+  // PR 16.3 — native path: try `gemini extensions install <localpath>` first.
+  if (commandExists("gemini")) {
+    const result = spawnSync("gemini", ["extensions", "install", srcDir], {
+      stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf8",
+    });
+    if (result.status === 0) {
+      ok(`installed via \`gemini extensions install ${srcDir}\``);
+      setRollback("gemini extensions uninstall fulcrum");
+      setJournalMeta({ agent: "gemini", action: "native_cli", target_path: extDir, mode: "native" });
+      console.log();
+      console.log("  To update the Fulcrum Gemini extension after upgrading:");
+      console.log("    gemini extensions update fulcrum");
+      return;
+    }
+    warn(`\`gemini extensions install\` failed (exit ${result.status ?? "unknown"}): ${result.stderr?.trim() ?? ""} — falling back to file-copy`);
+  } else {
+    verbose("`gemini` CLI not found — using file-copy install");
+  }
+
+  // Fallback: file-copy into ~/.gemini/extensions/fulcrum/ (pre-PR-16.3 behavior).
   mkdirp(extDir);
 
   for (const [src, dst] of flatFiles) {
@@ -818,6 +841,7 @@ function installGeminiExtension(): void {
 
   ok(`installed extension → ${extDir} (flat files + ${dirCount} dir(s): ${subDirs.filter(d => fs.existsSync(path.join(srcDir, d))).join(", ")})`);
   setRollback(`rm -rf ${extDir}  # removes entire Gemini extension`);
+  setJournalMeta({ agent: "gemini", action: "write_file", target_path: extDir, mode: "manual" });
   // PR 14.5 — post-install guidance
   console.log();
   console.log("  To update the Fulcrum Gemini extension after upgrading:");
