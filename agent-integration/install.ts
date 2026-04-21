@@ -1114,7 +1114,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void | Promis
   all: [
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
     ["Verify fulcrum in PATH", verifyCliInPath],
-    ["Claude Code: native plugin install (dual-mode; auto/native/manual)", installClaudePluginNative],
+    ["Claude Code: native plugin install (native/manual; default=probe)", installClaudePluginNative],
     ["Claude Code: user-scope MCP server", installClaudeMcp],
     ["Claude Code: PreToolUse hook", installClaudeHook],
     ["Regenerate CLAUDE.md from TOOL_SCHEMAS", regenerateClaudeMd],
@@ -1133,7 +1133,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void | Promis
   claude: [
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
     ["Verify fulcrum in PATH", verifyCliInPath],
-    ["Claude Code: native plugin install (dual-mode; auto/native/manual)", installClaudePluginNative],
+    ["Claude Code: native plugin install (native/manual; default=probe)", installClaudePluginNative],
     ["Claude Code: user-scope MCP server", installClaudeMcp],
     ["Claude Code: PreToolUse hook", installClaudeHook],
     ["Regenerate CLAUDE.md from TOOL_SCHEMAS", regenerateClaudeMd],

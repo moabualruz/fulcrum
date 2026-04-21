@@ -3750,8 +3750,10 @@ async function runInstall(): Promise<void> {
   if (command === 'apply') {
     const agentIdx = args.indexOf('--agent')
     const agentName = agentIdx >= 0 ? args[agentIdx + 1] : undefined
-    if (!agentName) {
+    const applyAll = args.includes('--all')
+    if (!agentName && !applyAll) {
       console.error('Usage: fulcrum install apply --agent <name> [--dry-run]')
+      console.error('       fulcrum install apply --all [--dry-run]')
       console.error('  agents: cursor, windsurf, codex, opencode, copilot')
       process.exit(1)
     }
@@ -3760,6 +3762,19 @@ async function runInstall(): Promise<void> {
     const {
       installCursor, installWindsurf, installCodex, installOpencode, installCopilot,
     } = await import('../../../agent-integration/install.js')
+    const projectAgents = ['cursor', 'windsurf', 'codex', 'opencode', 'copilot'] as const
+    if (applyAll) {
+      for (const agent of projectAgents) {
+        console.log(`\n=== ${agent} ===`)
+        if (agent === 'cursor')   await installCursor({ dryRun, targetDir })
+        if (agent === 'windsurf') await installWindsurf({ dryRun, targetDir })
+        if (agent === 'codex')    await installCodex({ dryRun, targetDir })
+        if (agent === 'opencode') await installOpencode({ dryRun, targetDir })
+        if (agent === 'copilot')  await installCopilot({ dryRun, targetDir })
+      }
+      if (dryRun) console.log('\n[dry-run] global agents (claude/gemini/pi): run `pnpm setup --dry-run`')
+      return
+    }
     switch (agentName) {
       case 'cursor':    await installCursor({ dryRun, targetDir }); break
       case 'windsurf':  await installWindsurf({ dryRun, targetDir }); break
