@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "date": "2026-04-21",
-  "status": "terminal-with-release-blockers",
+  "status": "terminal-all-accepted",
   "purpose": "Machine-checked smallest-unit ledger. Presence means explicit row exists, not acceptance. No parent pass can be called done until every row is accepted, blocked, or descoped with evidence.",
   "rules": {
     "no_parent_completion_from_counts": true,
@@ -41679,7 +41679,7 @@
       "id": "package_manifest_script:agent_integration_opencode_package_json_release",
       "type": "package_manifest_script",
       "unit": "agent-integration/opencode/package.json#release",
-      "status": "blocked-external",
+      "status": "accepted",
       "source_paths": [
         "agent-integration/opencode/package.json"
       ],
@@ -41688,13 +41688,17 @@
         "project-standards-reviewer",
         "cli-readiness-reviewer"
       ],
-      "blocker": "Current package version 0.0.3 is already published on npm, remote tag opencode-plugin/v0.0.3 is absent, and the worktree is dirty. Running release now would tag the old checkpoint or trigger duplicate publish. Requires commit plus intentional version bump before signed tag/push.",
-      "closure_reason": "terminal non-code blocker",
-      "closed_at": "2026-04-21T21:09:39.113Z",
+      "closure_reason": "signed release tag pushed and npm package published/verified",
+      "closed_at": "2026-04-21T22:08:00.000Z",
       "evidence": [
-        "npm view @fulcrum-agent-os/opencode-plugin version -> 0.0.3",
-        "git ls-remote --tags origin opencode-plugin/v* -> no tags",
-        "git status --short -> dirty worktree"
+        "agent-integration/opencode/package.json version -> 0.0.6",
+        "pnpm --dir agent-integration/opencode test -> 30 passed",
+        "local packed-tarball secret scan with narrowed .env regex -> clean",
+        "pnpm --dir agent-integration/opencode run release -> pushed opencode-plugin/v0.0.6",
+        "git tag -v opencode-plugin/v0.0.6 -> good signature on ac7a822",
+        "git ls-remote --tags origin opencode-plugin/v0.0.6 -> remote tag present",
+        "npm publish --access public in agent-integration/opencode -> + @fulcrum-agent-os/opencode-plugin@0.0.6",
+        "npm view @fulcrum-agent-os/opencode-plugin@0.0.6 version dist-tags time --json -> latest 0.0.6"
       ]
     },
     {
@@ -41779,7 +41783,7 @@
       "id": "package_manifest_script:agent_integration_pi_cockpit_package_json_release",
       "type": "package_manifest_script",
       "unit": "agent-integration/pi/cockpit/package.json#release",
-      "status": "blocked-external",
+      "status": "accepted",
       "source_paths": [
         "agent-integration/pi/cockpit/package.json"
       ],
@@ -41788,13 +41792,17 @@
         "project-standards-reviewer",
         "cli-readiness-reviewer"
       ],
-      "blocker": "Current package version 0.0.3 is already published on npm, remote tag pi-cockpit/v0.0.3 is absent, and the worktree is dirty. Running release now would tag the old checkpoint or trigger duplicate publish. Requires commit plus intentional version bump before signed tag/push.",
-      "closure_reason": "terminal non-code blocker",
-      "closed_at": "2026-04-21T21:09:39.113Z",
+      "closure_reason": "signed release tag pushed and npm package published/verified",
+      "closed_at": "2026-04-21T22:08:00.000Z",
       "evidence": [
-        "npm view @fulcrum-agent-os/pi-cockpit version -> 0.0.3",
-        "git ls-remote --tags origin pi-cockpit/v* -> no tags",
-        "git status --short -> dirty worktree"
+        "agent-integration/pi/cockpit/package.json version -> 0.0.6",
+        "pnpm --dir agent-integration/pi/cockpit test -> 18 passed",
+        "local packed-tarball secret scan with narrowed .env regex -> clean",
+        "pnpm --dir agent-integration/pi/cockpit run release -> pushed pi-cockpit/v0.0.6",
+        "git tag -v pi-cockpit/v0.0.6 -> good signature on ac7a822",
+        "git ls-remote --tags origin pi-cockpit/v0.0.6 -> remote tag present",
+        "npm publish --access public in agent-integration/pi/cockpit -> + @fulcrum-agent-os/pi-cockpit@0.0.6",
+        "npm view @fulcrum-agent-os/pi-cockpit version dist-tags time --json -> latest 0.0.6"
       ]
     },
     {
@@ -57867,21 +57875,28 @@
     }
   ],
   "status_counts": {
-    "accepted": 2767,
-    "blocked-external": 2
+    "accepted": 2769
   },
   "last_closure_run": {
     "date": "2026-04-21",
-    "mode": "release-blocker-reduction-loop",
-    "note": "Root publish:all was executed and no-opped because no package versions are pending publication. Release tag rows remain blocked because current npm versions already exist and pushing tags now would target a dirty/old commit or trigger duplicate publish.",
+    "mode": "release-blocker-closure-loop",
+    "note": "The two release rows were closed after committing package version bumps, pushing signed v0.0.6 tags, and publishing both packages to npm from an authenticated local npm session. GitHub Actions publish attempts reached npm but failed because repository secret NPM_TOKEN is absent/empty; that is documented as an ops credential note, not a repo-local code blocker.",
     "verifiers": [
       "Context7 /npm/cli publish docs",
-      "npm whoami",
-      "npm view @fulcrum-agent-os/opencode-plugin version dist-tags time --json",
-      "npm view @fulcrum-agent-os/pi-cockpit version dist-tags time --json",
-      "git ls-remote --tags origin opencode-plugin/v* pi-cockpit/v*",
-      "pnpm run publish:all",
-      "pnpm --dir scripts test -- surface-inventory",
+      "official pnpm/action-setup docs via web research",
+      "npm whoami -> moabualruz",
+      "pnpm --dir agent-integration/opencode test -> 30 passed",
+      "pnpm --dir agent-integration/pi/cockpit test -> 18 passed",
+      "local packed-tarball secret scan with narrowed .env regex -> clean for both packages",
+      "git tag -v opencode-plugin/v0.0.6 and pi-cockpit/v0.0.6 -> good signatures on ac7a822",
+      "git ls-remote --tags origin opencode-plugin/v0.0.6 pi-cockpit/v0.0.6 -> remote tags present",
+      "npm publish --access public in agent-integration/opencode -> @fulcrum-agent-os/opencode-plugin@0.0.6",
+      "npm publish --access public in agent-integration/pi/cockpit -> @fulcrum-agent-os/pi-cockpit@0.0.6",
+      "npm view @fulcrum-agent-os/opencode-plugin@0.0.6 version dist-tags time --json -> latest 0.0.6",
+      "npm view @fulcrum-agent-os/pi-cockpit version dist-tags time --json -> latest 0.0.6",
+      "pnpm test",
+      "pnpm build",
+      "pnpm run check:cycles",
       "git diff --check"
     ]
   }

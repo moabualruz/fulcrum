@@ -10,8 +10,7 @@ origin: "User correction that previous sixth-pass coverage was not granular and 
 
 This ledger reopened the sixth pass because the earlier report was a targeted
 gap-closure run plus broad verification, not a full granular project pass. The
-ledger is now terminal: every unit below is accepted or explicitly blocked with
-evidence.
+ledger is now terminal: every unit below is accepted with evidence.
 
 Guard: `scripts/surface-inventory.test.ts`.
 Machine-checked unit ledger:
@@ -49,8 +48,8 @@ Current JSON status counts:
 
 | Status | Rows |
 |---|---:|
-| accepted | 2,767 |
-| blocked-external | 2 |
+| accepted | 2,769 |
+| blocked-external | 0 |
 | blocked-decision | 0 |
 | open (`test-gap`, `integration-gap`, `runtime-unverified`) | 0 |
 
@@ -481,13 +480,13 @@ source is `.windsurf/mcp.json`.
 | Area | State | Reason |
 |---|---|---|
 | Surface inventory | accepted | Guarded by `scripts/surface-inventory.test.ts`. |
-| Full unit ledger | terminal-with-release-blockers | 2,769 unit rows: 2,767 accepted, 2 blocked-external, 0 open. |
-| Package internals and exports | accepted or blocked | Package roots, 277 production source files, 311 test files, 37 package configs, 37 generated dist artifacts, 72 manifest scripts, and 883 exports have terminal status rows. |
+| Full unit ledger | terminal-all-accepted | 2,769 unit rows: 2,769 accepted, 0 blocked, 0 open. |
+| Package internals and exports | accepted | Package roots, 277 production source files, 311 test files, 37 package configs, 37 generated dist artifacts, 72 manifest scripts, and 883 exports have accepted rows. |
 | Plugins/extensions | accepted | Host roots, native tools, 790 agent-integration artifact rows, 54 hook config events, 14 PI events, 13 PI commands, and 8 opencode plugin hooks have verifier evidence. |
 | Monitor web | accepted for ledgered routes | Route/docs/PI-consumer rows are accepted. Separate browser-visual review remains a future audit surface if new UI claims are added. |
 | Install/fanout | accepted | Setup, setup check, fanout utilization, generated artifact, and installer function rows are accepted. |
 | Memory v3 | accepted for ledgered units | Eval scripts now have repo-local verifier evidence; shipped memory code/tests remain accepted. |
-| External release tags | terminal blockers | Release tag/push rows remain explicit external blockers, not hidden open work. |
+| External release tags | accepted | Opencode and PI cockpit release rows closed after signed `0.0.6` tags, remote tag verification, manual authenticated npm publish, and registry checks. |
 
 ## Latest Verification
 
@@ -515,6 +514,17 @@ source is `.windsurf/mcp.json`.
   packages to publish.
 - `pnpm run publish:all` passed; build completed and pnpm reported no new
   packages should be published.
+- Opencode release closed: `pnpm --dir agent-integration/opencode run release`
+  pushed signed `opencode-plugin/v0.0.6`, `npm publish --access public`
+  published `@fulcrum-agent-os/opencode-plugin@0.0.6`, and `npm view`
+  shows `latest: 0.0.6`.
+- PI cockpit release closed: `pnpm --dir agent-integration/pi/cockpit run
+  release` pushed signed `pi-cockpit/v0.0.6`, `npm publish --access public`
+  published `@fulcrum-agent-os/pi-cockpit@0.0.6`, and `npm view` shows
+  `latest: 0.0.6`.
+- GitHub Actions publish attempts now reach npm but fail with empty
+  `NODE_AUTH_TOKEN`; repository secret `NPM_TOKEN` is absent/empty. The
+  packages were published manually from the authenticated local npm session.
 - Watch-script shape verifier passed: 14 `test:watch` scripts are `vitest`,
   with paired `test` scripts as `vitest run`.
 - Version-script temp verifier passed: opencode and PI cockpit
@@ -529,15 +539,17 @@ source is `.windsurf/mcp.json`.
 - Docs inventory compare passed: 149 inventory rows matched
   `find docs -type f | sort`.
 
-## Terminal Blockers
+## Release Closure Notes
 
-Remaining terminal blockers are not code gaps:
-
-- Release scripts for opencode and PI packages require signed tags and remote
-  pushes after an intentional version bump. Current `0.0.3` package versions
-  are already published on npm, matching remote release tags are absent, and
-  the worktree is dirty; running release now would tag the old checkpoint or
-  trigger duplicate publish.
+- `0.0.4` tags were pushed before workflow failures were discovered; those
+  publish workflows failed before npm because `pnpm/action-setup@v4` lacked a
+  pnpm version.
+- `0.0.5` tags verified that pnpm setup was fixed, then failed in tarball
+  secret scan because `.env` matched legitimate `process.env`/`output.env`
+  code references.
+- `0.0.6` tags verified both workflow fixes and reached npm publish, then
+  failed only because `NPM_TOKEN` is not configured in GitHub Actions. Manual
+  authenticated npm publish closed the package availability rows.
 
 ## Next Sweep
 

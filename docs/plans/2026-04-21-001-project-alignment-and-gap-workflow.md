@@ -10,9 +10,10 @@ origin: "User request to reinitialize Fulcrum goals/aims/values/parts/integratio
 
 This records the docs-to-gap workflow after five passes plus the granular
 feature-acceptance correction and seventh-pass closure loop. The workflow is
-active with terminal blockers: targeted fixes landed, and the full-project
-unit ledger is closed to accepted or blocked-external rows. Separate plan
-registry decisions remain marked `blocked-decision`.
+active with the full-project unit ledger closed to accepted rows. Targeted
+fixes landed, release blockers were reduced and closed, and remaining publish
+automation auth is documented as an ops credential note rather than a code
+ledger blocker.
 
 ## Inputs
 
@@ -755,7 +756,8 @@ external-blocker reduction, and post-fix broad verification.
 | ID | Surface | Evidence | Status |
 |---|---|---|---|
 | S7-OP-001 | local install state | `pnpm run setup`, `pnpm run setup:gemini`, and `pnpm run setup:check` passed after the Gemini fallback fix. | fixed |
-| S7-LEDGER-001 | full acceptance ledger | 2,769 rows now terminal: 2,767 accepted, 2 blocked-external, 0 open. | terminal-with-release-blockers |
+| S7-LEDGER-001 | full acceptance ledger | 2,769 rows now terminal: 2,769 accepted, 0 blocked, 0 open. | terminal-all-accepted |
+| S7-REL-001 | release package rows | Signed `0.0.6` tags pushed for opencode and PI cockpit, both packages published to npm and verified as `latest: 0.0.6`; GitHub Actions publish auth remains missing `NPM_TOKEN`, so manual npm publish closed package availability. | fixed-with-ops-note |
 
 ### Seventh-Pass Verification
 
@@ -769,6 +771,10 @@ external-blocker reduction, and post-fix broad verification.
 - Watch-script shape verifier passed for all 14 `test:watch` scripts.
 - Temp package version verifier passed for opencode and PI cockpit
   patch/minor/major scripts.
+- Release package closure passed for opencode and PI cockpit: package-local
+  tests, packed-tarball secret scan, signed tag verification, remote tag
+  verification, local authenticated `npm publish --access public`, and npm
+  registry `latest: 0.0.6`.
 - `git diff --check` passed.
 - Docs inventory compare passed.
 - Active-doc stale phrase scan ran and found deliberate open coordination rows.
@@ -788,3 +794,8 @@ external-blocker reduction, and post-fix broad verification.
     Eval scripts, watch scripts, version scripts, and publish dry-runs can
     often be verified safely with focused commands, shape checks, or temp-copy
     execution. Leave only credentialed release/publish work as external.
+16. Release blockers need a tag/version collision guard and CI publish
+    diagnosis loop. Never reuse a failed release tag for a fixed workflow;
+    bump to a fresh version, verify the version is unpublished, verify signed
+    tags point at the intended commit, and distinguish code/scan failures from
+    missing repository credentials.

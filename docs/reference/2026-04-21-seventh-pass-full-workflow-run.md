@@ -8,11 +8,11 @@ origin: "User request to run the full granular workflow after correcting false c
 
 # Seventh Pass Full Workflow Run
 
-Status: `terminal-with-release-blockers`. This was a full workflow execution lane:
+Status: `terminal-all-accepted`. This was a full workflow execution lane:
 snapshot, doc inventory, unit-ledger guard, package/plugin inventory, subsystem
 tests, integration checks, review gate, bounded fixes, ledger closure, and
-post-fix broad verification. The unit ledger has zero open rows; only release
-tag/push rows remain explicit external blockers.
+post-fix broad verification. The unit ledger has zero open rows and zero
+blocked rows after release-blocker closure.
 
 ## Snapshot
 
@@ -33,6 +33,10 @@ tag/push rows remain explicit external blockers.
 - Ledger statuses after the external-blocker reduction loop:
   - `accepted`: 2,767
   - `blocked-external`: 2
+  - open: 0
+- Ledger statuses after the release-blocker closure loop:
+  - `accepted`: 2,769
+  - blocked: 0
   - open: 0
 
 Rows were closed only after adding a terminal-status guard to
@@ -107,7 +111,7 @@ Fix:
 | ID | Type | Surface | Evidence | Status |
 |---|---|---|---|---|
 | S7-OP-001 | installer/check drift | Gemini extension local install | `gemini extensions install` exited 0 without materializing `~/.gemini/extensions/fulcrum`; installer now falls back to file-copy and `setup:check` passes. | fixed |
-| S7-LEDGER-001 | ledger closure | 2,769 unit rows | terminal guard passes: 2,767 accepted, 2 blocked-external, 0 open. | terminal-with-release-blockers |
+| S7-LEDGER-001 | ledger closure | 2,769 unit rows | terminal guard passes: 2,769 accepted, 0 blocked, 0 open. | terminal-all-accepted |
 | S7-DOC-001 | active-open docs | current plan/reference/guides | workflow reports updated to reflect zero open ledger rows and explicit blockers. | fixed-for-ledger |
 
 ## Verification
@@ -136,18 +140,23 @@ Passed:
 - `pnpm run publish:all` — passed; no new packages should be published.
 - watch-script shape verifier — passed for 14 `test:watch` scripts.
 - temp package version verifier — passed for opencode and PI cockpit patch/minor/major scripts.
+- release package verifiers — `0.0.6` versions, package-local tests,
+  packed-tarball secret scan, signed tag verification, remote tag verification,
+  local authenticated npm publish, and npm registry `latest: 0.0.6` checks all
+  passed for opencode and PI cockpit.
 
 Failed / blocked:
 
-- External release tag/push rows remain terminal blockers in the unit ledger;
-  they are not repo-local code gaps. Both release packages are already
-  published on npm at `0.0.3`; matching remote tags are absent, so release
-  needs a commit plus intentional version bump before signed tag/push.
+- No unit-ledger rows remain blocked. GitHub Actions publish workflows still
+  fail at npm auth because repository secret `NPM_TOKEN` is absent/empty; the
+  packages were published manually from the authenticated local npm session.
 
 ## Self Check
 
 - Asked: run full workflow.
 - Done: ran snapshot, inventory, full package tests, build, cycle checks, config/install dry checks, review gate, fixed two verifier-backed code/integration bugs plus one active-doc drift, closed the ledger to terminal statuses, reran full verification, and recorded status.
 - Evidence paths: this report, sixth-pass unit ledger, `scripts/surface-inventory.test.ts`, CLI TUI test, Gemini installer test, workflow runner test, setup check, package test output.
-- Remaining uncertainty: only external release tag/push blockers remain in this ledger, plus any future units found outside it.
+- Remaining uncertainty: GitHub Actions publish auth needs repo secret setup or
+  trusted-publishing migration; no current unit-ledger row remains open or
+  blocked.
 - Next step allowed: yes, but only to search for new units outside the current ledger or resolve explicit external blockers. No hidden open-row claim remains.
