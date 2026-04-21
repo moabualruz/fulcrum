@@ -21,6 +21,23 @@ export type { MarkerReplaceOptions, MarkerReplaceResult } from './marker-block.j
 export { computeRiderSha, writeRidersum } from './ridersum.js'
 export type { RiderShaResult, RidersumWriteResult } from './ridersum.js'
 
+export {
+  appendJournal,
+  readJournal,
+  clearJournal,
+  globalStateDir,
+  journalPath,
+  isGlobalAgent,
+  sha256File,
+  newRunId,
+} from './install-journal.js'
+export type {
+  InstallJournalEntry,
+  InstallAction,
+  InstallMode as JournalInstallMode,
+  ReadJournalOpts,
+} from './install-journal.js'
+
 export { ALL_TARGETS } from './types.js'
 export type {
   AgentTarget,
