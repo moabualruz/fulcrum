@@ -3882,7 +3882,58 @@ async function runInstall(): Promise<void> {
     return
   }
 
-  console.error('Usage: fulcrum install <plan|apply|verify|wipe> [options]')
+  if (command === 'uninstall') {
+    const agentIdx = args.indexOf('--agent')
+    const agentName = agentIdx >= 0 ? args[agentIdx + 1] : undefined
+    const all = args.includes('--all')
+    const globalScope = args.includes('--global')
+    const projectScope = args.includes('--project')
+    const dryRun = args.includes('--dry-run')
+    const purge = args.includes('--purge')
+    const targetDir = process.cwd()
+    const home = process.env['HOME'] ?? ''
+
+    const ALL_AGENTS = ['cursor', 'windsurf', 'codex', 'opencode', 'copilot', 'claude', 'gemini', 'pi'] as const
+    const GLOBAL_AGENTS = ['claude', 'gemini', 'codex', 'pi'] as const
+    const PROJECT_AGENTS = ['cursor', 'windsurf', 'opencode', 'copilot'] as const
+
+    let agents: string[]
+    if (agentName) {
+      agents = [agentName]
+    } else if (all && globalScope) {
+      agents = [...GLOBAL_AGENTS]
+    } else if (all && projectScope) {
+      agents = [...PROJECT_AGENTS]
+    } else if (all) {
+      agents = [...ALL_AGENTS]
+    } else {
+      console.error('Usage: fulcrum install uninstall --agent <name> [--dry-run] [--purge]')
+      console.error('       fulcrum install uninstall --all [--global | --project] [--dry-run] [--purge]')
+      console.error('  agents: cursor, windsurf, codex, opencode, copilot, claude, gemini, pi')
+      process.exit(1)
+    }
+
+    const { uninstallAgent } = await import('../../../agent-integration/uninstall.js')
+
+    for (const agent of agents) {
+      const validAgents: string[] = [...ALL_AGENTS]
+      if (!validAgents.includes(agent)) {
+        console.error(`Unknown agent: ${agent}`)
+        process.exit(1)
+      }
+      const result = uninstallAgent({ agent, dryRun, purge, targetDir, home })
+      const icon = dryRun ? '○' : result.uninstalled > 0 ? '✓' : result.fallback ? '⚠' : '—'
+      const suffix = dryRun ? ' (dry-run)' : result.fallback ? ' (no journal — wipe fallback)' : ''
+      console.log(`${icon} ${result.agent}${suffix}: ${result.uninstalled} uninstalled, ${result.orphaned} orphaned, ${result.skipped} skipped`)
+      for (const action of result.actions) {
+        const aIcon = action.result === 'ok' ? '  ✓' : action.result === 'orphaned' ? '  ⚠' : action.result === 'error' ? '  ✗' : '  —'
+        console.log(`${aIcon} ${action.action}: ${action.target_path}${action.reason ? `  (${action.reason})` : ''}`)
+      }
+    }
+    return
+  }
+
+  console.error('Usage: fulcrum install <plan|apply|verify|wipe|uninstall> [options]')
   process.exit(1)
 }
 
