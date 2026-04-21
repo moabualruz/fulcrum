@@ -689,9 +689,41 @@ function copyDirContents(srcDir: string, destDir: string): number {
   return count;
 }
 
+// PR 14.5 — Validate gemini-extension.json against required Gemini extension manifest fields.
+export interface GeminiExtensionManifestValidation {
+  ok: boolean;
+  errors: string[];
+}
+
+export function validateGeminiExtensionManifest(jsonPath: string): GeminiExtensionManifestValidation {
+  const errors: string[] = [];
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(fs.readFileSync(jsonPath, "utf8")) as Record<string, unknown>;
+  } catch (e) {
+    return { ok: false, errors: [`Cannot read or parse ${jsonPath}: ${String(e)}`] };
+  }
+  for (const field of ["name", "version"] as const) {
+    if (typeof data[field] !== "string" || !data[field]) {
+      errors.push(`Missing or empty required field: ${field}`);
+    }
+  }
+  if (!data["mcpServers"] || typeof data["mcpServers"] !== "object") {
+    errors.push("Missing required object: mcpServers");
+  }
+  return { ok: errors.length === 0, errors };
+}
+
 function installGeminiExtension(): void {
   const extDir = path.join(HOME, ".gemini", "extensions", "fulcrum");
   const srcDir = path.join(REPO_ROOT, "agent-integration", "gemini");
+  const manifestPath = path.join(srcDir, "gemini-extension.json");
+
+  // PR 14.5 — validate manifest before install
+  const manifestValidation = validateGeminiExtensionManifest(manifestPath);
+  if (!manifestValidation.ok) {
+    throw new Error(`gemini-extension.json schema errors:\n${manifestValidation.errors.join("\n")}`);
+  }
 
   // Flat files
   const flatFiles = [
@@ -713,6 +745,7 @@ function installGeminiExtension(): void {
       }
     }
     ok(`(dry-run) Gemini extension`);
+    console.log("    gemini extensions update fulcrum  # run after upgrading");
     return;
   }
 
@@ -733,12 +766,23 @@ function installGeminiExtension(): void {
 
   ok(`installed extension → ${extDir} (flat files + ${dirCount} dir(s): ${subDirs.filter(d => fs.existsSync(path.join(srcDir, d))).join(", ")})`);
   setRollback(`rm -rf ${extDir}  # removes entire Gemini extension`);
+  // PR 14.5 — post-install guidance
+  console.log();
+  console.log("  To update the Fulcrum Gemini extension after upgrading:");
+  console.log("    gemini extensions update fulcrum");
 }
 
 // ── 7. PI: cockpit extension (pi install <cockpit>) ──────────────────────────
 
 function installPiCockpit(): void {
   const cockpitDir = path.join(REPO_ROOT, "agent-integration", "pi", "cockpit");
+
+  // PR 14.4 — probe npm for the published package (operators can use npm install once live).
+  const npmVersion = probePiCockpitOnNpm(2_000);
+  if (npmVersion) {
+    console.log(`  npm: @fulcrum-agent-os/pi-cockpit@${npmVersion} is available`);
+    console.log(`       Install via: npm install -g @fulcrum-agent-os/pi-cockpit && pi install @fulcrum-agent-os/pi-cockpit`);
+  }
 
   if (!commandExists("pi")) {
     warn("`pi` CLI not found — skipping cockpit install");
@@ -1873,6 +1917,20 @@ export const OPENCODE_PLUGIN_PKG = "@fulcrum-agent-os/opencode-plugin";
  */
 export function probeOpencodePluginOnNpm(timeoutMs = 2_000): string | null {
   const r = spawnSync("npm", ["view", OPENCODE_PLUGIN_PKG, "version"], {
+    stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
+    timeout: timeoutMs,
+  });
+  if (r.status !== 0) return null;
+  const v = (r.stdout ?? "").trim();
+  return v ? v : null;
+}
+
+// PR 14.4 — Probe npm for the PI cockpit package. Same pattern as probeOpencodePluginOnNpm.
+export const PI_COCKPIT_PKG = "@fulcrum-agent-os/pi-cockpit";
+
+export function probePiCockpitOnNpm(timeoutMs = 2_000): string | null {
+  const r = spawnSync("npm", ["view", PI_COCKPIT_PKG, "version"], {
     stdio: ["ignore", "pipe", "pipe"],
     encoding: "utf8",
     timeout: timeoutMs,
