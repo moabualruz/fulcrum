@@ -3725,29 +3725,94 @@ async function runInit(): Promise<void> {
 }
 
 async function runInstall(): Promise<void> {
-  if (command !== 'plan') {
-    console.error('Usage: fulcrum install plan [--json]')
-    process.exit(1)
-  }
+  if (command === 'plan') {
+    const plan = summarizeAdaptiveInstallPlan({ cwd: process.cwd(), home: process.env['HOME'] })
+    if (args.includes('--json')) {
+      console.log(JSON.stringify(plan, null, 2))
+      return
+    }
 
-  const plan = summarizeAdaptiveInstallPlan({ cwd: process.cwd(), home: process.env['HOME'] })
-  if (args.includes('--json')) {
-    console.log(JSON.stringify(plan, null, 2))
+    console.log('Adaptive plugin/extension install plan')
+    console.log(`recommended path: ${plan.recommendedPath}`)
+    for (const runtime of plan.runtimes) {
+      console.log(`\n${runtime.detected ? '✓' : '○'} ${runtime.displayName}`)
+      console.log(`  install path: ${runtime.installPath}`)
+      console.log(`  supports: ${runtime.supports.join(', ')}`)
+      console.log(`  applyable here: ${runtime.applyable ? 'yes' : 'no'}`)
+      console.log(`  rationale: ${runtime.rationale}`)
+      if (runtime.detected) {
+        for (const step of runtime.nextSteps) console.log(`  next: ${step}`)
+      }
+    }
     return
   }
 
-  console.log('Adaptive plugin/extension install plan')
-  console.log(`recommended path: ${plan.recommendedPath}`)
-  for (const runtime of plan.runtimes) {
-    console.log(`\n${runtime.detected ? '✓' : '○'} ${runtime.displayName}`)
-    console.log(`  install path: ${runtime.installPath}`)
-    console.log(`  supports: ${runtime.supports.join(', ')}`)
-    console.log(`  applyable here: ${runtime.applyable ? 'yes' : 'no'}`)
-    console.log(`  rationale: ${runtime.rationale}`)
-    if (runtime.detected) {
-      for (const step of runtime.nextSteps) console.log(`  next: ${step}`)
+  if (command === 'apply') {
+    const agentIdx = args.indexOf('--agent')
+    const agentName = agentIdx >= 0 ? args[agentIdx + 1] : undefined
+    if (!agentName) {
+      console.error('Usage: fulcrum install apply --agent <name> [--dry-run]')
+      console.error('  agents: cursor, windsurf, codex, opencode, copilot')
+      process.exit(1)
     }
+    const dryRun = args.includes('--dry-run')
+    const targetDir = process.cwd()
+    const {
+      installCursor, installWindsurf, installCodex, installOpencode, installCopilot,
+    } = await import('../../../agent-integration/install.js')
+    switch (agentName) {
+      case 'cursor':    await installCursor({ dryRun, targetDir }); break
+      case 'windsurf':  await installWindsurf({ dryRun, targetDir }); break
+      case 'codex':     await installCodex({ dryRun, targetDir }); break
+      case 'opencode':  await installOpencode({ dryRun, targetDir }); break
+      case 'copilot':   await installCopilot({ dryRun, targetDir }); break
+      case 'claude':
+      case 'gemini':
+      case 'pi':
+        console.log(`${agentName}: global-only installer — use \`pnpm setup:${agentName}\``)
+        break
+      default:
+        console.error(`Unknown agent: ${agentName}`)
+        console.error('  agents: cursor, windsurf, codex, opencode, copilot')
+        process.exit(1)
+    }
+    return
   }
+
+  if (command === 'verify') {
+    const agentIdx = args.indexOf('--agent')
+    const agentName = agentIdx >= 0 ? args[agentIdx + 1] : undefined
+    if (!agentName) {
+      console.error('Usage: fulcrum install verify --agent <name>')
+      console.error('  agents: cursor, windsurf, codex, opencode, copilot')
+      process.exit(1)
+    }
+    const { verifyInstall } = await import('../../../agent-integration/install.js')
+    const validAgents = ['cursor', 'windsurf', 'codex', 'opencode', 'copilot']
+    if (!validAgents.includes(agentName)) {
+      console.error(`Unknown agent: ${agentName}`)
+      console.error('  agents: cursor, windsurf, codex, opencode, copilot')
+      process.exit(1)
+    }
+    const result = verifyInstall({
+      agent: agentName as Parameters<typeof verifyInstall>[0]['agent'],
+      targetDir: process.cwd(),
+    })
+    const statusIcon = result.ok ? '✓' : '✗'
+    console.log(`${statusIcon} ${result.agent} install verification`)
+    for (const check of result.checks) {
+      console.log(`  ${check.present ? '✓' : '✗'} ${check.path}${check.note ? `  (${check.note})` : ''}`)
+    }
+    if (!result.ok) {
+      const missing = result.checks.filter(c => !c.present).length
+      console.error(`\n${missing} missing file(s) — run: fulcrum install apply --agent ${result.agent}`)
+      process.exit(1)
+    }
+    return
+  }
+
+  console.error('Usage: fulcrum install <plan|apply|verify> [options]')
+  process.exit(1)
 }
 
 // ── Main dispatch ─────────────────────────────────────────────────────────────

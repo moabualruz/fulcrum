@@ -2322,6 +2322,112 @@ export async function installCopilot(opts: { dryRun: boolean; targetDir?: string
   });
 }
 
+// ── Verify install ────────────────────────────────────────────────────────────
+
+export type AgentName = "cursor" | "windsurf" | "codex" | "opencode" | "copilot";
+
+export interface VerifyCheck {
+  path: string;
+  present: boolean;
+  note?: string;
+}
+
+export interface VerifyResult {
+  agent: AgentName;
+  ok: boolean;
+  checks: VerifyCheck[];
+}
+
+/**
+ * Check that sentinel files for a given agent are present in targetDir.
+ * For Codex (which installs globally), pass homeDir to point at the right
+ * ~/.codex location (defaults to HOME env var).
+ */
+export function verifyInstall(opts: {
+  agent: AgentName;
+  targetDir?: string;
+  homeDir?: string;
+}): VerifyResult {
+  const targetDir = opts.targetDir ?? process.cwd();
+  const homeDir = opts.homeDir ?? (process.env["HOME"] ?? process.env["USERPROFILE"] ?? "");
+
+  function checkFile(relPath: string): VerifyCheck {
+    return { path: relPath, present: fs.existsSync(path.join(targetDir, relPath)) };
+  }
+
+  function checkGlob(dirAbs: string, pattern: RegExp, label: string): VerifyCheck {
+    const present = fs.existsSync(dirAbs) && fs.readdirSync(dirAbs).some(f => pattern.test(f));
+    return { path: label, present };
+  }
+
+  let checks: VerifyCheck[];
+
+  switch (opts.agent) {
+    case "cursor":
+      checks = [
+        checkFile(".cursor/mcp.json"),
+        checkFile(".cursor/rules/fulcrum-core.mdc"),
+        checkFile(".cursor/hooks.json"),
+        checkGlob(path.join(targetDir, ".cursor", "rules"), /^fulcrum-skill-.*\.mdc$/, ".cursor/rules/fulcrum-skill-*.mdc"),
+        checkGlob(path.join(targetDir, ".cursor", "skills"), /^fulcrum-/, ".cursor/skills/fulcrum-*/"),
+        checkGlob(path.join(targetDir, ".cursor", "commands"), /\.md$/, ".cursor/commands/*.md"),
+      ];
+      break;
+
+    case "windsurf":
+      checks = [
+        checkFile(".windsurf/mcp.json"),
+        checkFile(".windsurf/rules/fulcrum-core.md"),
+        checkFile(".windsurf/hooks.json"),
+        checkGlob(path.join(targetDir, ".windsurf", "rules"), /^fulcrum-skill-.*\.md$/, ".windsurf/rules/fulcrum-skill-*.md"),
+        checkGlob(path.join(targetDir, ".windsurf", "workflows"), /^fulcrum-.*\.md$/, ".windsurf/workflows/fulcrum-*.md"),
+      ];
+      break;
+
+    case "codex": {
+      const codexDir = path.join(homeDir, ".codex");
+      const configToml = path.join(codexDir, "config.toml");
+      checks = [
+        {
+          path: "~/.codex/config.toml ([mcp_servers.fulcrum])",
+          present: fs.existsSync(configToml) &&
+            fs.readFileSync(configToml, "utf8").includes("[mcp_servers.fulcrum]"),
+        },
+        checkGlob(path.join(codexDir, "skills"), /^fulcrum-/, "~/.codex/skills/fulcrum-*/"),
+        checkGlob(path.join(codexDir, "rules"), /\.md$/, "~/.codex/rules/*.md"),
+        checkFile("AGENTS.md"),
+      ];
+      break;
+    }
+
+    case "opencode":
+      checks = [
+        checkFile(".opencode/opencode.jsonc"),
+        checkFile(".opencode/opencode.md"),
+        checkGlob(path.join(targetDir, ".opencode", "command"), /\.md$/, ".opencode/command/*.md"),
+      ];
+      break;
+
+    case "copilot":
+      checks = [
+        checkFile(".mcp.json"),
+        checkFile(".github/copilot-instructions.md"),
+        checkFile(".github/hooks/fulcrum.json"),
+        checkFile("AGENTS.md"),
+        checkGlob(path.join(targetDir, ".github", "instructions"), /fulcrum-skill-.*\.instructions\.md$/, ".github/instructions/fulcrum-skill-*.instructions.md"),
+        checkGlob(path.join(targetDir, ".github", "agents"), /\.agent\.md$/, ".github/agents/*.agent.md"),
+      ];
+      break;
+
+    default: {
+      const _exhaustive: never = opts.agent;
+      throw new Error(`verifyInstall: unknown agent "${String(_exhaustive)}"`);
+    }
+  }
+
+  return { agent: opts.agent, ok: checks.every(c => c.present), checks };
+}
+
 // ── Entry guard ───────────────────────────────────────────────────────────────
 // Run main() only when executed as a script, not when imported as a module
 // (e.g. from `fulcrum init` which imports installCursor / installWindsurf).
