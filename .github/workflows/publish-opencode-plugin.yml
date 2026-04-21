@@ -1,9 +1,9 @@
-name: Publish @fulcrum-agent-os/pi-cockpit
+name: Publish @fulcrum-agent-os/opencode-plugin
 
 on:
   push:
     tags:
-      - 'pi-cockpit/v*'
+      - 'opencode-plugin/v*'
 
 jobs:
   publish:
@@ -22,7 +22,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - name: Post-pack tarball secret scan (PR 14.9 — Constraint #20)
-        working-directory: agent-integration/pi/cockpit
+        working-directory: agent-integration/opencode
         run: |
           mkdir -p /tmp/tarball-scan
           pnpm pack --pack-destination /tmp/tarball-scan
@@ -35,6 +35,6 @@ jobs:
           rm -rf /tmp/tarball-scan
       - name: Publish with provenance
         run: pnpm publish --provenance --no-git-checks
-        working-directory: agent-integration/pi/cockpit
+        working-directory: agent-integration/opencode
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

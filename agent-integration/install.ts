@@ -2455,6 +2455,16 @@ export async function installCopilot(opts: { dryRun: boolean; targetDir?: string
 
 export type AgentName = "cursor" | "windsurf" | "codex" | "opencode" | "copilot";
 
+// PR 14.8 — install mode reported by verifyInstall()
+export type InstallMode =
+  | "native"       // installed via agent-native plugin command (e.g. claude plugin install)
+  | "marketplace"  // registered in marketplace only; no CLI install (Codex)
+  | "npm"          // installed via npm package
+  | "local"        // installed from local repo path
+  | "manual"       // direct file-copy; no plugin standard (Cursor, Windsurf, Copilot)
+  | "auto"         // auto-resolved at install time (opencode auto mode)
+  | "unknown";     // cannot determine from installed state
+
 export interface VerifyCheck {
   path: string;
   present: boolean;
@@ -2465,12 +2475,45 @@ export interface VerifyResult {
   agent: AgentName;
   ok: boolean;
   checks: VerifyCheck[];
+  installMode: InstallMode;     // PR 14.8 — how the agent was installed
+  pluginVersion: string | null; // PR 14.8 — installed plugin version (null if not determinable)
+  canonicalVersion: string | null; // PR 14.8 — source version in this repo
+}
+
+// PR 14.8 helpers — read a version string from a JSON file's "version" field
+function readJsonVersion(jsonPath: string): string | null {
+  try {
+    const raw = fs.readFileSync(jsonPath, "utf8");
+    const obj = JSON.parse(raw) as Record<string, unknown>;
+    return typeof obj["version"] === "string" ? obj["version"] : null;
+  } catch {
+    return null;
+  }
+}
+
+// PR 14.8 — detect opencode install mode from the installed opencode.jsonc
+function detectOpencodeInstallMode(opencodejsoncPath: string): InstallMode {
+  if (!fs.existsSync(opencodejsoncPath)) return "unknown";
+  try {
+    const text = fs.readFileSync(opencodejsoncPath, "utf8");
+    // The "plugin" line contains either the npm package name or a local path
+    const match = /"plugin"\s*:\s*\[([^\]]*)\]/.exec(text);
+    if (!match) return "unknown";
+    const pluginRef = match[1].replace(/"/g, "").trim();
+    if (pluginRef.startsWith("@") || pluginRef.startsWith("http")) return "npm";
+    if (pluginRef.startsWith(".") || pluginRef.startsWith("/")) return "local";
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
 }
 
 /**
  * Check that sentinel files for a given agent are present in targetDir.
  * For Codex (which installs globally), pass homeDir to point at the right
  * ~/.codex location (defaults to HOME env var).
+ *
+ * PR 14.8: also reports installMode and pluginVersion / canonicalVersion.
  */
 export function verifyInstall(opts: {
   agent: AgentName;
@@ -2479,6 +2522,10 @@ export function verifyInstall(opts: {
 }): VerifyResult {
   const targetDir = opts.targetDir ?? process.cwd();
   const homeDir = opts.homeDir ?? (process.env["HOME"] ?? process.env["USERPROFILE"] ?? "");
+
+  // Canonical source versions (PR 14.8)
+  const OPENCODE_SRC_PKG = path.join(REPO_ROOT, "agent-integration", "opencode", "package.json");
+  const CODEX_SRC_PLUGIN = path.join(REPO_ROOT, "agent-integration", "codex", "plugin", ".codex-plugin", "plugin.json");
 
   function checkFile(relPath: string): VerifyCheck {
     return { path: relPath, present: fs.existsSync(path.join(targetDir, relPath)) };
@@ -2490,6 +2537,9 @@ export function verifyInstall(opts: {
   }
 
   let checks: VerifyCheck[];
+  let installMode: InstallMode;
+  let pluginVersion: string | null = null;
+  let canonicalVersion: string | null = null;
 
   switch (opts.agent) {
     case "cursor":
@@ -2501,6 +2551,7 @@ export function verifyInstall(opts: {
         checkGlob(path.join(targetDir, ".cursor", "skills"), /^fulcrum-/, ".cursor/skills/fulcrum-*/"),
         checkGlob(path.join(targetDir, ".cursor", "commands"), /\.md$/, ".cursor/commands/*.md"),
       ];
+      installMode = "manual";
       break;
 
     case "windsurf":
@@ -2511,6 +2562,7 @@ export function verifyInstall(opts: {
         checkGlob(path.join(targetDir, ".windsurf", "rules"), /^fulcrum-skill-.*\.md$/, ".windsurf/rules/fulcrum-skill-*.md"),
         checkGlob(path.join(targetDir, ".windsurf", "workflows"), /^fulcrum-.*\.md$/, ".windsurf/workflows/fulcrum-*.md"),
       ];
+      installMode = "manual";
       break;
 
     case "codex": {
@@ -2526,16 +2578,24 @@ export function verifyInstall(opts: {
         checkGlob(path.join(codexDir, "rules"), /\.md$/, "~/.codex/rules/*.md"),
         checkFile("AGENTS.md"),
       ];
+      installMode = "marketplace";
+      canonicalVersion = readJsonVersion(CODEX_SRC_PLUGIN);
       break;
     }
 
-    case "opencode":
+    case "opencode": {
+      const opencodeJsonc = path.join(targetDir, ".opencode", "opencode.jsonc");
       checks = [
         checkFile(".opencode/opencode.jsonc"),
         checkFile(".opencode/opencode.md"),
         checkGlob(path.join(targetDir, ".opencode", "command"), /\.md$/, ".opencode/command/*.md"),
       ];
+      installMode = detectOpencodeInstallMode(opencodeJsonc);
+      canonicalVersion = readJsonVersion(OPENCODE_SRC_PKG);
+      // pluginVersion: for local mode use canonical; for npm mode would need probe (keep null for now)
+      if (installMode === "local") pluginVersion = canonicalVersion;
       break;
+    }
 
     case "copilot":
       checks = [
@@ -2546,6 +2606,7 @@ export function verifyInstall(opts: {
         checkGlob(path.join(targetDir, ".github", "instructions"), /fulcrum-skill-.*\.instructions\.md$/, ".github/instructions/fulcrum-skill-*.instructions.md"),
         checkGlob(path.join(targetDir, ".github", "agents"), /\.agent\.md$/, ".github/agents/*.agent.md"),
       ];
+      installMode = "manual";
       break;
 
     default: {
@@ -2554,7 +2615,7 @@ export function verifyInstall(opts: {
     }
   }
 
-  return { agent: opts.agent, ok: checks.every(c => c.present), checks };
+  return { agent: opts.agent, ok: checks.every(c => c.present), checks, installMode, pluginVersion, canonicalVersion };
 }
 
 // ── Entry guard ───────────────────────────────────────────────────────────────

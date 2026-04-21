@@ -3800,6 +3800,13 @@ async function runInstall(): Promise<void> {
     })
     const statusIcon = result.ok ? '✓' : '✗'
     console.log(`${statusIcon} ${result.agent} install verification`)
+    // PR 14.8 — report install mode + version
+    console.log(`  mode: ${result.installMode}`)
+    if (result.pluginVersion || result.canonicalVersion) {
+      const installed = result.pluginVersion ?? '(not determined)'
+      const canonical = result.canonicalVersion ?? '(none)'
+      console.log(`  version: installed=${installed}  canonical=${canonical}`)
+    }
     for (const check of result.checks) {
       console.log(`  ${check.present ? '✓' : '✗'} ${check.path}${check.note ? `  (${check.note})` : ''}`)
     }
