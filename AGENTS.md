@@ -77,7 +77,7 @@ opaque `[auto] ... run` tasks. End every run with exactly one
 - `wip_limit: 0` means fully blocked, not unlimited.
 - Tests use real in-memory SQLite via `setDb` / `_configureDb` / `runMigrations`; do not mock DB.
 - Vitest pool stays `forks`; `better-sqlite3` is not thread-safe.
-- `@fulcrum/worker` owns subprocess spawning and adapter contracts. Other packages should not grow executor-specific behavior.
+- `@fulcrum/worker` owns agent-runtime spawning and adapter contracts. Other packages may spawn only for package-owned OS integrations (for example git worktrees, install probes, desktop openers, or index helpers) and must not grow executor-specific behavior.
 - Do not touch the `FULCRUM managed-block` at the bottom by hand.
 
 **Current docs/workflow map:**
@@ -285,13 +285,13 @@ Never change this to `threads`.
 
 **Current:** memory v3 is the only memory path (PR 9.5 retired the
 `FULCRUM_MEMORY_V3` opt-out flag). See
-[`docs/architecture/memory-v3.md`](architecture/memory-v3.md) for the operator
+[`docs/architecture/memory-v3.md`](docs/architecture/memory-v3.md) for the operator
 reference — layer glossary, curator pipeline, feature flags, `/memory/stats`
 schema, and end-to-end walkthrough.
 
 The v2a invariants below (L0 canonical commit point, `MemoryKind` catalog, vault
-watcher echo suppression) still apply to the v2a code paths that remain in the
-tree during the PR 9 deprecation window. New code targets v3 primitives directly
+watcher echo suppression) still apply to compatibility surfaces that remain in
+the tree. New code targets v3 primitives directly
 (`ingestRawSource`, `createCuratedPage`, `runCurator`, `applyDecay`).
 
 See [README.md#memory-system-three-layers](README.md#memory-system-three-layers) for the
@@ -337,13 +337,15 @@ deliberately suppressed.
 
 ---
 
-## Memory Tiers (v3 draft)
+## Memory Tiers (v3 shipped)
 
-> **Draft status.** The v3 schema + types have landed
-> (`packages/memory/src/schema.ts`, `packages/memory/src/l0/types.ts`) but no
-> runtime path invokes them yet. Keep writing memories via the v2a surface
-> (`writeMemory`, `ingestFile`, hooks) until PR 1 lights up L0 writes. Full
-> spec: [`docs/plans/2026-04-18-002-memory-tiered-architecture-plan.md`](docs/plans/2026-04-18-002-memory-tiered-architecture-plan.md).
+> **Shipped status.** Memory v3 is live and `FULCRUM_MEMORY_V3` was retired in
+> PR 9.5. Use v3 primitives (`ingestRawSource`, `createCuratedPage`,
+> `runCurator`, `applyDecay`) for new memory code. The original implementation
+> plan remains at
+> [`docs/plans/2026-04-18-002-memory-tiered-architecture-plan.md`](docs/plans/2026-04-18-002-memory-tiered-architecture-plan.md);
+> the current operator reference is
+> [`docs/architecture/memory-v3.md`](docs/architecture/memory-v3.md).
 
 Memory v3 splits the single `memories` + `vault/memories/curated/` surface
 into three tiers:
@@ -385,12 +387,13 @@ Number block `101..104` is reserved for the v3 chain.
 
 **System invariants live in `packages/policy/src/engine.ts` as `SYSTEM_INVARIANTS`.**
 They have priority 1000 and cannot be overridden by any custom rule. Never remove or
-weaken them. The set currently has **four** rules:
+weaken them. The set currently has **five** rules:
 
 1. `only_l1_invokes_teams` — only `chief_of_staff` may invoke a team
 2. `only_integration_worker_merges` — only `integration_worker` may merge a worktree
 3. `no_task_bypass` — every run must be tied to a real task
-4. `chief_of_staff_no_direct_writes` — CoS cannot Write/Edit/MultiEdit/NotebookEdit or run `git *` via `shell_exec`
+4. `capability_required_for_action` — action-specific capabilities in `AgentDefinition` are required for gated actions
+5. `chief_of_staff_no_direct_writes` — CoS cannot Write/Edit/MultiEdit/NotebookEdit or run `git *` via `shell_exec`
 
 **`evaluatePolicy()` never throws for a denial** — it returns `{ allowed: false, reason }`.
 It throws only for invalid configuration or unknown actor/resource types.
@@ -415,9 +418,9 @@ See [CONTRIBUTING.md#native-module-dependencies](CONTRIBUTING.md#native-module-d
 
 ## Testing Rules
 
-**Every code path must have a test.** The suite is currently at **~980 tests** across
-all packages and uses in-memory SQLite (see patterns above). New code lands with new
-tests — no exceptions.
+**Every code path must have a test.** The suite is large and moves quickly across
+all packages; run `pnpm test` for the current count. Tests use in-memory SQLite
+(see patterns above). New code lands with new tests — no exceptions.
 
 **Test file location:** `packages/<pkg>/src/tests/` — mirror the source file name:
 `vault/watcher.ts` → `tests/vault-watcher.test.ts`
@@ -470,8 +473,8 @@ definitions across implementation files.
 
 ## What NOT to Add
 
-- **No network calls in core / memory / policy / planning** — those packages are local-first by design
-- **No `process.spawn` / `child_process` outside `@fulcrum/worker`** — subprocess spawning is confined to the worker package and its adapters; nothing else in the monorepo may spawn a child process
+- **No implicit network calls in core / memory / policy / planning** — local-first remains the default. Remote embedding providers, webhook notification, and L1 curator backends are allowed only behind explicit config/env and must fail closed without credentials.
+- **No agent-runtime subprocess spawning outside `@fulcrum/worker`** — adapter/executor process management stays in worker. Package-owned OS integrations may use `child_process` only for their local concern (for example git worktrees, installer probes, desktop openers, or index helpers).
 - **No hardcoded workspace or project IDs** — always pass via input or config
 - **No synchronous LLM calls on the write path** — embedding and extraction are async
 - **No LLM API clients or CLI wire formats in `@fulcrum/worker` itself** — those belong in userland adapters registered via `registerAgentAdapter`
@@ -519,7 +522,7 @@ Treat them as such.
 
 ## Tool Registry — Unified Handler Pattern
 
-All 23 MCP tool implementations live in `packages/cli/src/tool-registry.ts` as a `Map<string, RegistryEntry>`. Every entry has:
+All MCP tool implementations live in `packages/cli/src/tool-registry.ts` as a `Map<string, RegistryEntry>`. Every entry has:
 
 ```typescript
 interface RegistryEntry {
@@ -537,7 +540,7 @@ interface RegistryEntry {
 - Set `minRole: 'chief_of_staff'` for tools that only L1 roles may call. Currently: `invoke_team`.
 - `schema: undefined` marks internal tools visible to the MCP resource handler but not served in the tool list (currently: `get_task`).
 
-**Capability lint:** `packages/cli/src/tests/tool-registry.test.ts` asserts that all 23 public entries have complete capabilities, `readOnly` matches `readOnlyHint`, `hookEquivalent` is set on exactly 3 tools, and `minRole` is set on exactly `invoke_team`.
+**Capability lint:** `packages/cli/src/tests/tool-registry.test.ts` asserts that all public entries have complete capabilities, `readOnly` matches `readOnlyHint`, `hookEquivalent` is set on exactly 3 tools, and `minRole` is set on exactly `invoke_team`.
 
 **CLI access:** Every tool is also callable without a live MCP server:
 ```bash
@@ -574,3 +577,72 @@ The lint test is `packages/cli/src/tests/mcp-tools-lint.test.ts`. Run `pnpm test
 | Gap analysis history (5 rounds) | [docs/gap-analysis/](docs/gap-analysis/) — raw findings and validated gap lists that drove rounds 1–5 |
 | User-facing guides | [docs/guides/](docs/guides/) — workflow authoring, worker adapters, telemetry, CLI reference |
 
+<!-- BEGIN FULCRUM managed-block v1 -->
+## Fulcrum canonical rules (auto-generated)
+
+---
+name: fulcrum-first
+description: Prefer Fulcrum recall + code-search before filesystem grep. Nudge, not gate.
+---
+
+# Fulcrum-first
+
+Before `Grep`/`Glob`/`Read`, try Fulcrum. Fulcrum holds prior decisions, task outcomes, code relations. Filesystem does not.
+
+Questions "where is X", "why X done", "does X exist" — call in order:
+
+1. `fulcrum action exec recall_knowledge` — NL query over L1 curated memory (L0 provenance).
+2. `fulcrum action exec search_code` — symbol + structural search.
+
+Fall to `Grep`/`Glob`/`Read` only if both empty. Filesystem tools stay available. Bias = default ordering, not block.
+
+Opt out: `FULCRUM_NO_RECALL_NUDGE=1`.
+
+---
+
+---
+name: lifecycle
+description: Register every session as Fulcrum agent run. Start, heartbeat, complete or block.
+---
+
+# Lifecycle
+
+Session start, before first task:
+
+1. `fulcrum action exec get_current_context` — returns `workspace_id`, `project_id`.
+2. `fulcrum action exec get_workspace_status` — running work, blockers, queue.
+3. `fulcrum action exec start_agent_run` — pass `agent_role`, `context_type`, and task. Save `run_id`.
+
+Long ops (>5 min):
+
+4. `fulcrum action exec heartbeat_agent_run` every 3–5 min. No heartbeat 10 min = stale.
+
+Task end, exactly one:
+
+5. `fulcrum action exec complete_agent_run` — summary + artifact paths.
+6. `fulcrum action exec block_agent_run` — reason if stuck on human/external.
+
+Silent end without complete/block = run stays `running`; janitor marks stale.
+
+---
+
+---
+name: role-boundaries
+description: CoS orchestrates only, never writes code. Specialists implement. Only CoS invokes teams.
+---
+
+# Role boundaries
+
+`chief_of_staff` (L1, orchestration only):
+
+- No code writes, file edits, builds, test mods.
+- Creates tasks, delegates to specialists, synthesizes results.
+- Only role that may `invoke_team` or spawn sub-orchestration.
+
+L2 specialists:
+
+- No `invoke_team`. No sub-orchestration.
+- Focus on assigned task. Report via `complete_agent_run` with summary + artifacts.
+
+Specialist sees orchestration need → do not spawn team. `block_agent_run` with reason (request CoS coordination), or surface to user.
+<!-- END FULCRUM managed-block v1 -->

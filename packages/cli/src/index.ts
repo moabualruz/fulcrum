@@ -34,7 +34,12 @@ CONTROL PLANE
   hook auto            Auto-detect runtime hook (stdin → policy check)
   hook claude          PreToolUse hook for Claude Code (stdin → policy check)
   hook gemini          BeforeTool hook for Gemini CLI
+  hook codex           Codex lifecycle and permission hooks
   hook pi              BeforeTool hook for PI coding agent
+  hook opencode        opencode tool hooks
+  hook cursor          Cursor tool hooks
+  hook windsurf        Windsurf tool hooks
+  hook copilot         GitHub Copilot CLI tool hooks
 
 DOMAIN
   workspaces list
@@ -101,6 +106,7 @@ INSTALL
   init --adaptive                     Alias for install plan
   init --cursor | --windsurf          Write project-local rule/config scaffolding
   init --codex | --opencode           Write project-local config scaffolding
+  install apply --agent <name>        Apply project/global agent integration
 
 SKILLS
   skills install                      Install bundled skills to ~/.claude/skills/ (Claude Code auto-loads)
@@ -108,7 +114,7 @@ SKILLS
   skills list                         List available skills
 
 TOOL REGISTRY
-  tool list                           List all 23 MCP tools with names and descriptions
+  tool list                           List all MCP tools with names and descriptions
   tool list --json                    Same, as JSON array
   tool exec <name>                    Execute a tool using cwd workspace context
   tool exec <name> --json <payload>   Execute with JSON payload string
@@ -159,7 +165,7 @@ AUTO-INITIALIZATION
 GLOBAL INSTALL
   From the repo root: pnpm install && pnpm run setup
   Installs: ~/.local/bin/fulcrum symlink, Claude user-scope MCP server,
-  Gemini extension, PI cockpit, and PreToolUse hooks.
+  Gemini extension, PI cockpit, Codex/opencode config, and hooks.
 
 DOCS
   README.md               Full user guide
@@ -1282,6 +1288,59 @@ async function runStubHook(cli: string, phase: string): Promise<void> {
   }
 }
 
+function hookEventNameToPhase(eventName: string | undefined): string | undefined {
+  switch (eventName) {
+    case 'PreToolUse':
+    case 'preToolUse':
+    case 'pre_tool_use':
+      return 'pre'
+    case 'PostToolUse':
+    case 'postToolUse':
+    case 'post_tool_use':
+      return 'post'
+    case 'SessionStart':
+    case 'sessionStart':
+    case 'session_start':
+      return 'session-start'
+    case 'SessionEnd':
+    case 'sessionEnd':
+    case 'session_end':
+      return 'session-end'
+    case 'SubagentStart':
+    case 'subagentStart':
+    case 'subagent_start':
+      return 'subagent-start'
+    case 'SubagentStop':
+    case 'subagentStop':
+    case 'subagent_stop':
+      return 'subagent-stop'
+    case 'AfterFileEdit':
+    case 'afterFileEdit':
+    case 'after_file_edit':
+      return 'post'
+    case 'pre_write_code':
+    case 'pre_run_command':
+    case 'pre_read_code':
+    case 'pre_mcp_tool_use':
+    case 'pre_user_prompt':
+      return 'pre'
+    case 'post_write_code':
+    case 'post_run_command':
+    case 'post_read_code':
+    case 'post_mcp_tool_use':
+    case 'post_cascade_response':
+      return 'post'
+    default:
+      return undefined
+  }
+}
+
+function hookPhaseArg(args: string[]): string | undefined {
+  const raw = args[2] as string | undefined
+  if (raw !== '--event') return raw
+  return hookEventNameToPhase(args[3] as string | undefined) ?? raw
+}
+
 /** Sanitize an arbitrary string for use as a filesystem path component. */
 function sanitizeId(id: string): string {
   return id.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 128)
@@ -1943,11 +2002,19 @@ fulcrum hook — tool-call policy hooks and session lifecycle for coding agents
   fulcrum hook codex  user-prompt-submit   Codex CLI UserPromptSubmit hook (injects canonical rider)
   fulcrum hook codex  permission-request   Codex CLI PermissionRequest hook (all-tool policy interceptor)
   fulcrum hook pi     [pre|post]           PI coding agent BeforeTool / AfterTool hook
+  fulcrum hook opencode [pre|post]         opencode tool hooks
+  fulcrum hook cursor [pre|post]           Cursor tool hooks
+  fulcrum hook windsurf [pre|post]         Windsurf tool hooks
+  fulcrum hook copilot [pre|post]          GitHub Copilot CLI tool hooks
+  fulcrum hook copilot --event <name>      Copilot hook config form
 
 Phase defaults to 'pre' when omitted (legacy). The pre hook normalises
 the event, scans for secrets, enforces the team-invoke policy, and
 recalls relevant task memories (surfaced via stderr). The post hook
 writes a tool_trace operational memory for the call.
+
+Hook config event names PreToolUse, PostToolUse, SessionStart, and
+SessionEnd are accepted through --event and mapped to the phase names above.
 
 Use 'auto' as a single hook entry point for any supported runtime —
 the event shape is inspected at runtime to determine the correct handler.
@@ -2770,9 +2837,10 @@ fulcrum task — task CRUD
 
   if (sub === 'get') {
     const task_id = requireArg('--id')
+    const workspace_id = optArg('--workspace-id') ?? currentProjectIds().workspace_id
     const { getDb } = await import('fulcrum-agent-core')
     const db = getDb()
-    const row = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(task_id) as Record<string, unknown> | undefined
+    const row = db.prepare('SELECT * FROM tasks WHERE task_id = ? AND workspace_id = ?').get(task_id, workspace_id) as Record<string, unknown> | undefined
     if (!row) { console.error(`task not found: ${task_id}`); process.exit(1) }
     outputObject(row)
     return
@@ -4061,10 +4129,10 @@ OPTIONS (serve mcp-http)
       await runHook(cli ?? '--help')
       return
     }
-    if (cli === 'claude' || cli === 'gemini' || cli === 'codex' || cli === 'pi' || cli === 'opencode' || cli === 'cursor' || cli === 'windsurf' || cli === 'auto') {
+    if (cli === 'claude' || cli === 'gemini' || cli === 'codex' || cli === 'pi' || cli === 'opencode' || cli === 'cursor' || cli === 'windsurf' || cli === 'copilot' || cli === 'auto') {
       // Optional second-level arg: lifecycle phase or tool phase
       // Default 'pre' for backward compatibility with existing settings.json entries.
-      const phaseArg = args[2] as string | undefined
+      const phaseArg = hookPhaseArg(args)
 
       // Claude lifecycle hooks
       if (cli === 'claude') {
@@ -4115,13 +4183,15 @@ OPTIONS (serve mcp-http)
         if (phaseArg === 'pre-compact')   { await runStubHook(cli, phaseArg);    return }
       }
 
-      // Cursor / Windsurf lifecycle hooks. They only route through `hook auto`
-      // today but we accept the lifecycle phases so future configs don't error.
-      if (cli === 'cursor' || cli === 'windsurf') {
+      // Cursor / Windsurf / Copilot lifecycle hooks. They only route through
+      // config files today but we accept lifecycle phases so installs don't error.
+      if (cli === 'cursor' || cli === 'windsurf' || cli === 'copilot') {
         if (
           phaseArg === 'session-start' ||
           phaseArg === 'session-end' ||
-          phaseArg === 'pre-compact'
+          ((cli === 'cursor' || cli === 'windsurf') && phaseArg === 'subagent-start') ||
+          ((cli === 'cursor' || cli === 'windsurf') && phaseArg === 'subagent-stop') ||
+          (cli !== 'copilot' && phaseArg === 'pre-compact')
         ) {
           await runStubHook(cli, phaseArg)
           return
@@ -4131,14 +4201,14 @@ OPTIONS (serve mcp-http)
       const phase: HookPhase = phaseArg === 'post' ? 'post' : 'pre'
       if (phaseArg && phaseArg !== 'pre' && phaseArg !== 'post') {
         console.error(`Unknown hook phase: ${phaseArg}`)
-        console.error('Usage: fulcrum hook auto|claude|gemini|codex|pi [pre|post|session-start|session-stop|session-end|pre-compact|before-agent|subagent-start|subagent-stop|before-model|after-model|pre-compress|after-agent|notify]')
+        console.error('Usage: fulcrum hook auto|claude|gemini|codex|pi|opencode|cursor|windsurf|copilot [pre|post|session-start|session-stop|session-end|pre-compact|before-agent|subagent-start|subagent-stop|before-model|after-model|pre-compress|after-agent|notify]')
         process.exit(1)
       }
       await runHook(cli, phase)
       return
     }
     console.error(`Unknown hook: ${cli}`)
-    console.error('Usage: fulcrum hook auto|claude|gemini|codex|pi [pre|post]')
+    console.error('Usage: fulcrum hook auto|claude|gemini|codex|pi|opencode|cursor|windsurf|copilot [pre|post]')
     process.exit(1)
   }
 

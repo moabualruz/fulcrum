@@ -47,10 +47,10 @@ export async function runProjectContext(
   // ── Tasks ────────────────────────────────────────────────────────────────
   try {
     const taskQuery = input.task_id
-      ? `SELECT task_id, title, status, priority FROM tasks WHERE task_id = ? LIMIT ?`
+      ? `SELECT task_id, title, status, priority FROM tasks WHERE task_id = ? AND workspace_id = ?${proj ? ' AND project_id = ?' : ''} LIMIT ?`
       : `SELECT task_id, title, status, priority FROM tasks WHERE workspace_id = ?${proj ? ' AND project_id = ?' : ''} LIMIT ?`
     const taskParams = input.task_id
-      ? [input.task_id, limit]
+      ? (proj ? [input.task_id, ws, proj, limit] : [input.task_id, ws, limit])
       : (proj ? [ws, proj, limit] : [ws, limit])
     const tasks = db.prepare(taskQuery).all(...taskParams)
     if (tasks.length > 0) result['tasks'] = tasks

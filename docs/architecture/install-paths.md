@@ -14,7 +14,7 @@
 | **Gemini CLI** | ✅ Gemini Extension | `gemini extensions install` (auto-loads `gemini-extension.json`) | Copy to `~/.gemini/extensions/fulcrum/` | `~/.gemini/extensions/fulcrum/gemini-extension.json` |
 | **PI** | ✅ PI Package | `pi install @fulcrum-agent-os/pi-cockpit` (npm) or `pi install <local-path>` | Manual copy | `pi list` shows `fulcrum`; local path install |
 | **Codex** | ⚠️ Marketplace-register only | `codex marketplace add moabualruz/fulcrum` → activate via `/plugins` TUI | Manual `~/.codex/config.toml` + skills + rules | `~/.codex/config.toml` has `[mcp_servers.fulcrum]`; `~/.codex/skills/fulcrum-*/` present |
-| **opencode** | ✅ opencode Plugin (npm) | `opencode extensions add @fulcrum-agent-os/opencode-plugin` | Local plugin path via `mode: local` | `.opencode/opencode.jsonc` + `.opencode/opencode.md` present |
+| **opencode** | ✅ opencode Plugin (npm) | `opencode extensions add @fulcrum-agent-os/opencode-plugin` | Local plugin path via `mode: manual` | `.opencode/opencode.jsonc` + `.opencode/opencode.md` present |
 | **Cursor** | ❌ Rules + files only | N/A — no marketplace | Copy `.cursor/rules/`, `.cursor/skills/`, MCP, hooks, commands | `.cursor/rules/fulcrum-core.mdc`, `.cursor/mcp.json`, `.cursor/hooks.json` |
 | **Windsurf** | ❌ Rules + files only | N/A — no marketplace | Copy `.windsurf/rules/`, workflows, hooks, MCP | `.windsurf/rules/fulcrum-core.md`, `.windsurf/mcp.json`, `.windsurf/hooks.json` |
 | **Copilot** | ❌ Rules + files only | N/A — no marketplace | Copy `.github/` instructions, agents, hooks; `.mcp.json` | `.github/copilot-instructions.md`, `.mcp.json`, `.github/hooks/fulcrum.json` |
@@ -99,10 +99,10 @@ gemini extensions update fulcrum
 
 **Plugin standard:** opencode Plugin (npm package).
 
-**Install mode** (`mode: auto|npm|local`):
-- `auto` (default): probe npm; fall through to local on miss.
-- `npm`: require `@fulcrum-agent-os/opencode-plugin` on npm; fail if unavailable.
-- `local`: use `agent-integration/opencode/` directly.
+**Install mode** (`mode: auto|native|manual`):
+- `auto` (default): probe npm; fall through to manual local path on miss.
+- `native`: require `@fulcrum-agent-os/opencode-plugin` on npm; fail if unavailable.
+- `manual`: use `agent-integration/opencode/` directly.
 
 **Published package:** `@fulcrum-agent-os/opencode-plugin` (npm).
 

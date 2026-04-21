@@ -22,14 +22,36 @@ import {
 } from '../../../../agent-integration/install.js'
 
 let tmpDir: string
+const originalPath = process.env.PATH
+const originalOpencodeInstallMode = process.env.FULCRUM_OPENCODE_INSTALL_MODE
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fulcrum-init-test-'))
 })
 
 afterEach(() => {
+  if (originalPath === undefined) delete process.env.PATH
+  else process.env.PATH = originalPath
+  if (originalOpencodeInstallMode === undefined) delete process.env.FULCRUM_OPENCODE_INSTALL_MODE
+  else process.env.FULCRUM_OPENCODE_INSTALL_MODE = originalOpencodeInstallMode
   fs.rmSync(tmpDir, { recursive: true, force: true })
 })
+
+function putFakeNpmOnPath(status: number, stdout = ''): void {
+  const binDir = path.join(tmpDir, 'bin')
+  fs.mkdirSync(binDir, { recursive: true })
+  const script = [
+    '#!/bin/sh',
+    stdout ? `printf '%s\\n' ${JSON.stringify(stdout)}` : ':',
+    `exit ${status}`,
+    '',
+  ].join('\n')
+  const npmPath = path.join(binDir, 'npm')
+  fs.writeFileSync(npmPath, script, 'utf8')
+  fs.chmodSync(npmPath, 0o755)
+  process.env.PATH = `${binDir}${path.delimiter}${originalPath ?? ''}`
+  delete process.env.FULCRUM_OPENCODE_INSTALL_MODE
+}
 
 // ── Cursor happy path ─────────────────────────────────────────────────────────
 
@@ -302,7 +324,7 @@ describe('installCodex()', () => {
 
 describe('installOpencode()', () => {
   it('creates .opencode/opencode.jsonc with correct MCP config', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
 
     const configPath = path.join(tmpDir, '.opencode', 'opencode.jsonc')
     expect(fs.existsSync(configPath)).toBe(true)
@@ -314,7 +336,7 @@ describe('installOpencode()', () => {
   })
 
   it('creates .opencode/opencode.md context doc', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
 
     const docPath = path.join(tmpDir, '.opencode', 'opencode.md')
     expect(fs.existsSync(docPath)).toBe(true)
@@ -325,7 +347,7 @@ describe('installOpencode()', () => {
   })
 
   it('creates .opencode/command/ slash commands', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
 
     const cmdDir = path.join(tmpDir, '.opencode', 'command')
     expect(fs.existsSync(cmdDir)).toBe(true)
@@ -335,19 +357,19 @@ describe('installOpencode()', () => {
   })
 
   it('skips files that already exist (idempotent)', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
 
     const configPath = path.join(tmpDir, '.opencode', 'opencode.jsonc')
     fs.writeFileSync(configPath, '{"sentinel": true}', 'utf8')
 
-    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
 
     expect(fs.readFileSync(configPath, 'utf8')).toBe('{"sentinel": true}')
   })
 
   it('dry-run: prints actions but writes no files', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-    await installOpencode({ dryRun: true, targetDir: tmpDir })
+    await installOpencode({ dryRun: true, targetDir: tmpDir, mode: 'manual' })
 
     expect(fs.existsSync(path.join(tmpDir, '.opencode', 'opencode.jsonc'))).toBe(false)
     expect(fs.existsSync(path.join(tmpDir, '.opencode', 'opencode.md'))).toBe(false)
@@ -358,7 +380,7 @@ describe('installOpencode()', () => {
   })
 
   it('fans out canonical skills to .opencode/agents/fulcrum-skill-<name>.md', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
     const agentsDir = path.join(tmpDir, '.opencode', 'agents')
     expect(fs.existsSync(agentsDir)).toBe(true)
     const files = fs.readdirSync(agentsDir).filter(f => f.startsWith('fulcrum-skill-') && f.endsWith('.md'))
@@ -371,7 +393,7 @@ describe('installOpencode()', () => {
   })
 
   it('copies canonical rules verbatim to .opencode/rules/', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
     const rulesDir = path.join(tmpDir, '.opencode', 'rules')
     expect(fs.existsSync(rulesDir)).toBe(true)
     const files = fs.readdirSync(rulesDir).filter(f => f.endsWith('.md'))
@@ -381,7 +403,7 @@ describe('installOpencode()', () => {
   })
 
   it('writes .opencode/.ridersum matching the SHA-256 of sorted rule bodies', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
     const ridersumPath = path.join(tmpDir, '.opencode', '.ridersum')
     expect(fs.existsSync(ridersumPath)).toBe(true)
     const content = fs.readFileSync(ridersumPath, 'utf8').trim()
@@ -401,7 +423,7 @@ describe('installOpencode()', () => {
 
   it('dry-run: skills/rules/.ridersum steps write nothing', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-    await installOpencode({ dryRun: true, targetDir: tmpDir })
+    await installOpencode({ dryRun: true, targetDir: tmpDir, mode: 'manual' })
     logSpy.mockRestore()
     expect(fs.existsSync(path.join(tmpDir, '.opencode', 'agents'))).toBe(false)
     expect(fs.existsSync(path.join(tmpDir, '.opencode', 'rules'))).toBe(false)
@@ -409,7 +431,7 @@ describe('installOpencode()', () => {
   })
 
   it('writes 24 role MDs to .opencode/agents/<role>.md with opencode-flavored frontmatter', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir })
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
     const agentsDir = path.join(tmpDir, '.opencode', 'agents')
     expect(fs.existsSync(agentsDir)).toBe(true)
 
@@ -435,19 +457,17 @@ describe('installOpencode()', () => {
   })
 
   // ── PR 4 c6 — dual-mode plugin resolution ──────────────────────────────────
-  it('mode=local writes opencode.jsonc with "plugin": ["./plugins/fulcrum.ts"]', async () => {
-    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'local' })
+  it('mode=manual writes opencode.jsonc with "plugin": ["./plugins/fulcrum.ts"]', async () => {
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'manual' })
     const config = fs.readFileSync(path.join(tmpDir, '.opencode', 'opencode.jsonc'), 'utf8')
     expect(config).toMatch(/"plugin"\s*:\s*\["\.\/plugins\/fulcrum\.ts"\]/)
-    // Local mode also copies fulcrum.ts + rider.ts into .opencode/plugins/.
+    // Manual mode also copies fulcrum.ts + rider.ts into .opencode/plugins/.
     expect(fs.existsSync(path.join(tmpDir, '.opencode', 'plugins', 'fulcrum.ts'))).toBe(true)
     expect(fs.existsSync(path.join(tmpDir, '.opencode', 'plugins', 'rider.ts'))).toBe(true)
   })
 
   it('mode=native throws OpencodePluginUnresolvedError when npm probe cannot resolve the package', async () => {
-    // The scoped package does not exist on npm (PR 14.3 blocked on npm-org
-    // registration — v3.3 approval checklist). mode=native MUST fail loudly; no
-    // silent fallback to manual.
+    putFakeNpmOnPath(1)
     await expect(installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'native' }))
       .rejects.toMatchObject({
         name: 'OpencodePluginUnresolvedError',
@@ -455,9 +475,16 @@ describe('installOpencode()', () => {
       })
   })
 
-  it('mode=auto (default) falls through to local when npm probe misses', async () => {
-    // Same conditions as above — the npm probe will miss — but mode=auto
-    // allows local fallback when the template file is present on disk.
+  it('mode=native writes the npm package ref when npm probe resolves', async () => {
+    putFakeNpmOnPath(0, '1.2.3')
+    await installOpencode({ dryRun: false, targetDir: tmpDir, mode: 'native' })
+    const config = fs.readFileSync(path.join(tmpDir, '.opencode', 'opencode.jsonc'), 'utf8')
+    expect(config).toMatch(new RegExp(`"plugin"\\s*:\\s*\\[${JSON.stringify(OPENCODE_PLUGIN_PKG)}\\]`))
+    expect(fs.existsSync(path.join(tmpDir, '.opencode', 'plugins', 'fulcrum.ts'))).toBe(false)
+  })
+
+  it('mode=auto (default) falls through to manual when npm probe misses', async () => {
+    putFakeNpmOnPath(1)
     await installOpencode({ dryRun: false, targetDir: tmpDir /* default mode */ })
     const config = fs.readFileSync(path.join(tmpDir, '.opencode', 'opencode.jsonc'), 'utf8')
     expect(config).toMatch(/"plugin"\s*:\s*\["\.\/plugins\/fulcrum\.ts"\]/)

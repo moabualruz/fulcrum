@@ -73,9 +73,14 @@ function hydrateTask(db: ReturnType<typeof getDb>, row: Record<string, unknown>)
   const task_id = row.task_id as string
   const labelRows = db.prepare('SELECT label FROM task_labels WHERE task_id = ? ORDER BY label').all(task_id) as { label: string }[]
   const labels = labelRows.map(r => r.label)
-  const blockerRows = db.prepare(
-    "SELECT task_id FROM task_relations WHERE target_task_id = ? AND relation_type = 'blocks'"
-  ).all(task_id) as { task_id: string }[]
+  const blockerRows = db.prepare(`
+    SELECT r.task_id
+      FROM task_relations r
+      INNER JOIN tasks source ON source.task_id = r.task_id
+     WHERE r.target_task_id = ?
+       AND r.relation_type = 'blocks'
+       AND source.workspace_id = ?
+  `).all(task_id, row.workspace_id as string) as { task_id: string }[]
   const blockers = blockerRows.map(r => r.task_id)
   return { ...rowToTaskBase(row), labels, blockers }
 }
@@ -145,7 +150,7 @@ export async function createTask(input: CreateTaskInput, db: Db = getDb()): Prom
     payload: { display_id, title: input.title, status: initialStatus },
   })
 
-  const row = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(task_id) as Record<string, unknown> | undefined
+  const row = db.prepare('SELECT * FROM tasks WHERE task_id = ? AND workspace_id = ?').get(task_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!row) throw new FulcrumError(`Task ${task_id} not found after insert`, 'not_found')
   return hydrateTask(db, row)
 }

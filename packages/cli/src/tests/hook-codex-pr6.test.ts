@@ -17,6 +17,7 @@ const originalFulcrumDir = process.env.FULCRUM_DATA_DIR
 const originalWorkspaceId = process.env.FULCRUM_WORKSPACE_ID
 const originalProjectId = process.env.FULCRUM_PROJECT_ID
 const originalRulesDir = process.env.FULCRUM_RULES_DIR
+const originalHome = process.env.HOME
 
 function setupTmpDb(): void {
   closeDb()
@@ -49,6 +50,7 @@ function tearDownTmpDb(): void {
     ['FULCRUM_WORKSPACE_ID', originalWorkspaceId],
     ['FULCRUM_PROJECT_ID', originalProjectId],
     ['FULCRUM_RULES_DIR', originalRulesDir],
+    ['HOME', originalHome],
   ] as const) {
     if (v === undefined) delete process.env[k]
     else process.env[k] = v
@@ -128,19 +130,22 @@ describe('PR 6.1 runCodexUserPromptSubmitHook', () => {
     expect(row?.cli_name).toBe('codex')
   })
 
-  it('falls back cleanly when FULCRUM_RULES_DIR points to a missing dir (no rider, empty response)', async () => {
+  it('falls back to installed rules when FULCRUM_RULES_DIR points to a missing dir', async () => {
     process.env.FULCRUM_RULES_DIR = join(tmpDir!, 'does-not-exist')
+    process.env.HOME = tmpDir!
+    const installedRulesDir = join(tmpDir!, '.codex', 'rules')
+    mkdirSync(installedRulesDir, { recursive: true })
+    writeFileSync(join(installedRulesDir, 'installed.md'), '# Installed Rider\n\nLoaded from ~/.codex/rules.', 'utf8')
     const { runCodexUserPromptSubmitHook } = await import('../index.js')
     const out = await runHookWithStdin(runCodexUserPromptSubmitHook, JSON.stringify({
       session_id: 'codex-sess-nodir',
       prompt: 'p',
     }))
     expect(out.exit).toBe(0)
-    // Either no stdout (rider empty → skip response) or response with empty additional_context.
-    if (out.stdout) {
-      const resp = JSON.parse(out.stdout) as { hook_specific_output?: { additional_context?: string } }
-      expect(resp.hook_specific_output?.additional_context ?? '').toBe('')
-    }
+    const resp = JSON.parse(out.stdout) as { hook_specific_output?: { additional_context?: string } }
+    const ctx = resp.hook_specific_output?.additional_context ?? ''
+    expect(ctx).toContain('Installed Rider')
+    expect(ctx).toContain('Loaded from ~/.codex/rules')
   })
 
   it('handles empty stdin without crashing', async () => {

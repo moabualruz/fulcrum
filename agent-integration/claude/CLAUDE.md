@@ -628,12 +628,13 @@ Use the `mcp__fulcrum__*` tools directly only when the runtime requires MCP-nati
 
 ---
 
-## Memory Tiers (v3 draft)
+## Memory Tiers (v3 shipped)
 
-> **Not live yet.** Schema + types have landed but no runtime path invokes them.
-> Keep writing via the v2a surface (`writeMemory`, `ingestFile`, `mcp__fulcrum__write_memory`)
-> until PR 1 flips L0 writes. Full spec:
-> [`docs/plans/2026-04-18-002-memory-tiered-architecture-plan.md`](../../docs/plans/2026-04-18-002-memory-tiered-architecture-plan.md).
+> **Live.** Memory v3 is the current memory path. `FULCRUM_MEMORY_V3` was
+> retired in PR 9.5; do not branch behavior on it. New code should use
+> `ingestRawSource`, `createCuratedPage`, `runCurator`, and `applyDecay`.
+> Operator reference:
+> [`docs/architecture/memory-v3.md`](../../docs/architecture/memory-v3.md).
 
 Three tiers:
 
@@ -641,9 +642,9 @@ Three tiers:
 - **L1 — curated wiki** (`${vault}/curated/…`): LLM-maintained markdown with `confidence`, `retention_tier`, `sources[]` back-refs to L0, `supersedes[]` lineage. Physical storage is still the `memories` table; the `l1_pages` view projects `schema_version >= 3` rows under v3 column names.
 - **L2 — vectors on L1**: embeddings over curated bodies, not raw dumps.
 
-**Feature flag:** `FULCRUM_MEMORY_V3` (default off through PR 4). Do not branch behavior on it yet.
+**Feature flag:** `FULCRUM_MEMORY_V3` was retired in PR 9.5. v3 is now the only memory path — no flag, no fallback.
 
-**If a user asks you to ingest raw dumps into L0:** the API (`ingestRawSource`) lands in PR 1. Until then, treat raw ingest requests as "captured for later curation" — save via the v2a path with `source: 'manual'` so PR 6 can classify and migrate it.
+**If a user asks you to ingest raw dumps into L0:** use the live v3 raw-source path (`ingestRawSource`) or an existing CLI/MCP surface backed by it. Curate captured L0 sources with `fulcrum memory curate <l0_id>` when curation is requested.
 
 ---
 

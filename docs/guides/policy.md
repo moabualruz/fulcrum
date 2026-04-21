@@ -6,7 +6,7 @@
 
 ## System Invariants (cannot be overridden)
 
-Priority 1000, evaluated before any DB-defined rules. All five check capabilities via `roleCapabilities()`, not hardcoded string comparisons — the `role-string-guard` test enforces this.
+Priority 1000, evaluated before any DB-defined rules. Role-boundary checks use capability helpers instead of hardcoded string comparisons — the `role-string-guard` test enforces this.
 
 | Rule | Description |
 |------|-------------|
@@ -77,9 +77,9 @@ Detects 12 named pattern classes with range-based deduplication (more-specific p
 
 ## Hook System
 
-Each of `fulcrum hook claude|gemini|pi` reads a tool-call event from stdin, normalizes it to a canonical shape (tool name + params + actor role), logs it as a `hook_executed` event, and enforces `chief_of_staff_no_direct_writes`.
+`fulcrum hook auto|claude|gemini|codex|pi|opencode|cursor|windsurf|copilot` reads a tool-call event from stdin, normalizes it to a canonical shape (tool name + params + actor role), logs it as a `hook_executed` event, and enforces `chief_of_staff_no_direct_writes`.
 
-Installing Fulcrum via `pnpm run setup` wires it into `~/.claude/settings.json` as a `PreToolUse` hook and into `~/.gemini/extensions/fulcrum/` as a Gemini extension.
+Install commands wire supported agents into their native hook/config paths; see `docs/architecture/install-paths.md` for the per-agent matrix.
 
 ```bash
 # What the hook does — called by the agent runtime

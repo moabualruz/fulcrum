@@ -7,7 +7,7 @@ Fulcrum is the persistence, coordination, and execution layer that keeps agents 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20+%20FTS5-003B57?logo=sqlite)](https://sqlite.org/)
-[![Tests](https://img.shields.io/badge/tests-1471%20passing-brightgreen)](#running-tests)
+[![Tests](https://img.shields.io/badge/tests-pnpm%20test-blue)](#running-tests)
 [![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm)](https://pnpm.io/)
 
 ---
@@ -16,7 +16,7 @@ Fulcrum is the persistence, coordination, and execution layer that keeps agents 
 
 Multi-agent systems fail in predictable ways: agents go rogue, pile up stale work, duplicate effort, merge broken branches, and lose context across sessions. Fulcrum solves this at the persistence and execution layer, before any of that reaches your agent code.
 
-- **Local-first** — SQLite on disk, zero network dependencies, zero cold starts
+- **Local-first** — SQLite on disk, no network dependency in the core loop, zero cold starts
 - **Pluggable agent executor** — built-in stub, subprocess, and claude-code adapters; `registerAgentAdapter()` for any CLI or SDK
 - **Workflow runner** — declarative step graphs with retries, exponential backoff, per-step timeouts, and 29 step handlers
 - **Real git merge queue** — `allocateWorktree` runs `git worktree add`, `processMergeQueue` runs `git merge --no-ff`, detects conflicts, aborts cleanly
@@ -36,7 +36,7 @@ Multi-agent systems fail in predictable ways: agents go rogue, pile up stale wor
 pnpm install && pnpm run setup
 ```
 
-`pnpm run setup` symlinks `fulcrum` to `~/.local/bin`, registers the Claude MCP server, merges the `PreToolUse` hook, installs the Gemini extension, and runs `pi install`.
+`pnpm run setup` symlinks `fulcrum` to `~/.local/bin`, registers Claude/Gemini/PI integrations, and installs Codex/opencode config, hooks, skills, and rules.
 
 The zero-friction install path (no clone required):
 
@@ -85,13 +85,13 @@ fulcrum doctor --fix             # health check + auto-repair
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
-│                      @moabualruz/fulcrum-worker                             │
+│                         fulcrum-worker                           │
 │   spawnAgent → policy gate → adapter.spawn → run lifecycle       │
 │   Built-in: stub · subprocess    Pluggable: registerAgentAdapter │
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
-│                       @moabualruz/fulcrum-core                              │
+│                       fulcrum-agent-core                         │
 │   tasks · runs · policy · memory · handoffs · events · CoS       │
 │   roles · capabilities · telemetry spans · advisory locks        │
 │                  SQLite (WAL + FTS5)                             │
@@ -118,18 +118,19 @@ fulcrum doctor --fix             # health check + auto-repair
 
 | Package | Description |
 |---------|-------------|
-| [`@moabualruz/fulcrum-core`](packages/core) | Domain functions, SQLite schema (52 migrations), role capability helpers, telemetry spans + OTel exporter, embedding providers, handoff protocol, event stream |
-| [`@moabualruz/fulcrum-memory`](packages/memory) | Three-layer memory stack — L0 git vault, L1 FTS5 + scoring, L2 Kuzu graph + HNSW vector search |
-| [`@moabualruz/fulcrum-monitor`](packages/monitor) | Real-time metrics dashboard — daily/project/agent metrics, burndown, SSE event stream, HTTP control API, built-in web dashboard, bearer-token-gated write endpoints |
-| [`@moabualruz/fulcrum-planning`](packages/planning) | Project planning domain — epics, issues, PRDs, plans, dependency graph, code review workflows |
-| [`@moabualruz/fulcrum-policy`](packages/policy) | Policy engine — 5 system invariants, custom rules, secret guard (12 named patterns, range-based dedup, auto-redact), audit log |
-| [`@moabualruz/fulcrum-sync`](packages/sync) | Bidirectional sync — Plane integration with retry/backoff, conflict detection, secret scan before push, priority queue |
-| [`@moabualruz/fulcrum-teams`](packages/teams) | Agent team orchestration — typed templates, slot policies, communication/budget/quality/latency classes |
-| [`@moabualruz/fulcrum-worker`](packages/worker) | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess + claude-code adapters, `spawnAgent` lifecycle with policy gate and span instrumentation |
-| [`@moabualruz/fulcrum-workflows`](packages/workflows) | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers, run state machine |
-| [`@moabualruz/fulcrum-worktrees`](packages/worktrees) | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, integration merge queue with `git merge --no-ff` and conflict handling |
-| [`@moabualruz/fulcrum-cli`](packages/cli) | `fulcrum` binary — 21 command groups, 23 MCP tools, auto-init per project, hook handlers for Claude/Gemini/PI, cockpit TUI, activity log |
-| [`fulcrum-mcp`](packages/fulcrum-mcp) | Zero-install MCP entry point — `npx fulcrum-mcp` starts the MCP server; `npx fulcrum-mcp init` auto-detects and configures all installed agent runtimes |
+| [`fulcrum-agent-core`](packages/core) | Domain functions, SQLite schema (52 migrations), role capability helpers, telemetry spans + OTel exporter, embedding providers, handoff protocol, event stream |
+| [`fulcrum-memory`](packages/memory) | Three-layer memory stack — L0 git vault, L1 FTS5 + scoring, L2 Kuzu graph + HNSW vector search |
+| [`fulcrum-monitor`](packages/monitor) | Real-time metrics dashboard — daily/project/agent metrics, burndown, SSE event stream, HTTP control API, built-in web dashboard, bearer-token-gated write endpoints |
+| [`fulcrum-planning`](packages/planning) | Project planning domain — epics, issues, PRDs, plans, dependency graph, code review workflows |
+| [`fulcrum-policy`](packages/policy) | Policy engine — 5 system invariants, custom rules, secret guard (12 named patterns, range-based dedup, auto-redact), audit log |
+| [`fulcrum-sync`](packages/sync) | Bidirectional sync — Plane integration with retry/backoff, conflict detection, secret scan before push, priority queue |
+| [`fulcrum-teams`](packages/teams) | Agent team orchestration — typed templates, slot policies, communication/budget/quality/latency classes |
+| [`fulcrum-worker`](packages/worker) | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess + claude-code adapters, `spawnAgent` lifecycle with policy gate and span instrumentation |
+| [`fulcrum-workflows`](packages/workflows) | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers, run state machine |
+| [`fulcrum-worktrees`](packages/worktrees) | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, integration merge queue with `git merge --no-ff` and conflict handling |
+| [`fulcrum-agent-fanout`](packages/agent-fanout) | Canonical skill and rule fanout — emits per-agent artifacts for Claude, Codex, Gemini, opencode, PI, Copilot, Cursor, and Windsurf |
+| [`fulcrum-agent-cli`](packages/cli) | `fulcrum` binary — 21 command groups, 32 MCP tools, auto-init per project, hook handlers for agent runtimes, cockpit TUI, activity log |
+| [`fulcrum-mcp`](packages/fulcrum-mcp) | Zero-install MCP entry point — `npx fulcrum-mcp` starts the MCP server; `npx fulcrum-mcp init` configures Claude Code, Gemini CLI, Cursor, and Windsurf MCP setup |
 
 ---
 
@@ -142,7 +143,7 @@ fulcrum doctor --fix             # health check + auto-repair
 | [CLI Reference](docs/guides/cli-reference.md) | Full command tree with all flags and examples |
 | [Core API](docs/guides/core-api.md) | Tasks, runs, policy, roles, memory, handoffs, events, locks, DB, janitor, embedding |
 | [Memory System](docs/guides/memory.md) | L0 vault structure, L1 FTS5/RRF scoring, L2 Kuzu graph + HNSW pipeline |
-| [MCP Tools](docs/guides/mcp-tools.md) | All 23 MCP tools with parameters and agent lifecycle |
+| [MCP Tools](docs/guides/mcp-tools.md) | All 32 MCP tools with parameters and agent lifecycle |
 | [Policy Engine](docs/guides/policy.md) | System invariants, custom rules, secret guard patterns, hook system, doctor |
 | [Monitor Server](docs/guides/monitor.md) | All HTTP endpoints, pagination, control API, A2A agent card |
 | [Agent Roles & Teams](docs/guides/agent-roles.md) | 24 roles, capability helpers, agent definitions, A2A cards, team templates |
@@ -165,7 +166,7 @@ pnpm test:watch                    # watch mode
 FULCRUM_EMBEDDING_TESTS=1 pnpm test  # embedding integration tests
 ```
 
-**1471 tests passing across 13 packages** (6 skipped — integration tests requiring live servers).
+Test counts move quickly across the workspace. Run `pnpm test` for the current full-suite count.
 
 ---
 
@@ -173,7 +174,7 @@ FULCRUM_EMBEDDING_TESTS=1 pnpm test  # embedding integration tests
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions welcome.
 
-> **Note for native module contributors:** `@moabualruz/fulcrum-memory` depends on `kuzu` (Rust native addon). pnpm 10 requires `onlyBuiltDependencies=kuzu` in `.npmrc` to allow the native build.
+> **Note for native module contributors:** `fulcrum-memory` depends on `kuzu` (Rust native addon). pnpm 10 requires `onlyBuiltDependencies=kuzu` in `.npmrc` to allow the native build.
 
 ## Security
 

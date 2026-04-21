@@ -9,7 +9,7 @@ Session start, before first task:
 
 1. `fulcrum action exec get_current_context` — returns `workspace_id`, `project_id`.
 2. `fulcrum action exec get_workspace_status` — running work, blockers, queue.
-3. `fulcrum action exec start_agent_run` — pass role + task. Save `run_id`.
+3. `fulcrum action exec start_agent_run` — pass `agent_role`, `context_type`, and task. Save `run_id`.
 
 Long ops (>5 min):
 

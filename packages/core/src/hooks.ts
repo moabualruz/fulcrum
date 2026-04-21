@@ -4,7 +4,7 @@
 // because they depend on fulcrum-policy and fulcrum-memory.
 
 /** Supported CLI runtimes that can invoke Fulcrum hooks. */
-export type HookCli = 'claude' | 'gemini' | 'pi' | 'codex' | 'opencode' | 'cursor' | 'windsurf'
+export type HookCli = 'claude' | 'gemini' | 'pi' | 'codex' | 'opencode' | 'cursor' | 'windsurf' | 'copilot'
 
 /** Canonical internal shape of a tool-call event after normalization. */
 export interface NormalizedHookEvent {

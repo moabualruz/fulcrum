@@ -29,7 +29,7 @@ fulcrum init --adaptive
 | git | 2.40+ | Repo clone and `fulcrum-worktrees` worktree management |
 | sqlite3 CLI | any | Optional — only needed to poke at `.fulcrum/fulcrum.db` by hand |
 
-Optional agent-runtime integrations (the installer silently skips anything that isn't on `PATH`):
+Optional agent-runtime integrations:
 
 - **Claude Code CLI** (`claude`) — for the user-scope MCP server and PreToolUse hook
 - **Gemini CLI** (`gemini`) — for the Gemini extension + BeforeTool hook
@@ -38,8 +38,9 @@ Optional agent-runtime integrations (the installer silently skips anything that 
 - **Windsurf** — MCP via `.windsurf/mcp.json` + always-applied rules via `.windsurf/rules/fulcrum.mdc`
 - **Codex** — `.codex/config.json` + repo-level `AGENTS.md`
 - **opencode** — `.opencode/config.json` + `.opencode/opencode.md`
+- **GitHub Copilot CLI** (`copilot`) — `.mcp.json`, Copilot instructions, agents, hooks, and repo-level `AGENTS.md`
 
-Fulcrum itself never talks to the network. It runs the embedding model locally through `onnxruntime-node`, ships its own SQLite build, and optionally links against `kuzu` for the L2 graph layer.
+Fulcrum's core control-plane path is local-first. It runs the embedding model locally through `onnxruntime-node`, ships its own SQLite build, and optionally links against `kuzu` for the L2 graph layer. Installer and sync surfaces may call external CLIs or services when the selected integration requires it.
 
 ---
 
@@ -69,6 +70,8 @@ pnpm run setup
 5. **CLAUDE.md** — writes a Fulcrum section into `~/.claude/CLAUDE.md` between `<!-- fulcrum:begin -->` and `<!-- fulcrum:end -->` markers. Idempotent: re-running rewrites only the fenced region and leaves any surrounding user content intact.
 6. **Gemini extension** — creates `~/.gemini/extensions/fulcrum/` with `extension.json`, `fulcrum.md` (the context file), and a `settings.json` that wires the BeforeTool hook to `fulcrum hook gemini`.
 7. **PI cockpit** — if the `pi` CLI is present on `PATH`, runs `pi install <cockpit-dir>` to register the Fulcrum cockpit. Skipped silently otherwise.
+8. **Codex config** — writes Codex config, hooks, skills, and canonical rules under `~/.codex/`.
+9. **opencode config** — writes opencode plugin, hook, skills, and rules artifacts.
 
 The installer prints a `✓ / — / ⚠` marker on each step so you can see exactly what ran and what was skipped.
 
@@ -82,7 +85,7 @@ No clone required. If you already have one of the supported AI coding agents ins
 npx fulcrum-mcp@latest init
 ```
 
-This detects which agents are present and configures them automatically:
+This detects a smaller zero-install MCP set and configures it automatically. For Codex, opencode, PI, and Copilot, use `pnpm run setup` or `fulcrum install apply --agent <name>`.
 
 | Agent | Detection | What gets written |
 |-------|-----------|------------------|
@@ -129,6 +132,7 @@ fulcrum init --cursor   # .cursor/mcp.json + .cursor/rules/fulcrum.mdc
 fulcrum init --windsurf # .windsurf/mcp.json + .windsurf/rules/fulcrum.mdc
 fulcrum init --codex    # .codex/config.json
 fulcrum init --opencode # .opencode/config.json + .opencode/opencode.md
+fulcrum install apply --agent copilot  # .mcp.json + Copilot instructions/agents/hooks
 ```
 
 Each scoped script runs the CLI-bin step first (so `fulcrum` always ends up on `PATH`) and then only the runtime-specific integration.

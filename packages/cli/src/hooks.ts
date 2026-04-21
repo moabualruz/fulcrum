@@ -72,8 +72,7 @@ export function detectHookCli(event: Record<string, unknown>): HookCli | null {
 // ---------- Normalisation ----------
 
 /**
- * Normalize a tool-call event from any of the three supported CLI runtimes
- * (Claude Code PreToolUse, Gemini CLI BeforeTool, PI BeforeTool) into the
+ * Normalize a tool-call event from supported CLI runtimes into the
  * canonical Fulcrum internal shape. Unknown fields default to empty strings
  * / empty objects so downstream policy and logging code always has defined
  * values to work with.
@@ -104,7 +103,7 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
     sessionId = (event['sessionId'] ?? event['session_id']) as string ?? 'unknown'
     agentRole = (event['role'] as string) ?? ''
     runId = (event['runId'] ?? event['run_id']) as string ?? ''
-  } else if (cliName === 'opencode' || cliName === 'cursor' || cliName === 'windsurf') {
+  } else if (cliName === 'opencode' || cliName === 'cursor' || cliName === 'windsurf' || cliName === 'copilot') {
     // Same event shape as Claude Code (tool_name / tool_input / session_id)
     toolName = (event['tool_name'] ?? event['tool'] ?? event['toolName']) as string ?? ''
     toolInput = (event['tool_input'] ?? event['input'] ?? event['toolInput'] ?? {}) as unknown as Record<string, unknown>

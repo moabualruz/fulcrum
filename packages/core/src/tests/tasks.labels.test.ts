@@ -147,4 +147,21 @@ describe('Task blockers', () => {
     expect(targetTask.blockers).toContain(b1.task_id)
     expect(targetTask.blockers).toContain(b2.task_id)
   })
+
+  it('does not include blocker task_ids from another workspace', async () => {
+    seed()
+    const target = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Target' })
+    const db = getDb()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_2', 'other')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2', 'ws_2', 'other')").run()
+    const foreignBlocker = await createTask({ workspace_id: 'ws_2', project_id: 'proj_2', title: 'Foreign blocker' })
+
+    db.prepare(
+      "INSERT INTO task_relations (task_id, target_task_id, relation_type) VALUES (?, ?, 'blocks')"
+    ).run(foreignBlocker.task_id, target.task_id)
+
+    const tasks = await listTasks({ workspace_id: 'ws_1' })
+    const targetTask = tasks.find(t => t.task_id === target.task_id)!
+    expect(targetTask.blockers).toEqual([])
+  })
 })

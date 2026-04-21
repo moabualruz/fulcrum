@@ -4,7 +4,7 @@
  *
  * Usage:
  *   npx fulcrum-mcp                    # stdio MCP server (Claude Desktop)
- *   npx fulcrum-mcp init               # detect agents and configure all of them
+ *   npx fulcrum-mcp init               # detect MCP-compatible agents and configure them
  *   npx fulcrum-mcp init --dry-run     # show what would be configured without writing
  *   npx fulcrum-mcp --no-monitor       # suppress auto-started monitor
  *
@@ -136,7 +136,7 @@ const fulcrumContextBlock = `
 
 ## Agent Lifecycle
 1. Session start: call \`fulcrum action exec get_current_context\`
-2. Before task: call \`fulcrum action exec start_agent_run\` with your role and task_id
+2. Before task: call \`fulcrum action exec start_agent_run\` with agent_role, context_type, and task_id
 3. During long tasks: call \`fulcrum action exec heartbeat_agent_run\`
 4. When blocked: call \`fulcrum action exec block_agent_run\`
 5. On completion: call \`fulcrum action exec complete_agent_run\`

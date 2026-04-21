@@ -137,14 +137,14 @@ describe('not_found errors', () => {
     ).rejects.toMatchObject({ code: 'not_found' })
   })
 
-  it('startAgentRun throws invalid_input when workspace_id does not match the task', async () => {
+  it('startAgentRun throws not_found when workspace_id does not match the task', async () => {
     const db = getDb()
     seed()
     db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_2','other ws')").run()
     const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
     await expect(
       startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_2', role: 'software_engineer' })
-    ).rejects.toMatchObject({ code: 'invalid_input' })
+    ).rejects.toMatchObject({ code: 'not_found' })
   })
 
   it('heartbeatAgentRun throws not_found for unknown run_id', async () => {

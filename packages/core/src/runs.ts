@@ -221,15 +221,9 @@ export async function startAgentRun(input: StartAgentRunInput, db: Db = getDb())
     if (typeof memoryPkg?.opportunisticSweep === 'function') memoryPkg.opportunisticSweep(db)
   } catch { /* sweep is best-effort */ }
 
-  const taskRow = db.prepare('SELECT workspace_id, project_id FROM tasks WHERE task_id = ?')
-    .get(input.task_id) as { workspace_id: string; project_id: string } | undefined
+  const taskRow = db.prepare('SELECT workspace_id, project_id FROM tasks WHERE task_id = ? AND workspace_id = ?')
+    .get(input.task_id, input.workspace_id) as { workspace_id: string; project_id: string } | undefined
   if (!taskRow) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
-  if (taskRow.workspace_id !== input.workspace_id) {
-    throw new FulcrumError(
-      `Task ${input.task_id} belongs to workspace ${taskRow.workspace_id}, not ${input.workspace_id}`,
-      'invalid_input'
-    )
-  }
   const run_id = newId('run')
   const now = new Date().toISOString()
   const { git_branch, git_commit } = captureGitContext()
@@ -591,8 +585,8 @@ export async function escalateRun(input: EscalateRunInput, db: Db = getDb()): Pr
   const abortedRun = getRun(input.run_id, db)
   upsertAgentStateProjection(db, abortedRun)
 
-  const taskRow = db.prepare('SELECT * FROM tasks WHERE task_id = ?')
-    .get(run.task_id) as Record<string, unknown> | undefined
+  const taskRow = db.prepare('SELECT * FROM tasks WHERE task_id = ? AND workspace_id = ?')
+    .get(run.task_id, run.workspace_id) as Record<string, unknown> | undefined
   if (!taskRow) throw new FulcrumError(`Task ${run.task_id} not found during escalation`, 'not_found')
 
   // Auto-write a task_decision memory capturing the escalation. Non-blocking.

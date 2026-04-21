@@ -157,6 +157,21 @@ describe('tools/call happy path', () => {
     expect(capturedArgs['dispatch']).toBe(true)
   })
 
+  it('start_agent_run with context_type passes enum through schema validation', async () => {
+    let capturedArgs: Record<string, unknown> = {}
+    const { client } = await makeConnectedPair(async (_name, args) => {
+      capturedArgs = args
+      return { tool: _name, args, ok: true }
+    })
+    const result = await callRaw(client, 'start_agent_run', {
+      workspace_id: 'ws_test',
+      agent_role: 'software_engineer',
+      context_type: 'primary',
+    })
+    expect(result.isError).toBeFalsy()
+    expect(capturedArgs['context_type']).toBe('primary')
+  })
+
   it('start_agent_run without dispatch behaves as before (no dispatch key)', async () => {
     let capturedArgs: Record<string, unknown> = {}
     const { client } = await makeConnectedPair(async (_name, args) => {

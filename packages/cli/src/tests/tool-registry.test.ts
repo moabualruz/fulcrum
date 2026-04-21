@@ -1,6 +1,6 @@
 // packages/cli/src/tests/tool-registry.test.ts
 // Phase 2 + Phase 4: verify registry structure, capability completeness, and
-// that all 23 public tool schemas have corresponding registry entries.
+// that all public tool schemas have corresponding registry entries.
 
 import { describe, it, expect, afterEach } from 'vitest'
 import { TOOL_REGISTRY, getActionDefinition, getRegistryEntry, listActionDefinitions, setAdditionalActionDefinitions } from '../tool-registry.js'
@@ -72,8 +72,9 @@ describe('TOOL_REGISTRY', () => {
 
   it('TOOL_REGISTRY contains more entries than TOOL_SCHEMAS (includes internal tools)', () => {
     expect(TOOL_REGISTRY.size).toBeGreaterThan(TOOL_SCHEMAS.length)
-    // Specifically: 23 public tools + 7 internal (get_task, query_memory, search_code,
-    // code_context, project_context, list_activations, graph_consistency_check) = 30
+    // Specifically: public tool schemas + 7 internal (get_task, query_memory,
+    // search_code, code_context, project_context, list_activations,
+    // graph_consistency_check)
     expect(TOOL_REGISTRY.size).toBe(TOOL_SCHEMAS.length + 7)
   })
 

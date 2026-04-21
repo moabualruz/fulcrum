@@ -174,7 +174,7 @@ The monitor server (`fulcrum serve monitor`, default port 4721) exposes `GET /me
 
 Curation percentiles read `vault/curated/log.md`. Missing file ⇒ nulls. Malformed lines are skipped.
 
-**CI gate.** `.github/workflows/memory-eval.yml` runs `pnpm --filter @moabualruz/fulcrum-memory eval:fulcrum-recall` on every PR touching `packages/memory/src/{retrieval,l0,l1,l2,migration,eval}/**`, `stats.ts`, `schema.ts`, `write.ts`, `recall.ts`, or `scoring.ts`. The job must pass before merge.
+**CI gate.** `.github/workflows/memory-eval.yml` runs `pnpm --filter fulcrum-memory eval:fulcrum-recall` on every PR touching `packages/memory/src/{retrieval,l0,l1,l2,migration,eval}/**`, `stats.ts`, `schema.ts`, `write.ts`, `recall.ts`, or `scoring.ts`. The job must pass before merge.
 
 ---
 

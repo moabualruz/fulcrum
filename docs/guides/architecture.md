@@ -18,7 +18,7 @@
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
-│                       fulcrum-core                              │
+│                    fulcrum-agent-core                           │
 │   tasks · runs · policy · memory · handoffs · events · CoS       │
 │   roles · capabilities · telemetry spans · advisory locks        │
 │                  SQLite (WAL + FTS5)                             │
@@ -39,7 +39,7 @@
 └──────────┘  └──────────────┘  └───────────────┘  └────────┘
 ```
 
-**Dependency rule:** all packages depend on `fulcrum-core`; `fulcrum-policy` must NOT depend on `fulcrum-teams` (the teams package uses `setTeamOps`/`getTeamOps` inversion-of-control to avoid this cycle); `fulcrum-worker` depends on `fulcrum-core`; step handlers in `fulcrum-workflows` use lazy imports to avoid cross-package cycles. Hook types (`HookCli`, `HookContext`, etc.) live in `fulcrum-core` so non-CLI packages can reference the hook contract without pulling in the CLI.
+**Dependency rule:** all packages depend on `fulcrum-agent-core`; `fulcrum-policy` must NOT depend on `fulcrum-teams` (the teams package uses `setTeamOps`/`getTeamOps` inversion-of-control to avoid this cycle); `fulcrum-worker` depends on `fulcrum-agent-core`; step handlers in `fulcrum-workflows` use lazy imports to avoid cross-package cycles. Hook types (`HookCli`, `HookContext`, etc.) live in `fulcrum-agent-core` so non-CLI packages can reference the hook contract without pulling in the CLI.
 
 ---
 
@@ -47,7 +47,7 @@
 
 | Package | Responsibility |
 |---------|---------------|
-| `fulcrum-core` | Domain functions, SQLite schema (52 migrations), role capability helpers, telemetry spans + OTel exporter, embedding providers, handoff protocol, in-process event bus, hook types |
+| `fulcrum-agent-core` | Domain functions, SQLite schema (52 migrations), role capability helpers, telemetry spans + OTel exporter, embedding providers, handoff protocol, in-process event bus, hook types |
 | `fulcrum-memory` | Three-layer memory stack — L0 git vault, L1 FTS5 + scoring, L2 Kuzu graph + HNSW vector search |
 | `fulcrum-monitor` | Real-time metrics dashboard — daily/project/agent metrics, burndown, SSE event stream, HTTP control API |
 | `fulcrum-planning` | Project planning domain — epics, issues, PRDs, plans, dependency graph, code review workflows |
@@ -57,7 +57,7 @@
 | `fulcrum-worker` | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess + claude-code adapters, `spawnAgent` lifecycle |
 | `fulcrum-workflows` | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers |
 | `fulcrum-worktrees` | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, merge queue |
-| `fulcrum-cli` | `fulcrum` binary — 21 command groups, 23 MCP tools, auto-init per project, hook handlers |
+| `fulcrum-agent-cli` | `fulcrum` binary — 21 command groups, 32 MCP tools, auto-init per project, hook handlers |
 
 ---
 
@@ -90,12 +90,12 @@ Grep-based guard that forbids hardcoded role comparisons (e.g., `role === 'chief
 ```
 fulcrum/
 ├── packages/
-│   ├── core/               # fulcrum-core
+│   ├── core/               # fulcrum-agent-core
 │   │   └── src/
 │   │       ├── db/         # Schema migrations (52), WAL config, client
 │   │       ├── embedding/  # Local embedder, reranker, registry
 │   │       ├── telemetry/  # spans.ts, otel.ts
-│   │       ├── tests/      # Vitest suite — 534 tests, includes 3 guards
+│   │       ├── tests/      # Vitest suite, includes 3 guards
 │   │       ├── config.ts
 │   │       ├── tasks.ts
 │   │       ├── runs.ts
@@ -178,13 +178,13 @@ fulcrum/
 │   │   └── src/
 │   │       └── worktrees.ts      # allocateWorktree, processMergeQueue (real git)
 │   │
-│   └── cli/                # fulcrum-cli
+│   └── cli/                # fulcrum-agent-cli
 │       └── src/
 │           ├── index.ts          # 21 command groups, auto-init
 │           ├── hooks.ts          # normalizeHookEvent, runPreHook, runPostHook
-│           │                     # (types imported from fulcrum-core)
+│           │                     # (types imported from fulcrum-agent-core)
 │           ├── mcp-server.ts     # JSON-RPC 2.0 MCP server; HTTP StreamableHTTP transport
-│           └── mcp-tools.ts      # TOOL_SCHEMAS — single source of truth for all 23 tools
+│           └── mcp-tools.ts      # TOOL_SCHEMAS — single source of truth for all 32 tools
 │
 ├── agent-integration/      # Runtime installers
 │   ├── install.ts          # pnpm setup entry point

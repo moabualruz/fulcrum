@@ -2,7 +2,7 @@
 
 Fulcrum is CLI-first: canonical actions are the primary contract, and MCP is a compatibility transport. Use `fulcrum action exec <action>` for skills, hooks, CI, and internal automation. Use `fulcrum serve mcp` or `fulcrum serve mcp-http` when a runtime needs an MCP tool surface.
 
-The built-in MCP compatibility catalog contains 23 tools. The active exposed subset depends on planner mode, runtime capabilities, platform, and agent type. In Claude Code these appear with the `mcp__fulcrum__` prefix.
+The built-in MCP compatibility catalog contains 32 tools. The active exposed subset depends on planner mode, runtime capabilities, platform, and agent type. In Claude Code these appear with the `mcp__fulcrum__` prefix.
 
 ```bash
 fulcrum action exec list_tasks --json '{"status":"open"}'
@@ -246,6 +246,7 @@ Registers the start of an agent run. Call at the beginning of every task. Auto-c
 | `workspace_id` | string | ✓ | Workspace ID |
 | `task_id` | string | — | Task to associate — auto-creates stub task if omitted or not found |
 | `project_id` | string | — | Optional project scope (defaults to workspace_id) |
+| `context_type` | string | — | Run context: `primary`, `subagent`, `cron`, `heartbeat`, or `flush`; defaults to `subagent` |
 | `worktree_path` | string | — | Git worktree path for code-writing roles |
 | `pi_run_id` | string | — | Optional custom run ID for external tracking |
 | `model` | string | — | Model override (e.g. `"claude-sonnet-4-6"`) |
@@ -257,7 +258,8 @@ Registers the start of an agent run. Call at the beginning of every task. Auto-c
 mcp__fulcrum__start_agent_run({
   agent_role: "software_engineer",
   workspace_id: "ws_1",
-  task_id: "task_01j..."
+  task_id: "task_01j...",
+  context_type: "primary"
 })
 ```
 

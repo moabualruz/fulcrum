@@ -122,7 +122,7 @@ Both go through the usual policy gate (`canInvokeTeams`). See [worker-adapters](
 | Step type | Blocking? | Config | Output |
 |-----------|-----------|--------|--------|
 | `read_project` | no | `{}` | `{project: row}` |
-| `evaluate_policy` | no | `{rule, subject}` | `{policy: result}` — lazy-imports `checkPolicy` from `fulcrum-core` |
+| `evaluate_policy` | no | `{rule, subject}` | `{policy: result}` — lazy-imports `checkPolicy` from `fulcrum-agent-core` |
 | `gate` | no | `{open: boolean}` | Returns `completed` when `open !== false`, otherwise `skipped` |
 | `validate_schema` | no | `{schema}` | **Stubbed** — returns `{validated: true}` |
 

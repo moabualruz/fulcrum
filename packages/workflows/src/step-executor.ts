@@ -280,7 +280,7 @@ HANDLERS['wait_for_task'] = async (ctx) => {
   const expected_status = str(c['status'], 'done')
   if (!target_task_id) return { status: 'failed', error: 'wait_for_task requires task_id' }
   const db: Db = getDb()
-  const row = db.prepare(`SELECT status FROM tasks WHERE task_id = ?`).get(target_task_id) as
+  const row = db.prepare(`SELECT status FROM tasks WHERE task_id = ? AND workspace_id = ?`).get(target_task_id, ctx.workspace_id) as
     | { status: string }
     | undefined
   if (!row) return { status: 'failed', error: `task not found: ${target_task_id}` }

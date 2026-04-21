@@ -173,7 +173,7 @@ Re-registering the same name overwrites the previous entry — handy for tests, 
 
 ## Policy gate
 
-`spawnAgent` enforces `canInvokeTeams(caller_role)` **before** resolving the adapter. Only L1 roles — `chief_of_staff`, `team_lead`, `workflow_coordinator`, and any role in the `can_invoke_teams` set — may call it. Everything else gets a `FulcrumError('policy_denied')` at the top of the function:
+`spawnAgent` enforces `canInvokeTeams(caller_role)` **before** resolving the adapter. `chief_of_staff` is the only built-in L1 role today, so every other role gets a `FulcrumError('policy_denied')` at the top of the function:
 
 ```typescript
 if (!canInvokeTeams(input.caller_role)) {
@@ -198,7 +198,7 @@ Full flow of a `spawnAgent` call (`packages/worker/src/lifecycle.ts`):
 
 1. **Policy check** — `canInvokeTeams(caller_role)` or throw.
 2. **Adapter resolution** — `input.adapter ?? process.env.FULCRUM_AGENT_ADAPTER ?? 'stub'`. Throws `FulcrumError('not_found')` if the name isn't registered.
-3. **`startAgentRun({ task_id, role, workspace_id })`** — creates the `agent_runs` row and returns `{run_id, ...}`.
+3. **`startAgentRun({ task_id, workspace_id, role, context_type })`** — creates the `agent_runs` row and returns `{run_id, ...}`.
 4. **`startSpan({ name: 'agent.run', workspace_id, run_id, payload: { role, adapter, model, caller_role } })`** — opens telemetry (see below).
 5. **Build `SpawnContext`** with a `heartbeat` closure that calls `heartbeatAgentRun({ run_id, current_step, progress_pct: progress_pct ?? 0 })`.
 6. **`adapter.spawn(ctx)`** wrapped in try/catch. Any thrown error becomes `{ status: 'blocked', error: err.message }`, so runs never leak in the `running` state.

@@ -25,6 +25,7 @@ import {
   parseFrontmatter,
   listDir,
   listFilesRec,
+  runCli,
 } from './helpers.js'
 
 const K = agentDir('copilot')
@@ -125,6 +126,16 @@ describe('Copilot: hooks (.github/hooks/*.json)', () => {
     if (!existsSync(path)) return
     const raw = readText(path)
     expect(raw).toMatch(/Write|Edit|Bash/)
+  })
+
+  it('GAP(cp-M4c) emitted --event hook commands dispatch without unknown-phase errors', () => {
+    const tool = runCli(['hook', 'copilot', '--event', 'pre_tool_use', '--tool', 'Write'])
+    expect(tool.exitCode).toBe(0)
+    expect(tool.stderr).not.toMatch(/Unknown hook phase/)
+
+    const session = runCli(['hook', 'copilot', '--event', 'session_start'])
+    expect(session.exitCode).toBe(0)
+    expect(session.stderr).not.toMatch(/Unknown hook phase/)
   })
 })
 

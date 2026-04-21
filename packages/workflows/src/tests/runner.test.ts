@@ -505,6 +505,40 @@ describe('runWorkflow (H-1/H-5)', () => {
     expect(result.status).toBe('failed')
   })
 
+  it('wait_for_task does not observe tasks from another workspace', async () => {
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_other', 'other')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_other', 'ws_other', 'other')").run()
+    db.prepare(`
+      INSERT INTO tasks (
+        task_id, workspace_id, project_id, display_id, title, status,
+        status_category, priority, created_at, updated_at
+      ) VALUES (
+        'task_other_workspace', 'ws_other', 'proj_other', 'T-OTHER',
+        'foreign done task', 'completed', 'done', 'medium',
+        datetime('now'), datetime('now')
+      )
+    `).run()
+
+    const ctx: StepContext = {
+      wf_id: 'wf_fake',
+      workspace_id,
+      project_id,
+      step_id: 's_wait',
+      step: {
+        step_id: 's_wait',
+        step_type: 'wait_for_task' as WorkflowStepDef['step_type'],
+        name: 'wait',
+        config: { task_id: 'task_other_workspace', status: 'completed' },
+      },
+      outputs: {},
+      attempts: 0,
+    }
+
+    const result = await executeStep(ctx)
+    expect(result.status).toBe('failed')
+    expect(result.error).toContain('task not found')
+  })
+
   it('run_tool returns failed with actionable error', async () => {
     const ctx: StepContext = {
       wf_id: 'wf_fake', workspace_id, project_id, step_id: 's_rt',

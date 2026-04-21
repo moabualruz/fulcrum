@@ -11,7 +11,7 @@
 
 | Plan | Package |
 |---|---|
-| [Core Extension](superpowers/plans/2026-04-13-core-extension.md) | `fulcrum-core` |
+| [Core Extension](superpowers/plans/2026-04-13-core-extension.md) | `fulcrum-agent-core` |
 | [Memory Stack L0+L2](superpowers/plans/2026-04-14-memory-stack-l0-l2.md) | `fulcrum-memory` |
 | [Memory (initial)](superpowers/plans/2026-04-13-memory.md) | `fulcrum-memory` |
 | [Monitor](superpowers/plans/2026-04-13-monitor.md) | `fulcrum-monitor` |

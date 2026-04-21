@@ -322,7 +322,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Start Agent Run',
     name: 'start_agent_run',
-    description: 'Register start of agent run. Call at start of every task. Auto-creates stub task if no task_id. Inserts agent_runs row, sets task status=running. Returns run_id, status. Requires agent_role. workspace_id optional (default cwd).',
+    description: 'Register start of agent run. Call at start of every task. Auto-creates stub task if no task_id. Inserts agent_runs row, sets task status=running. Returns run_id, status. Requires agent_role. workspace_id optional (default cwd). context_type defaults to subagent.',
     annotations: { idempotentHint: false },
     longRunningHint: true,
     inputSchema: {
@@ -332,6 +332,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         agent_role: { type: 'string', description: 'One of the 24 canonical role slugs (e.g. software_engineer)' },
         workspace_id: { type: 'string', description: 'Workspace ID (optional — defaults to cwd workspace)' },
         project_id: { type: 'string', description: 'Optional project ID (defaults to workspace_id)' },
+        context_type: { type: 'string', enum: ['primary', 'subagent', 'cron', 'heartbeat', 'flush'], description: 'Run context type (defaults to subagent)' },
         worktree_path: { type: 'string', description: 'Optional git worktree path for code-writing roles' },
         pi_run_id: { type: 'string', description: 'Optional custom run ID for external tracking' },
         model: { type: 'string', description: 'Optional model override (e.g. "claude-sonnet-4-6")' },

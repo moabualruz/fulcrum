@@ -22,10 +22,10 @@ supersedes: "2026-04-15 MASTER-PLAN (sprint-scoped; archived below)"
 
 ---
 
-## Status Overview (2026-04-18)
+## Status Overview (2026-04-21)
 
 **Active tracks (ordered by projected completion — earliest first):**
-1. **Memory v3 — tiered L0/L1/L2 architecture** · PR 0 of 10 complete · ~3 weeks remaining · plan `2026-04-18-002-memory-tiered-architecture-plan.md`
+1. **Agent parity + install standardization** · PR 17 complete; 2 operator publish rows remain; plan `2026-04-19-004-agent-parity-plan.md`
 2. **Indexer daemon refactor** · PRs 1–5 shipped per git log · likely closing · plan `2026-04-18-001-refactor-indexer-daemon-plan.md`
 3. **Install TUI Dashboard** · active · progress unaudited · plan `2026-04-16-001-feat-install-tui-dashboard-plan.md`
 4. **Worktrees v2 — PM-flow + orchestration** · draft, approval pending · 14 PRs / ~9 weeks · plan `2026-04-18-003-worktrees-v2-plan.md`
@@ -39,6 +39,7 @@ supersedes: "2026-04-15 MASTER-PLAN (sprint-scoped; archived below)"
 - `2026-04-15-001-feat-fulcrum-install-to-value-plan.md`
 - `2026-04-15-002-fix-monitor-reliability-and-test-gaps-plan.md`
 - `2026-04-16-cli-first-action-platform-plan.md`
+- `2026-04-18-002-memory-tiered-architecture-plan.md`
 
 **Likely abandoned** (stub / no progress / unreferenced):
 - `2026-04-16-plugin-install-operator-surfaces-plan.md` (55 lines, never fleshed out)
@@ -59,8 +60,9 @@ Canonical source of truth for every plan doc in this repo. One row per plan. Upd
 | `2026-04-16-memory-v2b-plan.md` | **needs triage** | memory | 12 | v2a | — | see §Open Questions #1 |
 | `2026-04-16-plugin-install-operator-surfaces-plan.md` | likely abandoned | CLI plugins | 0 (stub) | — | — | see §Open Questions #3 |
 | `2026-04-18-001-refactor-indexer-daemon-plan.md` | likely done | memory/indexer | 5 shipped | — | — | see §Open Questions #2 |
-| `2026-04-18-002-memory-tiered-architecture-plan.md` | active (PR 0 done) | memory | 10 | — | — | ~3 wks |
+| `2026-04-18-002-memory-tiered-architecture-plan.md` | completed (PR 9 done) | memory | 10 | — | shipped | — |
 | `2026-04-18-003-worktrees-v2-plan.md` | draft (awaiting approval) | worktrees | 14 | memory v3 rule-engine primitives (light) | — | ~9 wks after approval |
+| `2026-04-19-004-agent-parity-plan.md` | active closeout (PR 17 done; operator publish rows open) | agent integration, CLI, fanout | 18 | cli-first-action (done) | — | see integration checklist |
 | `plan-architecture.md` | **needs triage** | cross-cutting | 9 steps | — | — | see §Open Questions #4 |
 | `plan-mcp.md` | **needs triage** | mcp | 9 steps | cli-first-action (done) | — | see §Open Questions #4 |
 | `plan-plugins.md` | **needs triage** | cli | 7 steps | cli-first-action (done), mcp | — | see §Open Questions #4 |
@@ -72,6 +74,9 @@ Canonical source of truth for every plan doc in this repo. One row per plan. Upd
 - `2026-04-16-memory-v2a-plan-review.md`, `2026-04-16-memory-v2b-plan-review.md`, `2026-04-16-memory-v2-cross-plan-review.md` — document-review outputs.
 - `2026-04-18-002-memory-tiered-architecture-progress.md` — append-only progress ledger for memory v3.
 - `2026-04-18-002-memory-tiered-architecture-prompt.md` — reusable resume prompt for memory v3.
+- `2026-04-19-004-agent-parity-progress.md` — append-only progress ledger for agent parity / install standardization.
+- `2026-04-19-004-agent-parity-prompt.md` — reusable resume prompt for agent parity.
+- `../reference/2026-04-20-integration-completeness-checklist.md` — verifier-backed checklist for agent integration remaining work.
 
 **Plan status values:**
 - `active` — PRs shipping; commits landing against this plan.
@@ -169,7 +174,7 @@ New tables introduced by active/draft plans — listed so a future plan doesn't 
 
 ### MCP Tool Namespace Registry
 
-All MCP tools live under `mcp__fulcrum__`. Total **24** tools currently shipped (see `agent-integration/claude/CLAUDE.md` — auto-generated from `packages/cli/src/mcp-tools.ts`).
+All MCP tools live under `mcp__fulcrum__`. Total **32** tools currently shipped (see `packages/cli/src/mcp-tools.ts` and generated agent artifacts).
 
 Proposed additions (unshipped):
 
@@ -316,7 +321,17 @@ Four tracks run in parallel. Each track has an explicit **entry point** (first P
 - Progress ledger: `2026-04-18-002-memory-tiered-architecture-progress.md`
 - **Entry:** PR 1 unit 1.1 — `l0/ingest.ts` + `ingestRawSource`, wiring `runMigration101/102` at DB init.
 - **Exit:** PR 9 cutover done — `FULCRUM_MEMORY_V3` flag removed, v2a column `memories.canonical_text` dropped, `docs/architecture/memory-v3.md` shipped.
-- Current blocker: **none** — PR 0 merged and pushed. Ready for PR 1 on user approval.
+- Current status: **completed** — progress ledger records PR 9 complete; `docs/architecture/memory-v3.md` is the shipped operator reference.
+
+### Track 1.5 — Agent parity + install standardization
+
+- Plan: `2026-04-19-004-agent-parity-plan.md`
+- Resume prompt: `2026-04-19-004-agent-parity-prompt.md`
+- Progress ledger: `2026-04-19-004-agent-parity-progress.md`
+- Checklist: `../reference/2026-04-20-integration-completeness-checklist.md`
+- **Entry:** PR 1 — `packages/agent-fanout` canonical source parser and emitters.
+- **Exit:** all checklist rows either `✅` with verifier evidence or explicitly reclassified by user; PR 17 uninstall complete.
+- Current status: **active closeout** — PR 17 complete; remaining open rows are operator publish actions for `@fulcrum-agent-os/opencode-plugin` and `@fulcrum-agent-os/pi-cockpit`, plus partial consolidation/bias rows.
 
 ### Track 2 — Worktrees v2
 
@@ -356,21 +371,22 @@ Points where two plans touch the same surface. When a plan is about to modify th
 3. **Event stream.** `packages/core/src/event-bus.ts` (`FulcrumEventBus`) already exists as the canonical in-process pub-sub — it emits via `emitEvent()` in `packages/core/src/events.ts:32` and has a typed `EventType` union in `packages/core/src/types.ts:77-89` covering `worktree_allocated`, `merge_queued`, `merge_started`, `merge_completed`, `review_created`, `artifact_written`, etc. **Plans MUST reuse this bus; do not fork.** Memory v3 adds `l0.ingested`, `l1.page_written`, `curator.run_completed` to the existing `EventType` union. Worktrees v2 adds `fulcrum.merge_candidate` and rule-engine triggers likewise. No new per-subsystem events module is permitted.
 4. **Rule engine (worktrees v2 PR 5) cross-subsystem triggers.** The rule engine dispatcher subscribes directly to `FulcrumEventBus`, giving it visibility into every `EventType` namespace. To prevent privilege amplification (e.g. a worktree-scoped rule firing on every `l0.ingested`), rules declare an event namespace in their trigger spec. Subscriptions to `fulcrum.l0.*` / `fulcrum.l1.*` / `fulcrum.curator.*` require `chief_of_staff` authorship (see §Open Questions #6 resolution). Worktree-local subscriptions (`fulcrum.worktree.*`, `fulcrum.task.*`) follow the rule-authorship gate in worktrees v2 §Critical Constraints.
 5. **MCP tool surface.** Both plans propose new MCP tools (memory v3: inspect_memory, trace_claim, …; worktrees v2 may expose rule/intake/validator primitives). Must stay under `mcp__fulcrum__` prefix and register in `packages/cli/src/mcp-tools.ts` — this regenerates the counter in `agent-integration/claude/CLAUDE.md`.
-6. **CLAUDE.md / AGENTS.md memory + worktrees sections.** Both plans add orientation sections to these files. Memory v3's "Memory Tiers (v3 draft)" shipped in commit `368f9eb`. Worktrees v2's equivalent will land in PR 14 cutover (plan unit 14.5).
+6. **CLAUDE.md / AGENTS.md memory + worktrees sections.** Both plans add orientation sections to these files. Memory v3 orientation must now say shipped/live and stay synchronized with `docs/architecture/memory-v3.md`. Worktrees v2's equivalent will land in PR 14 cutover (plan unit 14.5).
 
 ---
 
-## Definition of "Project Complete" (as of 2026-04-18)
+## Definition of "Project Complete" (as of 2026-04-21)
 
-The Fulcrum roadmap as currently known closes when **all seven conditions** hold:
+The Fulcrum roadmap as currently known closes when **all eight conditions** hold:
 
 1. Memory v3 plan status = `completed` (all 10 PRs shipped; `FULCRUM_MEMORY_V3` flag removed; shipped-vs-plan diff on file).
-2. Worktrees v2 plan status = `completed` (all 14 PRs shipped; legacy `processMergeQueue` removed; shipped-vs-plan diff on file).
-3. Install TUI Dashboard plan status = `completed` **or** formally descoped (with a "what shipped / what didn't" note).
-4. All domain plans (architecture, mcp, plugins, rag, skills-agents) either `completed` or retired + remaining scope re-packaged into dated feature plans (each with a shipped-vs-plan diff).
-5. Indexer daemon refactor plan archived with shipped-PR outcomes documented (shipped-vs-plan diff required).
-6. Every Open Question is either closed (linked to a commit or ADR that resolves it) or explicitly reclassified as "future scope beyond v1 roadmap" with a new plan created. Unresolved questions may NOT be moved to a separate doc to satisfy this condition — the criterion is resolution, not absence.
-7. No plan in `partial`, `superseded`, or `archived` status has undocumented schema assumptions consumed by an `active` plan. (Prevents memory v2a/v2b type silent dependencies from corrupting downstream cutovers.)
+2. Agent parity + install standardization has no open checklist rows except user-approved operator/release steps.
+3. Worktrees v2 plan status = `completed` (all 14 PRs shipped; legacy `processMergeQueue` removed; shipped-vs-plan diff on file).
+4. Install TUI Dashboard plan status = `completed` **or** formally descoped (with a "what shipped / what didn't" note).
+5. All domain plans (architecture, mcp, plugins, rag, skills-agents) either `completed` or retired + remaining scope re-packaged into dated feature plans (each with a shipped-vs-plan diff).
+6. Indexer daemon refactor plan archived with shipped-PR outcomes documented (shipped-vs-plan diff required).
+7. Every Open Question is either closed (linked to a commit or ADR that resolves it) or explicitly reclassified as "future scope beyond v1 roadmap" with a new plan created. Unresolved questions may NOT be moved to a separate doc to satisfy this condition — the criterion is resolution, not absence.
+8. No plan in `partial`, `superseded`, or `archived` status has undocumented schema assumptions consumed by an `active` plan. (Prevents memory v2a/v2b type silent dependencies from corrupting downstream cutovers.)
 
 **New work beyond this set creates a new plan** and updates §Plan Registry + §Active Track Map.
 
@@ -428,6 +444,10 @@ Questions are triaged by **failure mode**: *silent-corrupt* (ships and breaks do
 ### 2026-04-16 — CLI-First Action Platform
 - File: `2026-04-16-cli-first-action-platform-plan.md`
 - Outcome: Tool-registry refactor shipped; unblocked `plan-plugins` + `plan-mcp`. Last commit: **2026-04-17**.
+
+### 2026-04-18 — Memory v3 tiered architecture
+- File: `2026-04-18-002-memory-tiered-architecture-plan.md`
+- Outcome: PR 0 through PR 9 shipped. Memory v3 is the only memory path; `FULCRUM_MEMORY_V3` was retired in PR 9.5, `canonical_text` dropped via migration 104, and `docs/architecture/memory-v3.md` is the operator reference. Progress ledger: `2026-04-18-002-memory-tiered-architecture-progress.md`.
 
 ### (Archive) — 2026-04-15 MASTER-PLAN sprint
 

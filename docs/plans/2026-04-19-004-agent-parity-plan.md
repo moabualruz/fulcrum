@@ -1,7 +1,7 @@
 ---
 title: "refactor: cross-agent parity + Fulcrum-first behavioral bias + plugin-standard packaging across 8 CLI agents (v3)"
 type: refactor
-status: draft
+status: active-closeout
 date: 2026-04-19
 origin: handover at docs/handover/2026-04-19-agent-parity-handover.md; audit of `pnpm run setup` coverage across Claude Code / Codex / Gemini / opencode / PI / Copilot / Cursor / Windsurf; v3 adds plugin-standard packaging parity (PR 14) after user raised the gap 2026-04-19
 ---
@@ -51,7 +51,7 @@ origin: handover at docs/handover/2026-04-19-agent-parity-handover.md; audit of 
 
 ## Goal
 
-Bring every CLI agent Fulcrum installs into (Claude Code, Codex CLI, Gemini CLI, opencode, PI, Copilot, Cursor, Windsurf) to **full feature-for-feature parity** — every agent's native extension surface is wired end-to-end, all 34 skills reach every skill-capable agent with per-skill identity preserved, a layered **"Fulcrum-first / recall-before-file-search"** rule is wired at **every achievable interception point**, and **each agent's native plugin/extension distribution standard is the install path** (not manual file-copy where the agent offers a first-class plugin mechanism).
+Bring every CLI agent Fulcrum installs into (Claude Code, Codex CLI, Gemini CLI, opencode, PI, Copilot, Cursor, Windsurf) to **full feature-for-feature parity** — every agent's native extension surface is wired end-to-end, all 33 canonical skills reach every skill-capable agent with per-skill identity preserved, a layered **"Fulcrum-first / recall-before-file-search"** rule is wired at **every achievable interception point**, and **each agent's native plugin/extension distribution standard is the install path** (not manual file-copy where the agent offers a first-class plugin mechanism).
 
 ### Why this lands
 
@@ -63,7 +63,7 @@ User's stated goals (verbatim):
 > "some cli agent's have standards for installing plugins and extentions ... did we check those and to make sure everything is starndardized for each target cli agent?"
 
 Architectural split:
-- **Skills = HOW.** The 34 existing skills tell the agent HOW to perform a specific workflow. Preserve per-skill identity across every agent that supports model-invoked skill discovery OR equivalent. Never concat-without-markers. Never silently drop.
+- **Skills = HOW.** The 33 existing canonical skills tell the agent HOW to perform a specific workflow. Preserve per-skill identity across every agent that supports model-invoked skill discovery OR equivalent. Never concat-without-markers. Never silently drop.
 - **Rules = WHAT + WHEN.** "Prefer `recall_knowledge` / `search_code` before `Grep` / `Glob` / `Read`" is a rule. "On session start, call `start_agent_run`" is a rule. Rules fire at every achievable interception point.
 - **Distribution = native plugin/extension mechanism where it exists.** Claude marketplace + plugin install; Codex plugin + marketplace; Gemini extensions CLI; opencode npm package; PI package (npm or local); rules-files for Copilot/Cursor/Windsurf (which don't have plugin standards).
 
@@ -94,12 +94,12 @@ Severity codes: **H** = hard (blocks a stated goal), **S** = soft (wasted levera
 
 | Agent | Hooks / interception | Skills | Sub-agents / roles | Commands | Rules (WHAT+WHEN) | MCP | Distribution path (v3 focus) | Installer |
 |---|---|---|---|---|---|---|---|---|
-| **Claude Code** | 5/9 events. Missing: **UserPromptSubmit, SubagentStop, SessionEnd, Notification**. **H** | 34/34 ✓ (canonical) | 24/24 ✓ | 4 slash commands | CLAUDE.md marker block — ZERO Fulcrum-first content. **H** | user-scope ✓ | **`.claude-plugin/plugin.json` exists ✓; NO `.claude-plugin/marketplace.json`; install uses manual `claude mcp add` + direct `~/.claude/settings.json` edit, NOT `/plugin install fulcrum@<mp>`. H** | `installClaude` ✓ (manual) |
-| **Codex CLI** | 4/5 events wired. Missing: **UserPromptSubmit**. **H** (Codex hooks Bash-only platform limit) | 6/34. **H** | ✗ platform N/A | ✗ no user slash | AGENTS.md ✓ — ZERO Fulcrum-first content. **H** | `[mcp_servers.fulcrum]` ✓ | **`.codex-plugin/plugin.json` ✓ + `marketplace.json` ✓. Install registers in user marketplace (`~/.agents/plugins/marketplace.json`) BUT installs pieces manually (config.toml MCP block, hooks, skills), NOT via a plugin-install command. S** (research-owed: does Codex even have a `codex plugin install` command? PR 14 confirms.) | `installCodex` ✓ (marketplace registered + pieces installed) |
-| **Gemini CLI** | 6/11 events. Missing: BeforeAgent, BeforeToolSelection, Notification, AfterModel-content. **H** | 6/34. **H** | 2/24. **H** | 6 TOML slash commands ✓ | GEMINI.md ✓ — ZERO Fulcrum-first content. `policies/` unused. **H** | `mcpServers` in ext manifest ✓ | **`gemini-extension.json` present; installed to `~/.gemini/extensions/fulcrum/` via standard path. `gemini extensions update fulcrum` flow untested by Fulcrum CI.** ✓ (standardized; PR 14 verifies) | `installGeminiExtension` ✓ (native) |
-| **opencode** | Plugin wires 6 event classes + 10 custom tools. Most-complete interception today. `experimental.chat.system.transform` needs fallback. **S** | ✗ 0/34. **H** | ✗ 0 role MDs. **H** | 5 MD slash commands ✓ | `opencode.md` skip-if-exists. **H** | `opencode.jsonc` mcp block ✓ | **`package.json` names `fulcrum-opencode-plugin@0.0.1` — NEVER PUBLISHED to npm. `opencode.jsonc` references local path `./plugins/fulcrum.ts`. Users must clone the repo. `opencode plugins update` flow unusable. H** | `installOpencode` ✓ (local path only) |
-| **PI cockpit** | ~1 of ~20 events bound (`session_start` only). **H** | 34/34 ✓ (symlink) | Roles implicit via MCP `--profile`. **H** (no role-switching UX) | Cockpit native ✓ | PI.md ✓ — ZERO Fulcrum-first content. **H** | Tools native ✓ | **`package.json` has `"pi"` key + `peerDependencies` + `publishConfig.access: public` — NEVER PUBLISHED to npm. Installed via `pi install <local-path>`. `pi update` flow unusable. H** | `installPiCockpit` ✓ (local path only) |
-| **Copilot** | ✗ no hooks (platform N/A) | 34 source exist in dead `.agents/skills/`; Copilot surface actually needs per-skill `.github/instructions/<skill>.instructions.md`. **H** | ✗ platform N/A | ✗ platform N/A | `.github/copilot-instructions.md` source, NO installer. **H** | `.vscode/mcp.json` source, NO installer. **H** | **No plugin/marketplace standard in Copilot — rule files + `.vscode/mcp.json` IS the standard. v3 plan PRs 10 wires it correctly.** ✓ (by design, once PR 10 lands) | ✗ no `installCopilot()` |
+| **Claude Code** | 5/9 events. Missing: **UserPromptSubmit, SubagentStop, SessionEnd, Notification**. **H** | 33/33 ✓ (canonical) | 24/24 ✓ | 4 slash commands | CLAUDE.md marker block — ZERO Fulcrum-first content. **H** | user-scope ✓ | **`.claude-plugin/plugin.json` exists ✓; NO `.claude-plugin/marketplace.json`; install uses manual `claude mcp add` + direct `~/.claude/settings.json` edit, NOT `/plugin install fulcrum@<mp>`. H** | `installClaude` ✓ (manual) |
+| **Codex CLI** | 4/5 events wired. Missing: **UserPromptSubmit**. **H** (Codex hooks Bash-only platform limit) | 6/33. **H** | ✗ platform N/A | ✗ no user slash | AGENTS.md ✓ — ZERO Fulcrum-first content. **H** | `[mcp_servers.fulcrum]` ✓ | **`.codex-plugin/plugin.json` ✓ + `marketplace.json` ✓. Install registers in user marketplace (`~/.agents/plugins/marketplace.json`) BUT installs pieces manually (config.toml MCP block, hooks, skills), NOT via a plugin-install command. S** (research-owed: does Codex even have a `codex plugin install` command? PR 14 confirms.) | `installCodex` ✓ (marketplace registered + pieces installed) |
+| **Gemini CLI** | 6/11 events. Missing: BeforeAgent, BeforeToolSelection, Notification, AfterModel-content. **H** | 6/33. **H** | 2/24. **H** | 6 TOML slash commands ✓ | GEMINI.md ✓ — ZERO Fulcrum-first content. `policies/` unused. **H** | `mcpServers` in ext manifest ✓ | **`gemini-extension.json` present; installed to `~/.gemini/extensions/fulcrum/` via standard path. `gemini extensions update fulcrum` flow untested by Fulcrum CI.** ✓ (standardized; PR 14 verifies) | `installGeminiExtension` ✓ (native) |
+| **opencode** | Plugin wires 6 event classes + 10 custom tools. Most-complete interception today. `experimental.chat.system.transform` needs fallback. **S** | ✗ 0/33. **H** | ✗ 0 role MDs. **H** | 5 MD slash commands ✓ | `opencode.md` skip-if-exists. **H** | `opencode.jsonc` mcp block ✓ | **`package.json` names `fulcrum-opencode-plugin@0.0.1` — NEVER PUBLISHED to npm. `opencode.jsonc` references local path `./plugins/fulcrum.ts`. Users must clone the repo. `opencode plugins update` flow unusable. H** | `installOpencode` ✓ (local path only) |
+| **PI cockpit** | ~1 of ~20 events bound (`session_start` only). **H** | 33/33 ✓ (symlink) | Roles implicit via MCP `--profile`. **H** (no role-switching UX) | Cockpit native ✓ | PI.md ✓ — ZERO Fulcrum-first content. **H** | Tools native ✓ | **`package.json` has `"pi"` key + `peerDependencies` + `publishConfig.access: public` — NEVER PUBLISHED to npm. Installed via `pi install <local-path>`. `pi update` flow unusable. H** | `installPiCockpit` ✓ (local path only) |
+| **Copilot** | ✗ no hooks (platform N/A) | 33 source skills exist in dead `.agents/skills/`; Copilot surface actually needs per-skill `.github/instructions/<skill>.instructions.md`. **H** | ✗ platform N/A | ✗ platform N/A | `.github/copilot-instructions.md` source, NO installer. **H** | `.vscode/mcp.json` source, NO installer. **H** | **No plugin/marketplace standard in Copilot — rule files + `.vscode/mcp.json` IS the standard. v3 plan PRs 10 wires it correctly.** ✓ (by design, once PR 10 lands) | ✗ no `installCopilot()` |
 | **Cursor** | ✗ no hooks | Via `.cursor/rules/<skill>.mdc`. 0 skills today. **H** | ✗ platform N/A | `/create-rule` built-in; no custom slash | `.cursor/rules/fulcrum.mdc` thin. **H** | `.cursor/mcp.json` source ✓ | **No plugin standard in Cursor — rule files IS the standard.** ✓ (by design) | `installCursor` per-project ✓ — EXPAND |
 | **Windsurf** | ✗ no hooks | Via `.windsurf/rules/<skill>.md`. 0 skills today. **H** | ✗ platform N/A | `/workflow-name` native — not wired by Fulcrum. **S** | `.windsurf/rules/fulcrum.mdc` minimal; global `~/.codeium/windsurf/memories/global_rules.md` untouched. **H** | Not yet wired. **H** | **No plugin standard in Windsurf — rule files IS the standard.** ✓ (by design, once PR 12 lands) | ✗ no `installWindsurf()` |
 
@@ -189,7 +189,7 @@ Severity codes: **H** = hard (blocks a stated goal), **S** = soft (wasted levera
 - `agent-skills:source-driven-development` — verify every PI event against local `node_modules/@mariozechner/pi-coding-agent/docs/extensions.md`.
 - `agent-skills:api-and-interface-design`.
 
-#### PR 9 — opencode native skills: 34 hidden subagent MDs
+#### PR 9 — opencode native skills: 33 hidden subagent MDs
 
 - `codex:gpt-5-4-prompting` — per-skill description text.
 - `compound-engineering:agent-native-architecture`.
@@ -201,12 +201,12 @@ Severity codes: **H** = hard (blocks a stated goal), **S** = soft (wasted levera
 - `agent-skills:security-and-hardening` — public-repo detection + sanitized variant.
 - `compound-engineering:review:correctness-reviewer`.
 
-#### PR 11 — Cursor installer expansion + 34 MDC + core rule
+#### PR 11 — Cursor installer expansion + 33 MDC + core rule
 
 - `agent-skills:api-and-interface-design`.
 - `codex:gpt-5-4-prompting` — per-skill descriptions (Cursor Apply-Intelligently relies on description-match).
 
-#### PR 12 — Windsurf installer + 34 rules + workflows + global opt-in
+#### PR 12 — Windsurf installer + 33 rules + workflows + global opt-in
 
 - `agent-skills:api-and-interface-design`.
 - `agent-skills:security-and-hardening` — global opt-in guard.
@@ -258,13 +258,13 @@ Layers table per agent (unchanged from v2):
 | Agent | Layers | Key surfaces |
 |---|---:|---|
 | Claude Code | 7 | project CLAUDE.md init + user CLAUDE.md + skills + sub-agent MD prologues + UserPromptSubmit hook + PreToolUse hook + SessionStart hook |
-| Codex | 5 | AGENTS.md + skills (6→34) + SessionStart hook + UserPromptSubmit hook + PreToolUse (Bash-only) |
-| Gemini | 9 | GEMINI.md + skills (6→34) + policies/ + sub-agents (2→24) + SessionStart + BeforeAgent + BeforeModel + BeforeToolSelection + BeforeTool |
-| opencode | 9 | plugin RIDER + chat.system.transform (state-adaptive: includes Fulcrum-first nudge when `recall_turn_state` shows grep-without-recall) + session.idle fallback + shell.env + tool.execute.before (policy gate; NOT a separate nudge layer per v3.1 OQ #2) + tool.execute.after (telemetry) + permission.ask + session.compacted + role agent MDs + 34 hidden-subagent skill MDs. **Note:** v3.1 collapsed "layer-3 post-tool nudge" into state-driven content on layer-2 rider — opencode's defense is deep but has a structural gap at tool-call-time for the recall nudge specifically (next-turn rider is the mechanism). |
+| Codex | 5 | AGENTS.md + skills (6→33) + SessionStart hook + UserPromptSubmit hook + PreToolUse (Bash-only) |
+| Gemini | 9 | GEMINI.md + skills (6→33) + policies/ + sub-agents (2→24) + SessionStart + BeforeAgent + BeforeModel + BeforeToolSelection + BeforeTool |
+| opencode | 9 | plugin RIDER + chat.system.transform (state-adaptive: includes Fulcrum-first nudge when `recall_turn_state` shows grep-without-recall) + session.idle fallback + shell.env + tool.execute.before (policy gate; NOT a separate nudge layer per v3.1 OQ #2) + tool.execute.after (telemetry) + permission.ask + session.compacted + role agent MDs + 33 hidden-subagent skill MDs. **Note:** v3.1 collapsed "layer-3 post-tool nudge" into state-driven content on layer-2 rider — opencode's defense is deep but has a structural gap at tool-call-time for the recall nudge specifically (next-turn rider is the mechanism). |
 | PI cockpit | 12+ | PI.md + skills + session_start + before_agent_start + before_provider_request + context event + tool_call + tool_result + model_select + session_before_compact + agent_end + role-switcher slash command |
-| Copilot | 3 | copilot-instructions.md + 34 per-skill instructions + core instructions file |
-| Cursor | 3 | fulcrum-core.mdc (alwaysApply: true) + 34 per-skill MDC (alwaysApply: false) + AGENTS.md |
-| Windsurf | 5 | fulcrum-core.md (trigger: always_on) + 34 per-skill MD (trigger: model_decision) + AGENTS.md + workflows for user-invocable skills + optional global opt-in |
+| Copilot | 3 | copilot-instructions.md + 33 per-skill instructions + core instructions file |
+| Cursor | 3 | fulcrum-core.mdc (alwaysApply: true) + 33 per-skill MDC (alwaysApply: false) + AGENTS.md |
+| Windsurf | 5 | fulcrum-core.md (trigger: always_on) + 33 per-skill MD (trigger: model_decision) + AGENTS.md + workflows for user-invocable skills + optional global opt-in |
 
 ### AD-3 — opencode `experimental.*` redundancy + integrity chain (v3.3 revised 2026-04-20 per PR 4 c5)
 
@@ -355,7 +355,7 @@ Per-agent install-path matrix:
 | Claude Code | `/plugin marketplace add <path-or-url>` + `/plugin install fulcrum@<mp>` | Manual (`claude mcp add` + direct `settings.json` edit + manual skill copy) | **Dual-mode.** Default: native plugin path with **GitHub-root marketplace at `.claude-plugin/marketplace.json` at `moabualruz/fulcrum`**; users run `/plugin marketplace add moabualruz/fulcrum` then `/plugin install fulcrum@fulcrum`. Fallback: existing manual path via `--manual`. |
 | Codex CLI | **`codex plugin marketplace {add\|upgrade\|remove}` CLI shipped** (re-verified 2026-04-20 against `codex-rs/cli/src/marketplace_cmd.rs` — was "TUI-only" in 2026-04-19 ref; that was stale). Per-plugin install/uninstall still TUI-gated. Marketplace reads `.claude-plugin/marketplace.json` OR `.agents/plugins/marketplace.json` (Claude-compat — **shares marketplace file with Claude**). | Marketplace entry registered ✓; install does manual piece-by-piece | **Dual-mode (revised).** Default: `codex plugin marketplace add moabualruz/fulcrum` + post-install TUI hint. Fallback: manual piece-by-piece (config.toml + skills + AGENTS.md). **Shared marketplace file**: one `.claude-plugin/marketplace.json` at repo root serves both Claude (PR 14.1) and Codex (PR 14.2), with per-agent `plugins[]` entries. |
 | Gemini CLI | Auto-load from `~/.gemini/extensions/<name>/`; updates via `gemini extensions update <name>` | Standard (copy extension dir) | **Standard confirmed + update flow wired.** Installer prints the `gemini extensions update fulcrum` command for user-triggered updates. |
-| opencode | `opencode.jsonc` `"plugin": ["@scope/pkg" | "./path"]`; resolved via Bun | Local-path only (`./plugins/fulcrum.ts`) | **Dual-mode.** Publish **`@fulcrum-agent-os/opencode-plugin`** to npm. Installer offers local-path (repo dogfood) OR npm (end users); defaults to npm if the package is resolvable, local-path otherwise. |
+| opencode | `opencode.jsonc` `"plugin": ["@scope/pkg" | "./path"]`; resolved via Bun | Manual local path (`./plugins/fulcrum.ts`) plus auto/native installer support | **Dual-mode.** Publish **`@fulcrum-agent-os/opencode-plugin`** to npm. Installer supports `auto`, `native`, and `manual`; auto defaults to npm when resolvable and manual local-path when not. |
 | PI cockpit | `pi install npm:<pkg>` / `pi install git:<url>` / `pi install <local-path>`; updates via `pi update` | Local-path (`pi install ./agent-integration/pi/cockpit`) | **Dual-mode.** Publish **`@fulcrum-agent-os/pi-cockpit`** to npm. Installer offers npm / git / local; defaults to npm if resolvable. peerDeps on `@mariozechner/pi-*` published without issue (v3.1 npm semantics confirmed). |
 | Copilot / Cursor / Windsurf | N/A — no plugin standards; rule files ARE the standard | Rule-files (once PRs 10/11/12 land) | **No change needed.** Plan's rules-file install IS the native standard. AD-10 does not apply. |
 
@@ -365,7 +365,7 @@ Per-agent install-path matrix:
 - Discoverability: marketplaces + npm are where users look for third-party agent tooling.
 - Plugin isolation: some CLIs (Claude) treat plugins as a boundary (tool allow-lists, hooks scoped to plugin). Using the plugin path = we get that isolation for free.
 
-**Dual-mode signature:** Every applicable installer function grows an optional `mode: "native" | "manual" | "auto"` parameter (defaults to `"auto"` — prefer native when available, fall back to manual). Operator flags: `pnpm setup:claude --manual` / `pnpm setup:opencode --npm` / `pnpm setup:pi --local`.
+**Dual-mode signature:** Every applicable installer function grows an optional `mode: "native" | "manual" | "auto"` parameter (defaults to `"auto"` — prefer native when available, fall back to manual). Operator knobs use the shipped mode names, e.g. `FULCRUM_CLAUDE_INSTALL_MODE=native|manual` and `FULCRUM_OPENCODE_INSTALL_MODE=auto|native|manual`; PI keeps its package/source-specific `auto|npm|git|local` plan.
 
 **What v3 does NOT require:** publishing a Fulcrum web marketplace (third-party discovery URL). PR 14 ships a **GitHub-repo-root marketplace** at `.claude-plugin/marketplace.json` on `moabualruz/fulcrum`; users register via `/plugin marketplace add moabualruz/fulcrum` (v3.1 resolution of Open Question #11). Public marketplace hosting at a dedicated domain (e.g. `fulcrum-agent-os.dev/marketplace.json`) stays future work.
 
@@ -461,7 +461,7 @@ Gemini + opencode hook wiring moves to PR 4 (opencode) + PR 7 (Gemini), gated on
 
 ### PR 4 — opencode plugin layer coverage + integrity + fallback + **npm publish (v3.3 absorbed from PR 14.3)**
 
-8 units; `OPENCODE_SYSTEM_RIDER` + `.ridersum`; `event` on `session.idle` fallback; opencode.md flip; 34 hidden subagent stubs (populated in PR 9). **v3.3 addition**: unit 4.8 publishes `@fulcrum-agent-os/opencode-plugin` to npm — canonical opencode plugin distribution path per research (npm scoped packages, auto-installed to `~/.cache/opencode/node_modules/` by Bun, existing community examples `@ranger-testing/opencode-plugin`, `@noodlbox/opencode-plugin`, `oh-my-opencode`). Dual-mode `installOpencode({ mode: "auto" | "npm" | "local" })` per v3.2 PR 14.3 spec. Probe: `npm view @fulcrum-agent-os/opencode-plugin version 2>/dev/null` with 2s timeout. npm org `@fulcrum-agent-os` + 2FA + publish-only token posture (v3.2 Critical Constraints #21/#22) remains a pre-PR-4.8 operator step.
+8 units; `OPENCODE_SYSTEM_RIDER` + `.ridersum`; `event` on `session.idle` fallback; opencode.md flip; 33 hidden subagent stubs (populated in PR 9). **v3.3 addition**: unit 4.8 publishes `@fulcrum-agent-os/opencode-plugin` to npm — canonical opencode plugin distribution path per research (npm scoped packages, auto-installed to `~/.cache/opencode/node_modules/` by Bun, existing community examples `@ranger-testing/opencode-plugin`, `@noodlbox/opencode-plugin`, `oh-my-opencode`). Current shipped modes are `installOpencode({ mode: "auto" | "native" | "manual" })`: `auto` probes npm and falls back to manual local path, `native` requires npm, and `manual` uses `./plugins/fulcrum.ts`. Probe: `npm view @fulcrum-agent-os/opencode-plugin version 2>/dev/null` with 2s timeout. npm org `@fulcrum-agent-os` + 2FA + publish-only token posture (v3.2 Critical Constraints #21/#22) remains a pre-PR-4.8 operator step.
 
 Gated on PR 3 measurement outcome: if Variant A (rule-only) wins, opencode rider includes rule text; if Variant B (passive-injection) wins, opencode `tool.execute.before` hook runs `recall_knowledge` silently + mutates `output.args` or throws-to-block-and-re-suggest.
 
@@ -584,7 +584,7 @@ PR 7 absorbs retroactive corrections for all four already-shipped agents, plus t
 
 **Compliance tests:** `pi-compliance.test.ts` (GAP(pi-M1) / GAP(pi-M2) / GAP(pi-S1-4)).
 
-### PR 9 — opencode native skills: 34 hidden subagent MDs + Task permissions
+### PR 9 — opencode native skills: 33 hidden subagent MDs + Task permissions
 
 4 units; `.opencode/agents/fulcrum-skill-<name>.md` with `mode: subagent, hidden: true`.
 
@@ -645,7 +645,7 @@ Full unit list — everything below ships in v3.3, not v4:
 - **14.0 — npm org `@fulcrum-agent-os` registration + 2FA + publish-only CI token + `SECURITY.md` at repo root.** Out-of-band operator work (npmjs.com web UI + GitHub Actions secret). Documented in `SECURITY.md` per Constraints #21 + #22 (2FA; branch protection; signed commits; signed release tags; publish-only tokens; CI-only publish path).
 - **14.1 — Claude marketplace `.claude-plugin/marketplace.json` at repo root** of `moabualruz/fulcrum`, referencing plugin manifest via `source: "./agent-integration/claude"`. Bundled `hooks/hooks.json` inside plugin dir. Dual-mode `installClaude({ mode: "auto" | "manual" })` — native path drives `claude plugin marketplace add moabualruz/fulcrum` + `claude plugin install fulcrum@fulcrum`; fallback: existing manual path. PR-time caveat: Claude marketplace update mechanics have known open issues (#46594/#46081/#38271/#37886); installer prints a "run `claude plugin marketplace refresh` to pick up updates" hint and degrades gracefully when refresh fails.
 - **14.2 — Codex install path: marketplace CLI + post-install message (v3.3 revised 2026-04-20 per Codex research).** `codex plugin marketplace {add|upgrade|remove}` is a real CLI today (shipped in alpha.11/12 per `codex-rs/cli/src/marketplace_cmd.rs`). `installCodex({mode: 'native' | 'manual'})`: native path runs `codex plugin marketplace add moabualruz/fulcrum` (same GitHub repo that hosts the shared `.claude-plugin/marketplace.json` from PR 14.1 + 6.7). Per-plugin install (toggling `AVAILABLE` → `INSTALLED_BY_DEFAULT` or user-opt-in install) remains TUI-only — post-install prints `Fulcrum marketplace registered with Codex. Run 'codex' then '/plugins' to install/manage via the TUI.` Install-state lives in `~/.codex/config.toml [plugins."<name>@<marketplace>"]` + cache at `~/.codex/plugins/cache/<marketplace>/<plugin>/` — manual-mode installer writes the config.toml block + cache dir so `/plugins` TUI shows Fulcrum as INSTALLED (not just AVAILABLE). Cleanup step for the malformed `{"host":"codex",...}` entry in `~/.agents/plugins/marketplace.json`.
-- **14.3 — opencode npm publish as `@fulcrum-agent-os/opencode-plugin`.** package.json rename (DONE in commit `2aa65b0`) + actual first `npm publish` via `.github/workflows/publish-opencode-plugin.yml` on signed tag `opencode-plugin/v*`. `--auto` probe (`npm view @fulcrum-agent-os/opencode-plugin version 2>/dev/null` with 2s timeout) in `installOpencode`. Error path `opencode-plugin-unresolved` when `--auto` falls to `--local` and local file absent.
+- **14.3 — opencode npm publish as `@fulcrum-agent-os/opencode-plugin`.** package.json rename (DONE in commit `2aa65b0`) + actual first `npm publish` via `.github/workflows/publish-opencode-plugin.yml` on signed tag `opencode-plugin/v*`. `auto` probe (`npm view @fulcrum-agent-os/opencode-plugin version 2>/dev/null` with 2s timeout) in `installOpencode`. Error path `opencode-plugin-unresolved` when native resolution fails or auto has neither npm package nor manual local file.
 - **14.4 — PI cockpit npm publish as `@fulcrum-agent-os/pi-cockpit`.** package.json rename; rename `.github/workflows/publish-cockpit.yml` → `publish-pi-cockpit.yml` with `pi-cockpit/v*` tag namespace; verify `@fulcrum/cockpit` npm history (legacy conflict check); keep existing `peerDependencies` on `@mariozechner/pi-*` (v3.1 confirmed npm does not validate peerDep ownership). Dual-mode `installPiCockpit({ mode: "auto" | "npm" | "git" | "local" })`.
 - **14.5 — Gemini extension lifecycle verification.** Post-install print `gemini extensions update fulcrum` command; `migratedTo` field scaffolding (commented-out) in `gemini-extension.json`; install-time schema validation against `find-docs`-verified schema.
 - **14.6 — `docs/architecture/install-paths.md`** — per-agent table of native install command vs manual fallback vs "rules-only (no plugin standard)". Referenced from README.md + ONBOARDING.md.
@@ -706,7 +706,7 @@ Full unit list — everything below ships in v3.3, not v4:
 
 - **14.2 — Codex plugin install: document status-quo + TUI verify path (v3.1, revised v3.2).** Confirmed: no `codex plugin install` CLI command; only interactive `codex /plugins` TUI browser. `installCodex()` keeps piece-by-piece install (MCP block + hooks in config.toml + skills copy + AGENTS.md). Post-install prints the v3.2-corrected message: **`Fulcrum is installed for Codex. Run 'codex' then '/plugins' to verify/manage in the TUI.`** (v3 said "to browse Fulcrum to install" — misleading since Fulcrum is ALREADY installed after this script runs.) Validate `agent-integration/codex/plugin/.codex-plugin/plugin.json` schema against current Codex plugin loader docs. **Load-bearing research (v3.2 added):** confirm that `codex /plugins` TUI actually reads from the filesystem `~/.agents/plugins/marketplace.json` and shows Fulcrum as installed; if not, the status-quo install path leaves invisible state. Update `docs/reference/2026-04-19-codex-cli-extension-surface.md` with the outcome.
 
-- **14.3 — opencode npm publish as `@fulcrum-agent-os/opencode-plugin` (v3.1, revised v3.2).** Rename `agent-integration/opencode/package.json` → `"name": "@fulcrum-agent-os/opencode-plugin"`. **v3.2 new sub-items (feasibility persona finding):** the current package has NO `main`/`exports`/`files`/`types`/build — plugin is shipped as raw `plugins/fulcrum.ts`. For npm install resolution, add: `"main": "./dist/fulcrum.js"`, `"exports": { ".": { "types": "./dist/fulcrum.d.ts", "import": "./dist/fulcrum.js" } }`, `"files": ["dist/", "README.md"]`, and a `build` script (`tsc` or `bun build`) that pre-compiles TS → JS + .d.ts in `dist/`. `.npmignore` audit: exclude `node_modules`, `tests/`, `plugins/*.ts` (source; `dist/` is the published artifact). Add CI step in `.github/workflows/publish-opencode-plugin.yml` triggered on release tag `opencode-plugin/v*`. **`--auto` probe (v3.2 specified):** `npm view @fulcrum-agent-os/opencode-plugin version 2>/dev/null` — exit 0 + version output = resolvable; any non-zero = fallback. Dual-mode in `installOpencode({ mode: "auto" | "npm" | "local" })`: `--auto` runs the probe (2s timeout); if yes, set `opencode.jsonc` `"plugin": ["@fulcrum-agent-os/opencode-plugin"]`; if no or `--local`, keep `./plugins/fulcrum.ts`. Error path (v3.2 added per adversarial persona F6): if `--auto` falls to `--local` AND `./plugins/fulcrum.ts` doesn't exist (user did `gh repo clone` + `pnpm setup:opencode` without `pnpm install`), `installOpencode` emits a structured error `{error: "opencode-plugin-unresolved", hint: "run 'pnpm install' or pass --npm"}`.
+- **14.3 — opencode npm publish as `@fulcrum-agent-os/opencode-plugin` (v3.1, revised v3.2).** Rename `agent-integration/opencode/package.json` → `"name": "@fulcrum-agent-os/opencode-plugin"`. **v3.2 new sub-items (feasibility persona finding):** the current package has NO `main`/`exports`/`files`/`types`/build — plugin is shipped as raw `plugins/fulcrum.ts`. For npm install resolution, add: `"main": "./dist/fulcrum.js"`, `"exports": { ".": { "types": "./dist/fulcrum.d.ts", "import": "./dist/fulcrum.js" } }`, `"files": ["dist/", "README.md"]`, and a `build` script (`tsc` or `bun build`) that pre-compiles TS → JS + .d.ts in `dist/`. `.npmignore` audit: exclude `node_modules`, `tests/`, `plugins/*.ts` (source; `dist/` is the published artifact). Add CI step in `.github/workflows/publish-opencode-plugin.yml` triggered on release tag `opencode-plugin/v*`. **`auto` probe (v3.2 specified):** `npm view @fulcrum-agent-os/opencode-plugin version 2>/dev/null` — exit 0 + version output = resolvable; any non-zero = fallback. Current shipped modes are `installOpencode({ mode: "auto" | "native" | "manual" })`: `auto` runs the probe (2s timeout); if yes, set `opencode.jsonc` `"plugin": ["@fulcrum-agent-os/opencode-plugin"]`; if no or `manual`, keep `./plugins/fulcrum.ts`. Error path (v3.2 added per adversarial persona F6): if `auto` has neither npm package nor `./plugins/fulcrum.ts`, or if `native` cannot resolve the npm package, `installOpencode` throws `OpencodePluginUnresolvedError` with code `opencode-plugin-unresolved`.
 
 - **14.4 — PI cockpit npm publish as `@fulcrum-agent-os/pi-cockpit` (v3.1, revised v3.2).** Rename `agent-integration/pi/cockpit/package.json` → `"name": "@fulcrum-agent-os/pi-cockpit"`. Keep existing `peerDependencies` on `@mariozechner/pi-*` — npm does not validate peerDep ownership (v3.1 confirmed). **v3.2 existing-workflow reconciliation (feasibility persona HIGH finding):** repo already has `.github/workflows/publish-cockpit.yml` titled `Publish @fulcrum/cockpit` triggering on `cockpit/v*` tags. Three names are in play (`fulcrum-cockpit` source; `@fulcrum/cockpit` workflow; `@fulcrum-agent-os/pi-cockpit` plan target). Reconciliation: (a) update the workflow to `.github/workflows/publish-pi-cockpit.yml` title `Publish @fulcrum-agent-os/pi-cockpit`, trigger on `pi-cockpit/v*`; (b) verify `@fulcrum/cockpit` history on npm — if ever published, document legacy status + whether deprecation is needed; (c) update `package.json` `name`. `.npmignore` audit. **`--auto` probe (v3.2 specified):** `npm view @fulcrum-agent-os/pi-cockpit version 2>/dev/null` — exit 0 + version = resolvable. Dual-mode `installPiCockpit({ mode: "auto" | "npm" | "git" | "local" })`: default `--auto` runs probe (2s timeout); resolvable → `pi install npm:@fulcrum-agent-os/pi-cockpit`; unresolvable → fallback to `pi install <local-path>`. Post-install prints: `pi install npm:@fulcrum-agent-os/pi-cockpit` as the user-facing re-install command.
 
@@ -771,7 +771,7 @@ Skill invocations stay in every Bootstrap PR.
 
 | Budget | Target |
 |---|---|
-| Fan-out transform (8 agents, 34 skills + 3 rules) | < 2000ms cold-start CI; < 500ms warm cache (v3.2 widened from v3's <1000ms per feasibility finding on CI I/O budget) |
+| Fan-out transform (8 agents, 33 skills + 3 rules) | < 2000ms cold-start CI; < 500ms warm cache (v3.2 widened from v3's <1000ms per feasibility finding on CI I/O budget) |
 | Per-agent install (heaviest: Claude with plugin marketplace) | < 5s non-dry-run (increased from v2's 2s to allow for `claude /plugin install` subprocess roundtrip) |
 | `fulcrum install verify --agent <any>` | < 3s incl. MCP ping |
 | Hook invocation (any agent, any event, any tool) | p95 < 20ms |
@@ -827,7 +827,7 @@ Skill invocations stay in every Bootstrap PR.
 
 ### PR 16 — Sanitize `install.ts` — unify native plugin/extension surfaces + install journal (v3.3 added 2026-04-20)
 
-**Origin**: PR 4 closeout review 2026-04-20 — user flagged that Claude's installer has a three-mode vocabulary (`auto|native|manual`) while other agents' surfaces are inconsistent (Gemini file-copies when `gemini extensions install` exists natively; opencode uses `auto|npm|local`; etc.). Also: no install journal exists, which means PR 17's uninstall would have no authoritative record of what to reverse.
+**Origin**: PR 4 closeout review 2026-04-20 — user flagged that Claude's installer had a three-mode vocabulary (`auto`, `native`, `manual`) while other agents' surfaces were inconsistent (Gemini file-copies when `gemini extensions install` exists natively; opencode used older npm/local naming, etc.). Also: no install journal exists, which means PR 17's uninstall would have no authoritative record of what to reverse.
 
 **Per-agent target shape**:
 
@@ -866,7 +866,7 @@ Skill invocations stay in every Bootstrap PR.
 1. Extract `packages/agent-fanout/src/install-journal.ts` with `appendJournal(entry)` + `readJournal(agent)`.
 2. Add managed-marker discipline for every JSON/TOML config edit (6 new call sites).
 3. Convert Gemini install to `gemini extensions install <localpath>` native path; file-copy fallback.
-4. Rename opencode modes `{npm, local}` → `{native, manual}`. Update PR 4 c6 tests.
+4. Keep opencode modes on the shipped vocabulary `{auto, native, manual}`. Ensure pre-v3 mode names do not reappear in docs or tests.
 5. Remove Claude's `FULCRUM_CLAUDE_INSTALL_MODE=auto` special-casing; collapse into two modes + default probe behavior.
 6. End-to-end: `fulcrum install --all --dry-run` shows a coherent per-agent install plan with consistent mode vocabulary.
 
@@ -1002,9 +1002,9 @@ Rough, one engineer, no heavy blockers.
 | 6 | **5 days** (Codex deep integration — UserPromptSubmit + PermissionRequest + prompt/agent handler types + skill fanout 6→33 + openai.yaml sidecars + full `.codex-plugin/plugin.json` interface block + shared `.claude-plugin/marketplace.json` with Claude + app-server `config/mcpServer/reload` + `skills/list` RPCs. v3.3 rescoped 2026-04-20 per Codex research pass — was 1 day for 4 units) |
 | 7 | 3 days (Gemini 11-event + policies + 24 sub-agent MDs) |
 | 8 | 3 days (PI cockpit + role-switching UX) |
-| 9 | 2 days (opencode 34 hidden subagent MDs) |
+| 9 | 2 days (opencode 33 hidden subagent MDs) |
 | 10 | 3 days (Copilot installer + public-repo guard + sanitized variant) |
-| 11 | 2 days (Cursor 34 MDCs) |
+| 11 | 2 days (Cursor 33 MDCs) |
 | 12 | 3 days (Windsurf installer + workflows + global opt-in) |
 | 13 | 2 days (install apply CLI + verify + demo reel) |
 | **14** | **3 days** (plugin-standard packaging — RESTORED IN SCOPE 2026-04-20; opencode npm scaffold already landed in PR 4 unit 4.8) |
@@ -1067,7 +1067,7 @@ PR 15/16/17 sequencing: PR 15 ships standalone (operator utility to reset curren
 - Per-agent reference docs: `docs/reference/2026-04-19-<agent>-extension-surface.md`.
 - Fulcrum MCP tool surface: `packages/cli/src/mcp-tools.ts` (32 tools).
 - Install entry: `agent-integration/install.ts` (to be refactored across PRs 1/10/12/13/14).
-- Skill source: `agent-integration/skills/` (34).
+- Skill source: `agent-integration/skills/` (33 `SKILL.md` files plus `roles/` role catalog).
 - Rule source (NEW in PR 2): `agent-integration/rules/`.
 - Claude plugin manifest: `agent-integration/claude/.claude-plugin/plugin.json`.
 - Codex plugin manifest: `agent-integration/codex/plugin/.codex-plugin/plugin.json`.

@@ -140,6 +140,6 @@ ChatGPT-style subscription login + Anthropic API key. Model availability depends
 
 ## Implications for Fulcrum parity plan
 
-- Fulcrum already ships 5 hooks, 34 skills, 24 sub-agent MDs, 4 slash commands, global-context stamp. **Surface coverage on Claude Code is already the most complete of any agent.**
+- Fulcrum already ships 5 hooks, 33 canonical skills, 24 sub-agent MDs, 4 slash commands, global-context stamp. **Surface coverage on Claude Code is already the most complete of any agent.**
 - Gap the plan addresses: skills do not bias *toward Fulcrum first for search*. Every skill tells the agent HOW to use a Fulcrum tool; none tells it WHEN TO PREFER Fulcrum over Grep/Glob.
 - Because Claude Code is the richest surface, it is the natural **canonical source** for the "Fulcrum-first" skill text — other agents' copies can be derived/fanned-out.

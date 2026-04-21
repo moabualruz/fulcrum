@@ -1,6 +1,6 @@
 # Skill Authoring Guide
 
-Skills teach agent runtimes (Claude Code, Gemini, Codex) the right sequence of Fulcrum actions for common situations. Each skill fires when its trigger condition is met and guides the agent through the correct procedure.
+Skills teach supported agent runtimes the right sequence of Fulcrum actions for common situations. Each skill fires when its trigger condition is met and guides the agent through the correct procedure.
 
 ---
 

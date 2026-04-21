@@ -1,4 +1,4 @@
-export const VERSION = '0.0.2'
+export const VERSION = '0.0.3'
 
 export { parseCanonicalSource } from './parse.js'
 export type { ParseOptions } from './parse.js'

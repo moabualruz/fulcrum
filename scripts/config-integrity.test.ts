@@ -18,7 +18,7 @@ const INT_DIR = join(REPO_ROOT, 'agent-integration')
 // ─── Accept lists — derived from packages/cli/src/index.ts dispatcher ────────
 
 const HOOK_CLIS = new Set([
-  'auto', 'claude', 'gemini', 'codex', 'pi', 'opencode', 'cursor', 'windsurf',
+  'auto', 'claude', 'gemini', 'codex', 'pi', 'opencode', 'cursor', 'windsurf', 'copilot',
 ])
 
 const HOOK_PHASES_COMMON = new Set([
@@ -30,8 +30,9 @@ const HOOK_PHASES_BY_CLI: Record<string, Set<string>> = {
   gemini:   new Set(['session-start', 'session-end', 'before-agent', 'before-tool-selection', 'before-model', 'after-model', 'pre-compress', 'after-agent', 'notification']),
   codex:    new Set(['session-start', 'session-end', 'notify', 'user-prompt-submit', 'permission-request']),
   opencode: new Set(['session-start', 'session-end', 'pre-compact']),
-  cursor:   new Set(['session-start', 'session-end', 'pre-compact']),
-  windsurf: new Set(['session-start', 'session-end', 'pre-compact']),
+  cursor:   new Set(['session-start', 'session-end', 'pre-compact', 'subagent-start', 'subagent-stop']),
+  windsurf: new Set(['session-start', 'session-end', 'pre-compact', 'subagent-start', 'subagent-stop']),
+  copilot:  new Set(['session-start', 'session-end']),
   pi:       new Set<string>(),
   auto:     new Set<string>(),
 }
@@ -87,6 +88,53 @@ function parseCommand(cmd: string): string[] {
   return cmd.split(/\s+/).filter(Boolean)
 }
 
+function hookEventToPhase(eventName: string | undefined): string | undefined {
+  switch (eventName) {
+    case 'PreToolUse':
+    case 'preToolUse':
+    case 'pre_tool_use':
+      return 'pre'
+    case 'PostToolUse':
+    case 'postToolUse':
+    case 'post_tool_use':
+      return 'post'
+    case 'SessionStart':
+    case 'sessionStart':
+    case 'session_start':
+      return 'session-start'
+    case 'SessionEnd':
+    case 'sessionEnd':
+    case 'session_end':
+      return 'session-end'
+    case 'SubagentStart':
+    case 'subagentStart':
+    case 'subagent_start':
+      return 'subagent-start'
+    case 'SubagentStop':
+    case 'subagentStop':
+    case 'subagent_stop':
+      return 'subagent-stop'
+    case 'AfterFileEdit':
+    case 'afterFileEdit':
+    case 'after_file_edit':
+      return 'post'
+    case 'pre_write_code':
+    case 'pre_run_command':
+    case 'pre_read_code':
+    case 'pre_mcp_tool_use':
+    case 'pre_user_prompt':
+      return 'pre'
+    case 'post_write_code':
+    case 'post_run_command':
+    case 'post_read_code':
+    case 'post_mcp_tool_use':
+    case 'post_cascade_response':
+      return 'post'
+    default:
+      return undefined
+  }
+}
+
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
 describe('agent-integration config integrity', () => {
@@ -134,7 +182,14 @@ describe('agent-integration config integrity', () => {
               cli && HOOK_CLIS.has(cli),
               `${cmd}  →  unknown hook CLI "${cli}"`,
             ).toBe(true)
-            const phase = parts[3]
+            let phase = parts[3]
+            if (phase === '--event') {
+              phase = hookEventToPhase(parts[4])
+              expect(
+                phase,
+                `${cmd}  →  unknown hook event "${parts[4] ?? ''}"`,
+              ).toBeDefined()
+            }
             if (phase && !phase.startsWith('--')) {
               const allowed = new Set([
                 ...HOOK_PHASES_COMMON,

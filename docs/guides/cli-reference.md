@@ -217,15 +217,16 @@ BeforeTool hook for Gemini CLI. Registered automatically via the Gemini extensio
 fulcrum hook gemini < event.json
 ```
 
-### `fulcrum hook pi`
+### `fulcrum hook pi|opencode|cursor|windsurf|copilot`
 
-BeforeTool hook for the PI coding agent.
+Tool hooks for PI, opencode, Cursor, Windsurf, and GitHub Copilot CLI.
 
 ```bash
 fulcrum hook pi < event.json
+fulcrum hook copilot --event pre_tool_use < event.json
 ```
 
-The Pi hook is the only one that extracts `role` and `runId` from the event — it's used for tighter policy enforcement on team-invocation tool calls.
+PI extracts `role` and `runId` from the event for tighter policy enforcement on team-invocation tool calls. Copilot, Cursor, and Windsurf generated configs use `--event <name>` forms that map back to Fulcrum hook phases.
 
 ### `fulcrum hook auto`
 
@@ -233,7 +234,7 @@ Auto-detect the agent runtime from environment variables and dispatch to the cor
 
 ```bash
 fulcrum hook auto < event.json
-# Dispatches to claude / gemini / pi based on env vars
+# Dispatches to the supported runtime based on event shape or environment
 ```
 
 ---

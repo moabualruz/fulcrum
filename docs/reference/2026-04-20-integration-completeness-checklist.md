@@ -62,13 +62,13 @@ Status legend:
 
 ## Claude Code
 
-Plan target: 7 layers per AD-2. Audit hit: 5/9 events wired; 34/34 skills ✓; 24/24 roles ✓; CLAUDE.md marker block with ZERO Fulcrum-first content (H).
+Plan target: 7 layers per AD-2. Audit hit: 5/9 events wired; 33/33 skills ✓; 24/24 roles ✓; CLAUDE.md marker block with ZERO Fulcrum-first content (H).
 
 **Compliance gate:** `packages/cli/src/tests/compliance/claude-compliance.test.ts` — 19/19 green as of PR 7 units 7.18–7.24. Every `✅` row below is backed by at least one `GAP(claude-*)` assertion in that file.
 
 | Layer / requirement | Status | Verify | Fixed by |
 |---|---|---|---|
-| Canonical skills at `agent-integration/skills/` (33 dirs, sorted) | ✅ | `find agent-integration/skills -maxdepth 1 -type d \| wc -l` = 34 (33 + parent) | PR 0 / AD-1 |
+| Canonical skills at `agent-integration/skills/` (33 `SKILL.md` files, sorted) | ✅ | `find agent-integration/skills -maxdepth 2 -name SKILL.md \| wc -l` = 33 (`roles/` is a role catalog, not a skill) | PR 0 / AD-1 |
 | 24 canonical role MDs at `agent-integration/claude/agents/` | ✅ | `ls agent-integration/claude/agents/*.md \| wc -l` ≥ 24 | pre-plan |
 | 4 slash commands at `agent-integration/claude/commands/` | ✅ | `ls agent-integration/claude/commands/*.md` | pre-plan |
 | `.claude-plugin/plugin.json` | ✅ | `ls agent-integration/claude/.claude-plugin/plugin.json` | pre-plan |
@@ -121,7 +121,7 @@ Plan target: **8 layers (v3.3 rescoped 2026-04-20 per Codex research pass — wa
 
 ## Gemini CLI
 
-Plan target: 9 layers. Audit: 6/11 events (BeforeAgent, BeforeToolSelection, Notification, AfterModel-content missing); 6/34 skills; 2/24 sub-agents.
+Plan target: 9 layers. Audit: 6/11 events (BeforeAgent, BeforeToolSelection, Notification, AfterModel-content missing); 6/33 skills; 2/24 sub-agents.
 
 **Compliance gate:** `packages/cli/src/tests/compliance/gemini-compliance.test.ts` — 28/28 green as of PR 7 units 7.1–7.10. Every `✅` row below is backed by at least one `GAP(hooks-*|pol-*|sub-*|gemini-*)` assertion in that file.
 
@@ -131,7 +131,7 @@ Plan target: 9 layers. Audit: 6/11 events (BeforeAgent, BeforeToolSelection, Not
 | `mcpServers` in extension manifest | ✅ | `grep -c '"mcpServers"' agent-integration/gemini/gemini-extension.json` ≥ 1 | pre-plan |
 | SessionStart / BeforeModel / BeforeTool (partial) | ✅ | `grep -n 'runGeminiSessionStart\|runGeminiBeforeAgent' packages/cli/src/index.ts` | pre-plan |
 | **BeforeAgent, BeforeToolSelection, Notification, AfterModel-content handlers** | ✅ | `runGeminiBeforeAgentHook` (hookEventName contract fix), `runGeminiBeforeToolSelectionHook`, `runGeminiNotificationHook`, `runGeminiAfterModelHook` — 4 real handlers. Dispatch in `packages/cli/src/index.ts` routes `before-tool-selection`, `notification`, `after-model`. `hooks.json` registers all 11 events. | PR 7.2 |
-| **34 canonical skills installed at `agent-integration/gemini/skills/fulcrum-<name>/`** | ✅ | `scripts/fanout-gemini-extension.ts` materializes `parseCanonicalSource + emitGemini` → 33 skill dirs committed at `agent-integration/gemini/skills/fulcrum-*/SKILL.md` (canonical source is 33 skills; `index.md` is a catalog). Verify: `ls agent-integration/gemini/skills/fulcrum-*/SKILL.md \| wc -l` = 33. | PR 7.3 |
+| **33 canonical skills installed at `agent-integration/gemini/skills/fulcrum-<name>/`** | ✅ | `scripts/fanout-gemini-extension.ts` materializes `parseCanonicalSource + emitGemini` → 33 skill dirs committed at `agent-integration/gemini/skills/fulcrum-*/SKILL.md` (canonical source is 33 skills; `index.md` is a catalog). Verify: `ls agent-integration/gemini/skills/fulcrum-*/SKILL.md \| wc -l` = 33. | PR 7.3 |
 | **24 sub-agent MDs at `agent-integration/gemini/agents/`** | ✅ | Fanout script `translateRoleForGemini` emits 24 canonical role MDs (name + description + `kind: local` per `docs/core/subagents.md` schema) alongside 2 legacy shortcut files. Verify: canonical 24 + legacy 2 = 26 files. | PR 7.4 |
 | **`agent-integration/gemini/policies/` populated** | ✅ | `fulcrum-core.toml` (24 read-only + 8 lifecycle Fulcrum MCP tools → `allow`, priority 500) + `fulcrum-sensitive.toml` (`invoke_team`, `mark_memory_wrong`, definition edits → `ask_user`, priority 500). Schema per `docs/reference/policy-engine.md`. | PR 7.5 |
 | **GEMINI.md marker block with canonical rules** | ✅ | `replaceMarkerBlock` emits BEGIN/END FULCRUM managed-block v1 embedding all 3 canonical rules joined with `\n\n---\n\n`. User-owned prose outside markers survives regeneration. Verify: `grep -c 'BEGIN FULCRUM managed-block' agent-integration/gemini/GEMINI.md` = 1. | PR 7.6 |
@@ -144,7 +144,7 @@ Plan target: 9 layers. Audit: 6/11 events (BeforeAgent, BeforeToolSelection, Not
 
 ## opencode
 
-Plan target: 9 layers. Audit: plugin wires 6 event classes + 10 custom tools (most-complete interception today); 0/34 skills; 0 role MDs; 5 MD slash commands ✓; `opencode.md` skip-if-exists; `opencode.jsonc` mcp block ✓.
+Plan target: 9 layers. Audit: plugin wires 6 event classes + 10 custom tools (most-complete interception today); 0/33 skills; 0 role MDs; 5 MD slash commands ✓; `opencode.md` skip-if-exists; `opencode.jsonc` mcp block ✓.
 
 **Compliance gate:** `packages/cli/src/tests/compliance/opencode-compliance.test.ts` — 17/17 green as of PR 7 units 7.11–7.17. Every `✅` row below is backed by at least one `GAP(oc-*)` assertion in that file.
 
@@ -160,7 +160,7 @@ Plan target: 9 layers. Audit: plugin wires 6 event classes + 10 custom tools (mo
 | **`session.idle` telemetry signal when primary injection never fired** | ✅ | `grep -c 'opencode_rider_never_injected' agent-integration/opencode/plugins/fulcrum.ts` ≥ 1 | PR 4 |
 | **`opencode.md` has BEGIN/END FULCRUM markers** | ✅ | `grep -c 'BEGIN FULCRUM managed-block' agent-integration/opencode/opencode.md` = 1 | PR 4 |
 | **npm publish scaffolding (`@fulcrum-agent-os/opencode-plugin`)** | ✅ | `grep '"name"' agent-integration/opencode/package.json` shows scoped name; `npm pack --dry-run` clean | PR 4 (`2aa65b0`) |
-| **34 skill artifacts written to `.opencode/agents/fulcrum-skill-<name>.md` on disk** | ✅ | installer now consumes `emitOpencode(parseCanonicalSource(...))` and writes 33 skill artifacts to `.opencode/agents/` (PR 1 observation — 33 skills, not 34; `index.md` is a catalog). Verify: `pnpm -F fulcrum-agent-fanout test -- emit-new-shapes` asserts `mode: subagent`, `hidden: true`, and `permission.task['*'] === 'deny'` (GAP(oc-agents-M4) — PR 9). Compliance live-env gate in `opencode-compliance.test.ts` (skips gracefully when installer not run; `.opencode/` is gitignored). | PR 4 c2 + PR 9 |
+| **33 skill artifacts written to `.opencode/agents/fulcrum-skill-<name>.md` on disk** | ✅ | installer now consumes `emitOpencode(parseCanonicalSource(...))` and writes 33 skill artifacts to `.opencode/agents/` (PR 1 observation — canonical source is 33 skills; `index.md` is a catalog). Verify: `pnpm -F fulcrum-agent-fanout test -- emit-new-shapes` asserts `mode: subagent`, `hidden: true`, and `permission.task['*'] === 'deny'` (GAP(oc-agents-M4) — PR 9). Compliance live-env gate in `opencode-compliance.test.ts` (skips gracefully when installer not run; `.opencode/` is gitignored). | PR 4 c2 + PR 9 |
 | **24 role MDs emitted / on disk for opencode** | ✅ | installer reads the 24 canonical role MDs from `agent-integration/claude/agents/` + translates frontmatter (chief_of_staff + orchestrator → `mode: primary`; others → `mode: subagent, hidden: true`) + writes to `.opencode/agents/<role>.md`. Verify: test asserts `roleFiles.length ≥ 24` + frontmatter shape. | PR 4 c3 |
 | **Bias nudge / passive injection on opencode's `tool.execute.before`** (not only Claude) | ✅ | `grep -c "cliName === 'opencode'" packages/cli/src/hooks.ts` = 4 (sections 3a + 3b + opt-out gate both opened). Plugin routes through `fulcrum hook opencode pre` (not `auto`) + writes session trust file on first observation via new `runOpencodeSessionStartHook`. Verify: `pnpm -F fulcrum-agent-cli test -- hook-bias-nudge` — 3 new opencode cases (trusted-session nudge fires, no-file silent skip, telemetry `agent_type=opencode`). | PR 4 c4 |
 | **Actual rider `additionalContext` fallback on `session.idle` (not just telemetry)** | ✅ | AD-3 revised per PR 4 c5 — `event` hook on session.idle is observable-only per `@opencode-ai/plugin@1.14.18` types; there is no `additionalContext` return from any observable event. True redundancy shipped as belt-and-suspenders via `experimental.chat.messages.transform`: when `experimentalFiredCount === 0` the fallback prepends a synthetic TextPart with the rider to the first user message. Both hooks fire per LLM call; whichever lands first wins (no duplication). Session.idle retains its telemetry signal. Verify: `pnpm --dir agent-integration/opencode test` covers 7 new `messages-transform-redundancy` tests. | PR 4 c5 |
@@ -168,14 +168,14 @@ Plan target: 9 layers. Audit: plugin wires 6 event classes + 10 custom tools (mo
 | **`installOpencode()` consumes `emitOpencode(parseCanonicalSource(...))` output and writes to disk** | ✅ | `grep -c 'emitOpencode\\|agent-fanout' agent-integration/install.ts` = 9. Installer steps: skill MDs → `.opencode/agents/`, canonical rules → `.opencode/rules/`, `.ridersum` → `.opencode/.ridersum`, 24 role MDs → `.opencode/agents/<role>.md`. | PR 4 c2 + c3 |
 | **Post-session workspace write via `fulcrum hook opencode session-end` (already wired) — verify no regression** | ✅ | existing | pre-plan |
 | **`npm publish @fulcrum-agent-os/opencode-plugin` to npm registry (first release)** | ⬜ | `npm view @fulcrum-agent-os/opencode-plugin version` returns a version; published from CI workflow (not laptop) | **PR 14.3 — requires npm org registration first (operator step)** |
-| **`--auto` probe (`npm view @fulcrum-agent-os/opencode-plugin version`) in installOpencode** | ✅ | `grep -c 'npm view @fulcrum-agent-os/opencode-plugin' agent-integration/install.ts` = 1. `probeOpencodePluginOnNpm(2000)` runs `npm view …` 2s-bounded; returns version on success, null otherwise. `installOpencode({mode: 'auto'})` consults the probe first and falls through to local on miss. | PR 4 c6 |
-| **Error path `opencode-plugin-unresolved` when --auto falls to --local and local file absent** | ✅ | `grep -c 'opencode-plugin-unresolved' agent-integration/install.ts` = 3. `OpencodePluginUnresolvedError` (code `"opencode-plugin-unresolved"`) is thrown by `installOpencode` when (a) mode=local but template missing, (b) mode=npm but probe misses, or (c) mode=auto and both paths miss. Covered by test `mode=npm throws OpencodePluginUnresolvedError …`. | PR 4 c6 |
+| **`--auto` probe (`npm view @fulcrum-agent-os/opencode-plugin version`) in installOpencode** | ✅ | `grep -c 'npm view @fulcrum-agent-os/opencode-plugin' agent-integration/install.ts` = 1. `probeOpencodePluginOnNpm(2000)` runs `npm view …` 2s-bounded; returns version on success, null otherwise. `installOpencode({mode: 'auto'})` consults the probe first and falls through to manual local-path install on miss. | PR 4 c6 |
+| **Error path `opencode-plugin-unresolved` when plugin resolution fails** | ✅ | `grep -c 'opencode-plugin-unresolved' agent-integration/install.ts` = 3. `OpencodePluginUnresolvedError` (code `"opencode-plugin-unresolved"`) is thrown by `installOpencode` when (a) mode=manual but template missing, (b) mode=native but probe misses, or (c) mode=auto and both paths miss. Covered by deterministic fake-`npm` tests for native miss and auto manual fallback. | PR 4 c6 |
 
 ---
 
 ## PI cockpit
 
-Plan target: 12+ layers. Audit: ~1/~20 events bound (session_start only); 34/34 skills ✓ (via symlink); roles implicit via MCP `--profile` — no role-switching UX.
+Plan target: 12+ layers. Audit: ~1/~20 events bound (session_start only); 33/33 skills ✓ (via symlink); roles implicit via MCP `--profile` — no role-switching UX.
 
 **Compliance gate:** `packages/cli/src/tests/compliance/pi-compliance.test.ts` — 11/11 green as of PR 8. Every `✅` row below is backed by at least one `GAP(pi-*)` assertion in that file.
 
@@ -209,7 +209,7 @@ Plan target: 5 layers (MCP, instructions, agents, hooks, AGENTS.md). Compliance:
 | **`.github/copilot-instructions.public.md` (sanitized public-repo variant, AD-8)** | ✅ | `grep FULCRUM_PUBLIC_REPO_VARIANT agent-integration/copilot/.github/copilot-instructions.public.md` | PR 10 |
 | **33 `.github/instructions/fulcrum-skill-<name>.instructions.md` path-scoped files** | ✅ | `ls agent-integration/copilot/.github/instructions/fulcrum-skill-*.instructions.md \| wc -l` ≥ 33 | PR 10 |
 | **24 `.github/agents/<role>.agent.md` custom agent files** | ✅ | `ls agent-integration/copilot/.github/agents/*.agent.md \| wc -l` ≥ 24 | PR 10 |
-| **`.github/hooks/fulcrum.json` with Claude Code-style matchers (Write/Edit/Bash)** | ✅ | `grep -c 'Write\|Edit\|Bash' agent-integration/copilot/.github/hooks/fulcrum.json` ≥ 1 | PR 10 |
+| **`.github/hooks/fulcrum.json` with Claude Code-style matchers (Write/Edit/Bash)** | ✅ | `grep -c 'Write\|Edit\|Bash' agent-integration/copilot/.github/hooks/fulcrum.json` ≥ 1; `fulcrum hook copilot --event pre_tool_use` exits 0; config-integrity covers `--event` dispatch | PR 10 + 2026-04-21 third pass |
 | **`AGENTS.md` with BEGIN FULCRUM managed-block** | ✅ | `grep 'BEGIN FULCRUM managed-block' agent-integration/copilot/AGENTS.md` | PR 10 |
 | **`installCopilot()` written in agent-integration/install.ts** | ✅ | `grep -c 'installCopilot' agent-integration/install.ts` ≥ 1 | PR 10 |
 | Extension surface doc updated for Copilot CLI (not VS Code) | ✅ | `grep 'standalone' docs/reference/2026-04-19-copilot-extension-surface.md` | PR 10 |
@@ -256,9 +256,9 @@ Plan target: 5 layers. Audit: no hooks; `.windsurf/rules/<skill>.md`; 0 skills t
 |---|---|---|---|
 | Canonical source at `agent-integration/skills/` + `agent-integration/rules/` | ✅ | `ls agent-integration/skills/ agent-integration/rules/` | PR 0, PR 2 |
 | `packages/agent-fanout/` produces emit artifacts for all 8 targets | ✅ | `pnpm -F fulcrum-agent-fanout test` green | PR 1 |
-| **Installer (`agent-integration/install.ts`) consumes fanout output and writes to disk** | ⚠️ | `grep -c 'parseCanonicalSource\|emit(Claude\|Codex\|Gemini\|Opencode\|Copilot\|Cursor\|Windsurf)' agent-integration/install.ts` = 9 (opencode fan-out landed PR 4 c2); other installers (Claude / Codex / Gemini / Copilot / Cursor / Windsurf) still consume templates directly — full consolidation remains PR 13 scope | **PR 13** (opencode partial — PR 4 c2) |
-| `fulcrum install verify --agent <name>` CLI | ✅ | `verifyInstall()` exported from `agent-integration/install.ts`; `runInstall()` handles `verify` + `apply` subcommands; 15 tests in `install-verify.test.ts` — 688/688 green | PR 13 |
-| **`fulcrum install verify` reports install mode + plugin version (PR 14.8)** | ✅ | `verifyInstall()` returns `installMode` + `pluginVersion` + `canonicalVersion`; rules-only agents (cursor/windsurf/copilot) → `"manual"`; codex → `"marketplace"`; opencode → detects from installed `opencode.jsonc` plugin ref (`"local"` / `"npm"` / `"unknown"`); 12 new TDD tests in `install-verify-mode-version-pr148.test.ts` — 715/715 green | **PR 14.8** |
+| **Installer (`agent-integration/install.ts`) consumes fanout output and writes to disk** | ⚠️ | `grep -c 'parseCanonicalSource\|emit(Codex\|Opencode)' agent-integration/install.ts` = 16. Codex + opencode now consume fanout in installer code; Claude / Gemini / Copilot / Cursor / Windsurf still consume committed templates or native source trees directly. Full consolidation remains open. | **PR 13** (opencode partial — PR 4 c2; codex added later) |
+| `fulcrum install verify --agent <name>` CLI | ✅ | `verifyInstall()` exported from `agent-integration/install.ts`; `runInstall()` handles `verify` + `apply` subcommands; `install-verify.test.ts` green | PR 13 |
+| **`fulcrum install verify` reports install mode + plugin version (PR 14.8)** | ✅ | `verifyInstall()` returns `installMode` + `pluginVersion` + `canonicalVersion`; rules-only agents (cursor/windsurf/copilot) → `"manual"`; codex → `"marketplace"`; opencode → detects from installed `opencode.jsonc` plugin ref (`"manual"` / `"native"` / `"unknown"`); 12 TDD tests in `install-verify-mode-version-pr148.test.ts` cover the mode mapping | **PR 14.8** |
 | **`docs/architecture/install-paths.md` per-agent install matrix** | ✅ | `ls docs/architecture/install-paths.md` exists; covers all 8 agents (native install command + manual fallback + sentinel) | **PR 14.6** |
 | **`SECURITY.md` at repo root (Constraints #21 + #22 posture)** | ✅ | `ls SECURITY.md` exists; covers npm org 2FA, publish-only CI tokens, signed release tags, branch protection, signed commits, marketplace `source:` scoping | **PR 14.0** |
 | **Post-pack tarball secret scan in publish workflows (PR 14.9)** | ✅ | `grep -c 'tarball secret scan' .github/workflows/publish-pi-cockpit.yml .github/workflows/publish-opencode-plugin.yml` = 2; `ls agent-integration/pi/cockpit/.npmignore` exists | **PR 14.9** |

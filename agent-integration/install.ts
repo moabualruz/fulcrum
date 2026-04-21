@@ -5,13 +5,14 @@
  * Installs Fulcrum as a user-wide tool: symlinks the CLI into ~/.local/bin,
  * registers the MCP server as a user-scope Claude Code server, merges the
  * PreToolUse hook into ~/.claude/settings.json, installs the Gemini extension
- * into ~/.gemini/extensions/fulcrum/, and installs the PI cockpit via `pi install`.
+ * into ~/.gemini/extensions/fulcrum/, installs the PI cockpit via `pi install`,
+ * and writes Codex/opencode config, hooks, skills, and rules.
  *
  * Does NOT touch $CWD. For per-project context files (CLAUDE.md, PI.md, etc.),
  * use `fulcrum init` after global setup.
  *
  * Usage:
- *   pnpm setup                # all runtimes (claude + gemini + pi)
+ *   pnpm setup                # global runtimes (claude + gemini + pi + codex + opencode)
  *   pnpm setup:claude         # Claude Code only
  *   pnpm setup:gemini         # Gemini CLI only
  *   pnpm setup:pi             # PI cockpit only
@@ -2035,7 +2036,7 @@ export function probePiCockpitOnNpm(timeoutMs = 2_000): string | null {
   return v ? v : null;
 }
 
-/** Error thrown when --auto falls to --local AND local plugin file is absent. */
+/** Error thrown when auto/manual/native opencode plugin resolution fails. */
 export class OpencodePluginUnresolvedError extends Error {
   readonly code = "opencode-plugin-unresolved";
   constructor(reason: string) {
@@ -2685,7 +2686,7 @@ export function verifyInstall(opts: {
       ];
       installMode = detectOpencodeInstallMode(opencodeJsonc);
       canonicalVersion = readJsonVersion(OPENCODE_SRC_PKG);
-      // pluginVersion: for local mode use canonical; for npm mode would need probe (keep null for now)
+      // pluginVersion: manual mode uses canonical; native mode would need a probe (keep null for now).
       if (installMode === "manual") pluginVersion = canonicalVersion;
       break;
     }

@@ -8,13 +8,15 @@
 
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'child_process'
-import { resolve } from 'path'
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { delimiter, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '../../../../../')
 const INSTALL_SCRIPT = resolve(REPO_ROOT, 'agent-integration/install.ts')
 
-function runInstall(args: string[]): { stdout: string; stderr: string; status: number | null } {
+function runInstall(args: string[], env: NodeJS.ProcessEnv = process.env): { stdout: string; stderr: string; status: number | null } {
   const result = spawnSync(
     'node',
     ['--import', 'tsx/esm', INSTALL_SCRIPT, ...args],
@@ -23,12 +25,24 @@ function runInstall(args: string[]): { stdout: string; stderr: string; status: n
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 30_000,
+      env,
     }
   )
   return {
     stdout: result.stdout ?? '',
     stderr: result.stderr ?? '',
     status: result.status,
+  }
+}
+
+function fakeFulcrumEnv(): { env: NodeJS.ProcessEnv; cleanup: () => void } {
+  const binDir = mkdtempSync(join(tmpdir(), 'fulcrum-install-test-bin-'))
+  const fulcrumPath = join(binDir, 'fulcrum')
+  writeFileSync(fulcrumPath, '#!/bin/sh\nexit 0\n', 'utf8')
+  chmodSync(fulcrumPath, 0o755)
+  return {
+    env: { ...process.env, PATH: `${binDir}${delimiter}${process.env.PATH ?? ''}` },
+    cleanup: () => rmSync(binDir, { recursive: true, force: true }),
   }
 }
 
@@ -50,10 +64,15 @@ describe('install.ts doctor gate (dry-run)', () => {
   })
 
   it('shows seed task and memory step in dry-run output', () => {
-    const { stdout } = runInstall(['claude', '--dry-run'])
-    expect(stdout).toContain('Seed task and memory')
-    expect(stdout).toContain("seed task: 'Fulcrum setup verified'")
-    expect(stdout).toContain('seed memory entry via MCP write_memory')
+    const fake = fakeFulcrumEnv()
+    try {
+      const { stdout } = runInstall(['claude', '--dry-run'], fake.env)
+      expect(stdout).toContain('Seed task and memory')
+      expect(stdout).toContain("seed task: 'Fulcrum setup verified'")
+      expect(stdout).toContain('seed memory entry via MCP write_memory')
+    } finally {
+      fake.cleanup()
+    }
   })
 })
 

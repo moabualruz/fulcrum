@@ -1,5 +1,5 @@
 // packages/cli/src/tool-registry.ts
-// Unified handler registry — all 23 MCP tool implementations in one place.
+// Unified handler registry — all MCP tool implementations in one place.
 //
 // Both the MCP server and CLI commands (`fulcrum tool exec`) dispatch through here.
 // This eliminates the divergence between runServeMcp() and runServeMcpHttp(),
@@ -547,7 +547,8 @@ TOOL_REGISTRY.set('get_task', {
   schema: undefined,
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args, deps) => {
-    const task = deps.db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(args['task_id'] as string) as Record<string, unknown> | undefined
+    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
+    const task = deps.db.prepare('SELECT * FROM tasks WHERE task_id = ? AND workspace_id = ?').get(args['task_id'] as string, ws) as Record<string, unknown> | undefined
     if (!task) return { error: 'not_found', task_id: args['task_id'] }
     return {
       task_id: task['task_id'],
@@ -990,7 +991,7 @@ TOOL_REGISTRY.set('start_agent_run', {
       const stub = await createTask({ title: `[auto] ${args['agent_role']} run`, workspace_id: ws, project_id: proj })
       task_id = stub.task_id
     } else {
-      const existing = deps.db.prepare('SELECT task_id FROM tasks WHERE task_id = ?').get(task_id)
+      const existing = deps.db.prepare('SELECT task_id FROM tasks WHERE task_id = ? AND workspace_id = ?').get(task_id, ws)
       if (!existing) {
         const stub = await createTask({ title: `[auto] ${args['agent_role']} run`, workspace_id: ws, project_id: proj })
         task_id = stub.task_id

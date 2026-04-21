@@ -125,6 +125,23 @@ describe('normalizeHookEvent (H-21)', () => {
     })
   })
 
+  describe('GitHub Copilot CLI (Claude-compatible hook shape)', () => {
+    it('normalizes tool_name / tool_input / session_id', () => {
+      const result = normalizeHookEvent('copilot', {
+        tool_name: 'Write',
+        tool_input: { file_path: '/x', content: 'hi' },
+        session_id: 'copilot_sess_1',
+      })
+      expect(result).toEqual({
+        toolName: 'Write',
+        toolInput: { file_path: '/x', content: 'hi' },
+        sessionId: 'copilot_sess_1',
+        agentRole: '',
+        runId: '',
+      })
+    })
+  })
+
   describe('safety', () => {
     it('non-object toolInput degrades to empty object', () => {
       const result = normalizeHookEvent('claude', {

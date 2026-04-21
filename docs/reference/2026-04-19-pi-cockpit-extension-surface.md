@@ -167,7 +167,7 @@ Fulcrum cockpit's `PI.md` is installed into PI's extension dir as part of the co
 
 PI's MCP support as of v0.66.1: not documented explicitly in `docs/extensions.md` — PI exposes an extension-native tool system (`pi.registerTool`) that can act as a shim to MCP without PI consuming MCP directly.
 
-The Fulcrum cockpit uses `pi.registerTool` to surface all 32 Fulcrum MCP tools as native PI tools, bypassing MCP overhead entirely. This is the cockpit's design intent (see `agent-integration/pi/cockpit/index.ts` header comment: "11 native fulcrum_* tools (no MCP overhead)").
+The Fulcrum cockpit uses `pi.registerTool` to surface 11 Fulcrum-native PI tools for the high-value lifecycle, task, memory, workspace-status, and CoS-context paths. It does not mirror the full 32-tool MCP compatibility catalog one-for-one; PI gets a smaller native tool surface that bypasses MCP overhead.
 
 ## 9. Authentication
 

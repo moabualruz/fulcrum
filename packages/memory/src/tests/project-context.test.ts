@@ -49,4 +49,25 @@ describe('project_context — v2b PR 13 Task 4.2', () => {
     })
     expect(typeof result).toBe('object')
   })
+
+  it('does not return task_id matches from another workspace', async () => {
+    seedWorkspaceAndProject(db, 'ws2', 'proj2')
+    db.prepare(`
+      INSERT INTO tasks (
+        task_id, workspace_id, project_id, display_id, title, status,
+        status_category, priority, created_at, updated_at
+      ) VALUES (
+        'task_foreign', 'ws2', 'proj2', 'T-2',
+        'foreign task', 'completed', 'done', 'medium',
+        datetime('now'), datetime('now')
+      )
+    `).run()
+
+    const result = await runProjectContext({
+      task_id: 'task_foreign',
+      workspace_id: 'ws1',
+      project_id: 'proj1',
+    })
+    expect(result.tasks).toBeUndefined()
+  })
 })
