@@ -460,10 +460,13 @@ function wipeClaude(home: string, dryRun: boolean): WipeAction[] {
   const actions: WipeAction[] = [];
   const claudeDir = path.join(home, ".claude");
   const settingsPath = path.join(claudeDir, "settings.json");
+  // ~/.claude.json is where `claude mcp add --scope user` writes MCP entries
+  const claudeJsonPath = path.join(home, ".claude.json");
 
   // Shared config — surgical
   stripClaudeHooks(settingsPath, dryRun, actions);
   stripMcpEntry(settingsPath, "fulcrum", dryRun, actions);
+  stripMcpEntry(claudeJsonPath, "fulcrum", dryRun, actions);
   stripMarkerBlock(path.join(claudeDir, "CLAUDE.md"), dryRun, actions);
 
   // Exclusive fulcrum dirs/files
