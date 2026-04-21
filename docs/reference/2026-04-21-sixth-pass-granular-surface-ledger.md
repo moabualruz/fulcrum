@@ -522,9 +522,10 @@ source is `.windsurf/mcp.json`.
   release` pushed signed `pi-cockpit/v0.0.6`, `npm publish --access public`
   published `@fulcrum-agent-os/pi-cockpit@0.0.6`, and `npm view` shows
   `latest: 0.0.6`.
-- GitHub Actions publish attempts now reach npm but fail with empty
-  `NODE_AUTH_TOKEN`; repository secret `NPM_TOKEN` is absent/empty. The
-  packages were published manually from the authenticated local npm session.
+- GitHub Actions publish attempts reached npm but failed with empty
+  `NODE_AUTH_TOKEN`; repository secret `NPM_TOKEN` was then configured on
+  2026-04-22 from the local npm auth token. The already-published `0.0.6` tag
+  runs remain historical failures; the next fresh tag verifies CI publishing.
 - Watch-script shape verifier passed: 14 `test:watch` scripts are `vitest`,
   with paired `test` scripts as `vitest run`.
 - Version-script temp verifier passed: opencode and PI cockpit
@@ -548,8 +549,9 @@ source is `.windsurf/mcp.json`.
   secret scan because `.env` matched legitimate `process.env`/`output.env`
   code references.
 - `0.0.6` tags verified both workflow fixes and reached npm publish, then
-  failed only because `NPM_TOKEN` is not configured in GitHub Actions. Manual
-  authenticated npm publish closed the package availability rows.
+  failed only because `NPM_TOKEN` was not configured in GitHub Actions at run
+  time. Manual authenticated npm publish closed the package availability rows;
+  `NPM_TOKEN` is now configured for future tag releases.
 
 ## Next Sweep
 

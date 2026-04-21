@@ -757,7 +757,7 @@ external-blocker reduction, and post-fix broad verification.
 |---|---|---|---|
 | S7-OP-001 | local install state | `pnpm run setup`, `pnpm run setup:gemini`, and `pnpm run setup:check` passed after the Gemini fallback fix. | fixed |
 | S7-LEDGER-001 | full acceptance ledger | 2,769 rows now terminal: 2,769 accepted, 0 blocked, 0 open. | terminal-all-accepted |
-| S7-REL-001 | release package rows | Signed `0.0.6` tags pushed for opencode and PI cockpit, both packages published to npm and verified as `latest: 0.0.6`; GitHub Actions publish auth remains missing `NPM_TOKEN`, so manual npm publish closed package availability. | fixed-with-ops-note |
+| S7-REL-001 | release package rows | Signed `0.0.6` tags pushed for opencode and PI cockpit, both packages published to npm and verified as `latest: 0.0.6`; GitHub Actions publish auth was missing `NPM_TOKEN` during those runs, manual npm publish closed package availability, and `NPM_TOKEN` is now configured for future fresh-tag releases. | fixed-with-ops-note |
 
 ### Seventh-Pass Verification
 

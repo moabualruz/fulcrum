@@ -57880,7 +57880,7 @@
   "last_closure_run": {
     "date": "2026-04-21",
     "mode": "release-blocker-closure-loop",
-    "note": "The two release rows were closed after committing package version bumps, pushing signed v0.0.6 tags, and publishing both packages to npm from an authenticated local npm session. GitHub Actions publish attempts reached npm but failed because repository secret NPM_TOKEN is absent/empty; that is documented as an ops credential note, not a repo-local code blocker.",
+    "note": "The two release rows were closed after committing package version bumps, pushing signed v0.0.6 tags, and publishing both packages to npm from an authenticated local npm session. GitHub Actions publish attempts reached npm but failed because repository secret NPM_TOKEN was absent/empty at run time; NPM_TOKEN is now configured for future fresh-tag publishes.",
     "verifiers": [
       "Context7 /npm/cli publish docs",
       "official pnpm/action-setup docs via web research",

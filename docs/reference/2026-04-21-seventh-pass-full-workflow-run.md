@@ -147,16 +147,18 @@ Passed:
 
 Failed / blocked:
 
-- No unit-ledger rows remain blocked. GitHub Actions publish workflows still
-  fail at npm auth because repository secret `NPM_TOKEN` is absent/empty; the
-  packages were published manually from the authenticated local npm session.
+- No unit-ledger rows remain blocked. GitHub Actions publish workflows failed
+  at npm auth during the `0.0.6` tag runs because repository secret
+  `NPM_TOKEN` was absent/empty at run time; `NPM_TOKEN` is now configured for
+  future fresh-tag publishes. The `0.0.6` packages were published manually
+  from the authenticated local npm session.
 
 ## Self Check
 
 - Asked: run full workflow.
 - Done: ran snapshot, inventory, full package tests, build, cycle checks, config/install dry checks, review gate, fixed two verifier-backed code/integration bugs plus one active-doc drift, closed the ledger to terminal statuses, reran full verification, and recorded status.
 - Evidence paths: this report, sixth-pass unit ledger, `scripts/surface-inventory.test.ts`, CLI TUI test, Gemini installer test, workflow runner test, setup check, package test output.
-- Remaining uncertainty: GitHub Actions publish auth needs repo secret setup or
-  trusted-publishing migration; no current unit-ledger row remains open or
-  blocked.
+- Remaining uncertainty: CI publish auth should be verified on the next fresh
+  version tag or migrated to trusted publishing; no current unit-ledger row
+  remains open or blocked.
 - Next step allowed: yes, but only to search for new units outside the current ledger or resolve explicit external blockers. No hidden open-row claim remains.
