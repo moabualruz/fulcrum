@@ -1,5 +1,5 @@
 // packages/planning/src/relations.ts
-import { getDb, FulcrumError, rowToTaskBase, Db} from 'fulcrum-agent-core'
+import { getDb, FulcrumError, rowToTaskBase, Db } from 'fulcrum-agent-core'
 import type { Task } from 'fulcrum-agent-core'
 import type { TaskRelation, AddTaskRelationInput, RemoveTaskRelationInput, GetTaskRelationsInput } from './types.js'
 
@@ -23,20 +23,24 @@ const DIRECTED_RELATION_TYPES: ReadonlySet<string> = new Set([
  * create a cycle. Uses a recursive CTE to walk the existing graph.
  * Only checked for directed dependency relations.
  */
-function wouldCreateCycle(db: Db, fromId: string, toId: string, relationType: string): boolean {
+function wouldCreateCycle(db: Db, workspaceId: string, fromId: string, toId: string, relationType: string): boolean {
   if (!DIRECTED_RELATION_TYPES.has(relationType)) return false
   // A cycle exists if `toId` already transitively reaches `fromId` via the same relation type.
   const row = db.prepare(`
     WITH RECURSIVE reachable(node) AS (
       SELECT target_task_id FROM task_relations
        WHERE task_id = ? AND relation_type = ?
+         AND EXISTS (SELECT 1 FROM tasks WHERE task_id = task_relations.task_id AND workspace_id = ?)
+         AND EXISTS (SELECT 1 FROM tasks WHERE task_id = task_relations.target_task_id AND workspace_id = ?)
       UNION
       SELECT r.target_task_id FROM task_relations r
       JOIN reachable rc ON r.task_id = rc.node
        WHERE r.relation_type = ?
+         AND EXISTS (SELECT 1 FROM tasks WHERE task_id = r.task_id AND workspace_id = ?)
+         AND EXISTS (SELECT 1 FROM tasks WHERE task_id = r.target_task_id AND workspace_id = ?)
     )
     SELECT 1 FROM reachable WHERE node = ? LIMIT 1
-  `).get(toId, relationType, relationType, fromId)
+  `).get(toId, relationType, workspaceId, workspaceId, relationType, workspaceId, workspaceId, fromId)
   return row !== undefined
 }
 
@@ -44,13 +48,13 @@ export async function addTaskRelation(input: AddTaskRelationInput, db: Db = getD
   if (input.task_id === input.target_task_id) {
     throw new FulcrumError('task_id and target_task_id must be different', 'invalid_input')
   }
-  const task = db.prepare('SELECT task_id FROM tasks WHERE task_id = ?').get(input.task_id)
+  const task = db.prepare('SELECT task_id FROM tasks WHERE task_id = ? AND workspace_id = ?').get(input.task_id, input.workspace_id)
   if (!task) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
-  const target = db.prepare('SELECT task_id FROM tasks WHERE task_id = ?').get(input.target_task_id)
+  const target = db.prepare('SELECT task_id FROM tasks WHERE task_id = ? AND workspace_id = ?').get(input.target_task_id, input.workspace_id)
   if (!target) throw new FulcrumError(`Task ${input.target_task_id} not found`, 'not_found')
 
   // PLAN-004: reject cycles in directed dependency relations
-  if (wouldCreateCycle(db, input.task_id, input.target_task_id, input.relation_type)) {
+  if (wouldCreateCycle(db, input.workspace_id, input.task_id, input.target_task_id, input.relation_type)) {
     throw new FulcrumError(
       `Adding relation '${input.relation_type}' from ${input.task_id} to ${input.target_task_id} would create a cycle`,
       'invalid_input'
@@ -65,8 +69,13 @@ export async function addTaskRelation(input: AddTaskRelationInput, db: Db = getD
 
 export async function removeTaskRelation(input: RemoveTaskRelationInput, db: Db = getDb()): Promise<void> {
   const result = db.prepare(`
-    DELETE FROM task_relations WHERE task_id = ? AND target_task_id = ? AND relation_type = ?
-  `).run(input.task_id, input.target_task_id, input.relation_type)
+    DELETE FROM task_relations
+     WHERE task_id = ?
+       AND target_task_id = ?
+       AND relation_type = ?
+       AND EXISTS (SELECT 1 FROM tasks WHERE task_id = task_relations.task_id AND workspace_id = ?)
+       AND EXISTS (SELECT 1 FROM tasks WHERE task_id = task_relations.target_task_id AND workspace_id = ?)
+  `).run(input.task_id, input.target_task_id, input.relation_type, input.workspace_id, input.workspace_id)
   if (result.changes === 0) {
     throw new FulcrumError(
       `Relation ${input.relation_type} from ${input.task_id} to ${input.target_task_id} not found`,
@@ -75,21 +84,31 @@ export async function removeTaskRelation(input: RemoveTaskRelationInput, db: Db 
   }
 }
 
-export async function getBlockers(taskId: string, db: Db = getDb()): Promise<Task[]> {
+export async function getBlockers(input: { workspace_id: string; task_id: string }, db: Db = getDb()): Promise<Task[]> {
   // A blocker is any task T where T blocks taskId, i.e. task_relations(T, taskId, 'blocks')
   const rows = db.prepare(`
     SELECT t.* FROM tasks t
     INNER JOIN task_relations r ON r.task_id = t.task_id
-    WHERE r.target_task_id = ? AND r.relation_type = 'blocks'
+    INNER JOIN tasks target ON target.task_id = r.target_task_id
+    WHERE r.target_task_id = ?
+      AND r.relation_type = 'blocks'
+      AND t.workspace_id = ?
+      AND target.workspace_id = ?
     ORDER BY r.created_at ASC
-  `).all(taskId) as Record<string, unknown>[]
+  `).all(input.task_id, input.workspace_id, input.workspace_id) as Record<string, unknown>[]
   return rows.map(rowToTask)
 }
 
 export async function getTaskRelations(input: GetTaskRelationsInput, db: Db = getDb()): Promise<TaskRelation[]> {
   const rows = db.prepare(`
-    SELECT * FROM task_relations WHERE task_id = ? ORDER BY created_at ASC
-  `).all(input.task_id) as Array<{
+    SELECT r.* FROM task_relations r
+    INNER JOIN tasks source ON source.task_id = r.task_id
+    INNER JOIN tasks target ON target.task_id = r.target_task_id
+    WHERE r.task_id = ?
+      AND source.workspace_id = ?
+      AND target.workspace_id = ?
+    ORDER BY r.created_at ASC
+  `).all(input.task_id, input.workspace_id, input.workspace_id) as Array<{
     task_id: string
     target_task_id: string
     relation_type: string

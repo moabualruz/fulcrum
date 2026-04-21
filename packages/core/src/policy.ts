@@ -1,4 +1,4 @@
-import { getDb , Db} from './db/client.js'
+import { getDb, Db } from './db/client.js'
 import { FulcrumError } from './types.js'
 import type { AgentRole, PolicyConfig, PolicyCheckResult } from './types.js'
 
@@ -26,14 +26,21 @@ export async function checkPolicy(input: CheckPolicyInput, db: Db = getDb()): Pr
 
   // Find all tasks that this task depends on (follows/blocked_by/preceded_by relations)
   const depRows = db.prepare(
-    `SELECT target_task_id FROM task_relations WHERE task_id = ? AND relation_type IN ('follows','blocked_by','preceded_by')`
-  ).all(input.task_id) as { target_task_id: string }[]
+    `SELECT r.target_task_id
+       FROM task_relations r
+       INNER JOIN tasks source ON source.task_id = r.task_id
+       INNER JOIN tasks target ON target.task_id = r.target_task_id
+      WHERE r.task_id = ?
+        AND source.workspace_id = ?
+        AND target.workspace_id = ?
+        AND r.relation_type IN ('follows','blocked_by','preceded_by')`
+  ).all(input.task_id, input.workspace_id, input.workspace_id) as { target_task_id: string }[]
   const deps = depRows.map(r => r.target_task_id)
   if (deps.length > 0) {
     const placeholders = deps.map(() => '?').join(',')
     const incomplete = db.prepare(
-      `SELECT task_id FROM tasks WHERE task_id IN (${placeholders}) AND status != 'completed'`
-    ).all(...deps) as { task_id: string }[]
+      `SELECT task_id FROM tasks WHERE workspace_id = ? AND task_id IN (${placeholders}) AND status != 'completed'`
+    ).all(input.workspace_id, ...deps) as { task_id: string }[]
     if (incomplete.length > 0) {
       return {
         allowed: false,

@@ -90,11 +90,11 @@ and code. This distinguishes workflow setup from an actual project pass.
 | docs inventory | all docs | `find docs -type f | sort`; top-level inventory counts | 146 docs; inventory remained canonical. |
 | active docs | AGENTS, guides, architecture, master plan, current plans/reference | stale phrase scans for counts, memory v2/v3 status, tool counts, package names, open-row markers | Found active memory-v3 drift in `AGENTS.md`, `agent-integration/claude/CLAUDE.md`, and `MASTER-PLAN.md`; fixed below. |
 | historical docs | audit/history/brainstorms/handover/old plans | same stale phrase scans with source-order classification | Many historical stale counts/status strings remain; left as archival unless active docs depend on them. |
-| core-data | `packages/core`, `packages/memory`, `packages/policy` | scans for wildcard exports, `.js` import suffixes, bare `ulid()`, role slug comparisons, task-by-ID workspace scoping | Workspace scoping debt remains in task update/relation/outcome/recall paths; requires fix-plan packet. |
-| cli-install | `packages/cli`, MCP, hooks, `agent-integration/install.ts` | MCP name scan, hook CLI scan, fanout import/call-site scan, install-mode scans | 32 public MCP tools remain current; fanout is consumed by Codex and opencode installers only. |
+| core-data | `packages/core`, `packages/memory`, `packages/policy` | scans for wildcard exports, `.js` import suffixes, bare `ulid()`, role slug comparisons, task-by-ID workspace scoping | Later passes fixed the bounded task scoping debt in `updateTask`, planning relations, policy dependency checks, task-memory recall, and task-outcome synthesis. |
+| cli-install | `packages/cli`, MCP, hooks, `agent-integration/install.ts` | MCP name scan, hook CLI scan, fanout import/call-site scan, install-mode scans | 32 public MCP tools remain current; later passes wired fanout consumption for Codex, opencode, Cursor, Windsurf, and Copilot generated installers. |
 | agent-integration | `packages/agent-fanout`, `agent-integration`, skills | skill count scan, role catalog scan, generated artifact and dispatcher scans | 33 canonical skills and 24 role catalog files remain current; PI and Codex Fulcrum-first bias gaps were fixed in the sixth-pass reopen. |
-| execution | worker/workflows/teams/worktrees/planning | package source/test scans, task lifecycle queries, public exports | No new bounded code fix accepted; strict task scoping surfaces remain too broad for opportunistic patching. |
-| integration | producer/consumer pairs | fanout producer/consumer scan, memory v3 doc-to-code scan, policy/run lifecycle scan | Memory v3 current docs now align with shipped code; fanout remains partial; audited PI/Codex Fulcrum-first integrations were fixed in the sixth-pass reopen. |
+| execution | worker/workflows/teams/worktrees/planning | package source/test scans, task lifecycle queries, public exports | Later passes fixed the bounded strict task scoping surfaces and verified planning/core/memory regressions. |
+| integration | producer/consumer pairs | fanout producer/consumer scan, memory v3 doc-to-code scan, policy/run lifecycle scan | Memory v3 current docs align with shipped code; audited fanout and PI/Codex Fulcrum-first integrations were fixed in later passes. |
 
 ### Packet Ledger
 
@@ -102,8 +102,8 @@ and code. This distinguishes workflow setup from an actual project pass.
 |---|---|---|---|---|---|---|
 | F5-L1 | docs active/current | packet-emulated | accepted | active memory-v3 stale docs found and fixed | stale phrase scan | static verification |
 | F5-L2 | docs historical | packet-emulated | accepted | stale historical phrases classified as archival | source-order classification | docs-policy packet only if desired |
-| F5-L3 | core-data | packet-emulated | accepted | strict task workspace scoping debt still open | task query guard scan | fix-plan packet |
-| F5-L4 | cli-install | packet-emulated | accepted | fanout consumption partial: Codex/opencode only | install fanout call-site scan | fix-plan packet |
+| F5-L3 | core-data | packet-emulated | fixed in seventh-cycle final check | strict task workspace scoping debt closed for planning relations, policy dependency checks, task-outcome synthesis, and task-memory recall | task query guard scan; targeted core/memory/planning tests | no remaining packet |
+| F5-L4 | cli-install | packet-emulated | fixed in sixth/seventh passes | fanout consumption wired for generated Codex, opencode, Cursor, Windsurf, and Copilot installer artifacts | install fanout utilization tests; fanout tests | no remaining packet |
 | F5-L5 | agent-integration | packet-emulated | fixed in sixth-pass reopen | Fulcrum-first bias fixed for PI and Codex with runtime-specific verifiers | hook/runtime scan | checklist refresh |
 | F5-L6 | skills | packet-emulated | fixed | skills hardened to reject setup-only passes | skill content/link scan | static verification |
 
@@ -122,25 +122,25 @@ and code. This distinguishes workflow setup from an actual project pass.
 | F5-001 | P1 | workflow-gap | pass orchestration | Existing workflow skills routed reviewers but did not define a conductor, lane graph, context capsules, or result merge protocol. | skill-creator, architecture-strategist, agent-native-audit | new skill bodies present and linked | Fixed |
 | F5-002 | P1 | workflow-gap | delegated tasks | Existing skills did not force each delegated task to carry research gate, forbidden scope, verifier, self-check, and return schema. | skill-creator, project-standards-reviewer | packet schema in `focused-subagent-task-packet` | Fixed |
 | F5-003 | P2 | workflow-gap | result integration | Multi-lane findings had no reusable merge/dedup/severity/verifier ledger skill. | maintainability-reviewer, testing-reviewer | `subagent-result-integrator` added | Fixed |
-| F5-004 | P2 | process-gap | big code gaps | Strict task workspace scoping API migration and full installer fanout consumption remain too large for opportunistic fixing. They need dedicated fix-plan packets and verifier-first implementation. | data-integrity-guardian, architecture-strategist, cli-agent-readiness-reviewer, agent-native-audit | future fix-plan packets | Open |
-| F5-005 | P3 | operator-gap | npm publish | opencode and PI cockpit publish rows remain external operator actions. | project-standards-reviewer | release evidence only | Blocked |
+| F5-004 | P2 | process-gap | big code gaps | Strict task workspace scoping API migration and full installer fanout consumption were promoted to dedicated fix lanes and closed in later passes. | data-integrity-guardian, architecture-strategist, cli-agent-readiness-reviewer, agent-native-audit | final-cycle targeted tests; fanout utilization tests | Fixed in later passes |
+| F5-005 | P3 | operator-gap | npm publish | opencode and PI cockpit publish rows were closed by signed tag checks, package-local tests, packed-tarball scans, manual authenticated npm publish, registry `latest` verification, and future `NPM_TOKEN` configuration. | project-standards-reviewer | release evidence | Fixed in seventh pass |
 | F5-006 | P1 | doc-stale | active memory docs | `AGENTS.md` and Claude integration guidance still described Memory v3 as draft/not live even though active architecture docs and code show v3 is shipped and the flag is retired. | document-review, coherence-reviewer, data-integrity-guardian | active stale phrase scan | Fixed |
-| F5-007 | P2 | code-gap | task workspace scoping | Task-by-ID scoping remains incomplete in `updateTask`, planning relations, memory task-outcome synthesis, and task-memory recall paths. | data-integrity-guardian, security-sentinel, correctness-reviewer | task query guard scan; needs failing regression before fix | Open |
-| F5-008 | P2 | integration-gap | installer fanout | `agent-integration/install.ts` consumes `agent-fanout` emitters for Codex and opencode, while other installers still use committed templates or native source trees directly. | cli-agent-readiness-reviewer, agent-native-audit, architecture-strategist | fanout import/call-site scan | Open |
+| F5-007 | P2 | code-gap | task workspace scoping | Final-cycle fix scoped planning relations, core policy dependency checks, CoS task-update ownership, memory task-outcome synthesis, and task-memory recall by `workspace_id`. | data-integrity-guardian, security-sentinel, correctness-reviewer | targeted cross-workspace regressions; core/memory/planning tests | Fixed in seventh-cycle final check |
+| F5-008 | P2 | integration-gap | installer fanout | Generated installer artifacts for Codex, opencode, Cursor, Windsurf, and Copilot now consume current fanout emitter output; host-native plugin/package trees stay separate surfaces with their own verifiers. | cli-agent-readiness-reviewer, agent-native-audit, architecture-strategist | fanout import/call-site scan; install fanout utilization tests | Fixed in sixth pass |
 | F5-009 | P2 | integration-gap | Fulcrum-first bias | Search-tool Fulcrum-first hook bias was wired through Claude/opencode/Gemini pre-hook paths, while PI and Codex needed runtime-specific lanes. PI now injects through `before_agent_start`; Codex now uses `PermissionRequest` search telemetry/nudge because PreToolUse is Bash-only. | agent-native-audit, cli-agent-readiness-reviewer, reliability-reviewer | PI cockpit tests; Codex hook tests | Fixed in sixth-pass reopen |
 | F5-010 | P3 | doc-stale | historical docs | Historical brainstorm, audit, handover, and old plan docs still contain older package/tool/test/memory-status language. They are not current truth unless referenced by active docs. | document-review, scope-guardian-reviewer | source-order classification | Blocked: docs-policy decision |
 | F5-011 | P2 | process-gap | claim verification | Naive catalog/count greps can create false positives, for example schema property `name:` fields when counting MCP tools. Skills now require source-shaped parsing for numeric claims. | testing-reviewer, project-standards-reviewer | updated packet/integrator/drift skill rules | Fixed |
 | F5-012 | P1 | workflow-gap | feature acceptance | Prior passes did not force active features, including the web view / install TUI dashboard, into smallest-unit requirement rows with runtime proof. The workflow could pass without answering a direct feature-completion question. | granular-feature-acceptance-auditor, document-review, testing-reviewer, agent-native-audit | new skill plus orchestrator/drift/fix gates | Fixed in workflow; project audit still required |
 
-## Big-Gap Packets Required Next
+## Big-Gap Packet Closure
 
 | Packet | Scope | Required verifier before fix |
 |---|---|---|
-| `strict-task-workspace-scoping-api-migration` | `updateTask`, planning task relations, task-outcome synthesis | failing cross-workspace regression or API guard scan |
-| `full-installer-fanout-consumption` | remaining installer paths that bypass fanout artifacts | config-integrity or fanout consumption canary |
-| `per-host-event-runtime-ledger` | Cursor/Windsurf/Copilot hook/event runtime scope | targeted read/search bias is fixed, but every host event/tool/artifact still needs separate config, dispatcher, payload, session, runtime-effect, and negative-path rows |
-| `historical-docs-archive-policy` | old brainstorm/audit/handover/planning docs with stale claims | decision on annotate/archive/ignore policy |
-| `operator-publish-closeout` | opencode and PI cockpit npm packages | external publish evidence; no code status flip without it |
+| `strict-task-workspace-scoping-api-migration` | `updateTask`, planning task relations, task-outcome synthesis, task-memory recall, policy dependency checks | Closed in later passes with cross-workspace regressions and targeted package tests. |
+| `full-installer-fanout-consumption` | generated installer paths that should use fanout artifacts | Closed in sixth pass with install fanout utilization tests and fanout package tests. |
+| `per-host-event-runtime-ledger` | Cursor/Windsurf/Copilot hook/event runtime scope | Closed through the sixth-pass unit ledger and terminal `surface-inventory` guard. |
+| `historical-docs-archive-policy` | old brainstorm/audit/handover/planning docs with stale claims | Not an active code gap; historical docs remain archival unless referenced by current docs. |
+| `operator-publish-closeout` | opencode and PI cockpit npm packages | Closed in seventh pass by release evidence and registry verification. |
 
 ## Lessons Fed Back Into Skills
 

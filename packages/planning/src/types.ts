@@ -241,18 +241,21 @@ export interface LinkIssueToPlanInput {
 }
 
 export interface AddTaskRelationInput {
+  workspace_id: string
   task_id: string
   target_task_id: string
   relation_type: TaskRelationType
 }
 
 export interface RemoveTaskRelationInput {
+  workspace_id: string
   task_id: string
   target_task_id: string
   relation_type: TaskRelationType
 }
 
 export interface GetTaskRelationsInput {
+  workspace_id: string
   task_id: string
 }
 

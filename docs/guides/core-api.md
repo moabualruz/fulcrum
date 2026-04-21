@@ -82,7 +82,7 @@ const caps = roleCapabilities('software_engineer')
 writeMemory(input)   // Write to L0 vault + L1 SQLite, async L2 graph update
 recallMemory(input)  // Hybrid: FTS5 → optional HNSW vector → optional BGE reranker
 getMemory(id)
-getMemoriesForTask(task_id)
+getMemoriesForTask({ workspace_id, task_id })
 ```
 
 See [`memory.md`](memory.md) for the full three-layer memory system.

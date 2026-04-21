@@ -26,7 +26,7 @@ describe('synthesizeTaskOutcome — v2a PR 8 Task 39', () => {
   afterEach(() => closeDb())
 
   it('produces a task_outcome with files_touched derived from file_patch rows', async () => {
-    const result = await synthesizeTaskOutcome('task_a', db)
+    const result = await synthesizeTaskOutcome({ workspace_id: 'ws_1', task_id: 'task_a' }, db)
     expect(result).toBeDefined()
     expect(result!.kind).toBe('task_outcome')
     expect(result!.files_touched).toContain('src/auth.ts')
@@ -35,7 +35,7 @@ describe('synthesizeTaskOutcome — v2a PR 8 Task 39', () => {
   })
 
   it('writes a memories row with kind=task_outcome and provenance.run_id set', async () => {
-    await synthesizeTaskOutcome('task_a', db)
+    await synthesizeTaskOutcome({ workspace_id: 'ws_1', task_id: 'task_a' }, db)
     const row = db.prepare(`SELECT kind, provenance FROM memories WHERE task_id='task_a' AND kind='task_outcome'`).get() as { kind: string; provenance: string }
     expect(row).toBeDefined()
     expect(row.kind).toBe('task_outcome')
@@ -45,15 +45,25 @@ describe('synthesizeTaskOutcome — v2a PR 8 Task 39', () => {
   })
 
   it('is idempotent — second call returns null because the row already exists', async () => {
-    const first = await synthesizeTaskOutcome('task_a', db)
+    const first = await synthesizeTaskOutcome({ workspace_id: 'ws_1', task_id: 'task_a' }, db)
     expect(first).toBeDefined()
-    const second = await synthesizeTaskOutcome('task_a', db)
+    const second = await synthesizeTaskOutcome({ workspace_id: 'ws_1', task_id: 'task_a' }, db)
     expect(second).toBeNull()
   })
 
   it('returns null when the task is not found', async () => {
-    const r = await synthesizeTaskOutcome('task_missing', db)
+    const r = await synthesizeTaskOutcome({ workspace_id: 'ws_1', task_id: 'task_missing' }, db)
     expect(r).toBeNull()
+  })
+
+  it('returns null for a task in another workspace', async () => {
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_2','w2','active','2026-04-17T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_2','ws_2','p2','git','active','worktree','2026-04-17T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO tasks (task_id, workspace_id, project_id, display_id, title, description, status, status_category, priority, created_at, updated_at) VALUES ('task_foreign','ws_2','proj_2','T-2','Foreign','x','completed','done','medium','2026-04-17T00:00:00Z','2026-04-17T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO agent_runs (run_id, task_id, workspace_id, project_id, display_id, agent_id, role, status, status_category, output_summary, started_at, updated_at) VALUES ('run_foreign','task_foreign','ws_2','proj_2','R-2','a','software_engineer','finished','done','foreign run','2026-04-17T00:00:00Z','2026-04-17T01:00:00Z')`).run()
+
+    const result = await synthesizeTaskOutcome({ workspace_id: 'ws_1', task_id: 'task_foreign' }, db)
+    expect(result).toBeNull()
   })
 })
 
@@ -69,7 +79,7 @@ describe('synthesizeBlockerResolution — v2a PR 8 Task 40', () => {
   afterEach(() => closeDb())
 
   it('produces a blocker_resolution with the task note carried into summary', async () => {
-    const result = await synthesizeBlockerResolution('task_b', db)
+    const result = await synthesizeBlockerResolution({ workspace_id: 'ws_1', task_id: 'task_b' }, db)
     expect(result).toBeDefined()
     expect(result!.kind).toBe('blocker_resolution')
     expect(result!.summary).toContain('need OWNER review')
@@ -77,7 +87,7 @@ describe('synthesizeBlockerResolution — v2a PR 8 Task 40', () => {
   })
 
   it('writes provenance.hook_point=update_task:blocked', async () => {
-    await synthesizeBlockerResolution('task_b', db)
+    await synthesizeBlockerResolution({ workspace_id: 'ws_1', task_id: 'task_b' }, db)
     const row = db.prepare(`SELECT provenance FROM memories WHERE task_id='task_b' AND kind='blocker_resolution'`).get() as { provenance: string }
     expect(JSON.parse(row.provenance).hook_point).toBe('update_task:blocked')
   })
@@ -85,7 +95,7 @@ describe('synthesizeBlockerResolution — v2a PR 8 Task 40', () => {
   it('race-guard: returns null if a task_outcome / blocker_resolution / session_summary already exists for the task', async () => {
     db.prepare(`INSERT INTO memories (memory_id, workspace_id, project_id, scope, kind, title, content, task_id, slug, vault_path, created_at, updated_at, last_accessed_at)
                 VALUES ('mem_existing','ws_1','proj_1','project','session_summary','existing','x','task_b','mem_existing','legacy/mem_existing.md','2026-04-17T00:00:00Z','2026-04-17T00:00:00Z','2026-04-17T00:00:00Z')`).run()
-    const r = await synthesizeBlockerResolution('task_b', db)
+    const r = await synthesizeBlockerResolution({ workspace_id: 'ws_1', task_id: 'task_b' }, db)
     expect(r).toBeNull()
   })
 })

@@ -97,13 +97,14 @@ describe('Full planning hierarchy: PRD → Plan → Issue → Task chain', () =>
       title: 'Set up secrets management',
     })
     await addTaskRelation({
+      workspace_id: 'ws_1',
       task_id: blockerTask.task_id,
       target_task_id: task.task_id,
       relation_type: 'blocks',
     })
 
     // 10. Verify blocker is found
-    const blockers = await getBlockers(task.task_id)
+    const blockers = await getBlockers({ workspace_id: 'ws_1', task_id: task.task_id })
     expect(blockers).toHaveLength(1)
     expect(blockers[0].task_id).toBe(blockerTask.task_id)
 

@@ -37,20 +37,27 @@ interface AgentRunRow {
   context_type: string | null
 }
 
-function loadTask(db: Db, task_id: string): TaskRow | null {
-  return db.prepare('SELECT task_id, workspace_id, project_id, title, description, status FROM tasks WHERE task_id = ?').get(task_id) as TaskRow | undefined ?? null
+interface TaskSynthesisInput {
+  workspace_id: string
+  task_id: string
 }
 
-function loadRunsForTask(db: Db, task_id: string): AgentRunRow[] {
-  return db.prepare('SELECT run_id, task_id, started_at, finished_at, output_summary, context_type FROM agent_runs WHERE task_id = ? ORDER BY started_at').all(task_id) as AgentRunRow[]
+function loadTask(db: Db, input: TaskSynthesisInput): TaskRow | null {
+  return db.prepare('SELECT task_id, workspace_id, project_id, title, description, status FROM tasks WHERE task_id = ? AND workspace_id = ?')
+    .get(input.task_id, input.workspace_id) as TaskRow | undefined ?? null
 }
 
-function gatherRelevantMemories(db: Db, task_id: string, kinds: string[]): { memory_id: string; kind: string; content: string; file_path: string | null }[] {
+function loadRunsForTask(db: Db, input: TaskSynthesisInput): AgentRunRow[] {
+  return db.prepare('SELECT run_id, task_id, started_at, finished_at, output_summary, context_type FROM agent_runs WHERE task_id = ? AND workspace_id = ? ORDER BY started_at')
+    .all(input.task_id, input.workspace_id) as AgentRunRow[]
+}
+
+function gatherRelevantMemories(db: Db, input: TaskSynthesisInput, kinds: string[]): { memory_id: string; kind: string; content: string; file_path: string | null }[] {
   if (kinds.length === 0) return []
   const placeholders = kinds.map(() => '?').join(',')
   return db.prepare(
-    `SELECT memory_id, kind, content, file_path FROM memories WHERE task_id = ? AND kind IN (${placeholders}) ORDER BY created_at`,
-  ).all(task_id, ...kinds) as Array<{ memory_id: string; kind: string; content: string; file_path: string | null }>
+    `SELECT memory_id, kind, content, file_path FROM memories WHERE task_id = ? AND workspace_id = ? AND kind IN (${placeholders}) ORDER BY created_at`,
+  ).all(input.task_id, input.workspace_id, ...kinds) as Array<{ memory_id: string; kind: string; content: string; file_path: string | null }>
 }
 
 function distinctFilePaths(memories: { file_path: string | null }[]): string[] {
@@ -95,24 +102,24 @@ function buildBlockerSummary(task: TaskRow, runs: AgentRunRow[], note: string | 
  * Returns null if the synthesis row already exists, or if the task isn't
  * found / has no run rows yet.
  */
-export async function synthesizeTaskOutcome(task_id: string, db: Db = getDb()): Promise<SynthesisResult | null> {
-  const task = loadTask(db, task_id)
+export async function synthesizeTaskOutcome(input: TaskSynthesisInput, db: Db = getDb()): Promise<SynthesisResult | null> {
+  const task = loadTask(db, input)
   if (!task) return null
-  const runs = loadRunsForTask(db, task_id)
+  const runs = loadRunsForTask(db, input)
 
   // Race-guard: skip if a task_outcome / blocker_resolution / session_summary
   // already exists for any run on this task.
   const existing = db.prepare(
-    `SELECT memory_id FROM memories WHERE task_id = ? AND kind IN ('task_outcome', 'blocker_resolution', 'session_summary') LIMIT 1`,
-  ).get(task_id) as { memory_id: string } | undefined
+    `SELECT memory_id FROM memories WHERE task_id = ? AND workspace_id = ? AND kind IN ('task_outcome', 'blocker_resolution', 'session_summary') LIMIT 1`,
+  ).get(input.task_id, input.workspace_id) as { memory_id: string } | undefined
   if (existing) return null
 
-  const filePatches = gatherRelevantMemories(db, task_id, ['file_patch', 'diff', 'code'])
+  const filePatches = gatherRelevantMemories(db, input, ['file_patch', 'diff', 'code'])
   const summary = buildOutcomeSummary(task, runs, filePatches)
   const filesTouched = distinctFilePaths(filePatches)
 
   return insertSynthesisMemory(db, {
-    task_id,
+    task_id: input.task_id,
     workspace_id: task.workspace_id,
     project_id: task.project_id,
     kind: 'task_outcome',
@@ -127,22 +134,22 @@ export async function synthesizeTaskOutcome(task_id: string, db: Db = getDb()): 
  * Synthesize a blocker_resolution memory for a blocked task. Same race-guard
  * semantics as synthesizeTaskOutcome.
  */
-export async function synthesizeBlockerResolution(task_id: string, db: Db = getDb()): Promise<SynthesisResult | null> {
-  const task = loadTask(db, task_id)
+export async function synthesizeBlockerResolution(input: TaskSynthesisInput, db: Db = getDb()): Promise<SynthesisResult | null> {
+  const task = loadTask(db, input)
   if (!task) return null
-  const runs = loadRunsForTask(db, task_id)
+  const runs = loadRunsForTask(db, input)
 
   const existing = db.prepare(
-    `SELECT memory_id FROM memories WHERE task_id = ? AND kind IN ('task_outcome', 'blocker_resolution', 'session_summary') LIMIT 1`,
-  ).get(task_id) as { memory_id: string } | undefined
+    `SELECT memory_id FROM memories WHERE task_id = ? AND workspace_id = ? AND kind IN ('task_outcome', 'blocker_resolution', 'session_summary') LIMIT 1`,
+  ).get(input.task_id, input.workspace_id) as { memory_id: string } | undefined
   if (existing) return null
 
-  const note = db.prepare('SELECT note FROM tasks WHERE task_id = ?').get(task_id) as { note: string | null } | undefined
-  const filePatches = gatherRelevantMemories(db, task_id, ['file_patch'])
+  const note = db.prepare('SELECT note FROM tasks WHERE task_id = ? AND workspace_id = ?').get(input.task_id, input.workspace_id) as { note: string | null } | undefined
+  const filePatches = gatherRelevantMemories(db, input, ['file_patch'])
   const summary = buildBlockerSummary(task, runs, note?.note ?? null)
 
   return insertSynthesisMemory(db, {
-    task_id,
+    task_id: input.task_id,
     workspace_id: task.workspace_id,
     project_id: task.project_id,
     kind: 'blocker_resolution',

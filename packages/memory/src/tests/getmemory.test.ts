@@ -78,7 +78,7 @@ describe('getMemoriesForTask', () => {
       task_id: 'task_1',
     })
 
-    const results = await getMemoriesForTask('task_1')
+    const results = await getMemoriesForTask({ workspace_id: 'ws_1', task_id: 'task_1' })
     expect(results).toHaveLength(2)
     // Sorted newest first (created_at DESC)
     expect(results[0].title).toBe('Second task memory')
@@ -92,7 +92,7 @@ describe('getMemoriesForTask', () => {
   it('returns empty array when task has no memories', async () => {
     const db = getDb()
     seedWorkspaceAndProject(db)
-    const results = await getMemoriesForTask('task_nonexistent')
+    const results = await getMemoriesForTask({ workspace_id: 'ws_1', task_id: 'task_nonexistent' })
     expect(results).toEqual([])
   })
 
@@ -133,9 +133,30 @@ describe('getMemoriesForTask', () => {
       content: 'no task linked',
     })
 
-    const results = await getMemoriesForTask('task_a')
+    const results = await getMemoriesForTask({ workspace_id: 'ws_1', task_id: 'task_a' })
     expect(results).toHaveLength(1)
     expect(results[0].title).toBe('Memory for A')
     expect(results[0].task_id).toBe('task_a')
+  })
+
+  it('does not return task memories from another workspace', async () => {
+    const db = getDb()
+    seedWorkspaceAndProject(db)
+    seedWorkspaceAndProject(db, 'ws_2', 'proj_2')
+    db.prepare("INSERT OR IGNORE INTO tasks(task_id, workspace_id, project_id, title, status) VALUES ('task_foreign', 'ws_2', 'proj_2', 'Foreign', 'queued')").run()
+
+    await writeMemory({
+      workspace_id: 'ws_2',
+      project_id: 'proj_2',
+      scope: 'project',
+      kind: 'fact',
+      title: 'Foreign task memory',
+      summary: 's',
+      content: 'foreign',
+      task_id: 'task_foreign',
+    })
+
+    const results = await getMemoriesForTask({ workspace_id: 'ws_1', task_id: 'task_foreign' })
+    expect(results).toEqual([])
   })
 })

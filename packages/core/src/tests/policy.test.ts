@@ -230,4 +230,24 @@ describe('checkPolicy — task dependencies', () => {
     })
     expect(result.allowed).toBe(true)
   })
+
+  it('ignores relation rows whose target task is outside the workspace', async () => {
+    seed()
+    const db = getDb()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_2', 'Other')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2', 'ws_2', 'Other')").run()
+    const child = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Child' })
+    const foreignDep = await createTask({ workspace_id: 'ws_2', project_id: 'proj_2', title: 'Foreign dep' })
+    db.prepare(
+      "INSERT INTO task_relations (task_id, target_task_id, relation_type, created_at) VALUES (?, ?, 'follows', datetime('now'))"
+    ).run(child.task_id, foreignDep.task_id)
+
+    const result = await checkPolicy({
+      workspace_id: 'ws_1',
+      task_id: child.task_id,
+      role: 'software_engineer',
+      policy: defaultPolicy,
+    })
+    expect(result.allowed).toBe(true)
+  })
 })

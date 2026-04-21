@@ -162,3 +162,67 @@ Failed / blocked:
   version tag or migrated to trusted publishing; no current unit-ledger row
   remains open or blocked.
 - Next step allowed: yes, but only to search for new units outside the current ledger or resolve explicit external blockers. No hidden open-row claim remains.
+
+## Seventh-Cycle Final Recheck (2026-04-22)
+
+Status: passed. This recheck reran the full
+workflow as a final alignment scan over the terminal ledger state, active pass
+reports, current docs, and task-scoping code paths.
+
+### Snapshot
+
+- Docs inventory: 149 files, canonical compare still clean.
+- Unit ledger: `terminal-all-accepted`, 2,769 accepted rows, zero open rows.
+- Repo state before this cycle: clean at `1109f30`.
+- Research gate: not needed for fixes; all changes are repo-internal
+  invariants around workspace scoping and stale report reconciliation.
+
+### Findings
+
+| ID | Severity | Type | Surface | Claim/contract | Evidence | Actual | Reviewer sources | Verifier | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| S7C-SCOPE-001 | P1 | code-gap | task workspace scoping | Task-by-ID behavior must remain scoped by `workspace_id` across domain APIs, relation APIs, policy dependency checks, task-memory recall, and task-outcome synthesis. | `packages/planning/src/relations.ts`; `packages/core/src/policy.ts`; `packages/core/src/cos-parser.ts`; `packages/memory/src/recall.ts`; `packages/memory/src/extractors/task-outcome.ts` | Earlier sixth/seventh work fixed `updateTask`, but planning relations, policy dependency traversal, memory task recall, and synthesis still needed scoped inputs and regressions. | data-integrity-guardian, security-sentinel, correctness-reviewer, testing-reviewer, project-standards-reviewer | planning/core/memory targeted package tests; task-query guard scan | fixed |
+| S7C-DOC-001 | P2 | doc-drift | active pass reports | Active reports must not keep stale open rows after later verifier-backed closure. | fifth-pass report and master workflow plan | The fifth-pass report still listed strict task scoping and installer fanout as open after later passes closed them. | document-review, coherence-reviewer, project-standards-reviewer | active stale-open scan; report reconciliation | fixed |
+
+### Fixes
+
+- Scoped planning relation APIs by `workspace_id`, including add, remove,
+  list, blocker lookup, and cycle detection.
+- Scoped memory task recall and task-outcome/blocker synthesis APIs by
+  `workspace_id`.
+- Scoped core policy dependency checks so cross-workspace manual relation rows
+  cannot block an unrelated task.
+- Scoped CoS task-update ownership lookup before applying parsed task updates.
+- Added cross-workspace regressions for planning, memory, and policy.
+- Updated current public API docs for `getBlockers()` and
+  `getMemoriesForTask()`.
+- Reconciled fifth-pass and master workflow reports so old open rows point to
+  their later closure evidence.
+
+### Verification
+
+Passed so far:
+
+- `pnpm -F fulcrum-planning test -- relations integration` — 105 tests.
+- `pnpm -F fulcrum-memory test -- getmemory task-outcome` — 1,115 tests.
+- `pnpm -F fulcrum-agent-core test -- policy cos-parser tasks` — 602 tests.
+
+Final broad gates in this cycle:
+
+- `pnpm --dir scripts test -- surface-inventory` — 63 tests passed.
+- `pnpm test` — passed across all recursive workspace test projects.
+- `pnpm build` — passed.
+- `pnpm run check:cycles` — passed, no circular dependencies.
+- `git diff --check` — passed.
+- canonical docs inventory compare — clean.
+- stale active-open scan over pass reports — clean for the fixed rows.
+- package wildcard export drift scan — clean.
+
+### Workflow Lesson
+
+17. Active pass reports are part of the acceptance surface. A later fix must
+    reconcile earlier open rows, or stale reports become false open gaps and
+    hide the true current state.
+18. Task-scoping guards must include relation tables, policy dependency
+    traversal, memory recall, synthesis, and agent-output parsers, not only the
+    main task CRUD API.

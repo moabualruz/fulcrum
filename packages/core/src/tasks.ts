@@ -226,9 +226,9 @@ export async function updateTask(input: UpdateTaskInput, db: Db = getDb()): Prom
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const memoryPkg = (await import(/* @vite-ignore */ moduleName)) as any
         if (input.status === 'completed' && typeof memoryPkg?.synthesizeTaskOutcome === 'function') {
-          await memoryPkg.synthesizeTaskOutcome(input.task_id, db)
+          await memoryPkg.synthesizeTaskOutcome({ task_id: input.task_id, workspace_id: input.workspace_id }, db)
         } else if (input.status === 'blocked' && typeof memoryPkg?.synthesizeBlockerResolution === 'function') {
-          await memoryPkg.synthesizeBlockerResolution(input.task_id, db)
+          await memoryPkg.synthesizeBlockerResolution({ task_id: input.task_id, workspace_id: input.workspace_id }, db)
         }
       } catch { /* synthesis is non-fatal — memory writes are an audit surface */ }
     }

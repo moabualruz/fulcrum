@@ -75,9 +75,9 @@ export async function applyCoSResponse(
     for (const update of response.task_updates) {
       if (!update.task_id) continue
       // Workspace ownership check — only update tasks belonging to this workspace
-      const owner = db.prepare('SELECT workspace_id FROM tasks WHERE task_id = ?')
-        .get(update.task_id) as { workspace_id: string } | undefined
-      if (!owner || owner.workspace_id !== workspace_id) continue
+      const owner = db.prepare('SELECT workspace_id FROM tasks WHERE task_id = ? AND workspace_id = ?')
+        .get(update.task_id, workspace_id) as { workspace_id: string } | undefined
+      if (!owner) continue
       try {
         await updateTask(
           {

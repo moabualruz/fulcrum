@@ -640,7 +640,7 @@ The full granular ledger is
 | MEM-001 | memory v3 | Memory guide presents curator backends and consolidation path. | PI curator backend and consolidation apply are explicit future slots in code/CLI help; Anthropic is available only through registered backend/provider paths and credentials. These rows are terminal blockers/future capability, not complete shipped behavior. | blocked/future capability | data integrity, document-review | `packages/memory/src/tests/l1-curator-backend-pi.test.ts`; consolidation dry-run tests; active docs/help wording | P2 | memory/docs | blocked-decision |
 | WORKER-001 | worker adapters | Worker docs should reflect built-in adapter set. | Worker guide now lists `stub`, `subprocess`, and `claude-code` as built-in adapters. | docs drift | architecture, document-review | `docs/guides/worker-adapters.md` update plus worker adapter tests from prior pass | P3 | worker/docs | fixed |
 
-### Remaining Packets
+### Sixth-Pass Remaining Packets (Superseded)
 
 1. `memory-shipped-state`: PI curator and consolidation apply stay
    blocked/future until verifier-backed implementations land.
@@ -648,11 +648,19 @@ The full granular ledger is
    targeted read/search bias coverage, but each host still needs rows for
    every emitted event, tool class, generated artifact, negative path, and
    install/update path before the plugin/extension lane can close.
-3. `strict-task-workspace-scoping-follow-up`: planning relations and
-   task-outcome synthesis still need scoped API migration.
+3. `strict-task-workspace-scoping-follow-up`: superseded by the 2026-04-22
+   final-cycle fix for scoped planning relations, policy dependency checks,
+   CoS task-update ownership, task-outcome synthesis, and task-memory recall.
 4. `per-unit-row-closure`: the machine-readable unit ledger now exists, but
-   rows are not accepted until each has verifier evidence, reviewer source,
-   and final status.
+   this line is superseded by the seventh-pass terminal guard: 2,769 accepted,
+   zero open, zero blocked.
+
+Superseded by later passes: the seventh pass closed the unit ledger, publish
+rows, and installer/fanout rows; the 2026-04-22 final-cycle recheck closed the
+remaining bounded task workspace scoping rows for planning relations, policy
+dependency checks, CoS task-update ownership, memory task-outcome synthesis,
+and task-memory recall. Remaining historical-doc stale text is archival, not
+current truth, unless a current guide/plan links to it as authoritative.
 
 ### Sixth-Pass Verification
 
@@ -799,3 +807,38 @@ external-blocker reduction, and post-fix broad verification.
     bump to a fresh version, verify the version is unpublished, verify signed
     tags point at the intended commit, and distinguish code/scan failures from
     missing repository credentials.
+
+## Seventh-Cycle Final Alignment Check
+
+Report: `docs/reference/2026-04-21-seventh-pass-full-workflow-run.md`.
+
+Status: passed.
+This recheck reused the full workflow after the terminal ledger closure. It
+started from 149 docs, clean prior commit state, zero open unit-ledger rows,
+and the active fifth/seventh pass reports. It then reran stale-open scans,
+task-by-ID scoping scans, source call-site scans, targeted package tests, and
+report reconciliation.
+
+### Seventh-Cycle Final Finding
+
+| ID | Subsystem | Claim | Observed state | Drift/gap type | Reviewer source | Verifier | Severity | Owner lane | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| S7C-SCOPE-001 | core/planning/memory/policy | Task-by-ID access must stay scoped by `workspace_id` across relation, policy, recall, and synthesis paths. | Fifth-pass report still listed the row open; code scan confirmed planning relations, policy dependency checks, memory task-outcome synthesis, and task-memory recall needed scoped APIs/verifiers beyond the earlier `updateTask` fix. | code gap | data-integrity, security, correctness, project standards | planning/core/memory cross-workspace regressions; task query guard scan | P1 | core-data | fixed in this cycle |
+| S7C-DOC-001 | workflow reports | Prior active pass reports must not keep stale open rows after later verifier-backed closure. | Fifth-pass report still said strict task scoping and installer fanout were open even after later passes fixed them. | doc drift / workflow gap | document-review, coherence, project standards | active stale-open scan; report reconciliation | P2 | docs/reporting | fixed in this cycle |
+
+### Seventh-Cycle Verification Ledger
+
+- `pnpm -F fulcrum-planning test -- relations integration` passed with 105 planning tests.
+- `pnpm -F fulcrum-memory test -- getmemory task-outcome` passed with 1,115 memory tests.
+- `pnpm -F fulcrum-agent-core test -- policy cos-parser tasks` passed with 602 core tests.
+- Old source API scan found no unscoped `getBlockers`, `getMemoriesForTask`,
+  `synthesizeTaskOutcome`, or `synthesizeBlockerResolution` calls.
+- Remaining `getBlockers(task_id)` mentions are historical plan/spec/audit
+  text, not current guides or public API docs.
+- Current docs were updated in `docs/guides/core-api.md` and
+  `packages/planning/README.md`.
+
+Final broad gates for this cycle passed and are recorded in the seventh-pass
+reference report: surface inventory, full tests, build, cycle check, diff
+whitespace check, docs inventory compare, stale active-open scan, and wildcard
+export drift scan.

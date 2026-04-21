@@ -132,8 +132,9 @@ export async function getMemory(memory_id: string, db: Db = getDb()): Promise<Fu
   return rowToFullMemory(row)
 }
 
-export async function getMemoriesForTask(task_id: string, db: Db = getDb()): Promise<FullMemory[]> {
-  const rows = db.prepare('SELECT * FROM memories WHERE task_id = ? ORDER BY created_at DESC').all(task_id) as Record<string, unknown>[]
+export async function getMemoriesForTask(input: { workspace_id: string; task_id: string }, db: Db = getDb()): Promise<FullMemory[]> {
+  const rows = db.prepare('SELECT * FROM memories WHERE task_id = ? AND workspace_id = ? ORDER BY created_at DESC')
+    .all(input.task_id, input.workspace_id) as Record<string, unknown>[]
   return rows.map(rowToFullMemory)
 }
 

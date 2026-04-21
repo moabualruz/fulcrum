@@ -71,6 +71,7 @@ await updateReview({
 
 // Add a task dependency
 await addTaskRelation({
+  workspace_id: 'ws_01HABC',
   task_id: 'task_01HABC',
   target_task_id: 'task_01HXYZ',
   relation_type: 'blocks',
@@ -114,7 +115,7 @@ await addTaskRelation({
 | `addTaskRelation(input)` | Add a directed relation between two tasks |
 | `removeTaskRelation(input)` | Remove a specific relation |
 | `getTaskRelations(input)` | Get all relations for a task |
-| `getBlockers(taskId)` | Get tasks that block the given task |
+| `getBlockers(input)` | Get tasks that block the given task in a workspace |
 
 ### Reviews
 | Function | Description |
