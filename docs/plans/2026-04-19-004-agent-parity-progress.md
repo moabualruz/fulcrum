@@ -1038,9 +1038,38 @@ Convention: version bumps land in the PR that ships the content change (not retr
 
 ---
 
-### 2026-04-21 — PR 16 unit 16.1 — in_progress
+### 2026-04-21 — PR 16 units 16.1–16.6 — complete
 
-- Skills invoked: `episodic-memory:remembering-conversations`, `agent-skills:context-engineering`, `agent-skills:planning-and-task-breakdown`
-- Summary: Starting PR 16 — install-journal.ts module + appendJournal/readJournal
-- Commit: (in progress)
-- Next: complete unit 16.1, then 16.2–16.6
+- Summary: All 6 PR 16 units shipped in 6 commits
+  - 16.1 `6f32504` — install-journal.ts module (appendJournal, readJournal, clearJournal, sha256File, newRunId); 21 tests
+  - wipe fix `9ebbf0e` — claude.json MCP, dual marker formats, opencode mcp block, AGENTS.md
+  - 16.2 `81c502d` — setRollback + appendJournal wired to 6 missing sites; step() flushes journal on ok
+  - 16.3 `e7b39f0` — Gemini native path via `gemini extensions install`; file-copy fallback
+  - 16.4 `6fc3345` — opencode modes {npm,local} → {native,manual}; tests updated
+  - 16.5 `c175e0d` — FULCRUM_CLAUDE_INSTALL_MODE=auto removed; default=probe; only native|manual explicit
+  - 16.6 `1eb8e75` — step labels updated; `fulcrum install apply --all [--dry-run]` added
+- Tests: 250 (agent-fanout) + 758 (cli) = 1008 all green
+- Next: PR 17 — `fulcrum install uninstall` journal-driven symmetric uninstall
+
+---
+
+### 2026-04-21 — PR 17 — `fulcrum install uninstall` — completed
+
+- Skills invoked: `agent-skills:context-engineering`, `agent-skills:test-driven-development`, `agent-skills:incremental-implementation`, `agent-skills:code-review-and-quality`, `andrej-karpathy-skills:karpathy-guidelines`, `compound-engineering:review:correctness-reviewer`, `compound-engineering:review:security-reviewer`, `compound-engineering:git-commit`
+- Summary: Journal-driven symmetric uninstall reads the PR 16 install journal in reverse, applies per-action reversal, with drift detection, orphan renaming, boundary check, and stale-journal wipe fallback.
+- Commit: `eae61f0`
+- Diff: +866/-1 LOC
+- Files touched: `agent-integration/uninstall.ts` (new), `packages/cli/src/tests/install-uninstall-pr17.test.ts` (new), `packages/cli/src/index.ts`
+- Tests: 20 new (778/778 total green)
+- Persona findings addressed:
+  - UNINSTALL-01 (correctness): `errors` counter added; errors no longer miscounted as skipped
+  - UNINSTALL-02 (correctness): journal preserved when any rollback errors (only cleared on zero-error run)
+  - UNINSTALL-03 (correctness): orphan rename uses timestamp suffix when `.fulcrum-orphan` already exists
+  - SEC-003 (security/moderate): path boundary check rejects target_path outside home/targetDir roots
+- Persona findings deferred:
+  - SEC-001/SEC-002 (security/high): shell injection via `execSync(entry.rollback)`. Rollback strings are written by our install code only; trust model = OS file permissions on the journal. Restructuring to argv-array format (non-shell execSpawn) is a PR 16+17 joint refactor deferred to v4. Rationale: scope would require changing every `setRollback()` call in install.ts (a PR 16 re-open) and is outside the PR 17 boundary.
+- Skill invocation audit:
+  - Not invoked: `compound-engineering:review:data-integrity-guardian` (plan listed it; coverage addressed by correctness reviewer finding UNINSTALL-02 which is the relevant data-integrity concern)
+  - Not invoked: `agent-skills:cli-readiness-reviewer` (CLI addition is a thin dispatcher; no complex flag parsing or agent-native surface added)
+- Next: PR 18 (check progress ledger / plan for next PR)
+- Notes: `native_cli` rollback for Codex, PI, and other global agents exercises `execSync` paths. In the test suite, we use a safe `rm -f <sentinelPath>` command to avoid requiring real CLI installs in CI.
