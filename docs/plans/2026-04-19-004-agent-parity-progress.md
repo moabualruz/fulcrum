@@ -858,3 +858,24 @@ User directive (verbatim): **"did I allow you to defer any fucking items !?"** �
 - **Tests updated**: `init-cursor.test.ts` windsurf section updated (fulcrum.mdc → fulcrum-core.md, alwaysApply → trigger). All 6 Windsurf compliance failures resolved. Total: 673/673 green.
 - **Compliance**: `windsurf-compliance.test.ts` **10/10 green** (was 4/10). Total: 673/673.
 - **Next**: PR 13 — fanout consolidation or remaining cross-cutting work.
+
+---
+
+## PR 13 — `fulcrum install apply` + `fulcrum install verify` CLI
+
+**Scope**: Cross-cutting install CLI — per-agent `apply` and `verify` subcommands.
+
+**Units completed**:
+- **13.1** `fulcrum install apply --agent <name>`: `runInstall()` in `packages/cli/src/index.ts` extended with `apply` branch — dispatches to 5 exported install functions (`installCursor`, `installWindsurf`, `installCodex`, `installOpencode`, `installCopilot`); prints "global-only installer" message for claude/gemini/pi; `--dry-run` flag forwarded.
+- **13.2** `fulcrum install verify --agent <name>`: `verifyInstall()` exported from `agent-integration/install.ts` — per-agent sentinel-file manifest; returns `{ agent, ok, checks[] }`; `runInstall()` `verify` branch prints per-check ✓/✗ table and exits 1 on failure. TDD: 15 tests in `packages/cli/src/tests/install-verify.test.ts` — cursor, windsurf, opencode, copilot happy paths + empty-dir failures + unknown-agent throw.
+
+**Test result**: 688/688 green (15 new tests added).
+
+**Checklist**: `fulcrum install verify --agent <name>` ⬜ → ✅ (sole remaining cross-cutting ⬜).
+
+**Key design decisions**:
+- `verifyInstall` checks sentinel files only (mcp.json, core rules, hooks, one glob-match for skill/workflow dirs) — not full manifest scan. Cheap and stable.
+- Codex global checks use `homeDir` param (default `HOME` env) so tests don't touch real `~/.codex`.
+- `never` exhaustive check on agent name switch — compiler guards future agent additions.
+
+**Next**: PR 14 — plugin packaging, ONBOARDING.md/CLAUDE.md updates, or demo reel.
