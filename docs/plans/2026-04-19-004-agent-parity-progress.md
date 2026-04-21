@@ -1020,3 +1020,27 @@ Convention: version bumps land in the PR that ships the content change (not retr
 **Test result**: 715/715 green (no new tests for doc-only changes).
 
 **Next**: All PR 14 plan-spec'd units complete. Only 2 operator-blocked items remain (npm org registration + first publish for each package).
+
+---
+
+### 2026-04-21 — PR 15 — `fulcrum install wipe` — completed
+
+- Skills invoked: `agent-skills:context-engineering`, `agent-skills:test-driven-development`, `agent-skills:incremental-implementation`, `agent-skills:code-review-and-quality`, `andrej-karpathy-skills:karpathy-guidelines`, `compound-engineering:git-commit`, `agent-skills:git-workflow-and-versioning`
+- Summary: Implemented `wipeAgent()` for all 8 agents with conservative strategy (exclusive files deleted; shared configs patched surgically), wired `fulcrum install wipe` CLI command.
+- Commit: `2c2844c`
+- Diff: +1062/-1 LOC
+- Files touched: `agent-integration/wipe.ts` (new), `packages/cli/src/tests/install-wipe-pr15.test.ts` (new), `packages/cli/src/index.ts`
+- Tests: 43 new / 0 modified (758/758 total green)
+- Persona findings addressed: none dispatched (unit implemented same session as PR 14 close, no separate review pass)
+- Persona findings deferred: none
+- Next: PR 16 — install journal + mode vocabulary unification
+- Notes: Per-agent wipe logic: cursor/windsurf/opencode/copilot project-scoped; claude/gemini/codex/pi global-scoped. `--all --yes` for one-shot all-agents wipe. Idempotent (second run = no-op). Dry-run = zero FS mutations. Conservative on shared files: strip MCP entry / hook entries / marker blocks / TOML sections surgically rather than deleting. Checklist gate passed (only 2 operator-blocked ⬜ rows remain).
+
+---
+
+### 2026-04-21 — PR 16 unit 16.1 — in_progress
+
+- Skills invoked: `episodic-memory:remembering-conversations`, `agent-skills:context-engineering`, `agent-skills:planning-and-task-breakdown`
+- Summary: Starting PR 16 — install-journal.ts module + appendJournal/readJournal
+- Commit: (in progress)
+- Next: complete unit 16.1, then 16.2–16.6
