@@ -879,3 +879,25 @@ User directive (verbatim): **"did I allow you to defer any fucking items !?"** �
 - `never` exhaustive check on agent name switch — compiler guards future agent additions.
 
 **Next**: PR 14 — plugin packaging, ONBOARDING.md/CLAUDE.md updates, or demo reel.
+
+---
+
+## PR 14.2 — Codex plugin-packaging additions
+
+**Scope**: Codex marketplace CLI, plugin.json schema validation, stray-entry cleanup, post-install message.
+
+**Units completed**:
+- **14.2.1** `codex marketplace add moabualruz/fulcrum` step in `installCodex()`: spawnSync-based; gracefully skips if codex binary absent or returns non-zero. Corrects checklist verify (top-level `codex marketplace add`, NOT `codex plugin marketplace add` — verified via `codex marketplace add --help` 2026-04-21).
+- **14.2.2** Post-install message: `"Fulcrum marketplace registered with Codex. Run 'codex' then '/plugins' to install/manage via the TUI."` printed after marketplace add step (success or skip).
+- **14.2.3** `validateCodexPluginManifest(jsonPath)` exported — checks name/version/description/interface.displayName/interface.shortDescription against codex-rs `PluginManifest` required fields. Step 0 in `installCodex()` validates plugin.json at install time.
+- **14.2.4** Stray marketplace.json cleanup: prunes entries with no `name` field (old `{"host":"codex",...}` format) before writing the proper entry. TDD: 8 tests in `packages/cli/src/tests/install-codex-pr14.test.ts`.
+
+**Test result**: 696/696 green (8 new tests added).
+
+**Checklist**: rows 115–118 all ⬜ → ✅.
+
+**Key design decisions**:
+- Marketplace add step is non-fatal on failure — install is still useful without the marketplace CLI step (config.toml MCP + skills + hooks already wired).
+- validateCodexPluginManifest is a pure FS function (exported for testability); no spawnSync or network access.
+
+**Next**: PR 14.4 (PI cockpit), PR 14.5 (Gemini), PR 14.6 (install-paths.md).
