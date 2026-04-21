@@ -111,6 +111,14 @@ describe('Cursor: hooks (cursor 2.4+ hook system)', () => {
     const doc = readJsonIfExists<any>(path)
     expect(doc?.version).toBe(1)
   })
+
+  it('GAP(cu-M3c) preToolUse covers read/search/MCP calls, not only mutations', () => {
+    if (!existsSync(path)) return
+    const raw = readText(path)
+    expect(raw).toMatch(/Read/)
+    expect(raw).toMatch(/Grep|Glob|MCP/)
+    expect(raw).toMatch(/fulcrum hook cursor --event pre_tool_use/)
+  })
 })
 
 describe('Cursor: slash commands', () => {

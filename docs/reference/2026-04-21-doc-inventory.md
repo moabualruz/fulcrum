@@ -13,7 +13,6 @@ Canonical order here means lexicographic path order under `docs/`.
 
 | Section | Files |
 |---|---:|
-| README.md | 1 |
 | architecture | 2 |
 | audit | 26 |
 | brainstorms | 13 |
@@ -23,11 +22,12 @@ Canonical order here means lexicographic path order under `docs/`.
 | history | 5 |
 | ideation | 5 |
 | plans | 25 |
-| reference | 13 |
+| README.md | 1 |
+| reference | 16 |
 | research | 7 |
 | specs | 2 |
 | superpowers | 17 |
-| Total | 146 |
+| Total | 149 |
 
 ## Files
 
@@ -151,29 +151,32 @@ Canonical order here means lexicographic path order under `docs/`.
 118. `docs/reference/2026-04-21-doc-inventory.md`
 119. `docs/reference/2026-04-21-fifth-pass-subagent-orchestration-audit.md`
 120. `docs/reference/2026-04-21-fourth-pass-implementation-drift-audit.md`
-121. `docs/research/agent-definitions.md`
-122. `docs/research/cli-plugins.md`
-123. `docs/research/mcp-standards.md`
-124. `docs/research/modular-architecture.md`
-125. `docs/research/plugin-standards-per-agent-host.md`
-126. `docs/research/rag-embeddings.md`
-127. `docs/research/skills-files.md`
-128. `docs/specs/2026-04-15-cli-mcp-parity.md`
-129. `docs/specs/2026-04-16-cli-first-action-platform.md`
-130. `docs/superpowers/plans/2026-04-13-core-extension.md`
-131. `docs/superpowers/plans/2026-04-13-memory.md`
-132. `docs/superpowers/plans/2026-04-13-monitor.md`
-133. `docs/superpowers/plans/2026-04-13-planning.md`
-134. `docs/superpowers/plans/2026-04-13-policy.md`
-135. `docs/superpowers/plans/2026-04-13-sync.md`
-136. `docs/superpowers/plans/2026-04-13-teams.md`
-137. `docs/superpowers/plans/2026-04-13-workflows.md`
-138. `docs/superpowers/plans/2026-04-13-worktrees.md`
-139. `docs/superpowers/plans/2026-04-14-fulcrum-round7.md`
-140. `docs/superpowers/plans/2026-04-14-memory-stack-l0-l2.md`
-141. `docs/superpowers/plans/2026-04-14-round-1-gap-fixes.md`
-142. `docs/superpowers/plans/2026-04-14-round-2-gap-fixes.md`
-143. `docs/superpowers/plans/2026-04-14-round-5-big-rocks.md`
-144. `docs/superpowers/plans/2026-04-15-fulcrum-round8.md`
-145. `docs/superpowers/specs/2026-04-13-fulcrum-full-rebuild-design.md`
-146. `docs/superpowers/specs/2026-04-14-memory-graph-l0-design.md`
+121. `docs/reference/2026-04-21-seventh-pass-full-workflow-run.md`
+122. `docs/reference/2026-04-21-sixth-pass-granular-surface-ledger.md`
+123. `docs/reference/2026-04-21-sixth-pass-unit-acceptance-ledger.json`
+124. `docs/research/agent-definitions.md`
+125. `docs/research/cli-plugins.md`
+126. `docs/research/mcp-standards.md`
+127. `docs/research/modular-architecture.md`
+128. `docs/research/plugin-standards-per-agent-host.md`
+129. `docs/research/rag-embeddings.md`
+130. `docs/research/skills-files.md`
+131. `docs/specs/2026-04-15-cli-mcp-parity.md`
+132. `docs/specs/2026-04-16-cli-first-action-platform.md`
+133. `docs/superpowers/plans/2026-04-13-core-extension.md`
+134. `docs/superpowers/plans/2026-04-13-memory.md`
+135. `docs/superpowers/plans/2026-04-13-monitor.md`
+136. `docs/superpowers/plans/2026-04-13-planning.md`
+137. `docs/superpowers/plans/2026-04-13-policy.md`
+138. `docs/superpowers/plans/2026-04-13-sync.md`
+139. `docs/superpowers/plans/2026-04-13-teams.md`
+140. `docs/superpowers/plans/2026-04-13-workflows.md`
+141. `docs/superpowers/plans/2026-04-13-worktrees.md`
+142. `docs/superpowers/plans/2026-04-14-fulcrum-round7.md`
+143. `docs/superpowers/plans/2026-04-14-memory-stack-l0-l2.md`
+144. `docs/superpowers/plans/2026-04-14-round-1-gap-fixes.md`
+145. `docs/superpowers/plans/2026-04-14-round-2-gap-fixes.md`
+146. `docs/superpowers/plans/2026-04-14-round-5-big-rocks.md`
+147. `docs/superpowers/plans/2026-04-15-fulcrum-round8.md`
+148. `docs/superpowers/specs/2026-04-13-fulcrum-full-rebuild-design.md`
+149. `docs/superpowers/specs/2026-04-14-memory-graph-l0-design.md`

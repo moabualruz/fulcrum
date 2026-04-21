@@ -86,9 +86,9 @@ appendCuratorLog(vault, {l0_id, backend, affected_pages, confidence_deltas,
 **Backend selection order** (override via `FULCRUM_CURATOR_BACKEND`):
 
 1. `codex` CLI — spawns `codex exec --json --output-schema=<file>`. Primary for ChatGPT Plus/Pro subscribers.
-2. `pi` CLI — stub reserves the slot; filled when pi's non-interactive mode stabilises.
+2. `pi` CLI — terminal future slot; filled when pi's non-interactive mode stabilises.
 3. `openai` API — direct fetch to `/v1/chat/completions` with `response_format.json_schema.strict:true`.
-4. `anthropic` API — reserved for Claude-powered curation; stubbed today.
+4. `anthropic` API — terminal future slot for Claude-powered curation.
 
 **Model + reasoning pinning** (per-task; override via `FULCRUM_CURATOR_MODEL_<TASK>`):
 

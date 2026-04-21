@@ -35,7 +35,7 @@ The dashboard shows:
 - **Blocked runs** — runs waiting on human action, with one-click unblock
 - **PM dashboard** — epics/issues/plans/reviews counts, delivery health, and current planning hotspots
 
-**Quick actions** (require `FULCRUM_MONITOR_TOKEN` to be set):
+**Quick actions** (require a bearer token only when auth enforcement is enabled):
 - Create a task — fills workspace/project from context
 - Unblock a run — sets status back to `running` and clears the blocker
 - Kill a run — marks status as `aborted`
@@ -46,10 +46,11 @@ Set the bearer token in the browser's token input field; it is persisted to `loc
 
 ## Bearer Token Auth
 
-Write endpoints (`POST /tasks`, `POST /runs`, `POST /runs/:id/complete`, etc.) require a bearer token when `FULCRUM_MONITOR_TOKEN` is set:
+Write endpoints (`POST /tasks`, `POST /runs`, `POST /runs/:id/complete`, etc.) require a bearer token only when auth enforcement is enabled. The monitor binds to loopback by default, so local development keeps write endpoints unauthenticated unless `FULCRUM_MONITOR_REQUIRE_AUTH=1` is set.
 
 ```bash
 export FULCRUM_MONITOR_TOKEN=my-secret-token
+export FULCRUM_MONITOR_REQUIRE_AUTH=1
 fulcrum serve monitor
 ```
 
@@ -108,7 +109,7 @@ The `/tasks` endpoint also accepts `?status=<value>` to filter by status.
 
 ## Control Endpoints
 
-All write endpoints require `Authorization: Bearer <FULCRUM_MONITOR_TOKEN>` when the env var is set.
+All write endpoints require `Authorization: Bearer <FULCRUM_MONITOR_TOKEN>` when `FULCRUM_MONITOR_REQUIRE_AUTH=1` is set.
 
 | Method | Path | Description |
 |--------|------|-------------|

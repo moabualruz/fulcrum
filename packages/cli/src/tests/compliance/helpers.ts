@@ -221,7 +221,7 @@ export function listFilesRec(p: string, match: RegExp): string[] {
 
 // Invoke the CLI with argv. Feeds synthetic stdin when provided. Returns
 // {stdout, stderr, exitCode}. Used to black-box test hook handlers end-to-end.
-export function runCli(argv: string[], stdin: string = ''): {
+export function runCli(argv: string[], stdin: string = '', envOverrides: Record<string, string> = {}): {
   stdout: string
   stderr: string
   exitCode: number
@@ -233,7 +233,7 @@ export function runCli(argv: string[], stdin: string = ''): {
     {
       input: stdin,
       encoding: 'utf8',
-      env: { ...process.env, FULCRUM_NO_MONITOR: '1' },
+      env: { ...process.env, ...envOverrides, FULCRUM_NO_MONITOR: '1' },
       timeout: 10_000,
     }
   )

@@ -77,6 +77,34 @@ function createTestDb(): Database.Database {
       created_at   TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS events (
+      evt_id         TEXT PRIMARY KEY,
+      workspace_id   TEXT NOT NULL,
+      project_id     TEXT,
+      evt_type       TEXT NOT NULL,
+      ts             TEXT NOT NULL DEFAULT (datetime('now')),
+      object_type    TEXT,
+      object_id      TEXT,
+      actor_type     TEXT NOT NULL,
+      actor_id       TEXT NOT NULL,
+      payload        TEXT NOT NULL DEFAULT '{}',
+      severity       TEXT NOT NULL DEFAULT 'info',
+      trace_id       TEXT,
+      span_id        TEXT,
+      correlation_id TEXT
+    );
+    CREATE TABLE IF NOT EXISTS trace_events (
+      span_id        TEXT PRIMARY KEY,
+      trace_id       TEXT NOT NULL,
+      parent_span_id TEXT,
+      name           TEXT NOT NULL,
+      workspace_id   TEXT NOT NULL,
+      run_id         TEXT,
+      status         TEXT NOT NULL DEFAULT 'started',
+      started_at     TEXT NOT NULL,
+      ended_at       TEXT,
+      payload        TEXT
+    );
   `)
 
   runMigration008(db)
@@ -114,6 +142,17 @@ describe('allocateWorktree', () => {
     expect(wt.run_id).toBeUndefined()
     expect(wt.merged_at).toBeUndefined()
     expect(wt.discarded_at).toBeUndefined()
+
+    const event = db.prepare("SELECT evt_type, span_id FROM events WHERE evt_type = 'worktree_allocated' AND object_id = ?")
+      .get(wt.worktree_id) as { evt_type: string; span_id: string | null } | undefined
+    expect(event).toBeTruthy()
+    expect(event!.span_id).toBeTruthy()
+
+    const span = db.prepare("SELECT status, payload FROM trace_events WHERE name = 'worktree.allocate' AND span_id = ?")
+      .get(event!.span_id) as { status: string; payload: string } | undefined
+    expect(span).toBeTruthy()
+    expect(span!.status).toBe('ok')
+    expect(JSON.parse(span!.payload).worktree_id).toBe(wt.worktree_id)
   })
 })
 

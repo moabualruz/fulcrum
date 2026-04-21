@@ -813,7 +813,7 @@ Exit 0 when every row embeds cleanly. Exit 2 if any row fails (see
 export type { HookCli, NormalizedHookEvent, HookPhase, HookContext, HookOutput, HookIO } from './hooks.js'
 export { normalizeHookEvent, runPreHook, runPostHook, detectHookCli } from './hooks.js'
 // Also import into local scope so runHook() can call them as functions.
-import { normalizeHookEvent, runPreHook, runPostHook, detectHookCli } from './hooks.js'
+import { normalizeHookEvent, runPreHook, runPostHook, detectHookCli, HOOK_SEARCH_TOOLS } from './hooks.js'
 import type { HookCli, HookPhase, HookContext, HookIO } from './hooks.js'
 
 // ── Session lifecycle hooks ───────────────────────────────────────────────────
@@ -859,7 +859,7 @@ export async function runSessionStartHook(): Promise<void> {
   sessionId = sessionId.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 128)
 
   try {
-    const { startAgentRun, getDb, runMigrations, loadConfig } = await import('fulcrum-agent-core')
+    const { createTask, startAgentRun, getDb, runMigrations, loadConfig } = await import('fulcrum-agent-core')
     const config = loadConfig()
     const db = getDb()
     runMigrations(db)
@@ -878,7 +878,17 @@ export async function runSessionStartHook(): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const agentRole = (process.env['FULCRUM_AGENT_ROLE'] ?? 'software_engineer') as any
 
+    const task = await createTask({
+      workspace_id: wsId,
+      project_id: projId,
+      title: `claude session ${sessionId.slice(0, 12)}`,
+      description: 'Auto-created task for agent session lifecycle tracking.',
+      assigned_to: agentRole,
+      labels: ['session', 'hook', 'claude'],
+    })
+
     const run = await startAgentRun({
+      task_id: task.task_id,
       role: agentRole,
       workspace_id: wsId,
       agent_id: `claude/${sessionId.slice(0, 12)}`,
@@ -1016,7 +1026,7 @@ export async function runUserPromptSubmitHook(): Promise<void> {
       'claude',
     )
     logRecallEvent({
-      kind: 'recall_called',
+      kind: 'turn_observed',
       agent_type: 'claude',
       session_id: sessionId,
       tool_name: 'UserPromptSubmit',
@@ -1355,7 +1365,7 @@ async function initFulcrumSession(opts: {
   cliName: string
   model?: string
 }): Promise<{ run_id: string; workspace_id: string; project_id: string }> {
-  const { startAgentRun, getDb, runMigrations, loadConfig } = await import('fulcrum-agent-core')
+  const { createTask, startAgentRun, getDb, runMigrations, loadConfig } = await import('fulcrum-agent-core')
   const config = loadConfig()
   const db = getDb()
   runMigrations(db)
@@ -1371,7 +1381,17 @@ async function initFulcrumSession(opts: {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const agentRole = (process.env['FULCRUM_AGENT_ROLE'] ?? 'software_engineer') as any
+  const task = await createTask({
+    workspace_id: wsId,
+    project_id: projId,
+    title: `${opts.cliName} session ${opts.sessionId.slice(0, 12)}`,
+    description: 'Auto-created task for agent session lifecycle tracking.',
+    assigned_to: agentRole,
+    labels: ['session', 'hook', opts.cliName],
+  })
+
   const run = await startAgentRun({
+    task_id: task.task_id,
     role: agentRole,
     workspace_id: wsId,
     agent_id: `${opts.cliName}/${opts.sessionId.slice(0, 12)}`,
@@ -1422,6 +1442,102 @@ async function completeFulcrumSession(sessionId: string, summary = ''): Promise<
   const session = JSON.parse(readFileSync(sessionFile, 'utf-8')) as { run_id: string }
   await completeAgentRun({ run_id: session.run_id, output_summary: summary || 'Session ended' })
   process.stderr.write(`[fulcrum/session] run completed: ${session.run_id}\n`)
+}
+
+function firstStringValue(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === 'string' && value) return value
+  }
+  return ''
+}
+
+async function runGenericHostSessionStartHook(cliName: 'cursor' | 'windsurf' | 'copilot'): Promise<void> {
+  const raw = await readStdinFully()
+  let sessionId = process.env[`${cliName.toUpperCase()}_SESSION_ID`] ?? process.env['FULCRUM_SESSION_ID'] ?? ''
+  let model: string | undefined
+  let runId = ''
+
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = firstStringValue(
+        evt['session_id'],
+        evt['sessionId'],
+        evt['conversationId'],
+        evt['trajectory_id'],
+        evt['execution_id'],
+        evt['tool_use_id'],
+        sessionId,
+      )
+      model = evt['model'] as string | undefined
+    } catch { /* fallback */ }
+  }
+
+  if (!sessionId) sessionId = `${cliName}_${Date.now()}`
+  sessionId = sanitizeId(sessionId)
+
+  if (!existsSync(getSessionFilePath(sessionId))) {
+    try {
+      const session = await initFulcrumSession({ sessionId, cliName, model })
+      runId = session.run_id
+      process.stderr.write(`[fulcrum/session] ${cliName} run started: ${session.run_id}\n`)
+    } catch (err) {
+      process.stderr.write(`[fulcrum/session-start] ${cliName} error (non-fatal): ${(err as Error).message}\n`)
+    }
+  } else {
+    try {
+      const session = JSON.parse(readFileSync(getSessionFilePath(sessionId), 'utf-8')) as { run_id?: string }
+      runId = session.run_id ?? ''
+    } catch { /* best-effort */ }
+  }
+
+  if (cliName === 'cursor') {
+    process.stdout.write(JSON.stringify({
+      env: {
+        FULCRUM_SESSION_ID: sessionId,
+        CURSOR_SESSION_ID: sessionId,
+        ...(runId ? { FULCRUM_RUN_ID: runId } : {}),
+      },
+      additional_context: runId ? `Fulcrum session started: ${runId}` : 'Fulcrum session hook active.',
+    }) + '\n')
+    process.exit(0)
+  }
+
+  process.stdout.write(JSON.stringify({ continue: true }) + '\n')
+  process.exit(0)
+}
+
+async function runGenericHostSessionEndHook(cliName: 'cursor' | 'windsurf' | 'copilot'): Promise<void> {
+  const raw = await readStdinFully()
+  let sessionId = process.env[`${cliName.toUpperCase()}_SESSION_ID`] ?? ''
+  let summary = `${cliName} session ended`
+
+  if (raw) {
+    try {
+      const evt = JSON.parse(raw) as Record<string, unknown>
+      sessionId = firstStringValue(
+        evt['session_id'],
+        evt['sessionId'],
+        evt['conversationId'],
+        evt['trajectory_id'],
+        evt['execution_id'],
+        evt['tool_use_id'],
+        sessionId,
+      )
+      summary = firstStringValue(evt['summary'], evt['message'], summary)
+    } catch { /* fallback */ }
+  }
+
+  if (sessionId) {
+    try {
+      await completeFulcrumSession(sanitizeId(sessionId), summary)
+    } catch (err) {
+      process.stderr.write(`[fulcrum/session-end] ${cliName} error (non-fatal): ${(err as Error).message}\n`)
+    }
+  }
+
+  process.stdout.write(JSON.stringify({ continue: true }) + '\n')
+  process.exit(0)
 }
 
 // ── Gemini lifecycle hooks ────────────────────────────────────────────────────
@@ -1811,7 +1927,7 @@ export async function runCodexUserPromptSubmitHook(): Promise<void> {
       'codex',
     )
     logRecallEvent({
-      kind: 'recall_called',
+      kind: 'turn_observed',
       agent_type: 'codex',
       session_id: sessionId,
       tool_name: 'UserPromptSubmit',
@@ -1852,6 +1968,7 @@ export async function runCodexUserPromptSubmitHook(): Promise<void> {
 export async function runCodexPermissionRequestHook(): Promise<void> {
   const raw = await readStdinFully()
   let sessionId = process.env['CODEX_SESSION_ID'] ?? 'unknown'
+  let turnId = ''
   let toolName = ''
   let toolInput: Record<string, unknown> = {}
 
@@ -1859,6 +1976,7 @@ export async function runCodexPermissionRequestHook(): Promise<void> {
     try {
       const evt = JSON.parse(raw) as Record<string, unknown>
       sessionId = (evt['session_id'] as string) || sessionId
+      turnId = (evt['turn_id'] as string) || ''
       toolName = (evt['tool_name'] as string) || ''
       toolInput = (evt['tool_input'] as Record<string, unknown>) || {}
     } catch { /* use defaults */ }
@@ -1874,6 +1992,7 @@ export async function runCodexPermissionRequestHook(): Promise<void> {
   // falls through (fail open) — team-invoke is the only role-gated check.
   let agentRole = ''
   let workspaceId = ''
+  let runId = ''
   try {
     const safeSid = sanitizeId(sessionId)
     const sessionFile = getSessionFilePath(safeSid)
@@ -1888,9 +2007,70 @@ export async function runCodexPermissionRequestHook(): Promise<void> {
           .get(session.run_id) as { role?: string; workspace_id?: string } | undefined
         agentRole = row?.role ?? ''
         workspaceId = row?.workspace_id ?? session.workspace_id ?? ''
+        runId = session.run_id
       }
     }
   } catch { /* best-effort — empty role means no team-invoke gate */ }
+
+  // Codex PreToolUse/PostToolUse are Bash-only, so Fulcrum-first search bias
+  // has to ride the all-tool PermissionRequest path. PermissionRequest cannot
+  // rewrite tool input; emit advisory stderr + telemetry only.
+  const isRecallTool = /recall/i.test(toolName)
+  const isSearchTool = HOOK_SEARCH_TOOLS.has(toolName)
+  if (runId && (isRecallTool || isSearchTool)) {
+    try {
+      const { getDb, isTrustedSession, recordGrepWithoutRecall, recordRecall, logRecallEvent } =
+        await import('fulcrum-agent-core')
+      const db = getDb()
+      if (isTrustedSession(db, runId)) {
+        if (isRecallTool) {
+          recordRecall(db, { sessionId: runId, turnId, agentType: 'codex' })
+          logRecallEvent({
+            kind: 'recall_called',
+            agent_type: 'codex',
+            session_id: sessionId,
+            turn_id: turnId || undefined,
+            tool_name: toolName,
+          })
+        } else if (process.env['FULCRUM_NO_RECALL_NUDGE'] === '1') {
+          logRecallEvent({
+            kind: 'nudge_opt_out',
+            agent_type: 'codex',
+            session_id: sessionId,
+            turn_id: turnId || undefined,
+            tool_name: toolName,
+          })
+        } else {
+          const count = recordGrepWithoutRecall(db, { sessionId: runId, turnId, agentType: 'codex' })
+          logRecallEvent({
+            kind: 'grep_called_without_recall',
+            agent_type: 'codex',
+            session_id: sessionId,
+            turn_id: turnId || undefined,
+            tool_name: toolName,
+            grep_count_without_recall: count,
+            extra: { run_id: runId },
+          })
+          if (count >= 1) {
+            process.stderr.write(
+              `[fulcrum/permission-request] fulcrum-first: Codex requested ${toolName} without a recall in this turn. ` +
+                `Use \`fulcrum__recall_memory\` or \`fulcrum action exec recall_knowledge\` first when possible. ` +
+                `Set FULCRUM_NO_RECALL_NUDGE=1 to suppress.\n`,
+            )
+            logRecallEvent({
+              kind: 'nudge_emitted',
+              agent_type: 'codex',
+              session_id: sessionId,
+              turn_id: turnId || undefined,
+              variant: 'A',
+              tool_name: toolName,
+              grep_count_without_recall: count,
+            })
+          }
+        }
+      }
+    } catch { /* best-effort — never block Codex approval path on telemetry */ }
+  }
 
   let denyMessage: string | null = null
 
@@ -2052,6 +2232,24 @@ the event shape is inspected at runtime to determine the correct handler.
       return
     }
     cliName = detected
+  }
+
+  if (cliName === 'windsurf' && event['agent_action_name'] === 'pre_user_prompt') {
+    const sessionId = sanitizeId(firstStringValue(
+      event['trajectory_id'],
+      event['execution_id'],
+      event['session_id'],
+      event['sessionId'],
+      `windsurf_${Date.now()}`,
+    ))
+    if (!existsSync(getSessionFilePath(sessionId))) {
+      try {
+        const model = typeof event['model'] === 'string' ? event['model'] : undefined
+        await initFulcrumSession({ sessionId, cliName: 'windsurf', model })
+      } catch (err) {
+        process.stderr.write(`[fulcrum/session-start] windsurf error (non-fatal): ${(err as Error).message}\n`)
+      }
+    }
   }
 
   // Normalise to canonical shape based on CLI type
@@ -2472,10 +2670,12 @@ async function runServeMcp(): Promise<void> {
       // and /agents|/board endpoints have a scope to filter on. Without this,
       // /status returns workspace_id: null and every panel fetches without a
       // query param → 400 "workspace_id required" → empty dashboard.
-      const monitorWorkspaceId = config.workspace_id || projectIdsFromPath(process.cwd()).workspace_id
+      const monitorIds = projectIdsFromPath(process.cwd())
+      const monitorWorkspaceId = config.workspace_id || monitorIds.workspace_id
       const monitorServer = startMonitorServer({
         port: monitorPort,
         workspace_id: monitorWorkspaceId,
+        project_id: monitorIds.project_id,
       })
       await monitorServer.start()
       _monitorStarted = true
@@ -2644,7 +2844,12 @@ async function runServeMonitor(): Promise<void> {
     if (val) port = parseInt(val, 10)
   }
 
-  const server = startMonitorServer({ port, workspace_id: config.workspace_id || projectIdsFromPath(process.cwd()).workspace_id })
+  const ids = projectIdsFromPath(process.cwd())
+  const server = startMonitorServer({
+    port,
+    workspace_id: config.workspace_id || ids.workspace_id,
+    project_id: ids.project_id,
+  })
 
   // Mount the PCI watcher for the cwd if nobody else already owns it. The
   // singleton's file lock does the cross-process dedup — same lock as
@@ -2684,7 +2889,7 @@ async function runServeMonitor(): Promise<void> {
 async function runServeAll(): Promise<void> {
   // Start monitor in background thread, MCP on stdio
   const { startMonitorServer } = await import('fulcrum-monitor')
-  const { getDb, runMigrations, loadConfig } = await import('fulcrum-agent-core')
+  const { getDb, runMigrations, loadConfig, projectIdsFromPath } = await import('fulcrum-agent-core')
 
   const config = loadConfig()
   const db = getDb()
@@ -2694,7 +2899,11 @@ async function runServeAll(): Promise<void> {
   await warmOtel()
   registerOtelShutdown()
 
-  const server = startMonitorServer({ workspace_id: config.workspace_id || undefined })
+  const ids = projectIdsFromPath(process.cwd())
+  const server = startMonitorServer({
+    workspace_id: config.workspace_id || ids.workspace_id,
+    project_id: ids.project_id,
+  })
   await server.start()
   _monitorStarted = true
   _monitorServer = server
@@ -2861,10 +3070,12 @@ fulcrum task — task CRUD
 
   if (sub === 'update') {
     const task_id = requireArg('--id')
+    const ids = currentProjectIds()
+    const workspace_id = optArg('--workspace-id') ?? ids.workspace_id
     const status = optArg('--status') as Parameters<typeof updateTask>[0]['status']
     const note = optArg('--note')
     const assigned_to = optArg('--assigned-to')
-    const task = await updateTask({ task_id, status, note, assigned_to })
+    const task = await updateTask({ task_id, workspace_id, status, note, assigned_to })
     outputObject({ task_id: task.task_id, status: task.status, note: task.note ?? '', assigned_to: task.assigned_to ?? '' })
     return
   }
@@ -4183,12 +4394,11 @@ OPTIONS (serve mcp-http)
         if (phaseArg === 'pre-compact')   { await runStubHook(cli, phaseArg);    return }
       }
 
-      // Cursor / Windsurf / Copilot lifecycle hooks. They only route through
-      // config files today but we accept lifecycle phases so installs don't error.
+      // Cursor / Windsurf / Copilot lifecycle hooks.
       if (cli === 'cursor' || cli === 'windsurf' || cli === 'copilot') {
+        if (phaseArg === 'session-start') { await runGenericHostSessionStartHook(cli); return }
+        if (phaseArg === 'session-end')   { await runGenericHostSessionEndHook(cli);   return }
         if (
-          phaseArg === 'session-start' ||
-          phaseArg === 'session-end' ||
           ((cli === 'cursor' || cli === 'windsurf') && phaseArg === 'subagent-start') ||
           ((cli === 'cursor' || cli === 'windsurf') && phaseArg === 'subagent-stop') ||
           (cli !== 'copilot' && phaseArg === 'pre-compact')

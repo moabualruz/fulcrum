@@ -27,6 +27,15 @@
             "command": "fulcrum hook copilot --event pre_tool_use --tool Bash"
           }
         ]
+      },
+      {
+        "matcher": "Read|Grep|Glob|MCP",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "fulcrum hook copilot --event pre_tool_use"
+          }
+        ]
       }
     ],
     "PostToolUse": [

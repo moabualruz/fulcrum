@@ -190,6 +190,7 @@
     // ── State ──────────────────────────────────────────────────────────────────
     const BASE = window.location.origin
     let wsId = null
+    let projectId = null
     let eventSource = null
     const MAX_EVENTS = 200
 
@@ -371,6 +372,7 @@
       try {
         const body = { title }
         if (wsId) body.workspace_id = wsId
+        if (projectId) body.project_id = projectId
         const r = await fetch(`${BASE}/tasks`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) })
         if (r.ok) { hideCreateForm(); refreshBoard() }
         else { const j = await r.json(); alert(`Error: ${j.error}`) }
@@ -387,6 +389,8 @@
       switch(evt.evt_type) {
         case 'agent_run_started': verb = 'started'; detail = payload.run_id||''; break
         case 'agent_run_blocked': verb = 'BLOCKED'; detail = payload.reason||payload.run_id||''; break
+        case 'agent_run_unblocked': verb = 'unblocked'; detail = payload.summary||payload.run_id||''; break
+        case 'agent_run_aborted': verb = 'aborted'; detail = payload.reason||payload.run_id||''; break
         case 'agent_run_finished': verb = 'finished'; detail = payload.run_id||''; break
         case 'agent_run_failed': verb = 'failed'; detail = payload.error||payload.run_id||''; break
         case 'task_created': verb = 'created task'; detail = payload.title||payload.task_id||''; break
@@ -394,6 +398,7 @@
       }
 
       const cls = evt.evt_type === 'agent_run_blocked' ? 'blocked'
+                : evt.evt_type === 'agent_run_aborted' ? 'blocked'
                 : evt.evt_type === 'policy_denied' ? 'policy' : ''
       const ts = fmtTs(evt.created_at || evt.ts || new Date().toISOString())
       return `<div class="event-line ${cls}">
@@ -473,6 +478,7 @@
         if (r.ok) {
           const j = await r.json()
           wsId = j.workspace_id || null
+          projectId = j.project_id || null
         }
       } catch {}
 

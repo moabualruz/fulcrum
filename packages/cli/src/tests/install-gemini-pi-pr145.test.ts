@@ -20,11 +20,11 @@ import {
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '../../../../../')
 const INSTALL_SCRIPT = resolve(REPO_ROOT, 'agent-integration/install.ts')
 
-function runInstall(args: string[]): { stdout: string; stderr: string; status: number | null } {
+function runInstall(args: string[], env: NodeJS.ProcessEnv = process.env): { stdout: string; stderr: string; status: number | null } {
   const result = spawnSync(
     'node',
     ['--import', 'tsx/esm', INSTALL_SCRIPT, ...args],
-    { cwd: REPO_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 }
+    { cwd: REPO_ROOT, encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 }
   )
   return { stdout: result.stdout ?? '', stderr: result.stderr ?? '', status: result.status }
 }
@@ -97,6 +97,29 @@ describe('installGeminiExtension dry-run output', () => {
   it('mentions gemini extensions update fulcrum', () => {
     const { stdout } = runInstall(['gemini', '--dry-run'])
     expect(stdout).toContain('gemini extensions update')
+  })
+
+  it('falls back to file-copy when native gemini install exits 0 without materializing files', () => {
+    const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'fulcrum-gemini-home-'))
+    const binDir = path.join(tmpHome, 'bin')
+    fs.mkdirSync(binDir, { recursive: true })
+    fs.writeFileSync(path.join(binDir, 'gemini'), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 })
+
+    try {
+      const { stdout, stderr, status } = runInstall(['gemini'], {
+        ...process.env,
+        HOME: tmpHome,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
+      })
+
+      expect(status, stderr).toBe(0)
+      expect(stdout).toContain('native install did not create checked files')
+      expect(fs.existsSync(path.join(tmpHome, '.gemini/extensions/fulcrum/gemini-extension.json'))).toBe(true)
+      expect(fs.existsSync(path.join(tmpHome, '.gemini/extensions/fulcrum/GEMINI.md'))).toBe(true)
+      expect(fs.existsSync(path.join(tmpHome, '.gemini/extensions/fulcrum/hooks/hooks.json'))).toBe(true)
+    } finally {
+      fs.rmSync(tmpHome, { recursive: true, force: true })
+    }
   })
 })
 

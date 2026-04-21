@@ -17,7 +17,13 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { computeProjectIds, loadCockpitConfig } from '../index.js'
+import {
+  buildFulcrumFirstNudge,
+  computeProjectIds,
+  loadCockpitConfig,
+  responseDataObject,
+  responseList,
+} from '../index.js'
 
 const COCKPIT_SRC = readFileSync(resolve(__dirname, '..', 'index.ts'), 'utf-8')
 
@@ -96,6 +102,38 @@ describe('loadCockpitConfig', () => {
   })
 })
 
+describe('monitor API response helpers', () => {
+  it('reads current paginated list envelopes', () => {
+    const rows = responseList<{ task_id: string }>({ data: [{ task_id: 'task_1' }], pagination: { total: 1 } }, 'tasks')
+    expect(rows).toEqual([{ task_id: 'task_1' }])
+  })
+
+  it('keeps legacy named list envelopes compatible', () => {
+    const rows = responseList<{ workspace_id: string }>({ workspaces: [{ workspace_id: 'ws_1' }] }, 'workspaces')
+    expect(rows).toEqual([{ workspace_id: 'ws_1' }])
+  })
+
+  it('reads current mutation data envelopes', () => {
+    const task = responseDataObject<{ task_id: string }>({ data: { task_id: 'task_1' } })
+    expect(task).toEqual({ task_id: 'task_1' })
+  })
+
+  it('keeps legacy mutation object responses compatible', () => {
+    const task = responseDataObject<{ task_id: string }>({ task_id: 'task_1' })
+    expect(task).toEqual({ task_id: 'task_1' })
+  })
+})
+
+describe('Fulcrum-first prompt nudge', () => {
+  it('names the native PI tools agents should prefer before filesystem search', () => {
+    const nudge = buildFulcrumFirstNudge('ws_1', 'run_1')
+    expect(nudge).toContain('Fulcrum-first')
+    expect(nudge).toContain('fulcrum_recall_memory')
+    expect(nudge).toContain('fulcrum_workspace_status')
+    expect(nudge).toContain('run_1')
+  })
+})
+
 describe('source-level integrity (regression guards)', () => {
   it('AgentRunRow interface declares field `role`, not `agent_role`', () => {
     // The DB column on agent_runs is `role`; the monitor /agents endpoint
@@ -123,5 +161,10 @@ describe('source-level integrity (regression guards)', () => {
     // IDs; findConfigFile was deleted but a caller in session_start was
     // left behind, crashing PI on extension load.
     expect(COCKPIT_SRC).not.toMatch(/\bfindConfigFile\b/)
+  })
+
+  it('does not claim before_provider_request mutates provider payload for Fulcrum-first bias', () => {
+    expect(COCKPIT_SRC).toMatch(/buildFulcrumFirstNudge/)
+    expect(COCKPIT_SRC).toMatch(/before_provider_request[\s\S]*observational/)
   })
 })

@@ -5,7 +5,7 @@
 // from FULCRUM_RULES_DIR and project it into additional_context.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync } from 'fs'
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { getDb, closeDb, runMigrations } from 'fulcrum-agent-core'
@@ -39,6 +39,30 @@ function setupRulesDir(rules: Array<{ name: string; body: string }>): void {
     writeFileSync(join(rulesDir, `${r.name}.md`), r.body, 'utf8')
   }
   process.env.FULCRUM_RULES_DIR = rulesDir
+}
+
+function seedTrustedCodexSession(sessionId: string, runId: string): void {
+  const db = getDb()
+  db.prepare(`INSERT OR IGNORE INTO tasks (task_id, workspace_id, project_id, title) VALUES ('task_codex_bias', 'ws_pr6', 'proj_pr6', 'codex bias task')`).run()
+  db.prepare(`INSERT INTO agent_runs (run_id, task_id, workspace_id, role) VALUES (?, 'task_codex_bias', 'ws_pr6', 'software_engineer')`).run(runId)
+  mkdirSync(join(tmpDir!, 'sessions'), { recursive: true })
+  const safeSessionId = sessionId.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 128)
+  writeFileSync(join(tmpDir!, 'sessions', `${safeSessionId}.json`), JSON.stringify({
+    session_id: sessionId,
+    run_id: runId,
+    workspace_id: 'ws_pr6',
+    project_id: 'proj_pr6',
+  }))
+}
+
+function readRecallTelemetry(): Array<Record<string, unknown>> {
+  const path = join(tmpDir!, 'telemetry', 'recall_bias.jsonl')
+  if (!existsSync(path)) return []
+  return readFileSync(path, 'utf8')
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
 }
 
 function tearDownTmpDb(): void {
@@ -128,6 +152,18 @@ describe('PR 6.1 runCodexUserPromptSubmitHook', () => {
     const row = db.prepare(`SELECT tool_name, cli_name FROM hook_events WHERE session_id = ?`).get('codex-sess-event') as { tool_name: string; cli_name: string } | undefined
     expect(row?.tool_name).toBe('UserPromptSubmit')
     expect(row?.cli_name).toBe('codex')
+  })
+
+  it('records UserPromptSubmit as turn_observed, not recall_called', async () => {
+    setupRulesDir([{ name: 'r', body: '# rule body' }])
+    const { runCodexUserPromptSubmitHook } = await import('../index.js')
+    await runHookWithStdin(runCodexUserPromptSubmitHook, JSON.stringify({
+      session_id: 'codex-sess-turn-observed',
+      prompt: 'hi',
+    }))
+    const kinds = readRecallTelemetry().map((e) => e.kind)
+    expect(kinds).toContain('turn_observed')
+    expect(kinds).not.toContain('recall_called')
   })
 
   it('falls back to installed rules when FULCRUM_RULES_DIR points to a missing dir', async () => {
@@ -239,6 +275,49 @@ describe('PR 6.2 runCodexPermissionRequestHook', () => {
     }
     expect(resp.hookSpecificOutput?.decision?.behavior).toBe('deny')
     expect(resp.hookSpecificOutput?.decision?.message ?? '').toMatch(/invoke_team|chief_of_staff/i)
+  })
+
+  it('nudge-path: Codex search PermissionRequest emits Fulcrum-first telemetry without blocking', async () => {
+    seedTrustedCodexSession('codex-perm-search', 'run_codex_search')
+    const { runCodexPermissionRequestHook } = await import('../index.js')
+    const out = await runHookWithStdin(runCodexPermissionRequestHook, JSON.stringify({
+      session_id: 'codex-perm-search',
+      turn_id: 'turn-search',
+      cwd: '/tmp',
+      hook_event_name: 'PermissionRequest',
+      tool_name: 'Grep',
+      tool_input: { pattern: 'workspace policy' },
+    }))
+    expect(out.exit).toBe(0)
+    expect(out.stdout).toBe('')
+    expect(out.stderr).toContain('fulcrum-first')
+    expect(out.stderr).toContain('Codex requested Grep')
+    const events = readRecallTelemetry()
+    const kinds = events.map((e) => e.kind)
+    expect(kinds).toContain('grep_called_without_recall')
+    expect(kinds).toContain('nudge_emitted')
+    const grep = events.find((e) => e.kind === 'grep_called_without_recall')
+    expect(grep?.agent_type).toBe('codex')
+    expect(grep?.turn_id).toBe('turn-search')
+  })
+
+  it('recall-path: Codex recall PermissionRequest records recall without nudge', async () => {
+    seedTrustedCodexSession('codex-perm-recall', 'run_codex_recall')
+    const { runCodexPermissionRequestHook } = await import('../index.js')
+    const out = await runHookWithStdin(runCodexPermissionRequestHook, JSON.stringify({
+      session_id: 'codex-perm-recall',
+      turn_id: 'turn-recall',
+      cwd: '/tmp',
+      hook_event_name: 'PermissionRequest',
+      tool_name: 'mcp__fulcrum__recall_memory',
+      tool_input: { query: 'workspace policy' },
+    }))
+    expect(out.exit).toBe(0)
+    expect(out.stdout).toBe('')
+    expect(out.stderr).not.toContain('fulcrum-first')
+    const events = readRecallTelemetry()
+    expect(events.map((e) => e.kind)).toContain('recall_called')
+    expect(events.map((e) => e.kind)).not.toContain('nudge_emitted')
   })
 
   it('handles empty stdin without crashing', async () => {

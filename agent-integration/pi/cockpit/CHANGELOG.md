@@ -4,7 +4,19 @@ All notable changes to this package follow [Semantic Versioning](https://semver.
 
 ---
 
-## [1.0.0] — 2026-04-21
+## [0.0.4] — 2026-04-21
+
+Alignment release.
+
+### Fixed
+
+- Added Fulcrum-first bias nudge through `before_agent_start`.
+- Kept `before_provider_request` observational instead of mutating
+  provider-specific payloads.
+- Accepted current monitor response envelopes for task/workspace reads and
+  create-task responses.
+
+## [0.0.3] — 2026-04-21
 
 First public release.
 
@@ -15,6 +27,9 @@ First public release.
 - 24 canonical role MDs (linked via `cockpit/skills → ../../skills` symlink)
 - Fulcrum-first rule text in `AGENTS.md` marker block (PI walks AGENTS.md up from cwd)
 - MCP server registration via `fulcrum serve mcp`
-- Bias-nudge hook on `before_provider_request` / `before_agent_start`
+- Fulcrum-first bias nudge via `before_agent_start`; `before_provider_request`
+  is bound as an observational provider-payload hook, not a cross-provider
+  mutation path
 - npm publish scaffolding as `@fulcrum-agent-os/pi-cockpit` with provenance attestation
 - `probePiCockpitOnNpm()` — 2-second bounded npm probe in installer
+- scoped npm package published as `@fulcrum-agent-os/pi-cockpit@0.0.3`

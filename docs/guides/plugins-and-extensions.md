@@ -9,10 +9,10 @@ Fulcrum should not force one packaging model onto every agent runtime. Different
 | Claude Code | plugin-capable + hooks + skills | `plugin-first` in principle, currently hooks + skills as the best shipped path |
 | Gemini CLI | extensions + hooks | `extension-first` |
 | PI | extensions + native tools + cockpit widgets | `extension-first` |
-| Cursor | project rules + config | `rules-first` |
-| Windsurf | rules + config | `rules-first` |
-| Codex | config + `AGENTS.md` | `config-first` |
-| opencode | config + project docs | `config-first` |
+| Cursor | project rules + hooks + MCP config | `rules-first` |
+| Windsurf | rules + hooks + MCP config | `rules-first` |
+| Codex | config + hooks + skills + `AGENTS.md` | `config-first` |
+| opencode | config + plugin + project docs | `config-first` |
 
 ## Commands
 

@@ -57,7 +57,7 @@ describe('buildWorldState — task grouping by status_category', () => {
   it('groups running tasks into active', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Active task' })
-    await updateTask({ task_id: t.task_id, status: 'running' })
+    await updateTask({ workspace_id: 'ws_1', task_id: t.task_id, status: 'running' })
     const db = getDb()
     const result = buildWorldState(db, { workspace_id: 'ws_1', goal: 'test' })
     expect(result.tasks.active).toHaveLength(1)
@@ -68,7 +68,7 @@ describe('buildWorldState — task grouping by status_category', () => {
   it('groups blocked tasks into blocked', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Blocked task' })
-    await updateTask({ task_id: t.task_id, status: 'blocked' })
+    await updateTask({ workspace_id: 'ws_1', task_id: t.task_id, status: 'blocked' })
     const db = getDb()
     const result = buildWorldState(db, { workspace_id: 'ws_1', goal: 'test' })
     expect(result.tasks.blocked).toHaveLength(1)
@@ -78,7 +78,7 @@ describe('buildWorldState — task grouping by status_category', () => {
   it('groups completed tasks into done', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Done task' })
-    await updateTask({ task_id: t.task_id, status: 'completed' })
+    await updateTask({ workspace_id: 'ws_1', task_id: t.task_id, status: 'completed' })
     const db = getDb()
     const result = buildWorldState(db, { workspace_id: 'ws_1', goal: 'test' })
     expect(result.tasks.done).toHaveLength(1)

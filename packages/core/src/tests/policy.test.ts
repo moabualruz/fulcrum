@@ -216,7 +216,7 @@ describe('checkPolicy — task dependencies', () => {
     const db = getDb()
     const dep = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Dep' })
     const { updateTask } = await import('../tasks.js')
-    await updateTask({ task_id: dep.task_id, status: 'completed' })
+    await updateTask({ workspace_id: 'ws_1', task_id: dep.task_id, status: 'completed' })
     const child = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Child' })
     // Use task_relations as the single source for dependency data
     db.prepare(

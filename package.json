@@ -29,11 +29,6 @@
     "url": "https://github.com/moabualruz/fulcrum/issues"
   },
   "type": "module",
-  "pi": {
-    "extensions": [
-      "./packages/extension/index.ts"
-    ]
-  },
   "scripts": {
     "test": "pnpm -r test",
     "build": "pnpm -r build",

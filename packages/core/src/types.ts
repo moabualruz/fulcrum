@@ -80,7 +80,7 @@ export type EventType =
   | 'epic_status_changed' | 'prd_status_changed'
   | 'team_created' | 'team_invoked'
   | 'agent_run_created' | 'agent_run_started' | 'agent_run_progress'
-  | 'agent_run_blocked' | 'agent_run_failed' | 'agent_run_finished'
+  | 'agent_run_blocked' | 'agent_run_unblocked' | 'agent_run_aborted' | 'agent_run_failed' | 'agent_run_finished'
   | 'handoff_created' | 'handoff_consumed' | 'artifact_written'
   | 'artifact_validated' | 'memory_written' | 'memory_recalled'
   | 'worktree_allocated' | 'merge_queued' | 'merge_started'

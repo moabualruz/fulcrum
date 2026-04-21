@@ -76,6 +76,17 @@ function makeManager(db: DB): { manager: SyncManager; adapter: StubAdapter } {
   return { manager, adapter }
 }
 
+function createConflict(db: DB, syncId: string, conflictId: string): void {
+  db.prepare(
+    `INSERT INTO sync_conflicts (conflict_id, sync_id, local_hash, remote_hash)
+     VALUES (?, ?, 'aaa', 'remote-hash')`,
+  ).run(conflictId, syncId)
+
+  db.prepare(
+    `UPDATE sync_states SET sync_status = 'conflicted', conflict_state = 'detected' WHERE sync_id = ?`,
+  ).run(syncId)
+}
+
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -286,6 +297,92 @@ describe('fulcrum-sync — SyncManager', () => {
       .prepare(`SELECT * FROM sync_conflicts WHERE conflict_id = ?`)
       .get(conflictId) as ConflictRecord
     expect(conflictRow.resolution).toBe('local_wins')
+    expect(conflictRow.resolved_at).toBeTruthy()
+    expect(conflictRow.resolved_by).toBe('agent-chief')
+  })
+
+  it('remote_wins requires a local apply callback before marking conflict resolved', async () => {
+    const { manager, adapter } = makeManager(db)
+
+    const state = await manager.syncObject({
+      object_type: 'Issue' as const,
+      object_id: 'issue-remote-wins-missing-apply',
+      workspace_id: 'ws-test',
+      local_data: { title: 'Local', status: 'open' },
+    })
+
+    const conflictId = 'conflict-remote-wins-missing-apply'
+    createConflict(db, state.sync_id, conflictId)
+
+    await expect(
+      manager.resolveConflict({
+        conflict_id: conflictId,
+        resolution: 'remote_wins',
+        resolved_by: 'agent-chief',
+      }),
+    ).rejects.toThrow('apply_remote_data callback is required for remote_wins resolution')
+
+    expect(adapter.pullCalls).toHaveLength(0)
+
+    interface ConflictRecord {
+      resolution: string | null
+      resolved_at: string | null
+    }
+    const conflictRow = db
+      .prepare(`SELECT resolution, resolved_at FROM sync_conflicts WHERE conflict_id = ?`)
+      .get(conflictId) as ConflictRecord
+    expect(conflictRow.resolution).toBeNull()
+    expect(conflictRow.resolved_at).toBeNull()
+
+    const syncRow = db
+      .prepare(`SELECT sync_status, conflict_state FROM sync_states WHERE sync_id = ?`)
+      .get(state.sync_id) as { sync_status: string; conflict_state: string }
+    expect(syncRow.sync_status).toBe('conflicted')
+    expect(syncRow.conflict_state).toBe('detected')
+  })
+
+  it('remote_wins applies mapped remote data locally before marking conflict resolved', async () => {
+    const adapter = new StubAdapter()
+    const applied: Array<Record<string, unknown>> = []
+    const manager = new SyncManager(db, adapter, undefined, ({ state, local_data, raw_remote }) => {
+      applied.push({ state, local_data, raw_remote })
+    })
+
+    const state = await manager.syncObject({
+      object_type: 'Issue' as const,
+      object_id: 'issue-remote-wins',
+      workspace_id: 'ws-test',
+      local_data: { title: 'Local', status: 'open' },
+    })
+
+    const conflictId = 'conflict-remote-wins'
+    createConflict(db, state.sync_id, conflictId)
+
+    const resolved = await manager.resolveConflict({
+      conflict_id: conflictId,
+      resolution: 'remote_wins',
+      resolved_by: 'agent-chief',
+    })
+
+    expect(adapter.pullCalls).toEqual(['ext-1'])
+    expect(applied).toHaveLength(1)
+    expect(applied[0]?.local_data).toEqual({ title: 'Remote Title' })
+    expect(applied[0]?.raw_remote).toEqual({ name: 'Remote Title', state: 'In Progress' })
+    expect((applied[0]?.state as { sync_id: string }).sync_id).toBe(state.sync_id)
+
+    expect(resolved.sync_status).toBe('synced')
+    expect(resolved.conflict_state).toBe('resolved')
+    expect(resolved.last_sync_hash).toBe('remote-hash')
+
+    interface ConflictRecord {
+      resolution: string
+      resolved_at: string
+      resolved_by: string
+    }
+    const conflictRow = db
+      .prepare(`SELECT resolution, resolved_at, resolved_by FROM sync_conflicts WHERE conflict_id = ?`)
+      .get(conflictId) as ConflictRecord
+    expect(conflictRow.resolution).toBe('remote_wins')
     expect(conflictRow.resolved_at).toBeTruthy()
     expect(conflictRow.resolved_by).toBe('agent-chief')
   })

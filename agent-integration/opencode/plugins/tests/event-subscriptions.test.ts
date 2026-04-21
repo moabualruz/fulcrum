@@ -19,8 +19,14 @@ const mockSpawn = vi.mocked(spawnSync)
 // Replicate the event-handler logic from plugins/fulcrum.ts so we can unit-test
 // the subscription paths without importing the plugin.
 
+function getContext(): { workspace_id: string; project_id: string } {
+  return { workspace_id: 'ws_opencode', project_id: 'proj_opencode' }
+}
+
 function handleEvent(input: Record<string, unknown>): void {
-  const name = input['type'] as string | undefined
+  if (!input || typeof input !== 'object') return
+  const event = (input['event'] ?? {}) as Record<string, unknown>
+  const name = event['type'] as string | undefined
   const sessionId = 'test-session'
 
   if (name === 'session.idle') {
@@ -44,13 +50,19 @@ function handleEvent(input: Record<string, unknown>): void {
     })], { encoding: 'utf-8', timeout: 5_000 })
   } else if (name === 'todo.updated') {
     // Mirror into Fulcrum tasks table
-    const todo = input['todo'] as Record<string, unknown> | undefined
-    if (!todo) return
-    spawnSync('fulcrum', ['action', 'exec', 'update_task', '--json', JSON.stringify({
-      task_id: todo['id'],
-      status: todo['status'],
-      note: `[opencode todo.updated] ${todo['title'] ?? ''}`,
-    })], { encoding: 'utf-8', timeout: 5_000 })
+    const properties = event['properties'] as Record<string, unknown> | undefined
+    const todos = (properties?.['todos'] ?? []) as Array<Record<string, unknown>>
+    if (!Array.isArray(todos) || todos.length === 0) return
+    const ids = getContext()
+    for (const todo of todos) {
+      spawnSync('fulcrum', ['action', 'exec', 'update_task', '--json', JSON.stringify({
+        task_id: todo['id'],
+        workspace_id: ids.workspace_id,
+        project_id: ids.project_id,
+        status: todo['status'],
+        note: `[opencode todo.updated] ${todo['title'] ?? ''}`,
+      })], { encoding: 'utf-8', timeout: 5_000 })
+    }
   }
 }
 
@@ -60,7 +72,7 @@ afterEach(() => {
 
 describe('OpenCode event subscriptions (Task 8.4)', () => {
   it('session.idle → calls fulcrum hook opencode session-end', () => {
-    handleEvent({ type: 'session.idle' })
+    handleEvent({ event: { type: 'session.idle' } })
     expect(mockSpawn).toHaveBeenCalledOnce()
     const call = mockSpawn.mock.calls[0]
     expect(call[0]).toBe('fulcrum')
@@ -68,7 +80,7 @@ describe('OpenCode event subscriptions (Task 8.4)', () => {
   })
 
   it('session.compacted → calls pre-compact AND emits graph reducer write', () => {
-    handleEvent({ type: 'session.compacted' })
+    handleEvent({ event: { type: 'session.compacted' } })
     expect(mockSpawn).toHaveBeenCalledTimes(2)
     const [first, second] = mockSpawn.mock.calls
     expect(first[1]).toContain('pre-compact')
@@ -76,22 +88,24 @@ describe('OpenCode event subscriptions (Task 8.4)', () => {
   })
 
   it('todo.updated → calls update_task with mirrored status', () => {
-    handleEvent({ type: 'todo.updated', todo: { id: 'tsk_001', title: 'Fix auth', status: 'completed' } })
+    handleEvent({ event: { type: 'todo.updated', properties: { todos: [{ id: 'tsk_001', title: 'Fix auth', status: 'completed' }] } } })
     expect(mockSpawn).toHaveBeenCalledOnce()
     const call = mockSpawn.mock.calls[0]
     expect(call[1]).toContain('update_task')
     // The --json arg should contain the task_id
     const jsonArg = call[1]?.find((a: string) => a.includes('tsk_001'))
     expect(jsonArg).toBeDefined()
+    expect(jsonArg).toContain('ws_opencode')
+    expect(jsonArg).toContain('proj_opencode')
   })
 
   it('unknown event type → no spawnSync calls', () => {
-    handleEvent({ type: 'unrelated.event' })
+    handleEvent({ event: { type: 'unrelated.event' } })
     expect(mockSpawn).not.toHaveBeenCalled()
   })
 
   it('todo.updated without todo payload → no spawnSync call', () => {
-    handleEvent({ type: 'todo.updated' })
+    handleEvent({ event: { type: 'todo.updated' } })
     expect(mockSpawn).not.toHaveBeenCalled()
   })
 })

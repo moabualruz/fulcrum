@@ -74,6 +74,9 @@ On PI session start, the cockpit:
 1. Computes `workspace_id` and `project_id` deterministically from the project directory path (sha256[:12] of abs path) — no file needed
 2. Starts the Fulcrum monitor server (`fulcrum serve monitor`) if not already running
 3. Polls workspace status every 5 s
+4. Injects a Fulcrum-first system-prompt nudge before each agent turn so PI
+   prefers native `fulcrum_workspace_status` / `fulcrum_recall_memory` before
+   filesystem search or architecture decisions
 
 ## Configuration
 

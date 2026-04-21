@@ -57,7 +57,7 @@ describe('listTasks', () => {
   it('filters by status', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T1' })
-    await updateTask({ task_id: t.task_id, status: 'completed' })
+    await updateTask({ workspace_id: 'ws_1', task_id: t.task_id, status: 'completed' })
     const queued = await listTasks({ workspace_id: 'ws_1', status: 'queued' })
     const completed = await listTasks({ workspace_id: 'ws_1', status: 'completed' })
     expect(queued).toHaveLength(0)
@@ -110,18 +110,18 @@ describe('updateTask', () => {
   it('increments version on update', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
-    const updated = await updateTask({ task_id: t.task_id, note: 'working on it' })
+    const updated = await updateTask({ workspace_id: 'ws_1', task_id: t.task_id, note: 'working on it' })
     expect(updated.version).toBe(1)
-    const again = await updateTask({ task_id: t.task_id, note: 'done' })
+    const again = await updateTask({ workspace_id: 'ws_1', task_id: t.task_id, note: 'done' })
     expect(again.version).toBe(2)
   })
 
   it('throws version_conflict when expected_version mismatches', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
-    await updateTask({ task_id: t.task_id, note: 'first' }) // now version=1
+    await updateTask({ workspace_id: 'ws_1', task_id: t.task_id, note: 'first' }) // now version=1
     await expect(
-      updateTask({ task_id: t.task_id, note: 'conflict', expected_version: 0 })
+      updateTask({ workspace_id: 'ws_1', task_id: t.task_id, note: 'conflict', expected_version: 0 })
     ).rejects.toMatchObject({ code: 'version_conflict' })
   })
 
@@ -129,7 +129,7 @@ describe('updateTask', () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
     expect(t.version).toBe(0)
-    const updated = await updateTask({ task_id: t.task_id, note: 'hello', expected_version: 0 })
+    const updated = await updateTask({ workspace_id: 'ws_1', task_id: t.task_id, note: 'hello', expected_version: 0 })
     expect(updated.version).toBe(1)
     expect(updated.note).toBe('hello')
   })
@@ -137,8 +137,23 @@ describe('updateTask', () => {
   it('throws not_found for unknown task_id', async () => {
     seed()
     await expect(
-      updateTask({ task_id: 'NONEXISTENT', status: 'completed' })
+      updateTask({ workspace_id: 'ws_1', task_id: 'NONEXISTENT', status: 'completed' })
     ).rejects.toMatchObject({ code: 'not_found' })
+  })
+
+  it('throws not_found when task exists in a different workspace', async () => {
+    seed()
+    const db = getDb()
+    db.prepare("INSERT INTO workspaces (workspace_id, name) VALUES ('ws_2','other ws')").run()
+    db.prepare("INSERT INTO projects (project_id, workspace_id, name) VALUES ('proj_2','ws_2','other proj')").run()
+    const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'Scoped task' })
+
+    await expect(
+      updateTask({ workspace_id: 'ws_2', task_id: t.task_id, status: 'completed' })
+    ).rejects.toMatchObject({ code: 'not_found' })
+
+    const row = db.prepare('SELECT status FROM tasks WHERE task_id = ? AND workspace_id = ?').get(t.task_id, 'ws_1') as { status: string }
+    expect(row.status).toBe('queued')
   })
 })
 
@@ -183,21 +198,21 @@ describe('updateTask — status_category and events', () => {
   it('updates status_category when status changes to completed', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
-    const updated = await updateTask({ task_id: t.task_id, status: 'completed' })
+    const updated = await updateTask({ workspace_id: 'ws_1', task_id: t.task_id, status: 'completed' })
     expect(updated.status_category).toBe('done')
   })
 
   it('updates status_category when status changes to blocked', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
-    const updated = await updateTask({ task_id: t.task_id, status: 'blocked' })
+    const updated = await updateTask({ workspace_id: 'ws_1', task_id: t.task_id, status: 'blocked' })
     expect(updated.status_category).toBe('blocked')
   })
 
   it('emits task_status_changed event when status changes', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
-    await updateTask({ task_id: t.task_id, status: 'running' })
+    await updateTask({ workspace_id: 'ws_1', task_id: t.task_id, status: 'running' })
     const db = getDb()
     const evt = db.prepare("SELECT * FROM events WHERE evt_type = 'task_status_changed' AND object_id = ?").get(t.task_id) as Record<string, unknown> | undefined
     expect(evt).toBeTruthy()
@@ -206,7 +221,7 @@ describe('updateTask — status_category and events', () => {
   it('does not emit task_status_changed when only note changes', async () => {
     seed()
     const t = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'T' })
-    await updateTask({ task_id: t.task_id, note: 'just a note' })
+    await updateTask({ workspace_id: 'ws_1', task_id: t.task_id, note: 'just a note' })
     const db = getDb()
     const evt = db.prepare("SELECT * FROM events WHERE evt_type = 'task_status_changed' AND object_id = ?").get(t.task_id) as Record<string, unknown> | undefined
     expect(evt).toBeUndefined()

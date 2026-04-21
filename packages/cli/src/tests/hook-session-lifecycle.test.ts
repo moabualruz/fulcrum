@@ -46,6 +46,7 @@ describe('runSessionStartHook', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let stderrSpy: any
   let coreModuleMock: {
+    createTask: ReturnType<typeof vi.fn>
     startAgentRun: ReturnType<typeof vi.fn>
     getDb: ReturnType<typeof vi.fn>
     runMigrations: ReturnType<typeof vi.fn>
@@ -58,6 +59,7 @@ describe('runSessionStartHook', () => {
     stderrSpy  = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     coreModuleMock = {
+      createTask:     vi.fn().mockResolvedValue({ task_id: 'task_session_test' }),
       startAgentRun:  vi.fn().mockResolvedValue({ run_id: 'run_session_test' }),
       getDb:          vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations:  vi.fn(),

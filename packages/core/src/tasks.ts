@@ -28,6 +28,7 @@ interface CreateTaskInput {
 
 interface UpdateTaskInput {
   task_id: string
+  workspace_id: string
   status?: TaskStatus
   action?: 'reopen'
   note?: string
@@ -156,7 +157,8 @@ export async function createTask(input: CreateTaskInput, db: Db = getDb()): Prom
 }
 
 export async function updateTask(input: UpdateTaskInput, db: Db = getDb()): Promise<Task> {
-  const existing = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(input.task_id) as Record<string, unknown> | undefined
+  const existing = db.prepare('SELECT * FROM tasks WHERE task_id = ? AND workspace_id = ?')
+    .get(input.task_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!existing) throw new FulcrumError(`Task ${input.task_id} not found`, 'not_found')
 
   if (input.expected_version !== undefined && existing.version !== input.expected_version) {
@@ -185,8 +187,8 @@ export async function updateTask(input: UpdateTaskInput, db: Db = getDb()): Prom
   if (input.completed_at !== undefined) { fields.push('completed_at = ?'); values.push(input.completed_at) }
   if (input.assigned_run_id !== undefined) { fields.push('assigned_run_id = ?'); values.push(input.assigned_run_id) }
 
-  values.push(input.task_id)
-  db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE task_id = ?`).run(...values)
+  values.push(input.task_id, input.workspace_id)
+  db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE task_id = ? AND workspace_id = ?`).run(...values)
 
   if (input.labels !== undefined) {
     db.prepare('DELETE FROM task_labels WHERE task_id = ?').run(input.task_id)
@@ -232,7 +234,8 @@ export async function updateTask(input: UpdateTaskInput, db: Db = getDb()): Prom
     }
   }
 
-  const updated = db.prepare('SELECT * FROM tasks WHERE task_id = ?').get(input.task_id) as Record<string, unknown> | undefined
+  const updated = db.prepare('SELECT * FROM tasks WHERE task_id = ? AND workspace_id = ?')
+    .get(input.task_id, input.workspace_id) as Record<string, unknown> | undefined
   if (!updated) throw new FulcrumError(`Task ${input.task_id} not found after update`, 'not_found')
   return hydrateTask(db, updated)
 }

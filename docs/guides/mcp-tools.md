@@ -75,7 +75,9 @@ The CLI path is the recommended execution path for hooks, CI pipelines, skills, 
 
 **When hooks are installed (Claude Code):** The `SessionStart` hook pre-fetches `get_workspace_status` and `list_tasks` (open, limit 10) in-process and writes the result to the session file. The `PreToolUse` hook then injects that snapshot into your context (as a stderr note) on the first tool call of the session — so Claude already has workspace context before making any MCP call. No explicit session-start calls are needed for orientation in this case.
 
-**Without hooks (PI, Gemini, Codex, CI):** Call these two tools at the beginning of every session, in order:
+**When no session-start/context hook is active (CI, MCP-only clients, or a
+runtime with hooks disabled):** Call these two tools at the beginning of every
+session, in order:
 
 1. `get_current_context` — derive `workspace_id`, `project_id`, and readiness
 2. `get_workspace_status` — understand active runs, blockers, and queue depth

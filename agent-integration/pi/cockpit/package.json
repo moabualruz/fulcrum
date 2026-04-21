@@ -1,6 +1,6 @@
 {
   "name": "@fulcrum-agent-os/pi-cockpit",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Fulcrum Cockpit — control-plane dashboard, task management, memory, lifecycle tools, and policy hook for the PI coding agent",
   "keywords": [
     "pi-package",

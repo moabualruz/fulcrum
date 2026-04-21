@@ -620,11 +620,12 @@ TOOL_REGISTRY.set('create_task', {
 TOOL_REGISTRY.set('update_task', {
   schema: TOOL_SCHEMA_MAP.get('update_task'),
   capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
-  handler: async (args) => {
+  handler: async (args, deps) => {
     const { updateTask } = await import('fulcrum-agent-core')
-    // updateTask doesn't need workspace_id — task_id is globally unique in the DB
+    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const task = await updateTask({
       task_id: args['task_id'] as string,
+      workspace_id: ws,
       status: args['status'] as Parameters<typeof updateTask>[0]['status'],
       note: args['note'] as string | undefined,
       assigned_to: args['assigned_to'] as string | undefined,

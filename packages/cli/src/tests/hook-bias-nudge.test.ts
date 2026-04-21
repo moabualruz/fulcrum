@@ -309,4 +309,31 @@ describe('PreToolUse Fulcrum-first bias nudge (Variant A, PR 3 R1)', () => {
     expect(grep).toBeDefined()
     expect(grep!.session_id).toBe('gm-sess-telem-uuid')
   })
+
+  function hostCtx(cliName: 'cursor' | 'windsurf' | 'copilot', toolName: string, sessionId: string): HookContext {
+    return {
+      cliName,
+      toolName,
+      toolInput: {},
+      sessionId,
+      agentRole: '',
+      runId: '',
+      workspace_id: 'ws_bias',
+    }
+  }
+
+  it('emits nudges for Cursor, Windsurf, and Copilot when a trusted session exists', async () => {
+    for (const [cliName, sessionId, runId] of [
+      ['cursor', 'cursor-sess-real', 'run_01CURSOR'],
+      ['windsurf', 'windsurf-sess-real', 'run_01WINDSURF'],
+      ['copilot', 'copilot-sess-real', 'run_01COPILOT'],
+    ] as const) {
+      seedTrustedSession(sessionId, runId)
+      const io = makeCapturedIO()
+      await runPreHook(hostCtx(cliName, 'Read', sessionId), io.io)
+      const nudge = io.stderr.find((l) => l.includes('fulcrum-first'))
+      expect(nudge, `missing nudge for ${cliName}`).toBeDefined()
+      expect(nudge).toMatch(/Read/)
+    }
+  })
 })

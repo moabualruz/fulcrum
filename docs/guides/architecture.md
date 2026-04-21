@@ -189,9 +189,9 @@ fulcrum/
 ├── agent-integration/      # Runtime installers
 │   ├── install.ts          # pnpm setup entry point
 │   ├── claude/             # Claude Code hook + CLAUDE.md
-│   ├── codex/              # OpenAI Codex CLI — AGENTS.md + mcp-config.json
+│   ├── codex/              # OpenAI Codex CLI — AGENTS.md + config.toml + hooks
 │   ├── gemini/             # Gemini extension + GEMINI.md
-│   ├── opencode/           # opencode — opencode.md + config.json
+│   ├── opencode/           # opencode — opencode.md + opencode.jsonc + plugin
 │   └── pi/                 # PI cockpit extension
 │
 ├── docs/                   # Design specs and guides

@@ -119,11 +119,11 @@ describe('Windsurf: global opt-in safety', () => {
 })
 
 describe('Windsurf: MCP integration', () => {
-  const path = join(W, '.windsurf/mcp_config.json')
+  const path = join(W, '.windsurf/mcp.json')
 
-  it('GAP(ws-S3) writes .windsurf/mcp_config.json with fulcrum server at install time', () => {
-    // Canonical path per docs is ~/.codeium/windsurf/mcp_config.json (user).
-    // Repo-local copy here serves as the installer template.
+  it('GAP(ws-S3) writes project .windsurf/mcp.json with fulcrum server at install time', () => {
+    // Project install path used by installWindsurf(); user-scope Windsurf MCP
+    // config remains a separate operator path.
     if (!existsSync(path)) return
     const doc = readJsonIfExists<any>(path)
     expect(doc?.mcpServers?.fulcrum).toBeDefined()

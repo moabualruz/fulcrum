@@ -801,9 +801,9 @@ fulcrum tui
 | Pane | Contents |
 |------|----------|
 | Tasks | Kanban columns — backlog / active / blocked / done |
-| Agents | Live agent run list with role, status, elapsed time |
+| Agents | Live agent run list with role, status, heartbeat lag, task title |
 | Events | Real-time SSE event feed |
-| Policy | Recent policy decisions |
+| Policy | Recent policy violations and blocked runs |
 
 **Key bindings:**
 
@@ -811,14 +811,16 @@ fulcrum tui
 |-----|--------|
 | `Tab` | Cycle panes |
 | `↑ / ↓` | Move selection |
+| `Enter` | Open/close selected item detail |
 | `u` | Unblock selected agent run |
 | `k` | Kill (abort) selected agent run |
 | `n` | Create new task (opens inline input) |
+| `d` | Mark selected task done |
 | `q` | Quit |
 
-Requires the monitor to be running (`fulcrum serve monitor`) for live SSE data. Falls back to direct DB reads (read-only) when the monitor is unreachable.
+Requires the monitor to be running (`fulcrum serve monitor`) for live SSE data and mutation actions. Falls back to direct DB reads (read-only) when the monitor is unreachable.
 
-Set `FULCRUM_MONITOR_TOKEN` to enable mutation actions (`u`, `k`, `n`).
+When monitor auth is required, set `FULCRUM_MONITOR_TOKEN` so mutation actions (`u`, `k`, `n`, `d`) can send the bearer token.
 
 ---
 

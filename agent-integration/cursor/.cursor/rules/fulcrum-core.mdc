@@ -62,4 +62,4 @@ Fulcrum data lives in `globalDataDir()` (`$XDG_DATA_HOME/fulcrum` or `~/.local/s
 
 ## Note on hooks
 
-Hook-based passive interception (used by Claude Code, Codex, Gemini) is not available in Cursor. Use MCP tools directly for all lifecycle calls.
+Project installs include `.cursor/hooks.json` for lifecycle and tool-time hook commands. Use MCP tools directly when hooks are disabled or unavailable in the running Cursor build.

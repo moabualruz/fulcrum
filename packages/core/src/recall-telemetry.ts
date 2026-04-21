@@ -11,6 +11,7 @@ import { globalDataDir } from './db/client.js'
 // If the write fails, swallow — telemetry must never block a hook or user turn.
 
 export type RecallEventKind =
+  | 'turn_observed'
   | 'recall_called'
   | 'grep_called_without_recall'
   | 'nudge_emitted'         // Variant A: advisory nudge sent to model

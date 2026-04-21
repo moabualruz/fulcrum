@@ -76,6 +76,8 @@ interface CompleteRunInput {
   artifacts?: RunArtifacts
 }
 interface BlockRunInput { run_id: string; reason: string; escalation_reason?: string }
+interface UnblockRunInput { run_id: string; summary?: string }
+interface AbortRunInput { run_id: string; reason?: string }
 interface EscalateRunInput { run_id: string; escalation_reason: string }
 
 // Keep RunStatus as alias for backward compat
@@ -481,6 +483,88 @@ export async function blockAgentRun(input: BlockRunInput, db: Db = getDb()): Pro
   }
 
   // v2a PR 4 Task 20: release PCI lifecycle refcount on block.
+  try {
+    const moduleName = 'fulcrum-memory'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mem = (await import(/* @vite-ignore */ moduleName)) as any
+    if (typeof mem?.onAgentRunEnd === 'function') mem.onAgentRunEnd(input.run_id)
+  } catch { /* best-effort */ }
+
+  return getRun(input.run_id, db)
+}
+
+export async function unblockAgentRun(input: UnblockRunInput, db: Db = getDb()): Promise<AgentRun> {
+  const run = getRun(input.run_id, db)
+  if (run.status !== 'blocked') {
+    throw new FulcrumError(`Run ${input.run_id} is not blocked`, 'invalid_state')
+  }
+
+  const now = new Date().toISOString()
+  const summary = input.summary?.trim() || 'Unblocked by operator'
+  db.prepare(`
+    UPDATE agent_runs
+    SET status = 'running', status_category = ?, blocker = NULL,
+        updated_at = ?, version = version + 1
+    WHERE run_id = ?
+  `).run(statusCategory('running'), now, input.run_id)
+
+  appendRunEvent(input.run_id, 'unblocked', { summary }, db)
+
+  const unblockedRun = getRun(input.run_id, db)
+  upsertAgentStateProjection(db, unblockedRun)
+
+  emitEvent({
+    workspace_id: run.workspace_id,
+    project_id: run.project_id || undefined,
+    evt_type: 'agent_run_unblocked',
+    object_type: 'agent_run',
+    object_id: input.run_id,
+    actor_type: 'agent',
+    actor_id: run.agent_id || 'system',
+    payload: { status: 'running', summary },
+  })
+
+  try {
+    const moduleName = 'fulcrum-memory'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mem = (await import(/* @vite-ignore */ moduleName)) as any
+    if (typeof mem?.onAgentRunStart === 'function') {
+      mem.onAgentRunStart({ run_id: input.run_id, project_id: unblockedRun.project_id, db })
+    }
+  } catch { /* best-effort */ }
+
+  return getRun(input.run_id, db)
+}
+
+export async function abortAgentRun(input: AbortRunInput, db: Db = getDb()): Promise<AgentRun> {
+  const run = getRun(input.run_id, db)
+  assertRunIsLive(run, input.run_id)
+  const now = new Date().toISOString()
+  const reason = input.reason?.trim() || 'Operator aborted run'
+
+  db.prepare(`
+    UPDATE agent_runs
+    SET status = 'aborted', status_category = ?, blocker = NULL,
+        updated_at = ?, version = version + 1
+    WHERE run_id = ?
+  `).run(statusCategory('aborted'), now, input.run_id)
+
+  appendRunEvent(input.run_id, 'aborted', { reason }, db)
+
+  const abortedRun = getRun(input.run_id, db)
+  upsertAgentStateProjection(db, abortedRun)
+
+  emitEvent({
+    workspace_id: run.workspace_id,
+    project_id: run.project_id || undefined,
+    evt_type: 'agent_run_aborted',
+    object_type: 'agent_run',
+    object_id: input.run_id,
+    actor_type: 'agent',
+    actor_id: run.agent_id || 'system',
+    payload: { status: 'aborted', reason },
+  })
+
   try {
     const moduleName = 'fulcrum-memory'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

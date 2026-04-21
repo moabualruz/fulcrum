@@ -340,9 +340,12 @@ export const FulcrumPlugin: Plugin = async (ctx) => {
         const todos = (properties?.["todos"] ?? []) as Array<Record<string, unknown>>
         if (!Array.isArray(todos) || todos.length === 0) return
         try {
+          const ids = getContext()
           for (const todo of todos) {
             spawnSync("fulcrum", ["action", "exec", "update_task", "--json", JSON.stringify({
               task_id: todo["id"],
+              workspace_id: ids.workspace_id,
+              project_id: ids.project_id,
               status: todo["status"],
               note: `[opencode todo.updated] ${todo["title"] ?? ""}`,
             })], { encoding: "utf-8", timeout: 5_000 })

@@ -60,6 +60,8 @@ export {
   getAgentRunStatus,
   completeAgentRun,
   blockAgentRun,
+  unblockAgentRun,
+  abortAgentRun,
   escalateRun,
   sweepStaleRuns,
   buildSpawnableRun,

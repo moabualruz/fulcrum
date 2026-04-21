@@ -30,12 +30,16 @@ import { execSync, spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import {
   parseCanonicalSource,
+  emitCursor,
+  emitWindsurf,
+  emitCopilot,
   emitOpencode,
   emitCodex,
   writeRidersum,
   appendJournal,
   sha256File,
   newRunId,
+  type EmitArtifact,
   type InstallJournalEntry,
 } from "../packages/agent-fanout/src/index.js";
 
@@ -152,6 +156,34 @@ function mkdirp(dir: string): void {
     return;
   }
   fs.mkdirSync(dir, { recursive: true });
+}
+
+function writeFanoutArtifacts(opts: {
+  artifacts: EmitArtifact[];
+  targetDir: string;
+  dryRun: boolean;
+  label: string;
+  rollback?: string;
+}): void {
+  const artifacts = opts.artifacts.filter((artifact) => artifact.sourceSkillName || artifact.sourceRuleName);
+  if (artifacts.length === 0) {
+    skip(`fanout produced zero ${opts.label} artifacts`);
+    return;
+  }
+  if (opts.dryRun) {
+    for (const artifact of artifacts.slice(0, 5)) {
+      dry(`would write ${path.join(opts.targetDir, artifact.path)}`);
+    }
+    ok(`(dry-run) ${artifacts.length} ${opts.label} artifact(s)`);
+    return;
+  }
+  for (const artifact of artifacts) {
+    const dest = path.join(opts.targetDir, artifact.path);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, artifact.contents, "utf8");
+  }
+  ok(`wrote ${artifacts.length} ${opts.label} artifact(s) from canonical fanout`);
+  if (opts.rollback) setRollback(opts.rollback);
 }
 
 function step(name: string, fn: () => void | Promise<void>): Promise<void> {
@@ -744,6 +776,12 @@ function copyDirContents(srcDir: string, destDir: string): number {
   return count;
 }
 
+function hasCheckedGeminiExtensionFiles(extDir: string): boolean {
+  return fs.existsSync(path.join(extDir, "gemini-extension.json")) &&
+    fs.existsSync(path.join(extDir, "GEMINI.md")) &&
+    fs.existsSync(path.join(extDir, "hooks", "hooks.json"));
+}
+
 // PR 14.5 — Validate gemini-extension.json against required Gemini extension manifest fields.
 export interface GeminiExtensionManifestValidation {
   ok: boolean;
@@ -813,15 +851,19 @@ function installGeminiExtension(): void {
       encoding: "utf8",
     });
     if (result.status === 0) {
-      ok(`installed via \`gemini extensions install ${srcDir}\``);
-      setRollback("gemini extensions uninstall fulcrum");
-      setJournalMeta({ agent: "gemini", action: "native_cli", target_path: extDir, mode: "native" });
-      console.log();
-      console.log("  To update the Fulcrum Gemini extension after upgrading:");
-      console.log("    gemini extensions update fulcrum");
-      return;
+      if (hasCheckedGeminiExtensionFiles(extDir)) {
+        ok(`installed via \`gemini extensions install ${srcDir}\``);
+        setRollback("gemini extensions uninstall fulcrum");
+        setJournalMeta({ agent: "gemini", action: "native_cli", target_path: extDir, mode: "native" });
+        console.log();
+        console.log("  To update the Fulcrum Gemini extension after upgrading:");
+        console.log("    gemini extensions update fulcrum");
+        return;
+      }
+      console.log("  — native install did not create checked files; falling back to file-copy");
+    } else {
+      warn(`\`gemini extensions install\` failed (exit ${result.status ?? "unknown"}): ${result.stderr?.trim() ?? ""} — falling back to file-copy`);
     }
-    warn(`\`gemini extensions install\` failed (exit ${result.status ?? "unknown"}): ${result.stderr?.trim() ?? ""} — falling back to file-copy`);
   } else {
     verbose("`gemini` CLI not found — using file-copy install");
   }
@@ -1588,10 +1630,6 @@ async function main(): Promise<void> {
 }
 
 // ── Per-project init: Cursor ──────────────────────────────────────────────────
-// Writes .cursor/mcp.json and .cursor/rules/fulcrum.mdc into targetDir.
-// Idempotent: skips files that already exist.
-
-// ── Per-project init: Cursor ──────────────────────────────────────────────────
 // Writes Fulcrum integration files for Cursor IDE:
 //   1. .cursor/mcp.json              — MCP server registration
 //   2. .cursor/rules/fulcrum-core.mdc — always-apply canonical rules
@@ -1606,6 +1644,7 @@ export async function installCursor(opts: { dryRun: boolean; targetDir?: string 
 
   const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
   const src = path.join(REPO_ROOT_LOCAL, "cursor", ".cursor");
+  const agentIntegrationRoot = REPO_ROOT_LOCAL;
 
   function copyOne(srcRel: string, destRel: string): void {
     const srcPath = path.join(src, srcRel);
@@ -1635,23 +1674,21 @@ export async function installCursor(opts: { dryRun: boolean; targetDir?: string 
   }
 
   function copySkillsDir(): void {
-    const skillsDir = path.join(src, "skills");
-    if (!fs.existsSync(skillsDir)) return;
-    for (const skillName of fs.readdirSync(skillsDir)) {
-      const skillSrc = path.join(skillsDir, skillName, "SKILL.md");
-      if (!fs.existsSync(skillSrc)) continue;
+    const source = parseCanonicalSource({ agentIntegrationRoot });
+    if (source.skills.length === 0) {
+      skip(`canonical skills dir is empty`);
+      return;
+    }
+    for (const skill of source.skills) {
+      const skillName = `fulcrum-${skill.name}`;
       const destPath = path.join(targetDir, ".cursor", "skills", skillName, "SKILL.md");
-      if (fs.existsSync(destPath)) {
-        skip(`already exists: ${destPath}`);
-        continue;
-      }
       if (dryRun) {
         console.log(`  [dry-run] would create ${destPath}`);
         ok(`(dry-run) .cursor/skills/${skillName}/SKILL.md`);
         continue;
       }
       fs.mkdirSync(path.dirname(destPath), { recursive: true });
-      fs.copyFileSync(skillSrc, destPath);
+      fs.writeFileSync(destPath, skill.raw, "utf8");
       ok(`wrote ${destPath}`);
       setRollback(`rm -f ${destPath}`);
     }
@@ -1665,11 +1702,18 @@ export async function installCursor(opts: { dryRun: boolean; targetDir?: string 
     copyOne("rules/fulcrum-core.mdc", "rules/fulcrum-core.mdc");
   });
 
-  await step("Cursor: .cursor/rules/ (33 per-skill .mdc files)", () => {
-    copyDir("rules", "rules", /fulcrum-skill-.*\.mdc$/);
+  await step("Cursor: .cursor/rules/ (canonical fanout)", () => {
+    const source = parseCanonicalSource({ agentIntegrationRoot });
+    writeFanoutArtifacts({
+      artifacts: emitCursor(source).artifacts,
+      targetDir,
+      dryRun,
+      label: "Cursor rule",
+      rollback: `rm -f ${path.join(targetDir, ".cursor", "rules", "fulcrum-skill-*.mdc")} ${path.join(targetDir, ".cursor", "rules", "fulcrum-rule-*.mdc")}`,
+    });
   });
 
-  await step("Cursor: .cursor/skills/ (33 SKILL.md files)", () => {
+  await step("Cursor: .cursor/skills/ (canonical SKILL.md files)", () => {
     copySkillsDir();
   });
 
@@ -2399,7 +2443,8 @@ export function translateRoleForOpencode(raw: string, slug: string, primary: boo
 }
 
 // ── Per-project init: Windsurf ────────────────────────────────────────────────
-// Writes .windsurf/mcp.json and .windsurf/rules/fulcrum.mdc into targetDir.
+// Writes Fulcrum integration files for Windsurf:
+//   .windsurf/mcp.json, rules, workflows, and hooks.
 // Idempotent: skips files that already exist.
 
 export async function installWindsurf(opts: {
@@ -2415,6 +2460,7 @@ export async function installWindsurf(opts: {
 
   const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
   const src = path.join(REPO_ROOT_LOCAL, "windsurf", ".windsurf");
+  const agentIntegrationRoot = REPO_ROOT_LOCAL;
 
   function copyOne(srcRel: string, destRel: string): void {
     const srcPath = path.join(src, srcRel);
@@ -2451,9 +2497,16 @@ export async function installWindsurf(opts: {
     copyOne("rules/fulcrum-core.md", "rules/fulcrum-core.md");
   });
 
-  // .windsurf/rules/fulcrum-skill-*.md × 33 — model_decision skill rules
-  await step("Windsurf: .windsurf/rules/fulcrum-skill-*.md (33 skill rules)", () => {
-    copyDir("rules", "rules", /^fulcrum-skill-.*\.md$/);
+  // .windsurf/rules/fulcrum-{skill,rule}-*.md — emitted from canonical source.
+  await step("Windsurf: .windsurf/rules/ (canonical fanout)", () => {
+    const source = parseCanonicalSource({ agentIntegrationRoot });
+    writeFanoutArtifacts({
+      artifacts: emitWindsurf(source).artifacts,
+      targetDir,
+      dryRun,
+      label: "Windsurf rule",
+      rollback: `rm -f ${path.join(targetDir, ".windsurf", "rules", "fulcrum-skill-*.md")} ${path.join(targetDir, ".windsurf", "rules", "fulcrum-rule-*.md")}`,
+    });
   });
 
   // .windsurf/hooks.json — 10 hook events
@@ -2481,6 +2534,7 @@ export async function installCopilot(opts: { dryRun: boolean; targetDir?: string
 
   const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
   const src = path.join(REPO_ROOT_LOCAL, "copilot");
+  const agentIntegrationRoot = REPO_ROOT_LOCAL;
 
   // Helper: copy a single file from src to dest, creating parent dirs.
   function copyOne(srcRel: string, destRel: string): void {
@@ -2526,12 +2580,15 @@ export async function installCopilot(opts: { dryRun: boolean; targetDir?: string
     );
   });
 
-  await step("Copilot: .github/instructions/ (33 skill files)", () => {
-    copyDir(
-      ".github/instructions",
-      ".github/instructions",
-      /fulcrum-skill-.*\.instructions\.md$/
-    );
+  await step("Copilot: .github/instructions/ (canonical fanout)", () => {
+    const source = parseCanonicalSource({ agentIntegrationRoot });
+    writeFanoutArtifacts({
+      artifacts: emitCopilot(source).artifacts,
+      targetDir,
+      dryRun,
+      label: "Copilot instruction",
+      rollback: `rm -f ${path.join(targetDir, ".github", "instructions", "fulcrum-skill-*.instructions.md")} ${path.join(targetDir, ".github", "instructions", "fulcrum-rule-*.instructions.md")}`,
+    });
   });
 
   await step("Copilot: .github/agents/ (24 role files)", () => {

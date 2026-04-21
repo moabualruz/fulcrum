@@ -22,6 +22,10 @@ await resolveConflict({
 })
 ```
 
+`remote_wins` requires an `apply_remote_data` callback, or a `SyncManager`
+constructed with an apply callback, so the pulled Plane object is mapped and
+persisted to the local domain object before the conflict is marked resolved.
+
 ---
 
 ## CLI
@@ -61,7 +65,7 @@ The client includes automatic retry:
 When a local write conflicts with a remote update (both sides changed since last sync), `fulcrum-sync` stores the conflict in the `sync_conflicts` table. Resolution strategies:
 
 - `local_wins` — apply the local version to Plane
-- `remote_wins` — apply the Plane version locally
+- `remote_wins` — apply the Plane version locally through `apply_remote_data`
 - `manual` — human (or agent) resolves via `resolveConflict()`
 
 Secret scanning runs on all outgoing payloads before push — any match aborts the sync and logs a `policy_event`.

@@ -76,7 +76,7 @@ The lifecycle driver translates this into `completeAgentRun` or `blockAgentRun` 
 
 ## Built-in adapters
 
-Both ship registered at module load of `fulcrum-worker`.
+These ship registered at module load of `fulcrum-worker`.
 
 ### `stub` — test default
 
@@ -135,6 +135,23 @@ fulcrum agent spawn \
 ```
 
 Your `pi_runner.py` reads the Fulcrum env vars, does its thing, and prints a JSON blob matching `WorkerResult` to stdout.
+
+### `claude-code` — Claude Code subprocess adapter
+
+Source: `packages/worker/src/adapters/claude-code.ts`.
+
+Resolves the `claude` binary from `$FULCRUM_CLAUDE_BIN` or `PATH`, writes the run prompt to a temporary prompt file, and invokes Claude Code in non-interactive print mode. Missing binaries, non-zero exits, and timeouts return a blocked `WorkerResult` with a clear error. The default timeout is 30 minutes and can be overridden with `FULCRUM_CLAUDE_TIMEOUT_MS`.
+
+Example wiring:
+
+```bash
+export FULCRUM_AGENT_ADAPTER=claude-code
+
+fulcrum agent spawn \
+  --target-role software_engineer \
+  --caller-role chief_of_staff \
+  --task-id task_abc
+```
 
 ---
 

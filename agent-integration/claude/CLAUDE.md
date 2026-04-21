@@ -164,13 +164,14 @@ Create task. Auto-creates workspace + project if absent. Writes task row. Return
 
 `idempotent`
 
-Update task status, note, or assignment. Updates task row in place. Returns task_id, updated=true, changed fields. Requires task_id.
+Update task status, note, or assignment. Updates a workspace-scoped task row in place. Returns task_id, updated=true, changed fields. Defaults workspace_id from the current project context.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `task_id` | string | Yes | Task ID to update |
+| `workspace_id` | string | No | Workspace scope for the task; defaults to current workspace when omitted |
 | `status` | string | No | New status value |
 | `note` | string | No | Progress note |
 | `assigned_to` | string | No | Reassign to this agent role slug |
@@ -346,7 +347,7 @@ Read live agent run status. Read-only. Returns run_id, status, role, current_ste
 
 ### `mcp__fulcrum__start_agent_run` — Start Agent Run
 
-Register start of agent run. Call at start of every task. Auto-creates stub task if no task_id. Inserts agent_runs row, sets task status=running. Returns run_id, status. Requires agent_role. workspace_id optional (default cwd).
+Register start of agent run. Call at start of every task. Auto-creates stub task if no task_id. Inserts agent_runs row, sets task status=running. Returns run_id, status. Requires agent_role. workspace_id optional (default cwd). context_type defaults to subagent.
 
 **Parameters:**
 
@@ -356,6 +357,7 @@ Register start of agent run. Call at start of every task. Auto-creates stub task
 | `agent_role` | string | Yes | One of the 24 canonical role slugs (e.g. software_engineer) |
 | `workspace_id` | string | No | Workspace ID (optional — defaults to cwd workspace) |
 | `project_id` | string | No | Optional project ID (defaults to workspace_id) |
+| `context_type` | `primary` \| `subagent` \| `cron` \| `heartbeat` \| `flush` | No | Run context type (defaults to subagent) |
 | `worktree_path` | string | No | Optional git worktree path for code-writing roles |
 | `pi_run_id` | string | No | Optional custom run ID for external tracking |
 | `model` | string | No | Optional model override (e.g. "claude-sonnet-4-6") |

@@ -115,7 +115,7 @@ Both go through the usual policy gate (`canInvokeTeams`). See [worker-adapters](
 | Step type | Blocking? | Config | Notes |
 |-----------|-----------|--------|-------|
 | `run_script` | yes | `{script}` | Allowlist: `run_tests`, `lint`, `typecheck`, `build`. Runs `npm run <script>` via `execFile` and captures the first 4000 chars of stdout |
-| `call_mcp_tool` | no | `{tool_name, args}` | Currently **stubbed** — records the intent and returns a no-op success so workflows referencing MCP tools don't fail. Full MCP wiring lands in a later round |
+| `call_mcp_tool` | no | `{tool_name, args}` | Requires a live MCP server connection. When no MCP connection is available, returns `failed` with an actionable error so the workflow can branch or retry instead of silently succeeding |
 
 ### Introspection
 
@@ -124,17 +124,17 @@ Both go through the usual policy gate (`canInvokeTeams`). See [worker-adapters](
 | `read_project` | no | `{}` | `{project: row}` |
 | `evaluate_policy` | no | `{rule, subject}` | `{policy: result}` — lazy-imports `checkPolicy` from `fulcrum-agent-core` |
 | `gate` | no | `{open: boolean}` | Returns `completed` when `open !== false`, otherwise `skipped` |
-| `validate_schema` | no | `{schema}` | **Stubbed** — returns `{validated: true}` |
+| `validate_schema` | no | `{schema, data?, data_key?}` | Validates inline data or a dotted `ctx.outputs` path with Ajv. Returns `{valid: true}` on success, `failed` with schema errors on mismatch, and `{valid: true, validated: false}` when no schema is supplied |
 
-### Advanced / stubbed
+### Advanced / conditional
 
 | Step type | Notes |
 |-----------|-------|
 | `parallel` | Parent node for fan-out; returns `{parallel: true}` immediately. The DAG does the real fan-out via `depends_on` edges |
 | `complete` | Returns `{complete: true}` — useful as an explicit terminal marker |
-| `run_tool` | **Stubbed** — placeholder for generic tool runs |
-| `search_code` | **Stubbed** — placeholder for a future code-search adapter |
-| `search_web` | **Stubbed** — placeholder for a future web-search adapter |
+| `run_tool` | Delegates to MCP-tool semantics. Without a live MCP server connection it returns `failed` with an actionable error instead of pretending success |
+| `search_code` | Searches the configured `cwd` with `rg --json`, falling back to `grep`; returns up to 50 matches and fails when `query` is missing or `cwd` is invalid |
+| `search_web` | Uses Tavily when `TAVILY_API_KEY` is set or Serper when `SERPER_API_KEY` is set; otherwise completes with empty results plus setup guidance |
 
 ---
 
@@ -233,7 +233,7 @@ const result = await runWorkflow({
 console.log(result.final_status)  // 'completed' | 'blocked' | 'failed'
 ```
 
-> The `${s1_plan.task_id}` placeholder is illustrative — in practice you bind prior step outputs inside a handler by reading `ctx.outputs[prior_step_id]`. The built-in handlers read `config` verbatim; if you need dynamic binding, write a small wrapper handler or thread `task_id` through the start-workflow `inputs` bag and materialise it at start time.
+> The `${s1_plan.task_id}` example token is illustrative — in practice you bind prior step outputs inside a handler by reading `ctx.outputs[prior_step_id]`. The built-in handlers read `config` verbatim; if you need dynamic binding, write a small wrapper handler or thread `task_id` through the start-workflow `inputs` bag and materialise it at start time.
 
 ---
 

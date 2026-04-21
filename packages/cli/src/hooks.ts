@@ -43,6 +43,19 @@ const GEMINI_SESSIONSTART_SOURCES = new Set([
   'startup', 'resume', 'clear', 'logout', 'prompt_input_exit', 'other',
 ])
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value) return value
+  }
+  return undefined
+}
+
 export function detectHookCli(event: Record<string, unknown>): HookCli | null {
   const hen = event['hook_event_name']
   if (typeof hen === 'string' && hen) {
@@ -63,6 +76,7 @@ export function detectHookCli(event: Record<string, unknown>): HookCli | null {
     // Unknown hook_event_name — best-guess: codex (legacy behavior).
     return 'codex'
   }
+  if (typeof event['agent_action_name'] === 'string' && 'tool_info' in event) return 'windsurf'
   if ('tool_name' in event && 'session_id' in event) return 'claude'
   if (('toolName' in event || 'tool_name' in event) && 'conversationId' in event) return 'gemini'
   if ('role' in event && 'runId' in event) return 'pi'
@@ -103,11 +117,55 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
     sessionId = (event['sessionId'] ?? event['session_id']) as string ?? 'unknown'
     agentRole = (event['role'] as string) ?? ''
     runId = (event['runId'] ?? event['run_id']) as string ?? ''
+  } else if (cliName === 'windsurf' && typeof event['agent_action_name'] === 'string') {
+    const actionName = event['agent_action_name'] as string
+    const toolInfo = asRecord(event['tool_info'])
+    sessionId = firstString(
+      event['trajectory_id'],
+      event['execution_id'],
+      event['session_id'],
+      event['sessionId'],
+      process.env['WINDSURF_SESSION_ID'],
+      process.env['FULCRUM_SESSION_ID'],
+    ) ?? 'unknown'
+
+    if (actionName.endsWith('_mcp_tool_use')) {
+      toolName = firstString(toolInfo['mcp_tool_name'], toolInfo['tool_name']) ?? actionName
+      const mcpArgs = asRecord(toolInfo['mcp_tool_arguments'])
+      toolInput = {
+        ...mcpArgs,
+        mcp_server_name: toolInfo['mcp_server_name'],
+      }
+    } else if (actionName.endsWith('_read_code')) {
+      toolName = 'Read'
+      toolInput = {
+        file_path: toolInfo['file_path'],
+      }
+    } else if (actionName.endsWith('_run_command')) {
+      toolName = 'Bash'
+      toolInput = {
+        command: toolInfo['command_line'],
+        cwd: firstString(toolInfo['cwd'], event['cwd']),
+      }
+    } else if (actionName.endsWith('_write_code')) {
+      toolName = 'Write'
+      toolInput = toolInfo
+    } else {
+      toolName = actionName
+      toolInput = toolInfo
+    }
   } else if (cliName === 'opencode' || cliName === 'cursor' || cliName === 'windsurf' || cliName === 'copilot') {
-    // Same event shape as Claude Code (tool_name / tool_input / session_id)
+    // Claude-compatible hook shape, with host-specific session fallbacks.
     toolName = (event['tool_name'] ?? event['tool'] ?? event['toolName']) as string ?? ''
-    toolInput = (event['tool_input'] ?? event['input'] ?? event['toolInput'] ?? {}) as unknown as Record<string, unknown>
-    sessionId = (event['session_id'] ?? event['sessionId']) as string ?? 'unknown'
+    toolInput = asRecord(event['tool_input'] ?? event['input'] ?? event['toolInput'])
+    const hostSessionId = (() => {
+      if (cliName === 'cursor') return process.env['CURSOR_SESSION_ID'] ?? process.env['FULCRUM_SESSION_ID']
+      if (cliName === 'copilot') return process.env['COPILOT_SESSION_ID'] ?? process.env['FULCRUM_SESSION_ID']
+      if (cliName === 'windsurf') return process.env['WINDSURF_SESSION_ID'] ?? process.env['FULCRUM_SESSION_ID']
+      if (cliName === 'opencode') return process.env['OPENCODE_SESSION_ID'] ?? process.env['FULCRUM_SESSION_ID']
+      return undefined
+    })()
+    sessionId = firstString(event['session_id'], event['sessionId'], hostSessionId, event['tool_use_id'], event['execution_id']) ?? 'unknown'
   }
 
   return { toolName, toolInput, sessionId, agentRole, runId }
@@ -124,7 +182,21 @@ const HOOK_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 
 export const HOOK_SEARCH_TOOLS = new Set([
   'Grep', 'Glob', 'Read',
   'grep_search', 'list_directory', 'read_file',
+  'search_code',
 ])
+
+const HOOK_BIAS_CLIS = new Set<HookCli>([
+  'claude',
+  'opencode',
+  'gemini',
+  'cursor',
+  'windsurf',
+  'copilot',
+])
+
+function supportsRecallBias(cliName: HookCli): boolean {
+  return HOOK_BIAS_CLIS.has(cliName)
+}
 
 // PR 3 R1: Variant B timeout. Passive-injection must not slow the hook above
 // the p95 < 20ms budget materially; we cap the recall call at 500ms wall-clock
@@ -154,6 +226,10 @@ export function extractRecallQuery(toolName: string, toolInput: Record<string, u
     const parts = p.split(/[\\/]/).filter(Boolean)
     const last = parts[parts.length - 1] ?? ''
     return last.replace(/[-_]+/g, ' ').trim()
+  }
+  if (toolName === 'search_code') {
+    const q = toolInput['query'] ?? toolInput['text'] ?? toolInput['pattern']
+    return typeof q === 'string' ? q : ''
   }
   return ''
 }
@@ -380,7 +456,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
   //     opencode close-out) before any SQLite write. Covers every hook-capable
   //     agent whose plugin routes `fulcrum hook <cli> pre`.
   if (
-    (ctx.cliName === 'claude' || ctx.cliName === 'opencode' || ctx.cliName === 'gemini')
+    supportsRecallBias(ctx.cliName)
     && /recall/i.test(ctx.toolName)
   ) {
     try {
@@ -411,7 +487,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
   //     measurement gate.
   if (
     HOOK_SEARCH_TOOLS.has(ctx.toolName)
-    && (ctx.cliName === 'claude' || ctx.cliName === 'opencode' || ctx.cliName === 'gemini')
+    && supportsRecallBias(ctx.cliName)
     && process.env['FULCRUM_NO_RECALL_NUDGE'] !== '1'
   ) {
     try {
@@ -510,7 +586,7 @@ export async function runPreHook(ctx: HookContext, io: HookIO): Promise<void> {
     } catch { /* best-effort — never block on nudge failure */ }
   } else if (
     HOOK_SEARCH_TOOLS.has(ctx.toolName)
-    && (ctx.cliName === 'claude' || ctx.cliName === 'opencode' || ctx.cliName === 'gemini')
+    && supportsRecallBias(ctx.cliName)
     && process.env['FULCRUM_NO_RECALL_NUDGE'] === '1'
   ) {
     try {

@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from 'fs'
 import { dirname, join } from 'path'
-import { getDb, FulcrumError, newId, canMerge, emitEvent, type AgentRole, Db} from 'fulcrum-agent-core'
+import { getDb, FulcrumError, newId, canMerge, emitEvent, startSpan, endSpan, type AgentRole, Db} from 'fulcrum-agent-core'
 import type {
   Worktree,
   MergeResult,
@@ -131,46 +131,86 @@ export async function allocateWorktree(input: AllocateWorktreeInput, db: Db = ge
     path = input.path
   }
 
-  // Insert DB row first so rollback on git failure is a simple DELETE.
-  db.prepare(`
-    INSERT INTO worktrees
-      (worktree_id, workspace_id, project_id, status, branch_name, path, base_branch, task_id, run_id, created_at, updated_at)
-    VALUES
-      (?, ?, ?, 'allocated', ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    worktree_id,
-    input.workspace_id,
-    input.project_id,
-    branch_name,
-    path,
-    base_branch,
-    input.task_id ?? null,
-    input.run_id ?? null,
-    now,
-    now,
-  )
+  const span_id = await safeStartSpan({
+    name: 'worktree.allocate',
+    workspace_id: input.workspace_id,
+    run_id: input.run_id,
+    payload: {
+      worktree_id,
+      project_id: input.project_id,
+      branch_name,
+      path,
+      base_branch,
+      managed,
+    },
+  })
 
-  if (runGit && projectRoot) {
-    try {
-      execFileSync(
-        'git',
-        ['worktree', 'add', path, '-b', branch_name, input.base_branch!],
-        { cwd: projectRoot, stdio: ['ignore', 'ignore', 'pipe'] }
-      )
-    } catch (err) {
-      // Roll back the DB row so we don't leave a ghost.
-      db.prepare(`DELETE FROM worktrees WHERE worktree_id = ?`).run(worktree_id)
-      const stderr = (err as { stderr?: Buffer | string }).stderr?.toString() ?? ''
-      const msg = stderr.trim() || (err as Error).message
-      throw new FulcrumError(`git worktree add failed: ${msg}`, 'git_error')
+  try {
+    // Insert DB row first so rollback on git failure is a simple DELETE.
+    db.prepare(`
+      INSERT INTO worktrees
+        (worktree_id, workspace_id, project_id, status, branch_name, path, base_branch, task_id, run_id, created_at, updated_at)
+      VALUES
+        (?, ?, ?, 'allocated', ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      worktree_id,
+      input.workspace_id,
+      input.project_id,
+      branch_name,
+      path,
+      base_branch,
+      input.task_id ?? null,
+      input.run_id ?? null,
+      now,
+      now,
+    )
+
+    if (runGit && projectRoot) {
+      try {
+        execFileSync(
+          'git',
+          ['worktree', 'add', path, '-b', branch_name, input.base_branch!],
+          { cwd: projectRoot, stdio: ['ignore', 'ignore', 'pipe'] }
+        )
+      } catch (err) {
+        // Roll back the DB row so we don't leave a ghost.
+        db.prepare(`DELETE FROM worktrees WHERE worktree_id = ?`).run(worktree_id)
+        const stderr = (err as { stderr?: Buffer | string }).stderr?.toString() ?? ''
+        const msg = stderr.trim() || (err as Error).message
+        throw new FulcrumError(`git worktree add failed: ${msg}`, 'git_error')
+      }
     }
+
+    const row = db
+      .prepare('SELECT * FROM worktrees WHERE worktree_id = ?')
+      .get(worktree_id) as Record<string, unknown>
+
+    const worktree = rowToWorktree(row)
+    safeEmit({
+      workspace_id: input.workspace_id,
+      project_id: input.project_id,
+      evt_type: 'worktree_allocated',
+      object_type: 'worktree',
+      object_id: worktree_id,
+      actor_type: 'system',
+      actor_id: input.run_id ?? 'worktrees',
+      span_id,
+      payload: {
+        worktree_id,
+        branch_name,
+        path,
+        base_branch,
+        task_id: input.task_id,
+        run_id: input.run_id,
+      },
+    })
+    await safeEndSpan(span_id, 'ok', { status: 'allocated' })
+
+    return worktree
+  } catch (err) {
+    await safeEndSpan(span_id, 'error', { error: (err as Error).message })
+    throw err
   }
-
-  const row = db
-    .prepare('SELECT * FROM worktrees WHERE worktree_id = ?')
-    .get(worktree_id) as Record<string, unknown>
-
-  return rowToWorktree(row)
 }
 
 /**
@@ -342,6 +382,28 @@ function safeEmit(input: Parameters<typeof emitEvent>[0]): void {
     emitEvent(input)
   } catch {
     /* best-effort — events table may not exist in this DB */
+  }
+}
+
+async function safeStartSpan(input: Parameters<typeof startSpan>[0]): Promise<string | undefined> {
+  try {
+    const span = await startSpan(input)
+    return span.span_id
+  } catch {
+    return undefined
+  }
+}
+
+async function safeEndSpan(
+  span_id: string | undefined,
+  status: 'ok' | 'error',
+  payload: Record<string, unknown>,
+): Promise<void> {
+  if (!span_id) return
+  try {
+    await endSpan({ span_id, status, payload })
+  } catch {
+    /* best-effort — trace_events table may not exist in this DB */
   }
 }
 

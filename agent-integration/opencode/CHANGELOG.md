@@ -4,9 +4,18 @@ All notable changes to this package follow [Semantic Versioning](https://semver.
 
 ---
 
-## [0.0.1] — 2026-04-21
+## [0.0.4] — 2026-04-21
 
-First pre-release. Not yet published to npm (pending npm org registration — PR 14.3 operator step).
+Alignment release.
+
+### Fixed
+
+- Scoped `todo.updated` mirroring to Fulcrum workspace/project context.
+- Verified opencode event wrapper payload shape against the runtime plugin test.
+
+## [0.0.3] — 2026-04-21
+
+Published pre-release.
 
 ### Added
 
@@ -19,3 +28,4 @@ First pre-release. Not yet published to npm (pending npm org registration — PR
 - 33 skill MDs in `.opencode/agents/fulcrum-skill-<name>.md`
 - 24 canonical role MDs in `.opencode/agents/<role>.md`
 - npm publish scaffolding as `@fulcrum-agent-os/opencode-plugin` with provenance attestation
+- scoped npm package published as `@fulcrum-agent-os/opencode-plugin@0.0.3`

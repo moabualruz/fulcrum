@@ -92,6 +92,15 @@ await resolveConflict({
   resolution: 'local_wins',    // 'local_wins' | 'remote_wins' | 'manual'
   resolved_by: 'agent_01J...',
 })
+
+await resolveConflict({
+  conflict_id: conflicts[0].conflict_id,
+  resolution: 'remote_wins',
+  resolved_by: 'agent_01J...',
+  apply_remote_data: async ({ local_data }) => {
+    // Persist adapter.unmap(remote) to the owning local object here.
+  },
+})
 ```
 
 ## API
@@ -120,7 +129,7 @@ listConflicts(input: ListConflictsInput): Promise<SyncConflict[]>
 | `SyncObjectInput` | `object_type`, `object_id`, `workspace_id`, `local_data`, `sync_target?` |
 | `SyncAllInput` | `workspace_id`, `object_type?`, `sync_target?`, `batch_size?` (default 50) |
 | `GetSyncStateInput` | `object_id`, `sync_target?` (default `'plane'`) |
-| `ResolveConflictInput` | `conflict_id`, `resolution`, `resolved_by?` |
+| `ResolveConflictInput` | `conflict_id`, `resolution`, `resolved_by?`, `local_data?`, `apply_remote_data?` |
 | `ListConflictsInput` | `workspace_id`, `sync_target?`, `unresolved_only?` |
 
 ### Extending to new targets
@@ -136,6 +145,10 @@ interface SyncAdapter {
   unmap(external: unknown): Record<string, unknown>
 }
 ```
+
+For `remote_wins`, either pass `apply_remote_data` to `resolveConflict()` or
+construct `SyncManager` with an apply callback. The callback must persist the
+mapped remote object before sync state moves to `synced`.
 
 ## Database tables owned
 

@@ -82,6 +82,7 @@ export async function applyCoSResponse(
         await updateTask(
           {
             task_id: update.task_id,
+            workspace_id,
             ...(update.status !== undefined ? { status: update.status as TaskStatus } : {}),
             ...(update.title !== undefined ? { title: update.title } : {}),
             ...(update.description !== undefined ? { description: update.description } : {}),

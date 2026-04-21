@@ -11,6 +11,8 @@ import {
   getAgentRunStatus,
   completeAgentRun,
   blockAgentRun,
+  unblockAgentRun,
+  abortAgentRun,
   escalateRun,
   buildSpawnableRun,
   getRunHistory,
@@ -104,6 +106,61 @@ describe('blockAgentRun', () => {
     const blocked = await blockAgentRun({ run_id: run.run_id, reason: 'waiting for upstream merge' })
     expect(blocked.status).toBe('blocked')
     expect(blocked.blocker).toBe('waiting for upstream merge')
+  })
+})
+
+describe('unblockAgentRun', () => {
+  it('moves a blocked run back to running with lifecycle state', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+    const blocked = await blockAgentRun({ run_id: run.run_id, reason: 'waiting for input' })
+    const unblocked = await unblockAgentRun({ run_id: blocked.run_id, summary: 'input arrived' })
+
+    expect(unblocked.status).toBe('running')
+    expect(unblocked.status_category).toBe('active')
+    expect(unblocked.blocker).toBeNull()
+    expect(unblocked.version).toBe(blocked.version + 1)
+
+    const db = getDb()
+    const evt = db.prepare("SELECT * FROM events WHERE evt_type = 'agent_run_unblocked' AND object_id = ?").get(run.run_id)
+    expect(evt).toBeTruthy()
+
+    const runEvt = db.prepare("SELECT payload FROM run_events WHERE run_id = ? AND event_type = 'unblocked'").get(run.run_id) as { payload: string } | undefined
+    expect(runEvt).toBeTruthy()
+    expect(JSON.parse(runEvt!.payload).summary).toBe('input arrived')
+
+    const projection = db.prepare('SELECT status, blocker FROM agent_state_projection WHERE run_id = ?').get(run.run_id) as { status: string; blocker: string | null }
+    expect(projection.status).toBe('running')
+    expect(projection.blocker).toBeNull()
+  })
+
+  it('throws invalid_state when run is not blocked', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+
+    await expect(
+      unblockAgentRun({ run_id: run.run_id })
+    ).rejects.toMatchObject({ code: 'invalid_state' })
+  })
+})
+
+describe('abortAgentRun', () => {
+  it('sets status to aborted and status_category to done', async () => {
+    const task = await seedTask()
+    const run = await startAgentRun({
+      task_id: task.task_id,
+      workspace_id: 'ws_1',
+      role: 'software_engineer',
+      context_type: 'primary',
+    })
+
+    const aborted = await abortAgentRun({ run_id: run.run_id, reason: 'operator kill' })
+
+    expect(aborted.status).toBe('aborted')
+    expect(aborted.status_category).toBe('done')
+
+    const evt = getDb().prepare("SELECT * FROM events WHERE evt_type = 'agent_run_aborted' AND object_id = ?").get(run.run_id)
+    expect(evt).toBeTruthy()
   })
 })
 

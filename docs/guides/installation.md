@@ -34,10 +34,10 @@ Optional agent-runtime integrations:
 - **Claude Code CLI** (`claude`) — for the user-scope MCP server and PreToolUse hook
 - **Gemini CLI** (`gemini`) — for the Gemini extension + BeforeTool hook
 - **PI** (`pi`) — for the PI cockpit + BeforeTool hook
-- **Cursor** — MCP via `.cursor/mcp.json` + always-applied rules via `.cursor/rules/fulcrum.mdc`
-- **Windsurf** — MCP via `.windsurf/mcp.json` + always-applied rules via `.windsurf/rules/fulcrum.mdc`
-- **Codex** — `.codex/config.json` + repo-level `AGENTS.md`
-- **opencode** — `.opencode/config.json` + `.opencode/opencode.md`
+- **Cursor** — MCP via `.cursor/mcp.json`, rules/skills, slash commands, and `.cursor/hooks.json`
+- **Windsurf** — MCP via `.windsurf/mcp.json`, rules, workflows, and `.windsurf/hooks.json`
+- **Codex** — `.codex/config.toml`, `hooks.json`, skills, rules, and repo-level `AGENTS.md`
+- **opencode** — `.opencode/opencode.jsonc`, plugin files, commands, skills, rules, and `.opencode/opencode.md`
 - **GitHub Copilot CLI** (`copilot`) — `.mcp.json`, Copilot instructions, agents, hooks, and repo-level `AGENTS.md`
 
 Fulcrum's core control-plane path is local-first. It runs the embedding model locally through `onnxruntime-node`, ships its own SQLite build, and optionally links against `kuzu` for the L2 graph layer. Installer and sync surfaces may call external CLIs or services when the selected integration requires it.
@@ -91,8 +91,8 @@ This detects a smaller zero-install MCP set and configures it automatically. For
 |-------|-----------|------------------|
 | Claude Code | `~/.claude/` exists | `~/.claude/settings.json` (MCP entry + PreToolUse hook), `~/.claude/CLAUDE.md` (context block) |
 | Gemini CLI | `~/.gemini/` exists | `~/.gemini/settings.json` (MCP entry), `~/.gemini/GEMINI.md` (context block) |
-| Cursor | `~/.cursor/` or `.cursor/` in CWD | `.cursor/mcp.json`, `.cursor/rules/fulcrum.mdc` (alwaysApply: true) |
-| Windsurf | `~/.windsurf/` or `.windsurf/` in CWD | `.windsurf/mcp.json`, `.windsurf/rules/fulcrum.mdc` (alwaysApply: true) |
+| Cursor | `~/.cursor/` or `.cursor/` in CWD | `.cursor/mcp.json`, `.cursor/rules/`, `.cursor/skills/`, `.cursor/commands/`, `.cursor/hooks.json` |
+| Windsurf | `~/.windsurf/` or `.windsurf/` in CWD | `.windsurf/mcp.json`, `.windsurf/rules/`, `.windsurf/workflows/`, `.windsurf/hooks.json` |
 
 All writes are idempotent — re-running is safe. Use `--dry-run` to preview what would be written:
 
@@ -111,10 +111,10 @@ Fulcrum now distinguishes packaging models instead of treating every runtime as 
 | Claude Code | `plugin-first` | hooks, skills, rules, user-scope setup |
 | Gemini CLI | `extension-first` | extension bundle + hook wiring |
 | PI | `extension-first` | cockpit extension + native tools |
-| Cursor | `rules-first` | project rules + local config |
-| Windsurf | `rules-first` | rules + local config |
-| Codex | `config-first` | `.codex/config.json` + `AGENTS.md` |
-| opencode | `config-first` | `.opencode/config.json` + `.opencode/opencode.md` |
+| Cursor | `rules-first` | project rules, skills, commands, hooks, and local MCP config |
+| Windsurf | `rules-first` | rules, workflows, hooks, and local MCP config |
+| Codex | `config-first` | `.codex/config.toml`, hooks, skills, rules, and `AGENTS.md` |
+| opencode | `config-first` | `.opencode/opencode.jsonc`, plugin, commands, skills, rules, and `.opencode/opencode.md` |
 
 The adaptive planner reports which runtimes are detected on the current machine and which install path Fulcrum recommends for each one.
 
@@ -128,10 +128,10 @@ If you only want Fulcrum wired into one agent runtime, use the scoped scripts:
 pnpm run setup:claude   # ~/.local/bin symlink + Claude MCP + PreToolUse hook + CLAUDE.md
 pnpm run setup:gemini   # ~/.local/bin symlink + Gemini extension + BeforeTool hook
 pnpm run setup:pi       # ~/.local/bin symlink + pi install cockpit
-fulcrum init --cursor   # .cursor/mcp.json + .cursor/rules/fulcrum.mdc
-fulcrum init --windsurf # .windsurf/mcp.json + .windsurf/rules/fulcrum.mdc
-fulcrum init --codex    # .codex/config.json
-fulcrum init --opencode # .opencode/config.json + .opencode/opencode.md
+fulcrum init --cursor   # .cursor/mcp.json + rules + skills + commands + hooks
+fulcrum init --windsurf # .windsurf/mcp.json + rules + workflows + hooks
+fulcrum init --codex    # .codex/config.toml + hooks + skills + rules
+fulcrum init --opencode # .opencode/opencode.jsonc + plugin + docs + commands
 fulcrum install apply --agent copilot  # .mcp.json + Copilot instructions/agents/hooks
 ```
 

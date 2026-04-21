@@ -86,8 +86,8 @@ describe('full lifecycle integration', () => {
   it('task status changes emit task_status_changed event with from/to', async () => {
     seed()
     const task = await createTask({ workspace_id: 'ws_1', project_id: 'proj_1', title: 'A task' })
-    await updateTask({ task_id: task.task_id, status: 'running' })
-    await updateTask({ task_id: task.task_id, status: 'completed' })
+    await updateTask({ workspace_id: 'ws_1', task_id: task.task_id, status: 'running' })
+    await updateTask({ workspace_id: 'ws_1', task_id: task.task_id, status: 'completed' })
 
     const db = getDb()
     const evts = db.prepare("SELECT payload FROM events WHERE evt_type = 'task_status_changed' AND object_id = ? ORDER BY rowid ASC").all(task.task_id) as { payload: string }[]

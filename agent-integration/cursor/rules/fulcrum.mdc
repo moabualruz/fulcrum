@@ -25,5 +25,5 @@ When working on a task:
 
 ## Notes
 
-- Hook-based features (passive trace harvesting, policy enforcement at tool time) are not available in Cursor/Windsurf. Use MCP tools directly.
+- Project installs also include `.cursor/hooks.json` for lifecycle and tool-time hook commands. Use MCP tools directly when hooks are disabled or unavailable in the running Cursor build.
 - Monitor dashboard: http://localhost:4721 (when `fulcrum serve monitor` is running)

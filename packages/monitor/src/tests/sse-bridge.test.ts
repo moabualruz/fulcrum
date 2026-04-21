@@ -242,4 +242,40 @@ describe('SSE Bridge — Last-Event-ID resume', () => {
     expect(raw).toContain('evt_old_1')
     expect(raw).toContain('evt_old_2')
   })
+
+  it('uses the same evt_type/event_id shape for DB replay that live clients parse', async () => {
+    db.exec(`
+      INSERT INTO events (evt_id, workspace_id, evt_type, payload, ts)
+      VALUES ('evt_shape_1', 'ws_sse_test', 'task_created', '{"task_id":"task_shape"}', '2026-04-21T00:00:00.000Z')
+    `)
+
+    const server = startMonitorServer({ workspace_id: 'ws_sse_test' })
+
+    const res = await server.fetch(
+      new Request('http://localhost/events/stream?workspace_id=ws_sse_test', {
+        headers: { 'Last-Event-ID': 'evt_shape_0' },
+      }),
+    )
+
+    const { chunks, cancel } = await collectChunks(res.body!, 150)
+    cancel()
+
+    const dataLine = chunks.join('').split('\n').find(line => line.startsWith('data: '))
+    expect(dataLine).toBeTruthy()
+    const event = JSON.parse(dataLine!.slice('data: '.length)) as {
+      evt_type?: string
+      event_type?: string
+      evt_id?: string
+      event_id?: string
+      created_at?: string
+      ts?: string
+    }
+
+    expect(event.evt_type).toBe('task_created')
+    expect(event.event_type).toBe('task_created')
+    expect(event.evt_id).toBe('evt_shape_1')
+    expect(event.event_id).toBe('evt_shape_1')
+    expect(event.created_at).toBe('2026-04-21T00:00:00.000Z')
+    expect(event.ts).toBe('2026-04-21T00:00:00.000Z')
+  })
 })

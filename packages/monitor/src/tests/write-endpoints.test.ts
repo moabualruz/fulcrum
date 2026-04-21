@@ -1,7 +1,6 @@
 // packages/monitor/src/tests/write-endpoints.test.ts
-// Tests for mutation HTTP endpoints: POST /tasks, PATCH /tasks/:id,
-// POST /runs/:id/unblock, POST /runs/:id/kill, POST /reviews/:id/approve,
-// POST /reviews/:id/reject — plus bearer token auth middleware.
+// Tests for mutation HTTP endpoints: task writes, run lifecycle writes,
+// review writes, memory writes/recall, CoS context, and bearer token auth.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { setDb, _configureDb, runMigrations, createTask, startAgentRun } from 'fulcrum-agent-core'
@@ -31,7 +30,7 @@ beforeEach(() => {
   // HIGH-9: bypass_auth requires both config.bypass_auth AND env to take
   // effect — the env guard prevents accidental production runs.
   process.env['FULCRUM_MONITOR_ALLOW_BYPASS'] = '1'
-  server = startMonitorServer({ workspace_id: 'ws_1', bypass_auth: true })
+  server = startMonitorServer({ workspace_id: 'ws_1', project_id: 'proj_1', bypass_auth: true })
 })
 
 afterEach(async () => {
@@ -86,6 +85,139 @@ describe('POST /tasks', () => {
     const json = await res.json() as { data: { workspace_id: string } }
     expect(json.data.workspace_id).toBe('ws_1')
   })
+
+  it('uses server-default project_id when not provided in body', async () => {
+    const res = await post('/tasks', { title: 'Implicit project', workspace_id: 'ws_1' })
+    expect(res.status).toBe(201)
+    const json = await res.json() as { data: { project_id: string } }
+    expect(json.data.project_id).toBe('proj_1')
+  })
+
+  it('rejects create when no project_id is available', async () => {
+    const noProjectServer = startMonitorServer({ workspace_id: 'ws_1', bypass_auth: true })
+    try {
+      const res = await noProjectServer.fetch(new Request('http://localhost/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'No project context' }),
+      })) as Response
+      expect(res.status).toBe(400)
+      const json = await res.json() as { error: string }
+      expect(json.error).toMatch(/project_id/)
+    } finally {
+      await noProjectServer.stop()
+    }
+  })
+})
+
+// ── POST /runs and lifecycle endpoints ──────────────────────────────────────
+
+describe('POST /runs', () => {
+  it('starts a run for an existing task', async () => {
+    const task = await createTask({ title: 'Task to run', workspace_id: 'ws_1', project_id: 'proj_1' })
+
+    const res = await post('/runs', {
+      task_id: task.task_id,
+      agent_role: 'software_engineer',
+      context_type: 'primary',
+    })
+
+    expect(res.status).toBe(201)
+    const json = await res.json() as { data: { run_id: string; status: string; task_id: string } }
+    expect(json.data.status).toBe('running')
+    expect(json.data.task_id).toBe(task.task_id)
+
+    const row = db.prepare('SELECT status, task_id FROM agent_runs WHERE run_id = ?').get(json.data.run_id) as {
+      status: string
+      task_id: string
+    }
+    expect(row.status).toBe('running')
+    expect(row.task_id).toBe(task.task_id)
+  })
+
+  it('creates an auto task when task_id is omitted', async () => {
+    const res = await post('/runs', {
+      agent_role: 'qa_engineer',
+      context_type: 'primary',
+    })
+
+    expect(res.status).toBe(201)
+    const json = await res.json() as { data: { task_id: string; run_id: string } }
+    expect(json.data.task_id).toBeTruthy()
+
+    const task = db.prepare('SELECT title FROM tasks WHERE task_id = ?').get(json.data.task_id) as { title: string }
+    expect(task.title).toContain('[auto] qa_engineer run')
+  })
+})
+
+describe('POST /runs/:id/heartbeat', () => {
+  it('updates run heartbeat progress', async () => {
+    const task = await createTask({ title: 'Heartbeat task', workspace_id: 'ws_1', project_id: 'proj_1' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+
+    const res = await post(`/runs/${run.run_id}/heartbeat`, {
+      current_step: 'writing tests',
+      progress_pct: 40,
+      current_path: 'packages/monitor/src/server.ts',
+    })
+
+    expect(res.status).toBe(200)
+    const json = await res.json() as { data: { run_id: string; ok: boolean } }
+    expect(json.data.ok).toBe(true)
+
+    const row = db.prepare('SELECT current_step, progress_pct, current_path FROM agent_runs WHERE run_id = ?').get(run.run_id) as {
+      current_step: string
+      progress_pct: number
+      current_path: string
+    }
+    expect(row.current_step).toBe('writing tests')
+    expect(row.progress_pct).toBe(40)
+    expect(row.current_path).toBe('packages/monitor/src/server.ts')
+  })
+})
+
+describe('POST /runs/:id/complete', () => {
+  it('finishes a run with an output summary', async () => {
+    const task = await createTask({ title: 'Complete task', workspace_id: 'ws_1', project_id: 'proj_1' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+
+    const res = await post(`/runs/${run.run_id}/complete`, {
+      output_summary: 'monitor lifecycle route implemented',
+      artifact_paths: ['packages/monitor/src/server.ts'],
+    })
+
+    expect(res.status).toBe(200)
+    const json = await res.json() as { data: { status: string } }
+    expect(json.data.status).toBe('finished')
+
+    const row = db.prepare('SELECT status, output_summary FROM agent_runs WHERE run_id = ?').get(run.run_id) as {
+      status: string
+      output_summary: string
+    }
+    expect(row.status).toBe('finished')
+    expect(row.output_summary).toBe('monitor lifecycle route implemented')
+  })
+})
+
+describe('POST /runs/:id/block', () => {
+  it('blocks a run with a reason', async () => {
+    const task = await createTask({ title: 'Block task', workspace_id: 'ws_1', project_id: 'proj_1' })
+    const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
+
+    const res = await post(`/runs/${run.run_id}/block`, { reason: 'waiting on operator' })
+
+    expect(res.status).toBe(200)
+    const json = await res.json() as { data: { status: string; reason: string } }
+    expect(json.data.status).toBe('blocked')
+    expect(json.data.reason).toBe('waiting on operator')
+
+    const row = db.prepare('SELECT status, blocker FROM agent_runs WHERE run_id = ?').get(run.run_id) as {
+      status: string
+      blocker: string
+    }
+    expect(row.status).toBe('blocked')
+    expect(row.blocker).toBe('waiting on operator')
+  })
 })
 
 // ── PATCH /tasks/:id ──────────────────────────────────────────────────────────
@@ -121,8 +253,27 @@ describe('POST /runs/:id/unblock', () => {
     const json = await res.json() as { data: { status: string } }
     expect(json.data.status).toBe('running')
 
-    const row = db.prepare('SELECT status FROM agent_runs WHERE run_id = ?').get(run.run_id) as { status: string }
+    const row = db.prepare('SELECT status, status_category, blocker FROM agent_runs WHERE run_id = ?').get(run.run_id) as {
+      status: string
+      status_category: string
+      blocker: string | null
+    }
     expect(row.status).toBe('running')
+    expect(row.status_category).toBe('active')
+    expect(row.blocker).toBeNull()
+
+    const lifecycle = db.prepare("SELECT event_type FROM run_events WHERE run_id = ? AND event_type = 'unblocked'").get(run.run_id)
+    expect(lifecycle).toBeTruthy()
+
+    const evt = db.prepare("SELECT evt_type FROM events WHERE object_id = ? AND evt_type = 'agent_run_unblocked'").get(run.run_id)
+    expect(evt).toBeTruthy()
+
+    const projection = db.prepare('SELECT status, blocker FROM agent_state_projection WHERE run_id = ?').get(run.run_id) as {
+      status: string
+      blocker: string | null
+    }
+    expect(projection.status).toBe('running')
+    expect(projection.blocker).toBeNull()
   })
 
   it('returns 404 for unknown run', async () => {
@@ -141,14 +292,21 @@ describe('POST /runs/:id/unblock', () => {
 // ── POST /runs/:id/kill ────────────────────────────────────────────────────────
 
 describe('POST /runs/:id/kill', () => {
-  it('kills a running agent run', async () => {
+  it('aborts a running agent run', async () => {
     const task = await createTask({ title: 'Task to kill', workspace_id: 'ws_1', project_id: 'proj_1' })
     const run = await startAgentRun({ context_type: 'primary', task_id: task.task_id, workspace_id: 'ws_1', role: 'software_engineer' })
 
     const res = await post(`/runs/${run.run_id}/kill`, { reason: 'operator request' })
     expect(res.status).toBe(200)
     const json = await res.json() as { data: { run_id: string; status: string } }
-    expect(json.data.status).toBe('blocked')
+    expect(json.data.status).toBe('aborted')
+
+    const row = db.prepare('SELECT status, status_category FROM agent_runs WHERE run_id = ?').get(run.run_id) as { status: string; status_category: string }
+    expect(row.status).toBe('aborted')
+    expect(row.status_category).toBe('done')
+
+    const evt = db.prepare("SELECT evt_type FROM events WHERE object_id = ? AND evt_type = 'agent_run_aborted'").get(run.run_id)
+    expect(evt).toBeTruthy()
   })
 
   it('returns 404 for unknown run', async () => {
@@ -223,6 +381,46 @@ describe('POST /reviews/:id/reject', () => {
   })
 })
 
+// ── Memory and CoS monitor endpoints ─────────────────────────────────────────
+
+describe('POST /memory/write and /memory/recall', () => {
+  it('writes then recalls project memory for plugin consumers', async () => {
+    const write = await post('/memory/write', {
+      title: 'Monitor memory route',
+      content: 'Monitor memory route stores project facts for PI cockpit recall.',
+      tags: 'monitor,pi',
+    })
+    expect(write.status).toBe(201)
+    const writeJson = await write.json() as { memory_id: string; saved: boolean; tags: string[] }
+    expect(writeJson.saved).toBe(true)
+    expect(writeJson.memory_id).toBeTruthy()
+    expect(writeJson.tags).toEqual(['monitor', 'pi'])
+
+    const recall = await post('/memory/recall', {
+      query: 'PI cockpit recall',
+      limit: 5,
+    })
+    expect(recall.status).toBe(200)
+    const recallJson = await recall.json() as { memories: Array<{ memory_id: string; content: string }> }
+    expect(recallJson.memories.some(memory => memory.memory_id === writeJson.memory_id)).toBe(true)
+    expect(recallJson.memories[0]?.content).toContain('PI cockpit recall')
+  })
+})
+
+describe('POST /cos-context', () => {
+  it('builds Chief of Staff context markdown from monitor defaults', async () => {
+    await createTask({ title: 'Queued context task', workspace_id: 'ws_1', project_id: 'proj_1' })
+
+    const res = await post('/cos-context', { max_tokens: 200 })
+
+    expect(res.status).toBe(200)
+    const json = await res.json() as { context_markdown: string; workspace_id: string; project_id: string }
+    expect(json.workspace_id).toBe('ws_1')
+    expect(json.project_id).toBe('proj_1')
+    expect(json.context_markdown).toContain('Workspace Status')
+  })
+})
+
 // ── Bearer token auth ─────────────────────────────────────────────────────────
 
 describe('bearer token auth', () => {
@@ -238,7 +436,7 @@ describe('bearer token auth', () => {
     authDb.prepare(`INSERT OR IGNORE INTO projects (project_id, workspace_id, name, status, type) VALUES ('proj_auth', 'ws_auth', 'Auth', 'active', 'git')`).run()
     process.env['FULCRUM_MONITOR_TOKEN'] = 'test-secret-token'
     process.env['FULCRUM_MONITOR_REQUIRE_AUTH'] = '1'
-    authServer = startMonitorServer({ workspace_id: 'ws_auth' })
+    authServer = startMonitorServer({ workspace_id: 'ws_auth', project_id: 'proj_auth' })
   })
 
   afterEach(async () => {
@@ -257,6 +455,15 @@ describe('bearer token auth', () => {
     expect(res.status).toBe(401)
     const json = await res.json() as { error: string }
     expect(json.error).toMatch(/Unauthorized/)
+  })
+
+  it('rejects POST /memory/write without token', async () => {
+    const res = await authServer.fetch(new Request('http://localhost/memory/write', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'Unauthorized memory' }),
+    })) as Response
+    expect(res.status).toBe(401)
   })
 
   it('rejects POST /tasks with wrong token', async () => {
@@ -283,5 +490,20 @@ describe('bearer token auth', () => {
   it('allows read endpoints without token', async () => {
     const res = await authServer.fetch(new Request('http://localhost/status')) as Response
     expect(res.status).toBe(200)
+  })
+
+  it('returns workspace and project display names for TUI headers', async () => {
+    const res = await authServer.fetch(new Request('http://localhost/status')) as Response
+    expect(res.status).toBe(200)
+    const body = await res.json() as {
+      workspace_id: string
+      workspace_name: string
+      project_id: string
+      project_name: string
+    }
+    expect(body.workspace_id).toBe('ws_auth')
+    expect(body.workspace_name).toBe('Auth Test')
+    expect(body.project_id).toBe('proj_auth')
+    expect(body.project_name).toBe('Auth')
   })
 })

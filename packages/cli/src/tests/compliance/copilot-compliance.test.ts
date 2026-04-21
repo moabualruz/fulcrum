@@ -128,6 +128,15 @@ describe('Copilot: hooks (.github/hooks/*.json)', () => {
     expect(raw).toMatch(/Write|Edit|Bash/)
   })
 
+  it('GAP(cp-M4d) PreToolUse covers read/search/MCP calls, not only mutations', () => {
+    const path = existsSync(hooksPath) ? hooksPath : claudeCompatPath
+    if (!existsSync(path)) return
+    const raw = readText(path)
+    expect(raw).toMatch(/Read/)
+    expect(raw).toMatch(/Grep|Glob|MCP/)
+    expect(raw).toMatch(/fulcrum hook copilot --event pre_tool_use/)
+  })
+
   it('GAP(cp-M4c) emitted --event hook commands dispatch without unknown-phase errors', () => {
     const tool = runCli(['hook', 'copilot', '--event', 'pre_tool_use', '--tool', 'Write'])
     expect(tool.exitCode).toBe(0)

@@ -1,6 +1,13 @@
-import { describe, it, expect } from 'vitest'
-import { formatEvent, parseSince } from '../log.js'
-import type { FulcrumEvent } from 'fulcrum-agent-core'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import Database from 'better-sqlite3'
+import { formatEvent, parseSince, runLog } from '../log.js'
+import {
+  _configureDb,
+  emitEvent,
+  runMigrations,
+  setDb,
+  type FulcrumEvent,
+} from 'fulcrum-agent-core'
 
 function makeEvent(overrides: Partial<FulcrumEvent>): FulcrumEvent {
   return {
@@ -154,5 +161,70 @@ describe('parseSince', () => {
     expect(() => parseSince('bad')).toThrow('Invalid --since format')
     expect(() => parseSince('5x')).toThrow()
     expect(() => parseSince('')).toThrow()
+  })
+})
+
+describe('runLog DB filtering', () => {
+  let db: Database.Database
+  let logSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    setDb(db)
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+  })
+
+  afterEach(() => {
+    logSpy.mockRestore()
+    db.close()
+  })
+
+  it('filters events by run id through object_id and payload, not a nonexistent events.run_id column', async () => {
+    emitEvent({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      evt_type: 'agent_run_started',
+      object_type: 'agent_run',
+      object_id: 'run_keep',
+      actor_type: 'agent',
+      actor_id: 'software_engineer',
+      payload: { role: 'software_engineer', run_id: 'run_keep', task_id: 'task_1' },
+    })
+    emitEvent({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      evt_type: 'agent_run_started',
+      object_type: 'agent_run',
+      object_id: 'run_skip',
+      actor_type: 'agent',
+      actor_id: 'qa_engineer',
+      payload: { role: 'qa_engineer', run_id: 'run_skip', task_id: 'task_2' },
+    })
+
+    await runLog(['--run-id', 'run_keep', '--limit', '10'])
+
+    const lines = logSpy.mock.calls.map(call => String(call[0]))
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain('run_keep')
+    expect(lines[0]).not.toContain('run_skip')
+  })
+
+  it('includes hook_events in DB output when filtering by run id', async () => {
+    db.prepare(`
+      INSERT INTO hook_events
+        (hook_event_id, workspace_id, session_id, tool_name, agent_role, run_id, ts, cli_name)
+      VALUES
+        ('hook_1', 'ws_1', 'sess_1', 'Write', 'software_engineer', 'run_hook', '2026-04-21T10:00:00.000Z', 'claude')
+    `).run()
+
+    await runLog(['--run-id', 'run_hook', '--limit', '10'])
+
+    const lines = logSpy.mock.calls.map(call => String(call[0]))
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain('hook executed')
+    expect(lines[0]).toContain('run_hook')
+    expect(lines[0]).toContain('Write')
   })
 })

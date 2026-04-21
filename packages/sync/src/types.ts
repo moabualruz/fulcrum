@@ -87,6 +87,14 @@ export interface SyncAdapter {
   unmap(external: unknown): Record<string, unknown>
 }
 
+export interface ApplyRemoteSyncInput {
+  state: SyncState
+  raw_remote: unknown
+  local_data: Record<string, unknown>
+}
+
+export type ApplyRemoteSync = (input: ApplyRemoteSyncInput) => void | Promise<void>
+
 export interface PlaneAPIClientConfig {
   baseUrl: string
   apiKey: string
@@ -128,6 +136,11 @@ export interface ResolveConflictInput {
   resolved_by?: string
   /** Required for local_wins — the authoritative local data to push on re-enqueue. */
   local_data?: Record<string, unknown>
+  /**
+   * Required for remote_wins unless SyncManager was constructed with an apply callback.
+   * The callback must persist adapter.unmap(remote) to the owning local domain object.
+   */
+  apply_remote_data?: ApplyRemoteSync
 }
 
 export interface ListConflictsInput {

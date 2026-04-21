@@ -4,8 +4,24 @@ import { serve } from '@hono/node-server'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { getDb, listAgentDefinitions, getEventBus, createTask, updateTask, blockAgentRun } from 'fulcrum-agent-core'
-import type { EmitEventInput } from 'fulcrum-agent-core'
+import {
+  getDb,
+  listAgentDefinitions,
+  getEventBus,
+  createTask,
+  updateTask,
+  startAgentRun,
+  heartbeatAgentRun,
+  completeAgentRun,
+  blockAgentRun,
+  unblockAgentRun,
+  abortAgentRun,
+  buildCosContext,
+  checkPolicy,
+  loadConfig,
+} from 'fulcrum-agent-core'
+import type { AgentRole, EmitEventInput, MemoryKind, MemoryScope } from 'fulcrum-agent-core'
+import { recallMemory, writeMemory } from 'fulcrum-memory'
 
 // Resolve the public directory relative to this file (works in both ts-node and compiled)
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -21,6 +37,26 @@ import {
 } from './metrics.js'
 import type { MonitorServer, MonitorServerConfig } from './types.js'
 
+function sseChunk(event: {
+  evt_id?: string
+  event_id?: string
+  evt_type: string
+  ts?: string
+  created_at?: string
+  payload?: unknown
+}): Uint8Array {
+  const eventId = event.event_id ?? event.evt_id ?? Date.now().toString()
+  const ts = event.created_at ?? event.ts ?? new Date().toISOString()
+  const data = JSON.stringify({
+    ...event,
+    evt_id: eventId,
+    event_id: eventId,
+    event_type: event.evt_type,
+    ts,
+    created_at: ts,
+  })
+  return new TextEncoder().encode(`id: ${eventId}\ndata: ${data}\n\n`)
+}
 
 const CAPABILITY_SKILL_MAP: Record<string, { name: string; description: string }> = {
   code_generation:    { name: 'Code Generation',    description: 'Generates code from specifications' },
@@ -44,6 +80,8 @@ const CAPABILITY_SKILL_MAP: Record<string, { name: string; description: string }
  * the IPv4/IPv6 loopback literals only.
  */
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '0:0:0:0:0:0:0:1'])
+const DEFAULT_PAGE_LIMIT = 50
+const MAX_PAGE_LIMIT = 200
 
 export class MonitorNonLoopbackError extends Error {
   constructor(host: string) {
@@ -56,6 +94,50 @@ export function assertLoopbackHost(host: string): void {
   if (!LOOPBACK_HOSTS.has(host)) throw new MonitorNonLoopbackError(host)
 }
 
+function readPagination(query: (name: string) => string | undefined): { limit: number; offset: number } {
+  const rawLimit = Number.parseInt(query('limit') ?? String(DEFAULT_PAGE_LIMIT), 10)
+  const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? rawLimit : DEFAULT_PAGE_LIMIT, 1), MAX_PAGE_LIMIT)
+
+  const rawOffset = Number.parseInt(query('cursor') ?? query('offset') ?? '0', 10)
+  const offset = Math.max(Number.isFinite(rawOffset) ? rawOffset : 0, 0)
+  return { limit, offset }
+}
+
+function paginated<T>(data: T[], total: number, limit: number, offset: number): {
+  data: T[]
+  pagination: { total: number; limit: number; offset: number; next_cursor: string | null }
+} {
+  const nextOffset = offset + data.length
+  return {
+    data,
+    pagination: {
+      total,
+      limit,
+      offset,
+      next_cursor: nextOffset < total ? String(nextOffset) : null,
+    },
+  }
+}
+
+function statusForError(err: unknown): 400 | 403 | 404 | 409 | 500 {
+  const code = (err as { code?: string }).code
+  if (code === 'invalid_input') return 400
+  if (code === 'policy_blocked' || code === 'policy_denied') return 403
+  if (code === 'not_found') return 404
+  if (code === 'conflict' || code === 'invalid_state' || code === 'version_conflict') return 409
+  return 500
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : 'internal_error'
+}
+
+function parseStringList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).map(v => v.trim()).filter(Boolean)
+  if (typeof value === 'string') return value.split(',').map(v => v.trim()).filter(Boolean)
+  return []
+}
+
 export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   // Per-instance set of active SSE controllers for event-bus push mode.
   const sseControllers = new Set<ReadableStreamDefaultController>()
@@ -66,9 +148,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   if (!config.isSubprocess) {
     busHandler = (event: EmitEventInput) => {
       if (sseControllers.size === 0) return
-      const sseId = Date.now().toString()
-      const data = JSON.stringify(event)
-      const chunk = new TextEncoder().encode(`id: ${sseId}\ndata: ${data}\n\n`)
+      const chunk = sseChunk(event)
 
       for (const controller of [...sseControllers]) {
         try {
@@ -87,6 +167,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   const host = config.host ?? '127.0.0.1'
   assertLoopbackHost(host)
   const workspace_id = config.workspace_id
+  const project_id = config.project_id
 
   // ─── GET / — serve the web UI ───────────────────────────────────────────
   app.get('/', (c) => {
@@ -99,9 +180,20 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   })
 
   app.get('/status', (c) => {
+    const db = getDb()
+    const workspace = workspace_id
+      ? db.prepare(`SELECT name FROM workspaces WHERE workspace_id = ?`).get(workspace_id) as { name: string } | undefined
+      : undefined
+    const project = project_id
+      ? db.prepare(`SELECT name FROM projects WHERE project_id = ?`).get(project_id) as { name: string } | undefined
+      : undefined
+
     return c.json({
       status: 'ok',
       workspace_id: workspace_id ?? null,
+      workspace_name: workspace?.name ?? null,
+      project_id: project_id ?? null,
+      project_name: project?.name ?? null,
       ts: new Date().toISOString(),
     })
   })
@@ -175,13 +267,13 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
               ts: string
             }>
             for (const row of rows) {
-              const data = JSON.stringify({
-                event_id: row.evt_id,
-                event_type: row.evt_type,
+              const data = sseChunk({
+                evt_id: row.evt_id,
+                evt_type: row.evt_type,
                 payload: JSON.parse(row.payload) as unknown,
                 ts: row.ts,
               })
-              controller.enqueue(new TextEncoder().encode(`id: ${row.evt_id}\ndata: ${data}\n\n`))
+              controller.enqueue(data)
             }
           } catch {
             // DB not yet available — skip catchup
@@ -203,13 +295,13 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
                 ts: string
               }>
               for (const row of rows) {
-                const data = JSON.stringify({
-                  event_id: row.evt_id,
-                  event_type: row.evt_type,
+                const data = sseChunk({
+                  evt_id: row.evt_id,
+                  evt_type: row.evt_type,
                   payload: JSON.parse(row.payload) as unknown,
                   ts: row.ts,
                 })
-                controller.enqueue(new TextEncoder().encode(`id: ${row.evt_id}\ndata: ${data}\n\n`))
+                controller.enqueue(data)
                 lastId = row.evt_id
               }
             } catch {
@@ -263,10 +355,14 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   app.get('/agents', (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     const db = getDb()
+    const { limit, offset } = readPagination(c.req.query.bind(c.req))
+    const total = ws
+      ? (db.prepare(`SELECT COUNT(*) AS n FROM agent_runs WHERE workspace_id = ?`).get(ws) as { n: number }).n
+      : (db.prepare(`SELECT COUNT(*) AS n FROM agent_runs`).get() as { n: number }).n
     const rows = ws
-      ? db.prepare(`SELECT * FROM agent_runs WHERE workspace_id = ? ORDER BY started_at DESC LIMIT 50`).all(ws)
-      : db.prepare(`SELECT * FROM agent_runs ORDER BY started_at DESC LIMIT 50`).all()
-    return c.json({ data: rows })
+      ? db.prepare(`SELECT * FROM agent_runs WHERE workspace_id = ? ORDER BY started_at DESC LIMIT ? OFFSET ?`).all(ws, limit, offset)
+      : db.prepare(`SELECT * FROM agent_runs ORDER BY started_at DESC LIMIT ? OFFSET ?`).all(limit, offset)
+    return c.json(paginated(rows, total, limit, offset))
   })
 
   // ─── GET /workspaces — list workspaces with project + run counts ────────
@@ -332,14 +428,19 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
     const db = getDb()
+    const { limit, offset } = readPagination(c.req.query.bind(c.req))
+    const total = (db.prepare(`
+      SELECT COUNT(*) AS n FROM artifacts
+      WHERE workspace_id = ?
+    `).get(ws) as { n: number }).n
     const rows = db.prepare(`
       SELECT * FROM artifacts
       WHERE workspace_id = ?
       ORDER BY created_at DESC
-      LIMIT 50
-    `).all(ws)
+      LIMIT ? OFFSET ?
+    `).all(ws, limit, offset)
 
-    return c.json({ data: rows })
+    return c.json(paginated(rows, total, limit, offset))
   })
 
   app.get('/memory-trace', (c) => {
@@ -347,14 +448,19 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
     const db = getDb()
+    const { limit, offset } = readPagination(c.req.query.bind(c.req))
+    const total = (db.prepare(`
+      SELECT COUNT(*) AS n FROM memories
+      WHERE workspace_id = ?
+    `).get(ws) as { n: number }).n
     const rows = db.prepare(`
       SELECT * FROM memories
       WHERE workspace_id = ?
       ORDER BY created_at DESC
-      LIMIT 50
-    `).all(ws)
+      LIMIT ? OFFSET ?
+    `).all(ws, limit, offset)
 
-    return c.json({ data: rows })
+    return c.json(paginated(rows, total, limit, offset))
   })
 
   app.get('/analytics/summary', (c) => {
@@ -545,13 +651,19 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
 
     const db = getDb()
+    const { limit, offset } = readPagination(c.req.query.bind(c.req))
+    const total = (db.prepare(`
+      SELECT COUNT(*) AS n FROM team_instances
+      WHERE workspace_id = ?
+    `).get(ws) as { n: number }).n
     const rows = db.prepare(`
       SELECT * FROM team_instances
       WHERE workspace_id = ?
       ORDER BY created_at DESC
-    `).all(ws)
+      LIMIT ? OFFSET ?
+    `).all(ws, limit, offset)
 
-    return c.json({ data: rows })
+    return c.json(paginated(rows, total, limit, offset))
   })
 
   app.get('/analytics/per-role', (c) => {
@@ -622,8 +734,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
 
     const db = getDb()
     const status = c.req.query('status')
-    const limit  = Math.min(parseInt(c.req.query('limit')  ?? '50',  10), 500)
-    const offset = parseInt(c.req.query('offset') ?? '0', 10)
+    const { limit, offset } = readPagination(c.req.query.bind(c.req))
 
     let countSql = `SELECT COUNT(*) AS n FROM tasks WHERE workspace_id = ?`
     let dataSql  = `SELECT * FROM tasks WHERE workspace_id = ?`
@@ -638,12 +749,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     const total = (db.prepare(countSql).get(...params) as { n: number }).n
     dataSql += ` ORDER BY created_at ASC LIMIT ? OFFSET ?`
     const data = db.prepare(dataSql).all(...params, limit, offset)
-    const next_cursor = offset + data.length < total ? String(offset + data.length) : null
-
-    return c.json({
-      data,
-      pagination: { total, limit, offset, next_cursor },
-    })
+    return c.json(paginated(data, total, limit, offset))
   })
 
   // ─── Bearer token auth middleware (mutation endpoints) ───────────────────
@@ -705,14 +811,16 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       assigned_to?: string
     }
     const ws = body.workspace_id ?? workspace_id
+    const project = body.project_id ?? project_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    if (!project) return c.json({ error: 'project_id required' }, 400)
     if (!body.title) return c.json({ error: 'title required' }, 400)
 
     try {
       const task = await createTask({
         title: body.title,
         workspace_id: ws,
-        project_id: body.project_id ?? '',
+        project_id: project,
         description: body.description,
         priority: body.priority,
         assigned_to: body.assigned_to,
@@ -736,10 +844,148 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
 
     try {
-      const task = await updateTask({ task_id, ...body })
+      const ws = workspace_id
+      if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+      const task = await updateTask({ ...body, task_id, workspace_id: ws })
       return c.json({ data: task })
     } catch (err) {
       process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)
+    }
+  })
+
+  // ─── POST /runs — start a policy-checked agent run ──────────────────────
+
+  app.post('/runs', requireAuth, async (c) => {
+    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as {
+      task_id?: string
+      workspace_id?: string
+      project_id?: string
+      agent_role?: AgentRole
+      agent_id?: string
+      pi_profile?: string
+      context_type?: 'primary' | 'subagent' | 'cron' | 'heartbeat' | 'flush'
+      parent_run_id?: string
+    }
+    const ws = body.workspace_id ?? workspace_id
+    const project = body.project_id ?? project_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    if (!project) return c.json({ error: 'project_id required' }, 400)
+    if (!body.agent_role) return c.json({ error: 'agent_role required' }, 400)
+
+    try {
+      let task_id = body.task_id
+      if (task_id) {
+        const existing = getDb().prepare('SELECT task_id FROM tasks WHERE task_id = ? AND workspace_id = ?').get(task_id, ws)
+        if (!existing) return c.json({ error: 'task not found' }, 404)
+      } else {
+        const task = await createTask({
+          title: `[auto] ${body.agent_role} run`,
+          workspace_id: ws,
+          project_id: project,
+        })
+        task_id = task.task_id
+      }
+
+      const policy = loadConfig().policy
+      const decision = await checkPolicy({ workspace_id: ws, task_id, role: body.agent_role, policy })
+      if (!decision.allowed) {
+        return c.json({
+          error: 'policy_denied',
+          reason: decision.reason,
+          blocking_tasks: decision.blocking_tasks ?? [],
+          current_wip: decision.current_wip ?? null,
+          limit: decision.limit ?? null,
+        }, 409)
+      }
+
+      const run = await startAgentRun({
+        task_id,
+        workspace_id: ws,
+        role: body.agent_role,
+        agent_id: body.agent_id,
+        pi_profile: body.pi_profile,
+        context_type: body.context_type ?? 'primary',
+        parent_run_id: body.parent_run_id,
+      })
+      return c.json({ data: run }, 201)
+    } catch (err) {
+      const status = statusForError(err)
+      process.stderr.write(`[fulcrum/monitor] ${errorMessage(err)}\n`)
+      return c.json({ error: errorMessage(err) }, status)
+    }
+  })
+
+  // ─── POST /runs/:id/heartbeat — update live run progress ────────────────
+
+  app.post('/runs/:id/heartbeat', requireAuth, async (c) => {
+    const run_id = c.req.param('id')
+    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as {
+      current_step?: string
+      progress_pct?: number
+      current_path?: string
+    }
+
+    try {
+      await heartbeatAgentRun({
+        run_id,
+        current_step: body.current_step ?? '',
+        progress_pct: body.progress_pct ?? 0,
+        current_path: body.current_path,
+      })
+      return c.json({ data: { run_id, ok: true } })
+    } catch (err) {
+      const status = statusForError(err)
+      process.stderr.write(`[fulcrum/monitor] ${errorMessage(err)}\n`)
+      return c.json({ error: errorMessage(err) }, status)
+    }
+  })
+
+  // ─── POST /runs/:id/complete — finish a run ─────────────────────────────
+
+  app.post('/runs/:id/complete', requireAuth, async (c) => {
+    const run_id = c.req.param('id')
+    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as {
+      output_summary?: string
+      summary?: string
+      artifact_paths?: string[] | string
+    }
+
+    try {
+      const paths = parseStringList(body.artifact_paths)
+      const run = await completeAgentRun({
+        run_id,
+        output_summary: body.output_summary ?? body.summary ?? '',
+        artifacts: paths.length > 0 ? { files_changed: paths } : undefined,
+      })
+      return c.json({ data: run })
+    } catch (err) {
+      const status = statusForError(err)
+      process.stderr.write(`[fulcrum/monitor] ${errorMessage(err)}\n`)
+      return c.json({ error: errorMessage(err) }, status)
+    }
+  })
+
+  // ─── POST /runs/:id/block — block a run with a reason ───────────────────
+
+  app.post('/runs/:id/block', requireAuth, async (c) => {
+    const run_id = c.req.param('id')
+    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as {
+      reason?: string
+      escalation_reason?: string
+    }
+    if (!body.reason) return c.json({ error: 'reason required' }, 400)
+
+    try {
+      const run = await blockAgentRun({
+        run_id,
+        reason: body.reason,
+        escalation_reason: body.escalation_reason,
+      })
+      return c.json({ data: { ...run, reason: run.blocker } })
+    } catch (err) {
+      const status = statusForError(err)
+      process.stderr.write(`[fulcrum/monitor] ${errorMessage(err)}\n`)
+      return c.json({ error: errorMessage(err) }, status)
     }
   })
 
@@ -757,9 +1003,8 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (run.status !== 'blocked') return c.json({ error: 'run is not blocked', status: run.status }, 409)
 
     try {
-      db.prepare(`UPDATE agent_runs SET status = 'running', blocker = NULL, updated_at = ? WHERE run_id = ? AND workspace_id = ?`)
-        .run(new Date().toISOString(), run_id, workspace_id)
-      return c.json({ data: { run_id, status: 'running', summary: body.summary ?? 'Unblocked by operator' } })
+      const unblocked = await unblockAgentRun({ run_id, summary: body.summary })
+      return c.json({ data: { run_id, status: unblocked.status, summary: body.summary ?? 'Unblocked by operator' } })
     } catch (err) {
       process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)
     }
@@ -779,12 +1024,8 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
 
     try {
-      await blockAgentRun({
-        run_id,
-        reason: body.reason ?? 'Killed by operator',
-        escalation_reason: 'Operator-initiated termination',
-      })
-      return c.json({ data: { run_id, status: 'blocked' } })
+      await abortAgentRun({ run_id, reason: body.reason ?? 'Killed by operator' })
+      return c.json({ data: { run_id, status: 'aborted' } })
     } catch (err) {
       process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)
     }
@@ -827,6 +1068,128 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       return c.json({ data: { review_id, status: 'rejected' } })
     } catch (err) {
       process.stderr.write(`[fulcrum/monitor] ${(err as Error).message}\n`); return c.json({ error: "internal_error" }, 500)
+    }
+  })
+
+  // ─── POST /memory/recall — plugin-friendly project memory recall ────────
+
+  app.post('/memory/recall', requireAuth, async (c) => {
+    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as {
+      query?: string
+      workspace_id?: string
+      project_id?: string | null
+      limit?: number
+      offset?: number
+      scope?: MemoryScope
+      kind?: MemoryKind
+      query_scope?: 'session' | 'project' | 'workspace' | 'global'
+      session_id?: string
+      max_chars?: number
+    }
+    const ws = body.workspace_id ?? workspace_id
+    const project = body.project_id ?? project_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    if (!body.query) return c.json({ error: 'query required' }, 400)
+
+    try {
+      const maxChars = body.max_chars ?? 1000
+      const results = await recallMemory({
+        workspace_id: ws,
+        project_id: project,
+        query: body.query,
+        limit: body.limit ?? 10,
+        offset: body.offset ?? 0,
+        scope: body.scope,
+        kind: body.kind,
+        query_scope: body.query_scope,
+        session_id: body.session_id,
+        mode: 'total_ranked',
+      })
+      if ('reason' in results) return c.json({ memories: [], reason: results.reason })
+      const memories = results.map(memory => ({
+        memory_id: memory.memory_id,
+        title: memory.title,
+        summary: memory.summary,
+        content: (('content' in memory ? memory.content : memory.summary) ?? '').slice(0, maxChars),
+        kind: memory.kind,
+        scope: memory.scope,
+        file_path: memory.file_path,
+        score: memory.recall_score ?? 0,
+      }))
+      return c.json({ memories })
+    } catch (err) {
+      const status = statusForError(err)
+      process.stderr.write(`[fulcrum/monitor] ${errorMessage(err)}\n`)
+      return c.json({ error: errorMessage(err) }, status)
+    }
+  })
+
+  // ─── POST /memory/write — plugin-friendly memory write ──────────────────
+
+  app.post('/memory/write', requireAuth, async (c) => {
+    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as {
+      workspace_id?: string
+      project_id?: string | null
+      content?: string
+      title?: string
+      summary?: string
+      kind?: MemoryKind
+      scope?: MemoryScope
+      tags?: string[] | string
+    }
+    const ws = body.workspace_id ?? workspace_id
+    const project = body.project_id ?? project_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    if (!project) return c.json({ error: 'project_id required' }, 400)
+    if (!body.content) return c.json({ error: 'content required' }, 400)
+
+    try {
+      const content = body.content
+      const title = body.title ?? content.slice(0, 80)
+      const summary = body.summary ?? title
+      const tags = parseStringList(body.tags).slice(0, 32)
+      const memory = await writeMemory({
+        workspace_id: ws,
+        project_id: project,
+        content,
+        title,
+        summary,
+        kind: body.kind ?? 'fact',
+        scope: body.scope ?? 'project',
+        tags,
+      })
+      return c.json({ saved: true, memory_id: memory.memory_id, project_id: project, tags }, 201)
+    } catch (err) {
+      const status = statusForError(err)
+      process.stderr.write(`[fulcrum/monitor] ${errorMessage(err)}\n`)
+      return c.json({ error: errorMessage(err) }, status)
+    }
+  })
+
+  // ─── POST /cos-context — build CoS world-state markdown ─────────────────
+
+  app.post('/cos-context', requireAuth, async (c) => {
+    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>) as {
+      workspace_id?: string
+      project_id?: string
+      max_tokens?: number
+    }
+    const ws = body.workspace_id ?? workspace_id
+    const project = body.project_id ?? project_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    if (!project) return c.json({ error: 'project_id required' }, 400)
+
+    try {
+      const context = await buildCosContext({
+        workspace_id: ws,
+        project_id: project,
+        max_tokens: body.max_tokens,
+      })
+      return c.json({ context_markdown: context, project_id: project, workspace_id: ws })
+    } catch (err) {
+      const status = statusForError(err)
+      process.stderr.write(`[fulcrum/monitor] ${errorMessage(err)}\n`)
+      return c.json({ error: errorMessage(err) }, status)
     }
   })
 

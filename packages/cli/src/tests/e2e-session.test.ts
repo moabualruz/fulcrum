@@ -53,8 +53,10 @@ afterEach(() => {
 
 describe('E2E session lifecycle — full hook sequence', () => {
   it('Phase 1 — SessionStart: calls startAgentRun and writes session file', async () => {
+    const createTask = vi.fn().mockResolvedValue({ task_id: 'task_e2e_001' })
     const startAgentRun = vi.fn().mockResolvedValue({ run_id: 'run_e2e_001' })
     vi.doMock('fulcrum-agent-core', () => ({
+      createTask,
       startAgentRun,
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),
@@ -77,8 +79,11 @@ describe('E2E session lifecycle — full hook sequence', () => {
     const { runSessionStartHook } = await import('../index.js')
     await expect(runSessionStartHook()).rejects.toThrow('EXIT_0')
 
+    expect(createTask).toHaveBeenCalledWith(
+      expect.objectContaining({ workspace_id: 'ws_e2e', project_id: 'proj_e2e' })
+    )
     expect(startAgentRun).toHaveBeenCalledWith(
-      expect.objectContaining({ workspace_id: 'ws_e2e' })
+      expect.objectContaining({ task_id: 'task_e2e_001', workspace_id: 'ws_e2e' })
     )
   })
 
@@ -161,8 +166,10 @@ describe('E2E session lifecycle — full hook sequence', () => {
     const CHAIN_RUN_ID = 'run_chain_001'
     let sessionFileData = ''
 
+    const createTask = vi.fn().mockResolvedValue({ task_id: 'task_chain_001' })
     const startAgentRun = vi.fn().mockResolvedValue({ run_id: CHAIN_RUN_ID })
     vi.doMock('fulcrum-agent-core', () => ({
+      createTask,
       startAgentRun,
       getDb:         vi.fn().mockReturnValue({ prepare: vi.fn().mockReturnValue({ run: vi.fn() }) }),
       runMigrations: vi.fn(),

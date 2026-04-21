@@ -77,7 +77,7 @@ export function getSyncState(input: GetSyncStateInput): SyncState | null {
  * Record the resolution of a detected conflict.
  *
  * - local_wins  → re-enqueues the object for push at higher priority (200).
- * - remote_wins → pulls the remote version via adapter.pull().
+ * - remote_wins → pulls the remote version and applies it locally through callback.
  * - manual      → clears conflict_state only; no automatic re-sync.
  */
 export async function resolveConflict(input: ResolveConflictInput): Promise<SyncState> {

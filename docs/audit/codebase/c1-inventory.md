@@ -23,7 +23,9 @@
   - `install-bin`: symlink fulcrum to `$HOME/.local/bin/fulcrum`
 - Peer dependencies (optional): `@mariozechner/pi-*` (PI coding agent + TUI)
 - pnpm overrides: force build for `better-sqlite3`, `esbuild`, `onnxruntime-node`, `koffi`, `protobufjs`, `kuzu`
-- Extension entry: `./packages/extension/index.ts` (for PI)
+- PI extension entry: root package has no `pi.extensions` entry; the active PI
+  package is `agent-integration/pi/cockpit/package.json` with
+  `pi.extensions: ["./index.ts"]`.
 
 **pnpm-workspace.yaml**
 ```yaml
@@ -1669,4 +1671,3 @@ No packages can be published to npm. Would require:
 ---
 
 **End of inventory. All facts. No opinions. Totals: 11 packages, ~19,090 LOC across all packages (non-test), 1004 passing tests (+5 skipped), 30 migrations, 24 canonical roles + 1 README, 13 Claude skills, 14 CLI command groups, 18 MCP tools, 32 HTTP monitor routes.**
-

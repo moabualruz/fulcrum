@@ -79,6 +79,11 @@ export function formatEvent(evt: FulcrumEvent): string {
       noun = String(payload['tool_name'] ?? payload['check'] ?? '')
       detail = String(payload['reason'] ?? '')
       break
+    case 'hook_executed':
+      verb = 'hook executed'
+      noun = String(payload['run_id'] ?? payload['session_id'] ?? '')
+      detail = String(payload['tool_name'] ?? payload['cli_name'] ?? '')
+      break
     case 'memory_written':
       verb = 'wrote memory'
       noun = String(payload['memory_id'] ?? '')
@@ -143,6 +148,17 @@ export function formatEvent(evt: FulcrumEvent): string {
   const parts = [`[${ts}]`, role, verb, noun]
   if (detail) parts.push(`— ${detail}`)
   return parts.filter(Boolean).join(' ')
+}
+
+function runIdFromEvent(evt: FulcrumEvent & { run_id?: string }): string | undefined {
+  if (typeof evt.run_id === 'string') return evt.run_id
+  if (evt.object_type === 'agent_run' && typeof evt.object_id === 'string') return evt.object_id
+  const payload = (evt.payload ?? {}) as EventPayload
+  return typeof payload['run_id'] === 'string' ? payload['run_id'] : undefined
+}
+
+function eventMatchesRun(evt: FulcrumEvent & { run_id?: string }, runId?: string): boolean {
+  return !runId || runIdFromEvent(evt) === runId
 }
 
 // ── parseSince ────────────────────────────────────────────────────────────────
@@ -239,7 +255,7 @@ async function followSse(runId?: string, sinceDate?: Date): Promise<void> {
           // End of SSE event
           try {
             const evt = JSON.parse(dataLine) as FulcrumEvent & { run_id?: string }
-            if (runId && evt.run_id !== runId) { dataLine = ''; continue }
+            if (!eventMatchesRun(evt, runId)) { dataLine = ''; continue }
             if (sinceDate && new Date(evt.ts) < sinceDate) { dataLine = ''; continue }
             console.log(formatEvent(evt))
           } catch { /* skip malformed */ }
@@ -287,8 +303,11 @@ async function printDbEvents(
 ): Promise<void> {
   let query = 'SELECT * FROM events WHERE rowid > ?'
   const params: (string | number)[] = [afterId]
-  if (runId) { query += ' AND run_id = ?'; params.push(runId) }
-  if (since) { query += ' AND created_at >= ?'; params.push(since) }
+  if (runId) {
+    query += ` AND (object_id = ? OR json_extract(payload, '$.run_id') = ?)`
+    params.push(runId, runId)
+  }
+  if (since) { query += ' AND ts >= ?'; params.push(since) }
   query += ' ORDER BY rowid ASC LIMIT 100'
 
   const rows = db.prepare(query).all(...params) as (FulcrumEvent & { rowid: number })[]
@@ -310,13 +329,21 @@ async function readFromDb(limit: number, runId?: string, sinceDate?: Date): Prom
   const params: (string | number)[] = []
   const clauses: string[] = []
 
-  if (runId) { clauses.push('run_id = ?'); params.push(runId) }
-  if (sinceDate) { clauses.push('created_at >= ?'); params.push(sinceDate.toISOString()) }
+  if (runId) {
+    clauses.push(`(object_id = ? OR json_extract(payload, '$.run_id') = ?)`)
+    params.push(runId, runId)
+  }
+  if (sinceDate) { clauses.push('ts >= ?'); params.push(sinceDate.toISOString()) }
   if (clauses.length > 0) query += ' WHERE ' + clauses.join(' AND ')
-  query += ' ORDER BY created_at DESC LIMIT ?'
+  query += ' ORDER BY ts DESC LIMIT ?'
   params.push(limit)
 
-  const rows = (db.prepare(query).all(...params) as (FulcrumEvent & { payload: string | Record<string, unknown> })[])
+  const rows = [
+    ...(db.prepare(query).all(...params) as (FulcrumEvent & { payload: string | Record<string, unknown> })[]),
+    ...readHookEvents(db, runId, sinceDate, limit),
+  ]
+    .sort((a, b) => b.ts.localeCompare(a.ts))
+    .slice(0, limit)
     .reverse()
 
   if (rows.length === 0) {
@@ -331,4 +358,54 @@ async function readFromDb(limit: number, runId?: string, sinceDate?: Date): Prom
     }
     console.log(formatEvent(evt as FulcrumEvent))
   }
+}
+
+function readHookEvents(
+  db: ReturnType<typeof import('fulcrum-agent-core').getDb>,
+  runId: string | undefined,
+  sinceDate: Date | undefined,
+  limit: number,
+): Array<FulcrumEvent & { payload: Record<string, unknown> }> {
+  let query = 'SELECT * FROM hook_events'
+  const params: (string | number)[] = []
+  const clauses: string[] = []
+  if (runId) { clauses.push('run_id = ?'); params.push(runId) }
+  if (sinceDate) { clauses.push('ts >= ?'); params.push(sinceDate.toISOString()) }
+  if (clauses.length > 0) query += ' WHERE ' + clauses.join(' AND ')
+  query += ' ORDER BY ts DESC LIMIT ?'
+  params.push(limit)
+
+  const rows = db.prepare(query).all(...params) as Array<{
+    hook_event_id: string
+    workspace_id: string
+    session_id: string
+    tool_name: string
+    agent_role: string
+    run_id: string | null
+    ts: string
+    cli_name: string
+  }>
+
+  return rows.map(row => ({
+    evt_id: row.hook_event_id,
+    workspace_id: row.workspace_id,
+    project_id: null,
+    evt_type: 'hook_executed',
+    ts: row.ts,
+    object_type: 'hook_event',
+    object_id: row.hook_event_id,
+    actor_type: 'agent',
+    actor_id: row.agent_role || 'unknown',
+    payload: {
+      session_id: row.session_id,
+      tool_name: row.tool_name,
+      role: row.agent_role,
+      run_id: row.run_id ?? undefined,
+      cli_name: row.cli_name,
+    },
+    severity: 'info',
+    trace_id: null,
+    span_id: null,
+    correlation_id: null,
+  }))
 }

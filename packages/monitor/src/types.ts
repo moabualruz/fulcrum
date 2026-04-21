@@ -82,6 +82,7 @@ export interface MonitorServerConfig {
   port?: number  // default 7331
   host?: string  // default '127.0.0.1'
   workspace_id?: string
+  project_id?: string
   bypass_auth?: boolean  // skip auth checks in tests
   /** When true, keep a 500ms poll loop for SSE instead of event bus push (subprocess mode) */
   isSubprocess?: boolean

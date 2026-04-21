@@ -56,18 +56,18 @@ Canonical source of truth for every plan doc in this repo. One row per plan. Upd
 | `2026-04-15-002-fix-monitor-reliability-and-test-gaps-plan.md` | completed (6/6) | cross-cutting | 6 | — | shipped | — |
 | `2026-04-16-001-feat-install-tui-dashboard-plan.md` | active | TUI, monitor, MCP | 10 phases | install-to-value (done) | TBC | TBC |
 | `2026-04-16-cli-first-action-platform-plan.md` | completed | CLI, MCP | 6 | — | shipped | — |
-| `2026-04-16-memory-v2a-plan.md` | **needs triage** | memory | 9 | — | — | see §Open Questions #1 |
-| `2026-04-16-memory-v2b-plan.md` | **needs triage** | memory | 12 | v2a | — | see §Open Questions #1 |
+| `2026-04-16-memory-v2a-plan.md` | **blocked-decision** | memory | 9 | — | — | see §Open Questions #1 |
+| `2026-04-16-memory-v2b-plan.md` | **blocked-decision** | memory | 12 | v2a | — | see §Open Questions #1 |
 | `2026-04-16-plugin-install-operator-surfaces-plan.md` | likely abandoned | CLI plugins | 0 (stub) | — | — | see §Open Questions #3 |
 | `2026-04-18-001-refactor-indexer-daemon-plan.md` | likely done | memory/indexer | 5 shipped | — | — | see §Open Questions #2 |
 | `2026-04-18-002-memory-tiered-architecture-plan.md` | completed (PR 9 done) | memory | 10 | — | shipped | — |
 | `2026-04-18-003-worktrees-v2-plan.md` | draft (awaiting approval) | worktrees | 14 | memory v3 rule-engine primitives (light) | — | ~9 wks after approval |
 | `2026-04-19-004-agent-parity-plan.md` | active closeout (PR 17 done; operator publish rows open) | agent integration, CLI, fanout | 18 | cli-first-action (done) | — | see integration checklist |
-| `plan-architecture.md` | **needs triage** | cross-cutting | 9 steps | — | — | see §Open Questions #4 |
-| `plan-mcp.md` | **needs triage** | mcp | 9 steps | cli-first-action (done) | — | see §Open Questions #4 |
-| `plan-plugins.md` | **needs triage** | cli | 7 steps | cli-first-action (done), mcp | — | see §Open Questions #4 |
-| `plan-rag.md` | **needs triage** | memory | 8 steps | — | — | see §Open Questions #4 |
-| `plan-skills-agents.md` | **needs triage** | core, agent-integration | 10 steps | cli-first-action (done) | — | see §Open Questions #4 |
+| `plan-architecture.md` | **blocked-decision** | cross-cutting | 9 steps | — | — | see §Open Questions #4 |
+| `plan-mcp.md` | **blocked-decision** | mcp | 9 steps | cli-first-action (done) | — | see §Open Questions #4 |
+| `plan-plugins.md` | **blocked-decision** | cli | 7 steps | cli-first-action (done), mcp | — | see §Open Questions #4 |
+| `plan-rag.md` | **blocked-decision** | memory | 8 steps | — | — | see §Open Questions #4 |
+| `plan-skills-agents.md` | **blocked-decision** | core, agent-integration | 10 steps | cli-first-action (done) | — | see §Open Questions #4 |
 | `MASTER-PLAN.md` | living | this doc | — | — | — | — |
 
 **Not plans (artifacts):**
@@ -85,7 +85,7 @@ Canonical source of truth for every plan doc in this repo. One row per plan. Upd
 - `completed` — all units shipped; shipped-vs-plan diff on file.
 - `superseded` — a later plan replaces this one; **must name the successor plan ID** in the registry row.
 - `archived` — reference-only; no further work; shipped-vs-plan diff required before move.
-- `needs triage` — status unknown; a §Open Questions entry covers the decision.
+- `blocked-decision` — repo-local work is not marked done; a §Open Questions entry names the required user/product decision.
 - `likely abandoned` — draft with no commits for >14 days; candidate for archive pending owner decision.
 
 ---

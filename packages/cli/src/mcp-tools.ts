@@ -95,12 +95,13 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Update Task',
     name: 'update_task',
-    description: "Update task status, note, or assignment. Updates task row in place. Returns task_id, updated=true, changed fields. Requires task_id.",
+    description: "Update task status, note, or assignment. Updates a workspace-scoped task row in place. Returns task_id, updated=true, changed fields. Defaults workspace_id from the current project context.",
     annotations: { idempotentHint: true },
     inputSchema: {
       type: 'object',
       properties: {
         task_id: { type: 'string', description: 'Task ID to update' },
+        workspace_id: { type: 'string', description: 'Workspace scope for the task; defaults to current workspace when omitted' },
         status: { type: 'string', description: 'New status value' },
         note: { type: 'string', description: 'Progress note' },
         assigned_to: { type: 'string', description: 'Reassign to this agent role slug' },

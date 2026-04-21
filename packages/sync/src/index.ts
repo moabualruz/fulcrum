@@ -5,7 +5,7 @@
 export type {
   SyncDirection, ConflictState, SyncableType,
   SyncState, SyncConflict, SyncQueueItem, SyncResult, ExternalPayload,
-  SyncAdapter, PlaneAPIClientConfig,
+  SyncAdapter, ApplyRemoteSyncInput, ApplyRemoteSync, PlaneAPIClientConfig,
   SyncObjectInput, CreateSyncStateInput, SyncAllInput,
   GetSyncStateInput, ResolveConflictInput, ListConflictsInput,
 } from './types.js'

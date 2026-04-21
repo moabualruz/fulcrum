@@ -50,7 +50,7 @@ describe('Task labels', () => {
       labels: ['old-label'],
     })
     expect(task.labels).toEqual(['old-label'])
-    const updated = await updateTask({ task_id: task.task_id, labels: ['new-label-a', 'new-label-b'] })
+    const updated = await updateTask({ workspace_id: 'ws_1', task_id: task.task_id, labels: ['new-label-a', 'new-label-b'] })
     expect(updated.labels).toEqual(['new-label-a', 'new-label-b'])
   })
 
@@ -62,7 +62,7 @@ describe('Task labels', () => {
       title: 'Clear labels',
       labels: ['to-be-removed'],
     })
-    const updated = await updateTask({ task_id: task.task_id, labels: [] })
+    const updated = await updateTask({ workspace_id: 'ws_1', task_id: task.task_id, labels: [] })
     expect(updated.labels).toEqual([])
   })
 
@@ -74,7 +74,7 @@ describe('Task labels', () => {
       title: 'Preserve labels',
       labels: ['keep-me'],
     })
-    const updated = await updateTask({ task_id: task.task_id, note: 'some note' })
+    const updated = await updateTask({ workspace_id: 'ws_1', task_id: task.task_id, note: 'some note' })
     expect(updated.labels).toEqual(['keep-me'])
   })
 

@@ -14,6 +14,7 @@ import type {
   ListConflictsInput,
   SyncDirection,
   ConflictState,
+  ApplyRemoteSync,
 } from './types.js'
 
 // Object types that must never be synchronised to external systems.
@@ -117,6 +118,8 @@ export class SyncManager {
     private adapter: SyncAdapter,
     /** Optional hook called with serialised local_data before each push.  Throw to abort. */
     private beforePush?: (serialisedData: string) => void,
+    /** Optional hook that persists adapter.unmap(remote) for remote_wins. */
+    private applyRemote?: ApplyRemoteSync,
   ) {}
 
   // ------------------------------------------------------------------ //
@@ -456,70 +459,118 @@ export class SyncManager {
       throw new Error(`Conflict not found: ${conflict_id}`)
     }
 
-    // Record resolution
-    this.db
-      .prepare(
-        `UPDATE sync_conflicts
-            SET resolution = ?,
-                resolved_at = datetime('now'),
-                resolved_by = ?
-          WHERE conflict_id = ?`,
-      )
-      .run(resolution, resolved_by ?? null, conflict_id)
-
     const syncStateRow = this.db
       .prepare(`SELECT * FROM sync_states WHERE sync_id = ?`)
       .get(conflictRow.sync_id) as SyncStateRow
+
+    const recordResolution = () => {
+      this.db
+        .prepare(
+          `UPDATE sync_conflicts
+              SET resolution = ?,
+                  resolved_at = datetime('now'),
+                  resolved_by = ?
+            WHERE conflict_id = ?`,
+        )
+        .run(resolution, resolved_by ?? null, conflict_id)
+    }
 
     if (resolution === 'local_wins') {
       if (!local_data) {
         throw new Error('local_data is required for local_wins resolution')
       }
-      // Re-enqueue for push, including local_data so processQueue can push it (SYNC-009 fix)
       const queueId = ulid()
-      this.db
-        .prepare(
-          `INSERT INTO sync_queue (queue_id, sync_id, operation, priority, local_data)
-           VALUES (?, ?, 'upsert', 200, ?)`,
-        )
-        .run(queueId, conflictRow.sync_id, JSON.stringify(local_data))
+      const resolveLocal = this.db.transaction(() => {
+        // Re-enqueue for push, including local_data so processQueue can push it (SYNC-009 fix)
+        this.db
+          .prepare(
+            `INSERT INTO sync_queue (queue_id, sync_id, operation, priority, local_data)
+             VALUES (?, ?, 'upsert', 200, ?)`,
+          )
+          .run(queueId, conflictRow.sync_id, JSON.stringify(local_data))
 
-      this.db
-        .prepare(
-          `UPDATE sync_states
-              SET sync_status = 'queued',
-                  conflict_state = 'resolved',
-                  updated_at = datetime('now')
-            WHERE sync_id = ?`,
-        )
-        .run(conflictRow.sync_id)
+        this.db
+          .prepare(
+            `UPDATE sync_states
+                SET sync_status = 'queued',
+                    conflict_state = 'resolved',
+                    last_sync_error = NULL,
+                    updated_at = datetime('now')
+              WHERE sync_id = ?`,
+          )
+          .run(conflictRow.sync_id)
+
+        recordResolution()
+      })
+      resolveLocal()
     } else if (resolution === 'remote_wins') {
-      // Pull remote data and mark as synced
-      if (syncStateRow.external_id) {
-        await this.adapter.pull(syncStateRow.external_id)
-        // In a full implementation, the pulled data would be written back to the
-        // local domain object via a domain callback. Here we mark the state as synced.
+      const applyRemote = input.apply_remote_data ?? this.applyRemote
+      if (!applyRemote) {
+        throw new Error('apply_remote_data callback is required for remote_wins resolution')
       }
-      this.db
-        .prepare(
-          `UPDATE sync_states
-              SET sync_status = 'synced',
-                  conflict_state = 'resolved',
-                  last_synced_at = datetime('now'),
-                  updated_at = datetime('now')
-            WHERE sync_id = ?`,
-        )
-        .run(conflictRow.sync_id)
+
+      if (!syncStateRow.external_id) {
+        throw new Error('external_id is required for remote_wins resolution')
+      }
+
+      try {
+        const rawRemote = await this.adapter.pull(syncStateRow.external_id)
+        const mappedLocalData = this.adapter.unmap(rawRemote)
+
+        await applyRemote({
+          state: rowToSyncState(syncStateRow),
+          raw_remote: rawRemote,
+          local_data: mappedLocalData,
+        })
+
+        const resolvedHash = conflictRow.remote_hash ?? canonicalHash(mappedLocalData)
+        const resolveRemote = this.db.transaction(() => {
+          this.db
+            .prepare(
+              `UPDATE sync_states
+                  SET sync_status = 'synced',
+                      conflict_state = 'resolved',
+                      last_sync_hash = ?,
+                      last_sync_error = NULL,
+                      last_synced_at = datetime('now'),
+                      updated_at = datetime('now')
+                WHERE sync_id = ?`,
+            )
+            .run(resolvedHash, conflictRow.sync_id)
+
+          recordResolution()
+        })
+        resolveRemote()
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        this.db
+          .prepare(
+            `UPDATE sync_states
+                SET sync_status = 'conflicted',
+                    conflict_state = 'detected',
+                    last_sync_error = ?,
+                    updated_at = datetime('now')
+              WHERE sync_id = ?`,
+          )
+          .run(message, conflictRow.sync_id)
+        throw err
+      }
     } else {
-      // manual — set conflict_state to resolved, leave status as-is
-      this.db
-        .prepare(
-          `UPDATE sync_states
-              SET conflict_state = 'resolved',
-                  updated_at = datetime('now')
-            WHERE sync_id = ?`,
-        )
-        .run(conflictRow.sync_id)
+      const resolveManual = this.db.transaction(() => {
+        // manual — set conflict_state to resolved, leave status as-is
+        this.db
+          .prepare(
+            `UPDATE sync_states
+                SET conflict_state = 'resolved',
+                    last_sync_error = NULL,
+                    updated_at = datetime('now')
+              WHERE sync_id = ?`,
+          )
+          .run(conflictRow.sync_id)
+
+        recordResolution()
+      })
+      resolveManual()
     }
 
     const updatedRow = this.db

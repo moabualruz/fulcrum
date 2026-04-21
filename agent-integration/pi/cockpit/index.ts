@@ -133,6 +133,34 @@ async function apiPatch<T>(baseUrl: string, urlPath: string, body: unknown): Pro
   }
 }
 
+export function responseList<T>(payload: unknown, legacyKey: string): T[] {
+  if (!payload || typeof payload !== "object") return [];
+  const record = payload as Record<string, unknown>;
+  const legacy = record[legacyKey];
+  if (Array.isArray(legacy)) return legacy as T[];
+  const data = record["data"];
+  return Array.isArray(data) ? data as T[] : [];
+}
+
+export function responseDataObject<T extends Record<string, unknown>>(payload: unknown): T | null {
+  if (!payload || typeof payload !== "object") return null;
+  const record = payload as Record<string, unknown>;
+  const data = record["data"];
+  if (data && typeof data === "object" && !Array.isArray(data)) return data as T;
+  return record as T;
+}
+
+export function buildFulcrumFirstNudge(workspaceId: string, runId?: string | null): string {
+  const lines = [
+    "[Fulcrum-first]",
+    `Workspace: ${workspaceId}`,
+    "Before file/code search or architecture decisions, prefer native PI tools `fulcrum_workspace_status` and `fulcrum_recall_memory`.",
+    "After non-obvious decisions or outcomes, persist durable knowledge with `fulcrum_write_memory`.",
+  ];
+  if (runId) lines.splice(2, 0, `Run ID: ${runId}`);
+  return lines.join("\n");
+}
+
 async function isServerUp(port: number): Promise<boolean> {
   try {
     const res = await fetch(`http://127.0.0.1:${port}/status`, {
@@ -532,9 +560,9 @@ export default function (pi: ExtensionAPI) {
         const qs = new URLSearchParams({ workspace_id: cfg.workspace_id });
         if (cfg.project_id) qs.set("project_id", cfg.project_id);
         if (status) qs.set("status", status);
-        const data = await apiGet<{ tasks: unknown[] }>(baseUrl, `/tasks?${qs}`);
+        const data = await apiGet<Record<string, unknown>>(baseUrl, `/tasks?${qs}`);
         if (!data) { ctx.ui.notify("Could not fetch tasks", "error"); return; }
-        const tasks = data.tasks ?? [];
+        const tasks = responseList<unknown>(data, "tasks");
         if (tasks.length === 0) {
           ctx.ui.notify(`No tasks${status ? ` with status "${status}"` : ""}`, "info");
           return;
@@ -560,7 +588,8 @@ export default function (pi: ExtensionAPI) {
           ctx.ui.notify(`Failed: ${result?.["error"] ?? "unknown"}`, "error");
           return;
         }
-        ctx.ui.notify(`Created: ${result["task_id"]} — "${title}"`, "success");
+        const task = responseDataObject<Record<string, unknown>>(result);
+        ctx.ui.notify(`Created: ${task?.["task_id"] ?? "(unknown task)"} — "${title}"`, "success");
       },
     });
 
@@ -648,8 +677,8 @@ export default function (pi: ExtensionAPI) {
     pi.registerCommand("fulcrum-workspaces", {
       description: "List all Fulcrum workspaces",
       handler: async (_args, ctx) => {
-        const data = await apiGet<{ workspaces: unknown[] }>(baseUrl, "/workspaces");
-        const ws = data?.workspaces ?? [];
+        const data = await apiGet<Record<string, unknown>>(baseUrl, "/workspaces");
+        const ws = responseList<unknown>(data, "workspaces");
         if (ws.length === 0) {
           ctx.ui.notify("No workspaces found — run: fulcrum workspaces create", "info");
           return;
@@ -748,8 +777,8 @@ export default function (pi: ExtensionAPI) {
         if (cfg.project_id) qs.set("project_id", cfg.project_id);
         if (args.status) qs.set("status", args.status);
         if (args.limit)  qs.set("limit", String(args.limit));
-        const data = await apiGet<{ tasks: unknown[] }>(baseUrl, `/tasks?${qs}`);
-        const tasks = data?.tasks ?? [];
+        const data = await apiGet<Record<string, unknown>>(baseUrl, `/tasks?${qs}`);
+        const tasks = responseList<unknown>(data, "tasks");
         return { content: [{ type: "text", text: JSON.stringify(tasks, null, 2) }], details: { count: tasks.length } };
       },
     });
@@ -773,8 +802,9 @@ export default function (pi: ExtensionAPI) {
           workspace_id: cfg.workspace_id,
           project_id: cfg.project_id || cfg.workspace_id,
         });
+        const task = responseDataObject<Record<string, unknown>>(result);
         refreshStatus();
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result ?? {} };
+        return { content: [{ type: "text", text: JSON.stringify(task ?? result, null, 2) }], details: task ?? result ?? {} };
       },
     });
 
@@ -1022,6 +1052,10 @@ export default function (pi: ExtensionAPI) {
 
       const basePrompt = (event as Record<string, unknown>)["systemPrompt"] as string ?? "";
       const additions: string[] = [];
+
+      if (process.env["FULCRUM_NO_RECALL_NUDGE"] !== "1") {
+        additions.push(buildFulcrumFirstNudge(cfg.workspace_id, currentRunId));
+      }
 
       if (!overBudget && snapshot) {
         const r = snapshot.running_agents ?? [];
