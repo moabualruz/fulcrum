@@ -4,6 +4,15 @@ All notable changes to this package follow [Semantic Versioning](https://semver.
 
 ---
 
+## [0.0.5] — 2026-04-21
+
+CI release retry.
+
+### Fixed
+
+- Retagged package release after pinning `pnpm/action-setup` to the repository
+  pnpm version used by GitHub Actions.
+
 ## [0.0.4] — 2026-04-21
 
 Alignment release.
