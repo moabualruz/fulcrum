@@ -1,0 +1,1169 @@
+{
+  "nodes": [
+    {
+      "id": "role_implementation_planner",
+      "label": "Implementation Planner (implementation_planner)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/implementation_planner.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_integration_worker",
+      "label": "Integration Worker (integration_worker)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/integration_worker.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_issue_decomposer",
+      "label": "Issue Decomposer (issue_decomposer)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/issue_decomposer.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_memory_curator",
+      "label": "Memory Curator (memory_curator)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/memory_curator.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_ml_engineer",
+      "label": "ML Engineer (ml_engineer)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/ml_engineer.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_orchestrator",
+      "label": "Orchestrator (orchestrator)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/orchestrator.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_prd_planner",
+      "label": "PRD Planner (prd_planner)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/prd_planner.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_product_manager",
+      "label": "Product Manager (product_manager)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/product_manager.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_qa_engineer",
+      "label": "QA Engineer (qa_engineer)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/qa_engineer.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_refactor_worker",
+      "label": "Refactor Worker (refactor_worker)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/refactor_worker.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_research_worker",
+      "label": "Research Worker (research_worker)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/research_worker.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_security_reviewer",
+      "label": "Security Reviewer (security_reviewer)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/security_reviewer.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_software_engineer",
+      "label": "Software Engineer (software_engineer)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/software_engineer.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_tech_lead",
+      "label": "Tech Lead (tech_lead)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/tech_lead.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rule_fulcrum_first",
+      "label": "Fulcrum-First Rule",
+      "file_type": "document",
+      "source_file": "agent-integration/rules/fulcrum-first.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rule_lifecycle",
+      "label": "Agent Lifecycle Rule",
+      "file_type": "document",
+      "source_file": "agent-integration/rules/lifecycle.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rule_role_boundaries",
+      "label": "Role Boundaries Rule",
+      "file_type": "document",
+      "source_file": "agent-integration/rules/role-boundaries.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "skill_block_when_stuck",
+      "label": "Block When Stuck Skill",
+      "file_type": "document",
+      "source_file": "agent-integration/skills/block-when-stuck/SKILL.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "skill_cos_response_format",
+      "label": "Chief-of-Staff Response Format Skill",
+      "file_type": "document",
+      "source_file": "agent-integration/skills/chief-of-staff-response-format/SKILL.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "skill_complete_agent_run",
+      "label": "Complete Agent Run Skill",
+      "file_type": "document",
+      "source_file": "agent-integration/skills/complete-agent-run/SKILL.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "skill_create_plan",
+      "label": "Create Plan Skill",
+      "file_type": "document",
+      "source_file": "agent-integration/skills/create-plan/SKILL.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "skill_daily_standup",
+      "label": "Daily Standup Skill",
+      "file_type": "document",
+      "source_file": "agent-integration/skills/daily-standup/SKILL.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_l2_specialist",
+      "label": "L2 Specialist Role Tier",
+      "file_type": "document",
+      "source_file": "agent-integration/rules/role-boundaries.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_l1_orchestration",
+      "label": "L1 Orchestration Authority (chief_of_staff)",
+      "file_type": "document",
+      "source_file": "agent-integration/rules/role-boundaries.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_agent_run_lifecycle",
+      "label": "Agent Run Lifecycle (start/heartbeat/complete/block)",
+      "file_type": "document",
+      "source_file": "agent-integration/rules/lifecycle.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_merge_queue",
+      "label": "Merge Queue (integration_worker owned)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/integration_worker.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_prd_artifact",
+      "label": "PRD Artifact",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/prd_planner.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_implementation_plan_artifact",
+      "label": "Implementation Plan Artifact",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/implementation_planner.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_issue_breakdown_artifact",
+      "label": "Issue Breakdown Artifact",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/issue_decomposer.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_research_note_artifact",
+      "label": "Research Note Artifact",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/research_worker.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_test_report_artifact",
+      "label": "Test Report Artifact",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/qa_engineer.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_model_card_artifact",
+      "label": "Model Card Artifact",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/ml_engineer.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_curation_report_artifact",
+      "label": "Curation Report Artifact",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/memory_curator.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_security_verdict",
+      "label": "Security Verdict (PASS/WARN/CRITICAL)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/security_reviewer.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_wip_limit",
+      "label": "WIP Limit / Budget",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/implementation_planner.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_memory_tombstone",
+      "label": "Memory Tombstone (no hard-deletes)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/memory_curator.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_invoke_team",
+      "label": "invoke_team Capability (L1 only)",
+      "file_type": "document",
+      "source_file": "agent-integration/rules/role-boundaries.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_fulcrum_memory_vault",
+      "label": "Fulcrum Memory Vault",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/memory_curator.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_owasp_top10",
+      "label": "OWASP Top 10",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/security_reviewer.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_pre_tool_use_hook",
+      "label": "PreToolUse Hook",
+      "file_type": "document",
+      "source_file": "agent-integration/skills/block-when-stuck/SKILL.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_cos_response_parser",
+      "label": "parseCoSResponse() (@moabualruz/fulcrum-core)",
+      "file_type": "document",
+      "source_file": "agent-integration/skills/chief-of-staff-response-format/SKILL.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_adr",
+      "label": "Architectural Decision Record (ADR)",
+      "file_type": "document",
+      "source_file": "agent-integration/roles/tech_lead.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "role_implementation_planner",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/implementation_planner.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_implementation_planner",
+      "target": "concept_prd_artifact",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/implementation_planner.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_implementation_planner",
+      "target": "concept_implementation_plan_artifact",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/implementation_planner.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_implementation_planner",
+      "target": "concept_wip_limit",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/implementation_planner.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_integration_worker",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/integration_worker.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_integration_worker",
+      "target": "concept_merge_queue",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/integration_worker.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_software_engineer",
+      "target": "role_integration_worker",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/software_engineer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_refactor_worker",
+      "target": "role_integration_worker",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/refactor_worker.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_issue_decomposer",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/issue_decomposer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_issue_decomposer",
+      "target": "concept_issue_breakdown_artifact",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/issue_decomposer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_issue_decomposer",
+      "target": "concept_wip_limit",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/issue_decomposer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_issue_decomposer",
+      "target": "role_implementation_planner",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/issue_decomposer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_memory_curator",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/memory_curator.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_memory_curator",
+      "target": "concept_fulcrum_memory_vault",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/memory_curator.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_memory_curator",
+      "target": "concept_memory_tombstone",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/memory_curator.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_memory_curator",
+      "target": "concept_curation_report_artifact",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/memory_curator.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_ml_engineer",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/ml_engineer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_ml_engineer",
+      "target": "concept_model_card_artifact",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/ml_engineer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_ml_engineer",
+      "target": "role_qa_engineer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/ml_engineer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_orchestrator",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/orchestrator.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_orchestrator",
+      "target": "concept_l1_orchestration",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/orchestrator.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_orchestrator",
+      "target": "concept_wip_limit",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/orchestrator.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_prd_planner",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/prd_planner.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_prd_planner",
+      "target": "concept_prd_artifact",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/prd_planner.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_prd_planner",
+      "target": "role_implementation_planner",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/prd_planner.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_product_manager",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/product_manager.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_product_manager",
+      "target": "role_prd_planner",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/product_manager.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_qa_engineer",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/qa_engineer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_qa_engineer",
+      "target": "concept_test_report_artifact",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/qa_engineer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_qa_engineer",
+      "target": "role_software_engineer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/qa_engineer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_qa_engineer",
+      "target": "role_refactor_worker",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/qa_engineer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_refactor_worker",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/refactor_worker.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_refactor_worker",
+      "target": "concept_agent_run_lifecycle",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/refactor_worker.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_research_worker",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/research_worker.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_research_worker",
+      "target": "concept_research_note_artifact",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/research_worker.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_security_reviewer",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/security_reviewer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_security_reviewer",
+      "target": "concept_security_verdict",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/security_reviewer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_security_reviewer",
+      "target": "concept_owasp_top10",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/security_reviewer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_security_reviewer",
+      "target": "role_integration_worker",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/security_reviewer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_software_engineer",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/software_engineer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_tech_lead",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/tech_lead.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_tech_lead",
+      "target": "concept_adr",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/tech_lead.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_tech_lead",
+      "target": "role_software_engineer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/tech_lead.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rule_role_boundaries",
+      "target": "concept_l1_orchestration",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/rules/role-boundaries.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rule_role_boundaries",
+      "target": "concept_l2_specialist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/rules/role-boundaries.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rule_role_boundaries",
+      "target": "concept_invoke_team",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/rules/role-boundaries.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rule_lifecycle",
+      "target": "concept_agent_run_lifecycle",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/rules/lifecycle.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "skill_block_when_stuck",
+      "target": "concept_agent_run_lifecycle",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/skills/block-when-stuck/SKILL.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "skill_block_when_stuck",
+      "target": "concept_pre_tool_use_hook",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/skills/block-when-stuck/SKILL.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "skill_block_when_stuck",
+      "target": "concept_l1_orchestration",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/skills/block-when-stuck/SKILL.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "skill_cos_response_format",
+      "target": "concept_l1_orchestration",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/skills/chief-of-staff-response-format/SKILL.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "skill_cos_response_format",
+      "target": "concept_cos_response_parser",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/skills/chief-of-staff-response-format/SKILL.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "skill_complete_agent_run",
+      "target": "concept_agent_run_lifecycle",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/skills/complete-agent-run/SKILL.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "skill_complete_agent_run",
+      "target": "skill_block_when_stuck",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/skills/complete-agent-run/SKILL.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "skill_create_plan",
+      "target": "concept_prd_artifact",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/skills/create-plan/SKILL.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "skill_create_plan",
+      "target": "concept_fulcrum_memory_vault",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/skills/create-plan/SKILL.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "skill_create_plan",
+      "target": "concept_implementation_plan_artifact",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "agent-integration/skills/create-plan/SKILL.md",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "skill_daily_standup",
+      "target": "concept_agent_run_lifecycle",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/skills/daily-standup/SKILL.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rule_fulcrum_first",
+      "target": "concept_fulcrum_memory_vault",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/rules/fulcrum-first.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_issue_decomposer",
+      "target": "role_implementation_planner",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "agent-integration/roles/issue_decomposer.md",
+      "source_location": null,
+      "weight": 0.75
+    },
+    {
+      "source": "role_research_worker",
+      "target": "role_prd_planner",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "agent-integration/roles/research_worker.md",
+      "source_location": null,
+      "weight": 0.65
+    },
+    {
+      "source": "role_orchestrator",
+      "target": "concept_l1_orchestration",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.7,
+      "source_file": "agent-integration/roles/orchestrator.md",
+      "source_location": null,
+      "weight": 0.7
+    },
+    {
+      "source": "skill_block_when_stuck",
+      "target": "skill_complete_agent_run",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/skills/block-when-stuck/SKILL.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rule_lifecycle",
+      "target": "skill_block_when_stuck",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "agent-integration/rules/lifecycle.md",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "rule_lifecycle",
+      "target": "skill_complete_agent_run",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "agent-integration/rules/lifecycle.md",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "concept_security_verdict",
+      "target": "concept_merge_queue",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/security_reviewer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "role_product_manager",
+      "target": "concept_l1_orchestration",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "agent-integration/roles/product_manager.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_code_delivery_pipeline",
+      "label": "Code delivery pipeline: software_engineer writes, security_reviewer audits, integration_worker merges",
+      "nodes": ["role_software_engineer", "role_security_reviewer", "role_integration_worker"],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "agent-integration/roles/integration_worker.md"
+    },
+    {
+      "id": "hyperedge_planning_pipeline",
+      "label": "Planning pipeline: product_manager scopes, prd_planner specifies, implementation_planner decomposes",
+      "nodes": ["role_product_manager", "role_prd_planner", "role_implementation_planner"],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.82,
+      "source_file": "agent-integration/roles/prd_planner.md"
+    },
+    {
+      "id": "hyperedge_agent_run_termination",
+      "label": "Agent run termination: lifecycle rule, complete-agent-run skill, block-when-stuck skill",
+      "nodes": ["rule_lifecycle", "skill_complete_agent_run", "skill_block_when_stuck"],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "agent-integration/rules/lifecycle.md"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

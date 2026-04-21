@@ -1,0 +1,268 @@
+{
+  "nodes": [
+    {"id": "agents_fulcrum_control_plane", "label": "Fulcrum Control Plane", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_fulcrum_worker", "label": "@fulcrum/worker package", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_agent_adapter_contract", "label": "AgentAdapter contract", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_stub_adapter", "label": "stub adapter", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_subprocess_adapter", "label": "subprocess adapter", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_register_agent_adapter", "label": "registerAgentAdapter()", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_spawnable_run", "label": "SpawnableRun contract", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_spawn_context", "label": "SpawnContext", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_worker_result", "label": "WorkerResult", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_package_ownership", "label": "Package Ownership Boundaries", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_core_package", "label": "@fulcrum/core package", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_memory_package", "label": "@fulcrum/memory package", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_monitor_package", "label": "@fulcrum/monitor package", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_planning_package", "label": "@fulcrum/planning package", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_policy_package", "label": "@fulcrum/policy package", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_sync_package", "label": "@fulcrum/sync package", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_teams_package", "label": "@fulcrum/teams package", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_workflows_package", "label": "@fulcrum/workflows package", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_worktrees_package", "label": "@fulcrum/worktrees package", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_l0_canonical_commit", "label": "L0 canonical commit point invariant", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_check_policy_invariant", "label": "checkPolicy before startAgentRun invariant", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_only_l1_invokes_teams", "label": "only_l1_invokes_teams invariant", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_only_integration_worker_merges", "label": "only_integration_worker_merges invariant", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_chief_of_staff_no_direct_writes", "label": "chief_of_staff_no_direct_writes invariant", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_capability_helpers", "label": "Role capability helpers (isL1, canInvokeTeams, canMerge)", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_new_id", "label": "newId() ID minting", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_check_constraints_guard", "label": "CHECK constraints guard test", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_role_string_guard", "label": "role-string-guard test", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_ulid_guard", "label": "ulid-guard test", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_memory_v3", "label": "Memory v3 architecture", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_l0_raw_dumps", "label": "L0 raw dumps tier", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_l1_curated_wiki", "label": "L1 curated wiki tier", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_l2_vector_on_l1", "label": "L2 vector embeddings tier", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_memory_kind_enum", "label": "MemoryKind union (16 values)", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_kuzu_cypher", "label": "Kuzu Cypher v0.10.x patterns", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_vault_watcher_echo", "label": "Vault watcher echo suppression", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_system_invariants", "label": "SYSTEM_INVARIANTS (4 rules)", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_tool_registry", "label": "Tool Registry unified handler pattern", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_mcp_tool_naming", "label": "MCP tool naming conventions", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_fulcrum_first_rule", "label": "Fulcrum-first rule", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_lifecycle_rule", "label": "Lifecycle rule (start/heartbeat/complete)", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "agents_role_boundaries_rule", "label": "Role boundaries rule", "file_type": "document", "source_file": "AGENTS.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "changelog_unreleased", "label": "Unreleased changes", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_indexer_daemon", "label": "Indexer Daemon (fulcrum-indexer)", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_watchman_inspiration", "label": "Meta's Watchman (inspiration)", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_daemon_watcher_fix", "label": "Daemon watcher producer fix", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_audit_round_3", "label": "Audit Round 3 (2026-04-15)", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_release_0_0_2", "label": "Release 0.0.2 (2026-04-17)", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_release_0_1_0", "label": "Release 0.1.0 (2026-04-14)", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_release_0_0_1", "label": "Release 0.0.1 (2025-04-13)", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_keepachangelog", "label": "Keep a Changelog format", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_semver", "label": "Semantic Versioning", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_workflow_step_handlers", "label": "29 workflow step handlers", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_merge_queue", "label": "Merge queue real execution", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_telemetry_spans", "label": "Telemetry spans (trace_events)", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_otel_exporter", "label": "OpenTelemetry OTLP exporter", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_a2a_agent_card", "label": "A2A Agent Card (/.well-known/agent.json)", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_claude_code_adapter", "label": "claude-code worker adapter", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_plane_api_client", "label": "PlaneAPIClient with retry/backoff", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "changelog_sparse_vector", "label": "Sparse vector rescue retrieval", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "coc_contributor_covenant", "label": "Contributor Covenant v2.1", "file_type": "document", "source_file": "CODE_OF_CONDUCT.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "contrib_conventional_commits", "label": "Conventional Commits format", "file_type": "document", "source_file": "CONTRIBUTING.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "contrib_kuzu_native_module", "label": "Kuzu native module dependency", "file_type": "document", "source_file": "CONTRIBUTING.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "contrib_vitest_forks", "label": "Vitest pool:forks requirement", "file_type": "document", "source_file": "CONTRIBUTING.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "contrib_dev_setup", "label": "Development Setup", "file_type": "document", "source_file": "CONTRIBUTING.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "readme_fulcrum_overview", "label": "Fulcrum local-first agent OS", "file_type": "document", "source_file": "README.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "readme_rationale_multi_agent_failure", "label": "Rationale: multi-agent systems fail predictably", "file_type": "document", "source_file": "README.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "readme_architecture_diagram", "label": "Architecture diagram", "file_type": "document", "source_file": "README.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "readme_packages_table", "label": "Packages table (13 packages)", "file_type": "document", "source_file": "README.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "readme_cli_package", "label": "@moabualruz/fulcrum-cli", "file_type": "document", "source_file": "README.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "readme_fulcrum_mcp_package", "label": "fulcrum-mcp (zero-install)", "file_type": "document", "source_file": "README.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "security_policy", "label": "Security Policy", "file_type": "document", "source_file": "SECURITY.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "security_attack_surface", "label": "Attack surface (local-first)", "file_type": "document", "source_file": "SECURITY.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "claude_md_integration", "label": "Claude Code Integration (CLAUDE.md)", "file_type": "document", "source_file": "agent-integration/claude/CLAUDE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "claude_md_mcp_server_config", "label": "fulcrum serve mcp server config", "file_type": "document", "source_file": "agent-integration/claude/CLAUDE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "claude_md_mcp_tools_32", "label": "32 MCP tools", "file_type": "document", "source_file": "agent-integration/claude/CLAUDE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "claude_md_hook_pretooluse", "label": "PreToolUse hook integration", "file_type": "document", "source_file": "agent-integration/claude/CLAUDE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "claude_md_filtered_mode", "label": "MCP filtered mode with hook capabilities", "file_type": "document", "source_file": "agent-integration/claude/CLAUDE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "claude_md_cos_response_format", "label": "Chief-of-Staff response format", "file_type": "document", "source_file": "agent-integration/claude/CLAUDE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "analyst_role", "label": "Analyst agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/analyst.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "analyst_comparison_matrix", "label": "comparison_matrix artifact", "file_type": "document", "source_file": "agent-integration/claude/agents/analyst.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "architecture_reviewer_role", "label": "Architecture Reviewer agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/architecture_reviewer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "architecture_reviewer_review_report", "label": "review_report artifact", "file_type": "document", "source_file": "agent-integration/claude/agents/architecture_reviewer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "browser_worker_role", "label": "Browser Worker agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/browser_worker.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "browser_worker_playwright", "label": "Playwright automation adapter", "file_type": "document", "source_file": "agent-integration/claude/agents/browser_worker.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "browser_worker_browser_report", "label": "browser_report artifact", "file_type": "document", "source_file": "agent-integration/claude/agents/browser_worker.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "chief_of_staff_role", "label": "Chief of Staff L1 orchestrator", "file_type": "document", "source_file": "agent-integration/claude/agents/chief_of_staff.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "chief_of_staff_invoke_team", "label": "invoke_team (CoS exclusive)", "file_type": "document", "source_file": "agent-integration/claude/agents/chief_of_staff.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "code_reviewer_role", "label": "Code Reviewer agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/code_reviewer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "code_reviewer_verdict", "label": "APPROVED/CHANGES_REQUESTED verdict", "file_type": "document", "source_file": "agent-integration/claude/agents/code_reviewer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "context_gatherer_role", "label": "Context Gatherer agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/context_gatherer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "context_gatherer_brief", "label": "context_brief artifact", "file_type": "document", "source_file": "agent-integration/claude/agents/context_gatherer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "custom_role", "label": "Custom Agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/custom.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "custom_agent_profiles", "label": "agent_profiles DB row", "file_type": "document", "source_file": "agent-integration/claude/agents/custom.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "data_engineer_role", "label": "Data Engineer agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/data_engineer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "data_engineer_data_report", "label": "data_report artifact", "file_type": "document", "source_file": "agent-integration/claude/agents/data_engineer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "devops_engineer_role", "label": "DevOps Engineer agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/devops_engineer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "devops_engineer_incident_report", "label": "incident_report artifact", "file_type": "document", "source_file": "agent-integration/claude/agents/devops_engineer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "documentation_writer_role", "label": "Documentation Writer agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/documentation_writer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "documentation_writer_doc_report", "label": "doc_report artifact", "file_type": "document", "source_file": "agent-integration/claude/agents/documentation_writer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "implementation_planner_role", "label": "Implementation Planner agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/implementation_planner.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "implementation_planner_plan_artifact", "label": "implementation_plan artifact", "file_type": "document", "source_file": "agent-integration/claude/agents/implementation_planner.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "integration_worker_role", "label": "Integration Worker agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/integration_worker.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "integration_worker_merge_queue", "label": "Merge queue ownership", "file_type": "document", "source_file": "agent-integration/claude/agents/integration_worker.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "issue_decomposer_role", "label": "Issue Decomposer agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/issue_decomposer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "issue_decomposer_breakdown", "label": "issue_breakdown artifact", "file_type": "document", "source_file": "agent-integration/claude/agents/issue_decomposer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "memory_curator_role", "label": "Memory Curator agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/memory_curator.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "memory_curator_curation_report", "label": "curation_report artifact", "file_type": "document", "source_file": "agent-integration/claude/agents/memory_curator.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "memory_curator_tombstone", "label": "Tombstone-only (no hard delete)", "file_type": "document", "source_file": "agent-integration/claude/agents/memory_curator.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+
+    {"id": "ml_engineer_role", "label": "ML Engineer agent role", "file_type": "document", "source_file": "agent-integration/claude/agents/ml_engineer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null},
+    {"id": "ml_engineer_model_card", "label": "model_card artifact", "file_type": "document", "source_file": "agent-integration/claude/agents/ml_engineer.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}
+  ],
+  "edges": [
+    {"source": "agents_fulcrum_control_plane", "target": "agents_fulcrum_worker", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_fulcrum_worker", "target": "agents_agent_adapter_contract", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_agent_adapter_contract", "target": "agents_stub_adapter", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_agent_adapter_contract", "target": "agents_subprocess_adapter", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_register_agent_adapter", "target": "agents_agent_adapter_contract", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_spawnable_run", "target": "agents_spawn_context", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_spawn_context", "target": "agents_worker_result", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_spawnable_run", "target": "agents_fulcrum_worker", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_package_ownership", "target": "agents_core_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_package_ownership", "target": "agents_memory_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_package_ownership", "target": "agents_monitor_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_package_ownership", "target": "agents_planning_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_package_ownership", "target": "agents_policy_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_package_ownership", "target": "agents_sync_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_package_ownership", "target": "agents_teams_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_package_ownership", "target": "agents_workflows_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_package_ownership", "target": "agents_worktrees_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_package_ownership", "target": "agents_fulcrum_worker", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_l0_canonical_commit", "target": "agents_memory_package", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_vault_watcher_echo", "target": "agents_l0_canonical_commit", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_system_invariants", "target": "agents_only_l1_invokes_teams", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_system_invariants", "target": "agents_only_integration_worker_merges", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_system_invariants", "target": "agents_chief_of_staff_no_direct_writes", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_only_l1_invokes_teams", "target": "agents_capability_helpers", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_only_integration_worker_merges", "target": "agents_capability_helpers", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_role_string_guard", "target": "agents_capability_helpers", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_ulid_guard", "target": "agents_new_id", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_memory_v3", "target": "agents_l0_raw_dumps", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_memory_v3", "target": "agents_l1_curated_wiki", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_memory_v3", "target": "agents_l2_vector_on_l1", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_memory_package", "target": "agents_memory_kind_enum", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_memory_package", "target": "agents_kuzu_cypher", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_fulcrum_first_rule", "target": "agents_memory_package", "relation": "conceptually_related_to", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_lifecycle_rule", "target": "agents_fulcrum_control_plane", "relation": "conceptually_related_to", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "agents_role_boundaries_rule", "target": "agents_chief_of_staff_no_direct_writes", "relation": "conceptually_related_to", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+
+    {"source": "changelog_keepachangelog", "target": "changelog_unreleased", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_indexer_daemon", "target": "changelog_watchman_inspiration", "relation": "cites", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_unreleased", "target": "changelog_indexer_daemon", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_unreleased", "target": "changelog_daemon_watcher_fix", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_release_0_0_2", "target": "changelog_audit_round_3", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_release_0_1_0", "target": "changelog_workflow_step_handlers", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_release_0_1_0", "target": "changelog_merge_queue", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_release_0_1_0", "target": "changelog_telemetry_spans", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_release_0_1_0", "target": "changelog_otel_exporter", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_release_0_0_2", "target": "changelog_a2a_agent_card", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_release_0_0_2", "target": "changelog_claude_code_adapter", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_release_0_0_2", "target": "changelog_plane_api_client", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_release_0_0_2", "target": "changelog_sparse_vector", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+    {"source": "changelog_unreleased", "target": "changelog_semver", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CHANGELOG.md", "source_location": null, "weight": 1.0},
+
+    {"source": "coc_contributor_covenant", "target": "contrib_dev_setup", "relation": "conceptually_related_to", "confidence": "INFERRED", "confidence_score": 0.7, "source_file": "CODE_OF_CONDUCT.md", "source_location": null, "weight": 1.0},
+
+    {"source": "contrib_kuzu_native_module", "target": "agents_memory_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CONTRIBUTING.md", "source_location": null, "weight": 1.0},
+    {"source": "contrib_vitest_forks", "target": "agents_core_package", "relation": "rationale_for", "confidence": "INFERRED", "confidence_score": 0.8, "source_file": "CONTRIBUTING.md", "source_location": null, "weight": 1.0},
+
+    {"source": "readme_fulcrum_overview", "target": "readme_architecture_diagram", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "README.md", "source_location": null, "weight": 1.0},
+    {"source": "readme_fulcrum_overview", "target": "readme_packages_table", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "README.md", "source_location": null, "weight": 1.0},
+    {"source": "readme_rationale_multi_agent_failure", "target": "readme_fulcrum_overview", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "README.md", "source_location": null, "weight": 1.0},
+    {"source": "readme_packages_table", "target": "readme_cli_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "README.md", "source_location": null, "weight": 1.0},
+    {"source": "readme_packages_table", "target": "readme_fulcrum_mcp_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "README.md", "source_location": null, "weight": 1.0},
+    {"source": "readme_packages_table", "target": "agents_core_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "README.md", "source_location": null, "weight": 1.0},
+
+    {"source": "security_policy", "target": "security_attack_surface", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "SECURITY.md", "source_location": null, "weight": 1.0},
+
+    {"source": "claude_md_integration", "target": "claude_md_mcp_server_config", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/CLAUDE.md", "source_location": null, "weight": 1.0},
+    {"source": "claude_md_mcp_server_config", "target": "claude_md_mcp_tools_32", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/CLAUDE.md", "source_location": null, "weight": 1.0},
+    {"source": "claude_md_integration", "target": "claude_md_hook_pretooluse", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/CLAUDE.md", "source_location": null, "weight": 1.0},
+    {"source": "claude_md_integration", "target": "claude_md_filtered_mode", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/CLAUDE.md", "source_location": null, "weight": 1.0},
+    {"source": "claude_md_integration", "target": "claude_md_cos_response_format", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/CLAUDE.md", "source_location": null, "weight": 1.0},
+    {"source": "claude_md_filtered_mode", "target": "claude_md_hook_pretooluse", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/CLAUDE.md", "source_location": null, "weight": 1.0},
+
+    {"source": "analyst_role", "target": "analyst_comparison_matrix", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/analyst.md", "source_location": null, "weight": 1.0},
+    {"source": "analyst_role", "target": "claude_md_integration", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/analyst.md", "source_location": null, "weight": 1.0},
+
+    {"source": "architecture_reviewer_role", "target": "architecture_reviewer_review_report", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/architecture_reviewer.md", "source_location": null, "weight": 1.0},
+
+    {"source": "browser_worker_role", "target": "browser_worker_playwright", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/browser_worker.md", "source_location": null, "weight": 1.0},
+    {"source": "browser_worker_role", "target": "browser_worker_browser_report", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/browser_worker.md", "source_location": null, "weight": 1.0},
+
+    {"source": "chief_of_staff_role", "target": "chief_of_staff_invoke_team", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/chief_of_staff.md", "source_location": null, "weight": 1.0},
+    {"source": "chief_of_staff_role", "target": "agents_chief_of_staff_no_direct_writes", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/chief_of_staff.md", "source_location": null, "weight": 1.0},
+    {"source": "chief_of_staff_invoke_team", "target": "agents_only_l1_invokes_teams", "relation": "conceptually_related_to", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/chief_of_staff.md", "source_location": null, "weight": 1.0},
+
+    {"source": "code_reviewer_role", "target": "code_reviewer_verdict", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/code_reviewer.md", "source_location": null, "weight": 1.0},
+    {"source": "code_reviewer_verdict", "target": "integration_worker_merge_queue", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/code_reviewer.md", "source_location": null, "weight": 1.0},
+
+    {"source": "context_gatherer_role", "target": "context_gatherer_brief", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/context_gatherer.md", "source_location": null, "weight": 1.0},
+
+    {"source": "custom_role", "target": "custom_agent_profiles", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/custom.md", "source_location": null, "weight": 1.0},
+
+    {"source": "data_engineer_role", "target": "data_engineer_data_report", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/data_engineer.md", "source_location": null, "weight": 1.0},
+    {"source": "data_engineer_role", "target": "ml_engineer_role", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/data_engineer.md", "source_location": null, "weight": 1.0},
+
+    {"source": "devops_engineer_role", "target": "devops_engineer_incident_report", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/devops_engineer.md", "source_location": null, "weight": 1.0},
+    {"source": "devops_engineer_role", "target": "integration_worker_role", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/devops_engineer.md", "source_location": null, "weight": 1.0},
+
+    {"source": "documentation_writer_role", "target": "documentation_writer_doc_report", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/documentation_writer.md", "source_location": null, "weight": 1.0},
+
+    {"source": "implementation_planner_role", "target": "implementation_planner_plan_artifact", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/implementation_planner.md", "source_location": null, "weight": 1.0},
+    {"source": "implementation_planner_role", "target": "context_gatherer_brief", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/implementation_planner.md", "source_location": null, "weight": 1.0},
+
+    {"source": "integration_worker_role", "target": "integration_worker_merge_queue", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/integration_worker.md", "source_location": null, "weight": 1.0},
+    {"source": "integration_worker_role", "target": "agents_only_integration_worker_merges", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/integration_worker.md", "source_location": null, "weight": 1.0},
+
+    {"source": "issue_decomposer_role", "target": "issue_decomposer_breakdown", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/issue_decomposer.md", "source_location": null, "weight": 1.0},
+    {"source": "issue_decomposer_role", "target": "implementation_planner_role", "relation": "conceptually_related_to", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/issue_decomposer.md", "source_location": null, "weight": 1.0},
+
+    {"source": "memory_curator_role", "target": "memory_curator_curation_report", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/memory_curator.md", "source_location": null, "weight": 1.0},
+    {"source": "memory_curator_role", "target": "memory_curator_tombstone", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/memory_curator.md", "source_location": null, "weight": 1.0},
+    {"source": "memory_curator_tombstone", "target": "memory_curator_role", "relation": "rationale_for", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/memory_curator.md", "source_location": null, "weight": 1.0},
+    {"source": "memory_curator_role", "target": "agents_memory_package", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/memory_curator.md", "source_location": null, "weight": 1.0},
+
+    {"source": "ml_engineer_role", "target": "ml_engineer_model_card", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/ml_engineer.md", "source_location": null, "weight": 1.0},
+    {"source": "ml_engineer_role", "target": "data_engineer_role", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "agent-integration/claude/agents/ml_engineer.md", "source_location": null, "weight": 1.0},
+
+    {"source": "analyst_role", "target": "context_gatherer_role", "relation": "semantically_similar_to", "confidence": "INFERRED", "confidence_score": 0.75, "source_file": "agent-integration/claude/agents/analyst.md", "source_location": null, "weight": 1.0},
+    {"source": "architecture_reviewer_role", "target": "code_reviewer_role", "relation": "semantically_similar_to", "confidence": "INFERRED", "confidence_score": 0.85, "source_file": "agent-integration/claude/agents/architecture_reviewer.md", "source_location": null, "weight": 1.0},
+    {"source": "issue_decomposer_role", "target": "implementation_planner_role", "relation": "semantically_similar_to", "confidence": "INFERRED", "confidence_score": 0.8, "source_file": "agent-integration/claude/agents/issue_decomposer.md", "source_location": null, "weight": 1.0},
+    {"source": "data_engineer_role", "target": "ml_engineer_role", "relation": "semantically_similar_to", "confidence": "INFERRED", "confidence_score": 0.7, "source_file": "agent-integration/claude/agents/data_engineer.md", "source_location": null, "weight": 1.0},
+
+    {"source": "agents_fulcrum_first_rule", "target": "claude_md_integration", "relation": "conceptually_related_to", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md", "source_location": null, "weight": 1.0},
+    {"source": "analyst_role", "target": "claude_md_mcp_tools_32", "relation": "references", "confidence": "INFERRED", "confidence_score": 0.8, "source_file": "agent-integration/claude/agents/analyst.md", "source_location": null, "weight": 1.0}
+  ],
+  "hyperedges": [
+    {"id": "read_only_l2_reviewers", "label": "Read-only L2 reviewer/gatherer roles", "nodes": ["analyst_role", "architecture_reviewer_role", "code_reviewer_role", "context_gatherer_role"], "relation": "participate_in", "confidence": "INFERRED", "confidence_score": 0.85, "source_file": "agent-integration/claude/agents/"},
+    {"id": "memory_v3_tiers", "label": "Memory v3 three-tier architecture", "nodes": ["agents_l0_raw_dumps", "agents_l1_curated_wiki", "agents_l2_vector_on_l1", "agents_memory_v3"], "relation": "form", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md"},
+    {"id": "role_boundary_enforcement", "label": "Role-boundary enforcement (invariants + capability helpers + guard test)", "nodes": ["agents_only_l1_invokes_teams", "agents_only_integration_worker_merges", "agents_chief_of_staff_no_direct_writes", "agents_capability_helpers", "agents_role_string_guard"], "relation": "implement", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "AGENTS.md"}
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}
