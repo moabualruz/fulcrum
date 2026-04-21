@@ -933,3 +933,90 @@ User directive (verbatim): **"did I allow you to defer any fucking items !?"** �
 **Checklist**: rows 139–141 all ⬜→✅.
 
 **Next**: PR 14.6 (install-paths.md architecture doc), PR 14.8 (verify mode/version), PR 14.9 (.npmignore + tarball scan scaffold).
+
+---
+
+## PR 14.6 — `docs/architecture/install-paths.md`
+
+**What landed**: Created `docs/architecture/install-paths.md` — per-agent matrix of native install command vs manual fallback vs "rules-only (no plugin standard)" for all 8 agents (Claude, Gemini, PI, Codex, opencode, Cursor, Windsurf, Copilot). Documents dual-mode Claude installer, Codex marketplace-only / TUI-activation limitation, opencode npm/local modes, Cursor/Windsurf/Copilot file-copy paths. Referenced by SECURITY.md.
+
+**Files changed**: `docs/architecture/install-paths.md` (new).
+
+**Checklist**: cross-cutting "install-paths.md" row ⬜→✅.
+
+---
+
+## PR 14.0 — `SECURITY.md` at repo root
+
+**What landed**: Replaced stub `SECURITY.md` with full posture document covering:
+- Critical Constraint #21: npm org 2FA, publish-only CI tokens, CI-only publish path, signed release tags, post-pack tarball scan gate.
+- Critical Constraint #22: marketplace-backing repo posture (branch protection, signed commits, 2FA membership, `source:` scoping to `./agent-integration/claude`).
+- Publish workflow table for both `@fulcrum-agent-os/*` packages.
+
+**Files changed**: `SECURITY.md` (rewritten).
+
+**Checklist**: cross-cutting "SECURITY.md" row ⬜→✅.
+
+---
+
+## PR 14.8 — `verifyInstall()` extended with install mode + version
+
+**What landed**: Extended `verifyInstall()` to report `installMode` and `pluginVersion` / `canonicalVersion` per agent.
+
+New exports:
+- `InstallMode` type: `"native" | "marketplace" | "npm" | "local" | "manual" | "auto" | "unknown"`
+- `VerifyResult` now carries `installMode`, `pluginVersion`, `canonicalVersion`
+- `readJsonVersion()` — reads `"version"` field from any JSON file (silent null on failure)
+- `detectOpencodeInstallMode()` — reads installed `.opencode/opencode.jsonc` plugin ref to determine mode
+
+Per-agent behavior:
+- cursor/windsurf/copilot: `installMode: "manual"` (no plugin standard)
+- codex: `installMode: "marketplace"` (TUI-only activation; no CLI install)
+- opencode: `installMode` from installed `opencode.jsonc` `"plugin"` ref (`.` prefix → `"local"`; `@` prefix → `"npm"`; absent → `"unknown"`); `canonicalVersion` from source `package.json`
+- CLI output extended to print `mode:` and `version: installed=… canonical=…`
+
+**TDD**: 12 new tests in `install-verify-mode-version-pr148.test.ts`.
+
+**Test result**: 715/715 green.
+
+**Key design decisions**:
+- Fields added as required (not optional) on `VerifyResult` — breaks no existing callers since all callers only read `ok`, `agent`, `checks`.
+- `pluginVersion` for opencode local install mirrors `canonicalVersion` (source package.json) since local = source.
+- npm-mode `pluginVersion` left null for now — would require a live `npm view` probe; too slow for verify.
+
+**Checklist**: cross-cutting "install mode + plugin version" row ⬜→✅.
+
+---
+
+## PR 14.9 — `.npmignore` + post-pack tarball secret scan
+
+**What landed**:
+- `agent-integration/pi/cockpit/.npmignore` — excludes `tests/`, `*.test.ts`, `tsconfig*.json`, `vitest.config*`, `PUBLISHING.md`, `node_modules` from npm tarball.
+- `agent-integration/opencode/.npmignore` already existed (excludes `plugins/`, `tests/`, `*.test.ts`, etc.).
+- `.github/workflows/publish-pi-cockpit.yml`: added "Post-pack tarball secret scan" step before publish — runs `pnpm pack`, extracts tarball, greps for secret patterns; fails CI on match.
+- `.github/workflows/publish-opencode-plugin.yml`: new workflow (did not exist) — same structure as PI cockpit workflow with tarball scan gate.
+
+Secret scan patterns: `password=`, `api_key=`, `private_key`, `BEGIN RSA PRIVATE`, `BEGIN OPENSSH PRIVATE`, `AKIA[0-9A-Z]{16}` (AWS key prefix), `.env` (bare filename).
+
+**Files changed**: `agent-integration/pi/cockpit/.npmignore` (new), `.github/workflows/publish-pi-cockpit.yml` (scan step added), `.github/workflows/publish-opencode-plugin.yml` (new).
+
+**Checklist**: cross-cutting "post-pack tarball secret scan" row ⬜→✅.
+
+---
+
+## PR 14.10 — CHANGELOG + semver version-bump discipline
+
+**What landed**:
+- `agent-integration/pi/cockpit/CHANGELOG.md` — initial `1.0.0` entry documenting the first public release.
+- `agent-integration/opencode/CHANGELOG.md` — initial `0.0.1` pre-release entry documenting all shipped features.
+- `version:patch/minor/major` + `release` scripts added to both `package.json` files. The `release` script creates a signed tag (`git tag -s`) and pushes it, triggering the publish workflow.
+
+Convention: version bumps land in the PR that ships the content change (not retroactively). The `release` script enforces signed tags (Constraint #21).
+
+**Files changed**: `agent-integration/pi/cockpit/CHANGELOG.md` (new), `agent-integration/opencode/CHANGELOG.md` (new), `agent-integration/pi/cockpit/package.json` (scripts), `agent-integration/opencode/package.json` (scripts).
+
+**Checklist**: cross-cutting "CHANGELOG + semver" row ⬜→✅.
+
+**Test result**: 715/715 green (no new tests for doc-only changes).
+
+**Next**: All PR 14 plan-spec'd units complete. Only 2 operator-blocked items remain (npm org registration + first publish for each package).
