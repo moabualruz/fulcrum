@@ -992,6 +992,19 @@ TOOL_REGISTRY.set('get_rag_rebuild_report', {
   },
 })
 
+TOOL_REGISTRY.set('get_rag_health', {
+  schema: TOOL_SCHEMA_MAP.get('get_rag_health'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { executeRagHealthCommand } = await import('./commands/memory-rag-health.js')
+    return executeRagHealthCommand({
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+      vault_path: args['vault_path'] as string | undefined,
+    }, deps.db)
+  },
+})
+
 TOOL_REGISTRY.set('start_embedding_job', {
   schema: TOOL_SCHEMA_MAP.get('start_embedding_job'),
   capabilities: { readOnly: false, destructive: true, hookEquivalent: false },

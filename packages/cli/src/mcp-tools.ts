@@ -235,6 +235,20 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Get RAG Health',
+    name: 'get_rag_health',
+    description: 'Read-only RAG health report covering L0, L1, FTS, code, vector, embedding failure, stale state, and graph coverage. Does not persist health reports or mutate derived state.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+        vault_path: { type: 'string' },
+      },
+    },
+  },
+  {
     title: 'Start Embedding Job',
     name: 'start_embedding_job',
     description: 'Start durable embedding job for memories, L1 pages, or code chunks. Records preflight counts, item ledger rows, runtime device, vector metadata, and audit event.',

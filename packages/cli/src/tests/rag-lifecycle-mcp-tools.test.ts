@@ -11,6 +11,7 @@ describe('RAG lifecycle MCP tool metadata', () => {
       'get_rag_rebuild_dry_run',
       'start_rag_rebuild',
       'get_rag_rebuild_report',
+      'get_rag_health',
       'start_embedding_job',
       'get_embedding_job_status',
       'get_embedding_job_logs',
@@ -33,6 +34,9 @@ describe('RAG lifecycle MCP tool metadata', () => {
 
     expect(byName.get('get_rag_rebuild_report')?.annotations?.readOnlyHint).toBe(true)
     expect(TOOL_REGISTRY.get('get_rag_rebuild_report')?.capabilities.readOnly).toBe(true)
+
+    expect(byName.get('get_rag_health')?.annotations?.readOnlyHint).toBe(true)
+    expect(TOOL_REGISTRY.get('get_rag_health')?.capabilities.readOnly).toBe(true)
 
     expect(byName.get('start_rag_rebuild')?.annotations?.destructiveHint).toBe(true)
     expect(TOOL_REGISTRY.get('start_rag_rebuild')?.capabilities.destructive).toBe(true)

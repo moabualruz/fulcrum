@@ -191,16 +191,16 @@
 
 ### Tests for User Story 5
 
-- [ ] T078 [P] [US5] Add failing health report fixture tests for raw/L1/FTS/code/vector/graph failures covering FR-028, SC-007, and SC-010 in packages/memory/src/tests/rag-health.test.ts
-- [ ] T079 [P] [US5] Add failing read-only non-mutation tests for health command and monitor endpoint covering FR-033 and SC-009 in packages/cli/src/tests/rag-health-readonly.test.ts
-- [ ] T080 [P] [US5] Add failing monitor read-only RAG health endpoint tests in packages/monitor/src/tests/rag-health-endpoint.test.ts
+- [X] T078 [P] [US5] Add failing health report fixture tests for raw/L1/FTS/code/vector/graph failures covering FR-028, SC-007, and SC-010 in packages/memory/src/tests/rag-health.test.ts
+- [X] T079 [P] [US5] Add failing read-only non-mutation tests for health command and monitor endpoint covering FR-033 and SC-009 in packages/cli/src/tests/rag-health-readonly.test.ts
+- [X] T080 [P] [US5] Add failing monitor read-only RAG health endpoint tests in packages/monitor/src/tests/rag-health-endpoint.test.ts
 
 ### Implementation for User Story 5
 
-- [ ] T081 [US5] Implement RAG health report aggregation and recommended-action ordering in packages/memory/src/setup/rag-health.ts
-- [ ] T082 [US5] Wire `fulcrum memory doctor --json` or equivalent RAG health command in packages/cli/src/index.ts
-- [ ] T083 [US5] Add MCP/action read-only RAG health handler with structured output in packages/cli/src/tool-registry.ts
-- [ ] T084 [US5] Add read-only monitor RAG health route and response mapping in packages/monitor/src/server.ts
+- [X] T081 [US5] Implement RAG health report aggregation and recommended-action ordering in packages/memory/src/setup/rag-health.ts
+- [X] T082 [US5] Wire `fulcrum memory doctor --json` or equivalent RAG health command in packages/cli/src/index.ts
+- [X] T083 [US5] Add MCP/action read-only RAG health handler with structured output in packages/cli/src/tool-registry.ts
+- [X] T084 [US5] Add read-only monitor RAG health route and response mapping in packages/monitor/src/server.ts
 
 **Checkpoint**: US5 health report is read-only and actionable.
 
