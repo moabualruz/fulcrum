@@ -175,6 +175,74 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Get RAG Rebuild Plan',
+    name: 'get_rag_rebuild_plan',
+    description: 'Read-only RAG lifecycle rebuild plan. Returns scope counts and no candidate; does not mutate derived state.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+        domains: { type: 'array', items: { type: 'string', enum: ['l0', 'l1', 'fts', 'code', 'vectors', 'graph'] } },
+        allow_empty: { type: 'boolean' },
+      },
+    },
+  },
+  {
+    title: 'Get RAG Rebuild Dry Run',
+    name: 'get_rag_rebuild_dry_run',
+    description: 'Read-only RAG lifecycle rebuild dry-run. Returns planned counts and validation without mutating served state.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+        domains: { type: 'array', items: { type: 'string', enum: ['l0', 'l1', 'fts', 'code', 'vectors', 'graph'] } },
+        allow_empty: { type: 'boolean' },
+      },
+    },
+  },
+  {
+    title: 'Start RAG Rebuild',
+    name: 'start_rag_rebuild',
+    description: 'Execute destructive RAG lifecycle rebuild with staged candidate, snapshot validation, parity checks, report persistence, and audit event.',
+    annotations: { destructiveHint: true },
+    longRunningHint: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+        domains: { type: 'array', items: { type: 'string', enum: ['l0', 'l1', 'fts', 'code', 'vectors', 'graph'] } },
+        allow_empty: { type: 'boolean' },
+        actor: {
+          type: 'object',
+          properties: {
+            kind: { type: 'string', enum: ['human', 'agent'] },
+            role: { type: 'string' },
+            id: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+  {
+    title: 'Get RAG Rebuild Report',
+    name: 'get_rag_rebuild_report',
+    description: 'Read a persisted RAG rebuild report by ID, scoped by workspace_id.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        report_id: { type: 'string' },
+        workspace_id: { type: 'string' },
+      },
+      required: ['report_id'],
+    },
+  },
+  {
     title: 'Inspect Memory',
     name: 'inspect_memory',
     description: 'Dump full L1 page — frontmatter, body, serialized form, resolved wikilink absolute paths (exists flag per link). Use before marking wrong or overriding a claim.',

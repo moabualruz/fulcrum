@@ -153,6 +153,96 @@ const GUARDED_COLUMNS: EnumColumn[] = [
       'product_manager', 'analyst', 'orchestrator', 'custom',
     ],
   },
+  {
+    // RagRebuildMode — packages/core/src/types.ts
+    table: 'rag_rebuild_reports',
+    column: 'mode',
+    expected: ['plan', 'dry_run', 'execute'],
+  },
+  {
+    // RagRebuildReportStatus — packages/core/src/types.ts
+    table: 'rag_rebuild_reports',
+    column: 'status',
+    expected: ['planned', 'running', 'completed', 'failed', 'cancelled'],
+  },
+  {
+    // RagRebuildCandidateDisposition — packages/core/src/types.ts
+    table: 'rag_rebuild_reports',
+    column: 'candidate_disposition',
+    expected: ['none', 'promoted', 'quarantined', 'discarded'],
+  },
+  {
+    // RagRebuildCandidateStatus — packages/core/src/types.ts
+    table: 'rag_rebuild_candidates',
+    column: 'status',
+    expected: ['building', 'verifying', 'verified', 'promoting', 'promoted', 'quarantined', 'discarded', 'failed'],
+  },
+  {
+    // RagRebuildSnapshotStatus — packages/core/src/types.ts
+    table: 'rag_rebuild_input_snapshots',
+    column: 'status',
+    expected: ['current', 'stale', 'superseded'],
+  },
+  {
+    // EmbeddingJobSourceDomain — packages/core/src/types.ts
+    table: 'embedding_jobs',
+    column: 'source_domain',
+    expected: ['memories', 'l1_pages', 'code_chunks'],
+  },
+  {
+    // EmbeddingJobStatus — packages/core/src/types.ts
+    table: 'embedding_jobs',
+    column: 'status',
+    expected: ['pending', 'running', 'completed', 'degraded', 'failed', 'cancelled'],
+  },
+  {
+    // EmbeddingJobSourceDomain — packages/core/src/types.ts
+    table: 'embedding_job_items',
+    column: 'source_domain',
+    expected: ['memories', 'l1_pages', 'code_chunks'],
+  },
+  {
+    // EmbeddingJobItemStatus — packages/core/src/types.ts
+    table: 'embedding_job_items',
+    column: 'status',
+    expected: ['pending', 'running', 'embedded', 'failed', 'skipped', 'stale'],
+  },
+  {
+    // RagJobEventType — packages/core/src/types.ts
+    table: 'rag_job_events',
+    column: 'event_type',
+    expected: ['progress', 'retry', 'split', 'fallback', 'cancelled', 'resumed', 'failed', 'completed'],
+  },
+  {
+    // VectorMetadataSourceDomain — packages/core/src/types.ts
+    table: 'vector_metadata',
+    column: 'source_domain',
+    expected: ['memory', 'code_chunk'],
+  },
+  {
+    // VectorMetadataTable — packages/core/src/types.ts
+    table: 'vector_metadata',
+    column: 'vector_table',
+    expected: ['vec_memories', 'vec_chunks'],
+  },
+  {
+    // VectorMetadataStatus — packages/core/src/types.ts
+    table: 'vector_metadata',
+    column: 'status',
+    expected: ['current', 'stale', 'failed', 'skipped', 'legacy'],
+  },
+  {
+    // RagHealthStatus — packages/core/src/types.ts
+    table: 'rag_health_reports',
+    column: 'status',
+    expected: ['healthy', 'degraded', 'failed'],
+  },
+  {
+    // RagEvalRunStatus — packages/core/src/types.ts
+    table: 'rag_eval_runs',
+    column: 'status',
+    expected: ['pending', 'running', 'passed', 'failed', 'cancelled'],
+  },
 ]
 
 /**

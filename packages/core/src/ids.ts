@@ -39,6 +39,15 @@ const PREFIXES: Record<string, string> = {
   l0_source: 'l0src_',
   graph_entity: 'ent_',
   graph_edge: 'edg_',
+  rag_rebuild_report: 'report_',
+  rag_rebuild_candidate: 'candidate_',
+  rag_rebuild_snapshot: 'snapshot_',
+  embedding_job: 'job_',
+  embedding_job_item: 'jobitem_',
+  rag_job_event: 'ragevt_',
+  vector_metadata: 'vecmeta_',
+  rag_health_report: 'health_',
+  rag_eval_run: 'evalrun_',
 }
 
 const DISPLAY_PREFIXES: Record<string, string> = {

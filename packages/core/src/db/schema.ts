@@ -1042,6 +1042,180 @@ export function applySchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_graph_episodes_entity ON graph_episodes(workspace_id, entity_id);
 
+    -- ── RAG lifecycle operational state ─────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS rag_rebuild_reports (
+      report_id             TEXT PRIMARY KEY,
+      workspace_id           TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id             TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      requested_by           TEXT NOT NULL DEFAULT '',
+      actor_role             TEXT NOT NULL DEFAULT '',
+      mode                   TEXT NOT NULL CHECK(mode IN ('plan','dry_run','execute')),
+      domains                TEXT NOT NULL DEFAULT '[]',
+      status                 TEXT NOT NULL DEFAULT 'planned' CHECK(status IN ('planned','running','completed','failed','cancelled')),
+      candidate_id           TEXT,
+      candidate_disposition  TEXT NOT NULL DEFAULT 'none' CHECK(candidate_disposition IN ('none','promoted','quarantined','discarded')),
+      input_snapshot_id      TEXT,
+      started_at             TEXT NOT NULL DEFAULT (datetime('now')),
+      finished_at            TEXT,
+      summary                TEXT NOT NULL DEFAULT '{}',
+      parity                 TEXT NOT NULL DEFAULT '[]',
+      warnings               TEXT NOT NULL DEFAULT '[]',
+      errors                 TEXT NOT NULL DEFAULT '[]',
+      artifact_path          TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_rebuild_reports_workspace ON rag_rebuild_reports(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_rebuild_reports_ws_project ON rag_rebuild_reports(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_rebuild_reports_candidate ON rag_rebuild_reports(workspace_id, candidate_id);
+
+    CREATE TABLE IF NOT EXISTS rag_rebuild_candidates (
+      candidate_id        TEXT PRIMARY KEY,
+      report_id           TEXT NOT NULL,
+      workspace_id         TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id           TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      domains              TEXT NOT NULL DEFAULT '[]',
+      status               TEXT NOT NULL CHECK(status IN ('building','verifying','verified','promoting','promoted','quarantined','discarded','failed')),
+      storage_ref          TEXT NOT NULL DEFAULT '{}',
+      input_snapshot_id    TEXT NOT NULL,
+      served_state_before  TEXT NOT NULL DEFAULT '{}',
+      verification         TEXT NOT NULL DEFAULT '[]',
+      created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
+      promoted_at          TEXT,
+      disposed_at          TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_rebuild_candidates_workspace ON rag_rebuild_candidates(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_rebuild_candidates_report ON rag_rebuild_candidates(workspace_id, report_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_rebuild_candidates_snapshot ON rag_rebuild_candidates(workspace_id, input_snapshot_id);
+
+    CREATE TABLE IF NOT EXISTS rag_rebuild_input_snapshots (
+      input_snapshot_id  TEXT PRIMARY KEY,
+      workspace_id        TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id          TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      domains             TEXT NOT NULL DEFAULT '[]',
+      source_manifest     TEXT NOT NULL DEFAULT '{}',
+      status              TEXT NOT NULL DEFAULT 'current' CHECK(status IN ('current','stale','superseded')),
+      created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+      validated_at        TEXT,
+      stale_reason        TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_rebuild_snapshots_workspace ON rag_rebuild_input_snapshots(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_rebuild_snapshots_ws_project ON rag_rebuild_input_snapshots(workspace_id, project_id);
+
+    CREATE TABLE IF NOT EXISTS embedding_jobs (
+      job_id               TEXT PRIMARY KEY,
+      workspace_id          TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id            TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      source_domain         TEXT NOT NULL CHECK(source_domain IN ('memories','l1_pages','code_chunks')),
+      status                TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','running','completed','degraded','failed','cancelled')),
+      requested_provider    TEXT,
+      requested_model       TEXT,
+      requested_device      TEXT,
+      dimensions            INTEGER,
+      scope                 TEXT NOT NULL DEFAULT '{}',
+      preflight_counts      TEXT NOT NULL DEFAULT '{}',
+      started_at            TEXT,
+      finished_at           TEXT,
+      cancel_requested_at   TEXT,
+      summary               TEXT NOT NULL DEFAULT '{}'
+    );
+    CREATE INDEX IF NOT EXISTS idx_embedding_jobs_workspace ON embedding_jobs(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_embedding_jobs_ws_project ON embedding_jobs(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_embedding_jobs_status ON embedding_jobs(workspace_id, status);
+
+    CREATE TABLE IF NOT EXISTS embedding_job_items (
+      job_item_id           TEXT PRIMARY KEY,
+      job_id                TEXT NOT NULL REFERENCES embedding_jobs(job_id) ON DELETE CASCADE,
+      workspace_id           TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      source_domain          TEXT NOT NULL CHECK(source_domain IN ('memories','l1_pages','code_chunks')),
+      source_id              TEXT NOT NULL,
+      source_content_hash    TEXT,
+      chunk_key              TEXT NOT NULL DEFAULT '',
+      requested_provider     TEXT,
+      requested_model        TEXT,
+      requested_device       TEXT,
+      actual_provider        TEXT,
+      actual_model           TEXT,
+      actual_device          TEXT,
+      dimensions             INTEGER,
+      status                 TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','running','embedded','failed','skipped','stale')),
+      attempts               INTEGER NOT NULL DEFAULT 0,
+      error_type             TEXT,
+      error_message          TEXT,
+      started_at             TEXT,
+      finished_at            TEXT,
+      UNIQUE(job_id, source_id, source_content_hash, requested_provider, requested_model, dimensions, chunk_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_embedding_job_items_workspace ON embedding_job_items(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_embedding_job_items_job_status ON embedding_job_items(workspace_id, job_id, status);
+    CREATE INDEX IF NOT EXISTS idx_embedding_job_items_source ON embedding_job_items(workspace_id, source_domain, source_id);
+
+    CREATE TABLE IF NOT EXISTS rag_job_events (
+      event_id    TEXT PRIMARY KEY,
+      job_id      TEXT NOT NULL,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      event_type  TEXT NOT NULL CHECK(event_type IN ('progress','retry','split','fallback','cancelled','resumed','failed','completed')),
+      source_id   TEXT,
+      message     TEXT NOT NULL DEFAULT '',
+      details     TEXT NOT NULL DEFAULT '{}',
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_job_events_workspace ON rag_job_events(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_job_events_job ON rag_job_events(workspace_id, job_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS vector_metadata (
+      vector_metadata_id TEXT PRIMARY KEY,
+      workspace_id        TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      source_domain       TEXT NOT NULL CHECK(source_domain IN ('memory','code_chunk')),
+      source_id           TEXT NOT NULL,
+      content_hash        TEXT,
+      provider            TEXT,
+      model               TEXT,
+      requested_device    TEXT,
+      actual_device       TEXT,
+      dimensions          INTEGER,
+      vector_table        TEXT NOT NULL CHECK(vector_table IN ('vec_memories','vec_chunks')),
+      status              TEXT NOT NULL DEFAULT 'current' CHECK(status IN ('current','stale','failed','skipped','legacy')),
+      embedded_at         TEXT,
+      error_type          TEXT,
+      error_message       TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_vector_metadata_workspace ON vector_metadata(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_vector_metadata_source ON vector_metadata(workspace_id, source_domain, source_id);
+    CREATE INDEX IF NOT EXISTS idx_vector_metadata_status ON vector_metadata(workspace_id, status);
+
+    CREATE TABLE IF NOT EXISTS rag_health_reports (
+      health_report_id    TEXT PRIMARY KEY,
+      workspace_id         TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id           TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      status               TEXT NOT NULL CHECK(status IN ('healthy','degraded','failed')),
+      generated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+      domains              TEXT NOT NULL DEFAULT '{}',
+      recommended_actions  TEXT NOT NULL DEFAULT '[]',
+      warnings             TEXT NOT NULL DEFAULT '[]',
+      errors               TEXT NOT NULL DEFAULT '[]',
+      artifact_path        TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_health_reports_workspace ON rag_health_reports(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_health_reports_ws_project ON rag_health_reports(workspace_id, project_id);
+
+    CREATE TABLE IF NOT EXISTS rag_eval_runs (
+      eval_run_id    TEXT PRIMARY KEY,
+      workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id      TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      suite           TEXT NOT NULL,
+      status          TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','running','passed','failed','cancelled')),
+      trigger_source  TEXT NOT NULL DEFAULT 'local' CHECK(trigger_source IN ('local','ci')),
+      trigger_scope   TEXT NOT NULL DEFAULT 'manual' CHECK(trigger_scope IN ('rag_related','non_rag','manual')),
+      gate_required   INTEGER NOT NULL DEFAULT 0,
+      started_at      TEXT,
+      finished_at     TEXT,
+      results         TEXT NOT NULL DEFAULT '{}'
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_eval_runs_workspace ON rag_eval_runs(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_eval_runs_ws_project ON rag_eval_runs(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_eval_runs_suite ON rag_eval_runs(workspace_id, suite);
+
     -- ── Sync ─────────────────────────────────────────────────────────────────
 
     CREATE TABLE IF NOT EXISTS sync_states (
@@ -1407,6 +1581,7 @@ function recordLegacyMigrationNames(db: Database.Database): void {
     '031_agent_definitions',
     '032b_seed_agent_definitions',
     '034_missing_indices',
+    '035_rag_lifecycle_schema',
   ]
   const stmt = db.prepare("INSERT OR IGNORE INTO schema_migrations(name) VALUES (?)")
   for (const n of names) stmt.run(n)

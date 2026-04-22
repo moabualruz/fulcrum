@@ -89,6 +89,24 @@ export type EventType =
   | 'hook_executed' | 'workflow_step_completed'
   // Memory v3 additions (2026-04-18-002 plan §L0→L1 pipeline).
   | 'l0_ingested'
+  | 'rag_maintenance_audit'
+
+export type RagRebuildMode = 'plan' | 'dry_run' | 'execute'
+export type RagRebuildReportStatus = 'planned' | 'running' | 'completed' | 'failed' | 'cancelled'
+export type RagRebuildCandidateDisposition = 'none' | 'promoted' | 'quarantined' | 'discarded'
+export type RagRebuildCandidateStatus =
+  | 'building' | 'verifying' | 'verified' | 'promoting'
+  | 'promoted' | 'quarantined' | 'discarded' | 'failed'
+export type RagRebuildSnapshotStatus = 'current' | 'stale' | 'superseded'
+export type EmbeddingJobSourceDomain = 'memories' | 'l1_pages' | 'code_chunks'
+export type EmbeddingJobStatus = 'pending' | 'running' | 'completed' | 'degraded' | 'failed' | 'cancelled'
+export type EmbeddingJobItemStatus = 'pending' | 'running' | 'embedded' | 'failed' | 'skipped' | 'stale'
+export type RagJobEventType = 'progress' | 'retry' | 'split' | 'fallback' | 'cancelled' | 'resumed' | 'failed' | 'completed'
+export type VectorMetadataSourceDomain = 'memory' | 'code_chunk'
+export type VectorMetadataTable = 'vec_memories' | 'vec_chunks'
+export type VectorMetadataStatus = 'current' | 'stale' | 'failed' | 'skipped' | 'legacy'
+export type RagHealthStatus = 'healthy' | 'degraded' | 'failed'
+export type RagEvalRunStatus = 'pending' | 'running' | 'passed' | 'failed' | 'cancelled'
 
 // Keep RunStatus as alias for backward compat with existing code
 export type RunStatus = AgentRunStatus

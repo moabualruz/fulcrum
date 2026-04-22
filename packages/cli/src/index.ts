@@ -285,7 +285,7 @@ fulcrum memory — memory vault commands
 
   init             Initialize vault (L0 + L1), optionally enable L2
   accelerate       Enable L2 graph + vector search on existing vault
-  rebuild          Rebuild L1 SQLite from L0 vault files
+  rebuild          Rebuild L1 from vault, or RAG lifecycle plan/dry-run/execute
   status           Show vault info
   page             L1 curated-page template scaffolding (v3 PR 2)
   curate           Run curator pipeline on a single L0 source (v3 PR 3)
@@ -330,6 +330,46 @@ fulcrum memory — memory vault commands
   }
 
   if (command === 'rebuild') {
+    const lifecycleMode = args.includes('--mode') || args.includes('--execute') || args.includes('--all') || args.includes('--domain') || args.includes('--domains')
+    if (lifecycleMode) {
+      const { executeRagRebuildCommand } = await import('./commands/memory-rag-lifecycle.js')
+      const ids = currentProjectIds()
+      const modeArg = optArg('--mode')
+      const mode = args.includes('--execute')
+        ? 'execute'
+        : modeArg === 'dry-run'
+          ? 'dry_run'
+          : modeArg === 'dry_run'
+            ? 'dry_run'
+            : 'plan'
+      if (!['plan', 'dry_run', 'execute'].includes(mode)) {
+        console.error('Usage: fulcrum memory rebuild --all --mode plan|dry-run --json OR fulcrum memory rebuild --all --execute --json')
+        process.exit(1)
+      }
+      const domainsArg = optArg('--domains')
+      const domains = args.includes('--all')
+        ? undefined
+        : domainsArg
+          ? domainsArg.split(',').map(s => s.trim()).filter(Boolean)
+          : optArgs('--domain')
+      const result = await executeRagRebuildCommand({
+        workspace_id: optArg('--workspace-id') ?? ids.workspace_id,
+        project_id: optArg('--project-id') ?? ids.project_id,
+        mode: mode as 'plan' | 'dry_run' | 'execute',
+        domains: domains as import('fulcrum-memory').RagRebuildDomain[] | undefined,
+        allow_empty: args.includes('--allow-empty'),
+        actor: { kind: 'human', role: 'software_engineer', id: process.env['USER'] ?? 'local-operator' },
+      })
+      if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+      else {
+        console.log(`RAG rebuild ${result.mode}: ${result.status}`)
+        console.log(`report_id: ${result.report_id}`)
+        console.log(`domains: ${result.scope.domains.join(', ')}`)
+      }
+      if (result.status === 'failed') process.exit(2)
+      return
+    }
+
     const { rebuildFromVault } = await import('fulcrum-memory')
     const { getVaultPath } = await import('fulcrum-memory')
     const vaultPath = process.env['FULCRUM_VAULT_PATH'] ?? getVaultPath()

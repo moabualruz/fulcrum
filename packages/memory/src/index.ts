@@ -180,11 +180,15 @@ export { writeMemory, insertMemoryDirect } from './write.js'
 // the barrel now sources them from their canonical l2/ modules directly.
 export { storeEmbeddingInVec, recordL1Embedding } from './l2/embed.js'
 export { storeChunkEmbedding, scheduleChunkEmbedding } from './l2/code.js'
+export { createEmbeddingJobPlaceholder } from './l2/embedding-jobs.js'
+export type { EmbeddingJobRow } from './l2/embedding-jobs.js'
 export { flushPendingMemoryWrites, waitForEmbedHeadroom } from './l2/queue.js'
 
 // v3 retrieval — graph + confidence + supersession filters (PR 5).
 export { runV3Search, v3DefaultWeights, resolveQueryEntities } from './retrieval/v3-search.js'
 export type { V3SearchInput, V3SearchWeights, V3RecallHit } from './retrieval/v3-search.js'
+export { emptyExplanation } from './retrieval/explain.js'
+export type { RagProvenanceClass, RagRecallExplanation } from './retrieval/explain.js'
 
 // v3 feature flag — plan §Migration strategy (PR 5.5 cutover: default ON).
 // Memory v3 feature flag retired in PR 9.5 — isMemoryV3Enabled is gone;
@@ -366,6 +370,35 @@ export type { LightPhaseInput, LightPhaseResult, ScoreEntry, MemoryRow, Wikilink
 
 // Setup
 export { rebuildFromVault, reconcileMergedBranch } from './setup/rebuild.js'
+export {
+  RAG_REBUILD_DOMAINS,
+  planRagRebuildScope,
+  runRagRebuild,
+} from './setup/rag-lifecycle.js'
+export type {
+  RagParityCheck,
+  RagRebuildActor,
+  RagRebuildDomain,
+  RagRebuildReport,
+  RagRebuildRequest,
+} from './setup/rag-lifecycle.js'
+export {
+  buildRebuildSourceManifest,
+  captureRebuildInputSnapshot,
+  validateRebuildInputSnapshot,
+} from './setup/rebuild-snapshot.js'
+export type { RebuildInputSnapshot } from './setup/rebuild-snapshot.js'
+export {
+  createRebuildCandidate,
+  finishRebuildCandidate,
+  updateRebuildCandidateStatus,
+} from './setup/rebuild-candidate.js'
+export type { RebuildCandidateRow } from './setup/rebuild-candidate.js'
+export { runRebuildParityChecks } from './setup/rebuild-parity.js'
+export { createRunningRebuildReport, finishRebuildReport, readRebuildReport } from './setup/rebuild-report.js'
+export { redactProviderConfig, redactRagDetails, redactRagText } from './setup/rag-redaction.js'
+export { buildRagHealthReport } from './setup/rag-health.js'
+export type { RagHealthReport } from './setup/rag-health.js'
 export { runMemoryInit } from './setup/wizard.js'
 export { activateL2 } from './setup/activate.js'
 export type { RebuildOptions, RebuildResult } from './setup/rebuild.js'

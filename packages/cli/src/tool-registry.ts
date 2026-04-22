@@ -13,7 +13,8 @@
 // Handlers default workspace_id and project_id from deps when args omit them.
 
 import { getDb } from 'fulcrum-agent-core'
-import type { Db } from 'fulcrum-agent-core'
+import type { AgentRole, Db } from 'fulcrum-agent-core'
+import type { RagRebuildDomain } from 'fulcrum-memory'
 import { TOOL_SCHEMA_MAP } from './mcp-tools.js'
 import type { ToolSchema } from './mcp-tools.js'
 
@@ -927,6 +928,74 @@ TOOL_REGISTRY.set('search_code', {
       caller_role: deps.trusted_caller_role,
     })
     return envelope.reason ? envelope : { results: envelope.results }
+  },
+})
+
+TOOL_REGISTRY.set('get_rag_rebuild_plan', {
+  schema: TOOL_SCHEMA_MAP.get('get_rag_rebuild_plan'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { executeRagRebuildCommand } = await import('./commands/memory-rag-lifecycle.js')
+    return executeRagRebuildCommand({
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+      mode: 'plan',
+      domains: args['domains'] as RagRebuildDomain[] | undefined,
+      allow_empty: args['allow_empty'] as boolean | undefined,
+      actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('get_rag_rebuild_dry_run', {
+  schema: TOOL_SCHEMA_MAP.get('get_rag_rebuild_dry_run'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { executeRagRebuildCommand } = await import('./commands/memory-rag-lifecycle.js')
+    return executeRagRebuildCommand({
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+      mode: 'dry_run',
+      domains: args['domains'] as RagRebuildDomain[] | undefined,
+      allow_empty: args['allow_empty'] as boolean | undefined,
+      actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('start_rag_rebuild', {
+  schema: TOOL_SCHEMA_MAP.get('start_rag_rebuild'),
+  capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { executeRagRebuildCommand } = await import('./commands/memory-rag-lifecycle.js')
+    const suppliedActor = args['actor'] as Record<string, unknown> | undefined
+    const trustedRole = deps.trusted_caller_role
+    return executeRagRebuildCommand({
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+      mode: 'execute',
+      domains: args['domains'] as RagRebuildDomain[] | undefined,
+      allow_empty: args['allow_empty'] as boolean | undefined,
+      actor: trustedRole
+        ? { kind: 'agent', role: trustedRole as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' }
+        : {
+            kind: suppliedActor?.['kind'] as 'human' | 'agent' | undefined,
+            role: (suppliedActor?.['role'] ?? 'software_engineer') as AgentRole,
+            id: (suppliedActor?.['id'] ?? 'mcp') as string,
+          },
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('get_rag_rebuild_report', {
+  schema: TOOL_SCHEMA_MAP.get('get_rag_rebuild_report'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { getRagRebuildReport } = await import('./commands/memory-rag-lifecycle.js')
+    return getRagRebuildReport({
+      report_id: args['report_id'] as string,
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+    }, deps.db)
   },
 })
 

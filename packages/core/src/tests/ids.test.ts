@@ -156,6 +156,15 @@ describe('newId prefixes (G-15)', () => {
     ['policy_event', 'pevt_'],
     ['team_instance', 'ti_'],
     ['agent_profile', 'ap_'],
+    ['rag_rebuild_report', 'report_'],
+    ['rag_rebuild_candidate', 'candidate_'],
+    ['rag_rebuild_snapshot', 'snapshot_'],
+    ['embedding_job', 'job_'],
+    ['embedding_job_item', 'jobitem_'],
+    ['rag_job_event', 'ragevt_'],
+    ['vector_metadata', 'vecmeta_'],
+    ['rag_health_report', 'health_'],
+    ['rag_eval_run', 'evalrun_'],
   ]
   for (const [kind, prefix] of cases) {
     it(`${kind} → ${prefix}...`, () => {

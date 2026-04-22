@@ -33,6 +33,7 @@ __pycache__/
 .idea/
 *.swp
 *.swo
+*.tmp
 .DS_Store
 Thumbs.db
 

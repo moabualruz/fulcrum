@@ -5,6 +5,16 @@
 **Status**: Draft  
 **Input**: User description: "Start Spec Kit workflow from docs/audit/2026-04-22-fulcrum-rag-capability-report.md findings."
 
+## Clarifications
+
+### Session 2026-04-22
+
+- Q: Which actors may execute destructive RAG maintenance? → A: Human operator, `chief_of_staff`, `memory_curator`, and any role with write-code/edit-file capability.
+- Q: How should embedding jobs behave when some items fail? → A: Complete as degraded with retryable failed items.
+- Q: What failure-atomicity guarantee should full RAG rebuilds provide? → A: Build in staging/quarantine and promote only after all checks pass.
+- Q: Which changes must run default golden RAG eval gates in CI? → A: Only changes touching RAG lifecycle, memory, code search, embeddings, graph, or eval fixtures.
+- Q: What happens if canonical sources change while a staged full rebuild is running? → A: Snapshot inputs at rebuild start and promote only if the snapshot is still current.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Rebuild Trusted Search State (Priority: P1)
@@ -17,8 +27,8 @@ As a Fulcrum operator, I need one authoritative reset and rebuild workflow for a
 
 **Acceptance Scenarios**:
 
-1. **Given** a workspace with existing raw vault files, curated memory files, project files, and stale derived search state, **When** an operator requests a full derived reset and rebuild, **Then** the system clears derived state, rebuilds all intended indexes from canonical sources, and returns a machine-readable report with counts and pass/fail checks.
-2. **Given** any parity check fails during rebuild, **When** the workflow reaches verification, **Then** the workflow reports the failing check, exits unsuccessfully, and leaves enough report detail for the operator to identify the affected domain.
+1. **Given** a workspace with existing raw vault files, curated memory files, project files, and stale derived search state, **When** an operator requests a full derived reset and rebuild, **Then** the system clears and rebuilds candidate derived state from canonical sources, promotes the candidate only after verification, and returns a machine-readable report with counts and pass/fail checks.
+2. **Given** any parity check fails during rebuild, **When** the workflow reaches verification, **Then** the workflow reports the failing check, exits unsuccessfully, leaves the current served derived state unchanged, and quarantines or discards the unpromoted candidate state with enough report detail for the operator to identify the affected domain.
 3. **Given** an operator asks only for a dry run or plan, **When** the workflow evaluates scope, **Then** it reports what would be cleared and rebuilt without mutating state.
 4. **Given** text-search indexes are rebuilt from source tables, **When** verification runs, **Then** keyword-search integrity is checked and any inconsistency is reported as a failed rebuild stage.
 
@@ -106,6 +116,7 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 3. **Given** a stale claim has been superseded, **When** recall runs in eval, **Then** the stale claim is excluded or clearly marked according to the recall contract.
 4. **Given** a full rebuild starts from empty derived state, **When** eval completes, **Then** it verifies index parity before retrieval assertions run.
 5. **Given** an eval case includes expected evidence, **When** recall returns an answerable result, **Then** the eval verifies retrieval relevance, source grounding, and provenance trace separately from answer correctness.
+6. **Given** a change touches RAG lifecycle, memory, code search, embeddings, graph, or eval fixtures, **When** CI evaluates the change, **Then** default golden RAG eval gates run and must pass before the change is accepted.
 
 ### Edge Cases
 
@@ -118,11 +129,16 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - Accelerator dependency mismatch, unsupported provider, or unavailable runtime must produce explicit state rather than a silent downgrade when configuration is explicit.
 - Legacy or unbacked memory must remain searchable only with visible provenance class and confidence limits.
 - Duplicate requests for cancellation, resume, or retry must be idempotent and produce current job state.
+- Embedding jobs with failed items must not stay indefinitely running solely because item failures exist; they complete as degraded and expose retry actions.
+- Failed full rebuild candidates must not be promoted or served as current search state.
+- Full rebuild candidates built from stale canonical-source snapshots must not be promoted.
 - Graph rebuild failures must not mark the full RAG state healthy.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
+
+#### Derived Lifecycle
 
 - **FR-001**: System MUST provide one authoritative full reset and rebuild workflow for derived RAG state.
 - **FR-002**: System MUST support plan, dry-run, execute, and report modes for destructive or expensive RAG maintenance work.
@@ -130,6 +146,14 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - **FR-004**: System MUST rebuild raw-source, curated-memory, text-search, code-file, code-chunk, vector, and graph coverage from canonical workspace sources.
 - **FR-005**: System MUST verify row-count and relationship parity after rebuild and fail the workflow when required parity checks fail.
 - **FR-006**: System MUST write a machine-readable rebuild report that includes scope, completed stages, counts, failures, warnings, timings, and parity results.
+- **FR-045**: System MUST perform full RAG rebuilds in staged or quarantined candidate state and promote the candidate to served current state only after all required rebuild and parity checks pass.
+- **FR-047**: System MUST snapshot canonical source identities and content hashes at full rebuild start and MUST revalidate that snapshot before promotion; stale snapshots MUST fail promotion without changing served derived state.
+- **FR-033**: System MUST guarantee that help, status, and explain-only operations do not mutate state.
+- **FR-034**: System MUST provide machine-readable output for reset, rebuild, embedding, health, explanation, job, and eval operations.
+- **FR-035**: System MUST verify text-search index integrity against backing content during rebuild and health checks where the storage engine supports that validation.
+
+#### Embedding And Vector Coverage
+
 - **FR-007**: System MUST provide separate memory embedding scopes for all recallable memories, curated pages only, and code chunks.
 - **FR-008**: System MUST show preflight scan counts before embedding starts and treat unexpected zero scope as warning or failure unless explicitly allowed.
 - **FR-009**: System MUST represent embedding work as durable jobs with inspectable job items.
@@ -138,10 +162,18 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - **FR-012**: System MUST expose vector coverage by source domain, model, provider, device, dimensions, content hash freshness, and error state.
 - **FR-013**: System MUST mark stale vectors when content hash, model, provider, device requirement, or dimensions no longer match the intended index configuration.
 - **FR-014**: System MUST split oversized content before embedding using stable chunk identities and source provenance.
+- **FR-036**: System MUST record adaptive embedding recovery actions, including batch-size reductions and content splits, as inspectable job events.
+- **FR-037**: System MUST distinguish requested runtime device from actual runtime device in embedding, reranking, recall explanation, and health output.
+
+#### Code Indexing
+
 - **FR-015**: System MUST ensure every searchable code chunk resolves to a file-level identity unless explicitly classified and reported as legacy.
 - **FR-016**: System MUST ensure batch project indexing and incremental file indexing produce the same file, chunk, failure, and attribution contracts.
 - **FR-017**: System MUST record parse and indexing failures as first-class file states instead of leaving ambiguous partial index rows.
 - **FR-018**: System MUST return path and line range for every code-search result.
+
+#### Explainability, Provenance, And Graph
+
 - **FR-019**: System MUST provide a stable explanation schema for memory recall and code search.
 - **FR-020**: System MUST include retrieval stages, stage ranks, stage scores, provider, model, device, fallback reason, latency, freshness, confidence, supersession state, and provenance in explanations when applicable.
 - **FR-021**: System MUST fail closed when an explicit runtime device requirement cannot be satisfied.
@@ -151,25 +183,34 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - **FR-025**: System MUST detect broken curated-memory source references and unresolved raw-source links.
 - **FR-026**: System MUST rebuild and report graph coverage as part of full RAG lifecycle maintenance.
 - **FR-027**: System MUST expose graph contribution in recall explanations when graph expansion affects results.
+
+#### Health, Jobs, And Evals
+
 - **FR-028**: System MUST provide a RAG health report covering raw-source coverage, curated-memory coverage, text-search parity, code-file and code-chunk parity, vector coverage, embedding failures, stale embeddings, and graph coverage.
 - **FR-029**: System MUST provide first-class job status, logs, cancellation, and resume surfaces for long-running RAG work.
+- **FR-044**: System MUST complete embedding jobs as degraded when one or more items fail while preserving retryable failed-item state; completed current items MUST NOT be reprocessed by default during failed-item retry.
 - **FR-030**: System MUST include a checked-in golden evaluation corpus for memory recall, code search, hybrid recall, reranking, provenance trace, graph expansion, and reset/rebuild parity.
 - **FR-031**: System MUST fail retrieval-quality gates when expected eval results, ranking bounds, provenance links, or parity checks regress.
 - **FR-032**: System MUST allow an operator to run local evals immediately after a full reindex or rebuild.
-- **FR-033**: System MUST guarantee that help, status, and explain-only operations do not mutate state.
-- **FR-034**: System MUST provide machine-readable output for reset, rebuild, embedding, health, explanation, job, and eval operations.
-- **FR-035**: System MUST verify text-search index integrity against backing content during rebuild and health checks where the storage engine supports that validation.
-- **FR-036**: System MUST record adaptive embedding recovery actions, including batch-size reductions and content splits, as inspectable job events.
-- **FR-037**: System MUST distinguish requested runtime device from actual runtime device in embedding, reranking, recall explanation, and health output.
 - **FR-038**: System MUST group eval failures by retrieval relevance, ranking, answer correctness, grounding/provenance, graph expansion, and operational parity.
 - **FR-039**: System MUST keep default evals deterministic and local-first, with model-heavy or accelerator-heavy checks opt-in.
+- **FR-046**: System MUST run default golden RAG eval gates in CI for changes touching RAG lifecycle, memory, code search, embeddings, graph, or eval fixtures; unrelated changes MAY skip the gate.
+
+#### Safety And Migration
+
+- **FR-040**: System MUST gate destructive or expensive maintenance execution so only a human operator, `chief_of_staff`, `memory_curator`, or a role with write-code/edit-file capability may execute; every execution MUST include explicit workspace/project scope, actor authorization, and persisted audit events.
+- **FR-041**: System MUST avoid writing secrets, credentials, raw environment values, or unredacted provider configuration into logs, reports, explanations, eval artifacts, or memory.
+- **FR-042**: System MUST make required schema or data migrations idempotent, workspace-scoped, backward-compatible during rollout, and recoverable without manual database surgery.
+- **FR-043**: System MUST allow P1 lifecycle hardening to ship independently of P2 quality-expansion work when lower-priority features are not required for parity or safety.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Rebuild Request**: Operator intent describing target domains, mode, scope, allow-empty behavior, and whether expensive derived stages should run.
 - **Rebuild Report**: Durable result of a reset or rebuild, including scope, counts, parity checks, failures, warnings, timings, and artifact references.
+- **Rebuild Input Snapshot**: Canonical-source identity and content-hash manifest captured at rebuild start and revalidated before candidate promotion.
 - **Embedding Job**: Durable unit of embedding work with configuration, lifecycle state, progress, cancellation status, and summary counts.
 - **Embedding Job Item**: Row-level unit of embedding work tied to one source item or source chunk, with status, attempts, error state, and freshness metadata.
+- **Staged Rebuild Candidate**: Isolated derived state produced by a full rebuild before promotion, including status, verification results, failure details, and cleanup or quarantine disposition.
 - **Embedding Model Record**: Declared embedding or reranking model identity, provider, dimensions, supported devices, and current intended configuration.
 - **Vector Coverage Record**: Operational metadata that proves whether a source item has a current vector for the intended content hash, model, provider, device, and dimensions.
 - **Code File Index Record**: File-level indexing state including path, content hash, language, chunk count, status, and failure reason when applicable.
@@ -181,6 +222,7 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - **RAG Eval Case**: Fixture-backed query with expected results, ranking expectations, provenance expectations, and rebuild prerequisites.
 - **Job Event**: Durable event attached to a long-running job, including progress updates, recovery actions, fallback decisions, cancellation, resume, and failure details.
 - **Text Search Integrity Check**: Verification that keyword-search index content matches its backing source rows and can be safely trusted for recall.
+- **Audit Event**: Workspace-scoped record of a destructive, expensive, or policy-sensitive RAG lifecycle operation, including actor, scope, mode, result, and report reference.
 
 ## Success Criteria *(mandatory)*
 
@@ -198,6 +240,10 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - **SC-010**: Operators can determine current RAG health and next required action from command output alone, without manual database queries, for all fixture failure modes.
 - **SC-011**: Eval output identifies the failing retrieval stage or operational parity stage for every intentionally broken fixture case.
 - **SC-012**: A workspace with text-search/backing-content drift is reported unhealthy before recall quality checks are allowed to pass.
+- **SC-013**: An embedding job with intentional item failures reaches a degraded terminal state and can retry only those failed items.
+- **SC-014**: A full rebuild with an intentional stage failure leaves the prior served derived state unchanged and does not expose the failed candidate through recall or code search.
+- **SC-015**: CI runs default golden RAG eval gates for a representative RAG-related change and does not require those gates for an unrelated non-RAG change.
+- **SC-016**: A full rebuild whose canonical source files or source rows change before promotion fails promotion, reports stale snapshot details, and leaves prior served derived state unchanged.
 
 ## Assumptions
 
@@ -207,3 +253,5 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - Graph recall is in scope for coverage, explanation, and evals, but quality improvements beyond first-class lifecycle participation can be staged after P1 work.
 - Operator-facing command names and exact JSON schemas may be refined during planning, provided the user-visible capabilities and machine-readable contracts remain intact.
 - Online research notes for this specification are captured in `research.md`; planning should turn those source-backed decisions into technical contracts and task slices.
+- Planning should slice delivery so P1 restores operational trust first: authoritative rebuild/reporting, embedding job durability, code-index parity, and explanation contracts. P2 can deepen graph recall quality, dashboards, and broader eval coverage after P1 parity and safety are proven.
+- Destructive RAG maintenance execution is intentionally broader than memory-only roles: human operators, `chief_of_staff`, `memory_curator`, and roles with write-code/edit-file capability are in scope; all other roles are limited to inspect, plan, dry-run, and status surfaces.
