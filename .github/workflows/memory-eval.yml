@@ -5,21 +5,33 @@ on:
     - cron: '0 2 * * *'  # nightly at 02:00 UTC
   pull_request:
     paths:
-      - 'packages/memory/src/retrieval/**'
-      - 'packages/memory/src/recall.ts'
-      - 'packages/memory/src/scoring.ts'
-      - 'packages/memory/src/eval/**'
-      # memory v3 surfaces (PR 8 unit 8.3 widening — any path that can
-      # affect recall quality must run the eval gate before merge)
-      - 'packages/memory/src/l0/**'
-      - 'packages/memory/src/l1/**'
-      - 'packages/memory/src/l2/**'
-      - 'packages/memory/src/stats.ts'
-      - 'packages/memory/src/schema.ts'
-      - 'packages/memory/src/write.ts'
-      - 'packages/memory/src/migration/**'
+      - 'specs/001-rag-lifecycle-hardening/**'
+      - 'packages/memory/package.json'
+      - 'packages/memory/src/**'
+      - 'packages/core/src/db/**'
+      - 'packages/core/src/types.ts'
+      - 'packages/core/src/ids.ts'
+      - 'packages/cli/src/commands/memory-rag-*.ts'
+      - 'packages/cli/src/tool-registry.ts'
+      - 'packages/cli/src/mcp-tools.ts'
+      - '.github/workflows/memory-eval.yml'
 
 jobs:
+  rag-lifecycle-eval:
+    name: RAG Lifecycle Eval (default gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter fulcrum-memory eval:rag-lifecycle
+
   fulcrum-recall-eval:
     name: Fulcrum Recall Eval (primary)
     runs-on: ubuntu-latest
@@ -33,10 +45,10 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @moabualruz/fulcrum-memory eval:fulcrum-recall
+      - run: pnpm --filter fulcrum-memory eval:fulcrum-recall
 
   longmemeval-harness:
-    name: LongMemEval Harness (secondary — conversational-memory benchmark)
+    name: LongMemEval Harness (secondary conversational-memory benchmark)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,4 +60,4 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @moabualruz/fulcrum-memory eval:longmemeval
+      - run: pnpm --filter fulcrum-memory eval:longmemeval

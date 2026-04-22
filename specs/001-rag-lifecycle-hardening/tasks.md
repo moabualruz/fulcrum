@@ -214,19 +214,19 @@
 
 ### Tests for User Story 6
 
-- [ ] T085 [P] [US6] Add failing golden eval fixture tests for retrieval relevance, ranking, answer correctness, grounding/provenance, graph expansion, and operational parity covering FR-030, FR-031, FR-038, SC-008, and SC-011 in packages/memory/src/eval/rag-lifecycle/runner.test.ts
-- [ ] T086 [P] [US6] Add failing local deterministic eval runner tests that keep model-heavy checks opt-in for FR-039 in packages/memory/src/tests/rag-eval-runner.test.ts
-- [ ] T087 [P] [US6] Add failing CI gate path-filter tests for RAG-related vs unrelated non-RAG changes covering FR-046 and SC-015 in packages/cli/src/tests/rag-eval-ci-gate.test.ts
-- [ ] T088 [P] [US6] Add failing CLI eval contract tests for `fulcrum memory eval --suite rag-lifecycle --json`, actor authorization, and audit events covering FR-040 in packages/cli/src/tests/rag-eval-contract.test.ts
+- [X] T085 [P] [US6] Add failing golden eval fixture tests for retrieval relevance, ranking, answer correctness, grounding/provenance, graph expansion, and operational parity covering FR-030, FR-031, FR-038, SC-008, and SC-011 in packages/memory/src/eval/rag-lifecycle/runner.test.ts
+- [X] T086 [P] [US6] Add failing local deterministic eval runner tests that keep model-heavy checks opt-in for FR-039 in packages/memory/src/tests/rag-eval-runner.test.ts
+- [X] T087 [P] [US6] Add failing CI gate path-filter tests for RAG-related vs unrelated non-RAG changes covering FR-046 and SC-015 in packages/cli/src/tests/rag-eval-ci-gate.test.ts
+- [X] T088 [P] [US6] Add failing CLI eval contract tests for `fulcrum memory eval --suite rag-lifecycle --json`, actor authorization, and audit events covering FR-040 in packages/cli/src/tests/rag-eval-contract.test.ts
 
 ### Implementation for User Story 6
 
-- [ ] T089 [US6] Implement checked-in golden eval fixtures for memory recall, code search, hybrid recall, reranking, provenance trace, graph expansion, and reset/rebuild parity in packages/memory/src/eval/rag-lifecycle/fixtures.ts
-- [ ] T090 [US6] Implement RAG lifecycle eval runner and grouped result categories in packages/memory/src/eval/rag-lifecycle/runner.ts
-- [ ] T091 [US6] Wire local deterministic eval suite into existing eval exports in packages/memory/src/eval/index.ts
-- [ ] T092 [US6] Wire `fulcrum memory eval --suite rag-lifecycle --json` command for local post-rebuild eval execution with audit events for expensive eval runs covering FR-032 and FR-040 in packages/cli/src/index.ts
-- [ ] T093 [US6] Add targeted CI gate for RAG lifecycle, memory, code search, embeddings, graph, and eval fixture paths in .github/workflows/memory-eval.yml
-- [ ] T094 [US6] Document opt-in model-heavy and accelerator-heavy eval flags in packages/memory/src/eval/rag-lifecycle/README.md
+- [X] T089 [US6] Implement checked-in golden eval fixtures for memory recall, code search, hybrid recall, reranking, provenance trace, graph expansion, and reset/rebuild parity in packages/memory/src/eval/rag-lifecycle/fixtures.ts
+- [X] T090 [US6] Implement RAG lifecycle eval runner and grouped result categories in packages/memory/src/eval/rag-lifecycle/runner.ts
+- [X] T091 [US6] Wire local deterministic eval suite into existing eval exports in packages/memory/src/eval/index.ts
+- [X] T092 [US6] Wire `fulcrum memory eval --suite rag-lifecycle --json` command for local post-rebuild eval execution with audit events for expensive eval runs covering FR-032 and FR-040 in packages/cli/src/index.ts
+- [X] T093 [US6] Add targeted CI gate for RAG lifecycle, memory, code search, embeddings, graph, and eval fixture paths in .github/workflows/memory-eval.yml
+- [X] T094 [US6] Document opt-in model-heavy and accelerator-heavy eval flags in packages/memory/src/eval/rag-lifecycle/README.md
 
 **Checkpoint**: US6 default eval gate protects RAG-related changes without blocking unrelated work.
 

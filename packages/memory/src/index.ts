@@ -449,3 +449,27 @@ export { runFulcrumEval, runFulcrumEvalFromFile, computeMrr, computeNdcg } from 
 export type { EvalCorpusEntry, EvalRetriever, FulcrumEvalResult, KindMetrics } from './eval/fulcrum-recall/harness.js'
 export { runLongMemEval, splitCorpus } from './eval/longmemeval/harness.js'
 export type { LmeEntry, LmeAnswerer, LmeSplit, LmeEvalResult } from './eval/longmemeval/harness.js'
+export {
+  RAG_LIFECYCLE_EVAL_CORPUS,
+  RAG_LIFECYCLE_EVAL_CATEGORIES,
+  RAG_LIFECYCLE_EVAL_FIXTURES,
+} from './eval/rag-lifecycle/fixtures.js'
+export { runRagLifecycleEvalSuite } from './eval/rag-lifecycle/runner.js'
+export type {
+  RagLifecycleEvalCategoryResult,
+  RagLifecycleEvalFailure,
+  RagLifecycleEvalObserver,
+  RagLifecycleEvalRunResult,
+  RagLifecycleEvalSkipped,
+  RunRagLifecycleEvalSuiteInput,
+} from './eval/rag-lifecycle/runner.js'
+export type {
+  RagLifecycleEvalCase,
+  RagLifecycleEvalCategory,
+  RagLifecycleEvalCodeChunkFixture,
+  RagLifecycleEvalCorpus,
+  RagLifecycleEvalExpected,
+  RagLifecycleEvalMemoryFixture,
+  RagLifecycleEvalObservation,
+  RagLifecycleEvalRequirement,
+} from './eval/rag-lifecycle/fixtures.js'
