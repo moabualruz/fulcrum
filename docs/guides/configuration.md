@@ -21,8 +21,14 @@ Created automatically on first `fulcrum` command invocation. Deterministic `work
     "text": {
       "provider":   "local",
       "model":      "onnx-community/Qwen3-Embedding-0.6B-ONNX",
-      "dimensions": 1024
+      "dimensions": 1024,
+      "device":     "auto"
     }
+  },
+  "reranker": {
+    "provider": "local",
+    "model":    "onnx-community/bge-reranker-v2-m3-ONNX",
+    "device":   "auto"
   },
   "vault": {
     "path":       "~/.fulcrum/vault",
@@ -57,6 +63,8 @@ Created automatically on first `fulcrum` command invocation. Deterministic `work
 | `PLANE_BASE_URL` | Plane API base URL |
 | `PLANE_WORKSPACE_SLUG` | Plane workspace |
 | `PLANE_PROJECT_ID` | Plane project |
+
+For local embeddings and the local reranker, `"device": "auto"` probes Transformers.js CUDA first, then WebGPU, then CPU/WASM. Use `"cpu"` to skip GPU probes, `"cuda"` to require CUDA, or `"webgpu"` to require WebGPU.
 
 ---
 

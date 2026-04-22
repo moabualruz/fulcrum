@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dir = dirname(fileURLToPath(import.meta.url))
-const hooks = JSON.parse(readFileSync(join(__dir, 'hooks.json'), 'utf8'))
+const hooks = JSON.parse(readFileSync(join(__dir, 'hooks.json'), 'utf8')).hooks
 
 let passed = 0
 let failed = 0

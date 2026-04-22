@@ -60,6 +60,22 @@ describe('rebuildFromVault', () => {
     expect(result.errors).toHaveLength(0)
   })
 
+  it('creates missing workspace/project references from vault frontmatter', async () => {
+    const orphanMemory: FullMemory = {
+      ...factMemory,
+      memory_id: '01JBXREBUILD000000000000009',
+      workspace_id: 'ws_orphan_vault',
+      project_id: 'proj_orphan_vault',
+      title: 'orphan scoped memory',
+      summary: 'orphan scoped memory',
+    }
+    await writeMemoryFile(vaultPath, orphanMemory)
+
+    const result = await rebuildFromVault({ vaultPath, target: 'l1' })
+    expect(result.l1Count).toBe(1)
+    expect(result.errors).toHaveLength(0)
+  })
+
   it('skips L2 rebuild when KuzuClient not active', async () => {
     await writeMemoryFile(vaultPath, factMemory)
 

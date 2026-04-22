@@ -53,6 +53,20 @@ function frontmatterToFullMemory(fm: MemoryFileFrontmatter, body: string): FullM
   }
 }
 
+function ensureWorkspaceProjectForMemory(db: Db, memory: FullMemory): void {
+  db.prepare(
+    `INSERT OR IGNORE INTO workspaces (workspace_id, name)
+     VALUES (?, ?)`,
+  ).run(memory.workspace_id, memory.workspace_id)
+
+  if (memory.project_id) {
+    db.prepare(
+      `INSERT OR IGNORE INTO projects (project_id, workspace_id, name)
+       VALUES (?, ?, ?)`,
+    ).run(memory.project_id, memory.workspace_id, memory.project_id)
+  }
+}
+
 export async function rebuildFromVault(options: RebuildOptions): Promise<RebuildResult> {
   const { vaultPath, target, verify = false } = options
   const result: RebuildResult = { l1Count: 0, l2Count: 0, errors: [] }
@@ -99,6 +113,7 @@ export async function rebuildFromVault(options: RebuildOptions): Promise<Rebuild
     // L1 rebuild — use insertMemoryDirect to preserve original memory_id
     if (target === 'l1' || target === 'both') {
       try {
+        ensureWorkspaceProjectForMemory(getDb(), memory)
         insertMemoryDirect(memory)
         result.l1Count++
       } catch (err) {

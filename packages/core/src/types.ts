@@ -394,6 +394,7 @@ export interface EmbeddingProviderConfig {
   apiKey?: string
   baseUrl?: string
   dimensions?: number
+  device?: 'auto' | 'cpu' | 'cuda' | 'webgpu'
 }
 
 export interface VaultConfig {

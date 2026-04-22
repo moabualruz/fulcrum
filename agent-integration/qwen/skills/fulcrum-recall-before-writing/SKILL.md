@@ -1,0 +1,55 @@
+---
+name: fulcrum-recall-before-writing
+description: >-
+  Query Fulcrum memory before writing new code, docs, or architectural
+  decisions. Applies before producing novel output on a topic project may have
+  prior context on.
+---
+# Recall memory before writing
+
+Fulcrum L2 memory stores prior decisions, outcomes, lessons. Skipping = reinventing wheel, or worse, contradicting a prior agent's decision. Always call `fulcrum action exec recall_memory` before novel output.
+
+## When
+
+- About to write new module / file / function.
+- About to make architectural decision (naming, schema, API shape, dependency choice).
+- Writing docs describing "how things work".
+- Encountered term/convention you don't recognize — memory may have defined it.
+- Resuming task after break or handoff.
+
+## How
+
+Short list of search terms drawn from task goal:
+
+```
+fulcrum action exec recall_memory
+  workspace_id: (same as your run)
+  query:        "plain english what you are about to do"
+  limit:        5 or 10
+```
+
+Run 2-3 queries, not one:
+
+1. **Goal query**: `"{task goal plain english}"` — e.g., `"reranker tokenizer batching"`.
+2. **Path query**: `"{file path or dir}"` — e.g., `"packages/core/src/memory"`.
+3. **Concept query**: `"{component or pattern name}"` — e.g., `"FTS5 fallback"`, `"WIP limiter"`.
+
+Read every returned memory before typing. Single 200-word decision from prior run can save an hour.
+
+## Citing memories
+
+Recalled memory changed your approach? Cite:
+
+- Final user response: "based on prior decision M-0423, this module uses text_pair tokenization..."
+- Commit message: `Refs memory M-0423`.
+- `complete_agent_run` summary: include memory IDs relied on.
+
+Creates visible reasoning chain CoS can audit.
+
+## Red flags
+
+- Wrote new file, zero `recall_memory` calls → probably contradicting something.
+- Memory said "don't do X" and you did X → stop, reread, justify divergence or revert.
+- Zero recalls on mature project → broaden query, search by path. Zero = bad query, not empty store.
+
+See also: [start-every-task](../start-every-task/SKILL.md), [write-memory-on-completion](../write-memory-on-completion/SKILL.md).

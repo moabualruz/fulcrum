@@ -1,6 +1,6 @@
 import type { EmbeddingProvider, RerankerProvider } from './types.js'
 import { LocalEmbeddingProvider } from './local.js'
-import { VoyageEmbeddingProvider, OpenAIEmbeddingProvider } from './remote.js'
+import { VoyageEmbeddingProvider, OpenAIEmbeddingProvider, OllamaEmbeddingProvider } from './remote.js'
 import { LocalRerankerProvider } from './reranker.js'
 import type { FulcrumConfig, EmbeddingProviderConfig } from '../types.js'
 
@@ -27,6 +27,7 @@ export function registerEmbeddingProvider(name: string, factory: ProviderFactory
 registerEmbeddingProvider('local',  (cfg) => new LocalEmbeddingProvider(cfg))
 registerEmbeddingProvider('voyage', (cfg) => new VoyageEmbeddingProvider(cfg))
 registerEmbeddingProvider('openai', (cfg) => new OpenAIEmbeddingProvider(cfg))
+registerEmbeddingProvider('ollama', (cfg) => new OllamaEmbeddingProvider(cfg))
 
 /**
  * Create an EmbeddingProvider from config. Throws on unknown provider names,

@@ -49,6 +49,7 @@
     "setup": "node --import tsx/esm agent-integration/install.ts all",
     "setup:claude": "node --import tsx/esm agent-integration/install.ts claude",
     "setup:gemini": "node --import tsx/esm agent-integration/install.ts gemini",
+    "setup:qwen": "node --import tsx/esm agent-integration/install.ts qwen",
     "setup:pi": "node --import tsx/esm agent-integration/install.ts pi",
     "setup:check": "node --import tsx/esm agent-integration/install.ts check",
     "setup:dry": "node --import tsx/esm agent-integration/install.ts all --dry-run",

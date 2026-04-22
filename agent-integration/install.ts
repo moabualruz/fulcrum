@@ -5,16 +5,18 @@
  * Installs Fulcrum as a user-wide tool: symlinks the CLI into ~/.local/bin,
  * registers the MCP server as a user-scope Claude Code server, merges the
  * PreToolUse hook into ~/.claude/settings.json, installs the Gemini extension
- * into ~/.gemini/extensions/fulcrum/, installs the PI cockpit via `pi install`,
+ * into ~/.gemini/extensions/fulcrum/, installs the Qwen Code extension into
+ * ~/.qwen/extensions/fulcrum/, installs the PI cockpit via `pi install`,
  * and writes Codex/opencode config, hooks, skills, and rules.
  *
  * Does NOT touch $CWD. For per-project context files (CLAUDE.md, PI.md, etc.),
  * use `fulcrum init` after global setup.
  *
  * Usage:
- *   pnpm setup                # global runtimes (claude + gemini + pi + codex + opencode)
+ *   pnpm setup                # global runtimes (claude + gemini + qwen + pi + codex + opencode)
  *   pnpm setup:claude         # Claude Code only
  *   pnpm setup:gemini         # Gemini CLI only
+ *   pnpm setup:qwen           # Qwen Code only
  *   pnpm setup:pi             # PI cockpit only
  *   pnpm setup:check          # non-destructive check of current install state
  *   pnpm setup:dry            # print what `setup all` would do, no changes
@@ -258,6 +260,9 @@ function recoveryHintFor(name: string): string | undefined {
   }
   if (name.includes("Gemini")) {
     return `manual: copy agent-integration/gemini/* into ~/.gemini/extensions/fulcrum/`;
+  }
+  if (name.includes("Qwen")) {
+    return `manual: copy agent-integration/qwen/* into ~/.qwen/extensions/fulcrum/`;
   }
   if (name.includes("PI")) {
     return `install the pi CLI, then: pi install ${path.join(REPO_ROOT, "agent-integration", "pi", "cockpit")}`;
@@ -782,6 +787,12 @@ function hasCheckedGeminiExtensionFiles(extDir: string): boolean {
     fs.existsSync(path.join(extDir, "hooks", "hooks.json"));
 }
 
+function hasCheckedQwenExtensionFiles(extDir: string): boolean {
+  return fs.existsSync(path.join(extDir, "qwen-extension.json")) &&
+    fs.existsSync(path.join(extDir, "QWEN.md")) &&
+    fs.existsSync(path.join(extDir, "hooks", "hooks.json"));
+}
+
 // PR 14.5 — Validate gemini-extension.json against required Gemini extension manifest fields.
 export interface GeminiExtensionManifestValidation {
   ok: boolean;
@@ -789,6 +800,25 @@ export interface GeminiExtensionManifestValidation {
 }
 
 export function validateGeminiExtensionManifest(jsonPath: string): GeminiExtensionManifestValidation {
+  const errors: string[] = [];
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(fs.readFileSync(jsonPath, "utf8")) as Record<string, unknown>;
+  } catch (e) {
+    return { ok: false, errors: [`Cannot read or parse ${jsonPath}: ${String(e)}`] };
+  }
+  for (const field of ["name", "version"] as const) {
+    if (typeof data[field] !== "string" || !data[field]) {
+      errors.push(`Missing or empty required field: ${field}`);
+    }
+  }
+  if (!data["mcpServers"] || typeof data["mcpServers"] !== "object") {
+    errors.push("Missing required object: mcpServers");
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+export function validateQwenExtensionManifest(jsonPath: string): GeminiExtensionManifestValidation {
   const errors: string[] = [];
   let data: Record<string, unknown>;
   try {
@@ -824,7 +854,7 @@ function installGeminiExtension(): void {
     ["GEMINI.md", "GEMINI.md"],
     [path.join("hooks", "hooks.json"), path.join("hooks", "hooks.json")],
   ];
-  const subDirs = ["commands", "skills", "agents"];
+  const subDirs = ["commands", "skills", "agents", "rules"];
 
   if (DRY_RUN) {
     if (commandExists("gemini")) {
@@ -891,6 +921,93 @@ function installGeminiExtension(): void {
   console.log();
   console.log("  To update the Fulcrum Gemini extension after upgrading:");
   console.log("    gemini extensions update fulcrum");
+}
+
+// ── 6b. Qwen Code: user extension (~/.qwen/extensions/fulcrum/) ───────────────
+
+function installQwenExtension(): void {
+  const extDir = path.join(HOME, ".qwen", "extensions", "fulcrum");
+  const srcDir = path.join(REPO_ROOT, "agent-integration", "qwen");
+  const manifestPath = path.join(srcDir, "qwen-extension.json");
+
+  const manifestValidation = validateQwenExtensionManifest(manifestPath);
+  if (!manifestValidation.ok) {
+    throw new Error(`qwen-extension.json schema errors:\n${manifestValidation.errors.join("\n")}`);
+  }
+
+  const flatFiles = [
+    ["qwen-extension.json", "qwen-extension.json"],
+    ["QWEN.md", "QWEN.md"],
+    [path.join("hooks", "hooks.json"), path.join("hooks", "hooks.json")],
+  ];
+  const subDirs = ["commands", "skills", "agents", "rules"];
+
+  if (DRY_RUN) {
+    if (commandExists("qwen")) {
+      dry(`would run: qwen extensions uninstall fulcrum`);
+      dry(`would run: qwen extensions install ${srcDir} --consent`);
+    } else {
+      for (const [src] of flatFiles) {
+        dry(`would copy ${path.join(srcDir, src)} → ${path.join(extDir, src)}`);
+      }
+      for (const d of subDirs) {
+        if (fs.existsSync(path.join(srcDir, d))) {
+          dry(`would copy ${path.join(srcDir, d)}/ → ${path.join(extDir, d)}/`);
+        }
+      }
+    }
+    ok(`(dry-run) Qwen extension`);
+    console.log("    qwen extensions update fulcrum  # run after upgrading");
+    return;
+  }
+
+  if (commandExists("qwen")) {
+    spawnSync("qwen", ["extensions", "uninstall", "fulcrum"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf8",
+    });
+    const result = spawnSync("qwen", ["extensions", "install", srcDir, "--consent"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf8",
+    });
+    if (result.status === 0) {
+      if (hasCheckedQwenExtensionFiles(extDir)) {
+        ok(`installed via \`qwen extensions install ${srcDir} --consent\``);
+        setRollback("qwen extensions uninstall fulcrum");
+        setJournalMeta({ agent: "qwen", action: "native_cli", target_path: extDir, mode: "native" });
+        console.log();
+        console.log("  To update the Fulcrum Qwen extension after upgrading:");
+        console.log("    qwen extensions update fulcrum");
+        return;
+      }
+      console.log("  — native install did not create checked files; falling back to file-copy");
+    } else {
+      warn(`\`qwen extensions install\` failed (exit ${result.status ?? "unknown"}): ${result.stderr?.trim() ?? ""} — falling back to file-copy`);
+    }
+  } else {
+    verbose("`qwen` CLI not found — using file-copy install");
+  }
+
+  mkdirp(extDir);
+  for (const [src, dst] of flatFiles) {
+    const from = path.join(srcDir, src);
+    const to = path.join(extDir, dst);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.copyFileSync(from, to);
+  }
+
+  let dirCount = 0;
+  for (const d of subDirs) {
+    const copied = copyDirContents(path.join(srcDir, d), path.join(extDir, d));
+    if (copied > 0) dirCount++;
+  }
+
+  ok(`installed extension → ${extDir} (flat files + ${dirCount} dir(s): ${subDirs.filter(d => fs.existsSync(path.join(srcDir, d))).join(", ")})`);
+  setRollback(`rm -rf ${extDir}  # removes entire Qwen extension`);
+  setJournalMeta({ agent: "qwen", action: "write_file", target_path: extDir, mode: "manual" });
+  console.log();
+  console.log("  To update the Fulcrum Qwen extension after upgrading:");
+  console.log("    qwen extensions update fulcrum");
 }
 
 // ── 7. PI: cockpit extension (pi install <cockpit>) ──────────────────────────
@@ -1109,6 +1226,20 @@ function runCheck(): number {
     rows.push({ label: "Gemini extension", status: "fail", detail: `${geminiDir} does not exist` });
   }
 
+  // Qwen extension
+  const qwenDir = path.join(HOME, ".qwen", "extensions", "fulcrum");
+  if (
+    fs.existsSync(path.join(qwenDir, "qwen-extension.json")) &&
+    fs.existsSync(path.join(qwenDir, "QWEN.md")) &&
+    fs.existsSync(path.join(qwenDir, "hooks", "hooks.json"))
+  ) {
+    rows.push({ label: "Qwen extension", status: "ok", detail: qwenDir });
+  } else if (fs.existsSync(qwenDir)) {
+    rows.push({ label: "Qwen extension", status: "fail", detail: `${qwenDir} exists but missing files (hooks/hooks.json required)` });
+  } else {
+    rows.push({ label: "Qwen extension", status: "fail", detail: `${qwenDir} does not exist` });
+  }
+
   // PI cockpit
   if (!commandExists("pi")) {
     rows.push({ label: "PI cockpit", status: "warn", detail: `pi CLI not found, skipping` });
@@ -1146,7 +1277,7 @@ function runCheck(): number {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-type Target = "all" | "claude" | "gemini" | "pi" | "codex" | "opencode" | "check";
+type Target = "all" | "claude" | "gemini" | "qwen" | "pi" | "codex" | "opencode" | "check";
 
 async function installCodexGlobal(): Promise<void> {
   await installCodex({ dryRun: DRY_RUN, globalHome: HOME });
@@ -1169,6 +1300,7 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void | Promis
     ["Claude Code: agent MDs → ~/.claude/agents/", installClaudeAgentMds],
     ["Claude Code: slash commands → ~/.claude/commands/", installClaudeCommands],
     ["Gemini CLI: user extension", installGeminiExtension],
+    ["Qwen Code: user extension", installQwenExtension],
     ["PI: cockpit extension", installPiCockpit],
     ["Codex CLI: config + hooks + skills", installCodexGlobal],
     ["opencode: plugin + hooks", installOpencodeGlobal],
@@ -1195,6 +1327,11 @@ const plans: Record<Exclude<Target, "check">, Array<[string, () => void | Promis
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
     ["Verify fulcrum in PATH", verifyCliInPath],
     ["Gemini CLI: user extension", installGeminiExtension],
+  ],
+  qwen: [
+    ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
+    ["Verify fulcrum in PATH", verifyCliInPath],
+    ["Qwen Code: user extension", installQwenExtension],
   ],
   pi: [
     ["CLI symlink → ~/.local/bin/fulcrum", installCliBin],
@@ -1527,7 +1664,7 @@ function printSummary(target: Target): void {
   console.log("");
   console.log("Installed:");
   const rows: Array<[string, string]> = [];
-  if (target === "all" || target === "claude" || target === "gemini" || target === "pi") {
+  if (target === "all" || target === "claude" || target === "gemini" || target === "qwen" || target === "pi") {
     rows.push(["fulcrum CLI", `~/.local/bin/fulcrum`]);
   }
   if (target === "all" || target === "claude") {
@@ -1539,6 +1676,9 @@ function printSummary(target: Target): void {
   }
   if (target === "all" || target === "gemini") {
     rows.push(["Gemini extension", `~/.gemini/extensions/fulcrum/`]);
+  }
+  if (target === "all" || target === "qwen") {
+    rows.push(["Qwen extension", `~/.qwen/extensions/fulcrum/`]);
   }
   if (target === "all" || target === "pi") {
     rows.push(["PI cockpit", `pi install ${path.join(REPO_ROOT, "agent-integration", "pi", "cockpit")}`]);
@@ -1587,7 +1727,7 @@ function printSummary(target: Target): void {
   console.log("  pnpm run setup:check       # verify install state any time");
   console.log("");
   console.log("Reopen your shell (or source your rc) if ~/.local/bin was just added to PATH.");
-  console.log("Restart your agent CLI (Claude / Gemini / PI) to pick up changes.");
+  console.log("Restart your agent CLI (Claude / Gemini / Qwen / PI) to pick up changes.");
   console.log("");
 }
 
@@ -1608,7 +1748,7 @@ async function main(): Promise<void> {
 
   const plan = plans[target];
   if (!plan) {
-    fail(`Unknown target: ${target}. Use one of: all | claude | gemini | pi | codex | opencode | check`);
+    fail(`Unknown target: ${target}. Use one of: all | claude | gemini | qwen | pi | codex | opencode | check`);
     process.exit(1);
   }
 

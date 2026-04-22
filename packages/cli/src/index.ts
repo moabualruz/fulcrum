@@ -40,6 +40,7 @@ CONTROL PLANE
   hook cursor          Cursor tool hooks
   hook windsurf        Windsurf tool hooks
   hook copilot         GitHub Copilot CLI tool hooks
+  hook qwen            Qwen Code tool hooks
 
 DOMAIN
   workspaces list
@@ -345,25 +346,92 @@ fulcrum memory — memory vault commands
   }
 
   if (command === 'embed') {
-    // Backfill vec_memories for all memories that don't have embeddings yet
+    // Backfill vec_memories for all memories that don't have embeddings yet.
+    const limitIdx = args.indexOf('--limit')
+    const limit = limitIdx >= 0 ? Number.parseInt(args[limitIdx + 1] ?? '', 10) : Infinity
+    if (!Number.isFinite(limit) && limitIdx >= 0) {
+      console.error('Usage: fulcrum memory embed [--limit <n>] [--batch-size <n>]')
+      process.exit(1)
+    }
+    const batchIdx = args.indexOf('--batch-size')
+    const batchSize = batchIdx >= 0 ? Number.parseInt(args[batchIdx + 1] ?? '', 10) : 64
+    if (!Number.isFinite(batchSize) || batchSize <= 0) {
+      console.error('Usage: fulcrum memory embed [--limit <n>] [--batch-size <n>]')
+      process.exit(1)
+    }
     await warmEmbedding()
-    const { storeEmbeddingInVec } = await import('fulcrum-memory')
-    const { getDb: _getDb, runMigrations: _rm, loadConfig: _lc2 } = await import('fulcrum-agent-core')
+    const { getDb: _getDb, runMigrations: _rm, getTextEmbedder } = await import('fulcrum-agent-core')
     _rm(_getDb())
     const db = _getDb()
-    const rows = db.prepare(
-      'SELECT memory_id, content FROM memories WHERE embedding IS NULL ORDER BY created_at'
-    ).all() as { memory_id: string; content: string }[]
+    const sql = Number.isFinite(limit)
+      ? 'SELECT memory_id, content FROM memories WHERE embedding IS NULL ORDER BY created_at LIMIT ?'
+      : 'SELECT memory_id, content FROM memories WHERE embedding IS NULL ORDER BY created_at'
+    const rows = (Number.isFinite(limit)
+      ? db.prepare(sql).all(limit)
+      : db.prepare(sql).all()) as { memory_id: string; content: string }[]
     console.log(`Embedding ${rows.length} memories without vectors...`)
-    let ok = 0, fail = 0
-    for (const row of rows) {
+
+    const embedder = getTextEmbedder()
+    if (!embedder) {
+      console.error('No text embedder registered')
+      process.exit(1)
+    }
+
+    const writeBatch = db.transaction((items: Array<{ memory_id: string; embedding: Float32Array }>) => {
+      const deleteStmt = db.prepare('DELETE FROM vec_memories WHERE memory_id = ?')
+      const insertStmt = db.prepare('INSERT INTO vec_memories(memory_id, embedding) VALUES (?, ?)')
+      const updateStmt = db.prepare('UPDATE memories SET embedding = ? WHERE memory_id = ?')
+      for (const item of items) {
+        const buf = Buffer.from(item.embedding.buffer, item.embedding.byteOffset, item.embedding.byteLength)
+        deleteStmt.run(item.memory_id)
+        insertStmt.run(item.memory_id, buf)
+        updateStmt.run(buf, item.memory_id)
+      }
+    })
+
+    type EmbedRow = { memory_id: string; content: string }
+
+    const embedDocuments = async (contents: string[]): Promise<Float32Array[]> => {
+      if (embedder.embedBatch) return embedder.embedBatch(contents)
+      const embedFn = (embedder.embedDocument ?? embedder.embed).bind(embedder)
+      return Promise.all(contents.map(content => embedFn(content)))
+    }
+
+    const embedAndWriteBatch = async (
+      batch: EmbedRow[],
+      startIdx: number,
+    ): Promise<{ ok: number; fail: number }> => {
       try {
-        await storeEmbeddingInVec(db, row.memory_id, row.content ?? '')
-        ok++
-      } catch {
-        fail++
+        const vectors = await embedDocuments(batch.map(row => row.content ?? ''))
+        if (vectors.length !== batch.length) {
+          throw new Error(`embedder returned ${vectors.length} vectors for ${batch.length} rows`)
+        }
+        writeBatch(batch.map((row, idx) => ({ memory_id: row.memory_id, embedding: vectors[idx]! })))
+        return { ok: batch.length, fail: 0 }
+      } catch (err) {
+        if (batch.length === 1) {
+          process.stderr.write(`\n[embed] row ${batch[0]!.memory_id} failed: ${err instanceof Error ? err.message : String(err)}\n`)
+          return { ok: 0, fail: 1 }
+        }
+
+        const mid = Math.ceil(batch.length / 2)
+        process.stderr.write(`\n[embed] batch ${startIdx}-${startIdx + batch.length - 1} failed; retrying as ${mid}/${batch.length - mid}: ${err instanceof Error ? err.message : String(err)}\n`)
+        const left = await embedAndWriteBatch(batch.slice(0, mid), startIdx)
+        const right = await embedAndWriteBatch(batch.slice(mid), startIdx + mid)
+        return { ok: left.ok + right.ok, fail: left.fail + right.fail }
       }
     }
+
+    let ok = 0, fail = 0
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const startIdx = i
+      const batch = rows.slice(i, i + batchSize)
+      const result = await embedAndWriteBatch(batch, startIdx)
+      ok += result.ok
+      fail += result.fail
+      if (rows.length > batchSize) process.stdout.write(`\rEmbedded ${ok + fail}/${rows.length}${fail > 0 ? ` (${ok} ok, ${fail} failed)` : ''}...`)
+    }
+    if (rows.length > batchSize) process.stdout.write('\n')
     console.log(`✓ Embedded ${ok} memories${fail > 0 ? `, ${fail} failed` : ''}`)
     return
   }
@@ -1451,7 +1519,7 @@ function firstStringValue(...values: unknown[]): string {
   return ''
 }
 
-async function runGenericHostSessionStartHook(cliName: 'cursor' | 'windsurf' | 'copilot'): Promise<void> {
+async function runGenericHostSessionStartHook(cliName: 'cursor' | 'windsurf' | 'copilot' | 'qwen'): Promise<void> {
   const raw = await readStdinFully()
   let sessionId = process.env[`${cliName.toUpperCase()}_SESSION_ID`] ?? process.env['FULCRUM_SESSION_ID'] ?? ''
   let model: string | undefined
@@ -1507,7 +1575,7 @@ async function runGenericHostSessionStartHook(cliName: 'cursor' | 'windsurf' | '
   process.exit(0)
 }
 
-async function runGenericHostSessionEndHook(cliName: 'cursor' | 'windsurf' | 'copilot'): Promise<void> {
+async function runGenericHostSessionEndHook(cliName: 'cursor' | 'windsurf' | 'copilot' | 'qwen'): Promise<void> {
   const raw = await readStdinFully()
   let sessionId = process.env[`${cliName.toUpperCase()}_SESSION_ID`] ?? ''
   let summary = `${cliName} session ended`
@@ -2186,6 +2254,7 @@ fulcrum hook — tool-call policy hooks and session lifecycle for coding agents
   fulcrum hook cursor [pre|post]           Cursor tool hooks
   fulcrum hook windsurf [pre|post]         Windsurf tool hooks
   fulcrum hook copilot [pre|post]          GitHub Copilot CLI tool hooks
+  fulcrum hook qwen [pre|post]             Qwen Code tool hooks
   fulcrum hook copilot --event <name>      Copilot hook config form
 
 Phase defaults to 'pre' when omitted (legacy). The pre hook normalises
@@ -2567,9 +2636,9 @@ async function warmEmbedding(): Promise<void> {
     const config = loadConfig()
     await initEmbedding(config)
     _embeddingWarmed = true
-    process.stderr.write('[fulcrum] embedding model ready\n')
+    process.stderr.write('[fulcrum] local model pipeline ready\n')
   } catch (err) {
-    process.stderr.write(`[fulcrum] embedding init failed: ${(err as Error).message}\n`)
+    process.stderr.write(`[fulcrum] local model init failed: ${(err as Error).message}\n`)
     process.exit(1)
   }
 }
@@ -4340,7 +4409,7 @@ OPTIONS (serve mcp-http)
       await runHook(cli ?? '--help')
       return
     }
-    if (cli === 'claude' || cli === 'gemini' || cli === 'codex' || cli === 'pi' || cli === 'opencode' || cli === 'cursor' || cli === 'windsurf' || cli === 'copilot' || cli === 'auto') {
+    if (cli === 'claude' || cli === 'gemini' || cli === 'codex' || cli === 'pi' || cli === 'opencode' || cli === 'cursor' || cli === 'windsurf' || cli === 'copilot' || cli === 'qwen' || cli === 'auto') {
       // Optional second-level arg: lifecycle phase or tool phase
       // Default 'pre' for backward compatibility with existing settings.json entries.
       const phaseArg = hookPhaseArg(args)
@@ -4394,13 +4463,13 @@ OPTIONS (serve mcp-http)
         if (phaseArg === 'pre-compact')   { await runStubHook(cli, phaseArg);    return }
       }
 
-      // Cursor / Windsurf / Copilot lifecycle hooks.
-      if (cli === 'cursor' || cli === 'windsurf' || cli === 'copilot') {
+      // Cursor / Windsurf / Copilot / Qwen lifecycle hooks.
+      if (cli === 'cursor' || cli === 'windsurf' || cli === 'copilot' || cli === 'qwen') {
         if (phaseArg === 'session-start') { await runGenericHostSessionStartHook(cli); return }
         if (phaseArg === 'session-end')   { await runGenericHostSessionEndHook(cli);   return }
         if (
           ((cli === 'cursor' || cli === 'windsurf') && phaseArg === 'subagent-start') ||
-          ((cli === 'cursor' || cli === 'windsurf') && phaseArg === 'subagent-stop') ||
+          ((cli === 'cursor' || cli === 'windsurf' || cli === 'qwen') && phaseArg === 'subagent-stop') ||
           (cli !== 'copilot' && phaseArg === 'pre-compact')
         ) {
           await runStubHook(cli, phaseArg)
@@ -4411,14 +4480,14 @@ OPTIONS (serve mcp-http)
       const phase: HookPhase = phaseArg === 'post' ? 'post' : 'pre'
       if (phaseArg && phaseArg !== 'pre' && phaseArg !== 'post') {
         console.error(`Unknown hook phase: ${phaseArg}`)
-        console.error('Usage: fulcrum hook auto|claude|gemini|codex|pi|opencode|cursor|windsurf|copilot [pre|post|session-start|session-stop|session-end|pre-compact|before-agent|subagent-start|subagent-stop|before-model|after-model|pre-compress|after-agent|notify]')
+        console.error('Usage: fulcrum hook auto|claude|gemini|codex|pi|opencode|cursor|windsurf|copilot|qwen [pre|post|session-start|session-stop|session-end|pre-compact|before-agent|subagent-start|subagent-stop|before-model|after-model|pre-compress|after-agent|notify]')
         process.exit(1)
       }
       await runHook(cli, phase)
       return
     }
     console.error(`Unknown hook: ${cli}`)
-    console.error('Usage: fulcrum hook auto|claude|gemini|codex|pi|opencode|cursor|windsurf|copilot [pre|post]')
+    console.error('Usage: fulcrum hook auto|claude|gemini|codex|pi|opencode|cursor|windsurf|copilot|qwen [pre|post]')
     process.exit(1)
   }
 

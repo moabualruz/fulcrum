@@ -20,7 +20,7 @@
 // extends with resolved file paths.
 
 import type { Db } from 'fulcrum-agent-core'
-import { getDb, getTextEmbedder } from 'fulcrum-agent-core'
+import { getDb, getReranker, getTextEmbedder } from 'fulcrum-agent-core'
 import { extractWikilinks } from '../l1/wikilinks.js'
 
 export interface V3SearchWeights {
@@ -353,6 +353,32 @@ function materialize(db: Db, hits: FusionHit[]): V3RecallHit[] {
   return out
 }
 
+function sigmoidScore(logit: number): number {
+  return 1 / (1 + Math.exp(-logit))
+}
+
+async function rerankMaterialized(query: string, hits: V3RecallHit[]): Promise<V3RecallHit[]> {
+  const reranker = getReranker()
+  if (!reranker || hits.length <= 1) return hits
+
+  try {
+    const passages = hits.map((h) => h.content || h.summary || h.title)
+    const rerankScores = await reranker.rerank(query, passages)
+    return hits
+      .map((h, i) => {
+        const score = rerankScores[i]
+        if (typeof score !== 'number' || !Number.isFinite(score)) return h
+        return { ...h, score: sigmoidScore(score) }
+      })
+      .sort((a, b) => b.score - a.score)
+  } catch (err) {
+    if (process.env['FULCRUM_VERBOSE']) {
+      process.stderr.write(`[v3-search] reranker degraded: ${err instanceof Error ? err.message : String(err)}\n`)
+    }
+    return hits
+  }
+}
+
 function parseSources(provenance: string | null): string[] {
   if (!provenance) return []
   try {
@@ -394,6 +420,13 @@ export async function runV3Search(
   const fts = ftsStage(db, input.query, floor, input.workspace_id, whereTail, leadingParams, fetchLimit)
   const vec = await vecStage(db, input.query, floor, input.workspace_id, whereTail, leadingParams, fetchLimit)
   const graph = graphStage(db, input.query, floor, input.workspace_id, hops, whereTail, leadingParams, fetchLimit)
-  const hits = fuse(fts, vec, graph, weights).slice(offset, offset + limit)
-  return materialize(db, hits)
+  const fused = fuse(fts, vec, graph, weights)
+  const reranker = getReranker()
+  if (!reranker) {
+    return materialize(db, fused.slice(offset, offset + limit))
+  }
+
+  const candidates = materialize(db, fused.slice(0, fetchLimit))
+  const reranked = await rerankMaterialized(input.query, candidates)
+  return reranked.slice(offset, offset + limit)
 }

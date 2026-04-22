@@ -75,12 +75,14 @@ describe('Gemini: extension manifest', () => {
 })
 
 describe('Gemini: hooks.json contract', () => {
-  const hooks = readJsonIfExists<Record<string, Array<any>>>(
+  const hooksDoc = readJsonIfExists<{ hooks?: Record<string, Array<any>> }>(
     join(G, 'hooks/hooks.json')
   )
+  const hooks = hooksDoc?.hooks
 
   it('hooks.json exists', () => {
-    expect(hooks).not.toBeNull()
+    expect(hooksDoc).not.toBeNull()
+    expect(hooks).toBeDefined()
   })
 
   it('registers all 11 events', () => {
@@ -199,9 +201,9 @@ describe('Gemini: policies contract', () => {
 })
 
 describe('Gemini: subagent MCP isolation (per docs/core/subagents.md)', () => {
-  // Subagents do NOT inherit the extension's mcpServers automatically.
+  // Subagents do NOT inherit the extension's MCP servers automatically.
   // Every agent MD that documents fulcrum-MCP tool usage must declare the
-  // mcpServers block inline, or the chief_of_staff/etc invocations fail.
+  // mcp_servers block inline, or the chief_of_staff/etc invocations fail.
   const agentsDir = join(G, 'agents')
   const files = listDir(agentsDir).filter((f) => f.endsWith('.md'))
 
@@ -209,14 +211,14 @@ describe('Gemini: subagent MCP isolation (per docs/core/subagents.md)', () => {
     expect(files.length).toBeGreaterThanOrEqual(24)
   })
 
-  it('GAP(sub-M1) every role MD declares mcpServers.fulcrum inline', () => {
+  it('GAP(sub-M1) every role MD declares mcp_servers.fulcrum inline', () => {
     for (const f of files) {
       const fm = parseFrontmatter(readText(f))
       if (!fm) continue
-      const mcp = fm.mcpServers as Record<string, unknown> | undefined
+      const mcp = fm.mcp_servers as Record<string, unknown> | undefined
       expect(
         mcp?.fulcrum,
-        `${f} missing mcpServers.fulcrum — subagent isolation drops inheritance`
+        `${f} missing mcp_servers.fulcrum — subagent isolation drops inheritance`
       ).toBeDefined()
     }
   })

@@ -142,6 +142,35 @@ describe('normalizeHookEvent (H-21)', () => {
     })
   })
 
+  describe('Qwen Code hooks', () => {
+    it('normalizes Qwen PreToolUse input shape', () => {
+      const result = normalizeHookEvent('qwen', {
+        tool_name: 'run_shell_command',
+        tool_input: { command: 'pnpm test' },
+        tool_use_id: 'qwen_tool_123',
+      })
+      expect(result.toolName).toBe('run_shell_command')
+      expect(result.toolInput).toEqual({ command: 'pnpm test' })
+      expect(result.sessionId).toBe('qwen_tool_123')
+    })
+
+    it('uses QWEN_SESSION_ID before tool_use_id', () => {
+      const previous = process.env['QWEN_SESSION_ID']
+      process.env['QWEN_SESSION_ID'] = 'qwen_session_env'
+      const result = normalizeHookEvent('qwen', {
+        tool_name: 'write_file',
+        tool_input: { path: '/repo/a.ts' },
+        tool_use_id: 'qwen_tool_456',
+      })
+      if (previous === undefined) {
+        delete process.env['QWEN_SESSION_ID']
+      } else {
+        process.env['QWEN_SESSION_ID'] = previous
+      }
+      expect(result.sessionId).toBe('qwen_session_env')
+    })
+  })
+
   describe('Cursor hooks (actual request body)', () => {
     it('uses Cursor session env before tool_use_id when Cursor omits session_id', () => {
       const previous = process.env['CURSOR_SESSION_ID']

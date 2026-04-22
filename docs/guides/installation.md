@@ -294,13 +294,13 @@ To suppress the build entirely:
 PNPM_SKIP_BUILD_DEPS=kuzu pnpm install
 ```
 
-### Embedding model download on first query
+### Local model download on first query
 
-The ONNX embedding model (`bge-small-en-v1.5` by default) downloads on first use to `~/.cache/fulcrum/models/`. You'll see a one-time delay on the first `fulcrum serve mcp` / `serve monitor` / semantic-recall call. Subsequent runs load instantly from the cache.
+The ONNX embedding and reranker models (`Qwen3-Embedding-0.6B-ONNX` and `bge-reranker-v2-m3-ONNX` by default) download on first use to `$FULCRUM_DATA_DIR/models`. You'll see a one-time delay on the first semantic recall. Subsequent runs load from the cache.
 
-If you're on an air-gapped machine, pre-populate the cache from a networked box and copy `~/.cache/fulcrum/models/` across.
+If you're on an air-gapped machine, pre-populate the cache from a networked box and copy `$FULCRUM_DATA_DIR/models` across.
 
-### `[fulcrum] embedding init failed: …`
+### `[fulcrum] local model init failed: ...`
 
 Usually means the ONNX runtime couldn't load. Re-run `pnpm install --force` to rebuild `onnxruntime-node`, or check that your Node version is 20 or newer.
 

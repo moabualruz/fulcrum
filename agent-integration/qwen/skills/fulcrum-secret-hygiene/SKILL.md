@@ -1,0 +1,46 @@
+---
+name: fulcrum-secret-hygiene
+description: >-
+  Never include credentials, API keys, tokens, passwords in tool inputs or
+  memory writes. Every tool call accepting free-form text.
+---
+# Secret hygiene
+
+Never include credentials / API keys / tokens / passwords in:
+
+- Tool inputs (especially `Bash`, `Write`, `Edit`, any MCP call).
+- Memory writes (`write_memory` content or tags).
+- Commit messages / PR bodies.
+- Block / escalate / complete reasons or summaries.
+
+PreToolUse hook scans inputs, denies matches (9 patterns: AWS keys, GitHub tokens, `API_KEY=...`, bearer tokens, private keys, Slack tokens, DB URLs with inline creds, JWTs, `password=...`). Denial logged as `secret_redacted` policy event with tool name + approx location.
+
+## When this applies
+
+- Need API key for external service.
+- Config has `DATABASE_URL=postgres://user:pass@host/db`.
+- Shell command would echo token into logs.
+- Test fixture with sample credential.
+- Summarizing file containing secrets.
+
+## What to do
+
+Need secret to proceed:
+
+1. `fulcrum action exec block_agent_run` with reason `"needs secret: <NAME>"` — e.g., `"needs secret: STRIPE_WEBHOOK_SECRET for integration tests in packages/billing"`.
+2. CoS (or human operator) sets env var on worker adapter before next run.
+3. Read from `process.env.NAME` inside code — never from prompt.
+
+## Files containing secrets
+
+- Do not paste contents into tool inputs or memories.
+- Reference by path only: `"configured in .env.local"`.
+- Secret committed to repo by accident → block with reason `"secret committed: <path>"` + escalate. Rotation = human decision.
+
+## Red flags
+
+- Pasted key into `Bash` "just to test" → hook denied, attempt logged. Do not retry.
+- Wrote memory with literal token → delete (or ask CoS) + redo without secret.
+- Pattern scanner seems wrong, want to bypass → do not. File as feedback via `lesson` memory.
+
+See also: [block-when-stuck](../block-when-stuck/SKILL.md), [write-memory-on-completion](../write-memory-on-completion/SKILL.md).

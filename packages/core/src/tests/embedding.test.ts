@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { LocalEmbeddingProvider, QUERY_PREFIX, DOC_PREFIX, truncateDimensions } from '../embedding/local.js'
+import { LocalEmbeddingProvider, QUERY_PREFIX, DOC_PREFIX, localEmbeddingPipelineOptions, truncateDimensions } from '../embedding/local.js'
 import { LocalRerankerProvider } from '../embedding/reranker.js'
-import { VoyageEmbeddingProvider, OpenAIEmbeddingProvider } from '../embedding/remote.js'
+import { VoyageEmbeddingProvider, OpenAIEmbeddingProvider, OllamaEmbeddingProvider } from '../embedding/remote.js'
 import { createProvider } from '../embedding/registry.js'
 
 // NOTE: these tests download models on first run (~300MB+). Skipped in CI
@@ -87,6 +87,78 @@ describe('instruction prefixes', () => {
   })
 })
 
+describe('localEmbeddingPipelineOptions', () => {
+  it('defaults to CUDA first, then WebGPU, then CPU/WASM fallback', () => {
+    expect(localEmbeddingPipelineOptions()).toEqual([
+      { dtype: 'q8', device: 'cuda' },
+      { dtype: 'q8', device: 'webgpu' },
+      { dtype: 'q8' },
+    ])
+  })
+
+  it('can force CPU, CUDA, or WebGPU', () => {
+    expect(localEmbeddingPipelineOptions('cpu')).toEqual([{ dtype: 'q8' }])
+    expect(localEmbeddingPipelineOptions('cuda')).toEqual([{ dtype: 'q8', device: 'cuda' }])
+    expect(localEmbeddingPipelineOptions('webgpu')).toEqual([{ dtype: 'q8', device: 'webgpu' }])
+  })
+})
+
+describe('LocalRerankerProvider device selection', () => {
+  afterEach(() => {
+    vi.doUnmock('@huggingface/transformers')
+    vi.doUnmock('../db/client.js')
+    vi.resetModules()
+    vi.restoreAllMocks()
+  })
+
+  it('defaults to CUDA first, then WebGPU, then CPU/WASM fallback', async () => {
+    const calls: Array<{ dtype: 'q8'; device?: 'cuda' | 'webgpu' }> = []
+
+    vi.doMock('@huggingface/transformers', () => ({
+      env: {},
+      AutoTokenizer: { from_pretrained: vi.fn().mockResolvedValue(vi.fn()) },
+      AutoModelForSequenceClassification: {
+        from_pretrained: vi.fn().mockImplementation((_model: string, options: { dtype: 'q8'; device?: 'cuda' | 'webgpu' }) => {
+          calls.push(options)
+          if (options.device) throw new Error(`${options.device} unavailable`)
+          return Promise.resolve(vi.fn())
+        }),
+      },
+    }))
+    vi.doMock('../db/client.js', () => ({ globalDataDir: () => '/tmp/fulcrum-test' }))
+
+    const provider = new LocalRerankerProvider({ provider: 'local', model: 'reranker-model', dimensions: 0 })
+    await provider.warmUp()
+
+    expect(calls).toEqual([
+      { dtype: 'q8', device: 'cuda' },
+      { dtype: 'q8', device: 'webgpu' },
+      { dtype: 'q8' },
+    ])
+  })
+
+  it('does not fallback when CUDA is explicitly requested', async () => {
+    const calls: Array<{ dtype: 'q8'; device?: 'cuda' | 'webgpu' }> = []
+
+    vi.doMock('@huggingface/transformers', () => ({
+      env: {},
+      AutoTokenizer: { from_pretrained: vi.fn().mockResolvedValue(vi.fn()) },
+      AutoModelForSequenceClassification: {
+        from_pretrained: vi.fn().mockImplementation((_model: string, options: { dtype: 'q8'; device?: 'cuda' | 'webgpu' }) => {
+          calls.push(options)
+          throw new Error('cuda unavailable')
+        }),
+      },
+    }))
+    vi.doMock('../db/client.js', () => ({ globalDataDir: () => '/tmp/fulcrum-test' }))
+
+    const provider = new LocalRerankerProvider({ provider: 'local', model: 'reranker-model', dimensions: 0, device: 'cuda' })
+    await expect(provider.warmUp()).rejects.toThrow('cuda unavailable')
+
+    expect(calls).toEqual([{ dtype: 'q8', device: 'cuda' }])
+  })
+})
+
 // ---------- truncateDimensions (unit — no model needed) ----------
 
 describe('truncateDimensions', () => {
@@ -134,6 +206,16 @@ function makeOpenAIResponse(dims: number) {
     text: () => Promise.resolve(''),
     json: () => Promise.resolve({
       data: [{ embedding: Array.from({ length: dims }, (_, i) => i * 0.001) }],
+    }),
+  }
+}
+
+function makeOllamaResponse(dims: number, count = 1) {
+  return {
+    ok: true,
+    text: () => Promise.resolve(''),
+    json: () => Promise.resolve({
+      embeddings: Array.from({ length: count }, () => Array.from({ length: dims }, (_, i) => i * 0.001)),
     }),
   }
 }
@@ -313,6 +395,63 @@ describe('OpenAIEmbeddingProvider', () => {
 })
 
 // ---------------------------------------------------------------------------
+// OllamaEmbeddingProvider — explicit local service provider, never fallback
+// ---------------------------------------------------------------------------
+
+describe('OllamaEmbeddingProvider', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('calls /api/embed with model, input array, dimensions, and truncate', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeOllamaResponse(1024))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const provider = new OllamaEmbeddingProvider({
+      provider: 'ollama',
+      model: 'qwen3-embedding:4b',
+      dimensions: 1024,
+      baseUrl: 'http://localhost:11434/',
+    })
+    const result = await provider.embedDocument('some text')
+
+    expect(result).toBeInstanceOf(Float32Array)
+    expect(result.length).toBe(1024)
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:11434/api/embed', expect.any(Object))
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+    expect(body).toMatchObject({
+      model: 'qwen3-embedding:4b',
+      input: [expect.stringContaining('some text')],
+      dimensions: 1024,
+      truncate: true,
+    })
+  })
+
+  it('embedBatch sends one batched Ollama request', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeOllamaResponse(1024, 2))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const provider = new OllamaEmbeddingProvider({ provider: 'ollama', model: 'qwen3-embedding:4b', dimensions: 1024 })
+    const results = await provider.embedBatch(['text1', 'text2'])
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(results).toHaveLength(2)
+    expect(results[0]).toBeInstanceOf(Float32Array)
+  })
+
+  it('throws on non-ok API response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve('model failed'),
+    }))
+
+    const provider = new OllamaEmbeddingProvider({ provider: 'ollama', model: 'qwen3-embedding:4b', dimensions: 1024 })
+    await expect(provider.embed('test')).rejects.toThrow('Ollama API error: 500')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // createProvider — unknown provider throws
 // ---------------------------------------------------------------------------
 
@@ -346,5 +485,14 @@ describe('createProvider', () => {
       apiKey: 'test-key',
     })
     expect(provider).toBeInstanceOf(OpenAIEmbeddingProvider)
+  })
+
+  it('returns OllamaEmbeddingProvider for provider: ollama', () => {
+    const provider = createProvider({
+      provider: 'ollama',
+      model: 'qwen3-embedding:4b',
+      dimensions: 1024,
+    })
+    expect(provider).toBeInstanceOf(OllamaEmbeddingProvider)
   })
 })

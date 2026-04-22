@@ -23,6 +23,7 @@ describe('loadConfig', () => {
     const cfg = loadConfig()
     expect(cfg.port).toBe(4721)
     expect(cfg.embedding.text.provider).toBe('local')
+    expect(cfg.reranker.device).toBe('auto')
     expect(cfg.policy.wip_limit).toBe(5)
   })
 
@@ -101,10 +102,10 @@ describe('validateFulcrumConfig', () => {
       project_id: 'proj_1',
       port: 4721,
       embedding: {
-        text: { provider: 'local', model: 'some-model', dimensions: 512 },
+        text: { provider: 'local', model: 'some-model', dimensions: 512, device: 'cuda' },
         code: null,
       },
-      reranker: { provider: 'local', model: 'reranker-model' },
+      reranker: { provider: 'local', model: 'reranker-model', device: 'cuda' },
       policy: { wip_limit: 5, heartbeat_timeout_minutes: 10, escalation_timeout_minutes: 30 },
       vault: { path: '/tmp/vault', l2_enabled: false },
     })
@@ -150,5 +151,21 @@ describe('validateFulcrumConfig', () => {
     const result = validateFulcrumConfig({ vault: { l2_enabled: 'yes' } })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.errors.some(e => e.includes('l2_enabled'))).toBe(true)
+  })
+
+  it('reports error for invalid embedding device', () => {
+    const result = validateFulcrumConfig({
+      embedding: { text: { provider: 'local', model: 'x', device: 'metal' } },
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.join('\n')).toContain('embedding.text.device')
+  })
+
+  it('reports error for invalid reranker device', () => {
+    const result = validateFulcrumConfig({
+      reranker: { provider: 'local', model: 'x', device: 'metal' },
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.join('\n')).toContain('reranker.device')
   })
 })

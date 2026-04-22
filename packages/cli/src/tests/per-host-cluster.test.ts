@@ -73,8 +73,8 @@ describe('Task 47 — hook matcher narrowing', () => {
     // Gemini tool names (write_file, replace, run_shell_command, …). Claude
     // tool names never fire. The Claude-only `tools: []` field is not part of
     // the Gemini hooks schema and must not appear.
-    const hooks = JSON.parse(readFileSync(join(REPO_ROOT, 'agent-integration/gemini/hooks/hooks.json'), 'utf8')) as Record<string, Array<Record<string, unknown>>>
-    const before = hooks['BeforeTool']!
+    const doc = JSON.parse(readFileSync(join(REPO_ROOT, 'agent-integration/gemini/hooks/hooks.json'), 'utf8')) as { hooks: Record<string, Array<Record<string, unknown>>> }
+    const before = doc.hooks['BeforeTool']!
     expect(before[0]!['matcher']).toMatch(/write_file|replace|run_shell_command/)
     expect(before[0]!['tools']).toBeUndefined()
   })
@@ -93,6 +93,16 @@ describe('Task 47 — hook matcher narrowing', () => {
     expect(plugin).toContain('FULCRUM_TOOL_ALLOWLIST')
     expect(plugin).toMatch(/Write.*Edit.*MultiEdit.*NotebookEdit.*Bash.*Task/s)
   })
+
+  it('Qwen: hooks use Qwen-native events and fulcrum hook qwen commands', () => {
+    const doc = JSON.parse(readFileSync(join(REPO_ROOT, 'agent-integration/qwen/hooks/hooks.json'), 'utf8')) as { hooks: Record<string, Array<Record<string, unknown>>> }
+    expect(doc.hooks).toHaveProperty('PreToolUse')
+    expect(doc.hooks).toHaveProperty('PostToolUse')
+    expect(doc.hooks).toHaveProperty('SessionStart')
+    const pre = doc.hooks['PreToolUse']![0]!
+    const hooks = pre['hooks'] as Array<{ command?: string }>
+    expect(hooks[0]!.command).toBe('fulcrum hook qwen pre')
+  })
 })
 
 describe('Task 48 — run-lifecycle signals', () => {
@@ -109,8 +119,8 @@ describe('Task 48 — run-lifecycle signals', () => {
   })
 
   it('Gemini: AfterAgent fires session_summary', () => {
-    const hooks = JSON.parse(readFileSync(join(REPO_ROOT, 'agent-integration/gemini/hooks/hooks.json'), 'utf8')) as Record<string, unknown>
-    expect(hooks).toHaveProperty('AfterAgent')
+    const doc = JSON.parse(readFileSync(join(REPO_ROOT, 'agent-integration/gemini/hooks/hooks.json'), 'utf8')) as { hooks: Record<string, unknown> }
+    expect(doc.hooks).toHaveProperty('AfterAgent')
   })
 
   it('Codex: notify is a root-level string array (PR 7 unit 7.26)', () => {
@@ -167,4 +177,3 @@ describe('Task 51 — Pi cockpit CLI + dead JSON removed', () => {
     }
   })
 })
-

@@ -13,7 +13,7 @@
 //   * L0 back-refs (sources[] + l0_wikilinks[]) on every hit
 //   * schema_version gate (legacy rows never returned)
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -24,7 +24,7 @@ import {
   registerStubEmbedder,
   unregisterStubEmbedder,
 } from './helpers.js'
-import { getDb } from 'fulcrum-agent-core'
+import { getDb, getReranker } from 'fulcrum-agent-core'
 import { runMigration101MemoryV3Lifecycle } from '../schema.js'
 import { upsertEntity, addEdge } from '../l1/entities.js'
 import { createCuratedPage } from '../l1/page.js'
@@ -33,10 +33,19 @@ import { flushPendingMemoryWrites } from '../l2/queue.js'
 import { runV3Search } from '../retrieval/v3-search.js'
 import type { CuratedPage } from '../l1/frontmatter.js'
 
+vi.mock('fulcrum-agent-core', async () => {
+  const actual = await vi.importActual<typeof import('fulcrum-agent-core')>('fulcrum-agent-core')
+  return {
+    ...actual,
+    getReranker: vi.fn().mockReturnValue(null),
+  }
+})
+
 let tmpVault: string
 let prevVaultEnv: string | undefined
 
 beforeEach(async () => {
+  vi.mocked(getReranker).mockReturnValue(null)
   createTestDb()
   runMigration101MemoryV3Lifecycle(getDb())
   seedWorkspaceAndProject(getDb(), 'ws_v3', 'proj_v3')
@@ -49,6 +58,7 @@ beforeEach(async () => {
 afterEach(() => {
   unregisterStubEmbedder()
   resetTestDb()
+  vi.clearAllMocks()
   rmSync(tmpVault, { recursive: true, force: true })
   if (prevVaultEnv === undefined) delete process.env['FULCRUM_VAULT_PATH']
   else process.env['FULCRUM_VAULT_PATH'] = prevVaultEnv
@@ -215,5 +225,74 @@ describe('runV3Search — L0 back-refs on every hit', () => {
     expect(hit.sources.sort()).toEqual(['01SRC_A', '01SRC_B'])
     expect(hit.l0_wikilinks.length).toBe(2)
     expect(hit.l0_wikilinks[0]).toContain('raw/bash_trace/')
+  })
+})
+
+describe('runV3Search — cross-encoder reranker', () => {
+  it('reranks fused candidates before pagination and exposes rerank score', async () => {
+    const dogId = seedPage({
+      id: '01KV3_DOG',
+      body: '# Dog memory\n\nmemory store for dog breed information and canine care. [[raw/bash_trace/2026/04/18/01SRC_DOG]]\n',
+      sources: ['01SRC_DOG'],
+    }).id
+    const physicsId = seedPage({
+      id: '01KV3_PHYSICS',
+      body: '# Physics memory\n\nmemory store for quantum physics experiments and superconducting circuits. [[raw/bash_trace/2026/04/18/01SRC_PHYS]]\n',
+      sources: ['01SRC_PHYS'],
+    }).id
+    await embedAll([dogId, physicsId])
+
+    const rerank = vi.fn().mockImplementation((_query: string, passages: string[]) => {
+      return Promise.resolve(passages.map((p) => p.includes('dog breed') ? 8 : -8))
+    })
+    vi.mocked(getReranker).mockReturnValue({ rerank, warmUp: vi.fn() })
+
+    const out = await runV3Search({
+      workspace_id: 'ws_v3',
+      project_id: 'proj_v3',
+      query: 'memory store',
+      limit: 1,
+      confidence_floor: 0,
+    })
+
+    expect(rerank).toHaveBeenCalled()
+    expect(out).toHaveLength(1)
+    expect(out[0]!.memory_id).toBe(dogId)
+    expect(out[0]!.score).toBeGreaterThan(0.99)
+  })
+
+  it('keeps fused ordering when reranker fails', async () => {
+    const firstId = seedPage({
+      id: '01KV3_FALLBACK_A',
+      body: '# Alpha\n\nauth token memory. [[raw/bash_trace/2026/04/18/01SRC_FA]]\n',
+      sources: ['01SRC_FA'],
+    }).id
+    seedPage({
+      id: '01KV3_FALLBACK_B',
+      body: '# Beta\n\nauth token memory. [[raw/bash_trace/2026/04/18/01SRC_FB]]\n',
+      sources: ['01SRC_FB'],
+    })
+    await embedAll(['01KV3_FALLBACK_A', '01KV3_FALLBACK_B'])
+
+    const baseline = await runV3Search({
+      workspace_id: 'ws_v3',
+      project_id: 'proj_v3',
+      query: 'auth token',
+      confidence_floor: 0,
+    })
+    vi.mocked(getReranker).mockReturnValue({
+      rerank: vi.fn().mockRejectedValue(new Error('model unavailable')),
+      warmUp: vi.fn(),
+    })
+
+    const out = await runV3Search({
+      workspace_id: 'ws_v3',
+      project_id: 'proj_v3',
+      query: 'auth token',
+      confidence_floor: 0,
+    })
+
+    expect(out.map((h) => h.memory_id)).toEqual(baseline.map((h) => h.memory_id))
+    expect(out.map((h) => h.memory_id)).toContain(firstId)
   })
 })

@@ -6,7 +6,7 @@ tools:
   - mcp_fulcrum_*
 model: gemini-2.0-flash
 max_turns: 20
-mcpServers:
+mcp_servers:
   fulcrum:
     command: fulcrum
     args: ["serve", "mcp", "--mode", "filtered", "--runtime-capability", "hooks"]

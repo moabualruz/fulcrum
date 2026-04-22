@@ -9,7 +9,7 @@ export type InstallPath =
   | 'cli-only'
 
 export interface RuntimeIntegrationPlan {
-  runtime: 'claude' | 'gemini' | 'pi' | 'cursor' | 'windsurf' | 'codex' | 'opencode'
+  runtime: 'claude' | 'gemini' | 'qwen' | 'pi' | 'cursor' | 'windsurf' | 'codex' | 'opencode'
   displayName: string
   detected: boolean
   installPath: InstallPath
@@ -51,6 +51,7 @@ export function buildRuntimeIntegrationPlan(options: IntegrationPlannerOptions =
 
   const hasClaude = has(join(home, '.claude')) || has(join(home, '.claude.json')) || hasCommand('claude')
   const hasGemini = has(join(home, '.gemini')) || hasCommand('gemini')
+  const hasQwen = has(join(home, '.qwen')) || hasCommand('qwen')
   const hasPi = hasCommand('pi')
   const hasCursor = has(join(home, '.cursor')) || has(join(cwd, '.cursor'))
   const hasWindsurf = has(join(home, '.windsurf')) || has(join(cwd, '.windsurf'))
@@ -79,6 +80,17 @@ export function buildRuntimeIntegrationPlan(options: IntegrationPlannerOptions =
       applyable: false,
       detectionHints: ['~/.gemini', '`gemini` on PATH'],
       nextSteps: ['Use `pnpm run setup:gemini` from the repo or `npx fulcrum-mcp@latest init` to install the extension bundle.'],
+    },
+    {
+      runtime: 'qwen',
+      displayName: 'Qwen Code',
+      detected: hasQwen,
+      installPath: 'extension-first',
+      supports: ['extensions', 'hooks', 'skills', 'agents', 'QWEN.md', 'MCP'],
+      rationale: 'Qwen Code has a native extension model with MCP servers, hooks, skills, agents, and context files. Fulcrum should install a Qwen extension bundle rather than treating Qwen as an unsupported Gemini clone.',
+      applyable: false,
+      detectionHints: ['~/.qwen', '`qwen` on PATH'],
+      nextSteps: ['Use `pnpm run setup:qwen` from the repo to install the Qwen extension bundle.'],
     },
     {
       runtime: 'pi',

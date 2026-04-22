@@ -1,0 +1,13 @@
+---
+name: fulcrum-delegate-task
+description: Create + assign task to another agent role.
+---
+# Delegate Task
+
+Delegate work to another role:
+
+1. `fulcrum action exec create_task` with `workspace_id`, `project_id`, clear `title`, detailed `description` (goal, inputs, done criteria), `priority`, `assigned_to` = target role slug (e.g., `software_engineer`, `qa_engineer`).
+2. `fulcrum action exec write_memory` recording delegation decision: why split off, parent task, dependency relationship.
+3. `fulcrum action exec get_workspace_status` to confirm WIP headroom before delegating. No budget → don't delegate.
+
+**Only chief_of_staff delegates between agents.** L2 roles complete their task; they don't spawn new agent workstreams.

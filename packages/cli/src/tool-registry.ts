@@ -200,16 +200,16 @@ const ACTION_PLATFORM_OVERRIDES: Record<string, Partial<Pick<ActionDefinition, '
   recall_memory: {
     hooks: {
       coverage: 'full',
-      nativePoints: ['claude.pre_tool_use', 'gemini.before_tool', 'pi.before_tool'],
-      nativePlatforms: ['claude', 'gemini', 'pi'],
+      nativePoints: ['claude.pre_tool_use', 'gemini.before_tool', 'qwen.pre_tool_use', 'pi.before_tool'],
+      nativePlatforms: ['claude', 'gemini', 'qwen', 'pi'],
       cliSubstitutable: true,
     },
   },
   write_memory: {
     hooks: {
       coverage: 'full',
-      nativePoints: ['claude.post_tool_use', 'claude.pre_compact', 'gemini.after_tool', 'pi.after_tool'],
-      nativePlatforms: ['claude', 'gemini', 'pi'],
+      nativePoints: ['claude.post_tool_use', 'claude.pre_compact', 'gemini.after_tool', 'qwen.post_tool_use', 'qwen.pre_compact', 'pi.after_tool'],
+      nativePlatforms: ['claude', 'gemini', 'qwen', 'pi'],
       cliSubstitutable: true,
     },
   },

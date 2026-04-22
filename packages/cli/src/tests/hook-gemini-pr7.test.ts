@@ -223,10 +223,11 @@ describe('PR 7.2 CLI dispatch for new Gemini phases', () => {
   })
 
   it('hooks.json registers BeforeAgent + BeforeToolSelection + Notification events', async () => {
-    const hooks = JSON.parse(readFileSync(
+    const doc = JSON.parse(readFileSync(
       join(import.meta.dirname ?? __dirname, '..', '..', '..', '..', 'agent-integration', 'gemini', 'hooks', 'hooks.json'),
       'utf8',
-    )) as Record<string, unknown>
+    )) as { hooks: Record<string, unknown> }
+    const hooks = doc.hooks
     expect(Object.keys(hooks)).toContain('BeforeAgent')
     expect(Object.keys(hooks)).toContain('BeforeToolSelection')
     expect(Object.keys(hooks)).toContain('Notification')

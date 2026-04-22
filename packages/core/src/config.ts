@@ -16,6 +16,7 @@ import {
 export type ValidationResult = { ok: true } | { ok: false; errors: string[] }
 
 const EMBEDDING_PROVIDERS = ['local', 'openai', 'voyage', 'cohere', 'ollama', 'jina', 'custom'] as const
+const EMBEDDING_DEVICES = ['auto', 'cpu', 'cuda', 'webgpu'] as const
 
 function validateEmbeddingProvider(value: unknown, path: string): string[] {
   const errs: string[] = []
@@ -32,6 +33,9 @@ function validateEmbeddingProvider(value: unknown, path: string): string[] {
   }
   if (v['dimensions'] !== undefined && (typeof v['dimensions'] !== 'number' || v['dimensions'] <= 0)) {
     errs.push(`${path}.dimensions: must be a positive number`)
+  }
+  if (v['device'] !== undefined && (typeof v['device'] !== 'string' || !(EMBEDDING_DEVICES as readonly string[]).includes(v['device']))) {
+    errs.push(`${path}.device: must be one of ${EMBEDDING_DEVICES.join(', ')}`)
   }
   if (v['apiKey'] !== undefined && typeof v['apiKey'] !== 'string') {
     errs.push(`${path}.apiKey: must be a string`)
@@ -124,11 +128,13 @@ const DEFAULT_TEXT_EMBEDDING: EmbeddingProviderConfig = {
   provider: 'local',
   model: 'onnx-community/Qwen3-Embedding-0.6B-ONNX',
   dimensions: DEFAULT_EMBED_DIM,
+  device: 'auto',
 }
 
 const DEFAULT_RERANKER: EmbeddingProviderConfig = {
   provider: 'local',
   model: 'onnx-community/bge-reranker-v2-m3-ONNX',
+  device: 'auto',
 }
 
 const DEFAULT_POLICY: PolicyConfig = {

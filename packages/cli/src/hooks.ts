@@ -154,7 +154,7 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
       toolName = actionName
       toolInput = toolInfo
     }
-  } else if (cliName === 'opencode' || cliName === 'cursor' || cliName === 'windsurf' || cliName === 'copilot') {
+  } else if (cliName === 'opencode' || cliName === 'cursor' || cliName === 'windsurf' || cliName === 'copilot' || cliName === 'qwen') {
     // Claude-compatible hook shape, with host-specific session fallbacks.
     toolName = (event['tool_name'] ?? event['tool'] ?? event['toolName']) as string ?? ''
     toolInput = asRecord(event['tool_input'] ?? event['input'] ?? event['toolInput'])
@@ -163,6 +163,7 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
       if (cliName === 'copilot') return process.env['COPILOT_SESSION_ID'] ?? process.env['FULCRUM_SESSION_ID']
       if (cliName === 'windsurf') return process.env['WINDSURF_SESSION_ID'] ?? process.env['FULCRUM_SESSION_ID']
       if (cliName === 'opencode') return process.env['OPENCODE_SESSION_ID'] ?? process.env['FULCRUM_SESSION_ID']
+      if (cliName === 'qwen') return process.env['QWEN_SESSION_ID'] ?? process.env['FULCRUM_SESSION_ID']
       return undefined
     })()
     sessionId = firstString(event['session_id'], event['sessionId'], hostSessionId, event['tool_use_id'], event['execution_id']) ?? 'unknown'
@@ -173,7 +174,10 @@ export function normalizeHookEvent(cliName: HookCli, event: Record<string, unkno
 
 // ---------- Pre/Post handlers ----------
 
-const HOOK_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash'])
+const HOOK_WRITE_TOOLS = new Set([
+  'Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash',
+  'write_file', 'replace', 'run_shell_command',
+])
 
 // PR 3 R1: tools that search the filesystem when the user might be better
 // served by a Fulcrum recall. Tracked per session by `recall_turn_state`.
@@ -192,6 +196,7 @@ const HOOK_BIAS_CLIS = new Set<HookCli>([
   'cursor',
   'windsurf',
   'copilot',
+  'qwen',
 ])
 
 function supportsRecallBias(cliName: HookCli): boolean {

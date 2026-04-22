@@ -1,0 +1,14 @@
+---
+name: fulcrum-worktree-merge
+description: Merge completed worktree branch back to base branch.
+---
+# Worktree Merge
+
+Before merging:
+
+1. Verify status = `ready_for_merge`. Do not merge `dirty` or `allocated`.
+2. Confirm required review = `approved` (status in `reviews` table).
+3. Check policy: `fulcrum action exec get_workspace_status` → no merge freeze active.
+4. Merge: `git merge --no-ff <branch>` from base branch.
+5. Update worktree status = `merged`. Complete agent run if final step.
+6. `fulcrum action exec write_memory` (`kind: "task_outcome"`) — what merged, what changed, notable decisions.

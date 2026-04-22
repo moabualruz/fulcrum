@@ -89,7 +89,7 @@ console.log(`fanout-gemini-extension: wrote ${skillCount} skills, ${ruleCount} r
 // different tool surface) and drop the Claude model line (let Gemini default).
 //
 // Per docs/core/subagents.md §"Subagent tool isolation": subagents do NOT
-// inherit the extension's mcpServers automatically. The fulcrum MCP surface
+// inherit the extension's MCP servers automatically. The fulcrum MCP surface
 // must be declared inline on every subagent or the role's documented tool
 // capabilities (invoke_team, start_agent_run, …) are unreachable from within
 // the subagent loop.
@@ -111,7 +111,7 @@ export function translateRoleForGemini(raw: string, slug: string): string {
   const descYaml = description.replace(/"/g, '\\"')
 
   const mcpBlock =
-    `mcpServers:\n` +
+    `mcp_servers:\n` +
     `  fulcrum:\n` +
     `    command: fulcrum\n` +
     `    args: ["serve", "mcp", "--mode", "filtered", "--runtime-capability", "hooks"]\n`

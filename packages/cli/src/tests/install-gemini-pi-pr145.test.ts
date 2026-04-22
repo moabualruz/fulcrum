@@ -15,6 +15,7 @@ import * as os from 'os'
 import {
   probePiCockpitOnNpm,
   validateGeminiExtensionManifest,
+  validateQwenExtensionManifest,
 } from '../../../../agent-integration/install.js'
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '../../../../../')
@@ -91,6 +92,31 @@ describe('validateGeminiExtensionManifest()', () => {
   })
 })
 
+describe('validateQwenExtensionManifest()', () => {
+  it('passes for the canonical qwen-extension.json', () => {
+    const manifestPath = path.join(REPO_ROOT, 'agent-integration/qwen/qwen-extension.json')
+    const result = validateQwenExtensionManifest(manifestPath)
+    expect(result.ok).toBe(true)
+    expect(result.errors).toHaveLength(0)
+  })
+
+  it('fails when mcpServers is missing', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fulcrum-qwen-pr145-'))
+    try {
+      const tmpJson = path.join(tmpDir, 'qwen-extension.json')
+      fs.writeFileSync(tmpJson, JSON.stringify({
+        name: 'fulcrum',
+        version: '1.0.0',
+      }), 'utf8')
+      const result = validateQwenExtensionManifest(tmpJson)
+      expect(result.ok).toBe(false)
+      expect(result.errors.some(e => e.includes('mcpServers'))).toBe(true)
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+})
+
 // ── PR 14.5: gemini extensions update message in dry-run ─────────────────────
 
 describe('installGeminiExtension dry-run output', () => {
@@ -117,9 +143,17 @@ describe('installGeminiExtension dry-run output', () => {
       expect(fs.existsSync(path.join(tmpHome, '.gemini/extensions/fulcrum/gemini-extension.json'))).toBe(true)
       expect(fs.existsSync(path.join(tmpHome, '.gemini/extensions/fulcrum/GEMINI.md'))).toBe(true)
       expect(fs.existsSync(path.join(tmpHome, '.gemini/extensions/fulcrum/hooks/hooks.json'))).toBe(true)
+      expect(fs.existsSync(path.join(tmpHome, '.gemini/extensions/fulcrum/rules/fulcrum-rule-fulcrum-first.md'))).toBe(true)
     } finally {
       fs.rmSync(tmpHome, { recursive: true, force: true })
     }
+  })
+})
+
+describe('installQwenExtension dry-run output', () => {
+  it('mentions qwen extensions update fulcrum', () => {
+    const { stdout } = runInstall(['qwen', '--dry-run'])
+    expect(stdout).toContain('qwen extensions update')
   })
 })
 

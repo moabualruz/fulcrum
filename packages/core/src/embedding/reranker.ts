@@ -1,8 +1,16 @@
 import type { RerankerProvider } from './types.js'
 import type { EmbeddingProviderConfig } from '../types.js'
+import { localEmbeddingPipelineOptions } from './local.js'
+
+type LocalRerankerDevice = NonNullable<EmbeddingProviderConfig['device']>
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
 
 export class LocalRerankerProvider implements RerankerProvider {
   private model: string
+  private device: LocalRerankerDevice
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private tokenizer: any = null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -11,6 +19,7 @@ export class LocalRerankerProvider implements RerankerProvider {
 
   constructor(config: EmbeddingProviderConfig) {
     this.model = config.model
+    this.device = config.device ?? 'auto'
   }
 
   async warmUp(): Promise<void> {
@@ -21,10 +30,27 @@ export class LocalRerankerProvider implements RerankerProvider {
         const { globalDataDir } = await import('../db/client.js')
         env.cacheDir = globalDataDir() + '/models'
         this.tokenizer = await AutoTokenizer.from_pretrained(this.model)
-        this.rankerModel = await AutoModelForSequenceClassification.from_pretrained(this.model, { dtype: 'q8' })
+        this.rankerModel = await this.createModel(AutoModelForSequenceClassification)
       })()
     }
     return this._warmingUp
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async createModel(AutoModelForSequenceClassification: any): Promise<any> {
+    for (const options of localEmbeddingPipelineOptions(this.device)) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        return await AutoModelForSequenceClassification.from_pretrained(this.model, options)
+      } catch (err) {
+        if (options.device && this.device === 'auto') {
+          process.stderr.write(`[fulcrum] ${options.device} reranker unavailable; trying next local reranker backend (${errorMessage(err)})\n`)
+          continue
+        }
+        throw err
+      }
+    }
+    throw new Error('Failed to initialize local reranker model')
   }
 
   async rerank(query: string, passages: string[]): Promise<number[]> {
