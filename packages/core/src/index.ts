@@ -8,7 +8,7 @@ export type {
   RagRebuildCandidateStatus, RagRebuildSnapshotStatus,
   EmbeddingJobSourceDomain, EmbeddingJobStatus, EmbeddingJobItemStatus,
   RagJobEventType, VectorMetadataSourceDomain, VectorMetadataTable,
-  VectorMetadataStatus, RagHealthStatus, RagEvalRunStatus,
+  VectorMetadataStatus, CodeFileStatus, RagHealthStatus, RagEvalRunStatus,
   FulcrumEvent, TaskRelation, RunEvent,
   EmbeddingProviderConfig, FulcrumConfig, PolicyCheckResult,
   HandoffPacket, CreateHandoffInput, HandoffPriority, HandoffScope, HandoffMode,

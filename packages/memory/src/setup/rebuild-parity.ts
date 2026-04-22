@@ -56,6 +56,18 @@ export function runRebuildParityChecks(
         )
     `, workspace_id, project_id)
     checks.push(chunkMismatches === 0 ? pass('code_files_chunk_counts') : fail('code_files_chunk_counts', chunkMismatches))
+
+    const failedOrSkippedWithChunks = count(db, `
+      SELECT COUNT(*) AS n
+      FROM code_files f
+      WHERE f.workspace_id = ? AND f.project_id = ?
+        AND f.status IN ('failed', 'skipped')
+        AND EXISTS (
+          SELECT 1 FROM code_chunks c
+          WHERE c.workspace_id = f.workspace_id AND c.project_id = f.project_id AND c.file_id = f.file_id
+        )
+    `, workspace_id, project_id)
+    checks.push(failedOrSkippedWithChunks === 0 ? pass('code_files_failure_state_chunks') : fail('code_files_failure_state_chunks', failedOrSkippedWithChunks))
   }
 
   if (input.domains.includes('vectors')) {

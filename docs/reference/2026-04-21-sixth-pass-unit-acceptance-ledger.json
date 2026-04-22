@@ -41095,26 +41095,6 @@
       "closed_at": "2026-04-21T21:09:39.113Z"
     },
     {
-      "id": "package_generated_artifact:packages_memory_dist_chunk_4oueyzvn_js",
-      "type": "package_generated_artifact",
-      "unit": "packages/memory/dist/chunk-4OUEYZVN.js",
-      "status": "accepted",
-      "source_paths": [
-        "packages/memory/dist/chunk-4OUEYZVN.js"
-      ],
-      "required_verifier": "generated artifact freshness and producer equality",
-      "reviewer_skills": [
-        "project-standards-reviewer",
-        "integration-utilization-auditor"
-      ],
-      "evidence": [
-        "pnpm build",
-        "pnpm --dir scripts test -- surface-inventory"
-      ],
-      "closure_reason": "repo-local verifier passed",
-      "closed_at": "2026-04-21T21:09:39.113Z"
-    },
-    {
       "id": "package_generated_artifact:packages_memory_dist_chunk_7vq4cwhh_js",
       "type": "package_generated_artifact",
       "unit": "packages/memory/dist/chunk-7VQ4CWHH.js",
@@ -41161,6 +41141,26 @@
       "status": "accepted",
       "source_paths": [
         "packages/memory/dist/chunk-MCKGQKYU.js"
+      ],
+      "required_verifier": "generated artifact freshness and producer equality",
+      "reviewer_skills": [
+        "project-standards-reviewer",
+        "integration-utilization-auditor"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-21T21:09:39.113Z"
+    },
+    {
+      "id": "package_generated_artifact:packages_memory_dist_chunk_ueaditin_js",
+      "type": "package_generated_artifact",
+      "unit": "packages/memory/dist/chunk-UEADITIN.js",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/dist/chunk-UEADITIN.js"
       ],
       "required_verifier": "generated artifact freshness and producer equality",
       "reviewer_skills": [
@@ -41235,12 +41235,12 @@
       "closed_at": "2026-04-21T21:09:39.113Z"
     },
     {
-      "id": "package_generated_artifact:packages_memory_dist_ingest_t3en7xk5_js",
+      "id": "package_generated_artifact:packages_memory_dist_ingest_4meo3im4_js",
       "type": "package_generated_artifact",
-      "unit": "packages/memory/dist/ingest-T3EN7XK5.js",
+      "unit": "packages/memory/dist/ingest-4MEO3IM4.js",
       "status": "accepted",
       "source_paths": [
-        "packages/memory/dist/ingest-T3EN7XK5.js"
+        "packages/memory/dist/ingest-4MEO3IM4.js"
       ],
       "required_verifier": "generated artifact freshness and producer equality",
       "reviewer_skills": [
@@ -58655,6 +58655,27 @@
       "closed_at": "2026-04-22T18:30:00.000Z"
     },
     {
+      "id": "package_export:packages_core_src_index_ts_codefilestatus",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#CodeFileStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
       "id": "package_export:packages_core_src_index_ts_embeddingjobitemstatus",
       "type": "package_export",
       "unit": "packages/core/src/index.ts#EmbeddingJobItemStatus",
@@ -62349,6 +62370,110 @@
       "closed_at": "2026-04-22T18:30:00.000Z"
     },
     {
+      "id": "package_generated_artifact:packages_cli_dist_packages_cli_tsconfig_tsbuildinfo",
+      "type": "package_generated_artifact",
+      "unit": "packages/cli/dist/packages/cli/tsconfig.tsbuildinfo",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/dist/packages/cli/tsconfig.tsbuildinfo"
+      ],
+      "required_verifier": "generated artifact freshness and producer equality",
+      "reviewer_skills": [
+        "project-standards-reviewer",
+        "integration-utilization-auditor"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_code_index_failures_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/code-index-failures.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/code-index-failures.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_code_index_lines_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/code-index-lines.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/code-index-lines.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_code_index_parity_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/code-index-parity.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/code-index-parity.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_code_index_utilization_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/code-index-utilization.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/code-index-utilization.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
       "id": "package_export:packages_memory_src_index_ts_writevectormetadata",
       "type": "package_export",
       "unit": "packages/memory/src/index.ts#writeVectorMetadata",
@@ -62371,7 +62496,7 @@
     }
   ],
   "status_counts": {
-    "accepted": 2936
+    "accepted": 2942
   },
   "last_closure_run": {
     "date": "2026-04-21",

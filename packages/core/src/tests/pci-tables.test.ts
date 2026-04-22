@@ -36,11 +36,11 @@ describe('code_files table — v2a Task 5', () => {
     expect(tableExists(db, 'code_files')).toBe(true)
     const cols = (db.prepare('PRAGMA table_info(code_files)').all() as { name: string; notnull: number }[])
     const colByName = new Map(cols.map(c => [c.name, c]))
-    for (const col of ['file_id', 'workspace_id', 'project_id', 'rel_path', 'language', 'sha256', 'mtime_ns', 'size_bytes', 'chunks_count', 'indexed_at']) {
+    for (const col of ['file_id', 'workspace_id', 'project_id', 'rel_path', 'language', 'sha256', 'mtime_ns', 'size_bytes', 'chunks_count', 'indexed_at', 'status', 'failure_reason', 'last_error_at']) {
       expect(colByName.has(col), `code_files.${col} missing`).toBe(true)
     }
     // Required NOT NULL on the load-bearing fields.
-    for (const col of ['file_id', 'workspace_id', 'project_id', 'rel_path', 'sha256', 'mtime_ns', 'size_bytes', 'indexed_at']) {
+    for (const col of ['file_id', 'workspace_id', 'project_id', 'rel_path', 'sha256', 'mtime_ns', 'size_bytes', 'indexed_at', 'status']) {
       expect(colByName.get(col)?.notnull, `code_files.${col} should be NOT NULL`).toBe(1)
     }
   })

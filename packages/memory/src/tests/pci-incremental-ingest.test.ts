@@ -124,6 +124,29 @@ describe('PCI syncer — v2a PR 4 Task 19', () => {
     expect(stillThere).toBeUndefined()
   })
 
+  it('same-path unlink followed by add cancels the pending delete', async () => {
+    const relPath = 'src/recreated.ts'
+    const abs = join(root, relPath)
+    mkdirSync(join(root, 'src'), { recursive: true })
+    writeFileSync(abs, 'export const recreated = "old"\n', 'utf8')
+    await syncFile({ db, workspaceId, projectId, projectRoot: root, event: { change_type: 'add', path: abs } })
+
+    const fileId = computeFileId(projectId, relPath)
+    unlinkSync(abs)
+    await syncFile({ db, workspaceId, projectId, projectRoot: root, event: { change_type: 'unlink', path: abs } })
+
+    const nextBody = 'export const recreated = "new"\n'
+    writeFileSync(abs, nextBody, 'utf8')
+    const r = await syncFile({ db, workspaceId, projectId, projectRoot: root, event: { change_type: 'add', path: abs } })
+    expect(r.action).toBe('updated')
+
+    await new Promise(resolve => setTimeout(resolve, 600))
+    const row = db.prepare('SELECT sha256, chunks_count FROM code_files WHERE file_id = ?').get(fileId) as { sha256: string; chunks_count: number } | undefined
+    expect(row).toBeDefined()
+    expect(row?.sha256).toBe(contentSha256(nextBody))
+    expect(Number(row?.chunks_count)).toBeGreaterThan(0)
+  })
+
   it('rename detected: unlink followed by add with same body hash migrates file_id', async () => {
     mkdirSync(join(root, 'src'), { recursive: true })
     const oldPath = 'src/old-name.ts'
@@ -165,5 +188,19 @@ describe('PCI syncer — v2a PR 4 Task 19', () => {
     writeFileSync(abs, 'x'.repeat(6 * 1024 * 1024), 'utf8')
     const r = await syncFile({ db, workspaceId, projectId, projectRoot: root, event: { change_type: 'add', path: abs } })
     expect(r.action).toBe('skipped')
+  })
+
+  it('read failures record failed file state', async () => {
+    const relPath = 'src/missing.ts'
+    const abs = join(root, relPath)
+    const fileId = computeFileId(projectId, relPath)
+
+    const r = await syncFile({ db, workspaceId, projectId, projectRoot: root, event: { change_type: 'add', path: abs } })
+    expect(r.action).toBe('failed')
+
+    const row = db.prepare('SELECT status, failure_reason, chunks_count FROM code_files WHERE file_id = ?').get(fileId) as { status: string; failure_reason: string; chunks_count: number }
+    expect(row.status).toBe('failed')
+    expect(row.failure_reason).toBe('read_failed')
+    expect(row.chunks_count).toBe(0)
   })
 })

@@ -105,6 +105,7 @@ export type RagJobEventType = 'progress' | 'retry' | 'split' | 'fallback' | 'can
 export type VectorMetadataSourceDomain = 'memory' | 'code_chunk'
 export type VectorMetadataTable = 'vec_memories' | 'vec_chunks'
 export type VectorMetadataStatus = 'current' | 'stale' | 'failed' | 'skipped' | 'legacy'
+export type CodeFileStatus = 'indexed' | 'skipped' | 'failed'
 export type RagHealthStatus = 'healthy' | 'degraded' | 'failed'
 export type RagEvalRunStatus = 'pending' | 'running' | 'passed' | 'failed' | 'cancelled'
 

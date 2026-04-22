@@ -166,18 +166,18 @@
 
 ### Tests for User Story 4
 
-- [ ] T069 [P] [US4] Add failing batch vs incremental code indexing parity tests for FR-015, FR-016, and SC-002 in packages/memory/src/tests/code-index-parity.test.ts
-- [ ] T070 [P] [US4] Add failing parse/index failure state tests for FR-017 in packages/memory/src/tests/code-index-failures.test.ts
-- [ ] T071 [P] [US4] Add failing stale chunk replacement and current line range tests for FR-018 in packages/memory/src/tests/code-index-lines.test.ts
-- [ ] T072 [P] [US4] Add failing integration utilization tests proving batch and PCI consumers use the same file-level primitive in packages/memory/src/tests/code-index-utilization.test.ts
+- [X] T069 [P] [US4] Add failing batch vs incremental code indexing parity tests for FR-015, FR-016, and SC-002 in packages/memory/src/tests/code-index-parity.test.ts
+- [X] T070 [P] [US4] Add failing parse/index failure state tests for FR-017 in packages/memory/src/tests/code-index-failures.test.ts
+- [X] T071 [P] [US4] Add failing stale chunk replacement and current line range tests for FR-018 in packages/memory/src/tests/code-index-lines.test.ts
+- [X] T072 [P] [US4] Add failing integration utilization tests proving batch and PCI consumers use the same file-level primitive in packages/memory/src/tests/code-index-utilization.test.ts
 
 ### Implementation for User Story 4
 
-- [ ] T073 [US4] Implement shared file-level code indexing primitive with file identity, hash, language, chunk count, and failure state in packages/memory/src/l2/code.ts
-- [ ] T074 [US4] Update batch project indexing to call the shared file-level primitive in packages/memory/src/setup/backfill-code-files.ts
-- [ ] T075 [US4] Update PCI incremental indexing to call the shared file-level primitive in packages/memory/src/pci/syncer.ts
-- [ ] T076 [US4] Enforce chunk/file relationship parity and legacy classification in packages/memory/src/retrieval/search-code.ts
-- [ ] T077 [US4] Return stable path and line range for every code-search result in packages/memory/src/retrieval/search-code.ts
+- [X] T073 [US4] Implement shared file-level code indexing primitive with file identity, hash, language, chunk count, and failure state in packages/memory/src/l2/code.ts
+- [X] T074 [US4] Update batch project indexing to call the shared file-level primitive in packages/memory/src/setup/backfill-code-files.ts
+- [X] T075 [US4] Update PCI incremental indexing to call the shared file-level primitive in packages/memory/src/pci/syncer.ts
+- [X] T076 [US4] Enforce chunk/file relationship parity and legacy classification in packages/memory/src/retrieval/search-code.ts
+- [X] T077 [US4] Return stable path and line range for every code-search result in packages/memory/src/retrieval/search-code.ts
 
 **Checkpoint**: US4 code index state is consistent across ingestion paths.
 

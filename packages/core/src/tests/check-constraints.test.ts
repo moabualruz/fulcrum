@@ -232,6 +232,12 @@ const GUARDED_COLUMNS: EnumColumn[] = [
     expected: ['current', 'stale', 'failed', 'skipped', 'legacy'],
   },
   {
+    // CodeFileStatus — packages/core/src/types.ts
+    table: 'code_files',
+    column: 'status',
+    expected: ['indexed', 'skipped', 'failed'],
+  },
+  {
     // RagHealthStatus — packages/core/src/types.ts
     table: 'rag_health_reports',
     column: 'status',

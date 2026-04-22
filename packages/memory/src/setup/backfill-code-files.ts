@@ -5,9 +5,9 @@
 // inserts a code_files row, and updates code_chunks.file_id. Idempotent —
 // safe to re-run.
 
-import { createHash } from 'node:crypto'
 import type { Db } from 'fulcrum-agent-core'
 import { getDb } from 'fulcrum-agent-core'
+import { computeFileId } from '../l2/code.js'
 
 export interface BackfillResult {
   filesBackfilled: number
@@ -20,9 +20,7 @@ export interface BackfillScope {
   project_id: string
 }
 
-export function computeFileId(project_id: string, rel_path: string): string {
-  return createHash('sha256').update(`${project_id}:${rel_path}`).digest('hex')
-}
+export { computeFileId } from '../l2/code.js'
 
 export function backfillCodeFiles(db: Db = getDb(), scope?: BackfillScope): BackfillResult {
   const scopeWhere = scope ? 'AND workspace_id = ? AND project_id = ?' : ''

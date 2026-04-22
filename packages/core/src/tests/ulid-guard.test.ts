@@ -35,11 +35,6 @@ const ALLOWED_PATHS: Array<{ path: string; reason: string }> = [
     reason: 'Canonical newId() implementation — wraps ulid() by design.',
   },
   {
-    path: 'packages/memory/src/ingest.ts',
-    reason:
-      'code_chunks.chunk_id is an internal, unprefixed identifier for a sub-object owned by the ingest pipeline — no registered prefix in ids.ts.',
-  },
-  {
     path: 'packages/sync/src/sync-manager.ts',
     reason:
       'sync_id / queueId / conflictId are internal identifiers for sync_states, sync_queue, sync_conflicts tables — no registered prefix in ids.ts. If these become user-visible, promote to newId().',

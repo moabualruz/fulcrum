@@ -160,6 +160,25 @@ function addCodeChunksFileIdIfMissing(db: Database.Database): void {
   }
 }
 
+/**
+ * US4 RAG lifecycle hardening: code_files owns explicit file-level state so
+ * skipped/failed files never look like partially indexed successes.
+ */
+function addCodeFilesLifecycleColumnsIfMissing(db: Database.Database): void {
+  const tbl = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='code_files'").get() as { name: string } | undefined
+  if (!tbl) return
+  const cols = (db.prepare('PRAGMA table_info(code_files)').all() as { name: string }[]).map(c => c.name)
+  if (!cols.includes('status')) {
+    db.exec(`ALTER TABLE code_files ADD COLUMN status TEXT NOT NULL DEFAULT 'indexed' CHECK(status IN ('indexed','skipped','failed'))`)
+  }
+  if (!cols.includes('failure_reason')) {
+    db.exec(`ALTER TABLE code_files ADD COLUMN failure_reason TEXT`)
+  }
+  if (!cols.includes('last_error_at')) {
+    db.exec(`ALTER TABLE code_files ADD COLUMN last_error_at TEXT`)
+  }
+}
+
 export function applySchema(db: Database.Database): void {
   // v2a PR 1 Task 1: rebuild legacy memories table BEFORE the idempotent CREATE
   // statements run. CREATE IF NOT EXISTS would skip the legacy table and leave
@@ -168,6 +187,7 @@ export function applySchema(db: Database.Database): void {
   addAgentRunsContextTypeIfMissing(db)
   addProjectsRootRealpathIfMissing(db)
   addCodeChunksFileIdIfMissing(db)
+  addCodeFilesLifecycleColumnsIfMissing(db)
 
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -982,6 +1002,9 @@ export function applySchema(db: Database.Database): void {
       size_bytes   INTEGER NOT NULL,
       chunks_count INTEGER NOT NULL DEFAULT 0,
       indexed_at   INTEGER NOT NULL,
+      status       TEXT NOT NULL DEFAULT 'indexed' CHECK(status IN ('indexed','skipped','failed')),
+      failure_reason TEXT,
+      last_error_at  TEXT,
       UNIQUE (project_id, rel_path)
     );
     CREATE INDEX IF NOT EXISTS idx_code_files_lang ON code_files (language);

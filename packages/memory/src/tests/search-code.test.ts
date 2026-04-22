@@ -74,4 +74,20 @@ describe('searchCode — v2a PR 2 Task 13', () => {
     expect(out2.results).toEqual([])
     expect(out2.reason).toBe('below_floor')
   })
+
+  it('does not return orphaned chunks with missing file rows', async () => {
+    db.prepare(`
+      INSERT INTO code_chunks (
+        chunk_id, workspace_id, project_id, file_path, file_id, language,
+        chunk_strategy, source_type, content, start_line, end_line, symbol_path, indexed_at
+      ) VALUES (
+        'c_orphan', 'ws_1', 'proj_1', 'src/orphan.ts', 'missing_file', 'typescript',
+        'syntax', 'code', 'orphan marker token', 1, 1, NULL, '2026-04-17T00:00:00Z'
+      )
+    `).run()
+
+    const out = await searchCode({ workspace_id: 'ws_1', project_id: 'proj_1', text: 'orphan marker' })
+    expect(out.results).toEqual([])
+    expect(out.reason).toBe('no_match')
+  })
 })
