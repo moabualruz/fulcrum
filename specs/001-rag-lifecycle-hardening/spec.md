@@ -20,6 +20,7 @@ As a Fulcrum operator, I need one authoritative reset and rebuild workflow for a
 1. **Given** a workspace with existing raw vault files, curated memory files, project files, and stale derived search state, **When** an operator requests a full derived reset and rebuild, **Then** the system clears derived state, rebuilds all intended indexes from canonical sources, and returns a machine-readable report with counts and pass/fail checks.
 2. **Given** any parity check fails during rebuild, **When** the workflow reaches verification, **Then** the workflow reports the failing check, exits unsuccessfully, and leaves enough report detail for the operator to identify the affected domain.
 3. **Given** an operator asks only for a dry run or plan, **When** the workflow evaluates scope, **Then** it reports what would be cleared and rebuilt without mutating state.
+4. **Given** text-search indexes are rebuilt from source tables, **When** verification runs, **Then** keyword-search integrity is checked and any inconsistency is reported as a failed rebuild stage.
 
 ---
 
@@ -36,6 +37,7 @@ As a Fulcrum operator, I need embedding work to be durable, resumable, and model
 1. **Given** a large corpus embedding job is interrupted, **When** the operator resumes the job, **Then** already completed rows are not reprocessed unless stale, pending rows continue, and failures remain inspectable.
 2. **Given** a row cannot be embedded, **When** the embedding job records the failure, **Then** the row keeps its source identity, content hash, model intent, error type, error message, attempt count, and retry eligibility.
 3. **Given** an embedding model, provider, device, dimensions, or content hash changes, **When** the operator checks coverage, **Then** stale vectors are reported separately from current vectors.
+4. **Given** the system reduces batch size or splits content to recover from an embedding failure, **When** the job continues, **Then** the recovery decision is recorded with source item identity and does not hide partial work.
 
 ---
 
@@ -103,6 +105,7 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 2. **Given** a lexical distractor competes with a semantically correct result, **When** reranking is enabled, **Then** the eval verifies the distractor is demoted.
 3. **Given** a stale claim has been superseded, **When** recall runs in eval, **Then** the stale claim is excluded or clearly marked according to the recall contract.
 4. **Given** a full rebuild starts from empty derived state, **When** eval completes, **Then** it verifies index parity before retrieval assertions run.
+5. **Given** an eval case includes expected evidence, **When** recall returns an answerable result, **Then** the eval verifies retrieval relevance, source grounding, and provenance trace separately from answer correctness.
 
 ### Edge Cases
 
@@ -111,6 +114,8 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - Long-running jobs must remain inspectable after process interruption, terminal close, or host restart.
 - Partial model migration must report mixed-vector coverage instead of presenting the index as homogeneous.
 - Content that exceeds model limits must be represented as explicit chunks with stable source provenance, never as a silent partial embedding.
+- Text-search index and backing data drift must be detected before the workspace is marked healthy.
+- Accelerator dependency mismatch, unsupported provider, or unavailable runtime must produce explicit state rather than a silent downgrade when configuration is explicit.
 - Legacy or unbacked memory must remain searchable only with visible provenance class and confidence limits.
 - Duplicate requests for cancellation, resume, or retry must be idempotent and produce current job state.
 - Graph rebuild failures must not mark the full RAG state healthy.
@@ -153,6 +158,11 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - **FR-032**: System MUST allow an operator to run local evals immediately after a full reindex or rebuild.
 - **FR-033**: System MUST guarantee that help, status, and explain-only operations do not mutate state.
 - **FR-034**: System MUST provide machine-readable output for reset, rebuild, embedding, health, explanation, job, and eval operations.
+- **FR-035**: System MUST verify text-search index integrity against backing content during rebuild and health checks where the storage engine supports that validation.
+- **FR-036**: System MUST record adaptive embedding recovery actions, including batch-size reductions and content splits, as inspectable job events.
+- **FR-037**: System MUST distinguish requested runtime device from actual runtime device in embedding, reranking, recall explanation, and health output.
+- **FR-038**: System MUST group eval failures by retrieval relevance, ranking, answer correctness, grounding/provenance, graph expansion, and operational parity.
+- **FR-039**: System MUST keep default evals deterministic and local-first, with model-heavy or accelerator-heavy checks opt-in.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -169,6 +179,8 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - **Graph Coverage Report**: Counts and freshness status for graph nodes and edges produced from code, tasks, decisions, errors, and memory relationships.
 - **RAG Health Report**: Consolidated health summary for all recall and code-search domains, including parity, stale state, failures, and recommended actions.
 - **RAG Eval Case**: Fixture-backed query with expected results, ranking expectations, provenance expectations, and rebuild prerequisites.
+- **Job Event**: Durable event attached to a long-running job, including progress updates, recovery actions, fallback decisions, cancellation, resume, and failure details.
+- **Text Search Integrity Check**: Verification that keyword-search index content matches its backing source rows and can be safely trusted for recall.
 
 ## Success Criteria *(mandatory)*
 
@@ -184,6 +196,8 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - **SC-008**: Golden evals fail when expected memory results, code chunks, provenance links, ranking order, or rebuild parity are intentionally broken.
 - **SC-009**: Help, status, dry-run, plan, and explain-only operations perform zero state mutations in automated tests.
 - **SC-010**: Operators can determine current RAG health and next required action from command output alone, without manual database queries, for all fixture failure modes.
+- **SC-011**: Eval output identifies the failing retrieval stage or operational parity stage for every intentionally broken fixture case.
+- **SC-012**: A workspace with text-search/backing-content drift is reported unhealthy before recall quality checks are allowed to pass.
 
 ## Assumptions
 
@@ -192,3 +206,4 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - Existing recall and code-search behavior should remain available while new lifecycle guarantees are added incrementally.
 - Graph recall is in scope for coverage, explanation, and evals, but quality improvements beyond first-class lifecycle participation can be staged after P1 work.
 - Operator-facing command names and exact JSON schemas may be refined during planning, provided the user-visible capabilities and machine-readable contracts remain intact.
+- Online research notes for this specification are captured in `research.md`; planning should turn those source-backed decisions into technical contracts and task slices.
