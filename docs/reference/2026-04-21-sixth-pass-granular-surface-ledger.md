@@ -16,30 +16,30 @@ Guard: `scripts/surface-inventory.test.ts`.
 Machine-checked unit ledger:
 `docs/reference/2026-04-21-sixth-pass-unit-acceptance-ledger.json`.
 
-The JSON ledger currently contains 2,769 explicit unit rows:
+The JSON ledger currently contains 2,936 explicit unit rows:
 
 | Unit class | Rows |
 |---|---:|
 | workspace projects | 17 |
-| package source files | 277 |
-| package test files | 311 |
+| package source files | 288 |
+| package test files | 322 |
 | package config files | 37 |
 | package generated artifacts | 37 |
-| script source files | 15 |
-| package manifest scripts | 72 |
+| script source files | 23 |
+| package manifest scripts | 80 |
 | public package entrypoints | 13 |
-| package exports | 883 |
+| package exports | 927 |
 | CLI dispatch tokens | 42 |
 | fanout targets | 8 |
-| MCP tool schemas | 32 |
-| tool registry entries | 39 |
+| MCP tool schemas | 36 |
+| tool registry entries | 43 |
 | monitor routes | 40 |
 | workflow steps | 29 |
-| installer functions | 17 |
+| installer functions | 18 |
 | opencode native tools | 10 |
 | PI native tools | 11 |
-| agent integration artifacts | 790 |
-| host hook config events | 54 |
+| agent integration artifacts | 859 |
+| host hook config events | 61 |
 | PI extension events | 14 |
 | PI extension commands | 13 |
 | opencode plugin events | 8 |
@@ -48,7 +48,7 @@ Current JSON status counts:
 
 | Status | Rows |
 |---|---:|
-| accepted | 2,769 |
+| accepted | 2,936 |
 | blocked-external | 0 |
 | blocked-decision | 0 |
 | open (`test-gap`, `integration-gap`, `runtime-unverified`) | 0 |
@@ -87,6 +87,7 @@ are explicit external blockers instead of hidden open work.
 - `agent-integration/gemini`
 - `agent-integration/opencode`
 - `agent-integration/pi`
+- `agent-integration/qwen`
 - `agent-integration/copilot`
 - `agent-integration/cursor`
 - `agent-integration/windsurf`
@@ -193,6 +194,10 @@ runtime rows.
 - `recall_memory`
 - `recall_knowledge`
 - `get_memory_sources`
+- `get_rag_rebuild_plan`
+- `get_rag_rebuild_dry_run`
+- `start_rag_rebuild`
+- `get_rag_rebuild_report`
 - `inspect_memory`
 - `read_raw_source`
 - `trace_claim`
@@ -243,6 +248,10 @@ CLI/action parity, response contract, negative path, and docs.
 - `project_context`
 - `query_memory`
 - `search_code`
+- `get_rag_rebuild_plan`
+- `get_rag_rebuild_dry_run`
+- `start_rag_rebuild`
+- `get_rag_rebuild_report`
 - `list_agent_profiles`
 - `create_agent_profile`
 - `get_agent_run_status`
@@ -364,6 +373,7 @@ by parent-level workflow presence alone.
 - `installClaudeAgentMds`
 - `installClaudeCommands`
 - `installGeminiExtension`
+- `installQwenExtension`
 - `installPiCockpit`
 - `installCodexGlobal`
 - `installOpencodeGlobal`
@@ -421,6 +431,7 @@ dashboard refresh.
 | Gemini | 81 | 33 | 26 | 1 | 12 |
 | opencode | 17 | 0 | 0 | 0 | 5 |
 | PI | 10 | 0 | 0 | 0 | 0 |
+| Qwen | 69 | 33 | 26 | 1 | 4 |
 | Copilot | 64 | 0 | 24 | 1 | 0 |
 | Cursor | 77 | 33 | 0 | 1 | 6 |
 | Windsurf | 44 | 0 | 0 | 1 | 6 |
@@ -465,6 +476,9 @@ rules-first wording cannot hide shipped hook surfaces.
 - `agent-integration/pi/fulcrum.d.ts`
 - `agent-integration/pi/cockpit/index.ts`
 - `agent-integration/pi/cockpit/package.json`
+- `agent-integration/qwen/QWEN.md`
+- `agent-integration/qwen/hooks/hooks.json`
+- `agent-integration/qwen/qwen-extension.json`
 - `agent-integration/windsurf/.windsurf/hooks.json`
 - `agent-integration/windsurf/.windsurf/mcp.json`
 - `agent-integration/windsurf/.windsurf/rules/fulcrum-core.md`
@@ -480,9 +494,9 @@ source is `.windsurf/mcp.json`.
 | Area | State | Reason |
 |---|---|---|
 | Surface inventory | accepted | Guarded by `scripts/surface-inventory.test.ts`. |
-| Full unit ledger | terminal-all-accepted | 2,769 unit rows: 2,769 accepted, 0 blocked, 0 open. |
-| Package internals and exports | accepted | Package roots, 277 production source files, 311 test files, 37 package configs, 37 generated dist artifacts, 72 manifest scripts, and 883 exports have accepted rows. |
-| Plugins/extensions | accepted | Host roots, native tools, 790 agent-integration artifact rows, 54 hook config events, 14 PI events, 13 PI commands, and 8 opencode plugin hooks have verifier evidence. |
+| Full unit ledger | terminal-all-accepted | 2,936 unit rows: 2,936 accepted, 0 blocked, 0 open. |
+| Package internals and exports | accepted | Package roots, 288 production source files, 322 test files, 37 package configs, 37 generated dist artifacts, 80 manifest scripts, and 927 exports have accepted rows. |
+| Plugins/extensions | accepted | Host roots, native tools, 859 agent-integration artifact rows, 61 hook config events, 14 PI events, 13 PI commands, and 8 opencode plugin hooks have verifier evidence. |
 | Monitor web | accepted for ledgered routes | Route/docs/PI-consumer rows are accepted. Separate browser-visual review remains a future audit surface if new UI claims are added. |
 | Install/fanout | accepted | Setup, setup check, fanout utilization, generated artifact, and installer function rows are accepted. |
 | Memory v3 | accepted for ledgered units | Eval scripts now have repo-local verifier evidence; shipped memory code/tests remain accepted. |
@@ -496,7 +510,7 @@ source is `.windsurf/mcp.json`.
   artifacts, callable surfaces, monitor docs/PI route parity, active host-doc
   config claims, package source/test/config/generated files, manifest scripts,
   hook config events, PI extension events/commands, opencode plugin hooks, and
-  2,769 explicit terminal unit status rows.
+  2,936 explicit terminal unit status rows.
 - `pnpm -F fulcrum-agent-cli test -- hook-host-runtime hook-normalization`
   passed inside the full CLI suite with 73 CLI test files and 813 assertions,
   including black-box hook

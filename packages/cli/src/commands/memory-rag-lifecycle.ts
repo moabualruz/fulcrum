@@ -90,7 +90,9 @@ export async function executeRagRebuildCommand(input: RagRebuildCommandInput, db
     actor,
   }, db)
 
-  auditRagRebuild({ workspace_id, project_id, actor, mode: input.mode, authorized: auth, report_id: result.report_id }, db)
+  if (input.mode === 'execute') {
+    auditRagRebuild({ workspace_id, project_id, actor, mode: input.mode, authorized: auth, report_id: result.report_id }, db)
+  }
   return result
 }
 

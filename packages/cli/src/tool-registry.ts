@@ -968,21 +968,14 @@ TOOL_REGISTRY.set('start_rag_rebuild', {
   capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
   handler: async (args, deps) => {
     const { executeRagRebuildCommand } = await import('./commands/memory-rag-lifecycle.js')
-    const suppliedActor = args['actor'] as Record<string, unknown> | undefined
-    const trustedRole = deps.trusted_caller_role
+    const trustedRole = (deps.trusted_caller_role ?? 'software_engineer') as AgentRole
     return executeRagRebuildCommand({
       workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
       project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
       mode: 'execute',
       domains: args['domains'] as RagRebuildDomain[] | undefined,
       allow_empty: args['allow_empty'] as boolean | undefined,
-      actor: trustedRole
-        ? { kind: 'agent', role: trustedRole as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' }
-        : {
-            kind: suppliedActor?.['kind'] as 'human' | 'agent' | undefined,
-            role: (suppliedActor?.['role'] ?? 'software_engineer') as AgentRole,
-            id: (suppliedActor?.['id'] ?? 'mcp') as string,
-          },
+      actor: { kind: 'agent', role: trustedRole, id: deps.trusted_caller_run_id ?? 'mcp' },
     }, deps.db)
   },
 })

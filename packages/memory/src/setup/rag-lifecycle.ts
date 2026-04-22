@@ -65,6 +65,31 @@ function rebuildFts(db: Db): string[] {
   return warnings
 }
 
+function releaseCandidateBuildSavepoint(db: Db, commit: boolean): void {
+  if (!commit) db.exec('ROLLBACK TO SAVEPOINT rag_rebuild_candidate')
+  db.exec('RELEASE SAVEPOINT rag_rebuild_candidate')
+}
+
+function runCandidateBuild(
+  input: { workspace_id: string; project_id: string; domains: RagRebuildDomain[] },
+  db: Db,
+): { parity: RagParityCheck[]; warnings: string[] } {
+  const warnings: string[] = []
+  let parity: RagParityCheck[] = []
+  db.exec('SAVEPOINT rag_rebuild_candidate')
+  try {
+    if (input.domains.includes('code')) backfillCodeFiles(db, { workspace_id: input.workspace_id, project_id: input.project_id })
+    if (input.domains.includes('fts') || input.domains.includes('l1') || input.domains.includes('code')) warnings.push(...rebuildFts(db))
+    parity = runRebuildParityChecks(input, db)
+    const passed = parity.every(check => check.status !== 'fail')
+    releaseCandidateBuildSavepoint(db, passed)
+    return { parity, warnings }
+  } catch (err) {
+    releaseCandidateBuildSavepoint(db, false)
+    throw err
+  }
+}
+
 export async function runRagRebuild(request: RagRebuildRequest, db: Db = getDb()): Promise<RagRebuildReport> {
   const domains = normalizeDomains(request.domains)
   const actor = request.actor ?? { kind: 'agent', role: 'software_engineer', id: 'unknown' }
@@ -123,13 +148,16 @@ export async function runRagRebuild(request: RagRebuildRequest, db: Db = getDb()
     }, db)
 
     updateRebuildCandidateStatus(candidate.candidate_id, 'verifying', [], db)
-    if (domains.includes('code')) backfillCodeFiles(db)
-    if (domains.includes('fts') || domains.includes('l1') || domains.includes('code')) warnings.push(...rebuildFts(db))
 
     await request.on_before_promote?.()
 
-    const parity = runRebuildParityChecks({ ...request, domains }, db)
     const validated = validateRebuildInputSnapshot(snapshot.input_snapshot_id, db)
+    let parity: RagParityCheck[] = []
+    if (validated.status === 'current') {
+      const build = runCandidateBuild({ workspace_id: request.workspace_id, project_id: request.project_id, domains }, db)
+      parity = build.parity
+      warnings.push(...build.warnings)
+    }
     const disposition = finishRebuildCandidate({
       candidate_id: candidate.candidate_id,
       snapshot_status: validated.status,

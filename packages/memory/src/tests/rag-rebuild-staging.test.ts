@@ -51,6 +51,12 @@ describe('RAG rebuild staged candidates', () => {
   it('quarantines a failed candidate and keeps served state unchanged', async () => {
     seedCodeFile('file_ok', 1)
     seedCodeChunk('chunk_orphan', 'missing_file')
+    getDb().prepare(`
+      INSERT INTO code_chunks (
+        chunk_id, workspace_id, project_id, file_path, language,
+        chunk_strategy, source_type, content, start_line, end_line, content_hash
+      ) VALUES ('chunk_unlinked', 'ws_1', 'proj_1', 'src/unlinked.ts', 'typescript', 'syntax', 'code', 'export const b = 1', 1, 1, 'unlinkedhash')
+    `).run()
 
     const result = await runRagRebuild({
       workspace_id: 'ws_1',
@@ -63,6 +69,9 @@ describe('RAG rebuild staged candidates', () => {
     expect(result.candidate?.disposition).toBe('quarantined')
     expect(result.candidate?.served_state_unchanged).toBe(true)
     expect(result.errors).toContainEqual(expect.objectContaining({ code: 'parity_failed', check: 'code_chunks_file_id' }))
+    const unlinked = getDb().prepare("SELECT file_id FROM code_chunks WHERE chunk_id = 'chunk_unlinked'").get() as { file_id: string | null }
+    const stagedFile = getDb().prepare("SELECT file_id FROM code_files WHERE rel_path = 'src/unlinked.ts'").get()
+    expect(unlinked.file_id).toBeNull()
+    expect(stagedFile).toBeUndefined()
   })
 })
-

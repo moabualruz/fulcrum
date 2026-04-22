@@ -26,5 +26,9 @@ describe('RAG lifecycle MCP tool metadata', () => {
     expect(byName.get('start_rag_rebuild')?.annotations?.destructiveHint).toBe(true)
     expect(TOOL_REGISTRY.get('start_rag_rebuild')?.capabilities.destructive).toBe(true)
   })
-})
 
+  it('does not accept caller-supplied actor identity on destructive MCP tools', () => {
+    const properties = byName.get('start_rag_rebuild')?.inputSchema.properties ?? {}
+    expect(properties).not.toHaveProperty('actor')
+  })
+})

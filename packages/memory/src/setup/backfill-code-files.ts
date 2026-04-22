@@ -15,23 +15,35 @@ export interface BackfillResult {
   alreadyLinked: number
 }
 
+export interface BackfillScope {
+  workspace_id: string
+  project_id: string
+}
+
 export function computeFileId(project_id: string, rel_path: string): string {
   return createHash('sha256').update(`${project_id}:${rel_path}`).digest('hex')
 }
 
-export function backfillCodeFiles(db: Db = getDb()): BackfillResult {
+export function backfillCodeFiles(db: Db = getDb(), scope?: BackfillScope): BackfillResult {
+  const scopeWhere = scope ? 'AND workspace_id = ? AND project_id = ?' : ''
+  const scopeParams = scope ? [scope.workspace_id, scope.project_id] : []
   const distinct = db.prepare(`
     SELECT DISTINCT workspace_id, project_id, file_path
     FROM code_chunks
     WHERE file_id IS NULL
-  `).all() as Array<{ workspace_id: string; project_id: string; file_path: string }>
+      ${scopeWhere}
+  `).all(...scopeParams) as Array<{ workspace_id: string; project_id: string; file_path: string }>
 
   const insertFile = db.prepare(`
     INSERT OR IGNORE INTO code_files (file_id, workspace_id, project_id, rel_path, language, sha256, mtime_ns, size_bytes, chunks_count, indexed_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   const updateChunks = db.prepare(`UPDATE code_chunks SET file_id = ? WHERE file_id IS NULL AND workspace_id = ? AND project_id = ? AND file_path = ?`)
-  const countLinked = db.prepare(`SELECT COUNT(*) AS n FROM code_chunks WHERE file_id IS NOT NULL`).get() as { n: number }
+  const countLinked = db.prepare(`
+    SELECT COUNT(*) AS n FROM code_chunks
+    WHERE file_id IS NOT NULL
+      ${scopeWhere}
+  `).get(...scopeParams) as { n: number }
   const before = countLinked.n
 
   let filesBackfilled = 0
@@ -50,10 +62,18 @@ export function backfillCodeFiles(db: Db = getDb()): BackfillResult {
   tx()
 
   // Refresh chunks_count on backfilled file rows.
-  db.prepare(`
-    UPDATE code_files
-    SET chunks_count = (SELECT COUNT(*) FROM code_chunks c WHERE c.file_id = code_files.file_id)
-  `).run()
+  if (scope) {
+    db.prepare(`
+      UPDATE code_files
+      SET chunks_count = (SELECT COUNT(*) FROM code_chunks c WHERE c.file_id = code_files.file_id)
+      WHERE workspace_id = ? AND project_id = ?
+    `).run(scope.workspace_id, scope.project_id)
+  } else {
+    db.prepare(`
+      UPDATE code_files
+      SET chunks_count = (SELECT COUNT(*) FROM code_chunks c WHERE c.file_id = code_files.file_id)
+    `).run()
+  }
 
   return { filesBackfilled, chunksLinked, alreadyLinked: before }
 }

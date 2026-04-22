@@ -217,14 +217,6 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         project_id: { type: 'string' },
         domains: { type: 'array', items: { type: 'string', enum: ['l0', 'l1', 'fts', 'code', 'vectors', 'graph'] } },
         allow_empty: { type: 'boolean' },
-        actor: {
-          type: 'object',
-          properties: {
-            kind: { type: 'string', enum: ['human', 'agent'] },
-            role: { type: 'string' },
-            id: { type: 'string' },
-          },
-        },
       },
     },
   },

@@ -18,7 +18,7 @@ const INT_DIR = join(REPO_ROOT, 'agent-integration')
 // ─── Accept lists — derived from packages/cli/src/index.ts dispatcher ────────
 
 const HOOK_CLIS = new Set([
-  'auto', 'claude', 'gemini', 'codex', 'pi', 'opencode', 'cursor', 'windsurf', 'copilot',
+  'auto', 'claude', 'gemini', 'codex', 'pi', 'opencode', 'cursor', 'windsurf', 'copilot', 'qwen',
 ])
 
 const HOOK_PHASES_COMMON = new Set([
@@ -33,6 +33,7 @@ const HOOK_PHASES_BY_CLI: Record<string, Set<string>> = {
   cursor:   new Set(['session-start', 'session-end', 'pre-compact', 'subagent-start', 'subagent-stop']),
   windsurf: new Set(['session-start', 'session-end', 'pre-compact', 'subagent-start', 'subagent-stop']),
   copilot:  new Set(['session-start', 'session-end']),
+  qwen:     new Set(['session-start', 'session-end', 'pre-compact', 'subagent-stop']),
   pi:       new Set<string>(),
   auto:     new Set<string>(),
 }

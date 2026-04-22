@@ -21,6 +21,23 @@ function auditEvents(): Array<{ payload: string; severity: string }> {
 }
 
 describe('RAG rebuild authorization', () => {
+  it('does not emit audit events for read-only plan and dry-run modes', async () => {
+    await executeRagRebuildCommand({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      mode: 'plan',
+      allow_empty: true,
+    })
+    await executeRagRebuildCommand({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      mode: 'dry_run',
+      allow_empty: true,
+    })
+
+    expect(auditEvents()).toEqual([])
+  })
+
   it('denies destructive execute for non-writing reviewer roles and audits denial', async () => {
     await expect(executeRagRebuildCommand({
       workspace_id: 'ws_1',
@@ -50,4 +67,3 @@ describe('RAG rebuild authorization', () => {
     expect(payload.authorization_reason).toBe('human_operator')
   })
 })
-

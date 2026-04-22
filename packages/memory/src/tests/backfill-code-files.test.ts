@@ -18,13 +18,15 @@ describe('backfillCodeFiles — v2a PR 3 Task 16', () => {
     db = freshDb()
     db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1','w','active','2026-04-17T00:00:00Z')`).run()
     db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_1','ws_1','p','git','active','worktree','2026-04-17T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_2','w2','active','2026-04-17T00:00:00Z')`).run()
+    db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_2','ws_2','p2','git','active','worktree','2026-04-17T00:00:00Z')`).run()
   })
   afterEach(() => closeDb())
 
-  function seedChunk(opts: { chunk_id: string; file_path: string }) {
+  function seedChunk(opts: { chunk_id: string; file_path: string; workspace_id?: string; project_id?: string }) {
     db.prepare(`INSERT INTO code_chunks (chunk_id, workspace_id, project_id, file_path, language, chunk_strategy, source_type, content, indexed_at)
-                VALUES (?, 'ws_1', 'proj_1', ?, 'typescript', 'syntax', 'code', 'x', '2026-04-17T00:00:00Z')`)
-      .run(opts.chunk_id, opts.file_path)
+                VALUES (?, ?, ?, ?, 'typescript', 'syntax', 'code', 'x', '2026-04-17T00:00:00Z')`)
+      .run(opts.chunk_id, opts.workspace_id ?? 'ws_1', opts.project_id ?? 'proj_1', opts.file_path)
   }
 
   it('computeFileId is deterministic and prefix-distinct', () => {
@@ -67,5 +69,19 @@ describe('backfillCodeFiles — v2a PR 3 Task 16', () => {
     backfillCodeFiles(db)
     const row = db.prepare(`SELECT file_id FROM code_files WHERE rel_path = 'src/x.ts'`).get() as { file_id: string }
     expect(row.file_id).toBe(computeFileId('proj_1', 'src/x.ts'))
+  })
+
+  it('can backfill a single workspace/project without touching others', () => {
+    seedChunk({ chunk_id: 'c1', file_path: 'src/a.ts' })
+    seedChunk({ chunk_id: 'c2', file_path: 'src/b.ts', workspace_id: 'ws_2', project_id: 'proj_2' })
+
+    const result = backfillCodeFiles(db, { workspace_id: 'ws_1', project_id: 'proj_1' })
+
+    expect(result.filesBackfilled).toBe(1)
+    expect(result.chunksLinked).toBe(1)
+    const ws1Linked = db.prepare(`SELECT COUNT(*) AS n FROM code_chunks WHERE workspace_id = 'ws_1' AND file_id IS NOT NULL`).get() as { n: number }
+    const ws2Linked = db.prepare(`SELECT COUNT(*) AS n FROM code_chunks WHERE workspace_id = 'ws_2' AND file_id IS NOT NULL`).get() as { n: number }
+    expect(ws1Linked.n).toBe(1)
+    expect(ws2Linked.n).toBe(0)
   })
 })

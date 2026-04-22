@@ -11,29 +11,29 @@
     "plugin_extension_manifest_and_event_surfaces_are_first_class": true
   },
   "counts": {
-    "workspace_project": 17,
-    "package_source_file": 277,
-    "package_test_file": 311,
-    "package_config_file": 37,
-    "package_generated_artifact": 37,
-    "script_source_file": 23,
-    "package_manifest_script": 79,
-    "public_entrypoint": 13,
-    "package_export": 883,
+    "agent_integration_artifact": 859,
     "cli_dispatch_token": 42,
     "fanout_target": 8,
-    "mcp_tool": 32,
-    "tool_registry_entry": 39,
+    "host_hook_config_event": 61,
+    "installer_function": 18,
+    "mcp_tool": 36,
     "monitor_route": 40,
-    "workflow_step": 29,
-    "installer_function": 17,
     "opencode_native_tool": 10,
-    "pi_native_tool": 11,
-    "agent_integration_artifact": 790,
-    "host_hook_config_event": 54,
-    "pi_extension_event": 14,
+    "opencode_plugin_event": 8,
+    "package_config_file": 37,
+    "package_export": 927,
+    "package_generated_artifact": 37,
+    "package_manifest_script": 80,
+    "package_source_file": 288,
+    "package_test_file": 322,
     "pi_extension_command": 13,
-    "opencode_plugin_event": 8
+    "pi_extension_event": 14,
+    "pi_native_tool": 11,
+    "public_entrypoint": 13,
+    "script_source_file": 23,
+    "tool_registry_entry": 43,
+    "workflow_step": 29,
+    "workspace_project": 17
   },
   "rows": [
     {
@@ -58170,10 +58170,3202 @@
       ],
       "closure_reason": "approval harness promotes sandbox screenshots into durable gold and compares later reports against it",
       "closed_at": "2026-04-22T10:35:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_cli_src_commands_memory_rag_lifecycle_ts",
+      "type": "package_source_file",
+      "unit": "packages/cli/src/commands/memory-rag-lifecycle.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/commands/memory-rag-lifecycle.ts"
+      ],
+      "required_verifier": "production source file is covered by package tests and root verification",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_l2_embedding_jobs_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/l2/embedding-jobs.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/l2/embedding-jobs.ts"
+      ],
+      "required_verifier": "production source file is covered by package tests and root verification",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_retrieval_explain_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/retrieval/explain.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/retrieval/explain.ts"
+      ],
+      "required_verifier": "production source file is covered by package tests and root verification",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_rag_health_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/rag-health.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/rag-health.ts"
+      ],
+      "required_verifier": "production source file is covered by package tests and root verification",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_rag_lifecycle_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/rag-lifecycle.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/rag-lifecycle.ts"
+      ],
+      "required_verifier": "production source file is covered by package tests and root verification",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_rag_redaction_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/rag-redaction.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/rag-redaction.ts"
+      ],
+      "required_verifier": "production source file is covered by package tests and root verification",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_rag_types_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/rag-types.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/rag-types.ts"
+      ],
+      "required_verifier": "production source file is covered by package tests and root verification",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_rebuild_candidate_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/rebuild-candidate.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/rebuild-candidate.ts"
+      ],
+      "required_verifier": "production source file is covered by package tests and root verification",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_rebuild_parity_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/rebuild-parity.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/rebuild-parity.ts"
+      ],
+      "required_verifier": "production source file is covered by package tests and root verification",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_rebuild_report_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/rebuild-report.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/rebuild-report.ts"
+      ],
+      "required_verifier": "production source file is covered by package tests and root verification",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_rebuild_snapshot_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/rebuild-snapshot.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/rebuild-snapshot.ts"
+      ],
+      "required_verifier": "production source file is covered by package tests and root verification",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_cli_src_tests_rag_lifecycle_mcp_tools_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/cli/src/tests/rag-lifecycle-mcp-tools.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tests/rag-lifecycle-mcp-tools.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_cli_src_tests_rag_lifecycle_utilization_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/cli/src/tests/rag-lifecycle-utilization.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tests/rag-lifecycle-utilization.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_cli_src_tests_rag_rebuild_authorization_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/cli/src/tests/rag-rebuild-authorization.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tests/rag-rebuild-authorization.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_cli_src_tests_rag_rebuild_contract_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/cli/src/tests/rag-rebuild-contract.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tests/rag-rebuild-contract.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_core_src_tests_rag_lifecycle_schema_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/core/src/tests/rag-lifecycle-schema.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/tests/rag-lifecycle-schema.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_core_src_tests_rag_lifecycle_scope_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/core/src/tests/rag-lifecycle-scope.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/tests/rag-lifecycle-scope.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_rag_lifecycle_redaction_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/rag-lifecycle-redaction.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/rag-lifecycle-redaction.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_rag_rebuild_parity_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/rag-rebuild-parity.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/rag-rebuild-parity.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_rag_rebuild_plan_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/rag-rebuild-plan.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/rag-rebuild-plan.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_rag_rebuild_snapshot_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/rag-rebuild-snapshot.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/rag-rebuild-snapshot.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_rag_rebuild_staging_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/rag-rebuild-staging.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/rag-rebuild-staging.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_manifest_script:package_json_setup_qwen",
+      "type": "package_manifest_script",
+      "unit": "package.json#setup:qwen",
+      "status": "accepted",
+      "source_paths": [
+        "package.json"
+      ],
+      "required_verifier": "manifest script is included in workspace command surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_embeddingjobitemstatus",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#EmbeddingJobItemStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_embeddingjobsourcedomain",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#EmbeddingJobSourceDomain",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_embeddingjobstatus",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#EmbeddingJobStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_ragevalrunstatus",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RagEvalRunStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_raghealthstatus",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RagHealthStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_ragjobeventtype",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RagJobEventType",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_ragrebuildcandidatedisposition",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RagRebuildCandidateDisposition",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_ragrebuildcandidatestatus",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RagRebuildCandidateStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_ragrebuildmode",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RagRebuildMode",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_ragrebuildreportstatus",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RagRebuildReportStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_ragrebuildsnapshotstatus",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RagRebuildSnapshotStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_vectormetadatasourcedomain",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#VectorMetadataSourceDomain",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_vectormetadatastatus",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#VectorMetadataStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_vectormetadatatable",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#VectorMetadataTable",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_embeddingjobrow",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#EmbeddingJobRow",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_rag_rebuild_domains",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RAG_REBUILD_DOMAINS",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_raghealthreport",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagHealthReport",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragparitycheck",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagParityCheck",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragprovenanceclass",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagProvenanceClass",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragrebuildactor",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagRebuildActor",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragrebuilddomain",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagRebuildDomain",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragrebuildreport",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagRebuildReport",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragrebuildrequest",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagRebuildRequest",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragrecallexplanation",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagRecallExplanation",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_rebuildcandidaterow",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RebuildCandidateRow",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_rebuildinputsnapshot",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RebuildInputSnapshot",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_buildraghealthreport",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#buildRagHealthReport",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_buildrebuildsourcemanifest",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#buildRebuildSourceManifest",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_capturerebuildinputsnapshot",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#captureRebuildInputSnapshot",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_createembeddingjobplaceholder",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#createEmbeddingJobPlaceholder",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_createrebuildcandidate",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#createRebuildCandidate",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_createrunningrebuildreport",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#createRunningRebuildReport",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_emptyexplanation",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#emptyExplanation",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_finishrebuildcandidate",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#finishRebuildCandidate",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_finishrebuildreport",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#finishRebuildReport",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_planragrebuildscope",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#planRagRebuildScope",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_readrebuildreport",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#readRebuildReport",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_redactproviderconfig",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#redactProviderConfig",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_redactragdetails",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#redactRagDetails",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_redactragtext",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#redactRagText",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_runragrebuild",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#runRagRebuild",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_runrebuildparitychecks",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#runRebuildParityChecks",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_updaterebuildcandidatestatus",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#updateRebuildCandidateStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_validaterebuildinputsnapshot",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#validateRebuildInputSnapshot",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "mcp_tool:get_rag_rebuild_dry_run",
+      "type": "mcp_tool",
+      "unit": "get_rag_rebuild_dry_run",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "mcp_tool:get_rag_rebuild_plan",
+      "type": "mcp_tool",
+      "unit": "get_rag_rebuild_plan",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "mcp_tool:get_rag_rebuild_report",
+      "type": "mcp_tool",
+      "unit": "get_rag_rebuild_report",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "mcp_tool:start_rag_rebuild",
+      "type": "mcp_tool",
+      "unit": "start_rag_rebuild",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "tool_registry_entry:get_rag_rebuild_dry_run",
+      "type": "tool_registry_entry",
+      "unit": "get_rag_rebuild_dry_run",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "tool_registry_entry:get_rag_rebuild_plan",
+      "type": "tool_registry_entry",
+      "unit": "get_rag_rebuild_plan",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "tool_registry_entry:get_rag_rebuild_report",
+      "type": "tool_registry_entry",
+      "unit": "get_rag_rebuild_report",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "tool_registry_entry:start_rag_rebuild",
+      "type": "tool_registry_entry",
+      "unit": "start_rag_rebuild",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "installer_function:installqwenextension",
+      "type": "installer_function",
+      "unit": "installQwenExtension",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/install.ts"
+      ],
+      "required_verifier": "installer function is covered by install/config inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_qwen_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/QWEN.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/QWEN.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_analyst_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/analyst.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/analyst.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_architecture_reviewer_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/architecture_reviewer.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/architecture_reviewer.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_browser_worker_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/browser_worker.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/browser_worker.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_chief_of_staff_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/chief_of_staff.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/chief_of_staff.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_code_reviewer_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/code_reviewer.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/code_reviewer.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_context_gatherer_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/context_gatherer.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/context_gatherer.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_custom_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/custom.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/custom.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_data_engineer_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/data_engineer.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/data_engineer.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_devops_engineer_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/devops_engineer.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/devops_engineer.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_documentation_writer_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/documentation_writer.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/documentation_writer.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_fulcrum_cos_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/fulcrum-cos.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/fulcrum-cos.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_fulcrum_memory_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/fulcrum-memory.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/fulcrum-memory.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_implementation_planner_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/implementation_planner.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/implementation_planner.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_integration_worker_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/integration_worker.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/integration_worker.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_issue_decomposer_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/issue_decomposer.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/issue_decomposer.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_memory_curator_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/memory_curator.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/memory_curator.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_ml_engineer_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/ml_engineer.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/ml_engineer.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_orchestrator_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/orchestrator.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/orchestrator.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_prd_planner_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/prd_planner.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/prd_planner.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_product_manager_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/product_manager.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/product_manager.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_qa_engineer_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/qa_engineer.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/qa_engineer.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_refactor_worker_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/refactor_worker.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/refactor_worker.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_research_worker_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/research_worker.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/research_worker.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_security_reviewer_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/security_reviewer.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/security_reviewer.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_software_engineer_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/software_engineer.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/software_engineer.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_agents_tech_lead_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/agents/tech_lead.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/agents/tech_lead.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_commands_fulcrum_memory_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/commands/fulcrum-memory.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/commands/fulcrum-memory.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_commands_fulcrum_run_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/commands/fulcrum-run.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/commands/fulcrum-run.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_commands_fulcrum_status_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/commands/fulcrum-status.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/commands/fulcrum-status.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_commands_fulcrum_task_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/commands/fulcrum-task.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/commands/fulcrum-task.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_hooks_hooks_json",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/hooks/hooks.json",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/hooks/hooks.json"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_qwen_extension_json",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/qwen-extension.json",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/qwen-extension.json"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_rules_fulcrum_rule_fulcrum_first_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/rules/fulcrum-rule-fulcrum-first.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/rules/fulcrum-rule-fulcrum-first.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_rules_fulcrum_rule_lifecycle_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/rules/fulcrum-rule-lifecycle.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/rules/fulcrum-rule-lifecycle.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_rules_fulcrum_rule_role_boundaries_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/rules/fulcrum-rule-role-boundaries.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/rules/fulcrum-rule-role-boundaries.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_block_when_stuck_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-block-when-stuck/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-block-when-stuck/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_chief_of_staff_response_format_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-chief-of-staff-response-format/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-chief-of-staff-response-format/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_complete_agent_run_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-complete-agent-run/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-complete-agent-run/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_create_plan_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-create-plan/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-create-plan/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_daily_standup_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-daily-standup/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-daily-standup/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_debug_session_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-debug-session/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-debug-session/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_delegate_task_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-delegate-task/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-delegate-task/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_escalate_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-escalate/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-escalate/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_heartbeat_during_long_operations_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-heartbeat-during-long-operations/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-heartbeat-during-long-operations/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_heartbeat_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-heartbeat/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-heartbeat/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_integration_worker_merge_gate_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-integration-worker-merge-gate/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-integration-worker-merge-gate/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_invoke_team_only_from_cos_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-invoke-team-only-from-cos/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-invoke-team-only-from-cos/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_list_agents_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-list-agents/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-list-agents/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_memory_compact_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-memory-compact/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-memory-compact/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_policy_check_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-policy-check/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-policy-check/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_recall_before_writing_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-recall-before-writing/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-recall-before-writing/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_review_pr_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-review-pr/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-review-pr/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_run_workflow_not_freestyle_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-run-workflow-not-freestyle/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-run-workflow-not-freestyle/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_run_workflow_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-run-workflow/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-run-workflow/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_search_memory_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-search-memory/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-search-memory/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_secret_hygiene_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-secret-hygiene/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-secret-hygiene/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_session_end_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-session-end/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-session-end/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_session_start_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-session-start/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-session-start/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_spawn_agent_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-spawn-agent/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-spawn-agent/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_start_every_task_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-start-every-task/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-start-every-task/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_task_tracking_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-task-tracking/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-task-tracking/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_team_launch_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-team-launch/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-team-launch/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_team_status_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-team-status/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-team-status/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_workspace_status_on_session_start_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-workspace-status-on-session-start/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-workspace-status-on-session-start/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_worktree_checkout_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-worktree-checkout/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-worktree-checkout/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_worktree_merge_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-worktree-merge/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-worktree-merge/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_write_decision_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-write-decision/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-write-decision/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "agent_integration_artifact:agent_integration_qwen_skills_fulcrum_write_memory_on_completion_skill_md",
+      "type": "agent_integration_artifact",
+      "unit": "agent-integration/qwen/skills/fulcrum-write-memory-on-completion/SKILL.md",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/skills/fulcrum-write-memory-on-completion/SKILL.md"
+      ],
+      "required_verifier": "agent integration artifact is covered by surface inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "host_hook_config_event:agent_integration_qwen_hooks_hooks_json_posttooluse",
+      "type": "host_hook_config_event",
+      "unit": "agent-integration/qwen/hooks/hooks.json#PostToolUse",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/hooks/hooks.json"
+      ],
+      "required_verifier": "host hook config event is covered by hook inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "host_hook_config_event:agent_integration_qwen_hooks_hooks_json_posttoolusefailure",
+      "type": "host_hook_config_event",
+      "unit": "agent-integration/qwen/hooks/hooks.json#PostToolUseFailure",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/hooks/hooks.json"
+      ],
+      "required_verifier": "host hook config event is covered by hook inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "host_hook_config_event:agent_integration_qwen_hooks_hooks_json_precompact",
+      "type": "host_hook_config_event",
+      "unit": "agent-integration/qwen/hooks/hooks.json#PreCompact",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/hooks/hooks.json"
+      ],
+      "required_verifier": "host hook config event is covered by hook inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "host_hook_config_event:agent_integration_qwen_hooks_hooks_json_pretooluse",
+      "type": "host_hook_config_event",
+      "unit": "agent-integration/qwen/hooks/hooks.json#PreToolUse",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/hooks/hooks.json"
+      ],
+      "required_verifier": "host hook config event is covered by hook inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "host_hook_config_event:agent_integration_qwen_hooks_hooks_json_sessionend",
+      "type": "host_hook_config_event",
+      "unit": "agent-integration/qwen/hooks/hooks.json#SessionEnd",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/hooks/hooks.json"
+      ],
+      "required_verifier": "host hook config event is covered by hook inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "host_hook_config_event:agent_integration_qwen_hooks_hooks_json_sessionstart",
+      "type": "host_hook_config_event",
+      "unit": "agent-integration/qwen/hooks/hooks.json#SessionStart",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/hooks/hooks.json"
+      ],
+      "required_verifier": "host hook config event is covered by hook inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "host_hook_config_event:agent_integration_qwen_hooks_hooks_json_subagentstop",
+      "type": "host_hook_config_event",
+      "unit": "agent-integration/qwen/hooks/hooks.json#SubagentStop",
+      "status": "accepted",
+      "source_paths": [
+        "agent-integration/qwen/hooks/hooks.json"
+      ],
+      "required_verifier": "host hook config event is covered by hook inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
     }
   ],
   "status_counts": {
-    "accepted": 2781
+    "accepted": 2936
   },
   "last_closure_run": {
     "date": "2026-04-21",
