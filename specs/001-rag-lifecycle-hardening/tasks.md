@@ -132,26 +132,26 @@
 
 ### Tests for User Story 2
 
-- [ ] T054 [P] [US2] Add failing embedding job ledger migration and mapper tests for FR-009 and FR-010 in packages/memory/src/tests/embedding-jobs-schema.test.ts
-- [ ] T055 [P] [US2] Add failing resume/idempotency tests for interrupted jobs covering FR-011 and SC-004 in packages/memory/src/tests/embedding-jobs-resume.test.ts
-- [ ] T056 [P] [US2] Add failing degraded terminal-state and failed-item retry tests for FR-044 and SC-013 in packages/memory/src/tests/embedding-jobs-degraded.test.ts
-- [ ] T057 [P] [US2] Add failing vector metadata current/stale/mixed-model coverage tests for FR-012, FR-013, and SC-003 in packages/memory/src/tests/vector-metadata.test.ts
-- [ ] T058 [P] [US2] Add failing adaptive split and batch-reduction event tests for FR-014 and FR-036 in packages/memory/src/tests/embedding-recovery-events.test.ts
-- [ ] T059 [P] [US2] Add failing runtime device requested/actual/fallback tests for FR-021, FR-022, FR-037, and SC-006 in packages/memory/src/tests/embedding-runtime-device.test.ts
-- [ ] T060 [P] [US2] Add failing jobs CLI contract tests for status, logs, cancel, resume, retry failed, actor authorization, and audit events covering FR-029 and FR-040 in packages/cli/src/tests/rag-jobs-contract.test.ts
+- [X] T054 [P] [US2] Add failing embedding job ledger migration and mapper tests for FR-009 and FR-010 in packages/memory/src/tests/embedding-jobs-schema.test.ts
+- [X] T055 [P] [US2] Add failing resume/idempotency tests for interrupted jobs covering FR-011 and SC-004 in packages/memory/src/tests/embedding-jobs-resume.test.ts
+- [X] T056 [P] [US2] Add failing degraded terminal-state and failed-item retry tests for FR-044 and SC-013 in packages/memory/src/tests/embedding-jobs-degraded.test.ts
+- [X] T057 [P] [US2] Add failing vector metadata current/stale/mixed-model coverage tests for FR-012, FR-013, and SC-003 in packages/memory/src/tests/vector-metadata.test.ts
+- [X] T058 [P] [US2] Add failing adaptive split and batch-reduction event tests for FR-014 and FR-036 in packages/memory/src/tests/embedding-recovery-events.test.ts
+- [X] T059 [P] [US2] Add failing runtime device requested/actual/fallback tests for FR-021, FR-022, FR-037, and SC-006 in packages/memory/src/tests/embedding-runtime-device.test.ts
+- [X] T060 [P] [US2] Add failing jobs CLI contract tests for status, logs, cancel, resume, retry failed, actor authorization, and audit events covering FR-029 and FR-040 in packages/cli/src/tests/rag-jobs-contract.test.ts
 
 ### Implementation for User Story 2
 
-- [ ] T061 [US2] Implement embedding job and job item repositories with workspace-scoped queries in packages/memory/src/l2/embedding-jobs.ts
-- [ ] T062 [US2] Implement preflight scanner for memory, L1 page, and code chunk scopes with allow-empty handling for FR-007 and FR-008 in packages/memory/src/l2/embedding-jobs.ts
-- [ ] T063 [US2] Implement durable embedding runner that records source identity, content hash, requested model/provider/device/dimensions, status, attempts, and errors for FR-010 in packages/memory/src/l2/embedding-jobs.ts
-- [ ] T064 [US2] Implement resume, cancellation, and idempotent retry surfaces for FR-011 in packages/memory/src/l2/embedding-jobs.ts
-- [ ] T065 [US2] Implement degraded terminal state and failed/stale-only retry filtering for FR-044 in packages/memory/src/l2/embedding-jobs.ts
-- [ ] T066 [US2] Implement vector metadata writes and stale/current/legacy classification for FR-012 and FR-013 in packages/memory/src/l2/vector-metadata.ts
-- [ ] T067 [US2] Implement adaptive split and batch-size reduction event recording with redacted details for FR-014 and FR-036 in packages/memory/src/l2/embedding-jobs.ts
-- [ ] T068 [US2] Implement requested vs actual runtime device and fail-closed explicit device mismatch behavior for FR-021, FR-022, and FR-037 in packages/memory/src/l2/embed.ts
-- [ ] T069 [US2] Wire `fulcrum memory embed --scope` and `fulcrum jobs status|logs|cancel|resume|retry --failed --json` commands with audit events for expensive start/retry/cancel operations covering FR-029 and FR-040 in packages/cli/src/index.ts
-- [ ] T070 [US2] Add MCP/action parity for embedding job start, status, cancel, resume, and retry with read-only/destructive hints in packages/cli/src/tool-registry.ts
+- [X] T061 [US2] Implement embedding job and job item repositories with workspace-scoped queries in packages/memory/src/l2/embedding-jobs.ts
+- [X] T062 [US2] Implement preflight scanner for memory, L1 page, and code chunk scopes with allow-empty handling for FR-007 and FR-008 in packages/memory/src/l2/embedding-jobs.ts
+- [X] T063 [US2] Implement durable embedding runner that records source identity, content hash, requested model/provider/device/dimensions, status, attempts, and errors for FR-010 in packages/memory/src/l2/embedding-jobs.ts
+- [X] T064 [US2] Implement resume, cancellation, and idempotent retry surfaces for FR-011 in packages/memory/src/l2/embedding-jobs.ts
+- [X] T065 [US2] Implement degraded terminal state and failed/stale-only retry filtering for FR-044 in packages/memory/src/l2/embedding-jobs.ts
+- [X] T066 [US2] Implement vector metadata writes and stale/current/legacy classification for FR-012 and FR-013 in packages/memory/src/l2/vector-metadata.ts
+- [X] T067 [US2] Implement adaptive split and batch-size reduction event recording with redacted details for FR-014 and FR-036 in packages/memory/src/l2/embedding-jobs.ts
+- [X] T068 [US2] Implement requested vs actual runtime device and fail-closed explicit device mismatch behavior for FR-021, FR-022, and FR-037 in packages/memory/src/l2/embed.ts
+- [X] T069 [US2] Wire `fulcrum memory embed --scope` and `fulcrum jobs status|logs|cancel|resume|retry --failed --json` commands with audit events for expensive start/retry/cancel operations covering FR-029 and FR-040 in packages/cli/src/index.ts
+- [X] T070 [US2] Add MCP/action parity for embedding job start, status, cancel, resume, and retry with read-only/destructive hints in packages/cli/src/tool-registry.ts
 
 **Checkpoint**: US2 embedding jobs are durable, inspectable, resumable, and retryable.
 

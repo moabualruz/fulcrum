@@ -11,6 +11,30 @@ import type { Db } from 'fulcrum-agent-core'
 import { getTextEmbedder } from 'fulcrum-agent-core'
 import { enqueueEmbed } from './queue.js'
 
+export interface EmbeddingRuntimeInfo {
+  requested_device: string
+  actual_device: string
+  fallback_reason: string | null
+}
+
+type RuntimeAwareProvider = {
+  actualDevice?: string
+  actual_device?: string
+  device?: string
+}
+
+export function resolveEmbeddingRuntimeDevice(provider: unknown, requested_device = 'auto'): EmbeddingRuntimeInfo {
+  const runtime = provider as RuntimeAwareProvider
+  const actual = runtime.actualDevice ?? runtime.actual_device ?? (requested_device === 'auto' ? 'cpu' : requested_device)
+  const fallback_reason = requested_device === 'auto' && actual !== 'auto'
+    ? `auto device selected ${actual}`
+    : null
+  if (requested_device !== 'auto' && actual !== requested_device) {
+    throw new Error(`requested device ${requested_device} but embedding runtime used ${actual}`)
+  }
+  return { requested_device, actual_device: actual, fallback_reason }
+}
+
 /**
  * Enqueue an L1 page embedding through the shared embed queue. Fire-and-forget:
  * the caller returns immediately and flushPendingMemoryWrites drains the queue

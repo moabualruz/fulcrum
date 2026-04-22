@@ -253,6 +253,102 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'Start Embedding Job',
+    name: 'start_embedding_job',
+    description: 'Start durable embedding job for memories, L1 pages, or code chunks. Records preflight counts, item ledger rows, runtime device, vector metadata, and audit event.',
+    annotations: { destructiveHint: true, openWorldHint: true },
+    longRunningHint: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+        scope: { type: 'string', enum: ['memories', 'l1-pages', 'code'] },
+        allow_empty: { type: 'boolean' },
+        provider: { type: 'string' },
+        model: { type: 'string' },
+        requested_device: { type: 'string', enum: ['auto', 'cpu', 'cuda', 'webgpu'] },
+        dimensions: { type: 'number' },
+        batch_size: { type: 'number' },
+      },
+      required: ['scope'],
+    },
+  },
+  {
+    title: 'Get Embedding Job Status',
+    name: 'get_embedding_job_status',
+    description: 'Read embedding job status with progress counts and recent events. Non-mutating.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        job_id: { type: 'string' },
+        workspace_id: { type: 'string' },
+      },
+      required: ['job_id'],
+    },
+  },
+  {
+    title: 'Get Embedding Job Logs',
+    name: 'get_embedding_job_logs',
+    description: 'Read embedding job event log with redacted details. Non-mutating.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        job_id: { type: 'string' },
+        workspace_id: { type: 'string' },
+      },
+      required: ['job_id'],
+    },
+  },
+  {
+    title: 'Cancel Embedding Job',
+    name: 'cancel_embedding_job',
+    description: 'Request cancellation for an embedding job and write an audit event.',
+    annotations: { destructiveHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        job_id: { type: 'string' },
+        workspace_id: { type: 'string' },
+      },
+      required: ['job_id'],
+    },
+  },
+  {
+    title: 'Resume Embedding Job',
+    name: 'resume_embedding_job',
+    description: 'Resume pending/stale work for a durable embedding job without reprocessing completed current items.',
+    annotations: { destructiveHint: true, openWorldHint: true },
+    longRunningHint: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        job_id: { type: 'string' },
+        workspace_id: { type: 'string' },
+        batch_size: { type: 'number' },
+      },
+      required: ['job_id'],
+    },
+  },
+  {
+    title: 'Retry Failed Embedding Job Items',
+    name: 'retry_embedding_job_failed',
+    description: 'Retry only failed or stale embedding job items. Completed current items are not reprocessed.',
+    annotations: { destructiveHint: true, openWorldHint: true },
+    longRunningHint: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        job_id: { type: 'string' },
+        workspace_id: { type: 'string' },
+        batch_size: { type: 'number' },
+      },
+      required: ['job_id'],
+    },
+  },
+  {
     title: 'Inspect Memory',
     name: 'inspect_memory',
     description: 'Dump full L1 page — frontmatter, body, serialized form, resolved wikilink absolute paths (exists flag per link). Use before marking wrong or overriding a claim.',

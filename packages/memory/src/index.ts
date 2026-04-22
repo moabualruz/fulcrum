@@ -178,10 +178,35 @@ export { writeMemory, insertMemoryDirect } from './write.js'
 // L2 — embedding queue + writers (public surface for cli, pci, indexer).
 // Prior to PR 9.2 these were re-exported by write.ts as a back-compat shim;
 // the barrel now sources them from their canonical l2/ modules directly.
-export { storeEmbeddingInVec, recordL1Embedding } from './l2/embed.js'
+export { storeEmbeddingInVec, recordL1Embedding, resolveEmbeddingRuntimeDevice } from './l2/embed.js'
+export type { EmbeddingRuntimeInfo } from './l2/embed.js'
 export { storeChunkEmbedding, scheduleChunkEmbedding } from './l2/code.js'
-export { createEmbeddingJobPlaceholder } from './l2/embedding-jobs.js'
-export type { EmbeddingJobRow } from './l2/embedding-jobs.js'
+export {
+  appendRagJobEvent,
+  cancelEmbeddingJob,
+  createEmbeddingJob,
+  createEmbeddingJobPlaceholder,
+  getEmbeddingJob,
+  getEmbeddingJobStatus,
+  listEmbeddingJobItems,
+  listRagJobEvents,
+  resumeEmbeddingJob,
+  retryFailedEmbeddingJob,
+  runEmbeddingJob,
+} from './l2/embedding-jobs.js'
+export type {
+  EmbeddingJobCounts,
+  EmbeddingJobItemRow,
+  EmbeddingJobRow,
+  EmbeddingJobRunInput,
+  EmbeddingJobScope,
+  EmbeddingJobStartInput,
+  EmbeddingJobStatusView,
+  EmbeddingProviderLike,
+  RagJobEventRow,
+} from './l2/embedding-jobs.js'
+export { classifyVectorMetadata, writeVectorMetadata } from './l2/vector-metadata.js'
+export type { VectorFreshnessInput, VectorMetadataInput, VectorMetadataRow } from './l2/vector-metadata.js'
 export { flushPendingMemoryWrites, waitForEmbedHeadroom } from './l2/queue.js'
 
 // v3 retrieval — graph + confidence + supersession filters (PR 5).

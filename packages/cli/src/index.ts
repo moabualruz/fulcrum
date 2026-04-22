@@ -24,8 +24,13 @@ CONTROL PLANE
   memory init          Initialize L0 vault + L1 SQLite (+ optional L2)
   memory accelerate    Enable L2 (Kuzu graph + HNSW vector search)
   memory rebuild       Rebuild L1 from L0 vault files
-  memory embed         Backfill vector embeddings for all memories missing them
+  memory embed         Backfill vector embeddings or start scoped embedding job
   memory status        Show vault path and layer status
+  jobs status <job_id> Show embedding job status
+  jobs logs <job_id>   Show embedding job event log
+  jobs cancel <job_id> Cancel embedding job
+  jobs resume <job_id> Resume embedding job
+  jobs retry <job_id> --failed
 
   serve mcp            Start MCP server (stdio JSON-RPC 2.0) + auto-starts monitor
   serve monitor        Start HTTP monitor + control API (default port 4721)
@@ -389,6 +394,31 @@ fulcrum memory — memory vault commands
   }
 
   if (command === 'embed') {
+    const scope = optArg('--scope')
+    if (scope) {
+      if (!['memories', 'l1-pages', 'code'].includes(scope)) {
+        console.error('Usage: fulcrum memory embed --scope <memories|l1-pages|code> [--json]')
+        process.exit(1)
+      }
+      const { startEmbeddingJobCommand } = await import('./commands/memory-embedding-jobs.js')
+      const result = await startEmbeddingJobCommand({
+        workspace_id: optArg('--workspace-id'),
+        project_id: optArg('--project-id'),
+        scope: scope as 'memories' | 'l1-pages' | 'code',
+        allow_empty: args.includes('--allow-empty'),
+        provider: optArg('--provider'),
+        model: optArg('--model'),
+        requested_device: optArg('--device'),
+        dimensions: optIntArg('--dimensions'),
+        batch_size: optIntArg('--batch-size'),
+        actor: { kind: 'human', role: 'software_engineer', id: process.env['USER'] ?? 'local-operator' },
+      })
+      if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+      else console.log(`Embedding job ${result.job_id}: ${result.status}`)
+      if (result.status === 'failed') process.exit(2)
+      return
+    }
+
     // Backfill vec_memories for all memories that don't have embeddings yet.
     const limitIdx = args.indexOf('--limit')
     const limit = limitIdx >= 0 ? Number.parseInt(args[limitIdx + 1] ?? '', 10) : Infinity
@@ -914,6 +944,68 @@ Exit 0 when every row embeds cleanly. Exit 2 if any row fails (see
 
   console.error(`Unknown memory command: ${command}`)
   console.error('Run `fulcrum memory --help` for available commands.')
+  process.exit(1)
+}
+
+async function runJobs(): Promise<void> {
+  const jobId = args[2]
+  if (!command || command === '--help' || command === '-h' || !jobId) {
+    console.log('Usage: fulcrum jobs status|logs|cancel|resume|retry <job_id> [--failed] [--json]')
+    return
+  }
+
+  const input = {
+    job_id: jobId,
+    workspace_id: optArg('--workspace-id'),
+    batch_size: optIntArg('--batch-size'),
+    actor: { kind: 'human' as const, role: 'software_engineer' as const, id: process.env['USER'] ?? 'local-operator' },
+  }
+
+  if (command === 'status') {
+    const { getEmbeddingJobStatusCommand } = await import('./commands/memory-embedding-jobs.js')
+    const result = getEmbeddingJobStatusCommand(input)
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+    else console.log(`Embedding job ${result.job_id}: ${result.status}`)
+    return
+  }
+
+  if (command === 'logs') {
+    const { getEmbeddingJobLogsCommand } = await import('./commands/memory-embedding-jobs.js')
+    const result = getEmbeddingJobLogsCommand(input)
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+    else for (const event of result.events) console.log(`${event.created_at} ${event.event_type} ${event.message}`)
+    return
+  }
+
+  if (command === 'cancel') {
+    const { cancelEmbeddingJobCommand } = await import('./commands/memory-embedding-jobs.js')
+    const result = cancelEmbeddingJobCommand(input)
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+    else console.log(`Embedding job ${result.job_id}: ${result.status}`)
+    return
+  }
+
+  if (command === 'resume') {
+    const { resumeEmbeddingJobCommand } = await import('./commands/memory-embedding-jobs.js')
+    const result = await resumeEmbeddingJobCommand(input)
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+    else console.log(`Embedding job ${result.job_id}: ${result.status}`)
+    return
+  }
+
+  if (command === 'retry') {
+    if (!args.includes('--failed')) {
+      console.error('Usage: fulcrum jobs retry <job_id> --failed [--json]')
+      process.exit(1)
+    }
+    const { retryFailedEmbeddingJobCommand } = await import('./commands/memory-embedding-jobs.js')
+    const result = await retryFailedEmbeddingJobCommand(input)
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+    else console.log(`Embedding job ${result.job_id}: ${result.status}`)
+    return
+  }
+
+  console.error(`Unknown jobs command: ${command}`)
   process.exit(1)
 }
 
@@ -4543,6 +4635,7 @@ OPTIONS (serve mcp-http)
   }
   if (group === 'tool' || group === 'tools') { await runTool(); return }
   if (group === 'action' || group === 'actions') { await runAction(); return }
+  if (group === 'job' || group === 'jobs') { await runJobs(); return }
 
   if (group === 'workspaces') { await runWorkspaces(); return }
   if (group === 'projects') { await runProjects(); return }

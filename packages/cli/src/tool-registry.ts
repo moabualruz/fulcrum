@@ -1009,6 +1009,96 @@ TOOL_REGISTRY.set('get_rag_rebuild_report', {
   },
 })
 
+TOOL_REGISTRY.set('start_embedding_job', {
+  schema: TOOL_SCHEMA_MAP.get('start_embedding_job'),
+  capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { startEmbeddingJobCommand } = await import('./commands/memory-embedding-jobs.js')
+    return startEmbeddingJobCommand({
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+      scope: args['scope'] as 'memories' | 'l1-pages' | 'code',
+      allow_empty: args['allow_empty'] as boolean | undefined,
+      provider: args['provider'] as string | undefined,
+      model: args['model'] as string | undefined,
+      requested_device: args['requested_device'] as string | undefined,
+      dimensions: args['dimensions'] as number | undefined,
+      batch_size: args['batch_size'] as number | undefined,
+      actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('get_embedding_job_status', {
+  schema: TOOL_SCHEMA_MAP.get('get_embedding_job_status'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { getEmbeddingJobStatusCommand } = await import('./commands/memory-embedding-jobs.js')
+    return getEmbeddingJobStatusCommand({
+      job_id: args['job_id'] as string,
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: deps.project_id,
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('get_embedding_job_logs', {
+  schema: TOOL_SCHEMA_MAP.get('get_embedding_job_logs'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { getEmbeddingJobLogsCommand } = await import('./commands/memory-embedding-jobs.js')
+    return getEmbeddingJobLogsCommand({
+      job_id: args['job_id'] as string,
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: deps.project_id,
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('cancel_embedding_job', {
+  schema: TOOL_SCHEMA_MAP.get('cancel_embedding_job'),
+  capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { cancelEmbeddingJobCommand } = await import('./commands/memory-embedding-jobs.js')
+    return cancelEmbeddingJobCommand({
+      job_id: args['job_id'] as string,
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: deps.project_id,
+      actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('resume_embedding_job', {
+  schema: TOOL_SCHEMA_MAP.get('resume_embedding_job'),
+  capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { resumeEmbeddingJobCommand } = await import('./commands/memory-embedding-jobs.js')
+    return resumeEmbeddingJobCommand({
+      job_id: args['job_id'] as string,
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: deps.project_id,
+      batch_size: args['batch_size'] as number | undefined,
+      actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('retry_embedding_job_failed', {
+  schema: TOOL_SCHEMA_MAP.get('retry_embedding_job_failed'),
+  capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { retryFailedEmbeddingJobCommand } = await import('./commands/memory-embedding-jobs.js')
+    return retryFailedEmbeddingJobCommand({
+      job_id: args['job_id'] as string,
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: deps.project_id,
+      batch_size: args['batch_size'] as number | undefined,
+      actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
+    }, deps.db)
+  },
+})
+
 // ── Agent profile tools ─────────────────────────────────────────────────────
 
 TOOL_REGISTRY.set('list_agent_profiles', {
