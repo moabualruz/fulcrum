@@ -12,26 +12,26 @@
   },
   "counts": {
     "agent_integration_artifact": 859,
-    "cli_dispatch_token": 42,
+    "cli_dispatch_token": 44,
     "fanout_target": 8,
     "host_hook_config_event": 61,
     "installer_function": 18,
-    "mcp_tool": 36,
+    "mcp_tool": 42,
     "monitor_route": 40,
     "opencode_native_tool": 10,
     "opencode_plugin_event": 8,
     "package_config_file": 37,
-    "package_export": 927,
+    "package_export": 952,
     "package_generated_artifact": 37,
     "package_manifest_script": 80,
-    "package_source_file": 288,
-    "package_test_file": 322,
+    "package_source_file": 290,
+    "package_test_file": 329,
     "pi_extension_command": 13,
     "pi_extension_event": 14,
     "pi_native_tool": 11,
     "public_entrypoint": 13,
     "script_source_file": 23,
-    "tool_registry_entry": 43,
+    "tool_registry_entry": 49,
     "workflow_step": 29,
     "workspace_project": 17
   },
@@ -41095,12 +41095,12 @@
       "closed_at": "2026-04-21T21:09:39.113Z"
     },
     {
-      "id": "package_generated_artifact:packages_memory_dist_chunk_6lbgc6od_js",
+      "id": "package_generated_artifact:packages_memory_dist_chunk_4oueyzvn_js",
       "type": "package_generated_artifact",
-      "unit": "packages/memory/dist/chunk-6LBGC6OD.js",
+      "unit": "packages/memory/dist/chunk-4OUEYZVN.js",
       "status": "accepted",
       "source_paths": [
-        "packages/memory/dist/chunk-6LBGC6OD.js"
+        "packages/memory/dist/chunk-4OUEYZVN.js"
       ],
       "required_verifier": "generated artifact freshness and producer equality",
       "reviewer_skills": [
@@ -41235,12 +41235,12 @@
       "closed_at": "2026-04-21T21:09:39.113Z"
     },
     {
-      "id": "package_generated_artifact:packages_memory_dist_ingest_mvdjlz5i_js",
+      "id": "package_generated_artifact:packages_memory_dist_ingest_t3en7xk5_js",
       "type": "package_generated_artifact",
-      "unit": "packages/memory/dist/ingest-MVDJLZ5I.js",
+      "unit": "packages/memory/dist/ingest-T3EN7XK5.js",
       "status": "accepted",
       "source_paths": [
-        "packages/memory/dist/ingest-MVDJLZ5I.js"
+        "packages/memory/dist/ingest-T3EN7XK5.js"
       ],
       "required_verifier": "generated artifact freshness and producer equality",
       "reviewer_skills": [
@@ -61351,6 +61351,1012 @@
         "agent-integration/qwen/hooks/hooks.json"
       ],
       "required_verifier": "host hook config event is covered by hook inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "cli_dispatch_token:job",
+      "type": "cli_dispatch_token",
+      "unit": "job",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/index.ts"
+      ],
+      "required_verifier": "CLI probe for help, success path, failure path, exit code, docs parity",
+      "reviewer_skills": [
+        "cli-agent-readiness-reviewer"
+      ],
+      "evidence": [
+        "pnpm -F fulcrum-agent-cli test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "cli_dispatch_token:jobs",
+      "type": "cli_dispatch_token",
+      "unit": "jobs",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/index.ts"
+      ],
+      "required_verifier": "CLI probe for help, success path, failure path, exit code, docs parity",
+      "reviewer_skills": [
+        "cli-agent-readiness-reviewer"
+      ],
+      "evidence": [
+        "pnpm -F fulcrum-agent-cli test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "mcp_tool:start_embedding_job",
+      "type": "mcp_tool",
+      "unit": "start_embedding_job",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "tool_registry_entry:start_embedding_job",
+      "type": "tool_registry_entry",
+      "unit": "start_embedding_job",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "mcp_tool:get_embedding_job_status",
+      "type": "mcp_tool",
+      "unit": "get_embedding_job_status",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "tool_registry_entry:get_embedding_job_status",
+      "type": "tool_registry_entry",
+      "unit": "get_embedding_job_status",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "mcp_tool:get_embedding_job_logs",
+      "type": "mcp_tool",
+      "unit": "get_embedding_job_logs",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "tool_registry_entry:get_embedding_job_logs",
+      "type": "tool_registry_entry",
+      "unit": "get_embedding_job_logs",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "mcp_tool:cancel_embedding_job",
+      "type": "mcp_tool",
+      "unit": "cancel_embedding_job",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "tool_registry_entry:cancel_embedding_job",
+      "type": "tool_registry_entry",
+      "unit": "cancel_embedding_job",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "mcp_tool:resume_embedding_job",
+      "type": "mcp_tool",
+      "unit": "resume_embedding_job",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "tool_registry_entry:resume_embedding_job",
+      "type": "tool_registry_entry",
+      "unit": "resume_embedding_job",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "mcp_tool:retry_embedding_job_failed",
+      "type": "mcp_tool",
+      "unit": "retry_embedding_job_failed",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "tool_registry_entry:retry_embedding_job_failed",
+      "type": "tool_registry_entry",
+      "unit": "retry_embedding_job_failed",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_cli_src_commands_memory_embedding_jobs_ts",
+      "type": "package_source_file",
+      "unit": "packages/cli/src/commands/memory-embedding-jobs.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/commands/memory-embedding-jobs.ts"
+      ],
+      "required_verifier": "module contract, owned invariants, internal consumers, focused test",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "maintainability-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_l2_vector_metadata_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/l2/vector-metadata.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/l2/vector-metadata.ts"
+      ],
+      "required_verifier": "module contract, owned invariants, internal consumers, focused test",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "maintainability-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_cli_src_tests_rag_jobs_contract_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/cli/src/tests/rag-jobs-contract.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tests/rag-jobs-contract.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_embedding_jobs_degraded_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/embedding-jobs-degraded.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/embedding-jobs-degraded.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_embedding_jobs_resume_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/embedding-jobs-resume.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/embedding-jobs-resume.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_embedding_jobs_schema_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/embedding-jobs-schema.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/embedding-jobs-schema.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_embedding_recovery_events_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/embedding-recovery-events.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/embedding-recovery-events.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_embedding_runtime_device_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/embedding-runtime-device.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/embedding-runtime-device.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_vector_metadata_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/vector-metadata.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/vector-metadata.test.ts"
+      ],
+      "required_verifier": "test file is covered by root test run",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_embeddingjobcounts",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#EmbeddingJobCounts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_embeddingjobitemrow",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#EmbeddingJobItemRow",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_embeddingjobruninput",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#EmbeddingJobRunInput",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_embeddingjobscope",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#EmbeddingJobScope",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_embeddingjobstartinput",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#EmbeddingJobStartInput",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_embeddingjobstatusview",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#EmbeddingJobStatusView",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_embeddingproviderlike",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#EmbeddingProviderLike",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_embeddingruntimeinfo",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#EmbeddingRuntimeInfo",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragjobeventrow",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagJobEventRow",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_vectorfreshnessinput",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#VectorFreshnessInput",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_vectormetadatainput",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#VectorMetadataInput",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_vectormetadatarow",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#VectorMetadataRow",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_appendragjobevent",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#appendRagJobEvent",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_cancelembeddingjob",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#cancelEmbeddingJob",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_classifyvectormetadata",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#classifyVectorMetadata",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_createembeddingjob",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#createEmbeddingJob",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_getembeddingjob",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#getEmbeddingJob",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_getembeddingjobstatus",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#getEmbeddingJobStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_listembeddingjobitems",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#listEmbeddingJobItems",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_listragjobevents",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#listRagJobEvents",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_resolveembeddingruntimedevice",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#resolveEmbeddingRuntimeDevice",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_resumeembeddingjob",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#resumeEmbeddingJob",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_retryfailedembeddingjob",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#retryFailedEmbeddingJob",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_runembeddingjob",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#runEmbeddingJob",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_writevectormetadata",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#writeVectorMetadata",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
       "reviewer_skills": [
         "correctness-reviewer",
         "project-standards-reviewer"

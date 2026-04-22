@@ -16,23 +16,23 @@ Guard: `scripts/surface-inventory.test.ts`.
 Machine-checked unit ledger:
 `docs/reference/2026-04-21-sixth-pass-unit-acceptance-ledger.json`.
 
-The JSON ledger currently contains 2,936 explicit unit rows:
+The JSON ledger currently contains 2,984 explicit unit rows:
 
 | Unit class | Rows |
 |---|---:|
 | workspace projects | 17 |
-| package source files | 288 |
-| package test files | 322 |
+| package source files | 290 |
+| package test files | 329 |
 | package config files | 37 |
 | package generated artifacts | 37 |
 | script source files | 23 |
 | package manifest scripts | 80 |
 | public package entrypoints | 13 |
-| package exports | 927 |
-| CLI dispatch tokens | 42 |
+| package exports | 952 |
+| CLI dispatch tokens | 44 |
 | fanout targets | 8 |
-| MCP tool schemas | 36 |
-| tool registry entries | 43 |
+| MCP tool schemas | 42 |
+| tool registry entries | 49 |
 | monitor routes | 40 |
 | workflow steps | 29 |
 | installer functions | 18 |
@@ -48,7 +48,7 @@ Current JSON status counts:
 
 | Status | Rows |
 |---|---:|
-| accepted | 2,936 |
+| accepted | 2,984 |
 | blocked-external | 0 |
 | blocked-decision | 0 |
 | open (`test-gap`, `integration-gap`, `runtime-unverified`) | 0 |
@@ -143,6 +143,8 @@ with evidence in the JSON ledger.
 - `install`
 - `issue`
 - `issues`
+- `job`
+- `jobs`
 - `log`
 - `mcp`
 - `memory`
@@ -198,6 +200,12 @@ runtime rows.
 - `get_rag_rebuild_dry_run`
 - `start_rag_rebuild`
 - `get_rag_rebuild_report`
+- `start_embedding_job`
+- `get_embedding_job_status`
+- `get_embedding_job_logs`
+- `cancel_embedding_job`
+- `resume_embedding_job`
+- `retry_embedding_job_failed`
 - `inspect_memory`
 - `read_raw_source`
 - `trace_claim`
@@ -252,6 +260,12 @@ CLI/action parity, response contract, negative path, and docs.
 - `get_rag_rebuild_dry_run`
 - `start_rag_rebuild`
 - `get_rag_rebuild_report`
+- `start_embedding_job`
+- `get_embedding_job_status`
+- `get_embedding_job_logs`
+- `cancel_embedding_job`
+- `resume_embedding_job`
+- `retry_embedding_job_failed`
 - `list_agent_profiles`
 - `create_agent_profile`
 - `get_agent_run_status`
@@ -494,8 +508,8 @@ source is `.windsurf/mcp.json`.
 | Area | State | Reason |
 |---|---|---|
 | Surface inventory | accepted | Guarded by `scripts/surface-inventory.test.ts`. |
-| Full unit ledger | terminal-all-accepted | 2,936 unit rows: 2,936 accepted, 0 blocked, 0 open. |
-| Package internals and exports | accepted | Package roots, 288 production source files, 322 test files, 37 package configs, 37 generated dist artifacts, 80 manifest scripts, and 927 exports have accepted rows. |
+| Full unit ledger | terminal-all-accepted | 2,984 unit rows: 2,984 accepted, 0 blocked, 0 open. |
+| Package internals and exports | accepted | Package roots, 290 production source files, 329 test files, 37 package configs, 37 generated dist artifacts, 80 manifest scripts, and 952 exports have accepted rows. |
 | Plugins/extensions | accepted | Host roots, native tools, 859 agent-integration artifact rows, 61 hook config events, 14 PI events, 13 PI commands, and 8 opencode plugin hooks have verifier evidence. |
 | Monitor web | accepted for ledgered routes | Route/docs/PI-consumer rows are accepted. Separate browser-visual review remains a future audit surface if new UI claims are added. |
 | Install/fanout | accepted | Setup, setup check, fanout utilization, generated artifact, and installer function rows are accepted. |
@@ -510,7 +524,7 @@ source is `.windsurf/mcp.json`.
   artifacts, callable surfaces, monitor docs/PI route parity, active host-doc
   config claims, package source/test/config/generated files, manifest scripts,
   hook config events, PI extension events/commands, opencode plugin hooks, and
-  2,936 explicit terminal unit status rows.
+  2,984 explicit terminal unit status rows.
 - `pnpm -F fulcrum-agent-cli test -- hook-host-runtime hook-normalization`
   passed inside the full CLI suite with 73 CLI test files and 813 assertions,
   including black-box hook
