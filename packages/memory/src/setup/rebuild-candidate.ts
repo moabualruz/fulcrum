@@ -1,5 +1,5 @@
 import { getDb, newId } from 'fulcrum-agent-core'
-import type { Db } from 'fulcrum-agent-core'
+import type { Db, RuntimeDataProfile, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
 import type { RagParityCheck, RagRebuildDomain } from './rag-types.js'
 
 export interface RebuildCandidateRow {
@@ -10,6 +10,7 @@ export interface RebuildCandidateRow {
   domains: RagRebuildDomain[]
   status: string
   input_snapshot_id: string
+  runtime_profile: RuntimeDataProfile
 }
 
 function count(db: Db, sql: string, ...params: unknown[]): number {
@@ -39,6 +40,8 @@ export function createRebuildCandidate(
     project_id: string
     domains: RagRebuildDomain[]
     input_snapshot_id: string
+    runtime_profile: RuntimeDataProfile
+    profile_manifest: RuntimeDataProfileManifest
   },
   db: Db = getDb(),
 ): RebuildCandidateRow {
@@ -46,8 +49,8 @@ export function createRebuildCandidate(
   db.prepare(`
     INSERT INTO rag_rebuild_candidates (
       candidate_id, report_id, workspace_id, project_id, domains, status,
-      storage_ref, input_snapshot_id, served_state_before
-    ) VALUES (?, ?, ?, ?, ?, 'building', ?, ?, ?)
+      storage_ref, runtime_profile, profile_manifest, input_snapshot_id, served_state_before
+    ) VALUES (?, ?, ?, ?, ?, 'building', ?, ?, ?, ?, ?)
   `).run(
     candidate_id,
     input.report_id,
@@ -55,6 +58,8 @@ export function createRebuildCandidate(
     input.project_id,
     JSON.stringify(input.domains),
     JSON.stringify({ served: false, kind: 'logical-candidate' }),
+    input.runtime_profile,
+    JSON.stringify(input.profile_manifest),
     input.input_snapshot_id,
     JSON.stringify(servedState(input, db)),
   )

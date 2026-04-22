@@ -172,10 +172,22 @@ const GUARDED_COLUMNS: EnumColumn[] = [
     expected: ['none', 'promoted', 'quarantined', 'discarded'],
   },
   {
+    // RuntimeDataProfile — packages/core/src/types.ts
+    table: 'rag_rebuild_reports',
+    column: 'runtime_profile',
+    expected: ['install', 'dev', 'test'],
+  },
+  {
     // RagRebuildCandidateStatus — packages/core/src/types.ts
     table: 'rag_rebuild_candidates',
     column: 'status',
     expected: ['building', 'verifying', 'verified', 'promoting', 'promoted', 'quarantined', 'discarded', 'failed'],
+  },
+  {
+    // RuntimeDataProfile — packages/core/src/types.ts
+    table: 'rag_rebuild_candidates',
+    column: 'runtime_profile',
+    expected: ['install', 'dev', 'test'],
   },
   {
     // RagRebuildSnapshotStatus — packages/core/src/types.ts
@@ -236,6 +248,12 @@ const GUARDED_COLUMNS: EnumColumn[] = [
     table: 'rag_health_reports',
     column: 'status',
     expected: ['healthy', 'degraded', 'failed'],
+  },
+  {
+    // RuntimeDataProfile — packages/core/src/types.ts
+    table: 'rag_health_reports',
+    column: 'runtime_profile',
+    expected: ['install', 'dev', 'test'],
   },
   {
     // RagEvalRunStatus — packages/core/src/types.ts

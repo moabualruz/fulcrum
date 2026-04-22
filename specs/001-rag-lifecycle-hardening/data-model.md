@@ -87,6 +87,10 @@ Fields:
 - `candidate_id`: nullable reference to a staged rebuild candidate.
 - `candidate_disposition`: `none | promoted | quarantined | discarded`
 - `input_snapshot_id`: nullable reference to the rebuild input snapshot used by the candidate.
+- `runtime_profile`: `install | dev | test`
+- `profile_manifest`: JSON object with normalized display paths for preflight output and non-secret DB, vault, graph, vector, and artifact path fingerprints for persisted report/audit output.
+- `backup_ref`: nullable reference to a profile-scoped backup for destructive installed/operator execution.
+- `verification_refs`: JSON array of prior test-profile or dev/review-profile report IDs used to support installed/operator execution.
 - `started_at`
 - `finished_at`
 - `summary`: JSON object with counts by domain.
@@ -99,6 +103,8 @@ Validation:
 - `mode`, `status`, and `candidate_disposition` need TypeScript unions plus SQLite `CHECK`.
 - `workspace_id` required for every query.
 - Execute mode must persist actor identity and must be authorized for a human operator, `chief_of_staff`, `memory_curator`, or a role with write-code/edit-file capability.
+- Execute mode must persist runtime data profile identity and profile path manifest before mutation.
+- Installed/operator destructive execution must include profile confirmation and `backup_ref`.
 
 ### Staged Rebuild Candidate
 
@@ -112,6 +118,8 @@ Fields:
 - `domains`: JSON array of staged domains.
 - `status`: `building | verifying | verified | promoting | promoted | quarantined | discarded | failed`
 - `storage_ref`: JSON object describing candidate table names, temp DB path, artifact path, or domain-specific staging references.
+- `runtime_profile`: `install | dev | test`
+- `profile_manifest`: JSON object with path fingerprints for the active profile.
 - `input_snapshot_id`
 - `served_state_before`: JSON object recording the currently served derived-state identifiers before promotion.
 - `verification`: JSON object with parity check results.
@@ -125,6 +133,49 @@ Validation:
 - Candidate state must not be visible to recall or code search until `status=promoted`.
 - Failed candidates must be quarantined or discarded and must leave `served_state_before` unchanged.
 - Candidate promotion must revalidate `input_snapshot_id`; stale snapshots block promotion and leave served state unchanged.
+- Candidate state is scoped to exactly one runtime data profile and must never read or write another profile's DB, vault, graph, vector, or artifact roots.
+
+### Runtime Data Profile
+
+Configuration/output entity. It may be persisted only as report/audit metadata.
+
+Fields:
+- `profile`: `install | dev | test`
+- `db_path`: normalized absolute SQLite path.
+- `vault_path`: normalized absolute vault root.
+- `graph_path`: normalized absolute graph/Kuzu root or null when disabled.
+- `vector_path`: normalized absolute vector artifact root or null when vector state is in SQLite.
+- `artifact_path`: normalized absolute report/artifact root.
+- `path_fingerprints`: stable non-secret fingerprints for the resolved paths.
+- `display_paths`: normalized absolute paths for local human-facing preflight output; persisted reports and audit events may store fingerprints only.
+- `disposable`: true for test profile, false for install profile, configurable for dev profile.
+- `requires_confirmation`: true for installed/operator destructive execution.
+
+Validation:
+- `profile` needs a TypeScript union.
+- Install, dev, and test profiles must resolve to non-overlapping DB, vault, graph, vector, and artifact roots.
+- Test and dev/review profiles must fail closed when they resolve to installed/operator or shared global roots.
+- Persisted profile path output must avoid leaking secrets, raw environment values, or provider config. Human-facing local preflight output may include absolute paths for operator inspection.
+
+### Profile-Scoped Backup
+
+Suggested table or artifact metadata linked from rebuild reports and audit events.
+
+Fields:
+- `backup_id`: first-class ID if persisted.
+- `workspace_id`
+- `project_id`
+- `runtime_profile`: `install | dev | test`
+- `profile_manifest`: JSON object with path fingerprints.
+- `backup_kind`: `sqlite_backup | vault_snapshot | artifact_bundle`
+- `backup_path`: normalized absolute path or artifact reference.
+- `created_at`
+- `restorable`: boolean.
+
+Validation:
+- Required before destructive installed/operator profile rebuild execution.
+- Backup creation must happen before allowlisted derived-state clear.
+- Backup metadata must be included in rebuild report and audit event.
 
 ### Rebuild Input Snapshot
 
@@ -288,6 +339,8 @@ Output entity and optional artifact.
 Fields:
 - `workspace_id`
 - `project_id`
+- `runtime_profile`
+- `profile_manifest`
 - `generated_at`
 - `status`: `healthy | degraded | failed`
 - `domains`: raw, l1, fts, code, vector, graph, eval.

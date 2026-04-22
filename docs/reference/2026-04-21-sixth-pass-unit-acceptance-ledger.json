@@ -16,22 +16,22 @@
     "fanout_target": 8,
     "host_hook_config_event": 61,
     "installer_function": 18,
-    "mcp_tool": 36,
+    "mcp_tool": 37,
     "monitor_route": 40,
     "opencode_native_tool": 10,
     "opencode_plugin_event": 8,
     "package_config_file": 37,
-    "package_export": 927,
+    "package_export": 941,
     "package_generated_artifact": 37,
     "package_manifest_script": 80,
-    "package_source_file": 288,
-    "package_test_file": 322,
+    "package_source_file": 289,
+    "package_test_file": 327,
     "pi_extension_command": 13,
     "pi_extension_event": 14,
     "pi_native_tool": 11,
     "public_entrypoint": 13,
     "script_source_file": 23,
-    "tool_registry_entry": 43,
+    "tool_registry_entry": 44,
     "workflow_step": 29,
     "workspace_project": 17
   },
@@ -40955,12 +40955,12 @@
       "closed_at": "2026-04-21T21:09:39.113Z"
     },
     {
-      "id": "package_generated_artifact:packages_core_dist_chunk_vbxac6oi_js",
+      "id": "package_generated_artifact:packages_core_dist_chunk_xeqxn6bs_js",
       "type": "package_generated_artifact",
-      "unit": "packages/core/dist/chunk-VBXAC6OI.js",
+      "unit": "packages/core/dist/chunk-XEQXN6BS.js",
       "status": "accepted",
       "source_paths": [
-        "packages/core/dist/chunk-VBXAC6OI.js"
+        "packages/core/dist/chunk-XEQXN6BS.js"
       ],
       "required_verifier": "generated artifact freshness and producer equality",
       "reviewer_skills": [
@@ -40975,12 +40975,12 @@
       "closed_at": "2026-04-21T21:09:39.113Z"
     },
     {
-      "id": "package_generated_artifact:packages_core_dist_client_rygey3dh_js",
+      "id": "package_generated_artifact:packages_core_dist_client_akihbxrm_js",
       "type": "package_generated_artifact",
-      "unit": "packages/core/dist/client-RYGEY3DH.js",
+      "unit": "packages/core/dist/client-AKIHBXRM.js",
       "status": "accepted",
       "source_paths": [
-        "packages/core/dist/client-RYGEY3DH.js"
+        "packages/core/dist/client-AKIHBXRM.js"
       ],
       "required_verifier": "generated artifact freshness and producer equality",
       "reviewer_skills": [
@@ -59587,6 +59587,454 @@
         "packages/cli/src/mcp-tools.ts"
       ],
       "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_assertruntimedataprofilesafe",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#assertRuntimeDataProfileSafe",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_getdbatpath",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#getDbAtPath",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_normalizeruntimedataprofile",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#normalizeRuntimeDataProfile",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_normalizeruntimepath",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#normalizeRuntimePath",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_pathfingerprint",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#pathFingerprint",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_resolveallruntimedataprofiles",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#resolveAllRuntimeDataProfiles",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_resolveruntimedataprofile",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#resolveRuntimeDataProfile",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_resolveruntimedataprofileinput",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#ResolveRuntimeDataProfileInput",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_runtimedataprofile",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RuntimeDataProfile",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_runtimedataprofilemanifest",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RuntimeDataProfileManifest",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_runtimeprofiledbmismatch",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#runtimeProfileDbMismatch",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_runtimeprofileerror",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RuntimeProfileError",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_runtimeprofilepathkey",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RuntimeProfilePathKey",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_export:packages_core_src_index_ts_runtimeprofilepaths",
+      "type": "package_export",
+      "unit": "packages/core/src/index.ts#RuntimeProfilePaths",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "required_verifier": "per-export docs/code/consumer/test row",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "kieran-typescript-reviewer"
+      ],
+      "evidence": [
+        "pnpm build",
+        "pnpm test",
+        "pnpm --dir scripts test -- surface-inventory"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_core_src_runtime_profile_ts",
+      "type": "package_source_file",
+      "unit": "packages/core/src/runtime-profile.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/runtime-profile.ts"
+      ],
+      "required_verifier": "module contract, owned invariants, internal consumers, focused test",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "maintainability-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_cli_src_tests_runtime_data_profile_contract_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/cli/src/tests/runtime-data-profile-contract.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tests/runtime-data-profile-contract.test.ts"
+      ],
+      "required_verifier": "assertion strength, behavior coverage, regression value",
+      "reviewer_skills": [
+        "testing-reviewer"
+      ],
+      "evidence": [
+        "pnpm test"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_core_src_tests_runtime_data_profile_guard_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/core/src/tests/runtime-data-profile-guard.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/tests/runtime-data-profile-guard.test.ts"
+      ],
+      "required_verifier": "assertion strength, behavior coverage, regression value",
+      "reviewer_skills": [
+        "testing-reviewer"
+      ],
+      "evidence": [
+        "pnpm test"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_core_src_tests_runtime_data_profile_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/core/src/tests/runtime-data-profile.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/core/src/tests/runtime-data-profile.test.ts"
+      ],
+      "required_verifier": "assertion strength, behavior coverage, regression value",
+      "reviewer_skills": [
+        "testing-reviewer"
+      ],
+      "evidence": [
+        "pnpm test"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_rag_rebuild_profile_backup_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/rag-rebuild-profile-backup.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/rag-rebuild-profile-backup.test.ts"
+      ],
+      "required_verifier": "assertion strength, behavior coverage, regression value",
+      "reviewer_skills": [
+        "testing-reviewer"
+      ],
+      "evidence": [
+        "pnpm test"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_rag_rebuild_profile_isolation_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/rag-rebuild-profile-isolation.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/rag-rebuild-profile-isolation.test.ts"
+      ],
+      "required_verifier": "assertion strength, behavior coverage, regression value",
+      "reviewer_skills": [
+        "testing-reviewer"
+      ],
+      "evidence": [
+        "pnpm test"
+      ],
+      "closure_reason": "repo-local verifier passed",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "mcp_tool:get_runtime_profile_paths",
+      "type": "mcp_tool",
+      "unit": "get_runtime_profile_paths",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-22T18:30:00.000Z"
+    },
+    {
+      "id": "tool_registry_entry:get_runtime_profile_paths",
+      "type": "tool_registry_entry",
+      "unit": "get_runtime_profile_paths",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
       "reviewer_skills": [
         "correctness-reviewer",
         "project-standards-reviewer"

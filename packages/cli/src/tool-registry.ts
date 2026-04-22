@@ -13,7 +13,7 @@
 // Handlers default workspace_id and project_id from deps when args omit them.
 
 import { getDb } from 'fulcrum-agent-core'
-import type { AgentRole, Db } from 'fulcrum-agent-core'
+import type { AgentRole, Db, RuntimeDataProfile } from 'fulcrum-agent-core'
 import type { RagRebuildDomain } from 'fulcrum-memory'
 import { TOOL_SCHEMA_MAP } from './mcp-tools.js'
 import type { ToolSchema } from './mcp-tools.js'
@@ -940,10 +940,11 @@ TOOL_REGISTRY.set('get_rag_rebuild_plan', {
       workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
       project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
       mode: 'plan',
+      runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
       domains: args['domains'] as RagRebuildDomain[] | undefined,
       allow_empty: args['allow_empty'] as boolean | undefined,
       actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
-    }, deps.db)
+    })
   },
 })
 
@@ -956,10 +957,11 @@ TOOL_REGISTRY.set('get_rag_rebuild_dry_run', {
       workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
       project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
       mode: 'dry_run',
+      runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
       domains: args['domains'] as RagRebuildDomain[] | undefined,
       allow_empty: args['allow_empty'] as boolean | undefined,
       actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
-    }, deps.db)
+    })
   },
 })
 
@@ -973,10 +975,24 @@ TOOL_REGISTRY.set('start_rag_rebuild', {
       workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
       project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
       mode: 'execute',
+      runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
+      confirm_profile: args['confirm_profile'] as RuntimeDataProfile | undefined,
+      verification_refs: args['verification_refs'] as string[] | undefined,
       domains: args['domains'] as RagRebuildDomain[] | undefined,
       allow_empty: args['allow_empty'] as boolean | undefined,
       actor: { kind: 'agent', role: trustedRole, id: deps.trusted_caller_run_id ?? 'mcp' },
-    }, deps.db)
+    })
+  },
+})
+
+TOOL_REGISTRY.set('get_runtime_profile_paths', {
+  schema: TOOL_SCHEMA_MAP.get('get_runtime_profile_paths'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args) => {
+    const { inspectRuntimeProfilePaths } = await import('./commands/memory-rag-lifecycle.js')
+    return inspectRuntimeProfilePaths({
+      profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
+    })
   },
 })
 
@@ -988,7 +1004,8 @@ TOOL_REGISTRY.set('get_rag_rebuild_report', {
     return getRagRebuildReport({
       report_id: args['report_id'] as string,
       workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-    }, deps.db)
+      runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
+    }, args['runtime_profile'] ? undefined : deps.db)
   },
 })
 

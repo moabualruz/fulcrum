@@ -160,6 +160,46 @@ function addCodeChunksFileIdIfMissing(db: Database.Database): void {
   }
 }
 
+function addRagRuntimeProfileColumnsIfMissing(db: Database.Database): void {
+  const reports = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='rag_rebuild_reports'").get() as { name: string } | undefined
+  if (reports) {
+    const cols = (db.prepare('PRAGMA table_info(rag_rebuild_reports)').all() as { name: string }[]).map(c => c.name)
+    const additions: Array<[string, string]> = [
+      ['runtime_profile', "TEXT NOT NULL DEFAULT 'dev' CHECK(runtime_profile IN ('install','dev','test'))"],
+      ['profile_manifest', "TEXT NOT NULL DEFAULT '{}'"],
+      ['backup_ref', 'TEXT'],
+      ['verification_refs', "TEXT NOT NULL DEFAULT '[]'"],
+      ['mutation_scope', "TEXT NOT NULL DEFAULT '{}'"],
+      ['profile_confirmation', 'TEXT'],
+    ]
+    for (const [name, ddl] of additions) {
+      if (!cols.includes(name)) db.exec(`ALTER TABLE rag_rebuild_reports ADD COLUMN ${name} ${ddl}`)
+    }
+  }
+
+  const candidates = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='rag_rebuild_candidates'").get() as { name: string } | undefined
+  if (candidates) {
+    const cols = (db.prepare('PRAGMA table_info(rag_rebuild_candidates)').all() as { name: string }[]).map(c => c.name)
+    if (!cols.includes('runtime_profile')) {
+      db.exec(`ALTER TABLE rag_rebuild_candidates ADD COLUMN runtime_profile TEXT NOT NULL DEFAULT 'dev' CHECK(runtime_profile IN ('install','dev','test'))`)
+    }
+    if (!cols.includes('profile_manifest')) {
+      db.exec(`ALTER TABLE rag_rebuild_candidates ADD COLUMN profile_manifest TEXT NOT NULL DEFAULT '{}'`)
+    }
+  }
+
+  const health = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='rag_health_reports'").get() as { name: string } | undefined
+  if (health) {
+    const cols = (db.prepare('PRAGMA table_info(rag_health_reports)').all() as { name: string }[]).map(c => c.name)
+    if (!cols.includes('runtime_profile')) {
+      db.exec(`ALTER TABLE rag_health_reports ADD COLUMN runtime_profile TEXT NOT NULL DEFAULT 'dev' CHECK(runtime_profile IN ('install','dev','test'))`)
+    }
+    if (!cols.includes('profile_manifest')) {
+      db.exec(`ALTER TABLE rag_health_reports ADD COLUMN profile_manifest TEXT NOT NULL DEFAULT '{}'`)
+    }
+  }
+}
+
 export function applySchema(db: Database.Database): void {
   // v2a PR 1 Task 1: rebuild legacy memories table BEFORE the idempotent CREATE
   // statements run. CREATE IF NOT EXISTS would skip the legacy table and leave
@@ -168,6 +208,7 @@ export function applySchema(db: Database.Database): void {
   addAgentRunsContextTypeIfMissing(db)
   addProjectsRootRealpathIfMissing(db)
   addCodeChunksFileIdIfMissing(db)
+  addRagRuntimeProfileColumnsIfMissing(db)
 
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -1056,6 +1097,12 @@ export function applySchema(db: Database.Database): void {
       candidate_id           TEXT,
       candidate_disposition  TEXT NOT NULL DEFAULT 'none' CHECK(candidate_disposition IN ('none','promoted','quarantined','discarded')),
       input_snapshot_id      TEXT,
+      runtime_profile        TEXT NOT NULL DEFAULT 'dev' CHECK(runtime_profile IN ('install','dev','test')),
+      profile_manifest       TEXT NOT NULL DEFAULT '{}',
+      backup_ref             TEXT,
+      verification_refs      TEXT NOT NULL DEFAULT '[]',
+      mutation_scope         TEXT NOT NULL DEFAULT '{}',
+      profile_confirmation   TEXT,
       started_at             TEXT NOT NULL DEFAULT (datetime('now')),
       finished_at            TEXT,
       summary                TEXT NOT NULL DEFAULT '{}',
@@ -1076,6 +1123,8 @@ export function applySchema(db: Database.Database): void {
       domains              TEXT NOT NULL DEFAULT '[]',
       status               TEXT NOT NULL CHECK(status IN ('building','verifying','verified','promoting','promoted','quarantined','discarded','failed')),
       storage_ref          TEXT NOT NULL DEFAULT '{}',
+      runtime_profile      TEXT NOT NULL DEFAULT 'dev' CHECK(runtime_profile IN ('install','dev','test')),
+      profile_manifest     TEXT NOT NULL DEFAULT '{}',
       input_snapshot_id    TEXT NOT NULL,
       served_state_before  TEXT NOT NULL DEFAULT '{}',
       verification         TEXT NOT NULL DEFAULT '[]',
@@ -1189,6 +1238,8 @@ export function applySchema(db: Database.Database): void {
       workspace_id         TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
       project_id           TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
       status               TEXT NOT NULL CHECK(status IN ('healthy','degraded','failed')),
+      runtime_profile      TEXT NOT NULL DEFAULT 'dev' CHECK(runtime_profile IN ('install','dev','test')),
+      profile_manifest     TEXT NOT NULL DEFAULT '{}',
       generated_at         TEXT NOT NULL DEFAULT (datetime('now')),
       domains              TEXT NOT NULL DEFAULT '{}',
       recommended_actions  TEXT NOT NULL DEFAULT '[]',

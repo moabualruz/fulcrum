@@ -107,6 +107,30 @@ export type VectorMetadataTable = 'vec_memories' | 'vec_chunks'
 export type VectorMetadataStatus = 'current' | 'stale' | 'failed' | 'skipped' | 'legacy'
 export type RagHealthStatus = 'healthy' | 'degraded' | 'failed'
 export type RagEvalRunStatus = 'pending' | 'running' | 'passed' | 'failed' | 'cancelled'
+export type RuntimeDataProfile = 'install' | 'dev' | 'test'
+export type RuntimeProfilePathKey = 'db' | 'vault' | 'graph' | 'vectors' | 'artifacts'
+
+export type RuntimeProfilePaths = Record<RuntimeProfilePathKey, string>
+
+export interface RuntimeProfileError {
+  code: 'profile_path_overlap' | 'shared_global_path'
+  profile: RuntimeDataProfile
+  path_key: RuntimeProfilePathKey
+  path: string
+  conflicts_with_profile?: RuntimeDataProfile
+  conflicts_with_path_key?: RuntimeProfilePathKey
+  conflicts_with_path?: string
+}
+
+export interface RuntimeDataProfileManifest {
+  profile: RuntimeDataProfile
+  safe_for_destructive_execution: boolean
+  disposable: boolean
+  requires_confirmation: boolean
+  paths: RuntimeProfilePaths
+  path_fingerprints: Record<RuntimeProfilePathKey, string>
+  errors: RuntimeProfileError[]
+}
 
 // Keep RunStatus as alias for backward compat with existing code
 export type RunStatus = AgentRunStatus
@@ -431,6 +455,8 @@ export interface FulcrumConfig {
   reranker: EmbeddingProviderConfig
   policy: PolicyConfig
   vault?: VaultConfig
+  runtime_profile?: RuntimeDataProfile
+  runtime_profiles?: Partial<Record<RuntimeDataProfile, Partial<RuntimeProfilePaths>>>
 }
 
 export interface PolicyCheckResult {

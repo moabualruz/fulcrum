@@ -9,7 +9,8 @@ These contracts define expected CLI/MCP JSON shapes. Exact command names may cha
 ```bash
 fulcrum memory rebuild --all --mode plan --json
 fulcrum memory rebuild --all --mode dry-run --json
-fulcrum memory rebuild --all --execute --json
+fulcrum memory rebuild --all --execute --profile dev --json
+fulcrum doctor paths --profile dev --json
 ```
 
 ### Request Shape
@@ -24,9 +25,12 @@ fulcrum memory rebuild --all --execute --json
     "id": "agent_..."
   },
   "mode": "plan",
+  "runtime_profile": "dev",
   "domains": ["l0", "l1", "fts", "code", "vectors", "graph"],
   "embed": false,
-  "allow_empty": false
+  "allow_empty": false,
+  "confirm_profile": null,
+  "verification_refs": []
 }
 ```
 
@@ -40,7 +44,25 @@ fulcrum memory rebuild --all --execute --json
   "scope": {
     "workspace_id": "ws_...",
     "project_id": "proj_...",
+    "runtime_profile": "dev",
     "domains": ["l0", "l1", "fts", "code", "vectors", "graph"]
+  },
+  "profile_manifest": {
+    "profile": "dev",
+    "paths": {
+      "db": "/abs/path/to/dev/fulcrum.db",
+      "vault": "/abs/path/to/dev/vault",
+      "graph": "/abs/path/to/dev/graph",
+      "vectors": "/abs/path/to/dev/vectors",
+      "artifacts": "/abs/path/to/dev/artifacts"
+    },
+    "path_fingerprints": {
+      "db": "sha256:...",
+      "vault": "sha256:...",
+      "graph": "sha256:...",
+      "vectors": "sha256:...",
+      "artifacts": "sha256:..."
+    }
   },
   "candidate": null,
   "counts": {
@@ -71,7 +93,25 @@ fulcrum memory rebuild --all --execute --json
   "scope": {
     "workspace_id": "ws_...",
     "project_id": "proj_...",
+    "runtime_profile": "dev",
     "domains": ["l0", "l1", "fts", "code", "vectors", "graph"]
+  },
+  "profile_manifest": {
+    "profile": "dev",
+    "paths": {
+      "db": "/abs/path/to/dev/fulcrum.db",
+      "vault": "/abs/path/to/dev/vault",
+      "graph": "/abs/path/to/dev/graph",
+      "vectors": "/abs/path/to/dev/vectors",
+      "artifacts": "/abs/path/to/dev/artifacts"
+    },
+    "path_fingerprints": {
+      "db": "sha256:...",
+      "vault": "sha256:...",
+      "graph": "sha256:...",
+      "vectors": "sha256:...",
+      "artifacts": "sha256:..."
+    }
   },
   "candidate": {
     "candidate_id": "candidate_...",
@@ -81,6 +121,8 @@ fulcrum memory rebuild --all --execute --json
     "input_snapshot_status": "current",
     "served_state_unchanged": false
   },
+  "backup": null,
+  "verification_refs": [],
   "counts": {
     "raw_files": 0,
     "l0_sources": 0,
@@ -109,12 +151,63 @@ fulcrum memory rebuild --all --execute --json
 Rules:
 - `mode=plan` and `mode=dry-run` must not mutate.
 - `execute` must require explicit workspace/project scope and actor authorization.
+- `execute` must require explicit `runtime_profile`; omitted or ambiguous profile fails before mutation.
+- Runtime profile values are `install`, `dev`, and `test`.
+- Profile resolution precedence is explicit CLI arguments, explicit config/profile fields, environment (`FULCRUM_PROFILE`, `FULCRUM_DATA_DIR`, `FULCRUM_VAULT_PATH`), then profile defaults.
+- Any override that makes dev/review or test paths overlap installed/operator paths fails before mutation.
+- Dev/review and test profiles must fail closed if DB, vault, graph, vector, or artifact paths overlap installed/operator paths or shared global paths.
+- Installed/operator profile execution must require `confirm_profile=install` and a restorable backup reference before mutation.
+- Installed/operator execution may link prior test-profile and dev/review-profile verification report IDs in `verification_refs` for controlled review evidence.
+- Normal rebuild execution clears only allowlisted derived RAG state within the active profile; full DB or vault wipe requires a separate explicit wipe scope.
+- Plan, dry-run, path inspection, and structured errors include `profile_manifest`.
+- Persisted reports and audit events may store path fingerprints instead of raw absolute paths; local preflight/path-inspection output must expose absolute paths.
 - Destructive execution is allowed only for human operators, `chief_of_staff`, `memory_curator`, or roles with write-code/edit-file capability.
 - Full rebuild execution must build staged or quarantined candidate state and promote it only after all required checks pass.
 - Full rebuild execution must snapshot canonical source identities and content hashes at start and revalidate that snapshot before promotion.
 - If canonical sources change before promotion, the candidate must fail promotion and remain unserved.
 - A failed candidate must not be served by recall or code search; the previously served derived state remains current.
 - Failure status must include machine-readable failed checks.
+
+## Runtime Data Profile Paths
+
+### Command
+
+```bash
+fulcrum doctor paths --profile install --json
+fulcrum doctor paths --profile dev --json
+fulcrum doctor paths --profile test --json
+```
+
+### Response Shape
+
+```json
+{
+  "profile": "dev",
+  "safe_for_destructive_execution": true,
+  "disposable": false,
+  "paths": {
+    "db": "/abs/path/to/dev/fulcrum.db",
+    "vault": "/abs/path/to/dev/vault",
+    "graph": "/abs/path/to/dev/graph",
+    "vectors": "/abs/path/to/dev/vectors",
+    "artifacts": "/abs/path/to/dev/artifacts"
+  },
+  "path_fingerprints": {
+    "db": "sha256:...",
+    "vault": "sha256:...",
+    "graph": "sha256:...",
+    "vectors": "sha256:...",
+    "artifacts": "sha256:..."
+  },
+  "errors": []
+}
+```
+
+Rules:
+- Path inspection is read-only.
+- Path inspection must show the same profile/path resolution destructive commands will use.
+- `test` profile must be disposable and must not resolve to installed/operator or dev/review roots.
+- Unsafe profile resolution returns `safe_for_destructive_execution=false` with machine-readable errors.
 
 ## Embedding Job
 
@@ -268,6 +361,17 @@ fulcrum memory doctor --json
 {
   "workspace_id": "ws_...",
   "project_id": "proj_...",
+  "runtime_profile": "dev",
+  "profile_manifest": {
+    "profile": "dev",
+    "path_fingerprints": {
+      "db": "sha256:...",
+      "vault": "sha256:...",
+      "graph": "sha256:...",
+      "vectors": "sha256:...",
+      "artifacts": "sha256:..."
+    }
+  },
   "status": "degraded",
   "generated_at": "2026-04-22T00:00:00.000Z",
   "domains": {

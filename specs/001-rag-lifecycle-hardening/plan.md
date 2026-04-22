@@ -9,8 +9,10 @@ Fulcrum needs one trusted operational path for RAG-derived state: reset/rebuild,
 
 Primary technical approach:
 - Keep canonical data in vault raw files, vault curated files, project files, and explicit config.
+- Add a runtime data profile boundary before closing US1: installed/operator, dev/review, and test profiles resolve to separate DB, vault, graph, vector, and artifact roots.
 - Treat SQLite rows, FTS5 tables, sqlite-vec tables, Kuzu graph state, and eval reports as derived or operational state that can be rebuilt and audited.
 - Build full rebuild output in staged or quarantined candidate state and promote it to served search state only after all required parity checks pass.
+- Scope destructive rebuild/reset work to the active data profile; normal rebuilds clear only allowlisted derived RAG state, while full DB/vault wipe remains a separate backup-confirmed workflow.
 - Snapshot canonical source identities and content hashes at full rebuild start; before promotion, revalidate that the snapshot is still current.
 - Complete embedding jobs with item failures as `degraded`, preserving failed items for retry without reprocessing completed current items.
 - Gate default golden RAG evals in CI only for changes touching RAG lifecycle, memory, code search, embeddings, graph, or eval fixtures.
@@ -23,6 +25,7 @@ Primary technical approach:
 **Language/Version**: TypeScript ESM on Node 24.14.1 in this workspace; package TypeScript targets remain repo-defined.  
 **Primary Dependencies**: pnpm 10.33.0 workspace packages; `better-sqlite3`, `sqlite-vec`, `@huggingface/transformers`, optional `kuzu`, Hono monitor, Vitest.  
 **Storage**: SQLite core DB, FTS5 virtual tables, sqlite-vec `vec0` virtual tables, L0/L1 vault markdown files, optional Kuzu graph store, JSON report artifacts.  
+**Runtime Data Profiles**: `install` for real operator data, `dev` for controlled review/manual rebuild work, and `test` for ephemeral test runs. Each profile owns separate DB, vault, graph, vector, and artifact roots.
 **Testing**: Vitest with real in-memory SQLite; package tests under `packages/<pkg>/src/tests/`; root `pnpm test`; targeted package tests first.  
 **Target Platform**: Local-first developer machines and agent hosts using the Fulcrum CLI and monitor.  
 **Project Type**: TypeScript pnpm monorepo with CLI, MCP, local monitor, memory subsystem, worker adapters, and integration artifacts.  
@@ -39,6 +42,7 @@ Primary technical approach:
 - **Memory Is Source-Controlled Knowledge**: PASS. L0 remains canonical. L1, FTS, vector, and graph state are treated as derived or operational and rebuildable.
 - **Agent-Native Parity With Safe Tools**: PASS WITH REQUIREMENTS. New CLI operations need MCP/action parity where agents need them. Destructive execution is limited to human operators, `chief_of_staff`, `memory_curator`, and roles with write-code/edit-file capability; all execution needs explicit scope, authorization, dry-run/report support, and audit events.
 - **Test-First, Real Boundaries**: PASS. Migrations and behavior require real in-memory SQLite tests; no DB mocks.
+- **Profile Isolation**: PASS WITH REQUIREMENTS. US1 cannot close until install/dev/test DB, vault, graph, vector, and artifact roots are separated and tests prove review/test resets cannot mutate installed/operator data.
 - **Security And Policy Are Default Gates**: PASS WITH REQUIREMENTS. Reports, logs, evals, explanations, and job events must redact secrets and provider config.
 - **Observable And Recoverable Execution**: PASS. Durable job events, reports, status surfaces, and monitor readouts directly satisfy this principle.
 - **Simple, Typed, ESM-Publishable Code**: PASS. Implementation should add typed primitives inside owning packages and avoid new runtime-wide abstractions until multiple call sites need them.
@@ -68,10 +72,13 @@ specs/001-rag-lifecycle-hardening/
 packages/core/src/
 ├── db/schema.ts
 ├── ids.ts
+├── config.ts
+├── runtime-profile.ts
 ├── types.ts
 └── tests/
     ├── check-constraints.test.ts
     ├── memory-aux-tables.test.ts
+    ├── runtime-data-profile.test.ts
     └── schema-migration.test.ts
 
 packages/memory/src/
@@ -113,6 +120,7 @@ Research is captured in [research.md](./research.md). Resolved decisions:
 - Graph rebuild must materialize typed domain nodes/edges and explain graph contribution.
 - Golden evals must distinguish retrieval relevance, ranking, answer correctness, grounding/provenance, graph expansion, and operational parity.
 - Default golden RAG evals run in CI for RAG-related changes only, not every unrelated PR.
+- Runtime data profiles must separate installed/operator, dev/review, and test DB, vault, graph, vector, and artifact roots before destructive US1 rebuild work can be accepted.
 
 ## Phase 1: Design Output
 
@@ -125,6 +133,15 @@ Design artifacts:
 
 ### Slice 1: Derived Lifecycle And Reports
 
+Before US1 is considered complete, add a runtime data profile isolation gate:
+- Resolve `install`, `dev`, and `test` data profiles through one typed resolver.
+- Ensure each profile has distinct DB, vault, graph, vector, and artifact roots.
+- Define resolver precedence for existing configuration surfaces: explicit CLI arguments first, then explicit profile/config fields, then environment (`FULCRUM_PROFILE`, `FULCRUM_DATA_DIR`, `FULCRUM_VAULT_PATH`), then profile defaults. Any override that crosses profile boundaries fails closed.
+- Make destructive rebuild/reset commands print and persist a profile path manifest before mutation.
+- Fail closed when review/test profiles resolve to installed/operator data or shared global paths.
+- Require installed/operator profile confirmation and a restorable backup before destructive installed/operator maintenance.
+- Ensure automated tests use disposable test-profile data and cannot silently fall back to install/dev paths.
+
 Add a report-producing rebuild primitive in `@fulcrum/memory` that can:
 - Plan scope without mutation.
 - Create a staged or quarantined candidate for selected domains.
@@ -132,8 +149,9 @@ Add a report-producing rebuild primitive in `@fulcrum/memory` that can:
 - Rebuild L0 source rows, L1 memory rows, FTS indexes, code files/chunks, vector metadata placeholders, and graph coverage where configured inside the candidate state.
 - Verify parity, revalidate that the input snapshot is still current, promote the candidate only after all required checks pass, and leave previously served derived state unchanged when verification fails or the snapshot is stale.
 - Emit a machine-readable report that includes candidate disposition: promoted, quarantined, discarded, failed, or cancelled.
+- Include runtime data profile identity, non-secret path fingerprints, backup reference, and profile-scoped mutation scope in persisted reports and audit events. Human-facing preflight output may include absolute paths so operators can inspect the target before mutation.
 
-CLI surface should expose plan, dry-run, execute, and report modes. Help/status paths must be tested as non-mutating. Execution must be authorized for human operators, `chief_of_staff`, `memory_curator`, or roles with write-code/edit-file capability; read-only plan, dry-run, status, and report surfaces remain available to less-privileged actors.
+CLI surface should expose plan, dry-run, execute, profile/path inspection, and report modes. Help/status/path inspection paths must be tested as non-mutating. Execution must be authorized for human operators, `chief_of_staff`, `memory_curator`, or roles with write-code/edit-file capability; read-only plan, dry-run, status, path inspection, and report surfaces remain available to less-privileged actors.
 
 ### Slice 2: Embedding Job Ledger
 
@@ -174,15 +192,17 @@ Default golden RAG evals must be wired into CI only for changes touching RAG lif
 - **Mixed old/new vector state**: Treat missing metadata as legacy/stale and report it explicitly.
 - **Long-running jobs**: Persist job status/events before expensive work, make resume idempotent, and ensure degraded jobs can retry failed items without repeating completed work.
 - **Destructive command misuse**: Require explicit scope, dry-run output, audit events, and tests proving help/status do not mutate.
+- **Profile contamination risk**: Make profile resolution centralized, visible, and fail-closed; tests must prove test/dev resets cannot touch installed/operator DB, vault, graph, vector, or artifact roots.
+- **Unsafe full wipe risk**: Keep normal rebuild clearing allowlisted derived state only; require backup and profile confirmation for installed/operator destructive maintenance and a separate explicit scope for full DB/vault wipe.
 - **Eval flakiness**: Default evals use deterministic fixture cases and structural assertions. LLM/model-based checks remain opt-in. CI gating is limited to RAG-related changes.
 - **Graph scope creep**: P1 only requires coverage, rebuild participation, and explain fields. Deeper graph-quality improvements stay P2.
 
 ## Test Plan
 
 Targeted tests before broad suite:
-- `packages/core`: schema migration tests, check-constraint tests, ID guard tests for new entities.
-- `packages/memory`: staged rebuild promotion/failure tests, source-snapshot stale-promotion tests, rebuild report tests, embedding job ledger tests, degraded job retry tests, vector metadata stale/current tests, code indexing parity tests, explain contract tests, eval runner tests.
-- `packages/cli`: command parsing, dry-run/help non-mutation tests, destructive execution authorization tests, JSON contract tests, MCP/tool registry tests for new action parity.
+- `packages/core`: schema migration tests, check-constraint tests, ID guard tests for new entities, and runtime data profile guard tests proving install/dev/test paths are distinct and tests cannot resolve to installed/operator data.
+- `packages/memory`: staged rebuild promotion/failure tests, source-snapshot stale-promotion tests, profile-scoped backup/clear tests, rebuild report tests, embedding job ledger tests, degraded job retry tests, vector metadata stale/current tests, code indexing parity tests, explain contract tests, eval runner tests.
+- `packages/cli`: command parsing, dry-run/help/path-inspection non-mutation tests, destructive execution authorization tests, profile confirmation tests, JSON contract tests, MCP/tool registry tests for new action parity.
 - `packages/monitor`: read-only health coverage tests.
 - CI config/tests: path or package gate proving default golden RAG evals run for representative RAG changes and skip unrelated non-RAG changes.
 

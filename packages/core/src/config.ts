@@ -17,6 +17,8 @@ export type ValidationResult = { ok: true } | { ok: false; errors: string[] }
 
 const EMBEDDING_PROVIDERS = ['local', 'openai', 'voyage', 'cohere', 'ollama', 'jina', 'custom'] as const
 const EMBEDDING_DEVICES = ['auto', 'cpu', 'cuda', 'webgpu'] as const
+const RUNTIME_PROFILES = ['install', 'dev', 'test'] as const
+const RUNTIME_PATH_KEYS = ['db', 'vault', 'graph', 'vectors', 'artifacts'] as const
 
 function validateEmbeddingProvider(value: unknown, path: string): string[] {
   const errs: string[] = []
@@ -117,6 +119,36 @@ export function validateFulcrumConfig(raw: unknown): ValidationResult {
       }
       if (vlt['l2_enabled'] !== undefined && typeof vlt['l2_enabled'] !== 'boolean') {
         errs.push('vault.l2_enabled: must be a boolean')
+      }
+    }
+  }
+
+  if (v['runtime_profile'] !== undefined &&
+      (typeof v['runtime_profile'] !== 'string' || !(RUNTIME_PROFILES as readonly string[]).includes(v['runtime_profile']))) {
+    errs.push(`runtime_profile: must be one of ${RUNTIME_PROFILES.join(', ')}`)
+  }
+  if (v['runtime_profiles'] !== undefined) {
+    if (typeof v['runtime_profiles'] !== 'object' || v['runtime_profiles'] === null || Array.isArray(v['runtime_profiles'])) {
+      errs.push('runtime_profiles: must be an object')
+    } else {
+      const profiles = v['runtime_profiles'] as Record<string, unknown>
+      for (const [profile, value] of Object.entries(profiles)) {
+        if (!(RUNTIME_PROFILES as readonly string[]).includes(profile)) {
+          errs.push(`runtime_profiles.${profile}: unknown profile`)
+          continue
+        }
+        if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+          errs.push(`runtime_profiles.${profile}: must be an object`)
+          continue
+        }
+        const paths = value as Record<string, unknown>
+        for (const [key, path] of Object.entries(paths)) {
+          if (!(RUNTIME_PATH_KEYS as readonly string[]).includes(key)) {
+            errs.push(`runtime_profiles.${profile}.${key}: unknown path key`)
+          } else if (typeof path !== 'string') {
+            errs.push(`runtime_profiles.${profile}.${key}: must be a string`)
+          }
+        }
       }
     }
   }

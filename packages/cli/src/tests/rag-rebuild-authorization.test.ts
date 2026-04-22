@@ -27,13 +27,13 @@ describe('RAG rebuild authorization', () => {
       project_id: 'proj_1',
       mode: 'plan',
       allow_empty: true,
-    })
+    }, getDb())
     await executeRagRebuildCommand({
       workspace_id: 'ws_1',
       project_id: 'proj_1',
       mode: 'dry_run',
       allow_empty: true,
-    })
+    }, getDb())
 
     expect(auditEvents()).toEqual([])
   })
@@ -43,9 +43,10 @@ describe('RAG rebuild authorization', () => {
       workspace_id: 'ws_1',
       project_id: 'proj_1',
       mode: 'execute',
+      runtime_profile: 'dev',
       allow_empty: true,
       actor: { kind: 'agent', role: 'code_reviewer', id: 'run_reviewer' },
-    })).rejects.toThrow('not authorized')
+    }, getDb())).rejects.toThrow('not authorized')
 
     const payload = JSON.parse(auditEvents()[0]!.payload) as { authorized: boolean; authorization_reason: string }
     expect(payload.authorized).toBe(false)
@@ -57,9 +58,10 @@ describe('RAG rebuild authorization', () => {
       workspace_id: 'ws_1',
       project_id: 'proj_1',
       mode: 'execute',
+      runtime_profile: 'dev',
       allow_empty: true,
       actor: { kind: 'human', role: 'software_engineer', id: 'operator' },
-    })
+    }, getDb())
 
     expect(result.status).toBe('completed')
     const payload = JSON.parse(auditEvents().at(-1)!.payload) as { authorized: boolean; authorization_reason: string }

@@ -65,10 +65,16 @@ Output: `✓ L2 active — indexed <N> memories`, plus up to 10 error lines if a
 
 ### `fulcrum memory rebuild`
 
-Rebuild derived layers from the L0 vault.
+Rebuild derived layers from the L0 vault. Legacy L1/L2 rebuild flags still
+work. The RAG lifecycle rebuild surface uses explicit runtime data profiles so
+destructive maintenance cannot silently target installed/operator data.
 
 ```
 fulcrum memory rebuild [--l1 | --l2 | --both]
+fulcrum memory rebuild --all --mode plan --profile dev --json
+fulcrum memory rebuild --all --mode dry-run --profile dev --json
+fulcrum memory rebuild --all --execute --profile dev --json
+fulcrum memory rebuild --all --execute --profile install --confirm-profile install --verification-ref <report_id> --json
 ```
 
 | Flag | Default | Rebuilds |
@@ -76,12 +82,23 @@ fulcrum memory rebuild [--l1 | --l2 | --both]
 | `--l1` | yes | L1 SQLite FTS5 only |
 | `--l2` | — | L2 Kuzu + HNSW only |
 | `--both` | — | Both L1 and L2 |
+| `--all` | — | RAG lifecycle mode for all derived domains |
+| `--mode plan` | `plan` | Non-mutating RAG lifecycle plan |
+| `--mode dry-run` | — | Non-mutating RAG lifecycle dry run |
+| `--execute` | — | Execute destructive/profile-scoped derived-state rebuild |
+| `--profile <install|dev|test>` | — | Runtime data profile for RAG lifecycle commands |
+| `--confirm-profile install` | — | Required for installed/operator destructive execution |
+| `--verification-ref <report_id>` | — | Link prior dev/test verification reports for installed/operator execution |
+| `--allow-empty` | — | Permit zero-scope rebuild execution |
 
 ```bash
 fulcrum memory rebuild --both
+fulcrum memory rebuild --all --mode plan --profile dev --json
 ```
 
 Output: `✓ L1: <n> memories, L2: <n> memories` plus up to 10 errors.
+RAG lifecycle JSON output includes `runtime_profile`, absolute profile paths,
+non-secret path fingerprints, candidate/report state, and structured errors.
 
 ### `fulcrum memory status`
 
@@ -895,6 +912,22 @@ Fixable items:
 
 - **Data directory missing** → creates `$FULCRUM_DATA_DIR`
 - **No agent integration files in CWD** → writes a stub `CLAUDE.md` in the current directory
+
+### `fulcrum doctor paths`
+
+Inspect the runtime data profile paths used by destructive RAG lifecycle
+commands. This is read-only.
+
+```bash
+fulcrum doctor paths --profile install --json
+fulcrum doctor paths --profile dev --json
+fulcrum doctor paths --profile test --json
+```
+
+Output includes the resolved DB, vault, graph, vector, and artifact roots,
+their `sha256:` path fingerprints, `disposable`, `requires_confirmation`, and
+`safe_for_destructive_execution`. Dev/review and test profiles fail closed when
+their paths overlap installed/operator roots.
 
 ---
 

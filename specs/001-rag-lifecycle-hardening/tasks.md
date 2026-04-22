@@ -21,6 +21,7 @@
 - **Agent-native architecture**: CLI/MCP/action parity, machine-readable outputs, read-only vs destructive capability metadata.
 - **Test-driven development**: failing tests before implementation in every behavior slice.
 - **Integration utilization**: producer/consumer wiring tests across core, memory, CLI, MCP, monitor, and CI workflows.
+- **Runtime data isolation**: installed/operator, dev/review, and test profiles must use separate DB, vault, graph, vector, and artifact roots before US1 is closed.
 
 ---
 
@@ -93,6 +94,32 @@
 - [X] T038 [US1] Add MCP/action parity for rebuild plan, dry-run, execute, and report status with accurate capability hints for FR-034 and FR-040 in packages/cli/src/tool-registry.ts
 - [X] T039 [US1] Export rebuild primitives for downstream consumers through packages/memory/src/index.ts
 
+### Phase 3A Amendment: Runtime Data Profile Isolation Gate
+
+**Purpose**: Fortify US1 before closure by preventing installed/operator, dev/review, and test data contamination during rebuild, review, and future destructive maintenance work.
+
+**Status rule**: These late-added tasks were inserted before later phases and task IDs were renumbered to preserve execution order. They are required before the US1 checkpoint is accepted, before merge/release decisions based on US1, and before any P1/P2/P3 follow-on phase resumes.
+
+#### Tests for Phase 3A
+
+- [X] T040 [P] [US1] Add failing runtime data profile resolver tests for distinct install/dev/test DB, vault, graph, vector, and artifact roots covering FR-048, FR-049, SC-017, and SC-018 in packages/core/src/tests/runtime-data-profile.test.ts
+- [X] T041 [P] [US1] Add failing fail-closed path contamination guard tests for test and dev/review profiles resolving to installed/operator or shared global paths covering FR-050 and SC-018 in packages/core/src/tests/runtime-data-profile-guard.test.ts
+- [X] T042 [P] [US1] Add failing CLI path inspection and destructive confirmation contract tests covering profile path manifests, installed/operator confirmation, structured errors, and non-mutation for FR-049, FR-051, FR-053, and SC-020 in packages/cli/src/tests/runtime-data-profile-contract.test.ts
+- [X] T043 [P] [US1] Add failing profile-scoped rebuild tests proving dev/review and test derived-state clears do not mutate installed/operator DB or vault sentinels covering FR-052, FR-054, SC-018, and SC-019 in packages/memory/src/tests/rag-rebuild-profile-isolation.test.ts
+- [X] T044 [P] [US1] Add failing rebuild backup/report tests proving installed/operator destructive execution records backup reference, profile confirmation, path fingerprints, verification refs, and audit event covering FR-051, FR-053, and SC-020 in packages/memory/src/tests/rag-rebuild-profile-backup.test.ts
+
+#### Implementation for Phase 3A
+
+- [X] T045 [US1] Implement shared runtime data profile types, resolver precedence, path normalization, and path fingerprinting for install/dev/test in packages/core/src/runtime-profile.ts and packages/core/src/config.ts
+- [X] T046 [US1] Export runtime data profile contracts through packages/core/src/index.ts and consume them through public package APIs only
+- [X] T047 [US1] Implement test-profile guardrails so automated tests use ephemeral/disposable DB and vault roots and fail before touching installed/operator or dev/review paths in packages/core/src/runtime-profile.ts
+- [X] T048 [US1] Wire CLI profile selection, profile path inspection, and machine-readable profile path manifest output using existing `FULCRUM_DATA_DIR` and `FULCRUM_VAULT_PATH` overrides in packages/cli/src/index.ts
+- [X] T049 [US1] Enforce explicit profile selection, installed/operator confirmation, and fail-closed unsafe-path errors for destructive rebuild execution in packages/cli/src/commands/memory-rag-lifecycle.ts
+- [X] T050 [US1] Include runtime data profile identity, path fingerprints, backup reference, verification refs, and mutation scope in rebuild reports, audit events, health output, and structured errors in packages/memory/src/setup/rebuild-report.ts and packages/memory/src/setup/rag-health.ts
+- [X] T051 [US1] Implement profile-scoped restorable backup capture before installed/operator destructive rebuild and allowlisted derived-state clear behavior in packages/memory/src/setup/rag-lifecycle.ts
+- [X] T052 [US1] Add MCP/action parity for runtime profile path inspection and destructive rebuild profile arguments with accurate read-only/destructive hints in packages/cli/src/tool-registry.ts and packages/cli/src/mcp-tools.ts
+- [X] T053 [US1] Update operator quickstart and CLI reference notes for profile-safe rebuild/review/test flows in specs/001-rag-lifecycle-hardening/quickstart.md and docs/guides/cli-reference.md
+
 **Checkpoint**: US1 rebuild workflow is independently functional and safe.
 
 ---
@@ -105,26 +132,26 @@
 
 ### Tests for User Story 2
 
-- [ ] T040 [P] [US2] Add failing embedding job ledger migration and mapper tests for FR-009 and FR-010 in packages/memory/src/tests/embedding-jobs-schema.test.ts
-- [ ] T041 [P] [US2] Add failing resume/idempotency tests for interrupted jobs covering FR-011 and SC-004 in packages/memory/src/tests/embedding-jobs-resume.test.ts
-- [ ] T042 [P] [US2] Add failing degraded terminal-state and failed-item retry tests for FR-044 and SC-013 in packages/memory/src/tests/embedding-jobs-degraded.test.ts
-- [ ] T043 [P] [US2] Add failing vector metadata current/stale/mixed-model coverage tests for FR-012, FR-013, and SC-003 in packages/memory/src/tests/vector-metadata.test.ts
-- [ ] T044 [P] [US2] Add failing adaptive split and batch-reduction event tests for FR-014 and FR-036 in packages/memory/src/tests/embedding-recovery-events.test.ts
-- [ ] T045 [P] [US2] Add failing runtime device requested/actual/fallback tests for FR-021, FR-022, FR-037, and SC-006 in packages/memory/src/tests/embedding-runtime-device.test.ts
-- [ ] T046 [P] [US2] Add failing jobs CLI contract tests for status, logs, cancel, resume, retry failed, actor authorization, and audit events covering FR-029 and FR-040 in packages/cli/src/tests/rag-jobs-contract.test.ts
+- [ ] T054 [P] [US2] Add failing embedding job ledger migration and mapper tests for FR-009 and FR-010 in packages/memory/src/tests/embedding-jobs-schema.test.ts
+- [ ] T055 [P] [US2] Add failing resume/idempotency tests for interrupted jobs covering FR-011 and SC-004 in packages/memory/src/tests/embedding-jobs-resume.test.ts
+- [ ] T056 [P] [US2] Add failing degraded terminal-state and failed-item retry tests for FR-044 and SC-013 in packages/memory/src/tests/embedding-jobs-degraded.test.ts
+- [ ] T057 [P] [US2] Add failing vector metadata current/stale/mixed-model coverage tests for FR-012, FR-013, and SC-003 in packages/memory/src/tests/vector-metadata.test.ts
+- [ ] T058 [P] [US2] Add failing adaptive split and batch-reduction event tests for FR-014 and FR-036 in packages/memory/src/tests/embedding-recovery-events.test.ts
+- [ ] T059 [P] [US2] Add failing runtime device requested/actual/fallback tests for FR-021, FR-022, FR-037, and SC-006 in packages/memory/src/tests/embedding-runtime-device.test.ts
+- [ ] T060 [P] [US2] Add failing jobs CLI contract tests for status, logs, cancel, resume, retry failed, actor authorization, and audit events covering FR-029 and FR-040 in packages/cli/src/tests/rag-jobs-contract.test.ts
 
 ### Implementation for User Story 2
 
-- [ ] T047 [US2] Implement embedding job and job item repositories with workspace-scoped queries in packages/memory/src/l2/embedding-jobs.ts
-- [ ] T048 [US2] Implement preflight scanner for memory, L1 page, and code chunk scopes with allow-empty handling for FR-007 and FR-008 in packages/memory/src/l2/embedding-jobs.ts
-- [ ] T049 [US2] Implement durable embedding runner that records source identity, content hash, requested model/provider/device/dimensions, status, attempts, and errors for FR-010 in packages/memory/src/l2/embedding-jobs.ts
-- [ ] T050 [US2] Implement resume, cancellation, and idempotent retry surfaces for FR-011 in packages/memory/src/l2/embedding-jobs.ts
-- [ ] T051 [US2] Implement degraded terminal state and failed/stale-only retry filtering for FR-044 in packages/memory/src/l2/embedding-jobs.ts
-- [ ] T052 [US2] Implement vector metadata writes and stale/current/legacy classification for FR-012 and FR-013 in packages/memory/src/l2/vector-metadata.ts
-- [ ] T053 [US2] Implement adaptive split and batch-size reduction event recording with redacted details for FR-014 and FR-036 in packages/memory/src/l2/embedding-jobs.ts
-- [ ] T054 [US2] Implement requested vs actual runtime device and fail-closed explicit device mismatch behavior for FR-021, FR-022, and FR-037 in packages/memory/src/l2/embed.ts
-- [ ] T055 [US2] Wire `fulcrum memory embed --scope` and `fulcrum jobs status|logs|cancel|resume|retry --failed --json` commands with audit events for expensive start/retry/cancel operations covering FR-029 and FR-040 in packages/cli/src/index.ts
-- [ ] T056 [US2] Add MCP/action parity for embedding job start, status, cancel, resume, and retry with read-only/destructive hints in packages/cli/src/tool-registry.ts
+- [ ] T061 [US2] Implement embedding job and job item repositories with workspace-scoped queries in packages/memory/src/l2/embedding-jobs.ts
+- [ ] T062 [US2] Implement preflight scanner for memory, L1 page, and code chunk scopes with allow-empty handling for FR-007 and FR-008 in packages/memory/src/l2/embedding-jobs.ts
+- [ ] T063 [US2] Implement durable embedding runner that records source identity, content hash, requested model/provider/device/dimensions, status, attempts, and errors for FR-010 in packages/memory/src/l2/embedding-jobs.ts
+- [ ] T064 [US2] Implement resume, cancellation, and idempotent retry surfaces for FR-011 in packages/memory/src/l2/embedding-jobs.ts
+- [ ] T065 [US2] Implement degraded terminal state and failed/stale-only retry filtering for FR-044 in packages/memory/src/l2/embedding-jobs.ts
+- [ ] T066 [US2] Implement vector metadata writes and stale/current/legacy classification for FR-012 and FR-013 in packages/memory/src/l2/vector-metadata.ts
+- [ ] T067 [US2] Implement adaptive split and batch-size reduction event recording with redacted details for FR-014 and FR-036 in packages/memory/src/l2/embedding-jobs.ts
+- [ ] T068 [US2] Implement requested vs actual runtime device and fail-closed explicit device mismatch behavior for FR-021, FR-022, and FR-037 in packages/memory/src/l2/embed.ts
+- [ ] T069 [US2] Wire `fulcrum memory embed --scope` and `fulcrum jobs status|logs|cancel|resume|retry --failed --json` commands with audit events for expensive start/retry/cancel operations covering FR-029 and FR-040 in packages/cli/src/index.ts
+- [ ] T070 [US2] Add MCP/action parity for embedding job start, status, cancel, resume, and retry with read-only/destructive hints in packages/cli/src/tool-registry.ts
 
 **Checkpoint**: US2 embedding jobs are durable, inspectable, resumable, and retryable.
 
@@ -138,21 +165,21 @@
 
 ### Tests for User Story 3
 
-- [ ] T057 [P] [US3] Add failing recall explain schema tests for FR-019, FR-020, FR-023, FR-024, and SC-005 in packages/memory/src/tests/recall-explain.test.ts
-- [ ] T058 [P] [US3] Add failing code-search explain schema and path/line range tests for FR-018, FR-019, and SC-005 in packages/memory/src/tests/search-code-explain.test.ts
-- [ ] T059 [P] [US3] Add failing provenance class and broken-source reference tests for FR-023, FR-024, and FR-025 in packages/memory/src/tests/provenance-explain.test.ts
-- [ ] T060 [P] [US3] Add failing graph contribution explain tests for FR-026 and FR-027 in packages/memory/src/tests/graph-explain.test.ts
-- [ ] T061 [P] [US3] Add failing CLI/MCP explain contract tests for `fulcrum memory recall --explain --json` and `recall_knowledge` in packages/cli/src/tests/recall-explain-contract.test.ts
+- [ ] T071 [P] [US3] Add failing recall explain schema tests for FR-019, FR-020, FR-023, FR-024, and SC-005 in packages/memory/src/tests/recall-explain.test.ts
+- [ ] T072 [P] [US3] Add failing code-search explain schema and path/line range tests for FR-018, FR-019, and SC-005 in packages/memory/src/tests/search-code-explain.test.ts
+- [ ] T073 [P] [US3] Add failing provenance class and broken-source reference tests for FR-023, FR-024, and FR-025 in packages/memory/src/tests/provenance-explain.test.ts
+- [ ] T074 [P] [US3] Add failing graph contribution explain tests for FR-026 and FR-027 in packages/memory/src/tests/graph-explain.test.ts
+- [ ] T075 [P] [US3] Add failing CLI/MCP explain contract tests for `fulcrum memory recall --explain --json` and `recall_knowledge` in packages/cli/src/tests/recall-explain-contract.test.ts
 
 ### Implementation for User Story 3
 
-- [ ] T062 [US3] Implement stable recall explanation schema and mappers in packages/memory/src/retrieval/explain.ts
-- [ ] T063 [US3] Capture lexical, vector, reranker, graph, fused score, and rank data from recall pipeline in packages/memory/src/retrieval/v3-search.ts
-- [ ] T064 [US3] Capture provider, model, requested device, actual device, fallback reason, and latency fields in packages/memory/src/retrieval/v3-search.ts
-- [ ] T065 [US3] Implement provenance class and source reference mapping for raw-backed, curated-backed, code-backed, legacy-unbacked, and generated results in packages/memory/src/retrieval/explain.ts
-- [ ] T066 [US3] Add graph contribution metadata when graph expansion affects results in packages/memory/src/retrieval/v3-search.ts
-- [ ] T067 [US3] Add code-search explanation and line/path result mapping in packages/memory/src/retrieval/search-code.ts
-- [ ] T068 [US3] Wire `--explain --json` recall output and MCP `recall_knowledge` explain support in packages/cli/src/commands/memory-recall.ts
+- [ ] T076 [US3] Implement stable recall explanation schema and mappers in packages/memory/src/retrieval/explain.ts
+- [ ] T077 [US3] Capture lexical, vector, reranker, graph, fused score, and rank data from recall pipeline in packages/memory/src/retrieval/v3-search.ts
+- [ ] T078 [US3] Capture provider, model, requested device, actual device, fallback reason, and latency fields in packages/memory/src/retrieval/v3-search.ts
+- [ ] T079 [US3] Implement provenance class and source reference mapping for raw-backed, curated-backed, code-backed, legacy-unbacked, and generated results in packages/memory/src/retrieval/explain.ts
+- [ ] T080 [US3] Add graph contribution metadata when graph expansion affects results in packages/memory/src/retrieval/v3-search.ts
+- [ ] T081 [US3] Add code-search explanation and line/path result mapping in packages/memory/src/retrieval/search-code.ts
+- [ ] T082 [US3] Wire `--explain --json` recall output and MCP `recall_knowledge` explain support in packages/cli/src/commands/memory-recall.ts
 
 **Checkpoint**: US3 explain outputs are stable and contract-tested.
 
@@ -166,18 +193,18 @@
 
 ### Tests for User Story 4
 
-- [ ] T069 [P] [US4] Add failing batch vs incremental code indexing parity tests for FR-015, FR-016, and SC-002 in packages/memory/src/tests/code-index-parity.test.ts
-- [ ] T070 [P] [US4] Add failing parse/index failure state tests for FR-017 in packages/memory/src/tests/code-index-failures.test.ts
-- [ ] T071 [P] [US4] Add failing stale chunk replacement and current line range tests for FR-018 in packages/memory/src/tests/code-index-lines.test.ts
-- [ ] T072 [P] [US4] Add failing integration utilization tests proving batch and PCI consumers use the same file-level primitive in packages/memory/src/tests/code-index-utilization.test.ts
+- [ ] T083 [P] [US4] Add failing batch vs incremental code indexing parity tests for FR-015, FR-016, and SC-002 in packages/memory/src/tests/code-index-parity.test.ts
+- [ ] T084 [P] [US4] Add failing parse/index failure state tests for FR-017 in packages/memory/src/tests/code-index-failures.test.ts
+- [ ] T085 [P] [US4] Add failing stale chunk replacement and current line range tests for FR-018 in packages/memory/src/tests/code-index-lines.test.ts
+- [ ] T086 [P] [US4] Add failing integration utilization tests proving batch and PCI consumers use the same file-level primitive in packages/memory/src/tests/code-index-utilization.test.ts
 
 ### Implementation for User Story 4
 
-- [ ] T073 [US4] Implement shared file-level code indexing primitive with file identity, hash, language, chunk count, and failure state in packages/memory/src/l2/code.ts
-- [ ] T074 [US4] Update batch project indexing to call the shared file-level primitive in packages/memory/src/setup/backfill-code-files.ts
-- [ ] T075 [US4] Update PCI incremental indexing to call the shared file-level primitive in packages/memory/src/pci/syncer.ts
-- [ ] T076 [US4] Enforce chunk/file relationship parity and legacy classification in packages/memory/src/retrieval/search-code.ts
-- [ ] T077 [US4] Return stable path and line range for every code-search result in packages/memory/src/retrieval/search-code.ts
+- [ ] T087 [US4] Implement shared file-level code indexing primitive with file identity, hash, language, chunk count, and failure state in packages/memory/src/l2/code.ts
+- [ ] T088 [US4] Update batch project indexing to call the shared file-level primitive in packages/memory/src/setup/backfill-code-files.ts
+- [ ] T089 [US4] Update PCI incremental indexing to call the shared file-level primitive in packages/memory/src/pci/syncer.ts
+- [ ] T090 [US4] Enforce chunk/file relationship parity and legacy classification in packages/memory/src/retrieval/search-code.ts
+- [ ] T091 [US4] Return stable path and line range for every code-search result in packages/memory/src/retrieval/search-code.ts
 
 **Checkpoint**: US4 code index state is consistent across ingestion paths.
 
@@ -191,16 +218,16 @@
 
 ### Tests for User Story 5
 
-- [ ] T078 [P] [US5] Add failing health report fixture tests for raw/L1/FTS/code/vector/graph failures covering FR-028, SC-007, and SC-010 in packages/memory/src/tests/rag-health.test.ts
-- [ ] T079 [P] [US5] Add failing read-only non-mutation tests for health command and monitor endpoint covering FR-033 and SC-009 in packages/cli/src/tests/rag-health-readonly.test.ts
-- [ ] T080 [P] [US5] Add failing monitor read-only RAG health endpoint tests in packages/monitor/src/tests/rag-health-endpoint.test.ts
+- [ ] T092 [P] [US5] Add failing health report fixture tests for raw/L1/FTS/code/vector/graph failures covering FR-028, SC-007, and SC-010 in packages/memory/src/tests/rag-health.test.ts
+- [ ] T093 [P] [US5] Add failing read-only non-mutation tests for health command and monitor endpoint covering FR-033 and SC-009 in packages/cli/src/tests/rag-health-readonly.test.ts
+- [ ] T094 [P] [US5] Add failing monitor read-only RAG health endpoint tests in packages/monitor/src/tests/rag-health-endpoint.test.ts
 
 ### Implementation for User Story 5
 
-- [ ] T081 [US5] Implement RAG health report aggregation and recommended-action ordering in packages/memory/src/setup/rag-health.ts
-- [ ] T082 [US5] Wire `fulcrum memory doctor --json` or equivalent RAG health command in packages/cli/src/index.ts
-- [ ] T083 [US5] Add MCP/action read-only RAG health handler with structured output in packages/cli/src/tool-registry.ts
-- [ ] T084 [US5] Add read-only monitor RAG health route and response mapping in packages/monitor/src/server.ts
+- [ ] T095 [US5] Implement RAG health report aggregation and recommended-action ordering in packages/memory/src/setup/rag-health.ts
+- [ ] T096 [US5] Wire `fulcrum memory doctor --json` or equivalent RAG health command in packages/cli/src/index.ts
+- [ ] T097 [US5] Add MCP/action read-only RAG health handler with structured output in packages/cli/src/tool-registry.ts
+- [ ] T098 [US5] Add read-only monitor RAG health route and response mapping in packages/monitor/src/server.ts
 
 **Checkpoint**: US5 health report is read-only and actionable.
 
@@ -214,19 +241,19 @@
 
 ### Tests for User Story 6
 
-- [ ] T085 [P] [US6] Add failing golden eval fixture tests for retrieval relevance, ranking, answer correctness, grounding/provenance, graph expansion, and operational parity covering FR-030, FR-031, FR-038, SC-008, and SC-011 in packages/memory/src/eval/rag-lifecycle/runner.test.ts
-- [ ] T086 [P] [US6] Add failing local deterministic eval runner tests that keep model-heavy checks opt-in for FR-039 in packages/memory/src/tests/rag-eval-runner.test.ts
-- [ ] T087 [P] [US6] Add failing CI gate path-filter tests for RAG-related vs unrelated non-RAG changes covering FR-046 and SC-015 in packages/cli/src/tests/rag-eval-ci-gate.test.ts
-- [ ] T088 [P] [US6] Add failing CLI eval contract tests for `fulcrum memory eval --suite rag-lifecycle --json`, actor authorization, and audit events covering FR-040 in packages/cli/src/tests/rag-eval-contract.test.ts
+- [ ] T099 [P] [US6] Add failing golden eval fixture tests for retrieval relevance, ranking, answer correctness, grounding/provenance, graph expansion, and operational parity covering FR-030, FR-031, FR-038, SC-008, and SC-011 in packages/memory/src/eval/rag-lifecycle/runner.test.ts
+- [ ] T100 [P] [US6] Add failing local deterministic eval runner tests that keep model-heavy checks opt-in for FR-039 in packages/memory/src/tests/rag-eval-runner.test.ts
+- [ ] T101 [P] [US6] Add failing CI gate path-filter tests for RAG-related vs unrelated non-RAG changes covering FR-046 and SC-015 in packages/cli/src/tests/rag-eval-ci-gate.test.ts
+- [ ] T102 [P] [US6] Add failing CLI eval contract tests for `fulcrum memory eval --suite rag-lifecycle --json`, actor authorization, and audit events covering FR-040 in packages/cli/src/tests/rag-eval-contract.test.ts
 
 ### Implementation for User Story 6
 
-- [ ] T089 [US6] Implement checked-in golden eval fixtures for memory recall, code search, hybrid recall, reranking, provenance trace, graph expansion, and reset/rebuild parity in packages/memory/src/eval/rag-lifecycle/fixtures.ts
-- [ ] T090 [US6] Implement RAG lifecycle eval runner and grouped result categories in packages/memory/src/eval/rag-lifecycle/runner.ts
-- [ ] T091 [US6] Wire local deterministic eval suite into existing eval exports in packages/memory/src/eval/index.ts
-- [ ] T092 [US6] Wire `fulcrum memory eval --suite rag-lifecycle --json` command for local post-rebuild eval execution with audit events for expensive eval runs covering FR-032 and FR-040 in packages/cli/src/index.ts
-- [ ] T093 [US6] Add targeted CI gate for RAG lifecycle, memory, code search, embeddings, graph, and eval fixture paths in .github/workflows/memory-eval.yml
-- [ ] T094 [US6] Document opt-in model-heavy and accelerator-heavy eval flags in packages/memory/src/eval/rag-lifecycle/README.md
+- [ ] T103 [US6] Implement checked-in golden eval fixtures for memory recall, code search, hybrid recall, reranking, provenance trace, graph expansion, and reset/rebuild parity in packages/memory/src/eval/rag-lifecycle/fixtures.ts
+- [ ] T104 [US6] Implement RAG lifecycle eval runner and grouped result categories in packages/memory/src/eval/rag-lifecycle/runner.ts
+- [ ] T105 [US6] Wire local deterministic eval suite into existing eval exports in packages/memory/src/eval/index.ts
+- [ ] T106 [US6] Wire `fulcrum memory eval --suite rag-lifecycle --json` command for local post-rebuild eval execution with audit events for expensive eval runs covering FR-032 and FR-040 in packages/cli/src/index.ts
+- [ ] T107 [US6] Add targeted CI gate for RAG lifecycle, memory, code search, embeddings, graph, and eval fixture paths in .github/workflows/memory-eval.yml
+- [ ] T108 [US6] Document opt-in model-heavy and accelerator-heavy eval flags in packages/memory/src/eval/rag-lifecycle/README.md
 
 **Checkpoint**: US6 default eval gate protects RAG-related changes without blocking unrelated work.
 
@@ -236,14 +263,14 @@
 
 **Purpose**: Cross-package verification, docs sync, and final quality gates.
 
-- [ ] T095 [P] Update CLI reference and operator docs for rebuild, jobs, health, explain, and eval commands in docs/guides/cli-reference.md
-- [ ] T096 [P] Update memory architecture docs for staged rebuilds, input snapshots, degraded embedding jobs, vector metadata, and eval gates in docs/architecture/memory-v3.md
-- [ ] T097 [P] Add quickstart validation script or command notes matching specs/001-rag-lifecycle-hardening/quickstart.md in packages/cli/src/tests/rag-lifecycle-quickstart.test.ts
-- [ ] T098 Run targeted core schema and guard tests with `pnpm --filter fulcrum-agent-core test` from package.json
-- [ ] T099 Run targeted memory tests with `pnpm --filter fulcrum-memory test` from package.json
-- [ ] T100 Run targeted CLI and monitor tests with `pnpm --filter fulcrum-agent-cli test` and `pnpm --filter fulcrum-monitor test` from package.json
-- [ ] T101 Run full verification with `pnpm test`, `pnpm build`, and `pnpm run check:cycles` from package.json
-- [ ] T102 Add P1-only shipping gate proving FR-043 can ship without P2 health/eval expansion in packages/cli/src/tests/rag-lifecycle-p1-gate.test.ts
+- [ ] T109 [P] Update CLI reference and operator docs for rebuild, jobs, health, explain, and eval commands in docs/guides/cli-reference.md
+- [ ] T110 [P] Update memory architecture docs for staged rebuilds, input snapshots, degraded embedding jobs, vector metadata, and eval gates in docs/architecture/memory-v3.md
+- [ ] T111 [P] Add quickstart validation script or command notes matching specs/001-rag-lifecycle-hardening/quickstart.md in packages/cli/src/tests/rag-lifecycle-quickstart.test.ts
+- [ ] T112 Run targeted core schema and guard tests with `pnpm --filter fulcrum-agent-core test` from package.json
+- [ ] T113 Run targeted memory tests with `pnpm --filter fulcrum-memory test` from package.json
+- [ ] T114 Run targeted CLI and monitor tests with `pnpm --filter fulcrum-agent-cli test` and `pnpm --filter fulcrum-monitor test` from package.json
+- [ ] T115 Run full verification with `pnpm test`, `pnpm build`, and `pnpm run check:cycles` from package.json
+- [ ] T116 Add P1-only shipping gate proving FR-043 can ship without P2 health/eval expansion in packages/cli/src/tests/rag-lifecycle-p1-gate.test.ts
 
 ---
 
@@ -254,9 +281,10 @@
 - **Phase 1 Setup**: no dependencies.
 - **Phase 2 Foundational**: depends on Phase 1; blocks all user stories.
 - **Phase 3 US1**: depends on Phase 2; MVP.
-- **Phase 4 US2**: depends on Phase 2; can run after or alongside US1 once shared schema/types exist.
-- **Phase 5 US3**: depends on Phase 2 and benefits from US2 runtime metadata.
-- **Phase 6 US4**: depends on Phase 2; can run alongside US2/US3.
+- **Phase 3A US1 Amendment**: depends on Phase 2 and must complete before the Phase 3 US1 checkpoint is accepted; blocks all later P1/P2/P3 work.
+- **Phase 4 US2**: depends on accepted Phase 3/3A US1 completion.
+- **Phase 5 US3**: depends on accepted Phase 3/3A US1 completion and benefits from US2 runtime metadata.
+- **Phase 6 US4**: depends on accepted Phase 3/3A US1 completion.
 - **Phase 7 US5**: depends on US1, US2, US4, and graph coverage primitives.
 - **Phase 8 US6**: depends on US1, US3, US4, and fixture health signals.
 - **Phase 9 Polish**: depends on desired story phases.
@@ -264,9 +292,10 @@
 ### User Story Dependencies
 
 - **US1 Rebuild Trusted Search State**: MVP and prerequisite for rebuild parity assertions.
-- **US2 Resume and Inspect Embedding Work**: independent after shared schema; feeds vector health and eval fixtures.
-- **US3 Search With Explainable Trust Signals**: independent after shared schema; uses metadata from US2 when available.
-- **US4 Keep Code Index State Consistent**: independent after shared schema; feeds health and eval.
+- **US1 Runtime Data Profile Isolation**: required US1 amendment and prerequisite for safe rebuild, review, and test resets.
+- **US2 Resume and Inspect Embedding Work**: resumes only after US1/Phase 3A closure; feeds vector health and eval fixtures.
+- **US3 Search With Explainable Trust Signals**: resumes only after US1/Phase 3A closure; uses metadata from US2 when available.
+- **US4 Keep Code Index State Consistent**: resumes only after US1/Phase 3A closure; feeds health and eval.
 - **US5 Diagnose RAG Health Without Manual Queries**: depends on implemented signals from US1, US2, US4, and graph coverage.
 - **US6 Guard Retrieval Quality With Evals**: depends on rebuild, explain, code parity, and fixture surfaces.
 
@@ -275,9 +304,10 @@
 - Setup scaffolds T001-T007 can run in parallel.
 - Foundational failing tests T008-T014 can run in parallel before shared implementation T015-T022.
 - Test tasks within each user story can run in parallel.
-- US2 and US4 can proceed in parallel after Phase 2.
+- Phase 3A test tasks T040-T044 can run in parallel before implementation T045-T053.
+- US2 and US4 can proceed in parallel only after Phase 3A and the US1 review gate pass.
 - CLI/MCP contract work can proceed in parallel with memory primitives once output contracts are frozen.
-- Documentation tasks T095-T096 can run in parallel after contracts stabilize.
+- Documentation tasks T109-T110 can run in parallel after contracts stabilize.
 
 ---
 
@@ -287,6 +317,14 @@
 Task: "Add failing staged candidate promotion and failed-candidate quarantine tests for FR-045, SC-014, and SC-001 in packages/memory/src/tests/rag-rebuild-staging.test.ts"
 Task: "Add failing source-snapshot stale-promotion tests for FR-047 and SC-016 in packages/memory/src/tests/rag-rebuild-snapshot.test.ts"
 Task: "Add failing authorization and audit tests for destructive rebuild execution covering FR-040 in packages/cli/src/tests/rag-rebuild-authorization.test.ts"
+```
+
+## Parallel Example: Phase 3A Runtime Data Profile Isolation
+
+```bash
+Task: "Add failing runtime data profile resolver tests for distinct install/dev/test DB, vault, graph, vector, and artifact roots in packages/core/src/tests/runtime-data-profile.test.ts"
+Task: "Add failing profile-scoped rebuild tests proving dev/review and test derived-state clears do not mutate installed/operator sentinels in packages/memory/src/tests/rag-rebuild-profile-isolation.test.ts"
+Task: "Add failing CLI path inspection and destructive confirmation contract tests in packages/cli/src/tests/runtime-data-profile-contract.test.ts"
 ```
 
 ## Parallel Example: User Story 2
@@ -312,8 +350,9 @@ Task: "Add failing CI gate path-filter tests for RAG-related vs unrelated non-RA
 
 1. Complete Phase 1 and Phase 2.
 2. Complete Phase 3 (US1) only.
-3. Validate rebuild plan, dry-run, execute, failed parity, stale snapshot, and non-mutation behavior.
-4. Stop and review before adding embedding, explainability, health, and eval scope.
+3. Complete Phase 3A runtime data profile isolation before accepting US1.
+4. Validate rebuild plan, dry-run, execute, failed parity, stale snapshot, profile isolation, installed/operator backup, and non-mutation behavior.
+5. Stop and review before adding embedding, explainability, health, and eval scope.
 
 ### Incremental Delivery
 
@@ -331,3 +370,4 @@ Task: "Add failing CI gate path-filter tests for RAG-related vs unrelated non-RA
 3. Every destructive execution path has authorization, explicit scope, audit event, and non-mutating plan/dry-run alternative.
 4. Every CLI user capability has MCP/action parity where agents need the same outcome.
 5. Every producer/consumer path has an integration utilization test before completion.
+6. Every destructive rebuild/reset path declares a runtime data profile, prints/persists resolved DB, vault, graph, vector, and artifact paths, and fails closed on unsafe profile/path resolution.

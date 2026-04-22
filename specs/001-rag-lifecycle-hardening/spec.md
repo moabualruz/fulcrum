@@ -14,6 +14,7 @@
 - Q: What failure-atomicity guarantee should full RAG rebuilds provide? → A: Build in staging/quarantine and promote only after all checks pass.
 - Q: Which changes must run default golden RAG eval gates in CI? → A: Only changes touching RAG lifecycle, memory, code search, embeddings, graph, or eval fixtures.
 - Q: What happens if canonical sources change while a staged full rebuild is running? → A: Snapshot inputs at rebuild start and promote only if the snapshot is still current.
+- Q: How should rebuild, review, development, and test data be isolated before destructive RAG maintenance continues? → A: Use three explicit runtime data profiles with separate DB, vault, graph, vector, and artifact roots: installed/operator data, dev/review data, and ephemeral test data. Destructive maintenance must be profile-scoped, path-visible, and fail closed when profile boundaries are missing or unsafe.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -31,6 +32,8 @@ As a Fulcrum operator, I need one authoritative reset and rebuild workflow for a
 2. **Given** any parity check fails during rebuild, **When** the workflow reaches verification, **Then** the workflow reports the failing check, exits unsuccessfully, leaves the current served derived state unchanged, and quarantines or discards the unpromoted candidate state with enough report detail for the operator to identify the affected domain.
 3. **Given** an operator asks only for a dry run or plan, **When** the workflow evaluates scope, **Then** it reports what would be cleared and rebuilt without mutating state.
 4. **Given** text-search indexes are rebuilt from source tables, **When** verification runs, **Then** keyword-search integrity is checked and any inconsistency is reported as a failed rebuild stage.
+5. **Given** an operator, review agent, or test suite requests a destructive rebuild, **When** the runtime data profile is missing, ambiguous, or resolves to an unsafe shared path, **Then** the workflow fails before mutation and reports the resolved profile, DB, vault, graph, vector, and artifact paths that must be corrected.
+6. **Given** dev/review or test rebuilds run against their own data profiles, **When** they clear and rebuild derived state, **Then** installed/operator DB and vault contents remain unchanged and the rebuild report proves which profile was mutated.
 
 ---
 
@@ -121,6 +124,10 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 ### Edge Cases
 
 - Rebuild requested when the workspace has zero canonical files: report zero scope clearly and require explicit allow-empty execution for mutating work.
+- Destructive rebuild requested without an explicit runtime data profile: fail closed before mutation.
+- Test or review profile resolves to the installed/operator DB, vault, graph, vector, or artifact root: fail closed before mutation.
+- Installed/operator profile rebuild requested without backup and profile confirmation: fail closed before mutation.
+- Full database wipe requested when a profile-scoped derived-state clear would suffice: require explicit backup, profile confirmation, and machine-readable wipe scope before any mutation.
 - Help, status, plan, dry-run, or explain-only commands must never mutate workspace state.
 - Long-running jobs must remain inspectable after process interruption, terminal close, or host restart.
 - Partial model migration must report mixed-vector coverage instead of presenting the index as homogeneous.
@@ -202,6 +209,13 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - **FR-041**: System MUST avoid writing secrets, credentials, raw environment values, or unredacted provider configuration into logs, reports, explanations, eval artifacts, or memory.
 - **FR-042**: System MUST make required schema or data migrations idempotent, workspace-scoped, backward-compatible during rollout, and recoverable without manual database surgery.
 - **FR-043**: System MUST allow P1 lifecycle hardening to ship independently of P2 quality-expansion work when lower-priority features are not required for parity or safety.
+- **FR-048**: System MUST define explicit runtime data profiles for installed/operator, dev/review, and test execution, each with separate DB, vault, graph, vector, and artifact roots.
+- **FR-049**: System MUST resolve and expose the active runtime data profile and absolute DB, vault, graph, vector, and artifact paths in preflight command output before any destructive or expensive RAG maintenance work starts.
+- **FR-050**: System MUST fail closed when a dev/review or test profile resolves to installed/operator paths, shared global paths, or any path that would allow tests or reviews to mutate installed/operator data.
+- **FR-051**: System MUST require profile confirmation and a restorable backup or snapshot before destructive maintenance mutates installed/operator profile data.
+- **FR-052**: System MUST make test-profile DB and vault state ephemeral or explicitly disposable so automated tests can reset it without disturbing installed/operator or dev/review data.
+- **FR-053**: System MUST include runtime data profile identity and non-secret path fingerprints in persisted rebuild reports, audit events, health output, and destructive-command structured errors.
+- **FR-054**: System MUST clear only allowlisted profile-scoped derived RAG state during normal rebuilds; full DB or vault wipe requires a separate explicit wipe scope, backup confirmation, and installed/operator profile confirmation when applicable.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -223,6 +237,9 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - **Job Event**: Durable event attached to a long-running job, including progress updates, recovery actions, fallback decisions, cancellation, resume, and failure details.
 - **Text Search Integrity Check**: Verification that keyword-search index content matches its backing source rows and can be safely trusted for recall.
 - **Audit Event**: Workspace-scoped record of a destructive, expensive, or policy-sensitive RAG lifecycle operation, including actor, scope, mode, result, and report reference.
+- **Runtime Data Profile**: Operator-selected execution context (`install`, `dev`, or `test`) that resolves to isolated DB, vault, graph, vector, and artifact roots.
+- **Profile Path Manifest**: Machine-readable resolved path set and fingerprints for the active runtime data profile, included before mutation and persisted with reports/audit events.
+- **Profile-Scoped Backup**: Restorable copy or snapshot of the active profile's mutable data roots captured before destructive installed/operator maintenance.
 
 ## Success Criteria *(mandatory)*
 
@@ -244,6 +261,10 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - **SC-014**: A full rebuild with an intentional stage failure leaves the prior served derived state unchanged and does not expose the failed candidate through recall or code search.
 - **SC-015**: CI runs default golden RAG eval gates for a representative RAG-related change and does not require those gates for an unrelated non-RAG change.
 - **SC-016**: A full rebuild whose canonical source files or source rows change before promotion fails promotion, reports stale snapshot details, and leaves prior served derived state unchanged.
+- **SC-017**: Destructive rebuild execution fails before mutation in 100% of tested cases where the active runtime data profile is missing, ambiguous, or resolves to an unsafe shared path.
+- **SC-018**: Automated tests can reset the test-profile DB and vault in 100% of fixture runs while checksum or row-count sentinels prove installed/operator and dev/review profiles were not modified.
+- **SC-019**: A dev/review-profile rebuild can clear and rebuild derived state while installed/operator profile path fingerprints and canonical data sentinels remain unchanged.
+- **SC-020**: Installed/operator-profile destructive rebuild execution records a restorable backup reference, explicit profile confirmation, profile path manifest, and audit event in every tested execution.
 
 ## Assumptions
 
@@ -255,3 +276,5 @@ As a maintainer, I need a standing RAG evaluation suite so reset, rebuild, embed
 - Online research notes for this specification are captured in `research.md`; planning should turn those source-backed decisions into technical contracts and task slices.
 - Planning should slice delivery so P1 restores operational trust first: authoritative rebuild/reporting, embedding job durability, code-index parity, and explanation contracts. P2 can deepen graph recall quality, dashboards, and broader eval coverage after P1 parity and safety are proven.
 - Destructive RAG maintenance execution is intentionally broader than memory-only roles: human operators, `chief_of_staff`, `memory_curator`, and roles with write-code/edit-file capability are in scope; all other roles are limited to inspect, plan, dry-run, and status surfaces.
+- Runtime data profiles are a prerequisite for closing US1: installed/operator data, dev/review data, and test data must be isolated before any further destructive rebuild or review execution is considered safe.
+- Normal rebuilds clear derived state only within the active profile. They do not wipe canonical task/run/audit state or vault sources unless an explicit wipe workflow with backup and profile confirmation is added.

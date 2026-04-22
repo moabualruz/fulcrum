@@ -356,6 +356,9 @@ fulcrum memory — memory vault commands
         workspace_id: optArg('--workspace-id') ?? ids.workspace_id,
         project_id: optArg('--project-id') ?? ids.project_id,
         mode: mode as 'plan' | 'dry_run' | 'execute',
+        runtime_profile: optArg('--profile') as 'install' | 'dev' | 'test' | undefined,
+        confirm_profile: optArg('--confirm-profile') as 'install' | 'dev' | 'test' | undefined,
+        verification_refs: optArgs('--verification-ref'),
         domains: domains as import('fulcrum-memory').RagRebuildDomain[] | undefined,
         allow_empty: args.includes('--allow-empty'),
         actor: { kind: 'human', role: 'software_engineer', id: process.env['USER'] ?? 'local-operator' },
@@ -4628,6 +4631,18 @@ OPTIONS (serve mcp-http)
   }
 
   if (group === 'doctor') {
+    if (command === 'paths') {
+      const { inspectRuntimeProfilePaths } = await import('./commands/memory-rag-lifecycle.js')
+      const profile = optArg('--profile') as 'install' | 'dev' | 'test' | undefined
+      const manifest = inspectRuntimeProfilePaths({ profile })
+      if (args.includes('--json')) console.log(JSON.stringify(manifest, null, 2))
+      else {
+        console.log(`Runtime profile: ${manifest.profile}`)
+        console.log(`safe_for_destructive_execution: ${manifest.safe_for_destructive_execution}`)
+        for (const [key, value] of Object.entries(manifest.paths)) console.log(`${key}: ${value}`)
+      }
+      process.exit(manifest.safe_for_destructive_execution ? 0 : 2)
+    }
     const fix = args.includes('--fix')
     const dryRun = args.includes('--dry-run')
     const json = args.includes('--json')

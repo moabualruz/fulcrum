@@ -1,4 +1,4 @@
-import type { AgentRole, RagRebuildMode } from 'fulcrum-agent-core'
+import type { AgentRole, RagRebuildMode, RuntimeDataProfile, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
 
 export const RAG_REBUILD_DOMAINS = ['l0', 'l1', 'fts', 'code', 'vectors', 'graph'] as const
 export type RagRebuildDomain = typeof RAG_REBUILD_DOMAINS[number]
@@ -21,6 +21,10 @@ export interface RagRebuildRequest {
   workspace_id: string
   project_id: string
   mode: RagRebuildMode
+  runtime_profile?: RuntimeDataProfile
+  data_dir?: string
+  confirm_profile?: RuntimeDataProfile
+  verification_refs?: string[]
   domains?: RagRebuildDomain[]
   actor?: RagRebuildActor
   allow_empty?: boolean
@@ -35,8 +39,13 @@ export interface RagRebuildReport {
   scope: {
     workspace_id: string
     project_id: string
+    runtime_profile?: RuntimeDataProfile
     domains: RagRebuildDomain[]
   }
+  profile_manifest: RuntimeDataProfileManifest
+  profile_confirmation?: RuntimeDataProfile | null
+  backup?: null | { backup_ref: string; restorable: boolean; backup_path?: string }
+  verification_refs: string[]
   candidate: null | {
     candidate_id: string
     status: string
@@ -51,4 +60,3 @@ export interface RagRebuildReport {
   errors: unknown[]
   artifact_path: string | null
 }
-

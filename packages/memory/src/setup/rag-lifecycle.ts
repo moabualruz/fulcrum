@@ -1,5 +1,7 @@
-import { getDb, newId } from 'fulcrum-agent-core'
-import type { Db } from 'fulcrum-agent-core'
+import { copyFileSync, cpSync, existsSync, mkdirSync, statSync, writeFileSync } from 'fs'
+import { isAbsolute, join, relative, resolve } from 'path'
+import { getDb, getDbAtPath, newId, resolveRuntimeDataProfile, runMigrations, runtimeProfileDbMismatch } from 'fulcrum-agent-core'
+import type { Db, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
 import { backfillCodeFiles } from './backfill-code-files.js'
 import { captureRebuildInputSnapshot, validateRebuildInputSnapshot } from './rebuild-snapshot.js'
 import { createRebuildCandidate, finishRebuildCandidate, updateRebuildCandidateStatus } from './rebuild-candidate.js'
@@ -70,6 +72,64 @@ function releaseCandidateBuildSavepoint(db: Db, commit: boolean): void {
   db.exec('RELEASE SAVEPOINT rag_rebuild_candidate')
 }
 
+type RuntimeProfileBackup = NonNullable<RagRebuildReport['backup']>
+
+function backupRootInsideSource(source: string, backupRoot: string): boolean {
+  const fromSource = relative(resolve(source), resolve(backupRoot))
+  return fromSource === '' || Boolean(fromSource && !fromSource.startsWith('..') && !isAbsolute(fromSource))
+}
+
+function copyExistingPath(source: string, destination: string): boolean {
+  if (!existsSync(source)) return false
+  const stat = statSync(source)
+  if (stat.isDirectory()) {
+    cpSync(source, destination, { recursive: true, force: true })
+    return true
+  }
+  if (stat.isFile()) {
+    copyFileSync(source, destination)
+    return true
+  }
+  return false
+}
+
+async function captureRuntimeProfileBackup(backup_ref: string, profile_manifest: RuntimeDataProfileManifest, db: Db): Promise<RuntimeProfileBackup> {
+  const backup_path = join(profile_manifest.paths.artifacts, 'backups', backup_ref)
+  const sources = {
+    vault: profile_manifest.paths.vault,
+    graph: profile_manifest.paths.graph,
+    vectors: profile_manifest.paths.vectors,
+  }
+
+  if (existsSync(profile_manifest.paths.db) && backupRootInsideSource(profile_manifest.paths.db, backup_path)) {
+    throw new Error('cannot place profile backup inside db source path')
+  }
+  for (const [key, source] of Object.entries(sources)) {
+    if (existsSync(source) && backupRootInsideSource(source, backup_path)) {
+      throw new Error(`cannot place profile backup inside ${key} source path`)
+    }
+  }
+
+  mkdirSync(backup_path, { recursive: true })
+  const dbBackupPath = join(backup_path, 'fulcrum.db')
+  const copied_paths: Record<string, string | null> = {
+    db: dbBackupPath,
+  }
+  await db.backup(dbBackupPath)
+  for (const [key, source] of Object.entries(sources)) {
+    const destination = join(backup_path, key)
+    copied_paths[key] = copyExistingPath(source, destination) ? destination : null
+  }
+  writeFileSync(join(backup_path, 'profile-manifest.json'), JSON.stringify({
+    backup_ref,
+    created_at: new Date().toISOString(),
+    profile_manifest,
+    copied_paths,
+  }, null, 2))
+
+  return { backup_ref, restorable: true, backup_path }
+}
+
 function runCandidateBuild(
   input: { workspace_id: string; project_id: string; domains: RagRebuildDomain[] },
   db: Db,
@@ -90,12 +150,95 @@ function runCandidateBuild(
   }
 }
 
-export async function runRagRebuild(request: RagRebuildRequest, db: Db = getDb()): Promise<RagRebuildReport> {
+function ensureWorkspaceAndProject(db: Db, workspace_id: string, project_id: string): void {
+  db.prepare('INSERT OR IGNORE INTO workspaces(workspace_id, name) VALUES (?, ?)').run(workspace_id, workspace_id)
+  db.prepare('INSERT OR IGNORE INTO projects(project_id, workspace_id, name) VALUES (?, ?, ?)').run(project_id, workspace_id, project_id)
+}
+
+function openActiveDb(request: RagRebuildRequest, profile_manifest: RuntimeDataProfileManifest, db: Db | undefined): Db {
+  if (db) return db
+  if (!request.runtime_profile && !request.data_dir) return getDb()
+  const profileDb = getDbAtPath(profile_manifest.paths.db)
+  runMigrations(profileDb)
+  return profileDb
+}
+
+export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promise<RagRebuildReport> {
   const domains = normalizeDomains(request.domains)
   const actor = request.actor ?? { kind: 'agent', role: 'software_engineer', id: 'unknown' }
-  const planned = planRagRebuildScope({ ...request, domains }, db)
+  const runtime_profile = request.runtime_profile ?? 'dev'
+  const profile_manifest = resolveRuntimeDataProfile({
+    profile: runtime_profile,
+    data_dir: request.data_dir,
+  })
+  const verification_refs = request.verification_refs ?? []
+  const mutation_scope = { profile: runtime_profile, clear_scope: 'derived_rag_state', domains }
   const errors: unknown[] = []
   const warnings: string[] = []
+
+  const mismatch = db ? runtimeProfileDbMismatch(db, profile_manifest) : null
+  if (mismatch) {
+    errors.push({ code: mismatch.code, message: 'database connection does not match selected runtime profile', details: mismatch })
+    return {
+      report_id: newId('rag_rebuild_report'),
+      status: 'failed',
+      mode: request.mode,
+      scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
+      profile_manifest,
+      profile_confirmation: request.confirm_profile ?? null,
+      backup: null,
+      verification_refs,
+      candidate: null,
+      counts: {},
+      parity: [],
+      warnings,
+      errors,
+      artifact_path: null,
+    }
+  }
+
+  if (!profile_manifest.safe_for_destructive_execution) {
+    errors.push({ code: 'runtime_profile_unsafe', message: 'runtime profile path resolution is unsafe', details: profile_manifest.errors })
+    return {
+      report_id: newId('rag_rebuild_report'),
+      status: 'failed',
+      mode: request.mode,
+      scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
+      profile_manifest,
+      profile_confirmation: request.confirm_profile ?? null,
+      backup: null,
+      verification_refs,
+      candidate: null,
+      counts: {},
+      parity: [],
+      warnings,
+      errors,
+      artifact_path: null,
+    }
+  }
+
+  if (request.mode === 'execute' && runtime_profile === 'install' && request.confirm_profile !== 'install') {
+    errors.push({ code: 'install_profile_confirmation_required', message: 'install profile execution requires confirm_profile=install' })
+    return {
+      report_id: newId('rag_rebuild_report'),
+      status: 'failed',
+      mode: request.mode,
+      scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
+      profile_manifest,
+      profile_confirmation: request.confirm_profile ?? null,
+      backup: null,
+      verification_refs,
+      candidate: null,
+      counts: {},
+      parity: [],
+      warnings,
+      errors,
+      artifact_path: null,
+    }
+  }
+
+  const activeDb = openActiveDb(request, profile_manifest, db)
+  const planned = planRagRebuildScope({ ...request, domains }, activeDb)
 
   if (planned.total === 0 && request.allow_empty !== true) {
     errors.push({ code: 'empty_scope', message: 'RAG rebuild scope is empty; pass allow_empty to continue' })
@@ -103,7 +246,11 @@ export async function runRagRebuild(request: RagRebuildRequest, db: Db = getDb()
       report_id: newId('rag_rebuild_report'),
       status: 'failed',
       mode: request.mode,
-      scope: { workspace_id: request.workspace_id, project_id: request.project_id, domains },
+      scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
+      profile_manifest,
+      profile_confirmation: request.confirm_profile ?? null,
+      backup: null,
+      verification_refs,
       candidate: null,
       counts: planned.counts,
       parity: [],
@@ -118,7 +265,11 @@ export async function runRagRebuild(request: RagRebuildRequest, db: Db = getDb()
       report_id: newId('rag_rebuild_report'),
       status: 'completed',
       mode: request.mode,
-      scope: { workspace_id: request.workspace_id, project_id: request.project_id, domains },
+      scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
+      profile_manifest,
+      profile_confirmation: request.confirm_profile ?? null,
+      backup: null,
+      verification_refs,
       candidate: null,
       counts: planned.counts,
       parity: [],
@@ -128,6 +279,34 @@ export async function runRagRebuild(request: RagRebuildRequest, db: Db = getDb()
     }
   }
 
+  ensureWorkspaceAndProject(activeDb, request.workspace_id, request.project_id)
+
+  let backup: RuntimeProfileBackup | null = null
+  try {
+    backup = runtime_profile === 'install'
+      ? await captureRuntimeProfileBackup(newId('profile_backup'), profile_manifest, activeDb)
+      : null
+  } catch (err) {
+    errors.push({ code: 'profile_backup_failed', message: (err as Error).message })
+    return {
+      report_id: newId('rag_rebuild_report'),
+      status: 'failed',
+      mode: request.mode,
+      scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
+      profile_manifest,
+      profile_confirmation: request.confirm_profile ?? null,
+      backup: null,
+      verification_refs,
+      candidate: null,
+      counts: planned.counts,
+      parity: [],
+      warnings,
+      errors,
+      artifact_path: null,
+    }
+  }
+  const backup_ref = backup?.backup_ref ?? null
+
   const report_id = createRunningRebuildReport({
     workspace_id: request.workspace_id,
     project_id: request.project_id,
@@ -135,26 +314,34 @@ export async function runRagRebuild(request: RagRebuildRequest, db: Db = getDb()
     actor_role: actor.role,
     mode: request.mode,
     domains,
-  }, db)
+    runtime_profile,
+    profile_manifest,
+    backup_ref,
+    verification_refs,
+    mutation_scope,
+    profile_confirmation: request.confirm_profile ?? null,
+  }, activeDb)
 
   try {
-    const snapshot = captureRebuildInputSnapshot({ ...request, domains }, db)
+    const snapshot = captureRebuildInputSnapshot({ ...request, domains }, activeDb)
     const candidate = createRebuildCandidate({
       report_id,
       workspace_id: request.workspace_id,
       project_id: request.project_id,
       domains,
       input_snapshot_id: snapshot.input_snapshot_id,
-    }, db)
+      runtime_profile,
+      profile_manifest,
+    }, activeDb)
 
-    updateRebuildCandidateStatus(candidate.candidate_id, 'verifying', [], db)
+    updateRebuildCandidateStatus(candidate.candidate_id, 'verifying', [], activeDb)
 
     await request.on_before_promote?.()
 
-    const validated = validateRebuildInputSnapshot(snapshot.input_snapshot_id, db)
+    const validated = validateRebuildInputSnapshot(snapshot.input_snapshot_id, activeDb)
     let parity: RagParityCheck[] = []
     if (validated.status === 'current') {
-      const build = runCandidateBuild({ workspace_id: request.workspace_id, project_id: request.project_id, domains }, db)
+      const build = runCandidateBuild({ workspace_id: request.workspace_id, project_id: request.project_id, domains }, activeDb)
       parity = build.parity
       warnings.push(...build.warnings)
     }
@@ -162,7 +349,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db: Db = getDb()
       candidate_id: candidate.candidate_id,
       snapshot_status: validated.status,
       parity,
-    }, db)
+    }, activeDb)
 
     if (validated.status !== 'current') {
       errors.push({ code: 'stale_snapshot', message: validated.stale_reason ?? 'snapshot is stale' })
@@ -172,7 +359,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db: Db = getDb()
     }
 
     const status = errors.length > 0 ? 'failed' : 'completed'
-    const finalCounts = planRagRebuildScope({ ...request, domains }, db).counts
+    const finalCounts = planRagRebuildScope({ ...request, domains }, activeDb).counts
     finishRebuildReport({
       report_id,
       status,
@@ -183,13 +370,21 @@ export async function runRagRebuild(request: RagRebuildRequest, db: Db = getDb()
       parity,
       warnings,
       errors: redactRagDetails(errors),
-    }, db)
+      backup_ref,
+      verification_refs,
+      mutation_scope,
+      profile_confirmation: request.confirm_profile ?? null,
+    }, activeDb)
 
     return {
       report_id,
       status,
       mode: request.mode,
-      scope: { workspace_id: request.workspace_id, project_id: request.project_id, domains },
+      scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
+      profile_manifest,
+      profile_confirmation: request.confirm_profile ?? null,
+      backup,
+      verification_refs,
       candidate: {
         candidate_id: candidate.candidate_id,
         status: disposition.status,
@@ -214,12 +409,20 @@ export async function runRagRebuild(request: RagRebuildRequest, db: Db = getDb()
       parity: [],
       warnings,
       errors,
-    }, db)
+      backup_ref,
+      verification_refs,
+      mutation_scope,
+      profile_confirmation: request.confirm_profile ?? null,
+    }, activeDb)
     return {
       report_id,
       status: 'failed',
       mode: request.mode,
-      scope: { workspace_id: request.workspace_id, project_id: request.project_id, domains },
+      scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
+      profile_manifest,
+      profile_confirmation: request.confirm_profile ?? null,
+      backup,
+      verification_refs,
       candidate: null,
       counts: planned.counts,
       parity: [],

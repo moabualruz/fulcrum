@@ -9,6 +9,8 @@ export type {
   EmbeddingJobSourceDomain, EmbeddingJobStatus, EmbeddingJobItemStatus,
   RagJobEventType, VectorMetadataSourceDomain, VectorMetadataTable,
   VectorMetadataStatus, RagHealthStatus, RagEvalRunStatus,
+  RuntimeDataProfile, RuntimeProfilePathKey, RuntimeProfilePaths,
+  RuntimeProfileError, RuntimeDataProfileManifest,
   FulcrumEvent, TaskRelation, RunEvent,
   EmbeddingProviderConfig, FulcrumConfig, PolicyCheckResult,
   HandoffPacket, CreateHandoffInput, HandoffPriority, HandoffScope, HandoffMode,
@@ -22,6 +24,16 @@ export { FulcrumError } from './types.js'
 // Config
 export { loadConfig, defaultConfig, validateFulcrumConfig, readRawConfig, writeRawConfig } from './config.js'
 export type { ValidationResult } from './config.js'
+export {
+  assertRuntimeDataProfileSafe,
+  normalizeRuntimeDataProfile,
+  normalizeRuntimePath,
+  pathFingerprint,
+  resolveAllRuntimeDataProfiles,
+  resolveRuntimeDataProfile,
+  runtimeProfileDbMismatch,
+} from './runtime-profile.js'
+export type { ResolveRuntimeDataProfileInput } from './runtime-profile.js'
 
 // PR 3 — Fulcrum-first bias measurement spike
 export {
@@ -43,7 +55,7 @@ export {
 export type { SessionStats, MeasurementSummary } from './recall-measurement.js'
 
 // DB
-export { getDb, setDb, closeDb, _configureDb, globalDataDir, withTransaction, checkDbHealth } from './db/client.js'
+export { getDb, getDbAtPath, setDb, closeDb, _configureDb, globalDataDir, withTransaction, checkDbHealth } from './db/client.js'
 export type { Db } from './db/client.js'
 export { runMigrations } from './db/migrations.js'
 

@@ -24,7 +24,7 @@ describe('RAG rebuild JSON contract', () => {
       mode: 'plan',
       domains: ['code'],
       allow_empty: true,
-    })
+    }, getDb())
 
     expect(result).toMatchObject({
       status: 'completed',
@@ -45,9 +45,10 @@ describe('RAG rebuild JSON contract', () => {
       workspace_id: 'ws_1',
       project_id: 'proj_1',
       mode: 'execute',
+      runtime_profile: 'dev',
       domains: ['code'],
       allow_empty: true,
-    })
+    }, getDb())
 
     expect(result.report_id).toMatch(/^report_/)
     expect(result.candidate?.candidate_id).toMatch(/^candidate_/)

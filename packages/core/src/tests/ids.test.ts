@@ -159,6 +159,7 @@ describe('newId prefixes (G-15)', () => {
     ['rag_rebuild_report', 'report_'],
     ['rag_rebuild_candidate', 'candidate_'],
     ['rag_rebuild_snapshot', 'snapshot_'],
+    ['profile_backup', 'backup_'],
     ['embedding_job', 'job_'],
     ['embedding_job_item', 'jobitem_'],
     ['rag_job_event', 'ragevt_'],

@@ -60,8 +60,18 @@
 - [x] CHK032 Are failing test tasks defined before implementation tasks for every behavior-bearing user story? [Readiness, Tasks §US1..US6]
 - [x] CHK033 Are package ownership boundaries reflected in task file paths across core, memory, CLI, monitor, and CI? [Readiness, Plan §Project Structure, Tasks §All Phases]
 - [x] CHK034 Are integration utilization checks specified for producer/consumer wiring across memory primitives, CLI registry, MCP tools, code index paths, and CI gates? [Readiness, Tasks §Foundational, Tasks §US4, Tasks §US6]
+- [x] CHK035 Are Phase 3A profile-isolation tasks explicitly required before US1 closure and before later P1/P2/P3 phases resume? [Readiness, Tasks §Phase 3A, Tasks §MVP First]
+
+## Amendment Profile Isolation
+
+- [x] CHK036 Are installed/operator, dev/review, and test runtime data profiles specified with separate DB, vault, graph, vector, and artifact roots? [Completeness, Spec §FR-048, Plan §Technical Context]
+- [x] CHK037 Are destructive rebuild/reset requirements clear that profile resolution, path visibility, and fail-closed unsafe-path checks happen before mutation? [Clarity, Spec §FR-049, Spec §FR-050, Contracts §Runtime Data Profile Paths]
+- [x] CHK038 Are test-profile requirements explicit that automated tests can reset disposable data without touching installed/operator or dev/review state? [Coverage, Spec §FR-052, Spec §SC-018]
+- [x] CHK039 Are installed/operator destructive maintenance requirements explicit about backup, profile confirmation, audit, and report evidence? [Security, Spec §FR-051, Spec §SC-020]
+- [x] CHK040 Is normal rebuild scope bounded to allowlisted derived RAG state rather than full DB/vault wipe unless a separate wipe scope is confirmed? [Scope, Spec §FR-054]
 
 ## Notes
 
 - Checklist pass completed on 2026-04-22 after remediating contract/spec gaps found during review.
+- Checklist amended on 2026-04-22 to add runtime data profile isolation as a US1/Phase 3A gate before future destructive rebuild, review, and test execution.
 - Remaining implementation entry point: [tasks.md](../tasks.md), Phase 1 then Phase 2, then US1 MVP.

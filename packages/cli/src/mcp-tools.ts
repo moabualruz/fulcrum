@@ -184,6 +184,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       properties: {
         workspace_id: { type: 'string' },
         project_id: { type: 'string' },
+        runtime_profile: { type: 'string', enum: ['install', 'dev', 'test'] },
         domains: { type: 'array', items: { type: 'string', enum: ['l0', 'l1', 'fts', 'code', 'vectors', 'graph'] } },
         allow_empty: { type: 'boolean' },
       },
@@ -199,6 +200,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       properties: {
         workspace_id: { type: 'string' },
         project_id: { type: 'string' },
+        runtime_profile: { type: 'string', enum: ['install', 'dev', 'test'] },
         domains: { type: 'array', items: { type: 'string', enum: ['l0', 'l1', 'fts', 'code', 'vectors', 'graph'] } },
         allow_empty: { type: 'boolean' },
       },
@@ -215,8 +217,23 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       properties: {
         workspace_id: { type: 'string' },
         project_id: { type: 'string' },
+        runtime_profile: { type: 'string', enum: ['install', 'dev', 'test'] },
+        confirm_profile: { type: 'string', enum: ['install', 'dev', 'test'] },
+        verification_refs: { type: 'array', items: { type: 'string' } },
         domains: { type: 'array', items: { type: 'string', enum: ['l0', 'l1', 'fts', 'code', 'vectors', 'graph'] } },
         allow_empty: { type: 'boolean' },
+      },
+    },
+  },
+  {
+    title: 'Get Runtime Profile Paths',
+    name: 'get_runtime_profile_paths',
+    description: 'Read-only runtime data profile path inspection. Returns active DB, vault, graph, vector, and artifact roots with non-secret fingerprints.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        runtime_profile: { type: 'string', enum: ['install', 'dev', 'test'] },
       },
     },
   },
@@ -230,6 +247,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
       properties: {
         report_id: { type: 'string' },
         workspace_id: { type: 'string' },
+        runtime_profile: { type: 'string', enum: ['install', 'dev', 'test'] },
       },
       required: ['report_id'],
     },

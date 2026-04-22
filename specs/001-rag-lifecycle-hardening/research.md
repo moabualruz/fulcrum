@@ -74,12 +74,28 @@
 - LangSmith RAG evaluation categories: https://docs.langchain.com/langsmith/evaluate-rag-tutorial
 - OpenAI evaluation best practices: https://developers.openai.com/api/docs/guides/evaluation-best-practices
 
+### Decision: Destructive rebuild work must run inside explicit runtime data profiles
+
+**Rationale**: Full rebuild, review, and test flows need different blast radii. Installed/operator data must remain durable. Dev/review data must be resettable for controlled validation. Test data must be disposable and isolated from both. Without a first-class profile boundary, a correct rebuild implementation can still corrupt the wrong DB or vault.
+
+**Spec impact**:
+- Add install/dev/test runtime data profiles with separate DB, vault, graph, vector, and artifact roots.
+- Require path manifests and fail-closed unsafe-path checks before destructive maintenance.
+- Require installed/operator profile confirmation and backup before destructive execution.
+- Treat normal rebuild clearing as allowlisted derived-state reset, not full DB/vault wipe.
+
+**Sources**:
+- Operator incident context from 2026-04-22 local resource/run cleanup.
+- Existing project config surfaces: `$FULCRUM_DATA_DIR`, `$FULCRUM_VAULT_PATH`, CLI `--vault`, and repo test tmpdir usage.
+
 ## Alternatives Considered
 
 - **Single generic "RAG works" eval**: Rejected because it hides which stage failed and matches the audit's warning that "it indexed" can be mistaken for "it retrieves correctly."
 - **Embedding metadata embedded only in vector rows**: Rejected because stale/mixed-model detection and failed-item retry need queryable operational state even when vector insertion fails.
 - **Graph as optional optimization only**: Rejected for this feature's lifecycle scope because graph coverage and explanation are required to make relationship recall trustworthy.
 - **Silent accelerator fallback in auto mode**: Rejected because operators need to know if GPU-first actually used GPU.
+- **One shared DB/vault for install, review, and tests**: Rejected because tests and review rebuilds need reset freedom without risking installed/operator data.
+- **Full database wipe as normal rebuild behavior**: Rejected because canonical task/run/audit and vault source state should survive normal derived-state rebuilds; full wipe needs separate backup-confirmed scope.
 
 ## Open Questions For Planning
 

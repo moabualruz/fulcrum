@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3'
 import { mkdirSync } from 'fs'
-import { join } from 'path'
+import { dirname, join, resolve } from 'path'
 import { homedir, platform } from 'os'
 import { createRequire } from 'node:module'
 
@@ -29,25 +29,44 @@ export function globalDataDir(): string {
 }
 
 let _db: Database.Database | null = null
+let _dbPath: string | null = null
+const _dbByPath = new Map<string, Database.Database>()
 
 export function getDb(dataDir?: string): Database.Database {
+  const dbPath = resolve(join(dataDir ?? globalDataDir(), 'fulcrum.db'))
   if (_db) return _db
-  const dir = dataDir ?? globalDataDir()
-  mkdirSync(dir, { recursive: true })
-  const db = new Database(join(dir, 'fulcrum.db'))
-  _configureDb(db)
+  const db = getDbAtPath(dbPath)
   _db = db
+  _dbPath = dbPath
+  return db
+}
+
+export function getDbAtPath(path: string): Database.Database {
+  const dbPath = resolve(path)
+  if (_db && _dbPath === dbPath) return _db
+  const existing = _dbByPath.get(dbPath)
+  if (existing) return existing
+  mkdirSync(dirname(dbPath), { recursive: true })
+  const db = new Database(dbPath)
+  _configureDb(db)
+  _dbByPath.set(dbPath, db)
   return db
 }
 
 /** Inject a pre-configured database — used in tests to pass :memory: instances */
 export function setDb(db: Database.Database): void {
   _db = db
+  _dbPath = null
 }
 
 export function closeDb(): void {
-  _db?.close()
+  const seen = new Set<Database.Database>()
+  if (_db) seen.add(_db)
+  for (const db of _dbByPath.values()) seen.add(db)
+  for (const db of seen) db.close()
   _db = null
+  _dbPath = null
+  _dbByPath.clear()
 }
 
 export function _configureDb(db: Database.Database): void {
