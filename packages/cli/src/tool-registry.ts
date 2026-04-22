@@ -748,6 +748,7 @@ TOOL_REGISTRY.set('recall_knowledge', {
     if (args['confidence_floor'] !== undefined) input.confidence_floor = args['confidence_floor'] as number
     if (args['graph_hops'] !== undefined) input.graph_hops = args['graph_hops'] as number
     if (args['include_superseded'] !== undefined) input.include_superseded = Boolean(args['include_superseded'])
+    if (args['explain'] !== undefined) input.explain = Boolean(args['explain'])
     return recallKnowledge(input)
   },
 })
@@ -926,6 +927,7 @@ TOOL_REGISTRY.set('search_code', {
       limit: args['limit'] as number | undefined,
       caller_run_id: deps.trusted_caller_run_id,
       caller_role: deps.trusted_caller_role,
+      explain: args['explain'] === undefined ? undefined : Boolean(args['explain']),
     })
     return envelope.reason ? envelope : { results: envelope.results }
   },

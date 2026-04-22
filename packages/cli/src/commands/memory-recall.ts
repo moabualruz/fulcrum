@@ -13,7 +13,7 @@
 // the FULCRUM_MEMORY_V3 flag and removed the legacy fallback entirely — this
 // handler is now the only recall path for both names.
 
-import { runV3Search, type V3RecallHit, type V3SearchInput } from 'fulcrum-memory'
+import { runV3Search, type RagRecallExplanation, type V3RecallHit, type V3SearchInput } from 'fulcrum-memory'
 
 export interface RecallKnowledgeInput {
   workspace_id: string
@@ -25,6 +25,7 @@ export interface RecallKnowledgeInput {
   graph_hops?: number
   include_superseded?: boolean
   max_chars?: number
+  explain?: boolean
 }
 
 export interface RecallKnowledgeHit {
@@ -37,6 +38,7 @@ export interface RecallKnowledgeHit {
   l0_wikilinks: string[]
   retention_tier: string
   stage_ranks: V3RecallHit['stage_ranks']
+  explanation?: RagRecallExplanation
 }
 
 export interface RecallKnowledgeResult {
@@ -61,20 +63,25 @@ export async function recallKnowledge(input: RecallKnowledgeInput): Promise<Reca
   if (input.confidence_floor !== undefined) searchInput.confidence_floor = input.confidence_floor
   if (input.graph_hops !== undefined) searchInput.graph_hops = input.graph_hops
   if (input.include_superseded !== undefined) searchInput.include_superseded = input.include_superseded
+  if (input.explain !== undefined) searchInput.explain = input.explain
 
   const hits = await runV3Search(searchInput)
   if (hits.length === 0) return { results: [], reason: 'no_match' }
 
-  const results: RecallKnowledgeHit[] = hits.map((h) => ({
-    memory_id: h.memory_id,
-    title: h.title,
-    content: truncate(h.content, maxChars),
-    confidence: h.confidence,
-    score: h.score,
-    sources: h.sources,
-    l0_wikilinks: h.l0_wikilinks,
-    retention_tier: h.retention_tier,
-    stage_ranks: h.stage_ranks,
-  }))
+  const results: RecallKnowledgeHit[] = hits.map((h) => {
+    const result: RecallKnowledgeHit = {
+      memory_id: h.memory_id,
+      title: h.title,
+      content: truncate(h.content, maxChars),
+      confidence: h.confidence,
+      score: h.score,
+      sources: h.sources,
+      l0_wikilinks: h.l0_wikilinks,
+      retention_tier: h.retention_tier,
+      stage_ranks: h.stage_ranks,
+    }
+    if (input.explain && h.explanation) result.explanation = h.explanation
+    return result
+  })
   return { results }
 }

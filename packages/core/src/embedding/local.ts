@@ -33,9 +33,12 @@ function errorMessage(err: unknown): string {
 }
 
 export class LocalEmbeddingProvider implements EmbeddingProvider {
+  readonly provider = 'local'
   readonly dimensions: number
-  private model: string
-  private device: LocalEmbeddingDevice
+  readonly model: string
+  readonly device: LocalEmbeddingDevice
+  actualDevice: 'cpu' | 'cuda' | 'webgpu' | undefined
+  fallbackReason: string | null = null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private pipeline: any = null
   private _warmingUp: Promise<void> | null = null
@@ -61,12 +64,17 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async createPipeline(pipeline: any): Promise<any> {
+    let fellBack = false
     for (const options of localEmbeddingPipelineOptions(this.device)) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        return await pipeline('feature-extraction', this.model, options)
+        const candidate = await pipeline('feature-extraction', this.model, options)
+        this.actualDevice = options.device ?? 'cpu'
+        this.fallbackReason = fellBack ? `auto device fell back to ${this.actualDevice}` : null
+        return candidate
       } catch (err) {
         if (options.device && this.device === 'auto') {
+          fellBack = true
           process.stderr.write(`[fulcrum] ${options.device} embedding unavailable; trying next local embedding backend (${errorMessage(err)})\n`)
           continue
         }

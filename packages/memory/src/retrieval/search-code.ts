@@ -13,6 +13,7 @@
 import type { Db } from 'fulcrum-agent-core'
 import { getDb } from 'fulcrum-agent-core'
 import { rrfScore } from '../scoring.js'
+import { buildCodeSearchExplanation, type RagRecallExplanation } from './explain.js'
 
 export interface SearchCodeInput {
   workspace_id: string
@@ -26,6 +27,7 @@ export interface SearchCodeInput {
   limit?: number
   caller_run_id?: string
   caller_role?: string
+  explain?: boolean
 }
 
 export interface SearchCodeResultRow {
@@ -38,6 +40,7 @@ export interface SearchCodeResultRow {
   content: string
   score: number
   project_id: string
+  explanation?: RagRecallExplanation
 }
 
 export interface SearchCodeResponse {
@@ -77,6 +80,8 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
 
   // Rank map #1: FTS5 text-match rank by bm25 order.
   const ftsRankByChunk = new Map<string, number>()
+  const filterWhere = where.join(' AND ')
+  const filterParams = [...params]
   if (input.text && input.text.trim()) {
     const safe = input.text.match(/[\p{L}\p{N}_]+/gu)?.map(t => `"${t}"`).join(' AND ') ?? ''
     if (!safe) return { results: [], reason: 'no_match' }
@@ -85,10 +90,10 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
         SELECT c.chunk_id, bm25(code_chunks_fts) AS bm25
         FROM code_chunks c
         JOIN code_chunks_fts ON c.rowid = code_chunks_fts.rowid
-        WHERE code_chunks_fts MATCH ? AND c.workspace_id = ?
+        WHERE code_chunks_fts MATCH ? AND ${filterWhere}
         ORDER BY bm25 ASC
         LIMIT ?
-      `).all(safe, input.workspace_id, limit * 4) as Array<{ chunk_id: string; bm25: number }>
+      `).all(safe, ...filterParams, limit * 4) as Array<{ chunk_id: string; bm25: number }>
       ftsRows.forEach((row, idx) => {
         ftsRankByChunk.set(row.chunk_id, idx + 1)
       })
@@ -141,7 +146,7 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
       const ftsRank = ftsRankByChunk.get(r.chunk_id) ?? null
       const symRank = symbolRankByChunk.get(r.chunk_id) ?? null
       const score = rrfScore(ftsRank, symRank)
-      return {
+      const result: SearchCodeResultRow = {
         chunk_id: r.chunk_id,
         rel_path: r.rel_path,
         start_line: r.start_line,
@@ -152,6 +157,25 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
         score,
         project_id: r.project_id,
       }
+      if (input.explain) {
+        result.explanation = buildCodeSearchExplanation({
+          chunk_id: r.chunk_id,
+          rel_path: r.rel_path,
+          start_line: r.start_line,
+          end_line: r.end_line,
+          score,
+          stage_ranks: {
+            fts: ftsRank,
+            symbol: symRank,
+          },
+          stage_scores: {
+            fts: ftsRank === null ? null : 1 / (60 + ftsRank),
+            symbol: symRank === null ? null : 1 / (60 + symRank),
+            fused: score,
+          },
+        })
+      }
+      return result
     })
     .sort((a, b) => b.score - a.score)
 

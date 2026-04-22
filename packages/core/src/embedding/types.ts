@@ -1,4 +1,10 @@
 export interface EmbeddingProvider {
+  /** Optional runtime metadata for machine-readable explanations and job reports. */
+  provider?: string
+  model?: string
+  device?: string
+  actualDevice?: string
+  fallbackReason?: string | null
   /** Embed with DOC_PREFIX (backward-compatible default). */
   embed(text: string): Promise<Float32Array>
   embedBatch(texts: string[]): Promise<Float32Array[]>
@@ -11,6 +17,12 @@ export interface EmbeddingProvider {
 }
 
 export interface RerankerProvider {
+  /** Optional runtime metadata for machine-readable explanations and job reports. */
+  provider?: string
+  model?: string
+  device?: string
+  actualDevice?: string
+  fallbackReason?: string | null
   rerank(query: string, passages: string[]): Promise<number[]>
   warmUp(): Promise<void>
 }

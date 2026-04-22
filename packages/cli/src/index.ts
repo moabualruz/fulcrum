@@ -840,6 +840,7 @@ Flags:
     if (floor) input.confidence_floor = Number(floor)
     if (hops) input.graph_hops = Number(hops)
     if (args.includes('--include-superseded')) input.include_superseded = true
+    if (args.includes('--explain')) input.explain = true
     const out = await recallKnowledge(input)
     if (!args.includes('--explain')) {
       out.results = out.results.map((r) => ({ ...r, stage_ranks: undefined as unknown as typeof r.stage_ranks }))

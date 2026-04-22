@@ -165,21 +165,21 @@
 
 ### Tests for User Story 3
 
-- [ ] T071 [P] [US3] Add failing recall explain schema tests for FR-019, FR-020, FR-023, FR-024, and SC-005 in packages/memory/src/tests/recall-explain.test.ts
-- [ ] T072 [P] [US3] Add failing code-search explain schema and path/line range tests for FR-018, FR-019, and SC-005 in packages/memory/src/tests/search-code-explain.test.ts
-- [ ] T073 [P] [US3] Add failing provenance class and broken-source reference tests for FR-023, FR-024, and FR-025 in packages/memory/src/tests/provenance-explain.test.ts
-- [ ] T074 [P] [US3] Add failing graph contribution explain tests for FR-026 and FR-027 in packages/memory/src/tests/graph-explain.test.ts
-- [ ] T075 [P] [US3] Add failing CLI/MCP explain contract tests for `fulcrum memory recall --explain --json` and `recall_knowledge` in packages/cli/src/tests/recall-explain-contract.test.ts
+- [X] T071 [P] [US3] Add failing recall explain schema tests for FR-019, FR-020, FR-023, FR-024, and SC-005 in packages/memory/src/tests/recall-explain.test.ts
+- [X] T072 [P] [US3] Add failing code-search explain schema and path/line range tests for FR-018, FR-019, and SC-005 in packages/memory/src/tests/search-code-explain.test.ts
+- [X] T073 [P] [US3] Add failing provenance class and broken-source reference tests for FR-023, FR-024, and FR-025 in packages/memory/src/tests/provenance-explain.test.ts
+- [X] T074 [P] [US3] Add failing graph contribution explain tests for FR-026 and FR-027 in packages/memory/src/tests/graph-explain.test.ts
+- [X] T075 [P] [US3] Add failing CLI/MCP explain contract tests for `fulcrum memory recall --explain --json` and `recall_knowledge` in packages/cli/src/tests/recall-explain-contract.test.ts
 
 ### Implementation for User Story 3
 
-- [ ] T076 [US3] Implement stable recall explanation schema and mappers in packages/memory/src/retrieval/explain.ts
-- [ ] T077 [US3] Capture lexical, vector, reranker, graph, fused score, and rank data from recall pipeline in packages/memory/src/retrieval/v3-search.ts
-- [ ] T078 [US3] Capture provider, model, requested device, actual device, fallback reason, and latency fields in packages/memory/src/retrieval/v3-search.ts
-- [ ] T079 [US3] Implement provenance class and source reference mapping for raw-backed, curated-backed, code-backed, legacy-unbacked, and generated results in packages/memory/src/retrieval/explain.ts
-- [ ] T080 [US3] Add graph contribution metadata when graph expansion affects results in packages/memory/src/retrieval/v3-search.ts
-- [ ] T081 [US3] Add code-search explanation and line/path result mapping in packages/memory/src/retrieval/search-code.ts
-- [ ] T082 [US3] Wire `--explain --json` recall output and MCP `recall_knowledge` explain support in packages/cli/src/commands/memory-recall.ts
+- [X] T076 [US3] Implement stable recall explanation schema and mappers in packages/memory/src/retrieval/explain.ts
+- [X] T077 [US3] Capture lexical, vector, reranker, graph, fused score, and rank data from recall pipeline in packages/memory/src/retrieval/v3-search.ts
+- [X] T078 [US3] Capture provider, model, requested device, actual device, fallback reason, and latency fields in packages/memory/src/retrieval/v3-search.ts
+- [X] T079 [US3] Implement provenance class and source reference mapping for raw-backed, curated-backed, code-backed, legacy-unbacked, and generated results in packages/memory/src/retrieval/explain.ts
+- [X] T080 [US3] Add graph contribution metadata when graph expansion affects results in packages/memory/src/retrieval/v3-search.ts
+- [X] T081 [US3] Add code-search explanation and line/path result mapping in packages/memory/src/retrieval/search-code.ts
+- [X] T082 [US3] Wire `--explain --json` recall output and MCP `recall_knowledge` explain support in packages/cli/src/commands/memory-recall.ts
 
 **Checkpoint**: US3 explain outputs are stable and contract-tested.
 

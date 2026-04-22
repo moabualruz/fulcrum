@@ -9,8 +9,11 @@ function errorMessage(err: unknown): string {
 }
 
 export class LocalRerankerProvider implements RerankerProvider {
-  private model: string
-  private device: LocalRerankerDevice
+  readonly provider = 'local'
+  readonly model: string
+  readonly device: LocalRerankerDevice
+  actualDevice: 'cpu' | 'cuda' | 'webgpu' | undefined
+  fallbackReason: string | null = null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private tokenizer: any = null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,12 +41,17 @@ export class LocalRerankerProvider implements RerankerProvider {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async createModel(AutoModelForSequenceClassification: any): Promise<any> {
+    let fellBack = false
     for (const options of localEmbeddingPipelineOptions(this.device)) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        return await AutoModelForSequenceClassification.from_pretrained(this.model, options)
+        const candidate = await AutoModelForSequenceClassification.from_pretrained(this.model, options)
+        this.actualDevice = options.device ?? 'cpu'
+        this.fallbackReason = fellBack ? `auto device fell back to ${this.actualDevice}` : null
+        return candidate
       } catch (err) {
         if (options.device && this.device === 'auto') {
+          fellBack = true
           process.stderr.write(`[fulcrum] ${options.device} reranker unavailable; trying next local reranker backend (${errorMessage(err)})\n`)
           continue
         }

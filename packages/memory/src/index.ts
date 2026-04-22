@@ -212,8 +212,17 @@ export { flushPendingMemoryWrites, waitForEmbedHeadroom } from './l2/queue.js'
 // v3 retrieval — graph + confidence + supersession filters (PR 5).
 export { runV3Search, v3DefaultWeights, resolveQueryEntities } from './retrieval/v3-search.js'
 export type { V3SearchInput, V3SearchWeights, V3RecallHit } from './retrieval/v3-search.js'
-export { emptyExplanation } from './retrieval/explain.js'
-export type { RagProvenanceClass, RagRecallExplanation } from './retrieval/explain.js'
+export { buildCodeSearchExplanation, buildRecallExplanation, emptyExplanation } from './retrieval/explain.js'
+export type {
+  CodeExplainHit,
+  RagGraphContribution,
+  RagProvenanceClass,
+  RagRecallExplanation,
+  RagRuntimeDetails,
+  RagSourceReference,
+  RagSourceStatus,
+  RecallExplainHit,
+} from './retrieval/explain.js'
 
 // v3 feature flag — plan §Migration strategy (PR 5.5 cutover: default ON).
 // Memory v3 feature flag retired in PR 9.5 — isMemoryV3Enabled is gone;

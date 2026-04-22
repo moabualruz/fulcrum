@@ -7,9 +7,10 @@ import { DOC_PREFIX, QUERY_PREFIX, truncateDimensions } from './local.js'
 // ---------------------------------------------------------------------------
 
 export class VoyageEmbeddingProvider implements EmbeddingProvider {
+  readonly provider = 'voyage'
   readonly dimensions: number
   private readonly apiKey: string
-  private readonly model: string
+  readonly model: string
 
   constructor(config: EmbeddingProviderConfig) {
     const key = config.apiKey ?? process.env.VOYAGE_API_KEY
@@ -65,9 +66,10 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
 // ---------------------------------------------------------------------------
 
 export class OpenAIEmbeddingProvider implements EmbeddingProvider {
+  readonly provider = 'openai'
   readonly dimensions: number
   private readonly apiKey: string
-  private readonly model: string
+  readonly model: string
 
   constructor(config: EmbeddingProviderConfig) {
     const key = config.apiKey ?? process.env.OPENAI_API_KEY
@@ -120,9 +122,10 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
 // ---------------------------------------------------------------------------
 
 export class OllamaEmbeddingProvider implements EmbeddingProvider {
+  readonly provider = 'ollama'
   readonly dimensions: number
   private readonly baseUrl: string
-  private readonly model: string
+  readonly model: string
 
   constructor(config: EmbeddingProviderConfig) {
     this.baseUrl = (config.baseUrl ?? process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434').replace(/\/+$/, '')

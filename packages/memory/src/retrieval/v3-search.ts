@@ -22,6 +22,12 @@
 import type { Db } from 'fulcrum-agent-core'
 import { getDb, getReranker, getTextEmbedder } from 'fulcrum-agent-core'
 import { extractWikilinks } from '../l1/wikilinks.js'
+import {
+  buildRecallExplanation,
+  type RagGraphContribution,
+  type RagRecallExplanation,
+  type RagRuntimeDetails,
+} from './explain.js'
 
 export interface V3SearchWeights {
   fts?: number
@@ -43,6 +49,8 @@ export interface V3SearchInput {
   include_superseded?: boolean
   /** Unit 5.2 wires env defaults; unit 5.1 exposes this for deterministic tests. */
   weights?: V3SearchWeights
+  /** Include stable explanation objects on each result. */
+  explain?: boolean
 }
 
 export interface V3RecallHit {
@@ -55,9 +63,15 @@ export interface V3RecallHit {
   sources: string[]
   l0_wikilinks: string[]
   entities: string[]
+  sources_via: string[]
   superseded_by: string | null
+  freshness: number
+  source: string | null
   score: number
-  stage_ranks: { fts?: number; vec?: number; graph?: number }
+  stage_ranks: { fts?: number; vec?: number; graph?: number; reranker?: number }
+  stage_scores: { fts?: number; vec?: number; graph?: number; reranker?: number; fused?: number }
+  graph_contribution?: RagGraphContribution
+  explanation?: RagRecallExplanation
 }
 
 const RRF_K = 60
@@ -163,6 +177,7 @@ function walkGraph(
 
 interface RankMap {
   ranks: Map<string, number>
+  graphContributions?: Map<string, RagGraphContribution>
 }
 
 function ftsStage(
@@ -248,15 +263,30 @@ function graphStage(
   try {
     const rows = db
       .prepare(
-        `SELECT DISTINCT m.memory_id, m.updated_at
+        `SELECT DISTINCT m.memory_id, m.updated_at, m.entities
          FROM memories m, json_each(m.entities) j
          WHERE j.value IN (${placeholders})
            AND ${whereTail}
          ORDER BY m.updated_at DESC
          LIMIT ?`,
       )
-      .all(...reached, floor, workspace_id, ...whereTailParams, fetchLimit) as Array<{ memory_id: string }>
-    return { ranks: new Map(rows.map((r, i) => [r.memory_id, i + 1])) }
+      .all(...reached, floor, workspace_id, ...whereTailParams, fetchLimit) as Array<{ memory_id: string; entities: string | null }>
+    const ranks = new Map<string, number>()
+    const graphContributions = new Map<string, RagGraphContribution>()
+    rows.forEach((row, i) => {
+      const rank = i + 1
+      ranks.set(row.memory_id, rank)
+      const entities = parseEntities(row.entities)
+      graphContributions.set(row.memory_id, {
+        affected: true,
+        seed_entity_ids: seeds,
+        reached_entity_ids: [...reached],
+        matched_entity_ids: entities.filter((entityId) => reached.has(entityId)),
+        hops,
+        rank,
+      })
+    })
+    return { ranks, graphContributions }
   } catch (err) {
     if (process.env['FULCRUM_VERBOSE']) {
       process.stderr.write(`[v3-search] graph stage error: ${err instanceof Error ? err.message : String(err)}\n`)
@@ -271,6 +301,7 @@ interface FusionHit {
   fts_rank?: number
   vec_rank?: number
   graph_rank?: number
+  graph_contribution?: RagGraphContribution
 }
 
 function fuse(
@@ -292,7 +323,10 @@ function fuse(
     const hit: FusionHit = { memory_id: id, score }
     if (fr !== undefined) hit.fts_rank = fr
     if (vr !== undefined) hit.vec_rank = vr
-    if (gr !== undefined) hit.graph_rank = gr
+    if (gr !== undefined) {
+      hit.graph_rank = gr
+      hit.graph_contribution = graph.graphContributions?.get(id)
+    }
     hits.push(hit)
   }
   hits.sort((a, b) => b.score - a.score)
@@ -305,9 +339,11 @@ interface MemoryRow {
   summary: string
   content: string
   confidence: number
+  freshness: number
   retention_tier: string
   entities: string | null
   provenance: string | null
+  source: string | null
   superseded_by: string | null
 }
 
@@ -317,8 +353,8 @@ function materialize(db: Db, hits: FusionHit[]): V3RecallHit[] {
   const ids = hits.map((h) => h.memory_id)
   const rows = db
     .prepare(
-      `SELECT memory_id, title, summary, content, confidence, retention_tier,
-              entities, provenance, superseded_by
+      `SELECT memory_id, title, summary, content, confidence, freshness, retention_tier,
+              entities, provenance, source, superseded_by
        FROM memories
        WHERE memory_id IN (${placeholders})`,
     )
@@ -329,25 +365,36 @@ function materialize(db: Db, hits: FusionHit[]): V3RecallHit[] {
     const row = rowById.get(hit.memory_id)
     if (!row) continue
     const sources = parseSources(row.provenance)
+    const sources_via = parseSourcesVia(row.provenance)
     const entities = parseEntities(row.entities)
     const l0_wikilinks = extractWikilinks(row.content).filter((w) => w.startsWith('raw/'))
     const stage_ranks: V3RecallHit['stage_ranks'] = {}
+    const stage_scores: V3RecallHit['stage_scores'] = {}
     if (hit.fts_rank !== undefined) stage_ranks.fts = hit.fts_rank
     if (hit.vec_rank !== undefined) stage_ranks.vec = hit.vec_rank
     if (hit.graph_rank !== undefined) stage_ranks.graph = hit.graph_rank
+    if (hit.fts_rank !== undefined) stage_scores.fts = 1 / (RRF_K + hit.fts_rank)
+    if (hit.vec_rank !== undefined) stage_scores.vec = 1 / (RRF_K + hit.vec_rank)
+    if (hit.graph_rank !== undefined) stage_scores.graph = 1 / (RRF_K + hit.graph_rank)
+    stage_scores.fused = hit.score
     out.push({
       memory_id: row.memory_id,
       title: row.title,
       summary: row.summary,
       content: row.content,
       confidence: row.confidence,
+      freshness: row.freshness,
       retention_tier: row.retention_tier,
       sources,
+      sources_via,
       l0_wikilinks,
       entities,
       superseded_by: row.superseded_by,
+      source: row.source,
       score: hit.score,
       stage_ranks,
+      stage_scores,
+      graph_contribution: hit.graph_contribution,
     })
   }
   return out
@@ -364,13 +411,22 @@ async function rerankMaterialized(query: string, hits: V3RecallHit[]): Promise<V
   try {
     const passages = hits.map((h) => h.content || h.summary || h.title)
     const rerankScores = await reranker.rerank(query, passages)
-    return hits
+    const reranked = hits
       .map((h, i) => {
         const score = rerankScores[i]
         if (typeof score !== 'number' || !Number.isFinite(score)) return h
-        return { ...h, score: sigmoidScore(score) }
+        const rerankerScore = sigmoidScore(score)
+        return {
+          ...h,
+          score: rerankerScore,
+          stage_scores: { ...h.stage_scores, reranker: rerankerScore },
+        }
       })
       .sort((a, b) => b.score - a.score)
+    return reranked.map((h, i) => ({
+      ...h,
+      stage_ranks: { ...h.stage_ranks, reranker: i + 1 },
+    }))
   } catch (err) {
     if (process.env['FULCRUM_VERBOSE']) {
       process.stderr.write(`[v3-search] reranker degraded: ${err instanceof Error ? err.message : String(err)}\n`)
@@ -390,6 +446,17 @@ function parseSources(provenance: string | null): string[] {
   }
 }
 
+function parseSourcesVia(provenance: string | null): string[] {
+  if (!provenance) return []
+  try {
+    const parsed = JSON.parse(provenance) as { sources_via?: unknown }
+    if (!Array.isArray(parsed.sources_via)) return []
+    return parsed.sources_via.filter((s): s is string => typeof s === 'string')
+  } catch {
+    return []
+  }
+}
+
 function parseEntities(entities: string | null): string[] {
   if (!entities) return []
   try {
@@ -401,10 +468,66 @@ function parseEntities(entities: string | null): string[] {
   }
 }
 
+type RuntimeAwareProvider = {
+  provider?: unknown
+  model?: unknown
+  device?: unknown
+  actualDevice?: unknown
+  actual_device?: unknown
+  fallbackReason?: unknown
+  fallback_reason?: unknown
+  constructor?: { name?: string }
+}
+
+function runtimeFromProvider(provider: unknown, latencyMs: number): RagRuntimeDetails {
+  const runtime = provider as RuntimeAwareProvider | null
+  const ctorName = runtime?.constructor?.name
+  const providerName = typeof runtime?.provider === 'string'
+    ? runtime.provider
+    : (ctorName ? (ctorName.includes('Local') ? 'local' : 'custom') : null)
+  const model = typeof runtime?.model === 'string' ? runtime.model : (ctorName ?? null)
+  const requestedDevice = typeof runtime?.device === 'string' ? runtime.device : null
+  const actualDevice = typeof runtime?.actualDevice === 'string'
+    ? runtime.actualDevice
+    : (typeof runtime?.actual_device === 'string'
+        ? runtime.actual_device
+        : null)
+  const fallbackReason = typeof runtime?.fallbackReason === 'string'
+    ? runtime.fallbackReason
+    : (typeof runtime?.fallback_reason === 'string' ? runtime.fallback_reason : null)
+  return {
+    provider: providerName,
+    model,
+    requested_device: requestedDevice,
+    actual_device: actualDevice,
+    fallback_reason: fallbackReason,
+    latency_ms: latencyMs,
+  }
+}
+
+function maybeExplainHits(
+  hits: V3RecallHit[],
+  input: V3SearchInput,
+  db: Db,
+  runtime: RagRuntimeDetails,
+): V3RecallHit[] {
+  if (!input.explain) return hits
+  return hits.map((hit) => ({
+    ...hit,
+    explanation: buildRecallExplanation({
+      db,
+      workspace_id: input.workspace_id,
+      hit,
+      runtime,
+    }),
+  }))
+}
+
 export async function runV3Search(
   input: V3SearchInput,
   db: Db = getDb(),
 ): Promise<V3RecallHit[]> {
+  const startedAt = Date.now()
   const floor = input.confidence_floor ?? 0.3
   const limit = input.limit ?? 10
   const offset = input.offset ?? 0
@@ -422,11 +545,14 @@ export async function runV3Search(
   const graph = graphStage(db, input.query, floor, input.workspace_id, hops, whereTail, leadingParams, fetchLimit)
   const fused = fuse(fts, vec, graph, weights)
   const reranker = getReranker()
+  const runtimeProvider = reranker ?? getTextEmbedder()
   if (!reranker) {
-    return materialize(db, fused.slice(offset, offset + limit))
+    const hits = materialize(db, fused.slice(offset, offset + limit))
+    return maybeExplainHits(hits, input, db, runtimeFromProvider(runtimeProvider, Date.now() - startedAt))
   }
 
   const candidates = materialize(db, fused.slice(0, fetchLimit))
   const reranked = await rerankMaterialized(input.query, candidates)
-  return reranked.slice(offset, offset + limit)
+  const hits = reranked.slice(offset, offset + limit)
+  return maybeExplainHits(hits, input, db, runtimeFromProvider(runtimeProvider, Date.now() - startedAt))
 }

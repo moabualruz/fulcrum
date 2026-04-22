@@ -28,6 +28,10 @@ const STUB_DIM = 1024
 
 class StubEmbeddingProvider {
   dimensions = STUB_DIM
+  provider = 'stub'
+  model = 'stub'
+  device = 'auto'
+  actualDevice = 'cpu'
   async warmUp(): Promise<void> { /* no-op */ }
   async embed(text: string): Promise<Float32Array> { return this.embedDocument(text) }
   async embedBatch(texts: string[]): Promise<Float32Array[]> {

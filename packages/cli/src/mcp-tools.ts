@@ -159,6 +159,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         confidence_floor: { type: 'number', description: 'Minimum confidence for a page to be returned (default 0.3)' },
         graph_hops: { type: 'number', description: 'BFS depth from query-mentioned entities (default 2)' },
         include_superseded: { type: 'boolean', description: 'Include pages whose superseded_by is non-null (default false)' },
+        explain: { type: 'boolean', description: 'Include stable retrieval-stage, runtime, trust, provenance, and graph-contribution explanation objects' },
       },
       required: ['query'],
     },

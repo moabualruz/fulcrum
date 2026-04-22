@@ -103,6 +103,60 @@ describe('localEmbeddingPipelineOptions', () => {
   })
 })
 
+describe('LocalEmbeddingProvider device selection', () => {
+  afterEach(() => {
+    vi.doUnmock('@huggingface/transformers')
+    vi.doUnmock('../db/client.js')
+    vi.resetModules()
+    vi.restoreAllMocks()
+  })
+
+  it('records the actual accelerator selected by automatic device probing', async () => {
+    const calls: Array<{ dtype: 'q8'; device?: 'cuda' | 'webgpu' }> = []
+
+    vi.doMock('@huggingface/transformers', () => ({
+      env: {},
+      pipeline: vi.fn().mockImplementation((_task: string, _model: string, options: { dtype: 'q8'; device?: 'cuda' | 'webgpu' }) => {
+        calls.push(options)
+        return Promise.resolve(vi.fn())
+      }),
+    }))
+    vi.doMock('../db/client.js', () => ({ globalDataDir: () => '/tmp/fulcrum-test' }))
+
+    const provider = new LocalEmbeddingProvider({ provider: 'local', model: 'embed-model', dimensions: 1024 })
+    await provider.warmUp()
+
+    expect(calls).toEqual([{ dtype: 'q8', device: 'cuda' }])
+    expect(provider.actualDevice).toBe('cuda')
+    expect(provider.fallbackReason).toBeNull()
+  })
+
+  it('records CPU when automatic accelerator probing falls through', async () => {
+    const calls: Array<{ dtype: 'q8'; device?: 'cuda' | 'webgpu' }> = []
+
+    vi.doMock('@huggingface/transformers', () => ({
+      env: {},
+      pipeline: vi.fn().mockImplementation((_task: string, _model: string, options: { dtype: 'q8'; device?: 'cuda' | 'webgpu' }) => {
+        calls.push(options)
+        if (options.device) throw new Error(`${options.device} unavailable`)
+        return Promise.resolve(vi.fn())
+      }),
+    }))
+    vi.doMock('../db/client.js', () => ({ globalDataDir: () => '/tmp/fulcrum-test' }))
+
+    const provider = new LocalEmbeddingProvider({ provider: 'local', model: 'embed-model', dimensions: 1024 })
+    await provider.warmUp()
+
+    expect(calls).toEqual([
+      { dtype: 'q8', device: 'cuda' },
+      { dtype: 'q8', device: 'webgpu' },
+      { dtype: 'q8' },
+    ])
+    expect(provider.actualDevice).toBe('cpu')
+    expect(provider.fallbackReason).toBe('auto device fell back to cpu')
+  })
+})
+
 describe('LocalRerankerProvider device selection', () => {
   afterEach(() => {
     vi.doUnmock('@huggingface/transformers')
@@ -135,6 +189,8 @@ describe('LocalRerankerProvider device selection', () => {
       { dtype: 'q8', device: 'webgpu' },
       { dtype: 'q8' },
     ])
+    expect(provider.actualDevice).toBe('cpu')
+    expect(provider.fallbackReason).toBe('auto device fell back to cpu')
   })
 
   it('does not fallback when CUDA is explicitly requested', async () => {
@@ -322,6 +378,18 @@ describe('VoyageEmbeddingProvider', () => {
     const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>
     expect(headers['Authorization']).toBe('Bearer config-key-override')
   })
+
+  it('exposes provider and model metadata for recall explanations', () => {
+    const provider = new VoyageEmbeddingProvider({
+      provider: 'voyage',
+      model: 'voyage-code-3',
+      dimensions: 1024,
+      apiKey: 'config-key',
+    })
+
+    expect(provider.provider).toBe('voyage')
+    expect(provider.model).toBe('voyage-code-3')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -392,6 +460,18 @@ describe('OpenAIEmbeddingProvider', () => {
     const provider = new OpenAIEmbeddingProvider({ provider: 'openai', model: 'text-embedding-3-large', dimensions: 3072 })
     await expect(provider.embed('test')).rejects.toThrow('OpenAI API error: 429')
   })
+
+  it('exposes provider and model metadata for recall explanations', () => {
+    const provider = new OpenAIEmbeddingProvider({
+      provider: 'openai',
+      model: 'text-embedding-3-large',
+      dimensions: 3072,
+      apiKey: 'config-key',
+    })
+
+    expect(provider.provider).toBe('openai')
+    expect(provider.model).toBe('text-embedding-3-large')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -448,6 +528,17 @@ describe('OllamaEmbeddingProvider', () => {
 
     const provider = new OllamaEmbeddingProvider({ provider: 'ollama', model: 'qwen3-embedding:4b', dimensions: 1024 })
     await expect(provider.embed('test')).rejects.toThrow('Ollama API error: 500')
+  })
+
+  it('exposes provider and model metadata for recall explanations', () => {
+    const provider = new OllamaEmbeddingProvider({
+      provider: 'ollama',
+      model: 'qwen3-embedding:4b',
+      dimensions: 1024,
+    })
+
+    expect(provider.provider).toBe('ollama')
+    expect(provider.model).toBe('qwen3-embedding:4b')
   })
 })
 
