@@ -16,8 +16,8 @@
     "package_test_file": 311,
     "package_config_file": 37,
     "package_generated_artifact": 37,
-    "script_source_file": 15,
-    "package_manifest_script": 72,
+    "script_source_file": 23,
+    "package_manifest_script": 79,
     "public_entrypoint": 13,
     "package_export": 883,
     "cli_dispatch_token": 42,
@@ -57872,10 +57872,308 @@
       ],
       "closure_reason": "repo-local verifier passed",
       "closed_at": "2026-04-21T21:09:39.113Z"
+    },
+    {
+      "id": "package_manifest_script:package_json_e2e_monitor",
+      "type": "package_manifest_script",
+      "unit": "package.json#e2e:monitor",
+      "status": "accepted",
+      "source_paths": [
+        "package.json"
+      ],
+      "required_verifier": "manifest script exists and runs its scoped verifier",
+      "reviewer_skills": [
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm run e2e:monitor"
+      ],
+      "closure_reason": "script added for sandbox monitor Playwright E2E",
+      "closed_at": "2026-04-22T01:04:00.000Z"
+    },
+    {
+      "id": "package_manifest_script:package_json_sandbox_e2e",
+      "type": "package_manifest_script",
+      "unit": "package.json#sandbox:e2e",
+      "status": "accepted",
+      "source_paths": [
+        "package.json",
+        "scripts/sandbox-e2e.ts"
+      ],
+      "required_verifier": "manifest script exists and runs its scoped verifier",
+      "reviewer_skills": [
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm run sandbox:e2e:plan",
+        "pnpm --dir scripts test -- sandbox-e2e"
+      ],
+      "closure_reason": "script added for Dagger/Docker sandbox E2E harness",
+      "closed_at": "2026-04-22T01:04:00.000Z"
+    },
+    {
+      "id": "package_manifest_script:package_json_sandbox_e2e_plan",
+      "type": "package_manifest_script",
+      "unit": "package.json#sandbox:e2e:plan",
+      "status": "accepted",
+      "source_paths": [
+        "package.json",
+        "scripts/sandbox-e2e.ts"
+      ],
+      "required_verifier": "manifest script exists and runs its scoped verifier",
+      "reviewer_skills": [
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm run sandbox:e2e:plan",
+        "pnpm --dir scripts test -- sandbox-e2e"
+      ],
+      "closure_reason": "script added for dry inspection of sandbox source/config plan",
+      "closed_at": "2026-04-22T01:04:00.000Z"
+    },
+    {
+      "id": "script_source_file:scripts_sandbox_e2e_test_ts",
+      "type": "script_source_file",
+      "unit": "scripts/sandbox-e2e.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "scripts/sandbox-e2e.test.ts"
+      ],
+      "required_verifier": "script source has explicit test or scoped runtime evidence",
+      "reviewer_skills": [
+        "testing-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm --dir scripts test -- sandbox-e2e"
+      ],
+      "closure_reason": "unit tests cover sandbox plan, skips, command matrix, and shell generation",
+      "closed_at": "2026-04-22T01:04:00.000Z"
+    },
+    {
+      "id": "script_source_file:scripts_sandbox_e2e_ts",
+      "type": "script_source_file",
+      "unit": "scripts/sandbox-e2e.ts",
+      "status": "accepted",
+      "source_paths": [
+        "scripts/sandbox-e2e.ts"
+      ],
+      "required_verifier": "script source has explicit test or scoped runtime evidence",
+      "reviewer_skills": [
+        "testing-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm run sandbox:e2e:plan",
+        "pnpm --dir scripts test -- sandbox-e2e"
+      ],
+      "closure_reason": "Dagger sandbox harness covered by plan generation and unit tests",
+      "closed_at": "2026-04-22T01:04:00.000Z"
+    },
+    {
+      "id": "package_manifest_script:package_json_e2e_sandbox_scenarios",
+      "type": "package_manifest_script",
+      "unit": "package.json#e2e:sandbox-scenarios",
+      "status": "accepted",
+      "source_paths": [
+        "package.json",
+        "scripts/sandbox-scenarios.ts"
+      ],
+      "required_verifier": "script exists, scenario crawler runs, sandbox command matrix includes it",
+      "reviewer_skills": [
+        "agent-native-audit",
+        "testing-reviewer"
+      ],
+      "evidence": [
+        "pnpm run e2e:sandbox-scenarios",
+        "pnpm --dir scripts test -- sandbox-scenarios",
+        "pnpm run sandbox:e2e:plan"
+      ],
+      "closure_reason": "script added for crawl-driven human CLI and agent integration scenario simulation",
+      "closed_at": "2026-04-22T00:00:00.000Z"
+    },
+    {
+      "id": "package_manifest_script:package_json_e2e_agent_chat",
+      "type": "package_manifest_script",
+      "unit": "package.json#e2e:agent-chat",
+      "status": "accepted",
+      "source_paths": [
+        "package.json",
+        "scripts/sandbox-agent-chat.ts"
+      ],
+      "required_verifier": "script exists, agent chat harness runs, sandbox command matrix includes it",
+      "reviewer_skills": [
+        "agent-native-audit",
+        "testing-reviewer"
+      ],
+      "evidence": [
+        "pnpm run e2e:agent-chat",
+        "pnpm --dir scripts test -- sandbox-agent-chat",
+        "pnpm run sandbox:e2e:plan"
+      ],
+      "closure_reason": "script added for live CLI agent chat prompts that invoke Fulcrum skills, hooks, tools, DB validation, monitor validation, and sample code checks",
+      "closed_at": "2026-04-22T08:20:00.000Z"
+    },
+    {
+      "id": "script_source_file:scripts_sandbox_agent_chat_test_ts",
+      "type": "script_source_file",
+      "unit": "scripts/sandbox-agent-chat.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "scripts/sandbox-agent-chat.test.ts"
+      ],
+      "required_verifier": "unit test file exists and covers agent chat prompt, command, fixture, and report helpers",
+      "reviewer_skills": [
+        "testing-reviewer"
+      ],
+      "evidence": [
+        "pnpm --dir scripts test -- sandbox-agent-chat"
+      ],
+      "closure_reason": "unit tests cover noninteractive agent chat command construction and fixture validation surface",
+      "closed_at": "2026-04-22T08:20:00.000Z"
+    },
+    {
+      "id": "script_source_file:scripts_sandbox_agent_chat_ts",
+      "type": "script_source_file",
+      "unit": "scripts/sandbox-agent-chat.ts",
+      "status": "accepted",
+      "source_paths": [
+        "scripts/sandbox-agent-chat.ts"
+      ],
+      "required_verifier": "agent chat harness runs and emits machine-readable plus review artifacts",
+      "reviewer_skills": [
+        "agent-native-audit",
+        "testing-reviewer"
+      ],
+      "evidence": [
+        "pnpm run e2e:agent-chat",
+        "pnpm --dir scripts test -- sandbox-agent-chat"
+      ],
+      "closure_reason": "live-agent chat runner prompts installed CLI agents to invoke Fulcrum skills, hooks, tools, sample code, DB checks, and monitor checks",
+      "closed_at": "2026-04-22T08:20:00.000Z"
+    },
+    {
+      "id": "script_source_file:scripts_sandbox_scenarios_test_ts",
+      "type": "script_source_file",
+      "unit": "scripts/sandbox-scenarios.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "scripts/sandbox-scenarios.test.ts"
+      ],
+      "required_verifier": "unit test file exists and covers scenario parsing/report helpers",
+      "reviewer_skills": [
+        "testing-reviewer"
+      ],
+      "evidence": [
+        "pnpm --dir scripts test -- sandbox-scenarios"
+      ],
+      "closure_reason": "unit tests cover scenario discovery helpers, PTY command wrapping, and review report generation",
+      "closed_at": "2026-04-22T00:00:00.000Z"
+    },
+    {
+      "id": "script_source_file:scripts_sandbox_scenarios_ts",
+      "type": "script_source_file",
+      "unit": "scripts/sandbox-scenarios.ts",
+      "status": "accepted",
+      "source_paths": [
+        "scripts/sandbox-scenarios.ts"
+      ],
+      "required_verifier": "scenario crawler runs and emits machine-readable plus visual review artifacts",
+      "reviewer_skills": [
+        "agent-native-audit",
+        "testing-reviewer"
+      ],
+      "evidence": [
+        "pnpm run e2e:sandbox-scenarios",
+        "pnpm --dir scripts test -- sandbox-scenarios"
+      ],
+      "closure_reason": "crawl-driven sandbox scenario runner covers human CLI/TUI/actions/live-agent probes and review artifacts",
+      "closed_at": "2026-04-22T00:00:00.000Z"
+    },
+    {
+      "id": "package_manifest_script:package_json_sandbox_approve",
+      "type": "package_manifest_script",
+      "unit": "package.json#sandbox:approve",
+      "status": "accepted",
+      "source_paths": [
+        "package.json",
+        "scripts/sandbox-approval.ts"
+      ],
+      "required_verifier": "manifest script exists and runs its scoped verifier",
+      "reviewer_skills": [
+        "testing-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm run sandbox:approve -- --from sandbox-reports/dagger-e2e-smoke-latest --approved-by codex --note initial-sandbox-gold",
+        "pnpm --dir scripts test -- sandbox-approval"
+      ],
+      "closure_reason": "script added for durable approval of sandbox screenshots into a gold baseline",
+      "closed_at": "2026-04-22T10:35:00.000Z"
+    },
+    {
+      "id": "package_manifest_script:package_json_sandbox_gold_check",
+      "type": "package_manifest_script",
+      "unit": "package.json#sandbox:gold:check",
+      "status": "accepted",
+      "source_paths": [
+        "package.json",
+        "scripts/sandbox-approval.ts"
+      ],
+      "required_verifier": "manifest script exists and runs its scoped verifier",
+      "reviewer_skills": [
+        "testing-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm run sandbox:gold:check -- --from sandbox-reports/dagger-e2e-smoke-latest",
+        "pnpm --dir scripts test -- sandbox-approval"
+      ],
+      "closure_reason": "script added for comparing current sandbox screenshots against approved gold",
+      "closed_at": "2026-04-22T10:35:00.000Z"
+    },
+    {
+      "id": "script_source_file:scripts_sandbox_approval_test_ts",
+      "type": "script_source_file",
+      "unit": "scripts/sandbox-approval.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "scripts/sandbox-approval.test.ts"
+      ],
+      "required_verifier": "unit test file exists and covers approval and gold comparison helpers",
+      "reviewer_skills": [
+        "testing-reviewer"
+      ],
+      "evidence": [
+        "pnpm --dir scripts test -- sandbox-approval"
+      ],
+      "closure_reason": "unit tests cover screenshot collection, gold approval, and drift comparison",
+      "closed_at": "2026-04-22T10:35:00.000Z"
+    },
+    {
+      "id": "script_source_file:scripts_sandbox_approval_ts",
+      "type": "script_source_file",
+      "unit": "scripts/sandbox-approval.ts",
+      "status": "accepted",
+      "source_paths": [
+        "scripts/sandbox-approval.ts"
+      ],
+      "required_verifier": "approval harness runs and emits manifest plus review artifacts",
+      "reviewer_skills": [
+        "testing-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm run sandbox:approve -- --from sandbox-reports/dagger-e2e-smoke-latest --approved-by codex --note initial-sandbox-gold",
+        "pnpm run sandbox:gold:check -- --from sandbox-reports/dagger-e2e-smoke-latest",
+        "pnpm --dir scripts test -- sandbox-approval"
+      ],
+      "closure_reason": "approval harness promotes sandbox screenshots into durable gold and compares later reports against it",
+      "closed_at": "2026-04-22T10:35:00.000Z"
     }
   ],
   "status_counts": {
-    "accepted": 2769
+    "accepted": 2781
   },
   "last_closure_run": {
     "date": "2026-04-21",

@@ -40,6 +40,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+sandbox-reports/
+sandbox-agent-fixture/
+test-results/
 .worktrees/
 .fulcrum.json
 

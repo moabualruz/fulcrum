@@ -82,6 +82,14 @@ const ALLOWED_EXACT: Array<{ path: string; reason: string }> = [
     path: 'scripts/import-claude-sessions.ts',
     reason: 'Operator import script rebuilds memory indexes after import.',
   },
+  {
+    path: 'scripts/sandbox-scenarios.ts',
+    reason: 'Sandbox E2E crawler runs human CLI/TUI scenarios inside disposable test environments.',
+  },
+  {
+    path: 'scripts/sandbox-agent-chat.ts',
+    reason: 'Sandbox E2E chat harness runs installed agent CLIs inside disposable test environments.',
+  },
 ]
 
 const ALLOWED_PREFIXES: Array<{ prefix: string; reason: string }> = [

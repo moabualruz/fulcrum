@@ -153,6 +153,7 @@ fulcrum doctor --fix             # health check + auto-repair
 | [Sync](docs/guides/sync.md) | Plane integration, conflict resolution, retry behavior |
 | [Telemetry](docs/guides/telemetry.md) | Local spans, auto-instrumentation, OTLP export |
 | [Configuration](docs/guides/configuration.md) | `.fulcrum.json` schema, all environment variables |
+| [Sandboxed E2E](docs/guides/sandbox-e2e.md) | Dagger/Docker sandbox for full install, integration, and UI checks with fake home |
 | [Architecture](docs/guides/architecture.md) | System diagram, package ownership, guard tests, project structure |
 
 ---

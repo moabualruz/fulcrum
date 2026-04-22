@@ -37,6 +37,13 @@
     "gen:agent-mds": "node --import tsx/esm scripts/gen-agent-mds.ts",
     "gen:claude-md": "node --import tsx/esm scripts/gen-claude-md.ts",
     "check:claude-md": "node --import tsx/esm scripts/gen-claude-md.ts --check",
+    "sandbox:e2e": "tsx scripts/sandbox-e2e.ts",
+    "sandbox:e2e:plan": "tsx scripts/sandbox-e2e.ts --print-plan",
+    "sandbox:approve": "tsx scripts/sandbox-approval.ts approve",
+    "sandbox:gold:check": "tsx scripts/sandbox-approval.ts check",
+    "e2e:agent-chat": "tsx scripts/sandbox-agent-chat.ts",
+    "e2e:sandbox-scenarios": "tsx scripts/sandbox-scenarios.ts",
+    "e2e:monitor": "playwright test -c tests/e2e/playwright.config.ts",
     "fulcrum": "node --import tsx/esm packages/cli/src/index.ts",
     "install-bin": "mkdir -p $HOME/.local/bin && ln -sf $(pwd)/fulcrum $HOME/.local/bin/fulcrum && echo 'fulcrum → ~/.local/bin/fulcrum'",
     "setup": "node --import tsx/esm agent-integration/install.ts all",
@@ -64,6 +71,8 @@
     ]
   },
   "devDependencies": {
+    "@dagger.io/dagger": "0.20.6",
+    "@playwright/test": "1.59.1",
     "madge": "^8.0.0",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0"
