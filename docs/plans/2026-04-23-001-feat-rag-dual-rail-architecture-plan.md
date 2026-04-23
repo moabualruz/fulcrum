@@ -300,7 +300,7 @@ The intended shape is:
 **Verification:**
 - `search_context` no longer behaves like lexical heuristics plus observability; baseline retrieval quality moves materially toward the live-eval acceptance bar.
 
-- [ ] **Unit 3: Repair planner becomes orchestration**
+- [x] **Unit 3: Repair planner becomes orchestration**
 
 **Goal:** Upgrade repair from domain-status command synthesis into dependency-aware orchestration with explicit verification.
 

@@ -470,7 +470,6 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       errors.push({ code: 'parity_failed', check: failed.name, details: failed.details ?? null })
     }
 
-    const status = errors.length > 0 ? 'failed' : 'completed'
     const finalCounts = planRagRebuildScope({ ...request, domains }, activeDb).counts
     const finalHealth = buildRagHealthReport({
       workspace_id: request.workspace_id,
@@ -478,7 +477,20 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       runtime_profile,
       data_dir: request.data_dir,
     }, activeDb)
-    const verificationResult = evaluateRepairVerification(finalHealth, repairPlan.verification_steps)
+    const verificationResult = evaluateRepairVerification(finalHealth, repairPlan.verification_steps, {
+      workspace_id: request.workspace_id,
+      project_id: request.project_id,
+      verification_refs,
+      domains,
+    }, activeDb)
+    if (!verificationResult.verified) {
+      errors.push({
+        code: 'verification_failed',
+        failed_steps: verificationResult.failed_steps,
+        failed_eval_refs: verificationResult.failed_eval_refs,
+      })
+    }
+    const status = errors.length > 0 ? 'failed' : 'completed'
     const verification = {
       derived_state_only: true,
       canonical_sources_mutated: false,
@@ -488,6 +500,8 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       blocking_conditions: repairPlan.blocking_conditions,
       final_health_status: verificationResult.final_health_status,
       verification_failed_steps: verificationResult.failed_steps,
+      eval_gate_refs: verificationResult.eval_gate_refs,
+      eval_failed_refs: verificationResult.failed_eval_refs,
       verification_passed: verificationResult.verified,
       parity_failed: parity.filter(check => check.status === 'fail').length,
       input_snapshot_status: validated.status,

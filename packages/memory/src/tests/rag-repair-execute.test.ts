@@ -107,4 +107,41 @@ describe('targeted RAG repair execution', () => {
       blocking_conditions: [],
     })
   })
+
+  it('fails execute verification when referenced eval gates are not passed', async () => {
+    const manifest = resolveRuntimeDataProfile({ profile: 'test', data_dir: runtimeDataDir })
+    tmpVault = manifest.paths.vault
+    mkdirSync(tmpVault, { recursive: true })
+
+    getDb().prepare(`
+      INSERT INTO rag_eval_runs (
+        eval_run_id, workspace_id, project_id, suite, status, trigger_source,
+        trigger_scope, gate_required, started_at, finished_at, results
+      ) VALUES (
+        'evalrun_repair_failed', 'ws_1', 'proj_1', 'live-rag', 'failed', 'local',
+        'manual', 1, datetime('now'), datetime('now'), '{}'
+      )
+    `).run()
+
+    const report = await runRagRebuild({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      mode: 'execute',
+      runtime_profile: 'test',
+      data_dir: runtimeDataDir,
+      domains: ['fts'],
+      allow_empty: true,
+      verification_refs: ['evalrun_repair_failed'],
+    }, getDb())
+
+    expect(report.status).toBe('failed')
+    expect(report.verification).toMatchObject({
+      eval_gate_refs: ['evalrun_repair_failed'],
+      eval_failed_refs: ['evalrun_repair_failed'],
+      verification_passed: false,
+    })
+    expect(report.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'verification_failed' }),
+    ]))
+  })
 })
