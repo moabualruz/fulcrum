@@ -10,6 +10,8 @@ export {
   computeRoadmapEvalMetrics,
   runRoadmapRagEvalSuite,
 } from './roadmap.js'
+export { evaluateRoadmapLaneTrust } from './roadmap/gates.js'
+export { compareRoadmapEvalLanes } from './roadmap/lane-comparison.js'
 export type {
   RagEvalReadinessResult,
   RoadmapRagEvalCase,
@@ -25,6 +27,20 @@ export type {
   RoadmapRagEvalThresholds,
   RunRoadmapRagEvalSuiteInput,
 } from './roadmap.js'
+export type {
+  EvaluateRoadmapLaneTrustInput,
+  RoadmapRagEvalBaselineReference,
+  RoadmapRagEvalLaneComparison,
+  RoadmapRagEvalLaneGate,
+  RoadmapRagEvalLaneGateName,
+  RoadmapRagEvalLaneGateStatus,
+  RoadmapRagEvalLaneIdentity,
+  RoadmapRagEvalLaneResult,
+  RoadmapRagEvalLaneTrust,
+  RoadmapRagEvalLaneTrustStatus,
+  RoadmapRagEvalLaneType,
+  RoadmapRagEvalRollbackProof,
+} from './roadmap/contract.js'
 export {
   RAG_LIFECYCLE_EVAL_CORPUS,
   RAG_LIFECYCLE_EVAL_CATEGORIES,

@@ -566,6 +566,7 @@ fulcrum memory — memory vault commands
       console.log(`eval_run_id: ${result.eval_run_id}`)
       if (Array.isArray(result.results)) {
         if ('readiness' in result) console.log(`readiness: ${result.readiness}`)
+        if ('lane' in result) console.log(`lane: ${result.lane.identity.lane_id} (${result.lane.trust.status})`)
         console.log(`  cases: ${result.results.length}`)
         const failed = result.results.filter(row => row.status === 'failed' || row.status === 'error').length
         const skipped = result.results.filter(row => row.status === 'skipped').length

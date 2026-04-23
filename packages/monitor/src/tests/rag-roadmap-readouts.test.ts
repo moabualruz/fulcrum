@@ -25,7 +25,15 @@ beforeEach(() => {
       eval_run_id, workspace_id, project_id, suite, status, trigger_source,
       trigger_scope, gate_required, started_at, finished_at, results
     ) VALUES (?, 'ws_1', 'proj_1', 'live-rag', 'failed', 'local', 'manual', 1, datetime('now'), datetime('now'), ?)
-  `).run(evalRunId, JSON.stringify({ readiness: 'degraded', metrics: { recall_at_5: 0.5 } }))
+  `).run(evalRunId, JSON.stringify({
+    readiness: 'degraded',
+    metrics: { recall_at_5: 0.5 },
+    lane: {
+      identity: { lane_id: 'python-ml', lane_type: 'challenger' },
+      trust: { status: 'rejected', reasons: ['rollback proof missing'] },
+      comparison: { baseline_lane_id: 'baseline-local', candidate_lane_id: 'python-ml' },
+    },
+  }))
   db.prepare(`
     INSERT INTO rag_eval_results (
       eval_result_id, eval_run_id, eval_case_id, workspace_id, project_id,
@@ -87,7 +95,16 @@ describe('RAG roadmap monitor readouts', () => {
     ]))
 
     const evalRuns = await getJson('/rag/eval-runs')
-    expect(evalRuns.data).toEqual([expect.objectContaining({ eval_run_id: evalRunId, suite: 'live-rag' })])
+    expect(evalRuns.data).toEqual([expect.objectContaining({
+      eval_run_id: evalRunId,
+      suite: 'live-rag',
+      results: expect.objectContaining({
+        lane: expect.objectContaining({
+          identity: expect.objectContaining({ lane_id: 'python-ml' }),
+          trust: expect.objectContaining({ status: 'rejected' }),
+        }),
+      }),
+    })])
 
     const degraded = await getJson('/rag/degraded-domains')
     expect(degraded.data).toEqual([expect.objectContaining({ derived_domain: 'vector', status: 'failed' })])

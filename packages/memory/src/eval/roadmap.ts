@@ -6,6 +6,14 @@ import { readGraphEvidenceUnits } from '../graph/evidence.js'
 import { searchCode } from '../retrieval/search-code.js'
 import { searchContext } from '../retrieval/search-context.js'
 import { ndcg, recallAtK } from './metrics.js'
+import { evaluateRoadmapLaneTrust } from './roadmap/gates.js'
+import { compareRoadmapEvalLanes } from './roadmap/lane-comparison.js'
+import type {
+  RoadmapRagEvalBaselineReference,
+  RoadmapRagEvalLaneIdentity,
+  RoadmapRagEvalLaneResult,
+  RoadmapRagEvalRollbackProof,
+} from './roadmap/contract.js'
 
 export type RoadmapRagEvalReadiness = 'healthy' | 'degraded'
 export type RoadmapRagEvalDomain =
@@ -105,6 +113,7 @@ export interface RoadmapRagEvalRunResult {
   suite: Exclude<RagEvalSuite, 'rag-lifecycle'>
   status: Exclude<RagEvalRunStatus, 'pending' | 'running' | 'cancelled'>
   readiness: RoadmapRagEvalReadiness
+  lane: RoadmapRagEvalLaneResult
   thresholds: RoadmapRagEvalThresholds
   metrics: RoadmapRagEvalMetrics
   results: RoadmapRagEvalCaseResult[]
@@ -129,6 +138,9 @@ export interface RunRoadmapRagEvalSuiteInput {
   trigger_source?: 'local' | 'ci'
   trigger_scope?: 'rag_related' | 'non_rag' | 'manual'
   gate_required?: boolean
+  lane?: Partial<RoadmapRagEvalLaneIdentity>
+  baseline?: RoadmapRagEvalBaselineReference
+  rollback_proof?: RoadmapRagEvalRollbackProof | null
   db?: Db
 }
 
@@ -187,6 +199,18 @@ const ZERO_METRICS: RoadmapRagEvalMetrics = {
   citation_accuracy: 0,
   latency_p50_ms: 0,
   latency_p95_ms: 0,
+}
+
+function normalizeLaneIdentity(lane: Partial<RoadmapRagEvalLaneIdentity> | undefined): RoadmapRagEvalLaneIdentity {
+  const laneType = lane?.lane_type ?? 'baseline'
+  return {
+    lane_id: lane?.lane_id?.trim() || (laneType === 'baseline' ? 'baseline-local' : ''),
+    lane_label: lane?.lane_label?.trim() || (laneType === 'baseline' ? 'Local baseline' : 'Unnamed challenger'),
+    lane_type: laneType,
+    runtime: lane?.runtime ?? (laneType === 'baseline' ? 'local' : undefined),
+    adapter: lane?.adapter,
+    metadata: lane?.metadata,
+  }
 }
 
 function percentile(values: number[], percentileValue: number): number {
@@ -754,13 +778,36 @@ export async function runRoadmapRagEvalSuite(input: RunRoadmapRagEvalSuiteInput)
 
   const hasFailingResult = results.some(result => result.status === 'failed' || result.status === 'error')
   const status = readiness.status === 'degraded' || suiteCoverageFailures.length > 0 || hasFailingResult ? 'failed' : 'passed'
+  const metrics = computeRoadmapEvalMetrics(metricRows, { k: 5 })
+  const laneIdentity = normalizeLaneIdentity(input.lane)
+  const comparison = laneIdentity.lane_type === 'challenger' && input.baseline
+    ? compareRoadmapEvalLanes({
+        baseline: input.baseline,
+        candidate: { lane: laneIdentity, metrics },
+      })
+    : undefined
+  const lane = {
+    identity: laneIdentity,
+    trust: evaluateRoadmapLaneTrust({
+      lane: laneIdentity,
+      metrics,
+      readiness: readiness.status,
+      thresholds,
+      has_failures: hasFailingResult,
+      live_coverage_failures: suiteCoverageFailures,
+      comparison,
+      rollback_proof: input.rollback_proof,
+    }),
+    comparison,
+  } satisfies RoadmapRagEvalLaneResult
   const result = redactEvalArtifact({
     eval_run_id,
     suite: input.suite,
     status,
     readiness: readiness.status,
+    lane,
     thresholds,
-    metrics: computeRoadmapEvalMetrics(metricRows, { k: 5 }),
+    metrics,
     results,
   }) as RoadmapRagEvalRunResult
   persistRunFinish(result, db)

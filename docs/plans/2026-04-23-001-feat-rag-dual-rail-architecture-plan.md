@@ -345,7 +345,7 @@ The intended shape is:
 **Verification:**
 - `buildRagRepairPlan()` can be described as an orchestrator with explicit reasoning, not only a health-to-command formatter.
 
-- [ ] **Unit 4: Unified evaluation and trust gates**
+- [x] **Unit 4: Unified evaluation and trust gates**
 
 **Goal:** Make baseline and challenger lanes live under one eval, readiness, and acceptance contract.
 

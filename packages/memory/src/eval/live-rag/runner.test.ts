@@ -250,4 +250,94 @@ describe('live-rag eval runner', () => {
       })],
     })
   })
+
+  it('returns lane trust and comparison details for challenger runs', async () => {
+    getDb().prepare(`
+      INSERT INTO memories (
+        memory_id, workspace_id, project_id, kind, scope, content, content_hash,
+        schema_version, title, summary, entities, provenance
+      ) VALUES (
+        'mem_lane_eval', 'ws_1', 'proj_1', 'fact', 'project',
+        'lane eval source', 'hash-lane-eval',
+        3, 'lane eval', 'lane eval', '[]', '{}'
+      )
+    `).run()
+    getDb().prepare(`
+      INSERT INTO vector_metadata (
+        vector_metadata_id, workspace_id, source_domain, source_id,
+        content_hash, provider, model, requested_device, actual_device,
+        dimensions, vector_table, status
+      ) VALUES (
+        'vecmeta_lane_eval', 'ws_1', 'memory', 'mem_lane_eval',
+        'hash-lane-eval', 'stub', 'stub', 'cpu', 'cpu',
+        1024, 'vec_memories', 'current'
+      )
+    `).run()
+    getDb().prepare('INSERT INTO vec_memories(memory_id, embedding) VALUES (?, ?)')
+      .run('mem_lane_eval', Buffer.alloc(1024 * 4))
+
+    const result = await runLiveRagEvalSuite({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      required_domains: ['vectors'],
+      cases: [{
+        suite: 'live-rag',
+        query: 'challenger query',
+        required_domains: ['vectors'],
+        expected_sources: ['code:packages/memory/src/l2/code.ts'],
+        thresholds: { recall_at_5: 0.8, latency_p95_ms: 180 },
+      }],
+      lane: {
+        lane_id: 'python-ml',
+        lane_label: 'Python ML challenger',
+        lane_type: 'challenger',
+        adapter: 'python-ml',
+      },
+      baseline: {
+        lane: {
+          lane_id: 'baseline-local',
+          lane_label: 'Local baseline',
+          lane_type: 'baseline',
+          runtime: 'local',
+        },
+        metrics: {
+          recall_at_5: 0.8,
+          mrr: 0.8,
+          ndcg: 0.8,
+          context_precision: 0.8,
+          context_recall: 0.8,
+          groundedness: 1,
+          provenance_coverage: 1,
+          citation_accuracy: 1,
+          latency_p50_ms: 100,
+          latency_p95_ms: 120,
+        },
+      },
+      rollback_proof: {
+        verified: true,
+        reference: 'docs/runbooks/rag-rollback.md',
+      },
+      retriever: async () => ({
+        retrieved_sources: ['code:packages/memory/src/l2/code.ts'],
+        context_sources: ['code:packages/memory/src/l2/code.ts'],
+        cited_sources: ['code:packages/memory/src/l2/code.ts'],
+        grounded: true,
+        latency_ms: 110,
+      }),
+    })
+
+    expect(result.lane).toMatchObject({
+      identity: {
+        lane_id: 'python-ml',
+        lane_type: 'challenger',
+      },
+      trust: {
+        status: 'trusted',
+      },
+      comparison: {
+        baseline_lane_id: 'baseline-local',
+        candidate_lane_id: 'python-ml',
+      },
+    })
+  })
 })

@@ -600,6 +600,8 @@ export {
   computeRoadmapEvalMetrics,
   runRoadmapRagEvalSuite,
 } from './eval/roadmap.js'
+export { compareRoadmapEvalLanes } from './eval/roadmap/lane-comparison.js'
+export { evaluateRoadmapLaneTrust } from './eval/roadmap/gates.js'
 export { runLiveRagEvalSuite } from './eval/live-rag/runner.js'
 export { runRagLifecycleEvalSuite } from './eval/rag-lifecycle/runner.js'
 export type {
@@ -617,6 +619,19 @@ export type {
   RoadmapRagEvalThresholds,
   RunRoadmapRagEvalSuiteInput,
 } from './eval/roadmap.js'
+export type {
+  RoadmapRagEvalBaselineReference,
+  RoadmapRagEvalLaneComparison,
+  RoadmapRagEvalLaneGate,
+  RoadmapRagEvalLaneGateName,
+  RoadmapRagEvalLaneGateStatus,
+  RoadmapRagEvalLaneIdentity,
+  RoadmapRagEvalLaneResult,
+  RoadmapRagEvalLaneTrust,
+  RoadmapRagEvalLaneTrustStatus,
+  RoadmapRagEvalLaneType,
+  RoadmapRagEvalRollbackProof,
+} from './eval/roadmap/contract.js'
 export type { RunLiveRagEvalSuiteInput } from './eval/live-rag/runner.js'
 export type {
   RagLifecycleEvalCategoryResult,

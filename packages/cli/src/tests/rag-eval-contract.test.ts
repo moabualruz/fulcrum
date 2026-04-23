@@ -98,6 +98,15 @@ describe('RAG eval CLI contract', () => {
       suite: 'live-rag',
       status: 'failed',
       readiness: 'degraded',
+      lane: expect.objectContaining({
+        identity: expect.objectContaining({
+          lane_id: 'baseline-local',
+          lane_type: 'baseline',
+        }),
+        trust: expect.objectContaining({
+          status: 'degraded',
+        }),
+      }),
       thresholds: expect.objectContaining({ recall_at_5: 0.8 }),
       metrics: expect.objectContaining({ recall_at_5: 0 }),
       results: [],
