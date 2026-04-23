@@ -4366,24 +4366,38 @@ async function runInstall(): Promise<void> {
     const agentName = agentIdx >= 0 ? args[agentIdx + 1] : undefined
     const all = args.includes('--all')
     const yes = args.includes('--yes')
+    const globalScope = args.includes('--global')
+    const projectScope = args.includes('--project')
     const dryRun = args.includes('--dry-run')
     const targetDir = process.cwd()
     const home = process.env['HOME'] ?? ''
 
     if (all && !yes) {
-      console.error('--all requires --yes (this wipes all 8 agents)')
+      console.error('--all requires --yes (this wipes all configured agents)')
       process.exit(1)
     }
 
     const { wipeAgent } = await import('../../../agent-integration/wipe.js')
 
-    const ALL_AGENTS = ['cursor', 'windsurf', 'codex', 'opencode', 'copilot', 'claude', 'gemini', 'pi'] as const
-    const agents = all ? [...ALL_AGENTS] : agentName ? [agentName] : null
+    const ALL_AGENTS = ['cursor', 'windsurf', 'codex', 'opencode', 'copilot', 'claude', 'gemini', 'qwen', 'pi'] as const
+    const GLOBAL_AGENTS = ['codex', 'claude', 'gemini', 'qwen', 'pi'] as const
+    const PROJECT_AGENTS = ['cursor', 'windsurf', 'opencode', 'copilot'] as const
+    const agents = agentName
+      ? [agentName]
+      : all && projectScope && globalScope
+        ? [...ALL_AGENTS]
+        : all && projectScope
+          ? [...PROJECT_AGENTS]
+          : all
+            ? [...GLOBAL_AGENTS]
+            : null
+    const scope = projectScope ? 'project' : 'user'
 
     if (!agents) {
-      console.error('Usage: fulcrum install wipe --agent <name> [--dry-run]')
-      console.error('       fulcrum install wipe --all --yes [--dry-run]')
-      console.error('  agents: cursor, windsurf, codex, opencode, copilot, claude, gemini, pi')
+      console.error('Usage: fulcrum install wipe --agent <name> [--project] [--dry-run]')
+      console.error('       fulcrum install wipe --all --yes [--global | --project] [--dry-run]')
+      console.error('  default --all scope: user/global config only')
+      console.error('  agents: cursor, windsurf, codex, opencode, copilot, claude, gemini, qwen, pi')
       process.exit(1)
     }
 
@@ -4398,6 +4412,7 @@ async function runInstall(): Promise<void> {
         dryRun,
         targetDir,
         home,
+        scope,
       })
       const icon = dryRun ? '○' : result.wiped > 0 ? '✓' : '—'
       const label = dryRun ? ' (dry-run)' : ''
@@ -4421,25 +4436,29 @@ async function runInstall(): Promise<void> {
     const targetDir = process.cwd()
     const home = process.env['HOME'] ?? ''
 
-    const ALL_AGENTS = ['cursor', 'windsurf', 'codex', 'opencode', 'copilot', 'claude', 'gemini', 'pi'] as const
-    const GLOBAL_AGENTS = ['claude', 'gemini', 'codex', 'pi'] as const
+    const ALL_AGENTS = ['cursor', 'windsurf', 'codex', 'opencode', 'copilot', 'claude', 'gemini', 'qwen', 'pi'] as const
+    const GLOBAL_AGENTS = ['claude', 'gemini', 'qwen', 'codex', 'pi'] as const
     const PROJECT_AGENTS = ['cursor', 'windsurf', 'opencode', 'copilot'] as const
 
     let agents: string[]
     if (agentName) {
       agents = [agentName]
+    } else if (all && globalScope && projectScope) {
+      agents = [...ALL_AGENTS]
     } else if (all && globalScope) {
       agents = [...GLOBAL_AGENTS]
     } else if (all && projectScope) {
       agents = [...PROJECT_AGENTS]
     } else if (all) {
-      agents = [...ALL_AGENTS]
+      agents = [...GLOBAL_AGENTS]
     } else {
       console.error('Usage: fulcrum install uninstall --agent <name> [--dry-run] [--purge]')
       console.error('       fulcrum install uninstall --all [--global | --project] [--dry-run] [--purge]')
-      console.error('  agents: cursor, windsurf, codex, opencode, copilot, claude, gemini, pi')
+      console.error('  default --all scope: user/global config only')
+      console.error('  agents: cursor, windsurf, codex, opencode, copilot, claude, gemini, qwen, pi')
       process.exit(1)
     }
+    const scope = projectScope ? 'project' : 'user'
 
     const { uninstallAgent } = await import('../../../agent-integration/uninstall.js')
 
@@ -4449,7 +4468,7 @@ async function runInstall(): Promise<void> {
         console.error(`Unknown agent: ${agent}`)
         process.exit(1)
       }
-      const result = uninstallAgent({ agent, dryRun, purge, targetDir, home })
+      const result = uninstallAgent({ agent, dryRun, purge, targetDir, home, scope })
       const icon = dryRun ? '○' : result.uninstalled > 0 ? '✓' : result.fallback ? '⚠' : '—'
       const suffix = dryRun ? ' (dry-run)' : result.fallback ? ' (no journal — wipe fallback)' : ''
       console.log(`${icon} ${result.agent}${suffix}: ${result.uninstalled} uninstalled, ${result.orphaned} orphaned, ${result.skipped} skipped`)

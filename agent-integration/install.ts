@@ -52,6 +52,9 @@ const HOME = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "";
 const argv = process.argv.slice(2);
 const DRY_RUN = argv.includes("--dry-run");
 const VERBOSE = argv.includes("--verbose");
+const ALLOW_REPO_MACHINE_INSTALL = process.env["FULCRUM_ALLOW_REPO_MACHINE_INSTALL"] === "1"
+  || argv.includes("--from-repo");
+const FULCRUM_CLI_NPM_PKG = "fulcrum-agent-cli";
 
 // One run-id per install invocation; threads through every appendJournal call.
 const INSTALL_RUN_ID = newRunId();
@@ -139,6 +142,32 @@ function commandExists(cmd: string): boolean {
   } catch {
     return false;
   }
+}
+
+function commandPath(cmd: string): string | undefined {
+  try {
+    return execSync(`command -v ${cmd}`, { encoding: "utf8", shell: "/bin/sh" }).trim();
+  } catch {
+    return undefined;
+  }
+}
+
+function isPathInside(child: string, parent: string): boolean {
+  const resolvedChild = path.resolve(child);
+  const resolvedParent = path.resolve(parent);
+  return resolvedChild === resolvedParent || resolvedChild.startsWith(resolvedParent + path.sep);
+}
+
+function repoMachineInstallDisabled(name: string, installHint: string): boolean {
+  if (ALLOW_REPO_MACHINE_INSTALL) return false;
+  if (DRY_RUN) {
+    dry(`would skip ${name}; repo-to-machine install disabled`);
+  } else {
+    warn(`${name} skipped; repo-to-machine install disabled`);
+  }
+  console.log(`      Use published install: ${installHint}`);
+  console.log(`      Dev sandbox override: FULCRUM_ALLOW_REPO_MACHINE_INSTALL=1`);
+  return true;
 }
 
 function resolveCliPath(): string {
@@ -235,7 +264,7 @@ function step(name: string, fn: () => void | Promise<void>): Promise<void> {
 
 function recoveryHintFor(name: string): string | undefined {
   if (name.includes("CLI symlink")) {
-    return `fix perms on ~/.local/bin, then: pnpm run setup:claude`;
+    return `install published CLI: npm install -g ${FULCRUM_CLI_NPM_PKG}`;
   }
   if (name.includes("Claude Code: user-scope MCP")) {
     return `manual: claude mcp add --scope user fulcrum -- fulcrum ${CLAUDE_MCP_ARGS.join(" ")}`;
@@ -253,19 +282,19 @@ function recoveryHintFor(name: string): string | undefined {
     return `manual: fulcrum task create --title "Fulcrum setup verified"`;
   }
   if (name.includes("Claude Code: global CLAUDE.md")) {
-    return `manual: append agent-integration/claude/CLAUDE.md to ~/.claude/CLAUDE.md`;
+    return `install published Claude plugin instead of copying repo files`;
   }
   if (name.includes("Claude Code: skills")) {
-    return `manual: cp -r agent-integration/skills/*/ ~/.claude/skills/fulcrum/`;
+    return `install published Claude plugin instead of copying repo skills`;
   }
   if (name.includes("Gemini")) {
-    return `manual: copy agent-integration/gemini/* into ~/.gemini/extensions/fulcrum/`;
+    return `install published Gemini extension package when available`;
   }
   if (name.includes("Qwen")) {
-    return `manual: copy agent-integration/qwen/* into ~/.qwen/extensions/fulcrum/`;
+    return `install published Qwen extension package when available`;
   }
   if (name.includes("PI")) {
-    return `install the pi CLI, then: pi install ${path.join(REPO_ROOT, "agent-integration", "pi", "cockpit")}`;
+    return `install the pi CLI, then: npm install -g ${PI_COCKPIT_PKG} && pi install npm:${PI_COCKPIT_PKG}`;
   }
   return undefined;
 }
@@ -276,6 +305,22 @@ function installCliBin(): void {
   const wrapperPath = path.join(REPO_ROOT, "fulcrum");
   if (!fs.existsSync(wrapperPath)) {
     throw new Error(`Wrapper script not found: ${wrapperPath}`);
+  }
+
+  if (!ALLOW_REPO_MACHINE_INSTALL) {
+    const existing = commandPath("fulcrum");
+    if (existing && !isPathInside(existing, REPO_ROOT)) {
+      ok(`using existing published fulcrum CLI at ${existing}`);
+      return;
+    }
+    if (DRY_RUN) {
+      dry(`would require published CLI: npm install -g ${FULCRUM_CLI_NPM_PKG}`);
+      ok("(dry-run) repo symlink install disabled");
+      return;
+    }
+    throw new Error(
+      `repo symlink install disabled. Install published CLI instead: npm install -g ${FULCRUM_CLI_NPM_PKG}`,
+    );
   }
 
   const binDir = path.join(HOME, ".local", "bin");
@@ -393,10 +438,10 @@ function installClaudePluginNative(): boolean {
     return true;
   }
 
-  // Remove any stale marketplace registration (e.g. GitHub-cached copy from a previous run)
-  // then re-add from the local repo root so `plugin install` always reads current local files.
+  // Remove stale marketplace registration, then re-add the published marketplace
+  // ref. Machine installs must not register the current working repo.
   spawnSync("claude", ["plugin", "marketplace", "remove", "fulcrum"], { stdio: "ignore" });
-  const mpResult = spawnSync("claude", ["plugin", "marketplace", "add", REPO_ROOT], {
+  const mpResult = spawnSync("claude", ["plugin", "marketplace", "add", "moabualruz/fulcrum"], {
     stdio: ["ignore", "pipe", "pipe"],
     encoding: "utf8",
   });
@@ -418,7 +463,7 @@ function installClaudePluginNative(): boolean {
     return false;
   }
 
-  ok(`installed via \`claude plugin marketplace add ${REPO_ROOT}\` + \`claude plugin install fulcrum@fulcrum\``);
+  ok("installed via `claude plugin marketplace add moabualruz/fulcrum` + `claude plugin install fulcrum@fulcrum`");
   setRollback("claude plugin uninstall fulcrum@fulcrum && claude plugin marketplace remove fulcrum");
   setJournalMeta({ agent: "claude", action: "native_cli", target_path: "claude://plugin/fulcrum", mode: "native" });
   // PR 14.1 caveat: Claude marketplace update mechanics have open issues as
@@ -574,6 +619,9 @@ function installClaudeHook(): void {
 // tool count and table are never stale after a tool is added or removed.
 
 function regenerateClaudeMd(): void {
+  if (repoMachineInstallDisabled("CLAUDE.md regeneration in local repo", "use the published Fulcrum package artifacts")) {
+    return;
+  }
   if (DRY_RUN) {
     dry("would run: pnpm gen:claude-md");
     ok("(dry-run) CLAUDE.md regeneration");
@@ -599,6 +647,10 @@ const MARKER_END = "<!-- fulcrum:end -->";
 function installClaudeContext(): void {
   const globalPath = path.join(HOME, ".claude", "CLAUDE.md");
   const templatePath = path.join(REPO_ROOT, "agent-integration", "claude", "CLAUDE.md");
+
+  if (repoMachineInstallDisabled("Claude context copy from local repo", "install the published Fulcrum Claude plugin")) {
+    return;
+  }
 
   if (!fs.existsSync(templatePath)) {
     throw new Error(`template not found: ${templatePath}`);
@@ -642,6 +694,9 @@ function installClaudeContext(): void {
 
 function installClaudeSkills(): void {
   const srcDir = path.join(REPO_ROOT, "agent-integration", "skills");
+  if (repoMachineInstallDisabled("Claude skills copy from local repo", "install the published Fulcrum Claude plugin")) {
+    return;
+  }
   if (!fs.existsSync(srcDir)) {
     warn(`skills source dir not found: ${srcDir}`);
     return;
@@ -696,6 +751,9 @@ function installClaudeSkills(): void {
 
 function installClaudeAgentMds(): void {
   const srcDir = path.join(REPO_ROOT, "agent-integration", "claude", "agents");
+  if (repoMachineInstallDisabled("Claude agent MD copy from local repo", "install the published Fulcrum Claude plugin")) {
+    return;
+  }
   if (!fs.existsSync(srcDir)) {
     warn(`agent-mds source dir not found: ${srcDir} — run: pnpm gen:agent-mds`);
     return;
@@ -731,6 +789,9 @@ function installClaudeAgentMds(): void {
 
 function installClaudeCommands(): void {
   const srcDir = path.join(REPO_ROOT, "agent-integration", "claude", "commands");
+  if (repoMachineInstallDisabled("Claude command copy from local repo", "install the published Fulcrum Claude plugin")) {
+    return;
+  }
   if (!fs.existsSync(srcDir)) {
     warn(`commands source dir not found: ${srcDir}`);
     return;
@@ -848,6 +909,11 @@ function installGeminiExtension(): void {
     throw new Error(`gemini-extension.json schema errors:\n${manifestValidation.errors.join("\n")}`);
   }
 
+  if (repoMachineInstallDisabled("Gemini extension from local repo", "install the published Fulcrum Gemini extension package when available")) {
+    console.log("    gemini extensions update fulcrum  # run after upgrading");
+    return;
+  }
+
   // Flat files and subdirectories used by the manual (file-copy) fallback.
   const flatFiles = [
     ["gemini-extension.json", "gemini-extension.json"],
@@ -933,6 +999,11 @@ function installQwenExtension(): void {
   const manifestValidation = validateQwenExtensionManifest(manifestPath);
   if (!manifestValidation.ok) {
     throw new Error(`qwen-extension.json schema errors:\n${manifestValidation.errors.join("\n")}`);
+  }
+
+  if (repoMachineInstallDisabled("Qwen extension from local repo", "install the published Fulcrum Qwen extension package when available")) {
+    console.log("    qwen extensions update fulcrum  # run after upgrading");
+    return;
   }
 
   const flatFiles = [
@@ -1024,7 +1095,29 @@ function installPiCockpit(): void {
 
   if (!commandExists("pi")) {
     warn("`pi` CLI not found — skipping cockpit install");
-    console.log(`      To install later: pi install ${cockpitDir}`);
+    console.log(`      To install later: npm install -g ${PI_COCKPIT_PKG} && pi install npm:${PI_COCKPIT_PKG}`);
+    return;
+  }
+
+  if (npmVersion) {
+    if (DRY_RUN) {
+      dry(`would run: pi install npm:${PI_COCKPIT_PKG}`);
+      ok(`(dry-run) PI cockpit`);
+      return;
+    }
+    const result = spawnSync("pi", ["install", `npm:${PI_COCKPIT_PKG}`], {
+      stdio: "inherit",
+    });
+    if (result.status !== 0) {
+      throw new Error(`\`pi install npm:${PI_COCKPIT_PKG}\` failed (status ${result.status ?? "unknown"})`);
+    }
+    ok("PI cockpit installed from npm package");
+    setRollback(`pi uninstall fulcrum-cockpit`);
+    setJournalMeta({ agent: "pi", action: "native_cli", target_path: path.join(HOME, ".pi", "packages", "@fulcrum-agent-os", "pi-cockpit"), mode: "native" });
+    return;
+  }
+
+  if (repoMachineInstallDisabled("PI cockpit from local repo", `npm install -g ${PI_COCKPIT_PKG} && pi install npm:${PI_COCKPIT_PKG}`)) {
     return;
   }
 
@@ -1280,10 +1373,16 @@ function runCheck(): number {
 type Target = "all" | "claude" | "gemini" | "qwen" | "pi" | "codex" | "opencode" | "check";
 
 async function installCodexGlobal(): Promise<void> {
-  await installCodex({ dryRun: DRY_RUN, globalHome: HOME });
+  if (repoMachineInstallDisabled("Codex config/hooks/skills from local repo", `install published CLI first: npm install -g ${FULCRUM_CLI_NPM_PKG}`)) {
+    return;
+  }
+  await installCodex({ dryRun: DRY_RUN, globalHome: HOME, projectInstructions: false });
 }
 
 async function installOpencodeGlobal(): Promise<void> {
+  if (repoMachineInstallDisabled("opencode project-local install from global setup", `use project init with npm plugin ${OPENCODE_PLUGIN_PKG}`)) {
+    return;
+  }
   await installOpencode({ dryRun: DRY_RUN });
 }
 
@@ -1907,10 +2006,16 @@ export function validateCodexPluginManifest(jsonPath: string): CodexPluginManife
   return { ok: errors.length === 0, errors };
 }
 
-export async function installCodex(opts: { dryRun: boolean; targetDir?: string; globalHome?: string }): Promise<void> {
+export async function installCodex(opts: {
+  dryRun: boolean;
+  targetDir?: string;
+  globalHome?: string;
+  projectInstructions?: boolean;
+}): Promise<void> {
   const targetDir = opts.targetDir ?? process.cwd();
   const dryRun = opts.dryRun;
   const homeDir = opts.globalHome ?? (process.env["HOME"] ?? process.env["USERPROFILE"] ?? "");
+  const projectInstructions = opts.projectInstructions ?? true;
 
   const REPO_ROOT_LOCAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
   const templateAgentsMd = path.join(REPO_ROOT_LOCAL, "codex", "AGENTS.md");
@@ -2094,6 +2199,10 @@ export async function installCodex(opts: { dryRun: boolean; targetDir?: string; 
   const destAgentsMd = path.join(targetDir, "AGENTS.md");
 
   await step("Codex: AGENTS.md", () => {
+    if (!projectInstructions) {
+      skip("project AGENTS.md skipped for global install");
+      return;
+    }
     if (fs.existsSync(destAgentsMd)) {
       skip(`already exists: ${destAgentsMd}`);
       return;

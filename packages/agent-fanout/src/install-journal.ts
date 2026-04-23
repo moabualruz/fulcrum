@@ -44,7 +44,7 @@ export interface InstallJournalEntry {
 
 // ── global-scoped agents ──────────────────────────────────────────────────────
 
-const GLOBAL_AGENTS = new Set(["claude", "gemini", "codex", "pi"]);
+const GLOBAL_AGENTS = new Set(["claude", "gemini", "qwen", "codex", "pi"]);
 
 export function isGlobalAgent(agent: string): boolean {
   return GLOBAL_AGENTS.has(agent);

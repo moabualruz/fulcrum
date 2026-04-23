@@ -14,8 +14,8 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import * as crypto from "crypto";
-import { appendJournal, clearJournal } from "../../../../packages/agent-fanout/src/install-journal.js";
-import { uninstallAgent } from "../../../../agent-integration/uninstall.js";
+import { appendJournal } from "../../../../packages/agent-fanout/src/install-journal.js";
+import { uninstallAgent, type UninstallOpts } from "../../../../agent-integration/uninstall.js";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -45,18 +45,32 @@ afterEach(() => {
   fs.rmSync(fakeHome, { recursive: true, force: true });
 });
 
+function uninstallProject(opts: Omit<UninstallOpts, "agent" | "targetDir" | "scope"> = {}) {
+  return uninstallAgent({ agent: "cursor", targetDir: tmpDir, home: fakeHome, scope: "project", ...opts });
+}
+
 // ── fallback when no journal ─────────────────────────────────────────────────
 
 describe("no-journal fallback", () => {
   it("returns fallback:true when no journal exists", () => {
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir, home: fakeHome });
     expect(result.fallback).toBe(true);
     expect(result.uninstalled).toBe(0);
   });
 
   it("dry-run: fallback still returns fallback:true without FS changes", () => {
-    const result = uninstallAgent({ agent: "cursor", dryRun: true, purge: false, targetDir: tmpDir });
+    const result = uninstallAgent({ agent: "cursor", dryRun: true, purge: false, targetDir: tmpDir, home: fakeHome });
     expect(result.fallback).toBe(true);
+  });
+
+  it("does not project-wipe on no-journal fallback without scope=project", () => {
+    const hookPath = path.join(tmpDir, ".github/hooks/fulcrum.json");
+    mkfile(hookPath, "{}");
+
+    const result = uninstallAgent({ agent: "copilot", dryRun: false, purge: false, targetDir: tmpDir, home: fakeHome });
+
+    expect(result.fallback).toBe(true);
+    expect(fs.existsSync(hookPath)).toBe(true);
   });
 });
 
@@ -83,7 +97,7 @@ describe("write_file reversal", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.uninstalled).toBe(1);
     expect(fs.existsSync(filePath)).toBe(false);
     expect(result.actions[0]!.result).toBe("ok");
@@ -108,7 +122,7 @@ describe("write_file reversal", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.orphaned).toBe(1);
     expect(fs.existsSync(filePath)).toBe(false);
     expect(fs.existsSync(filePath + ".fulcrum-orphan")).toBe(true);
@@ -134,7 +148,7 @@ describe("write_file reversal", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: true, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: true });
     expect(result.uninstalled).toBe(1);
     expect(fs.existsSync(filePath)).toBe(false);
     expect(fs.existsSync(filePath + ".fulcrum-orphan")).toBe(false);
@@ -158,7 +172,7 @@ describe("write_file reversal", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.skipped).toBe(1);
     expect(result.uninstalled).toBe(0);
     expect(result.actions[0]!.result).toBe("skipped");
@@ -182,7 +196,7 @@ describe("write_file reversal", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.uninstalled).toBe(1);
     expect(fs.existsSync(dirPath)).toBe(false);
   });
@@ -205,7 +219,7 @@ describe("write_file reversal", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.uninstalled).toBe(1);
     expect(fs.existsSync(filePath)).toBe(false);
   });
@@ -233,7 +247,7 @@ describe("symlink reversal", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.uninstalled).toBe(1);
     let exists = false;
     try { fs.lstatSync(linkPath); exists = true; } catch { /* */ }
@@ -257,7 +271,7 @@ describe("symlink reversal", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.skipped).toBe(1);
     expect(fs.existsSync(filePath)).toBe(true); // not deleted
   });
@@ -296,7 +310,7 @@ x = 1
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.uninstalled).toBe(1);
     const after = fs.readFileSync(configPath, "utf8");
     expect(after).not.toContain("BEGIN FULCRUM MANAGED BLOCK");
@@ -318,7 +332,7 @@ describe("native_cli reversal", () => {
         agent: "cursor",
         step_name: "native install",
         action: "native_cli",
-        target_path: "some://native/path",
+        target_path: path.join(tmpDir, "native-placeholder"),
         rollback: `rm -f ${sentinelPath}`,
         mode: "native",
         install_run_id: "run-test-10",
@@ -326,7 +340,7 @@ describe("native_cli reversal", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.uninstalled).toBe(1);
     expect(result.actions[0]!.result).toBe("ok");
   });
@@ -365,7 +379,7 @@ describe("native_cli reversal", () => {
     );
 
     // Should not throw; step 1 should still succeed even though step 2 errors
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.actions.length).toBe(2);
     expect(result.errors).toBe(1);
     expect(result.skipped).toBe(0); // errors must NOT be counted as skipped
@@ -389,7 +403,7 @@ describe("native_cli reversal", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.errors).toBe(1);
     // Journal should NOT be cleared so a retry is possible
     const journalFile = path.join(tmpDir, ".fulcrum", "install.jsonl");
@@ -420,7 +434,7 @@ describe("merge_json reversal", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.uninstalled).toBe(1);
     const after = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
     expect(after.hooks).toBeUndefined();
@@ -431,6 +445,30 @@ describe("merge_json reversal", () => {
 // ── boundary check ───────────────────────────────────────────────────────────
 
 describe("path boundary check", () => {
+  it("default user scope skips project files even when project lives under home", () => {
+    const projectDir = path.join(fakeHome, "workspace", "repo");
+    const projectFile = path.join(projectDir, "AGENTS.md");
+    mkfile(projectFile, "project instructions");
+    appendJournal(
+      {
+        ts: new Date().toISOString(),
+        agent: "cursor",
+        step_name: "project file",
+        action: "write_file",
+        target_path: projectFile,
+        rollback: `rm -f ${projectFile}`,
+        mode: "manual",
+        install_run_id: "run-user-scope-boundary",
+      },
+      projectDir,
+    );
+
+    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: projectDir, home: fakeHome });
+
+    expect(result.skipped).toBe(1);
+    expect(fs.existsSync(projectFile)).toBe(true);
+  });
+
   it("skips entry whose target_path escapes allowed roots", () => {
     const outsidePath = path.join(os.tmpdir(), "outside-root-" + Date.now() + ".txt");
     mkfile(outsidePath, "sensitive");
@@ -448,7 +486,7 @@ describe("path boundary check", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir, home: fakeHome });
+    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir, home: fakeHome, scope: "project" });
     expect(result.skipped).toBe(1);
     expect(fs.existsSync(outsidePath)).toBe(true); // file untouched
     fs.rmSync(outsidePath, { force: true }); // cleanup
@@ -479,7 +517,7 @@ describe("orphan rename collision", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     expect(result.orphaned).toBe(1);
     expect(fs.existsSync(filePath)).toBe(false);
     // original orphan should still exist
@@ -521,7 +559,7 @@ describe("reverse order walking", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: false, purge: false });
     // Reversed: step-B processed first, then step-A
     expect(result.actions[0]!.step_name).toBe("step-B");
     expect(result.actions[1]!.step_name).toBe("step-A");
@@ -545,7 +583,7 @@ describe("dry-run mode", () => {
       tmpDir,
     );
 
-    const result = uninstallAgent({ agent: "cursor", dryRun: true, purge: false, targetDir: tmpDir });
+    const result = uninstallProject({ dryRun: true, purge: false });
     expect(result.dryRun).toBe(true);
     expect(fs.existsSync(filePath)).toBe(true); // file untouched
     // Journal still exists (dry-run doesn't clear it)
@@ -570,11 +608,11 @@ describe("idempotency", () => {
       tmpDir,
     );
 
-    const first = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const first = uninstallProject({ dryRun: false, purge: false });
     expect(first.uninstalled).toBe(1);
     expect(first.fallback).toBe(false);
 
-    const second = uninstallAgent({ agent: "cursor", dryRun: false, purge: false, targetDir: tmpDir });
+    const second = uninstallProject({ dryRun: false, purge: false });
     expect(second.fallback).toBe(true); // journal cleared; falls back to wipe (no-op)
     expect(second.uninstalled).toBe(0);
   });

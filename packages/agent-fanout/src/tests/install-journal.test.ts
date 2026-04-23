@@ -102,6 +102,11 @@ describe("journalPath", () => {
     const p = journalPath("gemini");
     expect(p).toBe("/state/fulcrum/install/gemini.jsonl");
   });
+
+  it("global agents: qwen path uses per-agent file", () => {
+    const p = journalPath("qwen");
+    expect(p).toBe("/state/fulcrum/install/qwen.jsonl");
+  });
 });
 
 // ── appendJournal() + readJournal() (global-scoped) ──────────────────────────

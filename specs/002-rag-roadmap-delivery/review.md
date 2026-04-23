@@ -74,3 +74,44 @@ None.
 None. The P1/P2 graph split, verify-and-fix repair default, eval zero-case behavior, optional runtime gates, and path exposure rules are now explicit and internally consistent.
 
 Review complete.
+
+## Pass 5 - Second Plan Pass Review
+
+**Document**: [plan.md](./plan.md), [contracts/rag-roadmap-contracts.md](./contracts/rag-roadmap-contracts.md), [quickstart.md](./quickstart.md)
+**Mode**: headless
+**Reviewing with**:
+- coherence-reviewer
+- feasibility-reviewer
+- scope-guardian-reviewer
+
+### Applied Auto-Fixes
+
+- **Embedding job execution path**: Replaced the open branch between a new `--run` flag and existing `jobs resume` with the existing `fulcrum jobs resume <job_id> --json` execution path plus a mandatory `next_action` from job creation when work is queued.
+
+### Findings Requiring Judgment
+
+None. The second plan pass now has no open tool-choice branches before task generation.
+
+Review complete.
+
+## Pass 4 - Plan Review
+
+**Document**: [plan.md](./plan.md), [data-model.md](./data-model.md), [contracts/rag-roadmap-contracts.md](./contracts/rag-roadmap-contracts.md), [quickstart.md](./quickstart.md)
+**Mode**: headless
+**Reviewing with**:
+- coherence-reviewer
+- feasibility-reviewer
+- product-lens-reviewer
+- security-lens-reviewer
+- scope-guardian-reviewer
+- adversarial-document-reviewer
+
+### Applied Auto-Fixes
+
+- **Repair-plan action contract**: Replaced the open choice between extending `get_rag_health` and adding `get_rag_repair_plan` with one dedicated read-only `get_rag_repair_plan` tool. This avoids task-level branching and MCP/action drift.
+
+### Findings Requiring Judgment
+
+None. The plan stays within existing package ownership, sequences P1 before optional runtime work, and documents repair, retrieval, code RAG, graph, eval, trace, and safety contracts clearly enough for task generation.
+
+Review complete.

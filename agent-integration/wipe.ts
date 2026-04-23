@@ -23,7 +23,10 @@ export type WipeAgentName =
   | "copilot"
   | "claude"
   | "gemini"
+  | "qwen"
   | "pi";
+
+export type WipeScope = "user" | "project";
 
 export interface WipeAction {
   path: string;
@@ -46,6 +49,12 @@ export interface WipeOpts {
   targetDir?: string;
   /** Home directory (global-scoped agents: claude, gemini, codex, pi). Defaults to os.homedir(). */
   home?: string;
+  /**
+   * User scope touches only user-level config/integration dirs.
+   * Project scope may edit/remove project-local files such as .github, .cursor, AGENTS.md.
+   * Defaults to user scope so `wipe --all` cannot modify the current repo by accident.
+   */
+  scope?: WipeScope;
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -408,6 +417,14 @@ function countSkipped(actions: WipeAction[]): number {
   return actions.filter(a => a.action === "skip").length;
 }
 
+function projectScopeDisabled(agent: WipeAgentName, targetDir: string): WipeAction[] {
+  return [{
+    path: targetDir,
+    action: "skip",
+    reason: `${agent} project-local wipe disabled; pass scope="project" or CLI --project`,
+  }];
+}
+
 // ── per-agent wipe implementations ───────────────────────────────────────────
 
 function wipeCursor(targetDir: string, dryRun: boolean): WipeAction[] {
@@ -514,6 +531,12 @@ function wipeGemini(home: string, dryRun: boolean): WipeAction[] {
   return actions;
 }
 
+function wipeQwen(home: string, dryRun: boolean): WipeAction[] {
+  const actions: WipeAction[] = [];
+  deleteDir(path.join(home, ".qwen", "extensions", "fulcrum"), dryRun, actions);
+  return actions;
+}
+
 function wipePi(home: string, dryRun: boolean): WipeAction[] {
   const actions: WipeAction[] = [];
   deleteDir(path.join(home, ".pi", "packages", "@fulcrum-agent-os", "pi-cockpit"), dryRun, actions);
@@ -528,19 +551,41 @@ export function wipeAgent(opts: WipeOpts): WipeResult {
     dryRun,
     targetDir = process.cwd(),
     home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "",
+    scope = "user",
   } = opts;
 
   let actions: WipeAction[];
+  const resolvedTargetDir = path.resolve(targetDir);
+  const resolvedHome = path.resolve(home);
 
   switch (agent) {
-    case "cursor":   actions = wipeCursor(targetDir, dryRun);   break;
-    case "windsurf": actions = wipeWindsurf(targetDir, dryRun); break;
-    case "codex":    actions = wipeCodex(home, dryRun);         break;
-    case "opencode": actions = wipeOpencode(targetDir, dryRun); break;
-    case "copilot":  actions = wipeCopilot(targetDir, dryRun);  break;
-    case "claude":   actions = wipeClaude(home, dryRun);        break;
-    case "gemini":   actions = wipeGemini(home, dryRun);        break;
-    case "pi":       actions = wipePi(home, dryRun);            break;
+    case "cursor":
+      actions = scope === "project" ? wipeCursor(resolvedTargetDir, dryRun) : projectScopeDisabled(agent, resolvedTargetDir);
+      break;
+    case "windsurf":
+      actions = scope === "project" ? wipeWindsurf(resolvedTargetDir, dryRun) : projectScopeDisabled(agent, resolvedTargetDir);
+      break;
+    case "codex":
+      actions = wipeCodex(resolvedHome, dryRun);
+      break;
+    case "opencode":
+      actions = scope === "project" ? wipeOpencode(resolvedTargetDir, dryRun) : projectScopeDisabled(agent, resolvedTargetDir);
+      break;
+    case "copilot":
+      actions = scope === "project" ? wipeCopilot(resolvedTargetDir, dryRun) : projectScopeDisabled(agent, resolvedTargetDir);
+      break;
+    case "claude":
+      actions = wipeClaude(resolvedHome, dryRun);
+      break;
+    case "gemini":
+      actions = wipeGemini(resolvedHome, dryRun);
+      break;
+    case "qwen":
+      actions = wipeQwen(resolvedHome, dryRun);
+      break;
+    case "pi":
+      actions = wipePi(resolvedHome, dryRun);
+      break;
     default: {
       const _exhaustive: never = agent;
       throw new Error(`wipeAgent: unknown agent "${String(_exhaustive)}"`);

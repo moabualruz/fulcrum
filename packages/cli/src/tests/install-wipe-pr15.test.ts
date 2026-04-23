@@ -1,7 +1,7 @@
 /**
  * PR 15 — `fulcrum install wipe` TDD test suite.
  *
- * Coverage: 8 agents × (dry-run + live + idempotent-rerun) = ≥ 48 assertions.
+ * Coverage: configured agents × (dry-run + live + idempotent-rerun).
  * Each test sets up a minimal fake FS tree, calls wipeAgent(), and asserts:
  *   - correct files removed / skipped
  *   - shared config files surgically patched (not deleted)
@@ -38,6 +38,10 @@ function read(p: string): string {
   return fs.readFileSync(p, "utf8");
 }
 
+function wipeProject(opts: Omit<Parameters<typeof wipeAgent>[0], "scope">) {
+  return wipeAgent({ ...opts, scope: "project" });
+}
+
 // ── cursor (project-scoped) ────────────────────────────────────────────────────
 
 describe("wipeAgent cursor", () => {
@@ -58,7 +62,7 @@ describe("wipeAgent cursor", () => {
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
   it("dry-run: reports actions but makes no changes", () => {
-    const result = wipeAgent({ agent: "cursor", dryRun: true, targetDir: dir });
+    const result = wipeProject({ agent: "cursor", dryRun: true, targetDir: dir });
     expect(result.dryRun).toBe(true);
     expect(result.actions.length).toBeGreaterThan(0);
     // all fulcrum files still present after dry-run
@@ -67,7 +71,7 @@ describe("wipeAgent cursor", () => {
   });
 
   it("wipes exclusive fulcrum files", () => {
-    wipeAgent({ agent: "cursor", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "cursor", dryRun: false, targetDir: dir });
     expect(exists(path.join(dir, ".cursor/rules/fulcrum-core.mdc"))).toBe(false);
     expect(exists(path.join(dir, ".cursor/rules/fulcrum-skill-foo.mdc"))).toBe(false);
     expect(exists(path.join(dir, ".cursor/skills/fulcrum-foo/SKILL.md"))).toBe(false);
@@ -75,7 +79,7 @@ describe("wipeAgent cursor", () => {
   });
 
   it("strips fulcrum key from shared mcp.json, preserves other entries", () => {
-    wipeAgent({ agent: "cursor", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "cursor", dryRun: false, targetDir: dir });
     expect(exists(path.join(dir, ".cursor/mcp.json"))).toBe(true);
     const mcp = JSON.parse(read(path.join(dir, ".cursor/mcp.json")));
     expect(mcp.mcpServers.fulcrum).toBeUndefined();
@@ -83,7 +87,7 @@ describe("wipeAgent cursor", () => {
   });
 
   it("strips fulcrum hooks from shared hooks.json, preserves other hooks", () => {
-    wipeAgent({ agent: "cursor", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "cursor", dryRun: false, targetDir: dir });
     expect(exists(path.join(dir, ".cursor/hooks.json"))).toBe(true);
     const hooksJson = JSON.parse(read(path.join(dir, ".cursor/hooks.json")));
     const cmds = hooksJson.hooks.map((h: { command: string }) => h.command);
@@ -92,13 +96,13 @@ describe("wipeAgent cursor", () => {
   });
 
   it("is idempotent — second run is a no-op", () => {
-    wipeAgent({ agent: "cursor", dryRun: false, targetDir: dir });
-    const result2 = wipeAgent({ agent: "cursor", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "cursor", dryRun: false, targetDir: dir });
+    const result2 = wipeProject({ agent: "cursor", dryRun: false, targetDir: dir });
     expect(result2.wiped).toBe(0);
   });
 
   it("result contains agent name and action list", () => {
-    const result = wipeAgent({ agent: "cursor", dryRun: false, targetDir: dir });
+    const result = wipeProject({ agent: "cursor", dryRun: false, targetDir: dir });
     expect(result.agent).toBe("cursor");
     expect(Array.isArray(result.actions)).toBe(true);
   });
@@ -121,26 +125,26 @@ describe("wipeAgent windsurf", () => {
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
   it("dry-run makes no changes", () => {
-    wipeAgent({ agent: "windsurf", dryRun: true, targetDir: dir });
+    wipeProject({ agent: "windsurf", dryRun: true, targetDir: dir });
     expect(exists(path.join(dir, ".windsurf/rules/fulcrum-core.md"))).toBe(true);
   });
 
   it("wipes exclusive fulcrum files", () => {
-    wipeAgent({ agent: "windsurf", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "windsurf", dryRun: false, targetDir: dir });
     expect(exists(path.join(dir, ".windsurf/rules/fulcrum-core.md"))).toBe(false);
     expect(exists(path.join(dir, ".windsurf/rules/fulcrum-skill-foo.md"))).toBe(false);
     expect(exists(path.join(dir, ".windsurf/workflows/fulcrum-recall.md"))).toBe(false);
   });
 
   it("strips fulcrum from mcp.json — deletes file if only fulcrum remained", () => {
-    wipeAgent({ agent: "windsurf", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "windsurf", dryRun: false, targetDir: dir });
     // file had only fulcrum entry → file removed
     expect(exists(path.join(dir, ".windsurf/mcp.json"))).toBe(false);
   });
 
   it("is idempotent", () => {
-    wipeAgent({ agent: "windsurf", dryRun: false, targetDir: dir });
-    const r2 = wipeAgent({ agent: "windsurf", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "windsurf", dryRun: false, targetDir: dir });
+    const r2 = wipeProject({ agent: "windsurf", dryRun: false, targetDir: dir });
     expect(r2.wiped).toBe(0);
   });
 });
@@ -237,12 +241,12 @@ describe("wipeAgent opencode", () => {
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
   it("dry-run makes no changes", () => {
-    wipeAgent({ agent: "opencode", dryRun: true, targetDir: dir });
+    wipeProject({ agent: "opencode", dryRun: true, targetDir: dir });
     expect(exists(path.join(dir, ".opencode/plugins/fulcrum.ts"))).toBe(true);
   });
 
   it("deletes exclusive plugin files", () => {
-    wipeAgent({ agent: "opencode", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "opencode", dryRun: false, targetDir: dir });
     expect(exists(path.join(dir, ".opencode/opencode.md"))).toBe(false);
     expect(exists(path.join(dir, ".opencode/plugins/fulcrum.ts"))).toBe(false);
     expect(exists(path.join(dir, ".opencode/plugins/rider.ts"))).toBe(false);
@@ -251,7 +255,7 @@ describe("wipeAgent opencode", () => {
   });
 
   it("strips fulcrum plugin entry from opencode.jsonc, preserves other keys", () => {
-    wipeAgent({ agent: "opencode", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "opencode", dryRun: false, targetDir: dir });
     expect(exists(path.join(dir, ".opencode/opencode.jsonc"))).toBe(true);
     const cfg = JSON.parse(read(path.join(dir, ".opencode/opencode.jsonc")));
     const plugins: string[] = cfg.plugin ?? [];
@@ -260,8 +264,8 @@ describe("wipeAgent opencode", () => {
   });
 
   it("is idempotent", () => {
-    wipeAgent({ agent: "opencode", dryRun: false, targetDir: dir });
-    const r2 = wipeAgent({ agent: "opencode", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "opencode", dryRun: false, targetDir: dir });
+    const r2 = wipeProject({ agent: "opencode", dryRun: false, targetDir: dir });
     expect(r2.wiped).toBe(0);
   });
 });
@@ -285,19 +289,19 @@ describe("wipeAgent copilot", () => {
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
   it("dry-run makes no changes", () => {
-    wipeAgent({ agent: "copilot", dryRun: true, targetDir: dir });
+    wipeProject({ agent: "copilot", dryRun: true, targetDir: dir });
     expect(exists(path.join(dir, ".github/hooks/fulcrum.json"))).toBe(true);
   });
 
   it("deletes exclusive fulcrum files", () => {
-    wipeAgent({ agent: "copilot", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "copilot", dryRun: false, targetDir: dir });
     expect(exists(path.join(dir, ".github/instructions/fulcrum-skill-foo.instructions.md"))).toBe(false);
     expect(exists(path.join(dir, ".github/agents/foo.agent.md"))).toBe(false);
     expect(exists(path.join(dir, ".github/hooks/fulcrum.json"))).toBe(false);
   });
 
   it("strips fulcrum from .mcp.json, preserves other entries", () => {
-    wipeAgent({ agent: "copilot", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "copilot", dryRun: false, targetDir: dir });
     expect(exists(path.join(dir, ".mcp.json"))).toBe(true);
     const mcp = JSON.parse(read(path.join(dir, ".mcp.json")));
     expect(mcp.mcpServers.fulcrum).toBeUndefined();
@@ -305,22 +309,22 @@ describe("wipeAgent copilot", () => {
   });
 
   it("strips marker block from copilot-instructions.md", () => {
-    wipeAgent({ agent: "copilot", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "copilot", dryRun: false, targetDir: dir });
     const content = read(path.join(dir, ".github/copilot-instructions.md"));
     expect(content).not.toContain("<!-- fulcrum:begin -->");
     expect(content).toContain("user content");
   });
 
   it("strips marker block from AGENTS.md, preserves user content", () => {
-    wipeAgent({ agent: "copilot", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "copilot", dryRun: false, targetDir: dir });
     const content = read(path.join(dir, "AGENTS.md"));
     expect(content).not.toContain("<!-- fulcrum:begin -->");
     expect(content).toContain("my notes");
   });
 
   it("is idempotent", () => {
-    wipeAgent({ agent: "copilot", dryRun: false, targetDir: dir });
-    const r2 = wipeAgent({ agent: "copilot", dryRun: false, targetDir: dir });
+    wipeProject({ agent: "copilot", dryRun: false, targetDir: dir });
+    const r2 = wipeProject({ agent: "copilot", dryRun: false, targetDir: dir });
     expect(r2.wiped).toBe(0);
   });
 });
@@ -437,6 +441,26 @@ describe("wipeAgent gemini", () => {
   });
 });
 
+// ── qwen (global-scoped) ──────────────────────────────────────────────────────
+
+describe("wipeAgent qwen", () => {
+  let home: string;
+
+  beforeEach(() => {
+    home = mktemp();
+    mkfile(path.join(home, ".qwen/extensions/fulcrum/qwen-extension.json"), "{}");
+    mkfile(path.join(home, ".qwen/extensions/other/qwen-extension.json"), "{}");
+  });
+
+  afterEach(() => fs.rmSync(home, { recursive: true, force: true }));
+
+  it("deletes fulcrum extension dir", () => {
+    wipeAgent({ agent: "qwen", dryRun: false, home });
+    expect(exists(path.join(home, ".qwen/extensions/fulcrum"))).toBe(false);
+    expect(exists(path.join(home, ".qwen/extensions/other"))).toBe(true);
+  });
+});
+
 // ── pi (global-scoped) ────────────────────────────────────────────────────────
 
 describe("wipeAgent pi", () => {
@@ -478,12 +502,36 @@ describe("wipeAgent pi", () => {
 describe("WipeResult shape", () => {
   it("has required fields", () => {
     const dir = mktemp();
-    const result = wipeAgent({ agent: "cursor", dryRun: true, targetDir: dir });
+    const result = wipeProject({ agent: "cursor", dryRun: true, targetDir: dir });
     expect(typeof result.agent).toBe("string");
     expect(typeof result.dryRun).toBe("boolean");
     expect(Array.isArray(result.actions)).toBe(true);
     expect(typeof result.wiped).toBe("number");
     expect(typeof result.skipped).toBe("number");
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+// ── default safety ───────────────────────────────────────────────────────────
+
+describe("wipeAgent project-scope safety", () => {
+  it("does not touch project-local files unless scope=project is explicit", () => {
+    const dir = mktemp();
+    try {
+      mkfile(path.join(dir, ".github/hooks/fulcrum.json"), "{}");
+      mkfile(path.join(dir, ".mcp.json"), JSON.stringify({ mcpServers: { fulcrum: { command: "fulcrum" } } }));
+      mkfile(path.join(dir, "AGENTS.md"), "<!-- fulcrum:begin -->\nfulcrum\n<!-- fulcrum:end -->\nnotes");
+
+      const result = wipeAgent({ agent: "copilot", dryRun: false, targetDir: dir });
+
+      expect(result.wiped).toBe(0);
+      expect(result.skipped).toBe(1);
+      expect(result.actions[0]?.reason).toContain("project-local wipe disabled");
+      expect(exists(path.join(dir, ".github/hooks/fulcrum.json"))).toBe(true);
+      expect(exists(path.join(dir, ".mcp.json"))).toBe(true);
+      expect(read(path.join(dir, "AGENTS.md"))).toContain("fulcrum");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

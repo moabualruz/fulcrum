@@ -156,7 +156,7 @@ Create failing tests that encode the roadmap gaps before changing behavior:
 Extend the existing RAG lifecycle foundation:
 - Add `out_of_scope` to `RagHealthStatus` and matching DB guard coverage wherever persisted.
 - Add a non-mutating repair planner in `@fulcrum/memory` that consumes `buildRagHealthReport`, vector metadata, code index state, graph coverage, eval readiness, and profile manifest.
-- Expose repair planning through `fulcrum memory doctor --repair-plan --json` and MCP/action parity (`get_rag_repair_plan` or compatible extension of `get_rag_health`).
+- Expose repair planning through `fulcrum memory doctor --repair-plan --json` and a dedicated read-only MCP/action tool: `get_rag_repair_plan`.
 - Keep normal repair on targeted verify/fix operations: no DB/vault wipe unless `memory rebuild` is explicitly scoped and preflighted.
 - Extend `fulcrum memory rebuild --all|--domain ... --mode plan|dry-run|execute --profile ... --confirm-profile ... --json` reports with repair-plan references, final health verification, and degraded-domain retry actions.
 - Verify vector rows and metadata by source identity, content hash, model, provider, actual device, dimensions, freshness, and status.
@@ -170,7 +170,7 @@ Close operational truth gaps before broader retrieval quality work:
 - Allow automatic fallback only when configuration permits it, and record fallback reason in job events, metadata, traces, and reports.
 - Make `storeChunkEmbedding` use `getCodeEmbedder()` and return structured success/failure instead of swallowing write failures.
 - Fix reindex counters so "embedded" increments only after vector row and metadata verification.
-- Add an explicit job execution surface if needed: either `fulcrum memory embed --scope <...> --run --json` or `fulcrum jobs resume <job_id> --json` as the documented default path. The contract must not leave users with a "started" job that never runs without a visible next action.
+- Use the existing explicit job execution surface as the documented default path: `fulcrum jobs resume <job_id> --json`. `fulcrum memory embed --scope <...> --json` must either run the job to terminal status or return `next_action` with that exact resume command, so users are never left with a "started" job that appears complete while work is only queued.
 
 ### Slice 3: Unified Context Search Surface
 

@@ -31,7 +31,7 @@ import {
   sha256File,
   type InstallJournalEntry,
 } from "../packages/agent-fanout/src/install-journal.js";
-import { wipeAgent, type WipeAgentName } from "./wipe.js";
+import { wipeAgent, type WipeAgentName, type WipeScope } from "./wipe.js";
 
 // ── public types ───────────────────────────────────────────────────────────────
 
@@ -66,6 +66,11 @@ export interface UninstallOpts {
   targetDir?: string;
   /** Home directory for global-scoped agents (claude, gemini, codex, pi). */
   home?: string;
+  /**
+   * User scope only touches known user config/integration paths.
+   * Project scope additionally permits targetDir-local files from project agents.
+   */
+  scope?: WipeScope;
 }
 
 // ── public API ─────────────────────────────────────────────────────────────────
@@ -74,6 +79,7 @@ export function uninstallAgent(opts: UninstallOpts): UninstallResult {
   const { agent, dryRun = false, purge = false } = opts;
   const targetDir = path.resolve(opts.targetDir ?? process.cwd());
   const home = path.resolve(opts.home ?? os.homedir());
+  const scope = opts.scope ?? "user";
 
   const result: UninstallResult = {
     agent, dryRun, purge,
@@ -86,9 +92,9 @@ export function uninstallAgent(opts: UninstallOpts): UninstallResult {
     // No journal → stale-journal fallback: wipe the agent (no-op if already clean).
     result.fallback = true;
     if (!dryRun) {
-      const KNOWN_AGENTS: WipeAgentName[] = ["cursor", "windsurf", "codex", "opencode", "copilot", "claude", "gemini", "pi"];
+      const KNOWN_AGENTS: WipeAgentName[] = ["cursor", "windsurf", "codex", "opencode", "copilot", "claude", "gemini", "qwen", "pi"];
       if (KNOWN_AGENTS.includes(agent as WipeAgentName)) {
-        wipeAgent({ agent: agent as WipeAgentName, dryRun: false, targetDir, home });
+        wipeAgent({ agent: agent as WipeAgentName, dryRun: false, targetDir, home, scope });
       }
     }
     return result;
@@ -96,7 +102,7 @@ export function uninstallAgent(opts: UninstallOpts): UninstallResult {
 
   // Walk in REVERSE order of journal writes.
   for (const entry of [...entries].reverse()) {
-    const action = applyReversal(entry, dryRun, purge, targetDir, home);
+    const action = applyReversal(entry, dryRun, purge, targetDir, home, scope);
     result.actions.push(action);
     if (action.result === "ok") result.uninstalled++;
     else if (action.result === "orphaned") result.orphaned++;
@@ -121,14 +127,17 @@ function applyReversal(
   purge: boolean,
   targetDir: string,
   home: string,
+  scope: WipeScope,
 ): UninstallAction {
   const base = { step_name: entry.step_name, target_path: entry.target_path, action: entry.action };
 
-  // Boundary check: target_path must be within home or targetDir to prevent
-  // a tampered journal from reaching outside expected roots.
-  const resolved = path.resolve(entry.target_path);
-  if (!resolved.startsWith(home + path.sep) && !resolved.startsWith(targetDir + path.sep)
-      && resolved !== home && resolved !== targetDir) {
+  // Boundary check: target_path must be inside known user config roots.
+  // Project-local paths are allowed only when scope="project".
+  if (isNonFileTarget(entry.target_path)) {
+    if (!isAllowedNonFileTarget(entry)) {
+      return { ...base, result: "skipped", reason: "target_path outside allowed roots" };
+    }
+  } else if (!isAllowedFileTarget(entry.target_path, targetDir, home, scope)) {
     return { ...base, result: "skipped", reason: "target_path outside allowed roots" };
   }
 
@@ -230,4 +239,44 @@ function uniqueOrphanPath(filePath: string): string {
   const base = filePath + ".fulcrum-orphan";
   if (!fs.existsSync(base)) return base;
   return `${base}.${Date.now()}`;
+}
+
+function isNonFileTarget(targetPath: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(targetPath);
+}
+
+function isAllowedNonFileTarget(entry: InstallJournalEntry): boolean {
+  return entry.action === "native_cli"
+    && entry.agent === "claude"
+    && entry.target_path === "claude://plugin/fulcrum";
+}
+
+function isAllowedFileTarget(targetPath: string, targetDir: string, home: string, scope: WipeScope): boolean {
+  const resolved = path.resolve(targetPath);
+  const allowedRoots = userScopeRoots(home);
+  if (scope === "project") allowedRoots.push(targetDir);
+  return allowedRoots.some(root => isWithinOrEqual(resolved, root));
+}
+
+function isWithinOrEqual(target: string, root: string): boolean {
+  const resolvedRoot = path.resolve(root);
+  return target === resolvedRoot || target.startsWith(resolvedRoot + path.sep);
+}
+
+function userScopeRoots(home: string): string[] {
+  return [
+    path.join(home, ".local", "bin"),
+    path.join(home, ".local", "state", "fulcrum"),
+    path.join(home, ".claude"),
+    path.join(home, ".claude.json"),
+    path.join(home, ".gemini"),
+    path.join(home, ".qwen"),
+    path.join(home, ".codex"),
+    path.join(home, ".pi"),
+    path.join(home, ".agents", "plugins"),
+    path.join(home, ".opencode"),
+    path.join(home, ".config", "codex"),
+    path.join(home, ".config", "opencode"),
+    path.join(home, ".config", "github-copilot"),
+  ];
 }

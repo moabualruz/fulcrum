@@ -125,6 +125,26 @@ describe('installGeminiExtension dry-run output', () => {
     expect(stdout).toContain('gemini extensions update')
   })
 
+  it('does not copy repo extension into HOME unless dev override is set', () => {
+    const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'fulcrum-gemini-home-'))
+    const binDir = path.join(tmpHome, 'bin')
+    fs.mkdirSync(binDir, { recursive: true })
+    fs.writeFileSync(path.join(binDir, 'fulcrum'), '#!/usr/bin/env bash\necho fulcrum-agent-cli 0.0.0\n', { mode: 0o755 })
+    try {
+      const { stdout, stderr, status } = runInstall(['gemini'], {
+        ...process.env,
+        HOME: tmpHome,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
+      })
+
+      expect(status).toBe(0)
+      expect(`${stdout}\n${stderr}`).toContain('repo-to-machine install disabled')
+      expect(fs.existsSync(path.join(tmpHome, '.gemini/extensions/fulcrum'))).toBe(false)
+    } finally {
+      fs.rmSync(tmpHome, { recursive: true, force: true })
+    }
+  })
+
   it('falls back to file-copy when native gemini install exits 0 without materializing files', () => {
     const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'fulcrum-gemini-home-'))
     const binDir = path.join(tmpHome, 'bin')
@@ -136,6 +156,7 @@ describe('installGeminiExtension dry-run output', () => {
         ...process.env,
         HOME: tmpHome,
         PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
+        FULCRUM_ALLOW_REPO_MACHINE_INSTALL: '1',
       })
 
       expect(status, stderr).toBe(0)
