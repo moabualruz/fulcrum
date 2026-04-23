@@ -65,23 +65,126 @@ Output: `✓ L2 active — indexed <N> memories`, plus up to 10 error lines if a
 
 ### `fulcrum memory rebuild`
 
-Rebuild derived layers from the L0 vault.
+Plan, dry-run, or execute the RAG lifecycle rebuild. Lifecycle mode is selected
+when `--all`, `--mode`, `--execute`, `--domain`, or `--domains` is present.
 
+```bash
+fulcrum memory rebuild --all --mode plan --json
+fulcrum memory rebuild --all --mode dry-run --json
+fulcrum memory rebuild --all --execute --json
 ```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--all` | — | Include all rebuild domains |
+| `--mode <plan\|dry-run>` | `plan` | Report scope without promotion; `dry-run` also validates execution shape |
+| `--execute` | — | Run destructive staged rebuild and promote only after parity + snapshot checks pass |
+| `--domain <name>` | — | Add one domain; repeatable |
+| `--domains <a,b>` | — | Comma-separated domain list: `l0,l1,fts,code,vectors,graph` |
+| `--allow-empty` | `false` | Permit zero-scope rebuilds |
+| `--workspace-id <id>` | current cwd | Explicit workspace scope |
+| `--project-id <id>` | current cwd | Explicit project scope |
+| `--json` | — | Emit machine-readable report |
+
+JSON output includes `report_id`, `mode`, `status`, `scope`, counts, parity
+checks, warnings, errors, and candidate disposition. `plan` and `dry-run` do
+not mutate state. `--execute` writes audit events and leaves the previous served
+state unchanged when parity or stale-snapshot checks fail.
+
+Legacy rebuild is still available for the older L1/L2 vault path:
+
+```bash
 fulcrum memory rebuild [--l1 | --l2 | --both]
 ```
 
-| Flag | Default | Rebuilds |
-|------|---------|----------|
-| `--l1` | yes | L1 SQLite FTS5 only |
-| `--l2` | — | L2 Kuzu + HNSW only |
-| `--both` | — | Both L1 and L2 |
+### `fulcrum memory embed`
+
+Start a durable embedding job for memories, L1 pages, or code chunks.
 
 ```bash
-fulcrum memory rebuild --both
+fulcrum memory embed --scope memories --json
+fulcrum memory embed --scope l1-pages --json
+fulcrum memory embed --scope code --json
 ```
 
-Output: `✓ L1: <n> memories, L2: <n> memories` plus up to 10 errors.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--scope <memories\|l1-pages\|code>` | — | Select job source domain |
+| `--allow-empty` | `false` | Permit zero preflight count |
+| `--provider <name>` | configured | Override embedding provider label |
+| `--model <name>` | configured | Override model label |
+| `--device <auto\|cpu\|cuda\|webgpu>` | `auto` | Requested runtime device |
+| `--dimensions <n>` | configured | Vector dimensions |
+| `--batch-size <n>` | runner default | Batch size for execution/resume |
+| `--workspace-id <id>` | current cwd | Explicit workspace scope |
+| `--project-id <id>` | current cwd | Explicit project scope |
+| `--json` | — | Emit job ID, status, preflight counts, and requested runtime |
+
+Without `--scope`, `fulcrum memory embed [--limit <n>] [--batch-size <n>]`
+keeps the legacy one-shot vector backfill behavior.
+
+### `fulcrum jobs`
+
+Inspect or control durable embedding jobs.
+
+```bash
+fulcrum jobs status job_... --json
+fulcrum jobs logs job_... --json
+fulcrum jobs cancel job_... --json
+fulcrum jobs resume job_... --json
+fulcrum jobs retry job_... --failed --json
+```
+
+`status` and `logs` are read-only. `cancel`, `resume`, and `retry --failed`
+write audit events and require the same RAG maintenance authorization as job
+start. Retry targets failed or stale eligible items and does not reprocess
+completed current items by default.
+
+### `fulcrum memory recall`
+
+Run v3 recall over FTS5, vectors, graph traversal, and RRF fusion.
+
+```bash
+fulcrum memory recall "why did rebuild fail" --explain --json
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--limit <n>` | `10` | Max results |
+| `--offset <n>` | `0` | Pagination offset |
+| `--max-chars <n>` | `500` | Truncate content per hit |
+| `--confidence-floor <f>` | `0.3` | Minimum L1 confidence |
+| `--graph-hops <n>` | `2` | Graph expansion depth |
+| `--include-superseded` | `false` | Include superseded pages |
+| `--explain` | `false` | Include stage ranks/scores, runtime provider/model/device, provenance class, source refs, supersession, confidence, freshness, and graph contribution |
+
+The MCP/action equivalent is `recall_knowledge` with `explain: true`.
+
+### `fulcrum memory doctor`
+
+Show a read-only RAG health report.
+
+```bash
+fulcrum memory doctor --json
+```
+
+The report covers raw/L1 coverage, FTS parity, code file/chunk state, vector
+freshness and failures, graph coverage, recommended actions, warnings, and
+errors. `fulcrum memory health` is an alias.
+
+### `fulcrum memory eval`
+
+Run the deterministic local RAG lifecycle eval suite.
+
+```bash
+fulcrum memory eval --suite rag-lifecycle --json
+```
+
+Default evals are local-first and deterministic. Model-heavy and
+accelerator-heavy checks are opt-in with `--include-model-heavy` and
+`--include-accelerator-heavy`. Output groups failures by retrieval relevance,
+ranking, answer correctness, grounding/provenance, graph expansion, and
+operational parity.
 
 ### `fulcrum memory status`
 

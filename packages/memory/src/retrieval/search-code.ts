@@ -13,6 +13,7 @@
 import type { Db } from 'fulcrum-agent-core'
 import { getDb } from 'fulcrum-agent-core'
 import { rrfScore } from '../scoring.js'
+import { buildCodeExplanation, type RagRecallExplanation } from './explain.js'
 
 export interface SearchCodeInput {
   workspace_id: string
@@ -26,6 +27,7 @@ export interface SearchCodeInput {
   limit?: number
   caller_run_id?: string
   caller_role?: string
+  explain?: boolean
 }
 
 export interface SearchCodeResultRow {
@@ -40,6 +42,7 @@ export interface SearchCodeResultRow {
   project_id: string
   file_id: string | null
   code_index_state: 'current' | 'legacy' | 'orphaned'
+  explanation?: RagRecallExplanation
 }
 
 export interface SearchCodeResponse {
@@ -52,6 +55,10 @@ function logRecallEvent(db: Db, chunk_id: string, query: string, rank: number, s
     db.prepare(`INSERT INTO memory_recall_events (memory_id, query, score, rank, caller_run_id, caller_role, source, created_at) VALUES (?,?,?,?,?,?,?,?)`)
       .run(chunk_id, query, score, rank, callerRunId ?? null, callerRole ?? null, 'search_code', Date.now())
   } catch { /* aux table absent — non-fatal */ }
+}
+
+function rankScore(rank: number | null): number | null {
+  return rank === null ? null : 1 / (60 + rank)
 }
 
 export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Promise<SearchCodeResponse> {
@@ -83,14 +90,24 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
     const safe = input.text.match(/[\p{L}\p{N}_]+/gu)?.map(t => `"${t}"`).join(' AND ') ?? ''
     if (!safe) return { results: [], reason: 'no_match' }
     try {
+      const ftsWhere = where.join(' AND ')
       const ftsRows = db.prepare(`
         SELECT c.chunk_id, bm25(code_chunks_fts) AS bm25
         FROM code_chunks c
         JOIN code_chunks_fts ON c.rowid = code_chunks_fts.rowid
-        WHERE code_chunks_fts MATCH ? AND c.workspace_id = ?
+        LEFT JOIN code_files f
+          ON f.file_id = c.file_id
+          AND f.workspace_id = c.workspace_id
+          AND f.project_id = c.project_id
+        WHERE code_chunks_fts MATCH ?
+          AND ${ftsWhere}
+          AND (
+            c.file_id IS NULL
+            OR (f.file_id IS NOT NULL AND f.status = 'indexed')
+          )
         ORDER BY bm25 ASC
         LIMIT ?
-      `).all(safe, input.workspace_id, limit * 4) as Array<{ chunk_id: string; bm25: number }>
+      `).all(safe, ...params, limit * 4) as Array<{ chunk_id: string; bm25: number }>
       ftsRows.forEach((row, idx) => {
         ftsRankByChunk.set(row.chunk_id, idx + 1)
       })
@@ -171,11 +188,12 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
   // Two-signal RRF — the score floor comes from the same k=60 formula as
   // recall_memory. Recency tie-breaker via the result-set order.
   const results: SearchCodeResultRow[] = rows
-    .map(r => {
+    .map((r, idx) => {
       const ftsRank = ftsRankByChunk.get(r.chunk_id) ?? null
       const symRank = symbolRankByChunk.get(r.chunk_id) ?? null
+      const recencyRank = idx + 1
       const score = rrfScore(ftsRank, symRank)
-      return {
+      const result: SearchCodeResultRow = {
         chunk_id: r.chunk_id,
         rel_path: r.rel_path,
         start_line: r.start_line,
@@ -188,6 +206,24 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
         file_id: r.file_id,
         code_index_state: r.code_index_state,
       }
+      if (input.explain) {
+        result.explanation = buildCodeExplanation({
+          chunk_id: r.chunk_id,
+          rel_path: r.rel_path,
+          start_line: r.start_line,
+          end_line: r.end_line,
+          file_id: r.file_id,
+          code_index_state: r.code_index_state,
+          stage_ranks: { fts: ftsRank, symbol: symRank, recency: recencyRank },
+          stage_scores: {
+            fts: rankScore(ftsRank),
+            symbol: rankScore(symRank),
+            recency: rankScore(recencyRank),
+            fused: score,
+          },
+        })
+      }
+      return result
     })
     .sort((a, b) => b.score - a.score)
 

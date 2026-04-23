@@ -103,6 +103,52 @@ describe('localEmbeddingPipelineOptions', () => {
   })
 })
 
+describe('LocalEmbeddingProvider device selection', () => {
+  afterEach(() => {
+    vi.doUnmock('@huggingface/transformers')
+    vi.doUnmock('../db/client.js')
+    vi.resetModules()
+    vi.restoreAllMocks()
+  })
+
+  it('records CPU when auto falls through CUDA and WebGPU', async () => {
+    const calls: Array<{ dtype: 'q8'; device?: 'cuda' | 'webgpu' }> = []
+
+    vi.doMock('@huggingface/transformers', () => ({
+      env: {},
+      pipeline: vi.fn().mockImplementation((_task: string, _model: string, options: { dtype: 'q8'; device?: 'cuda' | 'webgpu' }) => {
+        calls.push(options)
+        if (options.device) throw new Error(`${options.device} unavailable`)
+        return Promise.resolve(vi.fn())
+      }),
+    }))
+    vi.doMock('../db/client.js', () => ({ globalDataDir: () => '/tmp/fulcrum-test' }))
+
+    const provider = new LocalEmbeddingProvider({ provider: 'local', model: 'embedding-model', dimensions: 1024 })
+    await provider.warmUp()
+
+    expect(calls).toEqual([
+      { dtype: 'q8', device: 'cuda' },
+      { dtype: 'q8', device: 'webgpu' },
+      { dtype: 'q8' },
+    ])
+    expect((provider as unknown as { actualDevice: string | null }).actualDevice).toBe('cpu')
+  })
+
+  it('records CUDA when auto succeeds immediately', async () => {
+    vi.doMock('@huggingface/transformers', () => ({
+      env: {},
+      pipeline: vi.fn().mockResolvedValue(vi.fn()),
+    }))
+    vi.doMock('../db/client.js', () => ({ globalDataDir: () => '/tmp/fulcrum-test' }))
+
+    const provider = new LocalEmbeddingProvider({ provider: 'local', model: 'embedding-model', dimensions: 1024 })
+    await provider.warmUp()
+
+    expect((provider as unknown as { actualDevice: string | null }).actualDevice).toBe('cuda')
+  })
+})
+
 describe('LocalRerankerProvider device selection', () => {
   afterEach(() => {
     vi.doUnmock('@huggingface/transformers')
@@ -135,6 +181,23 @@ describe('LocalRerankerProvider device selection', () => {
       { dtype: 'q8', device: 'webgpu' },
       { dtype: 'q8' },
     ])
+    expect((provider as unknown as { actualDevice: string | null }).actualDevice).toBe('cpu')
+  })
+
+  it('records CUDA when auto succeeds immediately', async () => {
+    vi.doMock('@huggingface/transformers', () => ({
+      env: {},
+      AutoTokenizer: { from_pretrained: vi.fn().mockResolvedValue(vi.fn()) },
+      AutoModelForSequenceClassification: {
+        from_pretrained: vi.fn().mockResolvedValue(vi.fn()),
+      },
+    }))
+    vi.doMock('../db/client.js', () => ({ globalDataDir: () => '/tmp/fulcrum-test' }))
+
+    const provider = new LocalRerankerProvider({ provider: 'local', model: 'reranker-model', dimensions: 0 })
+    await provider.warmUp()
+
+    expect((provider as unknown as { actualDevice: string | null }).actualDevice).toBe('cuda')
   })
 
   it('does not fallback when CUDA is explicitly requested', async () => {

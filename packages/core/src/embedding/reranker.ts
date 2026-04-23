@@ -9,6 +9,7 @@ function errorMessage(err: unknown): string {
 }
 
 export class LocalRerankerProvider implements RerankerProvider {
+  actualDevice: 'cpu' | 'cuda' | 'webgpu' | null = null
   private model: string
   private device: LocalRerankerDevice
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,7 +42,9 @@ export class LocalRerankerProvider implements RerankerProvider {
     for (const options of localEmbeddingPipelineOptions(this.device)) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        return await AutoModelForSequenceClassification.from_pretrained(this.model, options)
+        const created = await AutoModelForSequenceClassification.from_pretrained(this.model, options)
+        this.actualDevice = options.device ?? 'cpu'
+        return created
       } catch (err) {
         if (options.device && this.device === 'auto') {
           process.stderr.write(`[fulcrum] ${options.device} reranker unavailable; trying next local reranker backend (${errorMessage(err)})\n`)

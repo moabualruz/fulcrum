@@ -14,6 +14,15 @@ type ProviderFactory = (config: EmbeddingProviderConfig) => EmbeddingProvider
 
 const _providerRegistry = new Map<string, ProviderFactory>()
 
+function annotateRuntimeConfig<T extends object>(provider: T, config: EmbeddingProviderConfig): T {
+  Object.defineProperties(provider, {
+    provider_name: { value: config.provider, configurable: true },
+    model_name: { value: config.model, configurable: true },
+    requested_device: { value: config.device ?? 'auto', configurable: true },
+  })
+  return provider
+}
+
 /**
  * Register a custom embedding provider factory.
  * Built-in providers (local, voyage, openai) are registered at module load.
@@ -42,7 +51,7 @@ export function createProvider(config: EmbeddingProviderConfig): EmbeddingProvid
       `Registered providers: ${[..._providerRegistry.keys()].join(', ')}`
     )
   }
-  return factory(config)
+  return annotateRuntimeConfig(factory(config), config)
 }
 
 /**
@@ -61,7 +70,7 @@ export async function initEmbedding(config: FulcrumConfig): Promise<void> {
   textProvider = createProvider(config.embedding.text)
   codeProvider = config.embedding.code ? createProvider(config.embedding.code) : null
   rerankerProvider = config.reranker.provider === 'local'
-    ? new LocalRerankerProvider(config.reranker)
+    ? annotateRuntimeConfig(new LocalRerankerProvider(config.reranker), config.reranker)
     : null
   // Warm up in parallel (downloads models if not cached)
   await Promise.all([

@@ -370,7 +370,10 @@ function buildCodeDomain(input: { workspace_id: string; project_id: string }, db
   const orphanChunks = safeCount(db, `
     SELECT COUNT(*) AS n
       FROM code_chunks c
-      LEFT JOIN code_files f ON f.file_id = c.file_id AND f.workspace_id = c.workspace_id
+      LEFT JOIN code_files f
+        ON f.file_id = c.file_id
+       AND f.workspace_id = c.workspace_id
+       AND f.project_id = c.project_id
      WHERE c.workspace_id = ? AND c.project_id = ?
        AND c.file_id IS NOT NULL
        AND f.file_id IS NULL

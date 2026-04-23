@@ -292,6 +292,30 @@ describe('RAG health report', () => {
     expect(report.recommended_actions.join('\n')).not.toContain('vector coverage')
   })
 
+  it('does not mask current-project orphan chunks with same file id in another project', () => {
+    getDb().prepare("INSERT INTO projects(project_id, workspace_id, name) VALUES ('proj_2', 'ws_1', 'proj_2')").run()
+    getDb().prepare(`
+      INSERT INTO code_files (
+        file_id, workspace_id, project_id, rel_path, language, sha256,
+        mtime_ns, size_bytes, chunks_count, indexed_at
+      ) VALUES ('shared_file_id', 'ws_1', 'proj_2', 'src/shared.ts', 'typescript', 'sha-shared', 0, 10, 1, 0)
+    `).run()
+    getDb().prepare(`
+      INSERT INTO code_chunks (
+        chunk_id, workspace_id, project_id, file_path, file_id,
+        chunk_strategy, source_type, content, content_hash
+      ) VALUES (
+        'chunk_cross_project_orphan', 'ws_1', 'proj_1', 'src/shared.ts', 'shared_file_id',
+        'syntax', 'code', 'cross project orphan', 'cross-project-orphan'
+      )
+    `).run()
+
+    const report = buildRagHealthReport({ workspace_id: 'ws_1', project_id: 'proj_1' })
+    const code = report.domains['code'] as Record<string, unknown>
+
+    expect(code).toMatchObject({ status: 'degraded', orphan_chunks: 1 })
+  })
+
   it('does not persist health reports unless explicitly requested', () => {
     seedL1MissingFile()
     const before = getDb().prepare('SELECT COUNT(*) AS n FROM rag_health_reports').get() as { n: number }

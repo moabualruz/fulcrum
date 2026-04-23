@@ -22,6 +22,12 @@
 import type { Db } from 'fulcrum-agent-core'
 import { getDb, getReranker, getTextEmbedder } from 'fulcrum-agent-core'
 import { extractWikilinks } from '../l1/wikilinks.js'
+import {
+  buildMemoryExplanation,
+  runtimeExplanationFromProvider,
+  type RagGraphContribution,
+  type RagRecallExplanation,
+} from './explain.js'
 
 export interface V3SearchWeights {
   fts?: number
@@ -43,6 +49,8 @@ export interface V3SearchInput {
   include_superseded?: boolean
   /** Unit 5.2 wires env defaults; unit 5.1 exposes this for deterministic tests. */
   weights?: V3SearchWeights
+  /** Include stable retrieval-stage, runtime, provenance, and graph metadata. */
+  explain?: boolean
 }
 
 export interface V3RecallHit {
@@ -56,8 +64,13 @@ export interface V3RecallHit {
   l0_wikilinks: string[]
   entities: string[]
   superseded_by: string | null
+  freshness: number
+  vault_path: string | null
   score: number
-  stage_ranks: { fts?: number; vec?: number; graph?: number }
+  stage_ranks: { fts?: number; vec?: number; vector?: number; graph?: number; reranker?: number }
+  stage_scores: { fts?: number; vector?: number; graph?: number; fused?: number; reranker?: number }
+  graph_contribution?: RagGraphContribution | null
+  explanation?: RagRecallExplanation
 }
 
 const RRF_K = 60
@@ -163,6 +176,8 @@ function walkGraph(
 
 interface RankMap {
   ranks: Map<string, number>
+  seed_entity_ids?: string[]
+  matched_entity_ids?: Map<string, string[]>
 }
 
 function ftsStage(
@@ -248,15 +263,23 @@ function graphStage(
   try {
     const rows = db
       .prepare(
-        `SELECT DISTINCT m.memory_id, m.updated_at
+        `SELECT m.memory_id, m.updated_at, j.value AS entity_id
          FROM memories m, json_each(m.entities) j
          WHERE j.value IN (${placeholders})
            AND ${whereTail}
          ORDER BY m.updated_at DESC
          LIMIT ?`,
       )
-      .all(...reached, floor, workspace_id, ...whereTailParams, fetchLimit) as Array<{ memory_id: string }>
-    return { ranks: new Map(rows.map((r, i) => [r.memory_id, i + 1])) }
+      .all(...reached, floor, workspace_id, ...whereTailParams, fetchLimit) as Array<{ memory_id: string; entity_id: string }>
+    const ranks = new Map<string, number>()
+    const matched = new Map<string, string[]>()
+    for (const row of rows) {
+      if (!ranks.has(row.memory_id)) ranks.set(row.memory_id, ranks.size + 1)
+      const entities = matched.get(row.memory_id) ?? []
+      if (!entities.includes(row.entity_id)) entities.push(row.entity_id)
+      matched.set(row.memory_id, entities)
+    }
+    return { ranks, seed_entity_ids: seeds, matched_entity_ids: matched }
   } catch (err) {
     if (process.env['FULCRUM_VERBOSE']) {
       process.stderr.write(`[v3-search] graph stage error: ${err instanceof Error ? err.message : String(err)}\n`)
@@ -271,6 +294,15 @@ interface FusionHit {
   fts_rank?: number
   vec_rank?: number
   graph_rank?: number
+  fts_score?: number
+  vector_score?: number
+  graph_score?: number
+  fused_score: number
+  graph_contribution?: RagGraphContribution | null
+}
+
+function stageScore(rank: number | undefined, weight: number): number | undefined {
+  return rank === undefined ? undefined : weight / (RRF_K + rank)
 }
 
 function fuse(
@@ -278,6 +310,7 @@ function fuse(
   vec: RankMap,
   graph: RankMap,
   weights: Required<V3SearchWeights>,
+  graphHops: number,
 ): FusionHit[] {
   const allIds = new Set<string>([...fts.ranks.keys(), ...vec.ranks.keys(), ...graph.ranks.keys()])
   const hits: FusionHit[] = []
@@ -289,10 +322,25 @@ function fuse(
       weights.fts / (RRF_K + (fr ?? PENALTY_RANK)) +
       weights.vec / (RRF_K + (vr ?? PENALTY_RANK)) +
       weights.graph / (RRF_K + (gr ?? PENALTY_RANK))
-    const hit: FusionHit = { memory_id: id, score }
+    const hit: FusionHit = { memory_id: id, score, fused_score: score }
     if (fr !== undefined) hit.fts_rank = fr
     if (vr !== undefined) hit.vec_rank = vr
     if (gr !== undefined) hit.graph_rank = gr
+    const fts_score = stageScore(fr, weights.fts)
+    const vector_score = stageScore(vr, weights.vec)
+    const graph_score = stageScore(gr, weights.graph)
+    if (fts_score !== undefined) hit.fts_score = fts_score
+    if (vector_score !== undefined) hit.vector_score = vector_score
+    if (graph_score !== undefined) hit.graph_score = graph_score
+    if (gr !== undefined) {
+      hit.graph_contribution = {
+        contributed: true,
+        seed_entity_ids: graph.seed_entity_ids ?? [],
+        matched_entity_ids: graph.matched_entity_ids?.get(id) ?? [],
+        hops: graphHops,
+        rank: gr,
+      }
+    }
     hits.push(hit)
   }
   hits.sort((a, b) => b.score - a.score)
@@ -306,9 +354,11 @@ interface MemoryRow {
   content: string
   confidence: number
   retention_tier: string
+  freshness: number
   entities: string | null
   provenance: string | null
   superseded_by: string | null
+  vault_path: string | null
 }
 
 function materialize(db: Db, hits: FusionHit[]): V3RecallHit[] {
@@ -318,7 +368,7 @@ function materialize(db: Db, hits: FusionHit[]): V3RecallHit[] {
   const rows = db
     .prepare(
       `SELECT memory_id, title, summary, content, confidence, retention_tier,
-              entities, provenance, superseded_by
+              freshness, entities, provenance, superseded_by, vault_path
        FROM memories
        WHERE memory_id IN (${placeholders})`,
     )
@@ -335,6 +385,11 @@ function materialize(db: Db, hits: FusionHit[]): V3RecallHit[] {
     if (hit.fts_rank !== undefined) stage_ranks.fts = hit.fts_rank
     if (hit.vec_rank !== undefined) stage_ranks.vec = hit.vec_rank
     if (hit.graph_rank !== undefined) stage_ranks.graph = hit.graph_rank
+    const stage_scores: V3RecallHit['stage_scores'] = {}
+    if (hit.fts_score !== undefined) stage_scores.fts = hit.fts_score
+    if (hit.vector_score !== undefined) stage_scores.vector = hit.vector_score
+    if (hit.graph_score !== undefined) stage_scores.graph = hit.graph_score
+    stage_scores.fused = hit.fused_score
     out.push({
       memory_id: row.memory_id,
       title: row.title,
@@ -346,8 +401,12 @@ function materialize(db: Db, hits: FusionHit[]): V3RecallHit[] {
       l0_wikilinks,
       entities,
       superseded_by: row.superseded_by,
+      freshness: row.freshness,
+      vault_path: row.vault_path,
       score: hit.score,
       stage_ranks,
+      stage_scores,
+      graph_contribution: hit.graph_contribution ?? null,
     })
   }
   return out
@@ -364,19 +423,56 @@ async function rerankMaterialized(query: string, hits: V3RecallHit[]): Promise<V
   try {
     const passages = hits.map((h) => h.content || h.summary || h.title)
     const rerankScores = await reranker.rerank(query, passages)
-    return hits
+    const scored = hits
       .map((h, i) => {
         const score = rerankScores[i]
         if (typeof score !== 'number' || !Number.isFinite(score)) return h
-        return { ...h, score: sigmoidScore(score) }
+        return { ...h, score: sigmoidScore(score), stage_scores: { ...h.stage_scores, reranker: sigmoidScore(score) } }
       })
       .sort((a, b) => b.score - a.score)
+    return scored.map((h, i) => ({
+      ...h,
+      stage_ranks: { ...h.stage_ranks, reranker: i + 1 },
+    }))
   } catch (err) {
     if (process.env['FULCRUM_VERBOSE']) {
       process.stderr.write(`[v3-search] reranker degraded: ${err instanceof Error ? err.message : String(err)}\n`)
     }
     return hits
   }
+}
+
+function maybeAttachExplanations(
+  db: Db,
+  input: V3SearchInput,
+  hits: V3RecallHit[],
+  latency_ms: number,
+): V3RecallHit[] {
+  if (!input.explain) return hits
+  const runtime = runtimeExplanationFromProvider(getTextEmbedder(), latency_ms)
+  return hits.map((hit) => ({
+    ...hit,
+    explanation: buildMemoryExplanation({
+      result_id: hit.memory_id,
+      workspace_id: input.workspace_id,
+      project_id: input.project_id,
+      sources: hit.sources,
+      l0_wikilinks: hit.l0_wikilinks,
+      vault_path: hit.vault_path,
+      confidence: hit.confidence,
+      freshness: hit.freshness,
+      superseded_by: hit.superseded_by,
+      stage_ranks: {
+        fts: hit.stage_ranks.fts,
+        vector: hit.stage_ranks.vector ?? hit.stage_ranks.vec,
+        graph: hit.stage_ranks.graph,
+        reranker: hit.stage_ranks.reranker,
+      },
+      stage_scores: hit.stage_scores,
+      runtime,
+      graph_contribution: hit.graph_contribution ?? null,
+    }, db),
+  }))
 }
 
 function parseSources(provenance: string | null): string[] {
@@ -405,6 +501,7 @@ export async function runV3Search(
   input: V3SearchInput,
   db: Db = getDb(),
 ): Promise<V3RecallHit[]> {
+  const started = Date.now()
   const floor = input.confidence_floor ?? 0.3
   const limit = input.limit ?? 10
   const offset = input.offset ?? 0
@@ -420,13 +517,14 @@ export async function runV3Search(
   const fts = ftsStage(db, input.query, floor, input.workspace_id, whereTail, leadingParams, fetchLimit)
   const vec = await vecStage(db, input.query, floor, input.workspace_id, whereTail, leadingParams, fetchLimit)
   const graph = graphStage(db, input.query, floor, input.workspace_id, hops, whereTail, leadingParams, fetchLimit)
-  const fused = fuse(fts, vec, graph, weights)
+  const fused = fuse(fts, vec, graph, weights, hops)
   const reranker = getReranker()
   if (!reranker) {
-    return materialize(db, fused.slice(offset, offset + limit))
+    const hits = materialize(db, fused.slice(offset, offset + limit))
+    return maybeAttachExplanations(db, input, hits, Date.now() - started)
   }
 
   const candidates = materialize(db, fused.slice(0, fetchLimit))
   const reranked = await rerankMaterialized(input.query, candidates)
-  return reranked.slice(offset, offset + limit)
+  return maybeAttachExplanations(db, input, reranked.slice(offset, offset + limit), Date.now() - started)
 }

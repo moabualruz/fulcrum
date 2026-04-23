@@ -34,6 +34,7 @@ function errorMessage(err: unknown): string {
 
 export class LocalEmbeddingProvider implements EmbeddingProvider {
   readonly dimensions: number
+  actualDevice: 'cpu' | 'cuda' | 'webgpu' | null = null
   private model: string
   private device: LocalEmbeddingDevice
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,7 +65,9 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
     for (const options of localEmbeddingPipelineOptions(this.device)) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        return await pipeline('feature-extraction', this.model, options)
+        const created = await pipeline('feature-extraction', this.model, options)
+        this.actualDevice = options.device ?? 'cpu'
+        return created
       } catch (err) {
         if (options.device && this.device === 'auto') {
           process.stderr.write(`[fulcrum] ${options.device} embedding unavailable; trying next local embedding backend (${errorMessage(err)})\n`)
