@@ -56,6 +56,7 @@ describe('searchContext graph explain contribution', () => {
       project_id: 'proj_1',
       limit: 10,
       context_budget_tokens: 1000,
+      persist: true,
       include_graph: true,
       graph_mode: 'local',
       explain: true,

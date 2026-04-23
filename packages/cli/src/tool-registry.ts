@@ -1092,6 +1092,7 @@ TOOL_REGISTRY.set('search_context', {
       limit: args['limit'] as number | undefined,
       context_budget_tokens: args['context_budget_tokens'] as number | undefined,
       explain: args['explain'] === undefined ? undefined : Boolean(args['explain']),
+      persist: args['persist'] === undefined ? undefined : Boolean(args['persist']),
       include_graph: args['include_graph'] === undefined ? undefined : Boolean(args['include_graph']),
       graph_mode: args['graph_mode'] as 'local' | 'global_summary' | 'drift' | undefined,
       graph_depth: args['graph_depth'] as number | undefined,

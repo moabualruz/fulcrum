@@ -7,6 +7,7 @@ export interface MemorySearchContextCommandInput {
   limit?: number
   context_budget_tokens?: number
   explain?: boolean
+  persist?: boolean
   include_graph?: boolean
   graph_mode?: 'local' | 'global_summary' | 'drift'
   graph_depth?: number

@@ -46,7 +46,7 @@ afterEach(() => {
 })
 
 describe('search context CLI/action contract', () => {
-  it('runs search_context registry handler with default deps and explain output', async () => {
+  it('runs search_context registry handler with read-only default deps and explain output', async () => {
     const db = installDb()
     seedUnifiedContext(db)
 
@@ -64,6 +64,28 @@ describe('search context CLI/action contract', () => {
     expect(result.results[0]?.source_ref.source_id).toBe('mem_cli_ctx')
     expect(result.results[0]?.explanation_status).toBe('partial')
     expect(result.context_pack?.query_trace_id).toBe(result.query_trace_id)
+    const traces = db.prepare('SELECT COUNT(*) AS n FROM rag_query_traces WHERE query_trace_id = ?')
+      .get(result.query_trace_id) as { n: number }
+    expect(traces.n).toBe(0)
+  })
+
+  it('persists query trace rows only when the registry handler requests it explicitly', async () => {
+    const db = installDb()
+    seedUnifiedContext(db)
+
+    const result = await TOOL_REGISTRY.get('search_context')!.handler({
+      query: 'unified search context',
+      explain: true,
+      persist: true,
+    }, deps(db)) as {
+      query_trace_id: string
+      results: Array<{ source_ref: { source_id?: string } }>
+    }
+
+    expect(result.results[0]?.source_ref.source_id).toBe('mem_cli_ctx')
+    const traces = db.prepare('SELECT COUNT(*) AS n FROM rag_query_traces WHERE query_trace_id = ?')
+      .get(result.query_trace_id) as { n: number }
+    expect(traces.n).toBe(1)
   })
 
   it('forwards graph mode controls through the registry handler', async () => {
@@ -129,5 +151,8 @@ describe('search context CLI/action contract', () => {
     expect(output.query_trace_id).toMatch(/^ragtrace_/)
     expect(output.results[0]?.source_ref.source_id).toBe('mem_cli_ctx')
     expect(output.skipped_stages.map(stage => stage.stage)).toContain('semantic')
+    const traces = db.prepare('SELECT COUNT(*) AS n FROM rag_query_traces WHERE query_trace_id = ?')
+      .get(output.query_trace_id) as { n: number }
+    expect(traces.n).toBe(0)
   })
 })

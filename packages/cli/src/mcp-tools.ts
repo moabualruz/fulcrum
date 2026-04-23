@@ -353,7 +353,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Search Context',
     name: 'search_context',
-    description: 'Agent-preferred unified context search over memory, code, file, graph, task, and decision evidence. Persists redacted query trace/result rows.',
+    description: 'Agent-preferred unified context search over memory, code, file, graph, task, and decision evidence. Read-only by default; set persist=true for redacted trace/result persistence.',
     annotations: { idempotentHint: false },
     inputSchema: {
       type: 'object',
@@ -364,6 +364,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         limit: { type: 'number' },
         context_budget_tokens: { type: 'number' },
         explain: { type: 'boolean' },
+        persist: { type: 'boolean', description: 'Persist redacted query trace, result rows, and context pack artifacts' },
         include_graph: { type: 'boolean' },
         graph_mode: { type: 'string', enum: ['local', 'global_summary', 'drift'] },
         graph_depth: { type: 'number' },

@@ -1192,6 +1192,7 @@ Flags:
   --limit <N>                    Max results (default 10)
   --context-budget-tokens <N>    Return a deduped context_pack within budget
   --budget <N>                   Alias for --context-budget-tokens
+  --persist                      Persist redacted query trace, result rows, and context pack artifacts
   --graph-mode <mode>            local, global_summary, or drift (default local)
   --graph-depth <N>              Bound graph neighborhood expansion depth
   --no-graph                     Disable graph candidates, graph scoring, and graph expansion
@@ -1212,6 +1213,7 @@ Flags:
     limit: optIntArg('--limit'),
     context_budget_tokens: optIntArg('--context-budget-tokens') ?? optIntArg('--budget'),
     explain: args.includes('--explain'),
+    persist: args.includes('--persist'),
     include_graph: args.includes('--no-graph') ? false : undefined,
     graph_mode: optArg('--graph-mode') as 'local' | 'global_summary' | 'drift' | undefined,
     graph_depth: optIntArg('--graph-depth'),

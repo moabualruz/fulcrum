@@ -53,7 +53,7 @@ function seedContextCorpus(): void {
 }
 
 describe('searchContext contract', () => {
-  it('returns typed source-diverse records with required source refs and trace id', async () => {
+  it('returns typed source-diverse records with required source refs and trace id without persisting by default', async () => {
     seedContextCorpus()
 
     const response = await searchContext({
@@ -87,10 +87,13 @@ describe('searchContext contract', () => {
     expect(codeResult?.source_ref.symbol_path).toBe('repairVectors')
     const persisted = getDb().prepare('SELECT COUNT(*) AS n FROM rag_context_results WHERE query_trace_id = ?')
       .get(response.query_trace_id) as { n: number }
-    expect(persisted.n).toBe(response.results.length)
+    const traces = getDb().prepare('SELECT COUNT(*) AS n FROM rag_query_traces WHERE query_trace_id = ?')
+      .get(response.query_trace_id) as { n: number }
+    expect(traces.n).toBe(0)
+    expect(persisted.n).toBe(0)
   })
 
-  it('redacts absolute paths from returned and persisted context pack evidence', async () => {
+  it('persists redacted trace, result, and context pack evidence only when explicitly requested', async () => {
     const db = getDb()
     db.prepare(`
       INSERT INTO memories (
@@ -109,12 +112,19 @@ describe('searchContext contract', () => {
       project_id: 'proj_1',
       limit: 5,
       context_budget_tokens: 200,
+      persist: true,
     })
 
     expect(JSON.stringify(response.results)).not.toContain('/home/')
     expect(JSON.stringify(response.context_pack?.results)).not.toContain('/home/')
+    const trace = db.prepare('SELECT COUNT(*) AS n FROM rag_query_traces WHERE query_trace_id = ?')
+      .get(response.query_trace_id) as { n: number }
+    const results = db.prepare('SELECT COUNT(*) AS n FROM rag_context_results WHERE query_trace_id = ?')
+      .get(response.query_trace_id) as { n: number }
     const row = db.prepare('SELECT results FROM context_packs WHERE query_trace_id = ?')
       .get(response.query_trace_id) as { results: string }
+    expect(trace.n).toBe(1)
+    expect(results.n).toBe(response.results.length)
     expect(row.results).not.toContain('/home/')
     expect(row.results).toContain('[REDACTED_PATH:')
   })

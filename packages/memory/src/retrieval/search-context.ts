@@ -3,6 +3,7 @@ import type { Db } from 'fulcrum-agent-core'
 import { readGraphEvidenceUnits, type GraphEvidenceUnit } from '../graph/evidence.js'
 import { pathFingerprintForRoadmap, redactRagDetails, redactRoadmapArtifact } from '../setup/rag-redaction.js'
 import { packContext, type ContextPack } from './context-pack.js'
+import { persistSearchContextObservability } from './planner/observability.js'
 import type {
   ContextFreshness,
   ContextSourceReference,
@@ -11,8 +12,6 @@ import type {
   TypedContextResultType,
 } from './context-types.js'
 import {
-  persistRagContextResults,
-  persistRagQueryTrace,
   type GraphContributionDetail,
   type QueryTraceStage,
 } from './query-trace.js'
@@ -32,6 +31,7 @@ export interface SearchContextInput {
   limit?: number
   context_budget_tokens?: number
   explain?: boolean
+  persist?: boolean
   include_graph?: boolean
   graph_mode?: 'local' | 'global_summary' | 'drift'
   graph_depth?: number
@@ -129,12 +129,14 @@ export async function searchContext(input: SearchContextInput, db: Db = getDb())
     graph_contributions = finalizeGraphContributions(graph_contributions, results, context_pack)
   }
 
-  persistRagQueryTrace({
+  persistSearchContextObservability({
+    persist: input.persist,
     query_trace_id,
     workspace_id: input.workspace_id,
     project_id: input.project_id,
     query: input.query,
     stages,
+    results,
     fusion: {
       method: 'weighted_sum',
       input_candidates: candidates.length,
@@ -170,22 +172,8 @@ export async function searchContext(input: SearchContextInput, db: Db = getDb())
       }, {}),
     },
     graph_contributions,
+    context_pack,
   }, db)
-
-  persistRagContextResults({
-    query_trace_id,
-    workspace_id: input.workspace_id,
-    project_id: input.project_id,
-    results,
-  }, db)
-
-  if (context_pack) {
-    persistContextPack({
-      workspace_id: input.workspace_id,
-      project_id: input.project_id,
-      context_pack,
-    }, db)
-  }
 
   return {
     query_trace_id,
@@ -886,26 +874,6 @@ function buildTraceStages(
     })
   }
   return stages
-}
-
-function persistContextPack(
-  input: { workspace_id: string; project_id: string; context_pack: ContextPack },
-  db: Db,
-): void {
-  db.prepare(`
-    INSERT INTO context_packs (
-      context_pack_id, query_trace_id, workspace_id, project_id,
-      budget, source_diversity, results
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    input.context_pack.pack_id,
-    input.context_pack.query_trace_id,
-    input.workspace_id,
-    input.project_id,
-    JSON.stringify(input.context_pack.budget),
-    JSON.stringify(input.context_pack.source_diversity),
-    JSON.stringify(redactRoadmapArtifact(redactRagDetails(input.context_pack.results))),
-  )
 }
 
 function safePathRef(value: unknown): Pick<ContextSourceReference, 'file_path' | 'path_fingerprint'> {

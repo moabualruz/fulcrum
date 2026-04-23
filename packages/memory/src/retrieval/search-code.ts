@@ -9,6 +9,7 @@ import type { Db } from 'fulcrum-agent-core'
 import { getCodeEmbedder, getDb } from 'fulcrum-agent-core'
 import { redactRoadmapArtifact } from '../setup/rag-redaction.js'
 import { buildCodeSearchExplanation, type RagRecallExplanation } from './explain.js'
+import { shouldPersistPlannerArtifacts } from './planner/contract.js'
 import { persistRagQueryTrace, redactQueryForTrace, type QueryTraceStage } from './query-trace.js'
 
 type CodeParseStatus = 'parsed' | 'skipped' | 'failed'
@@ -31,6 +32,7 @@ export interface SearchCodeInput {
   caller_run_id?: string
   caller_role?: string
   explain?: boolean
+  persist?: boolean
 }
 
 export interface SearchCodeStageContribution {
@@ -568,7 +570,7 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
     const failures = matchingFailureStages(db, input)
     const allSkipped = [...skipped, ...failures]
     if (allSkipped.length > 0) response.skipped_stages = allSkipped
-    if (input.explain && input.project_id) {
+    if (input.explain && input.project_id && shouldPersistPlannerArtifacts(input)) {
       response.query_trace_id = persistSearchCodeTrace({
         request: input,
         workspace_id: input.workspace_id,
@@ -599,7 +601,7 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
     const failures = matchingFailureStages(db, input)
     const allSkipped = [...skipped, ...failures]
     if (allSkipped.length > 0) response.skipped_stages = allSkipped
-    if (input.explain && input.project_id) {
+    if (input.explain && input.project_id && shouldPersistPlannerArtifacts(input)) {
       response.query_trace_id = persistSearchCodeTrace({
         request: input,
         workspace_id: input.workspace_id,
@@ -710,7 +712,7 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
     const response: SearchCodeResponse = { results: [], reason: 'below_floor' }
     const allSkipped = [...skipped, ...matchingFailureStages(db, input)]
     if (allSkipped.length > 0) response.skipped_stages = allSkipped
-    if (input.explain && input.project_id) {
+    if (input.explain && input.project_id && shouldPersistPlannerArtifacts(input)) {
       response.query_trace_id = persistSearchCodeTrace({
         request: input,
         workspace_id: input.workspace_id,
@@ -736,7 +738,7 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
   const response: SearchCodeResponse = { results: filtered }
   const allSkipped = [...skipped, ...matchingFailureStages(db, input)]
   if (allSkipped.length > 0) response.skipped_stages = allSkipped
-  if (input.explain) {
+  if (input.explain && shouldPersistPlannerArtifacts(input)) {
     response.query_trace_id = persistSearchCodeTrace({
       request: input,
       workspace_id: input.workspace_id,
