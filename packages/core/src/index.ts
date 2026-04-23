@@ -8,7 +8,7 @@ export type {
   RagRebuildCandidateStatus, RagRebuildSnapshotStatus,
   EmbeddingJobSourceDomain, EmbeddingJobStatus, EmbeddingJobItemStatus,
   RagJobEventType, VectorMetadataSourceDomain, VectorMetadataTable,
-  VectorMetadataStatus, RagHealthStatus, RagEvalRunStatus,
+  VectorMetadataStatus, CodeFileStatus, RagHealthStatus, RagEvalRunStatus,
   RuntimeDataProfile, RuntimeProfilePathKey, RuntimeProfilePaths,
   RuntimeProfileError, RuntimeDataProfileManifest,
   FulcrumEvent, TaskRelation, RunEvent,

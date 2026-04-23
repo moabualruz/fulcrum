@@ -16,22 +16,13 @@
 //   * on-demand: syncFile({...}) runs a single file through the cascade
 
 import { readFileSync, statSync, lstatSync } from 'node:fs'
-import { relative, extname, join, isAbsolute } from 'node:path'
-import { createHash } from 'node:crypto'
+import { relative, join, isAbsolute } from 'node:path'
 import type { Db } from 'fulcrum-agent-core'
-import { getDb, getContentChangeBus, newId, type ContentChangeEvent } from 'fulcrum-agent-core'
-import { computeFileId } from '../setup/backfill-code-files.js'
-import { ingestFile as fullIngest } from '../ingest.js'
-import { scheduleChunkEmbedding } from '../l2/code.js'
+import { getDb, getContentChangeBus, type ContentChangeEvent } from 'fulcrum-agent-core'
+import { computeFileId, contentSha256, detectCodeLanguage, indexCodeFile, markCodeFileFailed, markCodeFileSkipped } from '../l2/code.js'
 import { reduceFileToGraph, reduceUnlinkToGraph } from '../kuzu/reducers/code.js'
 
-const LANG_EXT_MAP: Record<string, string> = {
-  '.ts': 'typescript', '.tsx': 'typescript',
-  '.js': 'javascript', '.jsx': 'javascript',
-  '.py': 'python', '.java': 'java', '.go': 'go', '.rs': 'rust',
-  '.c': 'c', '.cpp': 'cpp', '.cc': 'cpp',
-  '.md': 'markdown', '.json': 'json', '.yaml': 'yaml', '.yml': 'yaml', '.toml': 'toml',
-}
+export { contentSha256 } from '../l2/code.js'
 
 // Rename-detection window — an unlink followed by an add carrying the same
 // body hash within this window is treated as a rename, not a delete+create.
@@ -61,17 +52,13 @@ interface PendingUnlink {
 const pendingUnlinks = new Map<string, PendingUnlink>() // keyed by fileId
 const pendingUnlinksBySha = new Map<string, string[]>() // sha256 → fileId[]
 
-export function contentSha256(content: string): string {
-  return createHash('sha256').update(content).digest('hex')
-}
-
 /**
  * Single-file sync entry point — used by the subscriber AND by one-shot
  * callers (tests, backfill, manual ingest). Idempotent.
  */
 export async function syncFile(
   opts: PciSyncerOpts & { event: Pick<ContentChangeEvent, 'change_type' | 'path'> }
-): Promise<{ action: 'indexed' | 'updated' | 'unlinked' | 'renamed' | 'skipped'; fileId: string }> {
+): Promise<{ action: 'indexed' | 'updated' | 'unlinked' | 'renamed' | 'skipped' | 'failed'; fileId: string }> {
   const db = opts.db ?? getDb()
   const { workspaceId, projectId, projectRoot, event } = opts
   const absPath = isAbsolute(event.path) ? event.path : join(projectRoot, event.path)
@@ -90,18 +77,13 @@ export async function syncFile(
     if (!shaList.includes(fileId)) shaList.push(fileId)
     pendingUnlinksBySha.set(row.sha256, shaList)
     // Opportunistic GC — drop expired pending renames before inserting.
-    sweepRenameWindow()
+    sweepRenameWindow(db)
 
     // Defer actual deletion so rename can reclaim; if nothing reclaims
     // within RENAME_WINDOW_MS, a second unlink call or the sweep deletes.
     setTimeout(() => {
       if (pendingUnlinks.has(fileId)) {
-        pendingUnlinks.delete(fileId)
-        const list = pendingUnlinksBySha.get(row.sha256) ?? []
-        const idx = list.indexOf(fileId)
-        if (idx !== -1) list.splice(idx, 1)
-        if (list.length === 0) pendingUnlinksBySha.delete(row.sha256)
-        else pendingUnlinksBySha.set(row.sha256, list)
+        clearPendingUnlink(fileId)
         deleteFile(db, fileId)
       }
     }, RENAME_WINDOW_MS + 10).unref?.()
@@ -116,77 +98,90 @@ export async function syncFile(
   let stats: ReturnType<typeof statSync>
   try {
     const l = lstatSync(absPath)
-    if (l.isSymbolicLink()) return { action: 'skipped', fileId }
+    if (l.isSymbolicLink()) {
+      markCodeFileSkipped({
+        workspace_id: workspaceId,
+        project_id: projectId,
+        rel_path: relPath,
+        language: detectCodeLanguage(relPath),
+        reason: 'symlink_skipped',
+      }, db)
+      return { action: 'skipped', fileId }
+    }
     if (!l.isFile()) return { action: 'skipped', fileId }
     stats = statSync(absPath)
-    if (stats.size > 5 * 1024 * 1024) return { action: 'skipped', fileId } // >5 MiB safety cap
+    if (stats.size > 5 * 1024 * 1024) {
+      markCodeFileSkipped({
+        workspace_id: workspaceId,
+        project_id: projectId,
+        rel_path: relPath,
+        language: detectCodeLanguage(relPath),
+        mtime_ns: mtimeNs(stats),
+        size_bytes: stats.size,
+        reason: 'file_too_large',
+      }, db)
+      return { action: 'skipped', fileId }
+    }
     // Minimal UTF-8 sanity check — reject binary files that would produce
     // garbage FTS5 tokens and waste vector storage (MEDIUM finding).
     const buf = readFileSync(absPath)
     for (let i = 0; i < Math.min(buf.length, 2048); i++) {
-      if (buf[i] === 0) return { action: 'skipped', fileId }
+      if (buf[i] === 0) {
+        markCodeFileSkipped({
+          workspace_id: workspaceId,
+          project_id: projectId,
+          rel_path: relPath,
+          language: detectCodeLanguage(relPath),
+          sha256: contentSha256(buf),
+          mtime_ns: mtimeNs(stats),
+          size_bytes: stats.size,
+          reason: 'binary_skipped',
+        }, db)
+        return { action: 'skipped', fileId }
+      }
     }
     content = buf.toString('utf8')
   } catch {
-    return { action: 'skipped', fileId }
+    markCodeFileFailed({
+      workspace_id: workspaceId,
+      project_id: projectId,
+      rel_path: relPath,
+      language: detectCodeLanguage(relPath),
+      reason: 'read_failed',
+    }, db)
+    return { action: 'failed', fileId }
   }
 
   const sha = contentSha256(content)
-  sweepRenameWindow()
+  sweepRenameWindow(db)
+  clearPendingUnlink(fileId)
   // Pick the first pending unlink with a matching sha256 that isn't the current fileId.
   const candidateFileIds = pendingUnlinksBySha.get(sha) ?? []
   const renameSourceId = candidateFileIds.find(id => id !== fileId)
   const rename = renameSourceId ? pendingUnlinks.get(renameSourceId) : undefined
   if (rename) {
     // Body-hash matched a pending unlink → migrate file_id + rel_path.
-    pendingUnlinks.delete(rename.fileId)
-    const list = pendingUnlinksBySha.get(sha) ?? []
-    const idx = list.indexOf(rename.fileId)
-    if (idx !== -1) list.splice(idx, 1)
-    if (list.length === 0) pendingUnlinksBySha.delete(sha)
-    else pendingUnlinksBySha.set(sha, list)
+    clearPendingUnlink(rename.fileId)
     db.prepare('UPDATE code_files SET file_id = ?, rel_path = ? WHERE file_id = ?').run(fileId, relPath, rename.fileId)
     db.prepare('UPDATE code_chunks SET file_id = ?, file_path = ? WHERE file_id = ?').run(fileId, relPath, rename.fileId)
     return { action: 'renamed', fileId }
   }
 
-  const existing = db.prepare('SELECT sha256, mtime_ns FROM code_files WHERE file_id = ?').get(fileId) as { sha256: string; mtime_ns: number } | undefined
-  if (existing && existing.sha256 === sha) {
-    // Content unchanged — just bump mtime.
-    db.prepare('UPDATE code_files SET mtime_ns = ? WHERE file_id = ?').run(mtimeNs(stats), fileId)
-    return { action: 'skipped', fileId }
-  }
+  const result = await indexCodeFile({
+    workspace_id: workspaceId,
+    project_id: projectId,
+    rel_path: relPath,
+    content,
+    sha256: sha,
+    mtime_ns: mtimeNs(stats),
+    size_bytes: stats.size,
+  }, db)
 
-  const ext = extname(relPath).toLowerCase()
-  const language = LANG_EXT_MAP[ext] ?? 'unknown'
-
-  if (existing) {
-    // change: diff chunks by content_hash.
-    await applyChunkDiff(db, { workspaceId, projectId, fileId, relPath, content, language })
-    db.prepare('UPDATE code_files SET sha256 = ?, mtime_ns = ?, size_bytes = ?, indexed_at = ? WHERE file_id = ?').run(sha, mtimeNs(stats), stats.size, Date.now(), fileId)
-    // v2a PR 7 Task 37 — project updated rows into Kuzu; fire-and-forget.
+  if (result.action === 'indexed' || result.action === 'updated') {
     void reduceFileToGraph(db, fileId).catch(() => { /* logged in reducer */ })
-    return { action: 'updated', fileId }
   }
 
-  // add: insert code_files row, then full ingest. Insert FIRST so the
-  // file_id FK is satisfiable by the chunk inserts inside fullIngest.
-  db.prepare(`INSERT OR IGNORE INTO code_files
-    (file_id, workspace_id, project_id, rel_path, language, sha256, mtime_ns, size_bytes, chunks_count, indexed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`
-  ).run(fileId, workspaceId, projectId, relPath, language, sha, mtimeNs(stats), stats.size, Date.now())
-
-  await fullIngest({ workspace_id: workspaceId, project_id: projectId, file_path: relPath, content, language }, db)
-
-  // Backfill file_id on the newly-inserted chunks + refresh count.
-  db.prepare('UPDATE code_chunks SET file_id = ? WHERE workspace_id = ? AND project_id = ? AND file_path = ? AND file_id IS NULL').run(fileId, workspaceId, projectId, relPath)
-  const count = db.prepare('SELECT COUNT(*) AS n FROM code_chunks WHERE file_id = ?').get(fileId) as { n: number }
-  db.prepare('UPDATE code_files SET chunks_count = ? WHERE file_id = ?').run(count.n, fileId)
-
-  // v2a PR 7 Task 37 — project new rows into Kuzu.
-  void reduceFileToGraph(db, fileId).catch(() => { /* logged in reducer */ })
-
-  return { action: 'indexed', fileId }
+  return { action: result.action, fileId }
 }
 
 function mtimeNs(stats: ReturnType<typeof statSync> | undefined): number {
@@ -205,126 +200,25 @@ function deleteFile(db: Db, fileId: string): void {
   void reduceUnlinkToGraph(fileId).catch(() => { /* logged inside reducer */ })
 }
 
-function sweepRenameWindow(): void {
+function clearPendingUnlink(fileId: string): void {
+  const pending = pendingUnlinks.get(fileId)
+  if (!pending) return
+  pendingUnlinks.delete(fileId)
+  const list = pendingUnlinksBySha.get(pending.sha256) ?? []
+  const idx = list.indexOf(fileId)
+  if (idx !== -1) list.splice(idx, 1)
+  if (list.length === 0) pendingUnlinksBySha.delete(pending.sha256)
+  else pendingUnlinksBySha.set(pending.sha256, list)
+}
+
+function sweepRenameWindow(db: Db): void {
   const now = Date.now()
   for (const [fid, pending] of pendingUnlinks.entries()) {
     if (now - pending.ts > RENAME_WINDOW_MS * 4) {
-      pendingUnlinks.delete(fid)
-      const list = pendingUnlinksBySha.get(pending.sha256) ?? []
-      const idx = list.indexOf(fid)
-      if (idx !== -1) list.splice(idx, 1)
-      if (list.length === 0) pendingUnlinksBySha.delete(pending.sha256)
-      else pendingUnlinksBySha.set(pending.sha256, list)
+      clearPendingUnlink(fid)
+      deleteFile(db, fid)
     }
   }
-}
-
-/**
- * Re-chunk the file, insert new chunk_ids not yet present, delete chunks
- * whose content_hash is no longer in the new chunk set. The syntactically
- * unchanged chunks keep their chunk_id (preserving embeddings).
- */
-async function applyChunkDiff(
-  db: Db,
-  args: { workspaceId: string; projectId: string; fileId: string; relPath: string; content: string; language: string },
-): Promise<void> {
-  const { workspaceId, projectId, fileId, relPath, content, language } = args
-
-  // Lift the existing chunker path by running fullIngest on a scratch
-  // project_id slot, then reconcile. Simpler: re-chunk inline by reading
-  // from the live chunker module. Done via a lightweight re-chunking
-  // duplicated from ingest.ts (semantic/syntax split).
-  const newChunks = await rechunk(content, language)
-
-  const existing = db.prepare('SELECT chunk_id, content_hash FROM code_chunks WHERE file_id = ?').all(fileId) as Array<{ chunk_id: string; content_hash: string | null }>
-  const existingByHash = new Map(existing.filter(c => c.content_hash).map(c => [c.content_hash!, c.chunk_id]))
-  const newHashes = new Set(newChunks.map(c => contentSha256(c.text)))
-
-  // Insert chunks whose content_hash isn't already present.
-  const insert = db.prepare(`INSERT INTO code_chunks
-    (chunk_id, workspace_id, project_id, file_path, file_id, language, chunk_strategy, source_type, content, start_line, end_line, symbol_path, content_hash, indexed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`)
-  for (const chunk of newChunks) {
-    const h = contentSha256(chunk.text)
-    if (existingByHash.has(h)) continue
-    const chunkId = newId('chunk')
-    insert.run(
-      chunkId, workspaceId, projectId, relPath, fileId, language,
-      chunk.strategy, chunk.sourceType, chunk.text,
-      chunk.startLine, chunk.endLine, chunk.symbolPath, h,
-    )
-    scheduleChunkEmbedding(db, chunkId, chunk.text)
-  }
-
-  // Delete chunks whose content_hash is gone.
-  const del = db.prepare('DELETE FROM code_chunks WHERE chunk_id = ?')
-  for (const c of existing) {
-    if (c.content_hash && !newHashes.has(c.content_hash)) {
-      del.run(c.chunk_id)
-    }
-  }
-
-  // Refresh count.
-  const count = db.prepare('SELECT COUNT(*) AS n FROM code_chunks WHERE file_id = ?').get(fileId) as { n: number }
-  db.prepare('UPDATE code_files SET chunks_count = ? WHERE file_id = ?').run(count.n, fileId)
-}
-
-interface RechunkResult {
-  text: string
-  strategy: 'syntax' | 'semantic'
-  sourceType: 'code' | 'prose'
-  symbolPath: string | null
-  startLine: number
-  endLine: number
-}
-
-const CODE_LANGUAGES = new Set(['typescript', 'javascript', 'python', 'java', 'go', 'rust', 'c', 'cpp'])
-const MAX_CHUNK_CHARS = 1600
-const SYNTAX_BOUNDARIES = /(?=^(?:export\s+)?(?:async\s+)?(?:function|class)\s+\w)/gm
-
-async function rechunk(content: string, language: string): Promise<RechunkResult[]> {
-  const isCode = CODE_LANGUAGES.has(language)
-  const strategy: 'syntax' | 'semantic' = isCode ? 'syntax' : 'semantic'
-  const sourceType: 'code' | 'prose' = isCode ? 'code' : 'prose'
-
-  if (isCode) {
-    const parts = content.split(SYNTAX_BOUNDARIES).filter(p => p.trim())
-    const result: RechunkResult[] = []
-    let offset = 0
-    for (const part of parts) {
-      const partLines = part.split('\n')
-      const match = part.match(/(?:export\s+)?(?:async\s+)?(?:function|class)\s+(\w+)/)
-      const symbolPath = match ? match[1] ?? null : null
-      const slice = part.length > MAX_CHUNK_CHARS ? part.slice(0, MAX_CHUNK_CHARS) : part.trim()
-      result.push({
-        text: slice || part,
-        strategy, sourceType, symbolPath,
-        startLine: offset + 1,
-        endLine: offset + partLines.length,
-      })
-      offset += partLines.length
-    }
-    if (result.length === 0 && content.trim()) {
-      result.push({ text: content.trim().slice(0, MAX_CHUNK_CHARS), strategy, sourceType, symbolPath: null, startLine: 1, endLine: content.split('\n').length })
-    }
-    return result
-  }
-
-  // prose
-  const paragraphs = content.split(/\n\n+/).filter(p => p.trim())
-  const result: RechunkResult[] = []
-  let line = 1
-  for (const para of paragraphs) {
-    const paraLines = para.split('\n').length
-    result.push({
-      text: para.trim().slice(0, MAX_CHUNK_CHARS),
-      strategy, sourceType, symbolPath: null,
-      startLine: line,
-      endLine: line + paraLines - 1,
-    })
-    line += paraLines + 1
-  }
-  return result
 }
 
 /**

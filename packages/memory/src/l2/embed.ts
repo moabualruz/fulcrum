@@ -25,7 +25,13 @@ type RuntimeAwareProvider = {
 
 export function resolveEmbeddingRuntimeDevice(provider: unknown, requested_device = 'auto'): EmbeddingRuntimeInfo {
   const runtime = provider as RuntimeAwareProvider
-  const actual = runtime.actualDevice ?? runtime.actual_device ?? (requested_device === 'auto' ? 'cpu' : requested_device)
+  const actual = runtime.actualDevice ?? runtime.actual_device ?? runtime.device
+  if (!actual) {
+    if (requested_device !== 'auto') {
+      throw new Error(`requested device ${requested_device} but embedding runtime did not report actual device`)
+    }
+    return { requested_device, actual_device: 'unknown', fallback_reason: null }
+  }
   const fallback_reason = requested_device === 'auto' && actual !== 'auto'
     ? `auto device selected ${actual}`
     : null

@@ -25,6 +25,8 @@ CONTROL PLANE
   memory accelerate    Enable L2 (Kuzu graph + HNSW vector search)
   memory rebuild       Rebuild L1 from L0 vault files
   memory embed         Backfill vector embeddings or start scoped embedding job
+  memory doctor        Show read-only RAG health report
+  memory eval          Run deterministic RAG lifecycle eval suite
   memory status        Show vault path and layer status
   jobs status <job_id> Show embedding job status
   jobs logs <job_id>   Show embedding job event log
@@ -305,6 +307,8 @@ fulcrum memory — memory vault commands
   migrate          End-to-end v2a → v3 migration orchestrator (v3 PR 6)
   consolidate      Propose merge candidates across entity-set collisions (v3 PR 7)
   sweep-expired              Delete session-scope memories whose expires_at has passed
+  doctor                     Show read-only RAG health report
+  eval --suite rag-lifecycle Run deterministic local RAG lifecycle evals
   graph-consistency-check    Sample SQLite ↔ Kuzu and report drift (requires L2)
   rollback                   Operator-only rollback (--since= + --yes-i-really-want-to-undo-N-writes)
 `)
@@ -506,6 +510,46 @@ fulcrum memory — memory vault commands
     }
     if (rows.length > batchSize) process.stdout.write('\n')
     console.log(`✓ Embedded ${ok} memories${fail > 0 ? `, ${fail} failed` : ''}`)
+    return
+  }
+
+  if (command === 'doctor' || command === 'health') {
+    const { executeRagHealthCommand, formatRagHealthReport } = await import('./commands/memory-rag-health.js')
+    const result = executeRagHealthCommand({
+      workspace_id: optArg('--workspace-id'),
+      project_id: optArg('--project-id'),
+      vault_path: optArg('--vault-path'),
+      runtime_profile: optArg('--profile') as 'install' | 'dev' | 'test' | undefined,
+    })
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+    else console.log(formatRagHealthReport(result))
+    return
+  }
+
+  if (command === 'eval') {
+    const suite = optArg('--suite')
+    if (!suite) {
+      console.error('Usage: fulcrum memory eval --suite rag-lifecycle [--json]')
+      process.exit(1)
+    }
+    const { executeRagEvalCommand } = await import('./commands/memory-rag-eval.js')
+    const result = await executeRagEvalCommand({
+      workspace_id: optArg('--workspace-id'),
+      project_id: optArg('--project-id'),
+      suite,
+      include_model_heavy: args.includes('--include-model-heavy'),
+      include_accelerator_heavy: args.includes('--include-accelerator-heavy'),
+      actor: { kind: 'human', role: 'software_engineer', id: process.env['USER'] ?? 'local-operator' },
+    })
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+    else {
+      console.log(`RAG eval ${result.suite}: ${result.status}`)
+      console.log(`eval_run_id: ${result.eval_run_id}`)
+      for (const [category, counts] of Object.entries(result.results)) {
+        console.log(`  ${category}: ${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped`)
+      }
+    }
+    if (result.status === 'failed') process.exit(2)
     return
   }
 

@@ -701,6 +701,26 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
   })
 
+  app.get('/rag/health', async (c) => {
+    const ws = c.req.query('workspace_id') ?? workspace_id
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    const proj = c.req.query('project_id') ?? project_id
+    if (!proj) return c.json({ error: 'project_id required' }, 400)
+
+    try {
+      const { buildRagHealthReport } = await import('fulcrum-memory')
+      const data = buildRagHealthReport({
+        workspace_id: ws,
+        project_id: proj,
+        vault_path: c.req.query('vault_path'),
+        runtime_profile: c.req.query('runtime_profile') as 'install' | 'dev' | 'test' | undefined,
+      }, getDb())
+      return c.json(data)
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500)
+    }
+  })
+
   app.get('/replay/:run_id', async (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)

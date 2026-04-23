@@ -201,6 +201,7 @@ runtime rows.
 - `start_rag_rebuild`
 - `get_runtime_profile_paths`
 - `get_rag_rebuild_report`
+- `get_rag_health`
 - `start_embedding_job`
 - `get_embedding_job_status`
 - `get_embedding_job_logs`
@@ -262,6 +263,7 @@ CLI/action parity, response contract, negative path, and docs.
 - `start_rag_rebuild`
 - `get_runtime_profile_paths`
 - `get_rag_rebuild_report`
+- `get_rag_health`
 - `start_embedding_job`
 - `get_embedding_job_status`
 - `get_embedding_job_logs`
@@ -318,6 +320,7 @@ Status: inventory complete. Seven registry entries are not public MCP schemas:
 - `GET /analytics/per-role`
 - `GET /analytics/memory`
 - `GET /memory/stats`
+- `GET /rag/health`
 - `GET /replay/:run_id`
 - `GET /analytics/forecast`
 - `GET /tasks`

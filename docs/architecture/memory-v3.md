@@ -34,7 +34,38 @@ This document is the operator reference. For the implementation plan, see [`docs
 
 - **Tables:** `vec_memories` (embeds L1 page bodies), `vec_chunks` (embeds code_chunks; unchanged from v2a).
 - **Writer:** `recordL1Embedding(page_id)` fires after every curator apply. Hash-based change detection avoids re-embedding unchanged bodies.
-- **Retrieval:** hybrid — FTS5 BM25 + vector cosine + graph traversal + RRF fusion + confidence + supersession filter.
+- **Retrieval:** hybrid — FTS5 BM25 + vector cosine + graph traversal + RRF fusion + confidence + supersession filter. `--explain` adds stable stage ranks/scores, runtime provider/model/device, provenance class, source refs, supersession, confidence, freshness, and graph contribution.
+
+### RAG lifecycle hardening
+
+The RAG lifecycle surface treats FTS rows, vector rows, code chunks, graph rows,
+and eval reports as derived or operational state.
+
+- **Staged rebuilds.** `fulcrum memory rebuild --all --mode plan|dry-run --json`
+  reports scope without mutation. `fulcrum memory rebuild --all --execute --json`
+  builds candidate state, verifies parity, revalidates the canonical-source
+  snapshot, and promotes only after checks pass. Failed or stale candidates
+  remain unserved and preserve prior served state.
+- **Input snapshots.** Full rebuild execution captures source identities,
+  content hashes, and relevant config fingerprints before rebuilding. Promotion
+  compares the current canonical state against that manifest; stale snapshots
+  fail closed.
+- **Embedding jobs.** `fulcrum memory embed --scope memories|l1-pages|code --json`
+  creates durable `embedding_jobs` and `embedding_job_items` rows. Jobs record
+  requested provider/model/device/dimensions, actual runtime device, per-item
+  status, attempts, redacted errors, and recovery events. Jobs with partial item
+  failures finish `degraded`; `fulcrum jobs retry <job_id> --failed --json`
+  retries only failed or stale eligible rows.
+- **Vector metadata.** `vector_metadata` records source identity, content hash,
+  provider/model/device/dimensions, vector table, and freshness state outside the
+  vector blob so health checks can detect stale, failed, legacy, skipped, or
+  mixed-model coverage.
+- **Health.** `fulcrum memory doctor --json` is read-only and aggregates raw,
+  L1, FTS, code, vector, failed-job, stale-job, and graph coverage with ordered
+  recommended actions.
+- **Evals.** `fulcrum memory eval --suite rag-lifecycle --json` runs a
+  deterministic local suite. Model-heavy and accelerator-heavy checks stay
+  opt-in.
 
 ---
 
@@ -174,7 +205,7 @@ The monitor server (`fulcrum serve monitor`, default port 4721) exposes `GET /me
 
 Curation percentiles read `vault/curated/log.md`. Missing file ⇒ nulls. Malformed lines are skipped.
 
-**CI gate.** `.github/workflows/memory-eval.yml` runs `pnpm --filter fulcrum-memory eval:fulcrum-recall` on every PR touching `packages/memory/src/{retrieval,l0,l1,l2,migration,eval}/**`, `stats.ts`, `schema.ts`, `write.ts`, `recall.ts`, or `scoring.ts`. The job must pass before merge.
+**CI gate.** `.github/workflows/memory-eval.yml` runs `pnpm --filter fulcrum-memory eval:rag-lifecycle` for changes touching RAG lifecycle specs, `packages/memory/src/**`, core schema/types/IDs, RAG CLI commands, tool registry/schema files, or the workflow itself. Unrelated non-RAG changes may skip the default golden RAG gate.
 
 ---
 
@@ -190,7 +221,7 @@ fulcrum hook claude post --tool-name Bash --exit-code 0 <<< '{"command":"grep -r
 fulcrum memory curate l0src_01KPGHE... --backend codex
 
 # 3. Recall — picks the new L1 page ordered by fused FTS+vec+graph score.
-fulcrum memory recall "grep pattern in src"
+fulcrum memory recall "grep pattern in src" --explain --json
 
 # 4. Inspect the result.
 fulcrum memory inspect <page_id>
@@ -233,7 +264,15 @@ All of the above are mirrored as MCP tools so agents can drive the same flow.
 - `packages/memory/src/l1/consolidate-schedule.ts` — cadence-driven scan loop (PR 8.2).
 - `packages/memory/src/stats.ts` — `/memory/stats` compute fn (PR 8.3).
 - `packages/memory/src/schema.ts` — v3 migrations 101–104.
+- `packages/memory/src/setup/rag-lifecycle.ts` — rebuild planner/orchestrator.
+- `packages/memory/src/setup/rebuild-{candidate,parity,report,snapshot}.ts` — staged promotion, parity, reports, snapshots.
+- `packages/memory/src/setup/rag-health.ts` — read-only RAG health report.
+- `packages/memory/src/l2/embedding-jobs.ts` — durable embedding job ledger and runner.
+- `packages/memory/src/l2/vector-metadata.ts` — vector freshness/coverage sidecar rows.
 - `packages/memory/src/migration/` — v2a → v3 classifier + migrator (PR 6).
 - `packages/memory/src/retrieval/v3-search.ts` — graph + confidence + supersession-filtered recall.
+- `packages/memory/src/retrieval/explain.ts` — stable recall/code-search explanation schema.
+- `packages/memory/src/retrieval/search-code.ts` — code search attribution and code-backed explanation.
+- `packages/memory/src/eval/rag-lifecycle/` — deterministic golden RAG lifecycle suite.
 - `packages/cli/src/commands/memory-*.ts` — CLI shims + MCP parity handlers.
 - `docs/plans/2026-04-18-002-memory-tiered-architecture-plan.md` — the full plan.

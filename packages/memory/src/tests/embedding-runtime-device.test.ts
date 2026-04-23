@@ -60,6 +60,7 @@ describe('embedding runtime device reporting', () => {
 
   it('fails closed when an explicit requested device differs from actual runtime device', async () => {
     expect(() => resolveEmbeddingRuntimeDevice({ actualDevice: 'cpu' }, 'cuda')).toThrow(/requested device cuda/)
+    expect(() => resolveEmbeddingRuntimeDevice({}, 'cuda')).toThrow(/did not report actual device/)
 
     seedMemory('mem_2', 'device mismatch body')
     const job = createEmbeddingJob({

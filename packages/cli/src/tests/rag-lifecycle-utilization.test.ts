@@ -10,6 +10,7 @@ describe('RAG lifecycle integration utilization', () => {
       'start_rag_rebuild',
       'get_runtime_profile_paths',
       'get_rag_rebuild_report',
+      'get_rag_health',
       'start_embedding_job',
       'get_embedding_job_status',
       'get_embedding_job_logs',

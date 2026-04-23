@@ -193,18 +193,18 @@
 
 ### Tests for User Story 4
 
-- [ ] T083 [P] [US4] Add failing batch vs incremental code indexing parity tests for FR-015, FR-016, and SC-002 in packages/memory/src/tests/code-index-parity.test.ts
-- [ ] T084 [P] [US4] Add failing parse/index failure state tests for FR-017 in packages/memory/src/tests/code-index-failures.test.ts
-- [ ] T085 [P] [US4] Add failing stale chunk replacement and current line range tests for FR-018 in packages/memory/src/tests/code-index-lines.test.ts
-- [ ] T086 [P] [US4] Add failing integration utilization tests proving batch and PCI consumers use the same file-level primitive in packages/memory/src/tests/code-index-utilization.test.ts
+- [X] T083 [P] [US4] Add failing batch vs incremental code indexing parity tests for FR-015, FR-016, and SC-002 in packages/memory/src/tests/code-index-parity.test.ts
+- [X] T084 [P] [US4] Add failing parse/index failure state tests for FR-017 in packages/memory/src/tests/code-index-failures.test.ts
+- [X] T085 [P] [US4] Add failing stale chunk replacement and current line range tests for FR-018 in packages/memory/src/tests/code-index-lines.test.ts
+- [X] T086 [P] [US4] Add failing integration utilization tests proving batch and PCI consumers use the same file-level primitive in packages/memory/src/tests/code-index-utilization.test.ts
 
 ### Implementation for User Story 4
 
-- [ ] T087 [US4] Implement shared file-level code indexing primitive with file identity, hash, language, chunk count, and failure state in packages/memory/src/l2/code.ts
-- [ ] T088 [US4] Update batch project indexing to call the shared file-level primitive in packages/memory/src/setup/backfill-code-files.ts
-- [ ] T089 [US4] Update PCI incremental indexing to call the shared file-level primitive in packages/memory/src/pci/syncer.ts
-- [ ] T090 [US4] Enforce chunk/file relationship parity and legacy classification in packages/memory/src/retrieval/search-code.ts
-- [ ] T091 [US4] Return stable path and line range for every code-search result in packages/memory/src/retrieval/search-code.ts
+- [X] T087 [US4] Implement shared file-level code indexing primitive with file identity, hash, language, chunk count, and failure state in packages/memory/src/l2/code.ts
+- [X] T088 [US4] Update batch project indexing to call the shared file-level primitive in packages/memory/src/setup/backfill-code-files.ts
+- [X] T089 [US4] Update PCI incremental indexing to call the shared file-level primitive in packages/memory/src/pci/syncer.ts
+- [X] T090 [US4] Enforce chunk/file relationship parity and legacy classification in packages/memory/src/retrieval/search-code.ts
+- [X] T091 [US4] Return stable path and line range for every code-search result in packages/memory/src/retrieval/search-code.ts
 
 **Checkpoint**: US4 code index state is consistent across ingestion paths.
 
@@ -218,16 +218,16 @@
 
 ### Tests for User Story 5
 
-- [ ] T092 [P] [US5] Add failing health report fixture tests for raw/L1/FTS/code/vector/graph failures covering FR-028, SC-007, and SC-010 in packages/memory/src/tests/rag-health.test.ts
-- [ ] T093 [P] [US5] Add failing read-only non-mutation tests for health command and monitor endpoint covering FR-033 and SC-009 in packages/cli/src/tests/rag-health-readonly.test.ts
-- [ ] T094 [P] [US5] Add failing monitor read-only RAG health endpoint tests in packages/monitor/src/tests/rag-health-endpoint.test.ts
+- [X] T092 [P] [US5] Add failing health report fixture tests for raw/L1/FTS/code/vector/graph failures covering FR-028, SC-007, and SC-010 in packages/memory/src/tests/rag-health.test.ts
+- [X] T093 [P] [US5] Add failing read-only non-mutation tests for health command and monitor endpoint covering FR-033 and SC-009 in packages/cli/src/tests/rag-health-readonly.test.ts
+- [X] T094 [P] [US5] Add failing monitor read-only RAG health endpoint tests in packages/monitor/src/tests/rag-health-endpoint.test.ts
 
 ### Implementation for User Story 5
 
-- [ ] T095 [US5] Implement RAG health report aggregation and recommended-action ordering in packages/memory/src/setup/rag-health.ts
-- [ ] T096 [US5] Wire `fulcrum memory doctor --json` or equivalent RAG health command in packages/cli/src/index.ts
-- [ ] T097 [US5] Add MCP/action read-only RAG health handler with structured output in packages/cli/src/tool-registry.ts
-- [ ] T098 [US5] Add read-only monitor RAG health route and response mapping in packages/monitor/src/server.ts
+- [X] T095 [US5] Implement RAG health report aggregation and recommended-action ordering in packages/memory/src/setup/rag-health.ts
+- [X] T096 [US5] Wire `fulcrum memory doctor --json` or equivalent RAG health command in packages/cli/src/index.ts
+- [X] T097 [US5] Add MCP/action read-only RAG health handler with structured output in packages/cli/src/tool-registry.ts
+- [X] T098 [US5] Add read-only monitor RAG health route and response mapping in packages/monitor/src/server.ts
 
 **Checkpoint**: US5 health report is read-only and actionable.
 
@@ -241,19 +241,19 @@
 
 ### Tests for User Story 6
 
-- [ ] T099 [P] [US6] Add failing golden eval fixture tests for retrieval relevance, ranking, answer correctness, grounding/provenance, graph expansion, and operational parity covering FR-030, FR-031, FR-038, SC-008, and SC-011 in packages/memory/src/eval/rag-lifecycle/runner.test.ts
-- [ ] T100 [P] [US6] Add failing local deterministic eval runner tests that keep model-heavy checks opt-in for FR-039 in packages/memory/src/tests/rag-eval-runner.test.ts
-- [ ] T101 [P] [US6] Add failing CI gate path-filter tests for RAG-related vs unrelated non-RAG changes covering FR-046 and SC-015 in packages/cli/src/tests/rag-eval-ci-gate.test.ts
-- [ ] T102 [P] [US6] Add failing CLI eval contract tests for `fulcrum memory eval --suite rag-lifecycle --json`, actor authorization, and audit events covering FR-040 in packages/cli/src/tests/rag-eval-contract.test.ts
+- [X] T099 [P] [US6] Add failing golden eval fixture tests for retrieval relevance, ranking, answer correctness, grounding/provenance, graph expansion, and operational parity covering FR-030, FR-031, FR-038, SC-008, and SC-011 in packages/memory/src/eval/rag-lifecycle/runner.test.ts
+- [X] T100 [P] [US6] Add failing local deterministic eval runner tests that keep model-heavy checks opt-in for FR-039 in packages/memory/src/tests/rag-eval-runner.test.ts
+- [X] T101 [P] [US6] Add failing CI gate path-filter tests for RAG-related vs unrelated non-RAG changes covering FR-046 and SC-015 in packages/cli/src/tests/rag-eval-ci-gate.test.ts
+- [X] T102 [P] [US6] Add failing CLI eval contract tests for `fulcrum memory eval --suite rag-lifecycle --json`, actor authorization, and audit events covering FR-040 in packages/cli/src/tests/rag-eval-contract.test.ts
 
 ### Implementation for User Story 6
 
-- [ ] T103 [US6] Implement checked-in golden eval fixtures for memory recall, code search, hybrid recall, reranking, provenance trace, graph expansion, and reset/rebuild parity in packages/memory/src/eval/rag-lifecycle/fixtures.ts
-- [ ] T104 [US6] Implement RAG lifecycle eval runner and grouped result categories in packages/memory/src/eval/rag-lifecycle/runner.ts
-- [ ] T105 [US6] Wire local deterministic eval suite into existing eval exports in packages/memory/src/eval/index.ts
-- [ ] T106 [US6] Wire `fulcrum memory eval --suite rag-lifecycle --json` command for local post-rebuild eval execution with audit events for expensive eval runs covering FR-032 and FR-040 in packages/cli/src/index.ts
-- [ ] T107 [US6] Add targeted CI gate for RAG lifecycle, memory, code search, embeddings, graph, and eval fixture paths in .github/workflows/memory-eval.yml
-- [ ] T108 [US6] Document opt-in model-heavy and accelerator-heavy eval flags in packages/memory/src/eval/rag-lifecycle/README.md
+- [X] T103 [US6] Implement checked-in golden eval fixtures for memory recall, code search, hybrid recall, reranking, provenance trace, graph expansion, and reset/rebuild parity in packages/memory/src/eval/rag-lifecycle/fixtures.ts
+- [X] T104 [US6] Implement RAG lifecycle eval runner and grouped result categories in packages/memory/src/eval/rag-lifecycle/runner.ts
+- [X] T105 [US6] Wire local deterministic eval suite into existing eval exports in packages/memory/src/eval/index.ts
+- [X] T106 [US6] Wire `fulcrum memory eval --suite rag-lifecycle --json` command for local post-rebuild eval execution with audit events for expensive eval runs covering FR-032 and FR-040 in packages/cli/src/index.ts
+- [X] T107 [US6] Add targeted CI gate for RAG lifecycle, memory, code search, embeddings, graph, and eval fixture paths in .github/workflows/memory-eval.yml
+- [X] T108 [US6] Document opt-in model-heavy and accelerator-heavy eval flags in packages/memory/src/eval/rag-lifecycle/README.md
 
 **Checkpoint**: US6 default eval gate protects RAG-related changes without blocking unrelated work.
 

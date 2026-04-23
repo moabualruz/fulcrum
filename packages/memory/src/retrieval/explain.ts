@@ -18,10 +18,12 @@ export interface RagSourceReference {
   status: RagSourceStatus
   source_id?: string
   chunk_id?: string
+  file_id?: string
   path?: string
   source_type?: string
   start_line?: number | null
   end_line?: number | null
+  code_index_state?: string
 }
 
 export interface RagGraphContribution {
@@ -70,6 +72,8 @@ export interface CodeExplainHit {
   start_line: number | null
   end_line: number | null
   score: number
+  file_id?: string | null
+  code_index_state?: string | null
   stage_ranks: Record<string, number | null>
   stage_scores: Record<string, number | null>
 }
@@ -284,6 +288,8 @@ export function buildCodeSearchExplanation(row: CodeExplainHit): RagRecallExplan
       path: row.rel_path,
       start_line: row.start_line,
       end_line: row.end_line,
+      file_id: row.file_id ?? undefined,
+      code_index_state: row.code_index_state ?? undefined,
       status: 'resolved',
     }],
   }

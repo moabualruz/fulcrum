@@ -33,13 +33,15 @@ export interface SearchCodeInput {
 export interface SearchCodeResultRow {
   chunk_id: string
   rel_path: string
-  start_line: number | null
-  end_line: number | null
+  start_line: number
+  end_line: number
   symbol_path: string | null
   language: string | null
   content: string
   score: number
   project_id: string
+  file_id: string | null
+  code_index_state: 'current' | 'legacy' | 'orphaned'
   explanation?: RagRecallExplanation
 }
 
@@ -53,6 +55,10 @@ function logRecallEvent(db: Db, chunk_id: string, query: string, rank: number, s
     db.prepare(`INSERT INTO memory_recall_events (memory_id, query, score, rank, caller_run_id, caller_role, source, created_at) VALUES (?,?,?,?,?,?,?,?)`)
       .run(chunk_id, query, score, rank, callerRunId ?? null, callerRole ?? null, 'search_code', Date.now())
   } catch { /* aux table absent — non-fatal */ }
+}
+
+function rankScore(rank: number | null): number | null {
+  return rank === null ? null : 1 / (60 + rank)
 }
 
 export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Promise<SearchCodeResponse> {
@@ -80,20 +86,28 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
 
   // Rank map #1: FTS5 text-match rank by bm25 order.
   const ftsRankByChunk = new Map<string, number>()
-  const filterWhere = where.join(' AND ')
-  const filterParams = [...params]
   if (input.text && input.text.trim()) {
     const safe = input.text.match(/[\p{L}\p{N}_]+/gu)?.map(t => `"${t}"`).join(' AND ') ?? ''
     if (!safe) return { results: [], reason: 'no_match' }
     try {
+      const ftsWhere = where.join(' AND ')
       const ftsRows = db.prepare(`
         SELECT c.chunk_id, bm25(code_chunks_fts) AS bm25
         FROM code_chunks c
         JOIN code_chunks_fts ON c.rowid = code_chunks_fts.rowid
-        WHERE code_chunks_fts MATCH ? AND ${filterWhere}
+        LEFT JOIN code_files f
+          ON f.file_id = c.file_id
+          AND f.workspace_id = c.workspace_id
+          AND f.project_id = c.project_id
+        WHERE code_chunks_fts MATCH ?
+          AND ${ftsWhere}
+          AND (
+            c.file_id IS NULL
+            OR (f.file_id IS NOT NULL AND f.status = 'indexed')
+          )
         ORDER BY bm25 ASC
         LIMIT ?
-      `).all(safe, ...filterParams, limit * 4) as Array<{ chunk_id: string; bm25: number }>
+      `).all(safe, ...params, limit * 4) as Array<{ chunk_id: string; bm25: number }>
       ftsRows.forEach((row, idx) => {
         ftsRankByChunk.set(row.chunk_id, idx + 1)
       })
@@ -103,15 +117,47 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
   }
 
   const sql = `
-    SELECT c.chunk_id, c.file_path AS rel_path, c.start_line, c.end_line, c.symbol_path, c.language, c.content, c.project_id
+    SELECT c.chunk_id,
+           COALESCE(f.rel_path, c.file_path) AS rel_path,
+           COALESCE(c.start_line, 1) AS start_line,
+           COALESCE(c.end_line, COALESCE(c.start_line, 1)) AS end_line,
+           c.symbol_path,
+           COALESCE(c.language, f.language) AS language,
+           c.content,
+           c.project_id,
+           c.file_id,
+           CASE
+             WHEN c.file_id IS NULL THEN 'legacy'
+             WHEN f.file_id IS NULL THEN 'orphaned'
+             ELSE 'current'
+           END AS code_index_state
     FROM code_chunks c
+    LEFT JOIN code_files f
+      ON f.file_id = c.file_id
+      AND f.workspace_id = c.workspace_id
+      AND f.project_id = c.project_id
     WHERE ${where.join(' AND ')}
+      AND (
+        c.file_id IS NULL
+        OR (f.file_id IS NOT NULL AND f.status = 'indexed')
+      )
     ORDER BY c.indexed_at DESC
     LIMIT ?
   `
   params.push(limit)
 
-  let rows: Array<{ chunk_id: string; rel_path: string; start_line: number | null; end_line: number | null; symbol_path: string | null; language: string | null; content: string; project_id: string }>
+  let rows: Array<{
+    chunk_id: string
+    rel_path: string
+    start_line: number
+    end_line: number
+    symbol_path: string | null
+    language: string | null
+    content: string
+    project_id: string
+    file_id: string | null
+    code_index_state: 'current' | 'legacy' | 'orphaned'
+  }>
   try {
     rows = db.prepare(sql).all(...params) as typeof rows
   } catch {
@@ -142,9 +188,10 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
   // Two-signal RRF — the score floor comes from the same k=60 formula as
   // recall_memory. Recency tie-breaker via the result-set order.
   const results: SearchCodeResultRow[] = rows
-    .map(r => {
+    .map((r, idx) => {
       const ftsRank = ftsRankByChunk.get(r.chunk_id) ?? null
       const symRank = symbolRankByChunk.get(r.chunk_id) ?? null
+      const recencyRank = idx + 1
       const score = rrfScore(ftsRank, symRank)
       const result: SearchCodeResultRow = {
         chunk_id: r.chunk_id,
@@ -156,6 +203,8 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
         content: r.content,
         score,
         project_id: r.project_id,
+        file_id: r.file_id,
+        code_index_state: r.code_index_state,
       }
       if (input.explain) {
         result.explanation = buildCodeSearchExplanation({
@@ -164,13 +213,13 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
           start_line: r.start_line,
           end_line: r.end_line,
           score,
-          stage_ranks: {
-            fts: ftsRank,
-            symbol: symRank,
-          },
+          file_id: r.file_id,
+          code_index_state: r.code_index_state,
+          stage_ranks: { fts: ftsRank, symbol: symRank, recency: recencyRank },
           stage_scores: {
-            fts: ftsRank === null ? null : 1 / (60 + ftsRank),
-            symbol: symRank === null ? null : 1 / (60 + symRank),
+            fts: rankScore(ftsRank),
+            symbol: rankScore(symRank),
+            recency: rankScore(recencyRank),
             fused: score,
           },
         })

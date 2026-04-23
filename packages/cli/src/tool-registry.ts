@@ -13,7 +13,7 @@
 // Handlers default workspace_id and project_id from deps when args omit them.
 
 import { getDb } from 'fulcrum-agent-core'
-import type { AgentRole, Db, RuntimeDataProfile } from 'fulcrum-agent-core'
+import type { AgentRole, Db, FulcrumConfig, RuntimeDataProfile } from 'fulcrum-agent-core'
 import type { RagRebuildDomain } from 'fulcrum-memory'
 import { TOOL_SCHEMA_MAP } from './mcp-tools.js'
 import type { ToolSchema } from './mcp-tools.js'
@@ -85,6 +85,40 @@ export function assertOptionalIdentifier(val: unknown, field: string): string | 
 
 export function assertContent(val: unknown, field: string): string {
   return assertString(val, field, MAX_CONTENT_LEN)
+}
+
+function shouldFailClosedOnEmbeddingInit(config: FulcrumConfig): boolean {
+  return [
+    config.embedding.text.device,
+    config.reranker.device,
+  ].some((device) => device !== undefined && device !== 'auto')
+}
+
+async function warmRecallEmbedding(): Promise<void> {
+  const { getReranker, getTextEmbedder, initEmbedding, loadConfig } = await import('fulcrum-agent-core')
+  const { resolveEmbeddingRuntimeDevice } = await import('fulcrum-memory')
+  const existing = getTextEmbedder()
+  if (existing) {
+    const requested = (existing as { requested_device?: string; device?: string }).requested_device ?? (existing as { device?: string }).device
+    if (requested && requested !== 'auto') resolveEmbeddingRuntimeDevice(existing, requested)
+    const reranker = getReranker()
+    const requestedReranker = (reranker as { requested_device?: string; device?: string } | null)?.requested_device ?? (reranker as { device?: string } | null)?.device
+    if (requestedReranker && requestedReranker !== 'auto') resolveEmbeddingRuntimeDevice(reranker, requestedReranker)
+    return
+  }
+  const config = loadConfig()
+  try {
+    await initEmbedding(config)
+    if (config.embedding.text.device && config.embedding.text.device !== 'auto') {
+      resolveEmbeddingRuntimeDevice(getTextEmbedder(), config.embedding.text.device)
+    }
+    if (config.reranker.device && config.reranker.device !== 'auto') {
+      resolveEmbeddingRuntimeDevice(getReranker(), config.reranker.device)
+    }
+  } catch (err) {
+    if (shouldFailClosedOnEmbeddingInit(config)) throw err
+    // Auto/default device warm-up may degrade to FTS5 + graph-only recall.
+  }
 }
 
 export interface ToolCapabilities {
@@ -732,10 +766,7 @@ TOOL_REGISTRY.set('recall_knowledge', {
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args, deps) => {
     const { recallKnowledge } = await import('./commands/memory-recall.js')
-    const { getTextEmbedder, initEmbedding, loadConfig } = await import('fulcrum-agent-core')
-    if (!getTextEmbedder()) {
-      try { await initEmbedding(loadConfig()) } catch { /* FTS5 + graph still work */ }
-    }
+    await warmRecallEmbedding()
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const input: Parameters<typeof recallKnowledge>[0] = {
       workspace_id: ws,
@@ -768,13 +799,7 @@ TOOL_REGISTRY.set('recall_memory', {
     // returned rows. min_score has a v2a-default of 0.35 for multi-token
     // queries / 0 for single-token queries; callers can override via args.
     const { runStagedSearch } = await import('fulcrum-memory')
-    const { getTextEmbedder, initEmbedding, loadConfig } = await import('fulcrum-agent-core')
-    if (!getTextEmbedder()) {
-      try {
-        const config = loadConfig()
-        await initEmbedding(config)
-      } catch { /* embedding init failures degrade gracefully to FTS5-only */ }
-    }
+    await warmRecallEmbedding()
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const maxChars = (args['max_chars'] as number | undefined) ?? 500
     const envelope = await runStagedSearch({
@@ -789,6 +814,7 @@ TOOL_REGISTRY.set('recall_memory', {
       min_score: args['min_score'] as number | undefined,
       caller_run_id: deps.trusted_caller_run_id,
       caller_role: deps.trusted_caller_role,
+      explain: Boolean(args['explain']),
       recall_source: 'recall_memory',
     } as unknown as Parameters<typeof runStagedSearch>[0])
     const results = (envelope.results as Array<{ memory_id?: string; content?: string; summary?: string; tags?: string[]; recall_score?: number; source?: string }>)
@@ -1006,6 +1032,20 @@ TOOL_REGISTRY.set('get_rag_rebuild_report', {
     return getRagRebuildReport({
       report_id: args['report_id'] as string,
       workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
+    }, args['runtime_profile'] ? undefined : deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('get_rag_health', {
+  schema: TOOL_SCHEMA_MAP.get('get_rag_health'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { executeRagHealthCommand } = await import('./commands/memory-rag-health.js')
+    return executeRagHealthCommand({
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+      vault_path: args['vault_path'] as string | undefined,
       runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
     }, args['runtime_profile'] ? undefined : deps.db)
   },

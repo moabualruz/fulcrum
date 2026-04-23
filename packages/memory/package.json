@@ -35,7 +35,8 @@
     "test:watch": "vitest",
     "build": "tsup",
     "eval:fulcrum-recall": "vitest run src/eval/fulcrum-recall/tests/harness.test.ts",
-    "eval:longmemeval": "vitest run src/eval/longmemeval/tests/harness.test.ts"
+    "eval:longmemeval": "vitest run src/eval/longmemeval/tests/harness.test.ts",
+    "eval:rag-lifecycle": "vitest run src/eval/rag-lifecycle/runner.test.ts src/tests/rag-eval-runner.test.ts"
   },
   "dependencies": {
     "fulcrum-agent-core": "workspace:*",

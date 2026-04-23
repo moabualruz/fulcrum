@@ -29,8 +29,11 @@ const STUB_DIM = 1024
 class StubEmbeddingProvider {
   dimensions = STUB_DIM
   provider = 'stub'
+  provider_name = 'fulcrum-test-stub'
   model = 'stub'
+  model_name = 'stub'
   device = 'auto'
+  requested_device = 'auto'
   actualDevice = 'cpu'
   async warmUp(): Promise<void> { /* no-op */ }
   async embed(text: string): Promise<Float32Array> { return this.embedDocument(text) }

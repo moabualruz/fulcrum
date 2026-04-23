@@ -42,6 +42,11 @@ class StubEmbeddingProvider {
   }
 }
 
+class MismatchedEmbeddingProvider extends StubEmbeddingProvider {
+  device = 'cuda'
+  actualDevice = 'cpu'
+}
+
 let tmpVault: string
 let prevVaultEnv: string | undefined
 
@@ -162,5 +167,50 @@ describe('recall explain CLI/MCP contract', () => {
       result_id: '01CLI_EXP_PAGE',
       trust: { provenance_class: 'raw-backed' },
     })
+  })
+
+  it('fails closed when an initialized provider violates explicit recall device', async () => {
+    resetProviders()
+    registerEmbeddingProvider('fulcrum-cli-explain-mismatch-stub', () => new MismatchedEmbeddingProvider())
+    await initEmbedding({
+      workspace_id: 'test',
+      project_id: 'test',
+      port: 0,
+      embedding: { text: { provider: 'fulcrum-cli-explain-mismatch-stub' as 'custom', model: 'stub', device: 'cuda' }, code: null },
+      reranker: { provider: 'custom', model: 'stub' },
+      policy: { wip_limit: 0, wip_limit_per_role: {}, heartbeat_timeout_minutes: 0, escalation_timeout_minutes: 0 },
+    })
+
+    const entry = TOOL_REGISTRY.get('recall_knowledge')!
+    await expect(entry.handler(
+      {
+        workspace_id: 'ws_cli_exp',
+        project_id: 'proj_cli_exp',
+        query: 'auth recall',
+        explain: true,
+      },
+      { db: getDb(), workspace_id: 'ws_cli_exp', project_id: 'proj_cli_exp' },
+    )).rejects.toThrow(/requested device cuda/)
+  })
+
+  it('passes explain through the search_code registry handler', async () => {
+    getDb().prepare(`
+      INSERT INTO code_chunks (
+        chunk_id, workspace_id, project_id, file_path, language, chunk_strategy, source_type,
+        content, start_line, end_line, indexed_at
+      ) VALUES (
+        'chunk_cli_exp', 'ws_cli_exp', 'proj_cli_exp', 'src/cli-explain.ts', 'typescript',
+        'syntax', 'code', 'export const cliExplainNeedle = "search code explain"', 1, 1,
+        '2026-04-22T10:00:00Z'
+      )
+    `).run()
+
+    const entry = TOOL_REGISTRY.get('search_code')!
+    const out = await entry.handler(
+      { text: 'search code explain', explain: true },
+      { db: getDb(), workspace_id: 'ws_cli_exp', project_id: 'proj_cli_exp' },
+    ) as { results: Array<{ explanation?: { trust: { provenance_class: string } } }> }
+
+    expect(out.results[0]!.explanation?.trust.provenance_class).toBe('code-backed')
   })
 })

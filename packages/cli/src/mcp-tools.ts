@@ -138,6 +138,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
           description: 'Search breadth: project (default) = workspace+project; workspace = all projects in workspace; session = specific agent session',
         },
         session_id: { type: 'string', description: 'Session ID — required when query_scope=session' },
+        explain: { type: 'boolean', description: 'Include stable retrieval-stage, runtime, provenance, and graph contribution details' },
       },
       required: ['query'],
     },
@@ -251,6 +252,21 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         runtime_profile: { type: 'string', enum: ['install', 'dev', 'test'] },
       },
       required: ['report_id'],
+    },
+  },
+  {
+    title: 'Get RAG Health',
+    name: 'get_rag_health',
+    description: 'Read-only RAG health report covering L0, L1, FTS, code, vector, embedding failure, stale state, and graph coverage. Does not persist health reports or mutate derived state.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+        vault_path: { type: 'string' },
+        runtime_profile: { type: 'string', enum: ['install', 'dev', 'test'] },
+      },
     },
   },
   {
