@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { getDb } from 'fulcrum-agent-core'
+import { getDb, resolveRuntimeDataProfile } from 'fulcrum-agent-core'
 import { contentHash } from '../dedup.js'
 import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
 import { runMigration101MemoryV3Lifecycle } from '../schema.js'
@@ -180,6 +180,28 @@ describe('RAG health report', () => {
     expect(report.recommended_actions).toEqual([])
   })
 
+  it('uses the selected runtime profile vault when profile is explicit', () => {
+    const dataDir = join(tmpdir(), `fulcrum-rag-health-profile-${Date.now()}-${Math.random().toString(16).slice(2)}`)
+    const manifest = resolveRuntimeDataProfile({ profile: 'test', data_dir: dataDir })
+    const rawDir = join(manifest.paths.vault, 'raw', 'bash_trace', '2026', '04', '23')
+    mkdirSync(rawDir, { recursive: true })
+    writeFileSync(join(rawDir, 'src_orphan.md'), scopedMarkdown('orphan raw\n'), 'utf-8')
+
+    try {
+      const report = buildRagHealthReport({
+        workspace_id: 'ws_1',
+        project_id: 'proj_1',
+        runtime_profile: 'test',
+        data_dir: dataDir,
+      })
+
+      expect(report.profile_manifest.paths.vault).toBe(manifest.paths.vault)
+      expect(report.domains['l0']).toMatchObject({ files: 1, orphan_files: 1 })
+    } finally {
+      rmSync(dataDir, { recursive: true, force: true })
+    }
+  })
+
   it('identifies raw, L1, FTS, code, vector, embedding, and graph failures', () => {
     seedRawMismatch()
     seedL1MissingFile()
@@ -205,6 +227,7 @@ describe('RAG health report', () => {
     expect(domains['graph']?.['status']).toBe('degraded')
     expect(domains['graph']?.['coverage_gaps']).toEqual(expect.arrayContaining(['memories', 'code']))
     expect(report.recommended_actions.join('\n')).toContain('raw-source')
+    expect(report.recommended_actions.join('\n')).toContain('--profile dev')
     expect(report.recommended_actions.join('\n')).toContain('code index')
     expect(report.recommended_actions.join('\n')).toContain('jobs retry')
     expect(report.recommended_actions.join('\n')).toContain('graph')

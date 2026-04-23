@@ -419,7 +419,7 @@ async function rerankMaterialized(query: string, hits: V3RecallHit[]): Promise<V
         return {
           ...h,
           score: rerankerScore,
-          stage_scores: { ...h.stage_scores, reranker: rerankerScore },
+          stage_scores: { ...h.stage_scores, reranker: rerankerScore, fused: rerankerScore },
         }
       })
       .sort((a, b) => b.score - a.score)

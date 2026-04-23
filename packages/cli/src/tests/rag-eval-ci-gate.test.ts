@@ -16,6 +16,7 @@ describe('RAG eval CI path gate', () => {
       'packages/memory/src/l2/embedding-jobs.ts',
       'packages/memory/src/kuzu/graph.ts',
       'packages/core/src/db/schema.ts',
+      'packages/cli/src/index.ts',
       'packages/cli/src/commands/memory-rag-eval.ts',
     ])).toBe(true)
   })

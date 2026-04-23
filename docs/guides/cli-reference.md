@@ -72,9 +72,10 @@ mode is selected when `--all`, `--mode`, `--execute`, `--domain`, or `--domains`
 is present.
 
 ```bash
-fulcrum memory rebuild --all --mode plan --json
-fulcrum memory rebuild --all --mode dry-run --json
-fulcrum memory rebuild --all --execute --json
+fulcrum memory rebuild --all --mode plan --profile dev --json
+fulcrum memory rebuild --all --mode dry-run --profile dev --json
+fulcrum memory rebuild --all --execute --profile dev --json
+fulcrum memory rebuild --all --execute --profile install --confirm-profile install --verification-ref <report_id> --json
 ```
 
 | Flag | Default | Description |
@@ -85,6 +86,9 @@ fulcrum memory rebuild --all --execute --json
 | `--domain <name>` | — | Add one domain; repeatable |
 | `--domains <a,b>` | — | Comma-separated domain list: `l0,l1,fts,code,vectors,graph` |
 | `--allow-empty` | `false` | Permit zero-scope rebuilds |
+| `--profile <install\|dev\|test>` | `dev` for plan/dry-run | Select runtime data profile; required for `--execute` |
+| `--confirm-profile install` | — | Required before executing against installed/operator data |
+| `--verification-ref <ref>` | — | Attach prior dev/test verification evidence to an installed/operator rebuild |
 | `--workspace-id <id>` | current cwd | Explicit workspace scope |
 | `--project-id <id>` | current cwd | Explicit project scope |
 | `--json` | — | Emit machine-readable report |
@@ -98,10 +102,6 @@ Legacy rebuild is still available for the older L1/L2 vault path:
 
 ```bash
 fulcrum memory rebuild [--l1 | --l2 | --both]
-fulcrum memory rebuild --all --mode plan --profile dev --json
-fulcrum memory rebuild --all --mode dry-run --profile dev --json
-fulcrum memory rebuild --all --execute --profile dev --json
-fulcrum memory rebuild --all --execute --profile install --confirm-profile install --verification-ref <report_id> --json
 ```
 
 | Flag | Default | Rebuilds |

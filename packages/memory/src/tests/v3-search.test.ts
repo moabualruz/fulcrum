@@ -253,12 +253,15 @@ describe('runV3Search — cross-encoder reranker', () => {
       query: 'memory store',
       limit: 1,
       confidence_floor: 0,
+      explain: true,
     })
 
     expect(rerank).toHaveBeenCalled()
     expect(out).toHaveLength(1)
     expect(out[0]!.memory_id).toBe(dogId)
     expect(out[0]!.score).toBeGreaterThan(0.99)
+    expect(out[0]!.stage_scores.fused).toBe(out[0]!.score)
+    expect(out[0]!.explanation?.stage_scores.fused).toBe(out[0]!.score)
   })
 
   it('keeps fused ordering when reranker fails', async () => {

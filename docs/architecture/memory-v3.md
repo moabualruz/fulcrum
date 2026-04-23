@@ -41,8 +41,8 @@ This document is the operator reference. For the implementation plan, see [`docs
 The RAG lifecycle surface treats FTS rows, vector rows, code chunks, graph rows,
 and eval reports as derived or operational state.
 
-- **Staged rebuilds.** `fulcrum memory rebuild --all --mode plan|dry-run --json`
-  reports scope without mutation. `fulcrum memory rebuild --all --execute --json`
+- **Staged rebuilds.** `fulcrum memory rebuild --all --mode plan|dry-run --profile dev --json`
+  reports scope without mutation. `fulcrum memory rebuild --all --execute --profile dev --json`
   builds candidate state, verifies parity, revalidates the canonical-source
   snapshot, and promotes only after checks pass. Failed or stale candidates
   remain unserved and preserve prior served state.
@@ -205,7 +205,7 @@ The monitor server (`fulcrum serve monitor`, default port 4721) exposes `GET /me
 
 Curation percentiles read `vault/curated/log.md`. Missing file ⇒ nulls. Malformed lines are skipped.
 
-**CI gate.** `.github/workflows/memory-eval.yml` runs `pnpm --filter fulcrum-memory eval:rag-lifecycle` for changes touching RAG lifecycle specs, `packages/memory/src/**`, core schema/types/IDs, RAG CLI commands, tool registry/schema files, or the workflow itself. Unrelated non-RAG changes may skip the default golden RAG gate.
+**CI gate.** `.github/workflows/memory-eval.yml` runs `pnpm --filter fulcrum-memory eval:rag-lifecycle` for changes touching RAG lifecycle specs, `packages/memory/src/**`, core schema/types/IDs, the CLI dispatcher, RAG CLI commands, tool registry/schema files, or the workflow itself. Unrelated non-RAG changes may skip the default golden RAG gate.
 
 ---
 

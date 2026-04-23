@@ -1,4 +1,5 @@
-import { getDb, projectIdsFromPath } from 'fulcrum-agent-core'
+import { existsSync } from 'fs'
+import { getDb, getDbAtPath, projectIdsFromPath, resolveRuntimeDataProfile } from 'fulcrum-agent-core'
 import type { Db, RuntimeDataProfile } from 'fulcrum-agent-core'
 import { buildRagHealthReport } from 'fulcrum-memory'
 import type { RagHealthReport } from 'fulcrum-memory'
@@ -11,7 +12,20 @@ export interface RagHealthCommandInput {
   data_dir?: string
 }
 
-export function executeRagHealthCommand(input: RagHealthCommandInput = {}, db: Db = getDb()): RagHealthReport {
+function openHealthDb(input: RagHealthCommandInput, db: Db | undefined): Db {
+  if (db) return db
+  if (!input.runtime_profile) return getDb()
+  const profile_manifest = resolveRuntimeDataProfile({
+    profile: input.runtime_profile,
+    data_dir: input.data_dir,
+  })
+  if (!existsSync(profile_manifest.paths.db)) {
+    throw new Error(`runtime profile database not found: ${profile_manifest.paths.db}`)
+  }
+  return getDbAtPath(profile_manifest.paths.db)
+}
+
+export function executeRagHealthCommand(input: RagHealthCommandInput = {}, db?: Db): RagHealthReport {
   const ids = input.workspace_id && input.project_id
     ? { workspace_id: input.workspace_id, project_id: input.project_id }
     : projectIdsFromPath(process.cwd())
@@ -21,7 +35,7 @@ export function executeRagHealthCommand(input: RagHealthCommandInput = {}, db: D
     vault_path: input.vault_path,
     runtime_profile: input.runtime_profile,
     data_dir: input.data_dir,
-  }, db)
+  }, openHealthDb(input, db))
 }
 
 function isDomainObject(value: unknown): value is Record<string, unknown> {

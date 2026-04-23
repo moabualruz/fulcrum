@@ -553,16 +553,23 @@ function buildGraphDomain(input: { workspace_id: string; project_id: string }, d
   }
 }
 
-function recommendedActions(domains: Record<string, RagHealthDomain>): string[] {
+function rebuildProfileFlags(runtime_profile: RuntimeDataProfile): string {
+  return runtime_profile === 'install'
+    ? '--profile install --confirm-profile install'
+    : `--profile ${runtime_profile}`
+}
+
+function recommendedActions(domains: Record<string, RagHealthDomain>, runtime_profile: RuntimeDataProfile): string[] {
   const actions: string[] = []
+  const profileFlags = rebuildProfileFlags(runtime_profile)
   if (domains['l0']?.status !== 'healthy') {
-    pushAction(actions, 'Repair raw-source coverage, then run `fulcrum memory rebuild --domain l0 --execute --json`.')
+    pushAction(actions, `Repair raw-source coverage, then run \`fulcrum memory rebuild --domain l0 --execute ${profileFlags} --json\`.`)
   }
   if (domains['l1']?.status !== 'healthy') {
-    pushAction(actions, 'Repair curated L1 files, then run `fulcrum memory rebuild --domain l1 --execute --json`.')
+    pushAction(actions, `Repair curated L1 files, then run \`fulcrum memory rebuild --domain l1 --execute ${profileFlags} --json\`.`)
   }
   if (domains['fts']?.status !== 'healthy') {
-    pushAction(actions, 'Run `fulcrum memory rebuild --domain fts --execute --json` to repair text-search indexes.')
+    pushAction(actions, `Run \`fulcrum memory rebuild --domain fts --execute ${profileFlags} --json\` to repair text-search indexes.`)
   }
   if (domains['code']?.status !== 'healthy') {
     pushAction(actions, 'Run code index rebuild to repair file/chunk parity.')
@@ -575,7 +582,7 @@ function recommendedActions(domains: Record<string, RagHealthDomain>): string[] 
     pushAction(actions, 'Run `fulcrum jobs retry <job_id> --failed --json` for retryable embedding failures.')
   }
   if (domains['graph']?.status !== 'healthy') {
-    pushAction(actions, 'Run `fulcrum memory rebuild --domain graph --execute --json` to refresh graph coverage.')
+    pushAction(actions, `Run \`fulcrum memory rebuild --domain graph --execute ${profileFlags} --json\` to refresh graph coverage.`)
   }
   return actions
 }
@@ -591,9 +598,9 @@ export function buildRagHealthReport(
   },
   db: Db = getDb(),
 ): RagHealthReport {
-  const vault_path = input.vault_path ?? getVaultPath()
   const runtime_profile = input.runtime_profile ?? 'dev'
   const profile_manifest = resolveRuntimeDataProfile({ profile: runtime_profile, data_dir: input.data_dir })
+  const vault_path = input.vault_path ?? (input.runtime_profile ? profile_manifest.paths.vault : getVaultPath())
   const domains: Record<string, RagHealthDomain> = {
     l0: buildL0Domain({ ...input, vault_path }, db),
     l1: buildL1Domain({ ...input, vault_path }, db),
@@ -610,7 +617,7 @@ export function buildRagHealthReport(
     profile_manifest,
     generated_at: new Date().toISOString(),
     domains,
-    recommended_actions: recommendedActions(domains),
+    recommended_actions: recommendedActions(domains, runtime_profile),
     warnings: [],
     errors: [],
   }

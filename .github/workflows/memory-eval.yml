@@ -11,6 +11,7 @@ on:
       - 'packages/core/src/db/**'
       - 'packages/core/src/types.ts'
       - 'packages/core/src/ids.ts'
+      - 'packages/cli/src/index.ts'
       - 'packages/cli/src/commands/memory-rag-*.ts'
       - 'packages/cli/src/tool-registry.ts'
       - 'packages/cli/src/mcp-tools.ts'

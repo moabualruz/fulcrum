@@ -1,14 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { _configureDb, closeDb, runMigrations, setDb } from 'fulcrum-agent-core'
+import { mkdtempSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { _configureDb, closeDb, getDbAtPath, resolveRuntimeDataProfile, runMigrations, setDb } from 'fulcrum-agent-core'
 import { runMigration101MemoryV3Lifecycle } from 'fulcrum-memory'
 import { executeRagHealthCommand, formatRagHealthReport } from '../commands/memory-rag-health.js'
 import { TOOL_REGISTRY } from '../tool-registry.js'
 import { TOOL_SCHEMA_MAP } from '../mcp-tools.js'
 
 let db: Database.Database
+let tempDirs: string[] = []
 
 beforeEach(() => {
+  tempDirs = []
   db = new Database(':memory:')
   _configureDb(db)
   runMigrations(db)
@@ -20,6 +25,7 @@ beforeEach(() => {
 
 afterEach(() => {
   closeDb()
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true })
 })
 
 function mutationCounts(): Record<string, number> {
@@ -70,6 +76,33 @@ describe('RAG health command and action read-only behavior', () => {
     expect(mutationCounts()).toEqual(before)
   })
 
+  it('opens the selected runtime profile database when no DB is injected', () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'fulcrum-rag-health-profile-'))
+    tempDirs.push(dataDir)
+    const manifest = resolveRuntimeDataProfile({ profile: 'test', data_dir: dataDir })
+    const profileDb = getDbAtPath(manifest.paths.db)
+    runMigrations(profileDb)
+    runMigration101MemoryV3Lifecycle(profileDb)
+    profileDb.prepare("INSERT INTO workspaces(workspace_id, name) VALUES ('ws_profile', 'ws_profile')").run()
+    profileDb.prepare("INSERT INTO projects(project_id, workspace_id, name) VALUES ('proj_profile', 'ws_profile', 'proj_profile')").run()
+    profileDb.prepare(`
+      INSERT INTO l0_sources (
+        source_id, source_type, workspace_id, project_id, vault_path, content_hash, size_bytes
+      ) VALUES ('src_profile', 'bash_trace', 'ws_profile', 'proj_profile', 'raw/missing.md', 'hash', 12)
+    `).run()
+
+    const result = executeRagHealthCommand({
+      workspace_id: 'ws_profile',
+      project_id: 'proj_profile',
+      runtime_profile: 'test',
+      data_dir: dataDir,
+    })
+
+    expect(result.runtime_profile).toBe('test')
+    expect(result.profile_manifest.paths.db).toBe(manifest.paths.db)
+    expect(result.domains['l0']).toMatchObject({ rows: 1, missing_files: 1 })
+  })
+
   it('formats unhealthy domains with counts and recommended actions', () => {
     const output = formatRagHealthReport({
       workspace_id: 'ws_1',
@@ -101,7 +134,7 @@ describe('RAG health command and action read-only behavior', () => {
           }],
         },
       },
-      recommended_actions: ['Run `fulcrum memory rebuild --domain fts --execute --json`.'],
+      recommended_actions: ['Run `fulcrum memory rebuild --domain fts --execute --profile dev --json`.'],
       warnings: [],
       errors: [],
     })
