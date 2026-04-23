@@ -1,0 +1,76 @@
+# Document Review: Fulcrum RAG Roadmap Delivery
+
+## Pass 1 - Initial Specification Review
+
+**Document**: [spec.md](./spec.md)
+**Mode**: headless
+**Reviewing with**:
+- coherence-reviewer (always-on)
+- feasibility-reviewer (always-on)
+- product-lens-reviewer - roadmap scope and sequencing affect system trajectory
+- security-lens-reviewer - destructive repair operations, provider truth, traces, and logs have trust-boundary impact
+- scope-guardian-reviewer - spec has many requirements across priority tiers
+- adversarial-document-reviewer - spec has more than 10 requirements and major architectural decisions
+
+### Applied Auto-Fixes
+
+- **Scope Boundaries**: Added explicit boundaries that P1 stabilizes current local RAG, optional runtimes remain gated experiments, hosted/multi-tenant answer UI is out of scope, and normal repair touches only allowlisted derived RAG state.
+- **Health Terminology**: Added explicit RAG health statuses (`healthy`, `degraded`, `failed`, `out_of_scope`) and required reason/next-action behavior for non-healthy domains.
+- **Eval Readiness**: Added requirement and success criterion that required live-eval domains with zero expected cases are degraded, not passing.
+- **Security/Exposure**: Added authorization by actor capability and workspace/project scope before mutation. Added distinction between absolute operator preflight paths and non-secret path fingerprints for agent-facing traces/evals/memory.
+- **Measurability**: Replaced "accepted ranking bound" in SC-005 with top 5 result bound.
+
+### Findings Requiring Judgment
+
+None after auto-fixes. Review complete.
+
+## Pass 2 - Clarification Integration
+
+**Skill**: speckit-clarify
+**Mode**: headless per user instruction
+**Questions answered**: 5
+
+### Clarifications Applied
+
+- Repair defaults to verify-and-fix derived-state differences; clean-slate rebuild requires explicit scope and preflight.
+- P1 includes graph rebuild/coverage reporting; advanced relationship query modes remain P2.
+- Required live-eval domains with zero expected cases produce degraded eval readiness.
+- Optional runtime/store defaults require baseline comparison, rollback proof, local-first guarantees, and agent parity.
+- Absolute paths are limited to operator preflight/report surfaces; agent-facing traces/evals/memory use path fingerprints.
+
+### Coverage Summary
+
+| Taxonomy Category | Status | Notes |
+|---|---|---|
+| Functional Scope & Behavior | Resolved | Repair default and optional-runtime boundaries encoded. |
+| Domain & Data Model | Clear | Entities cover repair, coverage, result, graph, eval, trace, runtime truth. |
+| Interaction & UX Flow | Clear | Operator/agent surfaces and preflight/report behavior specified. |
+| Non-Functional Quality Attributes | Resolved | Eval readiness, path exposure, runtime truth, and gate behavior sharpened. |
+| Integration & External Dependencies | Resolved | Optional runtimes/stores constrained by adapter and proof gates. |
+| Edge Cases & Failure Handling | Resolved | Zero-case eval and clean-slate behavior covered. |
+| Constraints & Tradeoffs | Resolved | P1/P2 graph split and baseline-first policy encoded. |
+| Terminology & Consistency | Clear | Terminology section added during research enrichment. |
+| Completion Signals | Clear | Success criteria include top-K, coverage, eval, trace, runtime truth. |
+| Misc / Placeholders | Clear | No placeholders or clarification markers remain. |
+
+## Pass 3 - Post-Clarification Specification Review
+
+**Document**: [spec.md](./spec.md)
+**Mode**: headless
+**Reviewing with**:
+- coherence-reviewer
+- feasibility-reviewer
+- product-lens-reviewer
+- security-lens-reviewer
+- scope-guardian-reviewer
+- adversarial-document-reviewer
+
+### Applied Auto-Fixes
+
+None.
+
+### Findings Requiring Judgment
+
+None. The P1/P2 graph split, verify-and-fix repair default, eval zero-case behavior, optional runtime gates, and path exposure rules are now explicit and internally consistent.
+
+Review complete.
