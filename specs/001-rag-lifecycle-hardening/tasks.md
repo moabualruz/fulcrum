@@ -263,14 +263,14 @@
 
 **Purpose**: Cross-package verification, docs sync, and final quality gates.
 
-- [ ] T109 [P] Update CLI reference and operator docs for rebuild, jobs, health, explain, and eval commands in docs/guides/cli-reference.md
-- [ ] T110 [P] Update memory architecture docs for staged rebuilds, input snapshots, degraded embedding jobs, vector metadata, and eval gates in docs/architecture/memory-v3.md
-- [ ] T111 [P] Add quickstart validation script or command notes matching specs/001-rag-lifecycle-hardening/quickstart.md in packages/cli/src/tests/rag-lifecycle-quickstart.test.ts
-- [ ] T112 Run targeted core schema and guard tests with `pnpm --filter fulcrum-agent-core test` from package.json
-- [ ] T113 Run targeted memory tests with `pnpm --filter fulcrum-memory test` from package.json
-- [ ] T114 Run targeted CLI and monitor tests with `pnpm --filter fulcrum-agent-cli test` and `pnpm --filter fulcrum-monitor test` from package.json
-- [ ] T115 Run full verification with `pnpm test`, `pnpm build`, and `pnpm run check:cycles` from package.json
-- [ ] T116 Add P1-only shipping gate proving FR-043 can ship without P2 health/eval expansion in packages/cli/src/tests/rag-lifecycle-p1-gate.test.ts
+- [X] T109 [P] Update CLI reference and operator docs for rebuild, jobs, health, explain, and eval commands in docs/guides/cli-reference.md
+- [X] T110 [P] Update memory architecture docs for staged rebuilds, input snapshots, degraded embedding jobs, vector metadata, and eval gates in docs/architecture/memory-v3.md
+- [X] T111 [P] Add quickstart validation script or command notes matching specs/001-rag-lifecycle-hardening/quickstart.md in packages/cli/src/tests/rag-lifecycle-quickstart.test.ts
+- [X] T112 Run targeted core schema and guard tests with `pnpm --filter fulcrum-agent-core test` from package.json
+- [X] T113 Run targeted memory tests with `pnpm --filter fulcrum-memory test` from package.json
+- [X] T114 Run targeted CLI and monitor tests with `pnpm --filter fulcrum-agent-cli test` and `pnpm --filter fulcrum-monitor test` from package.json
+- [X] T115 Run full verification with `pnpm test`, `pnpm build`, and `pnpm run check:cycles` from package.json
+- [X] T116 Add P1-only shipping gate proving FR-043 can ship without P2 health/eval expansion in packages/cli/src/tests/rag-lifecycle-p1-gate.test.ts
 
 ---
 
