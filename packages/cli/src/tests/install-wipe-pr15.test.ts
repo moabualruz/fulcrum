@@ -352,6 +352,22 @@ describe("wipeAgent claude", () => {
     mkfile(path.join(home, ".claude/skills/fulcrum/foo.md"), "skill");
     mkfile(path.join(home, ".claude/agents/fulcrum-engineer.md"), "agent");
     mkfile(path.join(home, ".claude/commands/fulcrum-recall.md"), "cmd");
+    mkfile(path.join(home, ".claude.json"), JSON.stringify({
+      skillUsage: {
+        "fulcrum-memory": { usageCount: 1 },
+        "other-skill": { usageCount: 2 },
+      },
+      projects: {
+        "/repo": {
+          mcpServers: {
+            fulcrum: { command: "fulcrum" },
+            other: { command: "other" },
+          },
+          enabledMcpjsonServers: ["fulcrum", "other"],
+          allowedTools: ["mcp__fulcrum__recall", "Read"],
+        },
+      },
+    }));
   });
 
   afterEach(() => fs.rmSync(home, { recursive: true, force: true }));
@@ -396,6 +412,17 @@ describe("wipeAgent claude", () => {
   it("deletes fulcrum commands", () => {
     wipeAgent({ agent: "claude", dryRun: false, home });
     expect(exists(path.join(home, ".claude/commands/fulcrum-recall.md"))).toBe(false);
+  });
+
+  it("strips stale fulcrum metadata from .claude.json", () => {
+    wipeAgent({ agent: "claude", dryRun: false, home });
+    const claudeJson = JSON.parse(read(path.join(home, ".claude.json")));
+    expect(claudeJson.skillUsage?.["fulcrum-memory"]).toBeUndefined();
+    expect(claudeJson.skillUsage?.["other-skill"]).toBeDefined();
+    expect(claudeJson.projects["/repo"].mcpServers.fulcrum).toBeUndefined();
+    expect(claudeJson.projects["/repo"].mcpServers.other).toBeDefined();
+    expect(claudeJson.projects["/repo"].enabledMcpjsonServers).toEqual(["other"]);
+    expect(claudeJson.projects["/repo"].allowedTools).toEqual(["Read"]);
   });
 
   it("is idempotent", () => {
@@ -450,6 +477,8 @@ describe("wipeAgent qwen", () => {
     home = mktemp();
     mkfile(path.join(home, ".qwen/extensions/fulcrum/qwen-extension.json"), "{}");
     mkfile(path.join(home, ".qwen/extensions/other/qwen-extension.json"), "{}");
+    mkfile(path.join(home, ".qwen/debug/old.txt"), "Loaded /repo/agent-integration/qwen/skills/fulcrum-start/SKILL.md");
+    mkfile(path.join(home, ".qwen/debug/keep.txt"), "ordinary debug log");
   });
 
   afterEach(() => fs.rmSync(home, { recursive: true, force: true }));
@@ -458,6 +487,12 @@ describe("wipeAgent qwen", () => {
     wipeAgent({ agent: "qwen", dryRun: false, home });
     expect(exists(path.join(home, ".qwen/extensions/fulcrum"))).toBe(false);
     expect(exists(path.join(home, ".qwen/extensions/other"))).toBe(true);
+  });
+
+  it("deletes stale qwen debug logs containing fulcrum", () => {
+    wipeAgent({ agent: "qwen", dryRun: false, home });
+    expect(exists(path.join(home, ".qwen/debug/old.txt"))).toBe(false);
+    expect(exists(path.join(home, ".qwen/debug/keep.txt"))).toBe(true);
   });
 });
 

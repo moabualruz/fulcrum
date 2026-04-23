@@ -30,7 +30,16 @@ export type WipeScope = "user" | "project";
 
 export interface WipeAction {
   path: string;
-  action: "delete" | "strip-marker" | "strip-mcp-entry" | "strip-hook-entries" | "strip-toml-section" | "skip";
+  action:
+    | "delete"
+    | "strip-marker"
+    | "strip-mcp-entry"
+    | "strip-hook-entries"
+    | "strip-toml-section"
+    | "strip-plugin-entries"
+    | "strip-package-entries"
+    | "strip-metadata-entries"
+    | "skip";
   reason?: string;
 }
 
@@ -62,8 +71,8 @@ export interface WipeOpts {
 const MARKER_START = "<!-- fulcrum:begin -->";
 const MARKER_END = "<!-- fulcrum:end -->";
 // replaceMarkerBlock format (used by AGENTS.md, opencode.md, etc.)
-const MANAGED_BLOCK_START_RE = /<!--\s*BEGIN\s+FULCRUM\s+managed-block\s+v1\s*-->/i;
-const MANAGED_BLOCK_END_RE = /<!--\s*END\s+FULCRUM\s+managed-block\s+v1\s*-->/i;
+const MANAGED_BLOCK_START_RE = /<!--\s*BEGIN\s+FULCRUM\s+managed-block(?:\s+v\d+)?[^>]*-->/i;
+const MANAGED_BLOCK_END_RE = /<!--\s*END\s+FULCRUM\s+managed-block(?:\s+v\d+)?[^>]*-->/i;
 
 function deleteFile(filePath: string, dryRun: boolean, actions: WipeAction[]): void {
   if (!fs.existsSync(filePath)) {
@@ -97,11 +106,92 @@ function deleteGlob(dir: string, pattern: RegExp, dryRun: boolean, actions: Wipe
   }
 }
 
+function deleteFileIfOwned(
+  filePath: string,
+  isOwned: (content: string) => boolean,
+  dryRun: boolean,
+  actions: WipeAction[],
+): void {
+  if (!fs.existsSync(filePath)) {
+    actions.push({ path: filePath, action: "skip", reason: "not found" });
+    return;
+  }
+  const content = fs.readFileSync(filePath, "utf8");
+  if (!isOwned(content)) {
+    actions.push({ path: filePath, action: "skip", reason: "not fulcrum-owned" });
+    return;
+  }
+  deleteFile(filePath, dryRun, actions);
+}
+
+function deleteOwnedMarkdownFiles(
+  dir: string,
+  isOwned: (content: string) => boolean,
+  dryRun: boolean,
+  actions: WipeAction[],
+): void {
+  if (!fs.existsSync(dir)) return;
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith(".md")) continue;
+    deleteFileIfOwned(path.join(dir, name), isOwned, dryRun, actions);
+  }
+}
+
+function deleteFilesContaining(
+  dir: string,
+  marker: string,
+  dryRun: boolean,
+  actions: WipeAction[],
+): void {
+  if (!fs.existsSync(dir)) return;
+  for (const name of fs.readdirSync(dir)) {
+    const full = path.join(dir, name);
+    if (!fs.statSync(full).isFile()) continue;
+    let content: string;
+    try {
+      content = fs.readFileSync(full, "utf8");
+    } catch {
+      actions.push({ path: full, action: "skip", reason: "not utf8 text" });
+      continue;
+    }
+    if (!content.toLowerCase().includes(marker.toLowerCase())) continue;
+    deleteFile(full, dryRun, actions);
+  }
+}
+
+function isFulcrumOwnedMarkdown(content: string): boolean {
+  return content.includes("fulcrum-first: prefer")
+    || content.includes("fulcrum action exec")
+    || content.includes("mcp_fulcrum_")
+    || content.includes("mcp__fulcrum");
+}
+
+function deleteOwnedFulcrumBin(home: string, dryRun: boolean, actions: WipeAction[]): void {
+  const linkPath = path.join(home, ".local", "bin", "fulcrum");
+  let stat: fs.Stats;
+  try {
+    stat = fs.lstatSync(linkPath);
+  } catch {
+    actions.push({ path: linkPath, action: "skip", reason: "not found" });
+    return;
+  }
+  if (!stat.isSymbolicLink()) {
+    actions.push({ path: linkPath, action: "skip", reason: "not a symlink" });
+    return;
+  }
+  const target = fs.readlinkSync(linkPath);
+  if (!target.includes("pi-stack-plan")) {
+    actions.push({ path: linkPath, action: "skip", reason: "not fulcrum repo symlink" });
+    return;
+  }
+  deleteFile(linkPath, dryRun, actions);
+}
+
 /**
  * Strip all fulcrum-managed marker blocks from a file.
  * Handles both formats:
  *   1. `<!-- fulcrum:begin --> … <!-- fulcrum:end -->`
- *   2. `<!-- BEGIN FULCRUM managed-block v1 --> … <!-- END FULCRUM managed-block v1 -->`
+ *   2. `<!-- BEGIN FULCRUM managed-block ... --> … <!-- END FULCRUM managed-block ... -->`
  */
 function stripMarkerBlock(filePath: string, dryRun: boolean, actions: WipeAction[]): void {
   if (!fs.existsSync(filePath)) {
@@ -123,10 +213,10 @@ function stripMarkerBlock(filePath: string, dryRun: boolean, actions: WipeAction
     stripped = stripped
       .replace(new RegExp(`\\n?${escapeRe(MARKER_START)}[\\s\\S]*?${escapeRe(MARKER_END)}\\n?`, "g"), "\n");
   }
-  // Strip <!-- BEGIN FULCRUM managed-block v1 --> … <!-- END FULCRUM managed-block v1 -->
+  // Strip <!-- BEGIN FULCRUM managed-block ... --> … <!-- END FULCRUM managed-block ... -->
   if (hasManaged) {
     stripped = stripped.replace(
-      /\n?<!--\s*BEGIN\s+FULCRUM\s+managed-block\s+v1\s*-->[\s\S]*?<!--\s*END\s+FULCRUM\s+managed-block\s+v1\s*-->\n?/gi,
+      /\n?<!--\s*BEGIN\s+FULCRUM\s+managed-block(?:\s+v\d+)?[^>]*-->[\s\S]*?<!--\s*END\s+FULCRUM\s+managed-block(?:\s+v\d+)?[^>]*-->\n?/gi,
       "\n",
     );
   }
@@ -134,8 +224,176 @@ function stripMarkerBlock(filePath: string, dryRun: boolean, actions: WipeAction
   fs.writeFileSync(filePath, stripped, "utf8");
 }
 
+function stripMarkerOrDeleteOwnedFile(
+  filePath: string,
+  isOwned: (content: string) => boolean,
+  dryRun: boolean,
+  actions: WipeAction[],
+): void {
+  if (!fs.existsSync(filePath)) {
+    actions.push({ path: filePath, action: "skip", reason: "not found" });
+    return;
+  }
+  const content = fs.readFileSync(filePath, "utf8");
+  if (content.includes(MARKER_START) || MANAGED_BLOCK_START_RE.test(content)) {
+    stripMarkerBlock(filePath, dryRun, actions);
+    return;
+  }
+  if (!isOwned(content)) {
+    actions.push({ path: filePath, action: "skip", reason: "no marker block" });
+    return;
+  }
+  deleteFile(filePath, dryRun, actions);
+}
+
+function isFulcrumOwnedCopilotInstructions(content: string): boolean {
+  return content.includes("# Copilot instructions — Fulcrum control plane")
+    || content.includes("# Copilot instructions - Fulcrum control plane");
+}
+
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stripAgentsMarketplaceFulcrum(filePath: string, dryRun: boolean, actions: WipeAction[]): void {
+  if (!fs.existsSync(filePath)) {
+    actions.push({ path: filePath, action: "skip", reason: "not found" });
+    return;
+  }
+  let obj: Record<string, unknown>;
+  try {
+    obj = JSON.parse(fs.readFileSync(filePath, "utf8")) as Record<string, unknown>;
+  } catch {
+    actions.push({ path: filePath, action: "skip", reason: "not valid JSON" });
+    return;
+  }
+  const plugins = Array.isArray(obj["plugins"]) ? obj["plugins"] as Array<Record<string, unknown>> : [];
+  const filtered = plugins.filter((plugin) => {
+    const name = String(plugin["name"] ?? "");
+    const host = String(plugin["host"] ?? "");
+    const source = plugin["source"] as Record<string, unknown> | undefined;
+    const sourcePath = String(source?.["path"] ?? "");
+    return name !== "fulcrum"
+      && !host.toLowerCase().includes("fulcrum")
+      && !sourcePath.toLowerCase().includes("fulcrum")
+      && !sourcePath.includes("agent-integration/codex/plugin");
+  });
+  const topLevelFulcrum = String(obj["name"] ?? "").toLowerCase().includes("fulcrum")
+    || JSON.stringify(obj["interface"] ?? {}).toLowerCase().includes("fulcrum");
+  if (filtered.length === plugins.length && !topLevelFulcrum) {
+    actions.push({ path: filePath, action: "skip", reason: "no fulcrum plugin entries" });
+    return;
+  }
+  actions.push({ path: filePath, action: "strip-plugin-entries" });
+  if (dryRun) return;
+  if (filtered.length === 0 && topLevelFulcrum) {
+    fs.rmSync(filePath, { force: true });
+    return;
+  }
+  obj["plugins"] = filtered;
+  if (topLevelFulcrum) {
+    delete obj["name"];
+    delete obj["interface"];
+  }
+  fs.writeFileSync(filePath, JSON.stringify(obj, null, 2) + "\n", "utf8");
+}
+
+function stripPiPackageEntries(settingsPath: string, dryRun: boolean, actions: WipeAction[]): void {
+  if (!fs.existsSync(settingsPath)) {
+    actions.push({ path: settingsPath, action: "skip", reason: "not found" });
+    return;
+  }
+  let settings: Record<string, unknown>;
+  try {
+    settings = JSON.parse(fs.readFileSync(settingsPath, "utf8")) as Record<string, unknown>;
+  } catch {
+    actions.push({ path: settingsPath, action: "skip", reason: "not valid JSON" });
+    return;
+  }
+  const packages = settings["packages"];
+  if (!Array.isArray(packages)) {
+    actions.push({ path: settingsPath, action: "skip", reason: "no packages key" });
+    return;
+  }
+  const filtered = packages.filter((pkg) => {
+    const value = String(pkg);
+    return !value.includes("@fulcrum-agent-os/pi-cockpit")
+      && !value.includes("fulcrum-cockpit")
+      && !value.includes("agent-integration/pi/cockpit");
+  });
+  if (filtered.length === packages.length) {
+    actions.push({ path: settingsPath, action: "skip", reason: "no fulcrum packages" });
+    return;
+  }
+  actions.push({ path: settingsPath, action: "strip-package-entries" });
+  if (dryRun) return;
+  settings["packages"] = filtered;
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf8");
+}
+
+function stripClaudeJsonFulcrumMetadata(filePath: string, dryRun: boolean, actions: WipeAction[]): void {
+  if (!fs.existsSync(filePath)) {
+    actions.push({ path: filePath, action: "skip", reason: "not found" });
+    return;
+  }
+  let obj: Record<string, unknown>;
+  try {
+    obj = JSON.parse(fs.readFileSync(filePath, "utf8")) as Record<string, unknown>;
+  } catch {
+    actions.push({ path: filePath, action: "skip", reason: "not valid JSON" });
+    return;
+  }
+
+  let changed = false;
+  const stripStringArray = (value: unknown): unknown => {
+    if (!Array.isArray(value)) return value;
+    const filtered = value.filter(item => !String(item).toLowerCase().includes("fulcrum"));
+    if (filtered.length !== value.length) changed = true;
+    return filtered;
+  };
+
+  const skillUsage = obj["skillUsage"] as Record<string, unknown> | undefined;
+  if (skillUsage) {
+    for (const key of Object.keys(skillUsage)) {
+      if (key.toLowerCase().includes("fulcrum")) {
+        delete skillUsage[key];
+        changed = true;
+      }
+    }
+    if (Object.keys(skillUsage).length === 0) delete obj["skillUsage"];
+  }
+
+  const projects = obj["projects"] as Record<string, Record<string, unknown>> | undefined;
+  if (projects) {
+    for (const project of Object.values(projects)) {
+      const servers = project["mcpServers"] as Record<string, unknown> | undefined;
+      if (servers && "fulcrum" in servers) {
+        delete servers["fulcrum"];
+        changed = true;
+        if (Object.keys(servers).length === 0) delete project["mcpServers"];
+      }
+
+      for (const key of ["enabledMcpjsonServers", "disabledMcpjsonServers", "mcpContextUris", "allowedTools"]) {
+        if (key in project) {
+          project[key] = stripStringArray(project[key]);
+        }
+      }
+    }
+  }
+
+  if (!changed) {
+    actions.push({ path: filePath, action: "skip", reason: "no fulcrum metadata" });
+    return;
+  }
+  actions.push({ path: filePath, action: "strip-metadata-entries" });
+  if (dryRun) return;
+  fs.writeFileSync(filePath, JSON.stringify(obj, null, 2) + "\n", "utf8");
+}
+
+function wipeSharedFulcrumArtifacts(home: string, dryRun: boolean, actions: WipeAction[]): void {
+  deleteOwnedFulcrumBin(home, dryRun, actions);
+  deleteDir(path.join(home, ".agents", "skills", "fulcrum"), dryRun, actions);
+  stripAgentsMarketplaceFulcrum(path.join(home, ".agents", "plugins", "marketplace.json"), dryRun, actions);
 }
 
 /**
@@ -434,6 +692,7 @@ function wipeCursor(targetDir: string, dryRun: boolean): WipeAction[] {
   // Exclusive fulcrum files — safe to delete
   deleteFile(c(".cursor/rules/fulcrum-core.mdc"), dryRun, actions);
   deleteGlob(c(".cursor/rules"), /^fulcrum-skill-.*\.mdc$/, dryRun, actions);
+  deleteGlob(c(".cursor/rules"), /^fulcrum-rule-.*\.mdc$/, dryRun, actions);
   deleteGlob(c(".cursor/skills"), /^fulcrum-/, dryRun, actions);
   deleteGlob(c(".cursor/commands"), /^fulcrum-.*\.md$/, dryRun, actions);
 
@@ -450,6 +709,7 @@ function wipeWindsurf(targetDir: string, dryRun: boolean): WipeAction[] {
 
   deleteFile(c(".windsurf/rules/fulcrum-core.md"), dryRun, actions);
   deleteGlob(c(".windsurf/rules"), /^fulcrum-skill-.*\.md$/, dryRun, actions);
+  deleteGlob(c(".windsurf/rules"), /^fulcrum-rule-.*\.md$/, dryRun, actions);
   deleteGlob(c(".windsurf/workflows"), /^fulcrum-.*\.md$/, dryRun, actions);
 
   stripMcpEntry(c(".windsurf/mcp.json"), "fulcrum", dryRun, actions);
@@ -458,7 +718,7 @@ function wipeWindsurf(targetDir: string, dryRun: boolean): WipeAction[] {
   return actions;
 }
 
-function wipeCodex(home: string, dryRun: boolean): WipeAction[] {
+function wipeCodex(home: string, targetDir: string, scope: WipeScope, dryRun: boolean): WipeAction[] {
   const actions: WipeAction[] = [];
   const codexDir = path.join(home, ".codex");
   const configToml = path.join(codexDir, "config.toml");
@@ -467,6 +727,11 @@ function wipeCodex(home: string, dryRun: boolean): WipeAction[] {
   stripTomlHooks(configToml, "fulcrum hook codex", dryRun, actions);
   deleteGlob(path.join(codexDir, "skills"), /^fulcrum-/, dryRun, actions);
   deleteGlob(path.join(codexDir, "rules"), /^fulcrum-/, dryRun, actions);
+  deleteGlob(path.join(codexDir, "rules"), /^(fulcrum-first|lifecycle|role-boundaries)\.md$/, dryRun, actions);
+  wipeSharedFulcrumArtifacts(home, dryRun, actions);
+  if (scope === "project") {
+    stripMarkerBlock(path.join(targetDir, "AGENTS.md"), dryRun, actions);
+  }
 
   return actions;
 }
@@ -479,8 +744,10 @@ function wipeOpencode(targetDir: string, dryRun: boolean): WipeAction[] {
   deleteFile(c(".opencode/opencode.md"), dryRun, actions);
   deleteFile(c(".opencode/plugins/fulcrum.ts"), dryRun, actions);
   deleteFile(c(".opencode/plugins/rider.ts"), dryRun, actions);
+  deleteFile(c(".opencode/.ridersum"), dryRun, actions);
   deleteGlob(c(".opencode/command"), /^fulcrum-.*\.md$/, dryRun, actions);
   deleteGlob(c(".opencode/agents"), /^fulcrum-/, dryRun, actions);
+  deleteOwnedMarkdownFiles(c(".opencode/agents"), isFulcrumOwnedMarkdown, dryRun, actions);
   deleteGlob(c(".opencode/rules"), /^fulcrum-/, dryRun, actions);
   stripMarkerBlock(c("AGENTS.md"), dryRun, actions);
 
@@ -493,12 +760,14 @@ function wipeCopilot(targetDir: string, dryRun: boolean): WipeAction[] {
 
   // Exclusive fulcrum files
   deleteGlob(c(".github/instructions"), /^fulcrum-skill-.*\.instructions\.md$/, dryRun, actions);
+  deleteGlob(c(".github/instructions"), /^fulcrum-rule-.*\.instructions\.md$/, dryRun, actions);
   deleteGlob(c(".github/agents"), /\.agent\.md$/, dryRun, actions);
   deleteFile(c(".github/hooks/fulcrum.json"), dryRun, actions);
 
   // Shared files — surgical patch
   stripMcpEntry(c(".mcp.json"), "fulcrum", dryRun, actions);
-  stripMarkerBlock(c(".github/copilot-instructions.md"), dryRun, actions);
+  stripMarkerOrDeleteOwnedFile(c(".github/copilot-instructions.md"), isFulcrumOwnedCopilotInstructions, dryRun, actions);
+  stripMarkerOrDeleteOwnedFile(c(".github/copilot-instructions.public.md"), isFulcrumOwnedCopilotInstructions, dryRun, actions);
   stripMarkerBlock(c("AGENTS.md"), dryRun, actions);
 
   return actions;
@@ -515,12 +784,15 @@ function wipeClaude(home: string, dryRun: boolean): WipeAction[] {
   stripClaudeHooks(settingsPath, dryRun, actions);
   stripMcpEntry(settingsPath, "fulcrum", dryRun, actions);
   stripMcpEntry(claudeJsonPath, "fulcrum", dryRun, actions);
+  stripClaudeJsonFulcrumMetadata(claudeJsonPath, dryRun, actions);
   stripMarkerBlock(path.join(claudeDir, "CLAUDE.md"), dryRun, actions);
 
   // Exclusive fulcrum dirs/files
   deleteDir(path.join(claudeDir, "skills", "fulcrum"), dryRun, actions);
   deleteGlob(path.join(claudeDir, "agents"), /^fulcrum-/, dryRun, actions);
+  deleteOwnedMarkdownFiles(path.join(claudeDir, "agents"), isFulcrumOwnedMarkdown, dryRun, actions);
   deleteGlob(path.join(claudeDir, "commands"), /^fulcrum-/, dryRun, actions);
+  wipeSharedFulcrumArtifacts(home, dryRun, actions);
 
   return actions;
 }
@@ -528,18 +800,25 @@ function wipeClaude(home: string, dryRun: boolean): WipeAction[] {
 function wipeGemini(home: string, dryRun: boolean): WipeAction[] {
   const actions: WipeAction[] = [];
   deleteDir(path.join(home, ".gemini", "extensions", "fulcrum"), dryRun, actions);
+  wipeSharedFulcrumArtifacts(home, dryRun, actions);
   return actions;
 }
 
 function wipeQwen(home: string, dryRun: boolean): WipeAction[] {
   const actions: WipeAction[] = [];
   deleteDir(path.join(home, ".qwen", "extensions", "fulcrum"), dryRun, actions);
+  deleteFilesContaining(path.join(home, ".qwen", "debug"), "fulcrum", dryRun, actions);
+  wipeSharedFulcrumArtifacts(home, dryRun, actions);
   return actions;
 }
 
 function wipePi(home: string, dryRun: boolean): WipeAction[] {
   const actions: WipeAction[] = [];
   deleteDir(path.join(home, ".pi", "packages", "@fulcrum-agent-os", "pi-cockpit"), dryRun, actions);
+  deleteGlob(path.join(home, ".pi", "agent", "extensions"), /^fulcrum/i, dryRun, actions);
+  stripPiPackageEntries(path.join(home, ".pi", "agent", "settings.json"), dryRun, actions);
+  stripMarkerBlock(path.join(home, ".pi", "agent", "AGENTS.md"), dryRun, actions);
+  wipeSharedFulcrumArtifacts(home, dryRun, actions);
   return actions;
 }
 
@@ -566,7 +845,7 @@ export function wipeAgent(opts: WipeOpts): WipeResult {
       actions = scope === "project" ? wipeWindsurf(resolvedTargetDir, dryRun) : projectScopeDisabled(agent, resolvedTargetDir);
       break;
     case "codex":
-      actions = wipeCodex(resolvedHome, dryRun);
+      actions = wipeCodex(resolvedHome, resolvedTargetDir, scope, dryRun);
       break;
     case "opencode":
       actions = scope === "project" ? wipeOpencode(resolvedTargetDir, dryRun) : projectScopeDisabled(agent, resolvedTargetDir);

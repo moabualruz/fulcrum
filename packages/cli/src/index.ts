@@ -33,6 +33,7 @@ CONTROL PLANE
   jobs cancel <job_id> Cancel embedding job
   jobs resume <job_id> Resume embedding job
   jobs retry <job_id> --failed
+  search context "<query>" [--explain] [--json]
 
   serve mcp            Start MCP server (stdio JSON-RPC 2.0) + auto-starts monitor
   serve monitor        Start HTTP monitor + control API (default port 4721)
@@ -514,7 +515,22 @@ fulcrum memory — memory vault commands
   }
 
   if (command === 'doctor' || command === 'health') {
-    const { executeRagHealthCommand, formatRagHealthReport } = await import('./commands/memory-rag-health.js')
+    const { executeRagHealthCommand, executeRagRepairPlanCommand, formatRagHealthReport } = await import('./commands/memory-rag-health.js')
+    if (args.includes('--repair-plan')) {
+      const result = executeRagRepairPlanCommand({
+        workspace_id: optArg('--workspace-id'),
+        project_id: optArg('--project-id'),
+        vault_path: optArg('--vault-path'),
+        runtime_profile: optArg('--profile') as 'install' | 'dev' | 'test' | undefined,
+      })
+      if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+      else {
+        console.log(`RAG repair plan: ${result.health_status}`)
+        console.log(`repair_plan_id: ${result.repair_plan_id}`)
+        for (const action of result.required_actions) console.log(`  - ${action.command}`)
+      }
+      return
+    }
     const result = executeRagHealthCommand({
       workspace_id: optArg('--workspace-id'),
       project_id: optArg('--project-id'),
@@ -1052,6 +1068,55 @@ async function runJobs(): Promise<void> {
 
   console.error(`Unknown jobs command: ${command}`)
   process.exit(1)
+}
+
+export async function runSearch(): Promise<void> {
+  if (command !== 'context' || args.includes('--help') || args.includes('-h') || args.length < 3) {
+    console.log(`
+fulcrum search context "<query>" [flags]
+
+Run unified context search over memory, code/file chunks, graph, tasks, and
+decisions. This is the agent-preferred retrieval surface for focused context.
+
+Flags:
+  --limit <N>                    Max results (default 10)
+  --context-budget-tokens <N>    Return a deduped context_pack within budget
+  --budget <N>                   Alias for --context-budget-tokens
+  --workspace-id <id>            Override workspace (default: current cwd workspace)
+  --project-id <id>              Override project (default: current cwd project)
+  --explain                      Include skipped/degraded stage details
+  --json                         Output the full JSON envelope
+`)
+    process.exit(args.length < 3 ? 1 : 0)
+  }
+
+  const ids = (optArg('--workspace-id') && optArg('--project-id')) ? null : currentProjectIds()
+  const { executeMemorySearchContextCommand } = await import('./commands/memory-search-context.js')
+  const result = await executeMemorySearchContextCommand({
+    query: args[2]!,
+    workspace_id: optArg('--workspace-id') ?? ids!.workspace_id,
+    project_id: optArg('--project-id') ?? ids!.project_id,
+    limit: optIntArg('--limit'),
+    context_budget_tokens: optIntArg('--context-budget-tokens') ?? optIntArg('--budget'),
+    explain: args.includes('--explain'),
+  }) as {
+    query_trace_id: string
+    results: Array<{ rank: number; type: string; title: string; score: number }>
+    skipped_stages?: Array<{ stage: string; reason: string }>
+  }
+
+  if (args.includes('--json')) {
+    console.log(JSON.stringify(result, null, 2))
+    return
+  }
+
+  console.log(`query_trace_id\t${result.query_trace_id}`)
+  for (const row of result.results) {
+    console.log(`${row.rank}\t${row.type}\t${row.score.toFixed(3)}\t${row.title}`)
+  }
+  if (args.includes('--explain') && result.skipped_stages?.length) {
+    for (const stage of result.skipped_stages) console.log(`skipped\t${stage.stage}\t${stage.reason}`)
+  }
 }
 
 // ── Hook commands ─────────────────────────────────────────────────────────────
@@ -4381,7 +4446,7 @@ async function runInstall(): Promise<void> {
 
     const ALL_AGENTS = ['cursor', 'windsurf', 'codex', 'opencode', 'copilot', 'claude', 'gemini', 'qwen', 'pi'] as const
     const GLOBAL_AGENTS = ['codex', 'claude', 'gemini', 'qwen', 'pi'] as const
-    const PROJECT_AGENTS = ['cursor', 'windsurf', 'opencode', 'copilot'] as const
+    const PROJECT_AGENTS = ['cursor', 'windsurf', 'codex', 'opencode', 'copilot'] as const
     const agents = agentName
       ? [agentName]
       : all && projectScope && globalScope
@@ -4438,7 +4503,7 @@ async function runInstall(): Promise<void> {
 
     const ALL_AGENTS = ['cursor', 'windsurf', 'codex', 'opencode', 'copilot', 'claude', 'gemini', 'qwen', 'pi'] as const
     const GLOBAL_AGENTS = ['claude', 'gemini', 'qwen', 'codex', 'pi'] as const
-    const PROJECT_AGENTS = ['cursor', 'windsurf', 'opencode', 'copilot'] as const
+    const PROJECT_AGENTS = ['cursor', 'windsurf', 'codex', 'opencode', 'copilot'] as const
 
     let agents: string[]
     if (agentName) {
@@ -4564,6 +4629,7 @@ export async function main(): Promise<void> {
   await ensureProjectInitialized({ silent: silentInit })
 
   if (group === 'memory') { await runMemory(); return }
+  if (group === 'search') { await runSearch(); return }
 
   if (group === 'serve') {
     if (!command || command === '--help' || command === '-h') {
