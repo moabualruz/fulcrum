@@ -405,6 +405,7 @@ export type { LightPhaseInput, LightPhaseResult, ScoreEntry, MemoryRow, Wikilink
 // Setup
 export { rebuildFromVault, reconcileMergedBranch } from './setup/rebuild.js'
 export {
+  DEFAULT_RAG_REBUILD_DOMAINS,
   RAG_REBUILD_DOMAINS,
   planRagRebuildScope,
   runRagRebuild,

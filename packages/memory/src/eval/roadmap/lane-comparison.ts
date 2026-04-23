@@ -1,9 +1,9 @@
-import type { RoadmapRagEvalMetrics } from '../roadmap.js'
 import type {
   RoadmapRagEvalBaselineReference,
   RoadmapRagEvalLaneComparison,
   RoadmapRagEvalLaneIdentity,
-} from './contract.js'
+  RoadmapRagEvalMetrics,
+} from '../roadmap-types.js'
 
 export interface CompareRoadmapEvalLanesInput {
   baseline: RoadmapRagEvalBaselineReference

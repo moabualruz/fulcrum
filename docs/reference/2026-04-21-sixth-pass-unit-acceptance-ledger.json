@@ -12,26 +12,26 @@
   },
   "counts": {
     "agent_integration_artifact": 859,
-    "cli_dispatch_token": 44,
+    "cli_dispatch_token": 45,
     "fanout_target": 8,
     "host_hook_config_event": 61,
     "installer_function": 18,
-    "mcp_tool": 44,
-    "monitor_route": 41,
+    "mcp_tool": 53,
+    "monitor_route": 46,
     "opencode_native_tool": 10,
     "opencode_plugin_event": 8,
     "package_config_file": 37,
-    "package_export": 1147,
+    "package_export": 1179,
     "package_generated_artifact": 38,
     "package_manifest_script": 81,
-    "package_source_file": 312,
-    "package_test_file": 397,
+    "package_source_file": 340,
+    "package_test_file": 403,
     "pi_extension_command": 13,
     "pi_extension_event": 14,
     "pi_native_tool": 11,
     "public_entrypoint": 13,
     "script_source_file": 23,
-    "tool_registry_entry": 51,
+    "tool_registry_entry": 59,
     "workflow_step": 29,
     "workspace_project": 17
   },
@@ -68996,10 +68996,1417 @@
       ],
       "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
       "closed_at": "2026-04-23T17:20:00.000Z"
+    },
+    {
+      "id": "mcp_tool:list_runtime_experiments",
+      "type": "mcp_tool",
+      "unit": "list_runtime_experiments",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "mcp_tool:get_runtime_experiment_report",
+      "type": "mcp_tool",
+      "unit": "get_runtime_experiment_report",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "mcp_tool:adopt_runtime_experiment",
+      "type": "mcp_tool",
+      "unit": "adopt_runtime_experiment",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "mcp_tool:rollback_runtime_experiment",
+      "type": "mcp_tool",
+      "unit": "rollback_runtime_experiment",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_challengeravailabilityinput",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#ChallengerAvailabilityInput",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_challengerlaneid",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#ChallengerLaneId",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_challengerplannerstage",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#ChallengerPlannerStage",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_default_rag_rebuild_domains",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#DEFAULT_RAG_REBUILD_DOMAINS",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_rag_challenger_contract_version",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RAG_CHALLENGER_CONTRACT_VERSION",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_rag_challenger_eval_contract",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RAG_CHALLENGER_EVAL_CONTRACT",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_rag_challenger_explain_contract",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RAG_CHALLENGER_EXPLAIN_CONTRACT",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragchallengerlaneadapterref",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagChallengerLaneAdapterRef",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragchallengerlanecontract",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagChallengerLaneContract",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragrepairblockingcondition",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagRepairBlockingCondition",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragrepairdomaindecision",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagRepairDomainDecision",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragrepairphase",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagRepairPhase",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragrepairstrategy",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagRepairStrategy",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_ragrepairverificationstep",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RagRepairVerificationStep",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_roadmapragevalbaselinereference",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RoadmapRagEvalBaselineReference",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_roadmapragevallanecomparison",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RoadmapRagEvalLaneComparison",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_roadmapragevallanegate",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RoadmapRagEvalLaneGate",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_roadmapragevallanegatename",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RoadmapRagEvalLaneGateName",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_roadmapragevallanegatestatus",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RoadmapRagEvalLaneGateStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_roadmapragevallaneidentity",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RoadmapRagEvalLaneIdentity",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_roadmapragevallaneresult",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RoadmapRagEvalLaneResult",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_roadmapragevallanetrust",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RoadmapRagEvalLaneTrust",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_roadmapragevallanetruststatus",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RoadmapRagEvalLaneTrustStatus",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_roadmapragevallanetype",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RoadmapRagEvalLaneType",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_roadmapragevalrollbackproof",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#RoadmapRagEvalRollbackProof",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_buildchallengeravailability",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#buildChallengerAvailability",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_compareroadmapevallanes",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#compareRoadmapEvalLanes",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_evaluateroadmaplanetrust",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#evaluateRoadmapLaneTrust",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_getchallengerlanecontract",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#getChallengerLaneContract",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_getpythonmlchallengerlane",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#getPythonMlChallengerLane",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_getrustsearchchallengerlane",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#getRustSearchChallengerLane",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "package_export:packages_memory_src_index_ts_listchallengerlanecontracts",
+      "type": "package_export",
+      "unit": "packages/memory/src/index.ts#listChallengerLaneContracts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/index.ts"
+      ],
+      "required_verifier": "public export is covered by package tests and export inventory",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:57:43.913Z"
+    },
+    {
+      "id": "tool_registry_entry:list_runtime_experiments",
+      "type": "tool_registry_entry",
+      "unit": "list_runtime_experiments",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry-rag.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:58:58.194Z"
+    },
+    {
+      "id": "tool_registry_entry:get_runtime_experiment_report",
+      "type": "tool_registry_entry",
+      "unit": "get_runtime_experiment_report",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry-rag.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:58:58.194Z"
+    },
+    {
+      "id": "tool_registry_entry:adopt_runtime_experiment",
+      "type": "tool_registry_entry",
+      "unit": "adopt_runtime_experiment",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry-rag.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:58:58.194Z"
+    },
+    {
+      "id": "tool_registry_entry:rollback_runtime_experiment",
+      "type": "tool_registry_entry",
+      "unit": "rollback_runtime_experiment",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry-rag.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:58:58.194Z"
+    },
+    {
+      "id": "package_source_file:packages_cli_src_tool_registry_rag_ts",
+      "type": "package_source_file",
+      "unit": "packages/cli/src/tool-registry-rag.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry-rag.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:58:58.194Z"
+    },
+    {
+      "id": "package_source_file:packages_cli_src_tool_registry_support_ts",
+      "type": "package_source_file",
+      "unit": "packages/cli/src/tool-registry-support.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry-support.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_eval_roadmap_contract_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/eval/roadmap/contract.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/eval/roadmap/contract.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_eval_roadmap_gates_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/eval/roadmap/gates.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/eval/roadmap/gates.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_eval_roadmap_lane_comparison_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/eval/roadmap/lane-comparison.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/eval/roadmap/lane-comparison.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_eval_roadmap_support_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/eval/roadmap/support.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/eval/roadmap/support.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_retrieval_search_code_support_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/retrieval/search-code-support.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/retrieval/search-code-support.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_retrieval_search_context_support_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/retrieval/search-context-support.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/retrieval/search-context-support.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_runtime_challengers_contract_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/runtime/challengers/contract.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/runtime/challengers/contract.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_runtime_challengers_python_ml_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/runtime/challengers/python-ml.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/runtime/challengers/python-ml.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_runtime_challengers_rust_search_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/runtime/challengers/rust-search.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/runtime/challengers/rust-search.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_rag_health_support_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/rag-health-support.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/rag-health-support.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_repair_actions_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/repair/actions.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/repair/actions.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_repair_contract_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/repair/contract.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/repair/contract.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_repair_dependency_graph_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/repair/dependency-graph.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/repair/dependency-graph.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_repair_support_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/repair/support.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/repair/support.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_setup_repair_verification_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/setup/repair/verification.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/setup/repair/verification.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_monitor_src_rag_readouts_ts",
+      "type": "package_source_file",
+      "unit": "packages/monitor/src/rag-readouts.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/monitor/src/rag-readouts.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_monitor_src_server_support_ts",
+      "type": "package_source_file",
+      "unit": "packages/monitor/src/server-support.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/monitor/src/server-support.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_indexer_tests_helpers_spawn_daemon_stub_mjs",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/indexer/tests/helpers/spawn-daemon-stub.mjs",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/indexer/tests/helpers/spawn-daemon-stub.mjs"
+      ],
+      "required_verifier": "package test is covered by Vitest inventory and package test runs",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_rag_challenger_contract_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/rag-challenger-contract.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/rag-challenger-contract.test.ts"
+      ],
+      "required_verifier": "package test is covered by Vitest inventory and package test runs",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_rag_eval_lane_gates_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/rag-eval-lane-gates.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/rag-eval-lane-gates.test.ts"
+      ],
+      "required_verifier": "package test is covered by Vitest inventory and package test runs",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_rag_repair_orchestrator_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/rag-repair-orchestrator.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/rag-repair-orchestrator.test.ts"
+      ],
+      "required_verifier": "package test is covered by Vitest inventory and package test runs",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:00:10.194Z"
+    },
+    {
+      "id": "package_source_file:packages_cli_src_tool_registry_types_ts",
+      "type": "package_source_file",
+      "unit": "packages/cli/src/tool-registry-types.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry-types.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:08:02.603Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_eval_roadmap_types_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/eval/roadmap-types.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/eval/roadmap-types.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:08:02.603Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_retrieval_search_code_contract_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/retrieval/search-code-contract.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/retrieval/search-code-contract.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:08:02.603Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_retrieval_search_context_contract_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/retrieval/search-context-contract.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/retrieval/search-context-contract.ts"
+      ],
+      "required_verifier": "package source is covered by source inventory and package tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T22:08:02.603Z"
     }
   ],
   "status_counts": {
-    "accepted": 3283
+    "accepted": 3365
   },
   "last_closure_run": {
     "date": "2026-04-21",

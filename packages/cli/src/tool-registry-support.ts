@@ -6,7 +6,7 @@ import type {
   McpExposurePlan,
   McpExposureRequest,
   RegistryEntry,
-} from './tool-registry.js'
+} from './tool-registry-types.js'
 
 type ActionPlatformOverrides = Record<string, Partial<Pick<ActionDefinition, 'hooks' | 'availability'>>>
 
@@ -203,7 +203,7 @@ export async function buildMcpExposurePlanFromDefinitions(
 
     if (exposed && mode === 'minimal' && includeActions.size === 0 && action.hooks.coverage === 'full') {
       exposed = false
-      reasons.push('minimal_prefers_hook_or_cli')
+      reasons.push('minimal_mode_prefers_hook_or_cli')
     }
 
     if (exposed && mode === 'minimal' && includeActions.size === 0 && action.mcp.compatibilityOnly && action.hooks.coverage === 'none') {

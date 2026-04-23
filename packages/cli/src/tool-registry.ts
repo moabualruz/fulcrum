@@ -16,6 +16,14 @@ import { getDb } from 'fulcrum-agent-core'
 import type { AgentRole, Db, FulcrumConfig } from 'fulcrum-agent-core'
 import { TOOL_SCHEMA_MAP } from './mcp-tools.js'
 import type { ToolSchema } from './mcp-tools.js'
+import type {
+  ActionDefinition,
+  AdditionalActionDefinitionInput,
+  HandlerDeps,
+  McpExposurePlan,
+  McpExposureRequest,
+  RegistryEntry,
+} from './tool-registry-types.js'
 import {
   buildActionDefinition,
   buildActionDefinitions,
@@ -25,26 +33,17 @@ import {
 } from './tool-registry-support.js'
 import { registerRagToolEntries } from './tool-registry-rag.js'
 
-// ─────────────────────────── Interfaces ────────────────────────────────────
-
-export interface HandlerDeps {
-  /** better-sqlite3 Database, initialized once at server startup. */
-  db: Db
-  /** Workspace ID derived from cwd via projectIdsFromPath() at startup. */
-  workspace_id: string
-  /** Project ID derived from cwd via projectIdsFromPath() at startup. */
-  project_id: string
-  /**
-   * Trusted caller identity resolved from the server session, NOT from tool
-   * args. See CRIT-1: accepting caller_role from args lets any MCP client
-   * claim chief_of_staff and bypass the global-scope policy gate. The server
-   * resolves this once at startup via resolveTrustedCaller() from
-   * process.env['FULCRUM_RUN_ID'] → agent_runs.role, or falls back to
-   * 'software_engineer' for stdio callers that have no run context.
-   */
-  trusted_caller_role?: string
-  trusted_caller_run_id?: string
-}
+export type {
+  ActionDefinition,
+  AdditionalActionDefinitionInput,
+  HandlerDeps,
+  McpExposureDecision,
+  McpExposureMode,
+  McpExposurePlan,
+  McpExposureRequest,
+  RegistryEntry,
+  ToolCapabilities,
+} from './tool-registry-types.js'
 
 /**
  * Resolve the trusted caller identity from the server environment. Looks at
@@ -126,107 +125,6 @@ async function warmRecallEmbedding(): Promise<void> {
     if (shouldFailClosedOnEmbeddingInit(config)) throw err
     // Auto/default device warm-up may degrade to FTS5 + graph-only recall.
   }
-}
-
-export interface ToolCapabilities {
-  /** True if the handler never writes persistent state. Mirrors schema readOnlyHint. */
-  readOnly: boolean
-  /** True if the operation is hard to reverse (e.g. block_agent_run, invoke_team). */
-  destructive: boolean
-  /**
-   * True if the hook layer already calls this tool's logic directly (in-process).
-   * Used by --profile hook-only to subtract these from the MCP tool list.
-   * Hook-capable platforms gain nothing from these tools via MCP — hooks handle them.
-   */
-  hookEquivalent: boolean
-  /**
-   * Minimum AgentRole slug required to call this tool (undefined = any role).
-   * Enforced by --profile <role> filtering via agent_definitions.tools_allow / tools_deny.
-   */
-  minRole?: string
-}
-
-export interface RegistryEntry {
-  /**
-   * MCP tool schema. Undefined for internal tools not exposed to MCP clients
-   * (e.g. get_task — called by the MCP resource handler, not registered as a tool).
-   */
-  schema: ToolSchema | undefined
-  capabilities: ToolCapabilities
-  handler: (args: Record<string, unknown>, deps: HandlerDeps) => Promise<unknown>
-}
-
-export interface ActionCliContract {
-  /** Generic CLI execution path — stable for scripts, hooks, and automation. */
-  primaryCommand: string[]
-  /** Legacy compatibility path retained while `tool exec` remains supported. */
-  compatibilityCommand?: string[]
-  stdinJson: boolean
-}
-
-export interface ActionMcpContract {
-  /** MCP tool name exposed to compatibility clients. */
-  toolName?: string
-  /** True when MCP is a compatibility transport rather than the preferred path. */
-  compatibilityOnly: boolean
-}
-
-export interface ActionHookContract {
-  coverage: 'none' | 'partial' | 'full'
-  nativePoints: string[]
-  nativePlatforms: string[]
-  cliSubstitutable: boolean
-}
-
-export interface ActionAvailability {
-  platforms: string[]
-  agentTypes?: string[]
-  runtimeCapabilities: string[]
-}
-
-export interface ActionObservability {
-  traceName: string
-  eventName: string
-}
-
-export interface ActionDefinition {
-  action_name: string
-  cli: ActionCliContract
-  mcp: ActionMcpContract
-  hooks: ActionHookContract
-  availability: ActionAvailability
-  fallbackOrder: Array<'hook' | 'cli' | 'mcp'>
-  observability: ActionObservability
-}
-
-export type McpExposureMode = 'full' | 'filtered' | 'minimal'
-
-export interface McpExposureRequest {
-  mode?: McpExposureMode
-  profile?: string
-  agentType?: string
-  platform?: string
-  runtimeCapabilities?: string[]
-  includeActions?: string[]
-  excludeActions?: string[]
-}
-
-export interface McpExposureDecision {
-  toolName: string
-  actionName: string
-  exposed: boolean
-  reasons: string[]
-}
-
-export interface McpExposurePlan {
-  mode: McpExposureMode
-  decisions: McpExposureDecision[]
-  filter: (schema: import('./mcp-tools.js').ToolSchema) => boolean
-}
-
-export interface AdditionalActionDefinitionInput {
-  action_name: string
-  mcp: ToolSchema
 }
 
 // ─────────────────────────── Registry ────────────────────────────────────────

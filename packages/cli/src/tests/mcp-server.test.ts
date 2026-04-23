@@ -431,7 +431,7 @@ describe('MCP exposure planner', () => {
     expect(decisions.get('get_current_context')?.exposed).toBe(true)
   })
 
-  it('minimal mode also hides hook-covered actions without explicit include', async () => {
+  it('minimal mode hides hook-covered and CLI-covered actions without explicit include', async () => {
     const plan = await buildMcpExposurePlan({
       mode: 'minimal',
       runtimeCapabilities: [],
@@ -440,7 +440,8 @@ describe('MCP exposure planner', () => {
     const decisions = new Map(plan.decisions.map(decision => [decision.actionName, decision]))
     expect(decisions.get('recall_memory')?.exposed).toBe(false)
     expect(decisions.get('recall_memory')?.reasons).toContain('minimal_mode_prefers_hook_or_cli')
-    expect(decisions.get('list_tasks')?.exposed).toBe(true)
+    expect(decisions.get('list_tasks')?.exposed).toBe(false)
+    expect(decisions.get('list_tasks')?.reasons).toContain('minimal_prefers_cli')
   })
 
   it('explicit include overrides minimal-mode default hiding', async () => {

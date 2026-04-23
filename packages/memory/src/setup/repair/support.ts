@@ -11,7 +11,7 @@ export function selectRepairDomains(
       const status = domain.status as RagHealthStatus
       return status !== 'healthy' && status !== 'out_of_scope'
     })
-    .filter(([domain]) => requested === null || domain === 'l0' || domain === 'l1' || requested.has(domain))
+    .filter(([domain]) => requested === null || requested.has(domain))
     .map(([domain]) => domain)
 }
 

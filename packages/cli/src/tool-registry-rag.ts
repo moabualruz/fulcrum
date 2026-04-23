@@ -1,7 +1,7 @@
 import type { AgentRole, RuntimeDataProfile, RuntimeExperimentStatus } from 'fulcrum-agent-core'
 import type { RagRebuildDomain } from 'fulcrum-memory'
 import { TOOL_SCHEMA_MAP } from './mcp-tools.js'
-import type { HandlerDeps, RegistryEntry } from './tool-registry.js'
+import type { HandlerDeps, RegistryEntry } from './tool-registry-types.js'
 
 function stripNullish<T>(value: T): T {
   if (Array.isArray(value)) return value.map(item => stripNullish(item)) as T

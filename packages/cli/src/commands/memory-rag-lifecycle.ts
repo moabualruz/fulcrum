@@ -13,7 +13,7 @@ import {
   runtimeProfileDbMismatch,
 } from 'fulcrum-agent-core'
 import type { AgentRole, Db, RagRebuildMode, RuntimeDataProfile, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
-import { RAG_REBUILD_DOMAINS, readRebuildReport, runRagRebuild } from 'fulcrum-memory'
+import { DEFAULT_RAG_REBUILD_DOMAINS, readRebuildReport, runRagRebuild } from 'fulcrum-memory'
 import type { RagRebuildActor, RagRebuildDomain, RagRebuildReport } from 'fulcrum-memory'
 
 export interface RagRebuildCommandInput {
@@ -137,7 +137,7 @@ function failedProfileReport(
       workspace_id: input.workspace_id,
       project_id: input.project_id,
       runtime_profile: profile,
-      domains: input.domains && input.domains.length > 0 ? input.domains : [...RAG_REBUILD_DOMAINS],
+      domains: input.domains && input.domains.length > 0 ? input.domains : [...DEFAULT_RAG_REBUILD_DOMAINS],
     },
     profile_manifest,
     profile_confirmation: null,

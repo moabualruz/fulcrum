@@ -12,7 +12,7 @@ import type {
 import type {
   SearchContextInput,
   SearchContextResponse,
-} from './search-context.js'
+} from './search-context-contract.js'
 import type { BaselineSemanticRanks } from './planner/baseline-lane.js'
 import { boundedRankScore, sumStageScores } from './planner/fusion.js'
 import type {

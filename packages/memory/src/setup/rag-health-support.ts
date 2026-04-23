@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'fs'
 import { join, relative, resolve, sep } from 'path'
 import { pathFingerprintForRoadmap } from './rag-redaction.js'
 import type { Db, RagHealthStatus, RuntimeDataProfile, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
-import type { RagHealthDomain, RagHealthProfileManifest } from './rag-health.js'
+import type { RagHealthDomain, RagHealthProfileManifest } from './rag-types.js'
 
 interface CountRow {
   n: number

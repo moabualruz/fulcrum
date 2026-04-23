@@ -12,9 +12,10 @@ import { redactRagDetails } from './rag-redaction.js'
 import { buildRagHealthReport } from './rag-health.js'
 import { buildRagRepairPlan } from './rag-repair.js'
 import { evaluateRepairVerification } from './repair/verification.js'
-import { RAG_REBUILD_DOMAINS } from './rag-types.js'
+import { DEFAULT_RAG_REBUILD_DOMAINS, RAG_REBUILD_DOMAINS } from './rag-types.js'
 import type { RagParityCheck, RagRebuildActor, RagRebuildDomain, RagRebuildReport, RagRebuildRequest } from './rag-types.js'
 
+export { DEFAULT_RAG_REBUILD_DOMAINS } from './rag-types.js'
 export { RAG_REBUILD_DOMAINS } from './rag-types.js'
 export type { RagParityCheck, RagRebuildActor, RagRebuildDomain, RagRebuildReport, RagRebuildRequest } from './rag-types.js'
 
@@ -50,7 +51,7 @@ function countProjectGraphEvidence(db: Db, table: 'graph_entities' | 'graph_edge
 }
 
 function normalizeDomains(domains: RagRebuildDomain[] | undefined): RagRebuildDomain[] {
-  if (!domains || domains.length === 0) return [...RAG_REBUILD_DOMAINS]
+  if (!domains || domains.length === 0) return [...DEFAULT_RAG_REBUILD_DOMAINS]
   const seen = new Set<RagRebuildDomain>()
   for (const domain of domains) {
     if (!RAG_REBUILD_DOMAINS.includes(domain)) throw new Error(`unknown RAG rebuild domain: ${domain}`)

@@ -1,7 +1,16 @@
-import type { AgentRole, RagHealthStatus, RagRebuildMode, RuntimeDataProfile, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
+import type {
+  AgentRole,
+  RagHealthStatus,
+  RagRebuildMode,
+  RuntimeDataProfile,
+  RuntimeDataProfileManifest,
+  RuntimeProfileError,
+  RuntimeProfilePathKey,
+} from 'fulcrum-agent-core'
 
 export const RAG_REBUILD_DOMAINS = ['l0', 'l1', 'fts', 'code', 'vectors', 'graph'] as const
 export type RagRebuildDomain = typeof RAG_REBUILD_DOMAINS[number]
+export const DEFAULT_RAG_REBUILD_DOMAINS: RagRebuildDomain[] = ['fts', 'code', 'vectors', 'graph']
 
 export interface RagRebuildActor {
   kind: 'human' | 'agent'
@@ -64,4 +73,41 @@ export interface RagRebuildReport {
   final_health_status?: RagHealthStatus | null
   verification?: Record<string, unknown>
   retryable_actions?: string[]
+}
+
+export interface RagHealthProfileError {
+  code: RuntimeProfileError['code']
+  profile: RuntimeDataProfile
+  path_key: RuntimeProfilePathKey
+  path_fingerprint: string
+  conflicts_with_profile?: RuntimeDataProfile
+  conflicts_with_path_key?: RuntimeProfilePathKey
+  conflicts_with_path_fingerprint?: string
+}
+
+export interface RagHealthProfileManifest {
+  profile: RuntimeDataProfile
+  safe_for_destructive_execution: boolean
+  disposable: boolean
+  requires_confirmation: boolean
+  path_fingerprints: Record<RuntimeProfilePathKey, string>
+  errors: RagHealthProfileError[]
+}
+
+export interface RagHealthDomain {
+  status: RagHealthStatus
+  [key: string]: unknown
+}
+
+export interface RagHealthReport {
+  workspace_id: string
+  project_id: string
+  status: RagHealthStatus
+  runtime_profile: RuntimeDataProfile
+  profile_manifest: RagHealthProfileManifest
+  generated_at: string
+  domains: Record<string, RagHealthDomain>
+  recommended_actions: string[]
+  warnings: string[]
+  errors: string[]
 }

@@ -20,7 +20,7 @@ import type {
   RoadmapRagEvalRunResult,
   RoadmapRagEvalThresholds,
   RunRoadmapRagEvalSuiteInput,
-} from '../roadmap.js'
+} from '../roadmap-types.js'
 
 export const DEFAULT_THRESHOLDS: Record<Exclude<RagEvalSuite, 'rag-lifecycle'>, RoadmapRagEvalThresholds> = {
   'live-rag': {

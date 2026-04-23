@@ -67,7 +67,7 @@ export function evaluateRepairVerification(
          AND workspace_id = ?
          AND project_id = ?
     `).get(eval_run_id, input?.workspace_id, input?.project_id) as { status?: string } | undefined
-    return row?.status !== 'passed'
+    return row !== undefined && row.status !== 'passed'
   })
 
   return {

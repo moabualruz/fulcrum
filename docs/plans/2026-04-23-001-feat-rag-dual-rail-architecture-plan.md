@@ -256,7 +256,7 @@ The intended shape is:
 **Verification:**
 - Retrieval semantics can be described as read-only by default without hand-waving, and the CLI/MCP capability model matches actual behavior.
 
-- [ ] **Unit 2: Baseline local lane upgrade**
+- [x] **Unit 2: Baseline local lane upgrade**
 
 **Goal:** Make the default local unified retrieval lane genuinely hybrid and strong enough to serve as the everyday path.
 

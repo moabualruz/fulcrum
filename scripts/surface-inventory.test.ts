@@ -182,6 +182,10 @@ const EXPECTED_MCP_TOOLS = [
   'get_rag_repair_plan',
   'search_context',
   'run_rag_eval',
+  'list_runtime_experiments',
+  'get_runtime_experiment_report',
+  'adopt_runtime_experiment',
+  'rollback_runtime_experiment',
   'get_rag_query_trace',
   'start_embedding_job',
   'get_embedding_job_status',
@@ -243,6 +247,10 @@ const EXPECTED_REGISTRY_TOOLS = [
   'get_rag_repair_plan',
   'search_context',
   'run_rag_eval',
+  'list_runtime_experiments',
+  'get_runtime_experiment_report',
+  'adopt_runtime_experiment',
+  'rollback_runtime_experiment',
   'get_rag_query_trace',
   'start_embedding_job',
   'get_embedding_job_status',
@@ -438,8 +446,16 @@ function extractFanoutTargets(): string[] {
 }
 
 function extractRegistryTools(): string[] {
-  const raw = readFileSync(join(REPO_ROOT, 'packages/cli/src/tool-registry.ts'), 'utf8')
-  return [...raw.matchAll(/TOOL_REGISTRY\.set\('([a-z0-9_]+)'/g)].map((m) => m[1]!)
+  const files = [
+    'packages/cli/src/tool-registry.ts',
+    'packages/cli/src/tool-registry-rag.ts',
+  ]
+  return sorted(new Set(
+    files.flatMap((file) => {
+      const raw = readFileSync(join(REPO_ROOT, file), 'utf8')
+      return [...raw.matchAll(/(?:TOOL_REGISTRY|registry)\.set\('([a-z0-9_]+)'/g)].map((m) => m[1]!)
+    }),
+  ))
 }
 
 function extractMonitorRoutes(): string[] {
@@ -744,7 +760,7 @@ describe('granular full-pass surface inventory', () => {
 
   it('enumerates callable core surfaces', () => {
     expect(extractMcpTools()).toEqual(EXPECTED_MCP_TOOLS)
-    expect(extractRegistryTools()).toEqual(EXPECTED_REGISTRY_TOOLS)
+    expect(extractRegistryTools()).toEqual(sorted(EXPECTED_REGISTRY_TOOLS))
     expect(extractMonitorRoutes()).toEqual(EXPECTED_MONITOR_ROUTES)
     expect(extractInstallFunctions()).toEqual(EXPECTED_INSTALL_FUNCTIONS)
     expect(extractWorkflowSteps()).toEqual(EXPECTED_WORKFLOW_STEPS)

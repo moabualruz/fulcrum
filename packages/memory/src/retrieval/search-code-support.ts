@@ -8,7 +8,7 @@ import type {
   SearchCodeResultRow,
   SearchCodeRuntimeTruth,
   SearchCodeStageContribution,
-} from './search-code.js'
+} from './search-code-contract.js'
 
 export type CodeParseStatus = 'parsed' | 'skipped' | 'failed'
 export type CodeVectorStatus = 'pending' | 'current' | 'stale' | 'failed' | 'skipped' | 'legacy'

@@ -34,11 +34,25 @@ function derivedDependencies(domain: string, activeDomains: Set<string>): string
   return []
 }
 
-function blockedCanonicalDomains(health: RagHealthReport): RagRepairBlockingCondition[] {
+function relevantCanonicalDomains(requestedDomains?: string[]): Set<string> {
+  if (!requestedDomains || requestedDomains.length === 0) return new Set(['l0', 'l1'])
+
+  const relevant = new Set<string>()
+  for (const domain of requestedDomains) {
+    if (domain === 'l0') relevant.add('l0')
+    if (domain === 'l1' || domain === 'fts' || domain === 'vectors') relevant.add('l1')
+  }
+  return relevant
+}
+
+function blockedCanonicalDomains(health: RagHealthReport, requestedDomains?: string[]): RagRepairBlockingCondition[] {
   const blocked: RagRepairBlockingCondition[] = []
+  const relevant = relevantCanonicalDomains(requestedDomains)
   for (const domain of ['l0', 'l1']) {
+    if (!relevant.has(domain)) continue
     const details = health.domains[domain]
     if (!details || details.status === 'healthy' || details.status === 'out_of_scope') continue
+    if (typeof details['error'] === 'string' && details['error'].includes('is not available; run memory migrations')) continue
     blocked.push({
       code: 'canonical_source_repair_required',
       domain,
@@ -78,14 +92,14 @@ export function buildRepairDependencyGraph(
   repair_reasoning: string[]
 } {
   const repairReasoning: string[] = []
-  const canonicalBlocks = blockedCanonicalDomains(health)
+  const canonicalBlocks = blockedCanonicalDomains(health, input.domains)
   const runtimeBlocks = runtimeBlockingConditions(input, health)
   const blockingConditions = [...canonicalBlocks, ...runtimeBlocks]
   const blockedDomains = new Set(blockingConditions.map(condition => condition.domain))
   const requestedDomains = input.domains ? new Set(input.domains) : null
   const activeDomains = Object.entries(health.domains)
     .filter(([, domain]) => domain.status !== 'healthy' && domain.status !== 'out_of_scope')
-    .filter(([domain]) => requestedDomains === null || domain === 'l0' || domain === 'l1' || requestedDomains.has(domain))
+    .filter(([domain]) => requestedDomains === null || requestedDomains.has(domain))
     .map(([domain]) => domain)
 
   if (canonicalBlocks.length > 0) {

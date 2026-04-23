@@ -10,6 +10,11 @@ import type {
 import { summarizeGraphCoverage } from '../graph/coverage.js'
 import { getVaultPath } from '../vault/client.js'
 import { reconcileVectorMetadata } from './rag-coverage.js'
+import type {
+  RagHealthDomain,
+  RagHealthProfileManifest,
+  RagHealthReport,
+} from './rag-types.js'
 import {
   SCOPED_VECTOR_METADATA_CTE,
   type FtsParityCheck,
@@ -31,43 +36,12 @@ import {
   toHealthProfileManifest,
   walkVaultMarkdown,
 } from './rag-health-support.js'
-
-export interface RagHealthProfileError {
-  code: RuntimeProfileError['code']
-  profile: RuntimeDataProfile
-  path_key: RuntimeProfilePathKey
-  path_fingerprint: string
-  conflicts_with_profile?: RuntimeDataProfile
-  conflicts_with_path_key?: RuntimeProfilePathKey
-  conflicts_with_path_fingerprint?: string
-}
-
-export interface RagHealthProfileManifest {
-  profile: RuntimeDataProfile
-  safe_for_destructive_execution: boolean
-  disposable: boolean
-  requires_confirmation: boolean
-  path_fingerprints: Record<RuntimeProfilePathKey, string>
-  errors: RagHealthProfileError[]
-}
-
-export interface RagHealthReport {
-  workspace_id: string
-  project_id: string
-  status: RagHealthStatus
-  runtime_profile: RuntimeDataProfile
-  profile_manifest: RagHealthProfileManifest
-  generated_at: string
-  domains: Record<string, RagHealthDomain>
-  recommended_actions: string[]
-  warnings: string[]
-  errors: string[]
-}
-
-export interface RagHealthDomain {
-  status: RagHealthStatus
-  [key: string]: unknown
-}
+export type {
+  RagHealthDomain,
+  RagHealthProfileError,
+  RagHealthProfileManifest,
+  RagHealthReport,
+} from './rag-types.js'
 
 
 function buildL0Domain(input: { workspace_id: string; project_id: string; vault_path: string }, db: Db): RagHealthDomain {
