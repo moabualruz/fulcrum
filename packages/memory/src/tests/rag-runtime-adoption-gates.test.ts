@@ -143,4 +143,72 @@ describe('runtime experiment adoption gates', () => {
     expect(json).not.toContain('/home/alice')
     expect(json).not.toContain('super-secret-value')
   })
+
+  it('reports challenger lane contract details through the shared planner/eval model', () => {
+    const experiment = createRuntimeExperiment({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      status: 'completed',
+      experiment_type: 'model_runtime',
+      baseline_eval_run_id: 'evalrun_baseline',
+      candidate_adapter: 'python-ml',
+      adoption_gates: PASSING_GATES,
+      rollback_plan: { command: 'fulcrum memory runtime-experiments rollback runtimeexp_python' },
+    })
+
+    const report = buildRuntimeExperimentReport({
+      runtime_experiment_id: experiment.runtime_experiment_id,
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+    })
+
+    expect(report.lane).toMatchObject({
+      lane_id: 'python-ml',
+      lane_type: 'challenger',
+      adapter: 'python-ml',
+    })
+    expect(report.lane_contract).toMatchObject({
+      contract_version: 'rag-challenger-v1',
+      eval_contract: 'roadmap-rag-eval-v1',
+      explain_contract: 'shared-rag-explain-v1',
+      disabled_by_default: true,
+      status: 'registered',
+    })
+  })
+
+  it('fails closed when a registered challenger name does not match the persisted experiment type', () => {
+    const experiment = createRuntimeExperiment({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      status: 'completed',
+      experiment_type: 'graph_store',
+      candidate_adapter: 'python-ml',
+      adoption_gates: PASSING_GATES,
+      rollback_plan: { command: 'fulcrum memory runtime-experiments rollback runtimeexp_python' },
+    })
+
+    const report = buildRuntimeExperimentReport({
+      runtime_experiment_id: experiment.runtime_experiment_id,
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+    })
+
+    expect(report.availability).toMatchObject({
+      status: 'failed',
+      scope: 'optional_candidate',
+      local_baseline_impact: 'none',
+      adapter_kind: 'graph_store',
+      adapter_name: 'python-ml',
+    })
+    expect(report.lane.metadata).toMatchObject({
+      experiment_type: 'graph_store',
+      challenger_contract_status: 'mismatched',
+      registered_adapter_kind: 'model_runtime',
+    })
+    expect(report.lane_contract).toMatchObject({
+      contract_version: 'unverified',
+      status: 'mismatched',
+      disabled_by_default: true,
+    })
+  })
 })

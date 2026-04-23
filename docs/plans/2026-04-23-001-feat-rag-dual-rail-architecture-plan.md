@@ -388,7 +388,7 @@ The intended shape is:
 **Verification:**
 - There is one answer to “why is this lane trusted?” and that answer is visible in both CLI and monitor outputs.
 
-- [ ] **Unit 5: Optional challenger lanes under the common contract**
+- [x] **Unit 5: Optional challenger lanes under the common contract**
 
 **Goal:** Introduce optional Python ML and Rust search/index lanes as challengers rather than parallel products.
 

@@ -4,6 +4,17 @@ Runtime experiments are the optional path for testing alternate vector stores,
 graph stores, code indexers, and model runtimes against Fulcrum's local RAG
 baseline.
 
+Two built-in challenger lane identities currently ship under one shared contract:
+
+| Lane | Role under common contract |
+| --- | --- |
+| `python-ml` | Python challenger for model-heavy retrieval stages such as semantic candidate generation and rerank |
+| `rust-search` | Rust challenger for search/index stages such as candidate generation and fusion-side index work |
+
+Both lanes stay disabled by default. They are challenger implementations of the
+same planner, explain, and eval contract the baseline uses. They are not a
+separate retrieval product.
+
 They are disabled by default. A missing optional adapter is reported as
 `status: disabled` with `scope: out_of_scope` and `local_baseline_impact: none`.
 This means the local SQLite, vault, vector, graph, task, run, memory, and policy
@@ -113,5 +124,16 @@ fulcrum memory runtime-experiments rollback runtimeexp_... --workspace-id ws_1 -
 ```
 
 JSON output is redacted. Reports include availability, adoption gate evaluation,
-and next actions. Disabled optional candidates should be treated as informational,
-not as local baseline failures.
+lane identity, shared lane-contract metadata, and next actions. Disabled optional
+candidates should be treated as informational, not as local baseline failures.
+
+## MCP / Action Surface
+
+The same contract is exposed through MCP tools:
+
+- `list_runtime_experiments`
+- `get_runtime_experiment_report`
+- `adopt_runtime_experiment`
+- `rollback_runtime_experiment`
+
+Read tools stay read-only. Adoption and rollback tools are explicit writes.

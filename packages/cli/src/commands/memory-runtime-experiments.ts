@@ -22,6 +22,7 @@ export interface ListRuntimeExperimentsCommandResult {
   workspace_id: string
   project_id: string
   disabled_by_default: true
+  contract_version: 'rag-challenger-v1'
   experiments: RuntimeExperiment[]
 }
 
@@ -48,6 +49,7 @@ export function listRuntimeExperimentsCommand(
   return {
     ...scope,
     disabled_by_default: true,
+    contract_version: 'rag-challenger-v1',
     experiments: listRuntimeExperiments({
       ...scope,
       status: input.status,

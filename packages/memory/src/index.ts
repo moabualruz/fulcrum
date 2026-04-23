@@ -568,6 +568,23 @@ export type {
   RuntimeExperimentScope,
   RuntimeExperimentType,
 } from './runtime/experiments.js'
+export {
+  RAG_CHALLENGER_CONTRACT_VERSION,
+  RAG_CHALLENGER_EVAL_CONTRACT,
+  RAG_CHALLENGER_EXPLAIN_CONTRACT,
+  buildChallengerAvailability,
+  getChallengerLaneContract,
+  listChallengerLaneContracts,
+} from './runtime/challengers/contract.js'
+export { getPythonMlChallengerLane } from './runtime/challengers/python-ml.js'
+export { getRustSearchChallengerLane } from './runtime/challengers/rust-search.js'
+export type {
+  ChallengerAvailabilityInput,
+  ChallengerLaneId,
+  ChallengerPlannerStage,
+  RagChallengerLaneAdapterRef,
+  RagChallengerLaneContract,
+} from './runtime/challengers/contract.js'
 
 // Repo map
 export { buildRepoMap, scanAndBuildRepoMap } from './repo-map.js'

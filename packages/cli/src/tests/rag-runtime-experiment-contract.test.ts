@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { _configureDb, closeDb, getDb, runMigrations, setDb } from 'fulcrum-agent-core'
 import { createRuntimeExperiment } from 'fulcrum-memory'
+import { TOOL_SCHEMA_MAP } from '../mcp-tools.js'
+import { TOOL_REGISTRY } from '../tool-registry.js'
 import {
   getRuntimeExperimentReportCommand,
   listRuntimeExperimentsCommand,
@@ -23,6 +25,14 @@ afterEach(() => {
 })
 
 describe('runtime experiment CLI contract', () => {
+  it('exposes runtime experiment MCP tools with read/write semantics matching behavior', () => {
+    expect(TOOL_SCHEMA_MAP.get('list_runtime_experiments')?.annotations?.readOnlyHint).toBe(true)
+    expect(TOOL_SCHEMA_MAP.get('get_runtime_experiment_report')?.annotations?.readOnlyHint).toBe(true)
+    expect(TOOL_SCHEMA_MAP.get('adopt_runtime_experiment')?.annotations?.readOnlyHint).not.toBe(true)
+    expect(TOOL_REGISTRY.get('list_runtime_experiments')?.capabilities.readOnly).toBe(true)
+    expect(TOOL_REGISTRY.get('adopt_runtime_experiment')?.capabilities.readOnly).toBe(false)
+  })
+
   it('lists optional runtime experiments with stable scoped JSON and redacted fields', () => {
     const visible = createRuntimeExperiment({
       workspace_id: 'ws_1',
@@ -77,6 +87,10 @@ describe('runtime experiment CLI contract', () => {
     expect(report).toMatchObject({
       runtime_experiment_id: experiment.runtime_experiment_id,
       status: 'disabled',
+      lane_contract: expect.objectContaining({
+        contract_version: 'unregistered',
+        status: 'unregistered',
+      }),
       availability: {
         status: 'disabled',
         scope: 'out_of_scope',

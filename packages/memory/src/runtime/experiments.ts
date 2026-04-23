@@ -1,8 +1,15 @@
 import { getDb, newId } from 'fulcrum-agent-core'
 import type { Db, RuntimeExperimentStatus } from 'fulcrum-agent-core'
+import type { RoadmapRagEvalLaneIdentity } from '../eval/roadmap/contract.js'
 import { redactRagDetails, redactRoadmapArtifact } from '../setup/rag-redaction.js'
 import { disabledRuntimeAdapterStatus } from './adapters.js'
 import type { RuntimeAdapterAvailability, RuntimeAdapterKind } from './adapters.js'
+import {
+  RAG_CHALLENGER_CONTRACT_VERSION,
+  RAG_CHALLENGER_EVAL_CONTRACT,
+  RAG_CHALLENGER_EXPLAIN_CONTRACT,
+  getChallengerLaneContract,
+} from './challengers/contract.js'
 import type { RuntimeComparisonResult } from './comparison.js'
 
 export type RuntimeExperimentType = RuntimeAdapterKind
@@ -88,6 +95,15 @@ export interface RuntimeAdoptionGateEvaluation {
 }
 
 export interface RuntimeExperimentReport extends RuntimeExperiment {
+  lane: RoadmapRagEvalLaneIdentity
+  lane_contract: {
+    contract_version: string
+    eval_contract: string
+    explain_contract: string
+    disabled_by_default: boolean
+    planner_stages: string[]
+    status: 'registered' | 'mismatched' | 'unregistered'
+  }
   availability: RuntimeAdapterAvailability
   adoption: RuntimeAdoptionGateEvaluation
   next_actions: Array<{ label: string; command: string }>
@@ -317,15 +333,84 @@ export function rollbackRuntimeExperiment(input: RuntimeExperimentScope, db: Db 
   return transitionRuntimeExperimentStatus({ ...input, status: 'rolled_back' }, db)
 }
 
+function resolveRegisteredChallenger(experiment: RuntimeExperiment) {
+  const challenger = getChallengerLaneContract(experiment.candidate_adapter)
+  if (!challenger) {
+    return { challenger: null, status: 'unregistered' as const }
+  }
+  if (challenger.adapter.adapter_kind !== experiment.experiment_type) {
+    return { challenger, status: 'mismatched' as const }
+  }
+  return { challenger, status: 'registered' as const }
+}
+
 function availabilityForExperiment(experiment: RuntimeExperiment): RuntimeAdapterAvailability {
+  const resolved = resolveRegisteredChallenger(experiment)
+  const challenger = resolved.challenger
   if (experiment.status === 'disabled') {
-    return disabledRuntimeAdapterStatus({
+    return challenger && resolved.status === 'registered'
+      ? sanitizeRuntimeExperimentValue({
+        status: 'disabled',
+        scope: 'out_of_scope',
+        local_baseline_impact: 'none',
+        adapter_kind: challenger.adapter.adapter_kind,
+        adapter_name: challenger.adapter.adapter_name,
+        reason: 'optional runtime experiment disabled by default',
+        details: {
+          experiment_type: experiment.experiment_type,
+          baseline_eval_run_id: experiment.baseline_eval_run_id,
+          lane_id: challenger.lane.lane_id,
+        },
+      })
+      : challenger && resolved.status === 'mismatched'
+        ? sanitizeRuntimeExperimentValue({
+          status: 'failed',
+          scope: 'optional_candidate',
+          local_baseline_impact: 'none',
+          adapter_kind: experiment.experiment_type,
+          adapter_name: experiment.candidate_adapter || 'candidate',
+          reason: 'candidate adapter does not match persisted experiment type',
+          details: {
+            experiment_type: experiment.experiment_type,
+            registered_adapter_kind: challenger.adapter.adapter_kind,
+            baseline_eval_run_id: experiment.baseline_eval_run_id,
+          },
+        })
+      : disabledRuntimeAdapterStatus({
       adapter_kind: experiment.experiment_type,
       adapter_name: experiment.candidate_adapter || 'unconfigured',
       reason: 'optional runtime experiment disabled by default',
       details: {
         experiment_type: experiment.experiment_type,
         baseline_eval_run_id: experiment.baseline_eval_run_id,
+      },
+    })
+  }
+  if (challenger && resolved.status === 'registered') {
+    return sanitizeRuntimeExperimentValue({
+      status: 'available',
+      scope: 'optional_candidate',
+      local_baseline_impact: 'none',
+      adapter_kind: challenger.adapter.adapter_kind,
+      adapter_name: challenger.adapter.adapter_name,
+      reason: 'challenger lane is available for comparison; baseline remains source of truth until adoption gates pass',
+      details: {
+        lane_id: challenger.lane.lane_id,
+        contract_version: challenger.contract_version,
+      },
+    })
+  }
+  if (challenger && resolved.status === 'mismatched') {
+    return sanitizeRuntimeExperimentValue({
+      status: 'failed',
+      scope: 'optional_candidate',
+      local_baseline_impact: 'none',
+      adapter_kind: experiment.experiment_type,
+      adapter_name: experiment.candidate_adapter || 'candidate',
+      reason: 'candidate adapter does not match persisted experiment type',
+      details: {
+        experiment_type: experiment.experiment_type,
+        registered_adapter_kind: challenger.adapter.adapter_kind,
       },
     })
   }
@@ -364,11 +449,56 @@ function nextActionsForReport(experiment: RuntimeExperiment, evaluation: Runtime
   }]
 }
 
+function laneForExperiment(experiment: RuntimeExperiment): RoadmapRagEvalLaneIdentity {
+  const resolved = resolveRegisteredChallenger(experiment)
+  const challenger = resolved.challenger
+  if (challenger && resolved.status === 'registered') return sanitizeRuntimeExperimentValue(challenger.lane)
+  return sanitizeRuntimeExperimentValue({
+    lane_id: experiment.candidate_adapter.trim() || `${experiment.experiment_type}-candidate`,
+    lane_label: resolved.status === 'mismatched'
+      ? `${experiment.candidate_adapter.trim() || 'Unnamed challenger'} (unverified)`
+      : experiment.candidate_adapter.trim() || 'Unnamed challenger',
+    lane_type: 'challenger',
+    runtime: 'optional',
+    adapter: experiment.candidate_adapter.trim() || undefined,
+    metadata: {
+      experiment_type: experiment.experiment_type,
+      challenger_contract_status: resolved.status,
+      registered_adapter_kind: challenger?.adapter.adapter_kind,
+    },
+  })
+}
+
+function laneContractForExperiment(experiment: RuntimeExperiment): RuntimeExperimentReport['lane_contract'] {
+  const resolved = resolveRegisteredChallenger(experiment)
+  const challenger = resolved.challenger
+  if (challenger && resolved.status === 'registered') {
+    return sanitizeRuntimeExperimentValue({
+      contract_version: challenger.contract_version,
+      eval_contract: challenger.eval_contract,
+      explain_contract: challenger.explain_contract,
+      disabled_by_default: challenger.disabled_by_default,
+      planner_stages: challenger.planner_stages,
+      status: 'registered',
+    })
+  }
+  return sanitizeRuntimeExperimentValue({
+    contract_version: resolved.status === 'mismatched' ? 'unverified' : 'unregistered',
+    eval_contract: resolved.status === 'mismatched' ? RAG_CHALLENGER_EVAL_CONTRACT : 'unregistered',
+    explain_contract: resolved.status === 'mismatched' ? RAG_CHALLENGER_EXPLAIN_CONTRACT : 'unregistered',
+    disabled_by_default: true,
+    planner_stages: ['candidate_generation', 'runtime_truth', 'explain'],
+    status: resolved.status,
+  })
+}
+
 export function buildRuntimeExperimentReport(input: RuntimeExperimentScope, db: Db = getDb()): RuntimeExperimentReport {
   const experiment = requireRuntimeExperiment(input, db)
   const adoption = evaluateRuntimeAdoptionGates(experiment)
   return sanitizeRuntimeExperimentValue({
     ...experiment,
+    lane: laneForExperiment(experiment),
+    lane_contract: laneContractForExperiment(experiment),
     availability: availabilityForExperiment(experiment),
     adoption,
     next_actions: nextActionsForReport(experiment, adoption),

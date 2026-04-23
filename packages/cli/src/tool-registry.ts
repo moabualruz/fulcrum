@@ -13,7 +13,7 @@
 // Handlers default workspace_id and project_id from deps when args omit them.
 
 import { getDb } from 'fulcrum-agent-core'
-import type { AgentRole, Db, FulcrumConfig, RuntimeDataProfile } from 'fulcrum-agent-core'
+import type { AgentRole, Db, FulcrumConfig, RuntimeDataProfile, RuntimeExperimentStatus } from 'fulcrum-agent-core'
 import type { RagRebuildDomain } from 'fulcrum-memory'
 import { TOOL_SCHEMA_MAP } from './mcp-tools.js'
 import type { ToolSchema } from './mcp-tools.js'
@@ -1116,6 +1116,59 @@ TOOL_REGISTRY.set('run_rag_eval', {
       trigger_scope: args['trigger_scope'] as 'rag_related' | 'non_rag' | 'manual' | undefined,
       gate_required: args['gate_required'] as boolean | undefined,
       actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('list_runtime_experiments', {
+  schema: TOOL_SCHEMA_MAP.get('list_runtime_experiments'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { listRuntimeExperimentsCommand } = await import('./commands/memory-runtime-experiments.js')
+    return listRuntimeExperimentsCommand({
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+      status: args['status'] as RuntimeExperimentStatus | undefined,
+      limit: args['limit'] as number | undefined,
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('get_runtime_experiment_report', {
+  schema: TOOL_SCHEMA_MAP.get('get_runtime_experiment_report'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { getRuntimeExperimentReportCommand } = await import('./commands/memory-runtime-experiments.js')
+    return getRuntimeExperimentReportCommand({
+      runtime_experiment_id: args['runtime_experiment_id'] as string,
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('adopt_runtime_experiment', {
+  schema: TOOL_SCHEMA_MAP.get('adopt_runtime_experiment'),
+  capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { adoptRuntimeExperimentCommand } = await import('./commands/memory-runtime-experiments.js')
+    return adoptRuntimeExperimentCommand({
+      runtime_experiment_id: args['runtime_experiment_id'] as string,
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('rollback_runtime_experiment', {
+  schema: TOOL_SCHEMA_MAP.get('rollback_runtime_experiment'),
+  capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { rollbackRuntimeExperimentCommand } = await import('./commands/memory-runtime-experiments.js')
+    return rollbackRuntimeExperimentCommand({
+      runtime_experiment_id: args['runtime_experiment_id'] as string,
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
     }, deps.db)
   },
 })

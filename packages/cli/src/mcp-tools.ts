@@ -395,6 +395,64 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
   },
   {
+    title: 'List Runtime Experiments',
+    name: 'list_runtime_experiments',
+    description: 'List optional challenger runtime experiments in workspace/project scope. Read-only. Disabled-by-default candidates stay informational until adoption gates pass.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+        status: { type: 'string', enum: ['disabled', 'planned', 'running', 'completed', 'failed', 'adopted', 'rejected', 'rolled_back'] },
+        limit: { type: 'number' },
+      },
+    },
+  },
+  {
+    title: 'Get Runtime Experiment Report',
+    name: 'get_runtime_experiment_report',
+    description: 'Read one optional challenger runtime experiment report with lane contract, availability, adoption gates, and next actions. Read-only.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        runtime_experiment_id: { type: 'string' },
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+      },
+      required: ['runtime_experiment_id'],
+    },
+  },
+  {
+    title: 'Adopt Runtime Experiment',
+    name: 'adopt_runtime_experiment',
+    description: 'Adopt an optional challenger runtime experiment only after all gates pass. Writes runtime_experiments status.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        runtime_experiment_id: { type: 'string' },
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+      },
+      required: ['runtime_experiment_id'],
+    },
+  },
+  {
+    title: 'Rollback Runtime Experiment',
+    name: 'rollback_runtime_experiment',
+    description: 'Rollback an adopted optional challenger runtime experiment to the local baseline. Writes runtime_experiments status.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        runtime_experiment_id: { type: 'string' },
+        workspace_id: { type: 'string' },
+        project_id: { type: 'string' },
+      },
+      required: ['runtime_experiment_id'],
+    },
+  },
+  {
     title: 'Get RAG Query Trace',
     name: 'get_rag_query_trace',
     description: 'Read a persisted RAG query trace by ID, scoped by workspace/project. Read-only.',
