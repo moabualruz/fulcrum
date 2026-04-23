@@ -2,7 +2,7 @@
 
 **Local-first agent operating system for multi-agent TypeScript systems.**
 
-Fulcrum is the persistence, coordination, and execution layer that keeps agents on track. It manages tasks, enforces WIP limits, routes work through teams and workflows, drives real git worktrees through a merge queue, runs subordinate agents via pluggable adapters, and maintains a three-layer semantic memory that survives across sessions.
+Fulcrum is the persistence, coordination, and execution layer that keeps agents on track. It manages tasks, enforces WIP limits, routes work through teams and workflows, drives real git worktrees through a merge queue, runs subordinate agents via pluggable adapters, and maintains a three-layer semantic memory with profile-aware health, repair, unified context search, query traces, and eval gates.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue?logo=typescript)](https://www.typescriptlang.org/)
@@ -21,7 +21,8 @@ Multi-agent systems fail in predictable ways: agents go rogue, pile up stale wor
 - **Workflow runner** — declarative step graphs with retries, exponential backoff, per-step timeouts, and 29 step handlers
 - **Real git merge queue** — `allocateWorktree` runs `git worktree add`, `processMergeQueue` runs `git merge --no-ff`, detects conflicts, aborts cleanly
 - **Distributed tracing built-in** — `startSpan`/`endSpan` persist to `trace_events`, opt-in OTLP export to any OTel backend
-- **Three-layer memory** — L0 git-backed markdown vault, L1 FTS5 keyword search, L2 Kuzu graph + HNSW vector search (opt-in)
+- **Three-layer memory** — L0 git-backed markdown vault, L1 FTS5 keyword search, L2 Kuzu graph + HNSW vector search, with staged rebuilds, repair planning, and health reports
+- **Unified retrieval surfaces** — `search context`, explainable code search, persisted query traces, and deterministic + live RAG eval suites
 - **24 canonical roles with capability helpers** — `isL1`, `canInvokeTeams`, `canMerge`, `canWriteCode`, `canEditFiles` are the single source of truth
 - **5 system invariants, enforced on every call** — role boundaries cannot be bypassed
 - **3 guard tests** — CHECK-drift, bare-ulid, and role-string guards prevent entire classes of bugs from shipping
@@ -62,6 +63,7 @@ fulcrum task create --title "Implement OAuth callback"
 fulcrum task list --status running
 fulcrum board show
 fulcrum serve all --port 4721    # MCP + HTTP monitor + web dashboard at :4721
+fulcrum serve mcp-http --port 4722
 fulcrum tui                      # full-screen terminal cockpit (Tab to switch panes)
 fulcrum log                      # last 50 events from DB
 fulcrum log --follow             # tail live SSE stream
@@ -72,6 +74,20 @@ fulcrum agent spawn --target-role software_engineer --caller-role chief_of_staff
   --task-id task_01j... --workspace-id ws_1 --project-id proj_1 --adapter subprocess
 fulcrum doctor --fix             # health check + auto-repair
 ```
+
+### RAG Operations
+
+```bash
+fulcrum memory doctor --json
+fulcrum memory doctor --repair-plan --profile dev --json
+fulcrum memory rebuild --all --mode plan --profile dev --json
+fulcrum search context "why is vector coverage degraded?" --explain --json
+fulcrum memory trace-query ragtrace_... --json
+fulcrum memory eval --suite live-rag --json
+fulcrum memory runtime-experiments list --json
+```
+
+Use non-install profiles for development and review. Normal repair stays targeted to derived-state differences from canonical sources; clean-slate rebuilds remain explicit. Agent-facing traces, eval artifacts, events, and memory use path fingerprints instead of raw absolute paths.
 
 ---
 
@@ -104,12 +120,12 @@ fulcrum doctor --fix             # health check + auto-repair
 │ L2   │  │control│  │      │  │ANTS   │  │PRDs/plans│
 │kuzu  │  │API    │  │      │  │audit  │  │          │
 └──────┘  └───────┘  └──────┘  └───────┘  └──────────┘
-┌──────────┐  ┌──────────────┐  ┌───────────────┐  ┌────────┐
-│workflows │  │   worktrees  │  │     sync      │  │  cli   │
-│runner +  │  │ real git     │  │ Plane adapter │  │ 14     │
-│29 step   │  │ worktree +   │  │ conflict res. │  │ command│
-│handlers  │  │ merge queue  │  │ secret scan   │  │ groups │
-└──────────┘  └──────────────┘  └───────────────┘  └────────┘
+┌──────────┐  ┌──────────────┐  ┌───────────────┐  ┌─────────────┐
+│workflows │  │   worktrees  │  │     sync      │  │     cli     │
+│runner +  │  │ real git     │  │ Plane adapter │  │ control +   │
+│29 step   │  │ worktree +   │  │ conflict res. │  │ RAG ops +   │
+│handlers  │  │ merge queue  │  │ secret scan   │  │ MCP surfaces │
+└──────────┘  └──────────────┘  └───────────────┘  └─────────────┘
 ```
 
 ---
@@ -118,9 +134,9 @@ fulcrum doctor --fix             # health check + auto-repair
 
 | Package | Description |
 |---------|-------------|
-| [`fulcrum-agent-core`](packages/core) | Domain functions, SQLite schema (52 migrations), role capability helpers, telemetry spans + OTel exporter, embedding providers, handoff protocol, event stream |
-| [`fulcrum-memory`](packages/memory) | Three-layer memory stack — L0 git vault, L1 FTS5 + scoring, L2 Kuzu graph + HNSW vector search |
-| [`fulcrum-monitor`](packages/monitor) | Real-time metrics dashboard — daily/project/agent metrics, burndown, SSE event stream, HTTP control API, built-in web dashboard, bearer-token-gated write endpoints |
+| [`fulcrum-agent-core`](packages/core) | Domain functions, SQLite schema + migrations, role capability helpers, telemetry spans + OTel exporter, embedding providers, handoff protocol, event stream |
+| [`fulcrum-memory`](packages/memory) | Three-layer memory stack plus RAG lifecycle surfaces — profile-aware rebuilds, repair plans, health reports, unified context search, query traces, eval suites, graph/code/vector coverage |
+| [`fulcrum-monitor`](packages/monitor) | Real-time metrics and RAG readouts — daily/project/agent metrics, burndown, SSE event stream, HTTP control API, built-in web dashboard, bearer-token-gated write endpoints |
 | [`fulcrum-planning`](packages/planning) | Project planning domain — epics, issues, PRDs, plans, dependency graph, code review workflows |
 | [`fulcrum-policy`](packages/policy) | Policy engine — 5 system invariants, custom rules, secret guard (12 named patterns, range-based dedup, auto-redact), audit log |
 | [`fulcrum-sync`](packages/sync) | Bidirectional sync — Plane integration with retry/backoff, conflict detection, secret scan before push, priority queue |
@@ -129,7 +145,7 @@ fulcrum doctor --fix             # health check + auto-repair
 | [`fulcrum-workflows`](packages/workflows) | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers, run state machine |
 | [`fulcrum-worktrees`](packages/worktrees) | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, integration merge queue with `git merge --no-ff` and conflict handling |
 | [`fulcrum-agent-fanout`](packages/agent-fanout) | Canonical skill and rule fanout — emits per-agent artifacts for Claude, Codex, Gemini, opencode, PI, Copilot, Cursor, and Windsurf |
-| [`fulcrum-agent-cli`](packages/cli) | `fulcrum` binary — 21 command groups, 32 MCP tools, auto-init per project, hook handlers for agent runtimes, cockpit TUI, activity log |
+| [`fulcrum-agent-cli`](packages/cli) | `fulcrum` binary — task/workflow/team control plane, RAG doctor/rebuild/eval/search surfaces, 49 MCP tools, auto-init per project, hook handlers for agent runtimes, cockpit TUI, activity log |
 | [`fulcrum-mcp`](packages/fulcrum-mcp) | Zero-install MCP entry point — `npx fulcrum-mcp` starts the MCP server; `npx fulcrum-mcp init` configures Claude Code, Gemini CLI, Cursor, and Windsurf MCP setup |
 
 ---
@@ -143,7 +159,8 @@ fulcrum doctor --fix             # health check + auto-repair
 | [CLI Reference](docs/guides/cli-reference.md) | Full command tree with all flags and examples |
 | [Core API](docs/guides/core-api.md) | Tasks, runs, policy, roles, memory, handoffs, events, locks, DB, janitor, embedding |
 | [Memory System](docs/guides/memory.md) | L0 vault structure, L1 FTS5/RRF scoring, L2 Kuzu graph + HNSW pipeline |
-| [MCP Tools](docs/guides/mcp-tools.md) | All 32 MCP tools with parameters and agent lifecycle |
+| [MCP Tools](docs/guides/mcp-tools.md) | All 49 MCP tools with parameters, read/write semantics, and agent lifecycle |
+| [RAG Runtime Experiments](docs/guides/rag-runtime-experiments.md) | Disabled-by-default runtime/store experiments, adoption gates, rollback, and reporting |
 | [Policy Engine](docs/guides/policy.md) | System invariants, custom rules, secret guard patterns, hook system, doctor |
 | [Monitor Server](docs/guides/monitor.md) | All HTTP endpoints, pagination, control API, A2A agent card |
 | [Agent Roles & Teams](docs/guides/agent-roles.md) | 24 roles, capability helpers, agent definitions, A2A cards, team templates |
@@ -165,6 +182,9 @@ pnpm test                          # all packages
 cd packages/core && pnpm test      # single package
 pnpm test:watch                    # watch mode
 FULCRUM_EMBEDDING_TESTS=1 pnpm test  # embedding integration tests
+pnpm build                         # workspace build
+pnpm run check:cycles              # import cycle guard
+git diff --check                   # whitespace / patch hygiene
 ```
 
 Test counts move quickly across the workspace. Run `pnpm test` for the current full-suite count.

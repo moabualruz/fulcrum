@@ -57,11 +57,19 @@ Security posture:
 
 ## Scope
 
-Fulcrum is a local-first tool with no server component, no network listener, and no authentication layer. The attack surface is:
+Fulcrum is local-first, but it does expose optional local server and transport surfaces. Treat it as a developer tool running on trusted machines, not as a hardened multi-tenant service. The main attack surface is:
 
-- The SQLite database file (`.fulcrum/fulcrum.db`) — protect with filesystem permissions
-- The `.fulcrum.json` config file — do not commit API keys or secrets to it
-- Published npm packages (`@fulcrum-agent-os/*`) — enforced via the posture above
+- Profile-scoped SQLite, vault, graph, vector, and artifact roots under Fulcrum data directories
+- Local MCP transports: stdio (`fulcrum serve mcp`) and Streamable HTTP (`fulcrum serve mcp-http`)
+- Local HTTP monitor and control API (`fulcrum serve monitor` / `fulcrum serve all`)
+- Runtime hook/integration files (`AGENTS.md`, Claude/Cursor/Windsurf/Codex/Copilot/opencode assets)
+- Published npm packages (`fulcrum-agent-*`, `fulcrum-*`, `@fulcrum-agent-os/*`)
+
+Security expectations for shipped RAG surfaces:
+
+- Agent-facing traces, eval artifacts, events, and memory must redact secrets, raw environment values, and unintended absolute paths.
+- Absolute paths are allowed only on explicit operator-facing preflight and report surfaces.
+- Destructive or expensive RAG maintenance must stay profile-scoped and fail closed when profile boundaries are unsafe or ambiguous.
 
 Out of scope: issues that require physical access to the machine or root privileges.
 
@@ -73,6 +81,9 @@ Out of scope: issues that require physical access to the machine or root privile
 |---|---|
 | `@fulcrum-agent-os/opencode-plugin` | ✅ Maintained |
 | `@fulcrum-agent-os/pi-cockpit` | ✅ Maintained |
-| `@fulcrum/fulcrum` (CLI) | ✅ Maintained |
+| `fulcrum-agent-cli` | ✅ Maintained |
+| `fulcrum-mcp` | ✅ Maintained |
+| `fulcrum-agent-core` | ✅ Maintained |
+| `fulcrum-memory` | ✅ Maintained |
 
 Only the latest minor version of each package receives security patches.

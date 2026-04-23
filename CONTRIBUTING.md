@@ -41,7 +41,7 @@ Use the [feature request template](.github/ISSUE_TEMPLATE/feature_request.yml). 
 
 ## Development Setup
 
-**Prerequisites:** Node.js 20+, pnpm 9+
+**Prerequisites:** Node.js 20+, pnpm 10+
 
 ```bash
 git clone https://github.com/moabualruz/fulcrum.git
@@ -49,18 +49,20 @@ cd fulcrum
 pnpm install
 ```
 
-The repo is a pnpm workspace. The main package is `packages/core`.
+The repo is a pnpm workspace. Most changes touch more than one package, so start from the repo root and treat `packages/core`, `packages/memory`, `packages/cli`, and `packages/monitor` as one coordinated surface when you work on RAG behavior.
 
 ```bash
-cd packages/core
-pnpm test          # run the full test suite
-pnpm test:watch    # watch mode during development
+pnpm test
+pnpm build
+pnpm run check:cycles
 ```
 
-**TypeScript check:**
+For targeted work:
 
 ```bash
-npx tsc --noEmit
+pnpm --filter fulcrum-agent-core test
+pnpm --filter fulcrum-memory test
+pnpm --filter fulcrum-agent-cli test
 ```
 
 ---
@@ -81,10 +83,9 @@ If you add kuzu to a new package or see errors like `kuzu: Cannot find module '.
 
 ## Running Tests
 
-Tests use Vitest with `pool: 'forks'` (required because `better-sqlite3` is not thread-safe). Each test file gets a fresh in-memory SQLite instance via `createTestDb()` / `resetTestDb()`.
+Tests use Vitest with `pool: 'forks'` (required because `better-sqlite3` is not thread-safe). Use real in-memory SQLite for DB-backed tests; do not mock the DB.
 
 ```bash
-cd packages/core
 pnpm test
 ```
 
@@ -94,14 +95,30 @@ To run embedding integration tests (downloads ~500 MB of ONNX models on first ru
 FULCRUM_EMBEDDING_TESTS=1 pnpm test
 ```
 
+For RAG lifecycle, retrieval, eval, or monitor changes, run at least:
+
+```bash
+pnpm --filter fulcrum-agent-core test
+pnpm --filter fulcrum-memory test
+pnpm --filter fulcrum-agent-cli test
+```
+
+### RAG Contributor Notes
+
+- Use non-install profiles for development and review unless you are explicitly validating installed/operator data.
+- Keep normal repair targeted to derived-state differences from canonical sources; do not reach for clean-slate rebuilds unless the task explicitly requires them.
+- Keep model-heavy and accelerator-heavy evals opt-in unless you are intentionally working on those paths.
+- Agent-facing traces, eval artifacts, events, and memory must not expose secrets, raw environment values, or unintended absolute paths.
+
 ---
 
 ## Submitting a Pull Request
 
 1. Fork the repo and create a branch from `main`
 2. Make your changes with tests
-3. Ensure `pnpm test` and `npx tsc --noEmit` both pass
-4. Open a PR — the template will guide you through what to include
+3. Ensure `pnpm test`, `pnpm build`, and `pnpm run check:cycles` pass
+4. Run `git diff --check`
+5. Open a PR — the template will guide you through what to include
 
 **Keep PRs focused.** One logical change per PR is easier to review and easier to revert if needed.
 

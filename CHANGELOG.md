@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — RAG lifecycle hardening and roadmap delivery (2026-04-23)
+
+- **Profile-aware RAG health + repair surfaces** — `fulcrum memory doctor --json` and `fulcrum memory doctor --repair-plan --json` now expose machine-readable health, targeted repair planning, degraded-domain next actions, and profile/path fingerprint reporting.
+- **Unified context retrieval** — `fulcrum search context ... --explain --json` and the `search_context` action/tool provide typed memory, code, file, graph, task, and decision evidence with context packing and skipped-stage reporting.
+- **Persisted query traces** — `fulcrum memory trace-query` and `get_rag_query_trace` expose stored retrieval traces with redaction summaries, stage counts, scores, latency, runtime truth, freshness, and provenance.
+- **RAG eval and experiment surfaces** — roadmap delivery adds fixture/live eval wiring, runtime experiment reporting/adoption/rollback commands, and monitor readouts for roadmap-specific health coverage.
+- **Graph and code evidence expansion** — new graph coverage/evidence modules, code-vector retrieval paths, contextual index support, and parity/eval tests land as first-class package surfaces.
+
+### Changed — operator and agent-facing RAG behavior (2026-04-23)
+
+- **Repair stays targeted by default** — normal rebuild/repair flows fix derived-state differences from canonical sources; clean-slate rebuilds remain explicit and profile-gated.
+- **Runtime truth is explicit** — health, jobs, reports, and traces distinguish requested vs actual provider/model/device/dimensions and make fallback reasons visible.
+- **Agent-facing artifacts are redacted** — traces, health output, eval artifacts, and related memory/report surfaces use path fingerprints and redaction instead of exposing raw secrets, environment values, or unintended absolute paths.
+- **Root docs refreshed** — `README.md`, `CONTRIBUTING.md`, and `SECURITY.md` now describe the shipped RAG lifecycle, unified search, eval, and runtime experiment surfaces.
+
+### Fixed — roadmap follow-up issues (2026-04-23)
+
+- **Health output path leak** — `buildRagHealthReport()` now returns a redacted profile manifest instead of raw profile paths.
+- **Unbounded code search requests** — oversized `search_code` limits are clamped before candidate fan-out.
+- **Missing runtime experiment enum guard** — `runtime_experiments.experiment_type` now has SQLite `CHECK` enforcement plus guard-test coverage.
+- **Context-pack contract drift** — roadmap contract docs now match the shipped `context_pack` response field.
+
 ### Fixed — Memory + Embedding + Indexer end-to-end wiring (2026-04-18)
 
 Five independent silent failures were preventing the indexing pipeline from working
