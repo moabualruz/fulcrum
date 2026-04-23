@@ -719,10 +719,10 @@ function recommendedActions(
 ): string[] {
   const actions: string[] = []
   if (domains['l0']?.status !== 'healthy' && domains['l0']?.status !== 'out_of_scope') {
-    pushAction(actions, `Repair raw-source coverage, then run \`${rebuildCommand('l0', input, runtime_profile)}\`.`)
+    pushAction(actions, `Repair raw-source coverage from canonical vault files, then rerun \`fulcrum memory doctor --workspace-id ${input.workspace_id} --project-id ${input.project_id} --json\`.`)
   }
   if (domains['l1']?.status !== 'healthy' && domains['l1']?.status !== 'out_of_scope') {
-    pushAction(actions, `Repair curated L1 files, then run \`${rebuildCommand('l1', input, runtime_profile)}\`.`)
+    pushAction(actions, `Repair curated L1 files from canonical sources, then rerun \`fulcrum memory doctor --workspace-id ${input.workspace_id} --project-id ${input.project_id} --json\`.`)
   }
   if (domains['fts']?.status !== 'healthy' && domains['fts']?.status !== 'out_of_scope') {
     pushAction(actions, `Run \`${rebuildCommand('fts', input, runtime_profile)}\` to repair text-search indexes.`)

@@ -340,7 +340,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Get RAG Repair Plan',
     name: 'get_rag_repair_plan',
-    description: 'Read-only RAG repair plan over health, coverage, vectors, graph, provenance, required_actions, and eval readiness. Does not mutate derived state.',
+    description: 'Read-only RAG repair orchestrator plan over health, coverage, vectors, graph, provenance, required_actions, blocking_conditions, and verification_steps. Does not mutate derived state.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: {
       type: 'object',

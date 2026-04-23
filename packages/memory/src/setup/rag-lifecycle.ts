@@ -11,6 +11,7 @@ import { createRunningRebuildReport, finishRebuildReport } from './rebuild-repor
 import { redactRagDetails } from './rag-redaction.js'
 import { buildRagHealthReport } from './rag-health.js'
 import { buildRagRepairPlan } from './rag-repair.js'
+import { evaluateRepairVerification } from './repair/verification.js'
 import { RAG_REBUILD_DOMAINS } from './rag-types.js'
 import type { RagParityCheck, RagRebuildActor, RagRebuildDomain, RagRebuildReport, RagRebuildRequest } from './rag-types.js'
 
@@ -286,11 +287,16 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
     workspace_id: request.workspace_id,
     project_id: request.project_id,
     runtime_profile,
+    data_dir: request.data_dir,
+    domains,
   }, activeDb)
   const repair_plan_id = request.repair_plan_id ?? repairPlan.repair_plan_id
   const retryable_actions = repairPlan.required_actions
     .filter(action => action.retryable)
     .map(action => action.command)
+  const blockedRepair = request.mode === 'execute'
+    && repairPlan.blocking_conditions.length > 0
+    && repairPlan.required_actions.length === 0
 
   if (planned.total === 0 && request.allow_empty !== true) {
     errors.push({ code: 'empty_scope', message: 'RAG rebuild scope is empty; pass allow_empty to continue' })
@@ -315,6 +321,40 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
         derived_state_only: true,
         canonical_sources_mutated: false,
         domains,
+        repair_strategy: repairPlan.strategy,
+        verification_steps: repairPlan.verification_steps,
+        blocking_conditions: repairPlan.blocking_conditions,
+      },
+      retryable_actions,
+    }
+  }
+
+  if (blockedRepair) {
+    errors.push({ code: 'repair_blocked', blocking_conditions: repairPlan.blocking_conditions })
+    return {
+      report_id: newId('rag_rebuild_report'),
+      status: 'failed',
+      mode: request.mode,
+      scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
+      profile_manifest,
+      profile_confirmation: request.confirm_profile ?? null,
+      backup: null,
+      verification_refs,
+      candidate: null,
+      counts: planned.counts,
+      parity: [],
+      warnings,
+      errors,
+      artifact_path: null,
+      repair_plan_id,
+      final_health_status: repairPlan.health_status,
+      verification: {
+        derived_state_only: true,
+        canonical_sources_mutated: false,
+        domains,
+        repair_strategy: repairPlan.strategy,
+        verification_steps: repairPlan.verification_steps,
+        blocking_conditions: repairPlan.blocking_conditions,
       },
       retryable_actions,
     }
@@ -342,6 +382,9 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
         derived_state_only: true,
         canonical_sources_mutated: false,
         domains,
+        repair_strategy: repairPlan.strategy,
+        verification_steps: repairPlan.verification_steps,
+        blocking_conditions: repairPlan.blocking_conditions,
       },
       retryable_actions,
     }
@@ -435,11 +478,17 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       runtime_profile,
       data_dir: request.data_dir,
     }, activeDb)
+    const verificationResult = evaluateRepairVerification(finalHealth, repairPlan.verification_steps)
     const verification = {
       derived_state_only: true,
       canonical_sources_mutated: false,
       domains,
-      final_health_status: finalHealth.status,
+      repair_strategy: repairPlan.strategy,
+      verification_steps: repairPlan.verification_steps,
+      blocking_conditions: repairPlan.blocking_conditions,
+      final_health_status: verificationResult.final_health_status,
+      verification_failed_steps: verificationResult.failed_steps,
+      verification_passed: verificationResult.verified,
       parity_failed: parity.filter(check => check.status === 'fail').length,
       input_snapshot_status: validated.status,
     }
@@ -532,6 +581,9 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
         derived_state_only: true,
         canonical_sources_mutated: false,
         domains,
+        repair_strategy: repairPlan.strategy,
+        verification_steps: repairPlan.verification_steps,
+        blocking_conditions: repairPlan.blocking_conditions,
       },
       retryable_actions,
     }

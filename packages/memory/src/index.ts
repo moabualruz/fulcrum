@@ -434,7 +434,16 @@ export { pathFingerprintForRoadmap, redactProviderConfig, redactRagDetails, reda
 export { buildRagHealthReport } from './setup/rag-health.js'
 export type { RagHealthReport } from './setup/rag-health.js'
 export { buildRagRepairPlan, createEmptyRagRepairPlan } from './setup/rag-repair.js'
-export type { RagRepairAction, RagRepairPlan, RagRepairPlanInput } from './setup/rag-repair.js'
+export type {
+  RagRepairAction,
+  RagRepairBlockingCondition,
+  RagRepairDomainDecision,
+  RagRepairPhase,
+  RagRepairPlan,
+  RagRepairPlanInput,
+  RagRepairStrategy,
+  RagRepairVerificationStep,
+} from './setup/repair/contract.js'
 export { emptyCoverageSummary, reconcileVectorMetadata } from './setup/rag-coverage.js'
 export type {
   RagCoverageDerivedDomain,

@@ -48,6 +48,7 @@ export function executeRagRepairPlanCommand(input: RagHealthCommandInput = {}, d
     workspace_id: input.workspace_id ?? ids.workspace_id,
     project_id: input.project_id ?? ids.project_id,
     runtime_profile: input.runtime_profile,
+    data_dir: input.data_dir,
   }, openHealthDb(input, db))
 }
 

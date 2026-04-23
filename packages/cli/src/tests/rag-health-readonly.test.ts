@@ -1,19 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { mkdtempSync, rmSync } from 'fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { _configureDb, closeDb, getDbAtPath, resolveRuntimeDataProfile, runMigrations, setDb } from 'fulcrum-agent-core'
-import { runMigration101MemoryV3Lifecycle } from 'fulcrum-memory'
+import { contentHash, runMigration101MemoryV3Lifecycle } from 'fulcrum-memory'
 import { executeRagHealthCommand, formatRagHealthReport } from '../commands/memory-rag-health.js'
 import { TOOL_REGISTRY } from '../tool-registry.js'
 import { TOOL_SCHEMA_MAP } from '../mcp-tools.js'
 
 let db: Database.Database
 let tempDirs: string[] = []
+let prevVaultPath: string | undefined
 
 beforeEach(() => {
   tempDirs = []
+  prevVaultPath = process.env['FULCRUM_VAULT_PATH']
   db = new Database(':memory:')
   _configureDb(db)
   runMigrations(db)
@@ -25,6 +27,8 @@ beforeEach(() => {
 
 afterEach(() => {
   closeDb()
+  if (prevVaultPath === undefined) delete process.env['FULCRUM_VAULT_PATH']
+  else process.env['FULCRUM_VAULT_PATH'] = prevVaultPath
   for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true })
 })
 
@@ -50,6 +54,49 @@ describe('RAG health command and action read-only behavior', () => {
       status: 'healthy',
     })
     expect(result.domains).toHaveProperty('vectors')
+    expect(mutationCounts()).toEqual(before)
+  })
+
+  it('returns orchestration-rich repair plans without mutating operational tables', async () => {
+    const vaultDir = mkdtempSync(join(tmpdir(), 'fulcrum-rag-repair-readonly-'))
+    tempDirs.push(vaultDir)
+    const fullPath = join(vaultDir, 'curated/pages/mem_missing.md')
+    mkdirSync(dirname(fullPath), { recursive: true })
+    writeFileSync(fullPath, `---\nworkspace_id: ws_1\nproject_id: proj_1\n---\nmissing page\n`, 'utf-8')
+    process.env['FULCRUM_VAULT_PATH'] = vaultDir
+
+    db.prepare(`
+      INSERT INTO memories (
+        memory_id, workspace_id, project_id, kind, scope, content, content_hash,
+        schema_version, vault_path, title, summary, entities, provenance
+      ) VALUES (
+        'mem_missing', 'ws_1', 'proj_1', 'fact', 'project',
+        'missing page', ?, 3, 'curated/pages/mem_missing.md',
+        'missing', 'missing', '[]', '{}'
+      )
+    `).run(contentHash('missing page'))
+    const before = mutationCounts()
+
+    const result = await TOOL_REGISTRY.get('get_rag_repair_plan')!.handler({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+    }, {
+      db,
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+    })
+
+    expect(result).toMatchObject({
+      strategy: 'targeted_repair',
+      next_action: 'targeted_repair',
+      required_actions: expect.arrayContaining([
+        expect.objectContaining({ action: 'embed_vectors' }),
+        expect.objectContaining({ action: 'repair_graph' }),
+      ]),
+      verification_steps: expect.arrayContaining([
+        expect.objectContaining({ step: 'verify_rag_health' }),
+      ]),
+    })
     expect(mutationCounts()).toEqual(before)
   })
 
