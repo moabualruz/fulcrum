@@ -5,10 +5,79 @@
 
 ## Preconditions
 
-- Work from repo root: `/home/mkh/workspace/pi-stack-plan`.
+- Work from this checkout's repo root.
 - Use a non-install profile for development and review unless explicitly validating installed/operator data.
 - Do not run clean-slate rebuilds unless the task explicitly scopes them.
 - Keep model-heavy and accelerator-heavy evals opt-in.
+
+## Validation Transcript
+
+The transcript below uses expected placeholders, not machine-specific raw
+output. Replace the ellipses with the values your run produces.
+
+```bash
+$ ./fulcrum memory doctor --repair-plan --profile dev --json
+{
+  "status": "planned",
+  "clean_slate_required": false,
+  "required_actions": [
+    {
+      "action": "embed_code_vectors",
+      "command": "fulcrum memory embed --scope code --json"
+    }
+  ]
+}
+
+$ ./fulcrum memory rebuild --all --mode plan --profile dev --json
+{
+  "mode": "plan",
+  "status": "completed",
+  "repair_plan_id": "ragrepairplan_..."
+}
+
+$ ./fulcrum action exec search_context --json '{"query":"how is RAG repair connected to code vector coverage?","limit":10,"explain":true}'
+{
+  "action": "search_context",
+  "result": {
+    "query_trace_id": "ragtrace_...",
+    "results": [ ... typed memory/code/file/graph/task/decision evidence ... ],
+    "skipped_stages": [ ... ]
+  }
+}
+
+$ ./fulcrum action exec run_rag_eval --json '{"suite":"live-rag","include_model_heavy":false,"include_accelerator_heavy":false}'
+{
+  "action": "run_rag_eval",
+  "result": {
+    "suite": "live-rag",
+    "status": "failed",
+    "readiness": "degraded",
+    "results": [ ... ]
+  }
+}
+
+$ ./fulcrum memory trace-query ragtrace_... --json
+{
+  "query_trace_id": "ragtrace_...",
+  "redaction_summary": {
+    "absolute_paths_redacted": true,
+    "secrets_redacted": true
+  }
+}
+
+$ ./fulcrum memory runtime-experiments list --json
+{
+  "disabled_by_default": true,
+  "experiments": [ ... ]
+}
+```
+
+Expected:
+- Repair and rebuild previews stay read-only.
+- `search_context` returns typed memory, code, file, graph, task, and decision evidence when present.
+- Model-heavy and accelerator-heavy evals stay opt-in.
+- Query traces and reports redact secrets, raw env values, and private paths.
+- Optional runtime experiments stay disabled by default until adoption gates pass.
 
 ## Baseline Inspection
 
@@ -88,6 +157,21 @@ Expected:
 
 ```bash
 ./fulcrum action exec get_rag_query_trace --json '{"query_trace_id":"ragtrace_..."}'
+```
+
+Expected transcript shape:
+
+```json
+{
+  "action": "get_rag_query_trace",
+  "result": {
+    "query_trace_id": "ragtrace_...",
+    "redaction_summary": {
+      "absolute_paths_redacted": true,
+      "secrets_redacted": true
+    }
+  }
+}
 ```
 
 Expected:

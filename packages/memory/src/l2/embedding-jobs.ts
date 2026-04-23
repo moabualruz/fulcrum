@@ -112,6 +112,14 @@ export interface EmbeddingProviderLike {
   embed(text: string): Promise<Float32Array>
   embedBatch?(texts: string[]): Promise<Float32Array[]>
   embedDocument?(text: string): Promise<Float32Array>
+  provider?: string
+  provider_name?: string
+  actualProvider?: string
+  actual_provider?: string
+  model?: string
+  model_name?: string
+  actualModel?: string
+  actual_model?: string
   actualDevice?: string
   actual_device?: string
 }
@@ -425,7 +433,7 @@ function itemText(item: EmbeddingJobItemRow, db: Db): string {
 function writeVector(
   item: EmbeddingJobItemRow,
   vector: Float32Array,
-  runtime: { actual_device: string },
+  runtime: { actual_provider: string | null; actual_model: string | null; actual_device: string },
   db: Db,
 ): void {
   const buf = Buffer.from(vector.buffer, vector.byteOffset, vector.byteLength)
@@ -446,6 +454,8 @@ function writeVector(
     content_hash: item.source_content_hash,
     provider: item.requested_provider,
     model: item.requested_model,
+    actual_provider: runtime.actual_provider,
+    actual_model: runtime.actual_model,
     requested_device: item.requested_device,
     actual_device: runtime.actual_device,
     dimensions: item.dimensions,
@@ -462,13 +472,13 @@ function markItemRunning(item: EmbeddingJobItemRow, db: Db): void {
   `).run(item.job_item_id, item.workspace_id)
 }
 
-function markItemEmbedded(item: EmbeddingJobItemRow, runtime: { actual_device: string }, db: Db): void {
+function markItemEmbedded(item: EmbeddingJobItemRow, runtime: { actual_provider: string | null; actual_model: string | null; actual_device: string }, db: Db): void {
   db.prepare(`
     UPDATE embedding_job_items
-       SET status = 'embedded', actual_provider = requested_provider, actual_model = requested_model,
+       SET status = 'embedded', actual_provider = ?, actual_model = ?,
            actual_device = ?, finished_at = datetime('now'), error_type = NULL, error_message = NULL
      WHERE job_item_id = ? AND workspace_id = ?
-  `).run(runtime.actual_device, item.job_item_id, item.workspace_id)
+  `).run(runtime.actual_provider, runtime.actual_model, runtime.actual_device, item.job_item_id, item.workspace_id)
 }
 
 function markItemFailed(item: EmbeddingJobItemRow, err: unknown, db: Db): void {
@@ -485,6 +495,8 @@ function markItemFailed(item: EmbeddingJobItemRow, err: unknown, db: Db): void {
     content_hash: item.source_content_hash,
     provider: item.requested_provider,
     model: item.requested_model,
+    actual_provider: null,
+    actual_model: null,
     requested_device: item.requested_device,
     dimensions: item.dimensions,
     vector_table: sourceDomainToVectorTable(item.source_domain),
@@ -498,6 +510,26 @@ async function embedBatch(embedder: EmbeddingProviderLike, texts: string[]): Pro
   if (embedder.embedBatch) return embedder.embedBatch(texts)
   const embedFn = (embedder.embedDocument ?? embedder.embed).bind(embedder)
   return Promise.all(texts.map(text => embedFn(text)))
+}
+
+function runtimeIdentity(embedder: EmbeddingProviderLike, item: EmbeddingJobItemRow, actual_device: string): {
+  actual_provider: string | null
+  actual_model: string | null
+  actual_device: string
+} {
+  const actual_provider = embedder.actualProvider ?? embedder.actual_provider ?? embedder.provider ?? embedder.provider_name ?? item.requested_provider
+  const actual_model = embedder.actualModel ?? embedder.actual_model ?? embedder.model ?? embedder.model_name ?? item.requested_model
+  if (item.requested_provider && actual_provider && item.requested_provider !== actual_provider) {
+    throw new Error(`requested provider ${item.requested_provider} but embedding runtime used ${actual_provider}`)
+  }
+  if (item.requested_model && actual_model && item.requested_model !== actual_model) {
+    throw new Error(`requested model ${item.requested_model} but embedding runtime used ${actual_model}`)
+  }
+  return {
+    actual_provider: actual_provider ?? null,
+    actual_model: actual_model ?? null,
+    actual_device,
+  }
 }
 
 async function processBatch(items: EmbeddingJobItemRow[], embedder: EmbeddingProviderLike, db: Db): Promise<void> {
@@ -516,13 +548,14 @@ async function processBatch(items: EmbeddingJobItemRow[], embedder: EmbeddingPro
         details: { requested_device: runtime.requested_device, actual_device: runtime.actual_device },
       }, db)
     }
+    const identities = items.map(item => runtimeIdentity(embedder, item, runtime.actual_device))
     const vectors = await embedBatch(embedder, items.map(item => itemText(item, db)))
     if (vectors.length !== items.length) throw new Error(`embedder returned ${vectors.length} vectors for ${items.length} rows`)
     for (let i = 0; i < items.length; i++) {
       const item = items[i]!
       const vector = vectors[i]!
-      writeVector(item, vector, runtime, db)
-      markItemEmbedded(item, runtime, db)
+      writeVector(item, vector, identities[i]!, db)
+      markItemEmbedded(item, identities[i]!, db)
     }
   } catch (err) {
     if (items.length > 1) {

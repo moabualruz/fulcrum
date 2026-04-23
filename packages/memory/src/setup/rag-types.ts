@@ -1,4 +1,4 @@
-import type { AgentRole, RagRebuildMode, RuntimeDataProfile, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
+import type { AgentRole, RagHealthStatus, RagRebuildMode, RuntimeDataProfile, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
 
 export const RAG_REBUILD_DOMAINS = ['l0', 'l1', 'fts', 'code', 'vectors', 'graph'] as const
 export type RagRebuildDomain = typeof RAG_REBUILD_DOMAINS[number]
@@ -29,6 +29,7 @@ export interface RagRebuildRequest {
   actor?: RagRebuildActor
   allow_empty?: boolean
   embed?: boolean
+  repair_plan_id?: string
   on_before_promote?: () => void | Promise<void>
 }
 
@@ -59,4 +60,8 @@ export interface RagRebuildReport {
   warnings: string[]
   errors: unknown[]
   artifact_path: string | null
+  repair_plan_id?: string | null
+  final_health_status?: RagHealthStatus | null
+  verification?: Record<string, unknown>
+  retryable_actions?: string[]
 }

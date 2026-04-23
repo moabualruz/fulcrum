@@ -3,11 +3,14 @@ import { isAbsolute, join, relative, resolve } from 'path'
 import { getDb, getDbAtPath, newId, resolveRuntimeDataProfile, runMigrations, runtimeProfileDbMismatch } from 'fulcrum-agent-core'
 import type { Db, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
 import { backfillCodeFiles } from './backfill-code-files.js'
+import { rebuildGraphCoverage } from '../graph/coverage.js'
 import { captureRebuildInputSnapshot, validateRebuildInputSnapshot } from './rebuild-snapshot.js'
 import { createRebuildCandidate, finishRebuildCandidate, updateRebuildCandidateStatus } from './rebuild-candidate.js'
 import { runRebuildParityChecks } from './rebuild-parity.js'
 import { createRunningRebuildReport, finishRebuildReport } from './rebuild-report.js'
 import { redactRagDetails } from './rag-redaction.js'
+import { buildRagHealthReport } from './rag-health.js'
+import { buildRagRepairPlan } from './rag-repair.js'
 import { RAG_REBUILD_DOMAINS } from './rag-types.js'
 import type { RagParityCheck, RagRebuildActor, RagRebuildDomain, RagRebuildReport, RagRebuildRequest } from './rag-types.js'
 
@@ -18,6 +21,28 @@ function safeCount(db: Db, sql: string, ...params: unknown[]): number {
   try {
     const row = db.prepare(sql).get(...params) as { n: number } | undefined
     return row?.n ?? 0
+  } catch {
+    return 0
+  }
+}
+
+function parseJsonObject(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'string' || value.length === 0) return {}
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
+}
+
+function countProjectGraphEvidence(db: Db, table: 'graph_entities' | 'graph_edges', input: { workspace_id: string; project_id: string }): number {
+  try {
+    const rows = db.prepare(`SELECT properties FROM ${table} WHERE workspace_id = ?`).all(input.workspace_id) as Array<{ properties: string }>
+    return rows.filter(row => {
+      const properties = parseJsonObject(row.properties)
+      return properties['graph_evidence'] === true && properties['project_id'] === input.project_id
+    }).length
   } catch {
     return 0
   }
@@ -43,11 +68,28 @@ export function planRagRebuildScope(
     l0_sources: safeCount(db, 'SELECT COUNT(*) AS n FROM l0_sources WHERE workspace_id = ? AND (project_id = ? OR project_id IS NULL)', input.workspace_id, input.project_id),
     memory_files: 0,
     memories: safeCount(db, 'SELECT COUNT(*) AS n FROM memories WHERE workspace_id = ? AND (project_id = ? OR project_id IS NULL)', input.workspace_id, input.project_id),
+    tasks: safeCount(db, 'SELECT COUNT(*) AS n FROM tasks WHERE workspace_id = ? AND project_id = ?', input.workspace_id, input.project_id),
     code_files: safeCount(db, 'SELECT COUNT(*) AS n FROM code_files WHERE workspace_id = ? AND project_id = ?', input.workspace_id, input.project_id),
     code_chunks: safeCount(db, 'SELECT COUNT(*) AS n FROM code_chunks WHERE workspace_id = ? AND project_id = ?', input.workspace_id, input.project_id),
-    vectors: safeCount(db, 'SELECT COUNT(*) AS n FROM vector_metadata WHERE workspace_id = ?', input.workspace_id),
-    graph_entities: safeCount(db, 'SELECT COUNT(*) AS n FROM graph_entities WHERE workspace_id = ?', input.workspace_id),
-    graph_edges: safeCount(db, 'SELECT COUNT(*) AS n FROM graph_edges WHERE workspace_id = ?', input.workspace_id),
+    vectors: safeCount(db, `
+      SELECT COUNT(*) AS n
+        FROM vector_metadata vm
+        LEFT JOIN memories m
+          ON vm.source_domain = 'memory'
+         AND m.workspace_id = vm.workspace_id
+         AND m.memory_id = vm.source_id
+        LEFT JOIN code_chunks c
+          ON vm.source_domain = 'code_chunk'
+         AND c.workspace_id = vm.workspace_id
+         AND c.chunk_id = vm.source_id
+       WHERE vm.workspace_id = ?
+         AND (
+           (vm.source_domain = 'memory' AND (m.project_id = ? OR m.project_id IS NULL))
+           OR (vm.source_domain = 'code_chunk' AND c.project_id = ?)
+         )
+    `, input.workspace_id, input.project_id, input.project_id),
+    graph_entities: countProjectGraphEvidence(db, 'graph_entities', input),
+    graph_edges: countProjectGraphEvidence(db, 'graph_edges', input),
   }
   counts['raw_files'] = counts['l0_sources'] ?? 0
   counts['memory_files'] = counts['memories'] ?? 0
@@ -139,6 +181,7 @@ function runCandidateBuild(
   db.exec('SAVEPOINT rag_rebuild_candidate')
   try {
     if (input.domains.includes('code')) backfillCodeFiles(db, { workspace_id: input.workspace_id, project_id: input.project_id })
+    if (input.domains.includes('graph')) rebuildGraphCoverage({ workspace_id: input.workspace_id, project_id: input.project_id }, db)
     if (input.domains.includes('fts') || input.domains.includes('l1') || input.domains.includes('code')) warnings.push(...rebuildFts(db))
     parity = runRebuildParityChecks(input, db)
     const passed = parity.every(check => check.status !== 'fail')
@@ -239,6 +282,15 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
 
   const activeDb = openActiveDb(request, profile_manifest, db)
   const planned = planRagRebuildScope({ ...request, domains }, activeDb)
+  const repairPlan = buildRagRepairPlan({
+    workspace_id: request.workspace_id,
+    project_id: request.project_id,
+    runtime_profile,
+  }, activeDb)
+  const repair_plan_id = request.repair_plan_id ?? repairPlan.repair_plan_id
+  const retryable_actions = repairPlan.required_actions
+    .filter(action => action.retryable)
+    .map(action => action.command)
 
   if (planned.total === 0 && request.allow_empty !== true) {
     errors.push({ code: 'empty_scope', message: 'RAG rebuild scope is empty; pass allow_empty to continue' })
@@ -257,6 +309,14 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       warnings,
       errors,
       artifact_path: null,
+      repair_plan_id,
+      final_health_status: repairPlan.health_status,
+      verification: {
+        derived_state_only: true,
+        canonical_sources_mutated: false,
+        domains,
+      },
+      retryable_actions,
     }
   }
 
@@ -276,6 +336,14 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       warnings,
       errors,
       artifact_path: null,
+      repair_plan_id,
+      final_health_status: repairPlan.health_status,
+      verification: {
+        derived_state_only: true,
+        canonical_sources_mutated: false,
+        domains,
+      },
+      retryable_actions,
     }
   }
 
@@ -320,6 +388,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
     verification_refs,
     mutation_scope,
     profile_confirmation: request.confirm_profile ?? null,
+    repair_plan_id,
   }, activeDb)
 
   try {
@@ -360,6 +429,20 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
 
     const status = errors.length > 0 ? 'failed' : 'completed'
     const finalCounts = planRagRebuildScope({ ...request, domains }, activeDb).counts
+    const finalHealth = buildRagHealthReport({
+      workspace_id: request.workspace_id,
+      project_id: request.project_id,
+      runtime_profile,
+      data_dir: request.data_dir,
+    }, activeDb)
+    const verification = {
+      derived_state_only: true,
+      canonical_sources_mutated: false,
+      domains,
+      final_health_status: finalHealth.status,
+      parity_failed: parity.filter(check => check.status === 'fail').length,
+      input_snapshot_status: validated.status,
+    }
     finishRebuildReport({
       report_id,
       status,
@@ -374,6 +457,9 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       verification_refs,
       mutation_scope,
       profile_confirmation: request.confirm_profile ?? null,
+      final_health_status: finalHealth.status,
+      verification,
+      retryable_actions: status === 'failed' ? retryable_actions : [],
     }, activeDb)
 
     return {
@@ -398,6 +484,10 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       warnings,
       errors,
       artifact_path: null,
+      repair_plan_id,
+      final_health_status: finalHealth.status,
+      verification,
+      retryable_actions: status === 'failed' ? retryable_actions : [],
     }
   } catch (err) {
     errors.push({ code: 'rebuild_failed', message: (err as Error).message })
@@ -413,6 +503,13 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       verification_refs,
       mutation_scope,
       profile_confirmation: request.confirm_profile ?? null,
+      final_health_status: repairPlan.health_status,
+      verification: {
+        derived_state_only: true,
+        canonical_sources_mutated: false,
+        domains,
+      },
+      retryable_actions,
     }, activeDb)
     return {
       report_id,
@@ -429,6 +526,14 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       warnings,
       errors,
       artifact_path: null,
+      repair_plan_id,
+      final_health_status: repairPlan.health_status,
+      verification: {
+        derived_state_only: true,
+        canonical_sources_mutated: false,
+        domains,
+      },
+      retryable_actions,
     }
   }
 }

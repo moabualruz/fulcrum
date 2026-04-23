@@ -19,8 +19,9 @@ import { readFileSync, statSync, lstatSync } from 'node:fs'
 import { relative, join, isAbsolute } from 'node:path'
 import type { Db } from 'fulcrum-agent-core'
 import { getDb, getContentChangeBus, type ContentChangeEvent } from 'fulcrum-agent-core'
-import { computeFileId, contentSha256, detectCodeLanguage, indexCodeFile, markCodeFileFailed, markCodeFileSkipped } from '../l2/code.js'
+import { computeFileId, contentSha256, detectCodeLanguage, markCodeFileFailed, markCodeFileSkipped } from '../l2/code.js'
 import { reduceFileToGraph, reduceUnlinkToGraph } from '../kuzu/reducers/code.js'
+import { indexCodeFilePrimitive } from '../setup/backfill-code-files.js'
 
 export { contentSha256 } from '../l2/code.js'
 
@@ -167,7 +168,7 @@ export async function syncFile(
     return { action: 'renamed', fileId }
   }
 
-  const result = await indexCodeFile({
+  const result = await indexCodeFilePrimitive({
     workspace_id: workspaceId,
     project_id: projectId,
     rel_path: relPath,

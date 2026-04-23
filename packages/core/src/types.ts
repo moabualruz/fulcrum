@@ -106,8 +106,18 @@ export type VectorMetadataSourceDomain = 'memory' | 'code_chunk'
 export type VectorMetadataTable = 'vec_memories' | 'vec_chunks'
 export type VectorMetadataStatus = 'current' | 'stale' | 'failed' | 'skipped' | 'legacy'
 export type CodeFileStatus = 'indexed' | 'skipped' | 'failed'
-export type RagHealthStatus = 'healthy' | 'degraded' | 'failed'
+export type CodeParseStatus = 'parsed' | 'skipped' | 'failed'
+export type CodeVectorStatus = 'pending' | 'current' | 'stale' | 'failed' | 'skipped' | 'legacy'
+export type RagHealthStatus = 'healthy' | 'degraded' | 'failed' | 'out_of_scope'
 export type RagEvalRunStatus = 'pending' | 'running' | 'passed' | 'failed' | 'cancelled'
+export type RagRepairRunStatus = 'pending' | 'running' | 'completed' | 'degraded' | 'failed' | 'cancelled'
+export type RagCoverageStatus = 'current' | 'stale' | 'failed' | 'skipped' | 'intentionally_unembedded' | 'legacy'
+export type ContextResultType = 'memory' | 'code_chunk' | 'file_chunk' | 'graph_entity' | 'graph_edge' | 'task' | 'decision' | 'legacy'
+export type RagEvalSuite = 'rag-lifecycle' | 'live-rag' | 'code-rag' | 'unified-context'
+export type RagEvalCaseStatus = 'active' | 'disabled' | 'degraded'
+export type RagEvalResultStatus = 'passed' | 'failed' | 'skipped' | 'error'
+export type ContextualIndexStatus = 'current' | 'stale' | 'failed' | 'skipped'
+export type RuntimeExperimentStatus = 'disabled' | 'planned' | 'running' | 'completed' | 'failed' | 'adopted' | 'rejected' | 'rolled_back'
 export type RuntimeDataProfile = 'install' | 'dev' | 'test'
 export type RuntimeProfilePathKey = 'db' | 'vault' | 'graph' | 'vectors' | 'artifacts'
 
@@ -131,6 +141,65 @@ export interface RuntimeDataProfileManifest {
   paths: RuntimeProfilePaths
   path_fingerprints: Record<RuntimeProfilePathKey, string>
   errors: RuntimeProfileError[]
+}
+
+export interface RagStructuredError {
+  code: string
+  message: string
+  details?: Record<string, unknown>
+  retryable: boolean
+}
+
+export interface RagRuntimeTruth {
+  requested: {
+    provider?: string
+    model?: string
+    device?: string
+    dimensions?: number
+  }
+  actual: {
+    provider?: string
+    model?: string
+    device?: string
+    dimensions?: number
+  }
+  fallback_allowed?: boolean
+  fallback_reason?: string | null
+}
+
+export interface RagSourceRef {
+  source_id?: string
+  raw_source_id?: string
+  curated_page_id?: string
+  file_path?: string
+  path_fingerprint?: string
+  line_start?: number
+  line_end?: number
+  symbol_path?: string
+  graph_entity_id?: string
+  graph_edge_id?: string
+  task_id?: string
+  run_id?: string
+  legacy_class?: string
+}
+
+export interface RagStageContribution {
+  stage: string
+  rank: number
+  score: number
+}
+
+export interface RagContextResult {
+  type: ContextResultType
+  rank: number
+  score: number
+  title: string
+  snippet: string
+  source_ref: RagSourceRef
+  provenance_class: 'raw_backed' | 'curated_backed' | 'code_backed' | 'graph_backed' | 'task_backed' | 'legacy_unbacked'
+  freshness: 'current' | 'stale' | 'failed' | 'unknown'
+  stage_contributions: RagStageContribution[]
+  explanation_status: 'complete' | 'partial' | 'unavailable'
 }
 
 // Keep RunStatus as alias for backward compat with existing code

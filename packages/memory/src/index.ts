@@ -430,12 +430,135 @@ export {
 export type { RebuildCandidateRow } from './setup/rebuild-candidate.js'
 export { runRebuildParityChecks } from './setup/rebuild-parity.js'
 export { createRunningRebuildReport, finishRebuildReport, readRebuildReport } from './setup/rebuild-report.js'
-export { redactProviderConfig, redactRagDetails, redactRagText } from './setup/rag-redaction.js'
+export { pathFingerprintForRoadmap, redactProviderConfig, redactRagDetails, redactRagText, redactRoadmapArtifact } from './setup/rag-redaction.js'
 export { buildRagHealthReport } from './setup/rag-health.js'
 export type { RagHealthReport } from './setup/rag-health.js'
+export { buildRagRepairPlan, createEmptyRagRepairPlan } from './setup/rag-repair.js'
+export type { RagRepairAction, RagRepairPlan, RagRepairPlanInput } from './setup/rag-repair.js'
+export { emptyCoverageSummary, reconcileVectorMetadata } from './setup/rag-coverage.js'
+export type {
+  RagCoverageDerivedDomain,
+  RagCoverageRecord,
+  RagCoverageSourceDomain,
+  RagCoverageStatus,
+  RagCoverageSummary,
+  VectorMetadataCoverageGroup,
+  VectorMetadataReconciliationSummary,
+} from './setup/rag-coverage.js'
+export { rebuildGraphCoverage, summarizeGraphCoverage } from './graph/coverage.js'
+export type { GraphCoverageDomainSummary, GraphCoverageReport } from './graph/coverage.js'
+export { persistGraphEvidenceUnit, readGraphEvidenceUnits } from './graph/evidence.js'
+export type {
+  GraphEvidenceDomain,
+  GraphEvidenceFreshness,
+  GraphEvidenceKind,
+  GraphEvidenceSourceDomain,
+  GraphEvidenceSourceRef,
+  GraphEvidenceUnit,
+  PersistGraphEvidenceUnitInput,
+} from './graph/evidence.js'
+export { searchContext } from './retrieval/search-context.js'
+export type {
+  ContextFreshness,
+  ContextSourceReference,
+  SearchContextInput,
+  SearchContextResponse,
+  StageContribution,
+  TypedContextResult,
+  TypedContextResultType,
+} from './retrieval/search-context.js'
+export { packContext } from './retrieval/context-pack.js'
+export type { ContextPack, ContextPackBudget } from './retrieval/context-pack.js'
+export { createEmptyQueryTrace, hashQuery, persistRagContextResults, persistRagQueryTrace, readRagQueryTrace, redactQueryForTrace } from './retrieval/query-trace.js'
+export type { QueryTraceStage, QueryTraceStageStatus, RagQueryTrace } from './retrieval/query-trace.js'
+export {
+  isContextualIndexStale,
+  markStaleContextualIndexRecords,
+  readContextualIndexRecord,
+  writeContextualIndexRecord,
+} from './retrieval/contextual-index.js'
+export type {
+  ContextualIndexRecord,
+  ContextualIndexStatus,
+  MarkStaleContextualIndexRecordsInput,
+  ReadContextualIndexRecordInput,
+  WriteContextualIndexRecordInput,
+} from './retrieval/contextual-index.js'
 export { runMemoryInit } from './setup/wizard.js'
 export { activateL2 } from './setup/activate.js'
 export type { RebuildOptions, RebuildResult } from './setup/rebuild.js'
+
+// Optional RAG runtime experiment adapters and adoption gates.
+export {
+  disabledRuntimeAdapterStatus,
+  sanitizeRuntimeAdapterDescriptor,
+} from './runtime/adapters.js'
+export type {
+  CodeIndexerAdapter,
+  GraphStoreAdapter,
+  ModelRuntimeAdapter,
+  RuntimeAdapter,
+  RuntimeAdapterAvailability,
+  RuntimeAdapterAvailabilityStatus,
+  RuntimeAdapterBaselineImpact,
+  RuntimeAdapterKind,
+  RuntimeAdapterScope,
+  RuntimeCodeIndexInput,
+  RuntimeCodeIndexResult,
+  RuntimeGraphEdge,
+  RuntimeGraphEntity,
+  RuntimeGraphExpandInput,
+  RuntimeGraphExpandResult,
+  RuntimeGraphUpsertInput,
+  RuntimeGraphUpsertResult,
+  RuntimeModelEmbedInput,
+  RuntimeModelEmbedResult,
+  RuntimeModelRerankInput,
+  RuntimeModelRerankResult,
+  RuntimeScopeInput,
+  RuntimeVectorDeleteInput,
+  RuntimeVectorDeleteResult,
+  RuntimeVectorQueryHit,
+  RuntimeVectorQueryInput,
+  RuntimeVectorRecord,
+  RuntimeVectorUpsertInput,
+  RuntimeVectorUpsertResult,
+  VectorStoreAdapter,
+} from './runtime/adapters.js'
+export { compareRuntimeEvalRuns } from './runtime/comparison.js'
+export type {
+  CompareRuntimeEvalRunsInput,
+  RuntimeComparisonGate,
+  RuntimeComparisonGateStatus,
+  RuntimeComparisonResult,
+  RuntimeEvalSummary,
+} from './runtime/comparison.js'
+export {
+  REQUIRED_RUNTIME_ADOPTION_GATES,
+  adoptRuntimeExperiment,
+  buildRuntimeExperimentReport,
+  createRuntimeExperiment,
+  evaluateRuntimeAdoptionGates,
+  getRuntimeExperiment,
+  listRuntimeExperiments,
+  requireRuntimeExperiment,
+  rollbackRuntimeExperiment,
+  transitionRuntimeExperimentStatus,
+  updateRuntimeExperimentComparison,
+} from './runtime/experiments.js'
+export type {
+  CreateRuntimeExperimentInput,
+  ListRuntimeExperimentsInput,
+  RuntimeAdoptionGate,
+  RuntimeAdoptionGateEvaluation,
+  RuntimeAdoptionGateName,
+  RuntimeAdoptionGateStatus,
+  RuntimeAdoptionGates,
+  RuntimeExperiment,
+  RuntimeExperimentReport,
+  RuntimeExperimentScope,
+  RuntimeExperimentType,
+} from './runtime/experiments.js'
 
 // Repo map
 export { buildRepoMap, scanAndBuildRepoMap } from './repo-map.js'
@@ -463,7 +586,29 @@ export {
   RAG_LIFECYCLE_EVAL_CATEGORIES,
   RAG_LIFECYCLE_EVAL_FIXTURES,
 } from './eval/rag-lifecycle/fixtures.js'
+export {
+  assessRagEvalReadiness,
+  computeRoadmapEvalMetrics,
+  runRoadmapRagEvalSuite,
+} from './eval/roadmap.js'
+export { runLiveRagEvalSuite } from './eval/live-rag/runner.js'
 export { runRagLifecycleEvalSuite } from './eval/rag-lifecycle/runner.js'
+export type {
+  RagEvalReadinessResult,
+  RoadmapRagEvalCase,
+  RoadmapRagEvalCaseResult,
+  RoadmapRagEvalDomain,
+  RoadmapRagEvalFailure,
+  RoadmapRagEvalMetrics,
+  RoadmapRagEvalMetricInput,
+  RoadmapRagEvalObservation,
+  RoadmapRagEvalReadiness,
+  RoadmapRagEvalRetriever,
+  RoadmapRagEvalRunResult,
+  RoadmapRagEvalThresholds,
+  RunRoadmapRagEvalSuiteInput,
+} from './eval/roadmap.js'
+export type { RunLiveRagEvalSuiteInput } from './eval/live-rag/runner.js'
 export type {
   RagLifecycleEvalCategoryResult,
   RagLifecycleEvalFailure,

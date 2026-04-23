@@ -72,10 +72,9 @@ describe('TOOL_REGISTRY', () => {
 
   it('TOOL_REGISTRY contains more entries than TOOL_SCHEMAS (includes internal tools)', () => {
     expect(TOOL_REGISTRY.size).toBeGreaterThan(TOOL_SCHEMAS.length)
-    // Specifically: public tool schemas + 7 internal (get_task, query_memory,
-    // search_code, code_context, project_context, list_activations,
-    // graph_consistency_check)
-    expect(TOOL_REGISTRY.size).toBe(TOOL_SCHEMAS.length + 7)
+    // Specifically: public tool schemas + 6 internal (get_task, query_memory,
+    // code_context, project_context, list_activations, graph_consistency_check).
+    expect(TOOL_REGISTRY.size).toBe(TOOL_SCHEMAS.length + 6)
   })
 
   it('builds canonical action metadata for public actions', () => {

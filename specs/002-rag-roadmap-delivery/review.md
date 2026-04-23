@@ -75,6 +75,66 @@ None. The P1/P2 graph split, verify-and-fix repair default, eval zero-case behav
 
 Review complete.
 
+## Pass 8 - Final Document Review
+
+**Document**: spec, research, plan, data model, contracts, tasks, and checklists
+**Mode**: headless
+**Reviewing with**:
+- coherence-reviewer
+- feasibility-reviewer
+- product-lens-reviewer
+- security-lens-reviewer
+- scope-guardian-reviewer
+- adversarial-document-reviewer
+
+### Applied Auto-Fixes
+
+- **ID prefix drift in contract examples**: Updated existing rebuild and embedding examples from invented `ragrep_` / `embedjob_` prefixes to current `newId()` prefixes: `report_` and `job_`.
+
+### Findings Requiring Judgment
+
+None. Final artifacts align on scope, P1/P2/P3 sequencing, repair default, contextual index coverage, runtime truth, eval opt-in behavior, and agent-facing safety.
+
+Review complete.
+
+## Pass 7 - Analyze Remediation
+
+**Skill**: speckit-analyze
+**Mode**: read-only analysis followed by user-authorized no-pause remediation from workflow request
+
+### Findings Applied
+
+- **Contextual index coverage gap**: `spec.md` FR-016 and `plan.md` Slice 5 required contextual index text, but `tasks.md` had no implementation tasks. Added scaffold, tests, and implementation tasks for contextual index records, canonical-snippet behavior, and staleness.
+- **Embedding runtime truth / next action gap**: `plan.md` Slice 2 required actual runtime truth and visible queued-job execution, but `tasks.md` lacked direct tests. Added tests and tasks for requested-vs-actual provider/model/device/dimensions, fail-closed mismatches, visible fallback, and `next_action` resume commands.
+- **Eval opt-in gap**: `spec.md` FR-036 required model-heavy and accelerator-heavy evals to remain opt-in. Added tests and implementation tasks for opt-in gating across new eval suites.
+
+### Result
+
+Re-analysis after remediation: no critical or high consistency findings remain. Requirements now map to setup, foundation, user story, or polish tasks.
+
+Review complete.
+
+## Pass 6 - Tasks Review
+
+**Document**: [tasks.md](./tasks.md)
+**Mode**: headless
+**Reviewing with**:
+- coherence-reviewer
+- feasibility-reviewer
+- scope-guardian-reviewer
+- security-lens-reviewer
+
+### Applied Auto-Fixes
+
+- **Bad documentation path**: Replaced missing `docs/guides/agent-tools.md` with existing `docs/guides/mcp-tools.md`.
+- **Open validation artifact choice**: Replaced "script or documented command transcript" with a concrete quickstart validation command transcript task.
+
+### Findings Requiring Judgment
+
+None. Tasks are dependency-ordered, test-first, mapped to user stories, and include concrete repo paths.
+
+Review complete.
+
 ## Pass 5 - Second Plan Pass Review
 
 **Document**: [plan.md](./plan.md), [contracts/rag-roadmap-contracts.md](./contracts/rag-roadmap-contracts.md), [quickstart.md](./quickstart.md)

@@ -57,4 +57,36 @@ describe('RAG rebuild JSON contract', () => {
     expect(report.report_id).toBe(result.report_id)
     expect(report.scope.workspace_id).toBe('ws_1')
   })
+
+  it('executes graph domain rebuilds before final counts and guidance', async () => {
+    const db = getDb()
+    db.prepare(`
+      INSERT INTO tasks(task_id, workspace_id, project_id, display_id, title, description, status)
+      VALUES ('task_graph_rebuild_cli', 'ws_1', 'proj_1', 'T-GRAPH', 'CLI graph rebuild', 'Graph rebuild source.', 'queued')
+    `).run()
+
+    const result = await executeRagRebuildCommand({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      mode: 'execute',
+      runtime_profile: 'dev',
+      domains: ['graph'],
+    }, db)
+
+    expect(result.status).toBe('completed')
+    expect(result.counts.tasks).toBe(1)
+    expect(result.counts.graph_entities).toBeGreaterThan(0)
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('Graph rebuild refreshes relationship evidence'),
+    ]))
+    const coverage = db.prepare(`
+      SELECT status
+        FROM rag_coverage_records
+       WHERE workspace_id = 'ws_1'
+         AND project_id = 'proj_1'
+         AND derived_domain = 'graph'
+         AND source_id = 'task_graph_rebuild_cli'
+    `).get() as { status: string } | undefined
+    expect(coverage).toMatchObject({ status: 'current' })
+  })
 })

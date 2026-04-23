@@ -9,6 +9,8 @@ export interface VectorMetadataInput {
   content_hash?: string | null
   provider?: string | null
   model?: string | null
+  actual_provider?: string | null
+  actual_model?: string | null
   requested_device?: string | null
   actual_device?: string | null
   dimensions?: number | null
@@ -18,11 +20,13 @@ export interface VectorMetadataInput {
   error_message?: string | null
 }
 
-export interface VectorMetadataRow extends Required<Omit<VectorMetadataInput, 'status' | 'content_hash' | 'provider' | 'model' | 'requested_device' | 'actual_device' | 'dimensions' | 'error_type' | 'error_message'>> {
+export interface VectorMetadataRow extends Required<Omit<VectorMetadataInput, 'status' | 'content_hash' | 'provider' | 'model' | 'actual_provider' | 'actual_model' | 'requested_device' | 'actual_device' | 'dimensions' | 'error_type' | 'error_message'>> {
   vector_metadata_id: string
   content_hash: string | null
   provider: string | null
   model: string | null
+  actual_provider: string | null
+  actual_model: string | null
   requested_device: string | null
   actual_device: string | null
   dimensions: number | null
@@ -52,6 +56,8 @@ function rowToVectorMetadata(row: Record<string, unknown>): VectorMetadataRow {
     content_hash: row['content_hash'] === null ? null : String(row['content_hash']),
     provider: row['provider'] === null ? null : String(row['provider']),
     model: row['model'] === null ? null : String(row['model']),
+    actual_provider: row['actual_provider'] === null ? null : String(row['actual_provider']),
+    actual_model: row['actual_model'] === null ? null : String(row['actual_model']),
     requested_device: row['requested_device'] === null ? null : String(row['requested_device']),
     actual_device: row['actual_device'] === null ? null : String(row['actual_device']),
     dimensions: row['dimensions'] === null ? null : Number(row['dimensions']),
@@ -72,9 +78,9 @@ export function writeVectorMetadata(input: VectorMetadataInput, db: Db = getDb()
   db.prepare(`
     INSERT INTO vector_metadata (
       vector_metadata_id, workspace_id, source_domain, source_id, content_hash,
-      provider, model, requested_device, actual_device, dimensions, vector_table,
+      provider, model, actual_provider, actual_model, requested_device, actual_device, dimensions, vector_table,
       status, embedded_at, error_type, error_message
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     vector_metadata_id,
     input.workspace_id,
@@ -83,6 +89,8 @@ export function writeVectorMetadata(input: VectorMetadataInput, db: Db = getDb()
     input.content_hash ?? null,
     input.provider ?? null,
     input.model ?? null,
+    input.actual_provider ?? input.provider ?? null,
+    input.actual_model ?? input.model ?? null,
     input.requested_device ?? null,
     input.actual_device ?? null,
     input.dimensions ?? null,

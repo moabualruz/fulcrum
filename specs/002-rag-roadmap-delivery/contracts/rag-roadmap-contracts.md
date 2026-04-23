@@ -117,7 +117,7 @@ Required output additions:
 
 ```json
 {
-  "report_id": "ragrep_...",
+  "report_id": "report_...",
   "status": "completed",
   "mode": "execute",
   "repair_plan_id": "ragrepairplan_...",
@@ -160,7 +160,7 @@ Output shape:
 
 ```json
 {
-  "job_id": "embedjob_...",
+  "job_id": "job_...",
   "status": "degraded",
   "source_domain": "code_chunks",
   "progress": {
@@ -186,7 +186,7 @@ Output shape:
     "allowed": true,
     "reason": "cuda_unavailable"
   },
-  "next_action": "fulcrum jobs retry embedjob_... --failed --json"
+  "next_action": "fulcrum jobs retry job_... --failed --json"
 }
 ```
 
@@ -246,7 +246,7 @@ Response:
       "explanation_status": "complete"
     }
   ],
-  "packed_context": {
+  "context_pack": {
     "budget_tokens": 6000,
     "used_tokens": 3820,
     "source_diversity": {

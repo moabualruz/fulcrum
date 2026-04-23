@@ -1,5 +1,5 @@
 import { getDb, newId } from 'fulcrum-agent-core'
-import type { AgentRole, Db, RagRebuildMode, RuntimeDataProfile, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
+import type { AgentRole, Db, RagHealthStatus, RagRebuildMode, RuntimeDataProfile, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
 import { join } from 'path'
 import type { RagParityCheck, RagRebuildDomain, RagRebuildReport } from './rag-types.js'
 import { redactRagDetails } from './rag-redaction.js'
@@ -18,6 +18,7 @@ export function createRunningRebuildReport(
     verification_refs?: string[]
     mutation_scope?: Record<string, unknown>
     profile_confirmation?: RuntimeDataProfile | null
+    repair_plan_id?: string | null
   },
   db: Db = getDb(),
 ): string {
@@ -26,8 +27,8 @@ export function createRunningRebuildReport(
     INSERT INTO rag_rebuild_reports (
       report_id, workspace_id, project_id, requested_by, actor_role, mode,
       domains, status, candidate_disposition, runtime_profile, profile_manifest,
-      backup_ref, verification_refs, mutation_scope, profile_confirmation, started_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'none', ?, ?, ?, ?, ?, ?, datetime('now'))
+      backup_ref, verification_refs, mutation_scope, profile_confirmation, repair_plan_id, started_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'none', ?, ?, ?, ?, ?, ?, ?, datetime('now'))
   `).run(
     report_id,
     input.workspace_id,
@@ -42,6 +43,7 @@ export function createRunningRebuildReport(
     JSON.stringify(input.verification_refs ?? []),
     JSON.stringify(redactRagDetails(input.mutation_scope ?? {})),
     input.profile_confirmation ?? null,
+    input.repair_plan_id ?? null,
   )
   return report_id
 }
@@ -62,6 +64,9 @@ export function finishRebuildReport(
     verification_refs?: string[]
     mutation_scope?: Record<string, unknown>
     profile_confirmation?: RuntimeDataProfile | null
+    final_health_status?: RagHealthStatus | null
+    verification?: Record<string, unknown>
+    retryable_actions?: string[]
   },
   db: Db = getDb(),
 ): void {
@@ -80,7 +85,10 @@ export function finishRebuildReport(
         backup_ref = ?,
         verification_refs = ?,
         mutation_scope = ?,
-        profile_confirmation = ?
+        profile_confirmation = ?,
+        final_health_status = ?,
+        verification_summary = ?,
+        retryable_actions = ?
     WHERE report_id = ?
   `).run(
     input.status,
@@ -96,6 +104,9 @@ export function finishRebuildReport(
     JSON.stringify(input.verification_refs ?? []),
     JSON.stringify(redactRagDetails(input.mutation_scope ?? {})),
     input.profile_confirmation ?? null,
+    input.final_health_status ?? null,
+    JSON.stringify(redactRagDetails(input.verification ?? {})),
+    JSON.stringify(redactRagDetails(input.retryable_actions ?? [])),
     input.report_id,
   )
 }
@@ -138,5 +149,9 @@ export function readRebuildReport(report_id: string, workspace_id: string, db: D
     warnings: JSON.parse(row['warnings'] as string) as string[],
     errors: JSON.parse(row['errors'] as string) as unknown[],
     artifact_path: row['artifact_path'] as string | null,
+    repair_plan_id: row['repair_plan_id'] as string | null,
+    final_health_status: row['final_health_status'] as RagHealthStatus | null,
+    verification: JSON.parse(String(row['verification_summary'] ?? '{}')) as Record<string, unknown>,
+    retryable_actions: JSON.parse(String(row['retryable_actions'] ?? '[]')) as string[],
   }
 }

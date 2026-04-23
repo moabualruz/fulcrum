@@ -160,6 +160,42 @@ function addCodeChunksFileIdIfMissing(db: Database.Database): void {
   }
 }
 
+function addCodeIndexRoadmapColumnsIfMissing(db: Database.Database): void {
+  const chunks = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='code_chunks'").get() as { name: string } | undefined
+  if (chunks) {
+    const cols = (db.prepare('PRAGMA table_info(code_chunks)').all() as { name: string }[]).map(c => c.name)
+    if (!cols.includes('parse_status')) {
+      db.exec(`ALTER TABLE code_chunks ADD COLUMN parse_status TEXT NOT NULL DEFAULT 'parsed' CHECK(parse_status IN ('parsed','skipped','failed'))`)
+    }
+    if (!cols.includes('vector_status')) {
+      db.exec(`ALTER TABLE code_chunks ADD COLUMN vector_status TEXT NOT NULL DEFAULT 'legacy' CHECK(vector_status IN ('pending','current','stale','failed','skipped','legacy'))`)
+    }
+    if (!cols.includes('vector_error')) {
+      db.exec(`ALTER TABLE code_chunks ADD COLUMN vector_error TEXT`)
+    }
+    if (!cols.includes('vector_updated_at')) {
+      db.exec(`ALTER TABLE code_chunks ADD COLUMN vector_updated_at TEXT`)
+    }
+  }
+
+  const files = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='code_files'").get() as { name: string } | undefined
+  if (files) {
+    const cols = (db.prepare('PRAGMA table_info(code_files)').all() as { name: string }[]).map(c => c.name)
+    if (!cols.includes('parse_status')) {
+      db.exec(`ALTER TABLE code_files ADD COLUMN parse_status TEXT NOT NULL DEFAULT 'parsed' CHECK(parse_status IN ('parsed','skipped','failed'))`)
+    }
+    if (!cols.includes('vector_status')) {
+      db.exec(`ALTER TABLE code_files ADD COLUMN vector_status TEXT NOT NULL DEFAULT 'legacy' CHECK(vector_status IN ('pending','current','stale','failed','skipped','legacy'))`)
+    }
+    if (!cols.includes('vector_error')) {
+      db.exec(`ALTER TABLE code_files ADD COLUMN vector_error TEXT`)
+    }
+    if (!cols.includes('vector_updated_at')) {
+      db.exec(`ALTER TABLE code_files ADD COLUMN vector_updated_at TEXT`)
+    }
+  }
+}
+
 function addRagRuntimeProfileColumnsIfMissing(db: Database.Database): void {
   const reports = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='rag_rebuild_reports'").get() as { name: string } | undefined
   if (reports) {
@@ -171,6 +207,10 @@ function addRagRuntimeProfileColumnsIfMissing(db: Database.Database): void {
       ['verification_refs', "TEXT NOT NULL DEFAULT '[]'"],
       ['mutation_scope', "TEXT NOT NULL DEFAULT '{}'"],
       ['profile_confirmation', 'TEXT'],
+      ['repair_plan_id', 'TEXT'],
+      ['final_health_status', "TEXT CHECK(final_health_status IN ('healthy','degraded','failed','out_of_scope'))"],
+      ['verification_summary', "TEXT NOT NULL DEFAULT '{}'"],
+      ['retryable_actions', "TEXT NOT NULL DEFAULT '[]'"],
     ]
     for (const [name, ddl] of additions) {
       if (!cols.includes(name)) db.exec(`ALTER TABLE rag_rebuild_reports ADD COLUMN ${name} ${ddl}`)
@@ -200,6 +240,18 @@ function addRagRuntimeProfileColumnsIfMissing(db: Database.Database): void {
   }
 }
 
+function addVectorMetadataRuntimeTruthColumnsIfMissing(db: Database.Database): void {
+  const tbl = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='vector_metadata'").get() as { name: string } | undefined
+  if (!tbl) return
+  const cols = (db.prepare('PRAGMA table_info(vector_metadata)').all() as { name: string }[]).map(c => c.name)
+  if (!cols.includes('actual_provider')) {
+    db.exec(`ALTER TABLE vector_metadata ADD COLUMN actual_provider TEXT`)
+  }
+  if (!cols.includes('actual_model')) {
+    db.exec(`ALTER TABLE vector_metadata ADD COLUMN actual_model TEXT`)
+  }
+}
+
 /**
  * US4 RAG lifecycle hardening: code_files owns explicit file-level state so
  * skipped/failed files never look like partially indexed successes.
@@ -219,6 +271,125 @@ function addCodeFilesLifecycleColumnsIfMissing(db: Database.Database): void {
   }
 }
 
+function rebuildRagHealthReportsForRoadmapIfNeeded(db: Database.Database): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='rag_health_reports'").get() as { sql: string } | undefined
+  if (!row?.sql || row.sql.includes('out_of_scope')) return
+
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.exec(`
+      CREATE TABLE rag_health_reports_new (
+        health_report_id    TEXT PRIMARY KEY,
+        workspace_id         TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+        project_id           TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+        status               TEXT NOT NULL CHECK(status IN ('healthy','degraded','failed','out_of_scope')),
+        runtime_profile      TEXT NOT NULL DEFAULT 'dev' CHECK(runtime_profile IN ('install','dev','test')),
+        profile_manifest     TEXT NOT NULL DEFAULT '{}',
+        generated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+        domains              TEXT NOT NULL DEFAULT '{}',
+        recommended_actions  TEXT NOT NULL DEFAULT '[]',
+        warnings             TEXT NOT NULL DEFAULT '[]',
+        errors               TEXT NOT NULL DEFAULT '[]',
+        artifact_path        TEXT
+      );
+      INSERT INTO rag_health_reports_new (
+        health_report_id, workspace_id, project_id, status, runtime_profile, profile_manifest,
+        generated_at, domains, recommended_actions, warnings, errors, artifact_path
+      )
+      SELECT
+        health_report_id, workspace_id, project_id, status, runtime_profile, profile_manifest,
+        generated_at, domains, recommended_actions, warnings, errors, artifact_path
+      FROM rag_health_reports;
+      DROP TABLE rag_health_reports;
+      ALTER TABLE rag_health_reports_new RENAME TO rag_health_reports;
+    `)
+    db.exec('COMMIT')
+  } catch (err) {
+    db.exec('ROLLBACK')
+    throw err
+  }
+}
+
+function rebuildRagEvalRunsForRoadmapIfNeeded(db: Database.Database): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='rag_eval_runs'").get() as { sql: string } | undefined
+  if (!row?.sql || row.sql.includes("suite IN ('rag-lifecycle','live-rag','code-rag','unified-context')")) return
+
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.exec(`
+      CREATE TABLE rag_eval_runs_new (
+        eval_run_id    TEXT PRIMARY KEY,
+        workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+        project_id      TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+        suite           TEXT NOT NULL CHECK(suite IN ('rag-lifecycle','live-rag','code-rag','unified-context')),
+        status          TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','running','passed','failed','cancelled')),
+        trigger_source  TEXT NOT NULL DEFAULT 'local' CHECK(trigger_source IN ('local','ci')),
+        trigger_scope   TEXT NOT NULL DEFAULT 'manual' CHECK(trigger_scope IN ('rag_related','non_rag','manual')),
+        gate_required   INTEGER NOT NULL DEFAULT 0,
+        started_at      TEXT,
+        finished_at     TEXT,
+        results         TEXT NOT NULL DEFAULT '{}'
+      );
+      INSERT INTO rag_eval_runs_new (
+        eval_run_id, workspace_id, project_id, suite, status, trigger_source, trigger_scope,
+        gate_required, started_at, finished_at, results
+      )
+      SELECT
+        eval_run_id, workspace_id, project_id, suite, status, trigger_source, trigger_scope,
+        gate_required, started_at, finished_at, results
+      FROM rag_eval_runs;
+      DROP TABLE rag_eval_runs;
+      ALTER TABLE rag_eval_runs_new RENAME TO rag_eval_runs;
+    `)
+    db.exec('COMMIT')
+  } catch (err) {
+    db.exec('ROLLBACK')
+    throw err
+  }
+}
+
+function rebuildRuntimeExperimentsForTypeCheckIfNeeded(db: Database.Database): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='runtime_experiments'").get() as { sql: string } | undefined
+  if (!row?.sql || row.sql.includes("CHECK(experiment_type IN ('vector_store','graph_store','code_indexer','model_runtime'))")) return
+
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.exec(`
+      CREATE TABLE runtime_experiments_new (
+        runtime_experiment_id TEXT PRIMARY KEY,
+        workspace_id           TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+        project_id             TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+        status                 TEXT NOT NULL DEFAULT 'disabled' CHECK(status IN ('disabled','planned','running','completed','failed','adopted','rejected','rolled_back')),
+        experiment_type        TEXT NOT NULL DEFAULT 'vector_store' CHECK(experiment_type IN ('vector_store','graph_store','code_indexer','model_runtime')),
+        baseline_eval_run_id   TEXT,
+        candidate_adapter      TEXT NOT NULL DEFAULT '',
+        comparison             TEXT NOT NULL DEFAULT '{}',
+        adoption_gates         TEXT NOT NULL DEFAULT '{}',
+        rollback_plan          TEXT NOT NULL DEFAULT '{}',
+        risk_notes             TEXT NOT NULL DEFAULT '[]',
+        created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at             TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO runtime_experiments_new (
+        runtime_experiment_id, workspace_id, project_id, status, experiment_type,
+        baseline_eval_run_id, candidate_adapter, comparison, adoption_gates,
+        rollback_plan, risk_notes, created_at, updated_at
+      )
+      SELECT
+        runtime_experiment_id, workspace_id, project_id, status, experiment_type,
+        baseline_eval_run_id, candidate_adapter, comparison, adoption_gates,
+        rollback_plan, risk_notes, created_at, updated_at
+      FROM runtime_experiments;
+      DROP TABLE runtime_experiments;
+      ALTER TABLE runtime_experiments_new RENAME TO runtime_experiments;
+    `)
+    db.exec('COMMIT')
+  } catch (err) {
+    db.exec('ROLLBACK')
+    throw err
+  }
+}
+
 export function applySchema(db: Database.Database): void {
   // v2a PR 1 Task 1: rebuild legacy memories table BEFORE the idempotent CREATE
   // statements run. CREATE IF NOT EXISTS would skip the legacy table and leave
@@ -227,8 +398,13 @@ export function applySchema(db: Database.Database): void {
   addAgentRunsContextTypeIfMissing(db)
   addProjectsRootRealpathIfMissing(db)
   addCodeChunksFileIdIfMissing(db)
+  addCodeIndexRoadmapColumnsIfMissing(db)
   addRagRuntimeProfileColumnsIfMissing(db)
+  addVectorMetadataRuntimeTruthColumnsIfMissing(db)
   addCodeFilesLifecycleColumnsIfMissing(db)
+  rebuildRagHealthReportsForRoadmapIfNeeded(db)
+  rebuildRagEvalRunsForRoadmapIfNeeded(db)
+  rebuildRuntimeExperimentsForTypeCheckIfNeeded(db)
 
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -1017,6 +1193,10 @@ export function applySchema(db: Database.Database): void {
       symbol_path    TEXT,
       embedding      BLOB,
       content_hash   TEXT,
+      parse_status   TEXT NOT NULL DEFAULT 'parsed' CHECK(parse_status IN ('parsed','skipped','failed')),
+      vector_status  TEXT NOT NULL DEFAULT 'legacy' CHECK(vector_status IN ('pending','current','stale','failed','skipped','legacy')),
+      vector_error   TEXT,
+      vector_updated_at TEXT,
       indexed_at     TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -1044,8 +1224,12 @@ export function applySchema(db: Database.Database): void {
       chunks_count INTEGER NOT NULL DEFAULT 0,
       indexed_at   INTEGER NOT NULL,
       status       TEXT NOT NULL DEFAULT 'indexed' CHECK(status IN ('indexed','skipped','failed')),
+      parse_status TEXT NOT NULL DEFAULT 'parsed' CHECK(parse_status IN ('parsed','skipped','failed')),
+      vector_status TEXT NOT NULL DEFAULT 'legacy' CHECK(vector_status IN ('pending','current','stale','failed','skipped','legacy')),
       failure_reason TEXT,
       last_error_at  TEXT,
+      vector_error TEXT,
+      vector_updated_at TEXT,
       UNIQUE (project_id, rel_path)
     );
     CREATE INDEX IF NOT EXISTS idx_code_files_lang ON code_files (language);
@@ -1126,6 +1310,10 @@ export function applySchema(db: Database.Database): void {
       verification_refs      TEXT NOT NULL DEFAULT '[]',
       mutation_scope         TEXT NOT NULL DEFAULT '{}',
       profile_confirmation   TEXT,
+      repair_plan_id         TEXT,
+      final_health_status    TEXT CHECK(final_health_status IN ('healthy','degraded','failed','out_of_scope')),
+      verification_summary   TEXT NOT NULL DEFAULT '{}',
+      retryable_actions      TEXT NOT NULL DEFAULT '[]',
       started_at             TEXT NOT NULL DEFAULT (datetime('now')),
       finished_at            TEXT,
       summary                TEXT NOT NULL DEFAULT '{}',
@@ -1243,6 +1431,8 @@ export function applySchema(db: Database.Database): void {
       content_hash        TEXT,
       provider            TEXT,
       model               TEXT,
+      actual_provider     TEXT,
+      actual_model        TEXT,
       requested_device    TEXT,
       actual_device       TEXT,
       dimensions          INTEGER,
@@ -1260,7 +1450,7 @@ export function applySchema(db: Database.Database): void {
       health_report_id    TEXT PRIMARY KEY,
       workspace_id         TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
       project_id           TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
-      status               TEXT NOT NULL CHECK(status IN ('healthy','degraded','failed')),
+      status               TEXT NOT NULL CHECK(status IN ('healthy','degraded','failed','out_of_scope')),
       runtime_profile      TEXT NOT NULL DEFAULT 'dev' CHECK(runtime_profile IN ('install','dev','test')),
       profile_manifest     TEXT NOT NULL DEFAULT '{}',
       generated_at         TEXT NOT NULL DEFAULT (datetime('now')),
@@ -1277,7 +1467,7 @@ export function applySchema(db: Database.Database): void {
       eval_run_id    TEXT PRIMARY KEY,
       workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
       project_id      TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
-      suite           TEXT NOT NULL,
+      suite           TEXT NOT NULL CHECK(suite IN ('rag-lifecycle','live-rag','code-rag','unified-context')),
       status          TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','running','passed','failed','cancelled')),
       trigger_source  TEXT NOT NULL DEFAULT 'local' CHECK(trigger_source IN ('local','ci')),
       trigger_scope   TEXT NOT NULL DEFAULT 'manual' CHECK(trigger_scope IN ('rag_related','non_rag','manual')),
@@ -1289,6 +1479,196 @@ export function applySchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_rag_eval_runs_workspace ON rag_eval_runs(workspace_id);
     CREATE INDEX IF NOT EXISTS idx_rag_eval_runs_ws_project ON rag_eval_runs(workspace_id, project_id);
     CREATE INDEX IF NOT EXISTS idx_rag_eval_runs_suite ON rag_eval_runs(workspace_id, suite);
+
+    CREATE TABLE IF NOT EXISTS rag_repair_plans (
+      repair_plan_id       TEXT PRIMARY KEY,
+      workspace_id          TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id            TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      runtime_profile       TEXT NOT NULL DEFAULT 'dev' CHECK(runtime_profile IN ('install','dev','test')),
+      status                TEXT NOT NULL DEFAULT 'planned' CHECK(status IN ('planned')),
+      health_status         TEXT NOT NULL DEFAULT 'healthy' CHECK(health_status IN ('healthy','degraded','failed','out_of_scope')),
+      clean_slate_required  INTEGER NOT NULL DEFAULT 0,
+      domains               TEXT NOT NULL DEFAULT '[]',
+      mutation_scope        TEXT NOT NULL DEFAULT '{}',
+      required_actions      TEXT NOT NULL DEFAULT '[]',
+      optional_actions      TEXT NOT NULL DEFAULT '[]',
+      profile_path_fingerprints TEXT NOT NULL DEFAULT '{}',
+      blocking_errors       TEXT NOT NULL DEFAULT '[]',
+      preflight_warnings    TEXT NOT NULL DEFAULT '[]',
+      created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_repair_plans_workspace ON rag_repair_plans(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_repair_plans_ws_project ON rag_repair_plans(workspace_id, project_id);
+
+    CREATE TABLE IF NOT EXISTS rag_repair_runs (
+      repair_run_id       TEXT PRIMARY KEY,
+      repair_plan_id      TEXT REFERENCES rag_repair_plans(repair_plan_id) ON DELETE SET NULL,
+      workspace_id         TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id           TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      runtime_profile      TEXT NOT NULL DEFAULT 'dev' CHECK(runtime_profile IN ('install','dev','test')),
+      status               TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','running','completed','degraded','failed','cancelled')),
+      domains              TEXT NOT NULL DEFAULT '[]',
+      actor_kind           TEXT,
+      actor_role           TEXT,
+      report_id            TEXT,
+      final_health_status  TEXT CHECK(final_health_status IN ('healthy','degraded','failed','out_of_scope')),
+      retryable_actions    TEXT NOT NULL DEFAULT '[]',
+      errors               TEXT NOT NULL DEFAULT '[]',
+      started_at           TEXT,
+      finished_at          TEXT,
+      created_at           TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_repair_runs_workspace ON rag_repair_runs(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_repair_runs_ws_project ON rag_repair_runs(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_repair_runs_plan ON rag_repair_runs(workspace_id, project_id, repair_plan_id);
+
+    CREATE TABLE IF NOT EXISTS rag_coverage_records (
+      coverage_id          TEXT PRIMARY KEY,
+      workspace_id          TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id            TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      source_domain         TEXT NOT NULL CHECK(source_domain IN ('memory','l1_page','file_chunk','code_chunk','graph_entity','graph_edge','task','decision')),
+      source_id             TEXT NOT NULL,
+      derived_domain        TEXT NOT NULL CHECK(derived_domain IN ('fts','vector','graph','code_index','contextual_text','eval_case')),
+      content_hash          TEXT,
+      status                TEXT NOT NULL DEFAULT 'current' CHECK(status IN ('current','stale','failed','skipped','intentionally_unembedded','legacy')),
+      provider              TEXT,
+      model                 TEXT,
+      actual_device         TEXT,
+      dimensions            INTEGER,
+      freshness_checked_at  TEXT,
+      failure_code          TEXT,
+      failure_message       TEXT,
+      created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at            TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(workspace_id, project_id, source_domain, source_id, derived_domain)
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_coverage_records_workspace ON rag_coverage_records(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_coverage_records_ws_project ON rag_coverage_records(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_coverage_records_source ON rag_coverage_records(workspace_id, project_id, source_domain, source_id);
+
+    CREATE TABLE IF NOT EXISTS contextual_index_records (
+      contextual_index_id   TEXT PRIMARY KEY,
+      workspace_id           TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id             TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      source_domain          TEXT NOT NULL,
+      source_id              TEXT NOT NULL,
+      canonical_content_hash TEXT NOT NULL,
+      context_version        TEXT NOT NULL,
+      template_version       TEXT NOT NULL,
+      index_text_hash        TEXT NOT NULL,
+      index_text             TEXT NOT NULL,
+      status                 TEXT NOT NULL DEFAULT 'current' CHECK(status IN ('current','stale','failed','skipped')),
+      created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(workspace_id, project_id, source_domain, source_id, canonical_content_hash, context_version, template_version)
+    );
+    CREATE INDEX IF NOT EXISTS idx_contextual_index_records_workspace ON contextual_index_records(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_contextual_index_records_ws_project ON contextual_index_records(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_contextual_index_records_source ON contextual_index_records(workspace_id, project_id, source_domain, source_id);
+
+    CREATE TABLE IF NOT EXISTS rag_eval_cases (
+      eval_case_id    TEXT PRIMARY KEY,
+      workspace_id     TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id       TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      suite            TEXT NOT NULL CHECK(suite IN ('rag-lifecycle','live-rag','code-rag','unified-context')),
+      status           TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','disabled','degraded')),
+      query            TEXT NOT NULL,
+      expected         TEXT NOT NULL DEFAULT '{}',
+      tags             TEXT NOT NULL DEFAULT '[]',
+      model_heavy      INTEGER NOT NULL DEFAULT 0,
+      accelerator_heavy INTEGER NOT NULL DEFAULT 0,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_eval_cases_workspace ON rag_eval_cases(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_eval_cases_ws_project ON rag_eval_cases(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_eval_cases_suite ON rag_eval_cases(workspace_id, project_id, suite);
+
+    CREATE TABLE IF NOT EXISTS rag_eval_results (
+      eval_result_id  TEXT PRIMARY KEY,
+      eval_run_id     TEXT NOT NULL REFERENCES rag_eval_runs(eval_run_id) ON DELETE CASCADE,
+      eval_case_id    TEXT REFERENCES rag_eval_cases(eval_case_id) ON DELETE SET NULL,
+      workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id      TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      status          TEXT NOT NULL CHECK(status IN ('passed','failed','skipped','error')),
+      query_trace_id  TEXT,
+      metrics         TEXT NOT NULL DEFAULT '{}',
+      missing_sources TEXT NOT NULL DEFAULT '[]',
+      failures        TEXT NOT NULL DEFAULT '[]',
+      latency_ms      INTEGER,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_eval_results_workspace ON rag_eval_results(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_eval_results_ws_project ON rag_eval_results(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_eval_results_run ON rag_eval_results(workspace_id, project_id, eval_run_id);
+
+    CREATE TABLE IF NOT EXISTS rag_query_traces (
+      query_trace_id    TEXT PRIMARY KEY,
+      workspace_id       TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id         TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      query_hash         TEXT NOT NULL,
+      query_redacted     TEXT NOT NULL DEFAULT '',
+      stages             TEXT NOT NULL DEFAULT '[]',
+      fusion             TEXT NOT NULL DEFAULT '{}',
+      rerank             TEXT NOT NULL DEFAULT '{}',
+      runtime_truth      TEXT NOT NULL DEFAULT '{}',
+      freshness          TEXT NOT NULL DEFAULT '{}',
+      provenance         TEXT NOT NULL DEFAULT '{}',
+      redaction_summary  TEXT NOT NULL DEFAULT '{}',
+      created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_query_traces_workspace ON rag_query_traces(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_query_traces_ws_project ON rag_query_traces(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_query_traces_hash ON rag_query_traces(workspace_id, project_id, query_hash);
+
+    CREATE TABLE IF NOT EXISTS rag_context_results (
+      context_result_id TEXT PRIMARY KEY,
+      query_trace_id    TEXT REFERENCES rag_query_traces(query_trace_id) ON DELETE CASCADE,
+      workspace_id      TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id        TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      result_type       TEXT NOT NULL CHECK(result_type IN ('memory','code_chunk','file_chunk','graph_entity','graph_edge','task','decision','legacy')),
+      rank              INTEGER NOT NULL,
+      score             REAL NOT NULL DEFAULT 0,
+      source_ref        TEXT NOT NULL DEFAULT '{}',
+      stage_contributions TEXT NOT NULL DEFAULT '[]',
+      created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_rag_context_results_workspace ON rag_context_results(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_context_results_ws_project ON rag_context_results(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_rag_context_results_trace ON rag_context_results(workspace_id, project_id, query_trace_id);
+
+    CREATE TABLE IF NOT EXISTS context_packs (
+      context_pack_id  TEXT PRIMARY KEY,
+      query_trace_id   TEXT REFERENCES rag_query_traces(query_trace_id) ON DELETE SET NULL,
+      workspace_id     TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id       TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      budget           TEXT NOT NULL DEFAULT '{}',
+      source_diversity TEXT NOT NULL DEFAULT '{}',
+      results          TEXT NOT NULL DEFAULT '[]',
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_context_packs_workspace ON context_packs(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_context_packs_ws_project ON context_packs(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_context_packs_trace ON context_packs(workspace_id, project_id, query_trace_id);
+
+    CREATE TABLE IF NOT EXISTS runtime_experiments (
+      runtime_experiment_id TEXT PRIMARY KEY,
+      workspace_id           TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+      project_id             TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+      status                 TEXT NOT NULL DEFAULT 'disabled' CHECK(status IN ('disabled','planned','running','completed','failed','adopted','rejected','rolled_back')),
+      experiment_type        TEXT NOT NULL DEFAULT 'vector_store' CHECK(experiment_type IN ('vector_store','graph_store','code_indexer','model_runtime')),
+      baseline_eval_run_id   TEXT,
+      candidate_adapter      TEXT NOT NULL DEFAULT '',
+      comparison             TEXT NOT NULL DEFAULT '{}',
+      adoption_gates         TEXT NOT NULL DEFAULT '{}',
+      rollback_plan          TEXT NOT NULL DEFAULT '{}',
+      risk_notes             TEXT NOT NULL DEFAULT '[]',
+      created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at             TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_runtime_experiments_workspace ON runtime_experiments(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_runtime_experiments_ws_project ON runtime_experiments(workspace_id, project_id);
+    CREATE INDEX IF NOT EXISTS idx_runtime_experiments_status ON runtime_experiments(workspace_id, project_id, status);
 
     -- ── Sync ─────────────────────────────────────────────────────────────────
 
@@ -1656,6 +2036,7 @@ function recordLegacyMigrationNames(db: Database.Database): void {
     '032b_seed_agent_definitions',
     '034_missing_indices',
     '035_rag_lifecycle_schema',
+    '036_rag_roadmap_schema',
   ]
   const stmt = db.prepare("INSERT OR IGNORE INTO schema_migrations(name) VALUES (?)")
   for (const n of names) stmt.run(n)

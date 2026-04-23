@@ -7,16 +7,25 @@ import {
   projectIdsFromPath,
 } from 'fulcrum-agent-core'
 import type { AgentRole, Db } from 'fulcrum-agent-core'
-import { runRagLifecycleEvalSuite } from 'fulcrum-memory'
-import type { RagLifecycleEvalRunResult } from 'fulcrum-memory'
+import { runRagLifecycleEvalSuite, runRoadmapRagEvalSuite } from 'fulcrum-memory'
+import type { RagLifecycleEvalRunResult, RoadmapRagEvalRunResult } from 'fulcrum-memory'
 
 export const RAG_EVAL_GATE_PATH_PATTERNS = [
   'specs/001-rag-lifecycle-hardening/**',
+  'specs/002-rag-roadmap-delivery/**',
   'packages/memory/package.json',
+  'packages/memory/src/eval/**',
+  'packages/memory/src/retrieval/query-trace.ts',
+  'packages/memory/src/retrieval/search-code.ts',
+  'packages/memory/src/retrieval/search-context.ts',
+  'packages/memory/src/l2/**',
+  'packages/memory/src/graph/**',
+  'packages/memory/src/setup/rag-*.ts',
   'packages/memory/src/**',
   'packages/core/src/db/**',
   'packages/core/src/types.ts',
   'packages/core/src/ids.ts',
+  'packages/cli/src/**',
   'packages/cli/src/index.ts',
   'packages/cli/src/commands/memory-rag-*.ts',
   'packages/cli/src/tool-registry.ts',
@@ -114,8 +123,14 @@ export function isRagEvalGateRequiredForPaths(paths: string[]): boolean {
   return paths.some(path => regexes.some(regex => regex.test(path)))
 }
 
-export async function executeRagEvalCommand(input: RagEvalCommandInput, db: Db = getDb()): Promise<RagLifecycleEvalRunResult> {
-  if (input.suite !== 'rag-lifecycle') {
+type RagEvalCommandResult = RagLifecycleEvalRunResult | RoadmapRagEvalRunResult
+
+function isRoadmapSuite(suite: string): suite is 'live-rag' | 'code-rag' | 'unified-context' {
+  return suite === 'live-rag' || suite === 'code-rag' || suite === 'unified-context'
+}
+
+export async function executeRagEvalCommand(input: RagEvalCommandInput, db: Db = getDb()): Promise<RagEvalCommandResult> {
+  if (input.suite !== 'rag-lifecycle' && !isRoadmapSuite(input.suite)) {
     throw new Error(`unsupported eval suite: ${input.suite}`)
   }
 
@@ -127,16 +142,28 @@ export async function executeRagEvalCommand(input: RagEvalCommandInput, db: Db =
     throw new Error(`not authorized to run RAG eval: ${auth.reason}`)
   }
 
-  const result = await runRagLifecycleEvalSuite({
-    workspace_id: ids.workspace_id,
-    project_id: ids.project_id,
-    db,
-    include_model_heavy: input.include_model_heavy,
-    include_accelerator_heavy: input.include_accelerator_heavy,
-    trigger_source: input.trigger_source,
-    trigger_scope: input.trigger_scope,
-    gate_required: input.gate_required,
-  })
+  const result = input.suite === 'rag-lifecycle'
+    ? await runRagLifecycleEvalSuite({
+        workspace_id: ids.workspace_id,
+        project_id: ids.project_id,
+        db,
+        include_model_heavy: input.include_model_heavy,
+        include_accelerator_heavy: input.include_accelerator_heavy,
+        trigger_source: input.trigger_source,
+        trigger_scope: input.trigger_scope,
+        gate_required: input.gate_required,
+      })
+    : await runRoadmapRagEvalSuite({
+        workspace_id: ids.workspace_id,
+        project_id: ids.project_id,
+        db,
+        suite: input.suite,
+        include_model_heavy: input.include_model_heavy,
+        include_accelerator_heavy: input.include_accelerator_heavy,
+        trigger_source: input.trigger_source,
+        trigger_scope: input.trigger_scope,
+        gate_required: input.gate_required,
+      })
 
   auditRagEval({
     ...ids,

@@ -98,6 +98,10 @@ checks, warnings, errors, and candidate disposition. `plan` and `dry-run` do
 not mutate state. `--execute` writes audit events and leaves the previous served
 state unchanged when parity or stale-snapshot checks fail.
 
+The MCP/action equivalents are `get_rag_rebuild_plan`,
+`get_rag_rebuild_dry_run`, `start_rag_rebuild`, and
+`get_rag_rebuild_report`.
+
 Legacy rebuild is still available for the older L1/L2 vault path:
 
 ```bash
@@ -190,24 +194,66 @@ fulcrum memory recall "why did rebuild fail" --explain --json
 
 The MCP/action equivalent is `recall_knowledge` with `explain: true`.
 
+---
+
+## `search` — agent-preferred unified context
+
+### `fulcrum search context`
+
+Run one focused retrieval pass over memory rows, decision memories, code/file
+chunks, graph entities/edges, and tasks. Prefer this command when an agent needs
+mixed implementation context instead of calling `memory recall` and
+`search_code` separately.
+
+```bash
+fulcrum search context "why did rebuild fail" --explain --json
+fulcrum search context "repair vector freshness" --context-budget-tokens 1200 --json
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--limit <n>` | `10` | Max typed results |
+| `--context-budget-tokens <n>` | — | Include a deduplicated `context_pack` constrained to the token budget |
+| `--budget <n>` | — | Alias for `--context-budget-tokens` |
+| `--workspace-id <id>` | current cwd | Explicit workspace scope |
+| `--project-id <id>` | current cwd | Explicit project scope |
+| `--explain` | `false` | Include skipped/degraded stage explanations and result contribution details |
+| `--json` | — | Emit the full envelope |
+
+JSON output includes `query_trace_id`, typed `results`, `skipped_stages`, and
+`context_pack` when a budget is supplied. Result types include `memory`,
+`decision`, `code_chunk`, `file_chunk`, `graph_entity`, `graph_edge`, `task`, and
+`legacy`. Every result includes `source_ref`, `stage_contributions`,
+`provenance_class`, `freshness`, and `explanation_status`.
+
+The MCP/action equivalent is `search_context`. `recall_knowledge` and
+`search_code` remain stable compatibility surfaces for memory-only and
+code-only retrieval.
+
 ### `fulcrum memory doctor`
 
 Show a read-only RAG health report.
 
 ```bash
 fulcrum memory doctor --json
+fulcrum memory doctor --repair-plan --profile dev --json
 ```
 
 The report covers raw/L1 coverage, FTS parity, code file/chunk state, vector
 freshness and failures, graph coverage, recommended actions, warnings, and
-errors. `fulcrum memory health` is an alias.
+errors. `--repair-plan` stays read-only and returns exact mutation scope and
+next actions. `fulcrum memory health` is an alias. The MCP/action equivalents
+are `get_rag_health` and `get_rag_repair_plan`.
 
 ### `fulcrum memory eval`
 
-Run the deterministic local RAG lifecycle eval suite.
+Run deterministic local RAG eval suites.
 
 ```bash
 fulcrum memory eval --suite rag-lifecycle --json
+fulcrum memory eval --suite live-rag --json
+fulcrum memory eval --suite code-rag --json
+fulcrum memory eval --suite unified-context --json
 ```
 
 Default evals are local-first and deterministic. Model-heavy and
@@ -215,6 +261,38 @@ accelerator-heavy checks are opt-in with `--include-model-heavy` and
 `--include-accelerator-heavy`. Output groups failures by retrieval relevance,
 ranking, answer correctness, grounding/provenance, graph expansion, and
 operational parity.
+
+The MCP/action equivalent is `run_rag_eval`.
+
+### `fulcrum memory trace-query`
+
+Read a persisted RAG query trace by ID.
+
+```bash
+fulcrum memory trace-query ragtrace_... --json
+fulcrum action exec get_rag_query_trace --json '{"query_trace_id":"ragtrace_..."}'
+```
+
+Output includes candidate counts, stage ranks/scores, fusion/rerank data,
+latency, runtime truth, freshness, provenance, and a redaction summary. Agent
+traces redact secrets, raw env values, and private paths. Absolute paths stay
+on explicit operator surfaces.
+
+### `fulcrum memory runtime-experiments`
+
+List, report, adopt, or roll back optional runtime experiments.
+
+```bash
+fulcrum memory runtime-experiments list --json
+fulcrum memory runtime-experiments report <runtime_experiment_id> --json
+fulcrum memory runtime-experiments adopt <runtime_experiment_id> --json
+fulcrum memory runtime-experiments rollback <runtime_experiment_id> --json
+```
+
+Optional runtime and store experiments are disabled by default. Adoption must
+pass quality, latency, rollback, local-first, agent/tool parity, and operational
+risk gates before a candidate can become the default path. Report output
+includes baseline/candidate comparison data and adoption readiness.
 
 ### `fulcrum memory status`
 

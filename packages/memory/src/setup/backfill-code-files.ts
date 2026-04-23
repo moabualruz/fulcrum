@@ -7,7 +7,8 @@
 
 import type { Db } from 'fulcrum-agent-core'
 import { getDb } from 'fulcrum-agent-core'
-import { computeFileId } from '../l2/code.js'
+import { computeFileId, indexCodeFile } from '../l2/code.js'
+import type { IndexCodeFileInput, IndexCodeFileResult } from '../l2/code.js'
 
 export interface BackfillResult {
   filesBackfilled: number
@@ -21,6 +22,10 @@ export interface BackfillScope {
 }
 
 export { computeFileId } from '../l2/code.js'
+
+export function indexCodeFilePrimitive(input: IndexCodeFileInput, db: Db = getDb()): Promise<IndexCodeFileResult> {
+  return indexCodeFile(input, db)
+}
 
 export function backfillCodeFiles(db: Db = getDb(), scope?: BackfillScope): BackfillResult {
   const scopeWhere = scope ? 'AND workspace_id = ? AND project_id = ?' : ''

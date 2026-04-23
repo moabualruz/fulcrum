@@ -1,8 +1,8 @@
 import { existsSync } from 'fs'
 import { getDb, getDbAtPath, projectIdsFromPath, resolveRuntimeDataProfile } from 'fulcrum-agent-core'
 import type { Db, RuntimeDataProfile } from 'fulcrum-agent-core'
-import { buildRagHealthReport } from 'fulcrum-memory'
-import type { RagHealthReport } from 'fulcrum-memory'
+import { buildRagHealthReport, buildRagRepairPlan } from 'fulcrum-memory'
+import type { RagHealthReport, RagRepairPlan } from 'fulcrum-memory'
 
 export interface RagHealthCommandInput {
   workspace_id?: string
@@ -10,6 +10,7 @@ export interface RagHealthCommandInput {
   vault_path?: string
   runtime_profile?: RuntimeDataProfile
   data_dir?: string
+  out_of_scope_domains?: string[]
 }
 
 function openHealthDb(input: RagHealthCommandInput, db: Db | undefined): Db {
@@ -35,6 +36,18 @@ export function executeRagHealthCommand(input: RagHealthCommandInput = {}, db?: 
     vault_path: input.vault_path,
     runtime_profile: input.runtime_profile,
     data_dir: input.data_dir,
+    out_of_scope_domains: input.out_of_scope_domains,
+  }, openHealthDb(input, db))
+}
+
+export function executeRagRepairPlanCommand(input: RagHealthCommandInput = {}, db?: Db): RagRepairPlan {
+  const ids = input.workspace_id && input.project_id
+    ? { workspace_id: input.workspace_id, project_id: input.project_id }
+    : projectIdsFromPath(process.cwd())
+  return buildRagRepairPlan({
+    workspace_id: input.workspace_id ?? ids.workspace_id,
+    project_id: input.project_id ?? ids.project_id,
+    runtime_profile: input.runtime_profile,
   }, openHealthDb(input, db))
 }
 

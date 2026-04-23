@@ -153,6 +153,7 @@ with evidence in the JSON ledger.
 - `plugins`
 - `projects`
 - `queue`
+- `search`
 - `serve`
 - `skill`
 - `skills`
@@ -195,6 +196,7 @@ runtime rows.
 - `update_task`
 - `recall_memory`
 - `recall_knowledge`
+- `search_code`
 - `get_memory_sources`
 - `get_rag_rebuild_plan`
 - `get_rag_rebuild_dry_run`
@@ -202,6 +204,10 @@ runtime rows.
 - `get_runtime_profile_paths`
 - `get_rag_rebuild_report`
 - `get_rag_health`
+- `get_rag_repair_plan`
+- `search_context`
+- `run_rag_eval`
+- `get_rag_query_trace`
 - `start_embedding_job`
 - `get_embedding_job_status`
 - `get_embedding_job_logs`
@@ -264,6 +270,10 @@ CLI/action parity, response contract, negative path, and docs.
 - `get_runtime_profile_paths`
 - `get_rag_rebuild_report`
 - `get_rag_health`
+- `get_rag_repair_plan`
+- `search_context`
+- `run_rag_eval`
+- `get_rag_query_trace`
 - `start_embedding_job`
 - `get_embedding_job_status`
 - `get_embedding_job_logs`
@@ -292,8 +302,8 @@ CLI/action parity, response contract, negative path, and docs.
 - `list_agent_definitions`
 - `graph_consistency_check`
 
-Status: inventory complete. Seven registry entries are not public MCP schemas:
-`get_task`, `code_context`, `project_context`, `query_memory`, `search_code`,
+Status: inventory complete. Six registry entries are not public MCP schemas:
+`get_task`, `code_context`, `project_context`, `query_memory`,
 `list_activations`, `graph_consistency_check`.
 
 ## Monitor Routes
@@ -321,6 +331,11 @@ Status: inventory complete. Seven registry entries are not public MCP schemas:
 - `GET /analytics/memory`
 - `GET /memory/stats`
 - `GET /rag/health`
+- `GET /rag/eval-runs`
+- `GET /rag/degraded-domains`
+- `GET /rag/jobs`
+- `GET /rag/query-traces`
+- `GET /rag/readouts`
 - `GET /replay/:run_id`
 - `GET /analytics/forecast`
 - `GET /tasks`

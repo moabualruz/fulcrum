@@ -178,6 +178,12 @@ const GUARDED_COLUMNS: EnumColumn[] = [
     expected: ['install', 'dev', 'test'],
   },
   {
+    // RagHealthStatus — packages/core/src/types.ts
+    table: 'rag_rebuild_reports',
+    column: 'final_health_status',
+    expected: ['healthy', 'degraded', 'failed', 'out_of_scope'],
+  },
+  {
     // RagRebuildCandidateStatus — packages/core/src/types.ts
     table: 'rag_rebuild_candidates',
     column: 'status',
@@ -250,10 +256,34 @@ const GUARDED_COLUMNS: EnumColumn[] = [
     expected: ['indexed', 'skipped', 'failed'],
   },
   {
+    // CodeParseStatus — packages/core/src/types.ts
+    table: 'code_files',
+    column: 'parse_status',
+    expected: ['parsed', 'skipped', 'failed'],
+  },
+  {
+    // CodeParseStatus — packages/core/src/types.ts
+    table: 'code_chunks',
+    column: 'parse_status',
+    expected: ['parsed', 'skipped', 'failed'],
+  },
+  {
+    // CodeVectorStatus — packages/core/src/types.ts
+    table: 'code_files',
+    column: 'vector_status',
+    expected: ['pending', 'current', 'stale', 'failed', 'skipped', 'legacy'],
+  },
+  {
+    // CodeVectorStatus — packages/core/src/types.ts
+    table: 'code_chunks',
+    column: 'vector_status',
+    expected: ['pending', 'current', 'stale', 'failed', 'skipped', 'legacy'],
+  },
+  {
     // RagHealthStatus — packages/core/src/types.ts
     table: 'rag_health_reports',
     column: 'status',
-    expected: ['healthy', 'degraded', 'failed'],
+    expected: ['healthy', 'degraded', 'failed', 'out_of_scope'],
   },
   {
     // RuntimeDataProfile — packages/core/src/types.ts
@@ -266,6 +296,66 @@ const GUARDED_COLUMNS: EnumColumn[] = [
     table: 'rag_eval_runs',
     column: 'status',
     expected: ['pending', 'running', 'passed', 'failed', 'cancelled'],
+  },
+  {
+    // RagRepairRunStatus — packages/core/src/types.ts
+    table: 'rag_repair_runs',
+    column: 'status',
+    expected: ['pending', 'running', 'completed', 'degraded', 'failed', 'cancelled'],
+  },
+  {
+    // RagCoverageStatus — packages/core/src/types.ts
+    table: 'rag_coverage_records',
+    column: 'status',
+    expected: ['current', 'stale', 'failed', 'skipped', 'intentionally_unembedded', 'legacy'],
+  },
+  {
+    // ContextResultType — packages/core/src/types.ts
+    table: 'rag_context_results',
+    column: 'result_type',
+    expected: ['memory', 'code_chunk', 'file_chunk', 'graph_entity', 'graph_edge', 'task', 'decision', 'legacy'],
+  },
+  {
+    // RagEvalSuite — packages/core/src/types.ts
+    table: 'rag_eval_runs',
+    column: 'suite',
+    expected: ['rag-lifecycle', 'live-rag', 'code-rag', 'unified-context'],
+  },
+  {
+    // RagEvalSuite — packages/core/src/types.ts
+    table: 'rag_eval_cases',
+    column: 'suite',
+    expected: ['rag-lifecycle', 'live-rag', 'code-rag', 'unified-context'],
+  },
+  {
+    // RagEvalCaseStatus — packages/core/src/types.ts
+    table: 'rag_eval_cases',
+    column: 'status',
+    expected: ['active', 'disabled', 'degraded'],
+  },
+  {
+    // RagEvalResultStatus — packages/core/src/types.ts
+    table: 'rag_eval_results',
+    column: 'status',
+    expected: ['passed', 'failed', 'skipped', 'error'],
+  },
+  {
+    // ContextualIndexStatus — packages/core/src/types.ts
+    table: 'contextual_index_records',
+    column: 'status',
+    expected: ['current', 'stale', 'failed', 'skipped'],
+  },
+  {
+    // RuntimeExperimentStatus — packages/core/src/types.ts
+    table: 'runtime_experiments',
+    column: 'status',
+    expected: ['disabled', 'planned', 'running', 'completed', 'failed', 'adopted', 'rejected', 'rolled_back'],
+  },
+  {
+    // RuntimeExperimentType / RuntimeAdapterKind — packages/memory/src/runtime/adapters.ts
+    table: 'runtime_experiments',
+    column: 'experiment_type',
+    expected: ['vector_store', 'graph_store', 'code_indexer', 'model_runtime'],
   },
 ]
 

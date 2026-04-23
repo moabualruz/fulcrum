@@ -1,5 +1,5 @@
 // packages/monitor/src/server.ts
-import { Hono, type MiddlewareHandler } from 'hono'
+import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import { serve } from '@hono/node-server'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
@@ -21,7 +21,7 @@ import {
   loadConfig,
 } from 'fulcrum-agent-core'
 import type { AgentRole, EmitEventInput, MemoryKind, MemoryScope } from 'fulcrum-agent-core'
-import { recallMemory, writeMemory } from 'fulcrum-memory'
+import { recallMemory, redactRoadmapArtifact, writeMemory } from 'fulcrum-memory'
 
 // Resolve the public directory relative to this file (works in both ts-node and compiled)
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -136,6 +136,10 @@ function parseStringList(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(String).map(v => v.trim()).filter(Boolean)
   if (typeof value === 'string') return value.split(',').map(v => v.trim()).filter(Boolean)
   return []
+}
+
+function redactRagReadout<T>(value: T): T {
+  return redactRoadmapArtifact(value)
 }
 
 export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
@@ -701,6 +705,131 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
   })
 
+  function ragScope(c: Context): { ws: string | null; proj: string | null } {
+    return {
+      ws: c.req.query('workspace_id') ?? workspace_id ?? null,
+      proj: c.req.query('project_id') ?? project_id ?? null,
+    }
+  }
+
+  function parseJsonColumn(value: unknown, fallback: unknown): unknown {
+    if (typeof value !== 'string') return fallback
+    try {
+      return JSON.parse(value)
+    } catch {
+      return fallback
+    }
+  }
+
+  function readRagEvalRuns(ws: string, proj: string, limit: number, offset: number): { data: unknown[]; total: number } {
+    const db = getDb()
+    const total = (db.prepare(`
+      SELECT COUNT(*) AS n
+        FROM rag_eval_runs
+       WHERE workspace_id = ?
+         AND project_id = ?
+    `).get(ws, proj) as { n: number }).n
+    const rows = db.prepare(`
+      SELECT eval_run_id, workspace_id, project_id, suite, status, trigger_source,
+             trigger_scope, gate_required, started_at, finished_at, results
+        FROM rag_eval_runs
+       WHERE workspace_id = ?
+         AND project_id = ?
+       ORDER BY COALESCE(finished_at, started_at) DESC, eval_run_id DESC
+       LIMIT ? OFFSET ?
+    `).all(ws, proj, limit, offset) as Array<Record<string, unknown>>
+    return {
+      total,
+      data: rows.map(row => redactRagReadout({
+        ...row,
+        gate_required: Boolean(row['gate_required']),
+        results: parseJsonColumn(row['results'], {}),
+      })),
+    }
+  }
+
+  function readRagDegradedDomains(ws: string, proj: string, limit: number, offset: number): { data: unknown[]; total: number } {
+    const db = getDb()
+    const total = (db.prepare(`
+      SELECT COUNT(*) AS n
+        FROM rag_coverage_records
+       WHERE workspace_id = ?
+         AND project_id = ?
+         AND status != 'current'
+    `).get(ws, proj) as { n: number }).n
+    const data = db.prepare(`
+      SELECT coverage_id, source_domain, source_id, derived_domain, status,
+             failure_code, failure_message, freshness_checked_at, updated_at
+        FROM rag_coverage_records
+       WHERE workspace_id = ?
+         AND project_id = ?
+         AND status != 'current'
+       ORDER BY updated_at DESC, coverage_id DESC
+       LIMIT ? OFFSET ?
+    `).all(ws, proj, limit, offset)
+    return { data: redactRagReadout(data), total }
+  }
+
+  function readRagJobs(ws: string, proj: string, limit: number, offset: number): { data: unknown[]; total: number } {
+    const db = getDb()
+    const total = (db.prepare(`
+      SELECT COUNT(*) AS n
+        FROM embedding_jobs
+       WHERE workspace_id = ?
+         AND project_id = ?
+    `).get(ws, proj) as { n: number }).n
+    const rows = db.prepare(`
+      SELECT job_id, workspace_id, project_id, source_domain, status,
+             requested_provider, requested_model, requested_device, dimensions,
+             started_at, finished_at, summary
+        FROM embedding_jobs
+       WHERE workspace_id = ?
+         AND project_id = ?
+       ORDER BY COALESCE(finished_at, started_at) DESC, job_id DESC
+       LIMIT ? OFFSET ?
+    `).all(ws, proj, limit, offset) as Array<Record<string, unknown>>
+    return {
+      total,
+      data: rows.map(row => redactRagReadout({
+        ...row,
+        summary: parseJsonColumn(row['summary'], {}),
+      })),
+    }
+  }
+
+  function readRagQueryTraces(ws: string, proj: string, limit: number, offset: number): { data: unknown[]; total: number } {
+    const db = getDb()
+    const total = (db.prepare(`
+      SELECT COUNT(*) AS n
+        FROM rag_query_traces
+       WHERE workspace_id = ?
+         AND project_id = ?
+    `).get(ws, proj) as { n: number }).n
+    const rows = db.prepare(`
+      SELECT query_trace_id, workspace_id, project_id, query_hash, stages,
+             fusion, rerank, runtime_truth, freshness, provenance,
+             redaction_summary, created_at
+        FROM rag_query_traces
+       WHERE workspace_id = ?
+         AND project_id = ?
+       ORDER BY created_at DESC, query_trace_id DESC
+       LIMIT ? OFFSET ?
+    `).all(ws, proj, limit, offset) as Array<Record<string, unknown>>
+    return {
+      total,
+      data: rows.map(row => redactRagReadout({
+        ...row,
+        stages: parseJsonColumn(row['stages'], []),
+        fusion: parseJsonColumn(row['fusion'], {}),
+        rerank: parseJsonColumn(row['rerank'], {}),
+        runtime_truth: parseJsonColumn(row['runtime_truth'], {}),
+        freshness: parseJsonColumn(row['freshness'], {}),
+        provenance: parseJsonColumn(row['provenance'], {}),
+        redaction_summary: parseJsonColumn(row['redaction_summary'], {}),
+      })),
+    }
+  }
+
   app.get('/rag/health', async (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
@@ -719,6 +848,72 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     } catch (err) {
       return c.json({ error: (err as Error).message }, 500)
     }
+  })
+
+  app.get('/rag/eval-runs', (c) => {
+    const { ws, proj } = ragScope(c)
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    if (!proj) return c.json({ error: 'project_id required' }, 400)
+    const { limit, offset } = readPagination(c.req.query.bind(c.req))
+    const rows = readRagEvalRuns(ws, proj, limit, offset)
+    return c.json(paginated(rows.data, rows.total, limit, offset))
+  })
+
+  app.get('/rag/degraded-domains', (c) => {
+    const { ws, proj } = ragScope(c)
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    if (!proj) return c.json({ error: 'project_id required' }, 400)
+    const { limit, offset } = readPagination(c.req.query.bind(c.req))
+    const rows = readRagDegradedDomains(ws, proj, limit, offset)
+    return c.json(paginated(rows.data, rows.total, limit, offset))
+  })
+
+  app.get('/rag/jobs', (c) => {
+    const { ws, proj } = ragScope(c)
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    if (!proj) return c.json({ error: 'project_id required' }, 400)
+    const { limit, offset } = readPagination(c.req.query.bind(c.req))
+    const rows = readRagJobs(ws, proj, limit, offset)
+    return c.json(paginated(rows.data, rows.total, limit, offset))
+  })
+
+  app.get('/rag/query-traces', (c) => {
+    const { ws, proj } = ragScope(c)
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    if (!proj) return c.json({ error: 'project_id required' }, 400)
+    const { limit, offset } = readPagination(c.req.query.bind(c.req))
+    const rows = readRagQueryTraces(ws, proj, limit, offset)
+    return c.json(paginated(rows.data, rows.total, limit, offset))
+  })
+
+  app.get('/rag/readouts', async (c) => {
+    const { ws, proj } = ragScope(c)
+    if (!ws) return c.json({ error: 'workspace_id required' }, 400)
+    if (!proj) return c.json({ error: 'project_id required' }, 400)
+    const db = getDb()
+    const health = await (async () => {
+      try {
+        const { buildRagHealthReport } = await import('fulcrum-memory')
+        return buildRagHealthReport({ workspace_id: ws, project_id: proj }, db)
+      } catch {
+        return { status: 'failed' }
+      }
+    })()
+    const evals = readRagEvalRuns(ws, proj, 5, 0)
+    const degraded = readRagDegradedDomains(ws, proj, 5, 0)
+    const jobs = readRagJobs(ws, proj, 5, 0)
+    const traces = readRagQueryTraces(ws, proj, 5, 0)
+    return c.json({
+      workspace_id: ws,
+      project_id: proj,
+      cards: [
+        { id: 'rag_health', title: 'RAG Health', status: (health as { status?: string }).status ?? 'unknown', data: redactRagReadout(health) },
+        { id: 'rag_eval_runs', title: 'Eval Runs', count: evals.total, data: evals.data },
+        { id: 'rag_degraded_domains', title: 'Degraded Domains', count: degraded.total, data: degraded.data },
+        { id: 'rag_jobs', title: 'RAG Jobs', count: jobs.total, data: jobs.data },
+        { id: 'rag_query_traces', title: 'Query Traces', count: traces.total, data: traces.data },
+      ],
+    })
   })
 
   app.get('/replay/:run_id', async (c) => {

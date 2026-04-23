@@ -234,6 +234,164 @@ mcp__fulcrum__write_memory({
 
 ---
 
+## RAG Roadmap Parity
+
+Fulcrum stays CLI-first. These MCP tools mirror the matching `fulcrum action exec`
+and CLI maintenance surfaces so agents can read health, repair, rebuild, search,
+eval, and trace state without guessing which lower-level path to call.
+
+### `get_rag_health`
+
+Read-only RAG health report covering L0, L1, FTS, code, vector, embedding
+failure, stale state, graph coverage, degraded reasons, and explicitly
+`out_of_scope` domains.
+
+**Annotations:** read-only, idempotent
+
+| Parameter | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `workspace_id` | string | — | Workspace ID |
+| `project_id` | string | — | Project ID |
+| `vault_path` | string | — | Optional vault path override |
+| `runtime_profile` | string | — | Runtime data profile (`install`, `dev`, `test`) |
+| `out_of_scope_domains` | string[] | — | Domains to mark `out_of_scope` for the read-only check |
+
+### `get_rag_repair_plan`
+
+Read-only repair plan over health, coverage, vectors, graph, provenance,
+required actions, and eval readiness.
+
+**Annotations:** read-only, idempotent
+
+| Parameter | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `workspace_id` | string | — | Workspace ID |
+| `project_id` | string | — | Project ID |
+| `runtime_profile` | string | — | Runtime data profile (`install`, `dev`, `test`) |
+
+### `get_rag_rebuild_plan`
+
+Read-only rebuild plan. Mirrors `fulcrum memory rebuild --mode plan --json`.
+
+**Annotations:** read-only, idempotent
+
+| Parameter | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `workspace_id` | string | — | Workspace ID |
+| `project_id` | string | — | Project ID |
+| `runtime_profile` | string | — | Runtime data profile (`install`, `dev`, `test`) |
+| `domains` | string[] | — | Domains to plan (`l0`, `l1`, `fts`, `code`, `vectors`, `graph`) |
+| `allow_empty` | boolean | — | Permit a zero-scope plan |
+
+### `get_rag_rebuild_dry_run`
+
+Read-only dry run. Mirrors `fulcrum memory rebuild --mode dry-run --json`.
+
+**Annotations:** read-only, idempotent
+
+| Parameter | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `workspace_id` | string | — | Workspace ID |
+| `project_id` | string | — | Project ID |
+| `runtime_profile` | string | — | Runtime data profile (`install`, `dev`, `test`) |
+| `domains` | string[] | — | Domains to dry-run (`l0`, `l1`, `fts`, `code`, `vectors`, `graph`) |
+| `allow_empty` | boolean | — | Permit a zero-scope dry run |
+
+### `start_rag_rebuild`
+
+Execute destructive rebuild with staged candidate, snapshot validation, parity
+checks, report persistence, and audit event.
+
+**Annotations:** destructive, long-running
+
+| Parameter | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `workspace_id` | string | — | Workspace ID |
+| `project_id` | string | — | Project ID |
+| `runtime_profile` | string | — | Runtime data profile (`install`, `dev`, `test`) |
+| `confirm_profile` | string | — | Required profile confirmation for destructive runs |
+| `verification_refs` | string[] | — | Prior dev/test verification report IDs |
+| `domains` | string[] | — | Domains to rebuild (`l0`, `l1`, `fts`, `code`, `vectors`, `graph`) |
+| `allow_empty` | boolean | — | Permit a zero-scope rebuild |
+
+### `get_rag_rebuild_report`
+
+Read a persisted rebuild report by ID.
+
+**Annotations:** read-only, idempotent
+
+| Parameter | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `report_id` | string | ✓ | Rebuild report ID |
+| `workspace_id` | string | — | Workspace ID |
+| `runtime_profile` | string | — | Runtime data profile (`install`, `dev`, `test`) |
+
+### `search_context`
+
+Agent-preferred unified context search over memory, code, file, graph, task,
+and decision evidence.
+
+**Annotations:** write, non-destructive. This persists query trace/result rows.
+
+| Parameter | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `query` | string | ✓ | Natural language search query |
+| `workspace_id` | string | — | Workspace ID |
+| `project_id` | string | — | Project ID |
+| `limit` | number | — | Max results |
+| `context_budget_tokens` | number | — | Optional packed-context budget |
+| `explain` | boolean | — | Include skipped/degraded stage details |
+| `include_graph` | boolean | — | Include graph expansion |
+| `graph_mode` | `local` \| `global_summary` \| `drift` | — | Graph expansion mode |
+| `graph_depth` | number | — | Graph expansion depth |
+
+### `run_rag_eval`
+
+Run a RAG eval suite and persist eval results. Model-heavy and accelerator-heavy
+cases stay opt-in.
+
+**Annotations:** open-world, long-running
+
+| Parameter | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `workspace_id` | string | — | Workspace ID |
+| `project_id` | string | — | Project ID |
+| `suite` | `rag-lifecycle` \| `live-rag` \| `code-rag` \| `unified-context` | ✓ | Eval suite |
+| `include_model_heavy` | boolean | — | Opt in to model-heavy cases |
+| `include_accelerator_heavy` | boolean | — | Opt in to accelerator-heavy cases |
+| `trigger_source` | `local` \| `ci` | — | Trigger source |
+| `trigger_scope` | `rag_related` \| `non_rag` \| `manual` | — | Trigger scope |
+| `gate_required` | boolean | — | Require gate semantics |
+
+### `get_rag_query_trace`
+
+Read a persisted RAG query trace by ID.
+
+**Annotations:** read-only, idempotent
+
+| Parameter | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `query_trace_id` | string | ✓ | Query trace ID |
+| `workspace_id` | string | — | Workspace ID |
+| `project_id` | string | — | Project ID |
+
+### Compatibility guidance
+
+`recall_knowledge` and `search_code` remain supported compatibility surfaces,
+but `search_context` is the agent-preferred entry point when memory, files,
+code, graph, tasks, and decisions all matter. The corresponding CLI commands
+mirror the same boundary: `memory doctor --repair-plan`, `memory rebuild
+--mode plan|dry-run|execute`, `memory eval`, `memory trace-query`, and
+`memory runtime-experiments`.
+
+Optional runtime and store experiments stay disabled by default. They cannot be
+adopted without quality, latency, rollback, local-first, agent/tool parity, and
+operational risk gates. Agent-facing traces, reports, and eval artifacts redact
+secrets, raw env values, and private paths; absolute paths remain limited to
+explicit operator surfaces.
+
+---
+
 ## Agent Runs
 
 ### `start_agent_run`

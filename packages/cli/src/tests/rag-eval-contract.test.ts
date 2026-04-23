@@ -5,6 +5,7 @@ import {
   authorizeRagEvalOperation,
   executeRagEvalCommand,
 } from '../commands/memory-rag-eval.js'
+import { getMemoryQueryTraceCommand } from '../commands/memory-query-trace.js'
 
 beforeEach(() => {
   const db = new Database(':memory:')
@@ -83,5 +84,49 @@ describe('RAG eval CLI contract', () => {
       project_id: 'proj_1',
       suite: 'unknown',
     })).rejects.toThrow(/unsupported eval suite/)
+  })
+
+  it('runs roadmap eval suites with readiness, thresholds, metrics, and result arrays', async () => {
+    const result = await executeRagEvalCommand({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      suite: 'live-rag',
+      actor: { kind: 'human', role: 'software_engineer', id: 'tester' },
+    })
+
+    expect(result).toMatchObject({
+      suite: 'live-rag',
+      status: 'failed',
+      readiness: 'degraded',
+      thresholds: expect.objectContaining({ recall_at_5: 0.8 }),
+      metrics: expect.objectContaining({ recall_at_5: 0 }),
+      results: [],
+    })
+    expect(result.eval_run_id).toMatch(/^evalrun_/)
+  })
+
+  it('reads query traces only with explicit workspace and project scope', async () => {
+    getDb().prepare(`
+      INSERT INTO rag_query_traces (
+        query_trace_id, workspace_id, project_id, query_hash, query_redacted,
+        stages, fusion, rerank, runtime_truth, freshness, provenance, redaction_summary
+      ) VALUES (
+        'ragtrace_cli_scope', 'ws_1', 'proj_1', 'hash', 'query',
+        '[]', '{}', '{}', '{}', '{}', '{}', '{}'
+      )
+    `).run()
+
+    await expect(getMemoryQueryTraceCommand({
+      query_trace_id: 'ragtrace_cli_scope',
+      workspace_id: 'ws_1',
+    }, getDb())).rejects.toThrow(/project_id required/)
+
+    const trace = await getMemoryQueryTraceCommand({
+      query_trace_id: 'ragtrace_cli_scope',
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+    }, getDb()) as { query_trace_id: string }
+
+    expect(trace.query_trace_id).toBe('ragtrace_cli_scope')
   })
 })

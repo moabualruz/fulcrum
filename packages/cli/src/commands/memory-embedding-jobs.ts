@@ -42,6 +42,11 @@ export interface EmbeddingJobAuthorization {
   reason: string
 }
 
+interface EmbeddingJobNextAction {
+  command: string
+  reason: string
+}
+
 function normalizeActor(actor: Partial<EmbeddingJobActor> | undefined, fallbackRole: AgentRole = 'software_engineer'): EmbeddingJobActor {
   return {
     kind: actor?.kind ?? 'human',
@@ -116,6 +121,22 @@ function assertAuthorized(input: {
   }
 }
 
+function nextActionForJob(job: { job_id: string; status: string }): EmbeddingJobNextAction | null {
+  if (job.status === 'pending' || job.status === 'running') {
+    return {
+      command: `fulcrum jobs resume ${job.job_id} --json`,
+      reason: `embedding_job_${job.status}`,
+    }
+  }
+  if (job.status === 'degraded') {
+    return {
+      command: `fulcrum jobs retry ${job.job_id} --failed --json`,
+      reason: 'embedding_job_degraded',
+    }
+  }
+  return null
+}
+
 export async function startEmbeddingJobCommand(input: EmbeddingJobCommandInput, db: Db = getDb()) {
   const ids = resolveIds(input)
   const actor = normalizeActor(input.actor)
@@ -142,6 +163,7 @@ export async function startEmbeddingJobCommand(input: EmbeddingJobCommandInput, 
       device: job.requested_device,
       dimensions: job.dimensions,
     },
+    next_action: nextActionForJob(job),
   }
 }
 

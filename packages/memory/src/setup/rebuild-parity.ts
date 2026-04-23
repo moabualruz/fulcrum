@@ -1,5 +1,6 @@
 import { getDb } from 'fulcrum-agent-core'
 import type { Db } from 'fulcrum-agent-core'
+import { readGraphEvidenceUnits } from '../graph/evidence.js'
 import type { RagParityCheck, RagRebuildDomain } from './rag-types.js'
 
 function count(db: Db, sql: string, ...params: unknown[]): number {
@@ -89,13 +90,12 @@ export function runRebuildParityChecks(
   }
 
   if (input.domains.includes('graph')) {
-    const brokenEdges = count(db, `
-      SELECT COUNT(*) AS n
-      FROM graph_edges e
-      LEFT JOIN graph_entities s ON s.entity_id = e.source_id AND s.workspace_id = e.workspace_id
-      LEFT JOIN graph_entities t ON t.entity_id = e.target_id AND t.workspace_id = e.workspace_id
-      WHERE e.workspace_id = ? AND (s.entity_id IS NULL OR t.entity_id IS NULL)
-    `, workspace_id)
+    const units = readGraphEvidenceUnits({ workspace_id, project_id }, db)
+    const entityIds = new Set(units.filter(unit => unit.kind !== 'edge').map(unit => unit.graph_unit_id))
+    const brokenEdges = units.filter(unit => (
+      unit.kind === 'edge'
+      && (!unit.from_id || !unit.to_id || !entityIds.has(unit.from_id) || !entityIds.has(unit.to_id))
+    )).length
     checks.push(brokenEdges === 0 ? pass('graph_edges_entities') : fail('graph_edges_entities', brokenEdges))
   }
 

@@ -948,6 +948,10 @@ TOOL_REGISTRY.set('search_code', {
       symbol: args['symbol'] as string | undefined,
       lang: args['lang'] as string | undefined,
       path: args['path'] as string | undefined,
+      package: args['package'] as string | undefined,
+      module: args['module'] as string | undefined,
+      dependency: args['dependency'] as string | undefined,
+      changed_files: args['changed_files'] as string[] | undefined,
       scope: args['scope'] as 'session' | 'project' | 'workspace' | 'global' | undefined,
       min_score: args['min_score'] as number | undefined,
       limit: args['limit'] as number | undefined,
@@ -955,9 +959,20 @@ TOOL_REGISTRY.set('search_code', {
       caller_role: deps.trusted_caller_role,
       explain: args['explain'] === undefined ? undefined : Boolean(args['explain']),
     })
-    return envelope.reason ? envelope : { results: envelope.results }
+    return stripNullish(envelope)
   },
 })
+
+function stripNullish<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(item => stripNullish(item)) as T
+  if (!value || typeof value !== 'object') return value
+  const out: Record<string, unknown> = {}
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    if (nested === null || nested === undefined) continue
+    out[key] = stripNullish(nested)
+  }
+  return out as T
+}
 
 TOOL_REGISTRY.set('get_rag_rebuild_plan', {
   schema: TOOL_SCHEMA_MAP.get('get_rag_rebuild_plan'),
@@ -1047,7 +1062,72 @@ TOOL_REGISTRY.set('get_rag_health', {
       project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
       vault_path: args['vault_path'] as string | undefined,
       runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
+      out_of_scope_domains: args['out_of_scope_domains'] as string[] | undefined,
     }, args['runtime_profile'] ? undefined : deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('get_rag_repair_plan', {
+  schema: TOOL_SCHEMA_MAP.get('get_rag_repair_plan'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { executeRagRepairPlanCommand } = await import('./commands/memory-rag-health.js')
+    return executeRagRepairPlanCommand({
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+      runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
+    }, args['runtime_profile'] ? undefined : deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('search_context', {
+  schema: TOOL_SCHEMA_MAP.get('search_context'),
+  capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { searchContext } = await import('fulcrum-memory')
+    return searchContext({
+      query: args['query'] as string,
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+      limit: args['limit'] as number | undefined,
+      context_budget_tokens: args['context_budget_tokens'] as number | undefined,
+      explain: args['explain'] === undefined ? undefined : Boolean(args['explain']),
+      include_graph: args['include_graph'] === undefined ? undefined : Boolean(args['include_graph']),
+      graph_mode: args['graph_mode'] as 'local' | 'global_summary' | 'drift' | undefined,
+      graph_depth: args['graph_depth'] as number | undefined,
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('run_rag_eval', {
+  schema: TOOL_SCHEMA_MAP.get('run_rag_eval'),
+  capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { executeRagEvalCommand } = await import('./commands/memory-rag-eval.js')
+    return executeRagEvalCommand({
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+      suite: args['suite'] as string,
+      include_model_heavy: args['include_model_heavy'] as boolean | undefined,
+      include_accelerator_heavy: args['include_accelerator_heavy'] as boolean | undefined,
+      trigger_source: args['trigger_source'] as 'local' | 'ci' | undefined,
+      trigger_scope: args['trigger_scope'] as 'rag_related' | 'non_rag' | 'manual' | undefined,
+      gate_required: args['gate_required'] as boolean | undefined,
+      actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
+    }, deps.db)
+  },
+})
+
+TOOL_REGISTRY.set('get_rag_query_trace', {
+  schema: TOOL_SCHEMA_MAP.get('get_rag_query_trace'),
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
+  handler: async (args, deps) => {
+    const { readRagQueryTrace } = await import('fulcrum-memory')
+    return readRagQueryTrace({
+      query_trace_id: args['query_trace_id'] as string,
+      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
+    }, deps.db)
   },
 })
 

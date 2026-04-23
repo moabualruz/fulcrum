@@ -27,12 +27,14 @@ CONTROL PLANE
   memory embed         Backfill vector embeddings or start scoped embedding job
   memory doctor        Show read-only RAG health report
   memory eval          Run deterministic RAG lifecycle eval suite
+  memory runtime-experiments
+                       List/report optional runtime experiments
   memory status        Show vault path and layer status
   jobs status <job_id> Show embedding job status
   jobs logs <job_id>   Show embedding job event log
   jobs cancel <job_id> Cancel embedding job
   jobs resume <job_id> Resume embedding job
-  jobs retry <job_id> --failed
+  jobs retry <job_id> --failed [--workspace-id <id>] [--project-id <id>]
   search context "<query>" [--explain] [--json]
 
   serve mcp            Start MCP server (stdio JSON-RPC 2.0) + auto-starts monitor
@@ -286,7 +288,7 @@ function featureNotImplemented(feature: string): never {
 
 // ── Memory commands ──────────────────────────────────────────────────────────
 
-async function runMemory(): Promise<void> {
+export async function runMemory(): Promise<void> {
   if (!command || command === '--help' || command === '-h') {
     console.log(`
 fulcrum memory — memory vault commands
@@ -310,6 +312,7 @@ fulcrum memory — memory vault commands
   sweep-expired              Delete session-scope memories whose expires_at has passed
   doctor                     Show read-only RAG health report
   eval --suite rag-lifecycle Run deterministic local RAG lifecycle evals
+  runtime-experiments        List/report optional runtime experiments
   graph-consistency-check    Sample SQLite ↔ Kuzu and report drift (requires L2)
   rollback                   Operator-only rollback (--since= + --yes-i-really-want-to-undo-N-writes)
 `)
@@ -545,7 +548,7 @@ fulcrum memory — memory vault commands
   if (command === 'eval') {
     const suite = optArg('--suite')
     if (!suite) {
-      console.error('Usage: fulcrum memory eval --suite rag-lifecycle [--json]')
+      console.error('Usage: fulcrum memory eval --suite rag-lifecycle|live-rag|code-rag|unified-context [--json]')
       process.exit(1)
     }
     const { executeRagEvalCommand } = await import('./commands/memory-rag-eval.js')
@@ -561,12 +564,100 @@ fulcrum memory — memory vault commands
     else {
       console.log(`RAG eval ${result.suite}: ${result.status}`)
       console.log(`eval_run_id: ${result.eval_run_id}`)
-      for (const [category, counts] of Object.entries(result.results)) {
-        console.log(`  ${category}: ${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped`)
+      if (Array.isArray(result.results)) {
+        if ('readiness' in result) console.log(`readiness: ${result.readiness}`)
+        console.log(`  cases: ${result.results.length}`)
+        const failed = result.results.filter(row => row.status === 'failed' || row.status === 'error').length
+        const skipped = result.results.filter(row => row.status === 'skipped').length
+        console.log(`  failed: ${failed}`)
+        console.log(`  skipped: ${skipped}`)
+      } else {
+        for (const [category, counts] of Object.entries(result.results)) {
+          console.log(`  ${category}: ${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped`)
+        }
       }
     }
     if (result.status === 'failed') process.exit(2)
     return
+  }
+
+  if (command === 'runtime-experiments' || command === 'runtime-experiment') {
+    const sub = args[2]
+    if (!sub || sub === '--help' || sub === '-h') {
+      console.log(`
+fulcrum memory runtime-experiments <list|report|adopt|rollback> [id] [--json]
+
+Optional runtime experiments compare candidate vector, graph, code indexer,
+or model runtimes against the local baseline. Candidates are disabled by
+default and adoption requires all quality, latency, rollback, local-first,
+agent/tool parity, and operational risk gates.
+`)
+      process.exit(sub ? 0 : 1)
+    }
+
+    const {
+      adoptRuntimeExperimentCommand,
+      getRuntimeExperimentReportCommand,
+      listRuntimeExperimentsCommand,
+      rollbackRuntimeExperimentCommand,
+    } = await import('./commands/memory-runtime-experiments.js')
+
+    if (sub === 'list') {
+      const result = listRuntimeExperimentsCommand({
+        workspace_id: optArg('--workspace-id'),
+        project_id: optArg('--project-id'),
+        status: optArg('--status') as import('fulcrum-agent-core').RuntimeExperimentStatus | undefined,
+        limit: optIntArg('--limit'),
+      })
+      if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+      else outputRows(result.experiments.map(experiment => ({
+        runtime_experiment_id: experiment.runtime_experiment_id,
+        status: experiment.status,
+        experiment_type: experiment.experiment_type,
+        candidate_adapter: experiment.candidate_adapter,
+        baseline_eval_run_id: experiment.baseline_eval_run_id,
+      })), ['runtime_experiment_id', 'status', 'experiment_type', 'candidate_adapter', 'baseline_eval_run_id'])
+      return
+    }
+
+    const runtimeExperimentId = args[3] && !args[3]!.startsWith('--') ? args[3] : optArg('--id')
+    if (!runtimeExperimentId) {
+      console.error(`Usage: fulcrum memory runtime-experiments ${sub} <runtime_experiment_id> [--json]`)
+      process.exit(1)
+    }
+    const input = {
+      runtime_experiment_id: runtimeExperimentId,
+      workspace_id: optArg('--workspace-id'),
+      project_id: optArg('--project-id'),
+    }
+    if (sub === 'report') {
+      const result = getRuntimeExperimentReportCommand(input)
+      if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+      else outputObject({
+        runtime_experiment_id: result.runtime_experiment_id,
+        status: result.status,
+        experiment_type: result.experiment_type,
+        availability: result.availability.status,
+        adoption_ready: result.adoption.can_adopt,
+        blocking_gates: result.adoption.blocking_gates.join(','),
+      })
+      return
+    }
+    if (sub === 'adopt') {
+      const result = adoptRuntimeExperimentCommand(input)
+      if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+      else outputObject({ runtime_experiment_id: result.runtime_experiment_id, status: result.status })
+      return
+    }
+    if (sub === 'rollback') {
+      const result = rollbackRuntimeExperimentCommand(input)
+      if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+      else outputObject({ runtime_experiment_id: result.runtime_experiment_id, status: result.status })
+      return
+    }
+
+    console.error(`Unknown memory runtime-experiments command: ${sub}`)
+    process.exit(1)
   }
 
   if (command === 'status') {
@@ -713,6 +804,24 @@ Flags:
     }
     const { readRaw } = await import('./commands/memory-inspection.js')
     console.log(JSON.stringify(readRaw(l0Id), null, 2))
+    return
+  }
+
+  if (command === 'trace-query') {
+    const traceId = args[2]
+    if (!traceId || traceId === '--help' || traceId === '-h') {
+      console.log(`fulcrum memory trace-query <query_trace_id> [--workspace-id <id>] [--project-id <id>] [--json]\n\nRead a persisted RAG query trace.`)
+      process.exit(traceId ? 0 : 1)
+    }
+    const ids = (optArg('--workspace-id') && optArg('--project-id')) ? null : currentProjectIds()
+    const { getMemoryQueryTraceCommand } = await import('./commands/memory-query-trace.js')
+    const result = await getMemoryQueryTraceCommand({
+      query_trace_id: traceId,
+      workspace_id: optArg('--workspace-id') ?? ids!.workspace_id,
+      project_id: optArg('--project-id') ?? ids!.project_id,
+    })
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+    else console.log(result ? `query_trace_id\t${traceId}` : 'query trace not found')
     return
   }
 
@@ -1011,13 +1120,14 @@ Exit 0 when every row embeds cleanly. Exit 2 if any row fails (see
 async function runJobs(): Promise<void> {
   const jobId = args[2]
   if (!command || command === '--help' || command === '-h' || !jobId) {
-    console.log('Usage: fulcrum jobs status|logs|cancel|resume|retry <job_id> [--failed] [--json]')
+    console.log('Usage: fulcrum jobs status|logs|cancel|resume|retry <job_id> [--workspace-id <id>] [--project-id <id>] [--failed] [--json]')
     return
   }
 
   const input = {
     job_id: jobId,
     workspace_id: optArg('--workspace-id'),
+    project_id: optArg('--project-id'),
     batch_size: optIntArg('--batch-size'),
     actor: { kind: 'human' as const, role: 'software_engineer' as const, id: process.env['USER'] ?? 'local-operator' },
   }
@@ -1056,7 +1166,7 @@ async function runJobs(): Promise<void> {
 
   if (command === 'retry') {
     if (!args.includes('--failed')) {
-      console.error('Usage: fulcrum jobs retry <job_id> --failed [--json]')
+      console.error('Usage: fulcrum jobs retry <job_id> --failed [--workspace-id <id>] [--project-id <id>] [--json]')
       process.exit(1)
     }
     const { retryFailedEmbeddingJobCommand } = await import('./commands/memory-embedding-jobs.js')
@@ -1082,6 +1192,9 @@ Flags:
   --limit <N>                    Max results (default 10)
   --context-budget-tokens <N>    Return a deduped context_pack within budget
   --budget <N>                   Alias for --context-budget-tokens
+  --graph-mode <mode>            local, global_summary, or drift (default local)
+  --graph-depth <N>              Bound graph neighborhood expansion depth
+  --no-graph                     Disable graph candidates, graph scoring, and graph expansion
   --workspace-id <id>            Override workspace (default: current cwd workspace)
   --project-id <id>              Override project (default: current cwd project)
   --explain                      Include skipped/degraded stage details
@@ -1099,6 +1212,9 @@ Flags:
     limit: optIntArg('--limit'),
     context_budget_tokens: optIntArg('--context-budget-tokens') ?? optIntArg('--budget'),
     explain: args.includes('--explain'),
+    include_graph: args.includes('--no-graph') ? false : undefined,
+    graph_mode: optArg('--graph-mode') as 'local' | 'global_summary' | 'drift' | undefined,
+    graph_depth: optIntArg('--graph-depth'),
   }) as {
     query_trace_id: string
     results: Array<{ rank: number; type: string; title: string; score: number }>

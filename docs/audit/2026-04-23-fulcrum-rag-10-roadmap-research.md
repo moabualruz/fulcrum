@@ -5,6 +5,25 @@ Scope: memory RAG, file RAG, code RAG, embeddings, reranking, graph retrieval, i
 
 This report combines external industry research with code analysis of the current Fulcrum repo and live `fulcrum memory doctor --json` output from this workspace.
 
+## Roadmap Delivery Notes
+
+This audit now serves as the delivery umbrella for the RAG roadmap spec set:
+
+- [spec.md](../../specs/002-rag-roadmap-delivery/spec.md)
+- [plan.md](../../specs/002-rag-roadmap-delivery/plan.md)
+- [tasks.md](../../specs/002-rag-roadmap-delivery/tasks.md)
+- [contracts/rag-roadmap-contracts.md](../../specs/002-rag-roadmap-delivery/contracts/rag-roadmap-contracts.md)
+- [quickstart.md](../../specs/002-rag-roadmap-delivery/quickstart.md)
+
+Implemented coverage to date spans Phase 1 through Phase 8, covering T001-T120. Phase 9 focuses on docs and polish tasks T121-T124, with T125-T127 reserved for verification and artifact review.
+
+Evidence carried forward for the final polish gate:
+
+- Absolute paths stay operator-only; agent-facing traces, reports, evals, and artifacts use fingerprints or stable source refs.
+- Redaction applies to secrets, raw env values, and private paths in traces, reports, and eval artifacts.
+- Optional runtime and store experiments are disabled by default and cannot be adopted without quality, latency, rollback, local-first, agent/tool parity, and operational risk gates.
+- Model-heavy and accelerator-heavy evals stay opt-in.
+
 ## Executive Summary
 
 Fulcrum has the right architecture shape but not yet the operational guarantees of a 10/10 RAG system.

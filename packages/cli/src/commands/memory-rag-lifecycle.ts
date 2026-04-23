@@ -108,6 +108,14 @@ function openProfileDb(profile_manifest: RuntimeDataProfileManifest, db: Db | un
   return profileDb
 }
 
+function graphRebuildGuidance(domains: RagRebuildDomain[] | undefined): string[] {
+  if (domains && !domains.includes('graph')) return []
+  return [
+    'Graph rebuild refreshes relationship evidence for tasks, decisions, files, symbols, errors, fixes, memory entities, imports, and calls.',
+    'After graph rebuild, run `fulcrum memory doctor --json` or `fulcrum search context "<relationship query>" --explain --json` to verify coverage and contribution.',
+  ]
+}
+
 function failedProfileReport(
   input: {
     workspace_id: string
@@ -138,7 +146,7 @@ function failedProfileReport(
     candidate: null,
     counts: {},
     parity: [],
-    warnings: [],
+    warnings: graphRebuildGuidance(input.domains),
     errors: input.errors,
     artifact_path: null,
   }
@@ -227,6 +235,10 @@ export async function executeRagRebuildCommand(input: RagRebuildCommandInput, db
     allow_empty: input.allow_empty,
     actor,
   }, activeDb)
+
+  for (const warning of graphRebuildGuidance(result.scope.domains)) {
+    if (!result.warnings.includes(warning)) result.warnings.push(warning)
+  }
 
   if (input.mode === 'execute') {
     auditRagRebuild({

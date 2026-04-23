@@ -6,6 +6,26 @@ export type { QueryCase } from './queries.js'
 export { recallAtK, precisionAtK, mrr, ndcg, aggregate } from './metrics.js'
 export type { EvalResult, AggregateResult } from './metrics.js'
 export {
+  assessRagEvalReadiness,
+  computeRoadmapEvalMetrics,
+  runRoadmapRagEvalSuite,
+} from './roadmap.js'
+export type {
+  RagEvalReadinessResult,
+  RoadmapRagEvalCase,
+  RoadmapRagEvalCaseResult,
+  RoadmapRagEvalDomain,
+  RoadmapRagEvalFailure,
+  RoadmapRagEvalMetrics,
+  RoadmapRagEvalMetricInput,
+  RoadmapRagEvalObservation,
+  RoadmapRagEvalReadiness,
+  RoadmapRagEvalRetriever,
+  RoadmapRagEvalRunResult,
+  RoadmapRagEvalThresholds,
+  RunRoadmapRagEvalSuiteInput,
+} from './roadmap.js'
+export {
   RAG_LIFECYCLE_EVAL_CORPUS,
   RAG_LIFECYCLE_EVAL_CATEGORIES,
   RAG_LIFECYCLE_EVAL_FIXTURES,
@@ -30,3 +50,5 @@ export type {
   RagLifecycleEvalSkipped,
   RunRagLifecycleEvalSuiteInput,
 } from './rag-lifecycle/runner.js'
+export { runLiveRagEvalSuite } from './live-rag/runner.js'
+export type { RunLiveRagEvalSuiteInput } from './live-rag/runner.js'

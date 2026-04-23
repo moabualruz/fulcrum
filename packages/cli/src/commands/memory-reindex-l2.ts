@@ -54,13 +54,29 @@ async function reindexPages(): Promise<ReindexL2ScopeStats> {
   const stats: ReindexL2ScopeStats = { scanned: rows.length, embedded: 0, failed: 0 }
   for (const row of rows) {
     try {
+      clearMemoryVector(db, row.memory_id)
       await storeEmbeddingInVec(db, row.memory_id, row.content ?? '')
-      stats.embedded++
+      if (verifyMemoryVector(db, row.memory_id)) {
+        stats.embedded++
+      } else {
+        stats.failed++
+      }
     } catch {
       stats.failed++
     }
   }
   return stats
+}
+
+function clearMemoryVector(db: ReturnType<typeof getDb>, memoryId: string): void {
+  db.prepare('DELETE FROM vec_memories WHERE memory_id = ?').run(memoryId)
+  db.prepare('UPDATE memories SET embedding = NULL WHERE memory_id = ?').run(memoryId)
+}
+
+function verifyMemoryVector(db: ReturnType<typeof getDb>, memoryId: string): boolean {
+  const vec = db.prepare('SELECT 1 FROM vec_memories WHERE memory_id = ?').get(memoryId) as { 1: number } | undefined
+  const row = db.prepare('SELECT embedding FROM memories WHERE memory_id = ?').get(memoryId) as { embedding: Buffer | null } | undefined
+  return Boolean(vec && row?.embedding)
 }
 
 async function reindexCode(): Promise<ReindexL2ScopeStats> {
@@ -74,8 +90,12 @@ async function reindexCode(): Promise<ReindexL2ScopeStats> {
   const stats: ReindexL2ScopeStats = { scanned: rows.length, embedded: 0, failed: 0 }
   for (const row of rows) {
     try {
-      await storeChunkEmbedding(db, row.chunk_id, row.content ?? '')
-      stats.embedded++
+      const result = await storeChunkEmbedding(db, row.chunk_id, row.content ?? '')
+      if (result.status === 'embedded' && result.vector_row_verified && result.metadata_verified) {
+        stats.embedded++
+      } else {
+        stats.failed++
+      }
     } catch {
       stats.failed++
     }

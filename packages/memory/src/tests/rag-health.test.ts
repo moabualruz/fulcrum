@@ -195,7 +195,9 @@ describe('RAG health report', () => {
         data_dir: dataDir,
       })
 
-      expect(report.profile_manifest.paths.vault).toBe(manifest.paths.vault)
+      expect(report.profile_manifest).not.toHaveProperty('paths')
+      expect(report.profile_manifest.path_fingerprints.vault).toBe(manifest.path_fingerprints.vault)
+      expect(JSON.stringify(report)).not.toContain(manifest.paths.vault)
       expect(report.domains['l0']).toMatchObject({ files: 1, orphan_files: 1 })
     } finally {
       rmSync(dataDir, { recursive: true, force: true })

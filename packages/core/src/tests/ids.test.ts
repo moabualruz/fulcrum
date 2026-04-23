@@ -166,6 +166,15 @@ describe('newId prefixes (G-15)', () => {
     ['vector_metadata', 'vecmeta_'],
     ['rag_health_report', 'health_'],
     ['rag_eval_run', 'evalrun_'],
+    ['rag_repair_plan', 'ragrepairplan_'],
+    ['rag_repair_run', 'ragrepairrun_'],
+    ['rag_coverage', 'ragcov_'],
+    ['contextual_index', 'ctxidx_'],
+    ['rag_eval_case', 'ragevalcase_'],
+    ['rag_eval_result', 'ragevalresult_'],
+    ['rag_query_trace', 'ragtrace_'],
+    ['context_pack', 'ctxpack_'],
+    ['runtime_experiment', 'runtimeexp_'],
   ]
   for (const [kind, prefix] of cases) {
     it(`${kind} → ${prefix}...`, () => {

@@ -35,4 +35,32 @@ describe('RAG rebuild parity checks', () => {
     const checks = runRebuildParityChecks({ workspace_id: 'ws_1', project_id: 'proj_1', domains: ['vectors'] })
     expect(checks).toContainEqual(expect.objectContaining({ name: 'vector_metadata_memory_sources', status: 'fail' }))
   })
+
+  it('checks graph edge parity only within the requested project evidence scope', () => {
+    getDb().prepare("INSERT INTO projects(project_id, workspace_id, name) VALUES ('proj_2', 'ws_1', 'proj_2')").run()
+    const now = new Date().toISOString()
+    const properties = JSON.stringify({
+      graph_evidence: true,
+      project_id: 'proj_2',
+      kind: 'edge',
+      domain: 'memory',
+      relationship_type: 'mentions',
+      source_refs: [],
+    })
+    getDb().pragma('foreign_keys = OFF')
+    try {
+      getDb().prepare(`
+        INSERT INTO graph_edges(edge_id, workspace_id, source_id, target_id, relation, properties, created_at)
+        VALUES ('edge_broken_proj_2', 'ws_1', 'missing_source', 'missing_target', 'mentions', ?, ?)
+      `).run(properties, now)
+    } finally {
+      getDb().pragma('foreign_keys = ON')
+    }
+
+    const currentProjectChecks = runRebuildParityChecks({ workspace_id: 'ws_1', project_id: 'proj_1', domains: ['graph'] })
+    expect(currentProjectChecks).toContainEqual(expect.objectContaining({ name: 'graph_edges_entities', status: 'pass' }))
+
+    const otherProjectChecks = runRebuildParityChecks({ workspace_id: 'ws_1', project_id: 'proj_2', domains: ['graph'] })
+    expect(otherProjectChecks).toContainEqual(expect.objectContaining({ name: 'graph_edges_entities', status: 'fail', actual: 1 }))
+  })
 })

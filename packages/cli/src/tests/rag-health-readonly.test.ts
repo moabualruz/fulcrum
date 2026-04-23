@@ -99,7 +99,9 @@ describe('RAG health command and action read-only behavior', () => {
     })
 
     expect(result.runtime_profile).toBe('test')
-    expect(result.profile_manifest.paths.db).toBe(manifest.paths.db)
+    expect(result.profile_manifest).not.toHaveProperty('paths')
+    expect(result.profile_manifest.path_fingerprints.db).toBe(manifest.path_fingerprints.db)
+    expect(JSON.stringify(result)).not.toContain(manifest.paths.db)
     expect(result.domains['l0']).toMatchObject({ rows: 1, missing_files: 1 })
   })
 
@@ -108,6 +110,21 @@ describe('RAG health command and action read-only behavior', () => {
       workspace_id: 'ws_1',
       project_id: 'proj_1',
       status: 'degraded',
+      runtime_profile: 'dev',
+      profile_manifest: {
+        profile: 'dev',
+        safe_for_destructive_execution: true,
+        disposable: false,
+        requires_confirmation: false,
+        path_fingerprints: {
+          db: 'sha256:db',
+          vault: 'sha256:vault',
+          graph: 'sha256:graph',
+          vectors: 'sha256:vectors',
+          artifacts: 'sha256:artifacts',
+        },
+        errors: [],
+      },
       generated_at: '2026-04-23T00:00:00.000Z',
       domains: {
         l0: { status: 'degraded', files: 1, rows: 2, missing_files: 1, orphan_files: 1 },

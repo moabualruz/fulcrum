@@ -210,4 +210,30 @@ describe('reindexL2 — scope selection (PR 4.3)', () => {
     expect(result.pages.embedded).toBe(1)
     expect(vecMemCount()).toBe(1)
   })
+
+  it('counts page embeddings as failed when no vector row is verified', async () => {
+    seedPage('01KRX_NO_EMBEDDER')
+    resetProviders()
+
+    const result = await reindexL2({ pages: true })
+
+    expect(result.pages.scanned).toBe(1)
+    expect(result.pages.embedded).toBe(0)
+    expect(result.pages.failed).toBe(1)
+    expect(vecMemCount()).toBe(0)
+  })
+
+  it('does not count stale existing page vectors as fresh success', async () => {
+    seedPage('01KRX_STALE_VECTOR')
+    await reindexL2({ pages: true })
+    expect(vecMemCount()).toBe(1)
+    resetProviders()
+
+    const result = await reindexL2({ pages: true })
+
+    expect(result.pages.scanned).toBe(1)
+    expect(result.pages.embedded).toBe(0)
+    expect(result.pages.failed).toBe(1)
+    expect(vecMemCount()).toBe(0)
+  })
 })
