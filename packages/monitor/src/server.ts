@@ -21,7 +21,7 @@ import {
   loadConfig,
 } from 'fulcrum-agent-core'
 import type { AgentRole, EmitEventInput, MemoryKind, MemoryScope } from 'fulcrum-agent-core'
-import { recallMemory, redactRoadmapArtifact, writeMemory } from 'fulcrum-memory'
+import { recallMemory, writeMemory } from 'fulcrum-memory'
 
 // Resolve the public directory relative to this file (works in both ts-node and compiled)
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -35,28 +35,20 @@ import {
   getForecasting,
   replayRun,
 } from './metrics.js'
+import { readRagDegradedDomains, readRagEvalRuns, readRagJobs, readRagQueryTraces } from './rag-readouts.js'
+import {
+  LOOPBACK_HOSTS,
+  createSseBusHandler,
+  errorMessage,
+  formatSseEvent,
+  paginated,
+  parseStringList,
+  readPagination,
+  readPciStatus,
+  redactRagReadout,
+  statusForError,
+} from './server-support.js'
 import type { MonitorServer, MonitorServerConfig } from './types.js'
-
-function sseChunk(event: {
-  evt_id?: string
-  event_id?: string
-  evt_type: string
-  ts?: string
-  created_at?: string
-  payload?: unknown
-}): Uint8Array {
-  const eventId = event.event_id ?? event.evt_id ?? Date.now().toString()
-  const ts = event.created_at ?? event.ts ?? new Date().toISOString()
-  const data = JSON.stringify({
-    ...event,
-    evt_id: eventId,
-    event_id: eventId,
-    event_type: event.evt_type,
-    ts,
-    created_at: ts,
-  })
-  return new TextEncoder().encode(`id: ${eventId}\ndata: ${data}\n\n`)
-}
 
 const CAPABILITY_SKILL_MAP: Record<string, { name: string; description: string }> = {
   code_generation:    { name: 'Code Generation',    description: 'Generates code from specifications' },
@@ -79,10 +71,6 @@ const CAPABILITY_SKILL_MAP: Record<string, { name: string; description: string }
  * interface would expose them outside the machine. Allowed host values are
  * the IPv4/IPv6 loopback literals only.
  */
-const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '0:0:0:0:0:0:0:1'])
-const DEFAULT_PAGE_LIMIT = 50
-const MAX_PAGE_LIMIT = 200
-
 export class MonitorNonLoopbackError extends Error {
   constructor(host: string) {
     super(`Monitor host ${host} is not loopback; v2a requires 127.0.0.1 / ::1 / localhost`)
@@ -94,54 +82,6 @@ export function assertLoopbackHost(host: string): void {
   if (!LOOPBACK_HOSTS.has(host)) throw new MonitorNonLoopbackError(host)
 }
 
-function readPagination(query: (name: string) => string | undefined): { limit: number; offset: number } {
-  const rawLimit = Number.parseInt(query('limit') ?? String(DEFAULT_PAGE_LIMIT), 10)
-  const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? rawLimit : DEFAULT_PAGE_LIMIT, 1), MAX_PAGE_LIMIT)
-
-  const rawOffset = Number.parseInt(query('cursor') ?? query('offset') ?? '0', 10)
-  const offset = Math.max(Number.isFinite(rawOffset) ? rawOffset : 0, 0)
-  return { limit, offset }
-}
-
-function paginated<T>(data: T[], total: number, limit: number, offset: number): {
-  data: T[]
-  pagination: { total: number; limit: number; offset: number; next_cursor: string | null }
-} {
-  const nextOffset = offset + data.length
-  return {
-    data,
-    pagination: {
-      total,
-      limit,
-      offset,
-      next_cursor: nextOffset < total ? String(nextOffset) : null,
-    },
-  }
-}
-
-function statusForError(err: unknown): 400 | 403 | 404 | 409 | 500 {
-  const code = (err as { code?: string }).code
-  if (code === 'invalid_input') return 400
-  if (code === 'policy_blocked' || code === 'policy_denied') return 403
-  if (code === 'not_found') return 404
-  if (code === 'conflict' || code === 'invalid_state' || code === 'version_conflict') return 409
-  return 500
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : 'internal_error'
-}
-
-function parseStringList(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String).map(v => v.trim()).filter(Boolean)
-  if (typeof value === 'string') return value.split(',').map(v => v.trim()).filter(Boolean)
-  return []
-}
-
-function redactRagReadout<T>(value: T): T {
-  return redactRoadmapArtifact(value)
-}
-
 export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   // Per-instance set of active SSE controllers for event-bus push mode.
   const sseControllers = new Set<ReadableStreamDefaultController>()
@@ -150,19 +90,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
   let busHandler: ((event: EmitEventInput) => void) | null = null
 
   if (!config.isSubprocess) {
-    busHandler = (event: EmitEventInput) => {
-      if (sseControllers.size === 0) return
-      const chunk = sseChunk(event)
-
-      for (const controller of [...sseControllers]) {
-        try {
-          controller.enqueue(chunk)
-        } catch {
-          // Broken pipe or closed stream — remove and continue
-          sseControllers.delete(controller)
-        }
-      }
-    }
+    busHandler = createSseBusHandler(sseControllers)
     getEventBus().onAny(busHandler)
   }
 
@@ -258,7 +186,6 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         // Valid event IDs are short alphanumerics; reject anything else.
         const lastEventId = /^[A-Za-z0-9_-]{1,64}$/.test(rawLastEventId) ? rawLastEventId : ''
 
-        // ── Resume: replay missed events from DB ──────────────────────────────
         if (lastEventId) {
           try {
             const db = getDb()
@@ -271,7 +198,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
               ts: string
             }>
             for (const row of rows) {
-              const data = sseChunk({
+              const data = formatSseEvent({
                 evt_id: row.evt_id,
                 evt_type: row.evt_type,
                 payload: JSON.parse(row.payload) as unknown,
@@ -299,7 +226,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
                 ts: string
               }>
               for (const row of rows) {
-                const data = sseChunk({
+                const data = formatSseEvent({
                   evt_id: row.evt_id,
                   evt_type: row.evt_type,
                   payload: JSON.parse(row.payload) as unknown,
@@ -712,124 +639,6 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     }
   }
 
-  function parseJsonColumn(value: unknown, fallback: unknown): unknown {
-    if (typeof value !== 'string') return fallback
-    try {
-      return JSON.parse(value)
-    } catch {
-      return fallback
-    }
-  }
-
-  function readRagEvalRuns(ws: string, proj: string, limit: number, offset: number): { data: unknown[]; total: number } {
-    const db = getDb()
-    const total = (db.prepare(`
-      SELECT COUNT(*) AS n
-        FROM rag_eval_runs
-       WHERE workspace_id = ?
-         AND project_id = ?
-    `).get(ws, proj) as { n: number }).n
-    const rows = db.prepare(`
-      SELECT eval_run_id, workspace_id, project_id, suite, status, trigger_source,
-             trigger_scope, gate_required, started_at, finished_at, results
-        FROM rag_eval_runs
-       WHERE workspace_id = ?
-         AND project_id = ?
-       ORDER BY COALESCE(finished_at, started_at) DESC, eval_run_id DESC
-       LIMIT ? OFFSET ?
-    `).all(ws, proj, limit, offset) as Array<Record<string, unknown>>
-    return {
-      total,
-      data: rows.map(row => redactRagReadout({
-        ...row,
-        gate_required: Boolean(row['gate_required']),
-        results: parseJsonColumn(row['results'], {}),
-      })),
-    }
-  }
-
-  function readRagDegradedDomains(ws: string, proj: string, limit: number, offset: number): { data: unknown[]; total: number } {
-    const db = getDb()
-    const total = (db.prepare(`
-      SELECT COUNT(*) AS n
-        FROM rag_coverage_records
-       WHERE workspace_id = ?
-         AND project_id = ?
-         AND status != 'current'
-    `).get(ws, proj) as { n: number }).n
-    const data = db.prepare(`
-      SELECT coverage_id, source_domain, source_id, derived_domain, status,
-             failure_code, failure_message, freshness_checked_at, updated_at
-        FROM rag_coverage_records
-       WHERE workspace_id = ?
-         AND project_id = ?
-         AND status != 'current'
-       ORDER BY updated_at DESC, coverage_id DESC
-       LIMIT ? OFFSET ?
-    `).all(ws, proj, limit, offset)
-    return { data: redactRagReadout(data), total }
-  }
-
-  function readRagJobs(ws: string, proj: string, limit: number, offset: number): { data: unknown[]; total: number } {
-    const db = getDb()
-    const total = (db.prepare(`
-      SELECT COUNT(*) AS n
-        FROM embedding_jobs
-       WHERE workspace_id = ?
-         AND project_id = ?
-    `).get(ws, proj) as { n: number }).n
-    const rows = db.prepare(`
-      SELECT job_id, workspace_id, project_id, source_domain, status,
-             requested_provider, requested_model, requested_device, dimensions,
-             started_at, finished_at, summary
-        FROM embedding_jobs
-       WHERE workspace_id = ?
-         AND project_id = ?
-       ORDER BY COALESCE(finished_at, started_at) DESC, job_id DESC
-       LIMIT ? OFFSET ?
-    `).all(ws, proj, limit, offset) as Array<Record<string, unknown>>
-    return {
-      total,
-      data: rows.map(row => redactRagReadout({
-        ...row,
-        summary: parseJsonColumn(row['summary'], {}),
-      })),
-    }
-  }
-
-  function readRagQueryTraces(ws: string, proj: string, limit: number, offset: number): { data: unknown[]; total: number } {
-    const db = getDb()
-    const total = (db.prepare(`
-      SELECT COUNT(*) AS n
-        FROM rag_query_traces
-       WHERE workspace_id = ?
-         AND project_id = ?
-    `).get(ws, proj) as { n: number }).n
-    const rows = db.prepare(`
-      SELECT query_trace_id, workspace_id, project_id, query_hash, stages,
-             fusion, rerank, runtime_truth, freshness, provenance,
-             redaction_summary, created_at
-        FROM rag_query_traces
-       WHERE workspace_id = ?
-         AND project_id = ?
-       ORDER BY created_at DESC, query_trace_id DESC
-       LIMIT ? OFFSET ?
-    `).all(ws, proj, limit, offset) as Array<Record<string, unknown>>
-    return {
-      total,
-      data: rows.map(row => redactRagReadout({
-        ...row,
-        stages: parseJsonColumn(row['stages'], []),
-        fusion: parseJsonColumn(row['fusion'], {}),
-        rerank: parseJsonColumn(row['rerank'], {}),
-        runtime_truth: parseJsonColumn(row['runtime_truth'], {}),
-        freshness: parseJsonColumn(row['freshness'], {}),
-        provenance: parseJsonColumn(row['provenance'], {}),
-        redaction_summary: parseJsonColumn(row['redaction_summary'], {}),
-      })),
-    }
-  }
-
   app.get('/rag/health', async (c) => {
     const ws = c.req.query('workspace_id') ?? workspace_id
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
@@ -855,7 +664,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
     if (!proj) return c.json({ error: 'project_id required' }, 400)
     const { limit, offset } = readPagination(c.req.query.bind(c.req))
-    const rows = readRagEvalRuns(ws, proj, limit, offset)
+    const rows = readRagEvalRuns(ws, proj, limit, offset, redactRagReadout)
     return c.json(paginated(rows.data, rows.total, limit, offset))
   })
 
@@ -864,7 +673,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
     if (!proj) return c.json({ error: 'project_id required' }, 400)
     const { limit, offset } = readPagination(c.req.query.bind(c.req))
-    const rows = readRagDegradedDomains(ws, proj, limit, offset)
+    const rows = readRagDegradedDomains(ws, proj, limit, offset, redactRagReadout)
     return c.json(paginated(rows.data, rows.total, limit, offset))
   })
 
@@ -873,7 +682,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
     if (!proj) return c.json({ error: 'project_id required' }, 400)
     const { limit, offset } = readPagination(c.req.query.bind(c.req))
-    const rows = readRagJobs(ws, proj, limit, offset)
+    const rows = readRagJobs(ws, proj, limit, offset, redactRagReadout)
     return c.json(paginated(rows.data, rows.total, limit, offset))
   })
 
@@ -882,7 +691,7 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
     if (!ws) return c.json({ error: 'workspace_id required' }, 400)
     if (!proj) return c.json({ error: 'project_id required' }, 400)
     const { limit, offset } = readPagination(c.req.query.bind(c.req))
-    const rows = readRagQueryTraces(ws, proj, limit, offset)
+    const rows = readRagQueryTraces(ws, proj, limit, offset, redactRagReadout)
     return c.json(paginated(rows.data, rows.total, limit, offset))
   })
 
@@ -899,10 +708,10 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
         return { status: 'failed' }
       }
     })()
-    const evals = readRagEvalRuns(ws, proj, 5, 0)
-    const degraded = readRagDegradedDomains(ws, proj, 5, 0)
-    const jobs = readRagJobs(ws, proj, 5, 0)
-    const traces = readRagQueryTraces(ws, proj, 5, 0)
+    const evals = readRagEvalRuns(ws, proj, 5, 0, redactRagReadout)
+    const degraded = readRagDegradedDomains(ws, proj, 5, 0, redactRagReadout)
+    const jobs = readRagJobs(ws, proj, 5, 0, redactRagReadout)
+    const traces = readRagQueryTraces(ws, proj, 5, 0, redactRagReadout)
     return c.json({
       workspace_id: ws,
       project_id: proj,
@@ -1495,58 +1304,5 @@ export function startMonitorServer(config: MonitorServerConfig): MonitorServer {
       }
       sseControllers.clear()
     },
-  }
-}
-
-/**
- * v2a PR 4 Task 23 — resolve PCI + code-index counters for the /content-index
- * route. Uses string-module dynamic import so the monitor package doesn't
- * take a direct dep on fulcrum-memory (which depends on monitor
- * in some builds). Returns zeros on any resolution failure so the endpoint
- * is always available for liveness/scripted checks.
- */
-async function readPciStatus(): Promise<{
-  files_indexed: number
-  chunks_indexed: number
-  vecs_in_index: number
-  last_change_at: string | null
-  watcher_refcount: number
-  active_watchers: number
-}> {
-  let watcher_refcount = 0
-  let active_watchers = 0
-  try {
-    const moduleName = 'fulcrum-memory'
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mem = (await import(/* @vite-ignore */ moduleName)) as any
-    const pciMod = mem?.pciStatus ? mem : (await import(/* @vite-ignore */ `${moduleName}/dist/index.js`).catch(() => null) as any)
-    const status = typeof pciMod?.pciStatus === 'function' ? pciMod.pciStatus() : null
-    if (status) {
-      active_watchers = Number(status.activeWatchers ?? 0)
-      const refcounts = status.refcounts ?? {}
-      for (const v of Object.values(refcounts)) watcher_refcount += Number(v)
-    }
-  } catch { /* best-effort */ }
-
-  let files_indexed = 0
-  let chunks_indexed = 0
-  let last_change_at: string | null = null
-  try {
-    const db = getDb()
-    const files = db.prepare('SELECT COUNT(*) AS n FROM code_files').get() as { n: number } | undefined
-    files_indexed = Number(files?.n ?? 0)
-    const chunks = db.prepare('SELECT COUNT(*) AS n FROM code_chunks').get() as { n: number } | undefined
-    chunks_indexed = Number(chunks?.n ?? 0)
-    const latest = db.prepare('SELECT MAX(indexed_at) AS ts FROM code_chunks').get() as { ts: string | null } | undefined
-    last_change_at = latest?.ts ?? null
-  } catch { /* db may be closed during tests */ }
-
-  return {
-    files_indexed,
-    chunks_indexed,
-    vecs_in_index: chunks_indexed,  // vec rows mirror chunks in v2a
-    last_change_at,
-    watcher_refcount,
-    active_watchers,
   }
 }

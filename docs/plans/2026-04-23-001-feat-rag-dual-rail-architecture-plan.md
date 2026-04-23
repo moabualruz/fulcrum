@@ -433,7 +433,7 @@ The intended shape is:
 **Verification:**
 - Optional lanes raise the ceiling without changing the user’s mental model of retrieval, explain, or trust.
 
-- [ ] **Unit 6: Module decomposition and parity hardening**
+- [x] **Unit 6: Module decomposition and parity hardening**
 
 **Goal:** Split the oversized RAG modules into bounded units and finish cross-surface parity/documentation cleanup.
 

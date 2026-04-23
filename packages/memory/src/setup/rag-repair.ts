@@ -1,9 +1,10 @@
 import { getDb, newId } from 'fulcrum-agent-core'
-import type { Db, RagHealthStatus, RuntimeDataProfile } from 'fulcrum-agent-core'
+import type { Db, RuntimeDataProfile } from 'fulcrum-agent-core'
 import { buildRagHealthReport } from './rag-health.js'
 import { buildRepairActions } from './repair/actions.js'
 import type { RagRepairPlan, RagRepairPlanInput } from './repair/contract.js'
 import { buildRepairDependencyGraph } from './repair/dependency-graph.js'
+import { resolveRepairNextAction, selectRepairDomains } from './repair/support.js'
 import { buildRepairVerificationSteps } from './repair/verification.js'
 
 export function createEmptyRagRepairPlan(input: RagRepairPlanInput): RagRepairPlan {
@@ -39,20 +40,13 @@ export function createEmptyRagRepairPlan(input: RagRepairPlanInput): RagRepairPl
 
 export function buildRagRepairPlan(input: RagRepairPlanInput, db: Db = getDb()): RagRepairPlan {
   const runtime_profile = input.runtime_profile ?? 'dev'
-  const requestedDomains = input.domains ? new Set(input.domains) : null
   const health = buildRagHealthReport({
     workspace_id: input.workspace_id,
     project_id: input.project_id,
     runtime_profile,
     data_dir: input.data_dir,
   }, db)
-  const domains = Object.entries(health.domains)
-    .filter(([, domain]) => {
-      const status = domain.status as RagHealthStatus
-      return status !== 'healthy' && status !== 'out_of_scope'
-    })
-    .filter(([domain]) => requestedDomains === null || domain === 'l0' || domain === 'l1' || requestedDomains.has(domain))
-    .map(([domain]) => domain)
+  const domains = selectRepairDomains(health, input.domains)
   const domain_details = Object.fromEntries(domains.map(domain => [domain, health.domains[domain]]))
   const graph = buildRepairDependencyGraph({ ...input, runtime_profile }, health)
   const actions = buildRepairActions({ ...input, runtime_profile }, runtime_profile, graph.decisions, domain_details)
@@ -67,13 +61,7 @@ export function buildRagRepairPlan(input: RagRepairPlanInput, db: Db = getDb()):
     status: 'planned',
     health_status: health.status,
     strategy: graph.strategy,
-    next_action: graph.strategy === 'blocked'
-      ? 'review_blockers'
-      : graph.clean_slate_domains.length > 0
-        ? 'clean_slate_rebuild'
-        : graph.targeted_domains.length > 0
-          ? 'targeted_repair'
-          : 'none',
+    next_action: resolveRepairNextAction(graph),
     clean_slate_required: graph.clean_slate_domains.length > 0,
     domains,
     targeted_domains: graph.targeted_domains,

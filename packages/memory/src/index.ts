@@ -431,6 +431,8 @@ export type { RebuildCandidateRow } from './setup/rebuild-candidate.js'
 export { runRebuildParityChecks } from './setup/rebuild-parity.js'
 export { createRunningRebuildReport, finishRebuildReport, readRebuildReport } from './setup/rebuild-report.js'
 export { pathFingerprintForRoadmap, redactProviderConfig, redactRagDetails, redactRagText, redactRoadmapArtifact } from './setup/rag-redaction.js'
+// RAG health + repair stay on the same public surface while implementation
+// details move into setup/repair/* support modules.
 export { buildRagHealthReport } from './setup/rag-health.js'
 export type { RagHealthReport } from './setup/rag-health.js'
 export { buildRagRepairPlan, createEmptyRagRepairPlan } from './setup/rag-repair.js'

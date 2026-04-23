@@ -228,7 +228,8 @@ JSON output includes `query_trace_id`, typed `results`, `skipped_stages`, and
 
 The MCP/action equivalent is `search_context`. `recall_knowledge` and
 `search_code` remain stable compatibility surfaces for memory-only and
-code-only retrieval.
+code-only retrieval. Internal planner and ranking modules may change, but this
+CLI envelope is the compatibility contract.
 
 ### `fulcrum memory doctor`
 
@@ -243,7 +244,8 @@ The report covers raw/L1 coverage, FTS parity, code file/chunk state, vector
 freshness and failures, graph coverage, recommended actions, warnings, and
 errors. `--repair-plan` stays read-only and returns exact mutation scope and
 next actions. `fulcrum memory health` is an alias. The MCP/action equivalents
-are `get_rag_health` and `get_rag_repair_plan`.
+are `get_rag_health` and `get_rag_repair_plan`. Internal report assembly may be
+decomposed over time; the read-only report shape remains the contract.
 
 ### `fulcrum memory eval`
 

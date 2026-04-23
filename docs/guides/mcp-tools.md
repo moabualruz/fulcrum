@@ -238,7 +238,9 @@ mcp__fulcrum__write_memory({
 
 Fulcrum stays CLI-first. These MCP tools mirror the matching `fulcrum action exec`
 and CLI maintenance surfaces so agents can read health, repair, rebuild, search,
-eval, and trace state without guessing which lower-level path to call.
+eval, and trace state without guessing which lower-level path to call. Internal
+planner/report modules may split over time; tool names, scope rules, and
+read/write semantics remain the compatibility contract.
 
 ### `get_rag_health`
 

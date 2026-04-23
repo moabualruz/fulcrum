@@ -11,9 +11,22 @@ describe('RAG roadmap integration utilization', () => {
     }
   })
 
-  it('exposes memory primitives through registry-backed handlers', () => {
-    expect(TOOL_REGISTRY.get('get_rag_repair_plan')?.handler.toString()).toContain('executeRagRepairPlanCommand')
-    expect(TOOL_REGISTRY.get('search_context')?.handler.toString()).toContain('searchContext')
-    expect(TOOL_REGISTRY.get('get_rag_query_trace')?.handler.toString()).toContain('readRagQueryTrace')
+  it('keeps roadmap handlers on the expected read/write contracts', () => {
+    expect(TOOL_REGISTRY.get('get_rag_repair_plan')?.capabilities).toMatchObject({
+      readOnly: true,
+      destructive: false,
+    })
+    expect(TOOL_REGISTRY.get('search_context')?.capabilities).toMatchObject({
+      readOnly: true,
+      destructive: false,
+    })
+    expect(TOOL_REGISTRY.get('run_rag_eval')?.capabilities).toMatchObject({
+      readOnly: false,
+      destructive: false,
+    })
+    expect(TOOL_REGISTRY.get('get_rag_query_trace')?.capabilities).toMatchObject({
+      readOnly: true,
+      destructive: false,
+    })
   })
 })

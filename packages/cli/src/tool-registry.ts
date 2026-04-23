@@ -13,10 +13,17 @@
 // Handlers default workspace_id and project_id from deps when args omit them.
 
 import { getDb } from 'fulcrum-agent-core'
-import type { AgentRole, Db, FulcrumConfig, RuntimeDataProfile, RuntimeExperimentStatus } from 'fulcrum-agent-core'
-import type { RagRebuildDomain } from 'fulcrum-memory'
+import type { AgentRole, Db, FulcrumConfig } from 'fulcrum-agent-core'
 import { TOOL_SCHEMA_MAP } from './mcp-tools.js'
 import type { ToolSchema } from './mcp-tools.js'
+import {
+  buildActionDefinition,
+  buildActionDefinitions,
+  buildAdditionalActionDefinition,
+  buildMcpExposurePlanFromDefinitions,
+  normalizeActionName,
+} from './tool-registry-support.js'
+import { registerRagToolEntries } from './tool-registry-rag.js'
 
 // ─────────────────────────── Interfaces ────────────────────────────────────
 
@@ -258,79 +265,10 @@ const ACTION_PLATFORM_OVERRIDES: Record<string, Partial<Pick<ActionDefinition, '
   },
 }
 
-function normalizeActionName(name: string): string {
-  return name.replace(/^mcp__fulcrum__/, '')
-}
-
-function buildActionDefinition(name: string, entry: RegistryEntry): ActionDefinition {
-  const actionName = normalizeActionName(name)
-  const hookCoverage = entry.capabilities.hookEquivalent ? 'full' : 'none'
-  const overrides = ACTION_PLATFORM_OVERRIDES[actionName]
-  return {
-    action_name: actionName,
-    cli: {
-      primaryCommand: ['action', 'exec', actionName],
-      compatibilityCommand: ['tool', 'exec', entry.schema?.name ?? actionName],
-      stdinJson: true,
-    },
-    mcp: {
-      toolName: entry.schema?.name,
-      compatibilityOnly: entry.schema !== undefined,
-    },
-    hooks: {
-      coverage: overrides?.hooks?.coverage ?? hookCoverage,
-      nativePoints: overrides?.hooks?.nativePoints ?? (entry.capabilities.hookEquivalent ? ['fulcrum-hook'] : []),
-      nativePlatforms: overrides?.hooks?.nativePlatforms ?? (entry.capabilities.hookEquivalent ? ['any'] : []),
-      cliSubstitutable: true,
-    },
-    availability: {
-      platforms: overrides?.availability?.platforms ?? ['any'],
-      agentTypes: overrides?.availability?.agentTypes ?? (entry.capabilities.minRole ? [entry.capabilities.minRole] : undefined),
-      runtimeCapabilities: overrides?.availability?.runtimeCapabilities ?? [],
-    },
-    fallbackOrder: entry.capabilities.hookEquivalent ? ['hook', 'cli', 'mcp'] : ['cli', 'mcp'],
-    observability: {
-      traceName: `action.${actionName}`,
-      eventName: `${actionName}.executed`,
-    },
-  }
-}
-
-function buildAdditionalActionDefinition(action: AdditionalActionDefinitionInput): ActionDefinition {
-  const actionName = normalizeActionName(action.action_name)
-  return {
-    action_name: actionName,
-    cli: {
-      primaryCommand: ['action', 'exec', actionName],
-      compatibilityCommand: ['tool', 'exec', action.mcp.name],
-      stdinJson: true,
-    },
-    mcp: {
-      toolName: action.mcp.name,
-      compatibilityOnly: true,
-    },
-    hooks: {
-      coverage: 'none',
-      nativePoints: [],
-      nativePlatforms: [],
-      cliSubstitutable: true,
-    },
-    availability: {
-      platforms: ['any'],
-      runtimeCapabilities: [],
-    },
-    fallbackOrder: ['cli', 'mcp'],
-    observability: {
-      traceName: `action.${actionName}`,
-      eventName: `${actionName}.executed`,
-    },
-  }
-}
-
 export function getActionDefinition(name: string): ActionDefinition | undefined {
   const actionName = normalizeActionName(name)
   const entry = TOOL_REGISTRY.get(actionName)
-  if (entry) return buildActionDefinition(actionName, entry)
+  if (entry) return buildActionDefinition(actionName, entry, ACTION_PLATFORM_OVERRIDES)
   const additional = ADDITIONAL_ACTIONS.find(action => normalizeActionName(action.action_name) === actionName)
   return additional ? buildAdditionalActionDefinition(additional) : undefined
 }
@@ -340,11 +278,7 @@ export function getRegistryEntry(name: string): RegistryEntry | undefined {
 }
 
 export function listActionDefinitions(): ActionDefinition[] {
-  const builtIns = Array.from(TOOL_REGISTRY.entries())
-    .map(([name, entry]) => buildActionDefinition(name, entry))
-    .filter(action => action.mcp.toolName !== undefined)
-  const additional = ADDITIONAL_ACTIONS.map(action => buildAdditionalActionDefinition(action))
-  return [...builtIns, ...additional]
+  return buildActionDefinitions(TOOL_REGISTRY, ADDITIONAL_ACTIONS, ACTION_PLATFORM_OVERRIDES)
 }
 
 export function setAdditionalActionDefinitions(actions: AdditionalActionDefinitionInput[]): void {
@@ -352,132 +286,10 @@ export function setAdditionalActionDefinitions(actions: AdditionalActionDefiniti
   ADDITIONAL_ACTIONS.push(...actions)
 }
 
-function matchesPlatform(action: ActionDefinition, platform?: string): boolean {
-  if (!platform) return true
-  return action.availability.platforms.includes('any') || action.availability.platforms.includes(platform)
-}
-
-function matchesAgentType(action: ActionDefinition, agentType?: string): boolean {
-  if (!agentType) return true
-  if (!action.availability.agentTypes || action.availability.agentTypes.length === 0) return true
-  return action.availability.agentTypes.includes(agentType)
-}
-
-function matchesRuntimeCapabilities(
-  action: ActionDefinition,
-  platform: string | undefined,
-  mode: McpExposureMode,
-  runtimeCapabilities: Set<string>,
-): boolean {
-  if (mode === 'full') return true
-  if (runtimeCapabilities.has('hooks') && action.hooks.coverage === 'full') {
-    if (!platform) return false
-    if (
-      action.hooks.nativePlatforms.includes('any') ||
-      action.hooks.nativePlatforms.includes(platform)
-    ) {
-      return false
-    }
-  }
-  if (action.availability.runtimeCapabilities.length === 0) return true
-  return action.availability.runtimeCapabilities.every(cap => runtimeCapabilities.has(cap))
-}
-
-function matchesExplicitSets(actionName: string, includeActions: Set<string>, excludeActions: Set<string>): boolean {
-  if (excludeActions.has(actionName)) return false
-  if (includeActions.size === 0) return true
-  return includeActions.has(actionName)
-}
-
-async function resolveRolePolicy(profile?: string): Promise<{ allow: string[] | null; deny: Set<string>; warning?: string }> {
-  if (!profile) return { allow: null, deny: new Set<string>() }
-
-  const { getAgentDefinition } = await import('fulcrum-agent-core')
-  const def = getAgentDefinition(profile)
-  if (!def) {
-    return {
-      allow: null,
-      deny: new Set<string>(),
-      warning:
-        `[fulcrum/mcp] WARNING: --profile '${profile}' — no agent definition found for this role.\n` +
-        `  Role-based tool filtering is DISABLED; all tools matching other filters will be served.\n` +
-        `  Run: fulcrum agent definition list\n`,
-    }
-  }
-
-  return {
-    allow: def.tools_allow === null ? null : def.tools_allow.map(name => normalizeActionName(name)),
-    deny: new Set((def.tools_deny ?? []).map(name => normalizeActionName(name))),
-  }
-}
-
 export async function buildMcpExposurePlan(
   request: McpExposureRequest = {},
 ): Promise<McpExposurePlan> {
-  const mode = request.mode ?? 'filtered'
-  const runtimeCapabilities = new Set(request.runtimeCapabilities ?? [])
-  const includeActions = new Set((request.includeActions ?? []).map(name => normalizeActionName(name)))
-  const excludeActions = new Set((request.excludeActions ?? []).map(name => normalizeActionName(name)))
-  const rolePolicy = await resolveRolePolicy(request.profile ?? request.agentType)
-  if (rolePolicy.warning) process.stderr.write(rolePolicy.warning)
-
-  const decisions = listActionDefinitions().map((action): McpExposureDecision => {
-    const reasons: string[] = []
-    let exposed = true
-
-    if (!matchesExplicitSets(action.action_name, includeActions, excludeActions)) {
-      exposed = false
-      reasons.push(includeActions.size > 0 ? 'not_in_explicit_include_set' : 'explicitly_excluded')
-    }
-
-    if (exposed && !matchesPlatform(action, request.platform)) {
-      exposed = false
-      reasons.push(`platform_filtered:${request.platform}`)
-    }
-
-    if (exposed && !matchesAgentType(action, request.agentType)) {
-      exposed = false
-      reasons.push(`agent_type_filtered:${request.agentType}`)
-    }
-
-    if (exposed && !matchesRuntimeCapabilities(action, request.platform, mode, runtimeCapabilities)) {
-      exposed = false
-      reasons.push(runtimeCapabilities.has('hooks') && action.hooks.coverage === 'full'
-        ? 'hook_covered'
-        : 'runtime_capability_filtered')
-    }
-
-    if (exposed && rolePolicy.deny.has(action.action_name)) {
-      exposed = false
-      reasons.push('policy_deny')
-    }
-
-    if (exposed && rolePolicy.allow !== null && !rolePolicy.allow.includes(action.action_name)) {
-      exposed = false
-      reasons.push('policy_not_allowed')
-    }
-
-    if (exposed && mode === 'minimal' && includeActions.size === 0 && action.hooks.coverage === 'full') {
-      exposed = false
-      reasons.push('minimal_mode_prefers_hook_or_cli')
-    }
-
-    if (reasons.length === 0) reasons.push('exposed')
-
-    return {
-      toolName: action.mcp.toolName ?? action.action_name,
-      actionName: action.action_name,
-      exposed,
-      reasons,
-    }
-  })
-
-  const allowedToolNames = new Set(decisions.filter(decision => decision.exposed).map(decision => decision.toolName))
-  return {
-    mode,
-    decisions,
-    filter: (schema: import('./mcp-tools.js').ToolSchema) => allowedToolNames.has(schema.name),
-  }
+  return buildMcpExposurePlanFromDefinitions(listActionDefinitions(), request)
 }
 
 // ─────────────────────────── Helpers ────────────────────────────────────────
@@ -934,257 +746,7 @@ TOOL_REGISTRY.set('query_memory', {
   },
 })
 
-// v2a PR 2 Task 13 — search_code action.
-TOOL_REGISTRY.set('search_code', {
-  schema: TOOL_SCHEMA_MAP.get('search_code'),
-  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { searchCode } = await import('fulcrum-memory')
-    const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
-    const envelope = await searchCode({
-      workspace_id: ws,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-      text: args['text'] as string | undefined,
-      symbol: args['symbol'] as string | undefined,
-      lang: args['lang'] as string | undefined,
-      path: args['path'] as string | undefined,
-      package: args['package'] as string | undefined,
-      module: args['module'] as string | undefined,
-      dependency: args['dependency'] as string | undefined,
-      changed_files: args['changed_files'] as string[] | undefined,
-      scope: args['scope'] as 'session' | 'project' | 'workspace' | 'global' | undefined,
-      min_score: args['min_score'] as number | undefined,
-      limit: args['limit'] as number | undefined,
-      caller_run_id: deps.trusted_caller_run_id,
-      caller_role: deps.trusted_caller_role,
-      explain: args['explain'] === undefined ? undefined : Boolean(args['explain']),
-      persist: args['persist'] === undefined ? undefined : Boolean(args['persist']),
-    })
-    return stripNullish(envelope)
-  },
-})
-
-function stripNullish<T>(value: T): T {
-  if (Array.isArray(value)) return value.map(item => stripNullish(item)) as T
-  if (!value || typeof value !== 'object') return value
-  const out: Record<string, unknown> = {}
-  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-    if (nested === null || nested === undefined) continue
-    out[key] = stripNullish(nested)
-  }
-  return out as T
-}
-
-TOOL_REGISTRY.set('get_rag_rebuild_plan', {
-  schema: TOOL_SCHEMA_MAP.get('get_rag_rebuild_plan'),
-  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { executeRagRebuildCommand } = await import('./commands/memory-rag-lifecycle.js')
-    return executeRagRebuildCommand({
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-      mode: 'plan',
-      runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
-      domains: args['domains'] as RagRebuildDomain[] | undefined,
-      allow_empty: args['allow_empty'] as boolean | undefined,
-      actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
-    })
-  },
-})
-
-TOOL_REGISTRY.set('get_rag_rebuild_dry_run', {
-  schema: TOOL_SCHEMA_MAP.get('get_rag_rebuild_dry_run'),
-  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { executeRagRebuildCommand } = await import('./commands/memory-rag-lifecycle.js')
-    return executeRagRebuildCommand({
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-      mode: 'dry_run',
-      runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
-      domains: args['domains'] as RagRebuildDomain[] | undefined,
-      allow_empty: args['allow_empty'] as boolean | undefined,
-      actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
-    })
-  },
-})
-
-TOOL_REGISTRY.set('start_rag_rebuild', {
-  schema: TOOL_SCHEMA_MAP.get('start_rag_rebuild'),
-  capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { executeRagRebuildCommand } = await import('./commands/memory-rag-lifecycle.js')
-    const trustedRole = (deps.trusted_caller_role ?? 'software_engineer') as AgentRole
-    return executeRagRebuildCommand({
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-      mode: 'execute',
-      runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
-      confirm_profile: args['confirm_profile'] as RuntimeDataProfile | undefined,
-      verification_refs: args['verification_refs'] as string[] | undefined,
-      domains: args['domains'] as RagRebuildDomain[] | undefined,
-      allow_empty: args['allow_empty'] as boolean | undefined,
-      actor: { kind: 'agent', role: trustedRole, id: deps.trusted_caller_run_id ?? 'mcp' },
-    })
-  },
-})
-
-TOOL_REGISTRY.set('get_runtime_profile_paths', {
-  schema: TOOL_SCHEMA_MAP.get('get_runtime_profile_paths'),
-  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async (args) => {
-    const { inspectRuntimeProfilePaths } = await import('./commands/memory-rag-lifecycle.js')
-    return inspectRuntimeProfilePaths({
-      profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
-    })
-  },
-})
-
-TOOL_REGISTRY.set('get_rag_rebuild_report', {
-  schema: TOOL_SCHEMA_MAP.get('get_rag_rebuild_report'),
-  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { getRagRebuildReport } = await import('./commands/memory-rag-lifecycle.js')
-    return getRagRebuildReport({
-      report_id: args['report_id'] as string,
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
-    }, args['runtime_profile'] ? undefined : deps.db)
-  },
-})
-
-TOOL_REGISTRY.set('get_rag_health', {
-  schema: TOOL_SCHEMA_MAP.get('get_rag_health'),
-  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { executeRagHealthCommand } = await import('./commands/memory-rag-health.js')
-    return executeRagHealthCommand({
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-      vault_path: args['vault_path'] as string | undefined,
-      runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
-      out_of_scope_domains: args['out_of_scope_domains'] as string[] | undefined,
-    }, args['runtime_profile'] ? undefined : deps.db)
-  },
-})
-
-TOOL_REGISTRY.set('get_rag_repair_plan', {
-  schema: TOOL_SCHEMA_MAP.get('get_rag_repair_plan'),
-  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { executeRagRepairPlanCommand } = await import('./commands/memory-rag-health.js')
-    return executeRagRepairPlanCommand({
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-      runtime_profile: args['runtime_profile'] as RuntimeDataProfile | undefined,
-    }, args['runtime_profile'] ? undefined : deps.db)
-  },
-})
-
-TOOL_REGISTRY.set('search_context', {
-  schema: TOOL_SCHEMA_MAP.get('search_context'),
-  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { searchContext } = await import('fulcrum-memory')
-    return searchContext({
-      query: args['query'] as string,
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-      limit: args['limit'] as number | undefined,
-      context_budget_tokens: args['context_budget_tokens'] as number | undefined,
-      explain: args['explain'] === undefined ? undefined : Boolean(args['explain']),
-      persist: args['persist'] === undefined ? undefined : Boolean(args['persist']),
-      include_graph: args['include_graph'] === undefined ? undefined : Boolean(args['include_graph']),
-      graph_mode: args['graph_mode'] as 'local' | 'global_summary' | 'drift' | undefined,
-      graph_depth: args['graph_depth'] as number | undefined,
-    }, deps.db)
-  },
-})
-
-TOOL_REGISTRY.set('run_rag_eval', {
-  schema: TOOL_SCHEMA_MAP.get('run_rag_eval'),
-  capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { executeRagEvalCommand } = await import('./commands/memory-rag-eval.js')
-    return executeRagEvalCommand({
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-      suite: args['suite'] as string,
-      include_model_heavy: args['include_model_heavy'] as boolean | undefined,
-      include_accelerator_heavy: args['include_accelerator_heavy'] as boolean | undefined,
-      trigger_source: args['trigger_source'] as 'local' | 'ci' | undefined,
-      trigger_scope: args['trigger_scope'] as 'rag_related' | 'non_rag' | 'manual' | undefined,
-      gate_required: args['gate_required'] as boolean | undefined,
-      actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
-    }, deps.db)
-  },
-})
-
-TOOL_REGISTRY.set('list_runtime_experiments', {
-  schema: TOOL_SCHEMA_MAP.get('list_runtime_experiments'),
-  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { listRuntimeExperimentsCommand } = await import('./commands/memory-runtime-experiments.js')
-    return listRuntimeExperimentsCommand({
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-      status: args['status'] as RuntimeExperimentStatus | undefined,
-      limit: args['limit'] as number | undefined,
-    }, deps.db)
-  },
-})
-
-TOOL_REGISTRY.set('get_runtime_experiment_report', {
-  schema: TOOL_SCHEMA_MAP.get('get_runtime_experiment_report'),
-  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { getRuntimeExperimentReportCommand } = await import('./commands/memory-runtime-experiments.js')
-    return getRuntimeExperimentReportCommand({
-      runtime_experiment_id: args['runtime_experiment_id'] as string,
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-    }, deps.db)
-  },
-})
-
-TOOL_REGISTRY.set('adopt_runtime_experiment', {
-  schema: TOOL_SCHEMA_MAP.get('adopt_runtime_experiment'),
-  capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { adoptRuntimeExperimentCommand } = await import('./commands/memory-runtime-experiments.js')
-    return adoptRuntimeExperimentCommand({
-      runtime_experiment_id: args['runtime_experiment_id'] as string,
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-    }, deps.db)
-  },
-})
-
-TOOL_REGISTRY.set('rollback_runtime_experiment', {
-  schema: TOOL_SCHEMA_MAP.get('rollback_runtime_experiment'),
-  capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { rollbackRuntimeExperimentCommand } = await import('./commands/memory-runtime-experiments.js')
-    return rollbackRuntimeExperimentCommand({
-      runtime_experiment_id: args['runtime_experiment_id'] as string,
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-    }, deps.db)
-  },
-})
-
-TOOL_REGISTRY.set('get_rag_query_trace', {
-  schema: TOOL_SCHEMA_MAP.get('get_rag_query_trace'),
-  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
-  handler: async (args, deps) => {
-    const { readRagQueryTrace } = await import('fulcrum-memory')
-    return readRagQueryTrace({
-      query_trace_id: args['query_trace_id'] as string,
-      workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
-      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
-    }, deps.db)
-  },
-})
+registerRagToolEntries(TOOL_REGISTRY)
 
 TOOL_REGISTRY.set('start_embedding_job', {
   schema: TOOL_SCHEMA_MAP.get('start_embedding_job'),
