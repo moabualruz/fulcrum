@@ -3,6 +3,8 @@ import type { Db } from 'fulcrum-agent-core'
 import { readGraphEvidenceUnits, type GraphEvidenceUnit } from '../graph/evidence.js'
 import { pathFingerprintForRoadmap, redactRagDetails, redactRoadmapArtifact } from '../setup/rag-redaction.js'
 import { packContext, type ContextPack } from './context-pack.js'
+import { loadBaselineSemanticRanks, type BaselineSemanticRanks } from './planner/baseline-lane.js'
+import { boundedRankScore, rankCandidates, sumStageScores } from './planner/fusion.js'
 import { startSearchPlannerExecution } from './planner/planner.js'
 import { persistSearchContextObservability } from './planner/observability.js'
 import type {
@@ -90,35 +92,38 @@ export async function searchContext(input: SearchContextInput, db: Db = getDb())
   const terms = tokenize(planner.query)
   const includeGraph = planner.include_graph !== false
   const graphMode = normalizeGraphMode(planner.graph_mode)
+  const semanticRanks = await loadBaselineSemanticRanks({
+    query: planner.query,
+    workspace_id: planner.workspace_id,
+    project_id: planner.project_id,
+    limit: STAGE_CANDIDATE_LIMIT,
+  }, db)
   const graphUnits = includeGraph ? readGraphEvidenceUnits({
     workspace_id: planner.workspace_id,
     project_id: planner.project_id,
   }, db).filter(unit => unit.freshness !== 'failed') : []
   const graphNames = includeGraph ? loadGraphNames(planner.workspace_id, terms, db) : new Map<string, string>()
   const candidates = [
-    ...memoryCandidates(planner, db),
-    ...codeCandidates(planner, db),
+    ...memoryCandidates(planner, db, Array.from(semanticRanks.memory.keys())),
+    ...codeCandidates(planner, db, Array.from(semanticRanks.code.keys())),
     ...taskCandidates(planner, db),
     ...(includeGraph ? graphEvidenceCandidates(planner, graphUnits) : []),
   ]
 
-  scoreCandidates(candidates, terms, graphNames, planner, db, includeGraph)
+  scoreCandidates(candidates, terms, graphNames, semanticRanks, includeGraph)
   const graphExpansion = includeGraph
     ? expandGraphCandidates({ input: planner, graphMode, graphUnits, candidates, terms })
     : { candidates: [], skipped_stages: [{ stage: 'graph', reason: 'graph expansion disabled' }], graph_contributions: [] }
   candidates.push(...graphExpansion.candidates)
-  scoreCandidates(graphExpansion.candidates, terms, graphNames, planner, db, includeGraph)
+  scoreCandidates(graphExpansion.candidates, terms, graphNames, semanticRanks, includeGraph)
 
   const stageSummaries = summarizeStages(candidates)
-  const skipped_stages = skippedStages(stageSummaries, graphExpansion.skipped_stages)
-  const ranked = candidates
-    .map(candidate => ({
-      candidate,
-      score: totalScore(candidate.stage_scores),
-    }))
-    .filter(item => item.score > 0)
-    .sort((a, b) => b.score - a.score || a.candidate.title.localeCompare(b.candidate.title))
-    .slice(0, limit)
+  const skipped_stages = skippedStages(stageSummaries, [...semanticRanks.skipped_stages, ...graphExpansion.skipped_stages])
+  const ranked = rankCandidates(candidates, {
+    limit,
+    score: candidate => sumStageScores(candidate.stage_scores),
+    tieBreaker: candidate => candidate.title,
+  })
 
   const results = ranked.map((item, index) => toResult(item.candidate, item.score, index + 1, skipped_stages.length > 0))
   const stages = buildTraceStages(stageSummaries, skipped_stages, Date.now() - started, results)
@@ -146,7 +151,7 @@ export async function searchContext(input: SearchContextInput, db: Db = getDb())
       weights: {
         lexical: 1,
         contextual_text: 1.4,
-        semantic: 0.2,
+        semantic: 1.2,
         metadata_freshness: 1,
         graph: 1,
         graph_local: 0.8,
@@ -186,9 +191,9 @@ export async function searchContext(input: SearchContextInput, db: Db = getDb())
   }
 }
 
-function memoryCandidates(input: SearchContextInput, db: Db): Candidate[] {
-  const contextIds = matchingContextualSourceIds(input, ['memory', 'decision'], db)
-  const filter = queryFilter(['kind', 'title', 'summary', 'content', 'file_path', 'symbol_path'], 'memory_id', input.query, contextIds)
+function memoryCandidates(input: SearchContextInput, db: Db, semanticIds: string[] = []): Candidate[] {
+  const sourceIds = mergeSourceIds(matchingContextualSourceIds(input, ['memory', 'decision'], db), semanticIds)
+  const filter = queryFilter(['kind', 'title', 'summary', 'content', 'file_path', 'symbol_path'], 'memory_id', input.query, sourceIds)
   if (!filter) return []
   const rows = db.prepare(`
     SELECT memory_id, kind, title, summary, content, content_hash, freshness,
@@ -230,9 +235,9 @@ function memoryCandidates(input: SearchContextInput, db: Db): Candidate[] {
   })
 }
 
-function codeCandidates(input: SearchContextInput, db: Db): Candidate[] {
-  const contextIds = matchingContextualSourceIds(input, ['code_chunk', 'file_chunk'], db)
-  const filter = queryFilter(['file_path', 'symbol_path', 'content'], 'chunk_id', input.query, contextIds)
+function codeCandidates(input: SearchContextInput, db: Db, semanticIds: string[] = []): Candidate[] {
+  const sourceIds = mergeSourceIds(matchingContextualSourceIds(input, ['code_chunk', 'file_chunk'], db), semanticIds)
+  const filter = queryFilter(['file_path', 'symbol_path', 'content'], 'chunk_id', input.query, sourceIds)
   if (!filter) return []
   const rows = db.prepare(`
     SELECT chunk_id, file_path, source_type, content, content_hash,
@@ -318,17 +323,16 @@ function scoreCandidates(
   candidates: Candidate[],
   terms: string[],
   graphNames: Map<string, string>,
-  input: SearchContextInput,
-  db: Db,
+  semanticRanks: BaselineSemanticRanks,
   includeGraph: boolean,
 ): void {
   for (const candidate of candidates) {
     candidate.stage_scores['lexical'] = lexicalScore(terms, candidate.search_text)
     candidate.stage_scores['contextual_text'] = lexicalScore(terms, candidate.contextual_text) * 1.4
     candidate.stage_scores['graph'] = includeGraph ? graphContribution(candidate, graphNames, terms) : 0
+    candidate.stage_scores['semantic'] = semanticContribution(candidate, semanticRanks)
     const hasQueryEvidence = Object.values(candidate.stage_scores).some(score => score > 0)
     candidate.stage_scores['metadata_freshness'] = hasQueryEvidence ? candidate.freshness_score : 0
-    candidate.stage_scores['semantic'] = hasQueryEvidence && hasCurrentVectorMetadata(candidate, input.workspace_id, db) ? 0.2 : 0
   }
 }
 
@@ -677,20 +681,24 @@ function currentContextualText(
   return row?.index_text ?? ''
 }
 
-function hasCurrentVectorMetadata(candidate: Candidate, workspaceId: string, db: Db): boolean {
-  const domain = candidate.type === 'decision' ? 'memory' : candidate.type
+function semanticContribution(candidate: Candidate, semanticRanks: BaselineSemanticRanks): number {
   const sourceId = candidate.source_ref.source_id
-  if (!sourceId) return false
-  const row = db.prepare(`
-    SELECT 1
-      FROM vector_metadata
-     WHERE workspace_id = ?
-       AND source_domain = ?
-       AND source_id = ?
-       AND status = 'current'
-     LIMIT 1
-  `).get(workspaceId, domain, sourceId) as { 1: number } | undefined
-  return Boolean(row)
+  if (!sourceId) return 0
+  if (candidate.type === 'memory' || candidate.type === 'decision') {
+    return boundedRankScore(semanticRanks.memory.get(sourceId) ?? 0)
+  }
+  if (candidate.type === 'code_chunk' || candidate.type === 'file_chunk') {
+    return boundedRankScore(semanticRanks.code.get(sourceId) ?? 0)
+  }
+  return 0
+}
+
+function mergeSourceIds(...lists: string[][]): string[] {
+  return Array.from(new Set(lists.flat().filter(Boolean)))
+}
+
+function totalScore(stageScores: Record<string, number>): number {
+  return sumStageScores(stageScores)
 }
 
 function loadGraphNames(workspaceId: string, terms: string[], db: Db): Map<string, string> {
@@ -799,15 +807,11 @@ function lexicalScore(terms: string[], text: string): number {
   return matched / terms.length
 }
 
-function totalScore(stageScores: Record<string, number>): number {
-  return Object.values(stageScores).reduce((sum, score) => sum + score, 0)
-}
-
 function skippedStages(
   stageSummaries: Map<string, { candidate_count: number; limit: number }>,
-  graphSkipped: Array<{ stage: string; reason: string }> = [],
+  explicitSkipped: Array<{ stage: string; reason: string }> = [],
 ): Array<{ stage: string; reason: string }> {
-  const skipped: Array<{ stage: string; reason: string }> = [...graphSkipped]
+  const skipped: Array<{ stage: string; reason: string }> = [...explicitSkipped]
   const skippedStageNames = new Set(skipped.map(stage => stage.stage))
   for (const stage of ['semantic', 'graph']) {
     if (skippedStageNames.has(stage)) continue

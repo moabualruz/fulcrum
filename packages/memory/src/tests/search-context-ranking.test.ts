@@ -1,16 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { getDb } from 'fulcrum-agent-core'
-import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
+import { createTestDb, registerStubEmbedder, resetTestDb, seedWorkspaceAndProject, unregisterStubEmbedder } from './helpers.js'
+import { storeEmbeddingInVec } from '../l2/embed.js'
 import { searchContext } from '../retrieval/search-context.js'
 import { writeVectorMetadata } from '../l2/vector-metadata.js'
 import { writeContextualIndexRecord } from '../retrieval/contextual-index.js'
 
-beforeEach(() => {
+beforeEach(async () => {
   const db = createTestDb()
   seedWorkspaceAndProject(db)
+  await registerStubEmbedder()
 })
 
 afterEach(() => {
+  unregisterStubEmbedder()
   resetTestDb()
 })
 
@@ -44,6 +47,7 @@ describe('searchContext hybrid fusion', () => {
       vector_table: 'vec_memories',
       status: 'current',
     })
+    await storeEmbeddingInVec(db, 'mem_rank', 'Canonical repair plan keeps runtime fallback visible.')
     writeContextualIndexRecord({
       workspace_id: 'ws_1',
       project_id: 'proj_1',

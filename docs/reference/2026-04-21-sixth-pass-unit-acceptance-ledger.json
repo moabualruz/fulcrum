@@ -68837,6 +68837,146 @@
       "closed_at": "2026-04-23T17:15:00.000Z"
     },
     {
+      "id": "package_source_file:packages_memory_src_retrieval_planner_baseline_lane_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/retrieval/planner/baseline-lane.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/retrieval/planner/baseline-lane.ts"
+      ],
+      "required_verifier": "package production source file covered by targeted package suite and surface inventory",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm --filter fulcrum-memory test -- --run src/tests/search-planner-lanes.test.ts src/tests/search-context-ranking.test.ts src/tests/search-context-contract.test.ts src/tests/search-planner-readonly.test.ts src/tests/search-context-graph-local.test.ts src/tests/search-context-graph-modes.test.ts src/tests/search-context-graph-explain.test.ts src/tests/search-context-explain.test.ts src/tests/contextual-index.test.ts",
+        "pnpm --filter fulcrum-scripts exec vitest run surface-inventory.test.ts"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:10:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_retrieval_planner_contract_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/retrieval/planner/contract.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/retrieval/planner/contract.ts"
+      ],
+      "required_verifier": "package production source file covered by targeted package suite and surface inventory",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm --filter fulcrum-memory test",
+        "pnpm --filter fulcrum-scripts exec vitest run surface-inventory.test.ts"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:10:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_retrieval_planner_fusion_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/retrieval/planner/fusion.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/retrieval/planner/fusion.ts"
+      ],
+      "required_verifier": "package production source file covered by targeted package suite and surface inventory",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm --filter fulcrum-memory test -- --run src/tests/search-planner-lanes.test.ts src/tests/search-context-ranking.test.ts src/tests/search-context-contract.test.ts src/tests/search-planner-readonly.test.ts src/tests/search-context-graph-local.test.ts src/tests/search-context-graph-modes.test.ts src/tests/search-context-graph-explain.test.ts src/tests/search-context-explain.test.ts src/tests/contextual-index.test.ts",
+        "pnpm --filter fulcrum-scripts exec vitest run surface-inventory.test.ts"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:10:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_retrieval_planner_observability_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/retrieval/planner/observability.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/retrieval/planner/observability.ts"
+      ],
+      "required_verifier": "package production source file covered by targeted package suite and surface inventory",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm --filter fulcrum-memory test",
+        "pnpm --filter fulcrum-scripts exec vitest run surface-inventory.test.ts"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:10:00.000Z"
+    },
+    {
+      "id": "package_source_file:packages_memory_src_retrieval_planner_planner_ts",
+      "type": "package_source_file",
+      "unit": "packages/memory/src/retrieval/planner/planner.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/retrieval/planner/planner.ts"
+      ],
+      "required_verifier": "package production source file covered by targeted package suite and surface inventory",
+      "reviewer_skills": [
+        "api-contract-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm --filter fulcrum-memory test",
+        "pnpm --filter fulcrum-scripts exec vitest run surface-inventory.test.ts"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:10:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_search_planner_lanes_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/search-planner-lanes.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/search-planner-lanes.test.ts"
+      ],
+      "required_verifier": "package test file covered by targeted package suite and surface inventory",
+      "reviewer_skills": [
+        "code-review-and-quality",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm --filter fulcrum-memory test -- --run src/tests/search-planner-lanes.test.ts src/tests/search-context-ranking.test.ts src/tests/search-context-contract.test.ts src/tests/search-planner-readonly.test.ts src/tests/search-context-graph-local.test.ts src/tests/search-context-graph-modes.test.ts src/tests/search-context-graph-explain.test.ts src/tests/search-context-explain.test.ts src/tests/contextual-index.test.ts",
+        "pnpm --filter fulcrum-scripts exec vitest run surface-inventory.test.ts"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:10:00.000Z"
+    },
+    {
+      "id": "package_test_file:packages_memory_src_tests_search_planner_readonly_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/search-planner-readonly.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/search-planner-readonly.test.ts"
+      ],
+      "required_verifier": "package test file covered by targeted package suite and surface inventory",
+      "reviewer_skills": [
+        "code-review-and-quality",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm --filter fulcrum-memory test -- --run src/tests/search-planner-lanes.test.ts src/tests/search-context-ranking.test.ts src/tests/search-context-contract.test.ts src/tests/search-planner-readonly.test.ts src/tests/search-context-graph-local.test.ts src/tests/search-context-graph-modes.test.ts src/tests/search-context-graph-explain.test.ts src/tests/search-context-explain.test.ts src/tests/contextual-index.test.ts",
+        "pnpm --filter fulcrum-scripts exec vitest run surface-inventory.test.ts"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-23T21:10:00.000Z"
+    },
+    {
       "id": "package_source_file:packages_memory_src_retrieval_context_types_ts",
       "type": "package_source_file",
       "unit": "packages/memory/src/retrieval/context-types.ts",
@@ -68859,7 +68999,7 @@
     }
   ],
   "status_counts": {
-    "accepted": 3276
+    "accepted": 3283
   },
   "last_closure_run": {
     "date": "2026-04-21",
