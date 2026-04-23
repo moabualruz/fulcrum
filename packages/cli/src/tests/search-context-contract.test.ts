@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { _configureDb, closeDb, runMigrations, setDb } from 'fulcrum-agent-core'
 import { persistGraphEvidenceUnit } from 'fulcrum-memory'
+import { TOOL_SCHEMA_MAP } from '../mcp-tools.js'
 import { TOOL_REGISTRY, type HandlerDeps } from '../tool-registry.js'
 
 const originalArgv = process.argv
@@ -46,6 +47,15 @@ afterEach(() => {
 })
 
 describe('search context CLI/action contract', () => {
+  it('marks search_context as read-default in schema and registry metadata', () => {
+    const schema = TOOL_SCHEMA_MAP.get('search_context')
+    const entry = TOOL_REGISTRY.get('search_context')
+
+    expect(schema?.annotations?.readOnlyHint).toBe(true)
+    expect(schema?.description).toContain('Read-only by default')
+    expect(entry?.capabilities.readOnly).toBe(true)
+  })
+
   it('runs search_context registry handler with read-only default deps and explain output', async () => {
     const db = installDb()
     seedUnifiedContext(db)

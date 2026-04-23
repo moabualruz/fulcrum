@@ -10,6 +10,7 @@ import { getCodeEmbedder, getDb } from 'fulcrum-agent-core'
 import { redactRoadmapArtifact } from '../setup/rag-redaction.js'
 import { buildCodeSearchExplanation, type RagRecallExplanation } from './explain.js'
 import { shouldPersistPlannerArtifacts } from './planner/contract.js'
+import { startSearchPlannerExecution } from './planner/planner.js'
 import { persistRagQueryTrace, redactQueryForTrace, type QueryTraceStage } from './query-trace.js'
 
 type CodeParseStatus = 'parsed' | 'skipped' | 'failed'
@@ -553,28 +554,29 @@ function persistSearchCodeTrace(input: {
 }
 
 export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Promise<SearchCodeResponse> {
+  const planner = startSearchPlannerExecution(input)
   const started = Date.now()
-  const limit = normalizedLimit(input.limit)
-  const minScore = input.min_score ?? 0
+  const limit = normalizedLimit(planner.limit)
+  const minScore = planner.min_score ?? 0
   const fetchLimit = Math.max(limit * 6, 50)
   const skipped: Array<{ stage: string; reason: string }> = []
-  const { where, params } = baseWhere(input)
+  const { where, params } = baseWhere(planner)
 
-  const ftsRanks = ftsStage(db, input, where, params, fetchLimit)
-  const vectorRanks = await vectorStage(db, input, where, params, fetchLimit, skipped)
-  const hintRanks = hintStage(db, input, where, params, fetchLimit)
+  const ftsRanks = ftsStage(db, planner, where, params, fetchLimit)
+  const vectorRanks = await vectorStage(db, planner, where, params, fetchLimit, skipped)
+  const hintRanks = hintStage(db, planner, where, params, fetchLimit)
   const candidateIds = new Set<string>([...ftsRanks.keys(), ...vectorRanks.keys(), ...hintRanks.keys()])
-  const hasHints = Boolean(input.path || input.symbol || input.lang || input['package'] || input.module || input.dependency || input.changed_files?.length)
-  if (input.text?.trim() && candidateIds.size === 0 && !hasHints) {
+  const hasHints = Boolean(planner.path || planner.symbol || planner.lang || planner['package'] || planner.module || planner.dependency || planner.changed_files?.length)
+  if (planner.text?.trim() && candidateIds.size === 0 && !hasHints) {
     const response: SearchCodeResponse = { results: [], reason: 'no_match' }
-    const failures = matchingFailureStages(db, input)
+    const failures = matchingFailureStages(db, planner)
     const allSkipped = [...skipped, ...failures]
     if (allSkipped.length > 0) response.skipped_stages = allSkipped
-    if (input.explain && input.project_id && shouldPersistPlannerArtifacts(input)) {
+    if (planner.explain && planner.project_id && shouldPersistPlannerArtifacts(planner)) {
       response.query_trace_id = persistSearchCodeTrace({
-        request: input,
-        workspace_id: input.workspace_id,
-        project_id: input.project_id,
+        request: planner,
+        workspace_id: planner.workspace_id,
+        project_id: planner.project_id,
         fetchLimit,
         ftsRanks,
         vectorRanks,
@@ -591,21 +593,21 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
 
   let rows: CandidateRow[]
   try {
-    rows = fetchCandidateRows(db, input, where, params, candidateIds, Math.max(fetchLimit, candidateIds.size))
+    rows = fetchCandidateRows(db, planner, where, params, candidateIds, Math.max(fetchLimit, candidateIds.size))
   } catch {
     return { results: [], reason: 'no_match' }
   }
 
   if (rows.length === 0) {
     const response: SearchCodeResponse = { results: [], reason: 'no_match' }
-    const failures = matchingFailureStages(db, input)
+    const failures = matchingFailureStages(db, planner)
     const allSkipped = [...skipped, ...failures]
     if (allSkipped.length > 0) response.skipped_stages = allSkipped
-    if (input.explain && input.project_id && shouldPersistPlannerArtifacts(input)) {
+    if (planner.explain && planner.project_id && shouldPersistPlannerArtifacts(planner)) {
       response.query_trace_id = persistSearchCodeTrace({
-        request: input,
-        workspace_id: input.workspace_id,
-        project_id: input.project_id,
+        request: planner,
+        workspace_id: planner.workspace_id,
+        project_id: planner.project_id,
         fetchLimit,
         ftsRanks,
         vectorRanks,
@@ -620,28 +622,28 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
     return response
   }
 
-  const symbolRanks = input.symbol
-    ? rankByPredicate(rows, row => Boolean(row.symbol_path?.includes(input.symbol!)), row => {
+  const symbolRanks = planner.symbol
+    ? rankByPredicate(rows, row => Boolean(row.symbol_path?.includes(planner.symbol!)), row => {
       const symbol = row.symbol_path ?? ''
-      if (symbol === input.symbol) return 0
-      if (symbol.endsWith(`.${input.symbol}`) || symbol.endsWith(`:${input.symbol}`)) return 1
+      if (symbol === planner.symbol) return 0
+      if (symbol.endsWith(`.${planner.symbol}`) || symbol.endsWith(`:${planner.symbol}`)) return 1
       return 2
     })
     : new Map<string, number>()
-  const pathRanks = input.path
-    ? rankByPredicate(rows, row => hasPathMatch(row.rel_path, input.path!), row => normalizePath(row.rel_path).length)
+  const pathRanks = planner.path
+    ? rankByPredicate(rows, row => hasPathMatch(row.rel_path, planner.path!), row => normalizePath(row.rel_path).length)
     : new Map<string, number>()
-  const packageRanks = input['package']
-    ? rankByPredicate(rows, row => hasPackageMatch(row.rel_path, input['package']!), row => normalizePath(row.rel_path).indexOf(normalizePath(input['package']!)))
+  const packageRanks = planner['package']
+    ? rankByPredicate(rows, row => hasPackageMatch(row.rel_path, planner['package']!), row => normalizePath(row.rel_path).indexOf(normalizePath(planner['package']!)))
     : new Map<string, number>()
-  const moduleRanks = input.module
-    ? rankByPredicate(rows, row => hasModuleMatch(row.rel_path, input.module!), row => normalizePath(row.rel_path).indexOf(input.module!))
+  const moduleRanks = planner.module
+    ? rankByPredicate(rows, row => hasModuleMatch(row.rel_path, planner.module!), row => normalizePath(row.rel_path).indexOf(planner.module!))
     : new Map<string, number>()
-  const dependencyRanks = input.dependency
-    ? rankByPredicate(rows, row => hasDependencyMatch(row.content, input.dependency!))
+  const dependencyRanks = planner.dependency
+    ? rankByPredicate(rows, row => hasDependencyMatch(row.content, planner.dependency!))
     : new Map<string, number>()
-  const changedFileRanks = input.changed_files?.length
-    ? rankByPredicate(rows, row => hasChangedFileMatch(row.rel_path, input.changed_files!))
+  const changedFileRanks = planner.changed_files?.length
+    ? rankByPredicate(rows, row => hasChangedFileMatch(row.rel_path, planner.changed_files!))
     : new Map<string, number>()
   const recencyRanks = stageRankFromRows([...rows]
     .sort((a, b) => indexedTime(b.indexed_at) - indexedTime(a.indexed_at) || a.chunk_id.localeCompare(b.chunk_id))
@@ -686,7 +688,7 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
         stage_contributions: stageContributions(stage_scores, ranks),
         runtime_truth: runtimeTruth(db, row.chunk_id),
       }
-      if (input.explain) {
+      if (planner.explain) {
         const explanationScores = Object.fromEntries(
           Object.entries(ranks).map(([stage, rank]) => [stage, rank === null ? null : stage_scores[stage] ?? null]),
         ) as Record<string, number | null>
@@ -710,13 +712,13 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
   const filtered = minScore > 0 ? results.filter(r => r.score >= minScore) : results
   if (filtered.length === 0) {
     const response: SearchCodeResponse = { results: [], reason: 'below_floor' }
-    const allSkipped = [...skipped, ...matchingFailureStages(db, input)]
+    const allSkipped = [...skipped, ...matchingFailureStages(db, planner)]
     if (allSkipped.length > 0) response.skipped_stages = allSkipped
-    if (input.explain && input.project_id && shouldPersistPlannerArtifacts(input)) {
+    if (planner.explain && planner.project_id && shouldPersistPlannerArtifacts(planner)) {
       response.query_trace_id = persistSearchCodeTrace({
-        request: input,
-        workspace_id: input.workspace_id,
-        project_id: input.project_id,
+        request: planner,
+        workspace_id: planner.workspace_id,
+        project_id: planner.project_id,
         fetchLimit,
         ftsRanks,
         vectorRanks,
@@ -731,18 +733,20 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
     return response
   }
 
-  filtered.forEach((r, idx) => {
-    logRecallEvent(db, r.chunk_id, input.text ?? input.symbol ?? input.path ?? '', idx + 1, r.score, input.caller_run_id, input.caller_role)
-  })
+  if (planner.persist) {
+    filtered.forEach((r, idx) => {
+      logRecallEvent(db, r.chunk_id, searchCodeQuery(planner), idx + 1, r.score, planner.caller_run_id, planner.caller_role)
+    })
+  }
 
   const response: SearchCodeResponse = { results: filtered }
-  const allSkipped = [...skipped, ...matchingFailureStages(db, input)]
+  const allSkipped = [...skipped, ...matchingFailureStages(db, planner)]
   if (allSkipped.length > 0) response.skipped_stages = allSkipped
-  if (input.explain && shouldPersistPlannerArtifacts(input)) {
+  if (planner.explain && shouldPersistPlannerArtifacts(planner)) {
     response.query_trace_id = persistSearchCodeTrace({
-      request: input,
-      workspace_id: input.workspace_id,
-      project_id: input.project_id ?? filtered[0]?.project_id ?? '',
+      request: planner,
+      workspace_id: planner.workspace_id,
+      project_id: planner.project_id ?? filtered[0]?.project_id ?? '',
       fetchLimit,
       ftsRanks,
       vectorRanks,

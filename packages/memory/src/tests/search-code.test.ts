@@ -57,9 +57,16 @@ describe('searchCode — v2a PR 2 Task 13', () => {
     expect(out.results[0]!.language).toBe('python')
   })
 
-  it('inserts memory_recall_events with source=search_code', async () => {
+  it('does not insert memory_recall_events by default', async () => {
     seedChunk({ chunk_id: 'c1', file_path: 'src/a.ts', content: 'authenticate' })
     await searchCode({ workspace_id: 'ws_1', project_id: 'proj_1', text: 'authenticate' })
+    const sources = (db.prepare(`SELECT DISTINCT source FROM memory_recall_events`).all() as { source: string }[]).map(r => r.source)
+    expect(sources).not.toContain('search_code')
+  })
+
+  it('persists memory_recall_events only when explicitly requested', async () => {
+    seedChunk({ chunk_id: 'c1', file_path: 'src/a.ts', content: 'authenticate' })
+    await searchCode({ workspace_id: 'ws_1', project_id: 'proj_1', text: 'authenticate', persist: true })
     const sources = (db.prepare(`SELECT DISTINCT source FROM memory_recall_events`).all() as { source: string }[]).map(r => r.source)
     expect(sources).toContain('search_code')
   })

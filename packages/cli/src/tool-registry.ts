@@ -943,7 +943,7 @@ TOOL_REGISTRY.set('search_code', {
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const envelope = await searchCode({
       workspace_id: ws,
-      project_id: args['project_id'] as string | undefined,
+      project_id: (args['project_id'] as string | undefined) ?? deps.project_id,
       text: args['text'] as string | undefined,
       symbol: args['symbol'] as string | undefined,
       lang: args['lang'] as string | undefined,
@@ -958,6 +958,7 @@ TOOL_REGISTRY.set('search_code', {
       caller_run_id: deps.trusted_caller_run_id,
       caller_role: deps.trusted_caller_role,
       explain: args['explain'] === undefined ? undefined : Boolean(args['explain']),
+      persist: args['persist'] === undefined ? undefined : Boolean(args['persist']),
     })
     return stripNullish(envelope)
   },
@@ -1082,7 +1083,7 @@ TOOL_REGISTRY.set('get_rag_repair_plan', {
 
 TOOL_REGISTRY.set('search_context', {
   schema: TOOL_SCHEMA_MAP.get('search_context'),
-  capabilities: { readOnly: false, destructive: false, hookEquivalent: false },
+  capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args, deps) => {
     const { searchContext } = await import('fulcrum-memory')
     return searchContext({

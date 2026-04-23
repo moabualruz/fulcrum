@@ -156,6 +156,7 @@ describe('searchCode roadmap ranking signals', () => {
       project_id: 'proj_code_rank',
       text: 'redaction ranking token /home/mkh/private/source.ts token=sk-proj-secretsecretsecretsecretsecretsecretsecretsecret',
       explain: true,
+      persist: true,
       limit: 1,
     }, db)
 

@@ -44,6 +44,7 @@ describe('search_code roadmap CLI/action contract', () => {
     const schema = TOOL_SCHEMA_MAP.get('search_code')
     expect(schema).toBeDefined()
     expect(schema?.annotations?.readOnlyHint).toBe(true)
+    expect(schema?.description).toContain('Read-only by default')
     expect(schema?.inputSchema.properties).toMatchObject({
       text: expect.any(Object),
       path: expect.any(Object),
@@ -53,6 +54,7 @@ describe('search_code roadmap CLI/action contract', () => {
       dependency: expect.any(Object),
       changed_files: expect.any(Object),
       explain: expect.any(Object),
+      persist: expect.any(Object),
     })
   })
 
@@ -133,5 +135,28 @@ describe('search_code roadmap CLI/action contract', () => {
       'dependency',
       'changed_file',
     ]))
+  })
+
+  it('keeps search_code telemetry read-only by default and opt-in when persist=true', async () => {
+    const entry = TOOL_REGISTRY.get('search_code')!
+    const before = (db.prepare('SELECT COUNT(*) AS n FROM memory_recall_events WHERE source = ?').get('search_code') as { n: number }).n
+
+    await entry.handler({
+      text: 'searchCodeRoadmapContract',
+      explain: true,
+    }, deps())
+
+    expect(entry.capabilities.readOnly).toBe(true)
+    const afterReadonly = (db.prepare('SELECT COUNT(*) AS n FROM memory_recall_events WHERE source = ?').get('search_code') as { n: number }).n
+    expect(afterReadonly).toBe(before)
+
+    await entry.handler({
+      text: 'searchCodeRoadmapContract',
+      explain: true,
+      persist: true,
+    }, deps())
+
+    const afterPersist = (db.prepare('SELECT COUNT(*) AS n FROM memory_recall_events WHERE source = ?').get('search_code') as { n: number }).n
+    expect(afterPersist).toBeGreaterThan(afterReadonly)
   })
 })

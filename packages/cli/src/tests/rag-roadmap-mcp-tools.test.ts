@@ -20,7 +20,7 @@ describe('RAG roadmap MCP/action metadata', () => {
 
     expect(TOOL_SCHEMA_MAP.get('search_context')?.inputSchema.properties).toHaveProperty('persist')
     expect(TOOL_SCHEMA_MAP.get('search_context')?.description).toContain('Read-only by default')
-    expect(TOOL_REGISTRY.get('search_context')?.capabilities.readOnly).toBe(false)
+    expect(TOOL_REGISTRY.get('search_context')?.capabilities.readOnly).toBe(true)
     expect(TOOL_REGISTRY.get('search_context')?.capabilities.destructive).toBe(false)
     expect(TOOL_SCHEMA_MAP.get('run_rag_eval')?.annotations?.readOnlyHint).not.toBe(true)
     expect(TOOL_REGISTRY.get('run_rag_eval')?.capabilities.readOnly).toBe(false)

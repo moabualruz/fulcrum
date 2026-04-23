@@ -1,8 +1,9 @@
-import { getDb, newId } from 'fulcrum-agent-core'
+import { getDb } from 'fulcrum-agent-core'
 import type { Db } from 'fulcrum-agent-core'
 import { readGraphEvidenceUnits, type GraphEvidenceUnit } from '../graph/evidence.js'
 import { pathFingerprintForRoadmap, redactRagDetails, redactRoadmapArtifact } from '../setup/rag-redaction.js'
 import { packContext, type ContextPack } from './context-pack.js'
+import { startSearchPlannerExecution } from './planner/planner.js'
 import { persistSearchContextObservability } from './planner/observability.js'
 import type {
   ContextFreshness,
@@ -83,29 +84,30 @@ function normalizeGraphMode(value: SearchContextInput['graph_mode'] | undefined)
 }
 
 export async function searchContext(input: SearchContextInput, db: Db = getDb()): Promise<SearchContextResponse> {
+  const planner = startSearchPlannerExecution(input)
   const started = Date.now()
-  const limit = Math.max(1, Math.min(input.limit ?? DEFAULT_LIMIT, 50))
-  const terms = tokenize(input.query)
-  const includeGraph = input.include_graph !== false
-  const graphMode = normalizeGraphMode(input.graph_mode)
+  const limit = Math.max(1, Math.min(planner.limit ?? DEFAULT_LIMIT, 50))
+  const terms = tokenize(planner.query)
+  const includeGraph = planner.include_graph !== false
+  const graphMode = normalizeGraphMode(planner.graph_mode)
   const graphUnits = includeGraph ? readGraphEvidenceUnits({
-    workspace_id: input.workspace_id,
-    project_id: input.project_id,
+    workspace_id: planner.workspace_id,
+    project_id: planner.project_id,
   }, db).filter(unit => unit.freshness !== 'failed') : []
-  const graphNames = includeGraph ? loadGraphNames(input.workspace_id, terms, db) : new Map<string, string>()
+  const graphNames = includeGraph ? loadGraphNames(planner.workspace_id, terms, db) : new Map<string, string>()
   const candidates = [
-    ...memoryCandidates(input, db),
-    ...codeCandidates(input, db),
-    ...taskCandidates(input, db),
-    ...(includeGraph ? graphEvidenceCandidates(input, graphUnits) : []),
+    ...memoryCandidates(planner, db),
+    ...codeCandidates(planner, db),
+    ...taskCandidates(planner, db),
+    ...(includeGraph ? graphEvidenceCandidates(planner, graphUnits) : []),
   ]
 
-  scoreCandidates(candidates, terms, graphNames, input, db, includeGraph)
+  scoreCandidates(candidates, terms, graphNames, planner, db, includeGraph)
   const graphExpansion = includeGraph
-    ? expandGraphCandidates({ input, graphMode, graphUnits, candidates, terms })
+    ? expandGraphCandidates({ input: planner, graphMode, graphUnits, candidates, terms })
     : { candidates: [], skipped_stages: [{ stage: 'graph', reason: 'graph expansion disabled' }], graph_contributions: [] }
   candidates.push(...graphExpansion.candidates)
-  scoreCandidates(graphExpansion.candidates, terms, graphNames, input, db, includeGraph)
+  scoreCandidates(graphExpansion.candidates, terms, graphNames, planner, db, includeGraph)
 
   const stageSummaries = summarizeStages(candidates)
   const skipped_stages = skippedStages(stageSummaries, graphExpansion.skipped_stages)
@@ -120,21 +122,21 @@ export async function searchContext(input: SearchContextInput, db: Db = getDb())
 
   const results = ranked.map((item, index) => toResult(item.candidate, item.score, index + 1, skipped_stages.length > 0))
   const stages = buildTraceStages(stageSummaries, skipped_stages, Date.now() - started, results)
-  const query_trace_id = newId('rag_query_trace')
+  const query_trace_id = planner.query_trace_id
   let graph_contributions = finalizeGraphContributions(graphExpansion.graph_contributions, results, undefined)
   let context_pack: ContextPack | undefined
-  if (input.context_budget_tokens !== undefined) {
-    const packed = packContext(results, input.context_budget_tokens)
+  if (planner.context_budget_tokens !== undefined) {
+    const packed = packContext(results, planner.context_budget_tokens)
     context_pack = { ...packed, query_trace_id }
     graph_contributions = finalizeGraphContributions(graph_contributions, results, context_pack)
   }
 
   persistSearchContextObservability({
-    persist: input.persist,
+    persist: planner.persist,
     query_trace_id,
-    workspace_id: input.workspace_id,
-    project_id: input.project_id,
-    query: input.query,
+    workspace_id: planner.workspace_id,
+    project_id: planner.project_id,
+    query: planner.query,
     stages,
     results,
     fusion: {

@@ -168,7 +168,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     title: 'Search Code',
     name: 'search_code',
-    description: 'Focused code retrieval over code_chunks with FTS, vec_chunks, path, symbol, package/module, dependency, changed-file, recency, line range, and parse/vector status evidence. Backward compatible with existing text/path/symbol callers.',
+    description: 'Focused code retrieval over code_chunks with FTS, vec_chunks, path, symbol, package/module, dependency, changed-file, recency, line range, and parse/vector status evidence. Read-only by default; set persist=true for redacted trace and recall-event persistence.',
     annotations: { readOnlyHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -187,6 +187,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         min_score: { type: 'number', description: 'Minimum fused score' },
         limit: { type: 'number', description: 'Max results; default 20' },
         explain: { type: 'boolean', description: 'Include retrieval stage ranks/scores and source explanation' },
+        persist: { type: 'boolean', description: 'Persist redacted query traces and recall-event telemetry' },
       },
     },
     outputSchema: {
@@ -354,7 +355,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     title: 'Search Context',
     name: 'search_context',
     description: 'Agent-preferred unified context search over memory, code, file, graph, task, and decision evidence. Read-only by default; set persist=true for redacted trace/result persistence.',
-    annotations: { idempotentHint: false },
+    annotations: { readOnlyHint: true },
     inputSchema: {
       type: 'object',
       properties: {
