@@ -216,6 +216,32 @@ CREATE TABLE IF NOT EXISTS context_items (
   schema_version TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS graph_links (
+  graph_link_id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  source_type TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  relation TEXT NOT NULL,
+  source_ref_json TEXT NOT NULL,
+  target_ref_json TEXT NOT NULL,
+  evidence_ref_json TEXT,
+  reason TEXT NOT NULL,
+  freshness TEXT NOT NULL,
+  limitation TEXT,
+  confidence REAL,
+  derived INTEGER NOT NULL DEFAULT 0,
+  redaction_status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  schema_version TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_graph_links_project ON graph_links(project_id);
+CREATE INDEX IF NOT EXISTS idx_graph_links_source ON graph_links(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_graph_links_target ON graph_links(target_type, target_id);
+
 CREATE TABLE IF NOT EXISTS memory_entries (
   memory_id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(project_id),
@@ -257,25 +283,6 @@ CREATE TABLE IF NOT EXISTS code_evidence (
   linked_context_item_ids_json TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL,
   stale_at TEXT
-);
-
-CREATE TABLE IF NOT EXISTS graph_links (
-  link_id TEXT PRIMARY KEY,
-  source_type TEXT NOT NULL,
-  source_id TEXT NOT NULL,
-  target_type TEXT NOT NULL,
-  target_id TEXT NOT NULL,
-  relationship_type TEXT NOT NULL,
-  evidence_ref TEXT,
-  freshness TEXT NOT NULL,
-  provenance_json TEXT NOT NULL DEFAULT '{}',
-  confidence REAL,
-  limitation TEXT,
-  derived INTEGER NOT NULL DEFAULT 0,
-  rebuild_source TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  schema_version TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS worktree_allocations (

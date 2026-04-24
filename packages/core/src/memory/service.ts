@@ -15,6 +15,7 @@ import {
   type MemorySearchResult
 } from "@fulcrum/memory";
 import { exportMemoryWithProvenance, type MemoryExportRecord } from "./export.js";
+import type { GraphLinkWriters } from "../graph/link-writers.js";
 
 export interface MemoryRepositoryPort {
   save(entry: MemoryEntry): MemoryEntry;
@@ -41,7 +42,8 @@ export class MemoryService {
       new MarkdownMemoryAdapter(),
       new MemsearchMemoryAdapter(),
       new EngramMemoryAdapter()
-    ]
+    ],
+    private readonly graphLinks?: GraphLinkWriters
   ) {
     this.adapters = Object.fromEntries(adapters.map((adapter) => [adapter.backend, adapter]));
   }
@@ -103,6 +105,7 @@ export class MemoryService {
         })
       )
     );
+    this.graphLinks?.memory(entry);
     return {
       entry,
       policyDecision: evaluatePolicy({
@@ -137,7 +140,7 @@ export class MemoryService {
       return { entry: current, policyDecision };
     }
     return {
-      entry: this.repository.save({
+      entry: this.saveWithGraph({
         ...current,
         status: "active",
         approvedBy: input.requester ?? "operator",
@@ -156,7 +159,7 @@ export class MemoryService {
     if (!current) {
       throw new Error(`Memory not found: ${memoryId}`);
     }
-    return this.repository.save({
+    return this.saveWithGraph({
       ...current,
       status: "stale",
       freshness: "stale",
@@ -165,6 +168,12 @@ export class MemoryService {
         : `Stale reason: ${reason}`,
       updatedAt: new Date().toISOString()
     });
+  }
+
+  private saveWithGraph(entry: MemoryEntry): MemoryEntry {
+    const saved = this.repository.save(entry);
+    this.graphLinks?.memory(saved);
+    return saved;
   }
 
   markStaleForMissingSources(projectId: string): MemoryEntry[] {

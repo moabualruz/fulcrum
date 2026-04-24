@@ -7,6 +7,7 @@ import {
   FileQualityGateRepository,
   FileContextPackRepository,
   FileExternalWorkItemMirrorRepository,
+  FileGraphLinkRepository,
   FileRunRepository,
   FileTaskRepository,
   FileWorktreeRepository,
@@ -22,6 +23,9 @@ import {
   RunLifecycleService,
   WorktreeAllocationService,
   WorktreeStatusService,
+  GraphLinkService,
+  GraphLinkWriters,
+  TraceabilityQueryService,
   resolveSetupPaths
 } from "@fulcrum/core";
 import { searchExact, searchSemantic } from "@fulcrum/code-tools";
@@ -34,6 +38,10 @@ const projectRepository = new FileProjectRepository(work);
 export const runRepository = new FileRunRepository(work);
 export const serverQualityGateRepository = new FileQualityGateRepository(work);
 const worktreeRepository = new FileWorktreeRepository(work);
+const graphRepository = new FileGraphLinkRepository(work);
+export const serverGraphService = new GraphLinkService(graphRepository);
+export const serverGraphLinkWriters = new GraphLinkWriters(serverGraphService);
+export const serverTraceabilityService = new TraceabilityQueryService(graphRepository);
 
 export const serverTaskService = new LocalTaskService(taskRepository);
 export const serverProjectService = new ProjectRegistryService(
@@ -53,13 +61,19 @@ export const serverRunService = new RunLifecycleService(
   runRepository,
   taskRepository,
   serverWorktreeAllocationService,
-  worktreeRepository
+  worktreeRepository,
+  serverGraphLinkWriters
 );
-export const serverMemoryService = new MemoryService(new FileMemoryRepository(work));
+export const serverMemoryService = new MemoryService(
+  new FileMemoryRepository(work),
+  undefined,
+  serverGraphLinkWriters
+);
 export const serverContextBuilder = new ContextPackBuilder(
   new FileContextPackRepository(work),
   taskRepository,
-  projectRepository
+  projectRepository,
+  serverGraphLinkWriters
 );
 export const serverCodeService = new CodeEvidenceService(
   projectRepository,
@@ -67,8 +81,21 @@ export const serverCodeService = new CodeEvidenceService(
   {
     search: (options) => searchExact(options)
   },
-  searchSemantic
+  searchSemantic,
+  serverGraphLinkWriters
 );
+export function serverGraphRebuildSources(projectId: string) {
+  const state = work.read();
+  return {
+    tasks: state.tasks.filter((task) => task.projectId === projectId),
+    memories: state.memoryEntries.filter((entry) => entry.projectId === projectId),
+    codeEvidence: state.codeEvidence.filter((evidence) => evidence.projectId === projectId),
+    runs: state.runs.filter((run) => run.projectId === projectId),
+    contextPacks: state.contextPacks.filter((pack) => pack.projectId === projectId),
+    contextItems: state.contextItems,
+    qualityResults: state.qualityGateResults.filter((result) => result.projectId === projectId)
+  };
+}
 const planeAdapter =
   process.env.FULCRUM_PLANE_BASE_URL && process.env.FULCRUM_PLANE_TOKEN
     ? new PlaneApiAdapter({

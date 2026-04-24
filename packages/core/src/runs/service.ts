@@ -10,6 +10,7 @@ import {
 import type { TaskRepositoryPort } from "../tasks/service.js";
 import type { WorktreeAllocationService } from "../worktrees/allocation.js";
 import type { WorktreeRepositoryPort } from "../worktrees/status.js";
+import type { GraphLinkWriters } from "../graph/link-writers.js";
 
 export interface RunRepositoryPort {
   save(run: Run): Run;
@@ -41,7 +42,8 @@ export class RunLifecycleService {
     private readonly runs: RunRepositoryPort,
     private readonly tasks: Pick<TaskRepositoryPort, "get" | "save">,
     private readonly worktreeAllocator?: WorktreeAllocationService,
-    private readonly worktrees?: WorktreeRepositoryPort
+    private readonly worktrees?: WorktreeRepositoryPort,
+    private readonly graphLinks?: GraphLinkWriters
   ) {}
 
   start(input: StartRunInput): Run {
@@ -88,6 +90,7 @@ export class RunLifecycleService {
     }
     this.append(run, "run.created", "Run created.", "info");
     this.append(run, "run.started", "Run supervision started.", "info");
+    this.graphLinks?.run(run);
     return run;
   }
 
@@ -161,7 +164,7 @@ export class RunLifecycleService {
     const qualityGateIds = mergeIds(run.qualityGateIds, input.qualityGateIds);
     const policyDecisionIds = mergeIds(run.policyDecisionIds, input.policyDecisionIds);
     if (input.outcome === "failed") {
-      return this.toTerminal(run, "failed", "run.failed", input.summary, {
+      const failed = this.toTerminal(run, "failed", "run.failed", input.summary, {
         summary: input.summary,
         failureReason: input.summary,
         finalOutcome: input.outcome,
@@ -170,6 +173,8 @@ export class RunLifecycleService {
         qualityGateIds,
         policyDecisionIds
       });
+      this.graphLinks?.run(failed);
+      return failed;
     }
     const succeeded = this.runs.save({
       ...run,
@@ -182,10 +187,12 @@ export class RunLifecycleService {
       policyDecisionIds,
       updatedAt: new Date().toISOString()
     });
-    return this.toTerminal(succeeded, "completed", "run.completed", input.summary, {
+    const completed = this.toTerminal(succeeded, "completed", "run.completed", input.summary, {
       summary: input.summary,
       finalOutcome: input.outcome
     });
+    this.graphLinks?.run(completed);
+    return completed;
   }
 
   get(runId: string): Run | undefined {

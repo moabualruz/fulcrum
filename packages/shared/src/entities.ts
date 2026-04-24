@@ -290,6 +290,80 @@ export const QualityGateResultSchema = BaseEntitySchema.extend({
   redactionStatus: RedactionStatusSchema
 });
 
+export const GraphNodeTypeSchema = z.enum([
+  "task",
+  "memory",
+  "code",
+  "run",
+  "artifact",
+  "context_pack",
+  "context_item",
+  "quality_gate",
+  "policy_decision",
+  "project"
+]);
+
+export const GraphLinkSchema = BaseEntitySchema.extend({
+  graphLinkId: FulcrumIdSchema,
+  projectId: FulcrumIdSchema,
+  sourceType: GraphNodeTypeSchema,
+  sourceId: z.string(),
+  targetType: GraphNodeTypeSchema,
+  targetId: z.string(),
+  relation: z.enum([
+    "depends_on",
+    "references",
+    "produced",
+    "used",
+    "affected",
+    "validated_by",
+    "governed_by",
+    "derived_from",
+    "explains",
+    "supersedes"
+  ]),
+  sourceRef: SourceRefSchema,
+  targetRef: SourceRefSchema,
+  evidenceRef: SourceRefSchema.optional(),
+  reason: z.string(),
+  freshness: z.enum(["fresh", "stale", "unknown"]).default("fresh"),
+  limitation: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  derived: z.boolean().default(false),
+  redactionStatus: RedactionStatusSchema
+});
+
+export const BackupManifestSchema = z.object({
+  backupId: FulcrumIdSchema,
+  createdAt: TimestampSchema,
+  sourceStateRoot: z.string(),
+  includedRecords: z.record(z.number().int().nonnegative()).default({}),
+  includedArtifacts: z.array(SourceRefSchema).default([]),
+  includedLogs: z.array(SourceRefSchema).default([]),
+  includedMemory: z.array(SourceRefSchema).default([]),
+  includedContextPacks: z.array(FulcrumIdSchema).default([]),
+  integrityStatus: z.enum(["valid", "invalid", "partial"]),
+  restoreTarget: z.string().optional(),
+  redactionStatus: RedactionStatusSchema,
+  purgeApprovalDecisionId: FulcrumIdSchema.optional(),
+  localRef: z.string(),
+  contentHash: z.string(),
+  schemaVersion: SchemaVersionSchema
+});
+
+export const ExportRecordSchema = z.object({
+  exportId: FulcrumIdSchema,
+  format: z.enum(["json", "jsonl"]),
+  includedEntityClasses: z.array(z.string()).default([]),
+  createdAt: TimestampSchema,
+  localRef: z.string(),
+  redactionStatus: RedactionStatusSchema,
+  provenanceCoverage: z.enum(["complete", "partial", "none"]),
+  policyDecisionId: FulcrumIdSchema.optional(),
+  contentHash: z.string(),
+  schemaVersion: SchemaVersionSchema
+});
+
 export type Project = z.infer<typeof ProjectSchema>;
 export type SetupState = z.infer<typeof SetupStateSchema>;
 export type Task = z.infer<typeof TaskSchema>;
@@ -302,3 +376,7 @@ export type MemoryEntry = z.infer<typeof MemoryEntrySchema>;
 export type WorktreeAllocation = z.infer<typeof WorktreeAllocationSchema>;
 export type QualityGateDefinition = z.infer<typeof QualityGateDefinitionSchema>;
 export type QualityGateResult = z.infer<typeof QualityGateResultSchema>;
+export type BackupManifest = z.infer<typeof BackupManifestSchema>;
+export type ExportRecord = z.infer<typeof ExportRecordSchema>;
+export type GraphNodeType = z.infer<typeof GraphNodeTypeSchema>;
+export type GraphLink = z.infer<typeof GraphLinkSchema>;

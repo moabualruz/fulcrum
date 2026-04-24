@@ -276,20 +276,20 @@
 
 ### Tests And Validation for User Story 12
 
-- [ ] T142 [P] [US12] Add backup and restore contract tests in `tests/contract/recovery-contract.test.ts`
-- [ ] T143 [P] [US12] Add backup/restore integration test in `tests/recovery/backup-restore.test.ts`
-- [ ] T144 [P] [US12] Add rebuild derived data test in `tests/recovery/rebuild-derived-data.test.ts`
-- [ ] T145 [P] [US12] Add reset and uninstall destructive preview policy test in `tests/policy/reset-uninstall-preview.test.ts`
+- [x] T142 [P] [US12] Add backup and restore contract tests in `tests/contract/recovery-contract.test.ts`
+- [x] T143 [P] [US12] Add backup/restore integration test in `tests/recovery/backup-restore.test.ts`
+- [x] T144 [P] [US12] Add rebuild derived data test in `tests/recovery/rebuild-derived-data.test.ts`
+- [x] T145 [P] [US12] Add reset and uninstall destructive preview policy test in `tests/policy/reset-uninstall-preview.test.ts`
 
 ### Implementation for User Story 12
 
-- [ ] T146 [US12] Implement backup manifest service and repository in `packages/core/src/recovery/backup.ts` and `packages/db/src/backups.ts`
-- [ ] T147 [US12] Implement restore validation service in `packages/core/src/recovery/restore.ts`
-- [ ] T148 [US12] Implement export service with provenance and redaction status in `packages/core/src/recovery/export.ts`
-- [ ] T149 [US12] Implement rebuild orchestration for indexes, projections, repo maps, memory indexes, code refs, and context previews in `packages/core/src/recovery/rebuild.ts`
-- [ ] T150 [US12] Implement reset and uninstall preview service in `packages/core/src/recovery/reset-uninstall.ts`
-- [ ] T151 [US12] Implement backup, restore, export, rebuild, reset, and uninstall CLI commands in `apps/cli/src/commands/recovery.ts`
-- [ ] T152 [US12] Implement recovery API routes and cockpit recovery view in `apps/server/src/routes/recovery.ts` and `apps/cockpit/src/routes/recovery.tsx`
+- [x] T146 [US12] Implement backup manifest service and repository in `packages/core/src/recovery/backup.ts` and `packages/db/src/backups.ts`
+- [x] T147 [US12] Implement restore validation service in `packages/core/src/recovery/restore.ts`
+- [x] T148 [US12] Implement export service with provenance and redaction status in `packages/core/src/recovery/export.ts`
+- [x] T149 [US12] Implement rebuild orchestration for indexes, projections, repo maps, memory indexes, code refs, and context previews in `packages/core/src/recovery/rebuild.ts`
+- [x] T150 [US12] Implement reset and uninstall preview service in `packages/core/src/recovery/reset-uninstall.ts`
+- [x] T151 [US12] Implement backup, restore, export, rebuild, reset, and uninstall CLI commands in `apps/cli/src/commands/recovery.ts`
+- [x] T152 [US12] Implement recovery API routes and cockpit recovery view in `apps/server/src/routes/recovery.ts` and `apps/cockpit/src/routes/recovery.tsx`
 
 ## Phase 13: User Story 3 - Mirror Optional External Project Management (Priority: P2)
 
@@ -322,20 +322,20 @@
 
 ### Tests And Validation for User Story 8
 
-- [ ] T164 [P] [US8] Add graph link contract tests in `tests/contract/graph-links.test.ts`
-- [ ] T165 [P] [US8] Add traceability query integration test in `tests/integration/traceability-queries.test.ts`
-- [ ] T166 [P] [US8] Add graph projection rebuild recovery test in `tests/recovery/graph-rebuild.test.ts`
-- [ ] T167 [P] [US8] Add stale evidence limitation display test in `tests/integration/graph-stale-limitations.test.ts`
+- [x] T164 [P] [US8] Add graph link contract tests in `tests/contract/graph-links.test.ts`
+- [x] T165 [P] [US8] Add traceability query integration test in `tests/integration/traceability-queries.test.ts`
+- [x] T166 [P] [US8] Add graph projection rebuild recovery test in `tests/recovery/graph-rebuild.test.ts`
+- [x] T167 [P] [US8] Add stale evidence limitation display test in `tests/integration/graph-stale-limitations.test.ts`
 
 ### Implementation for User Story 8
 
-- [ ] T168 [US8] Implement graph link repository in `packages/db/src/graph-links.ts`
-- [ ] T169 [US8] Implement graph link service and rebuild source mapping in `packages/core/src/graph/service.ts`
-- [ ] T170 [US8] Implement traceability query service for context, memory, code, run, artifact, and policy links in `packages/core/src/graph/queries.ts`
-- [ ] T171 [US8] Implement graph CLI commands in `apps/cli/src/commands/graph.ts`
-- [ ] T172 [US8] Implement graph API routes in `apps/server/src/routes/graph.ts`
-- [ ] T173 [US8] Implement cockpit traceability view in `apps/cockpit/src/routes/traceability.tsx`
-- [ ] T174 [US8] Integrate graph links into context, memory, code, run, artifact, quality, and policy services in `packages/core/src/graph/link-writers.ts`
+- [x] T168 [US8] Implement graph link repository in `packages/db/src/graph-links.ts`
+- [x] T169 [US8] Implement graph link service and rebuild source mapping in `packages/core/src/graph/service.ts`
+- [x] T170 [US8] Implement traceability query service for context, memory, code, run, artifact, and policy links in `packages/core/src/graph/queries.ts`
+- [x] T171 [US8] Implement graph CLI commands in `apps/cli/src/commands/graph.ts`
+- [x] T172 [US8] Implement graph API routes in `apps/server/src/routes/graph.ts`
+- [x] T173 [US8] Implement cockpit traceability view in `apps/cockpit/src/routes/traceability.tsx`
+- [x] T174 [US8] Integrate graph links into context, memory, code, run, artifact, quality, and policy services in `packages/core/src/graph/link-writers.ts`
 
 ## Phase 15: User Story 13 - Use Agent-Facing MCP And Machine Interfaces (Priority: P2)
 
@@ -345,20 +345,20 @@
 
 ### Tests And Validation for User Story 13
 
-- [ ] T175 [P] [US13] Add MCP tool schema contract tests in `tests/contract/mcp-tools.test.ts`
-- [ ] T176 [P] [US13] Add stdio MCP validation-agent integration test in `tests/integration/mcp-stdio-agent.test.ts`
-- [ ] T177 [P] [US13] Add MCP policy bypass prevention test in `tests/policy/mcp-policy-gates.test.ts`
-- [ ] T178 [P] [US13] Add MCP/cockpit/CLI parity test in `tests/integration/mcp-surface-parity.test.ts`
+- [x] T175 [P] [US13] Add MCP tool schema contract tests in `tests/contract/mcp-tools.test.ts`
+- [x] T176 [P] [US13] Add stdio MCP validation-agent integration test in `tests/integration/mcp-stdio-agent.test.ts`
+- [x] T177 [P] [US13] Add MCP policy bypass prevention test in `tests/policy/mcp-policy-gates.test.ts`
+- [x] T178 [P] [US13] Add MCP/cockpit/CLI parity test in `tests/integration/mcp-surface-parity.test.ts`
 
 ### Implementation for User Story 13
 
-- [ ] T179 [US13] Implement MCP stdio server with TypeScript SDK in `packages/mcp/src/server.ts`
-- [ ] T180 [US13] Implement MCP task, run, heartbeat, event, context, memory, code, artifact, quality, policy, worktree, and doctor tools in `packages/mcp/src/tools.ts`
-- [ ] T181 [US13] Implement MCP resources for projects, tasks, runs, context packs, artifacts, and doctor in `packages/mcp/src/resources.ts`
-- [ ] T182 [US13] Implement structured MCP error mapping in `packages/mcp/src/errors.ts`
-- [ ] T183 [US13] Wire MCP CLI/server command entrypoints in `apps/cli/src/commands/mcp.ts` and `apps/server/src/mcp.ts`
-- [ ] T184 [US13] Document local stdio and loopback MCP configuration in `docs/mcp-local.md`
-- [ ] T185 [US13] Add MCP tool visibility and permissions display to cockpit adapter settings in `apps/cockpit/src/routes/adapters.tsx`
+- [x] T179 [US13] Implement MCP stdio server with TypeScript SDK in `packages/mcp/src/server.ts`
+- [x] T180 [US13] Implement MCP task, run, heartbeat, event, context, memory, code, artifact, quality, policy, worktree, and doctor tools in `packages/mcp/src/tools.ts`
+- [x] T181 [US13] Implement MCP resources for projects, tasks, runs, context packs, artifacts, and doctor in `packages/mcp/src/resources.ts`
+- [x] T182 [US13] Implement structured MCP error mapping in `packages/mcp/src/errors.ts`
+- [x] T183 [US13] Wire MCP CLI/server command entrypoints in `apps/cli/src/commands/mcp.ts` and `apps/server/src/mcp.ts`
+- [x] T184 [US13] Document local stdio and loopback MCP configuration in `docs/mcp-local.md`
+- [x] T185 [US13] Add MCP tool visibility and permissions display to cockpit adapter settings in `apps/cockpit/src/routes/adapters.tsx`
 
 ## Phase 16: User Story 14 - Operate With Optional Adapters And Degraded Capabilities (Priority: P2)
 

@@ -9,6 +9,7 @@ import {
   type Task
 } from "@fulcrum/shared";
 import { estimateBudget, rankContextItems } from "./ranking.js";
+import type { GraphLinkWriters } from "../graph/link-writers.js";
 
 type SourceRef = ContextItem["sourceRef"];
 
@@ -47,7 +48,8 @@ export class ContextPackBuilder {
   constructor(
     private readonly repository: ContextPackRepositoryPort,
     private readonly tasks: ContextTaskPort,
-    private readonly projects: ContextProjectPort
+    private readonly projects: ContextProjectPort,
+    private readonly graphLinks?: GraphLinkWriters
   ) {}
 
   build(input: ContextBuildInput): ContextBuildResult {
@@ -186,7 +188,9 @@ export class ContextPackBuilder {
 
     this.repository.savePack(pack);
     this.repository.saveItems(items);
-    return { pack, items };
+    const result = { pack, items };
+    this.graphLinks?.context(result);
+    return result;
   }
 
   get(contextPackId: string): ContextBuildResult | undefined {

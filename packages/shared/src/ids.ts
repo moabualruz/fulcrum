@@ -10,6 +10,7 @@ export const idPrefixes = [
   "evt",
   "ctx",
   "ctxi",
+  "gl",
   "mem",
   "evid",
   "wt",
@@ -20,7 +21,13 @@ export const idPrefixes = [
   "adapter",
   "mirror",
   "draft",
-  "preview"
+  "preview",
+  "backup",
+  "export",
+  "restore",
+  "rebuild",
+  "reset",
+  "uninstall"
 ] as const;
 
 export const IdPrefixSchema = z.enum(idPrefixes);

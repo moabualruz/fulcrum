@@ -23,6 +23,14 @@ interface AdapterEntry {
   };
 }
 
+interface McpToolEntry {
+  name: string;
+  aliases: string[];
+  permission: "read" | "write" | "policy_gated";
+  description: string;
+  visibleInCockpit: boolean;
+}
+
 const fallbackAdapters: AdapterEntry[] = [
   {
     metadata: {
@@ -49,6 +57,7 @@ const fallbackAdapters: AdapterEntry[] = [
 
 export function AdaptersRoute() {
   const [adapters, setAdapters] = useState<AdapterEntry[]>(fallbackAdapters);
+  const [mcpTools, setMcpTools] = useState<McpToolEntry[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "degraded">("loading");
 
   async function loadAdapters(shouldApply = () => true) {
@@ -70,6 +79,14 @@ export function AdaptersRoute() {
   useEffect(() => {
     let active = true;
     void loadAdapters(() => active);
+    void fetch("/api/v1/mcp/tools")
+      .then((response) => response.json() as Promise<{ data?: McpToolEntry[] }>)
+      .then((payload) => {
+        if (active && payload.data) setMcpTools(payload.data);
+      })
+      .catch(() => {
+        if (active) setMcpTools([]);
+      });
     return () => {
       active = false;
     };
@@ -129,6 +146,27 @@ export function AdaptersRoute() {
             </li>
           ))}
         </ul>
+      </section>
+      <section aria-label="MCP tool visibility and permissions">
+        <h2>MCP</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Tool</th>
+              <th>Permission</th>
+              <th>Aliases</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mcpTools.map((tool) => (
+              <tr key={tool.name}>
+                <td>{tool.name}</td>
+                <td>{tool.permission}</td>
+                <td>{tool.aliases.join(", ") || "none"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
     </main>
   );

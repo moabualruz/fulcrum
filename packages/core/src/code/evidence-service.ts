@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { makeId, type CodeEvidence, CodeEvidenceSchema, type Project } from "@fulcrum/shared";
 import { loadIgnoredPathPolicy, loadIgnoredPathPolicySync } from "../privacy/ignored-paths.js";
+import type { GraphLinkWriters } from "../graph/link-writers.js";
 
 export interface CodeSearchAdapter {
   search(options: {
@@ -55,7 +56,8 @@ export class CodeEvidenceService {
       state: string;
       capabilityId: "cap_semantic_code";
       nextAction: string;
-    }>
+    }>,
+    private readonly graphLinks?: GraphLinkWriters
   ) {}
 
   async search(input: {
@@ -106,6 +108,9 @@ export class CodeEvidenceService {
         })
       )
     );
+    for (const item of evidence) {
+      this.graphLinks?.code(item);
+    }
     const degraded = input.includeSemantic
       ? [
           await this.semanticSearch().then((semantic) => ({
@@ -137,11 +142,15 @@ export class CodeEvidenceService {
     }
     const staleAt = new Date().toISOString();
     const ignorePolicy = loadIgnoredPathPolicySync(project.rootPath);
-    return this.repository
+    const stale = this.repository
       .list(projectId)
       .filter((item) => !item.staleAt && this.isStale(project, item, ignorePolicy))
       .map((item) => this.repository.markStale(item.evidenceId, staleAt))
       .filter((item): item is CodeEvidence => Boolean(item));
+    for (const item of stale) {
+      this.graphLinks?.code(item);
+    }
+    return stale;
   }
 
   private isStale(

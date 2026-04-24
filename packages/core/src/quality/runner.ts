@@ -12,6 +12,7 @@ import {
   type QualityGateResult,
   type RunEvent
 } from "@fulcrum/shared";
+import type { GraphLinkWriters } from "../graph/link-writers.js";
 
 export interface QualityGateRepositoryPort {
   saveDefinition(definition: QualityGateDefinition): QualityGateDefinition;
@@ -57,7 +58,8 @@ export class QualityGateRunner {
     private readonly repository: QualityGateRepositoryPort,
     private readonly artifacts: QualityArtifactPort,
     private readonly events?: QualityEventPort,
-    private readonly runLinks?: QualityRunLinkPort
+    private readonly runLinks?: QualityRunLinkPort,
+    private readonly graphLinks?: GraphLinkWriters
   ) {}
 
   define(input: Omit<QualityGateDefinition, "createdAt" | "updatedAt" | "schemaVersion">) {
@@ -121,6 +123,7 @@ export class QualityGateRunner {
         schemaVersion: SCHEMA_VERSION
       });
       this.linkOrAppendCompleted(skipped, definition, input, "Quality gate skipped.", []);
+      this.graphLinks?.quality(skipped);
       return skipped;
     }
 
@@ -190,6 +193,7 @@ export class QualityGateRunner {
     this.linkOrAppendCompleted(result, definition, input, `Quality gate ${status}.`, [
       artifact.artifactId
     ]);
+    this.graphLinks?.quality(result);
     return result;
   }
 

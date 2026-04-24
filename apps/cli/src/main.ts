@@ -1,3 +1,4 @@
+import path from "node:path";
 import { Command } from "commander";
 import {
   buildAdapterDegradationSummary,
@@ -7,6 +8,13 @@ import {
   PolicyEnforcementService,
   QualityGateRunner,
   QualityReadinessEvaluator,
+  BackupManifestService,
+  FileBackupRepository,
+  FileExportRepository,
+  RebuildOrchestrator,
+  RecoveryExportService,
+  ResetUninstallPreviewService,
+  RestoreValidationService,
   RunQualityLinker,
   resolveSetupPaths,
   type ArtifactRepositoryPort
@@ -17,6 +25,7 @@ import {
   type PolicyDecision,
   type RunEvent
 } from "@fulcrum/shared";
+import { runFulcrumMcpStdio } from "@fulcrum/mcp";
 import {
   attachArtifactCommand,
   listRunArtifactsCommand,
@@ -71,6 +80,17 @@ import {
   enableAdapterCommand,
   listAdaptersCommand
 } from "./commands/adapter.js";
+import { rebuildGraphCommand, traceGraphCommand } from "./commands/graph.js";
+import {
+  createBackupCommand,
+  exportRecoveryCommand,
+  listBackupsCommand,
+  rebuildCommand,
+  resetPreviewCommand,
+  restoreBackupCommand,
+  uninstallPreviewCommand
+} from "./commands/recovery.js";
+import { listMcpToolsCommand } from "./commands/mcp.js";
 import { formatRedactionStatus } from "./output/redaction.js";
 import { createCliSetupPorts } from "./runtime.js";
 import {
@@ -85,7 +105,11 @@ import {
   runService,
   taskService,
   worktreeAllocationService,
-  worktreeStatusService
+  worktreeStatusService,
+  graphService,
+  graphLinkWriters,
+  traceabilityService,
+  graphRebuildSources
 } from "./work-runtime.js";
 
 class MemoryArtifactRepository implements ArtifactRepositoryPort {
@@ -202,19 +226,33 @@ program
 
 const artifactService = new ArtifactService(
   new MemoryArtifactRepository(),
-  new LocalArtifactStorage(resolveSetupPaths().artifactRoot)
+  new LocalArtifactStorage(resolveSetupPaths().artifactRoot),
+  graphLinkWriters
 );
 const qualityRunner = new QualityGateRunner(
   qualityGateRepository,
   artifactService,
   runService,
-  new RunQualityLinker(runRepository, qualityGateRepository)
+  new RunQualityLinker(runRepository, qualityGateRepository),
+  graphLinkWriters
 );
 const qualityReadiness = new QualityReadinessEvaluator(qualityGateRepository);
 const policyService = new PolicyEnforcementService(
   new MemoryPolicyDecisionRepository(),
-  new MemoryPolicyEventRepository()
+  new MemoryPolicyEventRepository(),
+  graphLinkWriters
 );
+const paths = resolveSetupPaths();
+const recoveryStoreFile = path.join(paths.stateRoot, "recovery-manifests.json");
+const backupRepository = new FileBackupRepository(recoveryStoreFile);
+const exportRepository = new FileExportRepository(recoveryStoreFile);
+const recoveryDeps = {
+  backups: new BackupManifestService(backupRepository),
+  restore: new RestoreValidationService(backupRepository),
+  exports: new RecoveryExportService(exportRepository),
+  rebuild: new RebuildOrchestrator(),
+  previews: new ResetUninstallPreviewService(policyService)
+};
 const artifactCommand = program.command("artifact").description("Attach, show, or list artifacts");
 
 artifactCommand
@@ -1022,5 +1060,248 @@ adapterCommand
         : `${data.adapterId} disabled`
     );
   });
+
+const backupCommand = program.command("backup").description("Create, list, and restore backups");
+
+backupCommand
+  .command("create")
+  .option("--state-root <path>", "state root", paths.stateRoot)
+  .option("--output-root <path>", "backup root", paths.backupRoot)
+  .option("--no-context-packs")
+  .action((options) => {
+    const data = createBackupCommand(recoveryDeps, {
+      stateRoot: options.stateRoot,
+      outputRoot: options.outputRoot,
+      includeContextPacks: options.contextPacks
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : data.backupId
+    );
+  });
+
+backupCommand.command("list").action(() => {
+  const data = listBackupsCommand(recoveryDeps);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+      : `${data.length} backups`
+  );
+});
+
+backupCommand
+  .command("restore <backupId>")
+  .requiredOption("--target <path>")
+  .action((backupId, options) => {
+    const data = restoreBackupCommand(recoveryDeps, { backupId, target: options.target });
+    console.log(
+      program.opts().json
+        ? JSON.stringify(
+            { schemaVersion: SCHEMA_VERSION, status: data.valid ? "ok" : "error", data },
+            null,
+            2
+          )
+        : data.nextAction
+    );
+  });
+
+program
+  .command("restore <backupId>")
+  .requiredOption("--target <path>")
+  .action((backupId, options) => {
+    const data = restoreBackupCommand(recoveryDeps, { backupId, target: options.target });
+    console.log(
+      program.opts().json
+        ? JSON.stringify(
+            { schemaVersion: SCHEMA_VERSION, status: data.valid ? "ok" : "error", data },
+            null,
+            2
+          )
+        : data.nextAction
+    );
+  });
+
+program
+  .command("export")
+  .option("--format <format>", "json or jsonl", "json")
+  .option("--output-root <path>", "export root", paths.stateRoot)
+  .option("--entity <entity...>", "entity classes to export")
+  .option("--policy-decision <policyDecisionId>")
+  .action((options) => {
+    const data = exportRecoveryCommand(recoveryDeps, {
+      outputRoot: options.outputRoot,
+      format: options.format,
+      stateRoot: paths.stateRoot,
+      entityClasses: options.entity ?? [
+        "projects",
+        "tasks",
+        "runs",
+        "artifacts",
+        "memory",
+        "policies"
+      ],
+      policyDecisionId: options.policyDecision
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : data.localRef
+    );
+  });
+
+const rebuildRoot = program.command("rebuild").description("Rebuild derived data");
+
+for (const name of ["projections", "memory-index", "code-cache"]) {
+  rebuildRoot.command(name).action(() => {
+    const data = rebuildCommand(recoveryDeps, {
+      projections: 1,
+      memory_indexes: name === "memory-index" ? 1 : 0,
+      code_refs: name === "code-cache" ? 1 : 0
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : `${data.steps.filter((step) => step.status === "rebuilt").length} rebuild steps`
+    );
+  });
+}
+
+const resetCommand = program.command("reset").description("Preview reset actions");
+
+resetCommand
+  .command("preview")
+  .option("--state-root <path>", "state root", paths.stateRoot)
+  .option("--purge-backups")
+  .action((options) => {
+    const data = resetPreviewCommand(recoveryDeps, {
+      stateRoot: options.stateRoot,
+      purgeBackups: Boolean(options.purgeBackups)
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : data.policyDecision?.status
+    );
+    process.exitCode = data.policyDecision?.status === "approval_required" ? 2 : 0;
+  });
+
+const uninstallCommand = program.command("uninstall").description("Preview uninstall actions");
+
+uninstallCommand
+  .command("preview")
+  .option("--state-root <path>", "state root", paths.stateRoot)
+  .option("--purge-backups")
+  .action((options) => {
+    const data = uninstallPreviewCommand(recoveryDeps, {
+      stateRoot: options.stateRoot,
+      purgeBackups: Boolean(options.purgeBackups)
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : data.policyDecision?.status
+    );
+    process.exitCode = data.policyDecision?.status === "approval_required" ? 2 : 0;
+  });
+
+const mcpCommand = program.command("mcp").description("Run or inspect Fulcrum MCP interface");
+
+mcpCommand
+  .command("stdio")
+  .description("Run local MCP stdio server")
+  .action(async () => {
+    const ports = await createCliSetupPorts();
+    await runFulcrumMcpStdio({
+      doctor: async (input) =>
+        doctorCommand({
+          setupRepository: ports.setupRepository,
+          setupState: await ports.latest(),
+          noNetwork: Boolean(input?.noNetwork),
+          extraCapabilities: [
+            await externalPmHealth(externalPmService.adapterHealthPort()),
+            ...(await buildAdapterDegradationSummary(adapterRegistry)).capabilities
+          ]
+        }),
+      projects: projectService,
+      tasks: taskService,
+      runs: runService,
+      context: contextBuilder,
+      memory: memoryService,
+      code: codeService,
+      artifacts: artifactService,
+      quality: qualityRunner,
+      policy: policyService,
+      worktrees: worktreeAllocationService,
+      worktreeStatus: worktreeStatusService
+    });
+  });
+
+mcpCommand
+  .command("tools")
+  .description("List MCP tool visibility and permissions")
+  .action(async () => {
+    const ports = await createCliSetupPorts();
+    const data = listMcpToolsCommand({
+      doctor: async (input) =>
+        doctorCommand({
+          setupRepository: ports.setupRepository,
+          setupState: await ports.latest(),
+          noNetwork: Boolean(input?.noNetwork)
+        }),
+      projects: projectService,
+      tasks: taskService,
+      runs: runService,
+      context: contextBuilder,
+      memory: memoryService,
+      code: codeService,
+      artifacts: artifactService,
+      quality: qualityRunner,
+      policy: policyService,
+      worktrees: worktreeAllocationService,
+      worktreeStatus: worktreeStatusService
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : data.map((tool) => `${tool.name}: ${tool.permission}`).join("\n")
+    );
+  });
+
+const graphCommand = program
+  .command("graph")
+  .description("Trace graph links and rebuild projections");
+const graphDeps = {
+  graph: graphService,
+  traceability: traceabilityService,
+  rebuildSources: graphRebuildSources
+};
+
+graphCommand
+  .command("trace <type> <id>")
+  .option("--depth <depth>")
+  .option("--include-stale")
+  .action((type, id, options) => {
+    const data = traceGraphCommand(graphDeps, {
+      type,
+      id,
+      depth: options.depth ? Number(options.depth) : undefined,
+      includeStale: Boolean(options.includeStale)
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : `${data.links.length} links`
+    );
+  });
+
+graphCommand.command("rebuild <projectId>").action((projectId) => {
+  const data = rebuildGraphCommand(graphDeps, projectId);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+      : `${data.length} graph links rebuilt`
+  );
+});
 
 program.parse();

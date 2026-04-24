@@ -1,3 +1,4 @@
+import path from "node:path";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import {
@@ -8,6 +9,13 @@ import {
   PolicyEnforcementService,
   QualityGateRunner,
   QualityReadinessEvaluator,
+  BackupManifestService,
+  FileBackupRepository,
+  FileExportRepository,
+  RebuildOrchestrator,
+  RecoveryExportService,
+  ResetUninstallPreviewService,
+  RestoreValidationService,
   RunQualityLinker,
   resolveSetupPaths
 } from "@fulcrum/core";
@@ -28,8 +36,11 @@ import { registerWorktreeRoutes } from "./routes/worktrees.js";
 import { registerExternalPmRoutes } from "./routes/external-pm.js";
 import { registerQualityRoutes } from "./routes/quality.js";
 import { registerAdapterRoutes } from "./routes/adapters.js";
+import { registerGraphRoutes } from "./routes/graph.js";
 import { registerSetupRoutes } from "./routes/setup.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
+import { registerRecoveryRoutes } from "./routes/recovery.js";
+import { registerMcpRoutes } from "./mcp.js";
 import { createServerSetupPorts, FileSetupRepository } from "./runtime.js";
 import {
   serverExternalPmService,
@@ -43,7 +54,11 @@ import {
   serverRunService,
   serverTaskService,
   serverWorktreeAllocationService,
-  serverWorktreeStatusService
+  serverWorktreeStatusService,
+  serverGraphService,
+  serverGraphLinkWriters,
+  serverTraceabilityService,
+  serverGraphRebuildSources
 } from "./work-runtime.js";
 
 const app = new Hono();
@@ -52,19 +67,33 @@ const setupRepository = new FileSetupRepository();
 const paths = resolveSetupPaths();
 const policyService = new PolicyEnforcementService(
   new MemoryPolicyDecisionRepository(),
-  new MemoryPolicyEventRepository()
+  new MemoryPolicyEventRepository(),
+  serverGraphLinkWriters
 );
 const artifactService = new ArtifactService(
   new MemoryArtifactRepository(),
-  new LocalArtifactStorage(paths.artifactRoot)
+  new LocalArtifactStorage(paths.artifactRoot),
+  serverGraphLinkWriters
 );
 const qualityRunner = new QualityGateRunner(
   serverQualityGateRepository,
   artifactService,
   serverRunService,
-  new RunQualityLinker(runRepository, serverQualityGateRepository)
+  new RunQualityLinker(runRepository, serverQualityGateRepository),
+  serverGraphLinkWriters
 );
 const qualityReadiness = new QualityReadinessEvaluator(serverQualityGateRepository);
+const recoveryStoreFile = path.join(paths.stateRoot, "recovery-manifests.json");
+const backupRepository = new FileBackupRepository(recoveryStoreFile);
+const exportRepository = new FileExportRepository(recoveryStoreFile);
+const recoveryDeps = {
+  backups: new BackupManifestService(backupRepository),
+  restore: new RestoreValidationService(backupRepository),
+  exports: new RecoveryExportService(exportRepository),
+  rebuild: new RebuildOrchestrator(),
+  previews: new ResetUninstallPreviewService(policyService),
+  stateRoot: paths.stateRoot
+};
 
 registerSetupRoutes(app, createServerSetupPorts(setupRepository));
 registerDoctorRoutes(app, setupRepository, async () => [
@@ -85,6 +114,28 @@ registerContextPackRoutes(app, serverContextBuilder);
 registerArtifactRoutes(app, artifactService);
 registerQualityRoutes(app, qualityRunner, qualityReadiness);
 registerPolicyRoutes(app, policyService);
+registerGraphRoutes(app, serverGraphService, serverTraceabilityService, serverGraphRebuildSources);
+registerRecoveryRoutes(app, recoveryDeps);
+registerMcpRoutes(app, {
+  doctor: async () => ({
+    setupState: await setupRepository.latest(),
+    extraCapabilities: [
+      await externalPmHealth(serverExternalPmService.adapterHealthPort()),
+      ...(await buildAdapterDegradationSummary(serverAdapterRegistry)).capabilities
+    ]
+  }),
+  projects: serverProjectService,
+  tasks: serverTaskService,
+  runs: serverRunService,
+  context: serverContextBuilder,
+  memory: serverMemoryService,
+  code: serverCodeService,
+  artifacts: artifactService,
+  quality: qualityRunner,
+  policy: policyService,
+  worktrees: serverWorktreeAllocationService,
+  worktreeStatus: serverWorktreeStatusService
+});
 
 const port = Number(process.env.FULCRUM_PORT ?? 4173);
 const hostname = process.env.FULCRUM_HOST ?? "127.0.0.1";

@@ -6,6 +6,8 @@ import { ProjectBoardRoute } from "./routes/project-board.js";
 import { RunDetailRoute } from "./routes/run-detail.js";
 import { WorktreeDetailRoute } from "./routes/worktree-detail.js";
 import { AdaptersRoute } from "./routes/adapters.js";
+import { RecoveryRoute } from "./routes/recovery.js";
+import { TraceabilityRoute } from "./routes/traceability.js";
 
 export function App() {
   const hash = globalThis.location?.hash ?? "";
@@ -26,6 +28,12 @@ export function App() {
   }
   if (hash.startsWith("#/adapters")) {
     return <AdaptersRoute />;
+  }
+  if (hash.startsWith("#/recovery")) {
+    return <RecoveryRoute />;
+  }
+  if (hash.startsWith("#/traceability")) {
+    return <TraceabilityRoute />;
   }
   return hash.startsWith("#/projects/") ? <ProjectBoardRoute /> : <OverviewRoute />;
 }

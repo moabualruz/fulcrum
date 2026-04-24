@@ -1,5 +1,6 @@
 import { makeId, SCHEMA_VERSION, type ArtifactContract } from "@fulcrum/shared";
 import { LocalArtifactStorage } from "./storage.js";
+import type { GraphLinkWriters } from "../graph/link-writers.js";
 
 export interface AttachArtifactInput {
   type: ArtifactContract["type"];
@@ -20,13 +21,14 @@ export interface ArtifactRepositoryPort {
 export class ArtifactService {
   constructor(
     private readonly artifacts: ArtifactRepositoryPort,
-    private readonly storage: LocalArtifactStorage
+    private readonly storage: LocalArtifactStorage,
+    private readonly graphLinks?: GraphLinkWriters
   ) {}
 
   async attach(input: AttachArtifactInput): Promise<ArtifactContract> {
     const stored = await this.storage.store(input.localRef, input.projectId, input.runId);
     const now = new Date().toISOString();
-    return this.artifacts.save({
+    const artifact = this.artifacts.save({
       artifactId: makeId("art", `${input.runId ?? input.taskId ?? "artifact"}-${now}`),
       type: input.type,
       localRef: input.localRef,
@@ -46,6 +48,8 @@ export class ArtifactService {
       createdAt: now,
       updatedAt: now
     });
+    this.graphLinks?.artifact(artifact);
+    return artifact;
   }
 
   show(artifactId: string): ArtifactContract | undefined {

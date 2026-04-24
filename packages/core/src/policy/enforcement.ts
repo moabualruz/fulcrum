@@ -6,6 +6,7 @@ import {
   type RunEvent
 } from "@fulcrum/shared";
 import { evaluatePolicy } from "@fulcrum/policy";
+import type { GraphLinkWriters } from "../graph/link-writers.js";
 
 export interface PolicyDecisionRepositoryPort {
   save(decision: PolicyDecision): PolicyDecision;
@@ -25,7 +26,8 @@ export interface PolicyCheckResult {
 export class PolicyEnforcementService {
   constructor(
     private readonly decisions: PolicyDecisionRepositoryPort,
-    private readonly events: PolicyEventRepositoryPort
+    private readonly events: PolicyEventRepositoryPort,
+    private readonly graphLinks?: GraphLinkWriters
   ) {}
 
   check(request: PolicyCheckRequest): PolicyCheckResult {
@@ -63,6 +65,9 @@ export class PolicyEnforcementService {
       ...evaluated,
       auditEventId: event.eventId
     });
+    if (request.projectId && request.runId) {
+      this.graphLinks?.policy(request.projectId, { type: "run", id: request.runId }, decision);
+    }
     return { decision, event };
   }
 

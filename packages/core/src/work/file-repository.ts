@@ -12,6 +12,7 @@ import {
   RunSchema,
   TaskSchema,
   WorktreeAllocationSchema,
+  GraphLinkSchema,
   type ContextItem,
   type ContextPack,
   type ExternalWorkItemMirror,
@@ -24,7 +25,9 @@ import {
   type Run,
   type RunEvent,
   type Task,
-  type WorktreeAllocation
+  type WorktreeAllocation,
+  type GraphLink,
+  type GraphNodeType
 } from "@fulcrum/shared";
 import type { CodeEvidenceRepositoryPort } from "../code/evidence-service.js";
 import type { ContextPackRepositoryPort } from "../context/builder.js";
@@ -35,6 +38,7 @@ import type { QualityGateRepositoryPort } from "../quality/runner.js";
 import type { RunRepositoryPort } from "../runs/service.js";
 import type { TaskRepositoryPort } from "../tasks/service.js";
 import type { WorktreeRepositoryPort } from "../worktrees/status.js";
+import type { GraphLinkRepositoryPort } from "../graph/service.js";
 
 interface WorkState {
   projects: Project[];
@@ -49,6 +53,7 @@ interface WorkState {
   worktrees: WorktreeAllocation[];
   qualityGateDefinitions: QualityGateDefinition[];
   qualityGateResults: QualityGateResult[];
+  graphLinks: GraphLink[];
 }
 
 const emptyState: WorkState = {
@@ -63,7 +68,8 @@ const emptyState: WorkState = {
   contextItems: [],
   worktrees: [],
   qualityGateDefinitions: [],
-  qualityGateResults: []
+  qualityGateResults: [],
+  graphLinks: []
 };
 
 export class FileWorkRepository {
@@ -149,7 +155,8 @@ export class FileWorkRepository {
         ),
         qualityGateResults: (data.qualityGateResults ?? []).map((result) =>
           QualityGateResultSchema.parse(result)
-        )
+        ),
+        graphLinks: (data.graphLinks ?? []).map((link) => GraphLinkSchema.parse(link))
       };
     } catch {
       return { ...emptyState };
@@ -159,6 +166,47 @@ export class FileWorkRepository {
   write(state: WorkState): void {
     mkdirSync(path.dirname(this.stateFile), { recursive: true });
     writeFileSync(this.stateFile, JSON.stringify(state, null, 2));
+  }
+}
+
+export class FileGraphLinkRepository implements GraphLinkRepositoryPort {
+  constructor(private readonly work: FileWorkRepository) {}
+
+  save(link: GraphLink): GraphLink {
+    const parsed = GraphLinkSchema.parse(link);
+    const state = this.work.read();
+    state.graphLinks = [
+      parsed,
+      ...state.graphLinks.filter((item) => item.graphLinkId !== parsed.graphLinkId)
+    ];
+    this.work.write(state);
+    return parsed;
+  }
+
+  list(projectId?: string): GraphLink[] {
+    const links = this.work.read().graphLinks;
+    return projectId ? links.filter((link) => link.projectId === projectId) : links;
+  }
+
+  listForNode(type: GraphNodeType, id: string): GraphLink[] {
+    return this.work
+      .read()
+      .graphLinks.filter(
+        (link) =>
+          (link.sourceType === type && link.sourceId === id) ||
+          (link.targetType === type && link.targetId === id)
+      );
+  }
+
+  replaceDerived(projectId: string, links: GraphLink[]): GraphLink[] {
+    const parsed = links.map((link) => GraphLinkSchema.parse(link));
+    const state = this.work.read();
+    state.graphLinks = [
+      ...parsed,
+      ...state.graphLinks.filter((link) => link.projectId !== projectId || !link.derived)
+    ];
+    this.work.write(state);
+    return parsed;
   }
 }
 
