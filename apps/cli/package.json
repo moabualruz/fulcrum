@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@fulcrum/code-tools": "workspace:*",
+    "@fulcrum/agents": "workspace:*",
     "@fulcrum/core": "workspace:*",
     "@fulcrum/mcp": "workspace:*",
     "@fulcrum/plane": "workspace:*",

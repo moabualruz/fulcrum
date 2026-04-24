@@ -24,6 +24,16 @@ export type TuiViewName =
   | "doctor"
   | "events";
 
+export interface TuiWorkState {
+  projects?: Array<{ projectId: string; name: string; healthState: string }>;
+  tasks?: Array<{ taskId: string; title: string; status: string; projectId: string }>;
+  runs?: Array<{ runId: string; status: string; taskId: string }>;
+  worktrees?: Array<{ worktreeId: string; status: string; path: string }>;
+  contextPacks?: Array<{ contextPackId: string; status: string; taskId: string }>;
+  qualityGateDefinitions?: Array<{ gateId: string; name: string; required: boolean }>;
+  runEvents?: Array<{ eventId: string; type: string; severity: string }>;
+}
+
 const titles: Record<TuiViewName, string> = {
   dashboard: "Dashboard",
   projects: "Projects",
@@ -55,17 +65,78 @@ export function renderTuiView(model: TuiViewModel): string {
   return [`${model.title} [${model.health ?? "unknown"}]`, ...rows].join("\n");
 }
 
-export function createAllTuiViews(): Record<TuiViewName, TuiViewModel> {
+export function createAllTuiViews(state: TuiWorkState = {}): Record<TuiViewName, TuiViewModel> {
+  const projects = state.projects ?? [];
+  const tasks = state.tasks ?? [];
+  const runs = state.runs ?? [];
+  const worktrees = state.worktrees ?? [];
+  const contextPacks = state.contextPacks ?? [];
+  const gates = state.qualityGateDefinitions ?? [];
+  const events = state.runEvents ?? [];
   return {
-    dashboard: createTuiView("dashboard"),
-    projects: createTuiView("projects"),
-    tasks: createTuiView("tasks"),
-    runs: createTuiView("runs"),
-    worktrees: createTuiView("worktrees"),
+    dashboard: createTuiView("dashboard", [
+      { id: "projects", label: `${projects.length} projects`, status: "managed" },
+      { id: "tasks", label: `${tasks.length} tasks`, status: "managed" },
+      { id: "runs", label: `${runs.length} runs`, status: "managed" }
+    ]),
+    projects: createTuiView(
+      "projects",
+      projects.map((project) => ({
+        id: project.projectId,
+        label: project.name,
+        status: project.healthState
+      }))
+    ),
+    tasks: createTuiView(
+      "tasks",
+      tasks.map((task) => ({
+        id: task.taskId,
+        label: task.title,
+        status: task.status,
+        detail: task.projectId
+      }))
+    ),
+    runs: createTuiView(
+      "runs",
+      runs.map((run) => ({
+        id: run.runId,
+        label: run.taskId,
+        status: run.status
+      }))
+    ),
+    worktrees: createTuiView(
+      "worktrees",
+      worktrees.map((worktree) => ({
+        id: worktree.worktreeId,
+        label: worktree.path,
+        status: worktree.status
+      }))
+    ),
     artifacts: createTuiView("artifacts"),
-    "context-packs": createTuiView("context-packs"),
-    "quality-gates": createTuiView("quality-gates"),
+    "context-packs": createTuiView(
+      "context-packs",
+      contextPacks.map((pack) => ({
+        id: pack.contextPackId,
+        label: pack.taskId,
+        status: pack.status
+      }))
+    ),
+    "quality-gates": createTuiView(
+      "quality-gates",
+      gates.map((gate) => ({
+        id: gate.gateId,
+        label: gate.name,
+        status: gate.required ? "required" : "optional"
+      }))
+    ),
     doctor: createTuiView("doctor"),
-    events: createTuiView("events")
+    events: createTuiView(
+      "events",
+      events.map((event) => ({
+        id: event.eventId,
+        label: event.type,
+        status: event.severity
+      }))
+    )
   };
 }

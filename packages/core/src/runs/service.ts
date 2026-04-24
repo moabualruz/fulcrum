@@ -11,6 +11,7 @@ import type { TaskRepositoryPort } from "../tasks/service.js";
 import type { WorktreeAllocationService } from "../worktrees/allocation.js";
 import type { WorktreeRepositoryPort } from "../worktrees/status.js";
 import type { GraphLinkWriters } from "../graph/link-writers.js";
+import type { QualityReadinessEvaluator } from "../quality/readiness.js";
 
 export interface RunRepositoryPort {
   save(run: Run): Run;
@@ -43,8 +44,13 @@ export class RunLifecycleService {
     private readonly tasks: Pick<TaskRepositoryPort, "get" | "save">,
     private readonly worktreeAllocator?: WorktreeAllocationService,
     private readonly worktrees?: WorktreeRepositoryPort,
-    private readonly graphLinks?: GraphLinkWriters
+    private readonly graphLinks?: GraphLinkWriters,
+    private qualityReadiness?: QualityReadinessEvaluator
   ) {}
+
+  setQualityReadiness(readiness: QualityReadinessEvaluator): void {
+    this.qualityReadiness = readiness;
+  }
 
   start(input: StartRunInput): Run {
     const task = this.requireTask(input.taskId);
@@ -163,6 +169,20 @@ export class RunLifecycleService {
     const logArtifactIds = mergeIds(run.logArtifactIds, input.logArtifactIds);
     const qualityGateIds = mergeIds(run.qualityGateIds, input.qualityGateIds);
     const policyDecisionIds = mergeIds(run.policyDecisionIds, input.policyDecisionIds);
+    if (input.outcome === "succeeded" && this.qualityReadiness) {
+      const readiness = this.qualityReadiness.evaluate({
+        projectId: run.projectId,
+        runId: run.runId,
+        taskId: run.taskId
+      });
+      if (readiness.status === "blocked") {
+        this.append(run, "quality.completed", readiness.summary, "warn", {
+          blockingGateIds: readiness.blockingGateIds,
+          requiredGateIds: readiness.requiredGateIds
+        });
+        throw new Error(`Run completion blocked: ${readiness.summary}`);
+      }
+    }
     if (input.outcome === "failed") {
       const failed = this.toTerminal(run, "failed", "run.failed", input.summary, {
         summary: input.summary,

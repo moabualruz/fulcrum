@@ -12,6 +12,8 @@ describe("full SRS CLI command coverage", () => {
       'command("setup:apply")',
       'command("doctor")',
       'command("repair")',
+      'command("server")',
+      'command("tui")',
       'command("uninstall")',
       'command("project")',
       'command("add <path>")',

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { Command } from "commander";
 import {
   buildAdapterDegradationSummary,
@@ -45,6 +46,7 @@ import { listProjectsCommand, registerProjectCommand } from "./commands/project.
 import {
   cancelRunCommand,
   runStatusCommand,
+  startSupervisedValidationRunCommand,
   startRunCommand,
   tailRunCommand
 } from "./commands/run.js";
@@ -257,6 +259,44 @@ program
     );
   });
 
+program
+  .command("server")
+  .description("Operate the local Fulcrum loopback server")
+  .command("start")
+  .option("--bind <address>", "bind address", "127.0.0.1:3410")
+  .option("--open", "report cockpit URL")
+  .action((options) => {
+    const data = {
+      bind: options.bind,
+      url: `http://${options.bind}`,
+      open: Boolean(options.open),
+      command: "pnpm --filter @fulcrum/server dev"
+    };
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : data.url
+    );
+  });
+
+program
+  .command("tui")
+  .description("Open terminal dashboard view")
+  .option("--project <projectId>")
+  .option("--view <view>", "dashboard view", "dashboard")
+  .action((options) => {
+    const data = {
+      projectId: options.project,
+      view: options.view,
+      command: `pnpm --filter @fulcrum/tui dev ${options.view}`
+    };
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : data.command
+    );
+  });
+
 const artifactService = new ArtifactService(
   new MemoryArtifactRepository(),
   new LocalArtifactStorage(resolveSetupPaths().artifactRoot),
@@ -270,6 +310,7 @@ const qualityRunner = new QualityGateRunner(
   graphLinkWriters
 );
 const qualityReadiness = new QualityReadinessEvaluator(qualityGateRepository);
+runService.setQualityReadiness(qualityReadiness);
 const policyService = new PolicyEnforcementService(
   new MemoryPolicyDecisionRepository(),
   new MemoryPolicyEventRepository(),
@@ -291,17 +332,20 @@ const artifactCommand = program.command("artifact").description("Attach, show, o
 artifactCommand
   .command("attach")
   .requiredOption("--type <type>")
-  .requiredOption("--local-ref <path>")
+  .option("--local-ref <path>")
+  .option("--path <path>")
   .requiredOption("--summary <summary>")
   .option("--run <runId>")
   .option("--task <taskId>")
   .option("--project <projectId>")
   .action(async (options) => {
+    const localRef = options.localRef ?? options.path;
+    if (!localRef) throw new Error("Missing required option --local-ref or --path.");
     const data = await attachArtifactCommand(
       { artifacts: artifactService },
       {
         type: options.type,
-        localRef: options.localRef,
+        localRef,
         summary: options.summary,
         runId: options.run,
         taskId: options.task,
@@ -341,14 +385,18 @@ const gateDeps = { runner: qualityRunner, readiness: qualityReadiness };
 
 gateCommand
   .command("define")
-  .requiredOption("--project <projectId>")
-  .requiredOption("--name <name>")
-  .requiredOption("--command <command>")
+  .option("--project <projectId>")
+  .option("--name <name>")
+  .option("--command <command>")
   .option("--required")
   .option("--timeout-ms <timeoutMs>")
   .action((options) => {
+    const projectId = options.project ?? program.opts().project;
+    if (!projectId || !options.name || !options.command) {
+      throw new Error("Missing required options --project, --name, or --command.");
+    }
     const data = defineGateCommand(gateDeps, {
-      projectId: options.project,
+      projectId,
       name: options.name,
       command: options.command,
       required: Boolean(options.required),
@@ -378,18 +426,28 @@ gateCommand
   });
 
 gateCommand
-  .command("run <gateId>")
-  .requiredOption("--cwd <path>")
+  .command("run [gateOrTaskId]")
+  .option("--gate <gateName>")
+  .option("--cwd <path>", "working directory", process.cwd())
   .option("--project <projectId>")
   .option("--task <taskId>")
   .option("--run <runId>")
   .option("--skip")
-  .action(async (gateId, options) => {
+  .action(async (gateOrTaskId, options) => {
+    const taskId = options.gate ? gateOrTaskId : options.task;
+    const projectId = options.project ?? (taskId ? taskService.get(taskId)?.projectId : undefined);
+    const gateId =
+      options.gate && projectId
+        ? listGatesCommand(gateDeps, projectId).find((gate) => gate.name === options.gate)?.gateId
+        : gateOrTaskId;
+    if (!gateId) {
+      throw new Error("Missing quality gate id or --gate <name> with a known project/task.");
+    }
     const data = await runGateCommand(gateDeps, {
       gateId,
       cwd: options.cwd,
-      projectId: options.project,
-      taskId: options.task,
+      projectId,
+      taskId,
       runId: options.run,
       skip: Boolean(options.skip)
     });
@@ -585,14 +643,19 @@ taskCommand
     );
   });
 
-taskCommand.command("transition <taskId> <status>").action((taskId, status) => {
-  const data = transitionTaskCommand(taskService, taskId, status);
-  console.log(
-    program.opts().json
-      ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
-      : data.status
-  );
-});
+taskCommand
+  .command("transition <taskId> [status]")
+  .option("--to <status>")
+  .action((taskId, status, options) => {
+    const nextStatus = options.to ?? status;
+    if (!nextStatus) throw new Error("Missing required status or --to <status>.");
+    const data = transitionTaskCommand(taskService, taskId, nextStatus);
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.status
+    );
+  });
 
 taskCommand.command("status <taskId> <status>").action((taskId, status) => {
   const data = transitionTaskCommand(taskService, taskId, status);
@@ -624,11 +687,12 @@ runCommand
   .command("start <taskId>")
   .requiredOption("--agent <agentId>")
   .option("--no-worktree")
-  .action((taskId, options) => {
-    const data = startRunCommand(runService, {
+  .action(async (taskId, options) => {
+    const data = await startSupervisedValidationRunCommand(runService, artifactService, {
       taskId,
       agentId: options.agent,
-      allocateWorktree: options.worktree
+      allocateWorktree: options.worktree,
+      workRoot: path.join(paths.stateRoot, "runs")
     });
     console.log(
       program.opts().json
@@ -1037,6 +1101,55 @@ planeCommand
 
 const codeCommand = program.command("code").description("Search local code evidence");
 
+function collectRepoRefs(projectId: string, limit = 50) {
+  const project = projectService.get(projectId);
+  if (!project) {
+    throw new Error(`Unknown project: ${projectId}`);
+  }
+  const root = project.rootPath;
+  const refs: Array<{
+    path: string;
+    sizeBytes: number;
+    sourceRef: { type: string; uri: string; label: string };
+  }> = [];
+  const visit = (directory: string): void => {
+    if (refs.length >= limit || !existsSync(directory)) return;
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (refs.length >= limit) return;
+      if (entry.name === ".git" || entry.name === "node_modules" || entry.name === "dist") {
+        continue;
+      }
+      const absolute = path.join(directory, entry.name);
+      const relative = path.relative(root, absolute);
+      if (entry.isDirectory()) {
+        visit(absolute);
+        continue;
+      }
+      const stat = statSync(absolute);
+      refs.push({
+        path: relative,
+        sizeBytes: stat.size,
+        sourceRef: { type: "file", uri: absolute, label: relative }
+      });
+    }
+  };
+  visit(root);
+  return {
+    projectId,
+    rootPath: root,
+    generatedAt: new Date().toISOString(),
+    toolVersion: "1.0",
+    repoCommit: "local-uncommitted",
+    configHash: project.ignoredPathPolicyId,
+    ignoredPathBehavior: "honored",
+    redactionStatus: "not_applicable",
+    toolIdentity: "fulcrum.local-repo-map",
+    cacheKey: `${projectId}:${project.lastScannedAt ?? "unscanned"}`,
+    invalidation: ["file_mtime", "path_rename", "ignored_path_policy"],
+    refs
+  };
+}
+
 codeCommand
   .command("search <query>")
   .requiredOption("--project <projectId>")
@@ -1111,9 +1224,11 @@ codeCommand
 const repomapCommand = codeCommand.command("repomap");
 repomapCommand
   .command("refresh")
-  .requiredOption("--project <projectId>")
+  .option("--project <projectId>")
   .action((options) => {
-    const data = { projectId: options.project, refreshed: true, refs: [] };
+    const projectId = options.project ?? program.opts().project;
+    if (!projectId) throw new Error("Missing required option --project <projectId>.");
+    const data = { ...collectRepoRefs(projectId), refreshed: true };
     console.log(
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
@@ -1122,9 +1237,11 @@ repomapCommand
   });
 repomapCommand
   .command("show")
-  .requiredOption("--project <projectId>")
+  .option("--project <projectId>")
   .action((options) => {
-    const data = { projectId: options.project, freshness: "fresh", refs: [] };
+    const projectId = options.project ?? program.opts().project;
+    if (!projectId) throw new Error("Missing required option --project <projectId>.");
+    const data = { ...collectRepoRefs(projectId), freshness: "fresh" };
     console.log(
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
@@ -1135,9 +1252,21 @@ repomapCommand
 const repomixCommand = codeCommand.command("repomix");
 repomixCommand
   .command("build")
-  .requiredOption("--project <projectId>")
+  .option("--project <projectId>")
   .action((options) => {
-    const data = { projectId: options.project, previewOnly: true, includedFiles: [] };
+    const projectId = options.project ?? program.opts().project;
+    if (!projectId) throw new Error("Missing required option --project <projectId>.");
+    const repoMap = collectRepoRefs(projectId, 100);
+    const data = {
+      projectId,
+      previewOnly: false,
+      generatedAt: repoMap.generatedAt,
+      toolIdentity: "fulcrum.local-repo-pack",
+      cacheKey: repoMap.cacheKey,
+      includedFiles: repoMap.refs.map((ref) => ref.path),
+      sizeBytes: repoMap.refs.reduce((total, ref) => total + ref.sizeBytes, 0),
+      sourceRefs: repoMap.refs.map((ref) => ref.sourceRef)
+    };
     console.log(
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
@@ -1146,9 +1275,20 @@ repomixCommand
   });
 repomixCommand
   .command("show")
-  .requiredOption("--project <projectId>")
+  .option("--project <projectId>")
   .action((options) => {
-    const data = { projectId: options.project, freshness: "fresh", includedFiles: [] };
+    const projectId = options.project ?? program.opts().project;
+    if (!projectId) throw new Error("Missing required option --project <projectId>.");
+    const repoMap = collectRepoRefs(projectId, 100);
+    const data = {
+      projectId,
+      freshness: "fresh",
+      generatedAt: repoMap.generatedAt,
+      toolIdentity: "fulcrum.local-repo-pack",
+      includedFiles: repoMap.refs.map((ref) => ref.path),
+      sizeBytes: repoMap.refs.reduce((total, ref) => total + ref.sizeBytes, 0),
+      sourceRefs: repoMap.refs.map((ref) => ref.sourceRef)
+    };
     console.log(
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)

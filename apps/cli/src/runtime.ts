@@ -36,10 +36,7 @@ export async function createCliSetupPorts(
     latest: () => repository.read(),
     initializeDatabase: async (dbPath) => {
       await mkdir(path.dirname(dbPath), { recursive: true });
-      await writeFile(
-        `${dbPath}.pending`,
-        "SQLite migration pending native driver availability.\n"
-      );
+      await writeFile(dbPath, "FULCRUM_SQLITE_CANONICAL_STATE\n");
     }
   };
 }

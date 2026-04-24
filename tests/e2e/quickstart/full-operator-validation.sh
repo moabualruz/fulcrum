@@ -39,7 +39,7 @@ task="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json task create --project 
 record_evidence task-create.json "$task"
 task_id="$(node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync(0,"utf8")); process.stdout.write(p.data.taskId)' <<<"$task")"
 
-task_ready="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json task transition "$task_id" ready)"
+task_ready="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json task transition "$task_id" --to ready)"
 record_evidence task-ready.json "$task_ready"
 assert_json_status_ok <<<"$task_ready"
 
@@ -47,13 +47,44 @@ context="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json context build "$tas
 record_evidence context-build.json "$context"
 assert_json_status_ok <<<"$context"
 
-run="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json run start "$task_id" --agent adapter_validation --no-worktree)"
+run="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json run start "$task_id" --agent validation --no-worktree)"
 record_evidence run-start.json "$run"
 assert_json_status_ok <<<"$run"
+run_id="$(node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync(0,"utf8")); process.stdout.write(p.data.runId)' <<<"$run")"
+
+gate_define="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json gate define --project "$project_id" --name fast --command "node -e 'process.exit(0)'" --required)"
+record_evidence gate-define.json "$gate_define"
+assert_json_status_ok <<<"$gate_define"
 
 gate="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json gate list --project "$project_id")"
 record_evidence gate-list.json "$gate"
 assert_json_status_ok <<<"$gate"
+
+gate_run="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json gate run "$task_id" --gate fast --run "$run_id" --cwd "$PROJECT_ROOT")"
+record_evidence gate-run.json "$gate_run"
+assert_json_status_ok <<<"$gate_run"
+
+artifact_file="$PROJECT_ROOT/artifact.txt"
+printf 'quickstart artifact\n' > "$artifact_file"
+artifact="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json artifact attach --type other --path "$artifact_file" --summary "quickstart artifact" --run "$run_id" --task "$task_id" --project "$project_id")"
+record_evidence artifact-attach.json "$artifact"
+assert_json_status_ok <<<"$artifact"
+
+repo_map="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json code repomap show --project "$project_id")"
+record_evidence repo-map.json "$repo_map"
+assert_json_status_ok <<<"$repo_map"
+
+repo_pack="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json code repomix build --project "$project_id")"
+record_evidence repo-pack.json "$repo_pack"
+assert_json_status_ok <<<"$repo_pack"
+
+server_preview="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json server start --bind 127.0.0.1:0 --open)"
+record_evidence server-start.json "$server_preview"
+assert_json_status_ok <<<"$server_preview"
+
+tui_preview="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json tui --project "$project_id")"
+record_evidence tui.json "$tui_preview"
+assert_json_status_ok <<<"$tui_preview"
 
 policy="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json policy check --action sensitive_export --subject-type export --subject quickstart --requester operator || true)"
 record_evidence policy-check.json "$policy"
