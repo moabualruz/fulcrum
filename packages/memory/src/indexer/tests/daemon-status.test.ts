@@ -5,6 +5,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import Database from 'better-sqlite3'
+import { _configureDb, closeDb, runMigrations, setDb } from 'fulcrum-agent-core'
 
 vi.mock('../../pci/syncer.js', () => ({
   startPciSyncer: vi.fn(() => ({ stop: () => {} })),
@@ -45,6 +47,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   if (daemon) { await daemon.close().catch(() => {}); daemon = null }
+  closeDb()
   try { rmSync(tempDir, { recursive: true, force: true }) } catch { /* best-effort */ }
 })
 
@@ -89,6 +92,40 @@ describe('getStatus', () => {
       expect(typeof a.code_chunks_count).toBe('number')
       expect(typeof a.memories_count).toBe('number')
       expect(a.watcher_active).toBe(true)
+    } finally {
+      client.close()
+    }
+  })
+
+  it('scopes durable coverage counts by workspace and project', async () => {
+    const db = new Database(':memory:')
+    _configureDb(db)
+    runMigrations(db)
+    setDb(db)
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_shared', 'Shared', 'active', '2026-04-24')`).run()
+    db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_other', 'Other', 'active', '2026-04-24')`).run()
+    db.prepare(`INSERT INTO projects (project_id, workspace_id, name, status, created_at) VALUES ('proj_shared', 'ws_shared', 'Shared', 'active', '2026-04-24')`).run()
+    db.prepare(`
+      INSERT INTO code_chunks (chunk_id, workspace_id, project_id, file_path, chunk_strategy, source_type, content)
+      VALUES ('chunk_shared', 'ws_shared', 'proj_shared', 'src/a.ts', 'syntax', 'code', 'alpha')
+    `).run()
+    db.prepare(`
+      INSERT INTO code_chunks (chunk_id, workspace_id, project_id, file_path, chunk_strategy, source_type, content)
+      VALUES ('chunk_other', 'ws_other', 'proj_shared', 'src/b.ts', 'syntax', 'code', 'beta')
+    `).run()
+
+    const registry = createDaemonRegistry({
+      workspaceIdFor: () => 'ws_shared',
+      projectIdFor: () => 'proj_shared',
+      graceMs: 10,
+    })
+    daemon = await startDaemon({ socketPath, registry })
+    const client = createIndexerClient({ socketPath, disableAutoSpawn: true })
+    try {
+      await client.ensureWatching(treeA)
+      const s = await client.getStatus()
+      expect(s.projects[0]?.code_chunks_count).toBe(1)
+      expect(s.projects[0]?.coverage?.code_chunks_count).toBe(1)
     } finally {
       client.close()
     }

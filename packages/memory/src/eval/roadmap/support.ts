@@ -439,6 +439,37 @@ function verifiedCitations(expectedSources: string[], retrievedSources: string[]
   return retrievedSources.filter(source => expected.has(source)).slice(0, 1)
 }
 
+function normalizeClaimText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function claimSupported(claim: string, snippets: string[]): boolean {
+  const normalizedClaim = normalizeClaimText(claim)
+  if (!normalizedClaim) return true
+  const claimTerms = new Set(normalizedClaim.split(' ').filter(term => term.length > 2))
+  return snippets.some(snippet => {
+    const normalizedSnippet = normalizeClaimText(snippet)
+    if (normalizedSnippet.includes(normalizedClaim)) return true
+    if (claimTerms.size === 0) return true
+    const snippetTerms = new Set(normalizedSnippet.split(' '))
+    let overlap = 0
+    for (const term of claimTerms) if (snippetTerms.has(term)) overlap += 1
+    return overlap / claimTerms.size >= 0.8
+  })
+}
+
+function hasForbiddenClaim(forbiddenClaims: string[] | undefined, snippets: string[]): boolean {
+  return (forbiddenClaims ?? []).some(claim => claimSupported(claim, snippets))
+}
+
+function isGrounded(testCase: RoadmapRagEvalCase, citations: string[], snippets: string[]): boolean {
+  if (citations.length === 0) return false
+  if (hasForbiddenClaim(testCase.forbidden_claims, snippets)) return false
+  const claims = testCase.expected_claims ?? []
+  if (claims.length === 0) return true
+  return claims.every(claim => claimSupported(claim, snippets))
+}
+
 export async function defaultRetriever(
   testCase: RoadmapRagEvalCase,
   input: RunRoadmapRagEvalSuiteInput,
@@ -455,11 +486,14 @@ export async function defaultRetriever(
     }, db)
     const sources = code.results.map(result => `code:${result.rel_path}`)
     const citations = verifiedCitations(testCase.expected_sources, sources)
+    const citedSnippets = code.results
+      .filter(result => citations.includes(`code:${result.rel_path}`))
+      .map(result => result.content)
     return {
       retrieved_sources: sources,
       context_sources: sources,
       cited_sources: citations,
-      grounded: citations.length > 0,
+      grounded: isGrounded(testCase, citations, citedSnippets),
       latency_ms: Date.now() - started,
       query_trace_id: code.query_trace_id,
     }
@@ -474,11 +508,14 @@ export async function defaultRetriever(
   }, db)
   const sources = context.results.map(defaultSourceIdFromContextResult)
   const citations = verifiedCitations(testCase.expected_sources, sources)
+  const citedSnippets = context.results
+    .filter(result => citations.includes(defaultSourceIdFromContextResult(result)))
+    .map(result => result.snippet)
   return {
     retrieved_sources: sources,
     context_sources: sources,
     cited_sources: citations,
-    grounded: citations.length > 0,
+    grounded: isGrounded(testCase, citations, citedSnippets),
     latency_ms: Date.now() - started,
     query_trace_id: context.query_trace_id,
   }

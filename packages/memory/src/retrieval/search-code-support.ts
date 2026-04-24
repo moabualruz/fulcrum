@@ -1,5 +1,6 @@
 import type { Db } from 'fulcrum-agent-core'
 import { getCodeEmbedder } from 'fulcrum-agent-core'
+import { createHash } from 'node:crypto'
 import { redactRoadmapArtifact } from '../setup/rag-redaction.js'
 import { shouldPersistPlannerArtifacts } from './planner/contract.js'
 import { persistRagQueryTrace, redactQueryForTrace, type QueryTraceStage } from './query-trace.js'
@@ -31,11 +32,18 @@ export interface CandidateRow {
 }
 
 const RRF_K = 60
+const QUERY_EMBED_CACHE_TTL_MS = 10 * 60 * 1000
+const QUERY_EMBED_CACHE_MAX = 256
 export const DEFAULT_LIMIT = 20
 export const MAX_LIMIT = 50
 export const RANK_WEIGHTS: Record<string, number> = {
   fts: 1.0,
   code_vector: 1.35,
+  fts_split: 1.05,
+  exact_symbol: 4.0,
+  exact_identifier: 3.5,
+  split_symbol: 2.75,
+  exact_path: 3.75,
   symbol: 1.2,
   path: 1.1,
   package: 0.75,
@@ -44,6 +52,15 @@ export const RANK_WEIGHTS: Record<string, number> = {
   changed_file: 0.85,
   recency: 0.25,
 }
+
+export type CodeQueryKind = 'identifier' | 'path_like' | 'natural_language' | 'mixed' | 'empty'
+
+interface QueryEmbeddingCacheEntry {
+  vector: Float32Array
+  createdAt: number
+}
+
+const queryEmbeddingCache = new Map<string, QueryEmbeddingCacheEntry>()
 
 export function logRecallEvent(db: Db, chunk_id: string, query: string, rank: number, score: number, callerRunId?: string, callerRole?: string): void {
   try {
@@ -60,9 +77,78 @@ function tokenize(value: string): string[] {
   return value.match(/[\p{L}\p{N}_]+/gu) ?? []
 }
 
+function splitIdentifierToken(token: string): string[] {
+  return token
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .split(/[\s_-]+/)
+    .map(part => part.toLowerCase())
+    .filter(part => part.length > 1)
+}
+
+export function classifyCodeQuery(text: string | undefined): CodeQueryKind {
+  const query = text?.trim() ?? ''
+  if (!query) return 'empty'
+  const rawTokens = tokenize(query)
+  const hasPath = /[/\\]|\.[A-Za-z0-9]{1,8}\b/.test(query)
+  const hasIdentifier = rawTokens.some(token => /[_-]/.test(token) || /[a-z][A-Z]/.test(token) || /^[A-Z][A-Za-z0-9]*$/.test(token))
+  if (hasPath && rawTokens.length <= 3) return 'path_like'
+  if (rawTokens.length === 1 && hasIdentifier) return 'identifier'
+  if (hasPath || hasIdentifier) return 'mixed'
+  return 'natural_language'
+}
+
+export function codeQueryTerms(text: string): { exact: string[]; split: string[] } {
+  const exact = tokenize(text)
+  const split = new Set<string>()
+  for (const token of exact) {
+    for (const part of splitIdentifierToken(token)) split.add(part)
+  }
+  return { exact, split: [...split] }
+}
+
 function ftsQuery(text: string): string | null {
   const safe = tokenize(text).map(t => `"${t.replace(/"/g, '""')}"`).join(' AND ')
   return safe || null
+}
+
+function ftsSplitQuery(text: string): string | null {
+  const terms = codeQueryTerms(text).split
+  if (terms.length <= 1) return null
+  return terms.map(t => `"${t.replace(/"/g, '""')}"`).join(' AND ')
+}
+
+function queryCacheKey(input: SearchCodeInput, provider: unknown): string {
+  const identity = provider as Record<string, unknown>
+  const providerName = String(identity['actualProvider'] ?? identity['actual_provider'] ?? identity['provider'] ?? identity['provider_name'] ?? 'unknown')
+  const modelName = String(identity['actualModel'] ?? identity['actual_model'] ?? identity['model'] ?? identity['model_name'] ?? 'unknown')
+  const device = String(identity['actualDevice'] ?? identity['actual_device'] ?? 'auto')
+  const hash = createHash('sha256').update(input.text ?? '').digest('hex')
+  return `code|${providerName}|${modelName}|${device}|${hash}`
+}
+
+async function embedQueryCached(input: SearchCodeInput, embedder: NonNullable<ReturnType<typeof getCodeEmbedder>>): Promise<Float32Array> {
+  const key = queryCacheKey(input, embedder)
+  const now = Date.now()
+  const cached = queryEmbeddingCache.get(key)
+  if (cached && now - cached.createdAt <= QUERY_EMBED_CACHE_TTL_MS) {
+    queryEmbeddingCache.delete(key)
+    queryEmbeddingCache.set(key, cached)
+    return cached.vector
+  }
+  const embedFn = ((embedder as { embedQuery?: (text: string) => Promise<Float32Array> }).embedQuery ?? embedder.embed).bind(embedder)
+  const vector = await embedFn(input.text ?? '')
+  queryEmbeddingCache.set(key, { vector, createdAt: now })
+  while (queryEmbeddingCache.size > QUERY_EMBED_CACHE_MAX) {
+    const oldest = queryEmbeddingCache.keys().next().value as string | undefined
+    if (!oldest) break
+    queryEmbeddingCache.delete(oldest)
+  }
+  return vector
+}
+
+export function _clearSearchCodeQueryEmbeddingCacheForTest(): void {
+  queryEmbeddingCache.clear()
 }
 
 export function indexedTime(value: string | number | null | undefined): number {
@@ -165,6 +251,30 @@ export function ftsStage(db: Db, input: SearchCodeInput, where: string[], params
   }
 }
 
+export function ftsSplitStage(db: Db, input: SearchCodeInput, where: string[], params: unknown[], fetchLimit: number): Map<string, number> {
+  if (!input.text?.trim()) return new Map()
+  const safe = ftsSplitQuery(input.text)
+  if (!safe || safe === ftsQuery(input.text)) return new Map()
+  try {
+    const rows = db.prepare(`
+      SELECT c.chunk_id, bm25(code_chunks_fts) AS bm25
+        FROM code_chunks c
+        JOIN code_chunks_fts ON c.rowid = code_chunks_fts.rowid
+        LEFT JOIN code_files f
+          ON f.file_id = c.file_id
+         AND f.workspace_id = c.workspace_id
+         AND f.project_id = c.project_id
+       WHERE code_chunks_fts MATCH ?
+         AND ${where.join(' AND ')}
+       ORDER BY bm25 ASC
+       LIMIT ?
+    `).all(safe, ...params, fetchLimit) as Array<{ chunk_id: string }>
+    return stageRankFromRows(rows)
+  } catch {
+    return new Map()
+  }
+}
+
 export async function vectorStage(
   db: Db,
   input: SearchCodeInput,
@@ -180,8 +290,7 @@ export async function vectorStage(
     return new Map()
   }
   try {
-    const embedFn = ((embedder as { embedQuery?: (text: string) => Promise<Float32Array> }).embedQuery ?? embedder.embed).bind(embedder)
-    const queryVec = await embedFn(input.text)
+    const queryVec = await embedQueryCached(input, embedder)
     const buf = Buffer.from(queryVec.buffer, queryVec.byteOffset, queryVec.byteLength)
     const rows = db.prepare(`
       SELECT v.chunk_id, row_number() OVER (ORDER BY v.distance) AS vecRank
@@ -212,6 +321,47 @@ export async function vectorStage(
   }
 }
 
+export function exactSymbolRank(rows: CandidateRow[], query: string | undefined): Map<string, number> {
+  if (!query?.trim()) return new Map()
+  const needle = query.trim()
+  const lowered = needle.toLowerCase()
+  return rankByPredicate(rows, row => {
+    const symbol = row.symbol_path ?? ''
+    const base = symbol.split(/[.:/]/).pop() ?? symbol
+    return symbol === needle
+      || symbol.endsWith(`.${needle}`)
+      || symbol.endsWith(`:${needle}`)
+      || base.toLowerCase() === lowered
+  }, row => {
+    const symbol = row.symbol_path ?? ''
+    if (symbol === needle) return 0
+    if (symbol.endsWith(`.${needle}`) || symbol.endsWith(`:${needle}`)) return 1
+    return 2
+  })
+}
+
+export function exactIdentifierRank(rows: CandidateRow[], query: string | undefined): Map<string, number> {
+  if (!query?.trim()) return new Map()
+  const terms = codeQueryTerms(query).exact.map(term => term.toLowerCase())
+  if (terms.length === 0) return new Map()
+  return rankByPredicate(rows, row => {
+    const haystack = `${row.symbol_path ?? ''} ${row.content}`.toLowerCase()
+    return terms.some(term => new RegExp(`(^|[^\\p{L}\\p{N}_])${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\p{L}\\p{N}_])`, 'u').test(haystack))
+  })
+}
+
+export function splitSymbolRank(rows: CandidateRow[], query: string | undefined): Map<string, number> {
+  if (!query?.trim()) return new Map()
+  const terms = new Set(codeQueryTerms(query).split.filter(term => term.length > 2 && term !== 'for'))
+  if (terms.size === 0) return new Map()
+  return rankByPredicate(rows, row => {
+    const symbolTerms = new Set(codeQueryTerms(row.symbol_path ?? '').split)
+    if (symbolTerms.size === 0) return false
+    for (const term of terms) if (!symbolTerms.has(term)) return false
+    return true
+  }, row => normalizePath(row.rel_path).length)
+}
+
 export function hintStage(db: Db, input: SearchCodeInput, where: string[], params: unknown[], fetchLimit: number): Map<string, number> {
   const rows: Array<{ chunk_id: string }> = []
   const seen = new Set<string>()
@@ -227,6 +377,32 @@ export function hintStage(db: Db, input: SearchCodeInput, where: string[], param
   if (input.dependency) addRows('c.content LIKE ?', [`%${input.dependency}%`])
   for (const changed of input.changed_files ?? []) addRows('c.file_path LIKE ?', [`%${normalizePath(changed)}%`])
   return stageRankFromRows(rows)
+}
+
+export function symbolSplitStage(db: Db, input: SearchCodeInput, where: string[], params: unknown[], fetchLimit: number): Map<string, number> {
+  if (!input.text?.trim()) return new Map()
+  const terms = codeQueryTerms(input.text).split.filter(term => term.length > 2 && term !== 'for')
+  if (terms.length === 0) return new Map()
+  const clauses = terms.map(() => 'lower(c.symbol_path) LIKE ?')
+  const termParams = terms.map(term => `%${term.toLowerCase()}%`)
+  try {
+    const rows = db.prepare(`
+      SELECT c.chunk_id
+        FROM code_chunks c
+        LEFT JOIN code_files f
+          ON f.file_id = c.file_id
+         AND f.workspace_id = c.workspace_id
+         AND f.project_id = c.project_id
+       WHERE ${where.join(' AND ')}
+         AND c.symbol_path IS NOT NULL
+         AND ${clauses.join(' AND ')}
+       ORDER BY length(c.symbol_path) ASC, c.indexed_at DESC, c.rowid DESC
+       LIMIT ?
+    `).all(...params, ...termParams, fetchLimit) as Array<{ chunk_id: string }>
+    return stageRankFromRows(rows)
+  } catch {
+    return new Map()
+  }
 }
 
 function hintRows(
@@ -402,6 +578,7 @@ export function persistSearchCodeTrace(input: {
   project_id: string
   fetchLimit: number
   ftsRanks: Map<string, number>
+  ftsSplitRanks?: Map<string, number>
   vectorRanks: Map<string, number>
   hintRanks: Map<string, number>
   skipped: Array<{ stage: string; reason: string }>
@@ -419,6 +596,14 @@ export function persistSearchCodeTrace(input: {
     latency_ms: input.latency_ms,
     ranks: rankDetails(input.ftsRanks, input.results),
     score_summary: scoreSummary(input.results, 'fts'),
+  }, {
+    name: 'fts_split',
+    status: input.ftsSplitRanks && input.ftsSplitRanks.size > 0 ? 'ok' : 'skipped',
+    candidate_count: input.ftsSplitRanks?.size ?? 0,
+    limit: input.fetchLimit,
+    latency_ms: input.latency_ms,
+    ranks: rankDetails(input.ftsSplitRanks ?? new Map(), input.results),
+    score_summary: scoreSummary(input.results, 'fts_split'),
   }, {
     name: 'code_vector',
     status: stageStatus(input.vectorRanks.size, input.skipped, 'code_vector'),
@@ -455,7 +640,7 @@ export function persistSearchCodeTrace(input: {
     fusion: {
       method: 'rrf',
       weights: RANK_WEIGHTS,
-      input_candidates: new Set([...input.ftsRanks.keys(), ...input.vectorRanks.keys(), ...input.hintRanks.keys()]).size,
+      input_candidates: new Set([...input.ftsRanks.keys(), ...(input.ftsSplitRanks?.keys() ?? []), ...input.vectorRanks.keys(), ...input.hintRanks.keys()]).size,
       output_candidates: input.results.length,
       reason: input.reason,
     },

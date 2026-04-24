@@ -86,6 +86,21 @@ export interface IndexerProjectStatus {
   project_id: string
   refcount: number
   watcher_active: boolean
+  watch?: {
+    root: string
+    workspace_id: string
+    project_id: string
+    refcount: number
+    watcher_active: boolean
+  }
+  coverage?: {
+    code_files_count: number
+    code_chunks_count: number
+    memories_count: number
+    current_vectors_count: number
+    pending_vectors_count: number
+  } | null
+  coverage_reason?: string
   code_chunks_count: number
   memories_count: number
 }

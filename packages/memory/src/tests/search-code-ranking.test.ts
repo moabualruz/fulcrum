@@ -191,4 +191,58 @@ describe('searchCode roadmap ranking signals', () => {
 
     expect(out.results).toHaveLength(50)
   })
+
+  it('ranks exact identifier implementations over semantic-only or prose matches', async () => {
+    await seed(
+      'docs/rag-notes.md',
+      'refresh graph coverage for code files is discussed in this documentation',
+      'docs.ragNotes',
+      3,
+    )
+    await seed(
+      'packages/memory/src/graph/coverage.ts',
+      'export function refreshGraphCoverageForCodeFile() { return "implementation marker" }',
+      'graph.refreshGraphCoverageForCodeFile',
+      1,
+    )
+
+    const out = await searchCode({
+      workspace_id: 'ws_code_rank',
+      project_id: 'proj_code_rank',
+      text: 'refreshGraphCoverageForCodeFile',
+      explain: true,
+      limit: 5,
+    }, db)
+
+    expect(out.results[0]?.rel_path).toBe('packages/memory/src/graph/coverage.ts')
+    expect(out.results[0]?.stage_scores['exact_symbol']).toBeGreaterThan(0)
+    expect(out.results[0]?.stage_scores['exact_identifier']).toBeGreaterThan(0)
+  })
+
+  it('uses split symbol ranking for prose queries over camelCase identifiers', async () => {
+    await seed(
+      'docs/rag-notes.md',
+      'refresh graph coverage code file prose explanation',
+      'docs.ragNotes',
+      3,
+    )
+    await seed(
+      'packages/memory/src/graph/coverage.ts',
+      'export function refreshGraphCoverageForCodeFile() { return "implementation marker" }',
+      'graph.refreshGraphCoverageForCodeFile',
+      1,
+    )
+
+    const out = await searchCode({
+      workspace_id: 'ws_code_rank',
+      project_id: 'proj_code_rank',
+      text: 'refresh graph coverage code file',
+      explain: true,
+      limit: 5,
+    }, db)
+
+    expect(out.results[0]?.rel_path).toBe('packages/memory/src/graph/coverage.ts')
+    expect(out.results[0]?.stage_scores['split_symbol']).toBeGreaterThan(0)
+    expect(out.results[0]?.stage_scores['exact_identifier']).toBe(0)
+  })
 })

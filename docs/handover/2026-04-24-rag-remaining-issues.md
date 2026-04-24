@@ -148,6 +148,102 @@ Relevant files:
 - `packages/memory/src/retrieval/context-pack.ts`
 - `packages/memory/src/tests/context-pack.test.ts`
 
+## Additional Issues Found During Follow-Up Review
+
+### 8. `search_code` FTS Query Is Not Identifier-Aware Enough
+
+`search-code-support.ts` tokenizes text with `/[\p{L}\p{N}_]+/gu`, so
+`refreshGraphCoverageForCodeFile` is treated as one FTS term. If FTS content or
+symbol text was indexed with split/case-normalized pieces, exact implementation
+hits can be missed or ranked too low. The shared sparse tokenizer already splits
+camelCase/PascalCase, but `search_code` does not reuse it.
+
+Likely fix:
+
+- Introduce a code-query classifier and tokenizer that keeps the original
+  identifier and also emits camelCase, snake_case, path, and quoted phrase terms.
+- Use exact `symbol_path` / `file_path` equality and suffix matches as hard
+  ranking features, separate from generic FTS.
+- Add tests for full identifier, split identifier, symbol suffix, and path+symbol
+  mixed queries.
+
+Relevant files:
+
+- `packages/memory/src/retrieval/search-code-support.ts`
+- `packages/memory/src/sparse.ts`
+- `packages/memory/src/tests/search-code*.test.ts`
+
+### 9. Daemon Status SQL Is Under-Scoped And Handover Paths Are Stale
+
+The current status handler lives at `packages/memory/src/indexer/handlers.ts`,
+not `packages/memory/src/pci/daemon.ts`. It counts `code_chunks` and `memories`
+by `project_id` only. That can leak or miscount rows if project IDs collide or
+if future tooling uses project-scoped IDs across workspaces. Existing project
+status should count by both `workspace_id` and `project_id`.
+
+Likely fix:
+
+- Update status enrichment SQL to include `workspace_id = ? AND project_id = ?`.
+- Keep registry counters separate from durable SQLite coverage counters in the
+  response shape.
+- Update tests under `packages/memory/src/indexer/tests/daemon-status.test.ts`
+  with two workspaces sharing one project ID.
+
+Relevant files:
+
+- `packages/memory/src/indexer/handlers.ts`
+- `packages/memory/src/indexer/client.ts`
+- `packages/memory/src/indexer/tests/daemon-status.test.ts`
+
+### 10. Query-Time Semantic Search Can Also Pay Embedder Cold-Start Cost
+
+The hook/indexer path is the loudest runtime-cost problem, but `search_code` and
+`search_context` also call `getCodeEmbedder()` / `getTextEmbedder()` and embed
+the query inline. If the runtime is cold, read-only search can pay ONNX session
+startup latency. This is less frequent than hook churn, but it affects CLI/MCP
+latency and should be measured.
+
+Likely fix:
+
+- Add per-process query embedding cache keyed by `{domain, provider, model,
+  device, query_hash}` with a small TTL/LRU.
+- Prefer a warmed daemon-side embedder for repeated CLI/MCP queries when the
+  daemon is active.
+- Record cold-start and query-embedding latency in query traces.
+
+Relevant files:
+
+- `packages/memory/src/retrieval/search-code-support.ts`
+- `packages/memory/src/retrieval/planner/baseline-lane.ts`
+- `packages/memory/src/retrieval/query-trace.ts`
+
+### 11. Embedding Job Resume Is Manual, Not Daemon-Driven
+
+The active code embedding job can be resumed in bounded slices, but the handoff
+still requires repeated manual `jobs resume` commands. For a live daemon, durable
+jobs should be drainable by a background worker with bounded batch size,
+backpressure, cancellation, and status events.
+
+Likely fix:
+
+- Let indexer daemon own an embedding-job worker loop for pending/stale job
+  items, reusing `runEmbeddingJob` slices.
+- Hook and syncer code enqueue job items only; daemon drains them.
+- Keep CLI `jobs resume` as manual override and recovery path.
+
+Relevant files:
+
+- `packages/memory/src/l2/embedding-jobs.ts`
+- `packages/memory/src/indexer/registry.ts`
+- `packages/memory/src/indexer/handlers.ts`
+- `packages/cli/src/commands/memory-embedding-jobs.ts`
+
+## Design Solution Document
+
+Detailed researched design recommendations were added in:
+
+- `docs/plans/2026-04-24-rag-design-solutions.md`
+
 ## Verification Already Run
 
 - `pnpm --filter fulcrum-agent-core test` passed
@@ -166,4 +262,3 @@ pre-existing test type debt, while package build passes.
 
 All GitHub workflows were changed to `workflow_dispatch` only. Push, pull request,
 schedule, and tag auto-runs are disabled until explicitly restored.
-

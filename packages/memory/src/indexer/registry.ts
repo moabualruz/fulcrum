@@ -12,16 +12,22 @@
 //
 // See docs/plans/2026-04-18-001-refactor-indexer-daemon-plan.md Unit 2.1.
 
-import { realpathSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { startPciSyncer, syncFile, type PciSyncerHandle } from '../pci/syncer.js'
 import { startProjectWatch, type ProjectWatchHandle } from '../pci/watcher.js'
 import { enumerateProjectFiles } from '../pci/walker-integration.js'
 import { isVaultOwnedPath, VaultOwnedPathError } from '../pci/vault-guard.js'
 import { waitForEmbedHeadroom } from '../l2/queue.js'
+import { runEmbeddingJob } from '../l2/embedding-jobs.js'
+import { getDb } from 'fulcrum-agent-core'
 import { HandlerError } from './errors.js'
 
 const DEFAULT_GRACE_MS = 30_000
+const DEFAULT_EMBEDDING_WORKER_INTERVAL_MS = 5_000
+const DEFAULT_EMBEDDING_WORKER_BATCH_SIZE = 16
+const DEFAULT_EMBEDDING_WORKER_MAX_ITEMS = 512
+const DEFAULT_MISSING_FILE_SWEEP_INTERVAL_MS = 10_000
 
 export interface RegistryOptions {
   /** Hook for tests to map a realpath to a workspace_id; production uses projectIdsFromPath. */
@@ -77,6 +83,12 @@ interface Entry {
   graceTimer: ReturnType<typeof setTimeout> | null
   syncer: PciSyncerHandle
   watch: ProjectWatchHandle
+  embeddingWorker: EmbeddingWorkerHandle | null
+  missingFileSweeper: EmbeddingWorkerHandle | null
+}
+
+interface EmbeddingWorkerHandle {
+  stop(): void
 }
 
 export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
@@ -136,6 +148,8 @@ export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
       projectRoot: realpath,
     })
     const watch = startProjectWatch(realpath)
+    const embeddingWorker = startEmbeddingWorker(workspaceId, projectId)
+    const missingFileSweeper = startMissingFileSweeper(workspaceId, projectId, realpath)
     // Fire-and-forget initial scan — the watch is already live, so any edits
     // during the scan will flow through the bus; syncFile is content-hash
     // idempotent so double-processing is harmless.
@@ -149,6 +163,8 @@ export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
       graceTimer: null,
       syncer,
       watch,
+      embeddingWorker,
+      missingFileSweeper,
     })
     return { watch: realpath, relative_path: '', already_watched: false }
   }
@@ -175,6 +191,8 @@ export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
     if (entry.refcount > 0) return // someone re-ensured during grace
     try { entry.syncer.stop() } catch { /* already stopped */ }
     try { entry.watch.close() } catch { /* already closed */ }
+    try { entry.embeddingWorker?.stop() } catch { /* already stopped */ }
+    try { entry.missingFileSweeper?.stop() } catch { /* already stopped */ }
     if (entry.graceTimer) clearTimeout(entry.graceTimer)
     entries.delete(realpath)
   }
@@ -184,6 +202,8 @@ export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
       if (entry.graceTimer) clearTimeout(entry.graceTimer)
       try { entry.syncer.stop() } catch { /* already stopped */ }
       try { entry.watch.close() } catch { /* already closed */ }
+      try { entry.embeddingWorker?.stop() } catch { /* already stopped */ }
+      try { entry.missingFileSweeper?.stop() } catch { /* already stopped */ }
     }
     entries.clear()
   }
@@ -218,6 +238,115 @@ export function createDaemonRegistry(opts: RegistryOptions): DaemonRegistry {
     getRefcount,
     shutdownAll,
     activeWatches,
+  }
+}
+
+function startMissingFileSweeper(workspaceId: string, projectId: string, rootDir: string): EmbeddingWorkerHandle | null {
+  if (process.env['FULCRUM_INDEXER_MISSING_FILE_SWEEP'] === '0') return null
+  if (process.env['VITEST'] && process.env['FULCRUM_INDEXER_MISSING_FILE_SWEEP'] !== '1') return null
+  const intervalMs = Number(process.env['FULCRUM_INDEXER_MISSING_FILE_SWEEP_INTERVAL_MS'] ?? DEFAULT_MISSING_FILE_SWEEP_INTERVAL_MS)
+  let stopped = false
+  let running = false
+
+  async function tick(): Promise<void> {
+    if (stopped || running) return
+    running = true
+    try {
+      const db = getDb()
+      const rows = db.prepare(`
+        SELECT rel_path
+          FROM code_files
+         WHERE workspace_id = ?
+           AND project_id = ?
+           AND status = 'indexed'
+         ORDER BY indexed_at ASC
+         LIMIT 5000
+      `).all(workspaceId, projectId) as Array<{ rel_path: string }>
+      let repaired = 0
+      for (const row of rows) {
+        if (existsSync(join(rootDir, row.rel_path))) continue
+        await syncFile({
+          workspaceId,
+          projectId,
+          projectRoot: rootDir,
+          event: { change_type: 'unlink', path: join(rootDir, row.rel_path) },
+        })
+        repaired += 1
+        if (repaired >= 100) break
+      }
+    } catch (err) {
+      if (process.env['FULCRUM_VERBOSE']) {
+        process.stderr.write(`[missing-file-sweeper] ${projectId}: ${err instanceof Error ? err.message : String(err)}\n`)
+      }
+    } finally {
+      running = false
+    }
+  }
+
+  const timer = setInterval(() => { void tick() }, Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : DEFAULT_MISSING_FILE_SWEEP_INTERVAL_MS)
+  timer.unref?.()
+  void tick()
+  return {
+    stop() {
+      stopped = true
+      clearInterval(timer)
+    },
+  }
+}
+
+function startEmbeddingWorker(workspaceId: string, projectId: string): EmbeddingWorkerHandle | null {
+  if (process.env['FULCRUM_INDEXER_EMBEDDING_WORKER'] === '0') return null
+  if (process.env['VITEST'] && process.env['FULCRUM_INDEXER_EMBEDDING_WORKER'] !== '1') return null
+  const intervalMs = Number(process.env['FULCRUM_INDEXER_EMBEDDING_WORKER_INTERVAL_MS'] ?? DEFAULT_EMBEDDING_WORKER_INTERVAL_MS)
+  let stopped = false
+  let running = false
+
+  async function tick(): Promise<void> {
+    if (stopped || running) return
+    running = true
+    try {
+      const db = getDb()
+      const row = db.prepare(`
+        SELECT j.job_id
+          FROM embedding_jobs j
+         WHERE j.workspace_id = ?
+           AND j.project_id = ?
+           AND j.source_domain = 'code_chunks'
+           AND j.status IN ('pending', 'running', 'degraded')
+           AND EXISTS (
+             SELECT 1
+               FROM embedding_job_items i
+              WHERE i.job_id = j.job_id
+                AND i.workspace_id = j.workspace_id
+                AND i.status IN ('pending', 'stale')
+           )
+         ORDER BY COALESCE(j.started_at, j.finished_at, '') ASC, j.rowid ASC
+         LIMIT 1
+      `).get(workspaceId, projectId) as { job_id: string } | undefined
+      if (!row) return
+      await runEmbeddingJob({
+        job_id: row.job_id,
+        workspace_id: workspaceId,
+        batch_size: DEFAULT_EMBEDDING_WORKER_BATCH_SIZE,
+        max_items: DEFAULT_EMBEDDING_WORKER_MAX_ITEMS,
+      }, db)
+    } catch (err) {
+      if (process.env['FULCRUM_VERBOSE']) {
+        process.stderr.write(`[embedding-worker] ${projectId}: ${err instanceof Error ? err.message : String(err)}\n`)
+      }
+    } finally {
+      running = false
+    }
+  }
+
+  const timer = setInterval(() => { void tick() }, Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : DEFAULT_EMBEDDING_WORKER_INTERVAL_MS)
+  timer.unref?.()
+  void tick()
+  return {
+    stop() {
+      stopped = true
+      clearInterval(timer)
+    },
   }
 }
 

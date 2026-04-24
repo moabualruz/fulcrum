@@ -24,13 +24,13 @@ describe('context packing', () => {
       result({ type: 'memory', id: 'same', snippet: 'duplicate '.repeat(12), score: 0.8 }),
       result({ type: 'code_chunk', id: 'code', snippet: 'code '.repeat(12), score: 0.7 }),
       result({ type: 'task', id: 'task', snippet: 'task '.repeat(12), score: 0.6 }),
-    ], 45)
+    ], 35)
 
     expect(packed.results.map(item => item.source_ref.source_id)).toEqual(['same', 'code'])
     expect(packed.deduplicated_results).toBe(1)
     expect(packed.truncated_results).toBe(1)
     expect(packed.source_diversity).toMatchObject({ memory: 1, code_chunk: 1 })
-    expect(packed.budget.used_tokens).toBeLessThanOrEqual(45)
+    expect(packed.budget.used_tokens).toBeLessThanOrEqual(35)
   })
 
   it('uses a conservative token estimate for long strings without whitespace', () => {
@@ -41,7 +41,9 @@ describe('context packing', () => {
       result({ type: 'memory', id: 'dense', snippet: longDenseSnippet, score: 0.9 }),
     ], 20)
 
-    expect(packed.results).toHaveLength(0)
+    expect(packed.results).toHaveLength(1)
+    expect(packed.results[0]?.snippet.length).toBeLessThan(longDenseSnippet.length)
+    expect(packed.budget.used_tokens).toBeLessThanOrEqual(20)
     expect(packed.truncated_results).toBe(1)
   })
 })

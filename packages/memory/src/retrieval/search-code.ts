@@ -26,8 +26,12 @@ import {
   MAX_LIMIT,
   RANK_WEIGHTS,
   baseWhere,
+  classifyCodeQuery,
+  exactIdentifierRank,
+  exactSymbolRank,
   fetchCandidateRows,
   freshness,
+  ftsSplitStage,
   ftsStage,
   hasChangedFileMatch,
   hasDependencyMatch,
@@ -45,6 +49,8 @@ import {
   rankByPredicate,
   runtimeTruth,
   searchCodeQuery,
+  splitSymbolRank,
+  symbolSplitStage,
   stageRankFromRows,
   stageContributions,
   vectorStage,
@@ -69,9 +75,11 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
   const { where, params } = baseWhere(planner)
 
   const ftsRanks = ftsStage(db, planner, where, params, fetchLimit)
+  const ftsSplitRanks = ftsSplitStage(db, planner, where, params, fetchLimit)
   const vectorRanks = await vectorStage(db, planner, where, params, fetchLimit, skipped)
   const hintRanks = hintStage(db, planner, where, params, fetchLimit)
-  const candidateIds = new Set<string>([...ftsRanks.keys(), ...vectorRanks.keys(), ...hintRanks.keys()])
+  const symbolSplitCandidateRanks = symbolSplitStage(db, planner, where, params, fetchLimit)
+  const candidateIds = new Set<string>([...ftsRanks.keys(), ...ftsSplitRanks.keys(), ...vectorRanks.keys(), ...hintRanks.keys(), ...symbolSplitCandidateRanks.keys()])
   const hasHints = Boolean(planner.path || planner.symbol || planner.lang || planner['package'] || planner.module || planner.dependency || planner.changed_files?.length)
   if (planner.text?.trim() && candidateIds.size === 0 && !hasHints) {
     const response: SearchCodeResponse = { results: [], reason: 'no_match' }
@@ -85,6 +93,7 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
         project_id: planner.project_id,
         fetchLimit,
         ftsRanks,
+        ftsSplitRanks,
         vectorRanks,
         hintRanks,
         skipped: allSkipped,
@@ -116,6 +125,7 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
         project_id: planner.project_id,
         fetchLimit,
         ftsRanks,
+        ftsSplitRanks,
         vectorRanks,
         hintRanks,
         skipped: allSkipped,
@@ -136,8 +146,15 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
       return 2
     })
     : new Map<string, number>()
+  const queryKind = classifyCodeQuery(planner.text)
+  const exactSymbolRanks = exactSymbolRank(rows, planner.symbol ?? planner.text)
+  const exactIdentifierRanks = queryKind === 'natural_language' ? new Map<string, number>() : exactIdentifierRank(rows, planner.text)
+  const splitSymbolRanks = splitSymbolRank(rows, planner.text)
   const pathRanks = planner.path
     ? rankByPredicate(rows, row => hasPathMatch(row.rel_path, planner.path!), row => normalizePath(row.rel_path).length)
+    : new Map<string, number>()
+  const exactPathRanks = planner.path
+    ? rankByPredicate(rows, row => normalizePath(row.rel_path).toLowerCase() === normalizePath(planner.path!).toLowerCase() || normalizePath(row.rel_path).toLowerCase().endsWith(normalizePath(planner.path!).toLowerCase()), row => normalizePath(row.rel_path).length)
     : new Map<string, number>()
   const packageRanks = planner['package']
     ? rankByPredicate(rows, row => hasPackageMatch(row.rel_path, planner['package']!), row => normalizePath(row.rel_path).indexOf(normalizePath(planner['package']!)))
@@ -159,7 +176,12 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
     .map(row => {
       const ranks: Record<string, number | null> = {
         fts: ftsRanks.get(row.chunk_id) ?? null,
+        fts_split: ftsSplitRanks.get(row.chunk_id) ?? null,
         code_vector: vectorRanks.get(row.chunk_id) ?? null,
+        exact_symbol: exactSymbolRanks.get(row.chunk_id) ?? null,
+        exact_identifier: exactIdentifierRanks.get(row.chunk_id) ?? null,
+        split_symbol: splitSymbolRanks.get(row.chunk_id) ?? null,
+        exact_path: exactPathRanks.get(row.chunk_id) ?? null,
         symbol: symbolRanks.get(row.chunk_id) ?? null,
         path: pathRanks.get(row.chunk_id) ?? null,
         package: packageRanks.get(row.chunk_id) ?? null,
@@ -171,7 +193,17 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
       const stage_scores: Record<string, number> = Object.fromEntries(
         Object.entries(ranks).map(([stage, rank]) => [stage, rankScore(rank, RANK_WEIGHTS[stage] ?? 1)]),
       )
-      const score = Object.values(stage_scores).reduce((sum, value) => sum + value, 0)
+      let score = Object.values(stage_scores).reduce((sum, value) => sum + value, 0)
+      const lexicalExact = (stage_scores['exact_symbol'] ?? 0) + (stage_scores['exact_identifier'] ?? 0) + (stage_scores['split_symbol'] ?? 0) + (stage_scores['exact_path'] ?? 0)
+      const semanticOnly = (stage_scores['code_vector'] ?? 0) > 0
+        && (stage_scores['fts'] ?? 0) === 0
+        && (stage_scores['fts_split'] ?? 0) === 0
+        && lexicalExact === 0
+      if ((queryKind === 'identifier' || queryKind === 'path_like' || queryKind === 'mixed') && lexicalExact > 0) {
+        score += 1 + lexicalExact
+      } else if ((queryKind === 'identifier' || queryKind === 'path_like') && semanticOnly) {
+        score *= 0.5
+      }
       const result: SearchCodeResultRow = {
         chunk_id: row.chunk_id,
         rel_path: row.rel_path,
@@ -227,6 +259,7 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
         project_id: planner.project_id,
         fetchLimit,
         ftsRanks,
+        ftsSplitRanks,
         vectorRanks,
         hintRanks,
         skipped: allSkipped,
@@ -255,6 +288,7 @@ export async function searchCode(input: SearchCodeInput, db: Db = getDb()): Prom
       project_id: planner.project_id ?? filtered[0]?.project_id ?? '',
       fetchLimit,
       ftsRanks,
+      ftsSplitRanks,
       vectorRanks,
       hintRanks,
       skipped: allSkipped,

@@ -39,6 +39,8 @@ export interface RoadmapRagEvalCase {
   query: string
   required_domains: RoadmapRagEvalDomain[]
   expected_sources: string[]
+  expected_claims?: string[]
+  forbidden_claims?: string[]
   expected_top_k?: string[]
   thresholds?: RoadmapRagEvalThresholds
   model_heavy?: boolean

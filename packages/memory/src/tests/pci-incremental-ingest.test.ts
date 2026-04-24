@@ -155,6 +155,29 @@ describe('PCI syncer — v2a PR 4 Task 19', () => {
     expect(stillThere).toBeUndefined()
   })
 
+  it('unlink event removes code vector metadata for deleted chunks', async () => {
+    const relPath = 'src/vector-doomed.ts'
+    const abs = join(root, relPath)
+    mkdirSync(join(root, 'src'), { recursive: true })
+    writeFileSync(abs, 'export const vectorGone = true\n', 'utf8')
+    await syncFile({ db, workspaceId, projectId, projectRoot: root, event: { change_type: 'add', path: abs } })
+
+    const fileId = computeFileId(projectId, relPath)
+    const chunk = db.prepare('SELECT chunk_id FROM code_chunks WHERE file_id = ? LIMIT 1').get(fileId) as { chunk_id: string }
+    db.prepare(`
+      INSERT INTO vector_metadata (
+        vector_metadata_id, workspace_id, source_domain, source_id, vector_table, status
+      ) VALUES ('vecmeta_deleted_chunk', ?, 'code_chunk', ?, 'vec_chunks', 'current')
+    `).run(workspaceId, chunk.chunk_id)
+
+    unlinkSync(abs)
+    await syncFile({ db, workspaceId, projectId, projectRoot: root, event: { change_type: 'unlink', path: abs } })
+    await new Promise(resolve => setTimeout(resolve, 600))
+
+    expect(db.prepare('SELECT 1 FROM code_chunks WHERE chunk_id = ?').get(chunk.chunk_id)).toBeUndefined()
+    expect(db.prepare('SELECT 1 FROM vector_metadata WHERE source_domain = ? AND source_id = ?').get('code_chunk', chunk.chunk_id)).toBeUndefined()
+  })
+
   it('same-path unlink followed by add cancels the pending delete', async () => {
     const relPath = 'src/recreated.ts'
     const abs = join(root, relPath)

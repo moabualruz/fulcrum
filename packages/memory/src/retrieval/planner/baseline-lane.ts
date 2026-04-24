@@ -7,6 +7,11 @@ export interface BaselineSemanticRanks {
   code: Map<string, number>
   model_calls: number
   skipped_stages: Array<{ stage: string; reason: string }>
+  coverage: {
+    code_current: number
+    code_pending: number
+    memory_current: number
+  }
 }
 
 export interface LoadBaselineSemanticRanksInput {
@@ -22,6 +27,10 @@ export async function loadBaselineSemanticRanks(
 ): Promise<BaselineSemanticRanks> {
   const memory = await loadMemorySemanticRanks(input, db)
   const code = await loadCodeSemanticRanks(input, db)
+  const coverage = semanticCoverage(input, db)
+  const backlogReason = coverage.code_current === 0 && coverage.code_pending > 0
+    ? `vector_backlog: ${coverage.code_pending} code chunks pending or stale`
+    : undefined
 
   if (memory.skipped_reason || code.skipped_reason) {
     const reasons = [memory.skipped_reason, code.skipped_reason].filter((reason): reason is string => Boolean(reason))
@@ -30,7 +39,8 @@ export async function loadBaselineSemanticRanks(
         memory: memory.ranks,
         code: code.ranks,
         model_calls: memory.model_calls + code.model_calls,
-        skipped_stages: [{ stage: 'semantic', reason: reasons[0] ?? 'no current semantic candidates' }],
+        skipped_stages: [{ stage: 'semantic', reason: backlogReason ?? reasons[0] ?? 'no current semantic candidates' }],
+        coverage,
       }
     }
   }
@@ -40,8 +50,42 @@ export async function loadBaselineSemanticRanks(
     code: code.ranks,
     model_calls: memory.model_calls + code.model_calls,
     skipped_stages: memory.ranks.size === 0 && code.ranks.size === 0
-      ? [{ stage: 'semantic', reason: 'no current semantic candidates' }]
+      ? [{ stage: 'semantic', reason: backlogReason ?? 'no current semantic candidates' }]
       : [],
+    coverage,
+  }
+}
+
+function semanticCoverage(input: LoadBaselineSemanticRanksInput, db: Db): BaselineSemanticRanks['coverage'] {
+  try {
+    const codeCurrent = db.prepare(`
+      SELECT COUNT(*) AS n
+        FROM code_chunks
+       WHERE workspace_id = ?
+         AND project_id = ?
+         AND COALESCE(vector_status, 'legacy') = 'current'
+    `).get(input.workspace_id, input.project_id) as { n: number } | undefined
+    const codePending = db.prepare(`
+      SELECT COUNT(*) AS n
+        FROM code_chunks
+       WHERE workspace_id = ?
+         AND project_id = ?
+         AND COALESCE(vector_status, 'pending') IN ('pending', 'stale', 'legacy')
+    `).get(input.workspace_id, input.project_id) as { n: number } | undefined
+    const memoryCurrent = db.prepare(`
+      SELECT COUNT(*) AS n
+        FROM vector_metadata
+       WHERE workspace_id = ?
+         AND source_domain = 'memory'
+         AND status = 'current'
+    `).get(input.workspace_id) as { n: number } | undefined
+    return {
+      code_current: codeCurrent?.n ?? 0,
+      code_pending: codePending?.n ?? 0,
+      memory_current: memoryCurrent?.n ?? 0,
+    }
+  } catch {
+    return { code_current: 0, code_pending: 0, memory_current: 0 }
   }
 }
 

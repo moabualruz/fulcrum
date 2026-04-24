@@ -85,17 +85,61 @@ const getStatus: HandlerFn = (ctx) => {
   const projects = snapshot.projects.map((p) => {
     let code_chunks_count = 0
     let memories_count = 0
+    let coverage: Record<string, number> | null = null
+    let coverage_reason: string | undefined
     if (db) {
       try {
-        const r1 = db.prepare('SELECT COUNT(*) AS n FROM code_chunks WHERE project_id = ?').get(p.project_id) as { n: number } | undefined
+        const r1 = db.prepare('SELECT COUNT(*) AS n FROM code_chunks WHERE workspace_id = ? AND project_id = ?').get(p.workspace_id, p.project_id) as { n: number } | undefined
         code_chunks_count = r1?.n ?? 0
       } catch { /* table may be missing in a bootstrap daemon */ }
       try {
-        const r2 = db.prepare('SELECT COUNT(*) AS n FROM memories WHERE project_id = ?').get(p.project_id) as { n: number } | undefined
+        const r2 = db.prepare('SELECT COUNT(*) AS n FROM memories WHERE workspace_id = ? AND (project_id = ? OR project_id IS NULL)').get(p.workspace_id, p.project_id) as { n: number } | undefined
         memories_count = r2?.n ?? 0
       } catch { /* ditto */ }
+      try {
+        const files = db.prepare('SELECT COUNT(*) AS n FROM code_files WHERE workspace_id = ? AND project_id = ?').get(p.workspace_id, p.project_id) as { n: number } | undefined
+        const currentVectors = db.prepare(`
+          SELECT COUNT(*) AS n
+            FROM vector_metadata
+           WHERE workspace_id = ?
+             AND source_domain = 'code_chunk'
+             AND status = 'current'
+             AND source_id IN (SELECT chunk_id FROM code_chunks WHERE workspace_id = ? AND project_id = ?)
+        `).get(p.workspace_id, p.workspace_id, p.project_id) as { n: number } | undefined
+        const pendingVectors = db.prepare(`
+          SELECT COUNT(*) AS n
+            FROM code_chunks
+           WHERE workspace_id = ?
+             AND project_id = ?
+             AND COALESCE(vector_status, 'pending') IN ('pending', 'stale', 'legacy')
+        `).get(p.workspace_id, p.project_id) as { n: number } | undefined
+        coverage = {
+          code_files_count: files?.n ?? 0,
+          code_chunks_count,
+          memories_count,
+          current_vectors_count: currentVectors?.n ?? 0,
+          pending_vectors_count: pendingVectors?.n ?? 0,
+        }
+      } catch {
+        coverage_reason = 'coverage tables unavailable'
+      }
+    } else {
+      coverage_reason = 'database unavailable'
     }
-    return { ...p, code_chunks_count, memories_count }
+    return {
+      ...p,
+      watch: {
+        root: p.root,
+        workspace_id: p.workspace_id,
+        project_id: p.project_id,
+        refcount: p.refcount,
+        watcher_active: p.watcher_active,
+      },
+      coverage,
+      ...(coverage_reason ? { coverage_reason } : {}),
+      code_chunks_count,
+      memories_count,
+    }
   })
   return {
     version: ctx.version,

@@ -180,7 +180,7 @@ export async function syncFile(
     db.prepare('UPDATE code_chunks SET file_id = ?, file_path = ? WHERE file_id = ?').run(fileId, relPath, rename.fileId)
     refreshGraphCoverageForCodeFile({ workspace_id: workspaceId, project_id: projectId, file_id: rename.fileId, rel_path: rename.relPath }, db)
     refreshGraphCoverageForCodeFile({ workspace_id: workspaceId, project_id: projectId, file_id: fileId, rel_path: relPath }, db)
-    void reduceFileToGraph(db, fileId).catch(() => { /* logged in reducer */ })
+    await reduceFileToGraph(db, fileId).catch(() => { /* logged in reducer */ })
     return { action: 'renamed', fileId }
   }
 
@@ -196,7 +196,7 @@ export async function syncFile(
 
   if (result.action === 'indexed' || result.action === 'updated') {
     refreshGraphCoverageForCodeFile({ workspace_id: workspaceId, project_id: projectId, file_id: fileId, rel_path: relPath }, db)
-    void reduceFileToGraph(db, fileId).catch(() => { /* logged in reducer */ })
+    await reduceFileToGraph(db, fileId).catch(() => { /* logged in reducer */ })
   }
 
   return { action: result.action, fileId }
@@ -209,6 +209,20 @@ function mtimeNs(stats: ReturnType<typeof statSync> | undefined): number {
 }
 
 function deleteFile(db: Db, fileId: string, scope?: DeleteFileScope): void {
+  const chunkIds = (db.prepare('SELECT chunk_id FROM code_chunks WHERE file_id = ?').all(fileId) as Array<{ chunk_id: string }>)
+    .map(row => row.chunk_id)
+  for (const chunkId of chunkIds) {
+    try { db.prepare('DELETE FROM vec_chunks WHERE chunk_id = ?').run(chunkId) }
+    catch { /* vec_chunks may be unavailable if vec0 is not loaded */ }
+    db.prepare(`
+      DELETE FROM vector_metadata
+       WHERE source_domain = 'code_chunk' AND source_id = ?
+    `).run(chunkId)
+    db.prepare(`
+      DELETE FROM embedding_job_items
+       WHERE source_domain = 'code_chunks' AND source_id = ?
+    `).run(chunkId)
+  }
   try { db.prepare('DELETE FROM code_files WHERE file_id = ?').run(fileId) }
   catch { /* cascade clears chunks/symbols via FK */ }
   try { db.prepare('DELETE FROM code_chunks WHERE file_id = ?').run(fileId) }

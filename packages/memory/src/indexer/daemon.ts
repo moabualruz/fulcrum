@@ -87,11 +87,7 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<DaemonHandl
   const getDb = (): Db | null => {
     if (cachedDb !== undefined) return cachedDb
     try {
-      // Dynamic import, synchronous pattern: we swallow failures so the daemon
-      // remains usable even when the DB cannot be opened (e.g., permission).
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const core = require('fulcrum-agent-core') as { getDb: () => Db }
-      cachedDb = core.getDb()
+      cachedDb = getCoreDb() as Db
     } catch {
       cachedDb = null
     }
