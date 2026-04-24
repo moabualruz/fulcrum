@@ -1,0 +1,22 @@
+{
+  "name": "@fulcrum/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@fulcrum/shared": "workspace:*",
+    "better-sqlite3": "^11.9.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "typescript": "^5.8.2"
+  }
+}

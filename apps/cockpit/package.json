@@ -1,8 +1,22 @@
 {
-  "name": "@fulcrum/cockpit-spike",
+  "name": "@fulcrum/cockpit",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test --experimental-strip-types tests/live_stream.spec.ts"
+    "build": "vite build",
+    "dev": "vite --host 127.0.0.1",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fulcrum/shared": "workspace:*",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.2.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
   }
 }

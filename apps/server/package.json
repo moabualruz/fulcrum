@@ -1,0 +1,20 @@
+{
+  "name": "@fulcrum/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fulcrum/core": "workspace:*",
+    "@fulcrum/mcp": "workspace:*",
+    "@hono/node-server": "^1.14.0",
+    "hono": "^4.7.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}

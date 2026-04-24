@@ -1,0 +1,47 @@
+{
+  "name": "fulcrum",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.10.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter @fulcrum/cli dev",
+    "dev:server": "pnpm --filter @fulcrum/server dev",
+    "dev:cockpit": "pnpm --filter @fulcrum/cockpit dev",
+    "dev:tui": "pnpm --filter @fulcrum/tui dev",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "@modelcontextprotocol/sdk": "^1.9.0",
+    "better-sqlite3": "^11.9.1",
+    "commander": "^13.1.0",
+    "execa": "^9.5.2",
+    "hono": "^4.7.5",
+    "ink": "^5.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.23.0",
+    "@playwright/test": "^1.51.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.13.14",
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.23.0",
+    "prettier": "^3.5.3",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.3",
+    "vitest": "^3.0.9"
+  }
+}

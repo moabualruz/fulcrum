@@ -1,0 +1,18 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/core" },
+    { "path": "packages/db" },
+    { "path": "packages/mcp" },
+    { "path": "packages/plane" },
+    { "path": "packages/memory" },
+    { "path": "packages/code-tools" },
+    { "path": "packages/agents" },
+    { "path": "packages/policy" },
+    { "path": "apps/cli" },
+    { "path": "apps/server" },
+    { "path": "apps/cockpit" },
+    { "path": "apps/tui" }
+  ]
+}

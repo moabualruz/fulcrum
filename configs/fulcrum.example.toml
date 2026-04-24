@@ -1,0 +1,13 @@
+[core]
+state_root = "~/.local/share/fulcrum"
+network_default = "local-only"
+privacy_mode = "local_first"
+
+[server]
+bind = "127.0.0.1"
+port = 4173
+
+[adapters]
+external_pm_enabled = false
+remote_model_enabled = false
+telemetry_enabled = false

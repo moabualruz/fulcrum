@@ -1,11 +1,18 @@
-/target/
-
-# Local editor and OS noise
+node_modules/
+dist/
+build/
+coverage/
+*.log
+.env*
 .DS_Store
-.idea/
+Thumbs.db
+*.tmp
+*.swp
+*.tsbuildinfo
 .vscode/
-
-# Local environment files
-.env
-.env.*
-!.env.example
+.idea/
+__pycache__/
+*.pyc
+.venv/
+venv/
+target/

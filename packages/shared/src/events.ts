@@ -1,0 +1,73 @@
+import { z } from "zod";
+import { FulcrumIdSchema, SchemaVersionSchema, TimestampSchema } from "./ids.js";
+import { RedactionStatusSchema } from "./contracts/common.js";
+
+export const EventTypeSchema = z.enum([
+  "setup.previewed",
+  "setup.applied",
+  "doctor.checked",
+  "project.registered",
+  "task.created",
+  "task.transitioned",
+  "external.imported",
+  "external.writeback.previewed",
+  "external.writeback.completed",
+  "run.created",
+  "run.started",
+  "run.heartbeat",
+  "run.progress",
+  "run.stale_detected",
+  "run.cancel_requested",
+  "run.cancelled",
+  "run.failed",
+  "run.completed",
+  "context.build_started",
+  "context.build_completed",
+  "context.lane_degraded",
+  "memory.imported",
+  "memory.draft_created",
+  "memory.approved",
+  "memory.marked_stale",
+  "code.search_completed",
+  "code.evidence_stale",
+  "worktree.allocated",
+  "worktree.status_checked",
+  "worktree.cleanup_blocked",
+  "worktree.cleaned",
+  "quality.started",
+  "quality.completed",
+  "policy.checked",
+  "policy.approved",
+  "policy.denied",
+  "artifact.attached",
+  "adapter.health_checked",
+  "adapter.degraded",
+  "backup.created",
+  "restore.completed",
+  "rebuild.completed",
+  "export.created",
+  "reset.previewed",
+  "uninstall.previewed"
+]);
+
+export const RunEventSchema = z.object({
+  schemaVersion: SchemaVersionSchema,
+  eventId: FulcrumIdSchema,
+  sequence: z.number().int().nonnegative(),
+  timestamp: TimestampSchema,
+  source: z.string(),
+  severity: z.enum(["debug", "info", "warn", "error"]),
+  type: EventTypeSchema,
+  projectId: FulcrumIdSchema.optional(),
+  taskId: FulcrumIdSchema.optional(),
+  runId: FulcrumIdSchema.optional(),
+  correlationId: FulcrumIdSchema.optional(),
+  payloadSummary: z.record(z.unknown()),
+  payloadRef: z.string().nullable().default(null),
+  artifactRefs: z.array(FulcrumIdSchema).default([]),
+  policyDecisionRefs: z.array(FulcrumIdSchema).default([]),
+  redactionStatus: RedactionStatusSchema,
+  degraded: z.array(z.string()).default([])
+});
+
+export type RunEvent = z.infer<typeof RunEventSchema>;
