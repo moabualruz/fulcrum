@@ -5,6 +5,7 @@ import type {
   RunLifecycleService,
   LocalTaskService
 } from "@fulcrum/core";
+import { defaultMcpCallLog } from "./call-log.js";
 
 export interface McpResourceRuntime {
   projects: ProjectRegistryService;
@@ -83,6 +84,12 @@ export function createMcpResourceDefinitions(runtime: McpResourceRuntime): McpRe
       uri: "fulcrum://doctor",
       description: "Local Fulcrum health resource.",
       read: async () => runtime.doctor()
+    },
+    {
+      name: "fulcrum-mcp-call-log",
+      uri: "fulcrum://mcp-call-log",
+      description: "Local MCP call log with redacted parameters.",
+      read: async () => defaultMcpCallLog.list()
     }
   ];
 }

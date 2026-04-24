@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1",
+  "fixtureId": "scale-success-criteria",
+  "description": "Deterministic scale fixture metadata for SC validation.",
+  "counts": {
+    "projects": 25,
+    "tasks": 1000,
+    "events": 10000,
+    "artifacts": 500,
+    "memoryEntries": 100
+  },
+  "generation": {
+    "strategy": "deterministic-id-ranges",
+    "projectIds": "proj_scale_000..024",
+    "taskIds": "task_scale_0000..0999",
+    "eventIds": "event_scale_00000..09999",
+    "artifactIds": "artifact_scale_000..499",
+    "memoryIds": "memory_scale_000..099"
+  },
+  "acceptance": {
+    "projectListP95Ms": 500,
+    "taskListP95Ms": 750,
+    "runStatusP95Ms": 250,
+    "healthSummaryP95Ms": 250
+  }
+}

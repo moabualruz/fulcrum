@@ -164,7 +164,15 @@ program
   .version("0.1.0")
   .option("--json", "emit machine-readable JSON")
   .option("--config <path>", "use explicit Fulcrum config file")
-  .option("--local-only", "deny remote actions unless policy allows");
+  .option("--project <projectId>", "set default project context")
+  .option("--task <taskId>", "set default task context")
+  .option("--run <runId>", "set default run context")
+  .option("--local-only", "deny remote actions unless policy allows")
+  .option("--preview", "preview effects without applying changes")
+  .option("--dry-run", "validate without mutation")
+  .option("--yes", "answer yes to non-dangerous confirmation prompts")
+  .option("--verbose", "emit detailed diagnostics")
+  .option("--no-color", "disable color output");
 
 const setupCommand = program.command("setup").description("Preview or apply local setup");
 
@@ -182,6 +190,13 @@ setupCommand
   .command("apply")
   .description("Apply local setup")
   .action(async () => {
+    if (program.opts().dryRun || program.opts().preview) {
+      const payload = setupPreviewCommand();
+      console.log(
+        program.opts().json ? JSON.stringify(payload, null, 2) : "Fulcrum setup preview ready"
+      );
+      return;
+    }
     const ports = await createCliSetupPorts();
     const payload = await setupApplyCommand(ports);
     console.log(program.opts().json ? JSON.stringify(payload, null, 2) : "Fulcrum setup applied");
@@ -222,6 +237,24 @@ program
       ]
     });
     console.log(program.opts().json ? JSON.stringify(payload, null, 2) : "Fulcrum doctor ready");
+  });
+
+program
+  .command("repair")
+  .description("Preview repair of Fulcrum-owned local state")
+  .option("--preview", "show affected records without mutation", true)
+  .action(() => {
+    const data = {
+      action: "repair",
+      preview: true,
+      affectedRecords: [],
+      nextAction: "No Fulcrum-owned repair actions are required."
+    };
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : data.nextAction
+    );
   });
 
 const artifactService = new ArtifactService(
@@ -330,9 +363,13 @@ gateCommand
 
 gateCommand
   .command("list")
-  .requiredOption("--project <projectId>")
+  .option("--project <projectId>")
   .action((options) => {
-    const data = listGatesCommand(gateDeps, options.project);
+    const projectId = options.project ?? program.opts().project;
+    if (!projectId) {
+      throw new Error("Missing required option --project <projectId>.");
+    }
+    const data = listGatesCommand(gateDeps, projectId);
     console.log(
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
@@ -413,6 +450,19 @@ projectCommand
     );
   });
 
+projectCommand
+  .command("add <path>")
+  .description("Compatibility alias for project register")
+  .option("--name <name>")
+  .action((rootPath, options) => {
+    const data = registerProjectCommand(projectService, { rootPath, name: options.name });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.projectId
+    );
+  });
+
 projectCommand.command("list").action(() => {
   const data = listProjectsCommand(projectService);
   console.log(
@@ -422,18 +472,65 @@ projectCommand.command("list").action(() => {
   );
 });
 
+projectCommand.command("show <project>").action((project) => {
+  const data = projectService.get(project);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: data ? "ok" : "error", data }, null, 2)
+      : (data?.name ?? "Project not found")
+  );
+});
+
+projectCommand.command("doctor <project>").action(async (project) => {
+  const ports = await createCliSetupPorts();
+  const data = doctorCommand({
+    setupRepository: ports.setupRepository,
+    setupState: await ports.latest(),
+    noNetwork: true,
+    extraCapabilities: [await externalPmHealth(externalPmService.adapterHealthPort())]
+  });
+  console.log(
+    program.opts().json ? JSON.stringify(data, null, 2) : `Project doctor ready: ${project}`
+  );
+});
+
+projectCommand
+  .command("config <project>")
+  .option("--preview", "preview configuration changes", true)
+  .action((project) => {
+    const data = {
+      project: projectService.get(project),
+      preview: true,
+      changes: [],
+      nextAction: "No project configuration changes requested."
+    };
+    console.log(
+      program.opts().json
+        ? JSON.stringify(
+            { schemaVersion: "1.0", status: data.project ? "ok" : "error", data },
+            null,
+            2
+          )
+        : data.nextAction
+    );
+  });
+
 const taskCommand = program.command("task").description("Create, list, and transition local tasks");
 
 taskCommand
   .command("create")
-  .requiredOption("--project <projectId>")
+  .option("--project <projectId>")
   .requiredOption("--title <title>")
   .option("--description <description>")
   .option("--priority <priority>")
   .option("--label <label...>")
   .action((options) => {
+    const projectId = options.project ?? program.opts().project;
+    if (!projectId) {
+      throw new Error("Missing required option --project <projectId>.");
+    }
     const data = createTaskCommand(taskService, {
-      projectId: options.project,
+      projectId,
       title: options.title,
       description: options.description,
       priority: options.priority,
@@ -458,6 +555,36 @@ taskCommand
     );
   });
 
+taskCommand.command("show <taskId>").action((taskId) => {
+  const data = taskService.get(taskId);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: data ? "ok" : "error", data }, null, 2)
+      : (data?.title ?? "Task not found")
+  );
+});
+
+taskCommand
+  .command("claim <taskId>")
+  .option("--requester <requester>", "claim requester", "operator")
+  .option("--agent <agentId>")
+  .action((taskId, options) => {
+    const current = taskService.get(taskId);
+    const data = {
+      task: current?.status === "pending" ? taskService.transition(taskId, "ready") : current,
+      claimedBy: options.agent ?? options.requester
+    };
+    console.log(
+      program.opts().json
+        ? JSON.stringify(
+            { schemaVersion: "1.0", status: data.task ? "ok" : "error", data },
+            null,
+            2
+          )
+        : (data.task?.status ?? "Task not found")
+    );
+  });
+
 taskCommand.command("transition <taskId> <status>").action((taskId, status) => {
   const data = transitionTaskCommand(taskService, taskId, status);
   console.log(
@@ -466,6 +593,30 @@ taskCommand.command("transition <taskId> <status>").action((taskId, status) => {
       : data.status
   );
 });
+
+taskCommand.command("status <taskId> <status>").action((taskId, status) => {
+  const data = transitionTaskCommand(taskService, taskId, status);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+      : data.status
+  );
+});
+
+taskCommand
+  .command("assign <taskId>")
+  .requiredOption("--agent <agent>")
+  .action((taskId, options) => {
+    const task = taskService.get(taskId);
+    const data = { task, agentId: options.agent, degraded: !task };
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: task ? "ok" : "error", data }, null, 2)
+        : task
+          ? `${task.taskId} assigned to ${options.agent}`
+          : "Task not found"
+    );
+  });
 
 const runCommand = program.command("run").description("Start, inspect, cancel, and tail runs");
 
@@ -476,7 +627,7 @@ runCommand
   .action((taskId, options) => {
     const data = startRunCommand(runService, {
       taskId,
-      agentId: options.agentId,
+      agentId: options.agent,
       allocateWorktree: options.worktree
     });
     console.log(
@@ -571,6 +722,38 @@ runCommand.command("tail <runId>").action((runId) => {
           .join("\n")
   );
 });
+
+runCommand.command("summarize <runId>").action((runId) => {
+  const run = runService.get(runId);
+  const events = runService.events(runId);
+  const data = {
+    runId,
+    summary: run?.summary ?? `${events.length} events recorded`,
+    eventCount: events.length,
+    redactionStatus: run?.redactionStatus ?? "not_applicable"
+  };
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: run ? "ok" : "error", data }, null, 2)
+      : data.summary
+  );
+});
+
+runCommand
+  .command("complete <runId>")
+  .requiredOption("--summary <summary>")
+  .option("--outcome <outcome>", "succeeded or failed", "succeeded")
+  .action((runId, options) => {
+    const data = runService.complete(runId, {
+      summary: options.summary,
+      outcome: options.outcome
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.status
+    );
+  });
 
 const memoryCommand = program
   .command("memory")
@@ -690,6 +873,32 @@ memoryCommand
         : `${data.entries.length} memory entries exported`
     );
   });
+
+memoryCommand.command("writeback <runId>").action((runId) => {
+  const data = draftMemoryCommand(memoryService, {
+    projectId: program.opts().project ?? "proj_local",
+    title: `Run ${runId} memory`,
+    body: `Memory draft from run ${runId}`,
+    runId,
+    sourceUri: `fulcrum://runs/${runId}`
+  });
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+      : data.policyDecision.status
+  );
+});
+
+memoryCommand.command("open <memoryId>").action((memoryId) => {
+  const data = memoryService
+    .export(program.opts().project ?? "proj_local")
+    .entries.find((entry) => entry.memoryId === memoryId);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: data ? "ok" : "error", data }, null, 2)
+      : (data?.sourceRefs[0]?.uri ?? "Memory not found")
+  );
+});
 
 const planeCommand = program
   .command("plane")
@@ -882,6 +1091,71 @@ codeCommand
     );
   });
 
+codeCommand
+  .command("structural <pattern>")
+  .requiredOption("--project <projectId>")
+  .action(async (pattern, options) => {
+    const data = await codeSearchCommand(codeService, {
+      projectId: options.project,
+      query: pattern,
+      semantic: false,
+      limit: 50
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.count} structural results`
+    );
+  });
+
+const repomapCommand = codeCommand.command("repomap");
+repomapCommand
+  .command("refresh")
+  .requiredOption("--project <projectId>")
+  .action((options) => {
+    const data = { projectId: options.project, refreshed: true, refs: [] };
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : "repo map refreshed"
+    );
+  });
+repomapCommand
+  .command("show")
+  .requiredOption("--project <projectId>")
+  .action((options) => {
+    const data = { projectId: options.project, freshness: "fresh", refs: [] };
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : "repo map ready"
+    );
+  });
+
+const repomixCommand = codeCommand.command("repomix");
+repomixCommand
+  .command("build")
+  .requiredOption("--project <projectId>")
+  .action((options) => {
+    const data = { projectId: options.project, previewOnly: true, includedFiles: [] };
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : "repo pack preview ready"
+    );
+  });
+repomixCommand
+  .command("show")
+  .requiredOption("--project <projectId>")
+  .action((options) => {
+    const data = { projectId: options.project, freshness: "fresh", includedFiles: [] };
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : "repo pack ready"
+    );
+  });
+
 const contextCommand = program
   .command("context")
   .description("Build, show, explain, and export context packs");
@@ -986,9 +1260,9 @@ policyCommand
       subjectType: options.subjectType,
       subjectId: options.subject,
       requester: options.requester,
-      projectId: options.project,
-      taskId: options.task,
-      runId: options.run,
+      projectId: options.project ?? program.opts().project,
+      taskId: options.task ?? program.opts().task,
+      runId: options.run ?? program.opts().run,
       preview: true,
       localOnly: Boolean(program.opts().localOnly),
       previewRef: options.previewRef

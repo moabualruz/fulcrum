@@ -37,7 +37,8 @@ describe("MCP tool schemas", () => {
       "fulcrum://runs/{runId}",
       "fulcrum://context-packs/{contextPackId}",
       "fulcrum://artifacts/{artifactId}",
-      "fulcrum://doctor"
+      "fulcrum://doctor",
+      "fulcrum://mcp-call-log"
     ]);
 
     const missingTask = await createMcpToolDefinitions(runtime)

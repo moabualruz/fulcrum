@@ -387,33 +387,33 @@
 
 **Purpose**: Prove whole product coherence, documentation, performance, parity, and release readiness.
 
-- [ ] T197 [P] Run full quickstart validation and store evidence in `tests/e2e/quickstart/full-operator-validation.sh`
-- [ ] T198 [P] Add success-criteria fixture for 25 projects, 1,000 tasks, 10,000 events, 500 artifacts, and 100 memory entries in `tests/fixtures/scale/`
-- [ ] T199 [P] Add common status performance tests for project list, task list, run status, and health summary in `tests/integration/status-performance.test.ts`
-- [ ] T200 [P] Add cockpit primary workflow accessibility tests in `tests/e2e/cockpit-accessibility.spec.ts`
-- [ ] T201 Add cross-surface parity suite covering CLI, cockpit, JSON, MCP, and local health reports in `tests/integration/cross-surface-parity.test.ts`
-- [ ] T202 Add end-to-end no-network product workflow test in `tests/privacy/local-only-product-flow.test.ts`
-- [ ] T203 Add provenance completeness test for context, code, memory, artifacts, quality gates, and exports in `tests/integration/provenance-completeness.test.ts`
-- [ ] T204 Add policy coverage test for all dangerous actions listed in the constitution in `tests/policy/constitution-dangerous-actions.test.ts`
-- [ ] T205 Add backup/restore/export/rebuild/reset/uninstall release gate test in `tests/recovery/release-recovery-gates.test.ts`
-- [ ] T206 Add two-configured-agent lifecycle validation covering shared task, run, context, artifact, quality, and policy state in `tests/integration/two-agent-lifecycle.test.ts`
-- [ ] T207 Add release acceptance operator review validation fixtures and evidence capture for task, context, changed files, quality gates, policy decision, and next-action recognition in `tests/e2e/release-acceptance-operator-review.spec.ts`
-- [ ] T208 Update operator documentation for install, doctor, cockpit, MCP, adapters, policy, worktrees, quality gates, and recovery in `docs/operator-guide.md`
-- [ ] T209 Update architecture documentation for TypeScript boundaries, SQLite canonical state, adapters, events, and Go escape hatch criteria in `docs/architecture.md`
-- [ ] T210 Add release checklist mapping every success criterion SC-001 through SC-022 to validation evidence in `docs/release-checklist.md`
-- [ ] T211 [P] Add full SRS CLI command coverage contract tests for setup, doctor, repair, uninstall, project, external PM, task, context, code, memory, run, worktree, gate, artifact, backup, restore, export, and rebuild commands in `tests/contract/cli-full-srs-commands.test.ts`
-- [ ] T212 [P] Add full SRS MCP tool coverage and MCP call logging tests in `tests/contract/mcp-full-srs-tools.test.ts`
-- [ ] T213 Implement missing CLI command surfaces and aliases required by `contracts/cli-contract.md` in `apps/cli/src/commands/`
-- [ ] T214 Implement missing MCP tools, aliases, resources, and call logging required by `contracts/mcp-tool-contract.md` in `packages/mcp/src/tools.ts`, `packages/mcp/src/resources.ts`, and `packages/mcp/src/call-log.ts`
-- [ ] T215 Implement terminal dashboard/TUI views for dashboard, projects, tasks, runs, worktrees, artifacts, context packs, quality gates, doctor, and event stream in `apps/tui/src/views/`
-- [ ] T216 Add terminal dashboard/TUI parity tests against CLI, cockpit, MCP, JSON/JSONL, and health output in `tests/integration/tui-surface-parity.test.ts`
-- [ ] T217 Add optional observability adapter tests for disabled-by-default OpenTelemetry, Langfuse, and Helicone-style exporters in `tests/privacy/observability-disabled-by-default.test.ts`
-- [ ] T218 Update release checklist mapping SC-021 and SC-022 plus every SRS command/tool coverage item to validation evidence in `docs/release-checklist.md`
-- [ ] T219 Add real Plane adapter acceptance coverage for connect, doctor, import, sync, link-task, writeback, status mapping, docs/pages memory source registration, outage recovery, and local-history preservation in `tests/integration/plane-full-acceptance.test.ts`
-- [ ] T220 Add memsearch and Engram adapter acceptance coverage for install guidance, doctor health, search, writeback, degraded fallback, context-pack inclusion, rebuild, and export provenance in `tests/integration/memory-backend-acceptance.test.ts`
-- [ ] T221 Implement standalone GitHub Copilot CLI agent profile, wrapper, prompt mode, plugins, skills, session persistence, subagents/fleet capability model, install hints, version/auth/policy/MCP doctor checks, and `gh copilot` rejection in `packages/agents/src/copilot.ts` and `packages/core/src/doctor/copilot.ts`
-- [ ] T222 Implement optional OpenTelemetry, Langfuse, and Helicone-style observability adapters with disabled-by-default config, local-only blocking, redaction, export path, and health/privacy status in `packages/core/src/observability/adapters.ts`
-- [ ] T223 Add global CLI flag coverage for `--config`, `--project`, `--task`, `--run`, `--local-only`, `--preview`, `--dry-run`, `--yes`, `--verbose`, and `--no-color` in `tests/contract/cli-global-flags.test.ts`
+- [x] T197 [P] Run full quickstart validation and store evidence in `tests/e2e/quickstart/full-operator-validation.sh`
+- [x] T198 [P] Add success-criteria fixture for 25 projects, 1,000 tasks, 10,000 events, 500 artifacts, and 100 memory entries in `tests/fixtures/scale/`
+- [x] T199 [P] Add common status performance tests for project list, task list, run status, and health summary in `tests/integration/status-performance.test.ts`
+- [x] T200 [P] Add cockpit primary workflow accessibility tests in `tests/e2e/cockpit-accessibility.spec.ts`
+- [x] T201 Add cross-surface parity suite covering CLI, cockpit, JSON, MCP, and local health reports in `tests/integration/cross-surface-parity.test.ts`
+- [x] T202 Add end-to-end no-network product workflow test in `tests/privacy/local-only-product-flow.test.ts`
+- [x] T203 Add provenance completeness test for context, code, memory, artifacts, quality gates, and exports in `tests/integration/provenance-completeness.test.ts`
+- [x] T204 Add policy coverage test for all dangerous actions listed in the constitution in `tests/policy/constitution-dangerous-actions.test.ts`
+- [x] T205 Add backup/restore/export/rebuild/reset/uninstall release gate test in `tests/recovery/release-recovery-gates.test.ts`
+- [x] T206 Add two-configured-agent lifecycle validation covering shared task, run, context, artifact, quality, and policy state in `tests/integration/two-agent-lifecycle.test.ts`
+- [x] T207 Add release acceptance operator review validation fixtures and evidence capture for task, context, changed files, quality gates, policy decision, and next-action recognition in `tests/e2e/release-acceptance-operator-review.spec.ts`
+- [x] T208 Update operator documentation for install, doctor, cockpit, MCP, adapters, policy, worktrees, quality gates, and recovery in `docs/operator-guide.md`
+- [x] T209 Update architecture documentation for TypeScript boundaries, SQLite canonical state, adapters, events, and Go escape hatch criteria in `docs/architecture.md`
+- [x] T210 Add release checklist mapping every success criterion SC-001 through SC-022 to validation evidence in `docs/release-checklist.md`
+- [x] T211 [P] Add full SRS CLI command coverage contract tests for setup, doctor, repair, uninstall, project, external PM, task, context, code, memory, run, worktree, gate, artifact, backup, restore, export, and rebuild commands in `tests/contract/cli-full-srs-commands.test.ts`
+- [x] T212 [P] Add full SRS MCP tool coverage and MCP call logging tests in `tests/contract/mcp-full-srs-tools.test.ts`
+- [x] T213 Implement missing CLI command surfaces and aliases required by `contracts/cli-contract.md` in `apps/cli/src/commands/`
+- [x] T214 Implement missing MCP tools, aliases, resources, and call logging required by `contracts/mcp-tool-contract.md` in `packages/mcp/src/tools.ts`, `packages/mcp/src/resources.ts`, and `packages/mcp/src/call-log.ts`
+- [x] T215 Implement terminal dashboard/TUI views for dashboard, projects, tasks, runs, worktrees, artifacts, context packs, quality gates, doctor, and event stream in `apps/tui/src/views/`
+- [x] T216 Add terminal dashboard/TUI parity tests against CLI, cockpit, MCP, JSON/JSONL, and health output in `tests/integration/tui-surface-parity.test.ts`
+- [x] T217 Add optional observability adapter tests for disabled-by-default OpenTelemetry, Langfuse, and Helicone-style exporters in `tests/privacy/observability-disabled-by-default.test.ts`
+- [x] T218 Update release checklist mapping SC-021 and SC-022 plus every SRS command/tool coverage item to validation evidence in `docs/release-checklist.md`
+- [x] T219 Add real Plane adapter acceptance coverage for connect, doctor, import, sync, link-task, writeback, status mapping, docs/pages memory source registration, outage recovery, and local-history preservation in `tests/integration/plane-full-acceptance.test.ts`
+- [x] T220 Add memsearch and Engram adapter acceptance coverage for install guidance, doctor health, search, writeback, degraded fallback, context-pack inclusion, rebuild, and export provenance in `tests/integration/memory-backend-acceptance.test.ts`
+- [x] T221 Implement standalone GitHub Copilot CLI agent profile, wrapper, prompt mode, plugins, skills, session persistence, subagents/fleet capability model, install hints, version/auth/policy/MCP doctor checks, and `gh copilot` rejection in `packages/agents/src/copilot.ts` and `packages/core/src/doctor/copilot.ts`
+- [x] T222 Implement optional OpenTelemetry, Langfuse, and Helicone-style observability adapters with disabled-by-default config, local-only blocking, redaction, export path, and health/privacy status in `packages/core/src/observability/adapters.ts`
+- [x] T223 Add global CLI flag coverage for `--config`, `--project`, `--task`, `--run`, `--local-only`, `--preview`, `--dry-run`, `--yes`, `--verbose`, and `--no-color` in `tests/contract/cli-global-flags.test.ts`
 
 ## Dependencies And Execution Order
 

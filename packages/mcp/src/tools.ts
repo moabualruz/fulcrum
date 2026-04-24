@@ -19,6 +19,7 @@ import type {
   WorktreeAllocationService,
   WorktreeStatusService
 } from "@fulcrum/core";
+import { defaultMcpCallLog, summarizeMcpCall } from "./call-log.js";
 import { fromPolicyDecision, fromUnknownError, ok, type McpCommonResponse } from "./errors.js";
 
 export interface McpToolRuntime {
@@ -77,11 +78,17 @@ export function createMcpToolDefinitions(runtime: McpToolRuntime): McpToolDefini
           !options.policyDecisionIsResult &&
           ["denied", "approval_required"].includes(policyDecision.status)
         ) {
-          return fromPolicyDecision(policyDecision);
+          const response = fromPolicyDecision(policyDecision);
+          defaultMcpCallLog.record(summarizeMcpCall({ toolName: name, args: raw, response }));
+          return response;
         }
-        return ok(data, { policyDecisionIds });
+        const response = ok(data, { policyDecisionIds });
+        defaultMcpCallLog.record(summarizeMcpCall({ toolName: name, args: raw, response }));
+        return response;
       } catch (error) {
-        return fromUnknownError(error);
+        const response = fromUnknownError(error);
+        defaultMcpCallLog.record(summarizeMcpCall({ toolName: name, args: raw, response }));
+        return response;
       }
     }
   });
@@ -137,7 +144,8 @@ export function createMcpToolDefinitions(runtime: McpToolRuntime): McpToolDefini
       ({ taskId, requester, agentId }) => {
         const task = runtime.tasks.get(taskId);
         if (!task) throw new Error(`Task not found: ${taskId}`);
-        const claimed = task.status === "pending" ? runtime.tasks.transition(taskId, "ready") : task;
+        const claimed =
+          task.status === "pending" ? runtime.tasks.transition(taskId, "ready") : task;
         if (claimed.status !== "ready") {
           throw new Error(`Task cannot be claimed from status: ${claimed.status}`);
         }
@@ -565,7 +573,6 @@ function qualityGatePolicyDecision(
   return undefined;
 }
 
-const aliases: Partial<Record<McpToolDefinition["name"], string[]>> = {
-  fulcrum_doctor_status: ["fulcrum.doctor.status"],
-  fulcrum_project_list: ["fulcrum.project.list"]
-};
+const aliases = Object.fromEntries(
+  MCP_TOOL_NAMES.map((name) => [name, [name.replaceAll("_", ".")]])
+) as Partial<Record<McpToolDefinition["name"], string[]>>;
