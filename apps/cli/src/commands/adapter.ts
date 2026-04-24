@@ -1,4 +1,8 @@
-import { buildAdapterDegradationSummary, type AdapterRegistryService } from "@fulcrum/core";
+import {
+  buildAdapterDegradationSummary,
+  certifyAdapters,
+  type AdapterRegistryService
+} from "@fulcrum/core";
 
 export async function listAdaptersCommand(registry: AdapterRegistryService) {
   return registry.listHealth();
@@ -18,4 +22,8 @@ export async function disableAdapterCommand(
 
 export async function adapterDegradationCommand(registry: AdapterRegistryService) {
   return buildAdapterDegradationSummary(registry);
+}
+
+export async function certifyAdaptersCommand(registry: AdapterRegistryService) {
+  return certifyAdapters(registry);
 }

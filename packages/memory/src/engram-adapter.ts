@@ -1,20 +1,21 @@
 import { MarkdownMemoryAdapter } from "./markdown-adapter.js";
+import { probeMemoryExecutable } from "./probe.js";
 
 export class EngramMemoryAdapter extends MarkdownMemoryAdapter {
   readonly backend = "engram";
 
   override health() {
+    const probe = probeMemoryExecutable("engram", "FULCRUM_ENGRAM_ENABLED");
     return {
-      state:
-        process.env.FULCRUM_ENGRAM_ENABLED === "1" ? ("managed" as const) : ("degraded" as const),
+      state: probe.state,
       limitation:
-        process.env.FULCRUM_ENGRAM_ENABLED === "1"
-          ? undefined
-          : "Engram backend not configured; local markdown index used.",
+        probe.state === "managed" ? undefined : `${probe.reason}; local markdown index used.`,
       nextAction:
-        process.env.FULCRUM_ENGRAM_ENABLED === "1"
+        probe.state === "managed"
           ? undefined
-          : "Set FULCRUM_ENGRAM_ENABLED=1 after configuring Engram."
+          : "Install Engram and set FULCRUM_ENGRAM_ENABLED=1 after configuring it.",
+      version: probe.version,
+      executable: probe.executable
     };
   }
 }

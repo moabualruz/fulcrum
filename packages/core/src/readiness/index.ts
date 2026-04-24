@@ -8,3 +8,4 @@ export type {
   InvalidationRecord,
   ReleaseEvidencePack
 } from "@fulcrum/shared";
+export * from "./adapter-certification.js";

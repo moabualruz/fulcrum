@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import type { AdapterRegistryService } from "@fulcrum/core";
-import { buildAdapterDegradationSummary } from "@fulcrum/core";
+import { buildAdapterDegradationSummary, certifyAdapters } from "@fulcrum/core";
 
 export function registerAdapterRoutes(app: Hono, registry: AdapterRegistryService): void {
   app.get("/api/v1/adapters", async (context) =>
@@ -17,6 +17,15 @@ export function registerAdapterRoutes(app: Hono, registry: AdapterRegistryServic
       schemaVersion: "1.0",
       status: "ok",
       data: await buildAdapterDegradationSummary(registry),
+      redactionStatus: "not_applicable"
+    })
+  );
+
+  app.get("/api/v1/adapters/certification", async (context) =>
+    context.json({
+      schemaVersion: "1.0",
+      status: "ok",
+      data: await certifyAdapters(registry),
       redactionStatus: "not_applicable"
     })
   );

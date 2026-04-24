@@ -27,5 +27,7 @@ export interface MemoryAdapter {
     state: "managed" | "degraded";
     nextAction?: string;
     limitation?: string;
+    version?: string;
+    executable?: string;
   };
 }

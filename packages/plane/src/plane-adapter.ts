@@ -32,10 +32,34 @@ export class PlaneApiAdapter implements ExternalPmAdapter {
     if (!this.metadata.enabled || !this.options.baseUrl || !this.options.token) {
       return disabledPlaneHealth();
     }
+    const now = new Date().toISOString();
+    try {
+      const response = await this.fetchImpl(this.options.baseUrl.replace(/\/$/, ""), {
+        headers: { Authorization: `Bearer ${this.options.token}` },
+        method: "GET"
+      });
+      if (!response.ok && response.status !== 404) {
+        return {
+          ...disabledPlaneHealth(now),
+          state: "degraded",
+          cause: `Plane API connectivity failed: ${response.status}.`,
+          nextAction: "Check Plane base URL, token, and workspace permissions.",
+          privacyStatus: "operator_configured"
+        };
+      }
+    } catch {
+      return {
+        ...disabledPlaneHealth(now),
+        state: "degraded",
+        cause: "Plane API is unreachable.",
+        nextAction: "Check Plane network connectivity or disable Plane adapter.",
+        privacyStatus: "operator_configured"
+      };
+    }
     return {
-      ...disabledPlaneHealth(),
+      ...disabledPlaneHealth(now),
       state: "detected",
-      cause: "Plane API configuration is present.",
+      cause: "Plane API credentials and connectivity are present.",
       nextAction: "Run import or preview writeback.",
       privacyStatus: "operator_configured"
     };

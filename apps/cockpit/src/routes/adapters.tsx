@@ -31,6 +31,17 @@ interface McpToolEntry {
   visibleInCockpit: boolean;
 }
 
+interface AdapterCertification {
+  adapterId: string;
+  testMode: string;
+  status: string;
+  offlineBehavior: string;
+  disablementBehavior: string;
+  importExportStrategy: string;
+  rebuildStrategy: string;
+  healthEvidence: string[];
+}
+
 const fallbackAdapters: AdapterEntry[] = [
   {
     metadata: {
@@ -57,6 +68,7 @@ const fallbackAdapters: AdapterEntry[] = [
 
 export function AdaptersRoute() {
   const [adapters, setAdapters] = useState<AdapterEntry[]>(fallbackAdapters);
+  const [certifications, setCertifications] = useState<Record<string, AdapterCertification>>({});
   const [mcpTools, setMcpTools] = useState<McpToolEntry[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "degraded">("loading");
 
@@ -76,6 +88,24 @@ export function AdaptersRoute() {
     }
   }
 
+  async function loadCertifications(shouldApply = () => true) {
+    try {
+      const response = await fetch("/api/v1/adapters/certification");
+      const payload = (await response.json()) as { data?: AdapterCertification[] };
+      if (shouldApply() && payload.data) {
+        setCertifications(
+          Object.fromEntries(
+            payload.data.map((certification) => [certification.adapterId, certification])
+          )
+        );
+      }
+    } catch {
+      if (shouldApply()) {
+        setCertifications({});
+      }
+    }
+  }
+
   useEffect(() => {
     let active = true;
     void loadAdapters(() => active);
@@ -87,6 +117,7 @@ export function AdaptersRoute() {
       .catch(() => {
         if (active) setMcpTools([]);
       });
+    void loadCertifications(() => active);
     return () => {
       active = false;
     };
@@ -100,7 +131,7 @@ export function AdaptersRoute() {
       body: JSON.stringify({ reason: "Operator changed adapter setting in cockpit" })
     });
     if (response.ok) {
-      await loadAdapters();
+      await Promise.all([loadAdapters(), loadCertifications()]);
     }
   }
 
@@ -117,6 +148,14 @@ export function AdaptersRoute() {
             <li key={adapter.metadata.adapterId}>
               <article>
                 <h3>{adapter.metadata.name}</h3>
+                {(() => {
+                  const certification = certifications[adapter.metadata.adapterId];
+                  return certification ? (
+                    <p>
+                      Certification: {certification.status} ({certification.testMode})
+                    </p>
+                  ) : null;
+                })()}
                 <dl>
                   <dt>Category</dt>
                   <dd>{adapter.metadata.category}</dd>
@@ -134,6 +173,17 @@ export function AdaptersRoute() {
                   <dd>{adapter.capabilities.localFallback.join(", ") || "none"}</dd>
                   <dt>Policy gates</dt>
                   <dd>{adapter.capabilities.policyGated.join(", ") || "none"}</dd>
+                  {(() => {
+                    const certification = certifications[adapter.metadata.adapterId];
+                    return certification ? (
+                      <>
+                        <dt>Offline behavior</dt>
+                        <dd>{certification.offlineBehavior}</dd>
+                        <dt>Import/export</dt>
+                        <dd>{certification.importExportStrategy}</dd>
+                      </>
+                    ) : null;
+                  })()}
                 </dl>
                 <p>{adapter.health.cause ?? adapter.health.nextAction}</p>
                 <button

@@ -78,6 +78,7 @@ import {
 } from "./commands/worktree.js";
 import {
   adapterDegradationCommand,
+  certifyAdaptersCommand,
   disableAdapterCommand,
   enableAdapterCommand,
   listAdaptersCommand
@@ -1451,6 +1452,18 @@ adapterCommand.command("health").action(async () => {
     program.opts().json
       ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
       : `${data.degraded.length} degraded, ${data.disabled.length} disabled`
+  );
+});
+
+adapterCommand.command("certify").action(async () => {
+  const data = await certifyAdaptersCommand(adapterRegistry);
+  const failed = data.filter((certification) =>
+    ["blocked", "unknown"].includes(certification.status)
+  );
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+      : data.length + " adapter certifications, " + failed.length + " blocked"
   );
 });
 

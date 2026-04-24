@@ -102,8 +102,8 @@ export class ToolHealthAdapter implements FulcrumAdapter {
     const policyRequirements = this.options.policyGated?.length
       ? this.options.policyGated
       : this.metadata.networkRequired
-          ? ["remote_provider"]
-          : [];
+        ? ["remote_provider"]
+        : [];
     return {
       effects: [`Preview ${operation} on ${this.metadata.name}.`],
       recordsAffected: [this.metadata.adapterId],
@@ -119,7 +119,9 @@ export class ToolHealthAdapter implements FulcrumAdapter {
       (this.metadata.networkRequired || (this.options.policyGated?.length ?? 0) > 0) &&
       !policyDecisionId
     ) {
-      throw new Error(`Policy decision required before ${operation} on ${this.metadata.adapterId}.`);
+      throw new Error(
+        `Policy decision required before ${operation} on ${this.metadata.adapterId}.`
+      );
     }
     return this.healthCheck();
   }
@@ -184,6 +186,47 @@ export function createDefaultAdapterHealthModules(): FulcrumAdapter[] {
       supported: ["exact_search", "path_search"]
     }),
     new ToolHealthAdapter({
+      adapterId: "adapter_code_fd",
+      category: "code_tool",
+      name: "fd path search",
+      enabled: true,
+      command: "fd",
+      affectedWorkflows: ["code", "context"],
+      supported: ["path_search", "cache_metadata"],
+      localFallback: ["Node filesystem path scan remains available."]
+    }),
+    new ToolHealthAdapter({
+      adapterId: "adapter_code_ast_grep",
+      category: "code_tool",
+      name: "ast-grep structural search",
+      enabled: false,
+      command: "ast-grep",
+      affectedWorkflows: ["code", "context"],
+      supported: ["structural_search", "cache_metadata"],
+      localFallback: ["Exact code search remains available."]
+    }),
+    new ToolHealthAdapter({
+      adapterId: "adapter_code_aider",
+      category: "code_tool",
+      name: "Aider code assistant",
+      enabled: false,
+      command: "aider",
+      affectedWorkflows: ["run", "code"],
+      supported: ["assistant_version_probe", "cache_metadata"],
+      policyGated: ["arbitrary_shell"],
+      localFallback: ["Other configured CLI agents remain available."]
+    }),
+    new ToolHealthAdapter({
+      adapterId: "adapter_code_repomix",
+      category: "code_tool",
+      name: "Repomix repo pack",
+      enabled: false,
+      command: "repomix",
+      affectedWorkflows: ["context", "code"],
+      supported: ["repo_pack", "cache_metadata"],
+      localFallback: ["Fulcrum context packs remain available."]
+    }),
+    new ToolHealthAdapter({
       adapterId: "adapter_semantic_local",
       category: "semantic_search",
       name: "Optional semantic search",
@@ -209,7 +252,8 @@ export function createDefaultAdapterHealthModules(): FulcrumAdapter[] {
       affectedWorkflows: ["run", "doctor"],
       optional: ["prompt_mode", "mcp_config", "plugins", "skills", "session_persistence"],
       localFallback: ["Other configured CLI agents remain available."],
-      privacyNotes: "Uses standalone copilot command detection; gh copilot is intentionally not accepted."
+      privacyNotes:
+        "Uses standalone copilot command detection; gh copilot is intentionally not accepted."
     }),
     new ToolHealthAdapter({
       adapterId: "adapter_telemetry_disabled",

@@ -11,7 +11,13 @@ import {
 } from "./adapter.js";
 
 export class SimulatedPlaneAdapter implements ExternalPmAdapter {
-  metadata = { ...planeAdapterMetadata, enabled: true, credentialStatus: "not_required" as const };
+  metadata = {
+    ...planeAdapterMetadata,
+    name: "Simulated Plane",
+    enabled: true,
+    credentialStatus: "not_required" as const,
+    privacyNotes: "Test-only simulated Plane adapter; no remote data is shared."
+  };
   private enabled = true;
 
   constructor(private readonly items: PlaneWorkItem[] = []) {}

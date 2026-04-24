@@ -52,6 +52,7 @@ export * from "./context/ranking.js";
 export * from "./context/export.js";
 export * from "./quality/runner.js";
 export * from "./quality/readiness.js";
+export * from "./readiness/adapter-certification.js";
 export * from "./graph/service.js";
 export * from "./graph/queries.js";
 export * from "./graph/link-writers.js";

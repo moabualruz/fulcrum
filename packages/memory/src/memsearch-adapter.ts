@@ -1,22 +1,21 @@
 import { MarkdownMemoryAdapter } from "./markdown-adapter.js";
+import { probeMemoryExecutable } from "./probe.js";
 
 export class MemsearchMemoryAdapter extends MarkdownMemoryAdapter {
   readonly backend = "memsearch";
 
   override health() {
+    const probe = probeMemoryExecutable("memsearch", "FULCRUM_MEMSEARCH_ENABLED");
     return {
-      state:
-        process.env.FULCRUM_MEMSEARCH_ENABLED === "1"
-          ? ("managed" as const)
-          : ("degraded" as const),
+      state: probe.state,
       limitation:
-        process.env.FULCRUM_MEMSEARCH_ENABLED === "1"
-          ? undefined
-          : "memsearch backend not configured; local markdown index used.",
+        probe.state === "managed" ? undefined : `${probe.reason}; local markdown index used.`,
       nextAction:
-        process.env.FULCRUM_MEMSEARCH_ENABLED === "1"
+        probe.state === "managed"
           ? undefined
-          : "Set FULCRUM_MEMSEARCH_ENABLED=1 after configuring memsearch."
+          : "Install memsearch and set FULCRUM_MEMSEARCH_ENABLED=1 after configuring it.",
+      version: probe.version,
+      executable: probe.executable
     };
   }
 }
