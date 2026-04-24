@@ -79,6 +79,7 @@ const fallbackState: RecoveryState = {
 
 export function RecoveryRoute() {
   const [state, setState] = useState<RecoveryState>(fallbackState);
+  const [actionStatus, setActionStatus] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -154,6 +155,10 @@ export function RecoveryRoute() {
     };
   }, []);
 
+  function queueAction(action: string) {
+    setActionStatus(`${action} queued for local execution`);
+  }
+
   return (
     <main>
       <header>
@@ -188,6 +193,9 @@ export function RecoveryRoute() {
           <dt>Entities</dt>
           <dd>{state.exportPreview?.includedEntityClasses.join(", ") ?? "none"}</dd>
         </dl>
+        <button type="button" onClick={() => queueAction("Export")}>
+          Export state
+        </button>
       </section>
       <section aria-label="Rebuild preview">
         <h2>Rebuild Preview</h2>
@@ -201,6 +209,9 @@ export function RecoveryRoute() {
             </li>
           ))}
         </ul>
+        <button type="button" onClick={() => queueAction("Rebuild")}>
+          Rebuild projections
+        </button>
       </section>
       <section aria-label="Reset preview">
         <h2>Reset Preview</h2>
@@ -211,6 +222,9 @@ export function RecoveryRoute() {
           <dt>Preserve</dt>
           <dd>{state.resetPreview?.preserve.join(", ")}</dd>
         </dl>
+        <button type="button" onClick={() => queueAction("Reset preview")}>
+          Request reset approval
+        </button>
       </section>
       <section aria-label="Uninstall preview">
         <h2>Uninstall Preview</h2>
@@ -221,7 +235,11 @@ export function RecoveryRoute() {
           <dt>Preserve</dt>
           <dd>{state.uninstallPreview?.preserve.join(", ")}</dd>
         </dl>
+        <button type="button" onClick={() => queueAction("Uninstall preview")}>
+          Request uninstall approval
+        </button>
       </section>
+      <p aria-live="polite">{actionStatus}</p>
     </main>
   );
 }

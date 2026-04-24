@@ -26,9 +26,8 @@ export function RunDetailRoute() {
   const [status, setStatus] = useState<"loading" | "ready" | "degraded">("loading");
   const [gates, setGates] = useState<QualityGateDefinition[]>([]);
   const [gateResults, setGateResults] = useState<QualityGateResult[]>([]);
-  const [qualityStatus, setQualityStatus] = useState<"loading" | "ready" | "degraded">(
-    "loading"
-  );
+  const [qualityStatus, setQualityStatus] = useState<"loading" | "ready" | "degraded">("loading");
+  const [runActionStatus, setRunActionStatus] = useState("");
 
   useEffect(() => {
     if (!runId) {
@@ -51,18 +50,13 @@ export function RunDetailRoute() {
         const projectId = encodeURIComponent(payload.data.projectId);
         const encodedRunId = encodeURIComponent(payload.data.runId);
         return Promise.all([
-          fetch(`/api/v1/quality/gates?projectId=${projectId}`).then((response) =>
-            response.json()
-          ),
+          fetch(`/api/v1/quality/gates?projectId=${projectId}`).then((response) => response.json()),
           fetch(`/api/v1/quality/results?projectId=${projectId}&runId=${encodedRunId}`).then(
             (response) => response.json()
           )
         ])
           .then(
-            ([
-              gatesPayload,
-              resultsPayload
-            ]: [
+            ([gatesPayload, resultsPayload]: [
               { data?: QualityGateDefinition[] },
               { data?: QualityGateResult[] }
             ]) => {
@@ -90,10 +84,48 @@ export function RunDetailRoute() {
     };
   }, [runId]);
 
+  async function startRun() {
+    if (!run?.taskId || !run?.agentId) {
+      setRunActionStatus("Run start requires task and agent");
+      return;
+    }
+    const response = await fetch("/api/v1/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ taskId: run.taskId, agentId: run.agentId })
+    });
+    setRunActionStatus(response.ok ? "Run start requested" : "Run start failed");
+  }
+
+  async function cancelRun() {
+    if (!runId) {
+      return;
+    }
+    const response = await fetch(`/api/v1/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reason: "operator_cancelled_from_cockpit" })
+    });
+    if (response.ok) {
+      setRun((current) => (current ? { ...current, status: "cancel_requested" } : current));
+    }
+    setRunActionStatus(response.ok ? "Run cancel requested" : "Run cancel failed");
+  }
+
   return (
     <main>
       <h1>Run Detail</h1>
-      <p>{status === "degraded" ? "Run API degraded" : run?.status ?? "Loading"}</p>
+      <p>{status === "degraded" ? "Run API degraded" : (run?.status ?? "Loading")}</p>
+      <section aria-label="Run controls">
+        <h2>Run Controls</h2>
+        <button type="button" onClick={() => void startRun()} disabled={!run}>
+          Start run
+        </button>
+        <button type="button" onClick={() => void cancelRun()} disabled={!runId}>
+          Cancel run
+        </button>
+        <p aria-live="polite">{runActionStatus}</p>
+      </section>
       {run ? (
         <section aria-label="Run state">
           <dl>

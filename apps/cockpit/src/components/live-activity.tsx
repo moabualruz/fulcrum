@@ -9,6 +9,7 @@ interface RunEvent {
 
 export function LiveActivity({ runId }: { runId: string }) {
   const [events, setEvents] = useState<RunEvent[]>([]);
+  const [status, setStatus] = useState<"polling" | "ready" | "degraded">("polling");
 
   useEffect(() => {
     let active = true;
@@ -18,11 +19,13 @@ export function LiveActivity({ runId }: { runId: string }) {
         .then((payload: { data?: RunEvent[] }) => {
           if (active) {
             setEvents(payload.data ?? []);
+            setStatus("ready");
           }
         })
         .catch(() => {
           if (active) {
             setEvents([]);
+            setStatus("degraded");
           }
         });
     };
@@ -37,6 +40,9 @@ export function LiveActivity({ runId }: { runId: string }) {
   return (
     <section aria-label="Live activity">
       <h2>Live Activity</h2>
+      <p aria-live="polite">
+        {status === "degraded" ? "Activity polling degraded" : "Activity polling active"}
+      </p>
       <ol>
         {events.map((event) => (
           <li key={event.eventId}>

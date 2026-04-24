@@ -54,6 +54,14 @@ export function PolicyApprovalsRoute() {
     }
   }
 
+  function deny(decisionId: string) {
+    setDecisions((current) =>
+      current.map((decision) =>
+        decision.policyDecisionId === decisionId ? { ...decision, status: "denied" } : decision
+      )
+    );
+  }
+
   return (
     <main>
       <header>
@@ -87,9 +95,14 @@ export function PolicyApprovalsRoute() {
                 </dd>
               </dl>
               {decision.status === "approval_required" ? (
-                <button type="button" onClick={() => void approve(decision.policyDecisionId)}>
-                  Approve
-                </button>
+                <div>
+                  <button type="button" onClick={() => void approve(decision.policyDecisionId)}>
+                    Approve
+                  </button>
+                  <button type="button" onClick={() => deny(decision.policyDecisionId)}>
+                    Deny
+                  </button>
+                </div>
               ) : null}
             </article>
           ))}

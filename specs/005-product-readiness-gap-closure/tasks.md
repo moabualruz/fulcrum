@@ -160,19 +160,19 @@
 
 ### Tests And Validation for User Story 7
 
-- [ ] T071 [P] [US7] Add cockpit owned workflow Playwright test in `tests/e2e/cockpit-owned-workflow.spec.ts`
-- [ ] T072 [P] [US7] Add cockpit policy/review/merge readiness test in `tests/e2e/cockpit-review-readiness.spec.ts`
-- [ ] T073 [P] [US7] Add cockpit accessibility and non-color status test in `tests/e2e/cockpit-accessibility-full.spec.ts`
+- [X] T071 [P] [US7] Add cockpit owned workflow Playwright test in `tests/e2e/cockpit-owned-workflow.spec.ts`
+- [X] T072 [P] [US7] Add cockpit policy/review/merge readiness test in `tests/e2e/cockpit-review-readiness.spec.ts`
+- [X] T073 [P] [US7] Add cockpit accessibility and non-color status test in `tests/e2e/cockpit-accessibility-full.spec.ts`
 
 ### Implementation for User Story 7
 
-- [ ] T074 [US7] Add cockpit task creation and transition controls in `apps/cockpit/src/routes/project-board.tsx`
-- [ ] T075 [US7] Add cockpit run start/cancel/tail controls in `apps/cockpit/src/routes/run-detail.tsx`
-- [ ] T076 [US7] Add cockpit review and merge queue route in `apps/cockpit/src/routes/review-queue.tsx`
-- [ ] T077 [US7] Add cockpit policy approval controls in `apps/cockpit/src/routes/policy-approvals.tsx`
-- [ ] T078 [US7] Add cockpit recovery/rebuild/export controls in `apps/cockpit/src/routes/recovery.tsx`
-- [ ] T079 [US7] Add live activity event subscription/polling parity in `apps/cockpit/src/components/live-activity.tsx`
-- [ ] T080 [US7] Add cockpit navigation entries for compliance and release evidence in `apps/cockpit/src/App.tsx`
+- [X] T074 [US7] Add cockpit task creation and transition controls in `apps/cockpit/src/routes/project-board.tsx`
+- [X] T075 [US7] Add cockpit run start/cancel/tail controls in `apps/cockpit/src/routes/run-detail.tsx`
+- [X] T076 [US7] Add cockpit review and merge queue route in `apps/cockpit/src/routes/review-queue.tsx`
+- [X] T077 [US7] Add cockpit policy approval controls in `apps/cockpit/src/routes/policy-approvals.tsx`
+- [X] T078 [US7] Add cockpit recovery/rebuild/export controls in `apps/cockpit/src/routes/recovery.tsx`
+- [X] T079 [US7] Add live activity event subscription/polling parity in `apps/cockpit/src/components/live-activity.tsx`
+- [X] T080 [US7] Add cockpit navigation entries for compliance and release evidence in `apps/cockpit/src/App.tsx`
 
 ## Phase 10: User Story 8 - Incremental Graph And Cache Correctness (Priority: P1)
 
