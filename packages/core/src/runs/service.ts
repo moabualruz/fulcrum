@@ -8,6 +8,8 @@ import {
   type Task
 } from "@fulcrum/shared";
 import type { TaskRepositoryPort } from "../tasks/service.js";
+import type { WorktreeAllocationService } from "../worktrees/allocation.js";
+import type { WorktreeRepositoryPort } from "../worktrees/status.js";
 
 export interface RunRepositoryPort {
   save(run: Run): Run;
@@ -23,6 +25,7 @@ export interface StartRunInput {
   commandIdentity?: string;
   worktreeId?: string;
   contextPackId?: string;
+  allocateWorktree?: boolean;
 }
 
 function isTerminal(status: Run["status"]): boolean {
@@ -36,7 +39,9 @@ function mergeIds(current: string[], next: string[] = []): string[] {
 export class RunLifecycleService {
   constructor(
     private readonly runs: RunRepositoryPort,
-    private readonly tasks: Pick<TaskRepositoryPort, "get" | "save">
+    private readonly tasks: Pick<TaskRepositoryPort, "get" | "save">,
+    private readonly worktreeAllocator?: WorktreeAllocationService,
+    private readonly worktrees?: WorktreeRepositoryPort
   ) {}
 
   start(input: StartRunInput): Run {
@@ -45,9 +50,15 @@ export class RunLifecycleService {
       throw new Error(`Task must be ready before run start: ${task.taskId}`);
     }
     const now = new Date().toISOString();
+    const runId = makeId("run", `${task.taskId}-${input.agentId}-${now}`);
+    const allocatedWorktreeId =
+      input.worktreeId ??
+      (input.allocateWorktree === false || !this.worktreeAllocator
+        ? undefined
+        : this.worktreeAllocator.allocate({ taskId: task.taskId, runId }).worktreeId);
     const run = this.runs.save(
       RunSchema.parse({
-        runId: makeId("run", `${task.taskId}-${input.agentId}-${now}`),
+        runId,
         taskId: task.taskId,
         projectId: task.projectId,
         agentId: input.agentId,
@@ -55,7 +66,7 @@ export class RunLifecycleService {
         status: "running",
         startedAt: now,
         heartbeatState: "missing",
-        worktreeId: input.worktreeId,
+        worktreeId: allocatedWorktreeId,
         contextPackId: input.contextPackId,
         eventStreamId: makeId("evt", `${task.taskId}-${now}`),
         logArtifactIds: [],
@@ -69,6 +80,12 @@ export class RunLifecycleService {
       })
     );
     this.tasks.save({ ...task, status: "running", currentRunId: run.runId, updatedAt: now });
+    if (allocatedWorktreeId && this.worktrees) {
+      const worktree = this.worktrees.get(allocatedWorktreeId);
+      if (worktree) {
+        this.worktrees.save({ ...worktree, runId: run.runId, status: "active", updatedAt: now });
+      }
+    }
     this.append(run, "run.created", "Run created.", "info");
     this.append(run, "run.started", "Run supervision started.", "info");
     return run;
@@ -181,6 +198,10 @@ export class RunLifecycleService {
 
   events(runId: string): RunEvent[] {
     return this.runs.listEvents(runId);
+  }
+
+  appendEvent(event: Omit<RunEvent, "sequence">): RunEvent {
+    return this.runs.appendEvent(event);
   }
 
   private toTerminal(

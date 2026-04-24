@@ -2,12 +2,13 @@ import type { RunLifecycleService } from "@fulcrum/core";
 
 export function startRunCommand(
   runs: RunLifecycleService,
-  input: { taskId: string; agentId: string }
+  input: { taskId: string; agentId: string; allocateWorktree?: boolean }
 ) {
   return runs.start({
     taskId: input.taskId,
     agentId: input.agentId,
-    commandIdentity: input.agentId
+    commandIdentity: input.agentId,
+    allocateWorktree: input.allocateWorktree
   });
 }
 

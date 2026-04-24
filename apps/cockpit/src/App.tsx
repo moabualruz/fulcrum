@@ -4,6 +4,7 @@ import { MemoryRoute } from "./routes/memory.js";
 import { PolicyApprovalsRoute } from "./routes/policy-approvals.js";
 import { ProjectBoardRoute } from "./routes/project-board.js";
 import { RunDetailRoute } from "./routes/run-detail.js";
+import { WorktreeDetailRoute } from "./routes/worktree-detail.js";
 
 export function App() {
   const hash = globalThis.location?.hash ?? "";
@@ -15,6 +16,9 @@ export function App() {
   }
   if (hash.startsWith("#/runs/")) {
     return <RunDetailRoute />;
+  }
+  if (hash.startsWith("#/worktrees/")) {
+    return <WorktreeDetailRoute />;
   }
   if (hash.startsWith("#/memory")) {
     return <MemoryRoute />;

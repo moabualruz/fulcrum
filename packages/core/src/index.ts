@@ -31,6 +31,8 @@ export * from "./tasks/service.js";
 export * from "./queues/projections.js";
 export * from "./runs/service.js";
 export * from "./runs/log-capture.js";
+export * from "./worktrees/allocation.js";
+export * from "./worktrees/status.js";
 export * from "./work/file-repository.js";
 export * from "./external-pm/service.js";
 export * from "./policy/enforcement.js";

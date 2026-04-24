@@ -8,6 +8,7 @@ import {
   FileExternalWorkItemMirrorRepository,
   FileRunRepository,
   FileTaskRepository,
+  FileWorktreeRepository,
   FileWorkRepository,
   ContextPackBuilder,
   ExternalPmService,
@@ -15,6 +16,8 @@ import {
   MemoryService,
   ProjectRegistryService,
   RunLifecycleService,
+  WorktreeAllocationService,
+  WorktreeStatusService,
   resolveSetupPaths
 } from "@fulcrum/core";
 import { searchExact, searchSemantic } from "@fulcrum/code-tools";
@@ -26,10 +29,22 @@ const work = new FileWorkRepository(
 const taskRepository = new FileTaskRepository(work);
 const projectRepository = new FileProjectRepository(work);
 const runRepository = new FileRunRepository(work);
+const worktreeRepository = new FileWorktreeRepository(work);
 
 export const taskService = new LocalTaskService(taskRepository);
 export const projectService = new ProjectRegistryService(projectRepository, taskService);
-export const runService = new RunLifecycleService(runRepository, taskRepository);
+export const worktreeAllocationService = new WorktreeAllocationService(
+  worktreeRepository,
+  taskRepository,
+  projectRepository
+);
+export const worktreeStatusService = new WorktreeStatusService(worktreeRepository, runRepository);
+export const runService = new RunLifecycleService(
+  runRepository,
+  taskRepository,
+  worktreeAllocationService,
+  worktreeRepository
+);
 export const contextBuilder = new ContextPackBuilder(
   new FileContextPackRepository(work),
   taskRepository,

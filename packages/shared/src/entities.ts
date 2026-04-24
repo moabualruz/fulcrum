@@ -238,12 +238,22 @@ export const WorktreeAllocationSchema = BaseEntitySchema.extend({
   worktreeId: FulcrumIdSchema,
   projectId: FulcrumIdSchema,
   taskId: FulcrumIdSchema,
+  runId: FulcrumIdSchema.optional(),
   path: z.string(),
   branch: z.string(),
   baseBranch: z.string(),
+  baseCommit: z.string().optional(),
   status: WorktreeStatusSchema,
   dirtyState: z.enum(["clean", "dirty", "unknown"]),
-  cleanupEligibility: z.enum(["eligible", "blocked", "requires_approval"])
+  untrackedCount: z.number().int().nonnegative().default(0),
+  uncommittedCount: z.number().int().nonnegative().default(0),
+  unpushedCommitCount: z.number().int().nonnegative().default(0),
+  conflictState: z.enum(["none", "conflicted", "unknown"]).default("unknown"),
+  activeRunCount: z.number().int().nonnegative().default(0),
+  cleanupEligibility: z.enum(["eligible", "blocked", "requires_approval"]),
+  blockReason: z.string().optional(),
+  lastCheckedAt: TimestampSchema.optional(),
+  cleanedAt: TimestampSchema.optional()
 });
 
 export type Project = z.infer<typeof ProjectSchema>;
@@ -255,3 +265,4 @@ export type ContextPack = z.infer<typeof ContextPackSchema>;
 export type ContextItem = z.infer<typeof ContextItemSchema>;
 export type CodeEvidence = z.infer<typeof CodeEvidenceSchema>;
 export type MemoryEntry = z.infer<typeof MemoryEntrySchema>;
+export type WorktreeAllocation = z.infer<typeof WorktreeAllocationSchema>;

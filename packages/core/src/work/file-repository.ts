@@ -9,6 +9,7 @@ import {
   RunEventSchema,
   RunSchema,
   TaskSchema,
+  WorktreeAllocationSchema,
   type ContextItem,
   type ContextPack,
   type ExternalWorkItemMirror,
@@ -18,7 +19,8 @@ import {
   type Project,
   type Run,
   type RunEvent,
-  type Task
+  type Task,
+  type WorktreeAllocation
 } from "@fulcrum/shared";
 import type { CodeEvidenceRepositoryPort } from "../code/evidence-service.js";
 import type { ContextPackRepositoryPort } from "../context/builder.js";
@@ -27,6 +29,7 @@ import type { MemoryRepositoryPort } from "../memory/service.js";
 import type { ProjectRepositoryPort } from "../projects/service.js";
 import type { RunRepositoryPort } from "../runs/service.js";
 import type { TaskRepositoryPort } from "../tasks/service.js";
+import type { WorktreeRepositoryPort } from "../worktrees/status.js";
 
 interface WorkState {
   projects: Project[];
@@ -38,6 +41,7 @@ interface WorkState {
   runEvents: RunEvent[];
   contextPacks: ContextPack[];
   contextItems: ContextItem[];
+  worktrees: WorktreeAllocation[];
 }
 
 const emptyState: WorkState = {
@@ -49,7 +53,8 @@ const emptyState: WorkState = {
   runs: [],
   runEvents: [],
   contextPacks: [],
-  contextItems: []
+  contextItems: [],
+  worktrees: []
 };
 
 export class FileWorkRepository {
@@ -126,7 +131,10 @@ export class FileWorkRepository {
         runs: (data.runs ?? []).map((run) => RunSchema.parse(run)),
         runEvents: (data.runEvents ?? []).map((event) => RunEventSchema.parse(event)),
         contextPacks: (data.contextPacks ?? []).map((pack) => ContextPackSchema.parse(pack)),
-        contextItems: (data.contextItems ?? []).map((item) => ContextItemSchema.parse(item))
+        contextItems: (data.contextItems ?? []).map((item) => ContextItemSchema.parse(item)),
+        worktrees: (data.worktrees ?? []).map((worktree) =>
+          WorktreeAllocationSchema.parse(worktree)
+        )
       };
     } catch {
       return { ...emptyState };
@@ -136,6 +144,30 @@ export class FileWorkRepository {
   write(state: WorkState): void {
     mkdirSync(path.dirname(this.stateFile), { recursive: true });
     writeFileSync(this.stateFile, JSON.stringify(state, null, 2));
+  }
+}
+
+export class FileWorktreeRepository implements WorktreeRepositoryPort {
+  constructor(private readonly work: FileWorkRepository) {}
+
+  save(worktree: WorktreeAllocation): WorktreeAllocation {
+    const parsed = WorktreeAllocationSchema.parse(worktree);
+    const state = this.work.read();
+    state.worktrees = [
+      parsed,
+      ...state.worktrees.filter((item) => item.worktreeId !== parsed.worktreeId)
+    ];
+    this.work.write(state);
+    return parsed;
+  }
+
+  get(worktreeId: string): WorktreeAllocation | undefined {
+    return this.work.read().worktrees.find((worktree) => worktree.worktreeId === worktreeId);
+  }
+
+  list(projectId?: string): WorktreeAllocation[] {
+    const worktrees = this.work.read().worktrees;
+    return projectId ? worktrees.filter((worktree) => worktree.projectId === projectId) : worktrees;
   }
 }
 

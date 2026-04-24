@@ -207,20 +207,20 @@
 
 ### Tests And Validation for User Story 9
 
-- [ ] T109 [P] [US9] Add worktree allocation contract tests in `tests/contract/worktree.test.ts`
-- [ ] T110 [P] [US9] Add dirty and untracked cleanup block integration test in `tests/integration/worktree-cleanup-block.test.ts`
-- [ ] T111 [P] [US9] Add unpushed commit and conflict safety test in `tests/recovery/worktree-unsafe-states.test.ts`
-- [ ] T112 [P] [US9] Add merge readiness policy test in `tests/policy/worktree-merge-readiness.test.ts`
+- [x] T109 [P] [US9] Add worktree allocation contract tests in `tests/contract/worktree.test.ts`
+- [x] T110 [P] [US9] Add dirty and untracked cleanup block integration test in `tests/integration/worktree-cleanup-block.test.ts`
+- [x] T111 [P] [US9] Add unpushed commit and conflict safety test in `tests/recovery/worktree-unsafe-states.test.ts`
+- [x] T112 [P] [US9] Add merge readiness policy test in `tests/policy/worktree-merge-readiness.test.ts`
 
 ### Implementation for User Story 9
 
-- [ ] T113 [US9] Implement worktree allocation service in `packages/core/src/worktrees/allocation.ts`
-- [ ] T114 [US9] Implement Git status inspection and cleanup eligibility service in `packages/core/src/worktrees/status.ts`
-- [ ] T115 [US9] Implement worktree repository in `packages/db/src/worktrees.ts`
-- [ ] T116 [US9] Implement worktree CLI commands in `apps/cli/src/commands/worktree.ts`
-- [ ] T117 [US9] Implement worktree API routes in `apps/server/src/routes/worktrees.ts`
-- [ ] T118 [US9] Implement cockpit worktree delivery view in `apps/cockpit/src/routes/worktree-detail.tsx`
-- [ ] T119 [US9] Integrate worktree allocation into run start service in `packages/core/src/runs/start-run.ts`
+- [x] T113 [US9] Implement worktree allocation service in `packages/core/src/worktrees/allocation.ts`
+- [x] T114 [US9] Implement Git status inspection and cleanup eligibility service in `packages/core/src/worktrees/status.ts`
+- [x] T115 [US9] Implement worktree repository in `packages/db/src/worktrees.ts`
+- [x] T116 [US9] Implement worktree CLI commands in `apps/cli/src/commands/worktree.ts`
+- [x] T117 [US9] Implement worktree API routes in `apps/server/src/routes/worktrees.ts`
+- [x] T118 [US9] Implement cockpit worktree delivery view in `apps/cockpit/src/routes/worktree-detail.tsx`
+- [x] T119 [US9] Integrate worktree allocation into run start service in `packages/core/src/runs/start-run.ts`
 
 ## Phase 10: User Story 10 - Enforce Policy Gates And Privacy Controls (Priority: P1)
 

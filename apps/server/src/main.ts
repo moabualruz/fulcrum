@@ -20,6 +20,7 @@ import { registerPolicyRoutes } from "./routes/policy.js";
 import { registerQueueRoutes } from "./routes/queues.js";
 import { registerActivityRoutes } from "./routes/activity.js";
 import { registerRunRoutes } from "./routes/runs.js";
+import { registerWorktreeRoutes } from "./routes/worktrees.js";
 import { registerExternalPmRoutes } from "./routes/external-pm.js";
 import { registerSetupRoutes } from "./routes/setup.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
@@ -31,7 +32,9 @@ import {
   serverMemoryService,
   serverProjectService,
   serverRunService,
-  serverTaskService
+  serverTaskService,
+  serverWorktreeAllocationService,
+  serverWorktreeStatusService
 } from "./work-runtime.js";
 
 const app = new Hono();
@@ -51,6 +54,7 @@ registerProjectRoutes(app, serverProjectService);
 registerTaskRoutes(app, serverTaskService);
 registerQueueRoutes(app, serverProjectService, serverTaskService);
 registerRunRoutes(app, serverRunService);
+registerWorktreeRoutes(app, serverWorktreeAllocationService, serverWorktreeStatusService);
 registerActivityRoutes(app, serverRunService);
 registerMemoryRoutes(app, serverMemoryService);
 registerCodeRoutes(app, serverCodeService);

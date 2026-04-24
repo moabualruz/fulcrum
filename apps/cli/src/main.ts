@@ -47,6 +47,13 @@ import {
   syncPlaneCommand
 } from "./commands/plane.js";
 import { approvePolicyCommand, checkPolicyCommand } from "./commands/policy.js";
+import {
+  allocateWorktreeCommand,
+  worktreeCleanupCommand,
+  worktreeCleanupPreviewCommand,
+  worktreeDiffCommand,
+  worktreeStatusCommand
+} from "./commands/worktree.js";
 import { formatRedactionStatus } from "./output/redaction.js";
 import { createCliSetupPorts } from "./runtime.js";
 import {
@@ -56,7 +63,9 @@ import {
   memoryService,
   projectService,
   runService,
-  taskService
+  taskService,
+  worktreeAllocationService,
+  worktreeStatusService
 } from "./work-runtime.js";
 
 class MemoryArtifactRepository implements ArtifactRepositoryPort {
@@ -299,8 +308,13 @@ const runCommand = program.command("run").description("Start, inspect, cancel, a
 runCommand
   .command("start <taskId>")
   .requiredOption("--agent <agentId>")
+  .option("--no-worktree")
   .action((taskId, options) => {
-    const data = startRunCommand(runService, { taskId, agentId: options.agentId });
+    const data = startRunCommand(runService, {
+      taskId,
+      agentId: options.agentId,
+      allocateWorktree: options.worktree
+    });
     console.log(
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
@@ -314,6 +328,60 @@ runCommand.command("status <runId>").action((runId) => {
     program.opts().json
       ? JSON.stringify({ schemaVersion: "1.0", status: data ? "ok" : "error", data }, null, 2)
       : (data?.run.status ?? "Run not found")
+  );
+});
+
+const worktreeCommand = program
+  .command("worktree")
+  .description("Allocate, inspect, and clean worktrees");
+
+worktreeCommand
+  .command("allocate <taskId>")
+  .option("--branch <branch>")
+  .option("--path <path>")
+  .action((taskId, options) => {
+    const data = allocateWorktreeCommand(worktreeAllocationService, {
+      taskId,
+      branch: options.branch,
+      path: options.path
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.worktreeId
+    );
+  });
+
+worktreeCommand.command("status <worktreeId>").action((worktreeId) => {
+  const data = worktreeStatusCommand(worktreeStatusService, worktreeId);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+      : `${data.worktree.status}: ${data.worktree.cleanupEligibility}`
+  );
+});
+
+worktreeCommand
+  .command("cleanup <worktreeId>")
+  .option("--preview")
+  .option("--approved")
+  .action((worktreeId, options) => {
+    const data = options.preview
+      ? worktreeCleanupPreviewCommand(worktreeStatusService, worktreeId)
+      : worktreeCleanupCommand(worktreeStatusService, worktreeId, Boolean(options.approved));
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : "worktree cleanup evaluated"
+    );
+  });
+
+worktreeCommand.command("diff <worktreeId>").action((worktreeId) => {
+  const data = worktreeDiffCommand(worktreeStatusService, worktreeId);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+      : data.summary
   );
 });
 
