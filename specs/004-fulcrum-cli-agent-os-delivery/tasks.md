@@ -253,20 +253,20 @@
 
 ### Tests And Validation for User Story 11
 
-- [ ] T131 [P] [US11] Add quality gate contract tests in `tests/contract/quality-gates.test.ts`
-- [ ] T132 [P] [US11] Add quality gate execution integration test in `tests/integration/quality-gate-runner.test.ts`
-- [ ] T133 [P] [US11] Add required-gate readiness block policy test in `tests/policy/quality-required-blocks.test.ts`
-- [ ] T134 [P] [US11] Add quality output redaction privacy test in `tests/privacy/quality-output-redaction.test.ts`
+- [x] T131 [P] [US11] Add quality gate contract tests in `tests/contract/quality-gates.test.ts`
+- [x] T132 [P] [US11] Add quality gate execution integration test in `tests/integration/quality-gate-runner.test.ts`
+- [x] T133 [P] [US11] Add required-gate readiness block policy test in `tests/policy/quality-required-blocks.test.ts`
+- [x] T134 [P] [US11] Add quality output redaction privacy test in `tests/privacy/quality-output-redaction.test.ts`
 
 ### Implementation for User Story 11
 
-- [ ] T135 [US11] Implement quality gate definition and result repositories in `packages/db/src/quality-gates.ts`
-- [ ] T136 [US11] Implement quality gate runner service with timeout, status, output artifact capture, and parsed summary in `packages/core/src/quality/runner.ts`
-- [ ] T137 [US11] Implement readiness evaluator for required gate evidence and release exceptions in `packages/core/src/quality/readiness.ts`
-- [ ] T138 [US11] Implement gate CLI commands in `apps/cli/src/commands/gate.ts`
-- [ ] T139 [US11] Implement quality API routes in `apps/server/src/routes/quality.ts`
-- [ ] T140 [US11] Implement cockpit quality gate panel in `apps/cockpit/src/components/quality-gates.tsx`
-- [ ] T141 [US11] Link quality results to run artifacts and events in `packages/core/src/runs/quality-links.ts`
+- [x] T135 [US11] Implement quality gate definition and result repositories in `packages/db/src/quality-gates.ts`
+- [x] T136 [US11] Implement quality gate runner service with timeout, status, output artifact capture, and parsed summary in `packages/core/src/quality/runner.ts`
+- [x] T137 [US11] Implement readiness evaluator for required gate evidence and release exceptions in `packages/core/src/quality/readiness.ts`
+- [x] T138 [US11] Implement gate CLI commands in `apps/cli/src/commands/gate.ts`
+- [x] T139 [US11] Implement quality API routes in `apps/server/src/routes/quality.ts`
+- [x] T140 [US11] Implement cockpit quality gate panel in `apps/cockpit/src/components/quality-gates.tsx`
+- [x] T141 [US11] Link quality results to run artifacts and events in `packages/core/src/runs/quality-links.ts`
 
 ## Phase 12: User Story 12 - Backup, Restore, Export, Rebuild, Reset, And Uninstall Safely (Priority: P1)
 
@@ -368,20 +368,20 @@
 
 ### Tests And Validation for User Story 14
 
-- [ ] T186 [P] [US14] Add adapter base contract tests in `tests/contract/adapter-base.test.ts`
-- [ ] T187 [P] [US14] Add adapter enable/disable and outage integration test in `tests/integration/adapter-degradation.test.ts`
-- [ ] T188 [P] [US14] Add credential privacy status test in `tests/privacy/adapter-credentials.test.ts`
-- [ ] T189 [P] [US14] Add adapter replacement preservation test in `tests/recovery/adapter-replacement.test.ts`
+- [x] T186 [P] [US14] Add adapter base contract tests in `tests/contract/adapter-base.test.ts`
+- [x] T187 [P] [US14] Add adapter enable/disable and outage integration test in `tests/integration/adapter-degradation.test.ts`
+- [x] T188 [P] [US14] Add credential privacy status test in `tests/privacy/adapter-credentials.test.ts`
+- [x] T189 [P] [US14] Add adapter replacement preservation test in `tests/recovery/adapter-replacement.test.ts`
 
 ### Implementation for User Story 14
 
-- [ ] T190 [US14] Implement adapter configuration repository in `packages/db/src/adapters.ts`
-- [ ] T191 [US14] Implement adapter registry, health check, enable, disable, and replacement service in `packages/core/src/adapters/registry.ts`
-- [ ] T192 [US14] Implement memory, code, semantic, agent, telemetry, observability, and remote-provider adapter health modules, including standalone `copilot` command detection, in `packages/core/src/adapters/health-modules.ts`
-- [ ] T193 [US14] Implement adapter CLI commands in `apps/cli/src/commands/adapter.ts`
-- [ ] T194 [US14] Implement adapter API routes in `apps/server/src/routes/adapters.ts`
-- [ ] T195 [US14] Implement cockpit adapter settings and degraded capability display in `apps/cockpit/src/routes/adapters.tsx`
-- [ ] T196 [US14] Integrate adapter health into doctor, context, memory, code, run, and policy services in `packages/core/src/adapters/degradation-wiring.ts`
+- [x] T190 [US14] Implement adapter configuration repository in `packages/db/src/adapters.ts`
+- [x] T191 [US14] Implement adapter registry, health check, enable, disable, and replacement service in `packages/core/src/adapters/registry.ts`
+- [x] T192 [US14] Implement memory, code, semantic, agent, telemetry, observability, and remote-provider adapter health modules, including standalone `copilot` command detection, in `packages/core/src/adapters/health-modules.ts`
+- [x] T193 [US14] Implement adapter CLI commands in `apps/cli/src/commands/adapter.ts`
+- [x] T194 [US14] Implement adapter API routes in `apps/server/src/routes/adapters.ts`
+- [x] T195 [US14] Implement cockpit adapter settings and degraded capability display in `apps/cockpit/src/routes/adapters.tsx`
+- [x] T196 [US14] Integrate adapter health into doctor, context, memory, code, run, and policy services in `packages/core/src/adapters/degradation-wiring.ts`
 
 ## Phase 17: Polish And Cross-Cutting Validation
 

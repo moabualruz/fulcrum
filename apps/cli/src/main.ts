@@ -1,9 +1,13 @@
 import { Command } from "commander";
 import {
+  buildAdapterDegradationSummary,
   ArtifactService,
   externalPmHealth,
   LocalArtifactStorage,
   PolicyEnforcementService,
+  QualityGateRunner,
+  QualityReadinessEvaluator,
+  RunQualityLinker,
   resolveSetupPaths,
   type ArtifactRepositoryPort
 } from "@fulcrum/core";
@@ -48,20 +52,36 @@ import {
 } from "./commands/plane.js";
 import { approvePolicyCommand, checkPolicyCommand } from "./commands/policy.js";
 import {
+  defineGateCommand,
+  gateReadinessCommand,
+  listGateResultsCommand,
+  listGatesCommand,
+  runGateCommand
+} from "./commands/gate.js";
+import {
   allocateWorktreeCommand,
   worktreeCleanupCommand,
   worktreeCleanupPreviewCommand,
   worktreeDiffCommand,
   worktreeStatusCommand
 } from "./commands/worktree.js";
+import {
+  adapterDegradationCommand,
+  disableAdapterCommand,
+  enableAdapterCommand,
+  listAdaptersCommand
+} from "./commands/adapter.js";
 import { formatRedactionStatus } from "./output/redaction.js";
 import { createCliSetupPorts } from "./runtime.js";
 import {
   codeService,
   contextBuilder,
+  adapterRegistry,
   externalPmService,
   memoryService,
   projectService,
+  qualityGateRepository,
+  runRepository,
   runService,
   taskService,
   worktreeAllocationService,
@@ -172,7 +192,10 @@ program
       setupRepository: ports.setupRepository,
       setupState: await ports.latest(),
       noNetwork: options.network === false || Boolean(options.noNetwork),
-      extraCapabilities: [await externalPmHealth(externalPmService.adapterHealthPort())]
+      extraCapabilities: [
+        await externalPmHealth(externalPmService.adapterHealthPort()),
+        ...(await buildAdapterDegradationSummary(adapterRegistry)).capabilities
+      ]
     });
     console.log(program.opts().json ? JSON.stringify(payload, null, 2) : "Fulcrum doctor ready");
   });
@@ -181,6 +204,13 @@ const artifactService = new ArtifactService(
   new MemoryArtifactRepository(),
   new LocalArtifactStorage(resolveSetupPaths().artifactRoot)
 );
+const qualityRunner = new QualityGateRunner(
+  qualityGateRepository,
+  artifactService,
+  runService,
+  new RunQualityLinker(runRepository, qualityGateRepository)
+);
+const qualityReadiness = new QualityReadinessEvaluator(qualityGateRepository);
 const policyService = new PolicyEnforcementService(
   new MemoryPolicyDecisionRepository(),
   new MemoryPolicyEventRepository()
@@ -232,6 +262,102 @@ artifactCommand
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
         : `${data.length} artifacts`
+    );
+  });
+
+const gateCommand = program.command("gate").description("Define, run, and inspect quality gates");
+const gateDeps = { runner: qualityRunner, readiness: qualityReadiness };
+
+gateCommand
+  .command("define")
+  .requiredOption("--project <projectId>")
+  .requiredOption("--name <name>")
+  .requiredOption("--command <command>")
+  .option("--required")
+  .option("--timeout-ms <timeoutMs>")
+  .action((options) => {
+    const data = defineGateCommand(gateDeps, {
+      projectId: options.project,
+      name: options.name,
+      command: options.command,
+      required: Boolean(options.required),
+      timeoutMs: options.timeoutMs ? Number(options.timeoutMs) : undefined
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.gateId
+    );
+  });
+
+gateCommand
+  .command("list")
+  .requiredOption("--project <projectId>")
+  .action((options) => {
+    const data = listGatesCommand(gateDeps, options.project);
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.length} gates`
+    );
+  });
+
+gateCommand
+  .command("run <gateId>")
+  .requiredOption("--cwd <path>")
+  .option("--project <projectId>")
+  .option("--task <taskId>")
+  .option("--run <runId>")
+  .option("--skip")
+  .action(async (gateId, options) => {
+    const data = await runGateCommand(gateDeps, {
+      gateId,
+      cwd: options.cwd,
+      projectId: options.project,
+      taskId: options.task,
+      runId: options.run,
+      skip: Boolean(options.skip)
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.status
+    );
+  });
+
+gateCommand
+  .command("results")
+  .requiredOption("--project <projectId>")
+  .option("--task <taskId>")
+  .option("--run <runId>")
+  .action((options) => {
+    const data = listGateResultsCommand(gateDeps, {
+      projectId: options.project,
+      taskId: options.task,
+      runId: options.run
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.length} gate results`
+    );
+  });
+
+gateCommand
+  .command("readiness")
+  .requiredOption("--project <projectId>")
+  .option("--task <taskId>")
+  .option("--run <runId>")
+  .action((options) => {
+    const data = gateReadinessCommand(gateDeps, {
+      projectId: options.project,
+      taskId: options.task,
+      runId: options.run
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.status
     );
   });
 
@@ -851,6 +977,49 @@ policyCommand
       program.opts().json
         ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
         : `${data.status}: ${data.policyDecisionId}`
+    );
+  });
+
+const adapterCommand = program
+  .command("adapter")
+  .description("Inspect optional adapters and degraded capabilities");
+
+adapterCommand.command("list").action(async () => {
+  const data = await listAdaptersCommand(adapterRegistry);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+      : `${data.length} adapters`
+  );
+});
+
+adapterCommand.command("health").action(async () => {
+  const data = await adapterDegradationCommand(adapterRegistry);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+      : `${data.degraded.length} degraded, ${data.disabled.length} disabled`
+  );
+});
+
+adapterCommand.command("enable <adapterId>").action(async (adapterId) => {
+  const data = await enableAdapterCommand(adapterRegistry, adapterId);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+      : `${data.adapterId} enabled`
+  );
+});
+
+adapterCommand
+  .command("disable <adapterId>")
+  .option("--reason <reason>", "disable reason", "Operator disabled adapter")
+  .action(async (adapterId, options) => {
+    const data = await disableAdapterCommand(adapterRegistry, adapterId, options.reason);
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : `${data.adapterId} disabled`
     );
   });
 

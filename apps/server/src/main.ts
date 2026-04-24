@@ -2,9 +2,13 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import {
   ArtifactService,
+  buildAdapterDegradationSummary,
   externalPmHealth,
   LocalArtifactStorage,
   PolicyEnforcementService,
+  QualityGateRunner,
+  QualityReadinessEvaluator,
+  RunQualityLinker,
   resolveSetupPaths
 } from "@fulcrum/core";
 import { MemoryArtifactRepository } from "./artifact-runtime.js";
@@ -22,15 +26,20 @@ import { registerActivityRoutes } from "./routes/activity.js";
 import { registerRunRoutes } from "./routes/runs.js";
 import { registerWorktreeRoutes } from "./routes/worktrees.js";
 import { registerExternalPmRoutes } from "./routes/external-pm.js";
+import { registerQualityRoutes } from "./routes/quality.js";
+import { registerAdapterRoutes } from "./routes/adapters.js";
 import { registerSetupRoutes } from "./routes/setup.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
 import { createServerSetupPorts, FileSetupRepository } from "./runtime.js";
 import {
   serverExternalPmService,
+  serverAdapterRegistry,
   serverCodeService,
   serverContextBuilder,
   serverMemoryService,
   serverProjectService,
+  serverQualityGateRepository,
+  runRepository,
   serverRunService,
   serverTaskService,
   serverWorktreeAllocationService,
@@ -45,10 +54,22 @@ const policyService = new PolicyEnforcementService(
   new MemoryPolicyDecisionRepository(),
   new MemoryPolicyEventRepository()
 );
+const artifactService = new ArtifactService(
+  new MemoryArtifactRepository(),
+  new LocalArtifactStorage(paths.artifactRoot)
+);
+const qualityRunner = new QualityGateRunner(
+  serverQualityGateRepository,
+  artifactService,
+  serverRunService,
+  new RunQualityLinker(runRepository, serverQualityGateRepository)
+);
+const qualityReadiness = new QualityReadinessEvaluator(serverQualityGateRepository);
 
 registerSetupRoutes(app, createServerSetupPorts(setupRepository));
 registerDoctorRoutes(app, setupRepository, async () => [
-  await externalPmHealth(serverExternalPmService.adapterHealthPort())
+  await externalPmHealth(serverExternalPmService.adapterHealthPort()),
+  ...(await buildAdapterDegradationSummary(serverAdapterRegistry)).capabilities
 ]);
 registerProjectRoutes(app, serverProjectService);
 registerTaskRoutes(app, serverTaskService);
@@ -59,11 +80,10 @@ registerActivityRoutes(app, serverRunService);
 registerMemoryRoutes(app, serverMemoryService);
 registerCodeRoutes(app, serverCodeService);
 registerExternalPmRoutes(app, serverExternalPmService);
+registerAdapterRoutes(app, serverAdapterRegistry);
 registerContextPackRoutes(app, serverContextBuilder);
-registerArtifactRoutes(
-  app,
-  new ArtifactService(new MemoryArtifactRepository(), new LocalArtifactStorage(paths.artifactRoot))
-);
+registerArtifactRoutes(app, artifactService);
+registerQualityRoutes(app, qualityRunner, qualityReadiness);
 registerPolicyRoutes(app, policyService);
 
 const port = Number(process.env.FULCRUM_PORT ?? 4173);

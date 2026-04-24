@@ -3,6 +3,7 @@ import {
   AdapterMetadataSchema,
   ApiEndpointSchema,
   ArtifactContractSchema,
+  CliCommandSchema,
   CommonToolResponseSchema,
   McpToolNameSchema,
   PolicyCheckRequestSchema,
@@ -34,6 +35,10 @@ describe("shared contract schemas", () => {
   it("includes required CLI/API/MCP and adapter contract values", () => {
     expect(ApiEndpointSchema.parse("GET /api/v1/artifacts/{artifactId}")).toBe(
       "GET /api/v1/artifacts/{artifactId}"
+    );
+    expect(CliCommandSchema.parse("adapter")).toBe("adapter");
+    expect(ApiEndpointSchema.parse("POST /api/v1/adapters/{adapterId}/enable")).toBe(
+      "POST /api/v1/adapters/{adapterId}/enable"
     );
     expect(McpToolNameSchema.parse("fulcrum_artifact_attach")).toBe("fulcrum_artifact_attach");
     expect(

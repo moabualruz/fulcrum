@@ -6,6 +6,8 @@ import {
   ExternalWorkItemMirrorSchema,
   MemoryEntrySchema,
   ProjectSchema,
+  QualityGateDefinitionSchema,
+  QualityGateResultSchema,
   RunEventSchema,
   RunSchema,
   TaskSchema,
@@ -17,6 +19,8 @@ import {
   type CodeEvidence,
   type MemoryEntry,
   type Project,
+  type QualityGateDefinition,
+  type QualityGateResult,
   type Run,
   type RunEvent,
   type Task,
@@ -27,6 +31,7 @@ import type { ContextPackRepositoryPort } from "../context/builder.js";
 import type { ExternalWorkItemMirrorRepositoryPort } from "../external-pm/service.js";
 import type { MemoryRepositoryPort } from "../memory/service.js";
 import type { ProjectRepositoryPort } from "../projects/service.js";
+import type { QualityGateRepositoryPort } from "../quality/runner.js";
 import type { RunRepositoryPort } from "../runs/service.js";
 import type { TaskRepositoryPort } from "../tasks/service.js";
 import type { WorktreeRepositoryPort } from "../worktrees/status.js";
@@ -42,6 +47,8 @@ interface WorkState {
   contextPacks: ContextPack[];
   contextItems: ContextItem[];
   worktrees: WorktreeAllocation[];
+  qualityGateDefinitions: QualityGateDefinition[];
+  qualityGateResults: QualityGateResult[];
 }
 
 const emptyState: WorkState = {
@@ -54,7 +61,9 @@ const emptyState: WorkState = {
   runEvents: [],
   contextPacks: [],
   contextItems: [],
-  worktrees: []
+  worktrees: [],
+  qualityGateDefinitions: [],
+  qualityGateResults: []
 };
 
 export class FileWorkRepository {
@@ -134,6 +143,12 @@ export class FileWorkRepository {
         contextItems: (data.contextItems ?? []).map((item) => ContextItemSchema.parse(item)),
         worktrees: (data.worktrees ?? []).map((worktree) =>
           WorktreeAllocationSchema.parse(worktree)
+        ),
+        qualityGateDefinitions: (data.qualityGateDefinitions ?? []).map((definition) =>
+          QualityGateDefinitionSchema.parse(definition)
+        ),
+        qualityGateResults: (data.qualityGateResults ?? []).map((result) =>
+          QualityGateResultSchema.parse(result)
         )
       };
     } catch {
@@ -377,5 +392,64 @@ export class FileRunRepository implements RunRepositoryPort {
 
   listEvents(runId: string): RunEvent[] {
     return this.work.read().runEvents.filter((event) => event.runId === runId);
+  }
+}
+
+export class FileQualityGateRepository implements QualityGateRepositoryPort {
+  constructor(private readonly work: FileWorkRepository) {}
+
+  saveDefinition(definition: QualityGateDefinition): QualityGateDefinition {
+    const parsed = QualityGateDefinitionSchema.parse(definition);
+    const state = this.work.read();
+    state.qualityGateDefinitions = [
+      parsed,
+      ...state.qualityGateDefinitions.filter((item) => item.gateId !== parsed.gateId)
+    ];
+    this.work.write(state);
+    return parsed;
+  }
+
+  getDefinition(gateId: string): QualityGateDefinition | undefined {
+    return this.work
+      .read()
+      .qualityGateDefinitions.find((definition) => definition.gateId === gateId);
+  }
+
+  listDefinitions(projectId: string): QualityGateDefinition[] {
+    return this.work
+      .read()
+      .qualityGateDefinitions.filter((definition) => definition.projectId === projectId)
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }
+
+  saveResult(result: QualityGateResult): QualityGateResult {
+    const parsed = QualityGateResultSchema.parse(result);
+    const state = this.work.read();
+    state.qualityGateResults = [
+      parsed,
+      ...state.qualityGateResults.filter(
+        (item) => item.qualityGateResultId !== parsed.qualityGateResultId
+      )
+    ];
+    this.work.write(state);
+    return parsed;
+  }
+
+  getResult(resultId: string): QualityGateResult | undefined {
+    return this.work
+      .read()
+      .qualityGateResults.find((result) => result.qualityGateResultId === resultId);
+  }
+
+  listResults(input: { projectId: string; runId?: string; taskId?: string }): QualityGateResult[] {
+    return this.work
+      .read()
+      .qualityGateResults.filter(
+        (result) =>
+          result.projectId === input.projectId &&
+          (!input.runId || result.runId === input.runId) &&
+          (!input.taskId || result.taskId === input.taskId)
+      )
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   }
 }

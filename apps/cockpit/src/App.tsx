@@ -5,6 +5,7 @@ import { PolicyApprovalsRoute } from "./routes/policy-approvals.js";
 import { ProjectBoardRoute } from "./routes/project-board.js";
 import { RunDetailRoute } from "./routes/run-detail.js";
 import { WorktreeDetailRoute } from "./routes/worktree-detail.js";
+import { AdaptersRoute } from "./routes/adapters.js";
 
 export function App() {
   const hash = globalThis.location?.hash ?? "";
@@ -22,6 +23,9 @@ export function App() {
   }
   if (hash.startsWith("#/memory")) {
     return <MemoryRoute />;
+  }
+  if (hash.startsWith("#/adapters")) {
+    return <AdaptersRoute />;
   }
   return hash.startsWith("#/projects/") ? <ProjectBoardRoute /> : <OverviewRoute />;
 }

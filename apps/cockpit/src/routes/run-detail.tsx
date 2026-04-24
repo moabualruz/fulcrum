@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { LiveActivity } from "../components/live-activity.js";
+import { QualityGates } from "../components/quality-gates.js";
+import type { QualityGateDefinition, QualityGateResult } from "@fulcrum/shared";
 
 interface RunDetail {
   runId: string;
@@ -22,6 +24,11 @@ export function RunDetailRoute() {
   }, []);
   const [run, setRun] = useState<RunDetail | undefined>();
   const [status, setStatus] = useState<"loading" | "ready" | "degraded">("loading");
+  const [gates, setGates] = useState<QualityGateDefinition[]>([]);
+  const [gateResults, setGateResults] = useState<QualityGateResult[]>([]);
+  const [qualityStatus, setQualityStatus] = useState<"loading" | "ready" | "degraded">(
+    "loading"
+  );
 
   useEffect(() => {
     if (!runId) {
@@ -37,6 +44,41 @@ export function RunDetailRoute() {
         }
         setRun(payload.data);
         setStatus(payload.data ? "ready" : "degraded");
+        if (!payload.data) {
+          setQualityStatus("degraded");
+          return;
+        }
+        const projectId = encodeURIComponent(payload.data.projectId);
+        const encodedRunId = encodeURIComponent(payload.data.runId);
+        return Promise.all([
+          fetch(`/api/v1/quality/gates?projectId=${projectId}`).then((response) =>
+            response.json()
+          ),
+          fetch(`/api/v1/quality/results?projectId=${projectId}&runId=${encodedRunId}`).then(
+            (response) => response.json()
+          )
+        ])
+          .then(
+            ([
+              gatesPayload,
+              resultsPayload
+            ]: [
+              { data?: QualityGateDefinition[] },
+              { data?: QualityGateResult[] }
+            ]) => {
+              if (!active) {
+                return;
+              }
+              setGates(gatesPayload.data ?? []);
+              setGateResults(resultsPayload.data ?? []);
+              setQualityStatus("ready");
+            }
+          )
+          .catch(() => {
+            if (active) {
+              setQualityStatus("degraded");
+            }
+          });
       })
       .catch(() => {
         if (active) {
@@ -74,6 +116,12 @@ export function RunDetailRoute() {
             <dd>{run.summary ?? "Pending"}</dd>
           </dl>
         </section>
+      ) : null}
+      {run ? (
+        <>
+          <QualityGates gates={gates} results={gateResults} />
+          {qualityStatus === "degraded" ? <p>Quality gate API degraded</p> : null}
+        </>
       ) : null}
       {runId ? <LiveActivity runId={runId} /> : null}
     </main>

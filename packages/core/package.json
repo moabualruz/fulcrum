@@ -14,7 +14,8 @@
   "dependencies": {
     "@fulcrum/memory": "workspace:*",
     "@fulcrum/policy": "workspace:*",
-    "@fulcrum/shared": "workspace:*"
+    "@fulcrum/shared": "workspace:*",
+    "execa": "^9.5.2"
   },
   "devDependencies": {
     "typescript": "^5.8.2"

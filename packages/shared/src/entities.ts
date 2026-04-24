@@ -2,6 +2,7 @@ import { z } from "zod";
 import { FulcrumIdSchema, SchemaVersionSchema, TimestampSchema } from "./ids.js";
 import {
   CapabilityStateSchema,
+  GateStatusSchema,
   MemoryStatusSchema,
   RunStatusSchema,
   SetupStatusSchema,
@@ -256,6 +257,39 @@ export const WorktreeAllocationSchema = BaseEntitySchema.extend({
   cleanedAt: TimestampSchema.optional()
 });
 
+export const QualityGateDefinitionSchema = BaseEntitySchema.extend({
+  gateId: FulcrumIdSchema,
+  projectId: FulcrumIdSchema,
+  name: z.string(),
+  command: z.string(),
+  required: z.boolean().default(false),
+  timeoutMs: z.number().int().positive().optional()
+});
+
+export const QualityGateResultSchema = BaseEntitySchema.extend({
+  qualityGateResultId: FulcrumIdSchema,
+  gateId: FulcrumIdSchema,
+  projectId: FulcrumIdSchema,
+  taskId: FulcrumIdSchema.optional(),
+  runId: FulcrumIdSchema.optional(),
+  workingDirectory: z.string().optional(),
+  status: GateStatusSchema,
+  startedAt: TimestampSchema.optional(),
+  completedAt: TimestampSchema.optional(),
+  durationMs: z.number().int().nonnegative().optional(),
+  outputArtifactId: FulcrumIdSchema.optional(),
+  parsedSummary: z
+    .object({
+      exitCode: z.number().int().nullable().optional(),
+      stdoutLines: z.number().int().nonnegative().default(0),
+      stderrLines: z.number().int().nonnegative().default(0),
+      command: z.string().optional(),
+      timedOut: z.boolean().default(false)
+    })
+    .default({ stdoutLines: 0, stderrLines: 0, timedOut: false }),
+  redactionStatus: RedactionStatusSchema
+});
+
 export type Project = z.infer<typeof ProjectSchema>;
 export type SetupState = z.infer<typeof SetupStateSchema>;
 export type Task = z.infer<typeof TaskSchema>;
@@ -266,3 +300,5 @@ export type ContextItem = z.infer<typeof ContextItemSchema>;
 export type CodeEvidence = z.infer<typeof CodeEvidenceSchema>;
 export type MemoryEntry = z.infer<typeof MemoryEntrySchema>;
 export type WorktreeAllocation = z.infer<typeof WorktreeAllocationSchema>;
+export type QualityGateDefinition = z.infer<typeof QualityGateDefinitionSchema>;
+export type QualityGateResult = z.infer<typeof QualityGateResultSchema>;

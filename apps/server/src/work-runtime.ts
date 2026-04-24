@@ -4,13 +4,17 @@ import {
   FileCodeEvidenceRepository,
   FileMemoryRepository,
   FileProjectRepository,
+  FileQualityGateRepository,
   FileContextPackRepository,
   FileExternalWorkItemMirrorRepository,
   FileRunRepository,
   FileTaskRepository,
   FileWorktreeRepository,
   FileWorkRepository,
+  FileAdapterConfigurationRepository,
   ContextPackBuilder,
+  AdapterRegistryService,
+  createDefaultAdapterHealthModules,
   ExternalPmService,
   LocalTaskService,
   MemoryService,
@@ -23,12 +27,12 @@ import {
 import { searchExact, searchSemantic } from "@fulcrum/code-tools";
 import { PlaneApiAdapter, SimulatedPlaneAdapter } from "@fulcrum/plane";
 
-const work = new FileWorkRepository(
-  path.join(resolveSetupPaths(process.env.FULCRUM_STATE_ROOT).stateRoot, "work-state.json")
-);
+const setupPaths = resolveSetupPaths(process.env.FULCRUM_STATE_ROOT);
+const work = new FileWorkRepository(path.join(setupPaths.stateRoot, "work-state.json"));
 const taskRepository = new FileTaskRepository(work);
 const projectRepository = new FileProjectRepository(work);
-const runRepository = new FileRunRepository(work);
+export const runRepository = new FileRunRepository(work);
+export const serverQualityGateRepository = new FileQualityGateRepository(work);
 const worktreeRepository = new FileWorktreeRepository(work);
 
 export const serverTaskService = new LocalTaskService(taskRepository);
@@ -87,4 +91,10 @@ export const serverExternalPmService = new ExternalPmService(
   taskRepository,
   planeAdapter,
   projectRepository
+);
+export const serverAdapterRegistry = new AdapterRegistryService(
+  createDefaultAdapterHealthModules(),
+  new FileAdapterConfigurationRepository(
+    path.join(setupPaths.stateRoot, "adapter-configurations.json")
+  )
 );
