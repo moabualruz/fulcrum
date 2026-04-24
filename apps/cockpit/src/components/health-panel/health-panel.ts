@@ -1,6 +1,8 @@
 import type { CockpitSnapshot } from '../../live-stream.ts'
-import { healthLabels } from '../../live-stream.ts'
+import { healthDegradationLabels, healthLabels } from '../../live-stream.ts'
 
 export function renderHealthPanel(snapshot: CockpitSnapshot): string {
-  return healthLabels(snapshot).join('\n')
+  const degraded = healthDegradationLabels(snapshot)
+  const status = degraded.length > 0 ? 'health:degraded' : 'health:available'
+  return [status, ...healthLabels(snapshot)].join('\n')
 }

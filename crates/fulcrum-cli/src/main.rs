@@ -1,4 +1,5 @@
 use fulcrum_config::FulcrumPaths;
+use fulcrum_setup::{CommandHostProbe, SetupPlanner, SetupProfile, UninstallOptions};
 use fulcrum_storage::Storage;
 use fulcrum_worker::complete_stub_run;
 use std::env;
@@ -26,9 +27,12 @@ fn run(args: Vec<String>) -> Result<(), String> {
         Some("project") => cmd_project(&paths, &args[1..]),
         Some("task") => cmd_task(&paths, &args[1..]),
         Some("run") => cmd_run(&paths, &args[1..]),
+        Some("setup") => cmd_setup(&paths, &args[1..]),
         Some("artifact") => cmd_artifact(&paths, &args[1..]),
         Some("backup") => cmd_backup(&paths, &args[1..]),
         Some("restore") => cmd_restore(&args[1..]),
+        Some("export") => cmd_export(&paths),
+        Some("uninstall") => cmd_uninstall(&paths, &args[1..]),
         _ => {
             print_help();
             Ok(())
@@ -103,7 +107,7 @@ fn cmd_down(paths: &FulcrumPaths) -> Result<(), String> {
     if let Some(pid) = paths.read_daemon_pid()
         && process_alive(pid)
     {
-        let _ = Command::new("kill").arg(pid.to_string()).status();
+        let _ = terminate_process(pid);
     }
     paths.write_daemon_state("stopped")?;
     println!("daemon=stopped");
@@ -266,6 +270,83 @@ fn cmd_artifact(paths: &FulcrumPaths, args: &[String]) -> Result<(), String> {
     }
 }
 
+fn cmd_setup(paths: &FulcrumPaths, args: &[String]) -> Result<(), String> {
+    match (args.first().map(String::as_str), args.get(1)) {
+        (Some("plan"), Some(profile)) => {
+            let profile = parse_profile(profile)?;
+            let planner = SetupPlanner::for_current_host();
+            let plan = planner.plan(profile);
+            println!("profile={}", plan.profile);
+            println!("host_os={}", plan.host.os.as_str());
+            println!("host_arch={}", plan.host.arch.as_str());
+            println!("dependencies={}", plan.dependencies.len());
+            for dependency in &plan.dependencies {
+                println!(
+                    "dependency={} requirement={:?} kind={:?}",
+                    dependency.id, dependency.requirement, dependency.kind
+                );
+            }
+            for step in planner.dry_run(&plan).steps {
+                println!("step={} command={}", step.id, step.command);
+            }
+            println!("certified={}", plan.certification.passed());
+            Ok(())
+        }
+        (Some("doctor"), Some(profile)) => {
+            let profile = parse_profile(profile)?;
+            let planner = SetupPlanner::for_current_host();
+            let report = planner.doctor(profile, &CommandHostProbe::new(paths.home.clone()));
+            println!("profile={}", report.profile);
+            for health in &report.health {
+                println!(
+                    "dependency={} status={:?} evidence={}",
+                    health.dependency, health.status, health.evidence
+                );
+            }
+            println!("doctor_passed={}", report.passed());
+            if report.passed() {
+                Ok(())
+            } else {
+                Err(format!("setup doctor failed for {profile}"))
+            }
+        }
+        (Some("install"), Some(profile)) => {
+            let profile = parse_profile(profile)?;
+            let planner = SetupPlanner::for_current_host();
+            let plan = planner.plan(profile);
+            println!("install_mode=dry-run");
+            println!("profile={}", plan.profile);
+            for step in plan.steps.iter().chain(plan.health_checks.iter()) {
+                println!("step={} command={}", step.id, step.command);
+            }
+            println!("certified={}", plan.certification.passed());
+            Ok(())
+        }
+        (Some("uninstall"), Some(profile)) => {
+            let profile = parse_profile(profile)?;
+            let purge_backups = args.iter().any(|arg| arg == "--purge-backups");
+            let planner = SetupPlanner::for_current_host();
+            let plan = planner.uninstall_plan(
+                profile,
+                UninstallOptions {
+                    preserve_backups: !purge_backups,
+                },
+            );
+            println!("uninstall_mode=dry-run");
+            println!("profile={}", plan.profile);
+            println!("backups_preserved={}", plan.preserve_backups);
+            for step in plan.steps {
+                println!("step={} command={}", step.id, step.command);
+            }
+            Ok(())
+        }
+        _ => Err(
+            "usage: fulcrum setup <plan|install|doctor|uninstall> <core|code|memory|actions|full>"
+                .to_string(),
+        ),
+    }
+}
+
 fn cmd_backup(paths: &FulcrumPaths, args: &[String]) -> Result<(), String> {
     match args.first().map(String::as_str) {
         Some("create") => {
@@ -298,8 +379,55 @@ fn cmd_restore(args: &[String]) -> Result<(), String> {
     }
 }
 
+fn cmd_export(paths: &FulcrumPaths) -> Result<(), String> {
+    if !paths.db.exists() {
+        return Err(format!("not initialized: missing {}", paths.db.display()));
+    }
+    let storage = Storage::open(paths)?;
+    let summary = storage.summary()?;
+    println!("fulcrum_export_version=1");
+    println!("home={}", paths.home.display());
+    println!("db={}", paths.db.display());
+    println!("workspaces={}", summary.workspaces);
+    println!("projects={}", summary.projects);
+    println!("tasks={}", summary.tasks);
+    println!("runs={}", summary.runs);
+    println!("events={}", summary.events);
+    Ok(())
+}
+
+fn cmd_uninstall(paths: &FulcrumPaths, args: &[String]) -> Result<(), String> {
+    if !args.iter().any(|arg| arg == "--yes") {
+        return Err("usage: fulcrum uninstall --yes [--purge-backups]".to_string());
+    }
+    let purge_backups = args.iter().any(|arg| arg == "--purge-backups");
+    if let Some(pid) = paths.read_daemon_pid()
+        && process_alive(pid)
+    {
+        let _ = terminate_process(pid);
+    }
+    paths.remove_managed_state(!purge_backups)?;
+    println!("uninstalled=true");
+    println!("home={}", paths.home.display());
+    println!("backups_preserved={}", !purge_backups);
+    Ok(())
+}
+
 fn print_help() {
-    println!("fulcrum <init|up|down|status|doctor|project|task|run|artifact|backup|restore>");
+    println!(
+        "fulcrum <init|up|down|status|doctor|project|task|run|setup|artifact|backup|restore|export|uninstall>"
+    );
+}
+
+fn parse_profile(value: &str) -> Result<SetupProfile, String> {
+    match value {
+        "core" => Ok(SetupProfile::Core),
+        "code" => Ok(SetupProfile::Code),
+        "memory" => Ok(SetupProfile::Memory),
+        "actions" => Ok(SetupProfile::Actions),
+        "full" => Ok(SetupProfile::Full),
+        _ => Err(format!("unknown setup profile: {value}")),
+    }
 }
 
 fn live_daemon_status(paths: &FulcrumPaths) -> String {
@@ -362,14 +490,47 @@ fn http_get(endpoint: &str, path: &str) -> Result<String, String> {
 }
 
 fn process_alive(pid: u32) -> bool {
-    Command::new("kill")
-        .arg("-0")
-        .arg(pid.to_string())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
+    #[cfg(unix)]
+    {
+        return Command::new("kill")
+            .arg("-0")
+            .arg(pid.to_string())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false);
+    }
+    #[cfg(windows)]
+    {
+        return Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {pid}")])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .output()
+            .map(|output| {
+                output.status.success()
+                    && String::from_utf8_lossy(&output.stdout).contains(&pid.to_string())
+            })
+            .unwrap_or(false);
+    }
+    #[allow(unreachable_code)]
+    false
+}
+
+fn terminate_process(pid: u32) -> std::io::Result<std::process::ExitStatus> {
+    #[cfg(unix)]
+    {
+        return Command::new("kill").arg(pid.to_string()).status();
+    }
+    #[cfg(windows)]
+    {
+        return Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .status();
+    }
+    #[allow(unreachable_code)]
+    Command::new("kill").arg(pid.to_string()).status()
 }
 
 fn daemon_binary() -> Result<std::path::PathBuf, String> {

@@ -15,6 +15,9 @@ fn initializes_persists_task_run_and_backup() {
     let task = storage.create_task("ship first run").unwrap();
     let run = storage.start_run(&task.id, "stub").unwrap();
     storage.heartbeat_run(&run.id, "working").unwrap();
+    let artifact_id = storage
+        .add_artifact(&run.id, "/tmp/result.txt", "patch")
+        .unwrap();
     storage.complete_run(&run.id).unwrap();
     let canceled_task = storage.create_task("cancel path").unwrap();
     let canceled_run = storage.start_run(&canceled_task.id, "stub").unwrap();
@@ -30,9 +33,30 @@ fn initializes_persists_task_run_and_backup() {
     assert_eq!(project.id, "proj_000001");
     assert_eq!(task.id, "task_000001");
     assert_eq!(run.id, "run_000001");
+    assert_eq!(artifact_id, "art_000001");
     assert!(backup.exists());
     assert!(backup.with_extension("db.manifest").exists());
     assert!(storage.summary().unwrap().events >= 5);
+    let run_events = storage.events_for_subject(&run.id).unwrap();
+    assert_eq!(
+        run_events
+            .iter()
+            .find(|event| event.kind == "run.started")
+            .unwrap()
+            .attributes
+            .get("task_id"),
+        Some(&task.id)
+    );
+    let artifact_events = storage.events_for_subject(&artifact_id).unwrap();
+    let artifact_event = artifact_events
+        .iter()
+        .find(|event| event.kind == "artifact.created")
+        .unwrap();
+    assert_eq!(artifact_event.attributes.get("run_id"), Some(&run.id));
+    assert_eq!(
+        artifact_event.attributes.get("path"),
+        Some(&"/tmp/result.txt".to_string())
+    );
     Storage::verify_backup(backup.to_str().unwrap()).unwrap();
     let restore_root = root.with_extension("restore");
     let _ = fs::remove_dir_all(&restore_root);

@@ -1,6 +1,7 @@
 use fulcrum_config::FulcrumPaths;
 use fulcrum_policy::evaluate_run_transition;
 use rusqlite::{Connection, params};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -41,6 +42,7 @@ pub struct EventRow {
     pub kind: String,
     pub subject: String,
     pub message: String,
+    pub attributes: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,12 +122,14 @@ impl Storage {
                   kind TEXT NOT NULL,
                   subject TEXT NOT NULL,
                   message TEXT NOT NULL,
+                  attributes TEXT NOT NULL DEFAULT '',
                   created_at TEXT NOT NULL
                 );
                 INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (1, datetime('now'));
                 ",
             )
             .map_err(|err| format!("failed to run migrations: {err}"))?;
+        self.ensure_column("events", "attributes", "TEXT NOT NULL DEFAULT ''")?;
         Ok(())
     }
 
@@ -143,10 +147,11 @@ impl Storage {
                 params![workspace.id, workspace.name],
             )
             .map_err(|err| format!("failed to create workspace: {err}"))?;
-        self.append_event(
+        self.append_event_with_attributes(
             "workspace.created",
             &workspace.id,
             "default workspace created",
+            [("name", workspace.name.clone())],
         )?;
         Ok(workspace)
     }
@@ -186,7 +191,16 @@ impl Storage {
                 params![project.id, project.workspace_id, project.path, project.name],
             )
             .map_err(|err| format!("failed to add project: {err}"))?;
-        self.append_event("project.added", &project.id, "project added")?;
+        self.append_event_with_attributes(
+            "project.added",
+            &project.id,
+            "project added",
+            [
+                ("workspace_id", project.workspace_id.clone()),
+                ("path", project.path.clone()),
+                ("name", project.name.clone()),
+            ],
+        )?;
         Ok(project)
     }
 
@@ -226,7 +240,16 @@ impl Storage {
                 params![task.id, task.project_id, task.title, task.status],
             )
             .map_err(|err| format!("failed to create task: {err}"))?;
-        self.append_event("task.created", &task.id, &task.title)?;
+        self.append_event_with_attributes(
+            "task.created",
+            &task.id,
+            &task.title,
+            [
+                ("project_id", task.project_id.clone()),
+                ("title", task.title.clone()),
+                ("status", task.status.clone()),
+            ],
+        )?;
         Ok(task)
     }
 
@@ -253,7 +276,16 @@ impl Storage {
                 params![run.id, run.task_id, run.runner, run.status],
             )
             .map_err(|err| format!("failed to start run: {err}"))?;
-        self.append_event("run.started", &run.id, task_id)?;
+        self.append_event_with_attributes(
+            "run.started",
+            &run.id,
+            task_id,
+            [
+                ("task_id", task_id.to_string()),
+                ("agent_role", runner.to_string()),
+                ("status", run.status.clone()),
+            ],
+        )?;
         Ok(run)
     }
 
@@ -275,7 +307,12 @@ impl Storage {
                 params![run_id],
             )
             .map_err(|err| format!("failed to complete task: {err}"))?;
-        self.append_event("run.completed", run_id, "run completed")?;
+        self.append_event_with_attributes(
+            "run.completed",
+            run_id,
+            "run completed",
+            [("status", "completed".to_string())],
+        )?;
         Ok(())
     }
 
@@ -291,7 +328,12 @@ impl Storage {
         if changed == 0 {
             return Err(format!("run not found: {run_id}"));
         }
-        self.append_event("run.blocked", run_id, reason)?;
+        self.append_event_with_attributes(
+            "run.blocked",
+            run_id,
+            reason,
+            [("status", "blocked".to_string())],
+        )?;
         Ok(())
     }
 
@@ -307,7 +349,7 @@ impl Storage {
                 params![id, run_id, note],
             )
             .map_err(|err| format!("failed to write heartbeat: {err}"))?;
-        self.append_event("run.heartbeat", run_id, note)?;
+        self.append_event_with_attributes("run.heartbeat", run_id, note, [("status", status)])?;
         Ok(())
     }
 
@@ -330,7 +372,12 @@ impl Storage {
         if changed == 0 {
             return Err(format!("task not found: {task_id}"));
         }
-        self.append_event("task.done", task_id, "task marked done")?;
+        self.append_event_with_attributes(
+            "task.done",
+            task_id,
+            "task marked done",
+            [("status", "done".to_string())],
+        )?;
         Ok(())
     }
 
@@ -342,7 +389,17 @@ impl Storage {
                 params![id, run_id, path, kind],
             )
             .map_err(|err| format!("failed to add artifact: {err}"))?;
-        self.append_event("artifact.created", run_id, path)?;
+        self.append_event_with_attributes(
+            "artifact.created",
+            &id,
+            path,
+            [
+                ("run_id", run_id.to_string()),
+                ("path", path.to_string()),
+                ("kind", kind.to_string()),
+                ("state", "ready".to_string()),
+            ],
+        )?;
         Ok(id)
     }
 
@@ -360,7 +417,7 @@ impl Storage {
     pub fn events(&self) -> Result<Vec<EventRow>, String> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, kind, subject, message FROM events ORDER BY id")
+            .prepare("SELECT id, kind, subject, message, attributes FROM events ORDER BY id")
             .map_err(|err| format!("failed to prepare events query: {err}"))?;
         let rows = stmt
             .query_map([], |row| {
@@ -369,6 +426,7 @@ impl Storage {
                     kind: row.get(1)?,
                     subject: row.get(2)?,
                     message: row.get(3)?,
+                    attributes: decode_attributes(&row.get::<_, String>(4)?),
                 })
             })
             .map_err(|err| format!("failed to query events: {err}"))?;
@@ -378,7 +436,7 @@ impl Storage {
     pub fn events_for_subject(&self, subject: &str) -> Result<Vec<EventRow>, String> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, kind, subject, message FROM events WHERE subject = ?1 ORDER BY id")
+            .prepare("SELECT id, kind, subject, message, attributes FROM events WHERE subject = ?1 ORDER BY id")
             .map_err(|err| format!("failed to prepare events query: {err}"))?;
         let rows = stmt
             .query_map(params![subject], |row| {
@@ -387,6 +445,7 @@ impl Storage {
                     kind: row.get(1)?,
                     subject: row.get(2)?,
                     message: row.get(3)?,
+                    attributes: decode_attributes(&row.get::<_, String>(4)?),
                 })
             })
             .map_err(|err| format!("failed to query events: {err}"))?;
@@ -461,12 +520,22 @@ impl Storage {
         Ok(())
     }
 
-    fn append_event(&self, kind: &str, subject: &str, message: &str) -> Result<(), String> {
+    fn append_event_with_attributes<I>(
+        &self,
+        kind: &str,
+        subject: &str,
+        message: &str,
+        attributes: I,
+    ) -> Result<(), String>
+    where
+        I: IntoIterator<Item = (&'static str, String)>,
+    {
         let id = self.next_id("evt")?;
+        let attributes = encode_attributes(attributes);
         self.conn
             .execute(
-                "INSERT INTO events(id, kind, subject, message, created_at) VALUES (?1, ?2, ?3, ?4, datetime('now'))",
-                params![id, kind, subject, message],
+                "INSERT INTO events(id, kind, subject, message, attributes, created_at) VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'))",
+                params![id, kind, subject, message, attributes],
             )
             .map_err(|err| format!("failed to append event: {err}"))?;
         Ok(())
@@ -521,7 +590,12 @@ impl Storage {
         if changed == 0 {
             return Err(format!("run not found: {run_id}"));
         }
-        self.append_event(event_kind, run_id, reason)?;
+        self.append_event_with_attributes(
+            event_kind,
+            run_id,
+            reason,
+            [("status", status.to_string())],
+        )?;
         Ok(())
     }
 
@@ -548,6 +622,27 @@ impl Storage {
             .map_err(sql_err)?;
         Ok(format!("{prefix}_{next:06}"))
     }
+
+    fn ensure_column(&self, table: &str, column: &str, definition: &str) -> Result<(), String> {
+        let mut stmt = self
+            .conn
+            .prepare(&format!("PRAGMA table_info({table})"))
+            .map_err(sql_err)?;
+        let columns = stmt
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(sql_err)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err)?;
+        if !columns.iter().any(|existing| existing == column) {
+            self.conn
+                .execute(
+                    &format!("ALTER TABLE {table} ADD COLUMN {column} {definition}"),
+                    [],
+                )
+                .map_err(sql_err)?;
+        }
+        Ok(())
+    }
 }
 
 fn now_ms() -> u128 {
@@ -555,6 +650,41 @@ fn now_ms() -> u128 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis())
         .unwrap_or_default()
+}
+
+fn encode_attributes<I>(attributes: I) -> String
+where
+    I: IntoIterator<Item = (&'static str, String)>,
+{
+    attributes
+        .into_iter()
+        .map(|(key, value)| format!("{}={}", escape_attr(key), escape_attr(&value)))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn decode_attributes(encoded: &str) -> BTreeMap<String, String> {
+    encoded
+        .lines()
+        .filter_map(|line| {
+            let (key, value) = line.split_once('=')?;
+            Some((unescape_attr(key), unescape_attr(value)))
+        })
+        .collect()
+}
+
+fn escape_attr(value: &str) -> String {
+    value
+        .replace('%', "%25")
+        .replace('\n', "%0A")
+        .replace('=', "%3D")
+}
+
+fn unescape_attr(value: &str) -> String {
+    value
+        .replace("%3D", "=")
+        .replace("%0A", "\n")
+        .replace("%25", "%")
 }
 
 fn sql_err(err: rusqlite::Error) -> String {

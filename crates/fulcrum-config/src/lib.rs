@@ -110,6 +110,37 @@ impl FulcrumPaths {
             .ok()
             .and_then(|content| parse_quoted_field(&content, "endpoint"))
     }
+
+    pub fn remove_managed_state(&self, preserve_backups: bool) -> Result<(), String> {
+        if !self.home.exists() {
+            return Ok(());
+        }
+        if preserve_backups {
+            for entry in fs::read_dir(&self.home)
+                .map_err(|err| format!("failed to read {}: {err}", self.home.display()))?
+            {
+                let entry = entry.map_err(|err| format!("failed to read home entry: {err}"))?;
+                if entry.path() == self.backups {
+                    continue;
+                }
+                remove_path(&entry.path())?;
+            }
+            Ok(())
+        } else {
+            remove_path(&self.home)
+        }
+    }
+}
+
+fn remove_path(path: &Path) -> Result<(), String> {
+    if path.is_dir() {
+        fs::remove_dir_all(path)
+            .map_err(|err| format!("failed to remove {}: {err}", path.display()))
+    } else if path.exists() {
+        fs::remove_file(path).map_err(|err| format!("failed to remove {}: {err}", path.display()))
+    } else {
+        Ok(())
+    }
 }
 
 fn escape_toml_path(path: &Path) -> String {

@@ -49,6 +49,36 @@ fn init_project_task_run_backup_smoke() {
         &["doctor"],
         "warning optional sidecars not enabled",
     );
+    assert_cmd(
+        bin,
+        &root,
+        &["setup", "plan", "full"],
+        "dependency=lightrag",
+    );
+    assert_cmd(
+        bin,
+        &root,
+        &["setup", "install", "code"],
+        "install_mode=dry-run",
+    );
+    assert_cmd(
+        bin,
+        &root,
+        &["setup", "doctor", "core"],
+        "doctor_passed=true",
+    );
+    assert_cmd_fails(
+        bin,
+        &root,
+        &["setup", "doctor", "memory"],
+        "setup doctor failed for memory",
+    );
+    assert_cmd(
+        bin,
+        &root,
+        &["setup", "uninstall", "actions"],
+        "backups_preserved=true",
+    );
     assert_cmd_fails(
         bin,
         &root,
@@ -92,7 +122,17 @@ fn init_project_task_run_backup_smoke() {
         &["restore", "apply", backup_path],
         "backup=restored",
     );
+    assert_cmd(bin, &root, &["export"], "fulcrum_export_version=1");
     assert_cmd(bin, &root, &["down"], "daemon=stopped");
+    assert_cmd_fails(bin, &root, &["uninstall"], "usage: fulcrum uninstall --yes");
+    assert_cmd(
+        bin,
+        &root,
+        &["uninstall", "--yes"],
+        "backups_preserved=true",
+    );
+    assert!(root.join("backups").exists());
+    assert!(!root.join("fulcrum.db").exists());
 
     let _ = std::fs::remove_dir_all(&root);
     let _ = std::fs::remove_dir_all(&restore_root);

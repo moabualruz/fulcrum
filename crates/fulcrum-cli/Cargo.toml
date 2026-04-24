@@ -6,6 +6,7 @@ version.workspace = true
 
 [dependencies]
 fulcrum-config = { path = "../fulcrum-config" }
+fulcrum-setup = { path = "../fulcrum-setup" }
 fulcrum-storage = { path = "../fulcrum-storage" }
 fulcrum-worker = { path = "../fulcrum-worker" }
 

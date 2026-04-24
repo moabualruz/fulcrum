@@ -66,6 +66,7 @@ name = "fulcrum-cli"
 version = "0.1.0"
 dependencies = [
  "fulcrum-config",
+ "fulcrum-setup",
  "fulcrum-storage",
  "fulcrum-worker",
 ]
@@ -129,6 +130,10 @@ name = "fulcrum-policy"
 version = "0.1.0"
 
 [[package]]
+name = "fulcrum-setup"
+version = "0.1.0"
+
+[[package]]
 name = "fulcrum-storage"
 version = "0.1.0"
 dependencies = [
@@ -144,6 +149,10 @@ dependencies = [
  "fulcrum-config",
  "fulcrum-storage",
 ]
+
+[[package]]
+name = "fulcrum-worktree"
+version = "0.1.0"
 
 [[package]]
 name = "hashbrown"

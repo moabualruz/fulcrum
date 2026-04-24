@@ -11,8 +11,10 @@ members = [
   "crates/fulcrum-kernel",
   "crates/fulcrum-memory",
   "crates/fulcrum-policy",
+  "crates/fulcrum-setup",
   "crates/fulcrum-storage",
   "crates/fulcrum-worker",
+  "crates/fulcrum-worktree",
 ]
 resolver = "3"
 

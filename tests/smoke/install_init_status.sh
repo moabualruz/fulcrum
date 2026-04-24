@@ -23,10 +23,20 @@ fulcrum run watch run_000001
 fulcrum artifact list run_000001
 fulcrum status
 fulcrum doctor
+fulcrum setup plan full
+fulcrum setup install code
+fulcrum setup doctor core
+if PATH="$ROOT/bin" fulcrum setup doctor memory; then
+  echo "expected memory setup doctor to fail before LightRAG install" >&2
+  exit 1
+fi
+fulcrum setup uninstall actions
 BACKUP_OUTPUT="$(fulcrum backup create)"
 echo "$BACKUP_OUTPUT"
 BACKUP_PATH="${BACKUP_OUTPUT##*backup=}"
 fulcrum restore verify "$BACKUP_PATH"
 RESTORE_HOME="$ROOT/restore-home"
 FULCRUM_HOME="$RESTORE_HOME" fulcrum restore apply "$BACKUP_PATH"
+fulcrum export
 fulcrum down
+fulcrum uninstall --yes

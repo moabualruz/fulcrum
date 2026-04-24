@@ -36,20 +36,20 @@ Fulcrum is "shippable to a user" only when all are true:
 
 ## Current Branch Status
 
-Status after the 2026-04-24 alpha bootstrap implementation pass:
+Status after the 2026-04-24 alpha bootstrap and product-surface implementation pass:
 
 | Milestone | Status | Notes |
 |---|---|---|
 | M0 Bootstrap/product skeleton | Alpha complete | Rust workspace, local paths/config, SQLite/WAL storage, real daemon process, loopback health/events endpoints, installed-binary smoke, backup/restore verification |
 | M1 task/run/event loop | Alpha complete | project/task/run/artifact/event persistence, stub worker ownership, heartbeat/block/cancel/fail/complete transitions, transition policy, terminal watch loop |
-| M2 cockpit/TUI | Partial | cockpit snapshot shell and daemon event surface exist; TUI, queue boards, review/merge/policy views still missing |
-| M3 code intelligence | Spike only | in-memory incremental code index and backend contracts exist; no real Tree-sitter/Zoekt/LanceDB adapter yet |
-| M4 markdown memory | Spike only | in-memory markdown memory/provenance/update/delete exists; no persistent LightRAG sidecar yet |
-| M5 worktree delivery | Not implemented | worktree/review/merge safety loop still planned |
-| M6 sidecar/profile supervisor | Not implemented | adapter READMEs/contracts only |
+| M2 cockpit/TUI | Alpha model complete | dashboard DTO/reducer covers global and per-project task board, active runs, blockers, artifacts, review/merge queues, policy decisions, adapter health, and live events; browser/TUI shell still missing |
+| M3 code intelligence | Alpha model complete | persistent index snapshot, file state, create/update/delete/rename, exact/path/import/symbol/semantic search explanations, stale detection, and Tree-sitter/Zoekt/LanceDB certification contracts exist; real external binaries still not invoked |
+| M4 markdown memory | Alpha model complete | markdown directory import, caller L0 IDs, update/delete/tombstones, provenance, query explanations, graph separation, and LightRAG certification contract exist; no persistent LightRAG process/socket yet |
+| M5 worktree delivery | Alpha model complete | worktree allocation, artifact attachment, review queue/findings, merge queue/apply/block, conflict artifacts, and dirty cleanup refusal exist via injectable git provider; no real git command adapter yet |
+| M6 sidecar/profile supervisor | Alpha dry-run complete | setup planner and CLI dry-run model dependency plans, health checks, uninstall, cross-OS strategy, and certification gates for core/code/memory/actions/full; real downloads/install execution still missing |
 | M7 actions/Windmill | Contract stub only | action boundary documented/tested; no Windmill runtime |
 | M8 Plane adapter | Not implemented | optional adapter docs only |
-| M9 packaging/security/RC | Partial | smoke/doctor/backup exist; release packaging, uninstall, privacy/security gates still planned |
+| M9 packaging/security/RC | Partial | smoke/doctor/backup/export/uninstall exist; release packaging, privacy/security gates, signed artifacts, and real clean-machine OS matrix still planned |
 
 ## Architecture Decisions
 

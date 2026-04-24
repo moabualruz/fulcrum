@@ -105,14 +105,30 @@ fn events_body(paths: &FulcrumPaths, skip: usize) -> String {
             .skip(skip)
             .map(|event| {
                 format!(
-                    "id: {}\nevent: {}\ndata: subject={} message={}\n\n",
-                    event.id, event.kind, event.subject, event.message
+                    "id: {}\nevent: {}\ndata: subject={} message={}{}\n\n",
+                    event.id,
+                    event.kind,
+                    event.subject,
+                    event.message,
+                    event
+                        .attributes
+                        .iter()
+                        .map(|(key, value)| format!(" attr.{key}={}", escape_sse_value(value)))
+                        .collect::<String>()
                 )
             })
             .collect::<Vec<_>>()
             .join(""),
         Err(err) => format!("event: error\ndata: {err}\n\n"),
     }
+}
+
+fn escape_sse_value(value: &str) -> String {
+    value
+        .replace('%', "%25")
+        .replace(' ', "%20")
+        .replace('\n', "%0A")
+        .replace('=', "%3D")
 }
 
 fn write_event_stream(paths: &FulcrumPaths, stream: &mut TcpStream) -> Result<(), String> {
