@@ -182,19 +182,19 @@
 
 ### Tests And Validation for User Story 8
 
-- [ ] T081 [P] [US8] Add cache invalidation contract test in `tests/contract/invalidation-records.test.ts`
-- [ ] T082 [P] [US8] Add graph incremental correctness test in `tests/integration/graph-incremental-correctness.test.ts`
-- [ ] T083 [P] [US8] Add repo cache invalidation recovery test in `tests/recovery/repo-cache-invalidation.test.ts`
+- [x] T081 [P] [US8] Add cache invalidation contract test in `tests/contract/invalidation-records.test.ts`
+- [x] T082 [P] [US8] Add graph incremental correctness test in `tests/integration/graph-incremental-correctness.test.ts`
+- [x] T083 [P] [US8] Add repo cache invalidation recovery test in `tests/recovery/repo-cache-invalidation.test.ts`
 
 ### Implementation for User Story 8
 
-- [ ] T084 [US8] Implement invalidation service in `packages/core/src/readiness/invalidation-service.ts`
-- [ ] T085 [US8] Persist invalidation records in `packages/db/src/readiness.ts`
-- [ ] T086 [US8] Wire invalidation into code evidence service in `packages/core/src/code/evidence-service.ts`
-- [ ] T087 [US8] Wire invalidation into memory service in `packages/core/src/memory/service.ts`
-- [ ] T088 [US8] Wire invalidation into graph service in `packages/core/src/graph/service.ts`
-- [ ] T089 [US8] Wire invalidation into context builder in `packages/core/src/context/builder.ts`
-- [ ] T090 [US8] Add graph/cache status to CLI and cockpit in `apps/cli/src/main.ts` and `apps/cockpit/src/routes/traceability.tsx`
+- [x] T084 [US8] Implement invalidation service in `packages/core/src/readiness/invalidation-service.ts`
+- [x] T085 [US8] Persist invalidation records in `packages/db/src/readiness.ts`
+- [x] T086 [US8] Wire invalidation into code evidence service in `packages/core/src/code/evidence-service.ts`
+- [x] T087 [US8] Wire invalidation into memory service in `packages/core/src/memory/service.ts`
+- [x] T088 [US8] Wire invalidation into graph service in `packages/core/src/graph/service.ts`
+- [x] T089 [US8] Wire invalidation into context builder in `packages/core/src/context/builder.ts`
+- [x] T090 [US8] Add graph/cache status to CLI and cockpit in `apps/cli/src/main.ts` and `apps/cockpit/src/routes/traceability.tsx`
 
 ## Phase 11: User Story 9 - Release Readiness Command And Evidence Pack (Priority: P1)
 

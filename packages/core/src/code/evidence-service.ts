@@ -3,6 +3,10 @@ import path from "node:path";
 import { makeId, type CodeEvidence, CodeEvidenceSchema, type Project } from "@fulcrum/shared";
 import { loadIgnoredPathPolicy, loadIgnoredPathPolicySync } from "../privacy/ignored-paths.js";
 import type { GraphLinkWriters } from "../graph/link-writers.js";
+import {
+  collectRepoFingerprint,
+  type InvalidationService
+} from "../readiness/invalidation-service.js";
 
 export interface CodeSearchAdapter {
   search(options: {
@@ -57,7 +61,8 @@ export class CodeEvidenceService {
       capabilityId: "cap_semantic_code";
       nextAction: string;
     }>,
-    private readonly graphLinks?: GraphLinkWriters
+    private readonly graphLinks?: GraphLinkWriters,
+    private readonly invalidation?: InvalidationService
   ) {}
 
   async search(input: {
@@ -111,6 +116,18 @@ export class CodeEvidenceService {
     for (const item of evidence) {
       this.graphLinks?.code(item);
     }
+    this.invalidation?.recordGenerated({
+      derivedKind: "code_evidence",
+      rebuildSource: `code-search:${project.projectId}:${input.query}`,
+      sourceRefs: evidence.map((item) => ({
+        type: "file",
+        uri: item.filePath,
+        label: item.symbol ?? item.query,
+        lineStart: item.lineStart,
+        lineEnd: item.lineEnd
+      })),
+      ...collectRepoFingerprint(project.rootPath, "fulcrum-code-evidence")
+    });
     const degraded = input.includeSemantic
       ? [
           await this.semanticSearch().then((semantic) => ({
@@ -149,6 +166,13 @@ export class CodeEvidenceService {
       .filter((item): item is CodeEvidence => Boolean(item));
     for (const item of stale) {
       this.graphLinks?.code(item);
+    }
+    if (stale.length > 0) {
+      this.invalidation?.markMatchingStale({
+        derivedKinds: ["code_evidence", "graph_projection", "context_preview", "ranking"],
+        rebuildSourceIncludes: project.projectId,
+        reason: "Code evidence source missing, ignored, or changed."
+      });
     }
     return stale;
   }

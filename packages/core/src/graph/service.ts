@@ -13,6 +13,7 @@ import {
   type SourceRef,
   type Task
 } from "@fulcrum/shared";
+import type { InvalidationService } from "../readiness/invalidation-service.js";
 
 export interface GraphLinkRepositoryPort {
   save(link: GraphLink): GraphLink;
@@ -32,7 +33,10 @@ export interface GraphRebuildSources {
 }
 
 export class GraphLinkService {
-  constructor(private readonly repository: GraphLinkRepositoryPort) {}
+  constructor(
+    private readonly repository: GraphLinkRepositoryPort,
+    private readonly invalidation?: InvalidationService
+  ) {}
 
   link(
     input: Omit<GraphLink, "graphLinkId" | "createdAt" | "updatedAt" | "schemaVersion">
@@ -62,7 +66,14 @@ export class GraphLinkService {
 
   rebuild(projectId: string, sources: GraphRebuildSources): GraphLink[] {
     const links = rebuildGraphLinks(projectId, sources);
-    return this.repository.replaceDerived(projectId, links);
+    const replaced = this.repository.replaceDerived(projectId, links);
+    this.invalidation?.recordGenerated({
+      derivedKind: "graph_projection",
+      rebuildSource: `graph:${projectId}`,
+      sourceRefs: graphSourceRefs(sources),
+      toolVersion: "fulcrum-graph"
+    });
+    return replaced;
   }
 }
 
@@ -416,6 +427,22 @@ export function rebuildGraphLinks(projectId: string, sources: GraphRebuildSource
   return links;
 }
 
+function graphSourceRefs(sources: GraphRebuildSources): SourceRef[] {
+  return [
+    ...(sources.tasks ?? []).map((task) => ref("task", task.taskId, task.title)),
+    ...(sources.memories ?? []).map((memory) => ref("memory", memory.memoryId, memory.title)),
+    ...(sources.codeEvidence ?? []).map((evidence) => codeRef(evidence)),
+    ...(sources.runs ?? []).map((run) => ref("run", run.runId, run.status)),
+    ...(sources.contextPacks ?? []).map((pack) => ref("context-pack", pack.contextPackId)),
+    ...(sources.contextItems ?? []).map((item) =>
+      ref("context-item", item.contextItemId, item.title)
+    ),
+    ...(sources.qualityResults ?? []).map((result) =>
+      ref("quality-gate", result.qualityGateResultId, result.status)
+    )
+  ];
+}
+
 function ref(type: string, id: string, label?: string) {
   return { type, uri: `fulcrum://${type}s/${id}`, label };
 }
@@ -446,9 +473,16 @@ function memoryFreshness(memory: MemoryEntry) {
   } as const;
 }
 
-function sourceNode(sourceRef: SourceRef): { type: GraphNodeType; id: string; ref: SourceRef } | undefined {
+function sourceNode(
+  sourceRef: SourceRef
+): { type: GraphNodeType; id: string; ref: SourceRef } | undefined {
   const sourceType = sourceRef.type.replace(/-/g, "_");
-  if (sourceType === "file" || sourceType === "path" || sourceType === "symbol" || sourceType === "code") {
+  if (
+    sourceType === "file" ||
+    sourceType === "path" ||
+    sourceType === "symbol" ||
+    sourceType === "code"
+  ) {
     return { type: "code", id: sourceRef.uri, ref: sourceRef };
   }
   const typeMap: Record<string, GraphNodeType> = {

@@ -7,6 +7,8 @@ import {
   FileCodeEvidenceRepository,
   FileProjectRepository,
   FileWorkRepository,
+  InvalidationService,
+  MemoryInvalidationRepository,
   ProjectRegistryService
 } from "@fulcrum/core";
 import { searchExact, searchSemantic } from "@fulcrum/code-tools";
@@ -63,5 +65,40 @@ describe("code evidence stale cleanup", () => {
     expect(staleAfterContentChange[0].freshness).toBe("stale");
     expect(staleAfterIgnoreChange).toHaveLength(1);
     expect(staleAfterIgnoreChange[0].ignoredPathStatus).toBe("not_ignored");
+  });
+
+  it("scopes invalidation records to the changed project", async () => {
+    const stateRoot = await mkdtemp(path.join(os.tmpdir(), "fulcrum-code-stale-scope-"));
+    const rootA = await mkdtemp(path.join(os.tmpdir(), "fulcrum-code-stale-a-"));
+    const rootB = await mkdtemp(path.join(os.tmpdir(), "fulcrum-code-stale-b-"));
+    await writeFile(path.join(rootA, "source.ts"), "export const scopedNeedle = true;\n");
+    await writeFile(path.join(rootB, "source.ts"), "export const scopedNeedle = true;\n");
+
+    const work = new FileWorkRepository(path.join(stateRoot, ".fulcrum", "work.json"));
+    const projectRepository = new FileProjectRepository(work);
+    const evidenceRepository = new FileCodeEvidenceRepository(work);
+    const invalidation = new InvalidationService(new MemoryInvalidationRepository());
+    const projects = new ProjectRegistryService(projectRepository);
+    const projectA = projects.register({ rootPath: rootA });
+    const projectB = projects.register({ rootPath: rootB });
+    const code = new CodeEvidenceService(
+      projectRepository,
+      evidenceRepository,
+      { search: (options) => searchExact(options) },
+      searchSemantic,
+      undefined,
+      invalidation
+    );
+
+    await code.search({ projectId: projectA.projectId, query: "scopedNeedle" });
+    await code.search({ projectId: projectB.projectId, query: "scopedNeedle" });
+    await rename(path.join(rootA, "source.ts"), path.join(rootA, "renamed.ts"));
+
+    code.cleanupStale(projectA.projectId);
+
+    expect(invalidation.status("code_evidence")).toMatchObject({ total: 2, fresh: 1, stale: 1 });
+    expect(invalidation.status("code_evidence").staleRecords[0]?.rebuildSource).toContain(
+      projectA.projectId
+    );
   });
 });

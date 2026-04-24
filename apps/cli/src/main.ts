@@ -113,7 +113,8 @@ import {
   graphService,
   graphLinkWriters,
   traceabilityService,
-  graphRebuildSources
+  graphRebuildSources,
+  invalidationService
 } from "./work-runtime.js";
 
 class MemoryArtifactRepository implements ArtifactRepositoryPort {
@@ -1758,5 +1759,18 @@ graphCommand.command("rebuild <projectId>").action((projectId) => {
       : `${data.length} graph links rebuilt`
   );
 });
+
+graphCommand
+  .command("status")
+  .description("Show graph/cache invalidation status")
+  .option("--kind <derivedKind>", "filter by derived kind")
+  .action((options) => {
+    const data = invalidationService.status(options.kind);
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : `${data.fresh} fresh, ${data.stale} stale invalidation records`
+    );
+  });
 
 program.parse();

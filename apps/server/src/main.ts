@@ -58,7 +58,8 @@ import {
   serverGraphService,
   serverGraphLinkWriters,
   serverTraceabilityService,
-  serverGraphRebuildSources
+  serverGraphRebuildSources,
+  serverInvalidationService
 } from "./work-runtime.js";
 
 const app = new Hono();
@@ -114,7 +115,13 @@ registerContextPackRoutes(app, serverContextBuilder);
 registerArtifactRoutes(app, artifactService);
 registerQualityRoutes(app, qualityRunner, qualityReadiness);
 registerPolicyRoutes(app, policyService);
-registerGraphRoutes(app, serverGraphService, serverTraceabilityService, serverGraphRebuildSources);
+registerGraphRoutes(
+  app,
+  serverGraphService,
+  serverTraceabilityService,
+  serverGraphRebuildSources,
+  serverInvalidationService
+);
 registerRecoveryRoutes(app, recoveryDeps);
 registerMcpRoutes(app, {
   doctor: async () => ({

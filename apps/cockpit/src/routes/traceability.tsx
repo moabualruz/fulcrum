@@ -17,6 +17,12 @@ interface TraceabilityView {
   links: TraceabilityLink[];
   limitations: Array<{ graphLinkId: string; message: string }>;
   affected: Record<string, string[]>;
+  invalidationStatus?: {
+    total: number;
+    fresh: number;
+    stale: number;
+    nextAction: string;
+  };
 }
 
 const emptyTrace: TraceabilityView = {
@@ -79,7 +85,21 @@ export function TraceabilityRoute({ trace: initialTrace }: { trace?: Traceabilit
           {trace.root.type}:{trace.root.id}
         </h1>
         <p>{status === "degraded" ? "Traceability API degraded" : `${trace.links.length} links`}</p>
+        {trace.invalidationStatus ? (
+          <p>
+            Cache {trace.invalidationStatus.fresh} fresh / {trace.invalidationStatus.stale} stale
+          </p>
+        ) : null}
       </header>
+
+      {trace.invalidationStatus ? (
+        <section aria-label="Graph and cache status">
+          <article>
+            <h2>Invalidation</h2>
+            <p>{trace.invalidationStatus.nextAction}</p>
+          </article>
+        </section>
+      ) : null}
 
       <section aria-label="Affected records">
         {Object.entries(trace.affected).map(([type, ids]) => (

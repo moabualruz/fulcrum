@@ -16,6 +16,7 @@ import {
 } from "@fulcrum/memory";
 import { exportMemoryWithProvenance, type MemoryExportRecord } from "./export.js";
 import type { GraphLinkWriters } from "../graph/link-writers.js";
+import type { InvalidationService } from "../readiness/invalidation-service.js";
 
 export interface MemoryRepositoryPort {
   save(entry: MemoryEntry): MemoryEntry;
@@ -43,7 +44,8 @@ export class MemoryService {
       new MemsearchMemoryAdapter(),
       new EngramMemoryAdapter()
     ],
-    private readonly graphLinks?: GraphLinkWriters
+    private readonly graphLinks?: GraphLinkWriters,
+    private readonly invalidation?: InvalidationService
   ) {
     this.adapters = Object.fromEntries(adapters.map((adapter) => [adapter.backend, adapter]));
   }
@@ -173,6 +175,17 @@ export class MemoryService {
   private saveWithGraph(entry: MemoryEntry): MemoryEntry {
     const saved = this.repository.save(entry);
     this.graphLinks?.memory(saved);
+    this.invalidation?.recordGenerated({
+      derivedKind: "memory_index",
+      rebuildSource: `memory:${saved.projectId}:${saved.memoryId}`,
+      sourceRefs: saved.sourceRefs,
+      toolVersion: "fulcrum-memory"
+    });
+    this.invalidation?.markMatchingStale({
+      derivedKinds: ["graph_projection", "context_preview", "ranking"],
+      rebuildSourceIncludes: saved.projectId,
+      reason: "Memory entry changed."
+    });
     return saved;
   }
 

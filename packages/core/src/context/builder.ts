@@ -10,6 +10,7 @@ import {
 } from "@fulcrum/shared";
 import { estimateBudget, rankContextItems } from "./ranking.js";
 import type { GraphLinkWriters } from "../graph/link-writers.js";
+import type { InvalidationService } from "../readiness/invalidation-service.js";
 
 type SourceRef = ContextItem["sourceRef"];
 
@@ -49,7 +50,8 @@ export class ContextPackBuilder {
     private readonly repository: ContextPackRepositoryPort,
     private readonly tasks: ContextTaskPort,
     private readonly projects: ContextProjectPort,
-    private readonly graphLinks?: GraphLinkWriters
+    private readonly graphLinks?: GraphLinkWriters,
+    private readonly invalidation?: InvalidationService
   ) {}
 
   build(input: ContextBuildInput): ContextBuildResult {
@@ -190,6 +192,12 @@ export class ContextPackBuilder {
     this.repository.saveItems(items);
     const result = { pack, items };
     this.graphLinks?.context(result);
+    this.invalidation?.recordGenerated({
+      derivedKind: "context_preview",
+      rebuildSource: `context:${project.projectId}:${task.taskId}:${pack.contextPackId}`,
+      sourceRefs: items.map((item) => item.sourceRef),
+      toolVersion: "fulcrum-context-builder"
+    });
     return result;
   }
 

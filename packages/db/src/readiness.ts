@@ -487,6 +487,7 @@ export class ReadinessRepository {
           working_tree_signature = excluded.working_tree_signature,
           ignore_config_hash = excluded.ignore_config_hash,
           tool_version = excluded.tool_version,
+          generated_at = excluded.generated_at,
           stale_at = excluded.stale_at,
           stale_reason = excluded.stale_reason,
           rebuild_source = excluded.rebuild_source,
@@ -518,6 +519,28 @@ export class ReadinessRepository {
     return (derivedKind ? statement.all(derivedKind) : statement.all()).map((row) =>
       invalidationRecordFromRow(row as Row)
     );
+  }
+
+  getInvalidationRecord(recordId: string): InvalidationRecord | undefined {
+    const row = this.db
+      .prepare("SELECT * FROM invalidation_records WHERE record_id = ?")
+      .get(recordId) as Row | undefined;
+    return row ? invalidationRecordFromRow(row) : undefined;
+  }
+
+  markInvalidationRecordStale(
+    recordId: string,
+    staleAt: string,
+    staleReason: string
+  ): InvalidationRecord | undefined {
+    this.db
+      .prepare(
+        `UPDATE invalidation_records
+         SET stale_at = ?, stale_reason = ?
+         WHERE record_id = ? AND stale_at IS NULL`
+      )
+      .run(staleAt, staleReason, recordId);
+    return this.getInvalidationRecord(recordId);
   }
 
   saveReleaseEvidencePack(pack: ReleaseEvidencePack): ReleaseEvidencePack {

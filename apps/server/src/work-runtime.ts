@@ -1,4 +1,6 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { migrate, openDatabase, ReadinessRepository } from "@fulcrum/db";
 import {
   CodeEvidenceService,
   FileCodeEvidenceRepository,
@@ -25,6 +27,7 @@ import {
   WorktreeStatusService,
   GraphLinkService,
   GraphLinkWriters,
+  InvalidationService,
   TraceabilityQueryService,
   resolveSetupPaths
 } from "@fulcrum/core";
@@ -32,6 +35,9 @@ import { searchExact, searchSemantic } from "@fulcrum/code-tools";
 import { PlaneApiAdapter, SimulatedPlaneAdapter } from "@fulcrum/plane";
 
 const setupPaths = resolveSetupPaths(process.env.FULCRUM_STATE_ROOT);
+const db = openDatabase(setupPaths.dbPath);
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+migrate(db, path.join(repoRoot, "packages/db/migrations"));
 const work = new FileWorkRepository(path.join(setupPaths.stateRoot, "work-state.json"));
 const taskRepository = new FileTaskRepository(work);
 const projectRepository = new FileProjectRepository(work);
@@ -39,7 +45,8 @@ export const runRepository = new FileRunRepository(work);
 export const serverQualityGateRepository = new FileQualityGateRepository(work);
 const worktreeRepository = new FileWorktreeRepository(work);
 const graphRepository = new FileGraphLinkRepository(work);
-export const serverGraphService = new GraphLinkService(graphRepository);
+export const serverInvalidationService = new InvalidationService(new ReadinessRepository(db));
+export const serverGraphService = new GraphLinkService(graphRepository, serverInvalidationService);
 export const serverGraphLinkWriters = new GraphLinkWriters(serverGraphService);
 export const serverTraceabilityService = new TraceabilityQueryService(graphRepository);
 
@@ -67,13 +74,15 @@ export const serverRunService = new RunLifecycleService(
 export const serverMemoryService = new MemoryService(
   new FileMemoryRepository(work),
   undefined,
-  serverGraphLinkWriters
+  serverGraphLinkWriters,
+  serverInvalidationService
 );
 export const serverContextBuilder = new ContextPackBuilder(
   new FileContextPackRepository(work),
   taskRepository,
   projectRepository,
-  serverGraphLinkWriters
+  serverGraphLinkWriters,
+  serverInvalidationService
 );
 export const serverCodeService = new CodeEvidenceService(
   projectRepository,
@@ -82,7 +91,8 @@ export const serverCodeService = new CodeEvidenceService(
     search: (options) => searchExact(options)
   },
   searchSemantic,
-  serverGraphLinkWriters
+  serverGraphLinkWriters,
+  serverInvalidationService
 );
 export function serverGraphRebuildSources(projectId: string) {
   const state = work.read();

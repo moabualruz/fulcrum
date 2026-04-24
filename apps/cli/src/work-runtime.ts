@@ -1,4 +1,6 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { migrate, openDatabase, ReadinessRepository } from "@fulcrum/db";
 import {
   CodeEvidenceService,
   FileCodeEvidenceRepository,
@@ -25,6 +27,7 @@ import {
   WorktreeStatusService,
   GraphLinkService,
   GraphLinkWriters,
+  InvalidationService,
   TraceabilityQueryService,
   resolveSetupPaths
 } from "@fulcrum/core";
@@ -32,6 +35,9 @@ import { searchExact, searchSemantic } from "@fulcrum/code-tools";
 import { PlaneApiAdapter, SimulatedPlaneAdapter } from "@fulcrum/plane";
 
 const setupPaths = resolveSetupPaths(process.env.FULCRUM_STATE_ROOT);
+const db = openDatabase(setupPaths.dbPath);
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+migrate(db, path.join(repoRoot, "packages/db/migrations"));
 const work = new FileWorkRepository(path.join(setupPaths.stateRoot, "work-state.json"));
 const taskRepository = new FileTaskRepository(work);
 const projectRepository = new FileProjectRepository(work);
@@ -39,7 +45,8 @@ export const runRepository = new FileRunRepository(work);
 export const qualityGateRepository = new FileQualityGateRepository(work);
 const worktreeRepository = new FileWorktreeRepository(work);
 const graphRepository = new FileGraphLinkRepository(work);
-export const graphService = new GraphLinkService(graphRepository);
+export const invalidationService = new InvalidationService(new ReadinessRepository(db));
+export const graphService = new GraphLinkService(graphRepository, invalidationService);
 export const graphLinkWriters = new GraphLinkWriters(graphService);
 export const traceabilityService = new TraceabilityQueryService(graphRepository);
 
@@ -62,12 +69,14 @@ export const contextBuilder = new ContextPackBuilder(
   new FileContextPackRepository(work),
   taskRepository,
   projectRepository,
-  graphLinkWriters
+  graphLinkWriters,
+  invalidationService
 );
 export const memoryService = new MemoryService(
   new FileMemoryRepository(work),
   undefined,
-  graphLinkWriters
+  graphLinkWriters,
+  invalidationService
 );
 export const codeService = new CodeEvidenceService(
   projectRepository,
@@ -76,7 +85,8 @@ export const codeService = new CodeEvidenceService(
     search: (options) => searchExact(options)
   },
   searchSemantic,
-  graphLinkWriters
+  graphLinkWriters,
+  invalidationService
 );
 export function graphRebuildSources(projectId: string) {
   const state = work.read();
