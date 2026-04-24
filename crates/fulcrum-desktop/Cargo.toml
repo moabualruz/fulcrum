@@ -1,0 +1,12 @@
+[package]
+name = "fulcrum-desktop"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+fulcrum-events = { path = "../fulcrum-events" }
+fulcrum-kernel = { path = "../fulcrum-kernel" }
+
+[lib]
+path = "src/lib.rs"

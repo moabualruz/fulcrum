@@ -1,0 +1,14 @@
+[package]
+name = "fulcrum-cli"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+fulcrum-config = { path = "../fulcrum-config" }
+fulcrum-storage = { path = "../fulcrum-storage" }
+fulcrum-worker = { path = "../fulcrum-worker" }
+
+[[bin]]
+name = "fulcrum"
+path = "src/main.rs"

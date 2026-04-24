@@ -1,0 +1,13 @@
+[package]
+name = "fulcrum-storage"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+fulcrum-config = { path = "../fulcrum-config" }
+fulcrum-policy = { path = "../fulcrum-policy" }
+rusqlite = { version = "0.39", features = ["bundled"] }
+
+[lib]
+path = "src/lib.rs"

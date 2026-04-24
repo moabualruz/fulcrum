@@ -1,0 +1,8 @@
+{
+  "name": "@fulcrum/cockpit-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --experimental-strip-types tests/live_stream.spec.ts"
+  }
+}

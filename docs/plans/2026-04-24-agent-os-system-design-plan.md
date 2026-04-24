@@ -6,6 +6,8 @@ origin: docs/brainstorms/2026-04-24-agent-os-system-design-requirements.md
 
 # Local-First CLI Agent OS System Design Plan
 
+> Delivery note: this document defines architecture and spike units. The full user-shippable delivery plan is `docs/plans/2026-04-24-agent-os-full-product-delivery-plan.md`.
+
 ## Problem Frame
 
 Build a new local-first CLI agent operating system from the recovered product direction, not from the deleted implementation. The plan starts from docs only and assumes a fresh codebase can be created later.

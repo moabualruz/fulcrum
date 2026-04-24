@@ -3,6 +3,14 @@
 Date: 2026-04-24
 Status: research draft
 
+## Supersession Note
+
+The full product delivery pass supersedes the earlier "Plane owns PM cockpit" wording. Current decision:
+
+- Fulcrum-owned cockpit ships first and remains the canonical operator UI.
+- Plane is an optional PM surface adapter only after local footprint, customization, sync, and reversibility gates pass.
+- Any older table entry saying Plane "owns PM cockpit" should be read as "Plane is the strongest external PM adapter candidate," not as the default product owner.
+
 ## CE Workflow Outputs
 
 This recovered research document now feeds the fresh CE planning pass:
@@ -10,6 +18,9 @@ This recovered research document now feeds the fresh CE planning pass:
 - `docs/ideation/2026-04-24-agent-os-system-design-ideation.md`
 - `docs/brainstorms/2026-04-24-agent-os-system-design-requirements.md`
 - `docs/plans/2026-04-24-agent-os-system-design-plan.md`
+- `docs/ideation/2026-04-24-agent-os-full-product-delivery-ideation.md`
+- `docs/brainstorms/2026-04-24-agent-os-full-product-delivery-requirements.md`
+- `docs/plans/2026-04-24-agent-os-full-product-delivery-plan.md`
 
 Current synthesis:
 
@@ -19,6 +30,7 @@ Current synthesis:
 - TypeScript should own UI and product-facing integration surfaces.
 - Python should be isolated to RAG sidecars such as LightRAG.
 - Memory graph RAG and code intelligence remain separate subsystems linked by Fulcrum IDs.
+- The full product delivery plan is milestone-based; the earlier system design units are spikes, not user-shippable product slices.
 
 ## Goal
 
@@ -86,7 +98,7 @@ Dominance rule:
 
 | Capability Type | Winner | Dropped / Deferred | Why Winner Dominates |
 |---|---|---|---|
-| PM cockpit + work items + project docs/views | Plane | Vikunja, Huly | Plane covers PM depth, views, pages, APIs, webhooks, dashboards. Vikunja is lighter but narrower. Huly is broader, but much of that breadth is outside target. |
+| Optional PM surface adapter + work items + project docs/views | Plane | Vikunja, Huly | Plane is the strongest external PM adapter candidate, but Fulcrum-owned cockpit ships first and remains canonical. Vikunja is lighter but narrower. Huly is broader, but much of that breadth is outside target. |
 | Workflow/action orchestration + scripts + operator UIs/logs | Windmill | Temporal, Activepieces | Windmill covers scripts, workflows, schedules, webhooks, forms/UIs, logs. Temporal covers durable execution only. Activepieces covers connector automation more than developer action orchestration. |
 | Memory RAG + graph RAG | LightRAG | Kotaemon, Khoj, AnythingLLM, Kuzu/Neo4j/Memgraph as default | LightRAG covers the required RAG+graph axis directly. Others are UI/personal assistant products or graph stores that would need more custom RAG logic. |
 | Code lexical search | Zoekt | OpenGrok, ripgrep as backend | Zoekt is a product-grade code search engine with indexing, query model, ranking, API/server paths. ripgrep remains ad-hoc fallback, not system index. |
@@ -101,7 +113,7 @@ Chosen default research stack:
 
 ```text
 Plane
-  -> PM cockpit, project/task/issue views, pages/docs, dashboards, webhooks/API
+  -> optional PM surface adapter, project/task/issue views, pages/docs, dashboards, webhooks/API
 
 Windmill
   -> action orchestration, scripts, workflows, schedules, operator forms/UIs, run logs
@@ -127,7 +139,7 @@ Owned thin integration layer
 
 Why this is not duplicate:
 
-- Plane owns PM cockpit.
+- Fulcrum owns cockpit; Plane is optional PM adapter.
 - Windmill owns action/workflow execution.
 - LightRAG owns memory graph RAG.
 - Zoekt owns lexical code search.
