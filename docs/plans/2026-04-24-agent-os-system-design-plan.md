@@ -7,6 +7,7 @@ origin: docs/brainstorms/2026-04-24-agent-os-system-design-requirements.md
 # Local-First CLI Agent OS System Design Plan
 
 > Delivery note: this document defines architecture and spike units. The full user-shippable delivery plan is `docs/plans/2026-04-24-agent-os-full-product-delivery-plan.md`.
+> Canonical combined roadmap: `docs/plans/2026-04-24-fulcrum-cli-agent-os-roadmap.md`.
 
 ## Problem Frame
 

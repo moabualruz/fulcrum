@@ -6,6 +6,8 @@ origin: docs/brainstorms/2026-04-24-agent-os-full-product-delivery-requirements.
 
 # Local-First Agent OS Full Product Delivery Plan
 
+Canonical combined roadmap: `docs/plans/2026-04-24-fulcrum-cli-agent-os-roadmap.md`.
+
 ## Problem Frame
 
 The current branch has a useful architecture spike, but a spike is not a product. This plan defines the path to a shippable local-first agent OS for one developer/operator on a normal machine.
