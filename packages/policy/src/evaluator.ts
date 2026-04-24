@@ -1,22 +1,33 @@
 import { makeId, type PolicyCheckRequest, type PolicyDecision } from "@fulcrum/shared";
 
+const remoteActions = new Set<PolicyCheckRequest["action"]>([
+  "remote_provider",
+  "remote_pm",
+  "remote_model",
+  "telemetry",
+  "remote_observability",
+  "public_bind"
+]);
+
 const approvalRequiredActions = new Set<PolicyCheckRequest["action"]>([
+  ...remoteActions,
   "destructive",
   "permanent_memory",
-  "public_bind",
   "arbitrary_shell",
   "backup_purge",
   "sensitive_export",
   "worktree_cleanup",
-  "external_writeback"
+  "external_writeback",
+  "memory_delete",
+  "adapter_execute"
 ]);
 
 export function evaluatePolicy(request: PolicyCheckRequest): PolicyDecision {
-  if (request.localOnly && request.action === "remote_provider") {
+  if (request.localOnly && remoteActions.has(request.action)) {
     return decision(
       request,
       "denied",
-      "Local-only mode denies remote provider access.",
+      `Local-only mode denies ${request.action}.`,
       "Use local evidence or change policy outside this request."
     );
   }
@@ -43,9 +54,18 @@ function decision(
       `${request.action}-${request.subjectType}-${request.subjectId}`
     ),
     action: request.action,
+    subjectType: request.subjectType,
+    subjectId: request.subjectId,
+    requester: request.requester,
+    projectId: request.projectId,
+    taskId: request.taskId,
+    runId: request.runId,
     status,
+    approvalRequired: status === "approval_required",
     reason,
     bypassScope: request.preview ? "preview" : undefined,
+    previewRef: request.previewRef,
+    createdAt: new Date().toISOString(),
     nextAction,
     redactionStatus: "not_applicable"
   };

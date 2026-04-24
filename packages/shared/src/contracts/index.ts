@@ -214,6 +214,10 @@ export const CapabilityHealthRecordSchema = z.object({
 export const PolicyActionSchema = z.enum([
   "destructive",
   "remote_provider",
+  "remote_pm",
+  "remote_model",
+  "telemetry",
+  "remote_observability",
   "permanent_memory",
   "public_bind",
   "arbitrary_shell",
@@ -231,19 +235,33 @@ export const PolicyCheckRequestSchema = z.object({
   subjectType: z.string(),
   subjectId: z.string(),
   requester: z.string(),
+  projectId: FulcrumIdSchema.optional(),
   runId: FulcrumIdSchema.optional(),
   taskId: FulcrumIdSchema.optional(),
   preview: z.boolean().default(false),
-  localOnly: z.boolean().default(true)
+  localOnly: z.boolean().default(true),
+  previewRef: z.string().optional()
 });
 
 export const PolicyDecisionSchema = z.object({
   policyDecisionId: FulcrumIdSchema,
   action: PolicyActionSchema,
+  subjectType: z.string(),
+  subjectId: z.string(),
+  requester: z.string(),
+  projectId: FulcrumIdSchema.optional(),
+  taskId: FulcrumIdSchema.optional(),
+  runId: FulcrumIdSchema.optional(),
   status: PolicyDecisionStatusSchema,
+  approvalRequired: z.boolean().default(false),
   reason: z.string(),
+  approvedBy: z.string().optional(),
+  approvalTime: z.string().optional(),
   auditEventId: FulcrumIdSchema.optional(),
   bypassScope: z.string().optional(),
+  expiresAt: z.string().optional(),
+  previewRef: z.string().optional(),
+  createdAt: z.string(),
   nextAction: z.string().optional(),
   redactionStatus: RedactionStatusSchema
 });

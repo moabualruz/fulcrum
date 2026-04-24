@@ -20,6 +20,7 @@ export interface PlaneWritebackInput {
   externalId: string;
   comment?: string;
   status?: string;
+  requester?: string;
 }
 
 export interface ExternalPmAdapter extends FulcrumAdapter<
@@ -79,8 +80,13 @@ export function policyPlaceholder(input: PlaneWritebackInput): PolicyDecision {
   return {
     policyDecisionId: makeId("pol", `external-writeback-${input.externalId}`),
     action: "external_writeback",
+    subjectType: "external_work_item",
+    subjectId: input.externalId,
+    requester: input.requester ?? "operator",
     status: "approval_required",
+    approvalRequired: true,
     reason: "External PM writeback requires operator approval.",
+    createdAt: new Date().toISOString(),
     nextAction: "Review preview and approve before execution.",
     redactionStatus: "needs_review"
   };

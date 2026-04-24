@@ -309,16 +309,28 @@ CREATE TABLE IF NOT EXISTS policy_decisions (
   subject_type TEXT NOT NULL,
   subject_id TEXT NOT NULL,
   requester TEXT NOT NULL,
+  project_id TEXT,
+  task_id TEXT,
+  run_id TEXT,
   status TEXT NOT NULL,
   reason TEXT NOT NULL,
+  approval_required INTEGER NOT NULL DEFAULT 0,
+  approved_by TEXT,
+  approval_time TEXT,
   audit_event_id TEXT,
   bypass_scope TEXT,
+  expires_at TEXT,
+  preview_ref TEXT,
   next_action TEXT,
   redaction_status TEXT NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   schema_version TEXT NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_policy_decisions_status ON policy_decisions(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_policy_decisions_subject ON policy_decisions(subject_type, subject_id);
+CREATE INDEX IF NOT EXISTS idx_policy_decisions_run ON policy_decisions(run_id);
 
 CREATE TABLE IF NOT EXISTS adapter_configurations (
   adapter_id TEXT PRIMARY KEY,

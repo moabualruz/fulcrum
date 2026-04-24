@@ -4,12 +4,16 @@ import {
   ArtifactService,
   externalPmHealth,
   LocalArtifactStorage,
+  PolicyEnforcementService,
   resolveSetupPaths
 } from "@fulcrum/core";
 import { MemoryArtifactRepository } from "./artifact-runtime.js";
+import { enforceServerBindPolicy } from "./bind-policy.js";
+import { MemoryPolicyDecisionRepository, MemoryPolicyEventRepository } from "./policy-runtime.js";
 import { registerDoctorRoutes } from "./routes/doctor.js";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
 import { registerProjectRoutes } from "./routes/projects.js";
+import { registerPolicyRoutes } from "./routes/policy.js";
 import { registerCodeRoutes } from "./routes/code.js";
 import { registerQueueRoutes } from "./routes/queues.js";
 import { registerExternalPmRoutes } from "./routes/external-pm.js";
@@ -27,6 +31,10 @@ const app = new Hono();
 
 const setupRepository = new FileSetupRepository();
 const paths = resolveSetupPaths();
+const policyService = new PolicyEnforcementService(
+  new MemoryPolicyDecisionRepository(),
+  new MemoryPolicyEventRepository()
+);
 
 registerSetupRoutes(app, createServerSetupPorts(setupRepository));
 registerDoctorRoutes(app, setupRepository, async () => [
@@ -41,9 +49,17 @@ registerArtifactRoutes(
   app,
   new ArtifactService(new MemoryArtifactRepository(), new LocalArtifactStorage(paths.artifactRoot))
 );
+registerPolicyRoutes(app, policyService);
 
 const port = Number(process.env.FULCRUM_PORT ?? 4173);
+const hostname = process.env.FULCRUM_HOST ?? "127.0.0.1";
+const bind = enforceServerBindPolicy({
+  hostname,
+  port,
+  policy: policyService,
+  approvedDecisionId: process.env.FULCRUM_PUBLIC_BIND_POLICY_DECISION
+});
 
-serve({ fetch: app.fetch, hostname: "127.0.0.1", port });
+serve({ fetch: app.fetch, hostname: bind.hostname, port });
 
-console.log(`Fulcrum local API listening on http://127.0.0.1:${port}`);
+console.log(`Fulcrum local API listening on http://${bind.hostname}:${port}`);

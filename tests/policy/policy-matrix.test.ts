@@ -17,10 +17,20 @@ describe("policy matrix", () => {
   it("requires approval for dangerous actions", () => {
     for (const action of [
       "destructive",
+      "remote_provider",
+      "remote_pm",
+      "remote_model",
+      "telemetry",
+      "remote_observability",
       "public_bind",
+      "permanent_memory",
       "arbitrary_shell",
       "backup_purge",
-      "sensitive_export"
+      "sensitive_export",
+      "worktree_cleanup",
+      "external_writeback",
+      "memory_delete",
+      "adapter_execute"
     ] as const) {
       expect(
         evaluatePolicy({
@@ -28,7 +38,7 @@ describe("policy matrix", () => {
           subjectType: "test",
           subjectId: "thing",
           requester: "test",
-          localOnly: true,
+          localOnly: false,
           preview: true
         }).status
       ).toBe("approval_required");

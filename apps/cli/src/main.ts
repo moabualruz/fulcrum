@@ -3,10 +3,16 @@ import {
   ArtifactService,
   externalPmHealth,
   LocalArtifactStorage,
+  PolicyEnforcementService,
   resolveSetupPaths,
   type ArtifactRepositoryPort
 } from "@fulcrum/core";
-import type { ArtifactContract } from "@fulcrum/shared";
+import {
+  SCHEMA_VERSION,
+  type ArtifactContract,
+  type PolicyDecision,
+  type RunEvent
+} from "@fulcrum/shared";
 import {
   attachArtifactCommand,
   listRunArtifactsCommand,
@@ -26,6 +32,8 @@ import {
   previewPlaneWritebackCommand,
   syncPlaneCommand
 } from "./commands/plane.js";
+import { approvePolicyCommand, checkPolicyCommand } from "./commands/policy.js";
+import { formatRedactionStatus } from "./output/redaction.js";
 import { createCliSetupPorts } from "./runtime.js";
 import { codeService, externalPmService, projectService, taskService } from "./work-runtime.js";
 
@@ -43,6 +51,33 @@ class MemoryArtifactRepository implements ArtifactRepositoryPort {
 
   listByRun(runId: string): ArtifactContract[] {
     return [...this.artifacts.values()].filter((artifact) => artifact.runId === runId);
+  }
+}
+
+class MemoryPolicyDecisionRepository {
+  private readonly decisions = new Map<string, PolicyDecision>();
+
+  save(decision: PolicyDecision): PolicyDecision {
+    this.decisions.set(decision.policyDecisionId, decision);
+    return decision;
+  }
+
+  get(policyDecisionId: string): PolicyDecision | undefined {
+    return this.decisions.get(policyDecisionId);
+  }
+
+  listPending(): PolicyDecision[] {
+    return [...this.decisions.values()].filter(
+      (decision) => decision.status === "approval_required"
+    );
+  }
+}
+
+class MemoryPolicyEventRepository {
+  private sequence = 0;
+
+  append(event: Omit<RunEvent, "sequence"> & { sequence?: number }): RunEvent {
+    return { ...event, sequence: event.sequence ?? this.sequence++ };
   }
 }
 
@@ -114,6 +149,10 @@ program
 const artifactService = new ArtifactService(
   new MemoryArtifactRepository(),
   new LocalArtifactStorage(resolveSetupPaths().artifactRoot)
+);
+const policyService = new PolicyEnforcementService(
+  new MemoryPolicyDecisionRepository(),
+  new MemoryPolicyEventRepository()
 );
 const artifactCommand = program.command("artifact").description("Attach, show, or list artifacts");
 
@@ -421,6 +460,56 @@ planeCommand
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
         : "Plane mirroring disabled"
+    );
+  });
+
+const policyCommand = program.command("policy").description("Check and approve policy decisions");
+
+policyCommand
+  .command("check")
+  .requiredOption("--action <action>")
+  .requiredOption("--subject-type <subjectType>")
+  .requiredOption("--subject <subjectId>")
+  .option("--requester <requester>")
+  .option("--project <projectId>")
+  .option("--task <taskId>")
+  .option("--run <runId>")
+  .option("--preview-ref <previewRef>")
+  .action((options) => {
+    const data = checkPolicyCommand(policyService, {
+      action: options.action,
+      subjectType: options.subjectType,
+      subjectId: options.subject,
+      requester: options.requester,
+      projectId: options.project,
+      taskId: options.task,
+      runId: options.run,
+      preview: true,
+      localOnly: Boolean(program.opts().localOnly),
+      previewRef: options.previewRef
+    });
+    const payload = { schemaVersion: SCHEMA_VERSION, status: "ok", data };
+    console.log(
+      program.opts().json
+        ? JSON.stringify(payload, null, 2)
+        : `${data.status}: ${data.reason} (${formatRedactionStatus(data.redactionStatus)})`
+    );
+    if (data.status === "approval_required") {
+      process.exitCode = 2;
+    } else if (data.status === "denied") {
+      process.exitCode = 1;
+    }
+  });
+
+policyCommand
+  .command("approve <decisionId>")
+  .option("--approved-by <approvedBy>")
+  .action((decisionId, options) => {
+    const data = approvePolicyCommand(policyService, decisionId, options.approvedBy);
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : `${data.status}: ${data.policyDecisionId}`
     );
   });
 

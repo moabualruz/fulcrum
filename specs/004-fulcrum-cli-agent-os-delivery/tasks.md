@@ -230,20 +230,20 @@
 
 ### Tests And Validation for User Story 10
 
-- [ ] T120 [P] [US10] Add policy action matrix contract tests in `tests/contract/policy-contract.test.ts`
-- [ ] T121 [P] [US10] Add cross-surface policy parity integration test in `tests/integration/policy-cross-surface.test.ts`
-- [ ] T122 [P] [US10] Add local-only remote action denial test in `tests/privacy/local-only-denies-remote.test.ts`
-- [ ] T123 [P] [US10] Add secret redaction validation test in `tests/privacy/secret-redaction.test.ts`
+- [x] T120 [P] [US10] Add policy action matrix contract tests in `tests/contract/policy-contract.test.ts`
+- [x] T121 [P] [US10] Add cross-surface policy parity integration test in `tests/integration/policy-cross-surface.test.ts`
+- [x] T122 [P] [US10] Add local-only remote action denial test in `tests/privacy/local-only-denies-remote.test.ts`
+- [x] T123 [P] [US10] Add secret redaction validation test in `tests/privacy/secret-redaction.test.ts`
 
 ### Implementation for User Story 10
 
-- [ ] T124 [US10] Implement policy decision repository and audit event linking in `packages/db/src/policy-decisions.ts`
-- [ ] T125 [US10] Implement policy CLI commands in `apps/cli/src/commands/policy.ts`
-- [ ] T126 [US10] Implement policy API routes and approval flow in `apps/server/src/routes/policy.ts`
-- [ ] T127 [US10] Implement cockpit policy approval queue in `apps/cockpit/src/routes/policy-approvals.tsx`
-- [ ] T128 [US10] Wire policy evaluator into run, worktree, memory, quality, backup, export, adapter, and server bind services in `packages/core/src/policy/enforcement.ts`
-- [ ] T129 [US10] Implement redaction status display helpers in `apps/cockpit/src/components/redaction-status.tsx` and `apps/cli/src/output/redaction.ts`
-- [ ] T130 [US10] Add public-bind approval guard to server startup in `apps/server/src/bind-policy.ts`
+- [x] T124 [US10] Implement policy decision repository and audit event linking in `packages/db/src/policy-decisions.ts`
+- [x] T125 [US10] Implement policy CLI commands in `apps/cli/src/commands/policy.ts`
+- [x] T126 [US10] Implement policy API routes and approval flow in `apps/server/src/routes/policy.ts`
+- [x] T127 [US10] Implement cockpit policy approval queue in `apps/cockpit/src/routes/policy-approvals.tsx`
+- [x] T128 [US10] Wire policy evaluator into run, worktree, memory, quality, backup, export, adapter, and server bind services in `packages/core/src/policy/enforcement.ts`
+- [x] T129 [US10] Implement redaction status display helpers in `apps/cockpit/src/components/redaction-status.tsx` and `apps/cli/src/output/redaction.ts`
+- [x] T130 [US10] Add public-bind approval guard to server startup in `apps/server/src/bind-policy.ts`
 
 ## Phase 11: User Story 11 - Run Quality Gates And Capture Proof (Priority: P1)
 
