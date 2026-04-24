@@ -31,19 +31,19 @@
 
 ### Tests And Validation for User Story 1
 
-- [ ] T014 [P] [US1] Add compliance extraction contract test in `tests/contract/compliance-contract.test.ts`
-- [ ] T015 [P] [US1] Add source conflict precedence test in `tests/integration/compliance-source-order.test.ts`
-- [ ] T016 [P] [US1] Add mock-only and preview-only failure test in `tests/policy/compliance-release-gate.test.ts`
+- [x] T014 [P] [US1] Add compliance extraction contract test in `tests/contract/compliance-contract.test.ts`
+- [x] T015 [P] [US1] Add source conflict precedence test in `tests/integration/compliance-source-order.test.ts`
+- [x] T016 [P] [US1] Add mock-only and preview-only failure test in `tests/policy/compliance-release-gate.test.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] Implement Product/SRS requirement extractor in `packages/core/src/readiness/compliance-extractor.ts`
-- [ ] T018 [US1] Implement compliance classifier and source-order resolver in `packages/core/src/readiness/compliance-service.ts`
-- [ ] T019 [US1] Implement compliance CLI commands in `apps/cli/src/commands/compliance.ts`
-- [ ] T020 [US1] Wire compliance commands in `apps/cli/src/main.ts`
-- [ ] T021 [US1] Add compliance API routes in `apps/server/src/routes/compliance.ts`
-- [ ] T022 [US1] Add cockpit compliance view in `apps/cockpit/src/routes/compliance.tsx`
-- [ ] T023 [US1] Add compliance export docs in `docs/operator-guide.md`
+- [x] T017 [US1] Implement Product/SRS requirement extractor in `packages/core/src/readiness/compliance-extractor.ts`
+- [x] T018 [US1] Implement compliance classifier and source-order resolver in `packages/core/src/readiness/compliance-service.ts`
+- [x] T019 [US1] Implement compliance CLI commands in `apps/cli/src/commands/compliance.ts`
+- [x] T020 [US1] Wire compliance commands in `apps/cli/src/main.ts`
+- [x] T021 [US1] Add compliance API routes in `apps/server/src/routes/compliance.ts`
+- [x] T022 [US1] Add cockpit compliance view in `apps/cockpit/src/routes/compliance.tsx`
+- [x] T023 [US1] Add compliance export docs in `docs/operator-guide.md`
 
 ## Phase 4: User Story 2 - Packaged Local Product Install (Priority: P1)
 

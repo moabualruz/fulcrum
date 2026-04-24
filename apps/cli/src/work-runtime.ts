@@ -54,7 +54,7 @@ const contextPackRepository = new ContextPackRepository(db);
 const memoryRepository = new MemoryRepository(db);
 const codeEvidenceRepository = new CodeEvidenceRepository(db);
 const externalWorkItemMirrorRepository = new ExternalWorkItemMirrorRepository(db);
-const readinessRepository = new ReadinessRepository(db);
+export const readinessRepository = new ReadinessRepository(db);
 export const jsonStateMigrationService = new JsonStateMigrationService({
   projects: projectRepository,
   tasks: taskRepository,

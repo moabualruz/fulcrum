@@ -54,7 +54,7 @@ const contextPackRepository = new ContextPackRepository(db);
 const memoryRepository = new MemoryRepository(db);
 const codeEvidenceRepository = new CodeEvidenceRepository(db);
 const externalWorkItemMirrorRepository = new ExternalWorkItemMirrorRepository(db);
-const readinessRepository = new ReadinessRepository(db);
+export const serverReadinessRepository = new ReadinessRepository(db);
 new JsonStateMigrationService({
   projects: projectRepository,
   tasks: taskRepository,
@@ -66,9 +66,9 @@ new JsonStateMigrationService({
   worktrees: worktreeRepository,
   qualityGates: serverQualityGateRepository,
   graphLinks: graphRepository,
-  migrationRecords: readinessRepository
+  migrationRecords: serverReadinessRepository
 }).migrateFromJsonMirror(workMirror);
-export const serverInvalidationService = new InvalidationService(readinessRepository);
+export const serverInvalidationService = new InvalidationService(serverReadinessRepository);
 export const serverGraphService = new GraphLinkService(graphRepository, serverInvalidationService);
 export const serverGraphLinkWriters = new GraphLinkWriters(serverGraphService);
 export const serverTraceabilityService = new TraceabilityQueryService(graphRepository);

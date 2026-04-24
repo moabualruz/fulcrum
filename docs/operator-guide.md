@@ -48,6 +48,22 @@ Global package mutation, public bind, adapter certification, compliance override
 
 Evidence: FR-001 through FR-006, SC-001, SC-006, `contracts/cli-contract.md`, and `tests/contract/cli-setup-doctor.test.ts`.
 
+## Product/SRS Compliance
+
+Compliance is the Product/SRS authority for release claims. Run it against the ordered source set before calling a feature complete:
+
+```sh
+fulcrum compliance audit --sources FULCRUM_PRODUCT.md,SRS.md,SRS-ammend-01.md,SRS-ammend-02.md --json
+fulcrum compliance show <requirementId> --json
+fulcrum compliance export --format markdown --output fulcrum-compliance.md
+```
+
+The matrix records requirement ID, source ref, implementation refs, test refs, evidence refs, status, and next action. Valid statuses are `implemented`, `partial`, `missing`, `deferred`, `superseded`, `mock_only`, `preview_only`, and `documentation_only`. Release readiness must fail for `missing`, `partial`, `mock_only`, `preview_only`, or `documentation_only` unless an approved deferral or supersession exists.
+
+Source precedence is `FULCRUM_PRODUCT.md`, then `SRS-ammend-02.md`, then `SRS-ammend-01.md`, then `SRS.md`. Runtime conflicts follow the TypeScript-first amendment. Copilot command conflicts follow standalone `copilot`, not `gh copilot`.
+
+Evidence: FR-001, FR-002, SC-001, `specs/005-product-readiness-gap-closure/contracts/compliance-contract.md`, `tests/contract/compliance-contract.test.ts`, `tests/integration/compliance-source-order.test.ts`, and `tests/policy/compliance-release-gate.test.ts`.
+
 ## Projects And Cockpit
 
 Register each local repository:

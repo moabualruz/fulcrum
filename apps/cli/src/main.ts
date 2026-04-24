@@ -10,6 +10,7 @@ import {
   QualityGateRunner,
   QualityReadinessEvaluator,
   BackupManifestService,
+  ComplianceService,
   FileBackupRepository,
   FileExportRepository,
   RebuildOrchestrator,
@@ -96,6 +97,11 @@ import {
 } from "./commands/recovery.js";
 import { listMcpToolsCommand } from "./commands/mcp.js";
 import { runReleaseAgentAcceptance } from "./commands/release.js";
+import {
+  complianceAuditCommand,
+  complianceExportCommand,
+  complianceShowCommand
+} from "./commands/compliance.js";
 import { formatRedactionStatus } from "./output/redaction.js";
 import { createCliSetupPorts } from "./runtime.js";
 import {
@@ -116,7 +122,8 @@ import {
   traceabilityService,
   graphRebuildSources,
   jsonStateMigrationService,
-  invalidationService
+  invalidationService,
+  readinessRepository
 } from "./work-runtime.js";
 
 class MemoryArtifactRepository implements ArtifactRepositoryPort {
@@ -164,6 +171,7 @@ class MemoryPolicyEventRepository {
 }
 
 const program = new Command();
+const complianceService = new ComplianceService(readinessRepository);
 
 program
   .name("fulcrum")
@@ -391,6 +399,57 @@ const gateDeps = { runner: qualityRunner, readiness: qualityReadiness };
 const releaseCommand = program
   .command("release")
   .description("Validate release readiness evidence");
+
+const complianceCommand = program
+  .command("compliance")
+  .description("Audit Product/SRS compliance matrix");
+
+complianceCommand
+  .command("audit")
+  .description("Extract and classify Product/SRS requirements")
+  .option("--sources <paths>", "comma-separated source documents")
+  .action((options) => {
+    const data = complianceAuditCommand(complianceService, {
+      rootDir: process.cwd(),
+      sources: options.sources ? String(options.sources).split(",") : undefined
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: data.pass ? "ok" : "blocked", data }, null, 2)
+        : `${data.requirements.length} compliance requirements; ${data.blockingRequirementIds.length} blocking`
+    );
+  });
+
+complianceCommand.command("show <requirementId>").action((requirementId) => {
+  const data = complianceShowCommand(complianceService, requirementId);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: data ? "ok" : "error", data }, null, 2)
+      : (data?.nextAction ?? "Requirement not found")
+  );
+});
+
+complianceCommand
+  .command("export")
+  .option("--format <format>", "json or markdown", "json")
+  .requiredOption("--output <path>")
+  .option("--sources <paths>", "comma-separated source documents")
+  .action((options) => {
+    const format = options.format === "markdown" ? "markdown" : "json";
+    const data = complianceExportCommand(complianceService, {
+      format,
+      output: options.output,
+      auditInput: {
+        rootDir: process.cwd(),
+        sources: options.sources ? String(options.sources).split(",") : undefined
+      }
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.output
+    );
+  });
 
 releaseCommand
   .command("agents")

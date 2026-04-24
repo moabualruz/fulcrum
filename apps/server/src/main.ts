@@ -10,6 +10,7 @@ import {
   QualityGateRunner,
   QualityReadinessEvaluator,
   BackupManifestService,
+  ComplianceService,
   FileBackupRepository,
   FileExportRepository,
   RebuildOrchestrator,
@@ -40,6 +41,7 @@ import { registerGraphRoutes } from "./routes/graph.js";
 import { registerSetupRoutes } from "./routes/setup.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
 import { registerRecoveryRoutes } from "./routes/recovery.js";
+import { registerComplianceRoutes } from "./routes/compliance.js";
 import { registerMcpRoutes } from "./mcp.js";
 import { createServerSetupPorts, FileSetupRepository } from "./runtime.js";
 import {
@@ -59,10 +61,12 @@ import {
   serverGraphLinkWriters,
   serverTraceabilityService,
   serverGraphRebuildSources,
-  serverInvalidationService
+  serverInvalidationService,
+  serverReadinessRepository
 } from "./work-runtime.js";
 
 const app = new Hono();
+const complianceService = new ComplianceService(serverReadinessRepository);
 
 const setupRepository = new FileSetupRepository();
 const paths = resolveSetupPaths();
@@ -123,6 +127,7 @@ registerGraphRoutes(
   serverInvalidationService
 );
 registerRecoveryRoutes(app, recoveryDeps);
+registerComplianceRoutes(app, complianceService);
 registerMcpRoutes(app, {
   doctor: async () => ({
     setupState: await setupRepository.latest(),
