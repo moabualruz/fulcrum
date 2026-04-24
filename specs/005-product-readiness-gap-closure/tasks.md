@@ -6,22 +6,22 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Add 005 feature pointer validation in `.specify/feature.json`
-- [ ] T002 [P] Add Product/SRS source fixture list in `tests/fixtures/compliance/source-order.json`
-- [ ] T003 [P] Add release evidence fixture directory layout in `tests/fixtures/release-evidence/README.md`
-- [ ] T004 Add shared scripts for clean local state setup in `tests/helpers/local-state.ts`
-- [ ] T005 Add package/start command inventory to `docs/operator-guide.md`
+- [X] T001 Add 005 feature pointer validation in `.specify/feature.json`
+- [X] T002 [P] Add Product/SRS source fixture list in `tests/fixtures/compliance/source-order.json`
+- [X] T003 [P] Add release evidence fixture directory layout in `tests/fixtures/release-evidence/README.md`
+- [X] T004 Add shared scripts for clean local state setup in `tests/helpers/local-state.ts`
+- [X] T005 Add package/start command inventory to `docs/operator-guide.md`
 
 ## Phase 2: Foundational
 
-- [ ] T006 Define compliance, install target, migration, capability probe, agent certification, adapter certification, invalidation, and release evidence schemas in `packages/shared/src/readiness.ts`
-- [ ] T007 Export readiness schemas from `packages/shared/src/index.ts`
-- [ ] T008 Add SQLite migration for compliance, install targets, migration records, capability probes, certifications, invalidation records, and release evidence in `packages/db/migrations/0002_readiness.sql`
-- [ ] T009 Implement readiness repositories in `packages/db/src/readiness.ts`
-- [ ] T010 Export readiness repositories from `packages/db/src/index.ts`
-- [ ] T011 Add core readiness service barrel in `packages/core/src/readiness/index.ts`
-- [ ] T012 Add policy actions for package/global mutation, release validation, adapter certification, and compliance override in `packages/policy/src/evaluator.ts`
-- [ ] T013 Add redaction coverage for release evidence and compliance exports in `packages/policy/src/redaction.ts`
+- [X] T006 Define compliance, install target, migration, capability probe, agent certification, adapter certification, invalidation, and release evidence schemas in `packages/shared/src/readiness.ts`
+- [X] T007 Export readiness schemas from `packages/shared/src/index.ts`
+- [X] T008 Add SQLite migration for compliance, install targets, migration records, capability probes, certifications, invalidation records, and release evidence in `packages/db/migrations/0002_readiness.sql`
+- [X] T009 Implement readiness repositories in `packages/db/src/readiness.ts`
+- [X] T010 Export readiness repositories from `packages/db/src/index.ts`
+- [X] T011 Add core readiness service barrel in `packages/core/src/readiness/index.ts`
+- [X] T012 Add policy actions for package/global mutation, release validation, adapter certification, and compliance override in `packages/policy/src/evaluator.ts`
+- [X] T013 Add redaction coverage for release evidence and compliance exports in `packages/policy/src/redaction.ts`
 
 ## Phase 3: User Story 1 - Product/SRS Compliance Authority (Priority: P1)
 

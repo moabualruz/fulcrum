@@ -24,6 +24,17 @@ export const defaultSecretPatterns: RedactionPattern[] = [
     name: "bearer-token",
     pattern: /\bBearer\s+[A-Za-z0-9._-]{16,}\b/g,
     replacement: "Bearer [REDACTED]"
+  },
+  {
+    name: "release-evidence-env-secret",
+    pattern: /\b([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|KEY))=("[^"]+"|'[^']+'|\S+)/g,
+    replacement: "$1=[REDACTED]"
+  },
+  {
+    name: "compliance-export-credential-path",
+    pattern:
+      /\b(?:credential(?:Path|File|Ref)?|(?:secret|token|password)(?:Path|File|Ref))\s*[:=]\s*\S+/gi,
+    replacement: "[REDACTED_CREDENTIAL_REF]"
   }
 ];
 

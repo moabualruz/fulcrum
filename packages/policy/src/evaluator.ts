@@ -19,7 +19,17 @@ const approvalRequiredActions = new Set<PolicyCheckRequest["action"]>([
   "worktree_cleanup",
   "external_writeback",
   "memory_delete",
-  "adapter_execute"
+  "adapter_execute",
+  "package_global_mutation",
+  "adapter_certification",
+  "compliance_override"
+]);
+
+const readinessActions = new Set<PolicyCheckRequest["action"]>([
+  "release_validation",
+  "adapter_certification",
+  "compliance_override",
+  "package_global_mutation"
 ]);
 
 export function evaluatePolicy(request: PolicyCheckRequest): PolicyDecision {
@@ -37,6 +47,14 @@ export function evaluatePolicy(request: PolicyCheckRequest): PolicyDecision {
       "approval_required",
       `${request.action} requires operator approval.`,
       "Review preview and approve policy decision."
+    );
+  }
+  if (readinessActions.has(request.action)) {
+    return decision(
+      request,
+      "allowed",
+      `${request.action} allowed with local evidence capture.`,
+      "Record command, artifacts, and redaction status in release evidence."
     );
   }
   return decision(request, "allowed", "Action allowed by default policy.");

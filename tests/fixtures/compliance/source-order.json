@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0",
+  "sourceOrder": ["FULCRUM_PRODUCT.md", "SRS-ammend-02.md", "SRS-ammend-01.md", "SRS.md"],
+  "notes": [
+    "FULCRUM_PRODUCT.md is product authority.",
+    "SRS-ammend-02.md supersedes earlier SRS language when runtime or local-first behavior conflicts.",
+    "SRS-ammend-01.md supersedes SRS.md where amendment scope matches.",
+    "SRS.md remains source for unsuperseded functional requirements."
+  ]
+}

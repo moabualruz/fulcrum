@@ -233,7 +233,11 @@ export const PolicyActionSchema = z.enum([
   "external_writeback",
   "quality_gate",
   "memory_delete",
-  "adapter_execute"
+  "adapter_execute",
+  "package_global_mutation",
+  "release_validation",
+  "adapter_certification",
+  "compliance_override"
 ]);
 
 export const PolicyCheckRequestSchema = z.object({

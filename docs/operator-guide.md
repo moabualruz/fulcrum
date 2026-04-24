@@ -32,6 +32,20 @@ pnpm --filter @fulcrum/tui dev
 pnpm --filter @fulcrum/cli dev -- mcp stdio
 ```
 
+Package/start command inventory for release readiness:
+
+| Surface | Source checkout command                                        | Release evidence                                               |
+| ------- | -------------------------------------------------------------- | -------------------------------------------------------------- |
+| CLI     | `pnpm --filter @fulcrum/cli dev -- --help`                     | command output, exit code, redaction status                    |
+| Setup   | `pnpm --filter @fulcrum/cli dev -- setup apply --json`         | setup state paths, policy decisions, SQLite path               |
+| Doctor  | `pnpm --filter @fulcrum/cli dev -- doctor --json --no-network` | blocking count, capability matrix, next actions                |
+| Server  | `pnpm --filter @fulcrum/server dev`                            | loopback bind, health route, policy decision when non-loopback |
+| Cockpit | `pnpm --filter @fulcrum/cockpit dev`                           | Vite build/dev start, route smoke evidence                     |
+| TUI     | `pnpm --filter @fulcrum/tui dev`                               | startup output and degraded terminal behavior                  |
+| MCP     | `pnpm --filter @fulcrum/cli dev -- mcp stdio`                  | stdio startup and tool list evidence                           |
+
+Global package mutation, public bind, adapter certification, compliance override, and remote/network behavior must go through policy before release evidence can count them as passing.
+
 Evidence: FR-001 through FR-006, SC-001, SC-006, `contracts/cli-contract.md`, and `tests/contract/cli-setup-doctor.test.ts`.
 
 ## Projects And Cockpit
