@@ -4,6 +4,13 @@ Source of truth: `SRS.md`, `SRS-ammend-01.md`, `SRS-ammend-02.md`, and `specs/00
 
 ## Install And Readiness
 
+Source checkout prerequisites:
+
+- Node.js 22-compatible runtime.
+- pnpm 10.x for workspace install and dev commands.
+- git for repository registration, code search context, and worktree workflows.
+- Optional Playwright browser dependencies for release/e2e validation.
+
 1. Preview setup before mutation:
    `fulcrum setup preview`
 2. Apply approved local setup:
@@ -14,6 +21,16 @@ Source of truth: `SRS.md`, `SRS-ammend-01.md`, `SRS-ammend-02.md`, and `specs/00
    `fulcrum doctor --json --no-network`
 
 Setup must show local state paths, proposed config changes, required and optional capabilities, privacy defaults, and approvals. It must not edit shell profiles, install privileged dependencies, start remote services, or mutate global host state without explicit operator approval. Doctor classifies capabilities as `managed`, `detected`, `guided`, `optional`, `blocked`, `degraded`, `disabled`, or `unknown`, with blocking status, freshness, privacy status, and exact next action.
+
+For this repository checkout, run the apps directly with pnpm:
+
+```sh
+pnpm --filter @fulcrum/cli dev -- --help
+pnpm --filter @fulcrum/server dev
+pnpm --filter @fulcrum/cockpit dev
+pnpm --filter @fulcrum/tui dev
+pnpm --filter @fulcrum/cli dev -- mcp stdio
+```
 
 Evidence: FR-001 through FR-006, SC-001, SC-006, `contracts/cli-contract.md`, and `tests/contract/cli-setup-doctor.test.ts`.
 

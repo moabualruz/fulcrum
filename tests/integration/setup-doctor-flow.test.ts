@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -22,8 +22,9 @@ describe("setup and doctor flow", () => {
           },
           getLatest: () => savedState
         },
-        initializeDatabase: (dbPath) => {
+        initializeDatabase: async (dbPath) => {
           initializedDbPath = dbPath;
+          await writeFile(dbPath, "");
         }
       },
       root

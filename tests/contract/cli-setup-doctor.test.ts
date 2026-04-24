@@ -1,3 +1,4 @@
+import { mkdirSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { doctorCommand } from "../../apps/cli/src/commands/doctor.js";
 import { setupApplyCommand, setupPreviewCommand } from "../../apps/cli/src/commands/setup.js";
@@ -29,7 +30,10 @@ describe("CLI setup and doctor contracts", () => {
     const response = await setupApplyCommand(
       {
         setupRepository,
-        initializeDatabase: () => undefined
+        initializeDatabase: (dbPath) => {
+          mkdirSync("/tmp/fulcrum-test", { recursive: true });
+          writeFileSync(dbPath, "");
+        }
       },
       "/tmp/fulcrum-test"
     );
@@ -41,5 +45,13 @@ describe("CLI setup and doctor contracts", () => {
       doctor.data.capabilities.find((capability) => capability.capabilityId === "cap_local_state")
         ?.state
     ).toBe("managed");
+    expect(
+      doctor.data.capabilities.find((capability) => capability.capabilityId === "cap_sqlite")?.state
+    ).toBe("managed");
+    expect(
+      doctor.data.capabilities.find(
+        (capability) => capability.capabilityId === "cap_pnpm_workspace"
+      )?.blocking
+    ).toBe(false);
   });
 });

@@ -20,8 +20,13 @@ export function buildSetupPreview(stateRoot?: string): SetupPreview {
     paths,
     privacyMode: "local_only",
     networkDefault: "local-only",
-    requiredCapabilities: ["cap_local_state", "cap_sqlite"],
-    optionalCapabilities: ["cap_git", "cap_playwright", "cap_mcp"],
+    requiredCapabilities: [
+      "cap_node_runtime",
+      "cap_pnpm_workspace",
+      "cap_local_state",
+      "cap_sqlite"
+    ],
+    optionalCapabilities: ["cap_git", "cap_playwright", "cap_mcp", "cap_cockpit", "cap_tui"],
     approvalsRequired: [],
     changes: [
       `create ${paths.stateRoot}`,
