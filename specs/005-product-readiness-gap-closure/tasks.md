@@ -220,13 +220,13 @@
 
 ## Phase 12: Polish And Cross-Cutting Validation
 
-- [ ] T101 Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` and record output in release evidence
-- [ ] T102 Run `pnpm typecheck`
-- [ ] T103 Run `pnpm test`
-- [ ] T104 Run `pnpm test:e2e`
-- [ ] T105 Run `tests/e2e/quickstart/product-install-readiness.sh`
-- [ ] T106 Run `tests/e2e/quickstart/release-readiness.sh`
-- [ ] T107 Run `pnpm --filter @fulcrum/cli dev -- release validate --local-only --evidence /tmp/fulcrum-release-evidence --json`
+- [x] T101 Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` and record output in release evidence
+- [x] T102 Run `pnpm typecheck`
+- [x] T103 Run `pnpm test`
+- [x] T104 Run `pnpm test:e2e`
+- [x] T105 Run `tests/e2e/quickstart/product-install-readiness.sh`
+- [x] T106 Run `tests/e2e/quickstart/release-readiness.sh`
+- [x] T107 Run `pnpm --filter @fulcrum/cli dev -- release validate --local-only --evidence /tmp/fulcrum-release-evidence --json`
 - [ ] T108 Commit final gap-closure implementation with passing evidence
 
 ## Dependencies And Execution Order

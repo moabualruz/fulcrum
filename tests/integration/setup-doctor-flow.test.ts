@@ -1,8 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { applySetup, buildSetupDoctorReport } from "@fulcrum/core";
+import { migrate, openDatabase } from "@fulcrum/db";
 import type { SetupState } from "@fulcrum/shared";
 
 describe("setup and doctor flow", () => {
@@ -24,7 +25,9 @@ describe("setup and doctor flow", () => {
         },
         initializeDatabase: async (dbPath) => {
           initializedDbPath = dbPath;
-          await writeFile(dbPath, "");
+          const db = openDatabase(dbPath);
+          migrate(db, path.join(process.cwd(), "packages/db/migrations"));
+          db.close();
         }
       },
       root

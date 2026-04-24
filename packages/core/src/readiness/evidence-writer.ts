@@ -55,11 +55,15 @@ export class ReleaseEvidenceWriter {
   }
 }
 
-function redactJson(value: unknown) {
+function redactJson(value: unknown): {
+  text: string;
+  redactionStatus: ReleaseEvidencePack["redactionStatus"];
+  redactedPatterns: string[];
+} {
   const redacted = redactText(JSON.stringify(value, null, 2));
   return {
     text: redacted.text,
-    redactionStatus: redacted.redacted ? "redacted" : ("not_redacted" as const),
+    redactionStatus: redacted.redacted ? "redacted" : "not_redacted",
     redactedPatterns: [...new Set(redacted.matches)].sort()
   };
 }

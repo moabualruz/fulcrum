@@ -1,4 +1,5 @@
 import path from "node:path";
+import { existsSync, renameSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   CodeEvidenceRepository,
@@ -40,9 +41,9 @@ import { searchExact, searchSemantic } from "@fulcrum/code-tools";
 import { PlaneApiAdapter, SimulatedPlaneAdapter } from "@fulcrum/plane";
 
 const setupPaths = resolveSetupPaths(process.env.FULCRUM_STATE_ROOT);
-const db = openDatabase(setupPaths.dbPath);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-migrate(db, path.join(repoRoot, "packages/db/migrations"));
+const migrationsPath = path.join(repoRoot, "packages/db/migrations");
+const db = openRuntimeDatabase(setupPaths.dbPath, migrationsPath);
 const workMirror = new FileWorkRepository(path.join(setupPaths.stateRoot, "work-state.json"));
 const taskRepository = new TaskRepository(db);
 const projectRepository = new ProjectRepository(db);
@@ -154,3 +155,28 @@ export const adapterRegistry = new AdapterRegistryService(
     path.join(setupPaths.stateRoot, "adapter-configurations.json")
   )
 );
+
+function openRuntimeDatabase(dbPath: string, migrationsDir: string) {
+  let db = openDatabase(dbPath);
+  try {
+    migrate(db, migrationsDir);
+    return db;
+  } catch (error) {
+    db.close();
+    if (!isSqliteNotDatabase(error) || !existsSync(dbPath)) throw error;
+    const recoveredPath = `${dbPath}.corrupt-${Date.now()}`;
+    renameSync(dbPath, recoveredPath);
+    db = openDatabase(dbPath);
+    migrate(db, migrationsDir);
+    return db;
+  }
+}
+
+function isSqliteNotDatabase(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "SQLITE_NOTADB"
+  );
+}

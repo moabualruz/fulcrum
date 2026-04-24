@@ -176,6 +176,7 @@ class MemoryPolicyEventRepository {
 const program = new Command();
 const complianceService = new ComplianceService(readinessRepository);
 const cliSourceDir = path.dirname(fileURLToPath(import.meta.url));
+const defaultRepoRoot = path.resolve(cliSourceDir, "../../..");
 
 function resolvePackagedEntrypoint(relativePath: string): string {
   return path.resolve(cliSourceDir, relativePath);
@@ -576,7 +577,7 @@ releaseCommand
   .description("Validate release readiness and write evidence pack")
   .requiredOption("--evidence <dir>")
   .option("--local-only", "require local-only release validation")
-  .option("--root <path>", "repository root", process.cwd())
+  .option("--root <path>", "repository root", defaultRepoRoot)
   .action(async (options) => {
     const data = await runReleaseValidationCommand({
       rootDir: options.root,
@@ -1995,4 +1996,5 @@ graphCommand
     );
   });
 
-program.parse();
+const argv = process.argv[2] === "--" ? process.argv.slice(0, 2).concat(process.argv.slice(3)) : process.argv;
+program.parse(argv);
