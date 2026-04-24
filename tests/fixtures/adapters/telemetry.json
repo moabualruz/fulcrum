@@ -1,0 +1,8 @@
+{
+  "adapterId": "adapter_telemetry_fixture",
+  "category": "telemetry",
+  "name": "Telemetry Fixture",
+  "enabled": false,
+  "healthState": "disabled",
+  "offlineBehavior": "No telemetry is emitted."
+}

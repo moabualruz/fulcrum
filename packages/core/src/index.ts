@@ -15,3 +15,14 @@ export function doctorScaffold(): CapabilityHealth[] {
 }
 
 export * from "./events/jsonl-writer.js";
+export * from "./artifacts/storage.js";
+export * from "./artifacts/service.js";
+export * from "./privacy/ignored-paths.js";
+export * from "./policy/previews.js";
+export * from "./doctor/service.js";
+export * from "./doctor/setup-doctor.js";
+export * from "./adapters/adapter.js";
+export * from "./container.js";
+export * from "./setup/paths.js";
+export * from "./setup/preview.js";
+export * from "./setup/apply.js";

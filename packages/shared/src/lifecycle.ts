@@ -50,12 +50,15 @@ export const WorktreeStatusSchema = z.enum([
 ]);
 
 export const GateStatusSchema = z.enum([
+  "not_run",
   "queued",
   "running",
   "passed",
   "failed",
   "timeout",
-  "skipped"
+  "skipped",
+  "cancelled",
+  "degraded"
 ]);
 export const MemoryStatusSchema = z.enum([
   "draft",

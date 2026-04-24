@@ -102,5 +102,6 @@ export const WorktreeAllocationSchema = BaseEntitySchema.extend({
 });
 
 export type Project = z.infer<typeof ProjectSchema>;
+export type SetupState = z.infer<typeof SetupStateSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type Run = z.infer<typeof RunSchema>;

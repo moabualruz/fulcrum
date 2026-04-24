@@ -1,0 +1,8 @@
+{
+  "adapterId": "adapter_semantic_fixture",
+  "category": "semantic_search",
+  "name": "Semantic Fixture",
+  "enabled": false,
+  "healthState": "degraded",
+  "offlineBehavior": "Semantic results omitted; exact evidence remains available."
+}

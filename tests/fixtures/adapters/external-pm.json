@@ -1,0 +1,8 @@
+{
+  "adapterId": "adapter_external_pm_fixture",
+  "category": "external_pm",
+  "name": "External PM Fixture",
+  "enabled": false,
+  "healthState": "degraded",
+  "offlineBehavior": "Local mirrors remain usable; sync unavailable."
+}

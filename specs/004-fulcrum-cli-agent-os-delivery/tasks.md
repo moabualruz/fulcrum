@@ -35,30 +35,30 @@
 - [x] T015 [P] Define shared error, redaction, degraded-state, provenance, and surface response schemas in `packages/shared/src/contracts/common.ts`
 - [x] T016 Define entity schemas from `data-model.md` in `packages/shared/src/entities.ts`
 - [x] T017 Define event schemas from `contracts/event-jsonl-contract.md` in `packages/shared/src/events.ts`
-- [ ] T018 Define CLI, API, MCP, and adapter contract schemas in `packages/shared/src/contracts/index.ts`
+- [x] T018 Define CLI, API, MCP, and adapter contract schemas in `packages/shared/src/contracts/index.ts`
 - [x] T019 Create SQLite migration runner in `packages/db/src/migrate.ts`
-- [ ] T020 Create initial SQLite schema migration for all canonical entities in `packages/db/migrations/0001_initial.sql`
+- [x] T020 Create initial SQLite schema migration for all canonical entities in `packages/db/migrations/0001_initial.sql`
 - [x] T021 Implement SQLite repository transaction helper in `packages/db/src/transaction.ts`
 - [x] T022 Implement append-only event repository and JSONL mirror writer in `packages/db/src/events.ts` and `packages/core/src/events/jsonl-writer.ts`
-- [ ] T023 [P] Add artifact contract tests for attach, show, list, redaction status, provenance, and storage references in `tests/contract/artifacts.test.ts`
-- [ ] T024 Implement artifact repository and local artifact storage layout in `packages/db/src/artifacts.ts` and `packages/core/src/artifacts/storage.ts`
-- [ ] T025 Implement artifact attach, show, list, provenance, retention, and redaction service in `packages/core/src/artifacts/service.ts`
-- [ ] T026 Wire artifact CLI and API surfaces in `apps/cli/src/commands/artifact.ts` and `apps/server/src/routes/artifacts.ts`
-- [ ] T027 Implement redaction utility and secret-pattern registry in `packages/policy/src/redaction.ts`
-- [ ] T028 Implement ignored-path policy resolver for `.gitignore`, `.ignore`, `.fulcrumignore`, and `.repomixignore` in `packages/core/src/privacy/ignored-paths.ts`
-- [ ] T029 Implement policy evaluator for destructive, remote, permanent-memory, public-bind, arbitrary-shell, backup-purge, and sensitive-export actions in `packages/policy/src/evaluator.ts`
-- [ ] T030 Implement preview model for broad or dangerous state changes in `packages/core/src/policy/previews.ts`
-- [ ] T031 Implement capability health model and doctor aggregation service in `packages/core/src/doctor/service.ts`
-- [ ] T032 Implement adapter base interface from `contracts/adapter-contract.md` in `packages/core/src/adapters/adapter.ts`
-- [ ] T033 Implement local-only mode network guard service in `packages/policy/src/local-only.ts`
-- [ ] T034 Implement shared core service container wiring repositories, policy, events, adapters, and redaction in `packages/core/src/container.ts`
-- [ ] T035 Create simulated adapter fixtures for external PM, memory, code, agent, semantic, and telemetry degradation in `tests/fixtures/adapters/`
-- [ ] T036 [P] Add unit tests for lifecycle transition validation in `tests/unit/lifecycle.test.ts`
-- [ ] T037 [P] Add unit tests for redaction and ignored-path behavior in `tests/unit/redaction-and-ignore.test.ts`
-- [ ] T038 [P] Add contract tests for shared response and error schemas in `tests/contract/shared-contracts.test.ts`
-- [ ] T039 [P] Add privacy no-network guard tests in `tests/privacy/no-network-core.test.ts`
-- [ ] T040 [P] Add policy deny/approval matrix tests in `tests/policy/policy-matrix.test.ts`
-- [ ] T041 Add cross-surface parity test harness helpers in `tests/integration/helpers/surface-parity.ts`
+- [x] T023 [P] Add artifact contract tests for attach, show, list, redaction status, provenance, and storage references in `tests/contract/artifacts.test.ts`
+- [x] T024 Implement artifact repository and local artifact storage layout in `packages/db/src/artifacts.ts` and `packages/core/src/artifacts/storage.ts`
+- [x] T025 Implement artifact attach, show, list, provenance, retention, and redaction service in `packages/core/src/artifacts/service.ts`
+- [x] T026 Wire artifact CLI and API surfaces in `apps/cli/src/commands/artifact.ts` and `apps/server/src/routes/artifacts.ts`
+- [x] T027 Implement redaction utility and secret-pattern registry in `packages/policy/src/redaction.ts`
+- [x] T028 Implement ignored-path policy resolver for `.gitignore`, `.ignore`, `.fulcrumignore`, and `.repomixignore` in `packages/core/src/privacy/ignored-paths.ts`
+- [x] T029 Implement policy evaluator for destructive, remote, permanent-memory, public-bind, arbitrary-shell, backup-purge, and sensitive-export actions in `packages/policy/src/evaluator.ts`
+- [x] T030 Implement preview model for broad or dangerous state changes in `packages/core/src/policy/previews.ts`
+- [x] T031 Implement capability health model and doctor aggregation service in `packages/core/src/doctor/service.ts`
+- [x] T032 Implement adapter base interface from `contracts/adapter-contract.md` in `packages/core/src/adapters/adapter.ts`
+- [x] T033 Implement local-only mode network guard service in `packages/policy/src/local-only.ts`
+- [x] T034 Implement shared core service container wiring repositories, policy, events, adapters, and redaction in `packages/core/src/container.ts`
+- [x] T035 Create simulated adapter fixtures for external PM, memory, code, agent, semantic, and telemetry degradation in `tests/fixtures/adapters/`
+- [x] T036 [P] Add unit tests for lifecycle transition validation in `tests/unit/lifecycle.test.ts`
+- [x] T037 [P] Add unit tests for redaction and ignored-path behavior in `tests/unit/redaction-and-ignore.test.ts`
+- [x] T038 [P] Add contract tests for shared response and error schemas in `tests/contract/shared-contracts.test.ts`
+- [x] T039 [P] Add privacy no-network guard tests in `tests/privacy/no-network-core.test.ts`
+- [x] T040 [P] Add policy deny/approval matrix tests in `tests/policy/policy-matrix.test.ts`
+- [x] T041 Add cross-surface parity test harness helpers in `tests/integration/helpers/surface-parity.ts`
 
 ## Phase 3: User Story 1 - Install And Prove Local Readiness (Priority: P1)
 
@@ -68,20 +68,20 @@
 
 ### Tests And Validation for User Story 1
 
-- [ ] T042 [P] [US1] Add CLI contract tests for `fulcrum setup preview`, `fulcrum setup apply`, and `fulcrum doctor --json` in `tests/contract/cli-setup-doctor.test.ts`
-- [ ] T043 [P] [US1] Add integration test for clean setup and doctor journey in `tests/integration/setup-doctor-flow.test.ts`
-- [ ] T044 [P] [US1] Add privacy no-network setup and doctor test in `tests/privacy/setup-doctor-no-network.test.ts`
-- [ ] T045 [P] [US1] Add cockpit doctor accessibility and state test in `tests/e2e/cockpit-doctor.spec.ts`
+- [x] T042 [P] [US1] Add CLI contract tests for `fulcrum setup preview`, `fulcrum setup apply`, and `fulcrum doctor --json` in `tests/contract/cli-setup-doctor.test.ts`
+- [x] T043 [P] [US1] Add integration test for clean setup and doctor journey in `tests/integration/setup-doctor-flow.test.ts`
+- [x] T044 [P] [US1] Add privacy no-network setup and doctor test in `tests/privacy/setup-doctor-no-network.test.ts`
+- [x] T045 [P] [US1] Add cockpit doctor accessibility and state test in `tests/e2e/cockpit-doctor.spec.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T046 [US1] Implement setup preview service with local path, privacy, capability, and approval summary in `packages/core/src/setup/preview.ts`
-- [ ] T047 [US1] Implement setup apply service that initializes SQLite and local directories without unapproved global mutations in `packages/core/src/setup/apply.ts`
-- [ ] T048 [US1] Implement setup and doctor CLI commands in `apps/cli/src/commands/setup.ts` and `apps/cli/src/commands/doctor.ts`
-- [ ] T049 [US1] Implement setup and doctor API routes in `apps/server/src/routes/setup.ts` and `apps/server/src/routes/doctor.ts`
-- [ ] T050 [US1] Implement cockpit doctor and privacy status views in `apps/cockpit/src/routes/doctor.tsx` and `apps/cockpit/src/components/privacy-status.tsx`
-- [ ] T051 [US1] Persist setup state and capability health records through repositories in `packages/db/src/setup.ts` and `packages/db/src/capabilities.ts`
-- [ ] T052 [US1] Add setup/doctor quickstart validation command script in `tests/e2e/quickstart/setup-doctor.sh`
+- [x] T046 [US1] Implement setup preview service with local path, privacy, capability, and approval summary in `packages/core/src/setup/preview.ts`
+- [x] T047 [US1] Implement setup apply service that initializes SQLite and local directories without unapproved global mutations in `packages/core/src/setup/apply.ts`
+- [x] T048 [US1] Implement setup and doctor CLI commands in `apps/cli/src/commands/setup.ts` and `apps/cli/src/commands/doctor.ts`
+- [x] T049 [US1] Implement setup and doctor API routes in `apps/server/src/routes/setup.ts` and `apps/server/src/routes/doctor.ts`
+- [x] T050 [US1] Implement cockpit doctor and privacy status views in `apps/cockpit/src/routes/doctor.tsx` and `apps/cockpit/src/components/privacy-status.tsx`
+- [x] T051 [US1] Persist setup state and capability health records through repositories in `packages/db/src/setup.ts` and `packages/db/src/capabilities.ts`
+- [x] T052 [US1] Add setup/doctor quickstart validation command script in `tests/e2e/quickstart/setup-doctor.sh`
 
 ## Phase 4: User Story 2 - Register Projects And See Local Work Cockpit (Priority: P1)
 

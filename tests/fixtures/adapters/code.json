@@ -1,0 +1,8 @@
+{
+  "adapterId": "adapter_code_fixture",
+  "category": "code_tool",
+  "name": "Code Tool Fixture",
+  "enabled": true,
+  "healthState": "detected",
+  "offlineBehavior": "Exact local search remains available."
+}

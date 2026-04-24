@@ -1,0 +1,8 @@
+{
+  "adapterId": "adapter_agent_fixture",
+  "category": "cli_agent",
+  "name": "Validation Agent Fixture",
+  "enabled": true,
+  "healthState": "managed",
+  "offlineBehavior": "Deterministic validation agent runs locally."
+}

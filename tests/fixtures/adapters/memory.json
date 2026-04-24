@@ -1,0 +1,8 @@
+{
+  "adapterId": "adapter_memory_fixture",
+  "category": "memory",
+  "name": "Memory Fixture",
+  "enabled": false,
+  "healthState": "degraded",
+  "offlineBehavior": "Markdown memory remains available."
+}
