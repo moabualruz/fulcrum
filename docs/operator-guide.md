@@ -46,6 +46,30 @@ Package/start command inventory for release readiness:
 
 Global package mutation, public bind, adapter certification, compliance override, and remote/network behavior must go through policy before release evidence can count them as passing.
 
+Packaged local product validation uses built artifacts:
+
+```sh
+pnpm install
+pnpm build:package
+pnpm exec fulcrum setup apply --json
+pnpm exec fulcrum doctor --json --no-network
+pnpm exec fulcrum server start --bind 127.0.0.1:3410
+pnpm exec fulcrum tui --view dashboard
+pnpm exec fulcrum mcp tools --json
+```
+
+Equivalent root runner forms:
+
+```sh
+pnpm start -- --json setup apply
+pnpm start -- --json doctor --no-network
+pnpm start -- --json server start --bind 127.0.0.1:3410
+pnpm start -- tui --view dashboard
+pnpm start -- --json mcp tools
+```
+
+`pnpm build:package` builds cockpit, CLI, server, TUI, and MCP artifacts. The root `fulcrum` binary points to `apps/cli/dist/main.js`; `pnpm start` forwards to that packaged entrypoint. `pnpm start:server` starts the packaged API server, binds to loopback unless explicitly configured otherwise, serves built cockpit assets from `apps/cockpit/dist`, and reports URL, state root, privacy status, cockpit asset readiness, and shutdown instructions. Public binds such as `0.0.0.0` are policy-gated.
+
 Evidence: FR-001 through FR-006, SC-001, SC-006, `contracts/cli-contract.md`, and `tests/contract/cli-setup-doctor.test.ts`.
 
 ## Product/SRS Compliance

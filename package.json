@@ -4,12 +4,19 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.10.0",
+  "bin": {
+    "fulcrum": "apps/cli/dist/main.js"
+  },
   "scripts": {
     "build": "pnpm -r build",
+    "build:package": "pnpm -r build",
     "dev": "pnpm --filter @fulcrum/cli dev",
     "dev:server": "pnpm --filter @fulcrum/server dev",
     "dev:cockpit": "pnpm --filter @fulcrum/cockpit dev",
     "dev:tui": "pnpm --filter @fulcrum/tui dev",
+    "start": "node -e \"const { spawnSync } = require('node:child_process'); const args = process.argv.slice(1); if (args[0] === '--') args.shift(); const result = spawnSync(process.execPath, ['apps/cli/dist/main.js', ...args], { stdio: 'inherit', env: process.env }); if (result.error) throw result.error; process.exit(result.status ?? 1);\" --",
+    "start:server": "node apps/server/dist/main.js",
+    "start:tui": "node apps/tui/dist/main.js",
     "lint": "eslint .",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
@@ -18,6 +25,18 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@fulcrum/agents": "workspace:*",
+    "@fulcrum/cli": "workspace:*",
+    "@fulcrum/code-tools": "workspace:*",
+    "@fulcrum/cockpit": "workspace:*",
+    "@fulcrum/core": "workspace:*",
+    "@fulcrum/db": "workspace:*",
+    "@fulcrum/mcp": "workspace:*",
+    "@fulcrum/plane": "workspace:*",
+    "@fulcrum/policy": "workspace:*",
+    "@fulcrum/server": "workspace:*",
+    "@fulcrum/shared": "workspace:*",
+    "@fulcrum/tui": "workspace:*",
     "@hono/node-server": "^1.14.0",
     "@modelcontextprotocol/sdk": "^1.9.0",
     "better-sqlite3": "^12.9.0",

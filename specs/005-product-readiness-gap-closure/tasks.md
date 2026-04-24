@@ -53,18 +53,18 @@
 
 ### Tests And Validation for User Story 2
 
-- [ ] T024 [P] [US2] Add package command contract test in `tests/contract/package-start-contract.test.ts`
-- [ ] T025 [P] [US2] Add clean install quickstart test in `tests/e2e/quickstart/product-install-readiness.sh`
-- [ ] T026 [P] [US2] Add loopback bind policy test in `tests/policy/package-server-bind.test.ts`
+- [X] T024 [P] [US2] Add package command contract test in `tests/contract/package-start-contract.test.ts`
+- [X] T025 [P] [US2] Add clean install quickstart test in `tests/e2e/quickstart/product-install-readiness.sh`
+- [X] T026 [P] [US2] Add loopback bind policy test in `tests/policy/package-server-bind.test.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T027 [US2] Add root package bin/build/start scripts for `fulcrum` in `package.json`
-- [ ] T028 [US2] Add CLI packaged entrypoint build support in `apps/cli/package.json` and `apps/cli/src/main.ts`
-- [ ] T029 [US2] Add server command that serves cockpit assets when built in `apps/server/src/main.ts`
-- [ ] T030 [US2] Add install target health probes in `packages/core/src/readiness/install-targets.ts`
-- [ ] T031 [US2] Add package/start section to `README.md`
-- [ ] T032 [US2] Add package/start section to `docs/operator-guide.md`
+- [X] T027 [US2] Add root package bin/build/start scripts for `fulcrum` in `package.json`
+- [X] T028 [US2] Add CLI packaged entrypoint build support in `apps/cli/package.json` and `apps/cli/src/main.ts`
+- [X] T029 [US2] Add server command that serves cockpit assets when built in `apps/server/src/main.ts`
+- [X] T030 [US2] Add install target health probes in `packages/core/src/readiness/install-targets.ts`
+- [X] T031 [US2] Add package/start section to `README.md`
+- [X] T032 [US2] Add package/start section to `docs/operator-guide.md`
 
 ## Phase 5: User Story 3 - SQLite Canonical State Cutover (Priority: P1)
 

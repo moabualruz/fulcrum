@@ -1,5 +1,8 @@
+#!/usr/bin/env node
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { existsSync, readdirSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import {
   buildAdapterDegradationSummary,
@@ -172,6 +175,51 @@ class MemoryPolicyEventRepository {
 
 const program = new Command();
 const complianceService = new ComplianceService(readinessRepository);
+const cliSourceDir = path.dirname(fileURLToPath(import.meta.url));
+
+function resolvePackagedEntrypoint(relativePath: string): string {
+  return path.resolve(cliSourceDir, relativePath);
+}
+
+function parseBindAddress(bindAddress: string): { hostname: string; port: number } {
+  if (bindAddress.startsWith("[")) {
+    const separator = bindAddress.lastIndexOf("]:");
+    if (separator > 0) {
+      const hostname = bindAddress.slice(1, separator);
+      const port = Number(bindAddress.slice(separator + 2));
+      if (hostname.length > 0 && Number.isInteger(port) && port > 0) return { hostname, port };
+    }
+  }
+
+  const separator = bindAddress.lastIndexOf(":");
+  if (separator <= 0) throw new Error(`Invalid bind address: ${bindAddress}`);
+  const hostname = bindAddress.slice(0, separator);
+  const port = Number(bindAddress.slice(separator + 1));
+  if (hostname.length === 0 || !Number.isInteger(port) || port <= 0) {
+    throw new Error(`Invalid bind address: ${bindAddress}`);
+  }
+  return { hostname, port };
+}
+
+function runPackagedCommand(
+  entrypoint: string,
+  args: string[],
+  options?: { env?: NodeJS.ProcessEnv }
+) {
+  if (!existsSync(entrypoint)) {
+    throw new Error(
+      `Missing packaged artifact at ${entrypoint}. Run pnpm build:package before using packaged commands.`
+    );
+  }
+
+  const result = spawnSync(process.execPath, [entrypoint, ...args], {
+    stdio: "inherit",
+    env: { ...process.env, ...options?.env }
+  });
+
+  if (result.error) throw result.error;
+  process.exit(result.status ?? 1);
+}
 
 program
   .name("fulcrum")
@@ -278,18 +326,39 @@ program
   .command("start")
   .option("--bind <address>", "bind address", "127.0.0.1:3410")
   .option("--open", "report cockpit URL")
+  .option("--approve-bind <policyDecisionId>", "approved public bind decision id")
   .action((options) => {
-    const data = {
-      bind: options.bind,
-      url: `http://${options.bind}`,
-      open: Boolean(options.open),
-      command: "pnpm --filter @fulcrum/server dev"
+    const { hostname, port } = parseBindAddress(options.bind);
+    const entrypoint = resolvePackagedEntrypoint("../../server/dist/main.js");
+    if (!existsSync(entrypoint)) {
+      throw new Error("Run pnpm build:package before starting the packaged server.");
+    }
+
+    const child = spawn(process.execPath, [entrypoint], {
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        FULCRUM_HOST: hostname,
+        FULCRUM_PORT: String(port),
+        FULCRUM_SERVER_OPEN: options.open ? "1" : "0",
+        ...(program.opts().json ? { FULCRUM_SERVER_OUTPUT: "json" } : {}),
+        ...(options.approveBind ? { FULCRUM_PUBLIC_BIND_POLICY_DECISION: options.approveBind } : {})
+      }
+    });
+
+    const forwardSignal = (signal: NodeJS.Signals) => {
+      if (!child.killed) child.kill(signal);
     };
-    console.log(
-      program.opts().json
-        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
-        : data.url
-    );
+
+    process.once("SIGINT", () => forwardSignal("SIGINT"));
+    process.once("SIGTERM", () => forwardSignal("SIGTERM"));
+    child.once("exit", (code, signal) => {
+      if (signal) {
+        process.kill(process.pid, signal);
+        return;
+      }
+      process.exit(code ?? 1);
+    });
   });
 
 program
@@ -298,16 +367,10 @@ program
   .option("--project <projectId>")
   .option("--view <view>", "dashboard view", "dashboard")
   .action((options) => {
-    const data = {
-      projectId: options.project,
-      view: options.view,
-      command: `pnpm --filter @fulcrum/tui dev ${options.view}`
-    };
-    console.log(
-      program.opts().json
-        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
-        : data.command
-    );
+    const entrypoint = resolvePackagedEntrypoint("../../tui/dist/main.js");
+    runPackagedCommand(entrypoint, [options.view], {
+      env: options.project ? { FULCRUM_PROJECT_ID: options.project } : undefined
+    });
   });
 
 const artifactService = new ArtifactService(
@@ -415,7 +478,11 @@ complianceCommand
     });
     console.log(
       program.opts().json
-        ? JSON.stringify({ schemaVersion: "1.0", status: data.pass ? "ok" : "blocked", data }, null, 2)
+        ? JSON.stringify(
+            { schemaVersion: "1.0", status: data.pass ? "ok" : "blocked", data },
+            null,
+            2
+          )
         : `${data.requirements.length} compliance requirements; ${data.blockingRequirementIds.length} blocking`
     );
   });

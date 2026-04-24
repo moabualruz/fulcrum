@@ -8,6 +8,42 @@ importers:
 
   .:
     dependencies:
+      '@fulcrum/agents':
+        specifier: workspace:*
+        version: link:packages/agents
+      '@fulcrum/cli':
+        specifier: workspace:*
+        version: link:apps/cli
+      '@fulcrum/cockpit':
+        specifier: workspace:*
+        version: link:apps/cockpit
+      '@fulcrum/code-tools':
+        specifier: workspace:*
+        version: link:packages/code-tools
+      '@fulcrum/core':
+        specifier: workspace:*
+        version: link:packages/core
+      '@fulcrum/db':
+        specifier: workspace:*
+        version: link:packages/db
+      '@fulcrum/mcp':
+        specifier: workspace:*
+        version: link:packages/mcp
+      '@fulcrum/plane':
+        specifier: workspace:*
+        version: link:packages/plane
+      '@fulcrum/policy':
+        specifier: workspace:*
+        version: link:packages/policy
+      '@fulcrum/server':
+        specifier: workspace:*
+        version: link:apps/server
+      '@fulcrum/shared':
+        specifier: workspace:*
+        version: link:packages/shared
+      '@fulcrum/tui':
+        specifier: workspace:*
+        version: link:apps/tui
       '@hono/node-server':
         specifier: ^1.14.0
         version: 1.19.14(hono@4.12.15)
