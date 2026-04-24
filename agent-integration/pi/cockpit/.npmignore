@@ -1,7 +1,0 @@
-# Only index.ts + skills/ + README.md + package.json + LICENSE ship to npm.
-node_modules
-tests
-*.test.ts
-tsconfig*.json
-vitest.config*
-PUBLISHING.md
