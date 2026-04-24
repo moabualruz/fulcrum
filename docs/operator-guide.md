@@ -72,6 +72,22 @@ pnpm start -- --json mcp tools
 
 Evidence: FR-001 through FR-006, SC-001, SC-006, `contracts/cli-contract.md`, and `tests/contract/cli-setup-doctor.test.ts`.
 
+## Doctor Capability Matrix
+
+Doctor quick mode is default and must stay usable for frequent local readiness checks:
+
+```sh
+fulcrum doctor --quick --json --no-network
+fulcrum doctor --mode deep --json --no-network
+fulcrum project doctor <projectId>
+```
+
+The matrix covers runtime, pnpm, local setup state, SQLite, event log readiness, git and worktree support, `rg`, `fd`, `ast-grep`, Aider, Repomix, memsearch, Engram, quality gates, project ignore-rule readiness, MCP/project agent config, redaction config, Plane, observability, remote providers, and adapter summaries. `--no-network` disables remote probes instead of treating them as core blockers. Deep mode adds slower optional tool checks and project doctor adds AGENTS/CLAUDE/GEMINI/OpenCode/Codex/Copilot MCP configuration probes plus ignore-file readiness for the registered project root.
+
+JSON and human output use the same report object fields: capability ID, state, blocking flag, privacy status, affected workflows, freshness, cause, and next action. Cockpit renders the same API matrix from `/api/v1/doctor?noNetwork=true`.
+
+Evidence: FR-007, FR-008, SC-004, `tests/contract/doctor-capability-matrix.test.ts`, `tests/integration/doctor-fixtures.test.ts`, and `tests/integration/project-doctor-readiness.test.ts`.
+
 ## Product/SRS Compliance
 
 Compliance is the Product/SRS authority for release claims. Run it against the ordered source set before calling a feature complete:

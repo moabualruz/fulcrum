@@ -1,5 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { migrate, openDatabase } from "@fulcrum/db";
 import { doctorCommand } from "../../apps/cli/src/commands/doctor.js";
 import { setupApplyCommand, setupPreviewCommand } from "../../apps/cli/src/commands/setup.js";
 import type { SetupState } from "@fulcrum/shared";
@@ -33,6 +35,9 @@ describe("CLI setup and doctor contracts", () => {
         initializeDatabase: (dbPath) => {
           mkdirSync("/tmp/fulcrum-test", { recursive: true });
           writeFileSync(dbPath, "");
+          const db = openDatabase(dbPath);
+          migrate(db, path.join(process.cwd(), "packages/db/migrations"));
+          db.close();
         }
       },
       "/tmp/fulcrum-test"

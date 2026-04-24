@@ -181,6 +181,48 @@ function resolvePackagedEntrypoint(relativePath: string): string {
   return path.resolve(cliSourceDir, relativePath);
 }
 
+function formatDoctorReport(
+  report: {
+    blockingCount: number;
+    degradedCount: number;
+    capabilities: Array<{
+      capabilityId: string;
+      state: string;
+      blocking: boolean;
+      cause?: string;
+      privacyStatus?: string;
+      affectedWorkflows?: string[];
+      freshness?: string;
+      nextAction?: string;
+    }>;
+  },
+  project?: string
+): string {
+  const heading = project ? `Project doctor: ${project}` : "Fulcrum doctor";
+  const rows = report.capabilities.map((capability) => {
+    const workflows =
+      capability.affectedWorkflows && capability.affectedWorkflows.length > 0
+        ? capability.affectedWorkflows.join(", ")
+        : "doctor";
+    const lines = [
+      `${capability.capabilityId}: state=${capability.state} blocking=${capability.blocking}`,
+      `  privacy=${capability.privacyStatus ?? "local_only"} workflows=${workflows} freshness=${capability.freshness ?? "unknown"}`
+    ];
+    if (capability.cause) {
+      lines.push(`  cause=${capability.cause}`);
+    }
+    if (capability.nextAction) {
+      lines.push(`  next=${capability.nextAction}`);
+    }
+    return lines.join("\n");
+  });
+  return [
+    heading,
+    `blocking=${report.blockingCount} degraded=${report.degradedCount}`,
+    ...rows
+  ].join("\n");
+}
+
 function parseBindAddress(bindAddress: string): { hostname: string; port: number } {
   if (bindAddress.startsWith("[")) {
     const separator = bindAddress.lastIndexOf("]:");
@@ -287,19 +329,30 @@ program
 program
   .command("doctor")
   .description("Report local capability and privacy health")
+  .option("--mode <mode>", "doctor probe mode: quick or deep", "quick")
+  .option("--quick", "run quick doctor probes")
+  .option("--deep", "run deep doctor probes")
   .option("--no-network", "avoid network checks")
   .action(async (options) => {
     const ports = await createCliSetupPorts();
+    const mode = options.quick
+      ? "quick"
+      : options.deep || options.mode === "deep"
+        ? "deep"
+        : "quick";
     const payload = doctorCommand({
       setupRepository: ports.setupRepository,
       setupState: await ports.latest(),
       noNetwork: options.network === false || Boolean(options.noNetwork),
+      mode,
       extraCapabilities: [
         await externalPmHealth(externalPmService.adapterHealthPort()),
         ...(await buildAdapterDegradationSummary(adapterRegistry)).capabilities
       ]
     });
-    console.log(program.opts().json ? JSON.stringify(payload, null, 2) : "Fulcrum doctor ready");
+    console.log(
+      program.opts().json ? JSON.stringify(payload, null, 2) : formatDoctorReport(payload.data)
+    );
   });
 
 program
@@ -699,14 +752,20 @@ projectCommand.command("show <project>").action((project) => {
 
 projectCommand.command("doctor <project>").action(async (project) => {
   const ports = await createCliSetupPorts();
+  const registeredProject = projectService.get(project);
   const data = doctorCommand({
     setupRepository: ports.setupRepository,
     setupState: await ports.latest(),
     noNetwork: true,
-    extraCapabilities: [await externalPmHealth(externalPmService.adapterHealthPort())]
+    mode: "deep",
+    projectPath: registeredProject?.rootPath ?? project,
+    extraCapabilities: [
+      await externalPmHealth(externalPmService.adapterHealthPort()),
+      ...(await buildAdapterDegradationSummary(adapterRegistry)).capabilities
+    ]
   });
   console.log(
-    program.opts().json ? JSON.stringify(data, null, 2) : `Project doctor ready: ${project}`
+    program.opts().json ? JSON.stringify(data, null, 2) : formatDoctorReport(data.data, project)
   );
 });
 

@@ -1,6 +1,14 @@
 export interface CapabilityHealth {
   capabilityId: string;
-  state: "managed" | "detected" | "guided" | "blocked" | "degraded" | "disabled" | "unknown";
+  state:
+    | "managed"
+    | "detected"
+    | "guided"
+    | "optional"
+    | "blocked"
+    | "degraded"
+    | "disabled"
+    | "unknown";
   nextAction?: string;
 }
 
@@ -21,6 +29,7 @@ export * from "./privacy/ignored-paths.js";
 export * from "./policy/previews.js";
 export * from "./doctor/service.js";
 export * from "./doctor/setup-doctor.js";
+export * from "./doctor/capability-probes.js";
 export * from "./doctor/copilot.js";
 export * from "./adapters/adapter.js";
 export * from "./adapters/registry.js";

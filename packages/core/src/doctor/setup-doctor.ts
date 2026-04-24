@@ -2,10 +2,14 @@ import { SCHEMA_VERSION, type CapabilityHealthRecord, type SetupState } from "@f
 import { execFileSync } from "node:child_process";
 import { aggregateDoctorReport, type DoctorReport } from "./service.js";
 import { sqliteStateStatus } from "../readiness/json-state-migration.js";
+import { runCapabilityProbes, type DoctorMode } from "./capability-probes.js";
 
 export interface SetupDoctorInput {
   setupState?: SetupState;
   noNetwork: boolean;
+  mode?: DoctorMode;
+  projectPath?: string;
+  env?: NodeJS.ProcessEnv;
   extraCapabilities?: CapabilityHealthRecord[];
 }
 
@@ -32,7 +36,8 @@ export function buildSetupDoctorReport(input: SetupDoctorInput): DoctorReport & 
       affectedWorkflows: ["source_install", "cli", "server", "cockpit", "tui"],
       missingState: "blocked",
       missingAction: "Install pnpm, then run pnpm install from the repository root.",
-      now
+      now,
+      env: input.env
     }),
     {
       capabilityId: "cap_local_state",
@@ -66,7 +71,8 @@ export function buildSetupDoctorReport(input: SetupDoctorInput): DoctorReport & 
       affectedWorkflows: ["project", "worktree", "code"],
       missingState: "guided",
       missingAction: "Install git before project registration or worktree allocation.",
-      now
+      now,
+      env: input.env
     }),
     {
       capabilityId: "cap_network",
@@ -80,6 +86,14 @@ export function buildSetupDoctorReport(input: SetupDoctorInput): DoctorReport & 
       affectedWorkflows: ["adapters"],
       freshness: now
     },
+    ...runCapabilityProbes({
+      mode: input.mode ?? "quick",
+      noNetwork: input.noNetwork,
+      projectPath: input.projectPath,
+      env: input.env,
+      now,
+      setupApplied: input.setupState?.status === "applied"
+    }),
     ...(input.extraCapabilities ?? [])
   ];
   return {
@@ -97,11 +111,13 @@ function commandCapability(input: {
   missingState: CapabilityHealthRecord["state"];
   missingAction: string;
   now: string;
+  env?: NodeJS.ProcessEnv;
 }): CapabilityHealthRecord {
   try {
     const version = execFileSync(input.command, input.args, {
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
+      stdio: ["ignore", "pipe", "ignore"],
+      env: input.env ? { ...process.env, ...input.env } : process.env
     }).trim();
     return {
       capabilityId: input.capabilityId,

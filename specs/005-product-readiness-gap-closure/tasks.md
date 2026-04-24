@@ -96,18 +96,18 @@
 
 ### Tests And Validation for User Story 4
 
-- [ ] T043 [P] [US4] Add full doctor matrix contract test in `tests/contract/doctor-capability-matrix.test.ts`
-- [ ] T044 [P] [US4] Add PATH/env fixture integration test in `tests/integration/doctor-fixtures.test.ts`
-- [ ] T045 [P] [US4] Add project doctor MCP/config readiness test in `tests/integration/project-doctor-readiness.test.ts`
+- [X] T043 [P] [US4] Add full doctor matrix contract test in `tests/contract/doctor-capability-matrix.test.ts`
+- [X] T044 [P] [US4] Add PATH/env fixture integration test in `tests/integration/doctor-fixtures.test.ts`
+- [X] T045 [P] [US4] Add project doctor MCP/config readiness test in `tests/integration/project-doctor-readiness.test.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T046 [US4] Implement capability probe registry in `packages/core/src/doctor/capability-probes.ts`
-- [ ] T047 [US4] Add probes for `fd`, `ast-grep`, Aider, Repomix, memsearch, Engram, quality gates, event log, git worktree, and project configs in `packages/core/src/doctor/capability-probes.ts`
-- [ ] T048 [US4] Add quick/deep doctor modes in `apps/cli/src/main.ts`
-- [ ] T049 [US4] Add project doctor output parity in `apps/cli/src/main.ts` and `apps/server/src/routes/doctor.ts`
-- [ ] T050 [US4] Add cockpit doctor matrix display in `apps/cockpit/src/routes/doctor.tsx`
-- [ ] T051 [US4] Add doctor matrix docs in `docs/operator-guide.md`
+- [X] T046 [US4] Implement capability probe registry in `packages/core/src/doctor/capability-probes.ts`
+- [X] T047 [US4] Add probes for `fd`, `ast-grep`, Aider, Repomix, memsearch, Engram, quality gates, event log, git worktree, and project configs in `packages/core/src/doctor/capability-probes.ts`
+- [X] T048 [US4] Add quick/deep doctor modes in `apps/cli/src/main.ts`
+- [X] T049 [US4] Add project doctor output parity in `apps/cli/src/main.ts` and `apps/server/src/routes/doctor.ts`
+- [X] T050 [US4] Add cockpit doctor matrix display in `apps/cockpit/src/routes/doctor.tsx`
+- [X] T051 [US4] Add doctor matrix docs in `docs/operator-guide.md`
 
 ## Phase 7: User Story 5 - Real CLI Agent Acceptance (Priority: P1)
 

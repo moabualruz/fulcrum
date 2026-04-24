@@ -4,6 +4,10 @@ import { PrivacyStatus } from "../components/privacy-status.js";
 interface Capability {
   capabilityId: string;
   state: string;
+  blocking?: boolean;
+  privacyStatus?: string;
+  affectedWorkflows?: string[];
+  freshness?: string;
   nextAction?: string;
 }
 
@@ -37,16 +41,33 @@ export function DoctorRoute() {
       <h1>Doctor</h1>
       <PrivacyStatus />
       <section aria-label="Capability health">
-        <h2>Capabilities</h2>
-        <ul>
-          {capabilities.map((capability) => (
-            <li key={capability.capabilityId}>
-              <strong>{capability.capabilityId}</strong>
-              <span>{capability.state}</span>
-              <span>{capability.nextAction}</span>
-            </li>
-          ))}
-        </ul>
+        <h2>Capability Matrix</h2>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Capability</th>
+              <th scope="col">State</th>
+              <th scope="col">Blocking</th>
+              <th scope="col">Privacy</th>
+              <th scope="col">Workflows</th>
+              <th scope="col">Freshness</th>
+              <th scope="col">Next action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {capabilities.map((capability) => (
+              <tr key={capability.capabilityId}>
+                <th scope="row">{capability.capabilityId}</th>
+                <td>{capability.state}</td>
+                <td>{capability.blocking ? "yes" : "no"}</td>
+                <td>{capability.privacyStatus ?? "local_only"}</td>
+                <td>{capability.affectedWorkflows?.join(", ") ?? "doctor"}</td>
+                <td>{capability.freshness ?? "unknown"}</td>
+                <td>{capability.nextAction}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
     </main>
   );
