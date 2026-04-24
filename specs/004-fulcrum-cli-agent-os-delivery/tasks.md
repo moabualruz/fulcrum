@@ -114,21 +114,21 @@
 
 ### Tests And Validation for User Story 4
 
-- [ ] T064 [P] [US4] Add run lifecycle contract tests in `tests/contract/run-lifecycle.test.ts`
-- [ ] T065 [P] [US4] Add deterministic validation agent supervised run integration test in `tests/integration/validation-agent-run.test.ts`
-- [ ] T066 [P] [US4] Add stale heartbeat and crash recovery test in `tests/recovery/run-stale-crash.test.ts`
-- [ ] T067 [P] [US4] Add cancellation terminal-state test in `tests/integration/run-cancel.test.ts`
+- [x] T064 [P] [US4] Add run lifecycle contract tests in `tests/contract/run-lifecycle.test.ts`
+- [x] T065 [P] [US4] Add deterministic validation agent supervised run integration test in `tests/integration/validation-agent-run.test.ts`
+- [x] T066 [P] [US4] Add stale heartbeat and crash recovery test in `tests/recovery/run-stale-crash.test.ts`
+- [x] T067 [P] [US4] Add cancellation terminal-state test in `tests/integration/run-cancel.test.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T068 [US4] Implement run lifecycle service with terminal-state enforcement in `packages/core/src/runs/service.ts`
-- [ ] T069 [US4] Implement run repository and event stream queries in `packages/db/src/runs.ts`
-- [ ] T070 [US4] Implement agent process supervisor and cancellation handling in `packages/agents/src/supervisor.ts`
-- [ ] T071 [US4] Implement deterministic validation agent in `packages/agents/src/validation-agent.ts`
-- [ ] T072 [US4] Implement run CLI commands in `apps/cli/src/commands/run.ts`
-- [ ] T073 [US4] Implement run API routes and live activity stream in `apps/server/src/routes/runs.ts` and `apps/server/src/routes/activity.ts`
-- [ ] T074 [US4] Implement cockpit run detail and live activity components in `apps/cockpit/src/routes/run-detail.tsx` and `apps/cockpit/src/components/live-activity.tsx`
-- [ ] T075 [US4] Implement run logs and transcript artifact capture in `packages/core/src/runs/log-capture.ts`
+- [x] T068 [US4] Implement run lifecycle service with terminal-state enforcement in `packages/core/src/runs/service.ts`
+- [x] T069 [US4] Implement run repository and event stream queries in `packages/db/src/runs.ts`
+- [x] T070 [US4] Implement agent process supervisor and cancellation handling in `packages/agents/src/supervisor.ts`
+- [x] T071 [US4] Implement deterministic validation agent in `packages/agents/src/validation-agent.ts`
+- [x] T072 [US4] Implement run CLI commands in `apps/cli/src/commands/run.ts`
+- [x] T073 [US4] Implement run API routes and live activity stream in `apps/server/src/routes/runs.ts` and `apps/server/src/routes/activity.ts`
+- [x] T074 [US4] Implement cockpit run detail and live activity components in `apps/cockpit/src/routes/run-detail.tsx` and `apps/cockpit/src/components/live-activity.tsx`
+- [x] T075 [US4] Implement run logs and transcript artifact capture in `packages/core/src/runs/log-capture.ts`
 
 ## Phase 6: User Story 5 - Build Explainable Context Packs (Priority: P1)
 

@@ -1,1 +1,2 @@
-export const AGENTS_PACKAGE = "@fulcrum/agents";
+export * from "./supervisor.js";
+export * from "./validation-agent.js";

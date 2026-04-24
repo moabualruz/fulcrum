@@ -4,15 +4,20 @@ import {
   CodeEvidenceSchema,
   ExternalWorkItemMirrorSchema,
   ProjectSchema,
+  RunEventSchema,
+  RunSchema,
   TaskSchema,
   type CodeEvidence,
   type ExternalWorkItemMirror,
   type Project,
+  type Run,
+  type RunEvent,
   type Task
 } from "@fulcrum/shared";
 import type { CodeEvidenceRepositoryPort } from "../code/evidence-service.js";
 import type { ExternalWorkItemMirrorRepositoryPort } from "../external-pm/service.js";
 import type { ProjectRepositoryPort } from "../projects/service.js";
+import type { RunRepositoryPort } from "../runs/service.js";
 import type { TaskRepositoryPort } from "../tasks/service.js";
 
 interface WorkState {
@@ -20,13 +25,17 @@ interface WorkState {
   tasks: Task[];
   externalWorkItemMirrors: ExternalWorkItemMirror[];
   codeEvidence: CodeEvidence[];
+  runs: Run[];
+  runEvents: RunEvent[];
 }
 
 const emptyState: WorkState = {
   projects: [],
   tasks: [],
   externalWorkItemMirrors: [],
-  codeEvidence: []
+  codeEvidence: [],
+  runs: [],
+  runEvents: []
 };
 
 export class FileWorkRepository {
@@ -98,7 +107,9 @@ export class FileWorkRepository {
         ),
         codeEvidence: (data.codeEvidence ?? []).map((evidence) =>
           CodeEvidenceSchema.parse(evidence)
-        )
+        ),
+        runs: (data.runs ?? []).map((run) => RunSchema.parse(run)),
+        runEvents: (data.runEvents ?? []).map((event) => RunEventSchema.parse(event))
       };
     } catch {
       return { ...emptyState };
@@ -222,5 +233,38 @@ export class FileTaskRepository implements TaskRepositoryPort {
 
   list(projectId?: string): Task[] {
     return this.work.listTasks(projectId);
+  }
+}
+
+export class FileRunRepository implements RunRepositoryPort {
+  constructor(private readonly work: FileWorkRepository) {}
+
+  save(run: Run): Run {
+    const parsed = RunSchema.parse(run);
+    const state = this.work.read();
+    state.runs = [parsed, ...state.runs.filter((item) => item.runId !== parsed.runId)];
+    this.work.write(state);
+    return parsed;
+  }
+
+  get(runId: string): Run | undefined {
+    return this.work.read().runs.find((run) => run.runId === runId);
+  }
+
+  list(projectId?: string): Run[] {
+    const runs = this.work.read().runs;
+    return projectId ? runs.filter((run) => run.projectId === projectId) : runs;
+  }
+
+  appendEvent(event: Omit<RunEvent, "sequence">): RunEvent {
+    const state = this.work.read();
+    const parsed = RunEventSchema.parse({ ...event, sequence: state.runEvents.length });
+    state.runEvents = [...state.runEvents, parsed];
+    this.work.write(state);
+    return parsed;
+  }
+
+  listEvents(runId: string): RunEvent[] {
+    return this.work.read().runEvents.filter((event) => event.runId === runId);
   }
 }

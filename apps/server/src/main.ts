@@ -15,6 +15,8 @@ import { registerArtifactRoutes } from "./routes/artifacts.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerPolicyRoutes } from "./routes/policy.js";
 import { registerCodeRoutes } from "./routes/code.js";
+import { registerActivityRoutes } from "./routes/activity.js";
+import { registerRunRoutes } from "./routes/runs.js";
 import { registerQueueRoutes } from "./routes/queues.js";
 import { registerExternalPmRoutes } from "./routes/external-pm.js";
 import { registerSetupRoutes } from "./routes/setup.js";
@@ -24,6 +26,7 @@ import {
   serverExternalPmService,
   serverCodeService,
   serverProjectService,
+  serverRunService,
   serverTaskService
 } from "./work-runtime.js";
 
@@ -43,6 +46,8 @@ registerDoctorRoutes(app, setupRepository, async () => [
 registerProjectRoutes(app, serverProjectService);
 registerTaskRoutes(app, serverTaskService);
 registerQueueRoutes(app, serverProjectService, serverTaskService);
+registerRunRoutes(app, serverRunService);
+registerActivityRoutes(app, serverRunService);
 registerCodeRoutes(app, serverCodeService);
 registerExternalPmRoutes(app, serverExternalPmService);
 registerArtifactRoutes(

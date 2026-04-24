@@ -21,6 +21,12 @@ import {
 import { doctorCommand } from "./commands/doctor.js";
 import { codeCleanupStaleCommand, codeSearchCommand } from "./commands/code.js";
 import { listProjectsCommand, registerProjectCommand } from "./commands/project.js";
+import {
+  cancelRunCommand,
+  runStatusCommand,
+  startRunCommand,
+  tailRunCommand
+} from "./commands/run.js";
 import { setupApplyCommand, setupPreviewCommand } from "./commands/setup.js";
 import { createTaskCommand, listTasksCommand, transitionTaskCommand } from "./commands/task.js";
 import {
@@ -35,7 +41,13 @@ import {
 import { approvePolicyCommand, checkPolicyCommand } from "./commands/policy.js";
 import { formatRedactionStatus } from "./output/redaction.js";
 import { createCliSetupPorts } from "./runtime.js";
-import { codeService, externalPmService, projectService, taskService } from "./work-runtime.js";
+import {
+  codeService,
+  externalPmService,
+  projectService,
+  runService,
+  taskService
+} from "./work-runtime.js";
 
 class MemoryArtifactRepository implements ArtifactRepositoryPort {
   private readonly artifacts = new Map<string, ArtifactContract>();
@@ -327,6 +339,52 @@ codeCommand
         : `${data.length} stale evidence records`
     );
   });
+
+const runCommand = program.command("run").description("Start, inspect, cancel, and tail runs");
+
+runCommand
+  .command("start <taskId>")
+  .requiredOption("--agent <agentId>")
+  .action((taskId, options) => {
+    const data = startRunCommand(runService, { taskId, agentId: options.agentId });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.runId
+    );
+  });
+
+runCommand.command("status <runId>").action((runId) => {
+  const data = runStatusCommand(runService, runId);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: data ? "ok" : "error", data }, null, 2)
+      : (data?.run.status ?? "Run not found")
+  );
+});
+
+runCommand
+  .command("cancel <runId>")
+  .option("--reason <reason>")
+  .action((runId, options) => {
+    const data = cancelRunCommand(runService, runId, options.reason);
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.status
+    );
+  });
+
+runCommand.command("tail <runId>").action((runId) => {
+  const data = tailRunCommand(runService, runId);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+      : data
+          .map((event) => `${event.type}: ${String(event.payloadSummary.message ?? "")}`)
+          .join("\n")
+  );
+});
 
 const planeCommand = program
   .command("plane")

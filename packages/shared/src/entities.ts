@@ -87,9 +87,21 @@ export const RunSchema = BaseEntitySchema.extend({
   agentId: FulcrumIdSchema,
   commandIdentity: z.string(),
   status: RunStatusSchema,
+  startedAt: TimestampSchema.optional(),
+  endedAt: TimestampSchema.optional(),
   heartbeatAt: TimestampSchema.optional(),
+  heartbeatState: z.enum(["fresh", "stale", "missing"]).default("missing"),
   worktreeId: FulcrumIdSchema.optional(),
   contextPackId: FulcrumIdSchema.optional(),
+  eventStreamId: FulcrumIdSchema.optional(),
+  logArtifactIds: z.array(FulcrumIdSchema).default([]),
+  artifactIds: z.array(FulcrumIdSchema).default([]),
+  qualityGateIds: z.array(FulcrumIdSchema).default([]),
+  policyDecisionIds: z.array(FulcrumIdSchema).default([]),
+  summary: z.string().optional(),
+  failureReason: z.string().optional(),
+  finalOutcome: z.string().optional(),
+  terminalStateRecordedAt: TimestampSchema.optional(),
   redactionStatus: RedactionStatusSchema
 });
 

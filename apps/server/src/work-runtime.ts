@@ -3,12 +3,14 @@ import {
   CodeEvidenceService,
   FileCodeEvidenceRepository,
   FileProjectRepository,
+  FileRunRepository,
   FileExternalWorkItemMirrorRepository,
   FileTaskRepository,
   FileWorkRepository,
   ExternalPmService,
   LocalTaskService,
   ProjectRegistryService,
+  RunLifecycleService,
   resolveSetupPaths
 } from "@fulcrum/core";
 import { searchExact, searchSemantic } from "@fulcrum/code-tools";
@@ -19,12 +21,14 @@ const work = new FileWorkRepository(
 );
 const taskRepository = new FileTaskRepository(work);
 const projectRepository = new FileProjectRepository(work);
+const runRepository = new FileRunRepository(work);
 
 export const serverTaskService = new LocalTaskService(taskRepository);
 export const serverProjectService = new ProjectRegistryService(
   projectRepository,
   serverTaskService
 );
+export const serverRunService = new RunLifecycleService(runRepository, taskRepository);
 export const serverCodeService = new CodeEvidenceService(
   projectRepository,
   new FileCodeEvidenceRepository(work),

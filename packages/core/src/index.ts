@@ -29,6 +29,8 @@ export * from "./setup/apply.js";
 export * from "./projects/service.js";
 export * from "./tasks/service.js";
 export * from "./queues/projections.js";
+export * from "./runs/service.js";
+export * from "./runs/log-capture.js";
 export * from "./work/file-repository.js";
 export * from "./external-pm/service.js";
 export * from "./policy/enforcement.js";
