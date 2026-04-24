@@ -17,6 +17,7 @@ Source documents:
 - `docs/brainstorms/2026-04-24-agent-os-full-product-delivery-requirements.md`
 - `docs/plans/2026-04-24-agent-os-system-design-plan.md`
 - `docs/spikes/agent-os-validation.md`
+- `docs/research/2026-04-24-cross-os-adapter-setup-research.md`
 
 ## Shipping Definition
 
@@ -46,7 +47,7 @@ Status after the 2026-04-24 alpha bootstrap and product-surface implementation p
 | M3 code intelligence | Alpha model complete | persistent index snapshot, file state, create/update/delete/rename, exact/path/import/symbol/semantic search explanations, stale detection, and Tree-sitter/Zoekt/LanceDB certification contracts exist; real external binaries still not invoked |
 | M4 markdown memory | Alpha model complete | markdown directory import, caller L0 IDs, update/delete/tombstones, provenance, query explanations, graph separation, and LightRAG certification contract exist; no persistent LightRAG process/socket yet |
 | M5 worktree delivery | Alpha model complete | worktree allocation, artifact attachment, review queue/findings, merge queue/apply/block, conflict artifacts, and dirty cleanup refusal exist via injectable git provider; no real git command adapter yet |
-| M6 sidecar/profile supervisor | Alpha dry-run complete | setup planner and CLI dry-run model dependency plans, health checks, uninstall, cross-OS strategy, and certification gates for core/code/memory/actions/full; real downloads/install execution still missing |
+| M6 sidecar/profile supervisor | Alpha dry-run complete, design corrected | setup planner and CLI dry-run model dependency plans, health checks, uninstall, cross-OS strategy, and certification gates for core/code/memory/actions/full; real managed install execution and doctor-guided dependency setup still missing |
 | M7 actions/Windmill | Contract stub only | action boundary documented/tested; no Windmill runtime |
 | M8 Plane adapter | Not implemented | optional adapter docs only |
 | M9 packaging/security/RC | Partial | smoke/doctor/backup/export/uninstall exist; release packaging, privacy/security gates, signed artifacts, and real clean-machine OS matrix still planned |
@@ -77,6 +78,7 @@ Status after the 2026-04-24 alpha bootstrap and product-surface implementation p
 | AST/symbols | Tree-sitter | incremental parsing and syntax chunks | language-specific simple parsers |
 | Semantic/hybrid retrieval | LanceDB | embedded vector/full-text/hybrid path | SQLite FTS5 + sqlite-vec |
 | Memory graph RAG | LightRAG | graph RAG fit for markdown memory | custom memory pipeline over SQLite/LanceDB |
+| Memory provider contract | OpenAI-compatible endpoint contract with presets | avoids locking memory to Ollama or any one local runner | provider-specific adapters only after generic contract |
 | Telemetry vocabulary | OpenTelemetry semantics | standard naming without backend dependency | local event names only |
 
 ### Planning Assumptions That Replace Deferred Blockers
@@ -86,6 +88,7 @@ Status after the 2026-04-24 alpha bootstrap and product-surface implementation p
 | Local DB and migrations | Use SQLite WAL with Rust-managed migrations. Start with `rusqlite` unless `sqlx` becomes necessary for async query ergonomics. | M0 migration tests and backup/restore smoke |
 | LanceDB binding maturity | Treat LanceDB as adapter behind `CodeSemanticStore`; allow Rust sidecar/CLI bridge or TypeScript sidecar if native Rust path is weak. | M3 adapter certification chooses native or sidecar path |
 | LightRAG update/delete/provenance | Treat LightRAG as supervised Python sidecar with explicit source IDs and delete/update wrapper. | M4 provenance and incremental delete tests |
+| Memory LLM/embedding provider | Treat provider as generic config: base URL, chat model, embedding model, dimensions, and API key env. Ollama is a preset only. | M4 doctor must prove embedding + chat endpoints and lock embedding dimensions before indexing |
 | Plane/Windmill footprint | Keep both out of default profile until measured on a clean local machine. | M6/M7/M8 clean-machine profile gates |
 | Secret scanning | Use layered denylist: ignore rules, binary/large-file skip, common token detector, allowlist file. | M3/M4/M9 security tests |
 
@@ -136,6 +139,112 @@ Research audit status:
 Default install: `core`.
 
 Default development target: `core` + `code` + markdown memory import.
+
+## Setup And Doctor Model
+
+Setup is not one locked path for every dependency. `doctor` is the authority for readiness, and `install` only performs safe, reversible managed setup.
+
+Dependency states:
+
+| State | Meaning | Product behavior |
+|---|---|---|
+| `managed` | Fulcrum can install/provision safely under `$FULCRUM_HOME`. | `setup install` creates assets and writes receipts. |
+| `detected` | Compatible host dependency already exists. | `doctor` records path/version and uses it. |
+| `guided` | Dependency is large, privileged, OS-specific, or user-preference-heavy. | `doctor` prints exact install and verify steps; `install` does not force it. |
+| `optional` | Needed only for selected profile/capability. | Missing dependency is a warning unless that profile requires it. |
+| `blocked` | Required for selected profile and neither managed nor detected. | `doctor` fails with actionable steps. |
+
+Commands:
+
+```bash
+fulcrum setup plan core
+fulcrum setup install core
+fulcrum setup doctor core
+
+fulcrum setup install code
+fulcrum setup doctor code
+
+fulcrum setup provider configure --kind openai-compatible --base-url http://127.0.0.1:11434/v1 --chat-model qwen3:8b --embedding-model embeddinggemma --embedding-dimensions 768
+fulcrum setup install memory
+fulcrum setup doctor memory
+```
+
+`setup plan` is preview only. `setup install` must mutate or verify real assets. `setup doctor` must prove functionality and print guided fixes for anything missing.
+
+### What Fulcrum Should Install Automatically
+
+| Area | Installed by `setup install` | Reason |
+|---|---|---|
+| Core | directories, config, SQLite DB, manifest/log dirs | owned local state |
+| Parser assets | parser manifest and bundled parser smoke fixtures | safe and reversible |
+| LanceDB | local index directory and embedded-store smoke | embedded local dependency |
+| Zoekt | Fulcrum-pinned binary bundle when available; otherwise detect/guided fallback | avoids requiring Go for normal users |
+| uv | detect host uv first; managed uv only with opt-in or packaged asset | avoids unexpected package-manager mutation |
+| LightRAG | uv project/env under `$FULCRUM_HOME/sidecars/lightrag` once uv path exists | owned sidecar env |
+| Windmill/Plane config | compose files/env under `$FULCRUM_HOME/sidecars` | config is owned; Docker runtime remains guided |
+
+### What Doctor Should Detect And Guide
+
+| Area | Doctor behavior |
+|---|---|
+| Memory provider | verify generic LLM endpoint and embedding endpoint; fail if missing |
+| Ollama / LM Studio / vLLM / llama.cpp / LocalAI | offer presets, never require one product |
+| Docker / Docker Desktop | detect and guide; only required for `actions` / `full` sidecars |
+| Go toolchain | only required for explicit Zoekt build-from-source fallback |
+| Host Python | fallback only; uv-managed Python preferred for LightRAG env |
+
+Provider config is generic:
+
+```toml
+[memory.provider]
+kind = "openai-compatible"
+base_url = "http://127.0.0.1:11434/v1"
+api_key_env = "FULCRUM_LLM_API_KEY"
+chat_model = "qwen3:8b"
+embedding_model = "embeddinggemma"
+embedding_dimensions = 768
+```
+
+Ollama is a preset that fills this shape. It is not a required dependency.
+
+Doctor output for a missing memory provider should be explicit:
+
+```text
+dependency=memory-provider status=blocked
+why=LightRAG needs both LLM and embedding endpoints for extraction/query.
+presets=ollama-local,lmstudio-local,vllm-local,llama-cpp-local,localai,openai-compatible
+fix=fulcrum setup provider configure --kind openai-compatible --base-url <url> --chat-model <model> --embedding-model <model> --embedding-dimensions <n>
+```
+
+### Human Quick Setup Path
+
+```bash
+fulcrum init
+fulcrum setup install core
+fulcrum setup doctor core
+
+fulcrum setup install code
+fulcrum setup doctor code
+
+# For memory, pick any compatible local or remote provider.
+fulcrum setup provider configure --kind openai-compatible --base-url http://127.0.0.1:11434/v1 --chat-model qwen3:8b --embedding-model embeddinggemma --embedding-dimensions 768
+fulcrum setup install memory
+fulcrum setup doctor memory
+```
+
+### Agent Quick Setup Path
+
+Agents should run setup in reportable, non-interactive mode:
+
+```bash
+fulcrum setup install core --json
+fulcrum setup doctor core --json
+fulcrum setup install code --json
+fulcrum setup doctor code --json
+fulcrum setup doctor memory --json
+```
+
+If `doctor memory` returns `blocked` for provider config, agents should stop and report exact missing fields instead of guessing a provider.
 
 ## Data And Ownership Model
 
