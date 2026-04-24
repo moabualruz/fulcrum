@@ -25,6 +25,7 @@ Required outcome:
 - LightRAG official README: https://github.com/HKUDS/LightRAG
 - Docker Compose official install docs: https://docs.docker.com/compose/install/
 - Ollama official docs: https://docs.ollama.com/capabilities/embeddings and https://docs.ollama.com/api/openai-compatibility
+- Model defaults and provider tiers: `docs/research/2026-04-24-model-recommendations.md`
 
 ## Core Setup Decision
 
@@ -346,6 +347,13 @@ POST embedding request with configured embedding_model
 POST chat/completion request with configured chat_model
 verify same embedding model recorded in setup-lock.toml as index uses
 ```
+
+Recommended model tiers live in `docs/research/2026-04-24-model-recommendations.md`. The setup implementation should expose them in `doctor` and provider presets:
+
+- normal local: `Qwen3-Embedding-0.6B`, `Qwen3-Reranker-0.6B`, `Qwen3-14B`
+- high local: Qwen3 4B/8B embedding and reranking, Qwen3 30B-A3B/32B chat
+- remote opt-in: Codestral Embed / voyage-code-3 for code, Gemini/OpenAI embeddings for general, Cohere rerank, GPT-5/GPT-5.5 for chat
+- low-resource fallback: `embeddinggemma` or `all-minilm`, plus `Qwen3-8B`
 
 Ollama preset doctor can additionally check:
 

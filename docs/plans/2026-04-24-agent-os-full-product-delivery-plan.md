@@ -18,6 +18,7 @@ Source documents:
 - `docs/plans/2026-04-24-agent-os-system-design-plan.md`
 - `docs/spikes/agent-os-validation.md`
 - `docs/research/2026-04-24-cross-os-adapter-setup-research.md`
+- `docs/research/2026-04-24-model-recommendations.md`
 
 ## Shipping Definition
 
@@ -79,6 +80,7 @@ Status after the 2026-04-24 alpha bootstrap and product-surface implementation p
 | Semantic/hybrid retrieval | LanceDB | embedded vector/full-text/hybrid path | SQLite FTS5 + sqlite-vec |
 | Memory graph RAG | LightRAG | graph RAG fit for markdown memory | custom memory pipeline over SQLite/LanceDB |
 | Memory provider contract | OpenAI-compatible endpoint contract with presets | avoids locking memory to Ollama or any one local runner | provider-specific adapters only after generic contract |
+| Recommended local model tier | Qwen3 embedding/reranking/chat family | strong open local defaults across memory, code, rerank, and chat without remote dependency | embeddinggemma/all-minilm low-resource fallback; remote opt-in models for quality |
 | Telemetry vocabulary | OpenTelemetry semantics | standard naming without backend dependency | local event names only |
 
 ### Planning Assumptions That Replace Deferred Blockers
@@ -89,6 +91,7 @@ Status after the 2026-04-24 alpha bootstrap and product-surface implementation p
 | LanceDB binding maturity | Treat LanceDB as adapter behind `CodeSemanticStore`; allow Rust sidecar/CLI bridge or TypeScript sidecar if native Rust path is weak. | M3 adapter certification chooses native or sidecar path |
 | LightRAG update/delete/provenance | Treat LightRAG as supervised Python sidecar with explicit source IDs and delete/update wrapper. | M4 provenance and incremental delete tests |
 | Memory LLM/embedding provider | Treat provider as generic config: base URL, chat model, embedding model, dimensions, and API key env. Ollama is a preset only. | M4 doctor must prove embedding + chat endpoints and lock embedding dimensions before indexing |
+| Model recommendations | Normal local tier is `Qwen3-Embedding-0.6B`, `Qwen3-Reranker-0.6B`, and `Qwen3-14B`; high local tier is Qwen3 4B/8B embeddings/rerankers and Qwen3 30B-A3B/32B chat; remote opt-in covers Codestral Embed, voyage-code-3, Gemini/OpenAI embeddings, Cohere rerank, GPT-5/GPT-5.5. | M4/M3 doctor must display selected model tier, dimensions, privacy status, and rebuild warning on dimension drift |
 | Plane/Windmill footprint | Keep both out of default profile until measured on a clean local machine. | M6/M7/M8 clean-machine profile gates |
 | Secret scanning | Use layered denylist: ignore rules, binary/large-file skip, common token detector, allowlist file. | M3/M4/M9 security tests |
 
@@ -206,6 +209,17 @@ embedding_dimensions = 768
 ```
 
 Ollama is a preset that fills this shape. It is not a required dependency.
+
+Recommended model tiers:
+
+| Tier | Embeddings | Reranker | Chat/extraction |
+|---|---|---|---|
+| Normal local | `Qwen3-Embedding-0.6B` | `Qwen3-Reranker-0.6B` or `BAAI/bge-reranker-v2-m3` | `Qwen3-14B`, with `Qwen3-8B` fallback |
+| High local | `Qwen3-Embedding-4B/8B` | `Qwen3-Reranker-4B` | `Qwen3-30B-A3B` or `Qwen3-32B` |
+| Remote opt-in code | `Codestral Embed` or `voyage-code-3` | Cohere `rerank-v4.0-fast/pro` | `gpt-5`, `gpt-5.5` when API is available |
+| Low resource | `all-minilm` or `embeddinggemma` fallback | none or `bge-reranker-v2-m3` if available | `Qwen3-8B` |
+
+Doctor must block silent embedding drift. If an index exists with different dimensions or model, user must rebuild vectors.
 
 Doctor output for a missing memory provider should be explicit:
 

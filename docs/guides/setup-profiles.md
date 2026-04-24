@@ -125,6 +125,42 @@ Supported presets should include:
 
 Ollama is only a preset. It is not required.
 
+## Recommended Models
+
+Normal local default:
+
+| Use | Model |
+|---|---|
+| Embeddings | `Qwen3-Embedding-0.6B` |
+| Reranking | `Qwen3-Reranker-0.6B` or `BAAI/bge-reranker-v2-m3` |
+| Chat/extraction | `Qwen3-14B`, with `Qwen3-8B` fallback |
+
+High-quality local workstation:
+
+| Use | Model |
+|---|---|
+| Embeddings | `Qwen3-Embedding-4B` or `Qwen3-Embedding-8B` |
+| Reranking | `Qwen3-Reranker-4B` |
+| Chat/extraction | `Qwen3-30B-A3B` or `Qwen3-32B` |
+
+Remote opt-in quality:
+
+| Use | Model |
+|---|---|
+| Code embeddings | `Codestral Embed` or `voyage-code-3` |
+| General embeddings | `gemini-embedding-001` or `text-embedding-3-large` |
+| Reranking | Cohere `rerank-v4.0-fast` or `rerank-v4.0-pro` |
+| Agent/chat | `gpt-5`, or `gpt-5.5` when API is available |
+
+Low-resource fallback:
+
+| Use | Model |
+|---|---|
+| Embeddings | `embeddinggemma` or `all-minilm` |
+| Chat | `Qwen3-8B` |
+
+`doctor` must verify embedding vector length equals configured `embedding_dimensions`. If dimensions or model change after indexing, doctor should block and request vector rebuild.
+
 ## Cross-OS Strategy
 
 Every dependency install, health, and uninstall step must expose Linux, macOS, and Windows strategy text. The strategy can differ by path conventions and runtime manager:
