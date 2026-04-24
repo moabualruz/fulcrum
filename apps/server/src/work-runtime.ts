@@ -1,16 +1,18 @@
 import path from "node:path";
 import {
-  ContextPackBuilder,
-  FileContextPackRepository,
   CodeEvidenceService,
   FileCodeEvidenceRepository,
+  FileMemoryRepository,
   FileProjectRepository,
-  FileRunRepository,
+  FileContextPackRepository,
   FileExternalWorkItemMirrorRepository,
+  FileRunRepository,
   FileTaskRepository,
   FileWorkRepository,
+  ContextPackBuilder,
   ExternalPmService,
   LocalTaskService,
+  MemoryService,
   ProjectRegistryService,
   RunLifecycleService,
   resolveSetupPaths
@@ -31,6 +33,12 @@ export const serverProjectService = new ProjectRegistryService(
   serverTaskService
 );
 export const serverRunService = new RunLifecycleService(runRepository, taskRepository);
+export const serverMemoryService = new MemoryService(new FileMemoryRepository(work));
+export const serverContextBuilder = new ContextPackBuilder(
+  new FileContextPackRepository(work),
+  taskRepository,
+  projectRepository
+);
 export const serverCodeService = new CodeEvidenceService(
   projectRepository,
   new FileCodeEvidenceRepository(work),
@@ -38,11 +46,6 @@ export const serverCodeService = new CodeEvidenceService(
     search: (options) => searchExact(options)
   },
   searchSemantic
-);
-export const serverContextBuilder = new ContextPackBuilder(
-  new FileContextPackRepository(work),
-  taskRepository,
-  projectRepository
 );
 const planeAdapter =
   process.env.FULCRUM_PLANE_BASE_URL && process.env.FULCRUM_PLANE_TOKEN

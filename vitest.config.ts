@@ -14,6 +14,7 @@ export default defineConfig({
       "@fulcrum/core": "/packages/core/src/index.ts",
       "@fulcrum/db": "/packages/db/src/index.ts",
       "@fulcrum/agents": "/packages/agents/src/index.ts",
+      "@fulcrum/memory": "/packages/memory/src/index.ts",
       "@fulcrum/mcp": "/packages/mcp/src/index.ts",
       "@fulcrum/plane": "/packages/plane/src/index.ts",
       "@fulcrum/policy": "/packages/policy/src/index.ts"

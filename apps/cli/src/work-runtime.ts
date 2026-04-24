@@ -1,16 +1,18 @@
 import path from "node:path";
 import {
-  ContextPackBuilder,
-  FileContextPackRepository,
   CodeEvidenceService,
   FileCodeEvidenceRepository,
+  FileMemoryRepository,
   FileProjectRepository,
-  FileRunRepository,
+  FileContextPackRepository,
   FileExternalWorkItemMirrorRepository,
+  FileRunRepository,
   FileTaskRepository,
   FileWorkRepository,
+  ContextPackBuilder,
   ExternalPmService,
   LocalTaskService,
+  MemoryService,
   ProjectRegistryService,
   RunLifecycleService,
   resolveSetupPaths
@@ -27,12 +29,13 @@ const runRepository = new FileRunRepository(work);
 
 export const taskService = new LocalTaskService(taskRepository);
 export const projectService = new ProjectRegistryService(projectRepository, taskService);
+export const runService = new RunLifecycleService(runRepository, taskRepository);
 export const contextBuilder = new ContextPackBuilder(
   new FileContextPackRepository(work),
   taskRepository,
   projectRepository
 );
-export const runService = new RunLifecycleService(runRepository, taskRepository);
+export const memoryService = new MemoryService(new FileMemoryRepository(work));
 export const codeService = new CodeEvidenceService(
   projectRepository,
   new FileCodeEvidenceRepository(work),

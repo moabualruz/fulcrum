@@ -13,12 +13,13 @@ import { MemoryPolicyDecisionRepository, MemoryPolicyEventRepository } from "./p
 import { registerDoctorRoutes } from "./routes/doctor.js";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
 import { registerProjectRoutes } from "./routes/projects.js";
-import { registerPolicyRoutes } from "./routes/policy.js";
 import { registerCodeRoutes } from "./routes/code.js";
+import { registerMemoryRoutes } from "./routes/memory.js";
 import { registerContextPackRoutes } from "./routes/context-packs.js";
+import { registerPolicyRoutes } from "./routes/policy.js";
+import { registerQueueRoutes } from "./routes/queues.js";
 import { registerActivityRoutes } from "./routes/activity.js";
 import { registerRunRoutes } from "./routes/runs.js";
-import { registerQueueRoutes } from "./routes/queues.js";
 import { registerExternalPmRoutes } from "./routes/external-pm.js";
 import { registerSetupRoutes } from "./routes/setup.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
@@ -27,6 +28,7 @@ import {
   serverExternalPmService,
   serverCodeService,
   serverContextBuilder,
+  serverMemoryService,
   serverProjectService,
   serverRunService,
   serverTaskService
@@ -50,9 +52,10 @@ registerTaskRoutes(app, serverTaskService);
 registerQueueRoutes(app, serverProjectService, serverTaskService);
 registerRunRoutes(app, serverRunService);
 registerActivityRoutes(app, serverRunService);
+registerMemoryRoutes(app, serverMemoryService);
 registerCodeRoutes(app, serverCodeService);
-registerContextPackRoutes(app, serverContextBuilder);
 registerExternalPmRoutes(app, serverExternalPmService);
+registerContextPackRoutes(app, serverContextBuilder);
 registerArtifactRoutes(
   app,
   new ArtifactService(new MemoryArtifactRepository(), new LocalArtifactStorage(paths.artifactRoot))

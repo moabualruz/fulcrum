@@ -91,7 +91,8 @@ export const PolicyDecisionStatusSchema = z.enum([
   "allowed",
   "denied",
   "approval_required",
-  "approved"
+  "approved",
+  "exception_recorded"
 ]);
 
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;

@@ -2,5 +2,5 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "composite": true, "outDir": "dist", "rootDir": "src" },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../shared" }, { "path": "../policy" }]
+  "references": [{ "path": "../shared" }, { "path": "../policy" }, { "path": "../memory" }]
 }

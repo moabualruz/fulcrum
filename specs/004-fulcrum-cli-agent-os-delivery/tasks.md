@@ -138,20 +138,20 @@
 
 ### Tests And Validation for User Story 5
 
-- [ ] T076 [P] [US5] Add context pack schema contract tests in `tests/contract/context-pack.test.ts`
-- [ ] T077 [P] [US5] Add offline context build integration test in `tests/integration/context-build-offline.test.ts`
-- [ ] T078 [P] [US5] Add provenance and omitted-lane validation test in `tests/integration/context-provenance.test.ts`
-- [ ] T079 [P] [US5] Add degraded memory/code lane test in `tests/integration/context-degraded-lanes.test.ts`
+- [x] T076 [P] [US5] Add context pack schema contract tests in `tests/contract/context-pack.test.ts`
+- [x] T077 [P] [US5] Add offline context build integration test in `tests/integration/context-build-offline.test.ts`
+- [x] T078 [P] [US5] Add provenance and omitted-lane validation test in `tests/integration/context-provenance.test.ts`
+- [x] T079 [P] [US5] Add degraded memory/code lane test in `tests/integration/context-degraded-lanes.test.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T080 [US5] Implement context pack builder and lane budget allocator in `packages/core/src/context/builder.ts`
-- [ ] T081 [US5] Implement context item ranking that prioritizes exact/path/structural evidence in `packages/core/src/context/ranking.ts`
-- [ ] T082 [US5] Implement context repositories in `packages/db/src/context-packs.ts`
-- [ ] T083 [US5] Implement context CLI command in `apps/cli/src/commands/context.ts`
-- [ ] T084 [US5] Implement context API routes in `apps/server/src/routes/context-packs.ts`
-- [ ] T085 [US5] Implement cockpit context evidence view in `apps/cockpit/src/routes/context-pack.tsx`
-- [ ] T086 [US5] Implement context exports for markdown, JSON, prompt file, and MCP resource in `packages/core/src/context/export.ts`
+- [x] T080 [US5] Implement context pack builder and lane budget allocator in `packages/core/src/context/builder.ts`
+- [x] T081 [US5] Implement context item ranking that prioritizes exact/path/structural evidence in `packages/core/src/context/ranking.ts`
+- [x] T082 [US5] Implement context repositories in `packages/db/src/context-packs.ts`
+- [x] T083 [US5] Implement context CLI command in `apps/cli/src/commands/context.ts`
+- [x] T084 [US5] Implement context API routes in `apps/server/src/routes/context-packs.ts`
+- [x] T085 [US5] Implement cockpit context evidence view in `apps/cockpit/src/routes/context-pack.tsx`
+- [x] T086 [US5] Implement context exports for markdown, JSON, prompt file, and MCP resource in `packages/core/src/context/export.ts`
 
 ## Phase 7: User Story 6 - Search Code With Provenance (Priority: P1)
 
@@ -184,20 +184,20 @@
 
 ### Tests And Validation for User Story 7
 
-- [ ] T098 [P] [US7] Add memory entry contract tests in `tests/contract/memory.test.ts`
-- [ ] T099 [P] [US7] Add markdown, memsearch, and Engram memory import/search integration tests in `tests/integration/memory-backends.test.ts`
-- [ ] T100 [P] [US7] Add permanent memory policy approval test in `tests/policy/memory-approval.test.ts`
-- [ ] T101 [P] [US7] Add memory stale-link recovery test in `tests/recovery/memory-stale-links.test.ts`
+- [x] T098 [P] [US7] Add memory entry contract tests in `tests/contract/memory.test.ts`
+- [x] T099 [P] [US7] Add markdown, memsearch, and Engram memory import/search integration tests in `tests/integration/memory-backends.test.ts`
+- [x] T100 [P] [US7] Add permanent memory policy approval test in `tests/policy/memory-approval.test.ts`
+- [x] T101 [P] [US7] Add memory stale-link recovery test in `tests/recovery/memory-stale-links.test.ts`
 
 ### Implementation for User Story 7
 
-- [ ] T102 [US7] Implement markdown, memsearch, and Engram memory adapters in `packages/memory/src/markdown-adapter.ts`, `packages/memory/src/memsearch-adapter.ts`, and `packages/memory/src/engram-adapter.ts`
-- [ ] T103 [US7] Implement memory service for backend selection, import, search, draft, approve, stale mark, and export in `packages/core/src/memory/service.ts`
-- [ ] T104 [US7] Implement memory repository in `packages/db/src/memory.ts`
-- [ ] T105 [US7] Implement memory CLI commands in `apps/cli/src/commands/memory.ts`
-- [ ] T106 [US7] Implement memory API routes in `apps/server/src/routes/memory.ts`
-- [ ] T107 [US7] Implement cockpit memory draft and source provenance components in `apps/cockpit/src/routes/memory.tsx`
-- [ ] T108 [US7] Implement memory export with provenance and redaction status in `packages/core/src/memory/export.ts`
+- [x] T102 [US7] Implement markdown, memsearch, and Engram memory adapters in `packages/memory/src/markdown-adapter.ts`, `packages/memory/src/memsearch-adapter.ts`, and `packages/memory/src/engram-adapter.ts`
+- [x] T103 [US7] Implement memory service for backend selection, import, search, draft, approve, stale mark, and export in `packages/core/src/memory/service.ts`
+- [x] T104 [US7] Implement memory repository in `packages/db/src/memory.ts`
+- [x] T105 [US7] Implement memory CLI commands in `apps/cli/src/commands/memory.ts`
+- [x] T106 [US7] Implement memory API routes in `apps/server/src/routes/memory.ts`
+- [x] T107 [US7] Implement cockpit memory draft and source provenance components in `apps/cockpit/src/routes/memory.tsx`
+- [x] T108 [US7] Implement memory export with provenance and redaction status in `packages/core/src/memory/export.ts`
 
 ## Phase 9: User Story 9 - Deliver Work Through Safe Worktrees (Priority: P1)
 

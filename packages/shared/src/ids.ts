@@ -19,6 +19,7 @@ export const idPrefixes = [
   "gate",
   "adapter",
   "mirror",
+  "draft",
   "preview"
 ] as const;
 

@@ -87,6 +87,9 @@ importers:
       '@fulcrum/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@fulcrum/plane':
+        specifier: workspace:*
+        version: link:../../packages/plane
       '@fulcrum/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -131,6 +134,9 @@ importers:
       '@fulcrum/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
+      '@fulcrum/plane':
+        specifier: workspace:*
+        version: link:../../packages/plane
       '@hono/node-server':
         specifier: ^1.14.0
         version: 1.19.14(hono@4.12.15)
@@ -175,13 +181,33 @@ importers:
         version: 5.9.3
 
   packages/core:
+    dependencies:
+      '@fulcrum/memory':
+        specifier: workspace:*
+        version: link:../memory
+      '@fulcrum/policy':
+        specifier: workspace:*
+        version: link:../policy
+      '@fulcrum/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       typescript:
         specifier: ^5.8.2
         version: 5.9.3
 
   packages/db:
+    dependencies:
+      '@fulcrum/shared':
+        specifier: workspace:*
+        version: link:../shared
+      better-sqlite3:
+        specifier: ^11.9.1
+        version: 11.10.0
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       typescript:
         specifier: ^5.8.2
         version: 5.9.3
@@ -193,12 +219,23 @@ importers:
         version: 5.9.3
 
   packages/memory:
+    dependencies:
+      '@fulcrum/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       typescript:
         specifier: ^5.8.2
         version: 5.9.3
 
   packages/plane:
+    dependencies:
+      '@fulcrum/core':
+        specifier: workspace:*
+        version: link:../core
+      '@fulcrum/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       typescript:
         specifier: ^5.8.2
@@ -211,6 +248,10 @@ importers:
         version: 5.9.3
 
   packages/shared:
+    dependencies:
+      zod:
+        specifier: ^3.24.2
+        version: 3.25.76
     devDependencies:
       typescript:
         specifier: ^5.8.2

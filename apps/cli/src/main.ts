@@ -20,6 +20,14 @@ import {
 } from "./commands/artifact.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { codeCleanupStaleCommand, codeSearchCommand } from "./commands/code.js";
+import {
+  buildContextCommand,
+  explainContextCommand,
+  exportContextCommand,
+  showContextCommand,
+  writeContextExport
+} from "./commands/context.js";
+import { approveMemoryCommand, draftMemoryCommand } from "./commands/memory.js";
 import { listProjectsCommand, registerProjectCommand } from "./commands/project.js";
 import {
   cancelRunCommand,
@@ -43,7 +51,9 @@ import { formatRedactionStatus } from "./output/redaction.js";
 import { createCliSetupPorts } from "./runtime.js";
 import {
   codeService,
+  contextBuilder,
   externalPmService,
+  memoryService,
   projectService,
   runService,
   taskService
@@ -284,62 +294,6 @@ taskCommand.command("transition <taskId> <status>").action((taskId, status) => {
   );
 });
 
-const codeCommand = program.command("code").description("Search local code evidence");
-
-codeCommand
-  .command("search <query>")
-  .requiredOption("--project <projectId>")
-  .option("--limit <limit>")
-  .option("--semantic", "include semantic degraded state")
-  .action(async (query, options) => {
-    const data = await codeSearchCommand(codeService, {
-      projectId: options.project,
-      query,
-      limit: options.limit ? Number(options.limit) : undefined,
-      semantic: Boolean(options.semantic)
-    });
-    console.log(
-      program.opts().json
-        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
-        : `${data.count} code evidence results`
-    );
-  });
-
-codeCommand
-  .command("files <pattern>")
-  .requiredOption("--project <projectId>")
-  .action(async (pattern, options) => {
-    const data = await codeSearchCommand(codeService, {
-      projectId: options.project,
-      query: pattern,
-      limit: 50
-    });
-    const fileResults = data.evidence.filter((item) =>
-      ["path", "filename"].includes(item.evidenceType)
-    );
-    console.log(
-      program.opts().json
-        ? JSON.stringify(
-            { schemaVersion: "1.0", status: "ok", data: { ...data, evidence: fileResults } },
-            null,
-            2
-          )
-        : `${fileResults.length} files`
-    );
-  });
-
-codeCommand
-  .command("cleanup-stale")
-  .requiredOption("--project <projectId>")
-  .action((options) => {
-    const data = codeCleanupStaleCommand(codeService, options.project);
-    console.log(
-      program.opts().json
-        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
-        : `${data.length} stale evidence records`
-    );
-  });
-
 const runCommand = program.command("run").description("Start, inspect, cancel, and tail runs");
 
 runCommand
@@ -385,6 +339,125 @@ runCommand.command("tail <runId>").action((runId) => {
           .join("\n")
   );
 });
+
+const memoryCommand = program
+  .command("memory")
+  .description("Import, search, approve, stale, and export local memory");
+
+memoryCommand
+  .command("import <path>")
+  .requiredOption("--project <projectId>")
+  .option("--backend <backend>")
+  .action(async (memoryPath, options) => {
+    const data = await memoryService.import({
+      projectId: options.project,
+      path: memoryPath,
+      backend: options.backend
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.length} memory entries imported`
+    );
+  });
+
+memoryCommand
+  .command("search <query>")
+  .requiredOption("--project <projectId>")
+  .option("--backend <backend>")
+  .option("--limit <limit>")
+  .action(async (query, options) => {
+    const data = await memoryService.search({
+      projectId: options.project,
+      query,
+      backend: options.backend,
+      limit: options.limit ? Number(options.limit) : undefined
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.length} memory results`
+    );
+  });
+
+memoryCommand
+  .command("add")
+  .requiredOption("--project <projectId>")
+  .requiredOption("--title <title>")
+  .requiredOption("--body <body>")
+  .option("--source <sourceUri>")
+  .option("--task <taskId>")
+  .option("--run <runId>")
+  .action((options) => {
+    const data = draftMemoryCommand(memoryService, {
+      projectId: options.project,
+      title: options.title,
+      body: options.body,
+      sourceUri: options.source,
+      taskId: options.task,
+      runId: options.run
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify(
+            {
+              schemaVersion: "1.0",
+              status: "ok",
+              data,
+              policyDecisionIds: [data.policyDecision.policyDecisionId]
+            },
+            null,
+            2
+          )
+        : data.policyDecision.status
+    );
+  });
+
+memoryCommand
+  .command("approve <memoryId>")
+  .requiredOption("--policy-decision <policyDecisionId>")
+  .action((memoryId, options) => {
+    const data = approveMemoryCommand(memoryService, memoryId, {
+      policyDecisionId: options.policyDecision
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify(
+            { schemaVersion: "1.0", status: data.entry ? "ok" : "error", data },
+            null,
+            2
+          )
+        : data.policyDecision.status
+    );
+  });
+
+memoryCommand
+  .command("stale <memoryId>")
+  .option("--reason <reason>")
+  .action((memoryId, options) => {
+    const data = memoryService.markStale(memoryId, options.reason);
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.status
+    );
+  });
+
+memoryCommand
+  .command("export")
+  .requiredOption("--project <projectId>")
+  .action((options) => {
+    const data = memoryService.export(options.project);
+    console.log(
+      program.opts().json
+        ? JSON.stringify(
+            { schemaVersion: "1.0", status: "ok", data, redactionStatus: data.redactionStatus },
+            null,
+            2
+          )
+        : `${data.entries.length} memory entries exported`
+    );
+  });
 
 const planeCommand = program
   .command("plane")
@@ -518,6 +591,148 @@ planeCommand
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
         : "Plane mirroring disabled"
+    );
+  });
+
+const codeCommand = program.command("code").description("Search local code evidence");
+
+codeCommand
+  .command("search <query>")
+  .requiredOption("--project <projectId>")
+  .option("--limit <limit>")
+  .option("--semantic", "include semantic degraded state")
+  .action(async (query, options) => {
+    const data = await codeSearchCommand(codeService, {
+      projectId: options.project,
+      query,
+      limit: options.limit ? Number(options.limit) : undefined,
+      semantic: Boolean(options.semantic)
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.count} code evidence results`
+    );
+  });
+
+codeCommand
+  .command("files <pattern>")
+  .requiredOption("--project <projectId>")
+  .action(async (pattern, options) => {
+    const data = await codeSearchCommand(codeService, {
+      projectId: options.project,
+      query: pattern,
+      limit: 50
+    });
+    const fileResults = data.evidence.filter((item) =>
+      ["path", "filename"].includes(item.evidenceType)
+    );
+    console.log(
+      program.opts().json
+        ? JSON.stringify(
+            { schemaVersion: "1.0", status: "ok", data: { ...data, evidence: fileResults } },
+            null,
+            2
+          )
+        : `${fileResults.length} files`
+    );
+  });
+
+codeCommand
+  .command("cleanup-stale")
+  .requiredOption("--project <projectId>")
+  .action((options) => {
+    const data = codeCleanupStaleCommand(codeService, options.project);
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.length} stale evidence records`
+    );
+  });
+
+const contextCommand = program
+  .command("context")
+  .description("Build, show, explain, and export context packs");
+
+contextCommand
+  .command("build <taskId>")
+  .option("--budget <budget>")
+  .option("--lane <lane...>")
+  .option("--offline")
+  .option("--memory-degraded")
+  .option("--code-degraded")
+  .option("--format <format>")
+  .option("--output <path>")
+  .action((taskId, options) => {
+    const data = buildContextCommand(contextBuilder, {
+      taskId,
+      budget: options.budget ? Number(options.budget) : undefined,
+      lanes: options.lane,
+      offline: Boolean(options.offline),
+      memoryAvailable: options.memoryDegraded ? false : undefined,
+      codeAvailable: options.codeDegraded ? false : undefined
+    });
+    const format = options.format as "markdown" | "json" | "prompt" | "mcp" | undefined;
+    if (format && !program.opts().json) {
+      const content = exportContextCommand(contextBuilder, data.pack.contextPackId, format) ?? "";
+      const written = options.output ? writeContextExport(options.output, content) : undefined;
+      console.log(written ? `${written.outputPath} (${written.bytes} bytes)` : content);
+      return;
+    }
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : data.pack.contextPackId
+    );
+  });
+
+contextCommand.command("show <contextPackId>").action((contextPackId) => {
+  const data = showContextCommand(contextBuilder, contextPackId);
+  console.log(
+    program.opts().json
+      ? JSON.stringify(
+          { schemaVersion: SCHEMA_VERSION, status: data ? "ok" : "error", data },
+          null,
+          2
+        )
+      : (data?.pack.contextPackId ?? "Context pack not found")
+  );
+});
+
+contextCommand.command("explain <contextPackId>").action((contextPackId) => {
+  const data = explainContextCommand(contextBuilder, contextPackId);
+  console.log(
+    program.opts().json
+      ? JSON.stringify(
+          { schemaVersion: SCHEMA_VERSION, status: data ? "ok" : "error", data },
+          null,
+          2
+        )
+      : `${data?.items.length ?? 0} context items explained`
+  );
+});
+
+contextCommand
+  .command("export <contextPackId>")
+  .option("--format <format>", "markdown, json, prompt, or mcp", "markdown")
+  .option("--output <path>")
+  .action((contextPackId, options) => {
+    const data = exportContextCommand(contextBuilder, contextPackId, options.format);
+    const written = data && options.output ? writeContextExport(options.output, data) : undefined;
+    console.log(
+      program.opts().json
+        ? JSON.stringify(
+            {
+              schemaVersion: SCHEMA_VERSION,
+              status: data ? "ok" : "error",
+              data: written ?? data
+            },
+            null,
+            2
+          )
+        : written
+          ? `${written.outputPath} (${written.bytes} bytes)`
+          : (data ?? "Context pack not found")
     );
   });
 

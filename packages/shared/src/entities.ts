@@ -109,11 +109,78 @@ export const ContextPackSchema = BaseEntitySchema.extend({
   contextPackId: FulcrumIdSchema,
   projectId: FulcrumIdSchema,
   taskId: FulcrumIdSchema,
+  runId: FulcrumIdSchema.optional(),
   status: z.enum(["building", "ready", "degraded", "failed"]),
+  generatedAt: TimestampSchema.optional(),
   budget: z.number().int().positive(),
   budgetUsed: z.number().int().nonnegative(),
-  omissions: z.array(z.string()).default([]),
+  laneSummaries: z
+    .array(
+      z.object({
+        lane: z.string(),
+        included: z.number().int().nonnegative(),
+        budgetUsed: z.number().int().nonnegative(),
+        budgetLimit: z.number().int().nonnegative()
+      })
+    )
+    .default([]),
+  omissions: z
+    .array(
+      z.object({
+        lane: z.string(),
+        reason: z.string(),
+        omittedRef: SourceRefSchema.optional()
+      })
+    )
+    .default([]),
+  degradedLanes: z
+    .array(
+      z.object({
+        lane: z.string(),
+        cause: z.string(),
+        fallback: z.string().optional()
+      })
+    )
+    .default([]),
+  freshness: TimestampSchema.optional(),
+  exportRefs: z.array(SourceRefSchema).default([]),
+  policyDecisionIds: z.array(FulcrumIdSchema).default([]),
   redactionStatus: RedactionStatusSchema
+});
+
+export const ContextItemSchema = BaseEntitySchema.extend({
+  contextItemId: FulcrumIdSchema,
+  contextPackId: FulcrumIdSchema,
+  lane: z.string(),
+  type: z.string(),
+  sourceRef: SourceRefSchema,
+  title: z.string(),
+  excerptRef: z.string().optional(),
+  inclusionReason: z.string(),
+  freshness: TimestampSchema,
+  evidenceType: z.enum([
+    "task",
+    "memory",
+    "exact_code",
+    "path",
+    "structural",
+    "repo_map",
+    "recent_run",
+    "artifact",
+    "quality_gate",
+    "policy",
+    "operator_note",
+    "graph",
+    "semantic",
+    "fallback"
+  ]),
+  confidence: z.number().min(0).max(1).optional(),
+  limitation: z.string().optional(),
+  toolIdentity: z.string().optional(),
+  budgetEstimate: z.number().int().nonnegative(),
+  rank: z.number().int().nonnegative(),
+  redactionStatus: RedactionStatusSchema,
+  linkedRefs: z.array(SourceRefSchema).default([])
 });
 
 export const MemoryEntrySchema = BaseEntitySchema.extend({
@@ -122,8 +189,17 @@ export const MemoryEntrySchema = BaseEntitySchema.extend({
   status: MemoryStatusSchema,
   title: z.string(),
   bodyRef: z.string(),
-  sourceRefs: z.array(SourceRefSchema),
+  excerpt: z.string().optional(),
+  sourceRefs: z.array(SourceRefSchema).min(1),
+  linkedTaskIds: z.array(FulcrumIdSchema).default([]),
+  linkedRunIds: z.array(FulcrumIdSchema).default([]),
+  linkedFileRefs: z.array(SourceRefSchema).default([]),
+  linkedSymbolRefs: z.array(SourceRefSchema).default([]),
+  linkedArtifactIds: z.array(FulcrumIdSchema).default([]),
   backend: z.string(),
+  freshness: z.enum(["fresh", "stale", "needs_review"]).default("fresh"),
+  approvedBy: z.string().optional(),
+  exportStatus: z.enum(["not_exported", "exported", "blocked"]).default("not_exported"),
   redactionStatus: RedactionStatusSchema
 });
 
@@ -175,4 +251,7 @@ export type SetupState = z.infer<typeof SetupStateSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type ExternalWorkItemMirror = z.infer<typeof ExternalWorkItemMirrorSchema>;
 export type Run = z.infer<typeof RunSchema>;
+export type ContextPack = z.infer<typeof ContextPackSchema>;
+export type ContextItem = z.infer<typeof ContextItemSchema>;
 export type CodeEvidence = z.infer<typeof CodeEvidenceSchema>;
+export type MemoryEntry = z.infer<typeof MemoryEntrySchema>;

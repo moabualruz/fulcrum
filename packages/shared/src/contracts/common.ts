@@ -46,4 +46,6 @@ export const SurfaceResponseSchema = z.object({
   redactionStatus: RedactionStatusSchema.default("not_applicable")
 });
 
+export type SourceRef = z.infer<typeof SourceRefSchema>;
 export type SurfaceResponse = z.infer<typeof SurfaceResponseSchema>;
+export type RedactionStatus = z.infer<typeof RedactionStatusSchema>;

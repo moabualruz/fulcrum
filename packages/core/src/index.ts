@@ -35,6 +35,8 @@ export * from "./work/file-repository.js";
 export * from "./external-pm/service.js";
 export * from "./policy/enforcement.js";
 export * from "./doctor/pm-health.js";
+export * from "./memory/service.js";
+export * from "./memory/export.js";
 export * from "./code/evidence-service.js";
 export * from "./context/builder.js";
 export * from "./context/ranking.js";

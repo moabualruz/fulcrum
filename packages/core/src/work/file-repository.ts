@@ -1,21 +1,29 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
-  CodeEvidenceSchema,
+  ContextItemSchema,
+  ContextPackSchema,
   ExternalWorkItemMirrorSchema,
+  MemoryEntrySchema,
   ProjectSchema,
   RunEventSchema,
   RunSchema,
   TaskSchema,
-  type CodeEvidence,
+  type ContextItem,
+  type ContextPack,
   type ExternalWorkItemMirror,
+  CodeEvidenceSchema,
+  type CodeEvidence,
+  type MemoryEntry,
   type Project,
   type Run,
   type RunEvent,
   type Task
 } from "@fulcrum/shared";
 import type { CodeEvidenceRepositoryPort } from "../code/evidence-service.js";
+import type { ContextPackRepositoryPort } from "../context/builder.js";
 import type { ExternalWorkItemMirrorRepositoryPort } from "../external-pm/service.js";
+import type { MemoryRepositoryPort } from "../memory/service.js";
 import type { ProjectRepositoryPort } from "../projects/service.js";
 import type { RunRepositoryPort } from "../runs/service.js";
 import type { TaskRepositoryPort } from "../tasks/service.js";
@@ -25,8 +33,11 @@ interface WorkState {
   tasks: Task[];
   externalWorkItemMirrors: ExternalWorkItemMirror[];
   codeEvidence: CodeEvidence[];
+  memoryEntries: MemoryEntry[];
   runs: Run[];
   runEvents: RunEvent[];
+  contextPacks: ContextPack[];
+  contextItems: ContextItem[];
 }
 
 const emptyState: WorkState = {
@@ -34,8 +45,11 @@ const emptyState: WorkState = {
   tasks: [],
   externalWorkItemMirrors: [],
   codeEvidence: [],
+  memoryEntries: [],
   runs: [],
-  runEvents: []
+  runEvents: [],
+  contextPacks: [],
+  contextItems: []
 };
 
 export class FileWorkRepository {
@@ -108,8 +122,11 @@ export class FileWorkRepository {
         codeEvidence: (data.codeEvidence ?? []).map((evidence) =>
           CodeEvidenceSchema.parse(evidence)
         ),
+        memoryEntries: (data.memoryEntries ?? []).map((entry) => MemoryEntrySchema.parse(entry)),
         runs: (data.runs ?? []).map((run) => RunSchema.parse(run)),
-        runEvents: (data.runEvents ?? []).map((event) => RunEventSchema.parse(event))
+        runEvents: (data.runEvents ?? []).map((event) => RunEventSchema.parse(event)),
+        contextPacks: (data.contextPacks ?? []).map((pack) => ContextPackSchema.parse(pack)),
+        contextItems: (data.contextItems ?? []).map((item) => ContextItemSchema.parse(item))
       };
     } catch {
       return { ...emptyState };
@@ -119,6 +136,68 @@ export class FileWorkRepository {
   write(state: WorkState): void {
     mkdirSync(path.dirname(this.stateFile), { recursive: true });
     writeFileSync(this.stateFile, JSON.stringify(state, null, 2));
+  }
+}
+
+export class FileContextPackRepository implements ContextPackRepositoryPort {
+  constructor(private readonly work: FileWorkRepository) {}
+
+  savePack(pack: ContextPack): ContextPack {
+    const parsed = ContextPackSchema.parse(pack);
+    const state = this.work.read();
+    state.contextPacks = [
+      parsed,
+      ...state.contextPacks.filter((item) => item.contextPackId !== parsed.contextPackId)
+    ];
+    this.work.write(state);
+    return parsed;
+  }
+
+  saveItems(items: ContextItem[]): ContextItem[] {
+    const parsed = items.map((item) => ContextItemSchema.parse(item));
+    const state = this.work.read();
+    const packIds = new Set(parsed.map((item) => item.contextPackId));
+    state.contextItems = [
+      ...parsed,
+      ...state.contextItems.filter((item) => !packIds.has(item.contextPackId))
+    ];
+    this.work.write(state);
+    return parsed;
+  }
+
+  getPack(contextPackId: string): ContextPack | undefined {
+    return this.work.read().contextPacks.find((pack) => pack.contextPackId === contextPackId);
+  }
+
+  listItems(contextPackId: string): ContextItem[] {
+    return this.work
+      .read()
+      .contextItems.filter((item) => item.contextPackId === contextPackId)
+      .sort((left, right) => left.rank - right.rank);
+  }
+}
+
+export class FileMemoryRepository implements MemoryRepositoryPort {
+  constructor(private readonly work: FileWorkRepository) {}
+
+  save(entry: MemoryEntry): MemoryEntry {
+    const parsed = MemoryEntrySchema.parse(entry);
+    const state = this.work.read();
+    state.memoryEntries = [
+      parsed,
+      ...state.memoryEntries.filter((item) => item.memoryId !== parsed.memoryId)
+    ];
+    this.work.write(state);
+    return parsed;
+  }
+
+  get(memoryId: string): MemoryEntry | undefined {
+    return this.work.read().memoryEntries.find((entry) => entry.memoryId === memoryId);
+  }
+
+  list(projectId?: string): MemoryEntry[] {
+    const entries = this.work.read().memoryEntries;
+    return projectId ? entries.filter((entry) => entry.projectId === projectId) : entries;
   }
 }
 
