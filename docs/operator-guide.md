@@ -231,3 +231,20 @@ fulcrum uninstall preview
 Backups preserve canonical state, config, artifacts, logs, managed memory, context packs, and restorable manifest. Restore validates references. Rebuild regenerates derived indexes and marks unavailable source systems degraded. Reset/uninstall previews removals and preserves backups unless purge is explicitly approved.
 
 Evidence: FR-071 through FR-073, FR-087 through FR-090, SC-013, SC-014, and `tests/recovery/release-recovery-gates.test.ts`.
+
+## Release Readiness
+
+Release validation is the final local-only gate. It writes a redacted evidence pack and fails on missing Product/SRS groups, partial evidence, mock-only evidence, preview-only evidence, documentation-only evidence, or unexecuted placeholders.
+
+Use:
+
+```sh
+fulcrum release validate --local-only --evidence /tmp/fulcrum-release-evidence --json
+tests/e2e/quickstart/release-readiness.sh
+```
+
+The evidence manifest is `/tmp/fulcrum-release-evidence/release-evidence.json` unless another directory is supplied. Fulcrum also writes `compliance-matrix.json` plus one section report under `sections/*.json` for each required release group. Required sections are compliance matrix, install/package/start, setup/doctor, SQLite restart, surface parity, real-agent acceptance, adapter certification, policy/privacy/no-network, quality gates, worktree safety, graph/cache invalidation, recovery/export/rebuild, and operator documentation.
+
+Cockpit exposes the same validation through `#/release`; the API route is `POST /api/v1/release/validate`.
+
+Evidence: T091 through T100, `tests/contract/release-readiness-contract.test.ts`, `tests/privacy/release-evidence-redaction.test.ts`, and `tests/e2e/quickstart/release-readiness.sh`.

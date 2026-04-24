@@ -31,6 +31,12 @@ export const defaultSecretPatterns: RedactionPattern[] = [
     replacement: "$1=[REDACTED]"
   },
   {
+    name: "release-evidence-json-secret",
+    pattern:
+      /"([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|KEY)|(?:secret|token|password))"\s*:\s*"[^"]+"/gi,
+    replacement: '"$1": "[REDACTED]"'
+  },
+  {
     name: "compliance-export-credential-path",
     pattern:
       /\b(?:credential(?:Path|File|Ref)?|(?:secret|token|password)(?:Path|File|Ref))\s*[:=]\s*\S+/gi,

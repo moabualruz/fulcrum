@@ -67,6 +67,8 @@ export * from "./readiness/compliance-extractor.js";
 export * from "./readiness/compliance-service.js";
 export * from "./readiness/install-targets.js";
 export * from "./readiness/invalidation-service.js";
+export * from "./readiness/evidence-writer.js";
+export * from "./readiness/release-validator.js";
 export * from "./graph/service.js";
 export * from "./graph/queries.js";
 export * from "./graph/link-writers.js";

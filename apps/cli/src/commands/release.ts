@@ -4,6 +4,7 @@ import { listAgentProfiles, runRealAgentPrompt, type AgentProfile } from "@fulcr
 import {
   AgentCertificationService,
   LocalTaskService,
+  ReleaseValidator,
   RunLifecycleService,
   captureRunTranscript,
   type AgentAcceptanceEvidence,
@@ -19,6 +20,20 @@ export interface ReleaseAgentAcceptanceInput {
   timeoutMs?: number;
   requiredAgents?: number;
   agentIds?: string[];
+}
+
+export interface ReleaseValidationCommandInput {
+  rootDir: string;
+  evidenceDir: string;
+  localOnly?: boolean;
+}
+
+export async function runReleaseValidationCommand(input: ReleaseValidationCommandInput) {
+  return new ReleaseValidator().validate({
+    rootDir: input.rootDir,
+    evidenceDir: input.evidenceDir,
+    localOnly: input.localOnly
+  });
 }
 
 class MemoryTaskRepository implements TaskRepositoryPort {
@@ -80,7 +95,10 @@ export async function runReleaseAgentAcceptance(input: ReleaseAgentAcceptanceInp
   const prompt =
     input.prompt ??
     "Fulcrum release acceptance: report whether this CLI agent can inspect this repository and return a short lifecycle validation note.";
-  const projectId = makeId("proj", `release-agent-acceptance-${path.basename(path.resolve(input.cwd))}`);
+  const projectId = makeId(
+    "proj",
+    `release-agent-acceptance-${path.basename(path.resolve(input.cwd))}`
+  );
 
   const executions = await Promise.all(
     selected.map((profile) =>
@@ -262,10 +280,20 @@ function buildTranscript(result: Awaited<ReturnType<typeof runRealAgentPrompt>>)
     `status: ${result.status}`
   ];
   if (result.stdout.trim()) {
-    lines.push(...result.stdout.trim().split(/\r?\n/).map((line) => `stdout: ${line}`));
+    lines.push(
+      ...result.stdout
+        .trim()
+        .split(/\r?\n/)
+        .map((line) => `stdout: ${line}`)
+    );
   }
   if (result.stderr.trim()) {
-    lines.push(...result.stderr.trim().split(/\r?\n/).map((line) => `stderr: ${line}`));
+    lines.push(
+      ...result.stderr
+        .trim()
+        .split(/\r?\n/)
+        .map((line) => `stderr: ${line}`)
+    );
   }
   if (result.nextAction) {
     lines.push(`next-action: ${result.nextAction}`);

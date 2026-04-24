@@ -204,19 +204,19 @@
 
 ### Tests And Validation for User Story 9
 
-- [ ] T091 [P] [US9] Add release readiness contract test in `tests/contract/release-readiness-contract.test.ts`
-- [ ] T092 [P] [US9] Add local-only release validation e2e script in `tests/e2e/quickstart/release-readiness.sh`
-- [ ] T093 [P] [US9] Add evidence pack redaction/privacy test in `tests/privacy/release-evidence-redaction.test.ts`
+- [X] T091 [P] [US9] Add release readiness contract test in `tests/contract/release-readiness-contract.test.ts`
+- [X] T092 [P] [US9] Add local-only release validation e2e script in `tests/e2e/quickstart/release-readiness.sh`
+- [X] T093 [P] [US9] Add evidence pack redaction/privacy test in `tests/privacy/release-evidence-redaction.test.ts`
 
 ### Implementation for User Story 9
 
-- [ ] T094 [US9] Implement release validation orchestrator in `packages/core/src/readiness/release-validator.ts`
-- [ ] T095 [US9] Implement release CLI command in `apps/cli/src/commands/release.ts`
-- [ ] T096 [US9] Add release API route in `apps/server/src/routes/release.ts`
-- [ ] T097 [US9] Add release evidence cockpit view in `apps/cockpit/src/routes/release.tsx`
-- [ ] T098 [US9] Add release evidence artifact writer in `packages/core/src/readiness/evidence-writer.ts`
-- [ ] T099 [US9] Add final operator guide path in `docs/operator-guide.md`
-- [ ] T100 [US9] Add release checklist update in `docs/release-checklist.md`
+- [X] T094 [US9] Implement release validation orchestrator in `packages/core/src/readiness/release-validator.ts`
+- [X] T095 [US9] Implement release CLI command in `apps/cli/src/commands/release.ts`
+- [X] T096 [US9] Add release API route in `apps/server/src/routes/release.ts`
+- [X] T097 [US9] Add release evidence cockpit view in `apps/cockpit/src/routes/release.tsx`
+- [X] T098 [US9] Add release evidence artifact writer in `packages/core/src/readiness/evidence-writer.ts`
+- [X] T099 [US9] Add final operator guide path in `docs/operator-guide.md`
+- [X] T100 [US9] Add release checklist update in `docs/release-checklist.md`
 
 ## Phase 12: Polish And Cross-Cutting Validation
 

@@ -85,3 +85,33 @@ Evidence target: `tests/contract/mcp-full-srs-tools.test.ts`, `tests/contract/mc
 ## Release Gate
 
 Release cannot pass when any matrix row lacks executed evidence, when a criterion is satisfied only by preview/stub/sample behavior, or when CLI, cockpit, TUI, MCP, JSON/JSONL, health reports, and exports disagree without explicit stale/partial/degraded marking.
+
+Run:
+
+```sh
+fulcrum release validate --local-only --evidence /tmp/fulcrum-release-evidence --json
+```
+
+Release evidence pack must include `release-evidence.json`, `compliance-matrix.json`, and per-section reports under `sections/*.json` with:
+
+- Product/SRS compliance summary and blocking requirement IDs.
+- One artifact for every required release section.
+- Command results for executed quality and readiness checks.
+- Redaction status of `redacted` or `not_redacted`.
+- Exact next actions for every failed check.
+
+Required evidence sections:
+
+- compliance matrix
+- install/package/start
+- setup/doctor
+- SQLite canonical state restart
+- CLI/API/cockpit/TUI/MCP parity
+- real-agent acceptance
+- adapter certification
+- policy/privacy/no-network
+- quality gates
+- worktree safety
+- graph/cache invalidation
+- backup/restore/export/rebuild
+- documentation and operator guide

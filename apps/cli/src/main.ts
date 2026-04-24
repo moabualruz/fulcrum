@@ -99,7 +99,7 @@ import {
   uninstallPreviewCommand
 } from "./commands/recovery.js";
 import { listMcpToolsCommand } from "./commands/mcp.js";
-import { runReleaseAgentAcceptance } from "./commands/release.js";
+import { runReleaseAgentAcceptance, runReleaseValidationCommand } from "./commands/release.js";
 import {
   complianceAuditCommand,
   complianceExportCommand,
@@ -569,6 +569,26 @@ complianceCommand
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
         : data.output
     );
+  });
+
+releaseCommand
+  .command("validate")
+  .description("Validate release readiness and write evidence pack")
+  .requiredOption("--evidence <dir>")
+  .option("--local-only", "require local-only release validation")
+  .option("--root <path>", "repository root", process.cwd())
+  .action(async (options) => {
+    const data = await runReleaseValidationCommand({
+      rootDir: options.root,
+      evidenceDir: options.evidence,
+      localOnly: Boolean(options.localOnly || program.opts().localOnly)
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify(data, null, 2)
+        : `${data.pass ? "Release ready" : "Release blocked"}: ${data.evidenceManifest}`
+    );
+    if (!data.pass) process.exitCode = 1;
   });
 
 releaseCommand

@@ -14,3 +14,5 @@ export * from "./agent-certification.js";
 export * from "./compliance-extractor.js";
 export * from "./compliance-service.js";
 export * from "./install-targets.js";
+export * from "./evidence-writer.js";
+export * from "./release-validator.js";

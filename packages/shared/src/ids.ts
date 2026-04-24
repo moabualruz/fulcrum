@@ -24,6 +24,7 @@ export const idPrefixes = [
   "preview",
   "backup",
   "export",
+  "release",
   "restore",
   "rebuild",
   "reset",

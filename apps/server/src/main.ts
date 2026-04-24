@@ -45,6 +45,7 @@ import { registerSetupRoutes } from "./routes/setup.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
 import { registerRecoveryRoutes } from "./routes/recovery.js";
 import { registerComplianceRoutes } from "./routes/compliance.js";
+import { registerReleaseRoutes } from "./routes/release.js";
 import { registerMcpRoutes } from "./mcp.js";
 import { createServerSetupPorts, FileSetupRepository } from "./runtime.js";
 import {
@@ -162,6 +163,7 @@ registerGraphRoutes(
 );
 registerRecoveryRoutes(app, recoveryDeps);
 registerComplianceRoutes(app, complianceService);
+registerReleaseRoutes(app, complianceService);
 registerMcpRoutes(app, {
   doctor: async () => ({
     setupState: await setupRepository.latest(),
