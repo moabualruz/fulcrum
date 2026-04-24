@@ -107,9 +107,9 @@ function classifyRequirement(
   const explicitStatus = evidence.statusOverrides?.[requirement.requirementId];
   const status =
     explicitStatus ??
-    (combinedRefs.includes("mock")
+    (/\bmock[-_ ]only\b/.test(combinedRefs)
       ? "mock_only"
-      : combinedRefs.includes("preview")
+      : /\bpreview[-_ ]only\b/.test(combinedRefs)
         ? "preview_only"
         : implementationRefs.every((ref) => ref.includes("docs/")) && implementationRefs.length > 0
           ? "documentation_only"

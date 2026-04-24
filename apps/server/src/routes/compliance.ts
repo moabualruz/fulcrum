@@ -1,5 +1,5 @@
 import type { Hono } from "hono";
-import type { ComplianceService } from "@fulcrum/core";
+import { buildRepositoryComplianceEvidence, type ComplianceService } from "@fulcrum/core";
 
 export function registerComplianceRoutes(
   app: Hono,
@@ -8,9 +8,15 @@ export function registerComplianceRoutes(
 ): void {
   app.get("/api/v1/compliance", (context) => {
     const sources = context.req.query("sources")?.split(",").filter(Boolean);
+    const rootDir = context.req.query("root") ?? defaultRootDir;
+    const initialAudit = service.audit({
+      rootDir,
+      sources: sources?.length ? sources : undefined
+    });
     const data = service.audit({
       rootDir: context.req.query("root") ?? defaultRootDir,
-      sources: sources?.length ? sources : undefined
+      sources: sources?.length ? sources : undefined,
+      evidence: buildRepositoryComplianceEvidence(initialAudit, rootDir)
     });
     return context.json({
       schemaVersion: "1.0",
@@ -34,12 +40,18 @@ export function registerComplianceRoutes(
     const format = context.req.query("format") === "markdown" ? "markdown" : "json";
     const output = context.req.query("output") ?? "fulcrum-compliance.json";
     const sources = context.req.query("sources")?.split(",").filter(Boolean);
+    const rootDir = context.req.query("root") ?? defaultRootDir;
+    const initialAudit = service.audit({
+      rootDir,
+      sources: sources?.length ? sources : undefined
+    });
     const data = service.export({
       format,
       output,
       audit: service.audit({
-        rootDir: context.req.query("root") ?? defaultRootDir,
-        sources: sources?.length ? sources : undefined
+        rootDir,
+        sources: sources?.length ? sources : undefined,
+        evidence: buildRepositoryComplianceEvidence(initialAudit, rootDir)
       })
     });
     return context.json({

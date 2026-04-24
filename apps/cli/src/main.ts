@@ -13,6 +13,7 @@ import {
   QualityGateRunner,
   QualityReadinessEvaluator,
   BackupManifestService,
+  buildRepositoryComplianceEvidence,
   ComplianceService,
   FileBackupRepository,
   FileExportRepository,
@@ -527,9 +528,14 @@ complianceCommand
   .option("--root <path>", "repository root", defaultRepoRoot)
   .option("--sources <paths>", "comma-separated source documents")
   .action((options) => {
-    const data = complianceAuditCommand(complianceService, {
+    const initialAudit = complianceAuditCommand(complianceService, {
       rootDir: options.root,
       sources: options.sources ? String(options.sources).split(",") : undefined
+    });
+    const data = complianceAuditCommand(complianceService, {
+      rootDir: options.root,
+      sources: options.sources ? String(options.sources).split(",") : undefined,
+      evidence: buildRepositoryComplianceEvidence(initialAudit, options.root)
     });
     console.log(
       program.opts().json
@@ -564,7 +570,14 @@ complianceCommand
       output: options.output,
       auditInput: {
         rootDir: options.root,
-        sources: options.sources ? String(options.sources).split(",") : undefined
+        sources: options.sources ? String(options.sources).split(",") : undefined,
+        evidence: buildRepositoryComplianceEvidence(
+          complianceAuditCommand(complianceService, {
+            rootDir: options.root,
+            sources: options.sources ? String(options.sources).split(",") : undefined
+          }),
+          options.root
+        )
       }
     });
     console.log(

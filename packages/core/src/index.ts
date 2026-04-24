@@ -65,6 +65,7 @@ export * from "./readiness/agent-certification.js";
 export * from "./readiness/adapter-certification.js";
 export * from "./readiness/compliance-extractor.js";
 export * from "./readiness/compliance-service.js";
+export * from "./readiness/compliance-evidence.js";
 export * from "./readiness/install-targets.js";
 export * from "./readiness/invalidation-service.js";
 export * from "./readiness/evidence-writer.js";

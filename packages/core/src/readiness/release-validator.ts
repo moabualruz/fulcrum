@@ -2,11 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { execa } from "execa";
 import { makeId, type ReleaseEvidencePack } from "@fulcrum/shared";
-import {
-  complianceGateFailures,
-  ComplianceService,
-  type ComplianceAuditResult
-} from "./compliance-service.js";
+import { complianceGateFailures, ComplianceService, type ComplianceAuditResult } from "./compliance-service.js";
+import { buildRepositoryComplianceEvidence } from "./compliance-evidence.js";
 import { ReleaseEvidenceWriter } from "./evidence-writer.js";
 
 export const REQUIRED_RELEASE_SECTIONS = [
@@ -90,7 +87,17 @@ export class ReleaseValidator {
       input.localOnly && !input.audit && !input.sectionEvidence
         ? await collectLocalReleaseEvidence(rootDir, evidenceRoot, this.writer)
         : undefined;
-    const audit = input.audit ?? this.compliance.audit({ rootDir });
+    const initialAudit = input.audit ?? this.compliance.audit({ rootDir });
+    const generatedCommandsPassed =
+      generatedEvidence?.commands.every((command) => command.status === "passed") ?? false;
+    const audit =
+      input.audit ??
+      this.compliance.audit({
+        rootDir,
+        evidence: generatedCommandsPassed
+          ? buildRepositoryComplianceEvidence(initialAudit, rootDir)
+          : undefined
+      });
     const sectionEvidence = mergeSectionEvidence(
       generatedEvidence?.sectionEvidence,
       input.sectionEvidence

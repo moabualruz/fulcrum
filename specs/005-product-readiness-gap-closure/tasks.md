@@ -226,8 +226,8 @@
 - [x] T104 Run `pnpm test:e2e`
 - [x] T105 Run `tests/e2e/quickstart/product-install-readiness.sh`
 - [x] T106 Run `tests/e2e/quickstart/release-readiness.sh`
-- [ ] T107 Run `pnpm --filter @fulcrum/cli dev -- release validate --local-only --evidence /tmp/fulcrum-release-evidence --json`
-- [ ] T108 Commit final gap-closure implementation with passing evidence
+- [x] T107 Run `pnpm --filter @fulcrum/cli dev -- release validate --local-only --evidence /tmp/fulcrum-release-evidence --json`
+- [x] T108 Commit final gap-closure implementation with passing evidence
 
 ## Dependencies And Execution Order
 
