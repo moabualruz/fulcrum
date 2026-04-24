@@ -50,11 +50,11 @@ describe("memory backend acceptance", () => {
 
     expect(memsearchHealth).toMatchObject({
       state: "degraded",
-      nextAction: "Set FULCRUM_MEMSEARCH_ENABLED=1 after configuring memsearch."
+      nextAction: "Install memsearch and set FULCRUM_MEMSEARCH_ENABLED=1 after configuring it."
     });
     expect(engramHealth).toMatchObject({
       state: "degraded",
-      nextAction: "Set FULCRUM_ENGRAM_ENABLED=1 after configuring Engram."
+      nextAction: "Install Engram and set FULCRUM_ENGRAM_ENABLED=1 after configuring it."
     });
     expect(memsearch[0]?.entry.memoryId).toBe(imported[0]?.memoryId);
     expect(memsearch[0]?.limitation).toContain("local markdown");

@@ -387,6 +387,7 @@ artifactCommand
 
 const gateCommand = program.command("gate").description("Define, run, and inspect quality gates");
 const gateDeps = { runner: qualityRunner, readiness: qualityReadiness };
+
 const releaseCommand = program
   .command("release")
   .description("Validate release readiness evidence");
@@ -413,7 +414,6 @@ releaseCommand
         : `${data.realAgentCount}/${data.requiredRealAgentCount} real agents certified`
     );
   });
-
 
 gateCommand
   .command("define")

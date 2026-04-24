@@ -6,22 +6,22 @@
 
 ## Phase 1: Setup
 
-- [X] T001 Add 005 feature pointer validation in `.specify/feature.json`
-- [X] T002 [P] Add Product/SRS source fixture list in `tests/fixtures/compliance/source-order.json`
-- [X] T003 [P] Add release evidence fixture directory layout in `tests/fixtures/release-evidence/README.md`
-- [X] T004 Add shared scripts for clean local state setup in `tests/helpers/local-state.ts`
-- [X] T005 Add package/start command inventory to `docs/operator-guide.md`
+- [x] T001 Add 005 feature pointer validation in `.specify/feature.json`
+- [x] T002 [P] Add Product/SRS source fixture list in `tests/fixtures/compliance/source-order.json`
+- [x] T003 [P] Add release evidence fixture directory layout in `tests/fixtures/release-evidence/README.md`
+- [x] T004 Add shared scripts for clean local state setup in `tests/helpers/local-state.ts`
+- [x] T005 Add package/start command inventory to `docs/operator-guide.md`
 
 ## Phase 2: Foundational
 
-- [X] T006 Define compliance, install target, migration, capability probe, agent certification, adapter certification, invalidation, and release evidence schemas in `packages/shared/src/readiness.ts`
-- [X] T007 Export readiness schemas from `packages/shared/src/index.ts`
-- [X] T008 Add SQLite migration for compliance, install targets, migration records, capability probes, certifications, invalidation records, and release evidence in `packages/db/migrations/0002_readiness.sql`
-- [X] T009 Implement readiness repositories in `packages/db/src/readiness.ts`
-- [X] T010 Export readiness repositories from `packages/db/src/index.ts`
-- [X] T011 Add core readiness service barrel in `packages/core/src/readiness/index.ts`
-- [X] T012 Add policy actions for package/global mutation, release validation, adapter certification, and compliance override in `packages/policy/src/evaluator.ts`
-- [X] T013 Add redaction coverage for release evidence and compliance exports in `packages/policy/src/redaction.ts`
+- [x] T006 Define compliance, install target, migration, capability probe, agent certification, adapter certification, invalidation, and release evidence schemas in `packages/shared/src/readiness.ts`
+- [x] T007 Export readiness schemas from `packages/shared/src/index.ts`
+- [x] T008 Add SQLite migration for compliance, install targets, migration records, capability probes, certifications, invalidation records, and release evidence in `packages/db/migrations/0002_readiness.sql`
+- [x] T009 Implement readiness repositories in `packages/db/src/readiness.ts`
+- [x] T010 Export readiness repositories from `packages/db/src/index.ts`
+- [x] T011 Add core readiness service barrel in `packages/core/src/readiness/index.ts`
+- [x] T012 Add policy actions for package/global mutation, release validation, adapter certification, and compliance override in `packages/policy/src/evaluator.ts`
+- [x] T013 Add redaction coverage for release evidence and compliance exports in `packages/policy/src/redaction.ts`
 
 ## Phase 3: User Story 1 - Product/SRS Compliance Authority (Priority: P1)
 
@@ -138,19 +138,19 @@
 
 ### Tests And Validation for User Story 6
 
-- [ ] T061 [P] [US6] Add adapter certification contract test in `tests/contract/adapter-certification.test.ts`
-- [ ] T062 [P] [US6] Add real code tools adapter test in `tests/integration/code-tool-adapter-certification.test.ts`
-- [ ] T063 [P] [US6] Add memory backend adapter certification test in `tests/integration/memory-adapter-certification.test.ts`
-- [ ] T064 [P] [US6] Add Plane live/simulated mode boundary test in `tests/integration/plane-adapter-certification.test.ts`
+- [x] T061 [P] [US6] Add adapter certification contract test in `tests/contract/adapter-certification.test.ts`
+- [x] T062 [P] [US6] Add real code tools adapter test in `tests/integration/code-tool-adapter-certification.test.ts`
+- [x] T063 [P] [US6] Add memory backend adapter certification test in `tests/integration/memory-adapter-certification.test.ts`
+- [x] T064 [P] [US6] Add Plane live/simulated mode boundary test in `tests/integration/plane-adapter-certification.test.ts`
 
 ### Implementation for User Story 6
 
-- [ ] T065 [US6] Implement adapter certification service in `packages/core/src/readiness/adapter-certification.ts`
-- [ ] T066 [US6] Add `fd`, `ast-grep`, Aider, and Repomix wrappers in `packages/code-tools/src/`
-- [ ] T067 [US6] Add tool version/config/hash/cache metadata in `packages/code-tools/src/cache-metadata.ts`
-- [ ] T068 [US6] Upgrade memsearch and Engram adapters from shells to executable probes in `packages/memory/src/`
-- [ ] T069 [US6] Add Plane live mode credential/connectivity certification in `packages/plane/src/plane-adapter.ts`
-- [ ] T070 [US6] Show adapter certification in CLI/API/cockpit via `apps/cli/src/commands/adapter.ts`, `apps/server/src/routes/adapters.ts`, and `apps/cockpit/src/routes/adapters.tsx`
+- [x] T065 [US6] Implement adapter certification service in `packages/core/src/readiness/adapter-certification.ts`
+- [x] T066 [US6] Add `fd`, `ast-grep`, Aider, and Repomix wrappers in `packages/code-tools/src/`
+- [x] T067 [US6] Add tool version/config/hash/cache metadata in `packages/code-tools/src/cache-metadata.ts`
+- [x] T068 [US6] Upgrade memsearch and Engram adapters from shells to executable probes in `packages/memory/src/`
+- [x] T069 [US6] Add Plane live mode credential/connectivity certification in `packages/plane/src/plane-adapter.ts`
+- [x] T070 [US6] Show adapter certification in CLI/API/cockpit via `apps/cli/src/commands/adapter.ts`, `apps/server/src/routes/adapters.ts`, and `apps/cockpit/src/routes/adapters.tsx`
 
 ## Phase 9: User Story 7 - Owned Cockpit Operations Center (Priority: P1)
 
