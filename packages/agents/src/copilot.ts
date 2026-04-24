@@ -3,6 +3,7 @@ export interface CopilotAgentProfile {
   command: "copilot";
   rejectedCommands: ["gh copilot"];
   promptMode: "stdin" | "argument";
+  versionArgs: ["--version"];
   supportsPlugins: boolean;
   supportsSkills: boolean;
   supportsMcp: boolean;
@@ -41,6 +42,7 @@ export function createCopilotAgentProfile(): CopilotAgentProfile {
     command: "copilot",
     rejectedCommands: ["gh copilot"],
     promptMode: "stdin",
+    versionArgs: ["--version"],
     supportsPlugins: true,
     supportsSkills: true,
     supportsMcp: true,

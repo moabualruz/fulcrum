@@ -9,3 +9,4 @@ export type {
   ReleaseEvidencePack
 } from "@fulcrum/shared";
 export * from "./adapter-certification.js";
+export * from "./agent-certification.js";

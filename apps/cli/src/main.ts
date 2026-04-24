@@ -94,6 +94,7 @@ import {
   uninstallPreviewCommand
 } from "./commands/recovery.js";
 import { listMcpToolsCommand } from "./commands/mcp.js";
+import { runReleaseAgentAcceptance } from "./commands/release.js";
 import { formatRedactionStatus } from "./output/redaction.js";
 import { createCliSetupPorts } from "./runtime.js";
 import {
@@ -383,6 +384,33 @@ artifactCommand
 
 const gateCommand = program.command("gate").description("Define, run, and inspect quality gates");
 const gateDeps = { runner: qualityRunner, readiness: qualityReadiness };
+const releaseCommand = program
+  .command("release")
+  .description("Validate release readiness evidence");
+
+releaseCommand
+  .command("agents")
+  .description("Run real CLI agent acceptance and write evidence")
+  .requiredOption("--evidence <dir>")
+  .option("--cwd <path>", "working directory", process.cwd())
+  .option("--agent <agentId...>", "agent profile ids")
+  .option("--timeout-ms <ms>", "per-agent timeout", (value) => Number(value), 30_000)
+  .option("--required-agents <count>", "required passing real agents", (value) => Number(value), 2)
+  .action(async (options) => {
+    const data = await runReleaseAgentAcceptance({
+      cwd: options.cwd,
+      evidenceDir: options.evidence,
+      agentIds: options.agent,
+      timeoutMs: options.timeoutMs,
+      requiredAgents: options.requiredAgents
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: data.status, data }, null, 2)
+        : `${data.realAgentCount}/${data.requiredRealAgentCount} real agents certified`
+    );
+  });
+
 
 gateCommand
   .command("define")

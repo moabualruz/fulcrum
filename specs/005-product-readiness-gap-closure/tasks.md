@@ -117,18 +117,18 @@
 
 ### Tests And Validation for User Story 5
 
-- [ ] T052 [P] [US5] Add real-agent certification contract test in `tests/contract/agent-certification.test.ts`
-- [ ] T053 [P] [US5] Add two-real-agent acceptance test in `tests/integration/real-agent-acceptance.test.ts`
-- [ ] T054 [P] [US5] Add Copilot standalone rejection test in `tests/contract/copilot-standalone-cli.test.ts`
+- [x] T052 [P] [US5] Add real-agent certification contract test in `tests/contract/agent-certification.test.ts`
+- [x] T053 [P] [US5] Add two-real-agent acceptance test in `tests/integration/real-agent-acceptance.test.ts`
+- [x] T054 [P] [US5] Add Copilot standalone rejection test in `tests/contract/copilot-standalone-cli.test.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T055 [US5] Implement agent certification service in `packages/core/src/readiness/agent-certification.ts`
-- [ ] T056 [US5] Implement generic real-agent prompt runner in `packages/agents/src/real-agent-runner.ts`
-- [ ] T057 [US5] Expand Codex/Claude/Gemini/OpenCode/Aider/generic profiles in `packages/agents/src/profiles.ts`
-- [ ] T058 [US5] Finalize standalone Copilot profile in `packages/agents/src/copilot.ts`
-- [ ] T059 [US5] Add real-agent acceptance CLI in `apps/cli/src/commands/release.ts`
-- [ ] T060 [US5] Link real-agent evidence into run artifacts in `packages/core/src/runs/service.ts`
+- [x] T055 [US5] Implement agent certification service in `packages/core/src/readiness/agent-certification.ts`
+- [x] T056 [US5] Implement generic real-agent prompt runner in `packages/agents/src/real-agent-runner.ts`
+- [x] T057 [US5] Expand Codex/Claude/Gemini/OpenCode/Aider/generic profiles in `packages/agents/src/profiles.ts`
+- [x] T058 [US5] Finalize standalone Copilot profile in `packages/agents/src/copilot.ts`
+- [x] T059 [US5] Add real-agent acceptance CLI in `apps/cli/src/commands/release.ts`
+- [x] T060 [US5] Link real-agent evidence into run artifacts in `packages/core/src/runs/service.ts`
 
 ## Phase 8: User Story 6 - Certified Optional Adapters (Priority: P1)
 
