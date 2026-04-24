@@ -160,13 +160,12 @@ function copyStateSnapshot(source: string, target: string, excludedPaths: string
 }
 
 function countSqliteRecords(stateRoot: string): Record<string, number> {
-  const counts = countWorkStateRecords(stateRoot);
   const dbPath = join(stateRoot, "fulcrum.sqlite");
   try {
     const { size } = statSync(dbPath);
-    return { ...counts, sqliteBytes: size };
+    return { sqliteBytes: size, sqliteCanonical: 1 };
   } catch {
-    return counts;
+    return countWorkStateRecords(stateRoot);
   }
 }
 

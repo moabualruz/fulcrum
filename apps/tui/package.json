@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",
+    "@fulcrum/db": "workspace:*",
     "ink": "^5.1.0",
     "react": "^19.0.0"
   },

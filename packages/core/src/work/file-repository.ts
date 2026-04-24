@@ -40,7 +40,7 @@ import type { TaskRepositoryPort } from "../tasks/service.js";
 import type { WorktreeRepositoryPort } from "../worktrees/status.js";
 import type { GraphLinkRepositoryPort } from "../graph/service.js";
 
-interface WorkState {
+export interface WorkState {
   projects: Project[];
   tasks: Task[];
   externalWorkItemMirrors: ExternalWorkItemMirror[];
@@ -72,8 +72,30 @@ const emptyState: WorkState = {
   graphLinks: []
 };
 
+export function emptyWorkState(): WorkState {
+  return {
+    projects: [],
+    tasks: [],
+    externalWorkItemMirrors: [],
+    codeEvidence: [],
+    memoryEntries: [],
+    runs: [],
+    runEvents: [],
+    contextPacks: [],
+    contextItems: [],
+    worktrees: [],
+    qualityGateDefinitions: [],
+    qualityGateResults: [],
+    graphLinks: []
+  };
+}
+
 export class FileWorkRepository {
   constructor(private readonly stateFile: string) {}
+
+  filePath(): string {
+    return this.stateFile;
+  }
 
   save(projectOrTask: Project | Task): Project | Task {
     return "projectId" in projectOrTask && "rootPath" in projectOrTask
@@ -262,6 +284,11 @@ export class FileContextPackRepository implements ContextPackRepositoryPort {
 
   getPack(contextPackId: string): ContextPack | undefined {
     return this.work.read().contextPacks.find((pack) => pack.contextPackId === contextPackId);
+  }
+
+  listPacks(projectId?: string): ContextPack[] {
+    const packs = this.work.read().contextPacks;
+    return projectId ? packs.filter((pack) => pack.projectId === projectId) : packs;
   }
 
   listItems(contextPackId: string): ContextItem[] {

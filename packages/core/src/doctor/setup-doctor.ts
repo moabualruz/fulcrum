@@ -1,7 +1,7 @@
 import { SCHEMA_VERSION, type CapabilityHealthRecord, type SetupState } from "@fulcrum/shared";
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import { aggregateDoctorReport, type DoctorReport } from "./service.js";
+import { sqliteStateStatus } from "../readiness/json-state-migration.js";
 
 export interface SetupDoctorInput {
   setupState?: SetupState;
@@ -14,6 +14,7 @@ export function buildSetupDoctorReport(input: SetupDoctorInput): DoctorReport & 
   networkDefault: "local-only" | "operator-configured";
 } {
   const now = new Date().toISOString();
+  const sqlite = sqliteStateStatus(input.setupState?.dbPath);
   const capabilities: CapabilityHealthRecord[] = [
     {
       capabilityId: "cap_node_runtime",
@@ -46,28 +47,14 @@ export function buildSetupDoctorReport(input: SetupDoctorInput): DoctorReport & 
     },
     {
       capabilityId: "cap_sqlite",
-      state:
-        input.setupState?.status === "applied" && input.setupState.dbPath
-          ? existsSync(input.setupState.dbPath)
-            ? "managed"
-            : "blocked"
-          : "guided",
-      blocking:
-        input.setupState?.status === "applied" && input.setupState.dbPath
-          ? !existsSync(input.setupState.dbPath)
-          : true,
+      state: input.setupState?.status === "applied" ? sqlite.state : "guided",
+      blocking: input.setupState?.status === "applied" ? sqlite.blocking : true,
       cause:
-        input.setupState?.status === "applied" && input.setupState.dbPath
-          ? existsSync(input.setupState.dbPath)
-            ? undefined
-            : `SQLite state file missing: ${input.setupState.dbPath}`
+        input.setupState?.status === "applied"
+          ? sqlite.cause
           : "Setup has not initialized local SQLite state.",
       nextAction:
-        input.setupState?.status === "applied" && input.setupState.dbPath
-          ? existsSync(input.setupState.dbPath)
-            ? "No action needed."
-            : "Run fulcrum repair, then fulcrum setup apply if repair cannot restore state."
-          : "Run fulcrum setup apply.",
+        input.setupState?.status === "applied" ? sqlite.nextAction : "Run fulcrum setup apply.",
       privacyStatus: "local_only",
       affectedWorkflows: ["setup", "doctor", "backup", "restore"],
       freshness: now

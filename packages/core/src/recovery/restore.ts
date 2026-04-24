@@ -34,6 +34,7 @@ export class RestoreValidationService {
     const checkedReferences = [
       "manifest",
       "state_snapshot",
+      "fulcrum.sqlite",
       "tasks",
       "runs",
       "artifacts",

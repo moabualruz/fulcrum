@@ -84,6 +84,7 @@ import {
   listAdaptersCommand
 } from "./commands/adapter.js";
 import { rebuildGraphCommand, traceGraphCommand } from "./commands/graph.js";
+import { rebuildJsonMirrorCommand } from "./commands/rebuild.js";
 import {
   createBackupCommand,
   exportRecoveryCommand,
@@ -114,6 +115,7 @@ import {
   graphLinkWriters,
   traceabilityService,
   graphRebuildSources,
+  jsonStateMigrationService,
   invalidationService
 } from "./work-runtime.js";
 
@@ -1607,6 +1609,21 @@ program
   });
 
 const rebuildRoot = program.command("rebuild").description("Rebuild derived data");
+
+rebuildRoot
+  .command("json-mirror")
+  .option("--output <path>", "JSON mirror path")
+  .action((options) => {
+    const data = rebuildJsonMirrorCommand(jsonStateMigrationService, {
+      stateRoot: paths.stateRoot,
+      mirrorPath: options.output
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: SCHEMA_VERSION, status: "ok", data }, null, 2)
+        : `JSON mirror rebuilt: ${data.mirrorPath}`
+    );
+  });
 
 for (const name of ["projections", "memory-index", "code-cache"]) {
   rebuildRoot.command(name).action(() => {

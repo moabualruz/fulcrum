@@ -1,8 +1,13 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { migrate, openDatabase } from "@fulcrum/db";
 import { resolveSetupPaths, type SetupApplyPorts, type SetupRepositoryPort } from "@fulcrum/core";
 import { SetupStateSchema, type SetupState } from "@fulcrum/shared";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const migrationsPath = path.join(repoRoot, "packages/db/migrations");
 
 export class FileSetupRepository implements SetupRepositoryPort {
   constructor(
@@ -33,10 +38,9 @@ export function createServerSetupPorts(repository = new FileSetupRepository()): 
     setupRepository: repository,
     initializeDatabase: async (dbPath) => {
       await mkdir(path.dirname(dbPath), { recursive: true });
-      await writeFile(
-        `${dbPath}.pending`,
-        "SQLite migration pending native driver availability.\n"
-      );
+      const db = openDatabase(dbPath);
+      migrate(db, migrationsPath);
+      db.close();
     }
   };
 }

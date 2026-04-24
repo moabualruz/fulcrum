@@ -63,3 +63,4 @@ export * from "./recovery/restore.js";
 export * from "./recovery/export.js";
 export * from "./recovery/rebuild.js";
 export * from "./recovery/reset-uninstall.js";
+export * from "./readiness/json-state-migration.js";

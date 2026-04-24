@@ -12,6 +12,7 @@ interface ContextPackRepositoryPort {
   savePack(pack: ContextPack): ContextPack;
   saveItems(items: ContextItem[]): ContextItem[];
   getPack(contextPackId: string): ContextPack | undefined;
+  listPacks(projectId?: string): ContextPack[];
   listItems(contextPackId: string): ContextItem[];
 }
 
@@ -170,6 +171,15 @@ export class ContextPackRepository implements ContextPackRepositoryPort {
       .prepare("SELECT * FROM context_packs WHERE context_pack_id = ?")
       .get(contextPackId);
     return row ? packFromRow(row as Row) : undefined;
+  }
+
+  listPacks(projectId?: string): ContextPack[] {
+    const statement = projectId
+      ? this.db.prepare("SELECT * FROM context_packs WHERE project_id = ? ORDER BY created_at DESC")
+      : this.db.prepare("SELECT * FROM context_packs ORDER BY created_at DESC");
+    return (projectId ? statement.all(projectId) : statement.all()).map((row) =>
+      packFromRow(row as Row)
+    );
   }
 
   listItems(contextPackId: string): ContextItem[] {

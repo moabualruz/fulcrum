@@ -1,18 +1,22 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { migrate, openDatabase, ReadinessRepository } from "@fulcrum/db";
+import {
+  CodeEvidenceRepository,
+  ContextPackRepository,
+  ExternalWorkItemMirrorRepository,
+  GraphLinkRepository,
+  MemoryRepository,
+  migrate,
+  openDatabase,
+  ProjectRepository,
+  QualityGateRepository,
+  ReadinessRepository,
+  RunRepository,
+  TaskRepository,
+  WorktreeRepository
+} from "@fulcrum/db";
 import {
   CodeEvidenceService,
-  FileCodeEvidenceRepository,
-  FileMemoryRepository,
-  FileProjectRepository,
-  FileQualityGateRepository,
-  FileContextPackRepository,
-  FileExternalWorkItemMirrorRepository,
-  FileGraphLinkRepository,
-  FileRunRepository,
-  FileTaskRepository,
-  FileWorktreeRepository,
   FileWorkRepository,
   FileAdapterConfigurationRepository,
   ContextPackBuilder,
@@ -27,9 +31,10 @@ import {
   WorktreeStatusService,
   GraphLinkService,
   GraphLinkWriters,
-  InvalidationService,
   TraceabilityQueryService,
-  resolveSetupPaths
+  resolveSetupPaths,
+  JsonStateMigrationService,
+  InvalidationService
 } from "@fulcrum/core";
 import { searchExact, searchSemantic } from "@fulcrum/code-tools";
 import { PlaneApiAdapter, SimulatedPlaneAdapter } from "@fulcrum/plane";
@@ -38,14 +43,33 @@ const setupPaths = resolveSetupPaths(process.env.FULCRUM_STATE_ROOT);
 const db = openDatabase(setupPaths.dbPath);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 migrate(db, path.join(repoRoot, "packages/db/migrations"));
-const work = new FileWorkRepository(path.join(setupPaths.stateRoot, "work-state.json"));
-const taskRepository = new FileTaskRepository(work);
-const projectRepository = new FileProjectRepository(work);
-export const runRepository = new FileRunRepository(work);
-export const qualityGateRepository = new FileQualityGateRepository(work);
-const worktreeRepository = new FileWorktreeRepository(work);
-const graphRepository = new FileGraphLinkRepository(work);
-export const invalidationService = new InvalidationService(new ReadinessRepository(db));
+const workMirror = new FileWorkRepository(path.join(setupPaths.stateRoot, "work-state.json"));
+const taskRepository = new TaskRepository(db);
+const projectRepository = new ProjectRepository(db);
+export const runRepository = new RunRepository(db);
+export const qualityGateRepository = new QualityGateRepository(db);
+const worktreeRepository = new WorktreeRepository(db);
+const graphRepository = new GraphLinkRepository(db);
+const contextPackRepository = new ContextPackRepository(db);
+const memoryRepository = new MemoryRepository(db);
+const codeEvidenceRepository = new CodeEvidenceRepository(db);
+const externalWorkItemMirrorRepository = new ExternalWorkItemMirrorRepository(db);
+const readinessRepository = new ReadinessRepository(db);
+export const jsonStateMigrationService = new JsonStateMigrationService({
+  projects: projectRepository,
+  tasks: taskRepository,
+  externalWorkItemMirrors: externalWorkItemMirrorRepository,
+  codeEvidence: codeEvidenceRepository,
+  memoryEntries: memoryRepository,
+  runs: runRepository,
+  contextPacks: contextPackRepository,
+  worktrees: worktreeRepository,
+  qualityGates: qualityGateRepository,
+  graphLinks: graphRepository,
+  migrationRecords: readinessRepository
+});
+jsonStateMigrationService.migrateFromJsonMirror(workMirror);
+export const invalidationService = new InvalidationService(readinessRepository);
 export const graphService = new GraphLinkService(graphRepository, invalidationService);
 export const graphLinkWriters = new GraphLinkWriters(graphService);
 export const traceabilityService = new TraceabilityQueryService(graphRepository);
@@ -66,21 +90,21 @@ export const runService = new RunLifecycleService(
   graphLinkWriters
 );
 export const contextBuilder = new ContextPackBuilder(
-  new FileContextPackRepository(work),
+  contextPackRepository,
   taskRepository,
   projectRepository,
   graphLinkWriters,
   invalidationService
 );
 export const memoryService = new MemoryService(
-  new FileMemoryRepository(work),
+  memoryRepository,
   undefined,
   graphLinkWriters,
   invalidationService
 );
 export const codeService = new CodeEvidenceService(
   projectRepository,
-  new FileCodeEvidenceRepository(work),
+  codeEvidenceRepository,
   {
     search: (options) => searchExact(options)
   },
@@ -89,15 +113,16 @@ export const codeService = new CodeEvidenceService(
   invalidationService
 );
 export function graphRebuildSources(projectId: string) {
-  const state = work.read();
   return {
-    tasks: state.tasks.filter((task) => task.projectId === projectId),
-    memories: state.memoryEntries.filter((entry) => entry.projectId === projectId),
-    codeEvidence: state.codeEvidence.filter((evidence) => evidence.projectId === projectId),
-    runs: state.runs.filter((run) => run.projectId === projectId),
-    contextPacks: state.contextPacks.filter((pack) => pack.projectId === projectId),
-    contextItems: state.contextItems,
-    qualityResults: state.qualityGateResults.filter((result) => result.projectId === projectId)
+    tasks: taskRepository.list(projectId),
+    memories: memoryRepository.list(projectId),
+    codeEvidence: codeEvidenceRepository.list(projectId),
+    runs: runRepository.list(projectId),
+    contextPacks: contextPackRepository.listPacks(projectId),
+    contextItems: contextPackRepository
+      .listPacks(projectId)
+      .flatMap((pack) => contextPackRepository.listItems(pack.contextPackId)),
+    qualityResults: qualityGateRepository.listResults({ projectId })
   };
 }
 const planeAdapter =
@@ -118,7 +143,7 @@ const planeAdapter =
         }
       ]);
 export const externalPmService = new ExternalPmService(
-  new FileExternalWorkItemMirrorRepository(work),
+  externalWorkItemMirrorRepository,
   taskRepository,
   planeAdapter,
   projectRepository

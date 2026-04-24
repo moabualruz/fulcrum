@@ -15,6 +15,7 @@
     "@fulcrum/code-tools": "workspace:*",
     "@fulcrum/agents": "workspace:*",
     "@fulcrum/core": "workspace:*",
+    "@fulcrum/db": "workspace:*",
     "@fulcrum/mcp": "workspace:*",
     "@fulcrum/plane": "workspace:*",
     "@fulcrum/shared": "workspace:*",

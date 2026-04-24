@@ -74,19 +74,19 @@
 
 ### Tests And Validation for User Story 3
 
-- [ ] T033 [P] [US3] Add SQLite canonical restart test in `tests/recovery/sqlite-canonical-restart.test.ts`
-- [ ] T034 [P] [US3] Add JSON migration rollback test in `tests/recovery/json-state-migration.test.ts`
-- [ ] T035 [P] [US3] Add cross-surface SQLite parity test in `tests/integration/sqlite-surface-parity.test.ts`
+- [X] T033 [P] [US3] Add SQLite canonical restart test in `tests/recovery/sqlite-canonical-restart.test.ts`
+- [X] T034 [P] [US3] Add JSON migration rollback test in `tests/recovery/json-state-migration.test.ts`
+- [X] T035 [P] [US3] Add cross-surface SQLite parity test in `tests/integration/sqlite-surface-parity.test.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T036 [US3] Implement JSON-to-SQLite migration service in `packages/core/src/readiness/json-state-migration.ts`
-- [ ] T037 [US3] Replace file work repository wiring with SQLite repositories in `apps/cli/src/work-runtime.ts`
-- [ ] T038 [US3] Replace file work repository wiring with SQLite repositories in `apps/server/src/runtime.ts`
-- [ ] T039 [US3] Replace file work repository wiring with SQLite repositories in `apps/tui/src/main.ts`
-- [ ] T040 [US3] Add JSON mirror rebuild command in `apps/cli/src/commands/rebuild.ts`
-- [ ] T041 [US3] Add SQLite corruption/missing doctor probe in `packages/core/src/doctor/setup-doctor.ts`
-- [ ] T042 [US3] Update backup/restore to use SQLite canonical source in `packages/core/src/recovery/backup.ts` and `packages/core/src/recovery/restore.ts`
+- [X] T036 [US3] Implement JSON-to-SQLite migration service in `packages/core/src/readiness/json-state-migration.ts`
+- [X] T037 [US3] Replace file work repository wiring with SQLite repositories in `apps/cli/src/work-runtime.ts`
+- [X] T038 [US3] Replace file work repository wiring with SQLite repositories in `apps/server/src/runtime.ts`
+- [X] T039 [US3] Replace file work repository wiring with SQLite repositories in `apps/tui/src/main.ts`
+- [X] T040 [US3] Add JSON mirror rebuild command in `apps/cli/src/commands/rebuild.ts`
+- [X] T041 [US3] Add SQLite corruption/missing doctor probe in `packages/core/src/doctor/setup-doctor.ts`
+- [X] T042 [US3] Update backup/restore to use SQLite canonical source in `packages/core/src/recovery/backup.ts` and `packages/core/src/recovery/restore.ts`
 
 ## Phase 6: User Story 4 - Complete Doctor Capability Matrix (Priority: P1)
 

@@ -1,18 +1,22 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { migrate, openDatabase, ReadinessRepository } from "@fulcrum/db";
+import {
+  CodeEvidenceRepository,
+  ContextPackRepository,
+  ExternalWorkItemMirrorRepository,
+  GraphLinkRepository,
+  MemoryRepository,
+  migrate,
+  openDatabase,
+  ProjectRepository,
+  QualityGateRepository,
+  ReadinessRepository,
+  RunRepository,
+  TaskRepository,
+  WorktreeRepository
+} from "@fulcrum/db";
 import {
   CodeEvidenceService,
-  FileCodeEvidenceRepository,
-  FileMemoryRepository,
-  FileProjectRepository,
-  FileQualityGateRepository,
-  FileContextPackRepository,
-  FileExternalWorkItemMirrorRepository,
-  FileGraphLinkRepository,
-  FileRunRepository,
-  FileTaskRepository,
-  FileWorktreeRepository,
   FileWorkRepository,
   FileAdapterConfigurationRepository,
   ContextPackBuilder,
@@ -29,6 +33,7 @@ import {
   GraphLinkWriters,
   InvalidationService,
   TraceabilityQueryService,
+  JsonStateMigrationService,
   resolveSetupPaths
 } from "@fulcrum/core";
 import { searchExact, searchSemantic } from "@fulcrum/code-tools";
@@ -38,14 +43,32 @@ const setupPaths = resolveSetupPaths(process.env.FULCRUM_STATE_ROOT);
 const db = openDatabase(setupPaths.dbPath);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 migrate(db, path.join(repoRoot, "packages/db/migrations"));
-const work = new FileWorkRepository(path.join(setupPaths.stateRoot, "work-state.json"));
-const taskRepository = new FileTaskRepository(work);
-const projectRepository = new FileProjectRepository(work);
-export const runRepository = new FileRunRepository(work);
-export const serverQualityGateRepository = new FileQualityGateRepository(work);
-const worktreeRepository = new FileWorktreeRepository(work);
-const graphRepository = new FileGraphLinkRepository(work);
-export const serverInvalidationService = new InvalidationService(new ReadinessRepository(db));
+const workMirror = new FileWorkRepository(path.join(setupPaths.stateRoot, "work-state.json"));
+const taskRepository = new TaskRepository(db);
+const projectRepository = new ProjectRepository(db);
+export const runRepository = new RunRepository(db);
+export const serverQualityGateRepository = new QualityGateRepository(db);
+const worktreeRepository = new WorktreeRepository(db);
+const graphRepository = new GraphLinkRepository(db);
+const contextPackRepository = new ContextPackRepository(db);
+const memoryRepository = new MemoryRepository(db);
+const codeEvidenceRepository = new CodeEvidenceRepository(db);
+const externalWorkItemMirrorRepository = new ExternalWorkItemMirrorRepository(db);
+const readinessRepository = new ReadinessRepository(db);
+new JsonStateMigrationService({
+  projects: projectRepository,
+  tasks: taskRepository,
+  externalWorkItemMirrors: externalWorkItemMirrorRepository,
+  codeEvidence: codeEvidenceRepository,
+  memoryEntries: memoryRepository,
+  runs: runRepository,
+  contextPacks: contextPackRepository,
+  worktrees: worktreeRepository,
+  qualityGates: serverQualityGateRepository,
+  graphLinks: graphRepository,
+  migrationRecords: readinessRepository
+}).migrateFromJsonMirror(workMirror);
+export const serverInvalidationService = new InvalidationService(readinessRepository);
 export const serverGraphService = new GraphLinkService(graphRepository, serverInvalidationService);
 export const serverGraphLinkWriters = new GraphLinkWriters(serverGraphService);
 export const serverTraceabilityService = new TraceabilityQueryService(graphRepository);
@@ -72,13 +95,13 @@ export const serverRunService = new RunLifecycleService(
   serverGraphLinkWriters
 );
 export const serverMemoryService = new MemoryService(
-  new FileMemoryRepository(work),
+  memoryRepository,
   undefined,
   serverGraphLinkWriters,
   serverInvalidationService
 );
 export const serverContextBuilder = new ContextPackBuilder(
-  new FileContextPackRepository(work),
+  contextPackRepository,
   taskRepository,
   projectRepository,
   serverGraphLinkWriters,
@@ -86,7 +109,7 @@ export const serverContextBuilder = new ContextPackBuilder(
 );
 export const serverCodeService = new CodeEvidenceService(
   projectRepository,
-  new FileCodeEvidenceRepository(work),
+  codeEvidenceRepository,
   {
     search: (options) => searchExact(options)
   },
@@ -95,15 +118,16 @@ export const serverCodeService = new CodeEvidenceService(
   serverInvalidationService
 );
 export function serverGraphRebuildSources(projectId: string) {
-  const state = work.read();
   return {
-    tasks: state.tasks.filter((task) => task.projectId === projectId),
-    memories: state.memoryEntries.filter((entry) => entry.projectId === projectId),
-    codeEvidence: state.codeEvidence.filter((evidence) => evidence.projectId === projectId),
-    runs: state.runs.filter((run) => run.projectId === projectId),
-    contextPacks: state.contextPacks.filter((pack) => pack.projectId === projectId),
-    contextItems: state.contextItems,
-    qualityResults: state.qualityGateResults.filter((result) => result.projectId === projectId)
+    tasks: taskRepository.list(projectId),
+    memories: memoryRepository.list(projectId),
+    codeEvidence: codeEvidenceRepository.list(projectId),
+    runs: runRepository.list(projectId),
+    contextPacks: contextPackRepository.listPacks(projectId),
+    contextItems: contextPackRepository
+      .listPacks(projectId)
+      .flatMap((pack) => contextPackRepository.listItems(pack.contextPackId)),
+    qualityResults: serverQualityGateRepository.listResults({ projectId })
   };
 }
 const planeAdapter =
@@ -124,7 +148,7 @@ const planeAdapter =
         }
       ]);
 export const serverExternalPmService = new ExternalPmService(
-  new FileExternalWorkItemMirrorRepository(work),
+  externalWorkItemMirrorRepository,
   taskRepository,
   planeAdapter,
   projectRepository
