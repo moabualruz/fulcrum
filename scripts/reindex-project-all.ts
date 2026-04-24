@@ -30,6 +30,9 @@ type Frontmatter = Record<string, string>
 const root = resolve(process.argv.includes('--root') ? process.argv[process.argv.indexOf('--root') + 1]! : process.cwd())
 const resetDerived = process.argv.includes('--reset-derived')
 const skipEmbeddings = process.argv.includes('--skip-embeddings')
+const embeddingDevice = process.argv.includes('--embedding-device')
+  ? process.argv[process.argv.indexOf('--embedding-device') + 1]!
+  : 'cpu'
 const ids = projectIdsFromPath(root)
 const vaultRoot = getVaultPath()
 const profile = resolveRuntimeDataProfile({ profile: 'dev' })
@@ -164,19 +167,25 @@ function gitProjectFiles(): string[] {
 async function indexCode(): Promise<number> {
   const files = gitProjectFiles()
   let indexed = 0
-  let skipped = 0
+  const skipped = new Map<string, { count: number; samples: string[] }>()
+  const skip = (reason: string, rel: string): void => {
+    const entry = skipped.get(reason) ?? { count: 0, samples: [] }
+    entry.count++
+    if (entry.samples.length < 10) entry.samples.push(rel)
+    skipped.set(reason, entry)
+  }
   for (let i = 0; i < files.length; i++) {
     const rel = files[i]!
     const abs = join(root, rel)
     if (!existsSync(abs)) continue
     const stats = statSync(abs)
     if (!stats.isFile() || stats.size > 5 * 1024 * 1024) {
-      skipped++
+      skip(!stats.isFile() ? 'not_regular_file_or_symlink' : 'too_large', rel)
       continue
     }
     const buffer = readFileSync(abs)
     if (buffer.subarray(0, 2048).includes(0)) {
-      skipped++
+      skip('binary', rel)
       continue
     }
     const content = buffer.toString('utf8')
@@ -190,14 +199,26 @@ async function indexCode(): Promise<number> {
       size_bytes: stats.size,
     })
     if (result.action === 'indexed' || result.action === 'updated' || result.action === 'skipped') indexed++
-    if (i < 10 || indexed % 100 === 0 || i + 1 === files.length) log(`code index ${i + 1}/${files.length} indexed=${indexed} skipped=${skipped}`)
+    const skippedCount = [...skipped.values()].reduce((sum, entry) => sum + entry.count, 0)
+    if (i < 10 || indexed % 100 === 0 || i + 1 === files.length) log(`code index ${i + 1}/${files.length} indexed=${indexed} skipped=${skippedCount}`)
+  }
+  const skippedTotal = [...skipped.values()].reduce((sum, entry) => sum + entry.count, 0)
+  if (skippedTotal > 0) {
+    log(`skipped non-text/non-regular files=${skippedTotal}`)
+    for (const [reason, entry] of skipped.entries()) {
+      log(`skip reason=${reason} count=${entry.count} samples=${entry.samples.join(', ')}`)
+    }
   }
   return indexed
 }
 
 async function embedAll(): Promise<void> {
-  log('warming embedding runtime')
-  await initEmbedding(loadConfig())
+  log(`warming embedding runtime device=${embeddingDevice}`)
+  const config = loadConfig()
+  config.embedding.text = { ...config.embedding.text, device: embeddingDevice as 'auto' | 'cpu' | 'cuda' | 'webgpu' }
+  if (config.embedding.code) config.embedding.code = { ...config.embedding.code, device: embeddingDevice as 'auto' | 'cpu' | 'cuda' | 'webgpu' }
+  config.reranker = { ...config.reranker, device: embeddingDevice as 'auto' | 'cpu' | 'cuda' | 'webgpu' }
+  await initEmbedding(config)
   const db = getDb()
   const memories = db.prepare(`
     SELECT memory_id, content FROM memories
