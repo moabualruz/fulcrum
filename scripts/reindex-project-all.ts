@@ -10,7 +10,7 @@ import {
   projectIdsFromPath,
   resolveRuntimeDataProfile,
   runMigrations,
-} from '../packages/core/src/index.ts'
+} from '../packages/core/dist/index.js'
 import {
   buildRagHealthReport,
   getVaultPath,
