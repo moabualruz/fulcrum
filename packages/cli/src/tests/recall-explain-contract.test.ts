@@ -170,6 +170,7 @@ describe('recall explain CLI/MCP contract', () => {
   })
 
   it('fails closed when an initialized provider violates explicit recall device', async () => {
+    await seedRecallFixture()
     resetProviders()
     registerEmbeddingProvider('fulcrum-cli-explain-mismatch-stub', () => new MismatchedEmbeddingProvider())
     await initEmbedding({

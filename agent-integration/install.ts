@@ -1785,7 +1785,7 @@ function printSummary(target: Target): void {
   if (target === "all" || target === "codex") {
     rows.push(["Codex MCP (native)", `codex mcp add fulcrum`]);
     rows.push(["Codex skills", `~/.codex/skills/fulcrum-*/`]);
-    rows.push(["Codex hooks", `~/.codex/config.toml [[hooks]]`]);
+    rows.push(["Codex hooks", `~/.codex/hooks.json`]);
   }
   if (target === "all" || target === "opencode") {
     rows.push(["opencode plugin + hooks", `~/.opencode/ plugin`]);
@@ -2137,62 +2137,62 @@ export async function installCodex(opts: {
     setRollback(`rm -rf ${codexRulesDir}`);
   });
 
-  // 3. Wire lifecycle hooks into config.toml (hooks are config-level — no plugin API for this)
+  // 3. Wire lifecycle hooks through hooks.json. Codex discovers hooks from
+  //    hooks.json in each config-layer folder; config.toml has no hooks key.
   const FULCRUM_HOOKS_MARKER = "fulcrum hook codex";
-  const FULCRUM_HOOKS_BLOCK_MARKER = "# BEGIN FULCRUM MANAGED BLOCK — hooks";
-  const FULCRUM_HOOKS_ENTRY = [
-    "",
-    FULCRUM_HOOKS_BLOCK_MARKER,
-    "# Fulcrum lifecycle hooks",
-    "[[hooks]]",
-    'event = "SessionStart"',
-    'command = "fulcrum hook codex session-start"',
-    "",
-    "# PR 6.1 — canonical rider injection on every user turn.",
-    "[[hooks]]",
-    'event = "UserPromptSubmit"',
-    'command = "fulcrum hook codex user-prompt-submit"',
-    "",
-    "# PR 6.2 — all-tool policy interceptor (PermissionRequest fires for",
-    "# Write/Edit/MultiEdit/Task/Bash — unlike PreToolUse which is Bash-only).",
-    "[[hooks]]",
-    'event = "PermissionRequest"',
-    'command = "fulcrum hook codex permission-request"',
-    "",
-    "[[hooks]]",
-    'event = "PreToolUse"',
-    'command = "fulcrum hook codex"',
-    "",
-    "[[hooks]]",
-    'event = "PostToolUse"',
-    'command = "fulcrum hook codex post"',
-    "",
-    "[[hooks]]",
-    'event = "Stop"',
-    'command = "fulcrum hook codex session-end"',
-    "# END FULCRUM MANAGED BLOCK — hooks",
-    "",
-  ].join("\n");
+  const codexHooksJsonSource = path.join(REPO_ROOT_LOCAL, "codex", "hooks.json");
+  const codexHooksJson = path.join(codexConfigDir, "hooks.json");
 
-  await step("Codex: lifecycle hooks → ~/.codex/config.toml", () => {
+  function hasFulcrumCodexCommand(entry: unknown): boolean {
+    if (!entry || typeof entry !== "object") return false;
+    const hooks = (entry as { hooks?: unknown }).hooks;
+    if (!Array.isArray(hooks)) return false;
+    return hooks.some((hook) => {
+      if (!hook || typeof hook !== "object") return false;
+      const command = (hook as { command?: unknown }).command;
+      return typeof command === "string" && command.includes(FULCRUM_HOOKS_MARKER);
+    });
+  }
+
+  function mergeCodexHooks(existingRaw: string | null, fulcrumRaw: string): string {
+    const fulcrum = JSON.parse(fulcrumRaw) as { hooks?: Record<string, unknown[]>; [k: string]: unknown };
+    const merged = existingRaw
+      ? JSON.parse(existingRaw) as { hooks?: Record<string, unknown[]>; [k: string]: unknown }
+      : {};
+    const fulcrumHooks = fulcrum.hooks ?? {};
+    const existingHooks = merged.hooks ?? {};
+    for (const [event, entries] of Object.entries(fulcrumHooks)) {
+      const currentEntries = Array.isArray(existingHooks[event]) ? existingHooks[event] : [];
+      existingHooks[event] = [
+        ...currentEntries.filter((entry) => !hasFulcrumCodexCommand(entry)),
+        ...entries,
+      ];
+    }
+    merged.hooks = existingHooks;
+    return `${JSON.stringify(merged, null, 2)}\n`;
+  }
+
+  await step("Codex: lifecycle hooks → ~/.codex/hooks.json", () => {
     if (dryRun) {
-      console.log(`  [dry-run] would add SessionStart/PreToolUse/PostToolUse/Stop hooks`);
+      console.log(`  [dry-run] would merge SessionStart/UserPromptSubmit/PermissionRequest/PreToolUse/PostToolUse/Stop hooks into ${codexHooksJson}`);
       ok(`(dry-run) hooks`);
       return;
     }
     fs.mkdirSync(codexConfigDir, { recursive: true });
-    const existing = fs.existsSync(codexConfigToml)
-      ? fs.readFileSync(codexConfigToml, "utf8")
-      : "";
-    if (existing.includes(FULCRUM_HOOKS_MARKER)) {
-      skip(`fulcrum hooks already in ${codexConfigToml}`);
+    const existing = fs.existsSync(codexHooksJson)
+      ? fs.readFileSync(codexHooksJson, "utf8")
+      : null;
+    const fulcrumHooks = fs.readFileSync(codexHooksJsonSource, "utf8");
+    const merged = mergeCodexHooks(existing, fulcrumHooks);
+    if (existing === merged) {
+      skip(`fulcrum hooks already in ${codexHooksJson}`);
       return;
     }
-    const sha256Before = sha256File(codexConfigToml);
-    fs.writeFileSync(codexConfigToml, existing + FULCRUM_HOOKS_ENTRY, "utf8");
-    ok(`wired SessionStart/PreToolUse/PostToolUse/Stop hooks`);
-    setRollback(`sed -i '/# BEGIN FULCRUM MANAGED BLOCK — hooks/,/# END FULCRUM MANAGED BLOCK — hooks/d' ${codexConfigToml}`);
-    setJournalMeta({ agent: "codex", action: "managed_marker", target_path: codexConfigToml, mode: "native", sha256_before: sha256Before, sha256_after: sha256File(codexConfigToml) });
+    const sha256Before = sha256File(codexHooksJson);
+    fs.writeFileSync(codexHooksJson, merged, "utf8");
+    ok(`wired SessionStart/UserPromptSubmit/PermissionRequest/PreToolUse/PostToolUse/Stop hooks`);
+    setRollback(existing === null ? `rm -f ${codexHooksJson}` : `remove Fulcrum hook entries from ${codexHooksJson}`);
+    setJournalMeta({ agent: "codex", action: "merge_json", target_path: codexHooksJson, mode: "native", sha256_before: sha256Before, sha256_after: sha256File(codexHooksJson) });
   });
 
   // 4. Write AGENTS.md to targetDir (project-level agent instructions for Codex)
@@ -2968,11 +2968,17 @@ export function verifyInstall(opts: {
     case "codex": {
       const codexDir = path.join(homeDir, ".codex");
       const configToml = path.join(codexDir, "config.toml");
+      const hooksJson = path.join(codexDir, "hooks.json");
       checks = [
         {
           path: "~/.codex/config.toml ([mcp_servers.fulcrum])",
           present: fs.existsSync(configToml) &&
             fs.readFileSync(configToml, "utf8").includes("[mcp_servers.fulcrum]"),
+        },
+        {
+          path: "~/.codex/hooks.json (fulcrum hook codex)",
+          present: fs.existsSync(hooksJson) &&
+            fs.readFileSync(hooksJson, "utf8").includes("fulcrum hook codex"),
         },
         checkGlob(path.join(codexDir, "skills"), /^fulcrum-/, "~/.codex/skills/fulcrum-*/"),
         checkGlob(path.join(codexDir, "rules"), /\.md$/, "~/.codex/rules/*.md"),

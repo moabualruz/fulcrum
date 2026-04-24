@@ -21,7 +21,7 @@ function openHealthDb(input: RagHealthCommandInput, db: Db | undefined): Db {
     data_dir: input.data_dir,
   })
   if (!existsSync(profile_manifest.paths.db)) {
-    throw new Error(`runtime profile database not found: ${profile_manifest.paths.db}`)
+    throw new Error(`runtime profile database not found: ${profile_manifest.path_fingerprints.db}`)
   }
   return getDbAtPath(profile_manifest.paths.db)
 }
@@ -49,6 +49,7 @@ export function executeRagRepairPlanCommand(input: RagHealthCommandInput = {}, d
     project_id: input.project_id ?? ids.project_id,
     runtime_profile: input.runtime_profile,
     data_dir: input.data_dir,
+    vault_path: input.vault_path,
   }, openHealthDb(input, db))
 }
 

@@ -316,6 +316,24 @@ checks, report persistence, and audit event.
 | `domains` | string[] | — | Domains to rebuild (`l0`, `l1`, `fts`, `code`, `vectors`, `graph`) |
 | `allow_empty` | boolean | — | Permit a zero-scope rebuild |
 
+### `start_rag_repair`
+
+Execute targeted repair through the rebuild pipeline and persist a repair run,
+rebuild report, final health, retry guidance, and errors.
+
+**Annotations:** destructive, long-running
+
+| Parameter | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `workspace_id` | string | — | Workspace ID |
+| `project_id` | string | — | Project ID |
+| `runtime_profile` | string | ✓ | Runtime data profile (`install`, `dev`, `test`) |
+| `confirm_profile` | string | — | Required profile confirmation for install-profile destructive runs |
+| `repair_plan_id` | string | — | Existing repair plan ID to attach |
+| `verification_refs` | string[] | — | Prior dev/test verification report IDs |
+| `domains` | string[] | — | Domains to repair (`l0`, `l1`, `fts`, `code`, `vectors`, `graph`) |
+| `allow_empty` | boolean | — | Permit a zero-scope repair |
+
 ### `get_rag_rebuild_report`
 
 Read a persisted rebuild report by ID.
@@ -525,7 +543,7 @@ Reads live status of an agent run.
 
 Returns the `workspace_id` and `project_id` for the directory the MCP server was started from. IDs are computed deterministically from the absolute path — no `.fulcrum.json` file is read, and two agents in the same checkout always get the same IDs.
 
-Also returns a `readiness` object that reports how many tools are currently exposed, whether the monitor HTTP server is reachable, and the suggested first canonical action for an agent that has just started.
+Also returns a `readiness` object that reports how many tools are currently exposed, whether the monitor HTTP server is reachable, the suggested first canonical action for an agent that has just started, and whether RAG recall has searchable L1 data yet.
 
 **Annotations:** read-only, idempotent
 
@@ -542,7 +560,14 @@ No parameters.
     "tools_available":   12,
     "monitor_url":       "http://localhost:4721",
     "monitor_running":   true,
-    "suggested_next_call": "list_tasks"
+    "suggested_next_call": "list_tasks",
+    "rag": {
+      "recall_status": "not_seeded",
+      "seeded": false,
+      "searchable_rows": 0,
+      "degraded_stages": ["l1", "vectors", "graph"],
+      "next_actions": ["Seed curated L1 memory before recall, for example by running memory ingest/curation or a scoped RAG rebuild."]
+    }
   }
 }
 ```
@@ -550,6 +575,8 @@ No parameters.
 When the MCP server is started in compatibility-heavy mode, `tools_available` may be larger. In planner-driven filtered mode, it reflects the active exposed subset for that runtime.
 
 `monitor_running` is probed with a 200 ms HTTP timeout and the result is cached for 15 seconds. Set `FULCRUM_MONITOR_PORT` to override the default port (4721). Set `FULCRUM_NO_MONITOR=1` to skip the probe entirely.
+
+When `readiness.rag.recall_status` is `not_seeded`, skip `recall_knowledge` for that workspace/project and seed/curate memory first. `recall_knowledge` also returns `reason: "not_seeded"` with the same readiness payload if called directly before seed data exists.
 
 ```
 mcp__fulcrum__get_current_context()

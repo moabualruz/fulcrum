@@ -235,6 +235,52 @@ describe('RAG health report', () => {
     expect(report.recommended_actions.join('\n')).toContain('graph')
   })
 
+  it('does not count recovered embedding job failures as unresolved', () => {
+    const body = 'recovered embedding body'
+    const hash = contentHash(body)
+    getDb().prepare(`
+      INSERT INTO memories (memory_id, workspace_id, project_id, content, content_hash, schema_version)
+      VALUES ('mem_recovered', 'ws_1', 'proj_1', ?, ?, 3)
+    `).run(body, hash)
+    getDb().prepare('INSERT INTO vec_memories(memory_id, embedding) VALUES (?, ?)').run('mem_recovered', Buffer.alloc(1024 * 4))
+    writeVectorMetadata({
+      workspace_id: 'ws_1',
+      source_domain: 'memory',
+      source_id: 'mem_recovered',
+      content_hash: hash,
+      provider: 'local',
+      model: 'test-model',
+      requested_device: 'auto',
+      actual_device: 'cuda',
+      dimensions: 1024,
+      vector_table: 'vec_memories',
+      status: 'current',
+    })
+    getDb().prepare(`
+      INSERT INTO embedding_jobs (
+        job_id, workspace_id, project_id, source_domain, status,
+        requested_provider, requested_model, requested_device, dimensions
+      ) VALUES ('job_recovered', 'ws_1', 'proj_1', 'l1_pages', 'degraded', 'local', 'unknown', 'auto', 1024)
+    `).run()
+    getDb().prepare(`
+      INSERT INTO embedding_job_items (
+        job_item_id, job_id, workspace_id, source_domain, source_id,
+        source_content_hash, requested_provider, requested_model, requested_device,
+        dimensions, status, attempts, error_type, error_message
+      ) VALUES (
+        'jobitem_recovered', 'job_recovered', 'ws_1', 'l1_pages', 'mem_recovered',
+        ?, 'local', 'unknown', 'auto', 1024, 'failed', 1, 'Error', 'old failure'
+      )
+    `).run(hash)
+
+    const report = buildRagHealthReport({ workspace_id: 'ws_1', project_id: 'proj_1' })
+    const vectors = report.domains['vectors'] as Record<string, unknown>
+
+    expect(vectors['failed']).toBe(0)
+    expect(vectors['failed_job_items']).toBe(0)
+    expect(vectors['failures_by_reason']).toEqual([])
+  })
+
   it('marks orphan raw and curated vault files as degraded coverage mismatches', () => {
     const rawDir = join(tmpVault, 'raw', 'bash_trace', '2026', '04', '23')
     const curatedDir = join(tmpVault, 'curated', 'pages')
@@ -315,6 +361,23 @@ describe('RAG health report', () => {
     expect(vectors).toMatchObject({ status: 'healthy', stale: 0 })
     expect(vectors['groups']).toEqual([])
     expect(report.recommended_actions.join('\n')).not.toContain('vector coverage')
+  })
+
+  it('does not require vectors for legacy pre-v3 memory rows', () => {
+    getDb().prepare(`
+      INSERT INTO memories (
+        memory_id, workspace_id, project_id, kind, scope, content, content_hash,
+        schema_version, vault_path, title, summary, entities, provenance
+      ) VALUES (
+        'mem_legacy_health', 'ws_1', 'proj_1', 'fact', 'project', 'legacy body', NULL,
+        2, 'memories/curated/mem_legacy_health.md', 'legacy', 'legacy', '[]', '{}'
+      )
+    `).run()
+
+    const report = buildRagHealthReport({ workspace_id: 'ws_1', project_id: 'proj_1' })
+    const vectors = report.domains['vectors'] as Record<string, unknown>
+
+    expect(vectors).toMatchObject({ status: 'healthy', missing_memory_metadata: 0 })
   })
 
   it('does not mask current-project orphan chunks with same file id in another project', () => {

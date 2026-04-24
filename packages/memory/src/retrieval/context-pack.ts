@@ -39,7 +39,7 @@ export function packContext(results: TypedContextResult[], budgetTokens: number)
       continue
     }
 
-    const tokenCount = estimateTokens(result)
+    const tokenCount = estimateContextTokens(result)
     if (usedTokens + tokenCount > budgetTokens) {
       truncatedResults += 1
       continue
@@ -66,8 +66,10 @@ export function packContext(results: TypedContextResult[], budgetTokens: number)
   }
 }
 
-function estimateTokens(result: TypedContextResult): number {
+export function estimateContextTokens(result: Pick<TypedContextResult, 'title' | 'snippet'>): number {
   const text = `${result.title} ${result.snippet}`.trim()
   if (!text) return 0
-  return text.split(/\s+/).filter(Boolean).length
+  const tokenLikePieces = text.match(/[\p{L}\p{N}]+|[^\s\p{L}\p{N}]/gu) ?? []
+  const charBudgetFloor = Math.ceil(text.length / 4)
+  return Math.max(tokenLikePieces.length, charBudgetFloor)
 }

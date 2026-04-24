@@ -475,8 +475,7 @@ TOOL_REGISTRY.set('recall_knowledge', {
   schema: TOOL_SCHEMA_MAP.get('recall_knowledge'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
   handler: async (args, deps) => {
-    const { recallKnowledge } = await import('./commands/memory-recall.js')
-    await warmRecallEmbedding()
+    const { assessRecallReadiness, recallKnowledge } = await import('./commands/memory-recall.js')
     const ws = (args['workspace_id'] as string | undefined) ?? deps.workspace_id
     const input: Parameters<typeof recallKnowledge>[0] = {
       workspace_id: ws,
@@ -490,7 +489,9 @@ TOOL_REGISTRY.set('recall_knowledge', {
     if (args['graph_hops'] !== undefined) input.graph_hops = args['graph_hops'] as number
     if (args['include_superseded'] !== undefined) input.include_superseded = Boolean(args['include_superseded'])
     if (args['explain'] !== undefined) input.explain = Boolean(args['explain'])
-    return recallKnowledge(input)
+    const readiness = assessRecallReadiness(input, deps.db)
+    if (readiness.seeded) await warmRecallEmbedding()
+    return recallKnowledge(input, deps.db)
   },
 })
 
@@ -716,6 +717,7 @@ TOOL_REGISTRY.set('resume_embedding_job', {
       workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
       project_id: deps.project_id,
       batch_size: args['batch_size'] as number | undefined,
+      max_items: args['max_items'] as number | undefined,
       actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
     }, deps.db)
   },
@@ -731,6 +733,7 @@ TOOL_REGISTRY.set('retry_embedding_job_failed', {
       workspace_id: (args['workspace_id'] as string | undefined) ?? deps.workspace_id,
       project_id: deps.project_id,
       batch_size: args['batch_size'] as number | undefined,
+      max_items: args['max_items'] as number | undefined,
       actor: { kind: 'agent', role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole, id: deps.trusted_caller_run_id ?? 'mcp' },
     }, deps.db)
   },
@@ -929,30 +932,42 @@ TOOL_REGISTRY.set('get_workspace_status', {
 TOOL_REGISTRY.set('get_current_context', {
   schema: TOOL_SCHEMA_MAP.get('get_current_context'),
   capabilities: { readOnly: true, destructive: false, hookEquivalent: true },
-  handler: async (_args, deps) => {
-    const { TOOL_SCHEMAS } = await import('./mcp-tools.js')
-    const { listTasks } = await import('fulcrum-agent-core')
-    const monitorPort = process.env['FULCRUM_MONITOR_PORT'] ?? '4721'
-    const monitorUrl = `http://localhost:${monitorPort}`
-    const monitorRunning = await probeMonitor(monitorUrl)
+	  handler: async (_args, deps) => {
+	    const { TOOL_SCHEMAS } = await import('./mcp-tools.js')
+	    const { listTasks } = await import('fulcrum-agent-core')
+	    const { assessRecallReadiness } = await import('./commands/memory-recall.js')
+	    const monitorPort = process.env['FULCRUM_MONITOR_PORT'] ?? '4721'
+	    const monitorUrl = `http://localhost:${monitorPort}`
+	    const monitorRunning = await probeMonitor(monitorUrl)
 
     let suggestedNextCall = 'list_tasks'
     try {
       const tasks = await listTasks({ workspace_id: deps.workspace_id, limit: 1 })
       if (tasks.length === 0) suggestedNextCall = 'create_task'
-    } catch { /* DB not ready — fall through */ }
+	    } catch { /* DB not ready — fall through */ }
+	    const ragReadiness = assessRecallReadiness({
+	      workspace_id: deps.workspace_id,
+	      project_id: deps.project_id,
+	    }, deps.db)
 
-    return {
+	    return {
       workspace_id: deps.workspace_id,
       project_id: deps.project_id,
       cwd: process.cwd(),
       readiness: {
         tools_available: TOOL_SCHEMAS.length,
-        monitor_url: monitorUrl,
-        monitor_running: monitorRunning,
-        suggested_next_call: suggestedNextCall,
-      },
-    }
+	        monitor_url: monitorUrl,
+	        monitor_running: monitorRunning,
+	        suggested_next_call: suggestedNextCall,
+	        rag: {
+	          recall_status: ragReadiness.status,
+	          seeded: ragReadiness.seeded,
+	          searchable_rows: ragReadiness.searchable_rows,
+	          degraded_stages: ragReadiness.degraded_stages,
+	          next_actions: ragReadiness.next_actions,
+	        },
+	      },
+	    }
   },
 })
 

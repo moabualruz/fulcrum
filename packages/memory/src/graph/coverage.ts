@@ -1,6 +1,7 @@
 import { getDb, newId } from 'fulcrum-agent-core'
 import type { Db } from 'fulcrum-agent-core'
 import {
+  clearGraphEvidenceCaches,
   persistGraphEvidenceUnit,
   readGraphEvidenceUnits,
   type GraphEvidenceDomain,
@@ -53,6 +54,28 @@ interface CoverageSource {
 }
 
 const GRAPH_DOMAINS: GraphEvidenceDomain[] = ['memory', 'task', 'decision', 'error', 'fix', 'file', 'symbol', 'import', 'call']
+const DEFAULT_IMPORT_SOURCE_LIMIT = 10_000
+const DEFAULT_CALL_SOURCE_LIMIT = 10_000
+const DEFAULT_IMPORTS_PER_FILE_LIMIT = 40
+const DEFAULT_CALLS_PER_FILE_LIMIT = 40
+const CODE_GRAPH_LANGUAGES = new Set([
+  'javascript',
+  'typescript',
+  'tsx',
+  'jsx',
+  'python',
+  'ruby',
+  'go',
+  'rust',
+  'java',
+  'kotlin',
+  'scala',
+  'c',
+  'cpp',
+  'csharp',
+  'php',
+  'swift',
+])
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -87,6 +110,18 @@ function parseJsonObject(value: unknown): Record<string, unknown> {
   }
 }
 
+function intFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name]
+  if (!raw) return fallback
+  const parsed = Number.parseInt(raw, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function isCodeGraphLanguage(language: unknown): boolean {
+  if (typeof language !== 'string' || language.length === 0) return false
+  return CODE_GRAPH_LANGUAGES.has(language.toLowerCase())
+}
+
 function memorySpecificDomain(kind: string): GraphEvidenceDomain | null {
   if (kind === 'decision') return 'decision'
   if (kind === 'error') return 'error'
@@ -113,6 +148,7 @@ function memorySources(input: { workspace_id: string; project_id: string }, db: 
     SELECT memory_id, kind, title, summary, content, content_hash, entities
       FROM memories
      WHERE workspace_id = ? AND (project_id = ? OR project_id IS NULL)
+       AND schema_version >= 3
   `, input.workspace_id, input.project_id)
   const sources: CoverageSource[] = []
   for (const row of rows) {
@@ -213,22 +249,32 @@ function extractCalls(content: string): string[] {
 
 function codeChunkRows(input: { workspace_id: string; project_id: string }, db: Db): Array<Record<string, unknown>> {
   return safeRows<Record<string, unknown>>(db, `
-    SELECT chunk_id, file_id, file_path, content, content_hash, start_line, end_line, symbol_path
+    SELECT chunk_id, file_id, file_path, language, content, content_hash, start_line, end_line, symbol_path
       FROM code_chunks
      WHERE workspace_id = ? AND project_id = ?
+     ORDER BY indexed_at DESC, chunk_id
   `, input.workspace_id, input.project_id)
 }
 
 function importSources(input: { workspace_id: string; project_id: string }, db: Db): CoverageSource[] {
   const sources: CoverageSource[] = []
+  const globalLimit = intFromEnv('FULCRUM_GRAPH_IMPORT_SOURCE_LIMIT', DEFAULT_IMPORT_SOURCE_LIMIT)
+  const perFileLimit = intFromEnv('FULCRUM_GRAPH_IMPORTS_PER_FILE_LIMIT', DEFAULT_IMPORTS_PER_FILE_LIMIT)
+  const perFile = new Map<string, number>()
   for (const row of codeChunkRows(input, db)) {
+    if (!isCodeGraphLanguage(row['language'])) continue
     for (const imported of extractImports(String(row['content'] ?? ''))) {
+      if (sources.length >= globalLimit) return sources
+      const filePath = String(row['file_path'] || '')
+      const count = perFile.get(filePath) ?? 0
+      if (count >= perFileLimit) continue
+      perFile.set(filePath, count + 1)
       sources.push({
         domain: 'import',
         source_id: `${row['chunk_id']}:import:${imported}`,
         source_domain: 'code_chunk',
         name: imported,
-        file_path: String(row['file_path'] || ''),
+        file_path: filePath,
         line_start: row['start_line'] === null || row['start_line'] === undefined ? undefined : Number(row['start_line']),
         line_end: row['end_line'] === null || row['end_line'] === undefined ? undefined : Number(row['end_line']),
         symbol_path: row['symbol_path'] === null || row['symbol_path'] === undefined ? undefined : String(row['symbol_path']),
@@ -249,14 +295,23 @@ function importSources(input: { workspace_id: string; project_id: string }, db: 
 
 function callSources(input: { workspace_id: string; project_id: string }, db: Db): CoverageSource[] {
   const sources: CoverageSource[] = []
+  const globalLimit = intFromEnv('FULCRUM_GRAPH_CALL_SOURCE_LIMIT', DEFAULT_CALL_SOURCE_LIMIT)
+  const perFileLimit = intFromEnv('FULCRUM_GRAPH_CALLS_PER_FILE_LIMIT', DEFAULT_CALLS_PER_FILE_LIMIT)
+  const perFile = new Map<string, number>()
   for (const row of codeChunkRows(input, db)) {
+    if (!isCodeGraphLanguage(row['language'])) continue
     for (const called of extractCalls(String(row['content'] ?? ''))) {
+      if (sources.length >= globalLimit) return sources
+      const filePath = String(row['file_path'] || '')
+      const count = perFile.get(filePath) ?? 0
+      if (count >= perFileLimit) continue
+      perFile.set(filePath, count + 1)
       sources.push({
         domain: 'call',
         source_id: `${row['chunk_id']}:call:${called}`,
         source_domain: 'code_chunk',
         name: called,
-        file_path: String(row['file_path'] || ''),
+        file_path: filePath,
         line_start: row['start_line'] === null || row['start_line'] === undefined ? undefined : Number(row['start_line']),
         line_end: row['end_line'] === null || row['end_line'] === undefined ? undefined : Number(row['end_line']),
         symbol_path: row['symbol_path'] === null || row['symbol_path'] === undefined ? undefined : String(row['symbol_path']),
@@ -273,6 +328,149 @@ function callSources(input: { workspace_id: string; project_id: string }, db: Db
     }
   }
   return sources
+}
+
+function fileSourceForFile(
+  input: { workspace_id: string; project_id: string; file_id?: string; rel_path?: string },
+  db: Db,
+): CoverageSource | null {
+  const row = safeRows<Record<string, unknown>>(db, `
+    SELECT file_id, rel_path, sha256
+      FROM code_files
+     WHERE workspace_id = ? AND project_id = ?
+       AND (? IS NULL OR file_id = ?)
+       AND (? IS NULL OR rel_path = ?)
+     LIMIT 1
+  `, input.workspace_id, input.project_id, input.file_id ?? null, input.file_id ?? null, input.rel_path ?? null, input.rel_path ?? null)[0]
+  if (!row) return null
+  return {
+    domain: 'file',
+    source_id: String(row['file_id']),
+    source_domain: 'file',
+    name: String(row['rel_path'] || row['file_id']),
+    file_path: String(row['rel_path'] || ''),
+    content_hash: row['sha256'] === null || row['sha256'] === undefined ? undefined : String(row['sha256']),
+  }
+}
+
+function symbolSourcesForFile(
+  input: { workspace_id: string; project_id: string; file_id: string },
+  db: Db,
+): CoverageSource[] {
+  return safeRows<Record<string, unknown>>(db, `
+    SELECT f.file_id, f.rel_path, f.sha256, s.name, s.kind, s.line
+      FROM code_symbols s
+      JOIN code_files f ON f.file_id = s.file_id
+     WHERE f.workspace_id = ? AND f.project_id = ? AND f.file_id = ?
+  `, input.workspace_id, input.project_id, input.file_id).map(row => ({
+    domain: 'symbol',
+    source_id: `${row['file_id']}:${row['name']}:${row['line']}`,
+    source_domain: 'file',
+    name: String(row['name']),
+    file_path: String(row['rel_path'] || ''),
+    line_start: Number(row['line']),
+    line_end: Number(row['line']),
+    symbol_path: String(row['name']),
+    content_hash: row['sha256'] === null || row['sha256'] === undefined ? undefined : String(row['sha256']),
+  }))
+}
+
+function codeChunkRowsForFile(
+  input: { workspace_id: string; project_id: string; file_id: string },
+  db: Db,
+): Array<Record<string, unknown>> {
+  return safeRows<Record<string, unknown>>(db, `
+    SELECT chunk_id, file_id, file_path, language, content, content_hash, start_line, end_line, symbol_path
+      FROM code_chunks
+     WHERE workspace_id = ? AND project_id = ? AND file_id = ?
+     ORDER BY indexed_at DESC, chunk_id
+  `, input.workspace_id, input.project_id, input.file_id)
+}
+
+function importSourcesForRows(input: { project_id: string }, rows: Array<Record<string, unknown>>): CoverageSource[] {
+  const sources: CoverageSource[] = []
+  const perFileLimit = intFromEnv('FULCRUM_GRAPH_IMPORTS_PER_FILE_LIMIT', DEFAULT_IMPORTS_PER_FILE_LIMIT)
+  const perFile = new Map<string, number>()
+  for (const row of rows) {
+    if (!isCodeGraphLanguage(row['language'])) continue
+    for (const imported of extractImports(String(row['content'] ?? ''))) {
+      const filePath = String(row['file_path'] || '')
+      const count = perFile.get(filePath) ?? 0
+      if (count >= perFileLimit) continue
+      perFile.set(filePath, count + 1)
+      sources.push({
+        domain: 'import',
+        source_id: `${row['chunk_id']}:import:${imported}`,
+        source_domain: 'code_chunk',
+        name: imported,
+        file_path: filePath,
+        line_start: row['start_line'] === null || row['start_line'] === undefined ? undefined : Number(row['start_line']),
+        line_end: row['end_line'] === null || row['end_line'] === undefined ? undefined : Number(row['end_line']),
+        symbol_path: row['symbol_path'] === null || row['symbol_path'] === undefined ? undefined : String(row['symbol_path']),
+        content_hash: row['content_hash'] === null || row['content_hash'] === undefined ? undefined : String(row['content_hash']),
+        source_ref: {
+          source_domain: 'code_chunk',
+          source_id: String(row['chunk_id']),
+          project_id: input.project_id,
+          content_hash: row['content_hash'] === null || row['content_hash'] === undefined ? undefined : String(row['content_hash']),
+          file_path: filePath,
+          symbol_path: `import:${imported}`,
+        },
+      })
+    }
+  }
+  return sources
+}
+
+function callSourcesForRows(input: { project_id: string }, rows: Array<Record<string, unknown>>): CoverageSource[] {
+  const sources: CoverageSource[] = []
+  const perFileLimit = intFromEnv('FULCRUM_GRAPH_CALLS_PER_FILE_LIMIT', DEFAULT_CALLS_PER_FILE_LIMIT)
+  const perFile = new Map<string, number>()
+  for (const row of rows) {
+    if (!isCodeGraphLanguage(row['language'])) continue
+    for (const called of extractCalls(String(row['content'] ?? ''))) {
+      const filePath = String(row['file_path'] || '')
+      const count = perFile.get(filePath) ?? 0
+      if (count >= perFileLimit) continue
+      perFile.set(filePath, count + 1)
+      sources.push({
+        domain: 'call',
+        source_id: `${row['chunk_id']}:call:${called}`,
+        source_domain: 'code_chunk',
+        name: called,
+        file_path: filePath,
+        line_start: row['start_line'] === null || row['start_line'] === undefined ? undefined : Number(row['start_line']),
+        line_end: row['end_line'] === null || row['end_line'] === undefined ? undefined : Number(row['end_line']),
+        symbol_path: row['symbol_path'] === null || row['symbol_path'] === undefined ? undefined : String(row['symbol_path']),
+        content_hash: row['content_hash'] === null || row['content_hash'] === undefined ? undefined : String(row['content_hash']),
+        source_ref: {
+          source_domain: 'code_chunk',
+          source_id: String(row['chunk_id']),
+          project_id: input.project_id,
+          content_hash: row['content_hash'] === null || row['content_hash'] === undefined ? undefined : String(row['content_hash']),
+          file_path: filePath,
+          symbol_path: `call:${called}`,
+        },
+      })
+    }
+  }
+  return sources
+}
+
+function collectFileCoverageSources(
+  input: { workspace_id: string; project_id: string; file_id?: string; rel_path?: string },
+  db: Db,
+): CoverageSource[] {
+  const file = fileSourceForFile(input, db)
+  if (!file) return []
+  const fileInput = { workspace_id: input.workspace_id, project_id: input.project_id, file_id: file.source_id }
+  const rows = codeChunkRowsForFile(fileInput, db)
+  return [
+    file,
+    ...symbolSourcesForFile(fileInput, db),
+    ...importSourcesForRows(input, rows),
+    ...callSourcesForRows(input, rows),
+  ]
 }
 
 function collectCoverageSources(input: { workspace_id: string; project_id: string }, db: Db): CoverageSource[] {
@@ -523,6 +721,82 @@ function deleteRowsByIds(db: Db, table: 'graph_entities' | 'graph_edges' | 'rag_
   for (const id of ids) stmt.run(id)
 }
 
+function sourceRefTouchesFile(ref: GraphEvidenceSourceRef, file_id: string, rel_path?: string): boolean {
+  if (ref.source_id === file_id) return true
+  if (ref.source_id?.startsWith(`${file_id}:`)) return true
+  return Boolean(rel_path && ref.file_path === rel_path)
+}
+
+function unitTouchesFile(unit: GraphEvidenceUnit, file_id: string, rel_path?: string): boolean {
+  return unit.source_refs.some(ref => sourceRefTouchesFile(ref, file_id, rel_path))
+}
+
+function coverageSourceIdForUnit(unit: GraphEvidenceUnit, ref: GraphEvidenceSourceRef): string | null {
+  if (unit.domain === 'import' || unit.domain === 'call') {
+    return ref.source_id && unit.name ? `${ref.source_id}:${unit.domain}:${unit.name}` : null
+  }
+  return ref.source_id ?? null
+}
+
+function clearFileGraphCoverageRecords(
+  input: { workspace_id: string; project_id: string; file_id: string; rel_path?: string },
+  staleUnits: GraphEvidenceUnit[],
+  currentSources: CoverageSource[],
+  db: Db,
+): void {
+  const keys = new Map<string, Set<string>>()
+  const add = (sourceDomain: string, sourceId: string | null): void => {
+    if (!sourceId) return
+    const ids = keys.get(sourceDomain) ?? new Set<string>()
+    ids.add(sourceId)
+    keys.set(sourceDomain, ids)
+  }
+
+  add('file_chunk', input.file_id)
+  for (const source of currentSources) add(coverageSourceDomain(source.domain), source.source_id)
+  for (const unit of staleUnits) {
+    for (const ref of unit.source_refs) {
+      if (!sourceRefTouchesFile(ref, input.file_id, input.rel_path)) continue
+      add(unit.domain === 'import' || unit.domain === 'call' ? 'code_chunk' : 'file_chunk', coverageSourceIdForUnit(unit, ref))
+    }
+  }
+
+  const stmt = db.prepare(`
+    DELETE FROM rag_coverage_records
+     WHERE workspace_id = ?
+       AND project_id = ?
+       AND derived_domain = 'graph'
+       AND source_domain = ?
+       AND source_id = ?
+  `)
+  for (const [domain, ids] of keys) {
+    for (const id of ids) stmt.run(input.workspace_id, input.project_id, domain, id)
+  }
+}
+
+function clearFileGraphEvidence(
+  input: { workspace_id: string; project_id: string; file_id: string; rel_path?: string },
+  currentSources: CoverageSource[],
+  db: Db,
+): void {
+  const staleUnits = readGraphEvidenceUnits(input, db).filter(unit => unitTouchesFile(unit, input.file_id, input.rel_path))
+  const entityIds = staleUnits.filter(unit => unit.kind !== 'edge').map(unit => unit.graph_unit_id)
+  const edgeIds = new Set(staleUnits.filter(unit => unit.kind === 'edge').map(unit => unit.graph_unit_id))
+  if (entityIds.length > 0) {
+    const edgeRows = safeRows<Record<string, unknown>>(db, `
+      SELECT edge_id
+        FROM graph_edges
+       WHERE workspace_id = ?
+         AND (source_id IN (${entityIds.map(() => '?').join(',')}) OR target_id IN (${entityIds.map(() => '?').join(',')}))
+    `, input.workspace_id, ...entityIds, ...entityIds)
+    for (const row of edgeRows) edgeIds.add(String(row['edge_id']))
+  }
+  deleteRowsByIds(db, 'graph_edges', 'edge_id', Array.from(edgeIds))
+  deleteRowsByIds(db, 'graph_entities', 'entity_id', entityIds)
+  clearFileGraphCoverageRecords(input, staleUnits, currentSources, db)
+  clearGraphEvidenceCaches(db)
+}
+
 function deleteUntouchedProjectGraphEvidence(input: { workspace_id: string; project_id: string }, touchedIds: Set<string>, db: Db): void {
   deleteRowsByIds(db, 'graph_edges', 'edge_id', projectGraphEvidenceIds(db, 'graph_edges', 'edge_id', input).filter(id => !touchedIds.has(id)))
   deleteRowsByIds(db, 'graph_entities', 'entity_id', projectGraphEvidenceIds(db, 'graph_entities', 'entity_id', input).filter(id => !touchedIds.has(id)))
@@ -583,4 +857,33 @@ export function rebuildGraphCoverage(
   tx()
 
   return summarize(input, sources, readGraphEvidenceUnits(input, db))
+}
+
+export function refreshGraphCoverageForCodeFile(
+  input: { workspace_id: string; project_id: string; file_id: string; rel_path?: string },
+  db: Db = getDb(),
+): void {
+  const sources = collectFileCoverageSources(input, db)
+  const entityIds = new Map<string, string>()
+
+  const tx = db.transaction(() => {
+    clearFileGraphEvidence(input, sources, db)
+    for (const source of sources) {
+      const entity = persistGraphEvidenceUnit({
+        workspace_id: input.workspace_id,
+        project_id: input.project_id,
+        kind: 'entity',
+        domain: source.domain,
+        relationship_type: 'represents',
+        name: sourceEntityName(source),
+        source_refs: [source.source_ref ?? sourceRef(source, input.project_id)],
+        confidence: 0.85,
+        freshness: 'current',
+      }, db)
+      entityIds.set(`${source.domain}:${source.source_id}`, entity.graph_unit_id)
+      upsertCoverageRecord(input, source, 'current', db)
+    }
+    rebuildCodeRelationships(input, sources, entityIds, db)
+  })
+  tx()
 }

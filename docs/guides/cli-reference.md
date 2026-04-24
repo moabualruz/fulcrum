@@ -99,8 +99,10 @@ not mutate state. `--execute` writes audit events and leaves the previous served
 state unchanged when parity or stale-snapshot checks fail.
 
 The MCP/action equivalents are `get_rag_rebuild_plan`,
-`get_rag_rebuild_dry_run`, `start_rag_rebuild`, and
-`get_rag_rebuild_report`.
+`get_rag_rebuild_dry_run`, `start_rag_rebuild`, `start_rag_repair`, and
+`get_rag_rebuild_report`. `start_rag_repair` uses the same rebuild/report
+pipeline but also records a `rag_repair_runs` row with final health, retry
+actions, and errors.
 
 Legacy rebuild is still available for the older L1/L2 vault path:
 
@@ -193,6 +195,9 @@ fulcrum memory recall "why did rebuild fail" --explain --json
 | `--explain` | `false` | Include stage ranks/scores, runtime provider/model/device, provenance class, source refs, supersession, confidence, freshness, and graph contribution |
 
 The MCP/action equivalent is `recall_knowledge` with `explain: true`.
+If the workspace/project has no searchable L1 pages yet, the command returns
+`reason: "not_seeded"` plus a `readiness` object instead of warming embeddings or
+running an empty retrieval pass.
 
 ---
 

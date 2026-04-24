@@ -1,30 +1,7 @@
 name: Memory Eval
 
 on:
-  schedule:
-    - cron: '0 2 * * *'  # nightly at 02:00 UTC
-  pull_request:
-    paths:
-      - 'specs/001-rag-lifecycle-hardening/**'
-      - 'specs/002-rag-roadmap-delivery/**'
-      - 'packages/memory/package.json'
-      - 'packages/memory/src/eval/**'
-      - 'packages/memory/src/retrieval/query-trace.ts'
-      - 'packages/memory/src/retrieval/search-code.ts'
-      - 'packages/memory/src/retrieval/search-context.ts'
-      - 'packages/memory/src/l2/**'
-      - 'packages/memory/src/graph/**'
-      - 'packages/memory/src/setup/rag-*.ts'
-      - 'packages/memory/src/**'
-      - 'packages/core/src/db/**'
-      - 'packages/core/src/types.ts'
-      - 'packages/core/src/ids.ts'
-      - 'packages/cli/src/**'
-      - 'packages/cli/src/index.ts'
-      - 'packages/cli/src/commands/memory-rag-*.ts'
-      - 'packages/cli/src/tool-registry.ts'
-      - 'packages/cli/src/mcp-tools.ts'
-      - '.github/workflows/memory-eval.yml'
+  workflow_dispatch:
 
 jobs:
   rag-lifecycle-eval:

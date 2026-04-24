@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
 import { getDb } from 'fulcrum-agent-core'
 import { appendRagJobEvent, createEmbeddingJob, getEmbeddingJob, listEmbeddingJobItems, listRagJobEvents, runEmbeddingJob } from '../l2/embedding-jobs.js'
@@ -23,6 +26,58 @@ function seedMemory(id: string, body: string): void {
 }
 
 describe('embedding job ledger schema and mappers', () => {
+  it('defaults requested runtime from embedding config when caller omits it', () => {
+    seedMemory('mem_configured', 'configured runtime body')
+    const originalDataDir = process.env.FULCRUM_DATA_DIR
+    const dataDir = mkdtempSync(join(tmpdir(), 'fulcrum-embedding-config-'))
+    process.env.FULCRUM_DATA_DIR = dataDir
+    writeFileSync(join(dataDir, 'config.json'), JSON.stringify({
+      embedding: {
+        text: { provider: 'local', model: 'configured-text-model', dimensions: 384, device: 'cpu' },
+        code: { provider: 'local', model: 'configured-code-model', dimensions: 1024, device: 'cuda' },
+      },
+    }))
+
+    try {
+      const memoryJob = createEmbeddingJob({
+        workspace_id: 'ws_1',
+        project_id: 'proj_1',
+        source_domain: 'memories',
+      })
+      const memoryItems = listEmbeddingJobItems({ job_id: memoryJob.job_id, workspace_id: 'ws_1' })
+
+      expect(memoryJob).toMatchObject({
+        requested_provider: 'local',
+        requested_model: 'configured-text-model',
+        requested_device: 'cpu',
+        dimensions: 384,
+      })
+      expect(memoryItems[0]).toMatchObject({
+        requested_model: 'configured-text-model',
+        requested_device: 'cpu',
+        dimensions: 384,
+      })
+
+      const codeJob = createEmbeddingJob({
+        workspace_id: 'ws_1',
+        project_id: 'proj_1',
+        source_domain: 'code_chunks',
+        scope: { allow_empty: true },
+      })
+
+      expect(codeJob).toMatchObject({
+        requested_provider: 'local',
+        requested_model: 'configured-code-model',
+        requested_device: 'cuda',
+        dimensions: 1024,
+      })
+    } finally {
+      if (originalDataDir === undefined) delete process.env.FULCRUM_DATA_DIR
+      else process.env.FULCRUM_DATA_DIR = originalDataDir
+      rmSync(dataDir, { recursive: true, force: true })
+    }
+  })
+
   it('creates workspace-scoped jobs, items, and redacted event rows', () => {
     seedMemory('mem_1', 'schema mapper body')
 

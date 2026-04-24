@@ -1,4 +1,4 @@
-import type { AgentRole, RuntimeDataProfile, RuntimeExperimentStatus } from 'fulcrum-agent-core'
+import type { AgentRole, Db, FulcrumConfig, RuntimeDataProfile, RuntimeExperimentStatus } from 'fulcrum-agent-core'
 import type { RagRebuildDomain } from 'fulcrum-memory'
 import { TOOL_SCHEMA_MAP } from './mcp-tools.js'
 import type { HandlerDeps, RegistryEntry } from './tool-registry-types.js'
@@ -27,6 +27,42 @@ function actor(deps: HandlerDeps): { kind: 'agent'; role: AgentRole; id: string 
     kind: 'agent',
     role: (deps.trusted_caller_role ?? 'software_engineer') as AgentRole,
     id: deps.trusted_caller_run_id ?? 'mcp',
+  }
+}
+
+function shouldFailClosedOnEmbeddingInit(config: FulcrumConfig): boolean {
+  return [
+    config.embedding.text.device,
+    config.embedding.code?.device,
+    config.reranker.device,
+  ].some((device) => device !== undefined && device !== 'auto')
+}
+
+function hasCurrentCodeVectors(db: Db, workspace_id: string): boolean {
+  try {
+    const row = db.prepare(`
+      SELECT 1
+        FROM vector_metadata
+       WHERE workspace_id = ?
+         AND vector_table = 'vec_chunks'
+         AND status = 'current'
+       LIMIT 1
+    `).get(workspace_id)
+    return Boolean(row)
+  } catch {
+    return false
+  }
+}
+
+async function warmCodeSearchEmbedding(db: Db, workspace_id: string): Promise<void> {
+  if (!hasCurrentCodeVectors(db, workspace_id)) return
+  const { getCodeEmbedder, initEmbedding, loadConfig } = await import('fulcrum-agent-core')
+  if (getCodeEmbedder()) return
+  const config = loadConfig()
+  try {
+    await initEmbedding(config)
+  } catch (err) {
+    if (shouldFailClosedOnEmbeddingInit(config)) throw err
   }
 }
 
@@ -81,6 +117,25 @@ export function registerRagToolEntries(registry: Map<string, RegistryEntry>): vo
         allow_empty: args['allow_empty'] as boolean | undefined,
         actor: actor(deps),
       })
+    },
+  })
+
+  registry.set('start_rag_repair', {
+    schema: TOOL_SCHEMA_MAP.get('start_rag_repair'),
+    capabilities: { readOnly: false, destructive: true, hookEquivalent: false },
+    handler: async (args, deps) => {
+      const { executeRagRepairCommand } = await import('./commands/memory-rag-lifecycle.js')
+      return stripNullish(await executeRagRepairCommand({
+        workspace_id: ws(args, deps),
+        project_id: proj(args, deps),
+        runtime_profile: args['runtime_profile'] as RuntimeDataProfile,
+        confirm_profile: args['confirm_profile'] as RuntimeDataProfile | undefined,
+        verification_refs: args['verification_refs'] as string[] | undefined,
+        domains: args['domains'] as RagRebuildDomain[] | undefined,
+        allow_empty: args['allow_empty'] as boolean | undefined,
+        repair_plan_id: args['repair_plan_id'] as string | undefined,
+        actor: actor(deps),
+      }, deps.db))
     },
   })
 
@@ -140,8 +195,8 @@ export function registerRagToolEntries(registry: Map<string, RegistryEntry>): vo
     schema: TOOL_SCHEMA_MAP.get('search_context'),
     capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
     handler: async (args, deps) => {
-      const { searchContext } = await import('fulcrum-memory')
-      return searchContext({
+      const { executeMemorySearchContextCommand } = await import('./commands/memory-search-context.js')
+      return executeMemorySearchContextCommand({
         query: args['query'] as string,
         workspace_id: ws(args, deps),
         project_id: proj(args, deps),
@@ -246,6 +301,7 @@ export function registerRagToolEntries(registry: Map<string, RegistryEntry>): vo
     capabilities: { readOnly: true, destructive: false, hookEquivalent: false },
     handler: async (args, deps) => {
       const { searchCode } = await import('fulcrum-memory')
+      await warmCodeSearchEmbedding(deps.db, ws(args, deps))
       const envelope = await searchCode({
         workspace_id: ws(args, deps),
         project_id: proj(args, deps),

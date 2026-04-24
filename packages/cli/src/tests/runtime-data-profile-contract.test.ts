@@ -94,7 +94,8 @@ describe('runtime profile CLI contract', () => {
     })
 
     expect(result.status).toBe('completed')
-    expect(result.profile_manifest.paths.db).toBe(join(tempRoot, 'profiles', 'dev', 'fulcrum.db'))
+    expect(result.profile_manifest).not.toHaveProperty('paths')
+    expect(result.profile_manifest.path_fingerprints.db).toMatch(/^sha256:/)
 
     const devDb = new Database(join(tempRoot, 'profiles', 'dev', 'fulcrum.db'))
     const installCheckDb = new Database(join(tempRoot, 'fulcrum.db'))
@@ -105,6 +106,29 @@ describe('runtime profile CLI contract', () => {
       devDb.close()
       installCheckDb.close()
     }
+  })
+
+  it('uses the active default DB for dev rebuilds when the current workspace exists there', async () => {
+    closeDb()
+    tempRoot = mkdtempSync(join(tmpdir(), 'fulcrum-cli-active-profile-db-'))
+    vi.stubEnv('FULCRUM_DATA_DIR', tempRoot)
+    const activeDb = getDb()
+    runMigrations(activeDb)
+    activeDb.prepare("INSERT INTO workspaces(workspace_id, name) VALUES ('ws_active', 'ws_active')").run()
+    activeDb.prepare("INSERT INTO projects(project_id, workspace_id, name) VALUES ('proj_active', 'ws_active', 'proj_active')").run()
+
+    const result = await executeRagRebuildCommand({
+      workspace_id: 'ws_active',
+      project_id: 'proj_active',
+      mode: 'execute',
+      runtime_profile: 'dev',
+      domains: ['code'],
+      allow_empty: true,
+    })
+
+    expect(result.status).toBe('completed')
+    expect(activeDb.prepare('SELECT COUNT(*) AS n FROM rag_rebuild_reports').get()).toEqual({ n: 1 })
+    expect(result.profile_manifest).not.toHaveProperty('paths')
   })
 
   it('fails closed when an injected file DB does not match the selected profile', async () => {
@@ -123,6 +147,7 @@ describe('runtime profile CLI contract', () => {
 
     expect(result.status).toBe('failed')
     expect(result.errors).toContainEqual(expect.objectContaining({ code: 'runtime_profile_db_mismatch' }))
+    expect(JSON.stringify(result.errors)).not.toContain(tempRoot)
     expect(wrongDb.prepare('SELECT COUNT(*) AS n FROM rag_rebuild_reports').get()).toEqual({ n: 0 })
     wrongDb.close()
   })

@@ -106,11 +106,18 @@ describe('search planner baseline lanes', () => {
       project_id: 'proj_lane',
       limit: 5,
       explain: true,
+      persist: true,
     }, db)
 
     expect(response.results[0]?.source_ref.source_id).toBe('mem_semantic_lane')
     expect(response.results[0]?.stage_contributions.map(stage => stage.stage)).toContain('semantic')
     expect(response.skipped_stages).not.toContainEqual(expect.objectContaining({ stage: 'semantic' }))
+    const trace = db.prepare('SELECT runtime_truth FROM rag_query_traces WHERE query_trace_id = ?')
+      .get(response.query_trace_id) as { runtime_truth: string }
+    expect(JSON.parse(trace.runtime_truth)).toMatchObject({
+      model_calls: 2,
+      retrieval: 'sqlite-lexical-contextual-semantic',
+    })
   })
 
   it('returns semantic code candidates through unified search when lexical overlap is weak', async () => {

@@ -104,6 +104,18 @@ describe('PCI walker integration — v2a PR 4 Task 21', () => {
     expect(shouldIndexPath(root, join(root, '.hidden'))).toBe(false)
   })
 
+  it('rejects transient test and bundler config artifacts', async () => {
+    mkdirSync(join(root, 'packages/memory'), { recursive: true })
+    writeFileSync(join(root, 'packages/memory/vitest.config.ts.timestamp-1776990501367-cd33f86df76b18.mjs'), 'export default {}')
+    writeFileSync(join(root, 'packages/memory/tsup.config.bundled_vdnkg42ics.mjs'), 'export default {}')
+    writeFileSync(join(root, 'packages/memory/kept.ts'), 'export const kept = true')
+
+    const result = await enumerateProjectFiles(root)
+    expect(result.files).toEqual(['packages/memory/kept.ts'])
+    expect(shouldIndexPath(root, join(root, 'packages/memory/vitest.config.ts.timestamp-1776990501367-cd33f86df76b18.mjs'))).toBe(false)
+    expect(shouldIndexPath(root, join(root, 'packages/memory/tsup.config.bundled_vdnkg42ics.mjs'))).toBe(false)
+  })
+
   it('shouldIndexPath rejects paths outside the project root', () => {
     const outsidePath = join(tmpdir(), 'not-in-root.ts')
     writeFileSync(outsidePath, 'x')

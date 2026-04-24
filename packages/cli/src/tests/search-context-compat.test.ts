@@ -34,10 +34,11 @@ describe('search context backward compatibility', () => {
   it('keeps recall_knowledge action callable after search_context wiring', async () => {
     const result = await TOOL_REGISTRY.get('recall_knowledge')!.handler({
       query: 'nothing indexed for recall compatibility',
-    }, deps()) as { results: unknown[]; reason?: string }
+    }, deps()) as { results: unknown[]; reason?: string; readiness?: { status: string } }
 
     expect(result.results).toEqual([])
-    expect(result.reason).toBe('no_match')
+    expect(result.reason).toBe('not_seeded')
+    expect(result.readiness?.status).toBe('not_seeded')
   })
 
   it('keeps search_code action returning code chunks', async () => {

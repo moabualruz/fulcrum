@@ -22399,6 +22399,27 @@
       "closed_at": "2026-04-22T18:30:00.000Z"
     },
     {
+      "id": "mcp_tool:start_rag_repair",
+      "type": "mcp_tool",
+      "unit": "start_rag_repair",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/mcp-tools.ts"
+      ],
+      "required_verifier": "MCP tool schema is covered by CLI MCP inventory tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-24T00:00:00.000Z"
+    },
+    {
       "id": "mcp_tool:sweep_stale_runs",
       "type": "mcp_tool",
       "unit": "sweep_stale_runs",
@@ -63329,6 +63350,27 @@
       "closed_at": "2026-04-22T18:30:00.000Z"
     },
     {
+      "id": "tool_registry_entry:start_rag_repair",
+      "type": "tool_registry_entry",
+      "unit": "start_rag_repair",
+      "status": "accepted",
+      "source_paths": [
+        "packages/cli/src/tool-registry.ts"
+      ],
+      "required_verifier": "tool registry entry is covered by CLI registry tests",
+      "reviewer_skills": [
+        "correctness-reviewer",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm test",
+        "pnpm build",
+        "pnpm run check:cycles"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-24T00:00:00.000Z"
+    },
+    {
       "id": "tool_registry_entry:sweep_stale_runs",
       "type": "tool_registry_entry",
       "unit": "sweep_stale_runs",
@@ -68397,6 +68439,27 @@
       "closed_at": "2026-04-23T17:15:00.000Z"
     },
     {
+      "id": "package_test_file:packages_memory_src_tests_rag_eval_default_retriever_test_ts",
+      "type": "package_test_file",
+      "unit": "packages/memory/src/tests/rag-eval-default-retriever.test.ts",
+      "status": "accepted",
+      "source_paths": [
+        "packages/memory/src/tests/rag-eval-default-retriever.test.ts"
+      ],
+      "required_verifier": "package test file covered by targeted package suite and surface inventory",
+      "reviewer_skills": [
+        "code-review-and-quality",
+        "project-standards-reviewer"
+      ],
+      "evidence": [
+        "pnpm --filter fulcrum-memory test",
+        "pnpm --filter fulcrum-scripts exec vitest run surface-inventory.test.ts",
+        "pnpm test"
+      ],
+      "closure_reason": "surface inventory guard requires explicit terminal row for current repo unit",
+      "closed_at": "2026-04-24T00:00:00.000Z"
+    },
+    {
       "id": "package_test_file:packages_memory_src_tests_rag_eval_opt_in_roadmap_test_ts",
       "type": "package_test_file",
       "unit": "packages/memory/src/tests/rag-eval-opt-in-roadmap.test.ts",
@@ -70406,7 +70469,7 @@
     }
   ],
   "status_counts": {
-    "accepted": 3365
+    "accepted": 3368
   },
   "last_closure_run": {
     "date": "2026-04-21",

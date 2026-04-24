@@ -125,6 +125,35 @@ describe('graph evidence units', () => {
     expect(units.find(unit => unit.graph_unit_id === entity.graph_unit_id)?.freshness).toBe('stale')
   })
 
+  it('keeps hashless but existing sources current instead of treating them as missing', () => {
+    const db = getDb()
+    db.prepare(`
+      INSERT INTO memories (
+        memory_id, workspace_id, project_id, kind, scope, content, content_hash,
+        schema_version, title, summary, entities, provenance
+      ) VALUES (
+        'mem_hashless_source', 'ws_1', 'proj_1', 'fact', 'project',
+        'Hashless but present source.', NULL,
+        3, 'Hashless source', 'fact', '[]', '{}'
+      )
+    `).run()
+
+    const entity = persistGraphEvidenceUnit({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      kind: 'entity',
+      domain: 'memory',
+      relationship_type: 'represents',
+      name: 'Hashless source',
+      source_refs: [{ source_domain: 'memory', source_id: 'mem_hashless_source', project_id: 'proj_1' }],
+      confidence: 0.8,
+      freshness: 'current',
+    })
+
+    const units = readGraphEvidenceUnits({ workspace_id: 'ws_1', project_id: 'proj_1' })
+    expect(units.find(unit => unit.graph_unit_id === entity.graph_unit_id)?.freshness).toBe('current')
+  })
+
   it('keeps same-name evidence entities isolated by project and source identity', () => {
     const db = getDb()
     db.prepare("INSERT INTO projects(project_id, workspace_id, name) VALUES ('proj_2', 'ws_1', 'proj_2')").run()

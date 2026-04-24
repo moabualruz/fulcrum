@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { packContext } from '../retrieval/context-pack.js'
+import { estimateContextTokens, packContext } from '../retrieval/context-pack.js'
 import type { TypedContextResult } from '../retrieval/search-context.js'
 
 function result(input: Partial<TypedContextResult> & { type: TypedContextResult['type']; id: string; snippet: string; score: number }): TypedContextResult {
@@ -24,12 +24,24 @@ describe('context packing', () => {
       result({ type: 'memory', id: 'same', snippet: 'duplicate '.repeat(12), score: 0.8 }),
       result({ type: 'code_chunk', id: 'code', snippet: 'code '.repeat(12), score: 0.7 }),
       result({ type: 'task', id: 'task', snippet: 'task '.repeat(12), score: 0.6 }),
-    ], 30)
+    ], 45)
 
     expect(packed.results.map(item => item.source_ref.source_id)).toEqual(['same', 'code'])
     expect(packed.deduplicated_results).toBe(1)
     expect(packed.truncated_results).toBe(1)
     expect(packed.source_diversity).toMatchObject({ memory: 1, code_chunk: 1 })
-    expect(packed.budget.used_tokens).toBeLessThanOrEqual(30)
+    expect(packed.budget.used_tokens).toBeLessThanOrEqual(45)
+  })
+
+  it('uses a conservative token estimate for long strings without whitespace', () => {
+    const longDenseSnippet = 'a'.repeat(120)
+    expect(estimateContextTokens({ title: 'dense', snippet: longDenseSnippet })).toBeGreaterThan(20)
+
+    const packed = packContext([
+      result({ type: 'memory', id: 'dense', snippet: longDenseSnippet, score: 0.9 }),
+    ], 20)
+
+    expect(packed.results).toHaveLength(0)
+    expect(packed.truncated_results).toBe(1)
   })
 })

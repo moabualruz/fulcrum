@@ -60,4 +60,87 @@ describe('vector metadata reconciliation', () => {
       count: 1,
     }))
   })
+
+  it('reconciles memory vectors only for v3 L1 pages', () => {
+    getDb().prepare(`
+      INSERT INTO memories (
+        memory_id, workspace_id, project_id, kind, scope, content, content_hash,
+        schema_version, vault_path, title, summary, entities, provenance
+      ) VALUES (
+        'mem_legacy_vector', 'ws_1', 'proj_1', 'fact', 'project',
+        'legacy memory source', NULL,
+        2, 'memories/curated/mem_legacy_vector.md', 'legacy', 'legacy', '[]', '{}'
+      )
+    `).run()
+    writeVectorMetadata({
+      workspace_id: 'ws_1',
+      source_domain: 'memory',
+      source_id: 'mem_legacy_vector',
+      content_hash: 'legacy-hash',
+      provider: 'local',
+      model: 'legacy-model',
+      requested_device: 'auto',
+      actual_device: 'cpu',
+      dimensions: 384,
+      vector_table: 'vec_memories',
+      status: 'current',
+    })
+
+    const summary = reconcileVectorMetadata({ workspace_id: 'ws_1', project_id: 'proj_1' })
+
+    expect(summary.metadata_rows).toBe(0)
+    expect(summary.content_hash_mismatches).toBe(0)
+    expect(summary.freshness_mismatches).toBe(0)
+    expect(summary.groups).toEqual([])
+  })
+
+  it('ignores superseded failed metadata after a later current vector write', () => {
+    getDb().prepare(`
+      INSERT INTO memories (
+        memory_id, workspace_id, project_id, kind, scope, content, content_hash,
+        schema_version, vault_path, title, summary, entities, provenance
+      ) VALUES (
+        'mem_recovered_vector', 'ws_1', 'proj_1', 'fact', 'project',
+        'recovered vector source', 'hash-recovered',
+        3, 'curated/pages/mem_recovered_vector.md', 'recovered', 'recovered', '[]', '{}'
+      )
+    `).run()
+    writeVectorMetadata({
+      workspace_id: 'ws_1',
+      source_domain: 'memory',
+      source_id: 'mem_recovered_vector',
+      content_hash: 'hash-recovered',
+      provider: 'local',
+      model: 'unknown',
+      requested_device: 'auto',
+      dimensions: 1024,
+      vector_table: 'vec_memories',
+      status: 'failed',
+      error_type: 'Error',
+      error_message: 'old failed job',
+    })
+    getDb().prepare('INSERT INTO vec_memories(memory_id, embedding) VALUES (?, ?)').run('mem_recovered_vector', Buffer.alloc(1024 * 4))
+    writeVectorMetadata({
+      workspace_id: 'ws_1',
+      source_domain: 'memory',
+      source_id: 'mem_recovered_vector',
+      content_hash: 'hash-recovered',
+      provider: 'local',
+      model: 'configured-model',
+      requested_device: 'auto',
+      actual_device: 'cuda',
+      dimensions: 1024,
+      vector_table: 'vec_memories',
+      status: 'current',
+    })
+
+    const summary = reconcileVectorMetadata({ workspace_id: 'ws_1', project_id: 'proj_1' })
+
+    expect(summary.metadata_rows).toBe(1)
+    expect(summary.current).toBe(1)
+    expect(summary.failed).toBe(0)
+    expect(summary.groups).toEqual([
+      expect.objectContaining({ status: 'current', model: 'configured-model', count: 1 }),
+    ])
+  })
 })

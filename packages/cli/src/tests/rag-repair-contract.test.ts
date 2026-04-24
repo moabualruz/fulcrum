@@ -31,6 +31,28 @@ afterEach(() => {
 })
 
 describe('RAG repair CLI contract', () => {
+  it('uses the same vault path for health and repair plan when profile is implicit', () => {
+    const vaultDir = mkdtempSync(join(tmpdir(), 'fulcrum-rag-repair-vault-'))
+    tempDirs.push(vaultDir)
+    const relPath = 'raw/tool_trace/2026/04/24/01RAW.md'
+    const fullPath = join(vaultDir, relPath)
+    mkdirSync(dirname(fullPath), { recursive: true })
+    writeFileSync(fullPath, `---\nworkspace_id: ws_1\nproject_id: proj_1\n---\nraw source\n`, 'utf-8')
+    process.env['FULCRUM_VAULT_PATH'] = vaultDir
+    getDb().prepare(`
+      INSERT INTO l0_sources (
+        source_id, source_type, workspace_id, project_id, cwd, vault_path, content_hash, size_bytes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('01RAW', 'tool_trace', 'ws_1', 'proj_1', '/repo', relPath, contentHash('raw source'), 10)
+
+    const health = executeRagHealthCommand({ workspace_id: 'ws_1', project_id: 'proj_1' }, getDb())
+    const plan = executeRagRepairPlanCommand({ workspace_id: 'ws_1', project_id: 'proj_1' }, getDb())
+
+    expect(health.domains['l0']).toMatchObject({ status: 'healthy', missing_files: 0 })
+    expect(plan.domains).not.toContain('l0')
+    expect(plan.blocking_conditions.map(condition => condition.domain)).not.toContain('l0')
+  })
+
   it('returns non-mutating repair plan JSON for memory doctor --repair-plan', () => {
     const vaultDir = mkdtempSync(join(tmpdir(), 'fulcrum-rag-repair-cli-'))
     tempDirs.push(vaultDir)

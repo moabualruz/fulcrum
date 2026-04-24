@@ -254,36 +254,99 @@ function insertEntity(input: PersistGraphEvidenceUnitInput, properties: Record<s
   return entity_id
 }
 
-function sameStringArray(left: unknown, right: unknown): boolean {
-  const leftValues = parseJsonArray(left).map(String).sort()
-  const rightValues = parseJsonArray(right).map(String).sort()
-  return leftValues.length === rightValues.length && leftValues.every((value, index) => value === rightValues[index])
+function entityEvidenceKey(properties: Record<string, unknown>): string {
+  const identity = properties['source_identity']
+  if (typeof identity === 'string' && identity.length > 0) return identity
+  return JSON.stringify([
+    properties['project_id'] ?? '',
+    properties['kind'] ?? '',
+    properties['domain'] ?? '',
+    properties['relationship_type'] ?? '',
+    properties['summary_id'] ?? '',
+    parseJsonArray(properties['source_ids']).map(String).sort(),
+  ])
 }
 
-function entityEvidenceMatches(existing: Record<string, unknown>, next: Record<string, unknown>): boolean {
-  const existingIdentity = existing['source_identity']
-  const nextIdentity = next['source_identity']
-  if (typeof existingIdentity === 'string' && typeof nextIdentity === 'string') {
-    return existingIdentity === nextIdentity
+type EntityCacheEntry = { entity_id: string; confidence?: number }
+type EdgeCacheEntry = { edge_id: string; properties?: string; confidence?: number }
+
+const entityEvidenceCaches = new WeakMap<Db, Map<string, Map<string, EntityCacheEntry>>>()
+const edgeEvidenceCaches = new WeakMap<Db, Map<string, Map<string, EdgeCacheEntry>>>()
+
+export function clearGraphEvidenceCaches(db: Db): void {
+  entityEvidenceCaches.delete(db)
+  edgeEvidenceCaches.delete(db)
+}
+
+function entityCacheFor(db: Db, workspace_id: string, entity_type: string): Map<string, EntityCacheEntry> {
+  let dbCache = entityEvidenceCaches.get(db)
+  if (!dbCache) {
+    dbCache = new Map()
+    entityEvidenceCaches.set(db, dbCache)
   }
+  const scopeKey = `${workspace_id}\0${entity_type}`
+  let cache = dbCache.get(scopeKey)
+  if (cache) return cache
 
-  return existing['project_id'] === next['project_id']
-    && existing['kind'] === next['kind']
-    && existing['domain'] === next['domain']
-    && existing['relationship_type'] === next['relationship_type']
-    && existing['summary_id'] === next['summary_id']
-    && sameStringArray(existing['source_ids'], next['source_ids'])
-}
-
-function persistEntity(input: PersistGraphEvidenceUnitInput, properties: Record<string, unknown>, db: Db): string {
-  const existing = (db.prepare(`
+  cache = new Map()
+  const rows = db.prepare(`
     SELECT entity_id, properties${columnExists(db, 'graph_entities', 'confidence') ? ', confidence' : ''}
       FROM graph_entities
      WHERE workspace_id = ? AND entity_type = ?
-  `).all(input.workspace_id, entityType(input)) as Array<{ entity_id: string; properties: string; confidence?: number }>)
-    .find(candidate => entityEvidenceMatches(parseJsonObject(candidate.properties), properties))
-  if (existing) return updateExistingEntity(input, existing, properties, db)
-  return insertEntity(input, properties, db)
+  `).all(workspace_id, entity_type) as Array<{ entity_id: string; properties: string; confidence?: number }>
+  for (const row of rows) {
+    cache.set(entityEvidenceKey(parseJsonObject(row.properties)), {
+      entity_id: row.entity_id,
+      confidence: row.confidence,
+    })
+  }
+  dbCache.set(scopeKey, cache)
+  return cache
+}
+
+function edgeEvidenceKey(input: PersistGraphEvidenceUnitInput): string {
+  return `${input.workspace_id}\0${input.from_id ?? ''}\0${input.to_id ?? ''}\0${input.relationship_type}`
+}
+
+function edgeCacheFor(db: Db, workspace_id: string): Map<string, EdgeCacheEntry> {
+  let dbCache = edgeEvidenceCaches.get(db)
+  if (!dbCache) {
+    dbCache = new Map()
+    edgeEvidenceCaches.set(db, dbCache)
+  }
+  let cache = dbCache.get(workspace_id)
+  if (cache) return cache
+
+  cache = new Map()
+  const rows = db.prepare(`
+    SELECT edge_id, source_id, target_id, relation, properties${columnExists(db, 'graph_edges', 'confidence') ? ', confidence' : ''}
+      FROM graph_edges
+     WHERE workspace_id = ?
+  `).all(workspace_id) as Array<{ edge_id: string; source_id: string; target_id: string; relation: string; properties?: string; confidence?: number }>
+  for (const row of rows) {
+    cache.set(`${workspace_id}\0${row.source_id}\0${row.target_id}\0${row.relation}`, {
+      edge_id: row.edge_id,
+      properties: row.properties,
+      confidence: row.confidence,
+    })
+  }
+  dbCache.set(workspace_id, cache)
+  return cache
+}
+
+function persistEntity(input: PersistGraphEvidenceUnitInput, properties: Record<string, unknown>, db: Db): string {
+  const type = entityType(input)
+  const cache = entityCacheFor(db, input.workspace_id, type)
+  const key = entityEvidenceKey(properties)
+  const existing = cache.get(key)
+  if (existing) {
+    const entity_id = updateExistingEntity(input, existing, properties, db)
+    cache.set(key, { entity_id, confidence: Math.max(Number(existing.confidence ?? 0), input.confidence ?? 1) })
+    return entity_id
+  }
+  const entity_id = insertEntity(input, properties, db)
+  cache.set(key, { entity_id, confidence: input.confidence ?? 1 })
+  return entity_id
 }
 
 function updateExistingEdge(
@@ -292,7 +355,7 @@ function updateExistingEdge(
   properties: Record<string, unknown>,
   source_refs: GraphEvidenceSourceRef[],
   db: Db,
-): string {
+): EdgeCacheEntry {
   const mergedSourceRefs = mergeSourceRefs(sourceRefsFromProperties(parseJsonObject(existing.properties)), source_refs)
   const mergedProperties = {
     ...properties,
@@ -311,7 +374,11 @@ function updateExistingEdge(
   }
   params.push(existing.edge_id)
   db.prepare(`UPDATE graph_edges SET ${assignments.join(', ')} WHERE edge_id = ?`).run(...params)
-  return existing.edge_id
+  return {
+    edge_id: existing.edge_id,
+    properties: JSON.stringify(mergedProperties),
+    confidence: Math.max(Number(existing.confidence ?? 0), input.confidence ?? 1),
+  }
 }
 
 function insertEdge(
@@ -355,14 +422,17 @@ function persistEdge(
   db: Db,
 ): string {
   if (!input.from_id || !input.to_id) throw new Error('persistGraphEvidenceUnit edge requires from_id and to_id')
-  const existing = db.prepare(`
-    SELECT edge_id, properties${columnExists(db, 'graph_edges', 'confidence') ? ', confidence' : ''}
-      FROM graph_edges
-     WHERE workspace_id = ? AND source_id = ? AND target_id = ? AND relation = ?
-     LIMIT 1
-  `).get(input.workspace_id, input.from_id, input.to_id, input.relationship_type) as { edge_id: string; properties?: string; confidence?: number } | undefined
-  if (existing) return updateExistingEdge(input, existing, properties, source_refs, db)
-  return insertEdge(input, properties, source_refs, db)
+  const cache = edgeCacheFor(db, input.workspace_id)
+  const key = edgeEvidenceKey(input)
+  const existing = cache.get(key)
+  if (existing) {
+    const updated = updateExistingEdge(input, existing, properties, source_refs, db)
+    cache.set(key, updated)
+    return updated.edge_id
+  }
+  const edge_id = insertEdge(input, properties, source_refs, db)
+  cache.set(key, { edge_id, properties: JSON.stringify(properties), confidence: input.confidence ?? 1 })
+  return edge_id
 }
 
 function mergeSourceRefs(existing: GraphEvidenceSourceRef[], next: GraphEvidenceSourceRef[]): GraphEvidenceSourceRef[] {
@@ -445,6 +515,59 @@ function sourceHashForRef(ref: GraphEvidenceSourceRef, workspace_id: string, db:
   return null
 }
 
+function sourceExistsForRef(ref: GraphEvidenceSourceRef, workspace_id: string, db: Db): boolean | null {
+  if (!ref.source_id && !ref.file_path) return null
+  const project_id = ref.project_id ?? null
+  const domain = ref.source_domain
+  try {
+    if (domain === 'memory' || domain === 'decision' || domain === 'error' || domain === 'fix') {
+      const row = db.prepare(`
+        SELECT 1
+          FROM memories
+         WHERE workspace_id = ?
+           AND memory_id = ?
+           AND (? IS NULL OR project_id = ? OR project_id IS NULL)
+         LIMIT 1
+      `).get(workspace_id, ref.source_id, project_id, project_id)
+      return Boolean(row)
+    }
+    if (domain === 'task') {
+      const row = db.prepare(`
+        SELECT 1
+          FROM tasks
+         WHERE workspace_id = ? AND task_id = ? AND (? IS NULL OR project_id = ?)
+         LIMIT 1
+      `).get(workspace_id, ref.source_id, project_id, project_id)
+      return Boolean(row)
+    }
+    if (domain === 'file') {
+      const row = db.prepare(`
+        SELECT 1
+          FROM code_files
+         WHERE workspace_id = ?
+           AND (? IS NULL OR project_id = ?)
+           AND (file_id = ? OR rel_path = ?)
+         LIMIT 1
+      `).get(workspace_id, project_id, project_id, ref.source_id, ref.file_path)
+      return Boolean(row)
+    }
+    if (domain === 'code_chunk' || domain === 'file_chunk' || domain === 'symbol' || domain === 'import' || domain === 'call') {
+      const row = db.prepare(`
+        SELECT 1
+          FROM code_chunks
+         WHERE workspace_id = ?
+           AND (? IS NULL OR project_id = ?)
+           AND chunk_id = ?
+         LIMIT 1
+      `).get(workspace_id, project_id, project_id, ref.source_id)
+      return Boolean(row)
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 function computedFreshness(
   workspace_id: string,
   declared: GraphEvidenceFreshness,
@@ -457,7 +580,7 @@ function computedFreshness(
   let checked = false
   for (const ref of source_refs) {
     if (!ref.content_hash) {
-      if ((ref.source_id || ref.file_path) && sourceHashForRef(ref, workspace_id, db) === null) return 'failed'
+      if ((ref.source_id || ref.file_path) && sourceExistsForRef(ref, workspace_id, db) === false) return 'failed'
       continue
     }
     checked = true

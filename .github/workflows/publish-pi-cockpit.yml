@@ -1,9 +1,7 @@
 name: Publish @fulcrum-agent-os/pi-cockpit
 
 on:
-  push:
-    tags:
-      - 'pi-cockpit/v*'
+  workflow_dispatch:
 
 jobs:
   publish:

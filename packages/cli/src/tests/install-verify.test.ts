@@ -164,6 +164,7 @@ describe('verifyInstall({ agent: "codex" })', () => {
     const codexDir = path.join(fakeHome, '.codex')
     fs.mkdirSync(path.join(codexDir, 'skills', 'fulcrum-start-every-task'), { recursive: true })
     fs.writeFileSync(path.join(codexDir, 'config.toml'), '[mcp_servers.fulcrum]\ncommand = "fulcrum"\n', 'utf8')
+    fs.writeFileSync(path.join(codexDir, 'hooks.json'), JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ command: 'fulcrum hook codex session-start' }] }] } }), 'utf8')
     fs.writeFileSync(path.join(codexDir, 'skills', 'fulcrum-start-every-task', 'SKILL.md'), '# skill', 'utf8')
     fs.mkdirSync(path.join(codexDir, 'rules'), { recursive: true })
     fs.writeFileSync(path.join(codexDir, 'rules', 'fulcrum-core.md'), '# rules', 'utf8')

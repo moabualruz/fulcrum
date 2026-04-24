@@ -47,7 +47,8 @@ describe('profile-scoped RAG rebuild isolation', () => {
 
     expect(result.status).toBe('completed')
     expect(result.scope.runtime_profile).toBe('dev')
-    expect(result.profile_manifest.paths.db).toBe(join(root, 'profiles', 'dev', 'fulcrum.db'))
+    expect(result.profile_manifest).not.toHaveProperty('paths')
+    expect(result.profile_manifest.path_fingerprints.db).toMatch(/^sha256:/)
     expect([fileHash(installDbSentinel), fileHash(installVaultSentinel)]).toEqual(before)
   })
 
@@ -63,7 +64,8 @@ describe('profile-scoped RAG rebuild isolation', () => {
     })
 
     expect(result.status).toBe('completed')
-    expect(result.profile_manifest.paths.db).toBe(join(root, 'profiles', 'dev', 'fulcrum.db'))
+    expect(result.profile_manifest).not.toHaveProperty('paths')
+    expect(result.profile_manifest.path_fingerprints.db).toMatch(/^sha256:/)
     expect(getDb().prepare('SELECT COUNT(*) AS n FROM rag_rebuild_reports').get()).toEqual({ n: 0 })
 
     const profileDb = new Database(join(root, 'profiles', 'dev', 'fulcrum.db'))

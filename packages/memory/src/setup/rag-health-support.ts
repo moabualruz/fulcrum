@@ -44,6 +44,19 @@ export const SCOPED_VECTOR_METADATA_CTE = `
      WHERE v.source_domain = 'memory'
        AND m.workspace_id = ?
        AND (m.project_id = ? OR m.project_id IS NULL)
+       AND m.schema_version >= 3
+       AND (
+         v.status = 'current'
+         OR NOT EXISTS (
+           SELECT 1
+             FROM vector_metadata current_v
+            WHERE current_v.workspace_id = v.workspace_id
+              AND current_v.source_domain = v.source_domain
+              AND current_v.source_id = v.source_id
+              AND current_v.status = 'current'
+              AND current_v.rowid > v.rowid
+         )
+       )
     UNION ALL
     SELECT v.*
       FROM vector_metadata v
@@ -51,6 +64,18 @@ export const SCOPED_VECTOR_METADATA_CTE = `
      WHERE v.source_domain = 'code_chunk'
        AND c.workspace_id = ?
        AND c.project_id = ?
+       AND (
+         v.status = 'current'
+         OR NOT EXISTS (
+           SELECT 1
+             FROM vector_metadata current_v
+            WHERE current_v.workspace_id = v.workspace_id
+              AND current_v.source_domain = v.source_domain
+              AND current_v.source_id = v.source_id
+              AND current_v.status = 'current'
+              AND current_v.rowid > v.rowid
+         )
+       )
   )
 `
 

@@ -10,6 +10,7 @@ describe('RAG lifecycle MCP tool metadata', () => {
       'get_rag_rebuild_plan',
       'get_rag_rebuild_dry_run',
       'start_rag_rebuild',
+      'start_rag_repair',
       'get_runtime_profile_paths',
       'get_rag_rebuild_report',
       'get_rag_health',
@@ -45,6 +46,9 @@ describe('RAG lifecycle MCP tool metadata', () => {
     expect(byName.get('start_rag_rebuild')?.annotations?.destructiveHint).toBe(true)
     expect(TOOL_REGISTRY.get('start_rag_rebuild')?.capabilities.destructive).toBe(true)
 
+    expect(byName.get('start_rag_repair')?.annotations?.destructiveHint).toBe(true)
+    expect(TOOL_REGISTRY.get('start_rag_repair')?.capabilities.destructive).toBe(true)
+
     expect(byName.get('get_embedding_job_status')?.annotations?.readOnlyHint).toBe(true)
     expect(TOOL_REGISTRY.get('get_embedding_job_status')?.capabilities.readOnly).toBe(true)
 
@@ -61,6 +65,9 @@ describe('RAG lifecycle MCP tool metadata', () => {
     const properties = byName.get('start_rag_rebuild')?.inputSchema.properties ?? {}
     expect(properties).not.toHaveProperty('actor')
     expect(properties).toHaveProperty('runtime_profile')
+    const repairProperties = byName.get('start_rag_repair')?.inputSchema.properties ?? {}
+    expect(repairProperties).not.toHaveProperty('actor')
+    expect(repairProperties).toHaveProperty('runtime_profile')
     expect(byName.get('get_rag_rebuild_report')?.inputSchema.properties ?? {}).toHaveProperty('runtime_profile')
     for (const name of ['start_embedding_job', 'cancel_embedding_job', 'resume_embedding_job', 'retry_embedding_job_failed']) {
       expect(byName.get(name)?.inputSchema.properties ?? {}).not.toHaveProperty('actor')

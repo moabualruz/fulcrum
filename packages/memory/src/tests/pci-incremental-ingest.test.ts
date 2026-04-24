@@ -12,6 +12,8 @@ import type Database from 'better-sqlite3'
 import { createTestDb, resetTestDb, seedWorkspaceAndProject } from './helpers.js'
 import { syncFile, contentSha256 } from '../pci/syncer.js'
 import { computeFileId } from '../setup/backfill-code-files.js'
+import { readGraphEvidenceUnits } from '../graph/evidence.js'
+import { summarizeGraphCoverage } from '../graph/coverage.js'
 
 describe('PCI syncer — v2a PR 4 Task 19', () => {
   let db: Database.Database
@@ -102,6 +104,35 @@ describe('PCI syncer — v2a PR 4 Task 19', () => {
       const betaStillThere = after.some(r => r.chunk_id === betaBefore.chunk_id)
       expect(betaStillThere).toBe(false)
     }
+  })
+
+  it('refreshes graph evidence and coverage in the same sync pass', async () => {
+    const relPath = 'src/graph-live.ts'
+    const abs = join(root, relPath)
+    mkdirSync(join(root, 'src'), { recursive: true })
+    writeFileSync(abs, 'import "./old.js"; export function run() { oldCall(); }\n', 'utf8')
+
+    await syncFile({ db, workspaceId, projectId, projectRoot: root, event: { change_type: 'add', path: abs } })
+
+    let coverage = summarizeGraphCoverage({ workspace_id: workspaceId, project_id: projectId }, db)
+    expect(coverage.domains.file).toMatchObject({ sources: 1, current: 1, failed: 0 })
+    expect(coverage.domains.import).toMatchObject({ sources: 1, current: 1, failed: 0 })
+    expect(coverage.domains.call).toMatchObject({ sources: 1, current: 1, failed: 0 })
+    expect(readGraphEvidenceUnits({ workspace_id: workspaceId, project_id: projectId }, db)
+      .some(unit => unit.domain === 'call' && unit.name === 'oldCall')).toBe(true)
+
+    writeFileSync(abs, 'import "./new.js"; export function run() { newCall(); }\n', 'utf8')
+    await syncFile({ db, workspaceId, projectId, projectRoot: root, event: { change_type: 'change', path: abs } })
+
+    coverage = summarizeGraphCoverage({ workspace_id: workspaceId, project_id: projectId }, db)
+    expect(coverage.domains.file).toMatchObject({ sources: 1, current: 1, failed: 0 })
+    expect(coverage.domains.import).toMatchObject({ sources: 1, current: 1, failed: 0 })
+    expect(coverage.domains.call).toMatchObject({ sources: 1, current: 1, failed: 0 })
+    const callNames = readGraphEvidenceUnits({ workspace_id: workspaceId, project_id: projectId }, db)
+      .filter(unit => unit.domain === 'call' && unit.kind === 'entity')
+      .map(unit => unit.name)
+    expect(callNames).toContain('newCall')
+    expect(callNames).not.toContain('oldCall')
   })
 
   it('unlink event schedules deletion; file row gone after grace window', async () => {
@@ -202,5 +233,16 @@ describe('PCI syncer — v2a PR 4 Task 19', () => {
     expect(row.status).toBe('failed')
     expect(row.failure_reason).toBe('read_failed')
     expect(row.chunks_count).toBe(0)
+  })
+
+  it('skips transient test and bundler config artifacts without failed rows', async () => {
+    const relPath = 'packages/memory/vitest.config.ts.timestamp-1776990501367-cd33f86df76b18.mjs'
+    const abs = join(root, relPath)
+    const fileId = computeFileId(projectId, relPath)
+
+    const r = await syncFile({ db, workspaceId, projectId, projectRoot: root, event: { change_type: 'add', path: abs } })
+
+    expect(r).toMatchObject({ action: 'skipped', fileId })
+    expect(db.prepare('SELECT file_id FROM code_files WHERE file_id = ?').get(fileId)).toBeUndefined()
   })
 })

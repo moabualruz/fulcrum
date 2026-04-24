@@ -3,7 +3,6 @@ import type {
   RagHealthStatus,
   RagRebuildMode,
   RuntimeDataProfile,
-  RuntimeDataProfileManifest,
   RuntimeProfileError,
   RuntimeProfilePathKey,
 } from 'fulcrum-agent-core'
@@ -52,7 +51,7 @@ export interface RagRebuildReport {
     runtime_profile?: RuntimeDataProfile
     domains: RagRebuildDomain[]
   }
-  profile_manifest: RuntimeDataProfileManifest
+  profile_manifest: RagHealthProfileManifest
   profile_confirmation?: RuntimeDataProfile | null
   backup?: null | { backup_ref: string; restorable: boolean; backup_path?: string }
   verification_refs: string[]

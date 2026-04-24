@@ -272,11 +272,18 @@ describe('get_current_context readiness object', () => {
       cwd: '/repo',
       readiness: {
         tools_available: 27,
-        monitor_url: 'http://localhost:4721',
-        monitor_running: false,
-        suggested_next_call: 'list_tasks',
-      },
-    }
+	        monitor_url: 'http://localhost:4721',
+	        monitor_running: false,
+	        suggested_next_call: 'list_tasks',
+	        rag: {
+	          recall_status: 'not_seeded',
+	          seeded: false,
+	          searchable_rows: 0,
+	          degraded_stages: ['l1', 'vectors', 'graph'],
+	          next_actions: [],
+	        },
+	      },
+	    }
     const { client } = await makeConnectedPair(async () => readinessPayload)
     const result = await callRaw(client, 'get_current_context', {})
     expect(result.isError).toBeFalsy()
@@ -297,11 +304,18 @@ describe('get_current_context readiness object', () => {
       cwd: '/repo',
       readiness: {
         tools_available: 27,
-        monitor_url: 'http://localhost:4721',
-        monitor_running: false,
-        suggested_next_call: 'list_tasks',
-      },
-    }))
+	        monitor_url: 'http://localhost:4721',
+	        monitor_running: false,
+	        suggested_next_call: 'list_tasks',
+	        rag: {
+	          recall_status: 'not_seeded',
+	          seeded: false,
+	          searchable_rows: 0,
+	          degraded_stages: ['l1', 'vectors', 'graph'],
+	          next_actions: [],
+	        },
+	      },
+	    }))
     const result = await callRaw(client, 'get_current_context', {})
     expect(result.isError).toBeFalsy()
     expect((result as { structuredContent?: unknown }).structuredContent).toBeDefined()

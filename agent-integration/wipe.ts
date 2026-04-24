@@ -434,8 +434,8 @@ function stripMcpEntry(filePath: string, serverKey: string, dryRun: boolean, act
 }
 
 /**
- * Remove hook entries whose `command` field matches a predicate from a JSON
- * hooks file (`{ hooks: Array<{ event, command }> }`).
+ * Remove hook entries whose command matches a predicate from a JSON hooks file.
+ * Supports legacy array files and Codex's event-keyed `{ hooks: { Event: [...] } }`.
  */
 function stripHookEntries(
   filePath: string,
@@ -454,19 +454,43 @@ function stripHookEntries(
     actions.push({ path: filePath, action: "skip", reason: "not valid JSON" });
     return;
   }
-  const hooks = obj["hooks"] as Array<Record<string, unknown>> | undefined;
+  const hooks = obj["hooks"] as Array<Record<string, unknown>> | Record<string, unknown[]> | undefined;
   if (!hooks) {
     actions.push({ path: filePath, action: "skip", reason: "no hooks key" });
     return;
   }
-  const filtered = hooks.filter(h => !isFullcrum(String(h["command"] ?? "")));
-  if (filtered.length === hooks.length) {
+
+  let changed = false;
+  if (Array.isArray(hooks)) {
+    const filtered = hooks.filter(h => !isFullcrum(String(h["command"] ?? "")));
+    changed = filtered.length !== hooks.length;
+    if (changed) obj["hooks"] = filtered;
+  } else {
+    const nextHooks: Record<string, unknown> = { ...hooks };
+    for (const [event, entries] of Object.entries(hooks)) {
+      if (!Array.isArray(entries)) continue;
+      const filtered = entries.filter((entry) => {
+        if (!entry || typeof entry !== "object") return true;
+        const nested = (entry as { hooks?: unknown }).hooks;
+        if (!Array.isArray(nested)) return true;
+        return !nested.some((hook) => {
+          if (!hook || typeof hook !== "object") return false;
+          return isFullcrum(String((hook as { command?: unknown }).command ?? ""));
+        });
+      });
+      if (filtered.length !== entries.length) changed = true;
+      if (filtered.length > 0) nextHooks[event] = filtered;
+      else delete nextHooks[event];
+    }
+    if (changed) obj["hooks"] = nextHooks;
+  }
+
+  if (!changed) {
     actions.push({ path: filePath, action: "skip", reason: "no fulcrum hooks" });
     return;
   }
   actions.push({ path: filePath, action: "strip-hook-entries" });
   if (dryRun) return;
-  obj["hooks"] = filtered;
   fs.writeFileSync(filePath, JSON.stringify(obj, null, 2) + "\n", "utf8");
 }
 
@@ -725,6 +749,7 @@ function wipeCodex(home: string, targetDir: string, scope: WipeScope, dryRun: bo
 
   stripTomlSection(configToml, "[mcp_servers.fulcrum]", dryRun, actions);
   stripTomlHooks(configToml, "fulcrum hook codex", dryRun, actions);
+  stripHookEntries(path.join(codexDir, "hooks.json"), (cmd) => cmd.includes("fulcrum hook codex"), dryRun, actions);
   deleteGlob(path.join(codexDir, "skills"), /^fulcrum-/, dryRun, actions);
   deleteGlob(path.join(codexDir, "rules"), /^fulcrum-/, dryRun, actions);
   deleteGlob(path.join(codexDir, "rules"), /^(fulcrum-first|lifecycle|role-boundaries)\.md$/, dryRun, actions);

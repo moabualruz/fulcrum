@@ -129,9 +129,29 @@ describe('recallKnowledge (PR 5.3)', () => {
     for (const id of secondIds) expect(firstIds.has(id)).toBe(false)
   })
 
-  it('returns empty results object when nothing matches', async () => {
+  it('reports not_seeded before recall when no searchable L1 pages exist', async () => {
+    const out = await recallKnowledge({ workspace_id: 'ws_rc', project_id: 'proj_rc', query: 'auth middleware' })
+    expect(out.results).toEqual([])
+    expect(out.reason).toBe('not_seeded')
+    expect(out.readiness).toMatchObject({
+      status: 'not_seeded',
+      seeded: false,
+      searchable_rows: 0,
+    })
+  })
+
+  it('returns no_match when the seeded corpus has no matching page', async () => {
+    seedPage(
+      '01REC_UNRELATED',
+      '# Billing\n\nBilling invoice details live here. [[raw/tool_trace/2026/04/18/01SRC_UNRELATED]]\n',
+      ['01SRC_UNRELATED'],
+    )
+    await flushPendingMemoryWrites(5_000)
+
     const out = await recallKnowledge({ workspace_id: 'ws_rc', project_id: 'proj_rc', query: 'nonexistent-foo-bar' })
     expect(out.results).toEqual([])
+    expect(out.reason).toBe('no_match')
+    expect(out.readiness?.seeded).toBe(true)
   })
 })
 

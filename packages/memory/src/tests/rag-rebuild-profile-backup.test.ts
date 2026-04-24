@@ -45,8 +45,8 @@ describe('installed/operator rebuild backup reporting', () => {
     expect(result.scope.runtime_profile).toBe('install')
     const backup = result.backup
     expect(backup?.backup_ref).toMatch(/^backup_/)
-    expect(backup?.backup_path).toBe(join(root, 'artifacts', 'backups', backup?.backup_ref ?? ''))
-    const backupPath = backup?.backup_path ?? ''
+    expect(backup).not.toHaveProperty('backup_path')
+    const backupPath = join(root, 'artifacts', 'backups', backup?.backup_ref ?? '')
     expect(existsSync(join(backupPath, 'profile-manifest.json'))).toBe(true)
     const backupDb = new Database(join(backupPath, 'fulcrum.db'), { readonly: true })
     try {
@@ -78,7 +78,7 @@ describe('installed/operator rebuild backup reporting', () => {
     expect(JSON.parse(row.mutation_scope)).toMatchObject({ profile: 'install', clear_scope: 'derived_rag_state' })
 
     const persisted = readRebuildReport(result.report_id, 'ws_1', getDb())
-    expect(persisted.backup?.backup_path).toBe(backupPath)
+    expect(persisted.backup).not.toHaveProperty('backup_path')
   })
 
   it('rejects installed/operator execution without explicit profile confirmation in memory primitive', async () => {

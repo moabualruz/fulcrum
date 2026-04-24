@@ -1,6 +1,7 @@
 import { getDb, newId } from 'fulcrum-agent-core'
 import type { Db, RuntimeDataProfile, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
 import type { RagParityCheck, RagRebuildDomain } from './rag-types.js'
+import { toHealthProfileManifest } from './rag-health-support.js'
 
 export interface RebuildCandidateRow {
   candidate_id: string
@@ -59,7 +60,7 @@ export function createRebuildCandidate(
     JSON.stringify(input.domains),
     JSON.stringify({ served: false, kind: 'logical-candidate' }),
     input.runtime_profile,
-    JSON.stringify(input.profile_manifest),
+    JSON.stringify(toHealthProfileManifest(input.profile_manifest)),
     input.input_snapshot_id,
     JSON.stringify(servedState(input, db)),
   )

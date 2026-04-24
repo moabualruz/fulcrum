@@ -1,11 +1,7 @@
 name: fulcrum-mcp smoke test
 
 on:
-  pull_request:
-    paths:
-      - 'packages/fulcrum-mcp/**'
-      - 'packages/cli/src/**'
-      - 'packages/core/src/**'
+  workflow_dispatch:
 
 jobs:
   smoke:

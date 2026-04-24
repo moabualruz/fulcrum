@@ -6,7 +6,7 @@ import {
   isL1,
   projectIdsFromPath,
 } from 'fulcrum-agent-core'
-import type { AgentRole, Db, EmbeddingJobSourceDomain } from 'fulcrum-agent-core'
+import type { AgentRole, Db, EmbeddingJobSourceDomain, FulcrumConfig } from 'fulcrum-agent-core'
 import {
   cancelEmbeddingJob,
   createEmbeddingJob,
@@ -33,6 +33,7 @@ export interface EmbeddingJobCommandInput {
   requested_device?: string
   dimensions?: number
   batch_size?: number
+  max_items?: number
   job_id?: string
   actor?: Partial<EmbeddingJobActor>
 }
@@ -137,6 +138,29 @@ function nextActionForJob(job: { job_id: string; status: string }): EmbeddingJob
   return null
 }
 
+function shouldFailClosedOnEmbeddingInit(config: FulcrumConfig): boolean {
+  return [
+    config.embedding.text.device,
+    config.embedding.code?.device,
+    config.reranker.device,
+  ].some((device) => device !== undefined && device !== 'auto')
+}
+
+async function warmEmbeddingRuntime(): Promise<void> {
+  const { getTextEmbedder, initEmbedding, loadConfig } = await import('fulcrum-agent-core')
+  if (getTextEmbedder()) return
+  const config = loadConfig()
+  try {
+    await initEmbedding(config)
+  } catch (err) {
+    if (shouldFailClosedOnEmbeddingInit(config)) throw err
+  }
+}
+
+function embeddingWorkRemaining(status: ReturnType<typeof getEmbeddingJobStatus>): boolean {
+  return status.progress.pending > 0 || status.progress.stale > 0 || status.progress.running > 0
+}
+
 export async function startEmbeddingJobCommand(input: EmbeddingJobCommandInput, db: Db = getDb()) {
   const ids = resolveIds(input)
   const actor = normalizeActor(input.actor)
@@ -192,7 +216,10 @@ export async function resumeEmbeddingJobCommand(input: EmbeddingJobCommandInput,
   if (!input.job_id) throw new Error('job_id required')
   const actor = normalizeActor(input.actor)
   assertAuthorized({ ...ids, actor, operation: 'resume', job_id: input.job_id }, db)
-  return resumeEmbeddingJob({ job_id: input.job_id, workspace_id: ids.workspace_id, batch_size: input.batch_size }, db)
+  if (embeddingWorkRemaining(getEmbeddingJobStatus({ job_id: input.job_id, workspace_id: ids.workspace_id }, db))) {
+    await warmEmbeddingRuntime()
+  }
+  return resumeEmbeddingJob({ job_id: input.job_id, workspace_id: ids.workspace_id, batch_size: input.batch_size, max_items: input.max_items }, db)
 }
 
 export async function retryFailedEmbeddingJobCommand(input: EmbeddingJobCommandInput, db: Db = getDb()) {
@@ -200,5 +227,8 @@ export async function retryFailedEmbeddingJobCommand(input: EmbeddingJobCommandI
   if (!input.job_id) throw new Error('job_id required')
   const actor = normalizeActor(input.actor)
   assertAuthorized({ ...ids, actor, operation: 'retry', job_id: input.job_id }, db)
-  return retryFailedEmbeddingJob({ job_id: input.job_id, workspace_id: ids.workspace_id, batch_size: input.batch_size }, db)
+  if (embeddingWorkRemaining(getEmbeddingJobStatus({ job_id: input.job_id, workspace_id: ids.workspace_id }, db))) {
+    await warmEmbeddingRuntime()
+  }
+  return retryFailedEmbeddingJob({ job_id: input.job_id, workspace_id: ids.workspace_id, batch_size: input.batch_size, max_items: input.max_items }, db)
 }

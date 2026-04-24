@@ -125,12 +125,20 @@ function makeConnectedPair(handler: (name: string, args: Record<string, unknown>
   return { server, client, clientTransport, serverTransport }
 }
 
+const RAG_READINESS = {
+  recall_status: 'not_seeded',
+  seeded: false,
+  searchable_rows: 0,
+  degraded_stages: ['l1', 'vectors', 'graph'],
+  next_actions: [],
+}
+
 describe('serve mcp: readiness shape via MCP transport', () => {
   it('monitor_running: false when monitor is unreachable', async () => {
     const { server, client, clientTransport, serverTransport } = makeConnectedPair(
       async () => ({
         workspace_id: 'ws_test', project_id: 'proj_test', cwd: '/repo',
-        readiness: { tools_available: 23, monitor_url: 'http://localhost:49999', monitor_running: false, suggested_next_call: 'list_tasks' },
+        readiness: { tools_available: 23, monitor_url: 'http://localhost:49999', monitor_running: false, suggested_next_call: 'list_tasks', rag: RAG_READINESS },
       })
     )
     await server.connect(serverTransport)
@@ -148,7 +156,7 @@ describe('serve mcp: readiness shape via MCP transport', () => {
     const { server, client, clientTransport, serverTransport } = makeConnectedPair(
       async () => ({
         workspace_id: 'ws_test', project_id: 'proj_test', cwd: '/repo',
-        readiness: { tools_available: 23, monitor_url: 'http://localhost:4721', monitor_running: true, suggested_next_call: 'list_tasks' },
+        readiness: { tools_available: 23, monitor_url: 'http://localhost:4721', monitor_running: true, suggested_next_call: 'list_tasks', rag: RAG_READINESS },
       })
     )
     await server.connect(serverTransport)
@@ -166,7 +174,7 @@ describe('serve mcp: readiness shape via MCP transport', () => {
     const { server, client, clientTransport, serverTransport } = makeConnectedPair(
       async () => ({
         workspace_id: 'ws_test', project_id: 'proj_test', cwd: '/repo',
-        readiness: { tools_available: 23, monitor_url: `http://localhost:${port}`, monitor_running: false, suggested_next_call: 'list_tasks' },
+        readiness: { tools_available: 23, monitor_url: `http://localhost:${port}`, monitor_running: false, suggested_next_call: 'list_tasks', rag: RAG_READINESS },
       })
     )
     await server.connect(serverTransport)
@@ -229,7 +237,7 @@ describe('_monitorStarted double-start guard', () => {
     const { server, client, clientTransport, serverTransport } = makeConnectedPair(
       async () => ({
         workspace_id: 'ws_test', project_id: 'proj_test', cwd: '/repo',
-        readiness: { tools_available: 23, monitor_url: 'http://localhost:4721', monitor_running: false, suggested_next_call: 'list_tasks' },
+        readiness: { tools_available: 23, monitor_url: 'http://localhost:4721', monitor_running: false, suggested_next_call: 'list_tasks', rag: RAG_READINESS },
       })
     )
     await server.connect(serverTransport)

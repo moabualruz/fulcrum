@@ -390,6 +390,39 @@ function rebuildRuntimeExperimentsForTypeCheckIfNeeded(db: Database.Database): v
   }
 }
 
+function rebuildRagJobEventsForBatchClampedIfNeeded(db: Database.Database): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='rag_job_events'").get() as { sql: string } | undefined
+  if (!row?.sql || row.sql.includes("'batch_clamped'")) return
+
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.exec(`
+      CREATE TABLE rag_job_events_new (
+        event_id     TEXT PRIMARY KEY,
+        job_id       TEXT NOT NULL,
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+        event_type   TEXT NOT NULL CHECK(event_type IN ('progress','retry','split','fallback','batch_clamped','cancelled','resumed','failed','completed')),
+        source_id    TEXT,
+        message      TEXT NOT NULL DEFAULT '',
+        details      TEXT NOT NULL DEFAULT '{}',
+        created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO rag_job_events_new (
+        event_id, job_id, workspace_id, event_type, source_id, message, details, created_at
+      )
+      SELECT
+        event_id, job_id, workspace_id, event_type, source_id, message, details, created_at
+      FROM rag_job_events;
+      DROP TABLE rag_job_events;
+      ALTER TABLE rag_job_events_new RENAME TO rag_job_events;
+    `)
+    db.exec('COMMIT')
+  } catch (err) {
+    db.exec('ROLLBACK')
+    throw err
+  }
+}
+
 export function applySchema(db: Database.Database): void {
   // v2a PR 1 Task 1: rebuild legacy memories table BEFORE the idempotent CREATE
   // statements run. CREATE IF NOT EXISTS would skip the legacy table and leave
@@ -405,6 +438,7 @@ export function applySchema(db: Database.Database): void {
   rebuildRagHealthReportsForRoadmapIfNeeded(db)
   rebuildRagEvalRunsForRoadmapIfNeeded(db)
   rebuildRuntimeExperimentsForTypeCheckIfNeeded(db)
+  rebuildRagJobEventsForBatchClampedIfNeeded(db)
 
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -1414,7 +1448,7 @@ export function applySchema(db: Database.Database): void {
       event_id    TEXT PRIMARY KEY,
       job_id      TEXT NOT NULL,
       workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
-      event_type  TEXT NOT NULL CHECK(event_type IN ('progress','retry','split','fallback','cancelled','resumed','failed','completed')),
+      event_type  TEXT NOT NULL CHECK(event_type IN ('progress','retry','split','fallback','batch_clamped','cancelled','resumed','failed','completed')),
       source_id   TEXT,
       message     TEXT NOT NULL DEFAULT '',
       details     TEXT NOT NULL DEFAULT '{}',

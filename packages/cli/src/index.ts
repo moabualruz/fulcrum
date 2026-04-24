@@ -402,6 +402,19 @@ fulcrum memory — memory vault commands
   }
 
   if (command === 'embed') {
+    if (args.includes('--help') || args.includes('-h')) {
+      console.log(`
+fulcrum memory embed
+
+  fulcrum memory embed --scope <memories|l1-pages|code> [--json]
+      Start a scoped embedding job with resume/retry support.
+
+  fulcrum memory embed [--limit <n>] [--batch-size <n>]
+      Legacy direct backfill for memories without vectors.
+`)
+      return
+    }
+
     const scope = optArg('--scope')
     if (scope) {
       if (!['memories', 'l1-pages', 'code'].includes(scope)) {
@@ -985,8 +998,7 @@ Flags:
 `)
       process.exit(args.length < 3 ? 1 : 0)
     }
-    await warmEmbedding()
-    const { recallKnowledge } = await import('./commands/memory-recall.js')
+    const { assessRecallReadiness, recallKnowledge } = await import('./commands/memory-recall.js')
     const query = args[2]!
     const get = (flag: string): string | undefined => {
       const i = args.indexOf(flag)
@@ -1011,6 +1023,7 @@ Flags:
     if (hops) input.graph_hops = Number(hops)
     if (args.includes('--include-superseded')) input.include_superseded = true
     if (args.includes('--explain')) input.explain = true
+    if (assessRecallReadiness(input).seeded) await warmEmbedding()
     const out = await recallKnowledge(input)
     if (!args.includes('--explain')) {
       out.results = out.results.map((r) => ({ ...r, stage_ranks: undefined as unknown as typeof r.stage_ranks }))
@@ -1121,7 +1134,7 @@ Exit 0 when every row embeds cleanly. Exit 2 if any row fails (see
 async function runJobs(): Promise<void> {
   const jobId = args[2]
   if (!command || command === '--help' || command === '-h' || !jobId) {
-    console.log('Usage: fulcrum jobs status|logs|cancel|resume|retry <job_id> [--workspace-id <id>] [--project-id <id>] [--failed] [--json]')
+    console.log('Usage: fulcrum jobs status|logs|cancel|resume|retry <job_id> [--workspace-id <id>] [--project-id <id>] [--batch-size <n>] [--max-items <n>] [--failed] [--json]')
     return
   }
 
@@ -1130,6 +1143,7 @@ async function runJobs(): Promise<void> {
     workspace_id: optArg('--workspace-id'),
     project_id: optArg('--project-id'),
     batch_size: optIntArg('--batch-size'),
+    max_items: optIntArg('--max-items'),
     actor: { kind: 'human' as const, role: 'software_engineer' as const, id: process.env['USER'] ?? 'local-operator' },
   }
 
@@ -1167,7 +1181,7 @@ async function runJobs(): Promise<void> {
 
   if (command === 'retry') {
     if (!args.includes('--failed')) {
-      console.error('Usage: fulcrum jobs retry <job_id> --failed [--workspace-id <id>] [--project-id <id>] [--json]')
+      console.error('Usage: fulcrum jobs retry <job_id> --failed [--workspace-id <id>] [--project-id <id>] [--batch-size <n>] [--max-items <n>] [--json]')
       process.exit(1)
     }
     const { retryFailedEmbeddingJobCommand } = await import('./commands/memory-embedding-jobs.js')
@@ -2778,7 +2792,19 @@ export function _setProjectIdsForTest(ids: { workspace_id: string; project_id: s
 // config.workspace_id (file-derived) and could return different values.
 async function buildCurrentContextResponse(): Promise<{
   workspace_id: string; project_id: string; cwd: string
-  readiness: { tools_available: number; monitor_url: string; monitor_running: boolean; suggested_next_call: string }
+  readiness: {
+    tools_available: number
+    monitor_url: string
+    monitor_running: boolean
+    suggested_next_call: string
+    rag?: {
+      recall_status: string
+      seeded: boolean
+      searchable_rows: number
+      degraded_stages: string[]
+      next_actions: string[]
+    }
+  }
 }> {
   // Delegate to the unified registry handler so stdio and HTTP paths stay in sync.
   const { TOOL_REGISTRY, buildDeps } = await import('./tool-registry.js')
@@ -2786,7 +2812,19 @@ async function buildCurrentContextResponse(): Promise<{
   const deps = buildDeps(ids.workspace_id, ids.project_id)
   return TOOL_REGISTRY.get('get_current_context')!.handler({}, deps) as Promise<{
     workspace_id: string; project_id: string; cwd: string
-    readiness: { tools_available: number; monitor_url: string; monitor_running: boolean; suggested_next_call: string }
+    readiness: {
+      tools_available: number
+      monitor_url: string
+      monitor_running: boolean
+      suggested_next_call: string
+      rag?: {
+        recall_status: string
+        seeded: boolean
+        searchable_rows: number
+        degraded_stages: string[]
+        next_actions: string[]
+      }
+    }
   }>
 }
 

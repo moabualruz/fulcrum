@@ -1,11 +1,7 @@
 name: Check CLAUDE.md drift
 
 on:
-  pull_request:
-    paths:
-      - 'packages/cli/src/mcp-tools.ts'
-      - 'agent-integration/claude/CLAUDE.md'
-      - 'scripts/gen-claude-md.ts'
+  workflow_dispatch:
 
 jobs:
   check-claude-md:

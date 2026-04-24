@@ -8,6 +8,7 @@ describe('RAG lifecycle integration utilization', () => {
       'get_rag_rebuild_plan',
       'get_rag_rebuild_dry_run',
       'start_rag_rebuild',
+      'start_rag_repair',
       'get_runtime_profile_paths',
       'get_rag_rebuild_report',
       'get_rag_health',

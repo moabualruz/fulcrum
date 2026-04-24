@@ -42,10 +42,10 @@ function seedGraphCoverageSources(): void {
   db.prepare(`
     INSERT INTO code_chunks (
       chunk_id, workspace_id, project_id, file_path, file_id,
-      chunk_strategy, source_type, content, content_hash, start_line, end_line, symbol_path
+      language, chunk_strategy, source_type, content, content_hash, start_line, end_line, symbol_path
     ) VALUES (
       'chunk_graph_coverage', 'ws_1', 'proj_1', 'src/graph-coverage.ts', 'file_graph_coverage',
-      'syntax', 'code',
+      'typescript', 'syntax', 'code',
       'import { persistGraphEvidenceUnit } from "./evidence.js"; export function rebuildGraphCoverage() { return persistGraphEvidenceUnit(); }',
       'hash-chunk-graph', 1, 3, 'rebuildGraphCoverage'
     )
@@ -218,10 +218,10 @@ describe('graph roadmap coverage producer', () => {
     db.prepare(`
       INSERT INTO code_chunks (
         chunk_id, workspace_id, project_id, file_path, file_id,
-        chunk_strategy, source_type, content, content_hash, start_line, end_line, symbol_path
+        language, chunk_strategy, source_type, content, content_hash, start_line, end_line, symbol_path
       ) VALUES (
         'chunk_graph_multi', 'ws_1', 'proj_1', 'src/multi.ts', 'file_graph_multi',
-        'syntax', 'code',
+        'typescript', 'syntax', 'code',
         'import "./alpha.js"; import "./beta.js"; export function run() { alphaCall(); betaCall(); }',
         'hash-chunk-multi', 1, 3, 'run'
       )

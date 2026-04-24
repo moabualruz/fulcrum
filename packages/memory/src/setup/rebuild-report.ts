@@ -1,8 +1,8 @@
 import { getDb, newId } from 'fulcrum-agent-core'
 import type { AgentRole, Db, RagHealthStatus, RagRebuildMode, RuntimeDataProfile, RuntimeDataProfileManifest } from 'fulcrum-agent-core'
-import { join } from 'path'
 import type { RagParityCheck, RagRebuildDomain, RagRebuildReport } from './rag-types.js'
-import { redactRagDetails } from './rag-redaction.js'
+import { redactRagDetails, redactRoadmapArtifact } from './rag-redaction.js'
+import { toHealthProfileManifest } from './rag-health-support.js'
 
 export function createRunningRebuildReport(
   input: {
@@ -38,10 +38,10 @@ export function createRunningRebuildReport(
     input.mode,
     JSON.stringify(input.domains),
     input.runtime_profile,
-    JSON.stringify(redactRagDetails(input.profile_manifest)),
+    JSON.stringify(toHealthProfileManifest(input.profile_manifest)),
     input.backup_ref ?? null,
     JSON.stringify(input.verification_refs ?? []),
-    JSON.stringify(redactRagDetails(input.mutation_scope ?? {})),
+    JSON.stringify(redactRoadmapArtifact(redactRagDetails(input.mutation_scope ?? {}))),
     input.profile_confirmation ?? null,
     input.repair_plan_id ?? null,
   )
@@ -95,18 +95,18 @@ export function finishRebuildReport(
     input.candidate_id ?? null,
     input.candidate_disposition,
     input.input_snapshot_id ?? null,
-    JSON.stringify(redactRagDetails(input.summary)),
-    JSON.stringify(redactRagDetails(input.parity)),
-    JSON.stringify(input.warnings.map(warning => redactRagDetails(warning))),
-    JSON.stringify(redactRagDetails(input.errors)),
+    JSON.stringify(redactRoadmapArtifact(redactRagDetails(input.summary))),
+    JSON.stringify(redactRoadmapArtifact(redactRagDetails(input.parity))),
+    JSON.stringify(input.warnings.map(warning => redactRoadmapArtifact(redactRagDetails(warning)))),
+    JSON.stringify(redactRoadmapArtifact(redactRagDetails(input.errors))),
     input.artifact_path ?? null,
     input.backup_ref ?? null,
     JSON.stringify(input.verification_refs ?? []),
-    JSON.stringify(redactRagDetails(input.mutation_scope ?? {})),
+    JSON.stringify(redactRoadmapArtifact(redactRagDetails(input.mutation_scope ?? {}))),
     input.profile_confirmation ?? null,
     input.final_health_status ?? null,
-    JSON.stringify(redactRagDetails(input.verification ?? {})),
-    JSON.stringify(redactRagDetails(input.retryable_actions ?? [])),
+    JSON.stringify(redactRoadmapArtifact(redactRagDetails(input.verification ?? {}))),
+    JSON.stringify(redactRoadmapArtifact(redactRagDetails(input.retryable_actions ?? []))),
     input.report_id,
   )
 }
@@ -116,7 +116,7 @@ export function readRebuildReport(report_id: string, workspace_id: string, db: D
     SELECT * FROM rag_rebuild_reports WHERE report_id = ? AND workspace_id = ?
   `).get(report_id, workspace_id) as Record<string, unknown> | undefined
   if (!row) throw new Error(`rebuild report not found: ${report_id}`)
-  const profile_manifest = JSON.parse(row['profile_manifest'] as string) as RuntimeDataProfileManifest
+  const profile_manifest = JSON.parse(row['profile_manifest'] as string) as RagRebuildReport['profile_manifest']
   const backup_ref = row['backup_ref'] as string | null
   return {
     report_id: row['report_id'] as string,
@@ -133,7 +133,6 @@ export function readRebuildReport(report_id: string, workspace_id: string, db: D
     backup: backup_ref ? {
       backup_ref,
       restorable: true,
-      backup_path: join(profile_manifest.paths.artifacts, 'backups', backup_ref),
     } : null,
     verification_refs: JSON.parse(row['verification_refs'] as string) as string[],
     candidate: row['candidate_id'] ? {

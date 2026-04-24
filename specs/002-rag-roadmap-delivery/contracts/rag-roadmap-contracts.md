@@ -113,6 +113,10 @@ fulcrum memory rebuild --all --execute --profile dev --json
 fulcrum memory rebuild --domain graph --execute --profile dev --json
 ```
 
+MCP/action callers may use `start_rag_repair` for the same targeted execution
+path when they need a first-class `rag_repair_runs` audit row in addition to
+the rebuild report.
+
 Required output additions:
 
 ```json
@@ -390,6 +394,7 @@ Required public tools:
 - `get_rag_rebuild_plan`: existing, remains read-only.
 - `get_rag_rebuild_dry_run`: existing, remains read-only simulation.
 - `start_rag_rebuild`: existing, mutating and capability-gated.
+- `start_rag_repair`: mutating repair wrapper over rebuild execution, with repair-run persistence.
 - `get_rag_rebuild_report`: existing, read-only.
 - `search_code`: existing, enhanced but backward compatible.
 - `search_context`: new agent-preferred unified retrieval surface.

@@ -434,6 +434,11 @@ function defaultSourceIdFromContextResult(result: Awaited<ReturnType<typeof sear
     ?? result.title
 }
 
+function verifiedCitations(expectedSources: string[], retrievedSources: string[]): string[] {
+  const expected = new Set(expectedSources)
+  return retrievedSources.filter(source => expected.has(source)).slice(0, 1)
+}
+
 export async function defaultRetriever(
   testCase: RoadmapRagEvalCase,
   input: RunRoadmapRagEvalSuiteInput,
@@ -448,11 +453,13 @@ export async function defaultRetriever(
       limit: 5,
       explain: true,
     }, db)
+    const sources = code.results.map(result => `code:${result.rel_path}`)
+    const citations = verifiedCitations(testCase.expected_sources, sources)
     return {
-      retrieved_sources: code.results.map(result => `code:${result.rel_path}`),
-      context_sources: code.results.map(result => `code:${result.rel_path}`),
-      cited_sources: code.results.length > 0 ? [`code:${code.results[0]!.rel_path}`] : [],
-      grounded: code.results.length > 0,
+      retrieved_sources: sources,
+      context_sources: sources,
+      cited_sources: citations,
+      grounded: citations.length > 0,
       latency_ms: Date.now() - started,
       query_trace_id: code.query_trace_id,
     }
@@ -466,11 +473,12 @@ export async function defaultRetriever(
     explain: true,
   }, db)
   const sources = context.results.map(defaultSourceIdFromContextResult)
+  const citations = verifiedCitations(testCase.expected_sources, sources)
   return {
     retrieved_sources: sources,
     context_sources: sources,
-    cited_sources: sources.slice(0, 1),
-    grounded: sources.length > 0,
+    cited_sources: citations,
+    grounded: citations.length > 0,
     latency_ms: Date.now() - started,
     query_trace_id: context.query_trace_id,
   }

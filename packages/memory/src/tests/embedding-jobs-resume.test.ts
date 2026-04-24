@@ -18,6 +18,15 @@ class CountingEmbedder implements EmbeddingProviderLike {
   }
 }
 
+class BatchCaptureEmbedder extends CountingEmbedder {
+  batchSizes: number[] = []
+
+  async embedBatch(texts: string[]): Promise<Float32Array[]> {
+    this.batchSizes.push(texts.length)
+    return Promise.all(texts.map(text => this.embed(text)))
+  }
+}
+
 beforeEach(() => {
   const db = createTestDb()
   seedWorkspaceAndProject(db)
@@ -50,8 +59,9 @@ describe('embedding job resume and idempotency', () => {
     })
 
     const interrupted = await runEmbeddingJob({ job_id: job.job_id, workspace_id: 'ws_1', batch_size: 1, max_items: 1, embedder })
-    expect(interrupted.status).toBe('running')
+    expect(interrupted.status).toBe('pending')
     expect(interrupted.progress).toMatchObject({ embedded: 1, pending: 1 })
+    expect(interrupted.events.some(event => event.event_type === 'failed')).toBe(false)
 
     const completed = await resumeEmbeddingJob({ job_id: job.job_id, workspace_id: 'ws_1', batch_size: 1, embedder })
     expect(completed.status).toBe('completed')
@@ -111,5 +121,29 @@ describe('embedding job resume and idempotency', () => {
     expect(completed.progress).toMatchObject({ embedded: 1, pending: 0 })
     const row = getDb().prepare('SELECT cancel_requested_at FROM embedding_jobs WHERE job_id = ?').get(job.job_id) as { cancel_requested_at: string | null }
     expect(row.cancel_requested_at).toBeNull()
+  })
+
+  it('clamps oversized batches and honors max_items slices', async () => {
+    for (let i = 0; i < 20; i++) seedMemory(`mem_${i}`, `body ${i}`)
+    const embedder = new BatchCaptureEmbedder()
+    const job = createEmbeddingJob({
+      workspace_id: 'ws_1',
+      project_id: 'proj_1',
+      source_domain: 'memories',
+      provider: 'local',
+      model: 'test-model',
+      requested_device: 'auto',
+      dimensions: 1024,
+    })
+
+    const sliced = await runEmbeddingJob({ job_id: job.job_id, workspace_id: 'ws_1', batch_size: 64, max_items: 16, embedder })
+
+    expect(sliced.status).toBe('pending')
+    expect(sliced.progress).toMatchObject({ embedded: 16, pending: 4 })
+    expect(embedder.batchSizes).toEqual([16])
+    const events = getDb().prepare("SELECT event_type, details FROM rag_job_events WHERE job_id = ? ORDER BY rowid").all(job.job_id) as Array<{ event_type: string; details: string }>
+    expect(events.some(event => event.event_type === 'batch_clamped' && JSON.parse(event.details).effective === 16)).toBe(true)
+    expect(events.some(event => event.event_type === 'progress')).toBe(true)
+    expect(events.some(event => event.event_type === 'failed')).toBe(false)
   })
 })

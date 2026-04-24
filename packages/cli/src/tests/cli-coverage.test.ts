@@ -86,6 +86,21 @@ describe('CLI coverage groups (J-6)', () => {
     expect(typeof mod.runAction).toBe('function')
   })
 
+  it('prints memory embed help without starting legacy backfill', async () => {
+    const originalArgv = process.argv
+    process.argv = ['node', 'cli', 'memory', 'embed', '--help']
+    try {
+      vi.resetModules()
+      const mod = await import('../index.js')
+      const spy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      await mod.runMemory()
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('fulcrum memory embed --scope <memories|l1-pages|code>'))
+      spy.mockRestore()
+    } finally {
+      process.argv = originalArgv
+    }
+  })
+
   it('optArg returns the value after a flag, or undefined', async () => {
     const originalArgv = process.argv
     process.argv = ['node', 'cli', '--foo', 'bar']

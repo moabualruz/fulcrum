@@ -229,7 +229,7 @@ const GUARDED_COLUMNS: EnumColumn[] = [
     // RagJobEventType — packages/core/src/types.ts
     table: 'rag_job_events',
     column: 'event_type',
-    expected: ['progress', 'retry', 'split', 'fallback', 'cancelled', 'resumed', 'failed', 'completed'],
+    expected: ['progress', 'retry', 'split', 'fallback', 'batch_clamped', 'cancelled', 'resumed', 'failed', 'completed'],
   },
   {
     // VectorMetadataSourceDomain — packages/core/src/types.ts

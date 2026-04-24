@@ -205,6 +205,35 @@ describe('installCodex()', () => {
     expect(content).toContain('[mcp_servers.fulcrum]')
     expect(content).toContain('command = "fulcrum"')
     expect(content).toContain('args = ["serve", "mcp", "--mode", "filtered"]')
+    expect(content).not.toContain('[[hooks]]')
+  })
+
+  it('merges lifecycle hooks into ~/.codex/hooks.json', async () => {
+    const fakeHome = tmpDir
+    const codexDir = path.join(fakeHome, '.codex')
+    fs.mkdirSync(codexDir, { recursive: true })
+    fs.writeFileSync(path.join(codexDir, 'hooks.json'), JSON.stringify({
+      hooks: {
+        Stop: [
+          {
+            hooks: [
+              { type: 'command', command: 'user stop hook' },
+            ],
+          },
+        ],
+      },
+    }), 'utf8')
+
+    await installCodex({ dryRun: false, targetDir: tmpDir, globalHome: fakeHome })
+
+    const hooksPath = path.join(codexDir, 'hooks.json')
+    const parsed = JSON.parse(fs.readFileSync(hooksPath, 'utf8')) as {
+      hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>
+    }
+    expect(parsed.hooks.SessionStart![0]!.hooks[0]!.command).toBe('fulcrum hook codex session-start')
+    expect(parsed.hooks.UserPromptSubmit![0]!.hooks[0]!.command).toBe('fulcrum hook codex user-prompt-submit')
+    expect(parsed.hooks.PermissionRequest![0]!.hooks[0]!.command).toBe('fulcrum hook codex permission-request')
+    expect(parsed.hooks.Stop!.some(entry => entry.hooks.some(hook => hook.command === 'user stop hook'))).toBe(true)
   })
 
   it('writes AGENTS.md to targetDir', async () => {
@@ -248,6 +277,7 @@ describe('installCodex()', () => {
     await installCodex({ dryRun: true, targetDir: tmpDir, globalHome: fakeHome })
 
     expect(fs.existsSync(path.join(fakeHome, '.codex', 'config.toml'))).toBe(false)
+    expect(fs.existsSync(path.join(fakeHome, '.codex', 'hooks.json'))).toBe(false)
     expect(fs.existsSync(path.join(tmpDir, 'AGENTS.md'))).toBe(false)
 
     const allOutput = logSpy.mock.calls.map(c => c.join(' ')).join('\n')

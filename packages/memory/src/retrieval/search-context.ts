@@ -160,7 +160,10 @@ export async function searchContext(input: SearchContextInput, db: Db = getDb())
       status: 'skipped',
       reason: 'search_context uses deterministic weighted fusion',
     },
-    runtime_truth: { model_calls: 0, retrieval: 'sqlite-lexical-contextual' },
+    runtime_truth: {
+      model_calls: semanticRanks.model_calls,
+      retrieval: semanticRanks.model_calls > 0 ? 'sqlite-lexical-contextual-semantic' : 'sqlite-lexical-contextual',
+    },
     freshness: results.reduce<Record<string, number>>((acc, result) => {
       acc[result.freshness] = (acc[result.freshness] ?? 0) + 1
       return acc

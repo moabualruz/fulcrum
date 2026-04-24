@@ -66,6 +66,7 @@ export interface RagRepairPlanInput {
   project_id: string
   runtime_profile?: RuntimeDataProfile
   data_dir?: string
+  vault_path?: string
   domains?: string[]
 }
 

@@ -1,5 +1,6 @@
-import { getCodeEmbedder, getDb, getTextEmbedder, newId } from 'fulcrum-agent-core'
+import { DEFAULT_EMBED_DIM, getCodeEmbedder, getDb, getTextEmbedder, loadConfig, newId } from 'fulcrum-agent-core'
 import type { Db, EmbeddingJobItemStatus, EmbeddingJobSourceDomain, EmbeddingJobStatus } from 'fulcrum-agent-core'
+import type { EmbeddingProviderConfig } from 'fulcrum-agent-core'
 import { contentHash } from '../dedup.js'
 import { redactRagDetails, redactRagText } from '../setup/rag-redaction.js'
 import { resolveEmbeddingRuntimeDevice } from './embed.js'
@@ -124,10 +125,20 @@ export interface EmbeddingProviderLike {
   actual_device?: string
 }
 
+const DEFAULT_EMBEDDING_JOB_BATCH_SIZE = 16
+const MAX_EMBEDDING_JOB_BATCH_SIZE = 16
+
 interface EmbeddingSource {
   source_id: string
   content: string
   content_hash: string
+}
+
+interface RequestedEmbeddingRuntime {
+  provider: string
+  model: string
+  requested_device: string
+  dimensions: number
 }
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
@@ -201,6 +212,19 @@ function emptyCounts(): EmbeddingJobCounts {
   return { scanned: 0, current: 0, stale: 0, pending: 0, failed: 0, skipped: 0 }
 }
 
+function normalizedPositiveInteger(value: number | undefined, fallback: number): number {
+  if (value === undefined || !Number.isFinite(value)) return fallback
+  return Math.max(1, Math.floor(value))
+}
+
+function normalizedBatchSize(value: number | undefined): { requested: number; effective: number } {
+  const requested = normalizedPositiveInteger(value, DEFAULT_EMBEDDING_JOB_BATCH_SIZE)
+  return {
+    requested,
+    effective: Math.min(requested, MAX_EMBEDDING_JOB_BATCH_SIZE),
+  }
+}
+
 function sourceDomainToVectorDomain(source_domain: EmbeddingJobSourceDomain): 'memory' | 'code_chunk' {
   return source_domain === 'code_chunks' ? 'code_chunk' : 'memory'
 }
@@ -211,6 +235,22 @@ function sourceDomainToVectorTable(source_domain: EmbeddingJobSourceDomain): 've
 
 function providerForDomain(source_domain: EmbeddingJobSourceDomain): EmbeddingProviderLike | null {
   return source_domain === 'code_chunks' ? getCodeEmbedder() : getTextEmbedder()
+}
+
+function configuredProviderForDomain(source_domain: EmbeddingJobSourceDomain): EmbeddingProviderConfig {
+  const config = loadConfig()
+  if (source_domain === 'code_chunks') return config.embedding.code ?? config.embedding.text
+  return config.embedding.text
+}
+
+function requestedRuntime(input: EmbeddingJobStartInput): RequestedEmbeddingRuntime {
+  const configured = configuredProviderForDomain(input.source_domain)
+  return {
+    provider: input.provider ?? configured.provider,
+    model: input.model ?? configured.model,
+    requested_device: input.requested_device ?? configured.device ?? 'auto',
+    dimensions: input.dimensions ?? configured.dimensions ?? DEFAULT_EMBED_DIM,
+  }
 }
 
 function rowsForSources(input: EmbeddingJobStartInput, db: Db): EmbeddingSource[] {
@@ -257,9 +297,7 @@ function rowsForSources(input: EmbeddingJobStartInput, db: Db): EmbeddingSource[
 function computePreflightCounts(input: EmbeddingJobStartInput, sources: EmbeddingSource[], db: Db): EmbeddingJobCounts {
   const counts = emptyCounts()
   counts.scanned = sources.length
-  const provider = input.provider ?? 'local'
-  const model = input.model ?? 'unknown'
-  const dimensions = input.dimensions ?? 1024
+  const { provider, model, requested_device, dimensions } = requestedRuntime(input)
   const source_domain = sourceDomainToVectorDomain(input.source_domain)
   for (const source of sources) {
     const status = classifyVectorMetadata({
@@ -269,7 +307,7 @@ function computePreflightCounts(input: EmbeddingJobStartInput, sources: Embeddin
       content_hash: source.content_hash,
       provider,
       model,
-      requested_device: input.requested_device,
+      requested_device,
       dimensions,
     }, db)
     if (status === 'current') counts.current += 1
@@ -331,10 +369,7 @@ export function appendRagJobEvent(
 }
 
 export function createEmbeddingJob(input: EmbeddingJobStartInput, db: Db = getDb()): EmbeddingJobRow {
-  const provider = input.provider ?? 'local'
-  const model = input.model ?? 'unknown'
-  const requested_device = input.requested_device ?? 'auto'
-  const dimensions = input.dimensions ?? 1024
+  const { provider, model, requested_device, dimensions } = requestedRuntime(input)
   const scope = redactRagDetails(input.scope ?? {})
   const sources = rowsForSources(input, db)
   const preflight_counts = computePreflightCounts({ ...input, provider, model, requested_device, dimensions }, sources, db)
@@ -602,25 +637,38 @@ function summarizeItems(job_id: string, workspace_id: string, db: Db): Embedding
   }
 }
 
-function finalizeJob(job_id: string, workspace_id: string, db: Db): EmbeddingJobStatus {
+function finalizeJob(job_id: string, workspace_id: string, db: Db, opts: { boundedSlice?: boolean } = {}): EmbeddingJobStatus {
   const job = getEmbeddingJob({ job_id, workspace_id }, db)
   const progress = summarizeItems(job_id, workspace_id, db)
+  const hasRemainingWork = progress.pending > 0 || progress.stale > 0 || progress.running > 0
   const status: EmbeddingJobStatus =
     progress.total === 0 ? job.scope.allow_empty === true ? 'completed' : 'failed'
       : progress.failed > 0 ? 'degraded'
-        : progress.pending > 0 || progress.stale > 0 || progress.running > 0 ? 'running'
+        : hasRemainingWork ? opts.boundedSlice ? 'pending' : 'running'
           : 'completed'
   if (status !== 'running') {
-    db.prepare(`
-      UPDATE embedding_jobs
-         SET status = ?, finished_at = datetime('now'), summary = ?
-       WHERE job_id = ? AND workspace_id = ?
-    `).run(status, JSON.stringify(progress), job_id, workspace_id)
+    if (status === 'pending') {
+      db.prepare(`
+        UPDATE embedding_jobs
+           SET status = ?, finished_at = NULL, summary = ?
+         WHERE job_id = ? AND workspace_id = ?
+      `).run(status, JSON.stringify(progress), job_id, workspace_id)
+    } else {
+      db.prepare(`
+        UPDATE embedding_jobs
+           SET status = ?, finished_at = datetime('now'), summary = ?
+         WHERE job_id = ? AND workspace_id = ?
+      `).run(status, JSON.stringify(progress), job_id, workspace_id)
+    }
     appendRagJobEvent({
       job_id,
       workspace_id,
-      event_type: status === 'completed' ? 'completed' : 'failed',
-      message: status === 'completed' ? 'embedding job completed' : 'embedding job completed with failed items',
+      event_type: status === 'completed' ? 'completed' : status === 'pending' ? 'progress' : 'failed',
+      message: status === 'completed'
+        ? 'embedding job completed'
+        : status === 'pending'
+          ? 'embedding job slice completed'
+          : 'embedding job completed with failed items',
       details: progress,
     }, db)
   } else {
@@ -675,7 +723,16 @@ export async function runEmbeddingJob(input: EmbeddingJobRunInput, db: Db = getD
     return getEmbeddingJobStatus({ job_id: job.job_id, workspace_id: job.workspace_id }, db)
   }
 
-  const batchSize = Math.max(1, input.batch_size ?? 32)
+  const { requested: requestedBatchSize, effective: batchSize } = normalizedBatchSize(input.batch_size)
+  if (requestedBatchSize !== batchSize) {
+    appendRagJobEvent({
+      job_id: job.job_id,
+      workspace_id: job.workspace_id,
+      event_type: 'batch_clamped',
+      message: 'embedding batch size clamped',
+      details: { requested: requestedBatchSize, effective: batchSize },
+    }, db)
+  }
   let processed = 0
   while (true) {
     const remainingLimit = input.max_items === undefined ? batchSize : Math.min(batchSize, input.max_items - processed)
@@ -698,7 +755,7 @@ export async function runEmbeddingJob(input: EmbeddingJobRunInput, db: Db = getD
     }
   }
 
-  finalizeJob(job.job_id, job.workspace_id, db)
+  finalizeJob(job.job_id, job.workspace_id, db, { boundedSlice: input.max_items !== undefined })
   return getEmbeddingJobStatus({ job_id: job.job_id, workspace_id: job.workspace_id }, db)
 }
 

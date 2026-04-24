@@ -20,8 +20,10 @@ import { relative, join, isAbsolute } from 'node:path'
 import type { Db } from 'fulcrum-agent-core'
 import { getDb, getContentChangeBus, type ContentChangeEvent } from 'fulcrum-agent-core'
 import { computeFileId, contentSha256, detectCodeLanguage, markCodeFileFailed, markCodeFileSkipped } from '../l2/code.js'
+import { refreshGraphCoverageForCodeFile } from '../graph/coverage.js'
 import { reduceFileToGraph, reduceUnlinkToGraph } from '../kuzu/reducers/code.js'
 import { indexCodeFilePrimitive } from '../setup/backfill-code-files.js'
+import { isTransientToolArtifactPath } from './walker-integration.js'
 
 export { contentSha256 } from '../l2/code.js'
 
@@ -39,6 +41,12 @@ export interface PciSyncerOpts {
 
 export interface PciSyncerHandle {
   stop: () => void
+}
+
+interface DeleteFileScope {
+  workspaceId: string
+  projectId: string
+  relPath: string
 }
 
 interface PendingUnlink {
@@ -66,6 +74,7 @@ export async function syncFile(
   const relPath = relative(projectRoot, absPath)
   if (!relPath || relPath.startsWith('..')) return { action: 'skipped', fileId: '' }
   const fileId = computeFileId(projectId, relPath)
+  if (isTransientToolArtifactPath(relPath)) return { action: 'skipped', fileId }
 
   if (event.change_type === 'unlink') {
     // Look up the existing file's sha256 before cascade-delete so rename
@@ -78,14 +87,14 @@ export async function syncFile(
     if (!shaList.includes(fileId)) shaList.push(fileId)
     pendingUnlinksBySha.set(row.sha256, shaList)
     // Opportunistic GC — drop expired pending renames before inserting.
-    sweepRenameWindow(db)
+    sweepRenameWindow(db, { workspaceId, projectId })
 
     // Defer actual deletion so rename can reclaim; if nothing reclaims
     // within RENAME_WINDOW_MS, a second unlink call or the sweep deletes.
     setTimeout(() => {
       if (pendingUnlinks.has(fileId)) {
         clearPendingUnlink(fileId)
-        deleteFile(db, fileId)
+        deleteFile(db, fileId, { workspaceId, projectId, relPath })
       }
     }, RENAME_WINDOW_MS + 10).unref?.()
     return { action: 'unlinked', fileId }
@@ -107,6 +116,7 @@ export async function syncFile(
         language: detectCodeLanguage(relPath),
         reason: 'symlink_skipped',
       }, db)
+      refreshGraphCoverageForCodeFile({ workspace_id: workspaceId, project_id: projectId, file_id: fileId, rel_path: relPath }, db)
       return { action: 'skipped', fileId }
     }
     if (!l.isFile()) return { action: 'skipped', fileId }
@@ -121,6 +131,7 @@ export async function syncFile(
         size_bytes: stats.size,
         reason: 'file_too_large',
       }, db)
+      refreshGraphCoverageForCodeFile({ workspace_id: workspaceId, project_id: projectId, file_id: fileId, rel_path: relPath }, db)
       return { action: 'skipped', fileId }
     }
     // Minimal UTF-8 sanity check — reject binary files that would produce
@@ -138,6 +149,7 @@ export async function syncFile(
           size_bytes: stats.size,
           reason: 'binary_skipped',
         }, db)
+        refreshGraphCoverageForCodeFile({ workspace_id: workspaceId, project_id: projectId, file_id: fileId, rel_path: relPath }, db)
         return { action: 'skipped', fileId }
       }
     }
@@ -150,11 +162,12 @@ export async function syncFile(
       language: detectCodeLanguage(relPath),
       reason: 'read_failed',
     }, db)
+    refreshGraphCoverageForCodeFile({ workspace_id: workspaceId, project_id: projectId, file_id: fileId, rel_path: relPath }, db)
     return { action: 'failed', fileId }
   }
 
   const sha = contentSha256(content)
-  sweepRenameWindow(db)
+  sweepRenameWindow(db, { workspaceId, projectId })
   clearPendingUnlink(fileId)
   // Pick the first pending unlink with a matching sha256 that isn't the current fileId.
   const candidateFileIds = pendingUnlinksBySha.get(sha) ?? []
@@ -165,6 +178,9 @@ export async function syncFile(
     clearPendingUnlink(rename.fileId)
     db.prepare('UPDATE code_files SET file_id = ?, rel_path = ? WHERE file_id = ?').run(fileId, relPath, rename.fileId)
     db.prepare('UPDATE code_chunks SET file_id = ?, file_path = ? WHERE file_id = ?').run(fileId, relPath, rename.fileId)
+    refreshGraphCoverageForCodeFile({ workspace_id: workspaceId, project_id: projectId, file_id: rename.fileId, rel_path: rename.relPath }, db)
+    refreshGraphCoverageForCodeFile({ workspace_id: workspaceId, project_id: projectId, file_id: fileId, rel_path: relPath }, db)
+    void reduceFileToGraph(db, fileId).catch(() => { /* logged in reducer */ })
     return { action: 'renamed', fileId }
   }
 
@@ -179,6 +195,7 @@ export async function syncFile(
   }, db)
 
   if (result.action === 'indexed' || result.action === 'updated') {
+    refreshGraphCoverageForCodeFile({ workspace_id: workspaceId, project_id: projectId, file_id: fileId, rel_path: relPath }, db)
     void reduceFileToGraph(db, fileId).catch(() => { /* logged in reducer */ })
   }
 
@@ -191,11 +208,19 @@ function mtimeNs(stats: ReturnType<typeof statSync> | undefined): number {
   return Math.round(Number(stats.mtimeMs) * 1_000_000)
 }
 
-function deleteFile(db: Db, fileId: string): void {
+function deleteFile(db: Db, fileId: string, scope?: DeleteFileScope): void {
   try { db.prepare('DELETE FROM code_files WHERE file_id = ?').run(fileId) }
   catch { /* cascade clears chunks/symbols via FK */ }
   try { db.prepare('DELETE FROM code_chunks WHERE file_id = ?').run(fileId) }
   catch { /* some schema versions don't cascade, best-effort */ }
+  if (scope) {
+    refreshGraphCoverageForCodeFile({
+      workspace_id: scope.workspaceId,
+      project_id: scope.projectId,
+      file_id: fileId,
+      rel_path: scope.relPath,
+    }, db)
+  }
   // v2a PR 7 Task 37 — drop the File node + its edges + chunks/symbols.
   // Fire-and-forget; graph eventually converges.
   void reduceUnlinkToGraph(fileId).catch(() => { /* logged inside reducer */ })
@@ -212,12 +237,12 @@ function clearPendingUnlink(fileId: string): void {
   else pendingUnlinksBySha.set(pending.sha256, list)
 }
 
-function sweepRenameWindow(db: Db): void {
+function sweepRenameWindow(db: Db, scope?: { workspaceId: string; projectId: string }): void {
   const now = Date.now()
   for (const [fid, pending] of pendingUnlinks.entries()) {
     if (now - pending.ts > RENAME_WINDOW_MS * 4) {
       clearPendingUnlink(fid)
-      deleteFile(db, fid)
+      deleteFile(db, fid, scope ? { ...scope, relPath: pending.relPath } : undefined)
     }
   }
 }

@@ -16,13 +16,13 @@ Guard: `scripts/surface-inventory.test.ts`.
 Machine-checked unit ledger:
 `docs/reference/2026-04-21-sixth-pass-unit-acceptance-ledger.json`.
 
-The JSON ledger currently contains 3,365 explicit unit rows:
+The JSON ledger currently contains 3,368 explicit unit rows:
 
 | Unit class | Rows |
 |---|---:|
 | workspace projects | 17 |
 | package source files | 340 |
-| package test files | 403 |
+| package test files | 404 |
 | package config files | 37 |
 | package generated artifacts | 38 |
 | script source files | 23 |
@@ -31,8 +31,8 @@ The JSON ledger currently contains 3,365 explicit unit rows:
 | package exports | 1,179 |
 | CLI dispatch tokens | 45 |
 | fanout targets | 8 |
-| MCP tool schemas | 53 |
-| tool registry entries | 59 |
+| MCP tool schemas | 54 |
+| tool registry entries | 60 |
 | monitor routes | 46 |
 | workflow steps | 29 |
 | installer functions | 18 |
@@ -201,6 +201,7 @@ runtime rows.
 - `get_rag_rebuild_plan`
 - `get_rag_rebuild_dry_run`
 - `start_rag_rebuild`
+- `start_rag_repair`
 - `get_runtime_profile_paths`
 - `get_rag_rebuild_report`
 - `get_rag_health`
@@ -271,6 +272,7 @@ CLI/action parity, response contract, negative path, and docs.
 - `get_rag_rebuild_plan`
 - `get_rag_rebuild_dry_run`
 - `start_rag_rebuild`
+- `start_rag_repair`
 - `get_runtime_profile_paths`
 - `get_rag_rebuild_report`
 - `get_rag_health`

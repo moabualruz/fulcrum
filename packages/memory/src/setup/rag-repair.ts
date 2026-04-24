@@ -43,8 +43,9 @@ export function buildRagRepairPlan(input: RagRepairPlanInput, db: Db = getDb()):
   const health = buildRagHealthReport({
     workspace_id: input.workspace_id,
     project_id: input.project_id,
-    runtime_profile,
+    runtime_profile: input.runtime_profile,
     data_dir: input.data_dir,
+    vault_path: input.vault_path,
   }, db)
   const domains = selectRepairDomains(health, input.domains)
   const domain_details = Object.fromEntries(domains.map(domain => [domain, health.domains[domain]]))

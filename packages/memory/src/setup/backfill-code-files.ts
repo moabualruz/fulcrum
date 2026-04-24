@@ -7,6 +7,8 @@
 
 import type { Db } from 'fulcrum-agent-core'
 import { getDb } from 'fulcrum-agent-core'
+import { existsSync } from 'fs'
+import { isAbsolute, resolve } from 'path'
 import { computeFileId, indexCodeFile } from '../l2/code.js'
 import type { IndexCodeFileInput, IndexCodeFileResult } from '../l2/code.js'
 
@@ -14,6 +16,7 @@ export interface BackfillResult {
   filesBackfilled: number
   chunksLinked: number
   alreadyLinked: number
+  staleFailuresPruned: number
 }
 
 export interface BackfillScope {
@@ -25,6 +28,32 @@ export { computeFileId } from '../l2/code.js'
 
 export function indexCodeFilePrimitive(input: IndexCodeFileInput, db: Db = getDb()): Promise<IndexCodeFileResult> {
   return indexCodeFile(input, db)
+}
+
+function pruneMissingFailedCodeFiles(db: Db, scope?: BackfillScope): number {
+  const scopeWhere = scope ? 'AND cf.workspace_id = ? AND cf.project_id = ?' : ''
+  const scopeParams = scope ? [scope.workspace_id, scope.project_id] : []
+  const rows = db.prepare(`
+    SELECT cf.file_id, cf.rel_path, p.root_realpath
+      FROM code_files cf
+      JOIN projects p
+        ON p.workspace_id = cf.workspace_id
+       AND p.project_id = cf.project_id
+     WHERE (cf.status = 'failed' OR cf.parse_status = 'failed')
+       AND cf.failure_reason = 'read_failed'
+       AND cf.chunks_count = 0
+       ${scopeWhere}
+  `).all(...scopeParams) as Array<{ file_id: string; rel_path: string; root_realpath: string | null }>
+
+  let pruned = 0
+  const deleteFile = db.prepare('DELETE FROM code_files WHERE file_id = ?')
+  for (const row of rows) {
+    if (!row.root_realpath) continue
+    const filePath = isAbsolute(row.rel_path) ? row.rel_path : resolve(row.root_realpath, row.rel_path)
+    if (existsSync(filePath)) continue
+    pruned += deleteFile.run(row.file_id).changes
+  }
+  return pruned
 }
 
 export function backfillCodeFiles(db: Db = getDb(), scope?: BackfillScope): BackfillResult {
@@ -51,6 +80,7 @@ export function backfillCodeFiles(db: Db = getDb(), scope?: BackfillScope): Back
 
   let filesBackfilled = 0
   let chunksLinked = 0
+  const staleFailuresPruned = pruneMissingFailedCodeFiles(db, scope)
   const now = Date.now()
 
   const tx = db.transaction(() => {
@@ -78,5 +108,5 @@ export function backfillCodeFiles(db: Db = getDb(), scope?: BackfillScope): Back
     `).run()
   }
 
-  return { filesBackfilled, chunksLinked, alreadyLinked: before }
+  return { filesBackfilled, chunksLinked, alreadyLinked: before, staleFailuresPruned }
 }

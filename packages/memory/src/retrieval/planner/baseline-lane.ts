@@ -5,6 +5,7 @@ import { redactRoadmapArtifact } from '../../setup/rag-redaction.js'
 export interface BaselineSemanticRanks {
   memory: Map<string, number>
   code: Map<string, number>
+  model_calls: number
   skipped_stages: Array<{ stage: string; reason: string }>
 }
 
@@ -28,6 +29,7 @@ export async function loadBaselineSemanticRanks(
       return {
         memory: memory.ranks,
         code: code.ranks,
+        model_calls: memory.model_calls + code.model_calls,
         skipped_stages: [{ stage: 'semantic', reason: reasons[0] ?? 'no current semantic candidates' }],
       }
     }
@@ -36,6 +38,7 @@ export async function loadBaselineSemanticRanks(
   return {
     memory: memory.ranks,
     code: code.ranks,
+    model_calls: memory.model_calls + code.model_calls,
     skipped_stages: memory.ranks.size === 0 && code.ranks.size === 0
       ? [{ stage: 'semantic', reason: 'no current semantic candidates' }]
       : [],
@@ -45,9 +48,9 @@ export async function loadBaselineSemanticRanks(
 async function loadMemorySemanticRanks(
   input: LoadBaselineSemanticRanksInput,
   db: Db,
-): Promise<{ ranks: Map<string, number>; skipped_reason?: string }> {
+): Promise<{ ranks: Map<string, number>; model_calls: number; skipped_reason?: string }> {
   const embedder = getTextEmbedder()
-  if (!embedder) return { ranks: new Map(), skipped_reason: 'no text embedder registered' }
+  if (!embedder) return { ranks: new Map(), model_calls: 0, skipped_reason: 'no text embedder registered' }
   try {
     const embedFn = ((embedder as { embedQuery?: (text: string) => Promise<Float32Array> }).embedQuery ?? embedder.embed).bind(embedder)
     const queryVec = await embedFn(input.query)
@@ -69,18 +72,18 @@ async function loadMemorySemanticRanks(
        ORDER BY v.distance
        LIMIT ?
     `).all(buf, input.limit, input.workspace_id, input.project_id, input.limit) as Array<{ memory_id: string; vecRank: number }>
-    return { ranks: new Map(rows.map(row => [row.memory_id, row.vecRank])) }
+    return { ranks: new Map(rows.map(row => [row.memory_id, row.vecRank])), model_calls: 1 }
   } catch (err) {
-    return { ranks: new Map(), skipped_reason: `vec_memories unavailable: ${redactRoadmapArtifact(err instanceof Error ? err.message : String(err))}` }
+    return { ranks: new Map(), model_calls: 1, skipped_reason: `vec_memories unavailable: ${redactRoadmapArtifact(err instanceof Error ? err.message : String(err))}` }
   }
 }
 
 async function loadCodeSemanticRanks(
   input: LoadBaselineSemanticRanksInput,
   db: Db,
-): Promise<{ ranks: Map<string, number>; skipped_reason?: string }> {
+): Promise<{ ranks: Map<string, number>; model_calls: number; skipped_reason?: string }> {
   const embedder = getCodeEmbedder()
-  if (!embedder) return { ranks: new Map(), skipped_reason: 'no code embedder registered' }
+  if (!embedder) return { ranks: new Map(), model_calls: 0, skipped_reason: 'no code embedder registered' }
   try {
     const embedFn = ((embedder as { embedQuery?: (text: string) => Promise<Float32Array> }).embedQuery ?? embedder.embed).bind(embedder)
     const queryVec = await embedFn(input.query)
@@ -103,8 +106,8 @@ async function loadCodeSemanticRanks(
        ORDER BY v.distance
        LIMIT ?
     `).all(buf, input.limit, input.workspace_id, input.project_id, input.limit) as Array<{ chunk_id: string; vecRank: number }>
-    return { ranks: new Map(rows.map(row => [row.chunk_id, row.vecRank])) }
+    return { ranks: new Map(rows.map(row => [row.chunk_id, row.vecRank])), model_calls: 1 }
   } catch (err) {
-    return { ranks: new Map(), skipped_reason: `vec_chunks unavailable: ${redactRoadmapArtifact(err instanceof Error ? err.message : String(err))}` }
+    return { ranks: new Map(), model_calls: 1, skipped_reason: `vec_chunks unavailable: ${redactRoadmapArtifact(err instanceof Error ? err.message : String(err))}` }
   }
 }

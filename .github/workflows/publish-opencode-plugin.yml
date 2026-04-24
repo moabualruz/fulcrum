@@ -1,9 +1,7 @@
 name: Publish @fulcrum-agent-os/opencode-plugin
 
 on:
-  push:
-    tags:
-      - 'opencode-plugin/v*'
+  workflow_dispatch:
 
 jobs:
   publish:

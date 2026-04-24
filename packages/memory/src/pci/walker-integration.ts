@@ -26,6 +26,10 @@ const BINARY_EXTS = new Set([
 ])
 
 const HARD_EXCLUDE_DIRS = new Set(['node_modules', '.fulcrum', 'dist', 'build', '.turbo', 'target'])
+const TRANSIENT_TOOL_ARTIFACT_PATTERNS = [
+  /(?:^|\/)vitest\.config\.ts\.timestamp-\d+-[A-Fa-f0-9]+\.mjs$/,
+  /(?:^|\/)tsup\.config\.bundled_[A-Za-z0-9]+\.mjs$/,
+] as const
 
 /**
  * Predicate: should we mount a watcher on this directory? Applied to directory
@@ -57,6 +61,11 @@ function hasHardExcludeSegment(relPath: string): boolean {
     if (HARD_EXCLUDE_DIRS.has(seg)) return true
   }
   return false
+}
+
+export function isTransientToolArtifactPath(relPath: string): boolean {
+  const normalized = relPath.replace(/\\/g, '/')
+  return TRANSIENT_TOOL_ARTIFACT_PATTERNS.some(pattern => pattern.test(normalized))
 }
 
 export interface WalkerResult {
@@ -93,6 +102,7 @@ export async function enumerateProjectFiles(rootDir: string): Promise<WalkerResu
     const relNorm = rel.replace(/\\/g, '/')
     if (hasHiddenSegment(relNorm)) { skipped++; continue }
     if (hasHardExcludeSegment(relNorm)) { skipped++; continue }
+    if (isTransientToolArtifactPath(relNorm)) { skipped++; continue }
     if (BINARY_EXTS.has(extname(relNorm).toLowerCase())) { skipped++; continue }
 
     const abs = isAbsolute(relNorm) ? relNorm : join(rootDir, relNorm)
@@ -124,6 +134,7 @@ export function shouldIndexPath(rootDir: string, absPath: string): boolean {
   if (!rel || rel.startsWith('..')) return false
   if (hasHiddenSegment(rel)) return false
   if (hasHardExcludeSegment(rel)) return false
+  if (isTransientToolArtifactPath(rel)) return false
   if (BINARY_EXTS.has(extname(basename(rel)).toLowerCase())) return false
   try {
     const stats = statSync(absPath)

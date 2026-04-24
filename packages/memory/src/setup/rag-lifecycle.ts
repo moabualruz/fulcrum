@@ -8,8 +8,9 @@ import { captureRebuildInputSnapshot, validateRebuildInputSnapshot } from './reb
 import { createRebuildCandidate, finishRebuildCandidate, updateRebuildCandidateStatus } from './rebuild-candidate.js'
 import { runRebuildParityChecks } from './rebuild-parity.js'
 import { createRunningRebuildReport, finishRebuildReport } from './rebuild-report.js'
-import { redactRagDetails } from './rag-redaction.js'
+import { pathFingerprintForRoadmap, redactRagDetails, redactRoadmapArtifact } from './rag-redaction.js'
 import { buildRagHealthReport } from './rag-health.js'
+import { toHealthProfileManifest } from './rag-health-support.js'
 import { buildRagRepairPlan } from './rag-repair.js'
 import { evaluateRepairVerification } from './repair/verification.js'
 import { DEFAULT_RAG_REBUILD_DOMAINS, RAG_REBUILD_DOMAINS } from './rag-types.js'
@@ -118,6 +119,14 @@ function releaseCandidateBuildSavepoint(db: Db, commit: boolean): void {
 
 type RuntimeProfileBackup = NonNullable<RagRebuildReport['backup']>
 
+function publicBackup(backup: RuntimeProfileBackup | null): RagRebuildReport['backup'] {
+  return backup ? { backup_ref: backup.backup_ref, restorable: backup.restorable } : null
+}
+
+function publicErrors(errors: unknown[]): unknown[] {
+  return redactRoadmapArtifact(redactRagDetails(errors)) as unknown[]
+}
+
 function backupRootInsideSource(source: string, backupRoot: string): boolean {
   const fromSource = relative(resolve(source), resolve(backupRoot))
   return fromSource === '' || Boolean(fromSource && !fromSource.startsWith('..') && !isAbsolute(fromSource))
@@ -208,6 +217,15 @@ function openActiveDb(request: RagRebuildRequest, profile_manifest: RuntimeDataP
   return profileDb
 }
 
+function publicDbMismatchDetails(mismatch: NonNullable<ReturnType<typeof runtimeProfileDbMismatch>>): Record<string, unknown> {
+  return {
+    code: mismatch.code,
+    profile: mismatch.profile,
+    expected_fingerprint: mismatch.expected_fingerprint,
+    actual_fingerprint: pathFingerprintForRoadmap(mismatch.actual_path),
+  }
+}
+
 export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promise<RagRebuildReport> {
   const domains = normalizeDomains(request.domains)
   const actor = request.actor ?? { kind: 'agent', role: 'software_engineer', id: 'unknown' }
@@ -216,20 +234,22 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
     profile: runtime_profile,
     data_dir: request.data_dir,
   })
+  const public_profile_manifest = toHealthProfileManifest(profile_manifest)
   const verification_refs = request.verification_refs ?? []
   const mutation_scope = { profile: runtime_profile, clear_scope: 'derived_rag_state', domains }
   const errors: unknown[] = []
   const warnings: string[] = []
 
-  const mismatch = db ? runtimeProfileDbMismatch(db, profile_manifest) : null
+  const enforceProfileDbMatch = Boolean(request.data_dir) || runtime_profile !== 'dev'
+  const mismatch = db && enforceProfileDbMatch ? runtimeProfileDbMismatch(db, profile_manifest) : null
   if (mismatch) {
-    errors.push({ code: mismatch.code, message: 'database connection does not match selected runtime profile', details: mismatch })
+    errors.push({ code: mismatch.code, message: 'database connection does not match selected runtime profile', details: publicDbMismatchDetails(mismatch) })
     return {
       report_id: newId('rag_rebuild_report'),
       status: 'failed',
       mode: request.mode,
       scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
-      profile_manifest,
+      profile_manifest: public_profile_manifest,
       profile_confirmation: request.confirm_profile ?? null,
       backup: null,
       verification_refs,
@@ -237,19 +257,19 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       counts: {},
       parity: [],
       warnings,
-      errors,
+      errors: publicErrors(errors),
       artifact_path: null,
     }
   }
 
   if (!profile_manifest.safe_for_destructive_execution) {
-    errors.push({ code: 'runtime_profile_unsafe', message: 'runtime profile path resolution is unsafe', details: profile_manifest.errors })
+    errors.push({ code: 'runtime_profile_unsafe', message: 'runtime profile path resolution is unsafe', details: public_profile_manifest.errors })
     return {
       report_id: newId('rag_rebuild_report'),
       status: 'failed',
       mode: request.mode,
       scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
-      profile_manifest,
+      profile_manifest: public_profile_manifest,
       profile_confirmation: request.confirm_profile ?? null,
       backup: null,
       verification_refs,
@@ -257,7 +277,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       counts: {},
       parity: [],
       warnings,
-      errors,
+      errors: publicErrors(errors),
       artifact_path: null,
     }
   }
@@ -269,7 +289,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       status: 'failed',
       mode: request.mode,
       scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
-      profile_manifest,
+      profile_manifest: public_profile_manifest,
       profile_confirmation: request.confirm_profile ?? null,
       backup: null,
       verification_refs,
@@ -277,7 +297,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       counts: {},
       parity: [],
       warnings,
-      errors,
+      errors: publicErrors(errors),
       artifact_path: null,
     }
   }
@@ -306,7 +326,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       status: 'failed',
       mode: request.mode,
       scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
-      profile_manifest,
+      profile_manifest: public_profile_manifest,
       profile_confirmation: request.confirm_profile ?? null,
       backup: null,
       verification_refs,
@@ -314,7 +334,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       counts: planned.counts,
       parity: [],
       warnings,
-      errors,
+      errors: publicErrors(errors),
       artifact_path: null,
       repair_plan_id,
       final_health_status: repairPlan.health_status,
@@ -337,7 +357,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       status: 'failed',
       mode: request.mode,
       scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
-      profile_manifest,
+      profile_manifest: public_profile_manifest,
       profile_confirmation: request.confirm_profile ?? null,
       backup: null,
       verification_refs,
@@ -345,7 +365,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       counts: planned.counts,
       parity: [],
       warnings,
-      errors,
+      errors: publicErrors(errors),
       artifact_path: null,
       repair_plan_id,
       final_health_status: repairPlan.health_status,
@@ -367,7 +387,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       status: 'completed',
       mode: request.mode,
       scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
-      profile_manifest,
+      profile_manifest: public_profile_manifest,
       profile_confirmation: request.confirm_profile ?? null,
       backup: null,
       verification_refs,
@@ -375,7 +395,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       counts: planned.counts,
       parity: [],
       warnings,
-      errors,
+      errors: publicErrors(errors),
       artifact_path: null,
       repair_plan_id,
       final_health_status: repairPlan.health_status,
@@ -405,7 +425,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       status: 'failed',
       mode: request.mode,
       scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
-      profile_manifest,
+      profile_manifest: public_profile_manifest,
       profile_confirmation: request.confirm_profile ?? null,
       backup: null,
       verification_refs,
@@ -413,7 +433,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       counts: planned.counts,
       parity: [],
       warnings,
-      errors,
+      errors: publicErrors(errors),
       artifact_path: null,
     }
   }
@@ -516,7 +536,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       summary: finalCounts,
       parity,
       warnings,
-      errors: redactRagDetails(errors),
+      errors: publicErrors(errors),
       backup_ref,
       verification_refs,
       mutation_scope,
@@ -531,9 +551,9 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       status,
       mode: request.mode,
       scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
-      profile_manifest,
+      profile_manifest: public_profile_manifest,
       profile_confirmation: request.confirm_profile ?? null,
-      backup,
+      backup: publicBackup(backup),
       verification_refs,
       candidate: {
         candidate_id: candidate.candidate_id,
@@ -546,7 +566,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       counts: finalCounts,
       parity,
       warnings,
-      errors,
+      errors: publicErrors(errors),
       artifact_path: null,
       repair_plan_id,
       final_health_status: finalHealth.status,
@@ -562,7 +582,7 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       summary: planned.counts,
       parity: [],
       warnings,
-      errors,
+      errors: publicErrors(errors),
       backup_ref,
       verification_refs,
       mutation_scope,
@@ -580,15 +600,15 @@ export async function runRagRebuild(request: RagRebuildRequest, db?: Db): Promis
       status: 'failed',
       mode: request.mode,
       scope: { workspace_id: request.workspace_id, project_id: request.project_id, runtime_profile, domains },
-      profile_manifest,
+      profile_manifest: public_profile_manifest,
       profile_confirmation: request.confirm_profile ?? null,
-      backup,
+      backup: publicBackup(backup),
       verification_refs,
       candidate: null,
       counts: planned.counts,
       parity: [],
       warnings,
-      errors,
+      errors: publicErrors(errors),
       artifact_path: null,
       repair_plan_id,
       final_health_status: repairPlan.health_status,

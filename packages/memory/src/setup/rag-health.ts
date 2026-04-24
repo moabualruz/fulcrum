@@ -250,6 +250,7 @@ function buildVectorDomain(input: { workspace_id: string; project_id: string }, 
     SELECT COUNT(*) AS n
       FROM memories m
      WHERE m.workspace_id = ? AND (m.project_id = ? OR m.project_id IS NULL)
+       AND m.schema_version >= 3
        AND NOT EXISTS (
          SELECT 1 FROM vector_metadata v
           WHERE v.workspace_id = m.workspace_id
@@ -285,6 +286,15 @@ function buildVectorDomain(input: { workspace_id: string; project_id: string }, 
       FROM embedding_job_items i
       JOIN embedding_jobs j ON j.job_id = i.job_id AND j.workspace_id = i.workspace_id
      WHERE i.workspace_id = ? AND j.project_id = ? AND i.status = 'failed'
+       AND NOT EXISTS (
+         SELECT 1
+           FROM vector_metadata v
+          WHERE v.workspace_id = i.workspace_id
+            AND v.source_domain = CASE i.source_domain WHEN 'code_chunks' THEN 'code_chunk' ELSE 'memory' END
+            AND v.source_id = i.source_id
+            AND v.status = 'current'
+            AND (i.source_content_hash = '' OR v.content_hash = i.source_content_hash)
+       )
   `, input.workspace_id, input.project_id)
   const failuresByReason = safeRows<Record<string, unknown>>(db, `
     SELECT COALESCE(i.error_type, 'unknown') AS error_type,
@@ -293,6 +303,15 @@ function buildVectorDomain(input: { workspace_id: string; project_id: string }, 
       FROM embedding_job_items i
       JOIN embedding_jobs j ON j.job_id = i.job_id AND j.workspace_id = i.workspace_id
      WHERE i.workspace_id = ? AND j.project_id = ? AND i.status = 'failed'
+       AND NOT EXISTS (
+         SELECT 1
+           FROM vector_metadata v
+          WHERE v.workspace_id = i.workspace_id
+            AND v.source_domain = CASE i.source_domain WHEN 'code_chunks' THEN 'code_chunk' ELSE 'memory' END
+            AND v.source_id = i.source_id
+            AND v.status = 'current'
+            AND (i.source_content_hash = '' OR v.content_hash = i.source_content_hash)
+       )
      GROUP BY COALESCE(i.error_type, 'unknown'), COALESCE(i.error_message, '')
      ORDER BY count DESC, error_type
   `, input.workspace_id, input.project_id)

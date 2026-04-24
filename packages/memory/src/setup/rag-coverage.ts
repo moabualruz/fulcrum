@@ -113,11 +113,24 @@ export function reconcileVectorMetadata(
   const scoped = `
     WITH scoped_vectors AS (
       SELECT v.*, m.content_hash AS source_hash
-        FROM vector_metadata v
+       FROM vector_metadata v
         JOIN memories m ON m.memory_id = v.source_id AND m.workspace_id = v.workspace_id
        WHERE v.workspace_id = ?
          AND v.source_domain = 'memory'
          AND (m.project_id = ? OR m.project_id IS NULL)
+         AND m.schema_version >= 3
+         AND (
+           v.status = 'current'
+           OR NOT EXISTS (
+             SELECT 1
+               FROM vector_metadata current_v
+              WHERE current_v.workspace_id = v.workspace_id
+                AND current_v.source_domain = v.source_domain
+                AND current_v.source_id = v.source_id
+                AND current_v.status = 'current'
+                AND current_v.rowid > v.rowid
+           )
+         )
       UNION ALL
       SELECT v.*, c.content_hash AS source_hash
         FROM vector_metadata v
@@ -125,6 +138,18 @@ export function reconcileVectorMetadata(
        WHERE v.workspace_id = ?
          AND v.source_domain = 'code_chunk'
          AND c.project_id = ?
+         AND (
+           v.status = 'current'
+           OR NOT EXISTS (
+             SELECT 1
+               FROM vector_metadata current_v
+              WHERE current_v.workspace_id = v.workspace_id
+                AND current_v.source_domain = v.source_domain
+                AND current_v.source_id = v.source_id
+                AND current_v.status = 'current'
+                AND current_v.rowid > v.rowid
+           )
+         )
     )
   `
   const rowsByStatus = safeRows<{ status: RagCoverageStatus; n: number }>(db, `
@@ -172,8 +197,9 @@ export function reconcileVectorMetadata(
   const contentHashMismatches = safeCount(db, `
     ${scoped}
     SELECT COUNT(*) AS n
-      FROM scoped_vectors
-     WHERE COALESCE(content_hash, '') != COALESCE(source_hash, '')
+     FROM scoped_vectors
+     WHERE source_hash IS NOT NULL
+       AND COALESCE(content_hash, '') != COALESCE(source_hash, '')
   `, ...baseParams)
   const runtimeMismatches = safeCount(db, `
     ${scoped}
@@ -189,7 +215,7 @@ export function reconcileVectorMetadata(
       FROM scoped_vectors
      WHERE status = 'current'
        AND (
-         COALESCE(content_hash, '') != COALESCE(source_hash, '')
+         (source_hash IS NOT NULL AND COALESCE(content_hash, '') != COALESCE(source_hash, ''))
          OR (source_domain = 'memory' AND NOT EXISTS (SELECT 1 FROM vec_memories vm WHERE vm.memory_id = scoped_vectors.source_id))
          OR (source_domain = 'code_chunk' AND NOT EXISTS (SELECT 1 FROM vec_chunks vc WHERE vc.chunk_id = scoped_vectors.source_id))
        )

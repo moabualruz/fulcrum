@@ -174,6 +174,17 @@ describe("wipeAgent codex", () => {
       'command = "other-hook"',
     ].join("\n");
     mkfile(path.join(home, ".codex/config.toml"), toml);
+    mkfile(path.join(home, ".codex/hooks.json"), JSON.stringify({
+      hooks: {
+        SessionStart: [
+          { hooks: [{ type: "command", command: "fulcrum hook codex session-start" }] },
+        ],
+        Stop: [
+          { hooks: [{ type: "command", command: "other codex hook" }] },
+        ],
+        CustomMetadata: { owner: "user" },
+      },
+    }));
     mkfile(path.join(home, ".codex/skills/fulcrum-foo/SKILL.md"), "skill");
     mkfile(path.join(home, ".codex/rules/fulcrum-rule-core.md"), "rule");
     mkfile(path.join(home, ".codex/rules/fulcrum-rule-roles.md"), "rule2");
@@ -198,6 +209,20 @@ describe("wipeAgent codex", () => {
     const toml = read(path.join(home, ".codex/config.toml"));
     expect(toml).not.toContain("fulcrum hook codex");
     expect(toml).toContain("other-hook");
+  });
+
+  it("strips fulcrum hook entries from hooks.json, preserves other hooks", () => {
+    wipeAgent({ agent: "codex", dryRun: false, home });
+    const hooksJson = JSON.parse(read(path.join(home, ".codex/hooks.json"))) as {
+      hooks: Record<string, unknown>
+    };
+    const commands = Object.values(hooksJson.hooks)
+      .filter((entries): entries is Array<{ hooks: Array<{ command: string }> }> => Array.isArray(entries))
+      .flatMap(entries => entries)
+      .flatMap(entry => entry.hooks.map(hook => hook.command));
+    expect(commands).not.toContain("fulcrum hook codex session-start");
+    expect(commands).toContain("other codex hook");
+    expect(hooksJson.hooks["CustomMetadata"]).toEqual({ owner: "user" });
   });
 
   it("deletes fulcrum skills dirs", () => {

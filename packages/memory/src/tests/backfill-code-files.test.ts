@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { setDb, closeDb, _configureDb } from 'fulcrum-agent-core'
 import { runMigrations } from 'fulcrum-agent-core'
 import { backfillCodeFiles, computeFileId } from '../setup/backfill-code-files.js'
@@ -14,14 +17,21 @@ function freshDb() {
 
 describe('backfillCodeFiles — v2a PR 3 Task 16', () => {
   let db: Database.Database
+  let root = ''
   beforeEach(() => {
     db = freshDb()
+    root = mkdtempSync(join(tmpdir(), 'fulcrum-backfill-code-files-'))
     db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_1','w','active','2026-04-17T00:00:00Z')`).run()
     db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_1','ws_1','p','git','active','worktree','2026-04-17T00:00:00Z')`).run()
+    db.prepare(`UPDATE projects SET root_realpath = ? WHERE project_id = 'proj_1'`).run(root)
     db.prepare(`INSERT INTO workspaces (workspace_id, name, status, created_at) VALUES ('ws_2','w2','active','2026-04-17T00:00:00Z')`).run()
     db.prepare(`INSERT INTO projects (project_id, workspace_id, name, type, status, write_mode, created_at) VALUES ('proj_2','ws_2','p2','git','active','worktree','2026-04-17T00:00:00Z')`).run()
   })
-  afterEach(() => closeDb())
+  afterEach(() => {
+    closeDb()
+    if (root) rmSync(root, { recursive: true, force: true })
+    root = ''
+  })
 
   function seedChunk(opts: { chunk_id: string; file_path: string; workspace_id?: string; project_id?: string }) {
     db.prepare(`INSERT INTO code_chunks (chunk_id, workspace_id, project_id, file_path, language, chunk_strategy, source_type, content, indexed_at)
@@ -83,5 +93,28 @@ describe('backfillCodeFiles — v2a PR 3 Task 16', () => {
     const ws2Linked = db.prepare(`SELECT COUNT(*) AS n FROM code_chunks WHERE workspace_id = 'ws_2' AND file_id IS NOT NULL`).get() as { n: number }
     expect(ws1Linked.n).toBe(1)
     expect(ws2Linked.n).toBe(0)
+  })
+
+  it('prunes scoped read_failed code file rows when the project root proves the file is gone', () => {
+    mkdirSync(join(root, 'src'), { recursive: true })
+    writeFileSync(join(root, 'src', 'present.ts'), 'export const present = true\n')
+    const missingId = computeFileId('proj_1', 'src/missing.ts')
+    const presentId = computeFileId('proj_1', 'src/present.ts')
+    const otherId = computeFileId('proj_2', 'src/missing.ts')
+    db.prepare(`
+      INSERT INTO code_files (
+        file_id, workspace_id, project_id, rel_path, language, sha256,
+        mtime_ns, size_bytes, chunks_count, indexed_at, status, parse_status, failure_reason
+      ) VALUES
+        (?, 'ws_1', 'proj_1', 'src/missing.ts', 'typescript', '', 0, 0, 0, 0, 'failed', 'failed', 'read_failed'),
+        (?, 'ws_1', 'proj_1', 'src/present.ts', 'typescript', '', 0, 0, 0, 0, 'failed', 'failed', 'read_failed'),
+        (?, 'ws_2', 'proj_2', 'src/missing.ts', 'typescript', '', 0, 0, 0, 0, 'failed', 'failed', 'read_failed')
+    `).run(missingId, presentId, otherId)
+
+    const result = backfillCodeFiles(db, { workspace_id: 'ws_1', project_id: 'proj_1' })
+
+    expect(result.staleFailuresPruned).toBe(1)
+    const remaining = db.prepare('SELECT file_id FROM code_files ORDER BY file_id').all() as Array<{ file_id: string }>
+    expect(remaining.map(row => row.file_id).sort()).toEqual([otherId, presentId].sort())
   })
 })
