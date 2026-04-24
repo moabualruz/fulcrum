@@ -7,6 +7,7 @@
   "include": ["src/**/*.ts"],
   "references": [
     { "path": "../../packages/shared" },
+    { "path": "../../packages/code-tools" },
     { "path": "../../packages/core" },
     { "path": "../../packages/plane" }
   ]

@@ -10,6 +10,7 @@ import { MemoryArtifactRepository } from "./artifact-runtime.js";
 import { registerDoctorRoutes } from "./routes/doctor.js";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
 import { registerProjectRoutes } from "./routes/projects.js";
+import { registerCodeRoutes } from "./routes/code.js";
 import { registerQueueRoutes } from "./routes/queues.js";
 import { registerExternalPmRoutes } from "./routes/external-pm.js";
 import { registerSetupRoutes } from "./routes/setup.js";
@@ -17,6 +18,7 @@ import { registerTaskRoutes } from "./routes/tasks.js";
 import { createServerSetupPorts, FileSetupRepository } from "./runtime.js";
 import {
   serverExternalPmService,
+  serverCodeService,
   serverProjectService,
   serverTaskService
 } from "./work-runtime.js";
@@ -33,6 +35,7 @@ registerDoctorRoutes(app, setupRepository, async () => [
 registerProjectRoutes(app, serverProjectService);
 registerTaskRoutes(app, serverTaskService);
 registerQueueRoutes(app, serverProjectService, serverTaskService);
+registerCodeRoutes(app, serverCodeService);
 registerExternalPmRoutes(app, serverExternalPmService);
 registerArtifactRoutes(
   app,

@@ -32,3 +32,4 @@ export * from "./queues/projections.js";
 export * from "./work/file-repository.js";
 export * from "./external-pm/service.js";
 export * from "./doctor/pm-health.js";
+export * from "./code/evidence-service.js";

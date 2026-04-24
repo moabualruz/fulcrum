@@ -13,6 +13,7 @@ import {
   showArtifactCommand
 } from "./commands/artifact.js";
 import { doctorCommand } from "./commands/doctor.js";
+import { codeCleanupStaleCommand, codeSearchCommand } from "./commands/code.js";
 import { listProjectsCommand, registerProjectCommand } from "./commands/project.js";
 import { setupApplyCommand, setupPreviewCommand } from "./commands/setup.js";
 import { createTaskCommand, listTasksCommand, transitionTaskCommand } from "./commands/task.js";
@@ -26,7 +27,7 @@ import {
   syncPlaneCommand
 } from "./commands/plane.js";
 import { createCliSetupPorts } from "./runtime.js";
-import { externalPmService, projectService, taskService } from "./work-runtime.js";
+import { codeService, externalPmService, projectService, taskService } from "./work-runtime.js";
 
 class MemoryArtifactRepository implements ArtifactRepositoryPort {
   private readonly artifacts = new Map<string, ArtifactContract>();
@@ -231,6 +232,62 @@ taskCommand.command("transition <taskId> <status>").action((taskId, status) => {
       : data.status
   );
 });
+
+const codeCommand = program.command("code").description("Search local code evidence");
+
+codeCommand
+  .command("search <query>")
+  .requiredOption("--project <projectId>")
+  .option("--limit <limit>")
+  .option("--semantic", "include semantic degraded state")
+  .action(async (query, options) => {
+    const data = await codeSearchCommand(codeService, {
+      projectId: options.project,
+      query,
+      limit: options.limit ? Number(options.limit) : undefined,
+      semantic: Boolean(options.semantic)
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.count} code evidence results`
+    );
+  });
+
+codeCommand
+  .command("files <pattern>")
+  .requiredOption("--project <projectId>")
+  .action(async (pattern, options) => {
+    const data = await codeSearchCommand(codeService, {
+      projectId: options.project,
+      query: pattern,
+      limit: 50
+    });
+    const fileResults = data.evidence.filter((item) =>
+      ["path", "filename"].includes(item.evidenceType)
+    );
+    console.log(
+      program.opts().json
+        ? JSON.stringify(
+            { schemaVersion: "1.0", status: "ok", data: { ...data, evidence: fileResults } },
+            null,
+            2
+          )
+        : `${fileResults.length} files`
+    );
+  });
+
+codeCommand
+  .command("cleanup-stale")
+  .requiredOption("--project <projectId>")
+  .action((options) => {
+    const data = codeCleanupStaleCommand(codeService, options.project);
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.length} stale evidence records`
+    );
+  });
 
 const planeCommand = program
   .command("plane")

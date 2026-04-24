@@ -81,6 +81,9 @@ importers:
 
   apps/cli:
     dependencies:
+      '@fulcrum/code-tools':
+        specifier: workspace:*
+        version: link:../../packages/code-tools
       '@fulcrum/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -119,6 +122,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@fulcrum/code-tools':
+        specifier: workspace:*
+        version: link:../../packages/code-tools
       '@fulcrum/core':
         specifier: workspace:*
         version: link:../../packages/core

@@ -115,6 +115,37 @@ export const MemoryEntrySchema = BaseEntitySchema.extend({
   redactionStatus: RedactionStatusSchema
 });
 
+export const CodeEvidenceSchema = z.object({
+  evidenceId: FulcrumIdSchema,
+  projectId: FulcrumIdSchema,
+  query: z.string(),
+  evidenceType: z.enum([
+    "exact_identifier",
+    "exact_string",
+    "path",
+    "filename",
+    "error",
+    "symbol",
+    "import",
+    "export",
+    "structural",
+    "semantic"
+  ]),
+  filePath: z.string(),
+  lineStart: z.number().int().positive().optional(),
+  lineEnd: z.number().int().positive().optional(),
+  symbol: z.string().optional(),
+  sourceTool: z.string(),
+  ignoredPathStatus: z.enum(["honored", "excluded", "not_ignored"]),
+  freshness: z.string(),
+  rank: z.number().int().nonnegative(),
+  reason: z.string(),
+  durationMs: z.number().int().nonnegative(),
+  linkedContextItemIds: z.array(FulcrumIdSchema).default([]),
+  createdAt: TimestampSchema,
+  staleAt: TimestampSchema.optional()
+});
+
 export const WorktreeAllocationSchema = BaseEntitySchema.extend({
   worktreeId: FulcrumIdSchema,
   projectId: FulcrumIdSchema,
@@ -132,3 +163,4 @@ export type SetupState = z.infer<typeof SetupStateSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type ExternalWorkItemMirror = z.infer<typeof ExternalWorkItemMirrorSchema>;
 export type Run = z.infer<typeof RunSchema>;
+export type CodeEvidence = z.infer<typeof CodeEvidenceSchema>;

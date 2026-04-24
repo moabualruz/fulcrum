@@ -1,13 +1,16 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
+  CodeEvidenceSchema,
   ExternalWorkItemMirrorSchema,
   ProjectSchema,
   TaskSchema,
+  type CodeEvidence,
   type ExternalWorkItemMirror,
   type Project,
   type Task
 } from "@fulcrum/shared";
+import type { CodeEvidenceRepositoryPort } from "../code/evidence-service.js";
 import type { ExternalWorkItemMirrorRepositoryPort } from "../external-pm/service.js";
 import type { ProjectRepositoryPort } from "../projects/service.js";
 import type { TaskRepositoryPort } from "../tasks/service.js";
@@ -16,9 +19,15 @@ interface WorkState {
   projects: Project[];
   tasks: Task[];
   externalWorkItemMirrors: ExternalWorkItemMirror[];
+  codeEvidence: CodeEvidence[];
 }
 
-const emptyState: WorkState = { projects: [], tasks: [], externalWorkItemMirrors: [] };
+const emptyState: WorkState = {
+  projects: [],
+  tasks: [],
+  externalWorkItemMirrors: [],
+  codeEvidence: []
+};
 
 export class FileWorkRepository {
   constructor(private readonly stateFile: string) {}
@@ -86,6 +95,9 @@ export class FileWorkRepository {
         tasks: (data.tasks ?? []).map((task) => TaskSchema.parse(task)),
         externalWorkItemMirrors: (data.externalWorkItemMirrors ?? []).map((mirror) =>
           ExternalWorkItemMirrorSchema.parse(mirror)
+        ),
+        codeEvidence: (data.codeEvidence ?? []).map((evidence) =>
+          CodeEvidenceSchema.parse(evidence)
         )
       };
     } catch {
@@ -96,6 +108,40 @@ export class FileWorkRepository {
   write(state: WorkState): void {
     mkdirSync(path.dirname(this.stateFile), { recursive: true });
     writeFileSync(this.stateFile, JSON.stringify(state, null, 2));
+  }
+}
+
+export class FileCodeEvidenceRepository implements CodeEvidenceRepositoryPort {
+  constructor(private readonly work: FileWorkRepository) {}
+
+  save(evidence: CodeEvidence): CodeEvidence {
+    const parsed = CodeEvidenceSchema.parse(evidence);
+    const state = this.work.read();
+    state.codeEvidence = [
+      parsed,
+      ...state.codeEvidence.filter((item) => item.evidenceId !== parsed.evidenceId)
+    ];
+    this.work.write(state);
+    return parsed;
+  }
+
+  list(projectId: string): CodeEvidence[] {
+    return this.work.read().codeEvidence.filter((item) => item.projectId === projectId);
+  }
+
+  markStale(evidenceId: string, staleAt: string): CodeEvidence | undefined {
+    const state = this.work.read();
+    const current = state.codeEvidence.find((item) => item.evidenceId === evidenceId);
+    if (!current) {
+      return undefined;
+    }
+    const updated = CodeEvidenceSchema.parse({ ...current, staleAt, freshness: "stale" });
+    state.codeEvidence = [
+      updated,
+      ...state.codeEvidence.filter((item) => item.evidenceId !== evidenceId)
+    ];
+    this.work.write(state);
+    return updated;
   }
 }
 

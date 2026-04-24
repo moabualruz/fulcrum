@@ -10,6 +10,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@fulcrum/shared": "/packages/shared/src/index.ts",
+      "@fulcrum/code-tools": "/packages/code-tools/src/index.ts",
       "@fulcrum/core": "/packages/core/src/index.ts",
       "@fulcrum/db": "/packages/db/src/index.ts",
       "@fulcrum/mcp": "/packages/mcp/src/index.ts",

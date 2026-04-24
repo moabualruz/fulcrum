@@ -161,20 +161,20 @@
 
 ### Tests And Validation for User Story 6
 
-- [ ] T087 [P] [US6] Add code search contract tests in `tests/contract/code-search.test.ts`
-- [ ] T088 [P] [US6] Add exact/path/string search integration test in `tests/integration/code-search-exact.test.ts`
-- [ ] T089 [P] [US6] Add ignored-path privacy test for code search in `tests/privacy/code-search-ignore.test.ts`
-- [ ] T090 [P] [US6] Add stale evidence rename/delete recovery test in `tests/recovery/code-evidence-stale.test.ts`
+- [x] T087 [P] [US6] Add code search contract tests in `tests/contract/code-search.test.ts`
+- [x] T088 [P] [US6] Add exact/path/string search integration test in `tests/integration/code-search-exact.test.ts`
+- [x] T089 [P] [US6] Add ignored-path privacy test for code search in `tests/privacy/code-search-ignore.test.ts`
+- [x] T090 [P] [US6] Add stale evidence rename/delete recovery test in `tests/recovery/code-evidence-stale.test.ts`
 
 ### Implementation for User Story 6
 
-- [ ] T091 [US6] Implement ripgrep and path search adapter in `packages/code-tools/src/exact-search.ts`
-- [ ] T092 [US6] Implement optional structural search adapter wrapper in `packages/code-tools/src/structural-search.ts`
-- [ ] T093 [US6] Implement optional semantic search degraded adapter in `packages/code-tools/src/semantic-search.ts`
-- [ ] T094 [US6] Implement code evidence service and stale cleanup in `packages/core/src/code/evidence-service.ts`
-- [ ] T095 [US6] Implement code evidence repository in `packages/db/src/code-evidence.ts`
-- [ ] T096 [US6] Implement code search CLI and API routes in `apps/cli/src/commands/code.ts` and `apps/server/src/routes/code.ts`
-- [ ] T097 [US6] Add code evidence display to cockpit context view in `apps/cockpit/src/components/code-evidence-list.tsx`
+- [x] T091 [US6] Implement ripgrep and path search adapter in `packages/code-tools/src/exact-search.ts`
+- [x] T092 [US6] Implement optional structural search adapter wrapper in `packages/code-tools/src/structural-search.ts`
+- [x] T093 [US6] Implement optional semantic search degraded adapter in `packages/code-tools/src/semantic-search.ts`
+- [x] T094 [US6] Implement code evidence service and stale cleanup in `packages/core/src/code/evidence-service.ts`
+- [x] T095 [US6] Implement code evidence repository in `packages/db/src/code-evidence.ts`
+- [x] T096 [US6] Implement code search CLI and API routes in `apps/cli/src/commands/code.ts` and `apps/server/src/routes/code.ts`
+- [x] T097 [US6] Add code evidence display to cockpit context view in `apps/cockpit/src/components/code-evidence-list.tsx`
 
 ## Phase 8: User Story 7 - Preserve And Recall Project Memory (Priority: P1)
 

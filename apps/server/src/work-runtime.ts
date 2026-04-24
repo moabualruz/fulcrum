@@ -1,5 +1,7 @@
 import path from "node:path";
 import {
+  CodeEvidenceService,
+  FileCodeEvidenceRepository,
   FileProjectRepository,
   FileExternalWorkItemMirrorRepository,
   FileTaskRepository,
@@ -9,6 +11,7 @@ import {
   ProjectRegistryService,
   resolveSetupPaths
 } from "@fulcrum/core";
+import { searchExact, searchSemantic } from "@fulcrum/code-tools";
 import { PlaneApiAdapter, SimulatedPlaneAdapter } from "@fulcrum/plane";
 
 const work = new FileWorkRepository(
@@ -21,6 +24,14 @@ export const serverTaskService = new LocalTaskService(taskRepository);
 export const serverProjectService = new ProjectRegistryService(
   projectRepository,
   serverTaskService
+);
+export const serverCodeService = new CodeEvidenceService(
+  projectRepository,
+  new FileCodeEvidenceRepository(work),
+  {
+    search: (options) => searchExact(options)
+  },
+  searchSemantic
 );
 const planeAdapter =
   process.env.FULCRUM_PLANE_BASE_URL && process.env.FULCRUM_PLANE_TOKEN

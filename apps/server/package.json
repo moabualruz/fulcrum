@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@fulcrum/code-tools": "workspace:*",
     "@fulcrum/core": "workspace:*",
     "@fulcrum/mcp": "workspace:*",
     "@fulcrum/plane": "workspace:*",
