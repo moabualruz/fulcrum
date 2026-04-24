@@ -4,6 +4,7 @@ import { aggregateDoctorReport, type DoctorReport } from "./service.js";
 export interface SetupDoctorInput {
   setupState?: SetupState;
   noNetwork: boolean;
+  extraCapabilities?: CapabilityHealthRecord[];
 }
 
 export function buildSetupDoctorReport(input: SetupDoctorInput): DoctorReport & {
@@ -34,7 +35,8 @@ export function buildSetupDoctorReport(input: SetupDoctorInput): DoctorReport & 
       privacyStatus: input.noNetwork ? "local_only" : "local_first",
       affectedWorkflows: ["adapters"],
       freshness: now
-    }
+    },
+    ...(input.extraCapabilities ?? [])
   ];
   return {
     ...aggregateDoctorReport(capabilities),

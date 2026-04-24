@@ -17,7 +17,9 @@ export const idPrefixes = [
   "pol",
   "cap",
   "gate",
-  "adapter"
+  "adapter",
+  "mirror",
+  "preview"
 ] as const;
 
 export const IdPrefixSchema = z.enum(idPrefixes);

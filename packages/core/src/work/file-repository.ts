@@ -1,15 +1,24 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { ProjectSchema, TaskSchema, type Project, type Task } from "@fulcrum/shared";
+import {
+  ExternalWorkItemMirrorSchema,
+  ProjectSchema,
+  TaskSchema,
+  type ExternalWorkItemMirror,
+  type Project,
+  type Task
+} from "@fulcrum/shared";
+import type { ExternalWorkItemMirrorRepositoryPort } from "../external-pm/service.js";
 import type { ProjectRepositoryPort } from "../projects/service.js";
 import type { TaskRepositoryPort } from "../tasks/service.js";
 
 interface WorkState {
   projects: Project[];
   tasks: Task[];
+  externalWorkItemMirrors: ExternalWorkItemMirror[];
 }
 
-const emptyState: WorkState = { projects: [], tasks: [] };
+const emptyState: WorkState = { projects: [], tasks: [], externalWorkItemMirrors: [] };
 
 export class FileWorkRepository {
   constructor(private readonly stateFile: string) {}
@@ -69,21 +78,68 @@ export class FileWorkRepository {
     return projectId ? tasks.filter((task) => task.projectId === projectId) : tasks;
   }
 
-  private read(): WorkState {
+  read(): WorkState {
     try {
       const data = JSON.parse(readFileSync(this.stateFile, "utf8")) as Partial<WorkState>;
       return {
         projects: (data.projects ?? []).map((project) => ProjectSchema.parse(project)),
-        tasks: (data.tasks ?? []).map((task) => TaskSchema.parse(task))
+        tasks: (data.tasks ?? []).map((task) => TaskSchema.parse(task)),
+        externalWorkItemMirrors: (data.externalWorkItemMirrors ?? []).map((mirror) =>
+          ExternalWorkItemMirrorSchema.parse(mirror)
+        )
       };
     } catch {
       return { ...emptyState };
     }
   }
 
-  private write(state: WorkState): void {
+  write(state: WorkState): void {
     mkdirSync(path.dirname(this.stateFile), { recursive: true });
     writeFileSync(this.stateFile, JSON.stringify(state, null, 2));
+  }
+}
+
+export class FileExternalWorkItemMirrorRepository implements ExternalWorkItemMirrorRepositoryPort {
+  constructor(private readonly work: FileWorkRepository) {}
+
+  save(mirror: ExternalWorkItemMirror): ExternalWorkItemMirror {
+    const parsed = ExternalWorkItemMirrorSchema.parse(mirror);
+    const state = this.read();
+    state.externalWorkItemMirrors = [
+      parsed,
+      ...state.externalWorkItemMirrors.filter((item) => item.mirrorId !== parsed.mirrorId)
+    ];
+    this.write(state);
+    return parsed;
+  }
+
+  get(mirrorId: string): ExternalWorkItemMirror | undefined {
+    return this.read().externalWorkItemMirrors.find((mirror) => mirror.mirrorId === mirrorId);
+  }
+
+  findByExternal(adapterId: string, externalId: string): ExternalWorkItemMirror | undefined {
+    return this.read().externalWorkItemMirrors.find(
+      (mirror) => mirror.adapterId === adapterId && mirror.externalId === externalId
+    );
+  }
+
+  list(projectId?: string): ExternalWorkItemMirror[] {
+    const state = this.read();
+    if (!projectId) {
+      return state.externalWorkItemMirrors;
+    }
+    const taskIds = new Set(
+      state.tasks.filter((task) => task.projectId === projectId).map((task) => task.taskId)
+    );
+    return state.externalWorkItemMirrors.filter((mirror) => taskIds.has(mirror.taskId));
+  }
+
+  private read(): WorkState {
+    return this.work.read();
+  }
+
+  private write(state: WorkState): void {
+    this.work.write(state);
   }
 }
 

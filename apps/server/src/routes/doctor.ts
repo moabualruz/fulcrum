@@ -1,10 +1,11 @@
 import type { Hono } from "hono";
 import { buildSetupDoctorReport, type SetupRepositoryPort } from "@fulcrum/core";
-import type { SetupState } from "@fulcrum/shared";
+import type { CapabilityHealthRecord, SetupState } from "@fulcrum/shared";
 
 export function registerDoctorRoutes(
   app: Hono,
-  setupRepository: SetupRepositoryPort & { latest?: () => Promise<SetupState | undefined> }
+  setupRepository: SetupRepositoryPort & { latest?: () => Promise<SetupState | undefined> },
+  extraCapabilities?: () => Promise<CapabilityHealthRecord[]>
 ): void {
   app.get("/api/v1/doctor", async (context) => {
     const noNetwork =
@@ -16,7 +17,8 @@ export function registerDoctorRoutes(
         setupState: setupRepository.latest
           ? await setupRepository.latest()
           : setupRepository.getLatest(),
-        noNetwork
+        noNetwork,
+        extraCapabilities: extraCapabilities ? await extraCapabilities() : []
       }),
       redactionStatus: "not_applicable"
     });

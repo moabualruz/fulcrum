@@ -6,3 +6,4 @@ export * from "./setup.js";
 export * from "./capabilities.js";
 export * from "./projects.js";
 export * from "./tasks.js";
+export * from "./external-work-items.js";

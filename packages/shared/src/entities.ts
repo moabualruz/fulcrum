@@ -5,6 +5,7 @@ import {
   MemoryStatusSchema,
   RunStatusSchema,
   SetupStatusSchema,
+  SyncStatusSchema,
   TaskStatusSchema,
   WorktreeStatusSchema
 } from "./lifecycle.js";
@@ -59,6 +60,26 @@ export const TaskSchema = BaseEntitySchema.extend({
   currentRunId: FulcrumIdSchema.optional()
 });
 
+export const ExternalWorkItemMirrorSchema = BaseEntitySchema.extend({
+  mirrorId: FulcrumIdSchema,
+  taskId: FulcrumIdSchema,
+  adapterId: FulcrumIdSchema,
+  externalSystem: z.string(),
+  externalId: z.string(),
+  externalUrl: z.string().optional(),
+  sourceTitle: z.string(),
+  sourceBodySnapshot: z.string().optional(),
+  sourceStatus: z.string().optional(),
+  sourceUpdatedAt: TimestampSchema.optional(),
+  syncStatus: SyncStatusSchema,
+  conflictStatus: z.enum(["none", "local_remote", "status_mapping"]).default("none"),
+  lastImportAt: TimestampSchema.optional(),
+  lastWritebackAt: TimestampSchema.optional(),
+  writebackPreviewId: FulcrumIdSchema.optional(),
+  lastFailure: z.string().optional(),
+  provenance: z.record(z.unknown()).default({})
+});
+
 export const RunSchema = BaseEntitySchema.extend({
   runId: FulcrumIdSchema,
   taskId: FulcrumIdSchema,
@@ -109,4 +130,5 @@ export const WorktreeAllocationSchema = BaseEntitySchema.extend({
 export type Project = z.infer<typeof ProjectSchema>;
 export type SetupState = z.infer<typeof SetupStateSchema>;
 export type Task = z.infer<typeof TaskSchema>;
+export type ExternalWorkItemMirror = z.infer<typeof ExternalWorkItemMirrorSchema>;
 export type Run = z.infer<typeof RunSchema>;

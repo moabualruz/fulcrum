@@ -299,20 +299,20 @@
 
 ### Tests And Validation for User Story 3
 
-- [ ] T153 [P] [US3] Add external PM and Plane adapter contract tests in `tests/contract/external-pm-adapter.test.ts`
-- [ ] T154 [P] [US3] Add Plane import/disconnect/reconnect, status mapping, docs/pages memory source, and writeback integration tests in `tests/integration/plane-mirror-sync.test.ts`
-- [ ] T155 [P] [US3] Add external writeback preview policy test in `tests/policy/external-writeback.test.ts`
-- [ ] T156 [P] [US3] Add PM adapter outage degradation test in `tests/integration/pm-adapter-degraded.test.ts`
+- [x] T153 [P] [US3] Add external PM and Plane adapter contract tests in `tests/contract/external-pm-adapter.test.ts`
+- [x] T154 [P] [US3] Add Plane import/disconnect/reconnect, status mapping, docs/pages memory source, and writeback integration tests in `tests/integration/plane-mirror-sync.test.ts`
+- [x] T155 [P] [US3] Add external writeback preview policy test in `tests/policy/external-writeback.test.ts`
+- [x] T156 [P] [US3] Add PM adapter outage degradation test in `tests/integration/pm-adapter-degraded.test.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T157 [US3] Implement external work item mirror repository in `packages/db/src/external-work-items.ts`
-- [ ] T158 [US3] Implement external PM adapter interface, real Plane API adapter, and simulated test fixture in `packages/plane/src/adapter.ts`, `packages/plane/src/plane-adapter.ts`, and `packages/plane/src/simulated-adapter.ts`
-- [ ] T159 [US3] Implement PM import, status mapping, docs/pages memory source registration, sync status, conflict, and writeback preview service in `packages/core/src/external-pm/service.ts`
-- [ ] T160 [US3] Implement external PM and Plane CLI commands in `apps/cli/src/commands/plane.ts`
-- [ ] T161 [US3] Implement PM API routes in `apps/server/src/routes/external-pm.ts`
-- [ ] T162 [US3] Implement cockpit external mirror and writeback preview components in `apps/cockpit/src/components/external-mirror.tsx`
-- [ ] T163 [US3] Link external PM health into doctor and adapter settings in `packages/core/src/doctor/pm-health.ts`
+- [x] T157 [US3] Implement external work item mirror repository in `packages/db/src/external-work-items.ts`
+- [x] T158 [US3] Implement external PM adapter interface, real Plane API adapter, and simulated test fixture in `packages/plane/src/adapter.ts`, `packages/plane/src/plane-adapter.ts`, and `packages/plane/src/simulated-adapter.ts`
+- [x] T159 [US3] Implement PM import, status mapping, docs/pages memory source registration, sync status, conflict, and writeback preview service in `packages/core/src/external-pm/service.ts`
+- [x] T160 [US3] Implement external PM and Plane CLI commands in `apps/cli/src/commands/plane.ts`
+- [x] T161 [US3] Implement PM API routes in `apps/server/src/routes/external-pm.ts`
+- [x] T162 [US3] Implement cockpit external mirror and writeback preview components in `apps/cockpit/src/components/external-mirror.tsx`
+- [x] T163 [US3] Link external PM health into doctor and adapter settings in `packages/core/src/doctor/pm-health.ts`
 
 ## Phase 14: User Story 8 - Connect Memory, Code, Work, Runs, And Artifacts (Priority: P2)
 

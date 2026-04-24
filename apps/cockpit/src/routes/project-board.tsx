@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ExternalMirrorPanel } from "../components/external-mirror.js";
 
 interface TaskItem {
   taskId: string;
@@ -59,6 +60,7 @@ export function ProjectBoardRoute() {
         <p>Managed: available</p>
         <p>Degraded: attention required</p>
       </section>
+      <ExternalMirrorPanel projectId={projectId} />
     </main>
   );
 }

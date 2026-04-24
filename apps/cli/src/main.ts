@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import {
   ArtifactService,
+  externalPmHealth,
   LocalArtifactStorage,
   resolveSetupPaths,
   type ArtifactRepositoryPort
@@ -15,8 +16,17 @@ import { doctorCommand } from "./commands/doctor.js";
 import { listProjectsCommand, registerProjectCommand } from "./commands/project.js";
 import { setupApplyCommand, setupPreviewCommand } from "./commands/setup.js";
 import { createTaskCommand, listTasksCommand, transitionTaskCommand } from "./commands/task.js";
+import {
+  disablePlaneCommand,
+  decidePlaneWritebackCommand,
+  importPlaneCommand,
+  linkPlaneTaskCommand,
+  listPlaneMirrorsCommand,
+  previewPlaneWritebackCommand,
+  syncPlaneCommand
+} from "./commands/plane.js";
 import { createCliSetupPorts } from "./runtime.js";
-import { projectService, taskService } from "./work-runtime.js";
+import { externalPmService, projectService, taskService } from "./work-runtime.js";
 
 class MemoryArtifactRepository implements ArtifactRepositoryPort {
   private readonly artifacts = new Map<string, ArtifactContract>();
@@ -94,7 +104,8 @@ program
     const payload = doctorCommand({
       setupRepository: ports.setupRepository,
       setupState: await ports.latest(),
-      noNetwork: options.network === false || Boolean(options.noNetwork)
+      noNetwork: options.network === false || Boolean(options.noNetwork),
+      extraCapabilities: [await externalPmHealth(externalPmService.adapterHealthPort())]
     });
     console.log(program.opts().json ? JSON.stringify(payload, null, 2) : "Fulcrum doctor ready");
   });
@@ -220,5 +231,140 @@ taskCommand.command("transition <taskId> <status>").action((taskId, status) => {
       : data.status
   );
 });
+
+const planeCommand = program
+  .command("plane")
+  .description("Import, inspect, and preview external Plane work mirroring");
+
+planeCommand
+  .command("connect")
+  .description("Show Plane adapter connection and privacy status")
+  .action(async () => {
+    const data = await externalPmHealth(externalPmService.adapterHealthPort());
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.state
+    );
+  });
+
+planeCommand
+  .command("doctor")
+  .description("Report Plane adapter health")
+  .action(async () => {
+    const data = await externalPmHealth(externalPmService.adapterHealthPort());
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.nextAction
+    );
+  });
+
+planeCommand
+  .command("import")
+  .requiredOption("--project <projectId>")
+  .action(async (options) => {
+    const data = await importPlaneCommand(externalPmService, { projectId: options.project });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.length} mirrors imported`
+    );
+  });
+
+planeCommand
+  .command("sync")
+  .requiredOption("--project <projectId>")
+  .action(async (options) => {
+    const data = await syncPlaneCommand(externalPmService, { projectId: options.project });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.length} mirrors synced`
+    );
+  });
+
+planeCommand
+  .command("list")
+  .option("--project <projectId>")
+  .action((options) => {
+    const data = listPlaneMirrorsCommand(externalPmService, options.project);
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.length} mirrors`
+    );
+  });
+
+planeCommand
+  .command("link-task")
+  .requiredOption("--mirror <mirrorId>")
+  .requiredOption("--task <taskId>")
+  .action((options) => {
+    const data = linkPlaneTaskCommand(externalPmService, {
+      mirrorId: options.mirror,
+      taskId: options.task
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.taskId
+    );
+  });
+
+planeCommand
+  .command("writeback-preview")
+  .requiredOption("--external-id <externalId>")
+  .option("--mirror <mirrorId>")
+  .option("--comment <comment>")
+  .option("--status <status>")
+  .action(async (options) => {
+    const data = await previewPlaneWritebackCommand(externalPmService, {
+      externalId: options.externalId,
+      mirrorId: options.mirror,
+      comment: options.comment,
+      status: options.status,
+      localOnly: Boolean(program.opts().localOnly)
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.policyDecision.status
+    );
+  });
+
+planeCommand
+  .command("writeback")
+  .requiredOption("--mirror <mirrorId>")
+  .requiredOption("--decision <decision>")
+  .option("--policy-decision <policyDecisionId>")
+  .option("--comment <comment>")
+  .option("--status <status>")
+  .action(async (options) => {
+    const data = await decidePlaneWritebackCommand(externalPmService, {
+      mirrorId: options.mirror,
+      decision: options.decision,
+      policyDecisionId: options.policyDecision,
+      comment: options.comment,
+      status: options.status
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.syncStatus
+    );
+  });
+
+planeCommand
+  .command("disable")
+  .option("--reason <reason>", "disable reason", "Operator disabled Plane adapter")
+  .action(async (options) => {
+    const data = await disablePlaneCommand(externalPmService, options.reason);
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : "Plane mirroring disabled"
+    );
+  });
 
 program.parse();

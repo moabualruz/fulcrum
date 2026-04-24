@@ -98,7 +98,12 @@ export const ApiEndpointSchema = z.enum([
   "POST /api/v1/rebuild",
   "POST /api/v1/exports",
   "POST /api/v1/reset/preview",
-  "POST /api/v1/uninstall/preview"
+  "POST /api/v1/uninstall/preview",
+  "GET /api/v1/external-pm/mirrors",
+  "POST /api/v1/external-pm/import",
+  "POST /api/v1/external-pm/writeback-preview",
+  "POST /api/v1/external-pm/disable",
+  "GET /api/v1/external-pm/health"
 ]);
 
 export const MCP_TOOL_NAMES = [

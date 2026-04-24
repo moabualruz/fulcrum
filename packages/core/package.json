@@ -12,6 +12,7 @@
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
+    "@fulcrum/policy": "workspace:*",
     "@fulcrum/shared": "workspace:*"
   },
   "devDependencies": {

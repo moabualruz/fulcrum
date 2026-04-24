@@ -5,5 +5,9 @@
     "rootDir": "src"
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../../packages/core" }, { "path": "../../packages/mcp" }]
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/mcp" },
+    { "path": "../../packages/plane" }
+  ]
 }

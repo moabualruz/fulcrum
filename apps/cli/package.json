@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@fulcrum/core": "workspace:*",
+    "@fulcrum/plane": "workspace:*",
     "@fulcrum/shared": "workspace:*",
     "commander": "^13.1.0"
   },
