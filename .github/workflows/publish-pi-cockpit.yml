@@ -1,0 +1,40 @@
+name: Publish @fulcrum-agent-os/pi-cockpit
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Publish to npm with provenance
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # required for npm provenance attestation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Post-pack tarball secret scan (PR 14.9 — Constraint #20)
+        working-directory: agent-integration/pi/cockpit
+        run: |
+          mkdir -p /tmp/tarball-scan
+          pnpm pack --pack-destination /tmp/tarball-scan
+          tar -xf /tmp/tarball-scan/*.tgz -C /tmp/tarball-scan
+          if grep -rE "(password\s*=|api_key\s*=|private_key|BEGIN RSA PRIVATE|BEGIN OPENSSH PRIVATE|AKIA[0-9A-Z]{16}|(^|[[:space:]\"'=/:.-])\.env([[:space:]\"'/:.-]|$))" /tmp/tarball-scan/package/ 2>/dev/null; then
+            echo "::error::Secret pattern detected in tarball — aborting publish"
+            exit 1
+          fi
+          echo "Tarball scan clean."
+          rm -rf /tmp/tarball-scan
+      - name: Publish with provenance
+        run: pnpm publish --provenance --no-git-checks
+        working-directory: agent-integration/pi/cockpit
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
