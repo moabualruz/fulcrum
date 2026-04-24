@@ -36,10 +36,15 @@ export const ProjectSchema = BaseEntitySchema.extend({
   name: z.string(),
   rootPath: z.string(),
   defaultBranch: z.string(),
+  worktreePolicyId: FulcrumIdSchema,
+  ignoredPathPolicyId: FulcrumIdSchema,
+  qualityGateSetId: FulcrumIdSchema,
   privacyMode: PrivacyModeSchema,
   healthState: CapabilityStateSchema,
   enabledCapabilities: z.array(FulcrumIdSchema).default([]),
-  disabledCapabilities: z.array(FulcrumIdSchema).default([])
+  disabledCapabilities: z.array(FulcrumIdSchema).default([]),
+  adapterMappings: z.record(z.string()).default({}),
+  lastScannedAt: TimestampSchema.optional()
 });
 
 export const TaskSchema = BaseEntitySchema.extend({

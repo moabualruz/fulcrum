@@ -12,8 +12,11 @@ import {
   showArtifactCommand
 } from "./commands/artifact.js";
 import { doctorCommand } from "./commands/doctor.js";
+import { listProjectsCommand, registerProjectCommand } from "./commands/project.js";
 import { setupApplyCommand, setupPreviewCommand } from "./commands/setup.js";
+import { createTaskCommand, listTasksCommand, transitionTaskCommand } from "./commands/task.js";
 import { createCliSetupPorts } from "./runtime.js";
+import { projectService, taskService } from "./work-runtime.js";
 
 class MemoryArtifactRepository implements ArtifactRepositoryPort {
   private readonly artifacts = new Map<string, ArtifactContract>();
@@ -149,5 +152,73 @@ artifactCommand
         : `${data.length} artifacts`
     );
   });
+
+const projectCommand = program.command("project").description("Register and list local projects");
+
+projectCommand
+  .command("register <rootPath>")
+  .option("--name <name>")
+  .action((rootPath, options) => {
+    const data = registerProjectCommand(projectService, { rootPath, name: options.name });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.projectId
+    );
+  });
+
+projectCommand.command("list").action(() => {
+  const data = listProjectsCommand(projectService);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+      : `${data.length} projects`
+  );
+});
+
+const taskCommand = program.command("task").description("Create, list, and transition local tasks");
+
+taskCommand
+  .command("create")
+  .requiredOption("--project <projectId>")
+  .requiredOption("--title <title>")
+  .option("--description <description>")
+  .option("--priority <priority>")
+  .option("--label <label...>")
+  .action((options) => {
+    const data = createTaskCommand(taskService, {
+      projectId: options.project,
+      title: options.title,
+      description: options.description,
+      priority: options.priority,
+      labels: options.label
+    });
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : data.taskId
+    );
+  });
+
+taskCommand
+  .command("list")
+  .option("--project <projectId>")
+  .action((options) => {
+    const data = listTasksCommand(taskService, options.project);
+    console.log(
+      program.opts().json
+        ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+        : `${data.length} tasks`
+    );
+  });
+
+taskCommand.command("transition <taskId> <status>").action((taskId, status) => {
+  const data = transitionTaskCommand(taskService, taskId, status);
+  console.log(
+    program.opts().json
+      ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
+      : data.status
+  );
+});
 
 program.parse();

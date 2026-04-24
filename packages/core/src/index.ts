@@ -26,3 +26,7 @@ export * from "./container.js";
 export * from "./setup/paths.js";
 export * from "./setup/preview.js";
 export * from "./setup/apply.js";
+export * from "./projects/service.js";
+export * from "./tasks/service.js";
+export * from "./queues/projections.js";
+export * from "./work/file-repository.js";

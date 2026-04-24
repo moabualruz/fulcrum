@@ -91,20 +91,20 @@
 
 ### Tests And Validation for User Story 2
 
-- [ ] T053 [P] [US2] Add project registry contract tests in `tests/contract/project-registry.test.ts`
-- [ ] T054 [P] [US2] Add cockpit and CLI project parity integration test in `tests/integration/project-cockpit-parity.test.ts`
-- [ ] T055 [P] [US2] Add local PM-free task workflow test in `tests/integration/local-task-workflow.test.ts`
-- [ ] T056 [P] [US2] Add cockpit keyboard and non-color status test in `tests/e2e/cockpit-project-board.spec.ts`
+- [x] T053 [P] [US2] Add project registry contract tests in `tests/contract/project-registry.test.ts`
+- [x] T054 [P] [US2] Add cockpit and CLI project parity integration test in `tests/integration/project-cockpit-parity.test.ts`
+- [x] T055 [P] [US2] Add local PM-free task workflow test in `tests/integration/local-task-workflow.test.ts`
+- [x] T056 [P] [US2] Add cockpit keyboard and non-color status test in `tests/e2e/cockpit-project-board.spec.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T057 [US2] Implement project registry service with stable IDs, root path, default branch, worktree policy, quality gates, privacy mode, and health in `packages/core/src/projects/service.ts`
-- [ ] T058 [US2] Implement local task service and task transition enforcement in `packages/core/src/tasks/service.ts`
-- [ ] T059 [US2] Implement project and task repositories in `packages/db/src/projects.ts` and `packages/db/src/tasks.ts`
-- [ ] T060 [US2] Implement project and task CLI commands in `apps/cli/src/commands/project.ts` and `apps/cli/src/commands/task.ts`
-- [ ] T061 [US2] Implement project, task, queue, and activity API routes in `apps/server/src/routes/projects.ts`, `apps/server/src/routes/tasks.ts`, and `apps/server/src/routes/queues.ts`
-- [ ] T062 [US2] Implement cockpit global overview and per-project board in `apps/cockpit/src/routes/overview.tsx` and `apps/cockpit/src/routes/project-board.tsx`
-- [ ] T063 [US2] Add queue summary projection for blockers, review, merge, active runs, and degraded states in `packages/core/src/queues/projections.ts`
+- [x] T057 [US2] Implement project registry service with stable IDs, root path, default branch, worktree policy, quality gates, privacy mode, and health in `packages/core/src/projects/service.ts`
+- [x] T058 [US2] Implement local task service and task transition enforcement in `packages/core/src/tasks/service.ts`
+- [x] T059 [US2] Implement project and task repositories in `packages/db/src/projects.ts` and `packages/db/src/tasks.ts`
+- [x] T060 [US2] Implement project and task CLI commands in `apps/cli/src/commands/project.ts` and `apps/cli/src/commands/task.ts`
+- [x] T061 [US2] Implement project, task, queue, and activity API routes in `apps/server/src/routes/projects.ts`, `apps/server/src/routes/tasks.ts`, and `apps/server/src/routes/queues.ts`
+- [x] T062 [US2] Implement cockpit global overview and per-project board in `apps/cockpit/src/routes/overview.tsx` and `apps/cockpit/src/routes/project-board.tsx`
+- [x] T063 [US2] Add queue summary projection for blockers, review, merge, active runs, and degraded states in `packages/core/src/queues/projections.ts`
 
 ## Phase 5: User Story 4 - Start Supervised Agent Runs (Priority: P1)
 

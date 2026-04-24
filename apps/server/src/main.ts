@@ -4,8 +4,12 @@ import { ArtifactService, LocalArtifactStorage, resolveSetupPaths } from "@fulcr
 import { MemoryArtifactRepository } from "./artifact-runtime.js";
 import { registerDoctorRoutes } from "./routes/doctor.js";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
+import { registerProjectRoutes } from "./routes/projects.js";
+import { registerQueueRoutes } from "./routes/queues.js";
 import { registerSetupRoutes } from "./routes/setup.js";
+import { registerTaskRoutes } from "./routes/tasks.js";
 import { createServerSetupPorts, FileSetupRepository } from "./runtime.js";
+import { serverProjectService, serverTaskService } from "./work-runtime.js";
 
 const app = new Hono();
 
@@ -14,6 +18,9 @@ const paths = resolveSetupPaths();
 
 registerSetupRoutes(app, createServerSetupPorts(setupRepository));
 registerDoctorRoutes(app, setupRepository);
+registerProjectRoutes(app, serverProjectService);
+registerTaskRoutes(app, serverTaskService);
+registerQueueRoutes(app, serverProjectService, serverTaskService);
 registerArtifactRoutes(
   app,
   new ArtifactService(new MemoryArtifactRepository(), new LocalArtifactStorage(paths.artifactRoot))
