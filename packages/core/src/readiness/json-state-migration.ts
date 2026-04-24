@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
 import path from "node:path";
 import {
   type CanonicalMigrationRecord,
@@ -81,6 +89,15 @@ export interface JsonStateMigrationResult {
   source: "json" | "sqlite";
   counts: Record<keyof WorkState, number>;
   mirrorPath?: string;
+}
+
+export interface SqliteRuntimeRecoveryMarker {
+  schemaVersion: typeof SCHEMA_VERSION;
+  dbPath: string;
+  recoveredPath: string;
+  detectedAt: string;
+  reason: string;
+  nextAction: string;
 }
 
 export class JsonStateMigrationService {
@@ -185,6 +202,15 @@ export function sqliteStateStatus(dbPath?: string): {
       nextAction: "Run fulcrum setup apply."
     };
   }
+  const recovery = readSqliteRuntimeRecovery(dbPath);
+  if (recovery) {
+    return {
+      state: "blocked",
+      blocking: true,
+      cause: `SQLite recovered from corrupt state. Original database moved to ${recovery.recoveredPath}.`,
+      nextAction: recovery.nextAction
+    };
+  }
   if (!existsSync(dbPath)) {
     return {
       state: "blocked",
@@ -221,6 +247,47 @@ export function sqliteStateStatus(dbPath?: string): {
     };
   }
   return { state: "managed", blocking: false, nextAction: "No action needed." };
+}
+
+export function sqliteRuntimeRecoveryMarkerPath(dbPath: string): string {
+  return `${dbPath}.runtime-recovery.json`;
+}
+
+export function recordSqliteRuntimeRecovery(input: {
+  dbPath: string;
+  recoveredPath: string;
+  reason?: string;
+  nextAction?: string;
+}): SqliteRuntimeRecoveryMarker {
+  const marker: SqliteRuntimeRecoveryMarker = {
+    schemaVersion: SCHEMA_VERSION,
+    dbPath: input.dbPath,
+    recoveredPath: input.recoveredPath,
+    detectedAt: new Date().toISOString(),
+    reason: input.reason ?? "SQLite runtime detected a corrupt or non-SQLite database.",
+    nextAction:
+      input.nextAction ??
+      "Review the recovered database copy, restore from backup if needed, then rerun fulcrum setup apply before continuing."
+  };
+  writeFileSync(sqliteRuntimeRecoveryMarkerPath(input.dbPath), JSON.stringify(marker, null, 2));
+  return marker;
+}
+
+export function readSqliteRuntimeRecovery(
+  dbPath?: string
+): SqliteRuntimeRecoveryMarker | undefined {
+  if (!dbPath) return undefined;
+  try {
+    return JSON.parse(
+      readFileSync(sqliteRuntimeRecoveryMarkerPath(dbPath), "utf8")
+    ) as SqliteRuntimeRecoveryMarker;
+  } catch {
+    return undefined;
+  }
+}
+
+export function clearSqliteRuntimeRecovery(dbPath: string): void {
+  rmSync(sqliteRuntimeRecoveryMarkerPath(dbPath), { force: true });
 }
 
 function countState(state: WorkState): Record<keyof WorkState, number> {

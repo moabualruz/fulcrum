@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -145,4 +145,66 @@ describe("release readiness contract", () => {
       redactionStatus: "not_redacted"
     });
   });
+
+  it("keeps local-only validation blocked when commands pass but compliance lacks implementation evidence", async () => {
+    const rootDir = mkdtempSync(path.join(tmpdir(), "fulcrum-release-local-only-"));
+    const evidenceDir = mkdtempSync(path.join(tmpdir(), "fulcrum-release-local-evidence-"));
+    const binDir = path.join(rootDir, "bin");
+    mkdirSync(binDir, { recursive: true });
+    writeExecutable(path.join(binDir, "pnpm"), "#!/usr/bin/env sh\nexit 0\n");
+    writeExecutable(
+      path.join(rootDir, ".specify/scripts/bash/check-prerequisites.sh"),
+      "#!/usr/bin/env sh\nexit 0\n"
+    );
+    writeExecutable(
+      path.join(rootDir, "tests/e2e/quickstart/product-install-readiness.sh"),
+      "#!/usr/bin/env sh\nexit 0\n"
+    );
+    writeFileSync(
+      path.join(rootDir, "FULCRUM_PRODUCT.md"),
+      "PRODUCT-001:\nFulcrum MUST keep release claims backed by evidence.\n"
+    );
+    writeFileSync(path.join(rootDir, "SRS.md"), "# SRS\n");
+    writeFileSync(
+      path.join(rootDir, "SRS-ammend-01.md"),
+      "SRS-AMEND-01-001:\nCopilot target MUST stay standalone.\n"
+    );
+    writeFileSync(
+      path.join(rootDir, "SRS-ammend-02.md"),
+      "SRS-AMEND-02-001:\nTypeScript-first direction MUST win runtime conflicts.\n"
+    );
+
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${binDir}:${previousPath ?? ""}`;
+    try {
+      const result = await new ReleaseValidator().validate({
+        rootDir,
+        evidenceDir,
+        localOnly: true
+      });
+
+      expect(result.pass).toBe(false);
+      expect(result.checks).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            checkId: "compliance.matrix",
+            status: "failed",
+            sourceRequirements: expect.arrayContaining(["PRODUCT-001"])
+          })
+        ])
+      );
+      expect(result.pack.complianceSummary).toMatchObject({
+        implemented: 0,
+        missing: 3
+      });
+    } finally {
+      process.env.PATH = previousPath;
+    }
+  });
 });
+
+function writeExecutable(file: string, contents: string) {
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, contents);
+  chmodSync(file, 0o755);
+}

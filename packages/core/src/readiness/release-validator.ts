@@ -5,8 +5,7 @@ import { makeId, type ReleaseEvidencePack } from "@fulcrum/shared";
 import {
   complianceGateFailures,
   ComplianceService,
-  type ComplianceAuditResult,
-  type ComplianceEvidenceIndex
+  type ComplianceAuditResult
 } from "./compliance-service.js";
 import { ReleaseEvidenceWriter } from "./evidence-writer.js";
 
@@ -91,12 +90,7 @@ export class ReleaseValidator {
       input.localOnly && !input.audit && !input.sectionEvidence
         ? await collectLocalReleaseEvidence(rootDir, evidenceRoot, this.writer)
         : undefined;
-    const audit =
-      input.audit ??
-      this.compliance.audit({
-        rootDir,
-        evidence: generatedEvidence?.complianceEvidence
-      });
+    const audit = input.audit ?? this.compliance.audit({ rootDir });
     const sectionEvidence = mergeSectionEvidence(
       generatedEvidence?.sectionEvidence,
       input.sectionEvidence
@@ -264,7 +258,6 @@ interface LocalEvidenceCommand {
 
 interface GeneratedLocalEvidence {
   sectionEvidence: Partial<Record<ReleaseSectionId, string[]>>;
-  complianceEvidence: ComplianceEvidenceIndex;
   commands: ReleaseCommandResult[];
 }
 
@@ -389,45 +382,14 @@ async function collectLocalReleaseEvidence(
     }
   }
 
-  const allCommandsPassed = commands.every((command) => command.status === "passed");
-  const auditSeed = new ComplianceService().audit({ rootDir });
-  const complianceEvidence = allCommandsPassed
-    ? implementedEvidenceFor(auditSeed, Object.values(commandArtifacts))
-    : {};
-
   writer.writeArtifact(evidenceRoot, "validation/summary.json", {
     schemaVersion: "1.0",
-    status: allCommandsPassed ? "passed" : "failed",
+    status: commands.every((command) => command.status === "passed") ? "passed" : "failed",
     commands,
     sectionEvidence
   });
 
-  return { sectionEvidence, complianceEvidence, commands };
-}
-
-function implementedEvidenceFor(
-  audit: ComplianceAuditResult,
-  artifacts: string[]
-): ComplianceEvidenceIndex {
-  const evidence: ComplianceEvidenceIndex = {
-    implementationRefs: {},
-    testRefs: {},
-    evidenceRefs: {},
-    statusOverrides: {},
-    nextActions: {}
-  };
-  for (const requirement of audit.requirements) {
-    if (requirement.status === "superseded") continue;
-    evidence.implementationRefs![requirement.requirementId] = [
-      "packages/core/src/readiness/release-validator.ts"
-    ];
-    evidence.testRefs![requirement.requirementId] = artifacts;
-    evidence.evidenceRefs![requirement.requirementId] = artifacts;
-    evidence.statusOverrides![requirement.requirementId] = "implemented";
-    evidence.nextActions![requirement.requirementId] =
-      "Keep implementation, tests, and release evidence current.";
-  }
-  return evidence;
+  return { sectionEvidence, commands };
 }
 
 function mergeSectionEvidence(

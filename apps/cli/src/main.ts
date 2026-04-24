@@ -524,10 +524,11 @@ const complianceCommand = program
 complianceCommand
   .command("audit")
   .description("Extract and classify Product/SRS requirements")
+  .option("--root <path>", "repository root", defaultRepoRoot)
   .option("--sources <paths>", "comma-separated source documents")
   .action((options) => {
     const data = complianceAuditCommand(complianceService, {
-      rootDir: process.cwd(),
+      rootDir: options.root,
       sources: options.sources ? String(options.sources).split(",") : undefined
     });
     console.log(
@@ -554,6 +555,7 @@ complianceCommand
   .command("export")
   .option("--format <format>", "json or markdown", "json")
   .requiredOption("--output <path>")
+  .option("--root <path>", "repository root", defaultRepoRoot)
   .option("--sources <paths>", "comma-separated source documents")
   .action((options) => {
     const format = options.format === "markdown" ? "markdown" : "json";
@@ -561,7 +563,7 @@ complianceCommand
       format,
       output: options.output,
       auditInput: {
-        rootDir: process.cwd(),
+        rootDir: options.root,
         sources: options.sources ? String(options.sources).split(",") : undefined
       }
     });

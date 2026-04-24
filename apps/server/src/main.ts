@@ -20,6 +20,7 @@ import {
   ResetUninstallPreviewService,
   RestoreValidationService,
   RunQualityLinker,
+  readSqliteRuntimeRecovery,
   resolveSetupPaths
 } from "@fulcrum/core";
 import { SCHEMA_VERSION } from "@fulcrum/shared";
@@ -72,6 +73,7 @@ import {
 const app = new Hono();
 const complianceService = new ComplianceService(serverReadinessRepository);
 const serverSourceDir = path.dirname(fileURLToPath(import.meta.url));
+const defaultRepoRoot = path.resolve(serverSourceDir, "../../..");
 const cockpitAssetRoots = [
   process.env.FULCRUM_COCKPIT_DIST,
   path.resolve(process.cwd(), "apps/cockpit/dist"),
@@ -162,8 +164,8 @@ registerGraphRoutes(
   serverInvalidationService
 );
 registerRecoveryRoutes(app, recoveryDeps);
-registerComplianceRoutes(app, complianceService);
-registerReleaseRoutes(app, complianceService);
+registerComplianceRoutes(app, complianceService, defaultRepoRoot);
+registerReleaseRoutes(app, complianceService, defaultRepoRoot);
 registerMcpRoutes(app, {
   doctor: async () => ({
     setupState: await setupRepository.latest(),
@@ -225,9 +227,10 @@ serve({ fetch: app.fetch, hostname: bind.hostname, port });
 
 const cockpitIndexPath = resolveCockpitAsset("index.html");
 const url = `http://${bind.hostname}:${port}`;
+const sqliteRecovery = readSqliteRuntimeRecovery(paths.dbPath);
 const startupPayload = {
   schemaVersion: SCHEMA_VERSION,
-  status: "ok",
+  status: sqliteRecovery ? "blocked" : "ok",
   data: {
     url,
     stateRoot: paths.stateRoot,
@@ -235,6 +238,16 @@ const startupPayload = {
       bind.hostname === "127.0.0.1" || bind.hostname === "localhost" || bind.hostname === "::1"
         ? "local_only"
         : "operator_configured",
+    sqlite: sqliteRecovery
+      ? {
+          status: "blocked",
+          cause: `SQLite recovered from corrupt state. Original database moved to ${sqliteRecovery.recoveredPath}.`,
+          nextAction: sqliteRecovery.nextAction
+        }
+      : {
+          status: "managed",
+          nextAction: "No action needed."
+        },
     cockpit: cockpitIndexPath
       ? {
           status: "managed",
@@ -254,7 +267,11 @@ if (process.env.FULCRUM_SERVER_OUTPUT === "json") {
   const cockpitStatus = cockpitIndexPath
     ? `cockpit assets: ${path.dirname(cockpitIndexPath)}`
     : "cockpit assets missing; run pnpm --filter @fulcrum/cockpit build";
+  const sqliteStatus =
+    startupPayload.data.sqlite.status === "blocked"
+      ? `sqlite: blocked\nnext: ${startupPayload.data.sqlite.nextAction}`
+      : "sqlite: managed";
   console.log(
-    `Fulcrum local API listening on ${url}\nstate root: ${paths.stateRoot}\nprivacy: ${startupPayload.data.privacyStatus}\n${cockpitStatus}\nshutdown: ${startupPayload.data.shutdown}`
+    `Fulcrum local API listening on ${url}\nstate root: ${paths.stateRoot}\nprivacy: ${startupPayload.data.privacyStatus}\n${sqliteStatus}\n${cockpitStatus}\nshutdown: ${startupPayload.data.shutdown}`
   );
 }

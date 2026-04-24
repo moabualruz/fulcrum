@@ -2,7 +2,11 @@ import type { Hono } from "hono";
 import type { ComplianceService } from "@fulcrum/core";
 import { ReleaseValidator } from "@fulcrum/core";
 
-export function registerReleaseRoutes(app: Hono, compliance: ComplianceService): void {
+export function registerReleaseRoutes(
+  app: Hono,
+  compliance: ComplianceService,
+  defaultRootDir: string
+): void {
   app.post("/api/v1/release/validate", async (context) => {
     const body = (await context.req.json().catch(() => ({}))) as {
       evidence?: string;
@@ -11,7 +15,7 @@ export function registerReleaseRoutes(app: Hono, compliance: ComplianceService):
     };
     const validator = new ReleaseValidator(compliance);
     const data = await validator.validate({
-      rootDir: body.root ?? process.cwd(),
+      rootDir: body.root ?? defaultRootDir,
       evidenceDir: body.evidence ?? "fulcrum-release-evidence",
       localOnly: Boolean(body.localOnly)
     });

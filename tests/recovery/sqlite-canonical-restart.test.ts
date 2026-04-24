@@ -1,8 +1,14 @@
-import { rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrate, openDatabase } from "@fulcrum/db";
-import { FileWorkRepository, emptyWorkState } from "@fulcrum/core";
+import {
+  FileWorkRepository,
+  emptyWorkState,
+  sqliteRuntimeRecoveryMarkerPath,
+  sqliteStateStatus
+} from "@fulcrum/core";
 import { createLocalStateFixture, type LocalStateFixture } from "../helpers/local-state.js";
 import { createMigration, project, task } from "../helpers/sqlite-canonical.js";
 
@@ -31,5 +37,29 @@ describe("SQLite canonical restart", () => {
     expect(restarted.tasks).toHaveLength(1);
     expect(restarted.tasks[0]?.title).toBe("Canonical task");
     db.close();
+  });
+
+  it("marks readiness blocked after runtime recovers a corrupt SQLite database", () => {
+    fixture = createLocalStateFixture("fulcrum-sqlite-corrupt-");
+    writeFileSync(fixture.dbPath, "not sqlite");
+
+    execFileSync(
+      "pnpm",
+      ["exec", "tsx", "-e", "(async () => { await import('./src/work-runtime.ts'); })();"],
+      {
+        cwd: join(process.cwd(), "apps/cli"),
+        env: { ...process.env, FULCRUM_STATE_ROOT: fixture.root },
+        encoding: "utf8"
+      }
+    );
+
+    const status = sqliteStateStatus(fixture.dbPath);
+
+    expect(status).toMatchObject({
+      state: "blocked",
+      blocking: true
+    });
+    expect(status.cause).toContain(".corrupt-");
+    expect(existsSync(sqliteRuntimeRecoveryMarkerPath(fixture.dbPath))).toBe(true);
   });
 });

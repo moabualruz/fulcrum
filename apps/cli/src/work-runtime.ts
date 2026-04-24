@@ -35,7 +35,8 @@ import {
   TraceabilityQueryService,
   resolveSetupPaths,
   JsonStateMigrationService,
-  InvalidationService
+  InvalidationService,
+  recordSqliteRuntimeRecovery
 } from "@fulcrum/core";
 import { searchExact, searchSemantic } from "@fulcrum/code-tools";
 import { PlaneApiAdapter, SimulatedPlaneAdapter } from "@fulcrum/plane";
@@ -166,6 +167,7 @@ function openRuntimeDatabase(dbPath: string, migrationsDir: string) {
     if (!isSqliteNotDatabase(error) || !existsSync(dbPath)) throw error;
     const recoveredPath = `${dbPath}.corrupt-${Date.now()}`;
     renameSync(dbPath, recoveredPath);
+    recordSqliteRuntimeRecovery({ dbPath, recoveredPath });
     db = openDatabase(dbPath);
     migrate(db, migrationsDir);
     return db;

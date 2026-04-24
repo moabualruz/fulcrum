@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -44,5 +45,38 @@ describe("compliance contract", () => {
     expect(audit.blockingRequirementIds).toEqual(
       expect.arrayContaining(["FR-DOC-003", "NFR-LOCAL-001"])
     );
+  });
+
+  it("supports explicit repo roots from the CLI source-checkout entrypoint", () => {
+    const rootDir = mkdtempSync(path.join(tmpdir(), "fulcrum-compliance-cli-"));
+    writeFileSync(path.join(rootDir, "SRS.md"), "FR-DOC-003:\nDoctor MUST report exact next action.\n");
+
+    const output = execFileSync(
+      "pnpm",
+      [
+        "exec",
+        "tsx",
+        "src/main.ts",
+        "--json",
+        "compliance",
+        "audit",
+        "--root",
+        rootDir,
+        "--sources",
+        "SRS.md"
+      ],
+      {
+        cwd: path.join(process.cwd(), "apps/cli"),
+        encoding: "utf8"
+      }
+    );
+    const payload = JSON.parse(output) as {
+      status: string;
+      data: { sourceOrder: string[]; requirements: Array<{ requirementId: string }> };
+    };
+
+    expect(payload.status).toBe("blocked");
+    expect(payload.data.sourceOrder).toEqual(["SRS.md"]);
+    expect(payload.data.requirements.map((item) => item.requirementId)).toEqual(["FR-DOC-003"]);
   });
 });
