@@ -60,7 +60,9 @@ export class ComplianceService {
   constructor(private readonly repository?: ComplianceRepositoryPort) {}
 
   audit(input: ComplianceAuditInput = {}): ComplianceAuditResult {
-    const sourceOrder = input.sources?.length ? input.sources.map((source) => path.basename(source)) : DEFAULT_COMPLIANCE_SOURCES;
+    const sourceOrder = input.sources?.length
+      ? input.sources.map((source) => path.basename(source))
+      : DEFAULT_COMPLIANCE_SOURCES;
     const extracted = extractComplianceRequirements(input);
     const classified = applySourceOrder(extracted).map((requirement) =>
       classifyRequirement(requirement, input.evidence)
@@ -85,13 +87,21 @@ export class ComplianceService {
     const audit = input.audit ?? buildAuditResult(this.list(), DEFAULT_COMPLIANCE_SOURCES);
     const content = input.format === "json" ? JSON.stringify(audit, null, 2) : toMarkdown(audit);
     writeFileSync(input.output, content);
-    return { output: input.output, format: input.format, requirementCount: audit.requirements.length };
+    return {
+      output: input.output,
+      format: input.format,
+      requirementCount: audit.requirements.length
+    };
   }
 }
 
-export function complianceGateFailures(requirements: ComplianceRequirement[]): ComplianceRequirement[] {
+export function complianceGateFailures(
+  requirements: ComplianceRequirement[]
+): ComplianceRequirement[] {
   return requirements.filter(
-    (requirement) => !["deferred", "superseded"].includes(requirement.status) && blockingStatuses.has(requirement.status)
+    (requirement) =>
+      !["deferred", "superseded"].includes(requirement.status) &&
+      blockingStatuses.has(requirement.status)
   );
 }
 
@@ -103,7 +113,9 @@ function classifyRequirement(
   const implementationRefs = evidence.implementationRefs?.[requirement.requirementId] ?? [];
   const testRefs = evidence.testRefs?.[requirement.requirementId] ?? [];
   const evidenceRefs = evidence.evidenceRefs?.[requirement.requirementId] ?? [];
-  const combinedRefs = [...implementationRefs, ...testRefs, ...evidenceRefs].join(" ").toLowerCase();
+  const combinedRefs = [...implementationRefs, ...testRefs, ...evidenceRefs]
+    .join(" ")
+    .toLowerCase();
   const explicitStatus = evidence.statusOverrides?.[requirement.requirementId];
   const status =
     explicitStatus ??
@@ -137,11 +149,13 @@ function applySourceOrder(requirements: ComplianceRequirement[]): ComplianceRequ
   );
   const amendment02 = runtimeRequirements.find(
     (requirement) =>
-      requirement.sourceFile === "SRS-ammend-02.md" && /typescript-first|typescript/i.test(requirement.text)
+      requirement.sourceFile === "SRS-ammend-02.md" &&
+      /typescript-first|typescript/i.test(requirement.text)
   );
   const copilotStandalone = requirements.find(
     (requirement) =>
-      requirement.sourceFile === "SRS-ammend-01.md" && /standalone `?copilot`?/i.test(requirement.text)
+      requirement.sourceFile === "SRS-ammend-01.md" &&
+      /standalone `?copilot`?/i.test(requirement.text)
   );
 
   return requirements.map((requirement) => {
@@ -150,14 +164,22 @@ function applySourceOrder(requirements: ComplianceRequirement[]): ComplianceRequ
       requirement.requirementId !== amendment02.requirementId &&
       isRuntimeDirectionConflict(requirement)
     ) {
-      return supersede(requirement, amendment02.requirementId, "SRS-ammend-02 TypeScript-first direction wins runtime conflicts.");
+      return supersede(
+        requirement,
+        amendment02.requirementId,
+        "SRS-ammend-02 TypeScript-first direction wins runtime conflicts."
+      );
     }
     if (
       copilotStandalone &&
       requirement.requirementId !== copilotStandalone.requirementId &&
       /gh copilot/i.test(requirement.text)
     ) {
-      return supersede(requirement, copilotStandalone.requirementId, "SRS-ammend-01 standalone copilot CLI target wins Copilot invocation conflicts.");
+      return supersede(
+        requirement,
+        copilotStandalone.requirementId,
+        "SRS-ammend-01 standalone copilot CLI target wins Copilot invocation conflicts."
+      );
     }
     return requirement;
   });
@@ -165,12 +187,11 @@ function applySourceOrder(requirements: ComplianceRequirement[]): ComplianceRequ
 
 function isRuntimeDirectionConflict(requirement: ComplianceRequirement): boolean {
   const text = requirement.text.toLowerCase();
-  if (!text.includes("go")) return false;
-
   return (
     /write fulcrum core in go/.test(text) ||
     /fulcrum core should be implemented in go/.test(text) ||
     /fulcrum core should be go/.test(text) ||
+    /node-first/.test(text) ||
     /go-first/.test(text) ||
     /not use typescript as the fulcrum core/.test(text)
   );

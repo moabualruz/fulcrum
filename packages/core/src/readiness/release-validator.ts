@@ -2,8 +2,16 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { execa } from "execa";
 import { makeId, type ReleaseEvidencePack } from "@fulcrum/shared";
-import { complianceGateFailures, ComplianceService, type ComplianceAuditResult } from "./compliance-service.js";
-import { buildRepositoryComplianceEvidence } from "./compliance-evidence.js";
+import {
+  complianceGateFailures,
+  ComplianceService,
+  type ComplianceAuditResult
+} from "./compliance-service.js";
+import {
+  buildRepositoryComplianceEvidence,
+  resolveEvidenceGroups,
+  type EvidenceGroupId
+} from "./compliance-evidence.js";
 import { ReleaseEvidenceWriter } from "./evidence-writer.js";
 
 export const REQUIRED_RELEASE_SECTIONS = [
@@ -62,6 +70,7 @@ export interface ReleaseValidationResult {
 
 interface ReleaseCommandResult {
   [key: string]: unknown;
+  key?: string;
   command: string;
   cwd: string;
   startedAt: string;
@@ -71,6 +80,38 @@ interface ReleaseCommandResult {
   logs: string[];
   output?: string;
 }
+
+const SECTION_EVIDENCE_GROUPS: Record<ReleaseSectionId, EvidenceGroupId[]> = {
+  "compliance matrix": ["compliance", "release"],
+  "install/package/start": ["setup"],
+  "setup/doctor": ["setup", "doctor"],
+  "SQLite canonical state restart": ["backup", "tech"],
+  "CLI/API/cockpit/TUI/MCP parity": ["product", "cockpit", "mcp"],
+  "real-agent acceptance": ["agent", "run"],
+  "adapter certification": ["adapter", "plane", "memory", "code"],
+  "policy/privacy/no-network": ["policy", "security", "release"],
+  "quality gates": ["quality", "policy"],
+  "worktree safety": ["worktree", "policy"],
+  "graph/cache invalidation": ["graph", "code", "context", "memory"],
+  "backup/restore/export/rebuild": ["backup", "artifact"],
+  "documentation and operator guide": ["release", "product", "setup", "doctor"]
+};
+
+const SECTION_REQUIRED_COMMANDS: Record<ReleaseSectionId, string[]> = {
+  "compliance matrix": ["typecheck", "test"],
+  "install/package/start": ["product-install-readiness"],
+  "setup/doctor": ["typecheck", "test", "test-e2e"],
+  "SQLite canonical state restart": ["test"],
+  "CLI/API/cockpit/TUI/MCP parity": ["typecheck", "test", "test-e2e", "product-install-readiness"],
+  "real-agent acceptance": ["test"],
+  "adapter certification": ["test"],
+  "policy/privacy/no-network": ["test"],
+  "quality gates": ["test"],
+  "worktree safety": ["test"],
+  "graph/cache invalidation": ["test"],
+  "backup/restore/export/rebuild": ["test"],
+  "documentation and operator guide": ["prerequisites", "docs-check", "typecheck"]
+};
 
 export class ReleaseValidator {
   constructor(
@@ -250,10 +291,52 @@ function artifactLooksUnexecuted(artifact: string): boolean {
 
 function artifactHasDisallowedStatus(artifact: string): boolean {
   if (!existsSync(artifact)) return false;
-  const text = readFileSync(artifact, "utf8").toLowerCase();
-  return /\bfailed\b|\bpass"\s*:\s*false\b|\bmissing\b|\bpartial\b|\bmock_only\b|\bpreview_only\b|\bdocumentation_only\b|\bmock-only\b|\bpreview-only\b|\bdocumentation-only\b/.test(
-    text
+  const text = readFileSync(artifact, "utf8");
+  const parsed = parseJsonArtifact(text);
+  if (parsed !== undefined) return jsonHasDisallowedStatus(parsed);
+  const normalized = text.toLowerCase();
+  return /\bfailed\b|\bpass"\s*:\s*false\b|\bmissing\b|\bpartial\b|\bmock_only\b|\bpreview_only\b|\bdocumentation_only\b|\bmock-only\b|\bpreview-only\b|\bdocumentation-only\b|\bmockonly\b|\bpreviewonly\b|\bdocumentationonly\b/.test(
+    normalized
   );
+}
+
+function parseJsonArtifact(text: string): unknown | undefined {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+function jsonHasDisallowedStatus(value: unknown): boolean {
+  if (typeof value === "string") {
+    const normalized = value.toLowerCase().replace(/[^a-z]/g, "");
+    return (
+      normalized === "failed" ||
+      normalized === "missing" ||
+      normalized === "partial" ||
+      normalized === "mockonly" ||
+      normalized === "previewonly" ||
+      normalized === "documentationonly"
+    );
+  }
+  if (Array.isArray(value)) return value.some((entry) => jsonHasDisallowedStatus(entry));
+  if (!value || typeof value !== "object") return false;
+
+  for (const [key, entry] of Object.entries(value)) {
+    const normalizedKey = key.toLowerCase().replace(/[^a-z]/g, "");
+    if (normalizedKey === "pass" && entry === false) return true;
+    if (
+      typeof entry === "number" &&
+      entry > 0 &&
+      ["missing", "partial", "mockonly", "previewonly", "documentationonly"].includes(normalizedKey)
+    ) {
+      return true;
+    }
+    if (jsonHasDisallowedStatus(entry)) return true;
+  }
+
+  return false;
 }
 
 interface LocalEvidenceCommand {
@@ -370,6 +453,7 @@ async function collectLocalReleaseEvidence(
     );
     commandArtifacts[command.key] = relativePath;
     commands.push({
+      key: command.key,
       command: [command.command, ...command.args].join(" "),
       cwd: rootDir,
       startedAt,
@@ -380,14 +464,13 @@ async function collectLocalReleaseEvidence(
     });
   }
 
-  const sectionEvidence: Partial<Record<ReleaseSectionId, string[]>> = {};
-  for (const command of LOCAL_RELEASE_COMMANDS) {
-    const artifact = commandArtifacts[command.key];
-    if (!artifact) continue;
-    for (const section of command.sections) {
-      sectionEvidence[section] = [...(sectionEvidence[section] ?? []), artifact];
-    }
-  }
+  const sectionEvidence = buildLocalSectionEvidence(
+    rootDir,
+    evidenceRoot,
+    commandArtifacts,
+    commands,
+    writer
+  );
 
   writer.writeArtifact(evidenceRoot, "validation/summary.json", {
     schemaVersion: "1.0",
@@ -397,6 +480,54 @@ async function collectLocalReleaseEvidence(
   });
 
   return { sectionEvidence, commands };
+}
+
+function buildLocalSectionEvidence(
+  rootDir: string,
+  evidenceRoot: string,
+  commandArtifacts: Record<string, string>,
+  commands: ReleaseCommandResult[],
+  writer: ReleaseEvidenceWriter
+): Partial<Record<ReleaseSectionId, string[]>> {
+  const sectionEvidence: Partial<Record<ReleaseSectionId, string[]>> = {};
+  const commandIndex = new Map(
+    commands.map((command) => [String(command.key ?? command.command), command])
+  );
+
+  for (const section of REQUIRED_RELEASE_SECTIONS) {
+    const coverage = resolveEvidenceGroups(rootDir, SECTION_EVIDENCE_GROUPS[section]);
+    const commandKeys = SECTION_REQUIRED_COMMANDS[section];
+    const relatedArtifacts = commandKeys
+      .map((key) => commandArtifacts[key])
+      .filter((artifact): artifact is string => Boolean(artifact));
+    const commandResults = commandKeys
+      .map((key) => commandIndex.get(key))
+      .filter((result): result is ReleaseCommandResult => Boolean(result));
+    const passed =
+      coverage.implementationRefs.length > 0 &&
+      coverage.testRefs.length > 0 &&
+      commandKeys.length > 0 &&
+      commandResults.length === commandKeys.length &&
+      commandResults.every((result) => result.status === "passed");
+    const relativePath = path.posix.join("validation", "sections", `${fileSlug(section)}.json`);
+    writer.writeArtifact(evidenceRoot, relativePath, {
+      schemaVersion: "1.0",
+      section,
+      status: passed ? "passed" : "failed",
+      evidenceGroups: coverage.groups,
+      implementationRefs: coverage.implementationRefs,
+      testRefs: coverage.testRefs,
+      evidenceRefs: coverage.evidenceRefs,
+      validationArtifacts: relatedArtifacts,
+      requiredCommands: commandKeys,
+      nextAction: passed
+        ? `Concrete implementation and test evidence recorded for ${section}.`
+        : `Record concrete implementation, tests, and passing validation commands for ${section}.`
+    });
+    sectionEvidence[section] = [relativePath];
+  }
+
+  return sectionEvidence;
 }
 
 function mergeSectionEvidence(
@@ -430,7 +561,7 @@ async function runValidationCommands(
         cwd: command.cwd ?? rootDir,
         startedAt,
         completedAt: new Date().toISOString(),
-      exitCode: result.exitCode ?? 1,
+        exitCode: result.exitCode ?? 1,
         status: result.exitCode === 0 ? "passed" : command.required === false ? "guided" : "failed",
         logs: [],
         output: result.all ?? ""

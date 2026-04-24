@@ -9,7 +9,8 @@ interface EvidenceGroup {
   evidenceRefs?: string[];
 }
 
-type EvidenceGroupId =
+export type EvidenceGroupId =
+  | "compliance"
   | "product"
   | "tech"
   | "project"
@@ -36,6 +37,23 @@ type EvidenceGroupId =
   | "adapter";
 
 const evidenceGroups: Record<EvidenceGroupId, EvidenceGroup> = {
+  compliance: {
+    implementationRefs: [
+      "packages/core/src/readiness/compliance-extractor.ts",
+      "packages/core/src/readiness/compliance-service.ts",
+      "packages/core/src/readiness/compliance-evidence.ts",
+      "apps/cli/src/commands/compliance.ts",
+      "apps/server/src/routes/compliance.ts",
+      "apps/cockpit/src/routes/compliance.tsx",
+      "docs/operator-guide.md"
+    ],
+    testRefs: [
+      "tests/contract/compliance-contract.test.ts",
+      "tests/integration/compliance-source-order.test.ts",
+      "tests/policy/compliance-release-gate.test.ts"
+    ],
+    evidenceRefs: ["specs/005-product-readiness-gap-closure/contracts/compliance-contract.md"]
+  },
   product: {
     implementationRefs: [
       "README.md",
@@ -403,6 +421,13 @@ const evidenceGroups: Record<EvidenceGroupId, EvidenceGroup> = {
   }
 };
 
+export interface ResolvedEvidenceGroups {
+  groups: EvidenceGroupId[];
+  implementationRefs: string[];
+  testRefs: string[];
+  evidenceRefs: string[];
+}
+
 export function buildRepositoryComplianceEvidence(
   audit: ComplianceAuditResult,
   rootDir: string
@@ -416,10 +441,8 @@ export function buildRepositoryComplianceEvidence(
 
   for (const requirement of audit.requirements) {
     if (requirement.status === "superseded") continue;
-    const groupIds = classifyRequirementEvidence(requirement);
-    const implementationRefs = uniqueExistingRefs(rootDir, groupIds.flatMap((id) => evidenceGroups[id].implementationRefs));
-    const testRefs = uniqueExistingRefs(rootDir, groupIds.flatMap((id) => evidenceGroups[id].testRefs));
-    const evidenceRefs = uniqueExistingRefs(rootDir, groupIds.flatMap((id) => evidenceGroups[id].evidenceRefs ?? []));
+    const resolved = resolveRequirementEvidence(requirement, rootDir);
+    const { groups: groupIds, implementationRefs, testRefs, evidenceRefs } = resolved;
     if (implementationRefs.length === 0 || testRefs.length === 0) continue;
     evidence.implementationRefs![requirement.requirementId] = implementationRefs;
     evidence.testRefs![requirement.requirementId] = testRefs;
@@ -429,6 +452,35 @@ export function buildRepositoryComplianceEvidence(
   }
 
   return evidence;
+}
+
+export function resolveEvidenceGroups(
+  rootDir: string,
+  groupIds: EvidenceGroupId[]
+): ResolvedEvidenceGroups {
+  const groups = [...new Set(groupIds)];
+  return {
+    groups,
+    implementationRefs: uniqueExistingRefs(
+      rootDir,
+      groups.flatMap((id) => evidenceGroups[id].implementationRefs)
+    ),
+    testRefs: uniqueExistingRefs(
+      rootDir,
+      groups.flatMap((id) => evidenceGroups[id].testRefs)
+    ),
+    evidenceRefs: uniqueExistingRefs(
+      rootDir,
+      groups.flatMap((id) => evidenceGroups[id].evidenceRefs ?? [])
+    )
+  };
+}
+
+export function resolveRequirementEvidence(
+  requirement: ComplianceRequirement,
+  rootDir: string
+): ResolvedEvidenceGroups {
+  return resolveEvidenceGroups(rootDir, classifyRequirementEvidence(requirement));
 }
 
 function classifyRequirementEvidence(requirement: ComplianceRequirement): EvidenceGroupId[] {
@@ -458,32 +510,100 @@ function classifyRequirementEvidence(requirement: ComplianceRequirement): Eviden
   else if (id.startsWith("NFR-USE")) groups.add("product");
   else if (id.startsWith("NFR-EXT")) groups.add("adapter");
 
-  if (/typescript|monorepo|react|server|sqlite schema|mcp tools/.test(text)) groups.add("tech");
-  if (/copilot|agent/.test(text)) groups.add("agent");
-  if (/plane|external pm|jira|linear|online pm/.test(text)) groups.add("plane");
-  if (/project/.test(text)) groups.add("project");
-  if (/task/.test(text)) groups.add("task");
-  if (/run|heartbeat|stdout|stderr|process/.test(text)) groups.add("run");
-  if (/mcp/.test(text)) groups.add("mcp");
-  if (/memory|markdown|engram|memsearch/.test(text)) groups.add("memory");
-  if (/code|ripgrep|git grep|fd|ast-grep|aider|repomix|semantic|lsp/.test(text)) groups.add("code");
-  if (/context/.test(text)) groups.add("context");
-  if (/worktree|branch|merge|cleanup|diff/.test(text)) groups.add("worktree");
-  if (/quality|gate|cargo|clippy|fmt/.test(text)) groups.add("quality");
-  if (/artifact|log|redact/.test(text)) groups.add("artifact");
-  if (/policy|approval|dangerous|preview|dry-run|loopback|ignore|privacy|remote|network|secret/.test(text)) {
+  if (
+    /compliance|product\/srs|source order|supersed|mock-only|preview-only|documentation-only/.test(
+      text
+    )
+  ) {
+    groups.add("compliance");
+  }
+
+  if (
+    /typescript|monorepo|react|shared schema|contract|sqlite schema|mcp tools|node-first/.test(text)
+  ) {
+    groups.add("tech");
+  }
+  if (/copilot|agent|claude|gemini|codex|opencode|goose|openhands|plandex/.test(text)) {
+    groups.add("agent");
+  }
+  if (/plane|external pm|jira|linear|online pm|source of truth|hidden source of truth/.test(text)) {
+    groups.add("plane");
+  }
+  if (/project|workspace|registry/.test(text)) groups.add("project");
+  if (/task|queue/.test(text)) groups.add("task");
+  if (/run|heartbeat|stdout|stderr|process|orchestrat|execution|supervis/.test(text)) {
+    groups.add("run");
+  }
+  if (/mcp|model context protocol/.test(text)) groups.add("mcp");
+  if (/memory|markdown|engram|memsearch|knowledge/.test(text)) groups.add("memory");
+  if (
+    /code|ripgrep|git grep|fd|ast-grep|aider|repomix|semantic|symbol|repo-map|repo pack|repo-pack|lsp|refreshed/.test(
+      text
+    )
+  ) {
+    groups.add("code");
+  }
+  if (/context|ranked|included|evidence was used/.test(text)) groups.add("context");
+  if (/worktree|branch|merge|cleanup|diff|delivery|delete|overwrite user changes/.test(text)) {
+    groups.add("worktree");
+  }
+  if (/quality|gate|merge readiness|review readiness/.test(text)) groups.add("quality");
+  if (/artifact|log|transcript|redact/.test(text)) groups.add("artifact");
+  if (
+    /policy|approval|dangerous|preview|dry-run|loopback|ignore|privacy|remote|network|secret|public bind|disabled by default|silently delete|silently overwrite/.test(
+      text
+    )
+  ) {
     groups.add("policy");
   }
-  if (/doctor|setup|install|diagnose|capabilit|uninstall/.test(text)) groups.add("doctor");
-  if (/backup|restore|export|rebuild|crash|canonical|sqlite|event log|transactional|projection/.test(text)) {
+  if (/doctor|diagnose|capabilit|next action|health status/.test(text)) groups.add("doctor");
+  if (
+    /setup|install|package|prerequisite|source checkout|usable `?fulcrum`?|server starts|loopback/.test(
+      text
+    )
+  ) {
+    groups.add("setup");
+  }
+  if (
+    /backup|restore|export|rebuild|crash|canonical|sqlite|event log|transactional|projection/.test(
+      text
+    )
+  ) {
     groups.add("backup");
   }
-  if (/release|validation|readiness|proof|evidence pack/.test(text)) groups.add("release");
-  if (/cockpit|dashboard|surface|api|tui|local work management/.test(text)) groups.add("cockpit");
-  if (/graph|link|provenance|explainable|source refs|stale|invalidation/.test(text)) groups.add("graph");
-  if (/adapter|replaceable|optional|integration|configured through adapter/.test(text)) groups.add("adapter");
-
-  if (groups.size === 0 || id.startsWith("PRODUCT") || id.startsWith("SRS-")) groups.add("product");
+  if (/release|validation|readiness|proof|evidence pack|operator guide|checklist/.test(text)) {
+    groups.add("release");
+  }
+  if (
+    /cockpit|dashboard|board|review queue|policy approvals|recovery view|live activity|ui|tui/.test(
+      text
+    )
+  ) {
+    groups.add("cockpit");
+  }
+  if (
+    /\bgraph\b|\bgraphs\b|link|provenance|explainable|source refs|stale|invalidation|ranking/.test(
+      text
+    )
+  ) {
+    groups.add("graph");
+  }
+  if (
+    /adapter|replaceable|optional|integration|configured through adapter|telemetry|observability|langfuse|helicone|opentelemetry|open-source tools|disabled by default/.test(
+      text
+    )
+  ) {
+    groups.add("adapter");
+  }
+  if (/performance|under 1 second|under 3 seconds/.test(text)) groups.add("performance");
+  if (
+    groups.size > 0 &&
+    /fulcrum|surface|cli|json|machine-readable|operator|local-first|product center|operations center|same underlying state/.test(
+      text
+    )
+  ) {
+    groups.add("product");
+  }
   return [...groups];
 }
 

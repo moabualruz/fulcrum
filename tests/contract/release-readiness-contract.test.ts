@@ -68,10 +68,12 @@ describe("release readiness contract", () => {
         })
       ])
     );
-    expect(readFileSync(path.join(evidenceDir, "compliance-matrix.json"), "utf8")).toContain("FR-REL-001");
-    expect(readFileSync(path.join(evidenceDir, "sections/compliance-matrix.json"), "utf8")).toContain(
-      "\"status\": \"failed\""
+    expect(readFileSync(path.join(evidenceDir, "compliance-matrix.json"), "utf8")).toContain(
+      "FR-REL-001"
     );
+    expect(
+      readFileSync(path.join(evidenceDir, "sections/compliance-matrix.json"), "utf8")
+    ).toContain('"status": "failed"');
     expect(readFileSync(result.evidenceManifest, "utf8")).toContain("FR-REL-001");
   });
 
@@ -137,13 +139,97 @@ describe("release readiness contract", () => {
     expect(readFileSync(path.join(evidenceDir, "compliance-matrix.json"), "utf8")).toContain(
       "FR-REL-002"
     );
-    expect(readFileSync(path.join(evidenceDir, "sections/compliance-matrix.json"), "utf8")).toContain(
-      "\"status\": \"passed\""
-    );
+    expect(
+      readFileSync(path.join(evidenceDir, "sections/compliance-matrix.json"), "utf8")
+    ).toContain('"status": "passed"');
     expect(JSON.parse(readFileSync(result.evidenceManifest, "utf8"))).toMatchObject({
       pass: true,
       redactionStatus: "not_redacted"
     });
+  });
+
+  it("fails provided section evidence on missing, mock-only, and preview-only status", async () => {
+    const rootDir = mkdtempSync(path.join(tmpdir(), "fulcrum-release-bad-artifacts-"));
+    const evidenceDir = mkdtempSync(path.join(tmpdir(), "fulcrum-release-bad-evidence-"));
+    mkdirSync(path.join(evidenceDir, "validation"), { recursive: true });
+    const goodArtifact = "validation/passed.json";
+    const mockArtifact = "validation/mock.json";
+    const previewArtifact = "validation/preview.json";
+
+    writeFileSync(path.join(evidenceDir, goodArtifact), JSON.stringify({ status: "passed" }));
+    writeFileSync(
+      path.join(evidenceDir, mockArtifact),
+      JSON.stringify({ status: "passed", summary: { mockOnly: 1 } })
+    );
+    writeFileSync(
+      path.join(evidenceDir, previewArtifact),
+      JSON.stringify({ status: "passed", summary: { previewOnly: 1 } })
+    );
+
+    const sectionEvidence = Object.fromEntries(
+      REQUIRED_RELEASE_SECTIONS.map((section) => [section, [goodArtifact]])
+    ) as Record<string, string[]>;
+    sectionEvidence["install/package/start"] = ["validation/missing.json"];
+    sectionEvidence["real-agent acceptance"] = [mockArtifact];
+    sectionEvidence["adapter certification"] = [previewArtifact];
+
+    const audit = {
+      schemaVersion: "1.0" as const,
+      generatedAt: new Date().toISOString(),
+      sourceOrder: ["SRS.md"],
+      summary: {
+        implemented: 1,
+        partial: 0,
+        missing: 0,
+        deferred: 0,
+        superseded: 0,
+        mockOnly: 0,
+        previewOnly: 0,
+        documentationOnly: 0
+      },
+      requirements: [
+        {
+          schemaVersion: "1.0" as const,
+          requirementId: "FR-REL-003",
+          sourceFile: "SRS.md",
+          sourceLine: 1,
+          text: "Release validation MUST reject bad provided evidence.",
+          priority: "P1" as const,
+          status: "implemented" as const,
+          implementationRefs: ["packages/core/src/readiness/release-validator.ts"],
+          testRefs: ["tests/contract/release-readiness-contract.test.ts"],
+          evidenceRefs: ["sections/compliance-matrix.json"],
+          nextAction: "Keep release evidence current."
+        }
+      ],
+      blockingRequirementIds: [],
+      pass: true
+    };
+
+    const result = await new ReleaseValidator().validate({
+      rootDir,
+      evidenceDir,
+      audit,
+      sectionEvidence
+    });
+
+    expect(result.pass).toBe(false);
+    expect(result.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          checkId: "release.section.install.package.start",
+          status: "failed"
+        }),
+        expect.objectContaining({
+          checkId: "release.section.real.agent.acceptance",
+          status: "failed"
+        }),
+        expect.objectContaining({
+          checkId: "release.section.adapter.certification",
+          status: "failed"
+        })
+      ])
+    );
   });
 
   it("keeps local-only validation blocked when commands pass but compliance lacks implementation evidence", async () => {

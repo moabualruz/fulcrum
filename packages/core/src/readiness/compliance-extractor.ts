@@ -26,9 +26,7 @@ export function extractComplianceRequirements(
   const requirements: ComplianceRequirement[] = [];
 
   for (const sourceFile of sources) {
-    const absolutePath = path.isAbsolute(sourceFile)
-      ? sourceFile
-      : path.join(rootDir, sourceFile);
+    const absolutePath = path.isAbsolute(sourceFile) ? sourceFile : path.join(rootDir, sourceFile);
     const sourceName = path.basename(sourceFile);
     const content = readFileSync(absolutePath, "utf8");
     const lines = content.split(/\r?\n/);
@@ -52,14 +50,18 @@ export function extractComplianceRequirements(
 
       if (!requirementLanguagePattern.test(text)) continue;
 
+      const block = shouldCollectImplicitBlock(lines, index, text)
+        ? collectRequirementBlock(lines, index, text)
+        : { text, lastLineIndex: index };
       requirements.push(
         buildRequirement(
           sourceName,
           index + 1,
           makeSourceRequirementId(sourceName, productSequence++),
-          text
+          block.text
         )
       );
+      index = block.lastLineIndex;
     }
   }
 
@@ -118,19 +120,35 @@ function collectRequirementBlock(
 ): { text: string; lastLineIndex: number } {
   const parts = inlineText ? [inlineText] : [];
   let lastLineIndex = requirementLineIndex;
+  let inCodeBlock = false;
+  let sawContinuation = false;
 
   for (let index = requirementLineIndex + 1; index < lines.length; index += 1) {
     const line = lines[index];
     if (line === undefined) continue;
     const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      inCodeBlock = !inCodeBlock;
+      lastLineIndex = index;
+      continue;
+    }
+    if (inCodeBlock) {
+      if (trimmed) {
+        parts.push(trimmed);
+        sawContinuation = true;
+      }
+      lastLineIndex = index;
+      continue;
+    }
     const normalized = normalizeRequirementText(line);
     if (!normalized) {
-      if (parts.length > 0) break;
+      if (sawContinuation) break;
       lastLineIndex = index;
       continue;
     }
     if (parseExplicitRequirement(normalized) || trimmed.startsWith("#")) break;
     parts.push(normalized);
+    sawContinuation = true;
     lastLineIndex = index;
   }
 
@@ -139,6 +157,28 @@ function collectRequirementBlock(
     text: parts.join(" ").trim() || fallbackText,
     lastLineIndex
   };
+}
+
+function shouldCollectImplicitBlock(
+  lines: string[],
+  requirementLineIndex: number,
+  text: string
+): boolean {
+  if (text.endsWith(":")) return true;
+  for (let index = requirementLineIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line === undefined) continue;
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    if (trimmed.startsWith("#")) return false;
+    return (
+      trimmed.startsWith("-") ||
+      trimmed.startsWith("*") ||
+      trimmed.startsWith("```") ||
+      /^\d+\./.test(trimmed)
+    );
+  }
+  return false;
 }
 
 function makeSourceRequirementId(sourceName: string, sequence: number): string {
