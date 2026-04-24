@@ -31,7 +31,7 @@ export const FulcrumErrorSchema = z.object({
   message: z.string(),
   actionable: z.boolean().default(true),
   nextAction: z.string().optional(),
-  policyDecisionId: FulcrumIdSchema.optional(),
+  policyDecisionId: FulcrumIdSchema.nullable().optional(),
   redactionStatus: RedactionStatusSchema
 });
 

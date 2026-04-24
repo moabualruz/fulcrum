@@ -154,7 +154,7 @@ Output: artifact record with hash, size, redaction status, and linked run/task.
 
 ### `fulcrum_quality_gate_run`
 
-Input: `projectId`, `gateName`, optional `taskId`, optional `runId`, optional `previewOnly`.
+Input: `projectId`, `gateName`, optional `taskId`, optional `runId`, optional `policyDecisionId`, optional `previewOnly`.
 Output: quality gate result or approval-required response if command crosses policy boundary.
 
 ### `fulcrum_policy_check`
