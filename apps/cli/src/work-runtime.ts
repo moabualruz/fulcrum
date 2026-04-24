@@ -1,5 +1,7 @@
 import path from "node:path";
 import {
+  ContextPackBuilder,
+  FileContextPackRepository,
   CodeEvidenceService,
   FileCodeEvidenceRepository,
   FileProjectRepository,
@@ -25,6 +27,11 @@ const runRepository = new FileRunRepository(work);
 
 export const taskService = new LocalTaskService(taskRepository);
 export const projectService = new ProjectRegistryService(projectRepository, taskService);
+export const contextBuilder = new ContextPackBuilder(
+  new FileContextPackRepository(work),
+  taskRepository,
+  projectRepository
+);
 export const runService = new RunLifecycleService(runRepository, taskRepository);
 export const codeService = new CodeEvidenceService(
   projectRepository,

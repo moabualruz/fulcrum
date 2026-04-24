@@ -15,6 +15,7 @@ import { registerArtifactRoutes } from "./routes/artifacts.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerPolicyRoutes } from "./routes/policy.js";
 import { registerCodeRoutes } from "./routes/code.js";
+import { registerContextPackRoutes } from "./routes/context-packs.js";
 import { registerActivityRoutes } from "./routes/activity.js";
 import { registerRunRoutes } from "./routes/runs.js";
 import { registerQueueRoutes } from "./routes/queues.js";
@@ -25,6 +26,7 @@ import { createServerSetupPorts, FileSetupRepository } from "./runtime.js";
 import {
   serverExternalPmService,
   serverCodeService,
+  serverContextBuilder,
   serverProjectService,
   serverRunService,
   serverTaskService
@@ -49,6 +51,7 @@ registerQueueRoutes(app, serverProjectService, serverTaskService);
 registerRunRoutes(app, serverRunService);
 registerActivityRoutes(app, serverRunService);
 registerCodeRoutes(app, serverCodeService);
+registerContextPackRoutes(app, serverContextBuilder);
 registerExternalPmRoutes(app, serverExternalPmService);
 registerArtifactRoutes(
   app,

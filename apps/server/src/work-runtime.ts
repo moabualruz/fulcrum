@@ -1,5 +1,7 @@
 import path from "node:path";
 import {
+  ContextPackBuilder,
+  FileContextPackRepository,
   CodeEvidenceService,
   FileCodeEvidenceRepository,
   FileProjectRepository,
@@ -36,6 +38,11 @@ export const serverCodeService = new CodeEvidenceService(
     search: (options) => searchExact(options)
   },
   searchSemantic
+);
+export const serverContextBuilder = new ContextPackBuilder(
+  new FileContextPackRepository(work),
+  taskRepository,
+  projectRepository
 );
 const planeAdapter =
   process.env.FULCRUM_PLANE_BASE_URL && process.env.FULCRUM_PLANE_TOKEN
