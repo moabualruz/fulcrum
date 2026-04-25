@@ -97,6 +97,9 @@ export class PlaneApiAdapter implements ExternalPmAdapter {
     if (operation === "writeback") {
       return externalWritebackPreview(input as PlaneWritebackInput);
     }
+    if (operation !== "import_work_items") {
+      throw new Error(`Unsupported Plane operation: ${operation}`);
+    }
     return {
       effects: ["Fetch selected Plane issues"],
       recordsAffected: [],
@@ -110,6 +113,9 @@ export class PlaneApiAdapter implements ExternalPmAdapter {
   async execute(operation: string, input: unknown, policyDecisionId?: string) {
     if (operation === "writeback") {
       return this.writeback(input as PlaneWritebackInput, policyDecisionId ?? "");
+    }
+    if (operation !== "import_work_items") {
+      throw new Error(`Unsupported Plane operation: ${operation}`);
     }
     return this.importWorkItems();
   }

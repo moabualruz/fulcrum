@@ -49,6 +49,9 @@ export class SimulatedPlaneAdapter implements ExternalPmAdapter {
     if (operation === "writeback") {
       return externalWritebackPreview(input as PlaneWritebackInput);
     }
+    if (operation !== "import_work_items") {
+      throw new Error(`Unsupported Plane operation: ${operation}`);
+    }
     return {
       effects: ["Import remote work item snapshots"],
       recordsAffected: this.items.map((item) => item.externalId),
@@ -64,6 +67,9 @@ export class SimulatedPlaneAdapter implements ExternalPmAdapter {
       return policyDecisionId
         ? this.writeback(input as PlaneWritebackInput, policyDecisionId)
         : policyPlaceholder(input as PlaneWritebackInput);
+    }
+    if (operation !== "import_work_items") {
+      throw new Error(`Unsupported Plane operation: ${operation}`);
     }
     return this.importWorkItems();
   }

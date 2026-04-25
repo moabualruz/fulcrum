@@ -86,4 +86,22 @@ describe("Plane adapter certification boundary", () => {
       external_id: "policy-1"
     });
   });
+
+  it("rejects unknown Plane adapter operations instead of falling back to import", async () => {
+    const live = new PlaneApiAdapter({
+      baseUrl: "https://plane.test",
+      workspaceSlug: "team",
+      projectId: "proj-id",
+      apiKey: "token",
+      fetchImpl: async () => {
+        throw new Error("unexpected network call");
+      }
+    });
+    const simulated = new SimulatedPlaneAdapter([]);
+
+    await expect(live.preview("typo", {})).rejects.toThrow("Unsupported Plane operation");
+    await expect(live.execute("typo", {})).rejects.toThrow("Unsupported Plane operation");
+    await expect(simulated.preview("typo", {})).rejects.toThrow("Unsupported Plane operation");
+    await expect(simulated.execute("typo", {})).rejects.toThrow("Unsupported Plane operation");
+  });
 });
