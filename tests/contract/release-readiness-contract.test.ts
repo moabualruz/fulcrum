@@ -155,6 +155,7 @@ describe("release readiness contract", () => {
     const goodArtifact = "validation/passed.json";
     const mockArtifact = "validation/mock.json";
     const previewArtifact = "validation/preview.json";
+    const degradedArtifact = "validation/degraded.json";
 
     writeFileSync(
       path.join(evidenceDir, goodArtifact),
@@ -168,6 +169,16 @@ describe("release readiness contract", () => {
       path.join(evidenceDir, previewArtifact),
       JSON.stringify({ status: "passed", summary: { previewOnly: 1 } })
     );
+    writeFileSync(
+      path.join(evidenceDir, degradedArtifact),
+      JSON.stringify({
+        status: "passed",
+        state: "degraded",
+        implementationRefs: ["packages/core/src/readiness/release-validator.ts"],
+        testRefs: ["tests/contract/release-readiness-contract.test.ts"],
+        validationArtifacts: ["validation/test.json"]
+      })
+    );
 
     const sectionEvidence = Object.fromEntries(
       REQUIRED_RELEASE_SECTIONS.map((section) => [section, [goodArtifact]])
@@ -175,6 +186,7 @@ describe("release readiness contract", () => {
     sectionEvidence["install/package/start"] = ["validation/missing.json"];
     sectionEvidence["real-agent acceptance"] = [mockArtifact];
     sectionEvidence["adapter certification"] = [previewArtifact];
+    sectionEvidence["quality gates"] = [degradedArtifact];
 
     const audit = {
       schemaVersion: "1.0" as const,
@@ -229,6 +241,10 @@ describe("release readiness contract", () => {
         }),
         expect.objectContaining({
           checkId: "release.section.adapter.certification",
+          status: "failed"
+        }),
+        expect.objectContaining({
+          checkId: "release.section.quality.gates",
           status: "failed"
         })
       ])

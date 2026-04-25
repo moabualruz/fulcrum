@@ -328,6 +328,10 @@ function jsonHasDisallowedStatus(value: unknown): boolean {
     const normalized = value.toLowerCase().replace(/[^a-z]/g, "");
     return (
       normalized === "failed" ||
+      normalized === "error" ||
+      normalized === "skipped" ||
+      normalized === "blocked" ||
+      normalized === "degraded" ||
       normalized === "missing" ||
       normalized === "partial" ||
       normalized === "mockonly" ||
@@ -341,10 +345,22 @@ function jsonHasDisallowedStatus(value: unknown): boolean {
   for (const [key, entry] of Object.entries(value)) {
     const normalizedKey = key.toLowerCase().replace(/[^a-z]/g, "");
     if (normalizedKey === "pass" && entry === false) return true;
+    if (["blocking", "blocked"].includes(normalizedKey) && entry === true) return true;
     if (
       typeof entry === "number" &&
       entry > 0 &&
-      ["missing", "partial", "mockonly", "previewonly", "documentationonly"].includes(normalizedKey)
+      [
+        "failed",
+        "error",
+        "skipped",
+        "blocked",
+        "degraded",
+        "missing",
+        "partial",
+        "mockonly",
+        "previewonly",
+        "documentationonly"
+      ].includes(normalizedKey)
     ) {
       return true;
     }
