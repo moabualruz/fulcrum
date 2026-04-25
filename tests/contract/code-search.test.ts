@@ -39,4 +39,29 @@ describe("code search contract", () => {
     });
     expect(result.evidence[0].reason).toContain("exact local search");
   });
+
+  it("reports degraded search instead of success when the project root is missing", async () => {
+    const stateRoot = await mkdtemp(path.join(os.tmpdir(), "fulcrum-code-missing-state-"));
+    const missingRoot = path.join(os.tmpdir(), `fulcrum-missing-code-root-${Date.now()}`);
+    const work = new FileWorkRepository(path.join(stateRoot, ".fulcrum", "work.json"));
+    const projects = new ProjectRegistryService(new FileProjectRepository(work));
+    const project = projects.register({ rootPath: missingRoot });
+    const service = new CodeEvidenceService(
+      new FileProjectRepository(work),
+      new FileCodeEvidenceRepository(work),
+      { search: (options) => searchExact(options) },
+      searchSemantic
+    );
+
+    const result = await service.search({ projectId: project.projectId, query: "anything" });
+
+    expect(result.count).toBe(0);
+    expect(result.degraded).toEqual([
+      expect.objectContaining({
+        capabilityId: "cap_code_search",
+        state: "degraded",
+        nextAction: expect.stringContaining(missingRoot)
+      })
+    ]);
+  });
 });

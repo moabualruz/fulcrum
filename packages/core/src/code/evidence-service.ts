@@ -161,6 +161,27 @@ export class CodeEvidenceService {
     if (!project) {
       throw new Error(`Unknown project: ${input.projectId}`);
     }
+    if (!existsSync(project.rootPath)) {
+      return {
+        query: input.query,
+        projectId: project.projectId,
+        rootPath: project.rootPath,
+        count: 0,
+        ignoredPathBehavior: {
+          status: "honored",
+          sources: [],
+          excludedPatterns: 0
+        },
+        degraded: [
+          {
+            capabilityId: "cap_code_search",
+            state: "degraded",
+            nextAction: `Restore missing project root: ${project.rootPath}.`
+          }
+        ],
+        evidence: []
+      };
+    }
     const started = Date.now();
     const ignorePolicy = await loadIgnoredPathPolicy(project.rootPath);
     const limit = normalizeLimit(input.limit);
