@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -140,6 +140,39 @@ describe("code tool adapter certification", () => {
         includedFiles: ["README.md"]
       });
       expect(pack.limitations[0]).toContain("Repomix executable unavailable");
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it("keeps nested path filters traversable for repo-map and repo-pack evidence", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "fulcrum-repo-path-filter-"));
+    const previousPath = process.env.PATH;
+    mkdirSync(path.join(root, "src", "feature"), { recursive: true });
+    writeFileSync(path.join(root, "src", "feature", "target.ts"), "export const target = true;\n");
+    writeFileSync(path.join(root, "src", "other.ts"), "export const other = true;\n");
+    process.env.PATH = "";
+
+    try {
+      const repoMap = buildRepoMapEvidence({
+        projectId: "proj_repo",
+        rootPath: root,
+        paths: ["src/feature/target.ts"],
+        limit: 10
+      });
+      const pack = buildRepoPackEvidence({
+        projectId: "proj_repo",
+        rootPath: root,
+        paths: ["src/feature/target.ts"],
+        limit: 10
+      });
+
+      expect(repoMap.refs.map((ref) => ref.path)).toEqual(["src/feature/target.ts"]);
+      expect(pack.includedFiles).toEqual(["src/feature/target.ts"]);
+      expect(pack.contentPreview).toContain("export const target");
+      expect(pack.contentPreview).not.toContain("export const other");
     } finally {
       if (previousPath === undefined) delete process.env.PATH;
       else process.env.PATH = previousPath;

@@ -126,7 +126,7 @@ function collectRepoRefs(
 ): RepoMapRef[] {
   const allowed =
     paths && paths.length > 0
-      ? new Set(paths.map((item) => item.replaceAll("\\", "/")))
+      ? paths.map((item) => item.replaceAll("\\", "/").replace(/^\/+/, ""))
       : undefined;
   const refs: RepoMapRef[] = [];
   const visit = (directory: string): void => {
@@ -136,7 +136,7 @@ function collectRepoRefs(
       if ([".git", ".fulcrum", "node_modules", "dist"].includes(entry.name)) continue;
       const absolute = path.join(directory, entry.name);
       const relative = path.relative(rootPath, absolute).replaceAll(path.sep, "/");
-      if (allowed && ![...allowed].some((candidate) => relative.startsWith(candidate))) continue;
+      if (allowed && !isAllowedPathTraversal(relative, entry.isDirectory(), allowed)) continue;
       if (entry.isDirectory()) {
         visit(absolute);
         continue;
@@ -152,6 +152,18 @@ function collectRepoRefs(
   };
   visit(rootPath);
   return refs;
+}
+
+function isAllowedPathTraversal(
+  relative: string,
+  isDirectory: boolean,
+  allowed: string[]
+): boolean {
+  if (relative === "") return true;
+  return allowed.some((candidate) => {
+    if (relative === candidate || relative.startsWith(`${candidate}/`)) return true;
+    return isDirectory && candidate.startsWith(`${relative}/`);
+  });
 }
 
 function tryBuildRepomix(rootPath: string): { outputPath: string; sizeBytes: number } | undefined {
