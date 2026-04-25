@@ -11,7 +11,7 @@
 
 - Q: Which task and run lifecycle states must implementation enforce? -> A: SRS-defined task transitions and run statuses.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Install And Prove Local Readiness (Priority: P1)
 
@@ -284,7 +284,7 @@ As an operator, I want every external tool, agent, memory backend, code search b
 - Local-only mode can conflict with an operator-requested remote writeback or remote model action; local-only policy must win unless explicitly changed by the operator.
 - Cockpit, terminal dashboard/TUI, CLI, MCP, JSON/JSONL, and local health surfaces can expose different command paths for the same action; policy, provenance, and canonical state requirements must remain identical.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Product And Business Requirements
 
@@ -402,7 +402,7 @@ As an operator, I want every external tool, agent, memory backend, code search b
 - **FR-090**: Fulcrum MUST write local logs and event mirrors to operator-visible local paths and link run traces to run ID, task ID, agent, command, context pack, worktree, event timeline, quality gates, artifacts, and writeback status.
 - **FR-091**: Fulcrum MUST support optional OpenTelemetry, Langfuse, and Helicone-style observability integrations as disabled-by-default adapters with explicit operator opt-in, privacy status, redaction, and local-only blocking.
 
-### Key Entities *(include if feature involves data)*
+### Key Entities _(include if feature involves data)_
 
 - **Project**: A local registered software workspace. Key attributes include Fulcrum project ID, name, root path, default branch, worktree base path, external PM workspace/project mapping, memory path, quality gates, enabled/disabled capabilities, ignored paths, privacy mode, health state, and optional external mappings.
 - **Task**: A unit of work owned or mirrored locally by Fulcrum. Key attributes include task ID, project ID, title, description snapshot, status, priority, labels, blocker state, assigned agent, current run, linked files, linked memory, linked artifacts, linked worktree, external source, and external ID.
@@ -425,7 +425,7 @@ As an operator, I want every external tool, agent, memory backend, code search b
 - **Export Record**: A machine-readable local export of Fulcrum records. Key attributes include export ID, format, included entity classes, redaction status, provenance coverage, created time, and local path/reference.
 - **Terminal Dashboard View**: A terminal-native surface over canonical state. Key attributes include view ID, view type, active project/task/run filters, selected record ID, stale/partial/degraded state, keyboard action map, privacy status, and last refresh time.
 
-## Fulcrum Constitution Alignment *(mandatory)*
+## Fulcrum Constitution Alignment _(mandatory)_
 
 ### Local-First And Degraded Behavior
 
@@ -458,9 +458,9 @@ As an operator, I want every external tool, agent, memory backend, code search b
 - Packages touched: Product delivery is expected to cover the cockpit, CLI, local server/MCP surface, core domain services, local state layer, adapter wrappers, context builder, doctor, and shared schemas/contracts. These map to the constitution's TypeScript-first monorepo boundary expectations for `apps/*` and `packages/*`.
 - Shared schemas/contracts: Project, task, external mirror, run, run event, agent, context pack, context item, memory entry, code evidence, graph link, worktree allocation, artifact, quality gate, policy decision, capability health, adapter configuration, backup manifest, export record, doctor output, machine-interface errors, and cross-surface event contracts.
 - Adapter boundaries: External PM, memory backends, code tools, semantic backends, repo map/pack providers, CLI agents, quality gate runners, telemetry/exporters, remote model/provider status, and packaging/runtime surfaces must be replaceable with declared ownership, health, offline, disablement, and rebuild/export behavior.
-- Non-TypeScript or Bun-only exceptions: No exception is assumed for  Go or other languages may be introduced only if implementation evidence shows TypeScript fails on reliable process supervision, packaging, memory use, filesystem safety, long-running daemon reliability, or single-binary distribution. Bun-only behavior must not become a product requirement until packaging and subprocess reliability are proven.
+- Non-TypeScript or Bun-only exceptions: No exception is assumed for Go or other languages may be introduced only if implementation evidence shows TypeScript fails on reliable process supervision, packaging, memory use, filesystem safety, long-running daemon reliability, or single-binary distribution. Bun-only behavior must not become a product requirement until packaging and subprocess reliability are proven.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

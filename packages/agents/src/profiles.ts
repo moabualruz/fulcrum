@@ -70,7 +70,8 @@ function buildAgentProfiles(): AgentProfile[] {
       roles: ["implementation", "validation"],
       supportsMcp: true,
       supportsHooks: false,
-      localOnlyBehavior: "Use local workspace context; remote provider use must be operator configured.",
+      localOnlyBehavior:
+        "Use local workspace context; remote provider use must be operator configured.",
       installHints: ["Install OpenCode CLI and configure its provider before release acceptance."]
     },
     {

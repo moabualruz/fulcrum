@@ -53,18 +53,18 @@
 
 ### Tests And Validation for User Story 2
 
-- [X] T024 [P] [US2] Add package command contract test in `tests/contract/package-start-contract.test.ts`
-- [X] T025 [P] [US2] Add clean install quickstart test in `tests/e2e/quickstart/product-install-readiness.sh`
-- [X] T026 [P] [US2] Add loopback bind policy test in `tests/policy/package-server-bind.test.ts`
+- [x] T024 [P] [US2] Add package command contract test in `tests/contract/package-start-contract.test.ts`
+- [x] T025 [P] [US2] Add clean install quickstart test in `tests/e2e/quickstart/product-install-readiness.sh`
+- [x] T026 [P] [US2] Add loopback bind policy test in `tests/policy/package-server-bind.test.ts`
 
 ### Implementation for User Story 2
 
-- [X] T027 [US2] Add root package bin/build/start scripts for `fulcrum` in `package.json`
-- [X] T028 [US2] Add CLI packaged entrypoint build support in `apps/cli/package.json` and `apps/cli/src/main.ts`
-- [X] T029 [US2] Add server command that serves cockpit assets when built in `apps/server/src/main.ts`
-- [X] T030 [US2] Add install target health probes in `packages/core/src/readiness/install-targets.ts`
-- [X] T031 [US2] Add package/start section to `README.md`
-- [X] T032 [US2] Add package/start section to `docs/operator-guide.md`
+- [x] T027 [US2] Add root package bin/build/start scripts for `fulcrum` in `package.json`
+- [x] T028 [US2] Add CLI packaged entrypoint build support in `apps/cli/package.json` and `apps/cli/src/main.ts`
+- [x] T029 [US2] Add server command that serves cockpit assets when built in `apps/server/src/main.ts`
+- [x] T030 [US2] Add install target health probes in `packages/core/src/readiness/install-targets.ts`
+- [x] T031 [US2] Add package/start section to `README.md`
+- [x] T032 [US2] Add package/start section to `docs/operator-guide.md`
 
 ## Phase 5: User Story 3 - SQLite Canonical State Cutover (Priority: P1)
 
@@ -74,19 +74,19 @@
 
 ### Tests And Validation for User Story 3
 
-- [X] T033 [P] [US3] Add SQLite canonical restart test in `tests/recovery/sqlite-canonical-restart.test.ts`
-- [X] T034 [P] [US3] Add JSON migration rollback test in `tests/recovery/json-state-migration.test.ts`
-- [X] T035 [P] [US3] Add cross-surface SQLite parity test in `tests/integration/sqlite-surface-parity.test.ts`
+- [x] T033 [P] [US3] Add SQLite canonical restart test in `tests/recovery/sqlite-canonical-restart.test.ts`
+- [x] T034 [P] [US3] Add JSON migration rollback test in `tests/recovery/json-state-migration.test.ts`
+- [x] T035 [P] [US3] Add cross-surface SQLite parity test in `tests/integration/sqlite-surface-parity.test.ts`
 
 ### Implementation for User Story 3
 
-- [X] T036 [US3] Implement JSON-to-SQLite migration service in `packages/core/src/readiness/json-state-migration.ts`
-- [X] T037 [US3] Replace file work repository wiring with SQLite repositories in `apps/cli/src/work-runtime.ts`
-- [X] T038 [US3] Replace file work repository wiring with SQLite repositories in `apps/server/src/runtime.ts`
-- [X] T039 [US3] Replace file work repository wiring with SQLite repositories in `apps/tui/src/main.ts`
-- [X] T040 [US3] Add JSON mirror rebuild command in `apps/cli/src/commands/rebuild.ts`
-- [X] T041 [US3] Add SQLite corruption/missing doctor probe in `packages/core/src/doctor/setup-doctor.ts`
-- [X] T042 [US3] Update backup/restore to use SQLite canonical source in `packages/core/src/recovery/backup.ts` and `packages/core/src/recovery/restore.ts`
+- [x] T036 [US3] Implement JSON-to-SQLite migration service in `packages/core/src/readiness/json-state-migration.ts`
+- [x] T037 [US3] Replace file work repository wiring with SQLite repositories in `apps/cli/src/work-runtime.ts`
+- [x] T038 [US3] Replace file work repository wiring with SQLite repositories in `apps/server/src/runtime.ts`
+- [x] T039 [US3] Replace file work repository wiring with SQLite repositories in `apps/tui/src/main.ts`
+- [x] T040 [US3] Add JSON mirror rebuild command in `apps/cli/src/commands/rebuild.ts`
+- [x] T041 [US3] Add SQLite corruption/missing doctor probe in `packages/core/src/doctor/setup-doctor.ts`
+- [x] T042 [US3] Update backup/restore to use SQLite canonical source in `packages/core/src/recovery/backup.ts` and `packages/core/src/recovery/restore.ts`
 
 ## Phase 6: User Story 4 - Complete Doctor Capability Matrix (Priority: P1)
 
@@ -96,18 +96,18 @@
 
 ### Tests And Validation for User Story 4
 
-- [X] T043 [P] [US4] Add full doctor matrix contract test in `tests/contract/doctor-capability-matrix.test.ts`
-- [X] T044 [P] [US4] Add PATH/env fixture integration test in `tests/integration/doctor-fixtures.test.ts`
-- [X] T045 [P] [US4] Add project doctor MCP/config readiness test in `tests/integration/project-doctor-readiness.test.ts`
+- [x] T043 [P] [US4] Add full doctor matrix contract test in `tests/contract/doctor-capability-matrix.test.ts`
+- [x] T044 [P] [US4] Add PATH/env fixture integration test in `tests/integration/doctor-fixtures.test.ts`
+- [x] T045 [P] [US4] Add project doctor MCP/config readiness test in `tests/integration/project-doctor-readiness.test.ts`
 
 ### Implementation for User Story 4
 
-- [X] T046 [US4] Implement capability probe registry in `packages/core/src/doctor/capability-probes.ts`
-- [X] T047 [US4] Add probes for `fd`, `ast-grep`, Aider, Repomix, memsearch, Engram, quality gates, event log, git worktree, and project configs in `packages/core/src/doctor/capability-probes.ts`
-- [X] T048 [US4] Add quick/deep doctor modes in `apps/cli/src/main.ts`
-- [X] T049 [US4] Add project doctor output parity in `apps/cli/src/main.ts` and `apps/server/src/routes/doctor.ts`
-- [X] T050 [US4] Add cockpit doctor matrix display in `apps/cockpit/src/routes/doctor.tsx`
-- [X] T051 [US4] Add doctor matrix docs in `docs/operator-guide.md`
+- [x] T046 [US4] Implement capability probe registry in `packages/core/src/doctor/capability-probes.ts`
+- [x] T047 [US4] Add probes for `fd`, `ast-grep`, Aider, Repomix, memsearch, Engram, quality gates, event log, git worktree, and project configs in `packages/core/src/doctor/capability-probes.ts`
+- [x] T048 [US4] Add quick/deep doctor modes in `apps/cli/src/main.ts`
+- [x] T049 [US4] Add project doctor output parity in `apps/cli/src/main.ts` and `apps/server/src/routes/doctor.ts`
+- [x] T050 [US4] Add cockpit doctor matrix display in `apps/cockpit/src/routes/doctor.tsx`
+- [x] T051 [US4] Add doctor matrix docs in `docs/operator-guide.md`
 
 ## Phase 7: User Story 5 - Real CLI Agent Acceptance (Priority: P1)
 
@@ -160,19 +160,19 @@
 
 ### Tests And Validation for User Story 7
 
-- [X] T071 [P] [US7] Add cockpit owned workflow Playwright test in `tests/e2e/cockpit-owned-workflow.spec.ts`
-- [X] T072 [P] [US7] Add cockpit policy/review/merge readiness test in `tests/e2e/cockpit-review-readiness.spec.ts`
-- [X] T073 [P] [US7] Add cockpit accessibility and non-color status test in `tests/e2e/cockpit-accessibility-full.spec.ts`
+- [x] T071 [P] [US7] Add cockpit owned workflow Playwright test in `tests/e2e/cockpit-owned-workflow.spec.ts`
+- [x] T072 [P] [US7] Add cockpit policy/review/merge readiness test in `tests/e2e/cockpit-review-readiness.spec.ts`
+- [x] T073 [P] [US7] Add cockpit accessibility and non-color status test in `tests/e2e/cockpit-accessibility-full.spec.ts`
 
 ### Implementation for User Story 7
 
-- [X] T074 [US7] Add cockpit task creation and transition controls in `apps/cockpit/src/routes/project-board.tsx`
-- [X] T075 [US7] Add cockpit run start/cancel/tail controls in `apps/cockpit/src/routes/run-detail.tsx`
-- [X] T076 [US7] Add cockpit review and merge queue route in `apps/cockpit/src/routes/review-queue.tsx`
-- [X] T077 [US7] Add cockpit policy approval controls in `apps/cockpit/src/routes/policy-approvals.tsx`
-- [X] T078 [US7] Add cockpit recovery/rebuild/export controls in `apps/cockpit/src/routes/recovery.tsx`
-- [X] T079 [US7] Add live activity event subscription/polling parity in `apps/cockpit/src/components/live-activity.tsx`
-- [X] T080 [US7] Add cockpit navigation entries for compliance and release evidence in `apps/cockpit/src/App.tsx`
+- [x] T074 [US7] Add cockpit task creation and transition controls in `apps/cockpit/src/routes/project-board.tsx`
+- [x] T075 [US7] Add cockpit run start/cancel/tail controls in `apps/cockpit/src/routes/run-detail.tsx`
+- [x] T076 [US7] Add cockpit review and merge queue route in `apps/cockpit/src/routes/review-queue.tsx`
+- [x] T077 [US7] Add cockpit policy approval controls in `apps/cockpit/src/routes/policy-approvals.tsx`
+- [x] T078 [US7] Add cockpit recovery/rebuild/export controls in `apps/cockpit/src/routes/recovery.tsx`
+- [x] T079 [US7] Add live activity event subscription/polling parity in `apps/cockpit/src/components/live-activity.tsx`
+- [x] T080 [US7] Add cockpit navigation entries for compliance and release evidence in `apps/cockpit/src/App.tsx`
 
 ## Phase 10: User Story 8 - Incremental Graph And Cache Correctness (Priority: P1)
 
@@ -204,19 +204,19 @@
 
 ### Tests And Validation for User Story 9
 
-- [X] T091 [P] [US9] Add release readiness contract test in `tests/contract/release-readiness-contract.test.ts`
-- [X] T092 [P] [US9] Add local-only release validation e2e script in `tests/e2e/quickstart/release-readiness.sh`
-- [X] T093 [P] [US9] Add evidence pack redaction/privacy test in `tests/privacy/release-evidence-redaction.test.ts`
+- [x] T091 [P] [US9] Add release readiness contract test in `tests/contract/release-readiness-contract.test.ts`
+- [x] T092 [P] [US9] Add local-only release validation e2e script in `tests/e2e/quickstart/release-readiness.sh`
+- [x] T093 [P] [US9] Add evidence pack redaction/privacy test in `tests/privacy/release-evidence-redaction.test.ts`
 
 ### Implementation for User Story 9
 
-- [X] T094 [US9] Implement release validation orchestrator in `packages/core/src/readiness/release-validator.ts`
-- [X] T095 [US9] Implement release CLI command in `apps/cli/src/commands/release.ts`
-- [X] T096 [US9] Add release API route in `apps/server/src/routes/release.ts`
-- [X] T097 [US9] Add release evidence cockpit view in `apps/cockpit/src/routes/release.tsx`
-- [X] T098 [US9] Add release evidence artifact writer in `packages/core/src/readiness/evidence-writer.ts`
-- [X] T099 [US9] Add final operator guide path in `docs/operator-guide.md`
-- [X] T100 [US9] Add release checklist update in `docs/release-checklist.md`
+- [x] T094 [US9] Implement release validation orchestrator in `packages/core/src/readiness/release-validator.ts`
+- [x] T095 [US9] Implement release CLI command in `apps/cli/src/commands/release.ts`
+- [x] T096 [US9] Add release API route in `apps/server/src/routes/release.ts`
+- [x] T097 [US9] Add release evidence cockpit view in `apps/cockpit/src/routes/release.tsx`
+- [x] T098 [US9] Add release evidence artifact writer in `packages/core/src/readiness/evidence-writer.ts`
+- [x] T099 [US9] Add final operator guide path in `docs/operator-guide.md`
+- [x] T100 [US9] Add release checklist update in `docs/release-checklist.md`
 
 ## Phase 12: Polish And Cross-Cutting Validation
 

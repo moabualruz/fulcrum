@@ -1,4 +1,6 @@
 import { execa } from "execa";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import {
   AgentCertificationSchema,
   makeId,
@@ -51,8 +53,12 @@ export class AgentCertificationService {
     );
     const now = new Date().toISOString();
     const certifications = availability.map(({ profile, version }) => {
-      const evidence = input.acceptanceEvidence?.filter((item) => item.agentId === profile.agentId) ?? [];
-      const passed = evidence.some((item) => item.status === "passed");
+      const evidence =
+        input.acceptanceEvidence?.filter((item) => item.agentId === profile.agentId) ?? [];
+      const passed = evidence.some(
+        (item) =>
+          item.status === "passed" && evidenceFileConfirmsPassed(item.evidenceRef, input.cwd)
+      );
       const guided = !version || evidence.some((item) => item.status === "guided");
       return AgentCertificationSchema.parse({
         agentId: profile.agentId,
@@ -73,7 +79,9 @@ export class AgentCertificationService {
         schemaVersion: SCHEMA_VERSION
       });
     });
-    const realAgentCount = certifications.filter((certification) => certification.status === "certified").length;
+    const realAgentCount = certifications.filter(
+      (certification) => certification.status === "certified"
+    ).length;
     return {
       requiredRealAgentCount,
       realAgentCount,
@@ -84,22 +92,57 @@ export class AgentCertificationService {
         .filter((certification) => certification.status !== "certified")
         .map((certification) => {
           const profile = this.profiles.find((item) => item.agentId === certification.agentId);
-          return profile?.installHints[0] ?? `Configure ${certification.command} and rerun release agent acceptance.`;
+          return (
+            profile?.installHints[0] ??
+            `Configure ${certification.command} and rerun release agent acceptance.`
+          );
         })
     };
   }
 
-  recordEvidenceAsRunArtifact(input: { runId: string; agentId: string; evidenceRef: string }): string {
+  recordEvidenceAsRunArtifact(input: {
+    runId: string;
+    agentId: string;
+    evidenceRef: string;
+  }): string {
     return makeId("art", `${input.runId}-${input.agentId}-${input.evidenceRef}`);
   }
 
-  private async detectVersion(profile: AgentCertificationProfile, cwd: string): Promise<string | undefined> {
+  private async detectVersion(
+    profile: AgentCertificationProfile,
+    cwd: string
+  ): Promise<string | undefined> {
     try {
-      const result = await execa(profile.command, profile.versionArgs, { cwd, timeout: 5_000, reject: false });
+      const result = await execa(profile.command, profile.versionArgs, {
+        cwd,
+        timeout: 5_000,
+        reject: false
+      });
       const output = `${result.stdout}\n${result.stderr}`.trim();
       return output || (result.exitCode === 0 ? "detected" : undefined);
     } catch {
       return undefined;
     }
   }
+}
+
+function evidenceFileConfirmsPassed(evidenceRef: string, cwd: string): boolean {
+  const filePath = path.isAbsolute(evidenceRef) ? evidenceRef : path.join(cwd, evidenceRef);
+  if (!existsSync(filePath)) return false;
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, "utf8")) as unknown;
+    return jsonContainsPassedResult(parsed);
+  } catch {
+    return false;
+  }
+}
+
+function jsonContainsPassedResult(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some((entry) => jsonContainsPassedResult(entry));
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  if (record.status === "passed") return true;
+  if (record.result && jsonContainsPassedResult(record.result)) return true;
+  if (record.run && jsonContainsPassedResult(record.run)) return true;
+  return false;
 }

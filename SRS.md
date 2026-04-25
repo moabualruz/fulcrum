@@ -1,9 +1,15 @@
 # Fulcrum CLI Agent OS
+
 # Software Requirements Specification + Technical Design
+
 # Version: 0.1.0
+
 # Date: 2026-04-24
+
 # Status: Product/architecture SRS draft
+
 # Authoring basis: Conversation requirements + current public tool research
+
 # Primary goal: Maximum leverage, minimum custom code, local-first operator control
 
 ---
@@ -44,20 +50,20 @@ local agent control layer
   + code context and validation pipeline
   + supervised multi-agent run tracker
   + worktree delivery and review queue
-````
+```
 
 Fulcrum should let a single operator:
 
-* see work across projects;
-* select or create work items;
-* build explainable context for an agent;
-* allocate safe isolated worktrees;
-* launch and supervise CLI agents;
-* capture run output, artifacts, diffs, test results, and decisions;
-* write summaries back to Plane;
-* persist useful memory in markdown;
-* preserve local state;
-* avoid custom heavyweight graph/RAG systems unless they prove necessary.
+- see work across projects;
+- select or create work items;
+- build explainable context for an agent;
+- allocate safe isolated worktrees;
+- launch and supervise CLI agents;
+- capture run output, artifacts, diffs, test results, and decisions;
+- write summaries back to Plane;
+- persist useful memory in markdown;
+- preserve local state;
+- avoid custom heavyweight graph/RAG systems unless they prove necessary.
 
 ---
 
@@ -69,12 +75,12 @@ Fulcrum must run on a developer machine.
 
 Local-first means:
 
-* Core workflows work without cloud dependencies.
-* No remote telemetry by default.
-* No remote model calls by default unless user configures agent/model.
-* Local state is inspectable, exportable, backup-able, and purgeable.
-* Remote integrations are optional, visible, and replaceable.
-* Missing optional integrations degrade clearly.
+- Core workflows work without cloud dependencies.
+- No remote telemetry by default.
+- No remote model calls by default unless user configures agent/model.
+- Local state is inspectable, exportable, backup-able, and purgeable.
+- Remote integrations are optional, visible, and replaceable.
+- Missing optional integrations degrade clearly.
 
 ### 2.2 Minimum custom code
 
@@ -82,37 +88,37 @@ Fulcrum should integrate mature open-source tools where possible.
 
 Custom Fulcrum code should focus on:
 
-* local canonical run state;
-* worktree lifecycle;
-* context pack assembly;
-* agent launch/supervision wrappers;
-* artifact capture;
-* doctor/health status;
-* policy/safety checks;
-* integration sync/writeback.
+- local canonical run state;
+- worktree lifecycle;
+- context pack assembly;
+- agent launch/supervision wrappers;
+- artifact capture;
+- doctor/health status;
+- policy/safety checks;
+- integration sync/writeback.
 
 Fulcrum should avoid building:
 
-* custom PM UI in v0;
-* custom vector database;
-* custom graph database;
-* custom code search engine;
-* custom LSP replacement;
-* custom agent framework;
-* custom hosted orchestration platform.
+- custom PM UI in v0;
+- custom vector database;
+- custom graph database;
+- custom code search engine;
+- custom LSP replacement;
+- custom agent framework;
+- custom hosted orchestration platform.
 
 ### 2.3 Explainability over magic
 
 Every meaningful output should show:
 
-* source;
-* tool used;
-* timestamp;
-* command/query;
-* inclusion reason;
-* freshness;
-* confidence or limitation;
-* linked task/run/artifact when relevant.
+- source;
+- tool used;
+- timestamp;
+- command/query;
+- inclusion reason;
+- freshness;
+- confidence or limitation;
+- linked task/run/artifact when relevant.
 
 ### 2.4 Quality gates over always-on LSP
 
@@ -120,12 +126,12 @@ For agents, especially with Rust and large workspaces, always-on LSP can be too 
 
 Fulcrum should prefer:
 
-* exact search;
-* structural search;
-* repo maps;
-* repo packs;
-* targeted build/test/lint commands;
-* quality gate evidence.
+- exact search;
+- structural search;
+- repo maps;
+- repo packs;
+- targeted build/test/lint commands;
+- quality gate evidence.
 
 LSP may be optional per project, disabled by default for heavy workspaces.
 
@@ -137,12 +143,12 @@ LSP may be optional per project, disabled by default for heavy workspaces.
 
 One developer/operator who:
 
-* works across multiple repositories;
-* uses CLI agents such as Codex, Claude Code, Gemini CLI, OpenCode, Copilot CLI, Aider, Goose, OpenHands, Plandex, or similar;
-* wants local control over agent work;
-* wants visibility into what agents are doing;
-* wants useful memory and code context without maintaining a custom RAG/graph system;
-* wants Plane or another PM system as a cockpit but does not want PM software to own execution truth.
+- works across multiple repositories;
+- uses CLI agents such as Codex, Claude Code, Gemini CLI, OpenCode, Copilot CLI, Aider, Goose, OpenHands, Plandex, or similar;
+- wants local control over agent work;
+- wants visibility into what agents are doing;
+- wants useful memory and code context without maintaining a custom RAG/graph system;
+- wants Plane or another PM system as a cockpit but does not want PM software to own execution truth.
 
 ### 3.2 Agent users
 
@@ -150,28 +156,28 @@ Agents are also first-class users of Fulcrum.
 
 Agent users need:
 
-* task details;
-* context packs;
-* memory search;
-* code search;
-* artifact attach;
-* run heartbeat/event tools;
-* policy checks;
-* quality-gate commands;
-* writeback instructions.
+- task details;
+- context packs;
+- memory search;
+- code search;
+- artifact attach;
+- run heartbeat/event tools;
+- policy checks;
+- quality-gate commands;
+- writeback instructions.
 
 ### 3.3 Non-target users for v0
 
 Fulcrum v0 is not designed for:
 
-* large teams;
-* SaaS multi-tenancy;
-* enterprise administration;
-* cloud-only agent execution;
-* plugin marketplace;
-* full PM replacement;
-* hosted GitHub Agent HQ clone;
-* autonomous swarm orchestration without operator supervision.
+- large teams;
+- SaaS multi-tenancy;
+- enterprise administration;
+- cloud-only agent execution;
+- plugin marketplace;
+- full PM replacement;
+- hosted GitHub Agent HQ clone;
+- autonomous swarm orchestration without operator supervision.
 
 ---
 
@@ -239,12 +245,12 @@ A graph DB is not required to link memories and files.
 
 Fulcrum v0 should use:
 
-* markdown frontmatter;
-* stable IDs;
-* `refs` table;
-* links between tasks, runs, artifacts, files, symbols, and memory notes;
-* memory backend search;
-* code search evidence.
+- markdown frontmatter;
+- stable IDs;
+- `refs` table;
+- links between tasks, runs, artifacts, files, symbols, and memory notes;
+- memory backend search;
+- code search evidence.
 
 Only introduce graph DB if simple refs cannot answer real operational questions.
 
@@ -254,10 +260,10 @@ LSP is not rejected; it is optional.
 
 Default is off because:
 
-* some language servers consume large memory;
-* agents need validation more than autocomplete;
-* exact/structural search plus tests are often more reliable;
-* quality gates provide proof.
+- some language servers consume large memory;
+- agents need validation more than autocomplete;
+- exact/structural search plus tests are often more reliable;
+- quality gates provide proof.
 
 LSP can be enabled per project only if doctor confirms it is healthy and not memory-dangerous.
 
@@ -273,36 +279,36 @@ Recommendation: DEFAULT
 
 Pros:
 
-* open-source PM platform;
-* issues/tasks, cycles, modules, docs, triage;
-* self-hostable;
-* API surface;
-* official MCP server;
-* good cockpit candidate for humans and agents.
+- open-source PM platform;
+- issues/tasks, cycles, modules, docs, triage;
+- self-hostable;
+- API surface;
+- official MCP server;
+- good cockpit candidate for humans and agents.
 
 Cons:
 
-* heavier than a local CLI task file;
-* must not become Fulcrum execution truth;
-* self-hosting adds operational overhead;
-* AGPL license considerations if bundling/distributing modifications.
+- heavier than a local CLI task file;
+- must not become Fulcrum execution truth;
+- self-hosting adds operational overhead;
+- AGPL license considerations if bundling/distributing modifications.
 
 Use for:
 
-* projects;
-* work items;
-* docs;
-* issue status;
-* human planning;
-* agent-visible PM context.
+- projects;
+- work items;
+- docs;
+- issue status;
+- human planning;
+- agent-visible PM context.
 
 Do not use for:
 
-* local run execution truth;
-* worktree lifecycle;
-* context-pack internals;
-* artifact storage;
-* safety policy.
+- local run execution truth;
+- worktree lifecycle;
+- context-pack internals;
+- artifact storage;
+- safety policy.
 
 #### Option B: Taskwarrior
 
@@ -310,22 +316,22 @@ Recommendation: FALLBACK / minimal mode
 
 Pros:
 
-* local CLI;
-* JSON export;
-* simple;
-* mature;
-* low infra.
+- local CLI;
+- JSON export;
+- simple;
+- mature;
+- low infra.
 
 Cons:
 
-* no rich PM cockpit;
-* not agent-run-native;
-* docs/triage/cycles are limited compared with Plane.
+- no rich PM cockpit;
+- not agent-run-native;
+- docs/triage/cycles are limited compared with Plane.
 
 Use when:
 
-* user refuses PM server;
-* terminal-only mode is desired.
+- user refuses PM server;
+- terminal-only mode is desired.
 
 #### Option C: OpenProject
 
@@ -333,16 +339,16 @@ Recommendation: OPTIONAL heavier PM alternative
 
 Pros:
 
-* mature open-source PM;
-* enterprise-grade project management;
-* task/work-package model;
-* self-hosted.
+- mature open-source PM;
+- enterprise-grade project management;
+- task/work-package model;
+- self-hosted.
 
 Cons:
 
-* heavier than Plane for this use case;
-* less agent-native;
-* likely more custom adapter work.
+- heavier than Plane for this use case;
+- less agent-native;
+- likely more custom adapter work.
 
 #### Option D: Huly
 
@@ -350,14 +356,14 @@ Recommendation: WATCH / optional alternative
 
 Pros:
 
-* all-in-one project/process/knowledge platform;
-* self-hosted path;
-* modern UI.
+- all-in-one project/process/knowledge platform;
+- self-hosted path;
+- modern UI.
 
 Cons:
 
-* heavier and broader than Fulcrum needs;
-* adapter maturity uncertain compared with Plane MCP/API path.
+- heavier and broader than Fulcrum needs;
+- adapter maturity uncertain compared with Plane MCP/API path.
 
 ### 5.2 Memory
 
@@ -367,27 +373,27 @@ Recommendation: DEFAULT
 
 Pros:
 
-* markdown-first;
-* cross-agent memory target;
-* designed around coding agents;
-* source of truth remains editable markdown;
-* index is rebuildable;
-* fits local-first and minimum-custom-code principle.
+- markdown-first;
+- cross-agent memory target;
+- designed around coding agents;
+- source of truth remains editable markdown;
+- index is rebuildable;
+- fits local-first and minimum-custom-code principle.
 
 Cons:
 
-* newer;
-* Milvus/vector layer may add moving parts;
-* still requires Fulcrum to manage run/task/worktree semantics.
+- newer;
+- Milvus/vector layer may add moving parts;
+- still requires Fulcrum to manage run/task/worktree semantics.
 
 Use for:
 
-* durable memory notes;
-* cross-agent recall;
-* project decisions;
-* lessons learned;
-* session handoffs;
-* memory-to-file links via markdown frontmatter.
+- durable memory notes;
+- cross-agent recall;
+- project decisions;
+- lessons learned;
+- session handoffs;
+- memory-to-file links via markdown frontmatter.
 
 #### Option B: Engram
 
@@ -395,22 +401,22 @@ Recommendation: SIMPLE FALLBACK
 
 Pros:
 
-* local SQLite + FTS5;
-* MCP server;
-* HTTP API;
-* CLI and TUI;
-* simple infra.
+- local SQLite + FTS5;
+- MCP server;
+- HTTP API;
+- CLI and TUI;
+- simple infra.
 
 Cons:
 
-* less markdown-first by default;
-* may require wrapper/export to align with Fulcrum memory files;
-* less specialized for cross-agent coding memory.
+- less markdown-first by default;
+- may require wrapper/export to align with Fulcrum memory files;
+- less specialized for cross-agent coding memory.
 
 Use when:
 
-* user wants no vector infra;
-* simple local full-text memory is enough.
+- user wants no vector infra;
+- simple local full-text memory is enough.
 
 #### Option C: Mem0
 
@@ -418,20 +424,20 @@ Recommendation: OPTIONAL mature/general memory
 
 Pros:
 
-* mature general agent memory ecosystem;
-* strong personalization/long-term memory story;
-* useful for user preferences and application memory.
+- mature general agent memory ecosystem;
+- strong personalization/long-term memory story;
+- useful for user preferences and application memory.
 
 Cons:
 
-* not naturally markdown-first;
-* can become opaque;
-* more infra;
-* less directly aligned with local coding-agent memory.
+- not naturally markdown-first;
+- can become opaque;
+- more infra;
+- less directly aligned with local coding-agent memory.
 
 Use when:
 
-* automatic extraction/personalization matters more than local markdown ownership.
+- automatic extraction/personalization matters more than local markdown ownership.
 
 #### Option D: Redis Agent Memory Server / mcp-memory-service / agentmemory
 
@@ -439,14 +445,14 @@ Recommendation: EVALUATE, not default
 
 Pros:
 
-* MCP/REST shared memory patterns;
-* useful for multi-agent pipelines.
+- MCP/REST shared memory patterns;
+- useful for multi-agent pipelines.
 
 Cons:
 
-* may add infrastructure;
-* may be less aligned with markdown source of truth;
-* uncertain maturity relative to Fulcrum needs.
+- may add infrastructure;
+- may be less aligned with markdown source of truth;
+- uncertain maturity relative to Fulcrum needs.
 
 ### 5.3 Code context and search
 
@@ -456,15 +462,15 @@ Recommendation: DEFAULT
 
 Pros:
 
-* fast;
-* respects ignore rules by default;
-* exact identifier/error/string search;
-* easy provenance.
+- fast;
+- respects ignore rules by default;
+- exact identifier/error/string search;
+- easy provenance.
 
 Cons:
 
-* needs query terms;
-* weak for conceptual search.
+- needs query terms;
+- weak for conceptual search.
 
 #### File discovery: fd
 
@@ -472,13 +478,13 @@ Recommendation: DEFAULT
 
 Pros:
 
-* fast;
-* user-friendly file search;
-* good replacement for complex find commands.
+- fast;
+- user-friendly file search;
+- good replacement for complex find commands.
 
 Cons:
 
-* not a semantic code tool.
+- not a semantic code tool.
 
 #### Structural search: ast-grep
 
@@ -486,15 +492,15 @@ Recommendation: DEFAULT
 
 Pros:
 
-* AST-based structural search/replace;
-* lighter than LSP;
-* good for patterns and refactors;
-* useful for agent-generated precise searches.
+- AST-based structural search/replace;
+- lighter than LSP;
+- good for patterns and refactors;
+- useful for agent-generated precise searches.
 
 Cons:
 
-* pattern syntax requires learning;
-* language coverage varies.
+- pattern syntax requires learning;
+- language coverage varies.
 
 #### Repo map: Aider
 
@@ -502,16 +508,16 @@ Recommendation: DEFAULT
 
 Pros:
 
-* concise whole-repo map;
-* symbols/functions/classes/call signatures;
-* useful for context budget;
-* reduces need for custom symbol index.
+- concise whole-repo map;
+- symbols/functions/classes/call signatures;
+- useful for context budget;
+- reduces need for custom symbol index.
 
 Cons:
 
-* not proof of correctness;
-* may not capture runtime behavior;
-* should be refreshed.
+- not proof of correctness;
+- may not capture runtime behavior;
+- should be refreshed.
 
 #### Repo pack: Repomix
 
@@ -519,15 +525,15 @@ Recommendation: DEFAULT ON DEMAND
 
 Pros:
 
-* packages repo into AI-friendly output;
-* useful for review/refactor/research;
-* easy to feed across many agents.
+- packages repo into AI-friendly output;
+- useful for review/refactor/research;
+- easy to feed across many agents.
 
 Cons:
 
-* can be too large;
-* must honor ignore/secrets rules;
-* not needed for every run.
+- can be too large;
+- must honor ignore/secrets rules;
+- not needed for every run.
 
 #### Static/security analysis: Semgrep
 
@@ -535,15 +541,15 @@ Recommendation: OPTIONAL QUALITY GATE
 
 Pros:
 
-* lightweight static analysis;
-* supports many languages;
-* CLI-friendly;
-* can enforce standards.
+- lightweight static analysis;
+- supports many languages;
+- CLI-friendly;
+- can enforce standards.
 
 Cons:
 
-* rule tuning required;
-* false positives possible.
+- rule tuning required;
+- false positives possible.
 
 #### Semantic/security analysis: CodeQL
 
@@ -551,15 +557,15 @@ Recommendation: OPTIONAL QUALITY GATE
 
 Pros:
 
-* strong security analysis;
-* query code as data;
-* useful for vulnerability classes.
+- strong security analysis;
+- query code as data;
+- useful for vulnerability classes.
 
 Cons:
 
-* heavier;
-* setup per language/repo;
-* overkill for small v0 flows.
+- heavier;
+- setup per language/repo;
+- overkill for small v0 flows.
 
 #### LSP
 
@@ -567,14 +573,14 @@ Recommendation: OPTIONAL / DISABLED BY DEFAULT
 
 Pros:
 
-* definitions/references/types;
-* useful when healthy and cheap.
+- definitions/references/types;
+- useful when healthy and cheap.
 
 Cons:
 
-* memory-heavy for some languages/workspaces;
-* agents can over-trust it;
-* quality gates are more valuable for correctness.
+- memory-heavy for some languages/workspaces;
+- agents can over-trust it;
+- quality gates are more valuable for correctness.
 
 ### 5.4 Agent workers
 
@@ -582,75 +588,75 @@ Fulcrum should not replace agents. It should orchestrate them.
 
 Supported categories:
 
-* Codex CLI
-* Claude Code
-* Gemini CLI
-* OpenCode
-* GitHub Copilot CLI
-* Aider
-* Goose
-* OpenHands CLI/SDK
-* Plandex
-* generic shell command agent
+- Codex CLI
+- Claude Code
+- Gemini CLI
+- OpenCode
+- GitHub Copilot CLI
+- Aider
+- Goose
+- OpenHands CLI/SDK
+- Plandex
+- generic shell command agent
 
 #### Codex CLI
 
 Use via:
 
-* MCP config;
-* CLI wrapper;
-* AGENTS.md.
+- MCP config;
+- CLI wrapper;
+- AGENTS.md.
 
 #### Claude Code
 
 Use via:
 
-* MCP;
-* hooks;
-* CLAUDE.md;
-* auto memory awareness;
-* CLI wrapper.
+- MCP;
+- hooks;
+- CLAUDE.md;
+- auto memory awareness;
+- CLI wrapper.
 
 #### Gemini CLI
 
 Use via:
 
-* MCP settings;
-* CLI wrapper;
-* GEMINI.md or project instruction equivalent if used.
+- MCP settings;
+- CLI wrapper;
+- GEMINI.md or project instruction equivalent if used.
 
 #### OpenCode
 
 Use via:
 
-* MCP config;
-* agent configuration;
-* CLI wrapper.
+- MCP config;
+- agent configuration;
+- CLI wrapper.
 
 #### GitHub Copilot CLI
 
 Use via:
 
-* custom agents;
-* MCP where available;
-* hooks where available;
-* CLI wrapper.
+- custom agents;
+- MCP where available;
+- hooks where available;
+- CLI wrapper.
 
 #### Aider
 
 Use as:
 
-* worker agent;
-* repo map provider;
-* optional edit agent.
+- worker agent;
+- repo map provider;
+- optional edit agent.
 
 #### Goose / OpenHands / Plandex
 
 Use as optional workers for:
 
-* autonomous coding tasks;
-* large codebase planning;
-* alternate model/tool stacks.
+- autonomous coding tasks;
+- large codebase planning;
+- alternate model/tool stacks.
 
 Do not build agent-specific deep integration in v0 unless needed.
 
@@ -662,19 +668,19 @@ Recommendation: OPTIONAL
 
 Pros:
 
-* local process orchestration;
-* TUI;
-* logs;
-* can supervise non-containerized apps.
+- local process orchestration;
+- TUI;
+- logs;
+- can supervise non-containerized apps.
 
 Cons:
 
-* extra dependency;
-* Fulcrum still needs run state.
+- extra dependency;
+- Fulcrum still needs run state.
 
 Use for:
 
-* starting local Plane, memory server, Fulcrum MCP, workers.
+- starting local Plane, memory server, Fulcrum MCP, workers.
 
 #### tmux
 
@@ -682,14 +688,14 @@ Recommendation: OPTIONAL
 
 Pros:
 
-* persistent terminal sessions;
-* attach/detach;
-* battle-tested.
+- persistent terminal sessions;
+- attach/detach;
+- battle-tested.
 
 Cons:
 
-* scripting can be brittle;
-* per-agent output capture still needs wrappers.
+- scripting can be brittle;
+- per-agent output capture still needs wrappers.
 
 #### watchexec
 
@@ -697,12 +703,12 @@ Recommendation: OPTIONAL
 
 Pros:
 
-* run commands on file changes;
-* useful for test/watch modes.
+- run commands on file changes;
+- useful for test/watch modes.
 
 Cons:
 
-* not a run state engine.
+- not a run state engine.
 
 ---
 
@@ -712,61 +718,61 @@ Cons:
 
 Fulcrum owns:
 
-* project registry;
-* local links to Plane projects/work items;
-* local run records;
-* run lifecycle;
-* worktree allocation records;
-* artifact records;
-* context pack records;
-* quality gate results;
-* local event log;
-* policy decisions;
-* doctor/health checks;
-* adapter configuration;
-* sync/writeback records;
-* local backups/exports.
+- project registry;
+- local links to Plane projects/work items;
+- local run records;
+- run lifecycle;
+- worktree allocation records;
+- artifact records;
+- context pack records;
+- quality gate results;
+- local event log;
+- policy decisions;
+- doctor/health checks;
+- adapter configuration;
+- sync/writeback records;
+- local backups/exports.
 
 ### 6.2 Fulcrum does not own
 
 Fulcrum does not own:
 
-* PM board UI if Plane is configured;
-* memory index implementation;
-* vector DB internals;
-* code search engine internals;
-* agent reasoning;
-* Git itself;
-* language build tools;
-* remote model provider;
-* remote PM data.
+- PM board UI if Plane is configured;
+- memory index implementation;
+- vector DB internals;
+- code search engine internals;
+- agent reasoning;
+- Git itself;
+- language build tools;
+- remote model provider;
+- remote PM data.
 
 ### 6.3 Canonical truth split
 
 Plane is canonical for:
 
-* human project planning;
-* Plane issue title/status/description/comments/docs.
+- human project planning;
+- Plane issue title/status/description/comments/docs.
 
 memsearch/Engram is canonical for:
 
-* memory content, unless Fulcrum stores markdown directly and indexes through it.
+- memory content, unless Fulcrum stores markdown directly and indexes through it.
 
 Git is canonical for:
 
-* repository content;
-* branches;
-* commits;
-* worktree status.
+- repository content;
+- branches;
+- commits;
+- worktree status.
 
 Fulcrum is canonical for:
 
-* local run state;
-* context packs;
-* artifacts;
-* quality gate results;
-* worktree allocation metadata;
-* execution safety decisions.
+- local run state;
+- context packs;
+- artifacts;
+- quality gate results;
+- worktree allocation metadata;
+- execution safety decisions.
 
 ---
 
@@ -824,18 +830,18 @@ Fulcrum shall maintain a local registry of projects.
 
 Each project shall include:
 
-* Fulcrum project ID;
-* name;
-* root repo path;
-* default branch;
-* worktree base path;
-* Plane workspace/project mapping if configured;
-* memory path;
-* quality gate config;
-* ignored paths;
-* enabled tools;
-* disabled tools;
-* privacy mode.
+- Fulcrum project ID;
+- name;
+- root repo path;
+- default branch;
+- worktree base path;
+- Plane workspace/project mapping if configured;
+- memory path;
+- quality gate config;
+- ignored paths;
+- enabled tools;
+- disabled tools;
+- privacy mode.
 
 FR-PROJ-002:
 Fulcrum shall support adding a project from an existing Git repository.
@@ -843,21 +849,21 @@ Fulcrum shall support adding a project from an existing Git repository.
 FR-PROJ-003:
 Fulcrum shall detect whether a project has:
 
-* git repo;
-* Plane mapping;
-* memory backend;
-* AGENTS.md;
-* CLAUDE.md;
-* quality gate config;
-* worktree path;
-* required CLI tools.
+- git repo;
+- Plane mapping;
+- memory backend;
+- AGENTS.md;
+- CLAUDE.md;
+- quality gate config;
+- worktree path;
+- required CLI tools.
 
 FR-PROJ-004:
 Fulcrum shall expose project registry through:
 
-* CLI;
-* JSON;
-* MCP resource/tool.
+- CLI;
+- JSON;
+- MCP resource/tool.
 
 ### 8.2 Plane integration
 
@@ -896,13 +902,13 @@ Fulcrum shall support Plane docs/pages as memory sources if configured.
 FR-PLANE-008:
 Fulcrum shall show sync status:
 
-* never synced;
-* synced;
-* local newer;
-* remote newer;
-* conflict;
-* failed;
-* disabled.
+- never synced;
+- synced;
+- local newer;
+- remote newer;
+- conflict;
+- failed;
+- disabled.
 
 ### 8.3 Task model
 
@@ -911,26 +917,26 @@ Fulcrum shall maintain local task mirrors.
 
 Fields:
 
-* task_id;
-* external_source;
-* external_id;
-* project_id;
-* title;
-* description_snapshot;
-* status;
-* priority;
-* labels;
-* created_at;
-* updated_at;
-* source_updated_at;
-* local_updated_at;
-* blocked_reason;
-* assigned_agent;
-* current_run_id;
-* linked_memory_refs;
-* linked_artifacts;
-* linked_files;
-* linked_worktree.
+- task_id;
+- external_source;
+- external_id;
+- project_id;
+- title;
+- description_snapshot;
+- status;
+- priority;
+- labels;
+- created_at;
+- updated_at;
+- source_updated_at;
+- local_updated_at;
+- blocked_reason;
+- assigned_agent;
+- current_run_id;
+- linked_memory_refs;
+- linked_artifacts;
+- linked_files;
+- linked_worktree.
 
 FR-TASK-002:
 Fulcrum shall support local-only tasks if Plane is not configured.
@@ -966,26 +972,26 @@ Fulcrum shall create a run for each agent execution.
 
 Run fields:
 
-* run_id;
-* task_id;
-* project_id;
-* agent_name;
-* agent_command;
-* status;
-* created_at;
-* started_at;
-* ended_at;
-* worktree_id;
-* context_pack_id;
-* parent_run_id;
-* log_path;
-* transcript_path;
-* artifact_refs;
-* quality_gate_refs;
-* policy_decision_refs;
-* summary;
-* failure_reason;
-* exit_code.
+- run_id;
+- task_id;
+- project_id;
+- agent_name;
+- agent_command;
+- status;
+- created_at;
+- started_at;
+- ended_at;
+- worktree_id;
+- context_pack_id;
+- parent_run_id;
+- log_path;
+- transcript_path;
+- artifact_refs;
+- quality_gate_refs;
+- policy_decision_refs;
+- summary;
+- failure_reason;
+- exit_code.
 
 FR-RUN-002:
 Run statuses shall be:
@@ -1086,12 +1092,12 @@ Fulcrum shall launch any configured agent through a generic command wrapper.
 FR-AGENT-003:
 Fulcrum shall pass task/context information to agents by one of:
 
-* stdin prompt;
-* prompt file;
-* environment variables;
-* MCP tools;
-* agent-specific hook/config;
-* command-line argument.
+- stdin prompt;
+- prompt file;
+- environment variables;
+- MCP tools;
+- agent-specific hook/config;
+- command-line argument.
 
 FR-AGENT-004:
 Fulcrum shall not require deep vendor-specific integration for any agent.
@@ -1102,12 +1108,12 @@ Fulcrum shall record which context pack was given to each run.
 FR-AGENT-006:
 Fulcrum shall support agent role preferences:
 
-* planner;
-* implementer;
-* reviewer;
-* researcher;
-* tester;
-* documenter.
+- planner;
+- implementer;
+- reviewer;
+- researcher;
+- tester;
+- documenter.
 
 FR-AGENT-007:
 Fulcrum shall support disabling an agent per project.
@@ -1153,24 +1159,24 @@ Dangerous MCP tools shall require policy approval unless explicitly configured o
 
 Dangerous actions include:
 
-* deleting worktrees;
-* running arbitrary shell;
-* writing memory marked permanent;
-* modifying Plane status;
-* posting Plane comment;
-* merging branches;
-* cleaning untracked files.
+- deleting worktrees;
+- running arbitrary shell;
+- writing memory marked permanent;
+- modifying Plane status;
+- posting Plane comment;
+- merging branches;
+- cleaning untracked files.
 
 FR-MCP-005:
 All MCP calls shall be logged with:
 
-* tool name;
-* caller if known;
-* run ID if known;
-* parameters hash;
-* redacted parameters;
-* result summary;
-* timestamp.
+- tool name;
+- caller if known;
+- run ID if known;
+- parameters hash;
+- redacted parameters;
+- result summary;
+- timestamp.
 
 FR-MCP-006:
 MCP errors shall be machine-readable.
@@ -1248,16 +1254,16 @@ Session refresh errors must distinguish transient auth API failure from confirme
 FR-MEM-006:
 Memory search results shall include:
 
-* memory ID;
-* title;
-* content excerpt;
-* source file;
-* linked task/run/file refs;
-* freshness;
-* status;
-* search backend;
-* rank;
-* reason if available.
+- memory ID;
+- title;
+- content excerpt;
+- source file;
+- linked task/run/file refs;
+- freshness;
+- status;
+- search backend;
+- rank;
+- reason if available.
 
 FR-MEM-007:
 Fulcrum shall support memory writeback after run completion.
@@ -1306,21 +1312,21 @@ Fulcrum shall support Repomix repo pack generation.
 FR-CODE-006:
 Fulcrum shall cache repo maps and repo packs with:
 
-* tool version;
-* repo commit hash;
-* config hash;
-* generated_at;
-* path;
-* size;
-* included files count.
+- tool version;
+- repo commit hash;
+- config hash;
+- generated_at;
+- path;
+- size;
+- included files count.
 
 FR-CODE-007:
 Fulcrum shall invalidate cached context when:
 
-* repo HEAD changes;
-* working tree changes if pack includes dirty files;
-* ignore rules change;
-* config changes.
+- repo HEAD changes;
+- working tree changes if pack includes dirty files;
+- ignore rules change;
+- config changes.
 
 FR-CODE-008:
 Fulcrum shall classify code evidence as:
@@ -1352,13 +1358,13 @@ Fulcrum shall support project-level disabling of LSP.
 FR-CODE-012:
 Fulcrum shall record code-search provenance:
 
-* command;
-* query;
-* working directory;
-* result count;
-* ignored paths;
-* duration;
-* exit code.
+- command;
+- query;
+- working directory;
+- result count;
+- ignored paths;
+- duration;
+- exit code.
 
 FR-CODE-013:
 Fulcrum shall support source line references when tool output includes line numbers.
@@ -1429,10 +1435,10 @@ Example:
 FR-CTX-007:
 Context pack shall be exportable as:
 
-* markdown;
-* JSON;
-* agent prompt file;
-* machine-readable MCP resource.
+- markdown;
+- JSON;
+- agent prompt file;
+- machine-readable MCP resource.
 
 FR-CTX-008:
 Context pack shall be explainable.
@@ -1454,22 +1460,22 @@ Fulcrum shall allocate a worktree per run or per task, configurable.
 FR-WT-003:
 Worktree fields:
 
-* worktree_id;
-* project_id;
-* task_id;
-* run_id;
-* path;
-* branch;
-* base_branch;
-* base_commit;
-* status;
-* created_at;
-* last_checked_at;
-* dirty_status;
-* untracked_count;
-* conflict_status;
-* cleanup_allowed;
-* cleanup_block_reason.
+- worktree_id;
+- project_id;
+- task_id;
+- run_id;
+- path;
+- branch;
+- base_branch;
+- base_commit;
+- status;
+- created_at;
+- last_checked_at;
+- dirty_status;
+- untracked_count;
+- conflict_status;
+- cleanup_allowed;
+- cleanup_block_reason.
 
 FR-WT-004:
 Fulcrum shall never silently delete or overwrite user changes.
@@ -1477,14 +1483,14 @@ Fulcrum shall never silently delete or overwrite user changes.
 FR-WT-005:
 Before cleanup, Fulcrum shall check:
 
-* dirty files;
-* untracked files;
-* uncommitted changes;
-* unpushed commits;
-* branch merged status;
-* attached artifacts;
-* active runs;
-* operator approval.
+- dirty files;
+- untracked files;
+- uncommitted changes;
+- unpushed commits;
+- branch merged status;
+- attached artifacts;
+- active runs;
+- operator approval.
 
 FR-WT-006:
 Fulcrum shall support branch naming template.
@@ -1551,15 +1557,15 @@ quality_gates:
 FR-QG-002:
 Quality gate results shall include:
 
-* command;
-* working directory;
-* start/end time;
-* duration;
-* exit code;
-* stdout path;
-* stderr path;
-* parsed summary if available;
-* status.
+- command;
+- working directory;
+- start/end time;
+- duration;
+- exit code;
+- stdout path;
+- stderr path;
+- parsed summary if available;
+- status.
 
 Statuses:
 
@@ -1614,18 +1620,18 @@ other
 FR-ART-002:
 Artifact fields:
 
-* artifact_id;
-* run_id;
-* task_id;
-* project_id;
-* type;
-* path;
-* content_hash;
-* size_bytes;
-* created_at;
-* redaction_status;
-* summary;
-* linked_refs.
+- artifact_id;
+- run_id;
+- task_id;
+- project_id;
+- type;
+- path;
+- content_hash;
+- size_bytes;
+- created_at;
+- redaction_status;
+- summary;
+- linked_refs.
 
 FR-ART-003:
 Fulcrum shall support attaching artifacts to Plane writeback when configured.
@@ -1643,15 +1649,15 @@ Fulcrum shall require explicit operator approval for destructive actions unless 
 
 Destructive actions:
 
-* delete worktree;
-* reset branch;
-* clean untracked files;
-* remove memory;
-* purge backup;
-* merge branch;
-* run arbitrary shell from MCP;
-* post to remote PM;
-* call remote model/provider if privacy mode forbids it.
+- delete worktree;
+- reset branch;
+- clean untracked files;
+- remove memory;
+- purge backup;
+- merge branch;
+- run arbitrary shell from MCP;
+- post to remote PM;
+- call remote model/provider if privacy mode forbids it.
 
 FR-POL-002:
 Fulcrum shall expose policy checks to agents.
@@ -1661,16 +1667,16 @@ Fulcrum shall log policy decisions.
 
 Policy decision fields:
 
-* decision_id;
-* action;
-* subject;
-* requested_by;
-* run_id;
-* allowed;
-* reason;
-* approval_required;
-* approved_by;
-* approved_at.
+- decision_id;
+- action;
+- subject;
+- requested_by;
+- run_id;
+- allowed;
+- reason;
+- approval_required;
+- approved_by;
+- approved_at.
 
 FR-POL-004:
 Fulcrum shall support dry-run/preview.
@@ -1725,31 +1731,31 @@ unknown
 FR-DOC-003:
 Doctor shall check:
 
-* SQLite state path;
-* event log integrity;
-* Plane connectivity;
-* memory backend;
-* memsearch index status;
-* Engram status if used;
-* rg installed;
-* fd installed;
-* ast-grep installed;
-* aider installed;
-* repomix installed;
-* git installed;
-* git worktree support;
-* project repo status;
-* worktree base path;
-* quality gates;
-* agent commands;
-* MCP server config for agents;
-* Claude hooks if configured;
-* Copilot agent/MCP config if configured;
-* Gemini MCP config if configured;
-* OpenCode MCP config if configured;
-* ignored paths;
-* secret redaction config;
-* remote endpoint/privacy status.
+- SQLite state path;
+- event log integrity;
+- Plane connectivity;
+- memory backend;
+- memsearch index status;
+- Engram status if used;
+- rg installed;
+- fd installed;
+- ast-grep installed;
+- aider installed;
+- repomix installed;
+- git installed;
+- git worktree support;
+- project repo status;
+- worktree base path;
+- quality gates;
+- agent commands;
+- MCP server config for agents;
+- Claude hooks if configured;
+- Copilot agent/MCP config if configured;
+- Gemini MCP config if configured;
+- OpenCode MCP config if configured;
+- ignored paths;
+- secret redaction config;
+- remote endpoint/privacy status.
 
 FR-DOC-004:
 Doctor shall show exact next action.
@@ -1783,12 +1789,12 @@ Uninstall shall preserve backups unless user explicitly purges.
 FR-BACKUP-001:
 Fulcrum shall support backup of:
 
-* SQLite DB;
-* artifacts;
-* logs;
-* config;
-* memory markdown if managed by Fulcrum;
-* generated context packs if requested.
+- SQLite DB;
+- artifacts;
+- logs;
+- config;
+- memory markdown if managed by Fulcrum;
+- generated context packs if requested.
 
 FR-BACKUP-002:
 Fulcrum shall support restore.
@@ -1799,11 +1805,11 @@ Fulcrum shall support export to JSON/JSONL.
 FR-BACKUP-004:
 Fulcrum shall support rebuild of derived data:
 
-* projections;
-* repo map cache;
-* repomix cache;
-* memory index;
-* code refs.
+- projections;
+- repo map cache;
+- repomix cache;
+- memory index;
+- code refs.
 
 FR-BACKUP-005:
 Backup purge shall require explicit confirmation.
@@ -1817,14 +1823,14 @@ Backup purge shall require explicit confirmation.
 NFR-LOCAL-001:
 Core operations shall work without network:
 
-* list projects/tasks from local cache;
-* list runs;
-* inspect artifacts;
-* allocate worktree if repo local;
-* build context from local memory/code;
-* run local agents if configured;
-* run quality gates;
-* backup/export.
+- list projects/tasks from local cache;
+- list runs;
+- inspect artifacts;
+- allocate worktree if repo local;
+- build context from local memory/code;
+- run local agents if configured;
+- run quality gates;
+- backup/export.
 
 NFR-LOCAL-002:
 Remote dependencies shall be optional.
@@ -1851,19 +1857,19 @@ Projections shall be rebuildable from events.
 NFR-PERF-001:
 Common CLI commands shall return quickly:
 
-* project list: < 500ms from local cache;
-* task list: < 1s from local cache;
-* run status: < 500ms;
-* doctor quick: < 3s excluding optional deep checks.
+- project list: < 500ms from local cache;
+- task list: < 1s from local cache;
+- run status: < 500ms;
+- doctor quick: < 3s excluding optional deep checks.
 
 NFR-PERF-002:
 Heavy operations shall be explicit or async:
 
-* Repomix pack;
-* Aider repo map refresh;
-* Semgrep/CodeQL;
-* full test suite;
-* Plane full sync.
+- Repomix pack;
+- Aider repo map refresh;
+- Semgrep/CodeQL;
+- full test suite;
+- Plane full sync.
 
 NFR-PERF-003:
 LSP shall not be automatically started unless enabled.
@@ -2646,6 +2652,7 @@ Reason: architecture orientation
 ## Quality Gates
 
 Required:
+
 - cargo check --workspace
 - cargo test {{targeted}}
 - cargo clippy --workspace --all-targets -- -D warnings
@@ -2659,6 +2666,7 @@ Required:
 ## Required Writeback
 
 At end of run, produce:
+
 - summary
 - files changed
 - tests run
@@ -2729,9 +2737,7 @@ Agents should be encouraged to output:
 ```json
 {
   "summary": "...",
-  "files_changed": [
-    "src/auth/session.ts"
-  ],
+  "files_changed": ["src/auth/session.ts"],
   "commands_run": [
     {
       "command": "cargo check --workspace",
@@ -2940,93 +2946,93 @@ As an operator, I want to connect Fulcrum to Plane so that I can use Plane as my
 
 Acceptance:
 
-* `fulcrum plane connect` works.
-* `fulcrum plane import` imports projects/tasks.
-* Fulcrum can show linked Plane IDs.
+- `fulcrum plane connect` works.
+- `fulcrum plane import` imports projects/tasks.
+- Fulcrum can show linked Plane IDs.
 
 US-H-002:
 As an operator, I want to see all local runs so that I know what agents are doing.
 
 Acceptance:
 
-* `fulcrum run status` lists running/blocked/failed/completed runs.
-* Each run has agent, task, worktree, start time, status.
+- `fulcrum run status` lists running/blocked/failed/completed runs.
+- Each run has agent, task, worktree, start time, status.
 
 US-H-003:
 As an operator, I want each agent run in a separate worktree so that agents do not trample my main working directory.
 
 Acceptance:
 
-* Fulcrum creates git worktree.
-* Branch name is predictable.
-* Run prompt includes worktree path.
-* Cleanup is blocked if dirty/untracked files exist.
+- Fulcrum creates git worktree.
+- Branch name is predictable.
+- Run prompt includes worktree path.
+- Cleanup is blocked if dirty/untracked files exist.
 
 US-H-004:
 As an operator, I want context packs to include memory, code evidence, and task details so that agents do not start from zero.
 
 Acceptance:
 
-* Context pack includes Plane task.
-* Context pack includes memory results.
-* Context pack includes code search results.
-* Context pack includes Aider repo map excerpt when enabled.
+- Context pack includes Plane task.
+- Context pack includes memory results.
+- Context pack includes code search results.
+- Context pack includes Aider repo map excerpt when enabled.
 
 US-H-005:
 As an operator, I want to avoid maintaining graph DBs unless they add proven value.
 
 Acceptance:
 
-* Fulcrum v0 uses refs/frontmatter.
-* No graph database is required.
-* Memory-to-file links work through markdown and refs.
+- Fulcrum v0 uses refs/frontmatter.
+- No graph database is required.
+- Memory-to-file links work through markdown and refs.
 
 US-H-006:
 As an operator, I want quality gates to be the source of correctness instead of LSP.
 
 Acceptance:
 
-* Project config can disable LSP.
-* Context pack mentions LSP disabled.
-* Required quality gates are presented to agent.
-* Gate outputs are recorded.
+- Project config can disable LSP.
+- Context pack mentions LSP disabled.
+- Required quality gates are presented to agent.
+- Gate outputs are recorded.
 
 US-H-007:
 As an operator, I want the agent’s result written back to Plane.
 
 Acceptance:
 
-* Run summary can be posted to linked Plane issue.
-* Writeback is previewed or policy-approved.
-* Large logs are not dumped by default.
+- Run summary can be posted to linked Plane issue.
+- Writeback is previewed or policy-approved.
+- Large logs are not dumped by default.
 
 US-H-008:
 As an operator, I want useful memory updated after a run.
 
 Acceptance:
 
-* Fulcrum proposes memory update.
-* Operator can approve.
-* Memory file gets structured frontmatter.
-* Memory is searchable later.
+- Fulcrum proposes memory update.
+- Operator can approve.
+- Memory file gets structured frontmatter.
+- Memory is searchable later.
 
 US-H-009:
 As an operator, I want doctor to tell me what is installed and what is broken.
 
 Acceptance:
 
-* Doctor checks Plane, memory, tools, agents, worktree, quality gates.
-* Doctor includes exact next action.
-* Doctor supports JSON.
+- Doctor checks Plane, memory, tools, agents, worktree, quality gates.
+- Doctor includes exact next action.
+- Doctor supports JSON.
 
 US-H-010:
 As an operator, I want no hidden network calls.
 
 Acceptance:
 
-* Privacy status visible.
-* Remote services marked enabled/disabled.
-* `--local-only` blocks remote actions.
+- Privacy status visible.
+- Remote services marked enabled/disabled.
+- `--local-only` blocks remote actions.
 
 ### 16.2 Agent user stories
 
@@ -3035,64 +3041,64 @@ As an agent, I want to fetch my task details through Fulcrum MCP so that I know 
 
 Acceptance:
 
-* `fulcrum_task_get` returns task data.
-* Response includes external Plane source when linked.
+- `fulcrum_task_get` returns task data.
+- Response includes external Plane source when linked.
 
 US-A-002:
 As an agent, I want to build or receive a context pack so that I have relevant memory and code evidence.
 
 Acceptance:
 
-* `fulcrum_context_build` returns context path.
-* Context includes evidence and reasons.
+- `fulcrum_context_build` returns context path.
+- Context includes evidence and reasons.
 
 US-A-003:
 As an agent, I want to search memory so that I can reuse previous decisions and gotchas.
 
 Acceptance:
 
-* `fulcrum_memory_search` returns entries with refs and freshness.
+- `fulcrum_memory_search` returns entries with refs and freshness.
 
 US-A-004:
 As an agent, I want to search code exactly and structurally so that I can find files without relying on LSP.
 
 Acceptance:
 
-* `fulcrum_code_search` supports exact mode.
-* Structural search mode uses ast-grep if available.
-* Results include tool and reason.
+- `fulcrum_code_search` supports exact mode.
+- Structural search mode uses ast-grep if available.
+- Results include tool and reason.
 
 US-A-005:
 As an agent, I want to emit heartbeat/progress so that the operator sees I am alive.
 
 Acceptance:
 
-* `fulcrum_run_heartbeat` updates run.
-* Events show in tail/status.
+- `fulcrum_run_heartbeat` updates run.
+- Events show in tail/status.
 
 US-A-006:
 As an agent, I want to run quality gates through Fulcrum so that results are attached to the run.
 
 Acceptance:
 
-* `fulcrum_quality_gate_run` starts gate.
-* Result is stored and linked.
+- `fulcrum_quality_gate_run` starts gate.
+- Result is stored and linked.
 
 US-A-007:
 As an agent, I want to attach artifacts so that the operator can review what I produced.
 
 Acceptance:
 
-* `fulcrum_artifact_attach` stores metadata.
-* Artifact appears in run status.
+- `fulcrum_artifact_attach` stores metadata.
+- Artifact appears in run status.
 
 US-A-008:
 As an agent, I want policy checks before dangerous actions.
 
 Acceptance:
 
-* `fulcrum_policy_check` returns allowed/denied.
-* Destructive commands are blocked without approval.
+- `fulcrum_policy_check` returns allowed/denied.
+- Destructive commands are blocked without approval.
 
 ---
 
@@ -3195,9 +3201,9 @@ Fulcrum creates:
 
 Fulcrum shall provide:
 
-* CLI;
-* JSON output;
-* MCP server.
+- CLI;
+- JSON output;
+- MCP server.
 
 ### 18.2 v1 surfaces
 
@@ -3224,10 +3230,10 @@ Plane remains the human PM cockpit.
 
 Fulcrum should not duplicate:
 
-* full Kanban board;
-* cycles/modules UI;
-* docs editor;
-* triage inbox.
+- full Kanban board;
+- cycles/modules UI;
+- docs editor;
+- triage inbox.
 
 Fulcrum can add links or writebacks to Plane.
 
@@ -3250,9 +3256,9 @@ Fulcrum shall write local logs:
 
 Optional backends:
 
-* OpenTelemetry for vendor-neutral traces/logs/metrics.
-* Langfuse for LLM trace/eval workflows.
-* Helicone for LLM observability/gateway workflows.
+- OpenTelemetry for vendor-neutral traces/logs/metrics.
+- Langfuse for LLM trace/eval workflows.
+- Helicone for LLM observability/gateway workflows.
 
 These must be disabled by default.
 
@@ -3260,16 +3266,16 @@ These must be disabled by default.
 
 Each run trace should include:
 
-* run ID;
-* task ID;
-* agent;
-* command;
-* context pack;
-* worktree;
-* event timeline;
-* quality gates;
-* artifacts;
-* writeback status.
+- run ID;
+- task ID;
+- agent;
+- command;
+- context pack;
+- worktree;
+- event timeline;
+- quality gates;
+- artifacts;
+- writeback status.
 
 ---
 
@@ -3319,13 +3325,13 @@ Fulcrum shall treat MCP as powerful but risky.
 
 Controls:
 
-* loopback/stdio by default;
-* no public bind unless explicit;
-* command allowlist;
-* dangerous tool approval;
-* redacted logs;
-* per-agent tool permissions;
-* MCP doctor warnings.
+- loopback/stdio by default;
+- no public bind unless explicit;
+- command allowlist;
+- dangerous tool approval;
+- redacted logs;
+- per-agent tool permissions;
+- MCP doctor warnings.
 
 ### 20.4 Remote status
 
@@ -3350,20 +3356,20 @@ Basic local control layer.
 
 Must include:
 
-* SQLite state;
-* project registry;
-* local tasks;
-* run lifecycle;
-* git worktree allocation;
-* artifact/log capture;
-* doctor;
-* JSON output.
+- SQLite state;
+- project registry;
+- local tasks;
+- run lifecycle;
+- git worktree allocation;
+- artifact/log capture;
+- doctor;
+- JSON output.
 
 Must not include:
 
-* custom graph DB;
-* custom PM UI;
-* custom vector DB.
+- custom graph DB;
+- custom PM UI;
+- custom vector DB.
 
 ### 21.2 Useful Alpha
 
@@ -3372,15 +3378,15 @@ Real work loop with Plane and memory.
 
 Must include:
 
-* Plane import/link/writeback;
-* memsearch integration;
-* markdown memory;
-* code context with rg/fd/ast-grep;
-* Aider repo map;
-* Repomix on demand;
-* quality gates;
-* context pack builder;
-* Claude/Codex/Gemini/OpenCode wrapper support.
+- Plane import/link/writeback;
+- memsearch integration;
+- markdown memory;
+- code context with rg/fd/ast-grep;
+- Aider repo map;
+- Repomix on demand;
+- quality gates;
+- context pack builder;
+- Claude/Codex/Gemini/OpenCode wrapper support.
 
 ### 21.3 Agent Beta
 
@@ -3389,15 +3395,15 @@ Multi-agent operation and MCP.
 
 Must include:
 
-* Fulcrum MCP server;
-* Claude hooks integration;
-* Codex MCP config guide;
-* Gemini MCP config guide;
-* OpenCode MCP config guide;
-* Copilot custom agent/MCP guide;
-* agent roles;
-* run heartbeat;
-* review queue.
+- Fulcrum MCP server;
+- Claude hooks integration;
+- Codex MCP config guide;
+- Gemini MCP config guide;
+- OpenCode MCP config guide;
+- Copilot custom agent/MCP guide;
+- agent roles;
+- run heartbeat;
+- review queue.
 
 ### 21.4 Delivery Beta
 
@@ -3406,12 +3412,12 @@ Safe local delivery.
 
 Must include:
 
-* diff review;
-* cleanup safety;
-* merge queue local;
-* quality gate enforcement;
-* Plane status writeback;
-* memory writeback approval.
+- diff review;
+- cleanup safety;
+- merge queue local;
+- quality gate enforcement;
+- Plane status writeback;
+- memory writeback approval.
 
 ### 21.5 Release Candidate
 
@@ -3420,15 +3426,15 @@ Reliability and recovery.
 
 Must include:
 
-* backup/restore;
-* export/import;
-* rebuild projections;
-* rebuild memory index;
-* privacy audit;
-* secret redaction tests;
-* installer/uninstaller;
-* documentation;
-* integration test suite.
+- backup/restore;
+- export/import;
+- rebuild projections;
+- rebuild memory index;
+- privacy audit;
+- secret redaction tests;
+- installer/uninstaller;
+- documentation;
+- integration test suite.
 
 ---
 
@@ -3519,11 +3525,11 @@ Fulcrum should use a mock Plane adapter for tests.
 
 Mock Plane supports:
 
-* projects;
-* work items;
-* comments;
-* status updates;
-* failure simulation.
+- projects;
+- work items;
+- comments;
+- status updates;
+- failure simulation.
 
 ---
 
@@ -3533,31 +3539,31 @@ Mock Plane supports:
 
 Fulcrum is acceptable when:
 
-* operator can use Plane as PM cockpit;
-* Fulcrum imports tasks;
-* Fulcrum builds cited/explainable context;
-* Fulcrum launches at least two different CLI agents through wrapper;
-* Fulcrum allocates isolated worktrees;
-* Fulcrum captures outputs/artifacts;
-* Fulcrum runs quality gates;
-* Fulcrum writes summary back to Plane;
-* Fulcrum writes approved memory to markdown;
-* Fulcrum works without graph DB;
-* Fulcrum works without LSP;
-* Fulcrum doctor clearly reports health.
+- operator can use Plane as PM cockpit;
+- Fulcrum imports tasks;
+- Fulcrum builds cited/explainable context;
+- Fulcrum launches at least two different CLI agents through wrapper;
+- Fulcrum allocates isolated worktrees;
+- Fulcrum captures outputs/artifacts;
+- Fulcrum runs quality gates;
+- Fulcrum writes summary back to Plane;
+- Fulcrum writes approved memory to markdown;
+- Fulcrum works without graph DB;
+- Fulcrum works without LSP;
+- Fulcrum doctor clearly reports health.
 
 ### 23.2 Technical acceptance
 
 Fulcrum is technically acceptable when:
 
-* SQLite event/projection state survives restart;
-* invalid transitions are rejected;
-* one run cannot have multiple terminal states;
-* derived caches are rebuildable;
-* backup/restore works;
-* local-only mode blocks remote actions;
-* cleanup cannot delete dirty worktrees silently;
-* context pack includes provenance.
+- SQLite event/projection state survives restart;
+- invalid transitions are rejected;
+- one run cannot have multiple terminal states;
+- derived caches are rebuildable;
+- backup/restore works;
+- local-only mode blocks remote actions;
+- cleanup cannot delete dirty worktrees silently;
+- context pack includes provenance.
 
 ---
 
@@ -3567,74 +3573,74 @@ Fulcrum is technically acceptable when:
 
 Mitigation:
 
-* keep Fulcrum independent;
-* support Taskwarrior/local-only mode;
-* do not make Plane required for core local run state.
+- keep Fulcrum independent;
+- support Taskwarrior/local-only mode;
+- do not make Plane required for core local run state.
 
 ### RISK-002: memsearch is newer than desired
 
 Mitigation:
 
-* markdown remains source of truth;
-* support Engram fallback;
-* support grep fallback;
-* do not make vector index canonical.
+- markdown remains source of truth;
+- support Engram fallback;
+- support grep fallback;
+- do not make vector index canonical.
 
 ### RISK-003: MCP creates security exposure
 
 Mitigation:
 
-* loopback/stdio default;
-* policy gate dangerous tools;
-* allowlist tools;
-* log all calls;
-* never expose public network by default.
+- loopback/stdio default;
+- policy gate dangerous tools;
+- allowlist tools;
+- log all calls;
+- never expose public network by default.
 
 ### RISK-004: Agents ignore instructions
 
 Mitigation:
 
-* context pack includes explicit run contract;
-* quality gates verify;
-* hooks/wrappers capture state;
-* final response schema;
-* operator review queue.
+- context pack includes explicit run contract;
+- quality gates verify;
+- hooks/wrappers capture state;
+- final response schema;
+- operator review queue.
 
 ### RISK-005: LSP disabled reduces code intelligence
 
 Mitigation:
 
-* use rg/fd/ast-grep/Aider/Repomix;
-* enable LSP per project only if useful;
-* rely on tests and build.
+- use rg/fd/ast-grep/Aider/Repomix;
+- enable LSP per project only if useful;
+- rely on tests and build.
 
 ### RISK-006: Repomix leaks secrets
 
 Mitigation:
 
-* enforce ignore files;
-* redaction;
-* preview included files;
-* local-only path;
-* require confirmation for broad packs.
+- enforce ignore files;
+- redaction;
+- preview included files;
+- local-only path;
+- require confirmation for broad packs.
 
 ### RISK-007: Worktree cleanup deletes valuable work
 
 Mitigation:
 
-* explicit cleanup policy;
-* dirty/untracked/unmerged checks;
-* backup artifacts;
-* confirmation.
+- explicit cleanup policy;
+- dirty/untracked/unmerged checks;
+- backup artifacts;
+- confirmation.
 
 ### RISK-008: Too many tools cause choice paralysis
 
 Mitigation:
 
-* provide default stack;
-* doctor reports only actionable missing items;
-* optional tools disabled by default;
-* project templates.
+- provide default stack;
+- doctor reports only actionable missing items;
+- optional tools disabled by default;
+- project templates.
 
 ---
 
@@ -3684,13 +3690,13 @@ Only after three or more important queries cannot be solved with refs/frontmatte
 
 Build:
 
-* SQLite DB;
-* project add;
-* task create/list/show;
-* run create/start/complete;
-* worktree allocate;
-* logs/artifacts;
-* doctor basic.
+- SQLite DB;
+- project add;
+- task create/list/show;
+- run create/start/complete;
+- worktree allocate;
+- logs/artifacts;
+- doctor basic.
 
 Do not integrate Plane yet.
 
@@ -3698,44 +3704,44 @@ Do not integrate Plane yet.
 
 Add:
 
-* rg search;
-* fd search;
-* ast-grep search;
-* Aider repo map refresh/show;
-* Repomix on-demand pack;
-* context pack builder v0.
+- rg search;
+- fd search;
+- ast-grep search;
+- Aider repo map refresh/show;
+- Repomix on-demand pack;
+- context pack builder v0.
 
 ### Phase 2: Memory
 
 Add:
 
-* markdown memory directory;
-* memsearch integration;
-* grep fallback;
-* memory search;
-* memory writeback draft.
+- markdown memory directory;
+- memsearch integration;
+- grep fallback;
+- memory search;
+- memory writeback draft.
 
 ### Phase 3: Plane
 
 Add:
 
-* Plane connect;
-* import projects/work items;
-* link tasks;
-* writeback comments;
-* status mapping.
+- Plane connect;
+- import projects/work items;
+- link tasks;
+- writeback comments;
+- status mapping.
 
 ### Phase 4: Agent wrappers
 
 Add:
 
-* generic shell agent;
-* Claude wrapper;
-* Codex wrapper;
-* Gemini wrapper;
-* OpenCode wrapper;
-* Aider wrapper;
-* Copilot wrapper if feasible.
+- generic shell agent;
+- Claude wrapper;
+- Codex wrapper;
+- Gemini wrapper;
+- OpenCode wrapper;
+- Aider wrapper;
+- Copilot wrapper if feasible.
 
 ### Phase 5: MCP
 
@@ -3743,42 +3749,42 @@ Add Fulcrum MCP server.
 
 Expose:
 
-* task get;
-* context build;
-* memory search;
-* code search;
-* run event;
-* artifact attach;
-* quality gate run;
-* policy check.
+- task get;
+- context build;
+- memory search;
+- code search;
+- run event;
+- artifact attach;
+- quality gate run;
+- policy check.
 
 ### Phase 6: Quality gates
 
 Add:
 
-* project quality gate config;
-* gate runner;
-* artifact capture;
-* required gate enforcement.
+- project quality gate config;
+- gate runner;
+- artifact capture;
+- required gate enforcement.
 
 ### Phase 7: Safe delivery
 
 Add:
 
-* diff review;
-* cleanup safety;
-* merge queue local;
-* writeback gates.
+- diff review;
+- cleanup safety;
+- merge queue local;
+- writeback gates.
 
 ### Phase 8: Recovery
 
 Add:
 
-* backup;
-* restore;
-* export;
-* rebuild projections;
-* rebuild caches.
+- backup;
+- restore;
+- export;
+- rebuild projections;
+- rebuild caches.
 
 ---
 
@@ -3837,27 +3843,33 @@ Worktree:
 fulcrum/PLANE-123-fix-billing-refresh-logout
 
 Summary:
+
 - Fixed session refresh handling so transient 401s do not clear user session.
 - Added targeted regression test for billing page refresh.
 
 Files changed:
+
 - src/auth/session.ts
 - src/auth/session.test.ts
 
 Quality gates:
+
 - cargo check --workspace: passed
 - cargo test session_refresh: passed
 - cargo fmt --check: passed
 
 Artifacts:
+
 - Fulcrum run: run_2026_04_24_001
 - Context pack: ctx_2026_04_24_001
-- Test log: art_...
+- Test log: art\_...
 
 Memory:
+
 - Proposed update added to decisions.md as draft.
 
 Risks:
+
 - Full test suite not run.
 ```
 
@@ -3873,6 +3885,7 @@ Risks:
 This repository is managed by Fulcrum.
 
 Before major work:
+
 1. Read the Fulcrum context pack if provided.
 2. Search before editing.
 3. Work only in the assigned worktree.
@@ -3880,15 +3893,18 @@ Before major work:
 5. Run required quality gates.
 
 Do not:
+
 - delete user changes;
 - clean untracked files;
 - modify generated files unless instructed;
 - post remote writebacks unless Fulcrum asks.
 
 Quality gates:
+
 - See `.fulcrum/project.yaml`.
 
 Memory:
+
 - Durable memory lives in `.fulcrum/memory` or the configured Fulcrum memory directory.
 ```
 
@@ -3918,14 +3934,17 @@ Memory:
 ## 2026-04-24 — Use quality gates over always-on LSP
 
 Decision:
+
 - LSP is disabled by default for this Rust workspace.
 - Correctness checks use cargo check/test/clippy/fmt.
 
 Reason:
+
 - rust-analyzer can be memory-heavy.
 - Agents need proof from build/test output.
 
 Linked:
+
 - Project: myapp
 - Files: Cargo.toml
 ```
@@ -3947,10 +3966,12 @@ Linked:
 ## Auth
 
 Files:
+
 - src/auth/session.ts
 - src/auth/provider.ts
 
 Common searches:
+
 - `rg "refreshSession|session token|logout" src`
 - `ast-grep -p 'async fn $NAME($$$ARGS) -> $RET { $$$BODY }' src`
 ```
@@ -4031,14 +4052,14 @@ Avoid custom graph/RAG/code-intelligence systems until the simple composed stack
 
 The product should optimize for:
 
-* operator control;
-* low custom code;
-* local-first state;
-* explainable context;
-* safe worktree delivery;
-* quality gates;
-* cross-agent memory;
-* Plane-powered cockpit.
+- operator control;
+- low custom code;
+- local-first state;
+- explainable context;
+- safe worktree delivery;
+- quality gates;
+- cross-agent memory;
+- Plane-powered cockpit.
 
 ### References
 

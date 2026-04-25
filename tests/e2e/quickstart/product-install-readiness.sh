@@ -16,7 +16,9 @@ pnpm start -- tui --view dashboard >/tmp/fulcrum-package-tui.txt
 pnpm start -- --json mcp tools >/tmp/fulcrum-package-mcp.json
 
 SERVER_LOG=/tmp/fulcrum-package-server.log
-pnpm start -- --json server start --bind 127.0.0.1:3410 >"$SERVER_LOG" 2>&1 &
+SERVER_PORT="${FULCRUM_PACKAGE_SERVER_PORT:-$((3410 + (RANDOM % 1000)))}"
+export FULCRUM_PACKAGE_SERVER_PORT="$SERVER_PORT"
+pnpm start -- --json server start --bind "127.0.0.1:$SERVER_PORT" >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 
 cleanup() {
@@ -30,7 +32,8 @@ trap cleanup EXIT
 
 node <<'EOF'
 const deadline = Date.now() + 15000;
-const url = "http://127.0.0.1:3410/";
+const port = process.env.FULCRUM_PACKAGE_SERVER_PORT;
+const url = `http://127.0.0.1:${port}/`;
 
 async function waitForServer() {
   while (Date.now() < deadline) {

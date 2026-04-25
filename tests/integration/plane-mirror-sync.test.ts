@@ -6,7 +6,7 @@ import {
   type ExternalWorkItemMirrorRepositoryPort,
   type TaskRepositoryPort
 } from "@fulcrum/core";
-import { SimulatedPlaneAdapter } from "@fulcrum/plane";
+import { SimulatedPlaneAdapter } from "../../packages/plane/src/simulated-adapter.js";
 import type { ExternalWorkItemMirror, Task } from "@fulcrum/shared";
 
 class MemoryTaskRepository implements TaskRepositoryPort {

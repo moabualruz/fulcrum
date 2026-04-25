@@ -26,9 +26,7 @@ describe("compliance source order", () => {
       rootDir,
       sources: ["SRS-ammend-02.md", "SRS-ammend-01.md"]
     });
-    const goRequirement = audit.requirements.find((requirement) =>
-      requirement.text.includes("Go")
-    );
+    const goRequirement = audit.requirements.find((requirement) => requirement.text.includes("Go"));
 
     expect(goRequirement).toMatchObject({
       status: "superseded",

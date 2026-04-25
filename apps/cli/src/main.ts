@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
+import { buildRepoMapEvidence, buildRepoPackEvidence } from "@fulcrum/code-tools";
 import {
   buildAdapterDegradationSummary,
   ArtifactService,
@@ -38,7 +39,11 @@ import {
   showArtifactCommand
 } from "./commands/artifact.js";
 import { doctorCommand } from "./commands/doctor.js";
-import { codeCleanupStaleCommand, codeSearchCommand } from "./commands/code.js";
+import {
+  codeCleanupStaleCommand,
+  codeSearchCommand,
+  codeStructuralCommand
+} from "./commands/code.js";
 import {
   buildContextCommand,
   explainContextCommand,
@@ -422,6 +427,24 @@ program
   .option("--project <projectId>")
   .option("--view <view>", "dashboard view", "dashboard")
   .action((options) => {
+    if (program.opts().json) {
+      console.log(
+        JSON.stringify(
+          {
+            schemaVersion: SCHEMA_VERSION,
+            status: "ok",
+            data: {
+              view: options.view,
+              projectId: options.project,
+              nextAction: "Run without --json to open the terminal dashboard."
+            }
+          },
+          null,
+          2
+        )
+      );
+      return;
+    }
     const entrypoint = resolvePackagedEntrypoint("../../tui/dist/main.js");
     runPackagedCommand(entrypoint, [options.view], {
       env: options.project ? { FULCRUM_PROJECT_ID: options.project } : undefined
@@ -1354,52 +1377,16 @@ planeCommand
 
 const codeCommand = program.command("code").description("Search local code evidence");
 
-function collectRepoRefs(projectId: string, limit = 50) {
+function projectRepoEvidenceInput(projectId: string, limit = 50) {
   const project = projectService.get(projectId);
   if (!project) {
     throw new Error(`Unknown project: ${projectId}`);
   }
-  const root = project.rootPath;
-  const refs: Array<{
-    path: string;
-    sizeBytes: number;
-    sourceRef: { type: string; uri: string; label: string };
-  }> = [];
-  const visit = (directory: string): void => {
-    if (refs.length >= limit || !existsSync(directory)) return;
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (refs.length >= limit) return;
-      if (entry.name === ".git" || entry.name === "node_modules" || entry.name === "dist") {
-        continue;
-      }
-      const absolute = path.join(directory, entry.name);
-      const relative = path.relative(root, absolute);
-      if (entry.isDirectory()) {
-        visit(absolute);
-        continue;
-      }
-      const stat = statSync(absolute);
-      refs.push({
-        path: relative,
-        sizeBytes: stat.size,
-        sourceRef: { type: "file", uri: absolute, label: relative }
-      });
-    }
-  };
-  visit(root);
   return {
     projectId,
-    rootPath: root,
-    generatedAt: new Date().toISOString(),
-    toolVersion: "1.0",
-    repoCommit: "local-uncommitted",
-    configHash: project.ignoredPathPolicyId,
-    ignoredPathBehavior: "honored",
-    redactionStatus: "not_applicable",
-    toolIdentity: "fulcrum.local-repo-map",
-    cacheKey: `${projectId}:${project.lastScannedAt ?? "unscanned"}`,
-    invalidation: ["file_mtime", "path_rename", "ignored_path_policy"],
-    refs
+    rootPath: project.rootPath,
+    ignoredPathPolicyId: project.ignoredPathPolicyId,
+    limit
   };
 }
 
@@ -1461,10 +1448,9 @@ codeCommand
   .command("structural <pattern>")
   .requiredOption("--project <projectId>")
   .action(async (pattern, options) => {
-    const data = await codeSearchCommand(codeService, {
+    const data = await codeStructuralCommand(codeService, {
       projectId: options.project,
-      query: pattern,
-      semantic: false,
+      pattern,
       limit: 50
     });
     console.log(
@@ -1481,7 +1467,7 @@ repomapCommand
   .action((options) => {
     const projectId = options.project ?? program.opts().project;
     if (!projectId) throw new Error("Missing required option --project <projectId>.");
-    const data = { ...collectRepoRefs(projectId), refreshed: true };
+    const data = { ...buildRepoMapEvidence(projectRepoEvidenceInput(projectId)), refreshed: true };
     console.log(
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
@@ -1494,7 +1480,7 @@ repomapCommand
   .action((options) => {
     const projectId = options.project ?? program.opts().project;
     if (!projectId) throw new Error("Missing required option --project <projectId>.");
-    const data = { ...collectRepoRefs(projectId), freshness: "fresh" };
+    const data = buildRepoMapEvidence(projectRepoEvidenceInput(projectId));
     console.log(
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
@@ -1509,17 +1495,7 @@ repomixCommand
   .action((options) => {
     const projectId = options.project ?? program.opts().project;
     if (!projectId) throw new Error("Missing required option --project <projectId>.");
-    const repoMap = collectRepoRefs(projectId, 100);
-    const data = {
-      projectId,
-      previewOnly: false,
-      generatedAt: repoMap.generatedAt,
-      toolIdentity: "fulcrum.local-repo-pack",
-      cacheKey: repoMap.cacheKey,
-      includedFiles: repoMap.refs.map((ref) => ref.path),
-      sizeBytes: repoMap.refs.reduce((total, ref) => total + ref.sizeBytes, 0),
-      sourceRefs: repoMap.refs.map((ref) => ref.sourceRef)
-    };
+    const data = buildRepoPackEvidence(projectRepoEvidenceInput(projectId, 100));
     console.log(
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
@@ -1532,16 +1508,7 @@ repomixCommand
   .action((options) => {
     const projectId = options.project ?? program.opts().project;
     if (!projectId) throw new Error("Missing required option --project <projectId>.");
-    const repoMap = collectRepoRefs(projectId, 100);
-    const data = {
-      projectId,
-      freshness: "fresh",
-      generatedAt: repoMap.generatedAt,
-      toolIdentity: "fulcrum.local-repo-pack",
-      includedFiles: repoMap.refs.map((ref) => ref.path),
-      sizeBytes: repoMap.refs.reduce((total, ref) => total + ref.sizeBytes, 0),
-      sourceRefs: repoMap.refs.map((ref) => ref.sourceRef)
-    };
+    const data = buildRepoPackEvidence(projectRepoEvidenceInput(projectId, 100));
     console.log(
       program.opts().json
         ? JSON.stringify({ schemaVersion: "1.0", status: "ok", data }, null, 2)
@@ -2011,5 +1978,6 @@ graphCommand
     );
   });
 
-const argv = process.argv[2] === "--" ? process.argv.slice(0, 2).concat(process.argv.slice(3)) : process.argv;
+const argv =
+  process.argv[2] === "--" ? process.argv.slice(0, 2).concat(process.argv.slice(3)) : process.argv;
 program.parse(argv);

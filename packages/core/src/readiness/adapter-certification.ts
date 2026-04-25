@@ -1,4 +1,6 @@
 import type { AdapterCertification } from "@fulcrum/shared";
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import type { AdapterRegistryEntry, AdapterRegistryService } from "../adapters/registry.js";
 
 export interface AdapterCertificationEvidence {
@@ -11,7 +13,12 @@ export async function certifyAdapters(
   evidence: AdapterCertificationEvidence = {}
 ): Promise<AdapterCertification[]> {
   const entries = await registry.listHealth();
-  return entries.map((entry) => certifyAdapterEntry(entry, evidence));
+  return entries.map((entry) => {
+    if (evidence.evidenceRoot) {
+      writeHealthEvidence(entry, evidence.evidenceRoot, evidence.healthEvidencePrefix);
+    }
+    return certifyAdapterEntry(entry, evidence);
+  });
 }
 
 export function certifyAdapterEntry(
@@ -33,14 +40,37 @@ export function certifyAdapterEntry(
     importExportStrategy: entry.metadata.importExportStrategy,
     rebuildStrategy: entry.metadata.rebuildStrategy,
     privacyNotes: entry.metadata.privacyNotes,
-    healthEvidence: [
-      `${evidence.healthEvidencePrefix ?? "adapters"}/${entry.metadata.adapterId}-health.json`
-    ],
+    healthEvidence: evidence.evidenceRoot
+      ? [`${evidence.healthEvidencePrefix ?? "adapters"}/${entry.metadata.adapterId}-health.json`]
+      : [],
     status,
     createdAt: now,
     updatedAt: now,
     schemaVersion: "1.0"
   };
+}
+
+function writeHealthEvidence(
+  entry: AdapterRegistryEntry,
+  evidenceRoot: string,
+  healthEvidencePrefix?: string
+): void {
+  const relativePath = `${healthEvidencePrefix ?? "adapters"}/${entry.metadata.adapterId}-health.json`;
+  const absolutePath = path.join(evidenceRoot, relativePath);
+  mkdirSync(path.dirname(absolutePath), { recursive: true });
+  writeFileSync(
+    absolutePath,
+    JSON.stringify(
+      {
+        schemaVersion: "1.0",
+        metadata: entry.metadata,
+        health: entry.health,
+        generatedAt: new Date().toISOString()
+      },
+      null,
+      2
+    )
+  );
 }
 
 function certificationStatus(

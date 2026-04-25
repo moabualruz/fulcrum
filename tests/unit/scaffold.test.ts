@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { SCHEMA_VERSION } from "@fulcrum/shared";
-import { doctorScaffold } from "@fulcrum/core";
+import { buildSetupDoctorReport } from "@fulcrum/core";
 
-describe("scaffold", () => {
-  it("exposes shared schema version and doctor data", () => {
+describe("core exports", () => {
+  it("exposes shared schema version and real setup doctor data", () => {
     expect(SCHEMA_VERSION).toBe("1.0");
-    expect(doctorScaffold()).toContainEqual(
-      expect.objectContaining({ capabilityId: "cap_local_state" })
+    expect(buildSetupDoctorReport({ noNetwork: true }).capabilities).toContainEqual(
+      expect.objectContaining({ capabilityId: "cap_event_log" })
     );
   });
 });

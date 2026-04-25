@@ -447,9 +447,16 @@ function memoryFreshness(entry: MemoryEntry) {
   } as const;
 }
 
-function sourceNode(sourceRef: SourceRef): { type: GraphNodeType; id: string; ref: SourceRef } | undefined {
+function sourceNode(
+  sourceRef: SourceRef
+): { type: GraphNodeType; id: string; ref: SourceRef } | undefined {
   const sourceType = sourceRef.type.replace(/-/g, "_");
-  if (sourceType === "file" || sourceType === "path" || sourceType === "symbol" || sourceType === "code") {
+  if (
+    sourceType === "file" ||
+    sourceType === "path" ||
+    sourceType === "symbol" ||
+    sourceType === "code"
+  ) {
     return { type: "code", id: sourceRef.uri, ref: sourceRef };
   }
   const typeMap: Record<string, GraphNodeType> = {

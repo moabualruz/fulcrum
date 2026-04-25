@@ -141,9 +141,9 @@ describe("quality gate runner", () => {
     expect(skipped.status).toBe("skipped");
     expect(passed.workingDirectory).toBe(cwd);
     expect(artifactRepo.listByRun("run_01")).toHaveLength(3);
-    await expect(
-      runner.run({ gateId: pass.gateId, cwd, projectId: "proj_other" })
-    ).rejects.toThrow(/belongs to project/);
+    await expect(runner.run({ gateId: pass.gateId, cwd, projectId: "proj_other" })).rejects.toThrow(
+      /belongs to project/
+    );
   });
 
   it("links quality results and output artifacts back to the run event stream", async () => {

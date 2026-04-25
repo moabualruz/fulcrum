@@ -12,7 +12,8 @@ export type ExactEvidenceType =
   | "filename"
   | "error"
   | "import"
-  | "export";
+  | "export"
+  | "structural";
 
 export interface PathIgnorePolicy {
   isIgnored(candidatePath: string): boolean;
@@ -24,7 +25,7 @@ export interface ExactSearchResult {
   lineEnd?: number;
   symbol?: string;
   evidenceType: ExactEvidenceType;
-  sourceTool: "ripgrep" | "node-fs";
+  sourceTool: "ripgrep" | "node-fs" | "ast-grep";
   reason: string;
 }
 

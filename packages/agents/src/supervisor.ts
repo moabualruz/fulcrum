@@ -61,7 +61,9 @@ export function startSupervisedProcess(
     }
   };
 
-  const settle = (outcome: Omit<SupervisedProcessOutcome, "startedAt" | "endedAt" | "transcript">): void => {
+  const settle = (
+    outcome: Omit<SupervisedProcessOutcome, "startedAt" | "endedAt" | "transcript">
+  ): void => {
     if (settled) {
       return;
     }

@@ -248,6 +248,7 @@ Fulcrum Web Cockpit:
 
 Fulcrum Native Desktop:
   Optional Tauri/Rust later, not v0
+```
 ````
 
 ### Non-goals
@@ -326,7 +327,6 @@ Fulcrum doctor shall check:
 ```
 
 So yes: correction accepted. **Copilot CLI is standalone `copilot`, and Fulcrum core should be Go.**
-
 
 ### References
 

@@ -166,7 +166,10 @@ export class RunLifecycleService {
     }
   ): Run {
     const run = this.requireMutableRun(runId);
-    const artifactIds = mergeIds(mergeIds(run.artifactIds, input.artifactIds), input.agentEvidenceArtifactIds);
+    const artifactIds = mergeIds(
+      mergeIds(run.artifactIds, input.artifactIds),
+      input.agentEvidenceArtifactIds
+    );
     const logArtifactIds = mergeIds(run.logArtifactIds, input.logArtifactIds);
     const qualityGateIds = mergeIds(run.qualityGateIds, input.qualityGateIds);
     const policyDecisionIds = mergeIds(run.policyDecisionIds, input.policyDecisionIds);

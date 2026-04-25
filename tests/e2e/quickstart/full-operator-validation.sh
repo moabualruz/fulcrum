@@ -5,8 +5,19 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 STATE_ROOT="${FULCRUM_QUICKSTART_STATE_ROOT:-$(mktemp -d "${TMPDIR:-/tmp}/fulcrum-full-operator.XXXXXX")}"
 PROJECT_ROOT="${FULCRUM_QUICKSTART_PROJECT_ROOT:-$(mktemp -d "${TMPDIR:-/tmp}/fulcrum-project.XXXXXX")}"
 CLI_DIR="$ROOT_DIR/apps/cli"
+SERVER_PORT="${FULCRUM_QUICKSTART_SERVER_PORT:-3412}"
+SERVER_PID=""
 
 export FULCRUM_STATE_ROOT="$STATE_ROOT"
+
+cleanup() {
+  if [[ -n "${SERVER_PID:-}" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
+    kill "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+  fi
+}
+
+trap cleanup EXIT
 
 record_evidence() {
   local name="$1"
@@ -78,9 +89,31 @@ repo_pack="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json code repomix buil
 record_evidence repo-pack.json "$repo_pack"
 assert_json_status_ok <<<"$repo_pack"
 
-server_preview="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json server start --bind 127.0.0.1:0 --open)"
-record_evidence server-start.json "$server_preview"
-assert_json_status_ok <<<"$server_preview"
+server_log="$STATE_ROOT/evidence/server-start.json"
+pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json server start --bind "127.0.0.1:$SERVER_PORT" --open >"$server_log" 2>&1 &
+SERVER_PID=$!
+node <<EOF
+const deadline = Date.now() + 15000;
+const url = "http://127.0.0.1:$SERVER_PORT/api/v1/projects";
+
+async function waitForServer() {
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(url);
+      const payload = await response.json();
+      if (response.ok && payload.status === "ok") return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+  throw new Error("timed out waiting for full operator validation server");
+}
+
+waitForServer().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});
+EOF
 
 tui_preview="$(pnpm --dir "$CLI_DIR" exec tsx src/main.ts --json tui --project "$project_id")"
 record_evidence tui.json "$tui_preview"

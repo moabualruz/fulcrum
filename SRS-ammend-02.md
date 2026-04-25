@@ -219,18 +219,22 @@ The official MCP ecosystem supports TypeScript as a Tier 1 SDK, and the TypeScri
 Write portable TypeScript.
 
 Preferred runtime:
+
 - Bun, if packaging and subprocess behavior are stable for Fulcrum.
 
 Compatibility target:
+
 - Node.js, so Fulcrum is not locked to Bun.
 
 ### Packaging Strategy
 
 Start with:
+
 - npm/pnpm package for development
 - `fulcrum` CLI entrypoint
 
 Evaluate:
+
 - Bun single-file executable for local all-in-one distribution
 
 ### Architecture
@@ -250,18 +254,19 @@ packages/
   code-tools/
   agents/
   shared/
+```
 ````
 
 ### When to introduce Go
 
 Only introduce Go later if TypeScript fails on:
 
-* reliable process supervision
-* packaging
-* memory use
-* filesystem safety
-* long-running daemon reliability
-* single-binary distribution
+- reliable process supervision
+- packaging
+- memory use
+- filesystem safety
+- long-running daemon reliability
+- single-binary distribution
 
 Until then, avoid split-language complexity.
 
@@ -298,7 +303,6 @@ MCP tools should call core services, not random scripts directly
 ```
 
 That gives you the speed of TypeScript without trapping Fulcrum in messy frontend-first architecture.
-
 
 ### References
 

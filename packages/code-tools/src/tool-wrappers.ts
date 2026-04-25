@@ -1,4 +1,7 @@
 import { execFile } from "node:child_process";
+import { mkdtempSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { promisify } from "node:util";
 import { buildCodeToolCacheMetadata, type CodeToolCacheMetadata } from "./cache-metadata.js";
 
@@ -30,7 +33,7 @@ export async function runFd(input: CodeToolRunInput): Promise<CodeToolRunResult>
 }
 
 export async function runAstGrep(input: CodeToolRunInput): Promise<CodeToolRunResult> {
-  const args = ["--pattern", input.pattern ?? input.query ?? "", input.rootPath];
+  const args = ["run", "-p", input.pattern ?? input.query ?? "", "--json", input.rootPath];
   return runTool("ast-grep", args, input, parseAstGrepIncludedFiles);
 }
 
@@ -40,8 +43,24 @@ export async function runAider(input: CodeToolRunInput): Promise<CodeToolRunResu
 }
 
 export async function runRepomix(input: CodeToolRunInput): Promise<CodeToolRunResult> {
-  const args = ["--version"];
-  return runTool("repomix", args, input);
+  const outputPath = path.join(
+    mkdtempSync(path.join(tmpdir(), "fulcrum-repomix-wrapper-")),
+    "repomix-output.json"
+  );
+  const result = await runTool(
+    "repomix",
+    [input.rootPath, "--style", "json", "-o", outputPath],
+    input
+  );
+  if (result.state === "managed") {
+    return {
+      ...result,
+      stdout: [result.stdout, `outputPath=${outputPath}`, `sizeBytes=${statSync(outputPath).size}`]
+        .filter(Boolean)
+        .join("\n")
+    };
+  }
+  return result;
 }
 
 async function runTool(
@@ -99,6 +118,19 @@ function parseFdIncludedFiles(stdout: string): string[] {
 }
 
 function parseAstGrepIncludedFiles(stdout: string): string[] {
+  const parsed = parseJsonArray(stdout);
+  if (parsed) {
+    return [
+      ...new Set(
+        parsed
+          .map((entry) =>
+            entry && typeof entry === "object" ? (entry as { file?: unknown }).file : undefined
+          )
+          .filter((file): file is string => typeof file === "string")
+          .map((file) => file.replaceAll("\\", "/"))
+      )
+    ];
+  }
   const files = new Set<string>();
   for (const line of stdout.split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -118,4 +150,13 @@ function parseAstGrepIncludedFiles(stdout: string): string[] {
     }
   }
   return [...files];
+}
+
+function parseJsonArray(value: string): unknown[] | undefined {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }

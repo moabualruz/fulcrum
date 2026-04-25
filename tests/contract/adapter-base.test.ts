@@ -27,7 +27,9 @@ describe("adapter base contract", () => {
       const health = await adapter.healthCheck();
       const capabilities = await adapter.describeCapabilities();
       const preview = await adapter.preview("execute");
-      const exported = (await adapter.exportLocalState("all")) as { metadata: { credentialStatus: string } };
+      const exported = (await adapter.exportLocalState("all")) as {
+        metadata: { credentialStatus: string };
+      };
 
       expect(adapter.metadata.credentialStatus).toBe("configured");
       expect(JSON.stringify(exported)).not.toContain("secret-value");
@@ -40,7 +42,9 @@ describe("adapter base contract", () => {
       expect(await adapter.execute("execute", {}, "pol_approved")).toMatchObject({
         capabilityId: "cap_adapter_contract_remote"
       });
-      expect(await adapter.rebuild("all")).toMatchObject({ capabilityId: "cap_adapter_contract_remote" });
+      expect(await adapter.rebuild("all")).toMatchObject({
+        capabilityId: "cap_adapter_contract_remote"
+      });
     } finally {
       if (previousToken === undefined) {
         delete process.env.FULCRUM_REMOTE_PROVIDER_TOKEN;
@@ -55,9 +59,10 @@ describe("adapter base contract", () => {
     const entries = await registry.listHealth();
 
     expect(entries.map((entry) => entry.metadata.adapterId)).toContain("adapter_copilot_cli");
-    expect(entries.find((entry) => entry.metadata.adapterId === "adapter_telemetry_disabled")?.health.state).toBe(
-      "disabled"
-    );
+    expect(
+      entries.find((entry) => entry.metadata.adapterId === "adapter_telemetry_disabled")?.health
+        .state
+    ).toBe("disabled");
   });
 
   it("checks standalone copilot command instead of gh copilot extension", async () => {

@@ -28,4 +28,8 @@ describe("CLI global flags", () => {
     expect(cliSource).toContain("program.opts().run");
     expect(cliSource).toContain("program.opts().dryRun");
   });
+
+  it("keeps TUI command machine-readable when --json is set", () => {
+    expect(cliSource).toContain('nextAction: "Run without --json to open the terminal dashboard."');
+  });
 });

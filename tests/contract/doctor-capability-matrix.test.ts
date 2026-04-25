@@ -3,7 +3,10 @@ import { buildSetupDoctorReport, buildSetupPreview, previewToSetupState } from "
 
 describe("doctor capability matrix contract", () => {
   it("reports required SRS matrix capabilities with privacy, freshness, and next action", () => {
-    const setupState = previewToSetupState(buildSetupPreview("/tmp/fulcrum-doctor-contract"), "applied");
+    const setupState = previewToSetupState(
+      buildSetupPreview("/tmp/fulcrum-doctor-contract"),
+      "applied"
+    );
     const report = buildSetupDoctorReport({
       setupState,
       noNetwork: true,

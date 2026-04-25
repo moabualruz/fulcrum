@@ -49,4 +49,28 @@ describe("MCP tool schemas", () => {
     expect(missingTask?.error?.code).toBe("NOT_FOUND");
     expect(missingTask?.error?.nextAction).toContain("Verify");
   });
+
+  it("returns real repo-map and honest repo-pack fallback evidence", async () => {
+    const runtime = createTestMcpRuntime(mkdtempSync(path.join(tmpdir(), "fulcrum-mcp-repo-")));
+    const tools = createMcpToolDefinitions(runtime);
+
+    const repoMap = await tools
+      .find((tool) => tool.name === "fulcrum_repo_map_get")
+      ?.execute({ projectId: runtime.project.projectId });
+    const repoPack = await tools
+      .find((tool) => tool.name === "fulcrum_repomix_pack")
+      ?.execute({ projectId: runtime.project.projectId });
+
+    expect(CommonToolResponseSchema.parse(repoMap).status).toBe("ok");
+    expect(repoMap?.data).toMatchObject({
+      toolIdentity: "fulcrum.local-repo-map",
+      refs: [expect.objectContaining({ path: "README.md" })]
+    });
+    expect(CommonToolResponseSchema.parse(repoPack).status).toBe("ok");
+    expect(repoPack?.data).toMatchObject({
+      redactionStatus: "needs_review",
+      sourceRefs: [expect.objectContaining({ label: "README.md" })]
+    });
+    expect(["repomix", "fulcrum.local-repo-pack"]).toContain(repoPack?.data?.toolIdentity);
+  });
 });

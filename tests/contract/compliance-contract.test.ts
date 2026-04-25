@@ -49,7 +49,10 @@ describe("compliance contract", () => {
 
   it("supports explicit repo roots from the CLI source-checkout entrypoint", () => {
     const rootDir = mkdtempSync(path.join(tmpdir(), "fulcrum-compliance-cli-"));
-    writeFileSync(path.join(rootDir, "SRS.md"), "FR-DOC-003:\nDoctor MUST report exact next action.\n");
+    writeFileSync(
+      path.join(rootDir, "SRS.md"),
+      "FR-DOC-003:\nDoctor MUST report exact next action.\n"
+    );
 
     const output = execFileSync(
       "pnpm",

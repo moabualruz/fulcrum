@@ -174,6 +174,8 @@ Adapters cover external PM/Plane, memory backends, code tools, semantic retrieva
 
 Plane writeback and other external actions require preview and approval. Local-only mode blocks remote PM, remote model/provider, telemetry, remote observability, and public-bind actions unless operator changes policy.
 
+Live Plane mode uses the Plane work-item API. Set `FULCRUM_PLANE_BASE_URL`, `FULCRUM_PLANE_WORKSPACE_SLUG`, `FULCRUM_PLANE_PROJECT_ID`, and either `FULCRUM_PLANE_API_KEY` or `FULCRUM_PLANE_OAUTH_TOKEN`. `FULCRUM_PLANE_TOKEN` remains accepted as an API-key alias for older local environments. Without those values, Plane remains disabled and no simulated work items are imported by runtime services.
+
 Evidence: FR-050 through FR-060, SC-017, `contracts/adapter-contract.md`, `tests/integration/adapter-degradation.test.ts`, and `tests/integration/pm-adapter-degraded.test.ts`.
 
 ## Policy

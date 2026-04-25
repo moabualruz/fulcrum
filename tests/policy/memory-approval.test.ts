@@ -33,9 +33,9 @@ describe("permanent memory approval", () => {
 
     expect(draft.policyDecision.status).toBe("approval_required");
     expect(blocked.entry?.status).toBe("draft");
-    expect(await service.search({ projectId: "proj_policy", query: "Permanent memory" })).toHaveLength(
-      0
-    );
+    expect(
+      await service.search({ projectId: "proj_policy", query: "Permanent memory" })
+    ).toHaveLength(0);
     const approved = service.approve(draft.entry.memoryId, {
       policyDecisionId: draft.policyDecision.policyDecisionId,
       requester: "test"
@@ -43,8 +43,8 @@ describe("permanent memory approval", () => {
 
     expect(approved.policyDecision.status).toBe("approved");
     expect(approved.entry?.status).toBe("active");
-    expect(await service.search({ projectId: "proj_policy", query: "Permanent memory" })).toHaveLength(
-      1
-    );
+    expect(
+      await service.search({ projectId: "proj_policy", query: "Permanent memory" })
+    ).toHaveLength(1);
   });
 });

@@ -38,8 +38,8 @@ import {
   InvalidationService,
   recordSqliteRuntimeRecovery
 } from "@fulcrum/core";
-import { searchExact, searchSemantic } from "@fulcrum/code-tools";
-import { PlaneApiAdapter, SimulatedPlaneAdapter } from "@fulcrum/plane";
+import { searchExact, searchSemantic, searchStructural } from "@fulcrum/code-tools";
+import { PlaneApiAdapter } from "@fulcrum/plane";
 
 const setupPaths = resolveSetupPaths(process.env.FULCRUM_STATE_ROOT);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -112,7 +112,21 @@ export const codeService = new CodeEvidenceService(
   },
   searchSemantic,
   graphLinkWriters,
-  invalidationService
+  invalidationService,
+  {
+    search: async (options) => {
+      const result = await searchStructural({
+        rootPath: options.rootPath,
+        pattern: options.query,
+        ignorePolicy: options.ignorePolicy,
+        limit: options.limit
+      });
+      if (result.state === "degraded") {
+        throw new Error(result.limitation ?? "ast-grep structural search unavailable.");
+      }
+      return result.results;
+    }
+  }
 );
 export function graphRebuildSources(projectId: string) {
   return {
@@ -127,23 +141,13 @@ export function graphRebuildSources(projectId: string) {
     qualityResults: qualityGateRepository.listResults({ projectId })
   };
 }
-const planeAdapter =
-  process.env.FULCRUM_PLANE_BASE_URL && process.env.FULCRUM_PLANE_TOKEN
-    ? new PlaneApiAdapter({
-        baseUrl: process.env.FULCRUM_PLANE_BASE_URL,
-        token: process.env.FULCRUM_PLANE_TOKEN
-      })
-    : new SimulatedPlaneAdapter([
-        {
-          externalId: "SIM-1",
-          title: "Simulated Plane work item",
-          body: "Imported from simulated Plane adapter.",
-          status: "todo",
-          updatedAt: new Date(0).toISOString(),
-          url: "plane://SIM-1",
-          docs: [{ title: "Plane docs page", url: "plane://SIM-1/docs" }]
-        }
-      ]);
+const planeAdapter = new PlaneApiAdapter({
+  baseUrl: process.env.FULCRUM_PLANE_BASE_URL,
+  workspaceSlug: process.env.FULCRUM_PLANE_WORKSPACE_SLUG,
+  projectId: process.env.FULCRUM_PLANE_PROJECT_ID,
+  apiKey: process.env.FULCRUM_PLANE_API_KEY ?? process.env.FULCRUM_PLANE_TOKEN,
+  oauthToken: process.env.FULCRUM_PLANE_OAUTH_TOKEN
+});
 export const externalPmService = new ExternalPmService(
   externalWorkItemMirrorRepository,
   taskRepository,

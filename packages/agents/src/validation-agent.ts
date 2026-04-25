@@ -15,7 +15,9 @@ export interface ValidationAgentResult {
   transcript: string[];
 }
 
-export async function runValidationAgent(input: ValidationAgentInput): Promise<ValidationAgentResult> {
+export async function runValidationAgent(
+  input: ValidationAgentInput
+): Promise<ValidationAgentResult> {
   const transcript = [`validation agent start ${input.run.runId}`];
   await input.onHeartbeat("validation agent alive");
   await input.onProgress("writing deterministic output");

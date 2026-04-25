@@ -40,8 +40,7 @@ export class ReleaseEvidenceWriter {
     const redacted = redactJson(parsed);
     const redactedPack = ReleaseEvidencePackSchema.parse({
       ...JSON.parse(redacted.text),
-      redactionStatus:
-        redacted.redactionStatus === "redacted" ? "redacted" : parsed.redactionStatus
+      redactionStatus: redacted.redactionStatus === "redacted" ? "redacted" : parsed.redactionStatus
     });
     const manifestPath = path.join(evidenceRoot, "release-evidence.json");
     writeFileSync(manifestPath, JSON.stringify(redactedPack, null, 2));

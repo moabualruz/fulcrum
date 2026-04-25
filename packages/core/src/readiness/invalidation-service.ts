@@ -98,8 +98,7 @@ export class InvalidationService {
       )
       .filter(
         (record) =>
-          !input.rebuildSourceIncludes ||
-          record.rebuildSource.includes(input.rebuildSourceIncludes)
+          !input.rebuildSourceIncludes || record.rebuildSource.includes(input.rebuildSourceIncludes)
       )
       .map((record) =>
         this.repository.markInvalidationRecordStale(record.recordId, staleAt, input.reason)

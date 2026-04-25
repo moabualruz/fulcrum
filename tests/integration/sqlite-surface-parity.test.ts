@@ -48,7 +48,9 @@ describe("cross-surface SQLite parity", () => {
       `await ports.initializeDatabase(join(${JSON.stringify(fixture.root)}, 'fulcrum.sqlite'));`
     ]);
 
-    runSurfaceScript("apps/cli", fixture.root, foreignCwd, ["await import('./src/work-runtime.ts');"]);
+    runSurfaceScript("apps/cli", fixture.root, foreignCwd, [
+      "await import('./src/work-runtime.ts');"
+    ]);
 
     runSurfaceScript("apps/server", fixture.root, foreignCwd, [
       "const { join } = await import('node:path');",

@@ -1,5 +1,9 @@
 import type { Hono } from "hono";
-import type { GraphLinkService, InvalidationService, TraceabilityQueryService } from "@fulcrum/core";
+import type {
+  GraphLinkService,
+  InvalidationService,
+  TraceabilityQueryService
+} from "@fulcrum/core";
 import type { GraphNodeType } from "@fulcrum/shared";
 
 export function registerGraphRoutes(

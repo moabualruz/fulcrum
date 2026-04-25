@@ -62,7 +62,8 @@ export class CodeEvidenceService {
       nextAction: string;
     }>,
     private readonly graphLinks?: GraphLinkWriters,
-    private readonly invalidation?: InvalidationService
+    private readonly invalidation?: InvalidationService,
+    private readonly structuralAdapter?: CodeSearchAdapter
   ) {}
 
   async search(input: {
@@ -71,6 +72,88 @@ export class CodeEvidenceService {
     limit?: number;
     includeSemantic?: boolean;
   }): Promise<CodeSearchResult> {
+    return this.runSearch(
+      input,
+      this.exactAdapter,
+      `code-search:${input.projectId}:${input.query}`
+    );
+  }
+
+  async structural(input: {
+    projectId: string;
+    pattern: string;
+    limit?: number;
+  }): Promise<CodeSearchResult> {
+    if (!this.structuralAdapter) {
+      const project = this.projects.get(input.projectId);
+      if (!project) {
+        throw new Error(`Unknown project: ${input.projectId}`);
+      }
+      return {
+        query: input.pattern,
+        projectId: project.projectId,
+        rootPath: project.rootPath,
+        count: 0,
+        ignoredPathBehavior: {
+          status: "honored",
+          sources: [],
+          excludedPatterns: 0
+        },
+        degraded: [
+          {
+            capabilityId: "cap_ast_grep",
+            state: "degraded",
+            nextAction: "Install ast-grep to enable structural code search."
+          }
+        ],
+        evidence: []
+      };
+    }
+    try {
+      return await this.runSearch(
+        { projectId: input.projectId, query: input.pattern, limit: input.limit },
+        this.structuralAdapter,
+        `structural-search:${input.projectId}:${input.pattern}`
+      );
+    } catch (error) {
+      const project = this.projects.get(input.projectId);
+      if (!project) throw error;
+      const ignorePolicy = await loadIgnoredPathPolicy(project.rootPath);
+      return {
+        query: input.pattern,
+        projectId: project.projectId,
+        rootPath: project.rootPath,
+        count: 0,
+        ignoredPathBehavior: {
+          status: "honored",
+          sources: ignorePolicy.sources,
+          excludedPatterns: ignorePolicy.patterns.length
+        },
+        degraded: [
+          {
+            capabilityId: "cap_ast_grep",
+            state: "degraded",
+            nextAction:
+              error instanceof Error
+                ? error.message
+                : "Install ast-grep to enable structural code search."
+          }
+        ],
+        evidence: []
+      };
+    }
+  }
+
+  private async runSearch(
+    input: {
+      projectId: string;
+      query: string;
+      limit?: number;
+      includeSemantic?: boolean;
+    },
+    adapter: CodeSearchAdapter,
+    rebuildSource: string
+  ): Promise<CodeSearchResult> {
     if (input.query.trim().length === 0) {
       throw new Error("Code search query must not be empty.");
     }
@@ -81,7 +164,7 @@ export class CodeEvidenceService {
     const started = Date.now();
     const ignorePolicy = await loadIgnoredPathPolicy(project.rootPath);
     const limit = normalizeLimit(input.limit);
-    const raw = await this.exactAdapter.search({
+    const raw = await adapter.search({
       rootPath: project.rootPath,
       query: input.query,
       ignorePolicy,
@@ -118,7 +201,7 @@ export class CodeEvidenceService {
     }
     this.invalidation?.recordGenerated({
       derivedKind: "code_evidence",
-      rebuildSource: `code-search:${project.projectId}:${input.query}`,
+      rebuildSource,
       sourceRefs: evidence.map((item) => ({
         type: "file",
         uri: item.filePath,

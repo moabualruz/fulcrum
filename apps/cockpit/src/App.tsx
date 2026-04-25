@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import type { ComponentType } from "react";
+import type { ComponentType, LazyExoticComponent } from "react";
 import { OverviewRoute } from "./routes/overview.js";
 import { ContextPackRoute } from "./routes/context-pack.js";
 import { MemoryRoute } from "./routes/memory.js";
@@ -12,7 +12,12 @@ import { AdaptersRoute } from "./routes/adapters.js";
 import { RecoveryRoute } from "./routes/recovery.js";
 import { TraceabilityRoute } from "./routes/traceability.js";
 
-const optionalRouteModules = import.meta.glob("./routes/*.tsx");
+const ComplianceRoute = lazy(() =>
+  import("./routes/compliance.js").then((module) => ({ default: module.ComplianceRoute }))
+);
+const ReleaseRoute = lazy(() =>
+  import("./routes/release.js").then((module) => ({ default: module.ReleaseEvidenceRoute }))
+);
 
 export function App() {
   const hash = globalThis.location?.hash ?? "";
@@ -44,44 +49,21 @@ export function App() {
     return <TraceabilityRoute />;
   }
   if (hash.startsWith("#/compliance")) {
-    return <OptionalReadinessRoute title="Compliance" modulePath="./routes/compliance.tsx" />;
+    return <LazyRoute title="Compliance" route={ComplianceRoute} />;
   }
   if (hash.startsWith("#/release")) {
-    return <OptionalReadinessRoute title="Release Evidence" modulePath="./routes/release.tsx" />;
+    return <LazyRoute title="Release Evidence" route={ReleaseRoute} />;
   }
   return hash.startsWith("#/projects/") ? <ProjectBoardRoute /> : <OverviewRoute />;
 }
 
-function OptionalReadinessRoute({
+function LazyRoute({
   title,
-  modulePath
+  route: Route
 }: {
   title: string;
-  modulePath: "./routes/compliance.tsx" | "./routes/release.tsx";
+  route: LazyExoticComponent<ComponentType>;
 }) {
-  const loader = optionalRouteModules[modulePath];
-  if (!loader) {
-    return (
-      <main>
-        <h1>{title}</h1>
-        <p>{title} route not available in this build.</p>
-      </main>
-    );
-  }
-  const Route = lazy(async () => {
-    const module = (await loader()) as Record<string, ComponentType>;
-    return {
-      default:
-        module[`${title.replace(/\s/g, "")}Route`] ??
-        module.default ??
-        (() => (
-          <main>
-            <h1>{title}</h1>
-            <p>{title} route did not export a component.</p>
-          </main>
-        ))
-    };
-  });
   return (
     <Suspense fallback={<main>Loading {title}</main>}>
       <Route />

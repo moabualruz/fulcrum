@@ -43,4 +43,31 @@ describe("doctor PATH and env fixtures", () => {
       nextAction: "Remote check skipped."
     });
   });
+
+  it("finds root config probes when doctor runs from a workspace package", () => {
+    const setupState = previewToSetupState(
+      buildSetupPreview("/tmp/fulcrum-doctor-package-cwd"),
+      "applied"
+    );
+    const previousCwd = process.cwd();
+
+    try {
+      process.chdir("apps/cli");
+      const report = buildSetupDoctorReport({
+        setupState,
+        noNetwork: true,
+        env: { PATH: process.env.PATH ?? "" }
+      });
+      const byId = new Map(
+        report.capabilities.map((capability) => [capability.capabilityId, capability])
+      );
+
+      expect(byId.get("cap_redaction_config")).toMatchObject({
+        state: "managed",
+        blocking: false
+      });
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
 });

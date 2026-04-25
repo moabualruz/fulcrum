@@ -33,9 +33,9 @@ export class FileAdapterConfigurationRepository implements AdapterConfigurationR
 
   private read(): AdapterConfigurationState {
     try {
-      const data = JSON.parse(readFileSync(this.stateFile, "utf8")) as Partial<
-        AdapterConfigurationState
-      >;
+      const data = JSON.parse(
+        readFileSync(this.stateFile, "utf8")
+      ) as Partial<AdapterConfigurationState>;
       return {
         adapters: (data.adapters ?? []).map((adapter) => AdapterMetadataSchema.parse(adapter))
       };

@@ -9,7 +9,10 @@ describe("real agent acceptance", () => {
   it("runs real commands when available and captures deterministic prompt evidence", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "fulcrum-real-agent-"));
     const command = path.join(root, "agent");
-    writeFileSync(command, "#!/usr/bin/env sh\ncat >/tmp/fulcrum-agent-prompt\nprintf 'accepted\\n'\n");
+    writeFileSync(
+      command,
+      "#!/usr/bin/env sh\ncat >/tmp/fulcrum-agent-prompt\nprintf 'accepted\\n'\n"
+    );
     chmodSync(command, 0o755);
 
     const result = await runRealAgentPrompt({

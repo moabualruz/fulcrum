@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SimulatedPlaneAdapter } from "@fulcrum/plane";
+import { SimulatedPlaneAdapter } from "../../packages/plane/src/simulated-adapter.js";
 
 describe("external PM adapter contract", () => {
   it("reports Plane metadata, health, capabilities, and writeback preview policy shape", async () => {

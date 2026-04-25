@@ -23,7 +23,7 @@ The delivery covers the full SRS scope, not a pilot or prototype: setup preview/
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 - **Local-first core**: PASS. Setup, doctor, project registry, local tasks, runs, context from local memory/code, worktrees, artifacts, quality gates, backup/restore/export/rebuild/reset/uninstall are local workflows. Network adapters are opt-in and degraded when unavailable.
 - **Operator control**: PASS. Policy decisions gate destructive, externally visible, permanent-memory, remote-provider, public-bind, and sensitive-export actions. Runs remain task-linked and operator-visible.

@@ -30,6 +30,7 @@ Follow-up TODOs:
 ## Core Principles
 
 ### I. Local-First Core
+
 Fulcrum MUST run its core workflows on a normal developer machine without
 requiring cloud services, hosted project management systems, remote databases,
 remote model providers, or remote telemetry. Core workflows include setup,
@@ -48,6 +49,7 @@ Rationale: Fulcrum's product identity is an operator-owned local agent OS, not
 a SaaS control plane or online project management wrapper.
 
 ### II. Operator Control And Human Review
+
 Fulcrum MUST keep one human operator in control of what runs, what changes,
 what is remembered, what is posted to external systems, what is merged, and
 what is deleted. Agent work MUST be visible as task-linked runs with status,
@@ -66,6 +68,7 @@ Rationale: Fulcrum exists to supervise agent leverage, not to move authority
 from the operator into opaque automation.
 
 ### III. Canonical Local State
+
 Fulcrum MUST own canonical local state for projects, task mirrors, local-only
 tasks, runs, run events, worktree allocations, context packs, artifacts,
 quality-gate results, policy decisions, setup state, health status, adapter
@@ -84,6 +87,7 @@ Rationale: Durable local state is required for crash recovery, auditability,
 backup, restore, uninstall safety, and cross-surface consistency.
 
 ### IV. Explainable Evidence And Provenance
+
 Fulcrum MUST make important outputs explainable. Context packs, memory recall,
 code search results, graph links, task decisions, policy decisions, quality
 gate outcomes, and agent-visible prompts MUST include source references,
@@ -100,6 +104,7 @@ Rationale: Operators can only trust Fulcrum if answers, actions, and context
 are traceable back to evidence.
 
 ### V. Minimum Reinvention And Replaceable Adapters
+
 Fulcrum MUST prefer mature local tools, open protocols, and replaceable
 adapters where they satisfy the product requirement. Fulcrum SHOULD integrate
 tools such as Git, SQLite, ripgrep, fd, ast-grep, repo-map generators, memory
@@ -119,6 +124,7 @@ Rationale: Fulcrum spends custom code on the local operating layer that only
 Fulcrum can own.
 
 ### VI. Security, Privacy, And Policy Gates
+
 Fulcrum MUST default to no remote telemetry, no remote model calls, no online
 project management sync, no hidden network access in core workflows, and
 loopback-only local service binding. Remote endpoints, telemetry exporters,
@@ -137,6 +143,7 @@ Rationale: A local agent OS coordinates powerful tools over private source
 trees; privacy and policy failures are product failures.
 
 ### VII. Incremental Delivery And Quality Gates
+
 Fulcrum MUST deliver in independently testable increments tied to operator
 value. Each feature specification MUST define user stories, independent tests,
 edge cases, success criteria, and degraded states. Each implementation plan
@@ -157,6 +164,7 @@ Rationale: Fulcrum proves local value and safety slice by slice instead of
 accumulating unverified infrastructure.
 
 ### VIII. TypeScript-First Boundary Discipline
+
 Fulcrum MUST use a TypeScript-first monorepo for the local API server, MCP
 server, CLI, cockpit UI, shared schemas, adapter wrappers, context builder,
 doctor, and SQLite state layer unless a feature plan documents a measured

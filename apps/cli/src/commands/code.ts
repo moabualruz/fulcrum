@@ -15,3 +15,10 @@ export function codeSearchCommand(
 export function codeCleanupStaleCommand(code: CodeEvidenceService, projectId: string) {
   return code.cleanupStale(projectId);
 }
+
+export function codeStructuralCommand(
+  code: CodeEvidenceService,
+  input: { projectId: string; pattern: string; limit?: number }
+) {
+  return code.structural(input);
+}

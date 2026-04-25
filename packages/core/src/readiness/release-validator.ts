@@ -216,6 +216,7 @@ export class ReleaseValidator {
       missingArtifacts: evaluation.missing,
       unexecutedArtifacts: evaluation.unexecuted,
       invalidStatusArtifacts: evaluation.badStatus,
+      weakEvidenceArtifacts: evaluation.weakEvidence,
       nextAction: evaluation.nextAction
     });
 
@@ -259,6 +260,7 @@ function evaluateSection(
   missing: string[];
   unexecuted: string[];
   badStatus: string[];
+  weakEvidence: string[];
   nextAction: string;
 } {
   const resolved = artifacts.map((artifact) =>
@@ -267,8 +269,13 @@ function evaluateSection(
   const missing = resolved.filter((artifact) => !existsSync(artifact));
   const unexecuted = resolved.filter((artifact) => artifactLooksUnexecuted(artifact));
   const badStatus = resolved.filter((artifact) => artifactHasDisallowedStatus(artifact));
+  const weakEvidence = resolved.filter((artifact) => artifactLacksConcreteEvidence(artifact));
   const failed =
-    artifacts.length === 0 || missing.length > 0 || unexecuted.length > 0 || badStatus.length > 0;
+    artifacts.length === 0 ||
+    missing.length > 0 ||
+    unexecuted.length > 0 ||
+    badStatus.length > 0 ||
+    weakEvidence.length > 0;
   const sourceRequirements = failed ? ["FR-017", "FR-018"] : ["FR-017"];
   return {
     checkId: `release.section.${slug(section)}`,
@@ -277,6 +284,7 @@ function evaluateSection(
     missing: missing.map((artifact) => normalizeArtifactPath(artifact, evidenceRoot)),
     unexecuted: unexecuted.map((artifact) => normalizeArtifactPath(artifact, evidenceRoot)),
     badStatus: badStatus.map((artifact) => normalizeArtifactPath(artifact, evidenceRoot)),
+    weakEvidence: weakEvidence.map((artifact) => normalizeArtifactPath(artifact, evidenceRoot)),
     nextAction: failed
       ? `Provide executed, redacted evidence for ${section}.`
       : `Evidence present for ${section}.`
@@ -298,6 +306,13 @@ function artifactHasDisallowedStatus(artifact: string): boolean {
   return /\bfailed\b|\bpass"\s*:\s*false\b|\bmissing\b|\bpartial\b|\bmock_only\b|\bpreview_only\b|\bdocumentation_only\b|\bmock-only\b|\bpreview-only\b|\bdocumentation-only\b|\bmockonly\b|\bpreviewonly\b|\bdocumentationonly\b/.test(
     normalized
   );
+}
+
+function artifactLacksConcreteEvidence(artifact: string): boolean {
+  if (!existsSync(artifact)) return false;
+  const parsed = parseJsonArtifact(readFileSync(artifact, "utf8"));
+  if (parsed === undefined || !parsed || typeof parsed !== "object") return false;
+  return !jsonHasConcreteEvidence(parsed);
 }
 
 function parseJsonArtifact(text: string): unknown | undefined {
@@ -336,6 +351,40 @@ function jsonHasDisallowedStatus(value: unknown): boolean {
     if (jsonHasDisallowedStatus(entry)) return true;
   }
 
+  return false;
+}
+
+function jsonHasConcreteEvidence(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  const concreteArrayKeys = [
+    "implementationRefs",
+    "testRefs",
+    "evidenceRefs",
+    "validationArtifacts",
+    "commands",
+    "runs",
+    "certifications",
+    "sourceRefs",
+    "artifacts",
+    "includedFiles"
+  ];
+  if (
+    concreteArrayKeys.some(
+      (key) => Array.isArray(record[key]) && (record[key] as unknown[]).length > 0
+    )
+  ) {
+    return true;
+  }
+  if (
+    typeof record.command === "string" &&
+    typeof record.exitCode === "number" &&
+    record.exitCode === 0 &&
+    record.status === "passed"
+  ) {
+    return true;
+  }
   return false;
 }
 

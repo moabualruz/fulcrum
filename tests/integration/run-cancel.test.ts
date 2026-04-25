@@ -54,7 +54,9 @@ describe("run cancellation", () => {
 
     expect(cancelled.status).toBe("cancelled");
     expect(cancelled.terminalStateRecordedAt).toBeDefined();
-    expect(() => runs.complete(run.runId, { summary: "late", outcome: "succeeded" })).toThrow(/terminal/);
+    expect(() => runs.complete(run.runId, { summary: "late", outcome: "succeeded" })).toThrow(
+      /terminal/
+    );
     expect(repository.listEvents(run.runId).map((event) => event.type)).toEqual([
       "run.created",
       "run.started",

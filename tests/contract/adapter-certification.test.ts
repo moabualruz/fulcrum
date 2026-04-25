@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { existsSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import {
   AdapterRegistryService,
   ToolHealthAdapter,
@@ -9,8 +12,9 @@ import {
 describe("adapter certification contract", () => {
   it("certifies optional adapters with offline, disablement, privacy, and evidence fields", async () => {
     const registry = new AdapterRegistryService(createDefaultAdapterHealthModules());
+    const evidenceRoot = mkdtempSync(path.join(tmpdir(), "fulcrum-adapter-evidence-"));
 
-    const certifications = await certifyAdapters(registry);
+    const certifications = await certifyAdapters(registry, { evidenceRoot });
     const markdown = certifications.find((entry) => entry.adapterId === "adapter_memory_markdown");
     const telemetry = certifications.find(
       (entry) => entry.adapterId === "adapter_telemetry_disabled"
@@ -23,6 +27,7 @@ describe("adapter certification contract", () => {
     });
     expect(markdown?.offlineBehavior).toContain("Local Fulcrum records remain usable");
     expect(markdown?.healthEvidence[0]).toBe("adapters/adapter_memory_markdown-health.json");
+    expect(existsSync(path.join(evidenceRoot, markdown!.healthEvidence[0]))).toBe(true);
     expect(telemetry).toMatchObject({ status: "optional", testMode: "disabled" });
   });
 

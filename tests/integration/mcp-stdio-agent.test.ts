@@ -25,7 +25,14 @@ describe("stdio MCP validation-agent flow", () => {
     const client = new Client({ name: "fulcrum-validation-agent", version: "0.1.0" });
     const transport = new StdioClientTransport({
       command: "pnpm",
-      args: ["exec", "tsx", "--tsconfig", "tsconfig.base.json", "tests/helpers/mcp-stdio-server.ts", root],
+      args: [
+        "exec",
+        "tsx",
+        "--tsconfig",
+        "tsconfig.base.json",
+        "tests/helpers/mcp-stdio-server.ts",
+        root
+      ],
       cwd: process.cwd(),
       stderr: "pipe"
     });

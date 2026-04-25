@@ -1,6 +1,6 @@
 import type { CapabilityHealthRecord, CapabilityProbe } from "@fulcrum/shared";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
 export type DoctorMode = "quick" | "deep";
@@ -209,7 +209,7 @@ function runProbe(
     );
   }
   if (probe.probeKind === "config" && probe.target) {
-    return existsSync(probe.target)
+    return configExists(probe.target)
       ? health(probe, "managed", false, now, undefined, "Configuration detected.")
       : health(
           probe,
@@ -234,6 +234,17 @@ function runProbe(
         );
   }
   return health(probe, "managed", false, now, undefined, "No action needed.");
+}
+
+function configExists(target: string): boolean {
+  if (existsSync(target)) return true;
+  let directory = process.cwd();
+  while (true) {
+    if (existsSync(resolve(directory, target))) return true;
+    const parent = dirname(directory);
+    if (parent === directory) return false;
+    directory = parent;
+  }
 }
 
 function runCommandProbe(

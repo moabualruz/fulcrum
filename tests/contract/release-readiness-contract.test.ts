@@ -89,7 +89,7 @@ describe("release readiness contract", () => {
     const sectionEvidence = Object.fromEntries(
       REQUIRED_RELEASE_SECTIONS.map((section) => {
         const file = `sections/${section.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.json`;
-        writeFileSync(path.join(evidenceDir, file), JSON.stringify({ status: "passed" }));
+        writeFileSync(path.join(evidenceDir, file), JSON.stringify(passedSectionEvidence(section)));
         return [section, [file]];
       })
     );
@@ -156,7 +156,10 @@ describe("release readiness contract", () => {
     const mockArtifact = "validation/mock.json";
     const previewArtifact = "validation/preview.json";
 
-    writeFileSync(path.join(evidenceDir, goodArtifact), JSON.stringify({ status: "passed" }));
+    writeFileSync(
+      path.join(evidenceDir, goodArtifact),
+      JSON.stringify(passedSectionEvidence("test"))
+    );
     writeFileSync(
       path.join(evidenceDir, mockArtifact),
       JSON.stringify({ status: "passed", summary: { mockOnly: 1 } })
@@ -293,4 +296,15 @@ function writeExecutable(file: string, contents: string) {
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, contents);
   chmodSync(file, 0o755);
+}
+
+function passedSectionEvidence(section: string) {
+  return {
+    schemaVersion: "1.0",
+    section,
+    status: "passed",
+    implementationRefs: ["packages/core/src/readiness/release-validator.ts"],
+    testRefs: ["tests/contract/release-readiness-contract.test.ts"],
+    validationArtifacts: ["validation/test.json"]
+  };
 }

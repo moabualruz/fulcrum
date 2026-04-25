@@ -12,6 +12,7 @@
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
+    "@fulcrum/code-tools": "workspace:*",
     "@fulcrum/core": "workspace:*",
     "@fulcrum/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.9.0",

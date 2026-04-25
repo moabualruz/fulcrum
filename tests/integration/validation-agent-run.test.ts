@@ -59,7 +59,11 @@ describe("deterministic validation agent run", () => {
     tasks.transition(task.taskId, "ready");
     const repository = new MemoryRunRepository();
     const runs = new RunLifecycleService(repository, taskRepo);
-    const run = runs.start({ taskId: task.taskId, agentId: "adapter_validation", worktreeId: "wt_01" });
+    const run = runs.start({
+      taskId: task.taskId,
+      agentId: "adapter_validation",
+      worktreeId: "wt_01"
+    });
 
     const result = await runValidationAgent({
       run,
@@ -81,7 +85,9 @@ describe("deterministic validation agent run", () => {
 
     expect(completed.status).toBe("completed");
     expect(completed.logArtifactIds).toContain(transcript.artifactId);
-    expect(readFileSync(path.join(root, "validation-agent-output.txt"), "utf8")).toContain(run.runId);
+    expect(readFileSync(path.join(root, "validation-agent-output.txt"), "utf8")).toContain(
+      run.runId
+    );
     expect(repository.listEvents(run.runId).map((event) => event.type)).toContain("run.heartbeat");
     expect(transcript.localRef.endsWith("transcript.log")).toBe(true);
     expect(transcript.hash).toBe(

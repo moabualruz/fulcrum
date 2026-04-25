@@ -15,7 +15,9 @@ class MemoryDecisionRepository {
   }
 
   listPending(): any[] {
-    return [...this.decisions.values()].filter((decision) => decision.status === "approval_required");
+    return [...this.decisions.values()].filter(
+      (decision) => decision.status === "approval_required"
+    );
   }
 }
 

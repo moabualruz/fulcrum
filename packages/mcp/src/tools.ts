@@ -1,6 +1,5 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
-import path from "node:path";
 import { z } from "zod";
+import { buildRepoMapEvidence, buildRepoPackEvidence } from "@fulcrum/code-tools";
 import {
   MCP_TOOL_NAMES,
   PolicyActionSchema,
@@ -385,17 +384,10 @@ export function createMcpToolDefinitions(runtime: McpToolRuntime): McpToolDefini
       }),
       "policy_gated",
       (input) => {
-        const repoMap = buildRepoMap(runtime, input.projectId, input.paths, input.budget ?? 100);
-        return {
-          projectId: input.projectId,
-          previewOnly: input.previewOnly ?? false,
-          redactionStatus: "needs_review",
-          generatedAt: repoMap.generatedAt,
-          toolIdentity: "fulcrum.local-repo-pack",
-          includedFiles: repoMap.refs.map((ref) => ref.path),
-          sizeBytes: repoMap.refs.reduce((total, ref) => total + ref.sizeBytes, 0),
-          sourceRefs: repoMap.refs.map((ref) => ref.sourceRef)
-        };
+        return buildRepoPackEvidence({
+          ...repoEvidenceInput(runtime, input.projectId, input.paths, input.budget ?? 100),
+          previewOnly: input.previewOnly
+        });
       }
     ),
     tool(
@@ -578,57 +570,25 @@ function qualityGatePolicyDecision(
 }
 
 function buildRepoMap(runtime: McpToolRuntime, projectId: string, paths?: string[], limit = 50) {
+  return buildRepoMapEvidence(repoEvidenceInput(runtime, projectId, paths, limit));
+}
+
+function repoEvidenceInput(
+  runtime: McpToolRuntime,
+  projectId: string,
+  paths?: string[],
+  limit = 50
+) {
   const project = runtime.projects.get(projectId);
   if (!project) {
     throw new Error(`Unknown project: ${projectId}`);
   }
-  const root = project.rootPath;
-  const allowed = paths && paths.length > 0 ? new Set(paths) : undefined;
-  const refs: Array<{
-    path: string;
-    sizeBytes: number;
-    sourceRef: { type: string; uri: string; label: string };
-  }> = [];
-  const visit = (directory: string): void => {
-    if (refs.length >= limit || !existsSync(directory)) return;
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (refs.length >= limit) return;
-      if (entry.name === ".git" || entry.name === "node_modules" || entry.name === "dist") {
-        continue;
-      }
-      const absolute = path.join(directory, entry.name);
-      const relative = path.relative(root, absolute);
-      if (allowed && ![...allowed].some((candidate) => relative.startsWith(candidate))) {
-        continue;
-      }
-      if (entry.isDirectory()) {
-        visit(absolute);
-        continue;
-      }
-      const stat = statSync(absolute);
-      refs.push({
-        path: relative,
-        sizeBytes: stat.size,
-        sourceRef: { type: "file", uri: absolute, label: relative }
-      });
-    }
-  };
-  visit(root);
   return {
     projectId,
-    rootPath: root,
-    generatedAt: new Date().toISOString(),
-    freshness: "fresh",
-    toolVersion: "1.0",
-    repoCommit: "local-uncommitted",
-    configHash: project.ignoredPathPolicyId,
-    ignoredPathBehavior: "honored",
-    redactionStatus: "not_applicable",
-    toolIdentity: "fulcrum.local-repo-map",
-    cacheKey: `${projectId}:${project.lastScannedAt ?? "unscanned"}`,
-    invalidation: ["file_mtime", "path_rename", "ignored_path_policy"],
-    limitations: refs.length >= limit ? [`Limited to ${limit} files.`] : [],
-    refs
+    rootPath: project.rootPath,
+    ignoredPathPolicyId: project.ignoredPathPolicyId,
+    paths,
+    limit
   };
 }
 

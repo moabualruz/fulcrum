@@ -130,7 +130,7 @@ export class AdapterRegistryService {
     if (adapter) {
       adapter.metadata = { ...adapter.metadata, ...metadata };
     }
-    return this.repository?.save(adapter?.metadata ?? metadata) ?? (adapter?.metadata ?? metadata);
+    return this.repository?.save(adapter?.metadata ?? metadata) ?? adapter?.metadata ?? metadata;
   }
 
   private applyPersistedMetadata(adapter: FulcrumAdapter): void {

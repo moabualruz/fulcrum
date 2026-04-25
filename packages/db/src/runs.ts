@@ -141,9 +141,11 @@ export class RunRepository implements RunRepositoryPort {
 
   appendEvent(event: Omit<RunEvent, "sequence">): RunEvent {
     const sequence = Number(
-      (this.db.prepare("SELECT COALESCE(MAX(sequence), -1) + 1 AS sequence FROM events").get() as {
-        sequence: number;
-      }).sequence
+      (
+        this.db.prepare("SELECT COALESCE(MAX(sequence), -1) + 1 AS sequence FROM events").get() as {
+          sequence: number;
+        }
+      ).sequence
     );
     const parsed = RunEventSchema.parse({ ...event, sequence });
     this.db
