@@ -209,7 +209,11 @@ export class MemoryService {
   }
 
   private selectAdapter(backend = "markdown"): MemoryAdapter {
-    return this.adapters[backend] ?? this.adapters.markdown ?? new MarkdownMemoryAdapter();
+    const adapter = this.adapters[backend];
+    if (!adapter) {
+      throw new Error(`Unknown memory backend: ${backend}`);
+    }
+    return adapter;
   }
 
   private withRedaction(entry: MemoryEntry): MemoryEntry {

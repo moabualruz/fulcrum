@@ -47,4 +47,12 @@ describe("memory backends", () => {
     expect(memsearch[0]?.limitation).toContain("local markdown");
     expect(engram[0]?.limitation).toContain("local markdown");
   });
+
+  it("rejects unknown memory backends instead of silently using markdown", async () => {
+    const service = new MemoryService(new MemoryRepo());
+
+    await expect(
+      service.search({ projectId: "proj_memory", query: "README", backend: "typo" })
+    ).rejects.toThrow("Unknown memory backend: typo");
+  });
 });
