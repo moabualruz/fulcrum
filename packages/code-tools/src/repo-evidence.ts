@@ -22,6 +22,7 @@ export interface RepoMapEvidence {
   projectId: string;
   rootPath: string;
   generatedAt: string;
+  state: "managed" | "degraded";
   freshness: "fresh";
   toolVersion: string;
   repoCommit?: string;
@@ -54,12 +55,18 @@ export interface RepoPackEvidence {
 
 export function buildRepoMapEvidence(input: RepoEvidenceInput): RepoMapEvidence {
   const limit = input.limit ?? 50;
+  const rootExists = existsSync(input.rootPath);
   const refs = collectRepoRefs(input.rootPath, input.paths, limit);
   const repoCommit = readRepoCommit(input.rootPath);
+  const limitations = [
+    ...(rootExists ? [] : [`Project root missing: ${input.rootPath}.`]),
+    ...(refs.length >= limit ? [`Limited to ${limit} files.`] : [])
+  ];
   return {
     projectId: input.projectId,
     rootPath: input.rootPath,
     generatedAt: new Date().toISOString(),
+    state: rootExists ? "managed" : "degraded",
     freshness: "fresh",
     toolVersion: "1.0",
     repoCommit,
@@ -69,7 +76,7 @@ export function buildRepoMapEvidence(input: RepoEvidenceInput): RepoMapEvidence 
     toolIdentity: "fulcrum.local-repo-map",
     cacheKey: `${input.projectId}:${repoCommit ?? "local-uncommitted"}:${refs.length}`,
     invalidation: ["file_mtime", "path_rename", "ignored_path_policy"],
-    limitations: refs.length >= limit ? [`Limited to ${limit} files.`] : [],
+    limitations,
     refs
   };
 }

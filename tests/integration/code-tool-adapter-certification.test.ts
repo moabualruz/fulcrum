@@ -134,6 +134,7 @@ describe("code tool adapter certification", () => {
       });
 
       expect(repoMap.refs[0]).toMatchObject({ path: "README.md" });
+      expect(repoMap.state).toBe("managed");
       expect(pack).toMatchObject({
         toolIdentity: "fulcrum.local-repo-pack",
         state: "degraded",
@@ -144,6 +145,39 @@ describe("code tool adapter certification", () => {
       if (previousPath === undefined) delete process.env.PATH;
       else process.env.PATH = previousPath;
       rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it("marks repo-map and repo-pack evidence degraded when the project root is missing", () => {
+    const root = path.join(tmpdir(), `fulcrum-missing-repo-${Date.now()}`);
+    const previousPath = process.env.PATH;
+    process.env.PATH = "";
+
+    try {
+      const repoMap = buildRepoMapEvidence({
+        projectId: "proj_missing_repo",
+        rootPath: root,
+        limit: 10
+      });
+      const pack = buildRepoPackEvidence({
+        projectId: "proj_missing_repo",
+        rootPath: root,
+        limit: 10
+      });
+
+      expect(repoMap).toMatchObject({
+        state: "degraded",
+        refs: [],
+        limitations: [expect.stringContaining("Project root missing")]
+      });
+      expect(pack).toMatchObject({
+        state: "degraded",
+        includedFiles: [],
+        limitations: expect.arrayContaining([expect.stringContaining("Project root missing")])
+      });
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
     }
   });
 
