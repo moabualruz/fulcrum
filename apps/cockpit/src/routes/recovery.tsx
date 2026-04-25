@@ -48,37 +48,12 @@ interface DestructivePreview {
 }
 
 const fallbackState: RecoveryState = {
-  backups: [],
-  resetPreview: {
-    remove: ["derived caches"],
-    preserve: ["backups", "artifacts", "user repositories"],
-    policyDecision: { status: "approval_required" }
-  },
-  uninstallPreview: {
-    remove: ["Fulcrum SQLite state", "derived caches"],
-    preserve: ["backups", "artifacts", "user repositories"],
-    policyDecision: { status: "approval_required" }
-  },
-  exportPreview: {
-    includedEntityClasses: ["projects", "tasks", "runs"],
-    recordCounts: {},
-    provenanceCoverage: "none",
-    redactionStatus: "not_applicable",
-    requiresPolicyApproval: true,
-    guarantees: ["Exports stay local and include provenance when state records are available."]
-  },
-  rebuildPreview: {
-    preservedCanonicalState: true,
-    steps: [
-      { name: "projections", status: "degraded", rebuiltCount: 0, source: "unavailable" },
-      { name: "memory_indexes", status: "degraded", rebuiltCount: 0, source: "unavailable" },
-      { name: "code_refs", status: "degraded", rebuiltCount: 0, source: "unavailable" }
-    ]
-  }
+  backups: []
 };
 
 export function RecoveryRoute() {
   const [state, setState] = useState<RecoveryState>(fallbackState);
+  const [status, setStatus] = useState<"loading" | "ready" | "degraded">("loading");
   const [actionStatus, setActionStatus] = useState("");
 
   useEffect(() => {
@@ -142,10 +117,12 @@ export function RecoveryRoute() {
             resetPreview: reset.data,
             uninstallPreview: uninstall.data
           });
+          setStatus("ready");
         }
       } catch {
         if (active) {
           setState(fallbackState);
+          setStatus("degraded");
         }
       }
     }
@@ -163,7 +140,11 @@ export function RecoveryRoute() {
     <main>
       <header>
         <h1>Recovery</h1>
-        <p>Backups, exports, rebuilds, reset previews, and uninstall previews</p>
+        <p>
+          {status === "degraded"
+            ? "Recovery API degraded"
+            : "Backups, exports, rebuilds, reset previews, and uninstall previews"}
+        </p>
       </header>
       <section aria-label="Backup manifests">
         <h2>Backups</h2>
