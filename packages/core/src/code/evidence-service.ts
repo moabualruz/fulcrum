@@ -269,6 +269,12 @@ export class CodeEvidenceService {
     if (!existsSync(absolutePath) || ignorePolicy.isIgnored(absolutePath)) {
       return true;
     }
+    if (evidence.evidenceType === "path" || evidence.evidenceType === "filename") {
+      return !evidence.filePath.toLowerCase().includes(evidence.query.toLowerCase());
+    }
+    if (evidence.evidenceType === "structural") {
+      return false;
+    }
     let body: string;
     try {
       body = readFileSync(absolutePath, "utf8");

@@ -67,6 +67,29 @@ describe("code evidence stale cleanup", () => {
     expect(staleAfterIgnoreChange[0].ignoredPathStatus).toBe("not_ignored");
   });
 
+  it("keeps path-only evidence fresh when only the file body omits the query", async () => {
+    const rootPath = await mkdtemp(path.join(os.tmpdir(), "fulcrum-code-path-fresh-"));
+    const source = path.join(rootPath, "feature-path-hit.ts");
+    await writeFile(source, "export const unrelated = true;\n");
+    const work = new FileWorkRepository(path.join(rootPath, ".fulcrum", "work.json"));
+    const projectRepository = new FileProjectRepository(work);
+    const evidenceRepository = new FileCodeEvidenceRepository(work);
+    const project = new ProjectRegistryService(projectRepository).register({ rootPath });
+    const code = new CodeEvidenceService(
+      projectRepository,
+      evidenceRepository,
+      { search: (options) => searchExact(options) },
+      searchSemantic
+    );
+    const result = await code.search({ projectId: project.projectId, query: "path-hit" });
+
+    const stale = code.cleanupStale(project.projectId);
+
+    expect(result.evidence.some((item) => item.evidenceType === "filename")).toBe(true);
+    expect(stale).toHaveLength(0);
+    expect(evidenceRepository.list(project.projectId).every((item) => !item.staleAt)).toBe(true);
+  });
+
   it("scopes invalidation records to the changed project", async () => {
     const stateRoot = await mkdtemp(path.join(os.tmpdir(), "fulcrum-code-stale-scope-"));
     const rootA = await mkdtemp(path.join(os.tmpdir(), "fulcrum-code-stale-a-"));
