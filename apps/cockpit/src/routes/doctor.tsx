@@ -12,8 +12,14 @@ interface Capability {
 }
 
 const fallbackCapabilities: Capability[] = [
-  { capabilityId: "cap_local_state", state: "guided", nextAction: "Run setup apply" },
-  { capabilityId: "cap_network", state: "disabled", nextAction: "Remote checks skipped" }
+  {
+    capabilityId: "cap_doctor_api",
+    state: "degraded",
+    blocking: true,
+    privacyStatus: "local_only",
+    affectedWorkflows: ["doctor"],
+    nextAction: "Start the Fulcrum server and retry doctor."
+  }
 ];
 
 export function DoctorRoute() {

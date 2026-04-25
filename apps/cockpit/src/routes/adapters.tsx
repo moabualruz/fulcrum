@@ -42,32 +42,8 @@ interface AdapterCertification {
   healthEvidence: string[];
 }
 
-const fallbackAdapters: AdapterEntry[] = [
-  {
-    metadata: {
-      adapterId: "adapter_memory_markdown",
-      category: "memory",
-      name: "Markdown memory",
-      enabled: true,
-      credentialStatus: "not_required",
-      privacyNotes: "Local markdown memory remains available."
-    },
-    health: {
-      state: "managed",
-      affectedWorkflows: ["memory", "context"],
-      nextAction: "No action needed."
-    },
-    capabilities: {
-      supported: ["import", "search", "export"],
-      unavailable: [],
-      localFallback: [],
-      policyGated: []
-    }
-  }
-];
-
 export function AdaptersRoute() {
-  const [adapters, setAdapters] = useState<AdapterEntry[]>(fallbackAdapters);
+  const [adapters, setAdapters] = useState<AdapterEntry[]>([]);
   const [certifications, setCertifications] = useState<Record<string, AdapterCertification>>({});
   const [mcpTools, setMcpTools] = useState<McpToolEntry[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "degraded">("loading");
@@ -82,7 +58,7 @@ export function AdaptersRoute() {
       }
     } catch {
       if (shouldApply()) {
-        setAdapters(fallbackAdapters);
+        setAdapters([]);
         setStatus("degraded");
       }
     }
@@ -143,6 +119,13 @@ export function AdaptersRoute() {
       </header>
       <section aria-label="Adapter settings">
         <h2>Settings</h2>
+        {adapters.length === 0 ? (
+          <p>
+            {status === "degraded"
+              ? "Adapter status unavailable."
+              : "No adapters reported by the server."}
+          </p>
+        ) : null}
         <ul>
           {adapters.map((adapter) => (
             <li key={adapter.metadata.adapterId}>
