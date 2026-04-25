@@ -14,24 +14,30 @@ export function MemoryRoute() {
   const params = new URLSearchParams(globalThis.location?.search ?? "");
   const projectId = params.get("projectId") ?? "";
   const [entries, setEntries] = useState<MemoryEntry[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "degraded">("loading");
 
   useEffect(() => {
     if (!projectId) {
+      setStatus("degraded");
       return;
     }
     fetch(`/api/v1/memory/export?projectId=${encodeURIComponent(projectId)}`)
       .then((response) => response.json())
-      .then((payload: { data?: { entries?: MemoryEntry[] } }) =>
-        setEntries(payload.data?.entries ?? [])
-      )
-      .catch(() => setEntries([]));
+      .then((payload: { data?: { entries?: MemoryEntry[] } }) => {
+        setEntries(payload.data?.entries ?? []);
+        setStatus("ready");
+      })
+      .catch(() => {
+        setEntries([]);
+        setStatus("degraded");
+      });
   }, [projectId]);
 
   return (
     <main>
       <header>
         <h1>Memory</h1>
-        <p>Drafts and source provenance</p>
+        <p>{status === "degraded" ? "Memory API degraded" : "Drafts and source provenance"}</p>
       </header>
       <section aria-label="Memory entries">
         {entries.map((entry) => (
