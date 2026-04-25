@@ -156,6 +156,7 @@ describe("release readiness contract", () => {
     const mockArtifact = "validation/mock.json";
     const previewArtifact = "validation/preview.json";
     const degradedArtifact = "validation/degraded.json";
+    const plainSkippedArtifact = "validation/plain-skipped.txt";
 
     writeFileSync(
       path.join(evidenceDir, goodArtifact),
@@ -179,6 +180,10 @@ describe("release readiness contract", () => {
         validationArtifacts: ["validation/test.json"]
       })
     );
+    writeFileSync(
+      path.join(evidenceDir, plainSkippedArtifact),
+      "quality validation skipped because tool degraded\n"
+    );
 
     const sectionEvidence = Object.fromEntries(
       REQUIRED_RELEASE_SECTIONS.map((section) => [section, [goodArtifact]])
@@ -187,6 +192,7 @@ describe("release readiness contract", () => {
     sectionEvidence["real-agent acceptance"] = [mockArtifact];
     sectionEvidence["adapter certification"] = [previewArtifact];
     sectionEvidence["quality gates"] = [degradedArtifact];
+    sectionEvidence["worktree safety"] = [plainSkippedArtifact];
 
     const audit = {
       schemaVersion: "1.0" as const,
@@ -245,6 +251,10 @@ describe("release readiness contract", () => {
         }),
         expect.objectContaining({
           checkId: "release.section.quality.gates",
+          status: "failed"
+        }),
+        expect.objectContaining({
+          checkId: "release.section.worktree.safety",
           status: "failed"
         })
       ])

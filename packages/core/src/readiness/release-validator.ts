@@ -303,7 +303,7 @@ function artifactHasDisallowedStatus(artifact: string): boolean {
   const parsed = parseJsonArtifact(text);
   if (parsed !== undefined) return jsonHasDisallowedStatus(parsed);
   const normalized = text.toLowerCase();
-  return /\bfailed\b|\bpass"\s*:\s*false\b|\bmissing\b|\bpartial\b|\bmock_only\b|\bpreview_only\b|\bdocumentation_only\b|\bmock-only\b|\bpreview-only\b|\bdocumentation-only\b|\bmockonly\b|\bpreviewonly\b|\bdocumentationonly\b/.test(
+  return /\bfailed\b|\berror\b|\bskipped\b|\bblocked\b|\bdegraded\b|\bpass"\s*:\s*false\b|\bmissing\b|\bpartial\b|\bmock_only\b|\bpreview_only\b|\bdocumentation_only\b|\bmock-only\b|\bpreview-only\b|\bdocumentation-only\b|\bmockonly\b|\bpreviewonly\b|\bdocumentationonly\b/.test(
     normalized
   );
 }
