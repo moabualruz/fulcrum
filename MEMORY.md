@@ -181,10 +181,7 @@ claude mcp add -s user memory \
   -e MEMORY_FILE_PATH=/Users/mkh/.agent-memory/memory.jsonl \
   -- npx -y @modelcontextprotocol/server-memory
 
-# Repomix MCP at user scope
-claude mcp add -s user repomix -- npx -y repomix --mcp
-
-# Repomix's three official Claude Code plugins
+# Repomix's three official Claude Code plugins (one of them registers MCP automatically)
 claude plugin marketplace add yamadashy/repomix
 claude plugin install repomix-mcp@repomix
 claude plugin install repomix-commands@repomix
@@ -194,17 +191,28 @@ claude plugin install repomix-explorer@repomix
 claude plugin marketplace add ast-grep/agent-skill
 claude plugin install ast-grep@ast-grep-marketplace
 
-# graphify (run per-project where wanted)
-# graphify install --platform claude
+# graphify skill at user scope (~/.claude/skills/graphify)
+graphify install --platform claude
 ```
+
+> Do **not** run `claude mcp add -s user repomix` separately — the `repomix-mcp` plugin already exposes a `plugin:repomix-mcp:repomix` MCP server and a manual entry creates a duplicate. Verify with `claude mcp list`.
 
 ### 8.2 Codex CLI
 
 ```bash
+# Memory + repomix MCP at global (user) scope
 codex mcp add memory --env MEMORY_FILE_PATH=/Users/mkh/.agent-memory/memory.jsonl \
   -- npx -y @modelcontextprotocol/server-memory
 codex mcp add repomix -- npx -y repomix --mcp
-# graphify per-project: graphify install --platform codex
+
+# Official ast-grep skill via Codex's marketplace mechanism
+codex plugin marketplace add ast-grep/agent-skill
+# Then enable in ~/.codex/config.toml (Codex has no `plugin install` verb):
+#   [plugins."ast-grep@ast-grep-marketplace"]
+#   enabled = true
+
+# graphify skill (Codex looks at ~/.agents/skills/, not ~/.codex/skills/)
+graphify install --platform codex
 ```
 
 ### 8.3 OpenCode — `~/.config/opencode/opencode.json`
@@ -227,7 +235,10 @@ codex mcp add repomix -- npx -y repomix --mcp
   }
 }
 ```
-graphify per-project: `graphify install --platform opencode`.
+
+```bash
+graphify install --platform opencode    # writes ~/.config/opencode/skills/graphify
+```
 
 ### 8.4 Gemini CLI — `~/.gemini/settings.json`
 
@@ -246,7 +257,12 @@ graphify per-project: `graphify install --platform opencode`.
   }
 }
 ```
-graphify per-project: `graphify install --platform gemini`.
+
+```bash
+graphify install --platform gemini      # writes ~/.gemini/skills/graphify
+```
+
+> **Gemini display quirk:** `gemini mcp list` returns empty output even when `~/.gemini/settings.json` is correctly populated. The settings file is the source of truth — `gemini mcp add` mutates the same file. The actual MCP servers load when a real Gemini session starts; the `list` command appears to be a Gemini-CLI display bug as of v0.39.x.
 
 ### 8.5 GitHub Copilot CLI — `~/.copilot/mcp-config.json`
 
@@ -276,11 +292,11 @@ graphify per-project: `graphify install --platform gemini`.
 
 | Agent | Memory | repomix | ast-grep | code-graph (graphify) |
 |---|---|---|---|---|
-| Claude Code | shared MCP (user scope) | MCP + 3 official plugins | system CLI + official skill | per-project |
-| Codex CLI | shared MCP (global) | MCP | system CLI | per-project |
-| OpenCode | shared MCP | MCP | system CLI | per-project |
-| Gemini CLI | shared MCP | MCP | system CLI | per-project |
-| Copilot CLI | shared MCP | MCP | system CLI | not supported |
+| Claude Code | shared MCP (user) | MCP via `repomix-mcp` plugin (3 plugins total) | system CLI + official skill | user-scope skill |
+| Codex CLI | shared MCP (global) | MCP | system CLI + official skill (via marketplace + config.toml enable) | user-scope skill (`~/.agents/skills/`) |
+| OpenCode | shared MCP | MCP | system CLI | user-scope skill |
+| Gemini CLI | shared MCP (settings.json) | MCP | system CLI | user-scope skill |
+| Copilot CLI | shared MCP | MCP | system CLI | not supported by graphify |
 
 All five agents read and write the **same** `~/.agent-memory/memory.jsonl`. That is the unified-memory guarantee.
 
@@ -351,8 +367,16 @@ That keeps fulcrum small, replaceable, and aligned with the constraint set above
 This commit reflects an **executed** rollout, not a proposal:
 
 - ✅ `~/.agent-memory/memory.jsonl` created.
-- ✅ `ast-grep`, `uv`, `graphifyy` installed locally.
-- ✅ `memory` and `repomix` MCP servers registered at user scope on Claude Code, Codex CLI, OpenCode, Gemini CLI, Copilot CLI.
-- ✅ Claude Code plugins installed: `repomix-mcp`, `repomix-commands`, `repomix-explorer`, `ast-grep`.
-- 🟡 graphify is installed locally; run `graphify install --platform <agent>` per project as needed.
-- 🟡 `AGENTS.md` template is documented above; drop it into target projects as needed.
+- ✅ `ast-grep`, `uv`, `graphifyy` installed locally (via `brew` + `uv tool`).
+- ✅ `memory` MCP at user scope on all 5 agents; `repomix` MCP at user scope on Codex / OpenCode / Gemini / Copilot, and via the `repomix-mcp` plugin on Claude Code (verified single-source — no duplicate manual entry).
+- ✅ Claude Code plugins installed (user scope): `repomix-mcp@repomix`, `repomix-commands@repomix`, `repomix-explorer@repomix`, `ast-grep@ast-grep-marketplace`.
+- ✅ Codex CLI: `ast-grep/agent-skill` marketplace added and `[plugins."ast-grep@ast-grep-marketplace"] enabled = true` set in `~/.codex/config.toml`.
+- ✅ graphify skill installed at user scope on Claude (`~/.claude/skills/graphify`), Codex (`~/.agents/skills/graphify`), OpenCode (`~/.config/opencode/skills/graphify`), Gemini (`~/.gemini/skills/graphify`).
+- 🟡 `AGENTS.md` template documented in §7; drop into target projects as needed.
+- 🟡 graphify is also a per-project tool: from inside a repo, `/graphify .` builds the knowledge graph in `graphify-out/`.
+
+### Audit caveats / known quirks
+
+- `gemini mcp list` returns empty output despite `~/.gemini/settings.json` being correctly populated and read. CLI display quirk; servers do load when a session starts.
+- `claude mcp list` shows `plugin:repomix-mcp:repomix` (provided by the plugin) — not a duplicate of `memory`. There is no separately-added `repomix` user-scope server on Claude (intentional — adding one creates a duplicate).
+- Copilot CLI does not appear in graphify's supported platform list (`claude | codex | opencode | aider | gemini | cursor | windows | claw | droid | trae | trae-cn | antigravity | hermes | kiro`). Copilot relies on memory + repomix MCP + system `ast-grep` only.
