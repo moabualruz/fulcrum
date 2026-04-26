@@ -130,19 +130,28 @@ done
 
 [yamadashy/repomix](https://github.com/yamadashy/repomix) is first-party. Run via `npx -y repomix --mcp`. With `--compress`, Tree-sitter strips function bodies and keeps signatures (~70% token reduction). Configured as an MCP server on every agent.
 
-### 6.3 code-graph (graphify) — per-project install, not user-global
+### 6.3 code-graph (graphify) — user-scope skill on all 5 agents
 
-[safishamsi/graphify](https://github.com/safishamsi/graphify) is first-party. Distributed as a Python tool installed via `uv`. Its installer drops a per-project skill/hook into `.claude/skills/`, `.codex/skills/`, `.opencode/plugins/`, or `.gemini/settings.json` of the **current working directory**.
+[safishamsi/graphify](https://github.com/safishamsi/graphify) is first-party. The Python CLI (`graphify install --platform <agent>`) writes a `SKILL.md` plus version pin into the agent's user-scope skills directory. Same pattern as ast-grep: a system CLI (the `graphify` Python tool) plus a skill that teaches the agent how/when to use it.
 
 ```bash
 brew install uv
 uv tool install graphifyy
-# Run inside each project where you want code-graph awareness:
-cd <project-root>
-graphify install --platform claude       # or codex | opencode | gemini
+
+graphify install --platform claude     # ~/.claude/skills/graphify
+graphify install --platform codex      # ~/.agents/skills/graphify (Codex's skills dir)
+graphify install --platform opencode   # ~/.config/opencode/skills/graphify
+graphify install --platform gemini     # ~/.gemini/skills/graphify
 ```
 
-Supported platforms (per `graphify install --help`): `claude | codex | opencode | gemini | aider | cursor | windows | claw | droid | trae | trae-cn | antigravity | hermes | kiro`. **Not supported: GitHub Copilot CLI** — drop graphify for that agent and use ast-grep + repomix only.
+Supported by `graphify install`: `claude | codex | opencode | gemini | aider | cursor | windows | claw | droid | trae | trae-cn | antigravity | hermes | kiro`. **Copilot CLI is not in that list**, so we apply the same first-party-skill-copy pattern as ast-grep — the `SKILL.md` is identical first-party content; only the placement differs:
+
+```bash
+mkdir -p ~/.copilot/skills/graphify && \
+  cp -R ~/.claude/skills/graphify/. ~/.copilot/skills/graphify/
+```
+
+The `graphify` CLI itself (used to build the graph and answer queries) is invoked from any project's working tree — it doesn't need per-agent registration beyond the skill above.
 
 ---
 
@@ -298,7 +307,7 @@ mkdir -p ~/.gemini/skills/ast-grep && \
 
 ### 8.5 GitHub Copilot CLI — `~/.copilot/mcp-config.json`
 
-> Standalone agent harness installed via `npm install -g @github/copilot`. Not `gh copilot`, not the VS Code extension. **graphify does not support Copilot CLI**, so this agent gets memory + repomix + system ast-grep only.
+> Standalone agent harness installed via `npm install -g @github/copilot`. Not `gh copilot`, not the VS Code extension. graphify's CLI installer doesn't list Copilot as a supported platform, but the skill is just markdown — we copy it (see §6.3).
 
 ```json
 {
@@ -323,6 +332,10 @@ mkdir -p ~/.gemini/skills/ast-grep && \
 mkdir -p ~/.copilot/skills/ast-grep && \
   cp -R ~/.claude/plugins/marketplaces/ast-grep-marketplace/ast-grep/skills/ast-grep/. \
         ~/.copilot/skills/ast-grep/
+
+# graphify skill (copy from Claude's user-scope install)
+mkdir -p ~/.copilot/skills/graphify && \
+  cp -R ~/.claude/skills/graphify/. ~/.copilot/skills/graphify/
 ```
 
 ---
@@ -335,9 +348,9 @@ mkdir -p ~/.copilot/skills/ast-grep && \
 | Codex CLI | shared MCP (global) | MCP | system CLI + official skill (marketplace + config.toml) | user-scope skill (`~/.agents/skills/`) |
 | OpenCode | shared MCP | MCP | system CLI + official skill (copied to `~/.config/opencode/skills/ast-grep`) | user-scope skill |
 | Gemini CLI | shared MCP (settings.json) | MCP | system CLI + official skill (copied to `~/.gemini/skills/ast-grep`) | user-scope skill |
-| Copilot CLI | shared MCP | MCP | system CLI + official skill (copied to `~/.copilot/skills/ast-grep`) | not supported by graphify |
+| Copilot CLI | shared MCP | MCP | system CLI + official skill (copied to `~/.copilot/skills/ast-grep`) | skill copied to `~/.copilot/skills/graphify` |
 
-Every agent has both the `ast-grep` binary **and** the official ast-grep skill. The skill content is identical first-party material from `ast-grep/agent-skill`; only the install mechanism differs (marketplace vs. file copy) because OpenCode/Gemini/Copilot don't expose ast-grep's marketplace.
+Every agent has both the `ast-grep` binary **and** the official ast-grep skill, and every agent has the graphify skill. Skill content is identical first-party material; only the install mechanism differs (marketplace install where supported, otherwise file copy from a sibling agent's user-scope skills dir).
 
 All five agents read and write the **same** `~/.agent-memory/memory.jsonl`. That is the unified-memory guarantee.
 
@@ -413,7 +426,7 @@ This commit reflects an **executed** rollout, not a proposal:
 - ✅ Claude Code plugins installed (user scope): `repomix-mcp@repomix`, `repomix-commands@repomix`, `repomix-explorer@repomix`, `ast-grep@ast-grep-marketplace`.
 - ✅ Codex CLI: `ast-grep/agent-skill` marketplace added and `[plugins."ast-grep@ast-grep-marketplace"] enabled = true` set in `~/.codex/config.toml`.
 - ✅ ast-grep skill copied to OpenCode (`~/.config/opencode/skills/ast-grep`), Gemini (`~/.gemini/skills/ast-grep`), Copilot CLI (`~/.copilot/skills/ast-grep`) — same first-party `SKILL.md` + `references/` from the ast-grep marketplace, just placed where each agent looks for skills.
-- ✅ graphify skill installed at user scope on Claude (`~/.claude/skills/graphify`), Codex (`~/.agents/skills/graphify`), OpenCode (`~/.config/opencode/skills/graphify`), Gemini (`~/.gemini/skills/graphify`).
+- ✅ graphify skill at user scope on all 5 agents: Claude (`~/.claude/skills/graphify`), Codex (`~/.agents/skills/graphify`), OpenCode (`~/.config/opencode/skills/graphify`), Gemini (`~/.gemini/skills/graphify`), Copilot (`~/.copilot/skills/graphify` — copied, since graphify's CLI installer doesn't target Copilot).
 - 🟡 `AGENTS.md` template documented in §7; drop into target projects as needed.
 - 🟡 graphify is also a per-project tool: from inside a repo, `/graphify .` builds the knowledge graph in `graphify-out/`.
 
@@ -421,4 +434,4 @@ This commit reflects an **executed** rollout, not a proposal:
 
 - `gemini mcp list` returns empty output despite `~/.gemini/settings.json` being correctly populated and read. CLI display quirk; servers do load when a session starts.
 - `claude mcp list` shows `plugin:repomix-mcp:repomix` (provided by the plugin) — not a duplicate of `memory`. There is no separately-added `repomix` user-scope server on Claude (intentional — adding one creates a duplicate).
-- Copilot CLI does not appear in graphify's supported platform list (`claude | codex | opencode | aider | gemini | cursor | windows | claw | droid | trae | trae-cn | antigravity | hermes | kiro`). Copilot relies on memory + repomix MCP + system `ast-grep` only.
+- Copilot CLI does not appear in graphify's CLI installer platform list (`claude | codex | opencode | aider | gemini | cursor | windows | claw | droid | trae | trae-cn | antigravity | hermes | kiro`). Closed by copying the same first-party `SKILL.md` from `~/.claude/skills/graphify` into `~/.copilot/skills/graphify` — the skill is plain markdown, the `graphify` CLI itself is a system binary that any agent invokes via shell.
