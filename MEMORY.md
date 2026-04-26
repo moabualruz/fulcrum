@@ -91,16 +91,40 @@ Plain text, human-readable, hand-editable. Backup = copy the file. Reset = `: > 
 
 ## 6. The Code Layer
 
-### 6.1 ast-grep (structural pattern search) — install as system CLI, not MCP
+### 6.1 ast-grep (structural pattern search) — system CLI **plus** skill on every agent
 
-The npm package `ast-grep-mcp` does **not** exist. The first-party `ast-grep-mcp` is a Python experimental project at [ast-grep/ast-grep-mcp](https://github.com/ast-grep/ast-grep-mcp), not on npm. Rather than adding Python tooling for a niche bridge, we install the `ast-grep` CLI globally and let agents shell out — every CLI agent in scope (Claude/Codex/OpenCode/Gemini/Copilot) has shell access.
+The npm package `ast-grep-mcp` does **not** exist. The first-party `ast-grep-mcp` is a Python experimental project at [ast-grep/ast-grep-mcp](https://github.com/ast-grep/ast-grep-mcp), not on npm. Rather than adding Python tooling for a niche bridge, we use the `ast-grep` CLI directly and rely on the official **agent skill** to teach every agent how/when to use it.
+
+**Important rule discovered during rollout:** *a system CLI alone isn't enough — every agent also needs the official skill (the `SKILL.md` + reference docs from [ast-grep/agent-skill](https://github.com/ast-grep/agent-skill))* so the model knows the YAML rule format, meta-variable syntax, and the canonical workflow. Without the skill, agents tend to invent broken `ast-grep` invocations.
+
+Approach:
+
+1. Install the `ast-grep` CLI once on the machine (`brew install ast-grep`).
+2. On agents that have a marketplace mechanism (Claude Code, Codex CLI), install the skill via the marketplace.
+3. On agents that don't (OpenCode, Gemini CLI, Copilot CLI), **copy** the same first-party `SKILL.md` + `references/` directly into each agent's skills directory. The content is unchanged — it's still ast-grep's first-party material, just placed where the agent looks for skills.
 
 ```bash
-brew install ast-grep
-ast-grep --version    # 0.42.x or newer
-```
+# 1. CLI
+brew install ast-grep                 # 0.42.x or newer
 
-**Tighter integration on Claude Code:** the official `ast-grep/agent-skill` (slash commands, examples) is installed as a Claude plugin (see §8.1).
+# 2a. Claude Code (marketplace)
+claude plugin marketplace add ast-grep/agent-skill
+claude plugin install ast-grep@ast-grep-marketplace
+
+# 2b. Codex CLI (marketplace + config.toml enable)
+codex plugin marketplace add ast-grep/agent-skill
+# then in ~/.codex/config.toml:
+#   [plugins."ast-grep@ast-grep-marketplace"]
+#   enabled = true
+
+# 3. OpenCode / Gemini / Copilot — copy the same first-party skill
+SRC=~/.claude/plugins/marketplaces/ast-grep-marketplace/ast-grep/skills/ast-grep
+for dest in ~/.config/opencode/skills/ast-grep \
+            ~/.gemini/skills/ast-grep \
+            ~/.copilot/skills/ast-grep; do
+  mkdir -p "$dest" && cp -R "$SRC"/. "$dest"/
+done
+```
 
 ### 6.2 repomix (pack repo into context) — MCP
 
@@ -238,6 +262,10 @@ graphify install --platform codex
 
 ```bash
 graphify install --platform opencode    # writes ~/.config/opencode/skills/graphify
+# ast-grep skill (copy from Claude's installed marketplace)
+mkdir -p ~/.config/opencode/skills/ast-grep && \
+  cp -R ~/.claude/plugins/marketplaces/ast-grep-marketplace/ast-grep/skills/ast-grep/. \
+        ~/.config/opencode/skills/ast-grep/
 ```
 
 ### 8.4 Gemini CLI — `~/.gemini/settings.json`
@@ -260,6 +288,10 @@ graphify install --platform opencode    # writes ~/.config/opencode/skills/graph
 
 ```bash
 graphify install --platform gemini      # writes ~/.gemini/skills/graphify
+# ast-grep skill (copy from Claude's installed marketplace)
+mkdir -p ~/.gemini/skills/ast-grep && \
+  cp -R ~/.claude/plugins/marketplaces/ast-grep-marketplace/ast-grep/skills/ast-grep/. \
+        ~/.gemini/skills/ast-grep/
 ```
 
 > **Gemini display quirk:** `gemini mcp list` returns empty output even when `~/.gemini/settings.json` is correctly populated. The settings file is the source of truth — `gemini mcp add` mutates the same file. The actual MCP servers load when a real Gemini session starts; the `list` command appears to be a Gemini-CLI display bug as of v0.39.x.
@@ -286,17 +318,26 @@ graphify install --platform gemini      # writes ~/.gemini/skills/graphify
 
 > **Built-in Copilot Memory:** Pro/Pro+ users have a native Copilot Memory feature enabled by default. It's repo-local and *additive* to our shared `memory.jsonl`. Don't disable it; ignore it — it doesn't interfere.
 
+```bash
+# ast-grep skill (copy from Claude's installed marketplace)
+mkdir -p ~/.copilot/skills/ast-grep && \
+  cp -R ~/.claude/plugins/marketplaces/ast-grep-marketplace/ast-grep/skills/ast-grep/. \
+        ~/.copilot/skills/ast-grep/
+```
+
 ---
 
 ## 9. Support Matrix (what landed)
 
 | Agent | Memory | repomix | ast-grep | code-graph (graphify) |
 |---|---|---|---|---|
-| Claude Code | shared MCP (user) | MCP via `repomix-mcp` plugin (3 plugins total) | system CLI + official skill | user-scope skill |
-| Codex CLI | shared MCP (global) | MCP | system CLI + official skill (via marketplace + config.toml enable) | user-scope skill (`~/.agents/skills/`) |
-| OpenCode | shared MCP | MCP | system CLI | user-scope skill |
-| Gemini CLI | shared MCP (settings.json) | MCP | system CLI | user-scope skill |
-| Copilot CLI | shared MCP | MCP | system CLI | not supported by graphify |
+| Claude Code | shared MCP (user) | MCP via `repomix-mcp` plugin (3 plugins total) | system CLI + official skill (marketplace) | user-scope skill |
+| Codex CLI | shared MCP (global) | MCP | system CLI + official skill (marketplace + config.toml) | user-scope skill (`~/.agents/skills/`) |
+| OpenCode | shared MCP | MCP | system CLI + official skill (copied to `~/.config/opencode/skills/ast-grep`) | user-scope skill |
+| Gemini CLI | shared MCP (settings.json) | MCP | system CLI + official skill (copied to `~/.gemini/skills/ast-grep`) | user-scope skill |
+| Copilot CLI | shared MCP | MCP | system CLI + official skill (copied to `~/.copilot/skills/ast-grep`) | not supported by graphify |
+
+Every agent has both the `ast-grep` binary **and** the official ast-grep skill. The skill content is identical first-party material from `ast-grep/agent-skill`; only the install mechanism differs (marketplace vs. file copy) because OpenCode/Gemini/Copilot don't expose ast-grep's marketplace.
 
 All five agents read and write the **same** `~/.agent-memory/memory.jsonl`. That is the unified-memory guarantee.
 
@@ -371,6 +412,7 @@ This commit reflects an **executed** rollout, not a proposal:
 - ✅ `memory` MCP at user scope on all 5 agents; `repomix` MCP at user scope on Codex / OpenCode / Gemini / Copilot, and via the `repomix-mcp` plugin on Claude Code (verified single-source — no duplicate manual entry).
 - ✅ Claude Code plugins installed (user scope): `repomix-mcp@repomix`, `repomix-commands@repomix`, `repomix-explorer@repomix`, `ast-grep@ast-grep-marketplace`.
 - ✅ Codex CLI: `ast-grep/agent-skill` marketplace added and `[plugins."ast-grep@ast-grep-marketplace"] enabled = true` set in `~/.codex/config.toml`.
+- ✅ ast-grep skill copied to OpenCode (`~/.config/opencode/skills/ast-grep`), Gemini (`~/.gemini/skills/ast-grep`), Copilot CLI (`~/.copilot/skills/ast-grep`) — same first-party `SKILL.md` + `references/` from the ast-grep marketplace, just placed where each agent looks for skills.
 - ✅ graphify skill installed at user scope on Claude (`~/.claude/skills/graphify`), Codex (`~/.agents/skills/graphify`), OpenCode (`~/.config/opencode/skills/graphify`), Gemini (`~/.gemini/skills/graphify`).
 - 🟡 `AGENTS.md` template documented in §7; drop into target projects as needed.
 - 🟡 graphify is also a per-project tool: from inside a repo, `/graphify .` builds the knowledge graph in `graphify-out/`.
