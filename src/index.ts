@@ -81,21 +81,44 @@ async function runHook(name: string, _args: string[]) {
     case "router":
     case "tool-output-router": {
       const { run } = await import("./hooks/tool-output-router.ts");
-      // Read stdin BEFORE the dynamic import resolves so it isn't lost.
-      // (The import above already resolved by the time we reach run.)
       await run();
       return;
     }
-    case "format":
-    case "lint-gate":
-    case "pm-policy":
-    case "test-on-edit":
-    case "audit-log":
-    case "index-check":
-    case "index-rebuild":
-      // Stubs to fill in next phase. For now, exit 0 (no-op).
-      process.stderr.write(`fulcrum hook ${name}: not yet ported to TS (stub)\n`);
-      process.exit(0);
+    case "format": {
+      const { runHook } = await import("./hooks/format.ts");
+      await runHook();
+      return;
+    }
+    case "lint-gate": {
+      const { runHook } = await import("./hooks/lint-gate.ts");
+      await runHook();
+      return;
+    }
+    case "pm-policy": {
+      const { runHook } = await import("./hooks/pm-policy.ts");
+      await runHook();
+      return;
+    }
+    case "test-on-edit": {
+      const { runHook } = await import("./hooks/test-on-edit.ts");
+      await runHook();
+      return;
+    }
+    case "audit-log": {
+      const { runHook } = await import("./hooks/audit-log.ts");
+      await runHook();
+      return;
+    }
+    case "index-check": {
+      const { runHook } = await import("./hooks/index-check.ts");
+      await runHook();
+      return;
+    }
+    case "index-rebuild": {
+      const { runHook } = await import("./hooks/index-rebuild.ts");
+      await runHook();
+      return;
+    }
     default:
       console.error(`fulcrum: unknown hook recipe '${name}'`);
       process.exit(2);
