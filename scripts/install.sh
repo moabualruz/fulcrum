@@ -36,16 +36,20 @@ echo "Fulcrum install — source: $REPO_DIR"
 echo
 
 # ── 1. Hooks ────────────────────────────────────────────────────────────
-echo "1/5  Copying hooks → ~/.fulcrum/hooks/"
-mkdir -p "$HOME/.fulcrum/hooks/recipes" "$HOME/.fulcrum/state"
-cp "$REPO_DIR/hooks/"*.sh "$HOME/.fulcrum/hooks/" 2>/dev/null || true
+# Two pools:
+#   recipes-available/  — every recipe shipped by fulcrum (vendored from repo)
+#   recipes/            — only those enabled via `fulcrum hooks enable <name>`
+# Agents register paths inside `recipes/`; presence in `recipes-available/`
+# alone does nothing.
+echo "1/5  Vendoring hook recipes → ~/.fulcrum/hooks/recipes-available/"
+mkdir -p "$HOME/.fulcrum/hooks/recipes" "$HOME/.fulcrum/hooks/recipes-available" "$HOME/.fulcrum/state"
 if [ -d "$REPO_DIR/hooks/recipes" ]; then
-  cp "$REPO_DIR/hooks/recipes/"*.sh "$HOME/.fulcrum/hooks/recipes/" 2>/dev/null || true
+  cp "$REPO_DIR/hooks/recipes/"*.sh "$HOME/.fulcrum/hooks/recipes-available/" 2>/dev/null || true
+  cp "$REPO_DIR/hooks/recipes/"*.snippet.md "$HOME/.fulcrum/hooks/recipes-available/" 2>/dev/null || true
 fi
-chmod +x "$HOME/.fulcrum/hooks/"*.sh "$HOME/.fulcrum/hooks/recipes/"*.sh 2>/dev/null || true
-echo "     installed: $(ls "$HOME/.fulcrum/hooks/" 2>/dev/null | grep -E '\.sh$' | tr '\n' ' ')"
-[ -d "$HOME/.fulcrum/hooks/recipes" ] && \
-  echo "     recipes:   $(ls "$HOME/.fulcrum/hooks/recipes/" 2>/dev/null | tr '\n' ' ')"
+chmod +x "$HOME/.fulcrum/hooks/recipes-available/"*.sh 2>/dev/null || true
+echo "     available: $(ls "$HOME/.fulcrum/hooks/recipes-available/" 2>/dev/null | grep -E '\.sh$' | tr '\n' ' ')"
+echo "     enabled:   $(ls "$HOME/.fulcrum/hooks/recipes/" 2>/dev/null | grep -E '\.sh$' | tr '\n' ' ' || echo '(none — fulcrum hooks enable <name>)')"
 echo
 
 # ── 2. Tool-output policy (default config) ─────────────────────────────
@@ -84,6 +88,14 @@ splice_sentinel() {
   local end="<!-- END FULCRUM RULES -->"
   mkdir -p "$(dirname "$target")"
   if [ -f "$target" ] && grep -q "$begin" "$target"; then
+    # Refuse on corrupted markers (counts must match and equal 1).
+    local nb ne
+    nb=$(grep -c "$begin" "$target" || true)
+    ne=$(grep -c "$end"   "$target" || true)
+    if [ "$nb" -ne 1 ] || [ "$ne" -ne 1 ]; then
+      echo "     ✗ $label  refused: $target has $nb BEGIN / $ne END markers (expected 1/1). Fix manually." >&2
+      return 1
+    fi
     # Replace existing block.
     awk -v begin="$begin" -v end="$end" -v body_file="$RULES" '
       BEGIN { inblock=0 }

@@ -1,30 +1,44 @@
 #!/usr/bin/env bash
 # Fulcrum eval-skill-claude — wrap Anthropic's skill-creator run_loop.py to
-# measure a skill's trigger rate on Claude Code. Claude-Code-only by design;
-# no equivalent harness exists for Codex/Gemini/OpenCode/Pi.
+# measure a skill's trigger rate on Claude Code. Claude-Code-only by design.
 #
 # Usage:
-#   scripts/eval-skill-claude.sh <skill-name> [--queries FILE]
+#   scripts/eval-skill-claude.sh <skill-name> [--queries FILE] [--model NAME]
 #
-# Expects:
-#   - skill-creator installed at ~/.claude/plugins/marketplaces/.../skill-creator/
-#   - claude CLI on PATH
-#   - python3 with the skill-creator scripts importable
-#   - skills/<skill-name>/SKILL.md present
-#   - eval queries at evals/<skill-name>.jsonl (10+ trigger + anti-trigger
-#     prompts) or pass --queries explicitly.
+# Eval set format (JSON array, default at evals/<skill>.json):
+#   [
+#     {"query": "how do I select fields from a JSON file", "should_trigger": true},
+#     {"query": "how do I select cells in a CSV",          "should_trigger": false},
+#     ...
+#   ]
+#
+# Flags surfaced from skill-creator's run_loop.py (verified 2026-04-27):
+#   --eval-set FILE          required (JSON array)
+#   --skill-path DIR         required (skill DIRECTORY, not the .md)
+#   --model NAME             required ("claude-opus-4-7", "claude-sonnet-4-6", etc.)
+#   --max-iterations N       default 5; pass 1 to measure once without rewriting
+#   --runs-per-query N       default 3
+#   --holdout FRAC           default 0.4 (set 0 to disable train/test split)
+#   --report PATH|auto|none  default "auto" (HTML report at temp file)
+#   --results-dir DIR        save results.json + report.html + log.txt
+# Set FULCRUM_EVAL_MAX_ITER=N to override --max-iterations.
 
 set -euo pipefail
 
 SKILL="${1:-}"
-[ -n "$SKILL" ] || { echo "usage: $0 <skill-name> [--queries FILE]" >&2; exit 2; }
+[ -n "$SKILL" ] || { echo "usage: $0 <skill-name> [--queries FILE] [--model NAME]" >&2; exit 2; }
 shift || true
 
 QUERIES=""
+MODEL="${FULCRUM_EVAL_MODEL:-claude-opus-4-7}"
+MAX_ITER="${FULCRUM_EVAL_MAX_ITER:-1}"
+EXTRA_ARGS=()
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --queries) QUERIES="$2"; shift 2 ;;
-    *) echo "unknown arg: $1" >&2; exit 2 ;;
+    --model)   MODEL="$2";   shift 2 ;;
+    *)         EXTRA_ARGS+=("$1"); shift ;;
   esac
 done
 
@@ -32,29 +46,32 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILL_DIR="$REPO_DIR/skills/$SKILL"
 [ -f "$SKILL_DIR/SKILL.md" ] || { echo "no such skill: $SKILL_DIR/SKILL.md" >&2; exit 1; }
 
-if [ -z "$QUERIES" ]; then
-  QUERIES="$REPO_DIR/evals/$SKILL.jsonl"
-fi
-[ -f "$QUERIES" ] || { echo "no eval queries at $QUERIES — write 10+ trigger + anti-trigger prompts (one JSON per line: {\"prompt\":\"…\",\"should_trigger\":true})" >&2; exit 1; }
-
-# Locate skill-creator.
-CREATOR_DIR=$(find "$HOME/.claude/plugins" -type d -name skill-creator 2>/dev/null | head -n1)
-if [ -z "$CREATOR_DIR" ]; then
-  echo "skill-creator not found under ~/.claude/plugins — install via /plugin install skill-creator" >&2
+[ -z "$QUERIES" ] && QUERIES="$REPO_DIR/evals/$SKILL.json"
+if [ ! -f "$QUERIES" ]; then
+  echo "no eval queries at $QUERIES" >&2
+  echo "create a JSON array (10+ entries):" >&2
+  echo '  [{"query":"…","should_trigger":true}, {"query":"…","should_trigger":false}, …]' >&2
   exit 1
 fi
 
-if [ ! -d "$CREATOR_DIR/scripts" ]; then
-  echo "skill-creator at $CREATOR_DIR has no scripts/ — version mismatch?" >&2
+# Locate skill-creator. Plugins now live under ~/.claude/plugins/cache/...
+CREATOR_DIR=$(find "$HOME/.claude/plugins" -type d -name skill-creator 2>/dev/null \
+  | grep -E '/skills/skill-creator$' | head -n1)
+if [ -z "$CREATOR_DIR" ] || [ ! -f "$CREATOR_DIR/scripts/run_loop.py" ]; then
+  echo "skill-creator not found. Install via:  /plugin install skill-creator" >&2
+  echo "Looked under: $HOME/.claude/plugins (need scripts/run_loop.py inside)" >&2
   exit 1
 fi
 
-echo "Evaluating skill '$SKILL' against $QUERIES"
-echo "Using harness: $CREATOR_DIR/scripts"
+echo "Evaluating '$SKILL' against $QUERIES (model=$MODEL, max-iterations=$MAX_ITER)"
+echo "Harness: $CREATOR_DIR/scripts/run_loop.py"
+echo
 
 cd "$CREATOR_DIR"
 python3 -m scripts.run_loop \
   --eval-set "$QUERIES" \
-  --skill-path "$SKILL_DIR/SKILL.md" \
-  --max-iterations 1 \
-  --no-modify "$@"
+  --skill-path "$SKILL_DIR" \
+  --model "$MODEL" \
+  --max-iterations "$MAX_ITER" \
+  --verbose \
+  "${EXTRA_ARGS[@]}"
