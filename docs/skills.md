@@ -6,15 +6,17 @@
 
 Each agent uses its own native skills directory. Do not use a shared `~/.agents/` folder — it pollutes every agent's context with skills that may not apply.
 
-| Agent | Skills path |
-|---|---|
-| Claude Code | `~/.claude/skills/<name>/SKILL.md` |
-| Codex CLI | `~/.codex/skills/<name>/SKILL.md` (user) · `.codex/skills/<name>/SKILL.md` (project) — Codex-namespaced; never `~/.agents/` (shared path collides with other agents) |
-| Gemini CLI | `~/.gemini/extensions/<ext>/skills/<name>/SKILL.md` |
-| OpenCode | `~/.config/opencode/skills/<name>/SKILL.md` |
-| Pi CLI | `~/.pi/agent/skills/<name>/SKILL.md` (user) · `.pi/skills/` (project) |
+Fulcrum-managed skills install under a `fulcrum/` subfolder so the address space matches the `fulcrum:<skill-name>` prefixing convention used by plugin / extension systems. Custom user-authored skills can sit alongside (flat or under their own namespace) — they just won't be touched by `fulcrum skills sync`.
 
-Install a skill to the agents that need it. If a skill is relevant to all agents, install it in each agent's own directory separately.
+| Agent | Fulcrum-managed skills path | Custom user skills path |
+|---|---|---|
+| Claude Code | `~/.claude/skills/fulcrum/<name>/SKILL.md` | `~/.claude/skills/<name>/SKILL.md` |
+| Codex CLI | `~/.codex/skills/fulcrum/<name>/SKILL.md` | `~/.codex/skills/<name>/SKILL.md` (user) · `.codex/skills/<name>/SKILL.md` (project) |
+| Gemini CLI | `~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md` (extension is the namespace) | `~/.gemini/extensions/<other>/skills/<name>/SKILL.md` |
+| OpenCode | `~/.config/opencode/skills/fulcrum/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` |
+| Pi CLI | `~/.pi/agent/skills/fulcrum/<name>/SKILL.md` | `~/.pi/agent/skills/<name>/SKILL.md` (user) · `.pi/skills/` (project) |
+
+`fulcrum skills sync` propagates `skills/<name>/SKILL.md` from the repo to every agent's `<skills-root>/fulcrum/` subfolder. The `fulcrum/` segment is the convention; **agents themselves still load by frontmatter `name:`** — the namespacing is path-based and recursive scans pick the skill up regardless of depth. The reason the prefix exists today is forward-compat: when fulcrum's plugin / extension layer ships, the install shape already conforms to how third-party content is namespaced in agent ecosystems.
 
 ## 2. Skill catalogue (general-purpose)
 
@@ -61,7 +63,9 @@ Don't install. Borrow:
 
 **Skill name equals slash trigger.** Skill `<name>` → `/<name>`. The folder name, the `name:` field in frontmatter, and the slash command are all the same string.
 
-**No prefix.** Use clean names. Rename after the fact only if a future collision appears — premature namespacing harms ergonomics.
+**No prefix on the `name:` itself.** Use clean names like `jq`, `gh`, `ruff`. The `fulcrum/` namespace is path-based (the parent folder under each agent's skills root, see §1) — the frontmatter name stays prefix-free. This keeps the `/jq` slash command short while still giving fulcrum-managed skills an effective `fulcrum:jq` address space at the filesystem layer.
+
+The colon-prefix invocation pattern (`fulcrum:jq`) is reserved for the future plugin / extension layer; today's agents resolve skills by frontmatter `name:` only.
 
 ## 5. Authoring template
 
