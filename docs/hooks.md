@@ -111,164 +111,50 @@ Rule of thumb: **PreToolUse for prevention, PostToolUse for reaction, SessionSta
 
 ## 5. Recipe library
 
-All recipes assume scripts live at `"$CLAUDE_PROJECT_DIR"/.claude/hooks/` (project) or `~/.fulcrum/hooks/` (user). All read JSON event from stdin via `jq`.
+Every recipe ships as a script in `hooks/recipes/<name>.sh`. Enable with `fulcrum hooks enable <name>` — that copies the script into `~/.fulcrum/hooks/recipes/` and prints the registration snippet for each agent's native config. Disable with `fulcrum hooks disable <name>`. Read the source for the full implementation; this section explains *what each one does and when to use it.*
 
-### 5.1 Index maintenance — Stop + SessionStart
+| Recipe | Lifecycle | Purpose | Blocks? |
+|---|---|---|---|
+| `index-check` | SessionStart-equivalent | Warn if `tags` / `graphify-out/` are stale or missing. | no |
+| `index-rebuild` | Stop-equivalent | Rebuild ctags + graphify + repomix when HEAD changed or working tree dirty. | no |
+| `format` | PostToolUse `Write\|Edit` | Run language-appropriate formatter on the just-edited file (ruff / biome / prettier / gofmt / rustfmt / google-java-format / ktlint / dart format). Fail-open. | no |
+| `lint-gate` | PostToolUse `Write\|Edit` | Block the next turn if `ruff check` / `biome check` / `golangci-lint run` reports violations on the edited file. Stderr feeds back. | yes (exit 2) |
+| `pm-policy` | PreToolUse `Bash` | Refuse `npm`/`yarn` when the repo declares pnpm; refuse `npm` when bun is declared. Detects `pnpm-lock.yaml` / `bun.lock(b)` / `yarn.lock`. | yes (exit 2) |
+| `test-on-edit` | PostToolUse `Write\|Edit` | **Opt-in per-project.** Reads `.fulcrum/test-on-edit.toml` mapping glob → command. No config = no-op. Runs in background; output to `/tmp/<project>-test-on-edit.log`. | no |
+| `audit-log` | PostToolUse `Bash` | Agent-neutral forensic trail. Appends `ISO-8601\tcommand\texit_code` to `~/.fulcrum/state/<project>/shell-commands.log`. Write-only. | no |
+| `tool-output-router` | PostToolUse (any) | Per-tool output-handling. Reads `~/.fulcrum/tool-output-policy.toml` and applies a tier (raw / status-only / summary+head / summary+file / file-only / leave-as-is). Default: leave-as-is. See [tool-output-policy.md](tool-output-policy.md). | no |
 
-Rebuilds `tags`, `graphify-out/`, repomix pack only when HEAD changed or working tree dirty. SHA stored in `/tmp/<slug>.index-sha`. Full scripts ship in `hooks/index-rebuild.sh` and `hooks/index-check.sh`.
+### 5.1 Index maintenance — `index-check` + `index-rebuild`
 
-### 5.2 Auto-format on edit — PostToolUse · `Write|Edit`
+Rebuilds `tags`, `graphify-out/`, and the repomix pack only when HEAD changed or the working tree is dirty. SHA cached in `/tmp/<slug>.index-sha` — never touches the repo. `index-check` runs at session start and warns if the index is stale; `index-rebuild` runs on Stop.
 
-```json
-{ "matcher": "Write|Edit",
-  "hooks": [{ "type": "command",
-    "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format.sh", "timeout": 8000 }] }
+### 5.2 Editor productivity — `format` + `lint-gate`
+
+`format` is non-blocking: it runs ruff / biome / prettier / gofmt / rustfmt / google-java-format / ktlint / dart format on the edited file and silently moves on if the formatter isn't installed. `lint-gate` is blocking: exit 2 with stderr forces the next agent turn to fix the lint error before continuing.
+
+### 5.3 `pm-policy`
+
+Detects `pnpm-lock.yaml` / `bun.lock(b)` / `yarn.lock` and refuses the wrong package manager with a clear stderr message.
+
+### 5.4 `test-on-edit` — opt-in per project
+
+Drop a `.fulcrum/test-on-edit.toml` in your repo:
+
+```toml
+"*.py"      = "pytest -x {file}"
+"src/*.ts"  = "vitest run {file}"
+"*.go"      = "go test ./$(dirname {file})/..."
 ```
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-FILE=$(jq -r '.tool_input.file_path // empty')
-[ -z "$FILE" ] || [ ! -f "$FILE" ] && exit 0
-case "$FILE" in
-  *.py)             ruff format "$FILE" >&2 2>/dev/null || true ;;
-  *.ts|*.tsx|*.js|*.jsx|*.json|*.md) prettier --write "$FILE" >&2 2>/dev/null || true ;;
-  *.go)             gofmt -w "$FILE" >&2 2>/dev/null || true ;;
-  *.rs)             rustfmt "$FILE" >&2 2>/dev/null || true ;;
-esac
-exit 0
-```
+Without that file, the hook does nothing. With it, on every edit the matching command runs in the background and writes to `/tmp/<project>-test-on-edit.log`. The agent is never blocked.
 
-Idempotent, never blocks, never speaks back to the model.
+### 5.5 `audit-log`
 
-### 5.3 Lint gate — PostToolUse · `Write|Edit` (blocking)
+Cheap forensic trail. Useful when something breaks ("which command rewrote my git history?") — `tail ~/.fulcrum/state/$(basename $PWD)/shell-commands.log` shows the last hour of agent shell activity. Drop the recipe entirely if you don't audit.
 
-Same matcher; exit 2 with stderr feeds the lint output back to Claude so the next turn fixes it.
+### 5.6 `tool-output-router`
 
-```bash
-#!/usr/bin/env bash
-FILE=$(jq -r '.tool_input.file_path // empty')
-[[ "$FILE" == *.py ]] || exit 0
-if ! ruff check --quiet "$FILE" >&2; then
-  echo "ruff found violations in $FILE — fix before continuing" >&2
-  exit 2
-fi
-```
-
-[source: https://blakecrosley.com/blog/claude-code-hooks-tutorial]
-
-### 5.4 Block destructive bash — PreToolUse · `Bash`
-
-```bash
-#!/usr/bin/env bash
-CMD=$(jq -r '.tool_input.command // empty')
-deny() { echo "blocked: $1" >&2; exit 2; }
-case "$CMD" in
-  *"rm -rf /"*|*"rm -rf ~"*|*"rm -rf \$HOME"*) deny "rm -rf on root/home" ;;
-  *"git push --force"*|*"git push -f"*)
-    [[ "$CMD" == *"origin main"* || "$CMD" == *"origin master"* ]] && deny "force-push to main/master" ;;
-  *"git reset --hard"*) deny "destructive reset — confirm with user" ;;
-  *":(){ :|:& };:"*)    deny "fork bomb" ;;
-  *"chmod -R 777"*)     deny "world-writable recursive chmod" ;;
-esac
-exit 0
-```
-
-[source: https://github.com/disler/claude-code-hooks-mastery]
-
-### 5.5 Secret scan before commit — PreToolUse · `Bash` matching `git commit`
-
-```bash
-#!/usr/bin/env bash
-CMD=$(jq -r '.tool_input.command // empty')
-[[ "$CMD" == *"git commit"* ]] || exit 0
-command -v gitleaks >/dev/null || exit 0
-if ! gitleaks protect --staged --no-banner --redact >&2; then
-  echo "gitleaks found secrets in staged diff — abort commit" >&2
-  exit 2
-fi
-```
-
-Falls open if `gitleaks` not installed (don't break devs without the tool).
-
-### 5.6 Protected paths — PreToolUse · `Edit|Write`
-
-```bash
-#!/usr/bin/env bash
-F=$(jq -r '.tool_input.file_path // empty')
-case "$F" in
-  *.env|*.env.*|*/.git/*|*/node_modules/*|*.lock|*-lock.json|*.pem|*.key)
-    echo "refuse to edit $F (sensitive/generated)" >&2; exit 2 ;;
-esac
-```
-
-### 5.7 Package-manager policy — PreToolUse · `Bash`
-
-```bash
-CMD=$(jq -r '.tool_input.command // empty')
-if [ -f "$CLAUDE_PROJECT_DIR/pnpm-lock.yaml" ] && [[ "$CMD" =~ (^|[[:space:]])npm[[:space:]] ]]; then
-  echo "this repo uses pnpm — replace 'npm' with 'pnpm'" >&2; exit 2
-fi
-```
-
-[source: https://stevekinney.com/courses/ai-development/claude-code-hook-examples]
-
-### 5.8 MCP output truncation — PostToolUse · `mcp__.*`
-
-For chatty MCP tools that blow context, return `hookSpecificOutput.updatedMCPToolOutput`:
-
-```bash
-RESP=$(jq -r '.tool_response | tostring')
-if [ "${#RESP}" -gt 8000 ]; then
-  TRUNC=$(printf '%s' "$RESP" | head -c 4000)
-  jq -nc --arg s "$TRUNC… [truncated $((${#RESP} - 4000)) bytes]" \
-    '{hookSpecificOutput:{hookEventName:"PostToolUse", updatedMCPToolOutput:$s}}'
-fi
-```
-
-### 5.9 Background test runner — PostToolUse · `Write|Edit` (non-blocking)
-
-```bash
-FILE=$(jq -r '.tool_input.file_path // empty')
-[[ "$FILE" == *.py ]] || exit 0
-TEST="${FILE%.py}_test.py"; [ -f "$TEST" ] || TEST="tests/test_$(basename "${FILE%.py}").py"
-[ -f "$TEST" ] || exit 0
-nohup pytest -x "$TEST" >"/tmp/$(basename "$TEST").log" 2>&1 &
-exit 0
-```
-
-Background `&` keeps the agent unblocked; results land in `/tmp/`. A SessionStart hook can surface failures from the previous run.
-
-### 5.10 Notify on long session — Stop
-
-There is no native "long-running" event. Compute duration in `Stop` from a timestamp written by `UserPromptSubmit`:
-
-```bash
-# UserPromptSubmit hook
-date +%s > /tmp/cc-turn-start; exit 0
-
-# Stop hook
-START=$(cat /tmp/cc-turn-start 2>/dev/null || echo 0)
-DUR=$(( $(date +%s) - START ))
-if [ $DUR -gt 120 ]; then
-  case "$(uname)" in
-    Darwin) osascript -e "display notification \"Claude finished after ${DUR}s\" with title \"Claude Code\"" ;;
-    Linux)  notify-send "Claude Code" "finished after ${DUR}s" ;;
-  esac
-fi
-exit 0
-```
-
-### 5.11 Bash command audit log — PostToolUse · `Bash`
-
-```bash
-mkdir -p "$CLAUDE_PROJECT_DIR/.claude"
-jq -r '[now|todate, .tool_input.command, .tool_response.exit_code // 0] | @tsv' \
-  >> "$CLAUDE_PROJECT_DIR/.claude/bash-commands.log"
-exit 0
-```
-
-Add `.claude/bash-commands.log` to `.gitignore`.
+The replacement for blanket MCP truncation. Each tool gets a tailored output strategy in `~/.fulcrum/tool-output-policy.toml` — small structured tools stay raw, huge dumps go to file, formatters return only their exit code. **Default: leave-as-is** (never truncate without explicit policy). Full tier matrix in [tool-output-policy.md](tool-output-policy.md). Edit `~/.fulcrum/tool-output-policy.toml` to override.
 
 ---
 
@@ -292,18 +178,14 @@ Same script, different registration. Use this table to wire each recipe in §5 a
 
 | Recipe | Claude Code | Codex | Gemini | OpenCode | Pi |
 |---|---|---|---|---|---|
-| Index check (5.1) | `SessionStart` | `SessionStart` | `SessionStart` | `session.created` | `session_start` |
-| Index rebuild (5.1) | `Stop` | `Stop` | `SessionEnd` | `session.idle` | `session_shutdown` |
-| Format on edit (5.2) | `PostToolUse` matcher `Write\|Edit` | `PostToolUse` (filter on `tool_name` in script) | `AfterTool` | `tool.execute.after` (or `file.edited`) | `tool_result` (filter on tool name) |
-| Lint gate (5.3) | `PostToolUse Write\|Edit`, exit 2 | `PostToolUse`, exit 2 | `AfterTool`, exit 2 | `tool.execute.after`, throw / return error | `tool_result`, return `{block:true,reason}` |
-| Block destructive bash (5.4) | `PreToolUse Bash`, exit 2 | `PreToolUse`, exit 2 | `BeforeTool`, exit 2 | `tool.execute.before` returns `{deny}` | `tool_call` returns `{block:true,reason}` |
-| Secret scan (5.5) | `PreToolUse Bash` | `PreToolUse` | `BeforeTool` | `tool.execute.before` | `tool_call` |
-| Protected paths (5.6) | `PreToolUse Edit\|Write` | `PreToolUse` | `BeforeTool` | `tool.execute.before` | `tool_call` |
-| Package-manager policy (5.7) | `PreToolUse Bash` | `PreToolUse` | `BeforeTool` | `tool.execute.before` | `tool_call` |
-| MCP truncation (5.8) | `PostToolUse mcp__.*` | `PostToolUse` | `AfterTool` | `tool.execute.after` | **N/A** — Pi has no MCP |
-| Background tests (5.9) | `PostToolUse Write\|Edit`, `nohup … &` | `PostToolUse`, `nohup … &` | `AfterTool`, `nohup … &` | `tool.execute.after`, spawn detached | `tool_result`, spawn detached |
-| Long-session notify (5.10) | `UserPromptSubmit` + `Stop` | `UserPromptSubmit` + `Stop` | hooks combo | `session.created` + `session.idle` | `turn_start` + `turn_end` |
-| Bash audit log (5.11) | `PostToolUse Bash` | `PostToolUse` | `AfterTool` | `tool.execute.after` | `tool_result` |
+| `index-check` | `SessionStart` | `SessionStart` | `SessionStart` | `session.created` | `session_start` |
+| `index-rebuild` | `Stop` | `Stop` | `SessionEnd` | `session.idle` | `session_shutdown` |
+| `format` | `PostToolUse` matcher `Write\|Edit` | `PostToolUse` (filter on `tool_name` in script) | `AfterTool` | `tool.execute.after` (or `file.edited`) | `tool_result` (filter on tool name) |
+| `lint-gate` | `PostToolUse Write\|Edit`, exit 2 | `PostToolUse`, exit 2 | `AfterTool`, exit 2 | `tool.execute.after`, throw / return error | `tool_result`, return `{block:true,reason}` |
+| `pm-policy` | `PreToolUse Bash`, exit 2 | `PreToolUse`, exit 2 | `BeforeTool`, exit 2 | `tool.execute.before` returns `{deny}` | `tool_call` returns `{block:true,reason}` |
+| `test-on-edit` | `PostToolUse Write\|Edit`, `nohup … &` | `PostToolUse`, `nohup … &` | `AfterTool`, `nohup … &` | `tool.execute.after`, spawn detached | `tool_result`, spawn detached |
+| `audit-log` | `PostToolUse Bash` | `PostToolUse` | `AfterTool` | `tool.execute.after` | `tool_result` |
+| `tool-output-router` | `PostToolUse` (any) | `PostToolUse` | `AfterTool` | `tool.execute.after` | `tool_result` |
 
 ### 6.3 Per-agent gotchas
 
@@ -314,11 +196,11 @@ Same script, different registration. Use this table to wire each recipe in §5 a
   // ~/.config/opencode/plugins/fulcrum.ts
   export const FulcrumPlugin = async ({ $ }) => ({
     "tool.execute.before": async ({ tool, input }) => {
-      if (tool === "bash") await $({ env: { HOOK_INPUT: JSON.stringify({ tool_input: input }) } })`~/.fulcrum/hooks/bash-guard.sh`
+      if (tool === "bash") await $({ env: { HOOK_INPUT: JSON.stringify({ tool_input: input }) } })`~/.fulcrum/hooks/recipes/pm-policy.sh`
     }
   })
   ```
-- **Pi** — TS extensions, hot-reloadable via `/reload`. `before_agent_start` can rewrite the system prompt; equivalent power to Claude Code's SessionStart context injection. No MCP support — recipes that target `mcp__.*` simply don't apply.
+- **Pi** — TS extensions, hot-reloadable via `/reload`. `before_agent_start` can rewrite the system prompt; equivalent power to Claude Code's SessionStart context injection. No MCP support — `tool-output-router` rules for `mcp__.*` won't fire on Pi.
 - **All agents** — keep the bash scripts at `~/.fulcrum/hooks/` and shell out from each agent's native config. One copy of the logic, five registrations. Per-agent registration snippets in [agents.md](agents.md).
 
 ---
