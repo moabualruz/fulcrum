@@ -12,12 +12,14 @@ interface ToolCheck {
 }
 
 const TOOLS: ToolCheck[] = [
+  // Core: git + indexing.
   // git is treated as optional: index-rebuild fail-opens via a "no-git" SHA fallback.
-  // Without git, every session re-runs the rebuild tasks (no HEAD diff possible).
   { cmd: "git",                    usedBy: "index-rebuild (HEAD diff; rebuilds every session without git)", required: false },
   { cmd: "ctags",                  usedBy: "index-rebuild + index-check",            required: false },
   { cmd: "graphify",               usedBy: "index-rebuild + index-check",            required: false },
   { cmd: "repomix",                usedBy: "index-rebuild (compress index)",         required: false },
+
+  // Format / lint hooks (per-language).
   { cmd: "biome",                  usedBy: "format/lint-gate (ts/js/json/md)",       required: false },
   { cmd: "prettier",               usedBy: "format fallback (ts/js/json/md)",        required: false },
   { cmd: "ruff",                   usedBy: "format/lint-gate (.py)",                 required: false },
@@ -28,14 +30,38 @@ const TOOLS: ToolCheck[] = [
   { cmd: "google-java-format",     usedBy: "format (.java)",                         required: false },
   { cmd: "dart",                   usedBy: "format (.dart)",                         required: false },
   { cmd: "php-cs-fixer",           usedBy: "format (.php)",                          required: false },
-  { cmd: "jq",                     usedBy: "skills/jq trigger surface",              required: false },
+
+  // Skill trigger surfaces (one per shipped skill, alphabetical-ish by category).
+  { cmd: "jq",                     usedBy: "skills/jq",                              required: false },
+  { cmd: "yq",                     usedBy: "skills/yq",                              required: false },
   { cmd: "fd",                     usedBy: "tool-output policy (raw tier)",          required: false },
   { cmd: "rg",                     usedBy: "tool-output policy (raw_then_head)",     required: false },
-  { cmd: "gh",                     usedBy: "skills/gh trigger surface",              required: false },
-  { cmd: "just",                   usedBy: "skills/just trigger surface",            required: false },
-  { cmd: "fzf",                    usedBy: "skills/fzf trigger surface",             required: false },
-  { cmd: "xh",                     usedBy: "skills/xh trigger surface",              required: false },
-  { cmd: "git-cliff",              usedBy: "bun run changelog",                      required: false },
+  { cmd: "gh",                     usedBy: "skills/gh",                              required: false },
+  { cmd: "just",                   usedBy: "skills/just",                            required: false },
+  { cmd: "fzf",                    usedBy: "skills/fzf (non-interactive `--filter`)",required: false },
+  { cmd: "xh",                     usedBy: "skills/xh",                              required: false },
+  { cmd: "bat",                    usedBy: "skills/bat",                             required: false },
+  { cmd: "eza",                    usedBy: "skills/eza",                             required: false },
+  { cmd: "sd",                     usedBy: "skills/sd",                              required: false },
+  { cmd: "zoxide",                 usedBy: "skills/zoxide",                          required: false },
+  { cmd: "difft",                  usedBy: "skills/difftastic (binary is `difft`)",  required: false },
+  { cmd: "direnv",                 usedBy: "skills/direnv",                          required: false },
+  { cmd: "mise",                   usedBy: "skills/mise",                            required: false },
+  { cmd: "watchexec",              usedBy: "skills/watchexec",                       required: false },
+  { cmd: "hyperfine",              usedBy: "skills/hyperfine",                       required: false },
+  { cmd: "lizard",                 usedBy: "skills/lizard",                          required: false },
+  { cmd: "gitleaks",               usedBy: "skills/gitleaks",                        required: false },
+  { cmd: "osv-scanner",            usedBy: "skills/osv-scanner",                     required: false },
+  { cmd: "pmd",                    usedBy: "skills/pmd",                             required: false },
+  { cmd: "spotbugs",               usedBy: "skills/spotbugs",                        required: false },
+  { cmd: "flarectl",               usedBy: "skills/flarectl",                        required: false },
+  { cmd: "usql",                   usedBy: "skills/usql",                            required: false },
+
+  // Release toolchain.
+  { cmd: "git-cliff",              usedBy: "`bun run changelog` and `bun run release`", required: false },
+
+  // Skill trigger-rate eval harness.
+  { cmd: "python3.12",             usedBy: "scripts/eval-skill-claude.sh (skill-creator's run_loop.py)", required: false },
 ];
 
 interface AgentDir {

@@ -75,6 +75,17 @@ Approach: 5 parallel audit-agent batches drilled into ~3-4 skills each via WebFe
 
 **git-cliff installed** (`brew install git-cliff`); `CHANGELOG.md` populated via `bun run changelog` for the first time.
 
+**Full host capability now provisioned.** Every tool the foundation can invoke is installed locally so we can smoke-test real flows end-to-end:
+
+- 32 of 32 tools detected by `fulcrum doctor` (formatters, linters, scanners, runtimes, eval-harness Python).
+- `fulcrum install` ran successfully — rules spliced into Claude Code, Codex CLI, OpenCode, Gemini (Pi CLI dir not present); policy seeded.
+- `fulcrum skills sync` deployed all 28 skills under each agent's `<skills-root>/fulcrum/` namespace.
+- Verified the format hook end-to-end: piped a Python `Edit` envelope through `fulcrum hook format` against a malformed `.py`; `ruff format` rewrote it correctly.
+
+`fulcrum doctor` was expanded to cover the full skill toolchain — was 22 tools, now 32 (added `yq`, `bat`, `eza`, `sd`, `zoxide`, `difft`, `direnv`, `mise`, `watchexec`, `hyperfine`, `lizard`, `gitleaks`, `osv-scanner`, `pmd`, `spotbugs`, `flarectl`, `usql`, `python3.12` plus a few notes). Note that the difftastic binary is `difft`, not `difftastic`.
+
+**Docs aligned with the `fulcrum/` namespace:** `docs/skills.md` §1 now lists fulcrum-managed paths separately from custom user skill paths; §4 clarifies that the `fulcrum:` prefix is path-based today (frontmatter `name:` stays clean) and reserved for future plugin/extension addressing. `docs/agents.md` cross-agent matrix updated.
+
 **Still outstanding (P3 / low priority)**
 - Trigger-rate evals for the 27 newly-shipped skills (Claude-Code-only via `scripts/eval-skill-claude.sh`; needs Python 3.10+ and `ANTHROPIC_API_KEY`). Lint passes for all; trigger rates not yet measured.
 - Manual cross-agent smoke for the 27 new skills per `docs/skill-smoke-test.md` (only Claude Code can be auto-eval'd).

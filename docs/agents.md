@@ -12,7 +12,7 @@
 | Hook mechanism | `~/.codex/hooks.json` | `hooks` in settings.json | TypeScript plugin | TypeScript extension (`~/.pi/agent/extensions/*.ts`, `pi.on(event, handler)`) |
 | Hook events | 6 | 11 | 30+ plugin events | **20+** — session_start, session_shutdown, before_agent_start, turn_start/end, tool_call (blockable), resources_discover, etc. |
 | Hook context inject | SessionStart + UserPromptSubmit only | Yes | Yes | Yes — `before_agent_start` can inject messages + rewrite system prompt |
-| Skills path | `~/.codex/skills/` (user) · `.codex/skills/` (project) | `~/.gemini/extensions/` | `~/.config/opencode/skills/` | `~/.pi/agent/skills/` |
+| Skills path (fulcrum-managed) | `~/.codex/skills/fulcrum/` (user) · `.codex/skills/` (project) | `~/.gemini/extensions/fulcrum-skills/skills/` | `~/.config/opencode/skills/fulcrum/` | `~/.pi/agent/skills/fulcrum/` |
 | MCP | Yes — `config.toml` | Yes — `settings.json` | Yes — `opencode.json` | **No** (by design) |
 | DeepWiki | Yes | Yes | Yes | No |
 
