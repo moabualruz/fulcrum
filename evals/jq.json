@@ -1,0 +1,22 @@
+[
+  {"query": "I have a JSON file with an array of users — how do I get just the email addresses on the command line?", "should_trigger": true},
+  {"query": "From this API response, extract only the items where status is active.", "should_trigger": true},
+  {"query": "How do I count the number of objects in a JSON array from the shell?", "should_trigger": true},
+  {"query": "Sort the JSON output by the created_at field and show me the latest five.", "should_trigger": true},
+  {"query": "Convert this JSON list of records into a CSV file.", "should_trigger": true},
+  {"query": "Pull the third element out of a JSON array in bash.", "should_trigger": true},
+  {"query": "Merge two JSON files into one at the command line.", "should_trigger": true},
+  {"query": "Filter a JSON document by a deeply nested field value.", "should_trigger": true},
+  {"query": "Get the keys of every object in a JSON array.", "should_trigger": true},
+  {"query": "Group these JSON records by the kind field and count each group.", "should_trigger": true},
+  {"query": "I'm piping the output of `gh pr list --json number,title` and need only the numbers.", "should_trigger": true},
+  {"query": "How do I compute the average of a numeric field across a JSON array?", "should_trigger": true},
+  {"query": "How do I parse a YAML config file in bash?", "should_trigger": false},
+  {"query": "Extract the third column from a CSV file on the command line.", "should_trigger": false},
+  {"query": "How do I read a TOML file from a shell script?", "should_trigger": false},
+  {"query": "Get all elements from an XML document via the command line.", "should_trigger": false},
+  {"query": "How do I parse JSON inside a Python script using the standard library?", "should_trigger": false},
+  {"query": "Filter rows in a SQL table where the country is 'US'.", "should_trigger": false},
+  {"query": "Pretty-print a JavaScript object in the Node REPL.", "should_trigger": false},
+  {"query": "How do I read JSON in Go without unmarshaling into a struct?", "should_trigger": false}
+]

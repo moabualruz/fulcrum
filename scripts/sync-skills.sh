@@ -23,14 +23,14 @@ fi
 shopt -s nullglob
 
 # Collect skill dirs (anything with a SKILL.md, excluding _template).
-mapfile -t SKILLS < <(
-  for d in "$SKILLS_SRC"/*/; do
-    name="$(basename "$d")"
-    [ "$name" = "_template" ] && continue
-    [ -f "$d/SKILL.md" ] || continue
-    printf '%s\n' "$name"
-  done
-)
+# Portable across macOS bash 3.2 (no mapfile).
+SKILLS=()
+for d in "$SKILLS_SRC"/*/; do
+  name="$(basename "$d")"
+  [ "$name" = "_template" ] && continue
+  [ -f "$d/SKILL.md" ] || continue
+  SKILLS+=("$name")
+done
 
 if [ ${#SKILLS[@]} -eq 0 ]; then
   echo "fulcrum sync-skills: no skills authored yet (skills/<name>/SKILL.md not found)"

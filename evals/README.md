@@ -18,6 +18,12 @@
 - **Query in plain English; no tool name.** The skill's job is to recognize the *intent*, not the keyword. `"how do I select fields from a JSON file"` good; `"jq query"` cheating.
 - **Anti-trigger phrases should be near-misses.** Domain-adjacent prompts that another skill would handle (`"how do I select cells in a CSV"` for jq).
 
+## Requirements
+
+- **Python 3.10+** — `skill-creator/scripts/run_loop.py` uses PEP-604 `X | Y` type syntax. macOS system Python is 3.9 and won't work. `brew install python@3.12` or `mise use -g python@3.12`. Override with `FULCRUM_PYTHON=/path/to/python3.12`.
+- **`skill-creator` plugin installed** — `/plugin install skill-creator` inside Claude Code.
+- **Anthropic API key** in the environment (`ANTHROPIC_API_KEY` or your shell's usual auth) — the harness calls the real model.
+
 ## Run
 
 ```bash
