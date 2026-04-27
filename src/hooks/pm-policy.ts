@@ -27,6 +27,7 @@ export async function runHook(): Promise<void> {
   }
   if (hasBun) {
     if (tok("npm"))  deny("this repo uses bun — replace 'npm' with 'bun'");
+    if (tok("yarn")) deny("this repo uses bun — replace 'yarn' with 'bun'");
   }
   if (hasYarn && !hasPnpm) {
     if (tok("npm"))  deny("this repo uses yarn — replace 'npm' with 'yarn'");

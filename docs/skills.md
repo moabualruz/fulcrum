@@ -70,7 +70,7 @@ In-repo skills follow Anthropic's spec-compliant frontmatter + a body skeleton p
 - **Frontmatter** — `name` (lowercase + digits + hyphens, ≤64 chars, no reserved words `anthropic`/`claude`, dir-name match) and `description` (≤1024 chars, no XML, third-person trigger sentence).
 - **Body** — `## When to use` / `## Invocation` / `## Patterns` / `## Anti-patterns` / `## Cross-refs`.
 
-Validate with `fulcrum skills lint <path>` (alias for `scripts/lint-skill.sh`). Lints against the strictest union of all 5 agents' frontmatter rules.
+Validate with `fulcrum skills lint <path>`. Lints against the strictest union of all 5 agents' frontmatter rules.
 
 ## 6. When to fork upstream skills
 
@@ -94,7 +94,7 @@ Always vendor (never pin) for individual-author repos like `mitsuhiko/agent-stuf
 
 Tiered:
 
-1. **Lint everywhere (CI):** `scripts/lint-skill.sh skills/` validates every authored skill on the strictest frontmatter union. Cheap; catches the 80% of cross-agent failures.
+1. **Lint everywhere (CI):** `fulcrum skills lint skills/` validates every authored skill on the strictest frontmatter union. Cheap; catches the 80% of cross-agent failures.
 2. **Trigger eval on Claude Code:** `scripts/eval-skill-claude.sh <name>` wraps Anthropic's `skill-creator/scripts/run_loop.py` — runs each query 3× through the live model, scores activation rate, splits 60/40 train/test, emits an HTML report. Eval set lives at `evals/<name>.json` (see `evals/README.md` for the format). Claude-Code-only because no equivalent harness exists for the other agents.
 3. **Manual smoke on the other 4:** for Gemini run `gemini extensions link <ext>` + `--debug`; for OpenCode and Codex copy the trigger phrase into a fresh session; for Pi invoke `/skill:<name>` directly. Checklist template at `docs/skill-smoke-test.md`.
 

@@ -5,7 +5,7 @@
 // Idempotent. Non-destructive: user content outside the markers is preserved.
 
 import { mkdir, readFile, writeFile, copyFile, readdir, stat, appendFile } from "node:fs/promises";
-import { dirname, basename } from "node:path";
+import { dirname } from "node:path";
 
 const BEGIN = "<!-- BEGIN FULCRUM RULES -->";
 const END   = "<!-- END FULCRUM RULES -->";
@@ -162,6 +162,4 @@ export async function run(args: string[]): Promise<void> {
   }
 
   console.log("\nDone.");
-  // Keep imports we used elsewhere from being marked unused.
-  void basename;
 }

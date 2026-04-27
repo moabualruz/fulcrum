@@ -49,10 +49,10 @@ Non-zero exit code (2) blocks the triggering action with stderr as the reason.
 {
   "hooks": {
     "Stop": [
-      {"hooks": [{"type": "command", "command": "~/.fulcrum/hooks/recipes/index-rebuild.sh"}]}
+      {"hooks": [{"type": "command", "command": "fulcrum hook index-rebuild"}]}
     ],
     "SessionStart": [
-      {"hooks": [{"type": "command", "command": "~/.fulcrum/hooks/recipes/index-check.sh"}]}
+      {"hooks": [{"type": "command", "command": "fulcrum hook index-check"}]}
     ]
   }
 }
@@ -114,10 +114,10 @@ Index hooks — add to `~/.gemini/settings.json`:
 {
   "hooks": {
     "SessionStart": [
-      {"type": "command", "command": "~/.fulcrum/hooks/recipes/index-check.sh"}
+      {"type": "command", "command": "fulcrum hook index-check"}
     ],
     "SessionEnd": [
-      {"type": "command", "command": "~/.fulcrum/hooks/recipes/index-rebuild.sh"}
+      {"type": "command", "command": "fulcrum hook index-rebuild"}
     ]
   }
 }
@@ -183,10 +183,10 @@ Index plugin:
 // ~/.config/opencode/plugins/fulcrum.ts
 export const FulcrumPlugin = async ({ $ }) => ({
   "session.idle": async () => {
-    await $`~/.fulcrum/hooks/recipes/index-rebuild.sh`
+    await $`fulcrum hook index-rebuild`
   },
   "session.created": async () => {
-    await $`~/.fulcrum/hooks/recipes/index-check.sh`
+    await $`fulcrum hook index-check`
   }
 })
 ```
@@ -259,7 +259,7 @@ The Bash tool also exposes a `spawnHook` for command/cwd/env mutation.
 | `SessionStart` | `session_start` |
 | `Stop` | `session_shutdown` |
 
-A TS file at `~/.pi/agent/extensions/index.ts` shells out to `~/.fulcrum/hooks/recipes/index-check.sh` and `index-rebuild.sh` via `child_process.execSync`.
+A TS file at `~/.pi/agent/extensions/index.ts` shells out to `fulcrum hook index-check` and `index-rebuild.sh` via `child_process.execSync`.
 
 ### 5.4 Skills
 

@@ -35,7 +35,7 @@
 | `universal-ctags` | ☑ | [DevonMorris/claude-ctags](https://github.com/DevonMorris/claude-ctags) | Auto-index + usage. ~80% token reduction vs grep. MIT. |
 | `gh` | ☑ | [mitsuhiko/agent-stuff/github](https://github.com/mitsuhiko/agent-stuff/tree/main/skills/github) | 2.1k stars. No upstream from `cli/cli`. |
 | `mise` | ☑ | [ray-manaloto/claude-code-marketplace/mise-toolkit](https://github.com/ray-manaloto/claude-code-marketplace/tree/main/mise-toolkit) | Multi-SKILL toolkit. 1 star — usable but consider re-authoring for our pin. |
-| `jq` | ✍️ | `skills/jq/SKILL.md` (to author) | **#1 friction.** Invoked dozens of times per session. Cover: structural query, `--raw-output`, `--arg`/`--argjson`, `select(...)`, `paths(...)`, error handling on missing keys. |
+| `jq` | ✍️ shipped | [`skills/jq/SKILL.md`](jq/SKILL.md) + [`evals/jq.json`](../evals/jq.json) | **#1 friction.** Authored 2026-04-27. 7 patterns + 7 anti-patterns covering extract / filter / reshape / aggregate / CSV / defaults / paths. 20-entry trigger eval set (12 trigger / 8 anti-trigger). |
 | `yq` | ✍️ | `skills/yq/SKILL.md` (to author) | YAML/TOML/XML round-trip; preserve comments; `eval-all` for multi-doc; differences from jq. |
 | `fzf` | ✍️ | `skills/fzf/SKILL.md` (to author) | **Non-interactive mode for agents** (`--filter`, `--no-tty`); piping from `gh`/`git`/`fd`; ranking semantics. Interactive UI is N/A in agent shells. |
 | `xh` | ✍️ | `skills/xh/SKILL.md` (to author) | `--check-status`, `--json`, sessions, `--auth-type bearer`, when to fall back to curl. |
@@ -160,7 +160,7 @@ description: <one-line trigger — when to invoke, what the skill teaches>
 - Hook recipe: see `docs/hooks.md` §<n> (if applicable)
 ```
 
-Skills authored in this repo are mirrored to every agent's skills path by `scripts/sync-skills.sh` (see the legacy script on `feat/agent-memory-foundation`; we'll restore an updated version once the first batch is authored).
+Skills authored in this repo are mirrored to every agent's skills path by `fulcrum skills sync` (`src/cli/skills.ts`). Gemini's extension wrapper is generated automatically.
 
 ---
 
@@ -177,5 +177,5 @@ gh skill install cloudflare/skills
 gh skill install googleworkspace/cli@main:skills
 
 # 3. In-repo authored (once skills/<name>/ folders exist)
-#    scripts/sync-skills.sh mirrors skills/* to each agent's skills path.
+#    `fulcrum skills sync` mirrors skills/* to each agent's skills path.
 ```

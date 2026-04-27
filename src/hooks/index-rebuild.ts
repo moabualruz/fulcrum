@@ -1,12 +1,13 @@
 // Stop / SessionEnd — rebuild ctags + graphify + repomix only when
-// HEAD changed or working tree is dirty. SHA cached in /tmp.
+// HEAD changed or working tree is dirty. SHA cached under os.tmpdir().
 
+import { tmpdir } from "node:os";
 import { run, which, exists } from "../utils/proc.ts";
 import { projectSlug } from "../utils/io.ts";
 
 export async function runHook(): Promise<void> {
   const slug = projectSlug();
-  const shaFile = `/tmp/${slug}.index-sha`;
+  const shaFile = `${tmpdir()}/${slug}.index-sha`;
 
   // git state
   const head = await run(["git", "rev-parse", "HEAD"]);
@@ -30,7 +31,7 @@ export async function runHook(): Promise<void> {
     tasks.push(run(["graphify", "build", "."]));
   }
   if (await which("repomix")) {
-    tasks.push(run(["repomix", "--compress", "-o", `/tmp/${slug}.xml`]));
+    tasks.push(run(["repomix", "--compress", "-o", `${tmpdir()}/${slug}.xml`]));
   }
 
   await Promise.allSettled(tasks);

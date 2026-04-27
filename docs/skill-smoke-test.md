@@ -53,6 +53,6 @@ Both must be plain English; do not include the tool name itself.
 
 ## Cross-refs
 
-- `scripts/lint-skill.sh` — frontmatter validator
+- `fulcrum skills lint` — frontmatter validator (`src/cli/skills.ts`)
 - `scripts/eval-skill-claude.sh` — trigger-rate harness (Claude Code only)
 - `docs/skills.md` §7 — verification policy

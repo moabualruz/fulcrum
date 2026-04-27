@@ -9,6 +9,7 @@
 //
 // Output goes to /tmp/<project>-test-on-edit.log; the hook never blocks.
 
+import { tmpdir } from "node:os";
 import { parse as parseToml } from "smol-toml";
 import { readHookEvent, projectSlug } from "../utils/io.ts";
 import { spawnDetached } from "../utils/proc.ts";
@@ -52,7 +53,7 @@ export async function runHook(): Promise<void> {
     if (typeof cmdRaw !== "string") continue;
     if (!globToRegExp(glob).test(rel)) continue;
     const cmd = cmdRaw.replaceAll("{file}", rel);
-    const log = `/tmp/${projectSlug()}-test-on-edit.log`;
+    const log = `${tmpdir()}/${projectSlug()}-test-on-edit.log`;
     spawnDetached(["bash", "-lc", `cd '${dir}' && ${cmd}`], { logFile: log });
     return;
   }

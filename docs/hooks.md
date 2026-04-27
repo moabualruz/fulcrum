@@ -2,7 +2,7 @@
 
 > Deterministic, lifecycle-driven hooks. Run *outside* the model loop — cannot be ignored, prompt-injected, or forgotten. Use them for things the agent must *not* be trusted to remember: format, lint, secret-scan, refresh tool indexes, block destructive shell, inject session-time context.
 >
-> **Cross-agent.** Recipes are universal bash; every agent registers them differently. Section 1 catalogs Claude Code events as the reference; section 6 maps the same recipes onto Codex, Gemini, OpenCode, Pi. Per-agent registration syntax lives in [agents.md](agents.md).
+> **Cross-agent.** Every recipe is a TypeScript subcommand of the `fulcrum` binary (`fulcrum hook <name>`). Each agent invokes the same binary differently. Section 1 catalogs Claude Code events as the reference; section 6 maps the same recipes onto Codex, Gemini, OpenCode, Pi. Per-agent registration syntax lives in [agents.md](agents.md).
 
 ## 1. Claude Code event catalogue (reference shape)
 
@@ -170,7 +170,7 @@ The replacement for blanket MCP truncation. Each tool gets a tailored output str
 | OpenCode | `~/.config/opencode/plugins/*.ts` | 30+ | TypeScript plugin | yes (`tool.execute.before` returns `{deny: true}`) |
 | Pi CLI | `~/.pi/agent/extensions/*.ts` | 20+ | TypeScript extension (`pi.on(event, …)`) | yes (`tool_call` returns `{block: true, reason}`) |
 
-Every agent supports the same five categories: session lifecycle, before-tool, after-tool, before-prompt, end-of-turn. The names differ; the bash scripts behind them don't.
+Every agent supports the same five categories: session lifecycle, before-tool, after-tool, before-prompt, end-of-turn. The names differ; the `fulcrum hook <name>` subcommand behind them doesn't.
 
 ### 6.2 Recipe → event mapping
 
@@ -196,12 +196,12 @@ Same script, different registration. Use this table to wire each recipe in §5 a
   // ~/.config/opencode/plugins/fulcrum.ts
   export const FulcrumPlugin = async ({ $ }) => ({
     "tool.execute.before": async ({ tool, input }) => {
-      if (tool === "bash") await $({ env: { HOOK_INPUT: JSON.stringify({ tool_input: input }) } })`~/.fulcrum/hooks/recipes/pm-policy.sh`
+      if (tool === "bash") await $({ env: { HOOK_INPUT: JSON.stringify({ tool_input: input }) } })`fulcrum hook pm-policy`
     }
   })
   ```
 - **Pi** — TS extensions, hot-reloadable via `/reload`. `before_agent_start` can rewrite the system prompt; equivalent power to Claude Code's SessionStart context injection. No MCP support — `tool-output-router` rules for `mcp__.*` won't fire on Pi.
-- **All agents** — keep the bash scripts at `~/.fulcrum/hooks/` and shell out from each agent's native config. One copy of the logic, five registrations. Per-agent registration snippets in [agents.md](agents.md).
+- **All agents** — invoke `fulcrum hook <name>` from each agent's native config. The binary at `~/.fulcrum/bin/fulcrum` (symlinked to `~/.local/bin/fulcrum` on PATH when possible) is the single source of truth. Per-agent registration snippets in [agents.md](agents.md) and via `fulcrum hooks enable <name>`.
 
 ---
 
