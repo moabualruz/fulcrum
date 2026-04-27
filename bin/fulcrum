@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# fulcrum — multi-agent foundation CLI.
+# Subcommands:
+#   init [DIR]                Bootstrap a project (AGENTS.md, .claude/CLAUDE.md, .gitignore).
+#   hooks list                List available hook recipes (installed + on-disk).
+#   hooks enable <name>       Copy a recipe into ~/.fulcrum/hooks/recipes/ and print
+#                             per-agent registration snippet for settings.json/etc.
+#   hooks disable <name>      Remove a recipe from ~/.fulcrum/hooks/recipes/.
+#   skills sync               Mirror skills/<name>/ to every agent's skills path
+#                             (Gemini wraps in extension manifest).
+#   skills lint <path>        Validate a SKILL.md frontmatter against all 5 agents.
+#   help                      This message.
+
+set -euo pipefail
+
+FULCRUM_HOME="${FULCRUM_HOME:-$HOME/.fulcrum}"
+RECIPES="$FULCRUM_HOME/hooks/recipes"
+REPO_DIR="${FULCRUM_REPO_DIR:-}"
+
+# Resolve repo dir relative to this script (when invoked from a clone).
+if [ -z "$REPO_DIR" ]; then
+  self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+  REPO_DIR="$(cd "$(dirname "$self")/.." 2>/dev/null && pwd || echo "$HOME/.fulcrum")"
+fi
+
+die() { echo "fulcrum: $*" >&2; exit 1; }
+
+usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \?//'; }
+
+# ── init ────────────────────────────────────────────────────────────────
+cmd_init() {
+  local dir="${1:-$PWD}"
+  [ -d "$dir" ] || die "not a directory: $dir"
+  cd "$dir"
+  echo "fulcrum init → $dir"
+
+  if [ ! -f AGENTS.md ]; then
+    cat > AGENTS.md <<'EOF'
+# AGENTS.md
+
+## Project
+<one-line description>
+
+## Stack
+- Language / runtime:
+- Framework:
+- Package manager:
+- Test runner:
+
+## Commands
+- Install:      <cmd>
+- Dev server:   <cmd>
+- Test:         <cmd>
+- Lint/format:  <cmd>
+- Build:        <cmd>
+
+## Conventions
+- Branch naming:
+- Commit style:
+- Code style:
+
+## Do / Don't
+- DO …
+- DON'T …
+EOF
+    echo "  + AGENTS.md  (template)"
+  else
+    echo "  · AGENTS.md  (kept)"
+  fi
+
+  mkdir -p .claude/skills
+  if [ ! -f .claude/CLAUDE.md ]; then
+    echo "@AGENTS.md" > .claude/CLAUDE.md
+    echo "  + .claude/CLAUDE.md  (@AGENTS.md import — single source of truth)"
+  else
+    echo "  · .claude/CLAUDE.md  (kept)"
+  fi
+  [ -f .claude/skills/.gitkeep ] || touch .claude/skills/.gitkeep
+
+  # GEMINI.md only if any sibling indicates Gemini use; otherwise skip.
+  if [ -f .gemini/settings.json ] || [ -f .gemini/GEMINI.md ]; then
+    if [ ! -f GEMINI.md ]; then
+      echo "@AGENTS.md" > GEMINI.md
+      echo "  + GEMINI.md  (@AGENTS.md import for Gemini)"
+    fi
+  fi
+
+  # .gitignore additions (idempotent)
+  touch .gitignore
+  for entry in ".claude/settings.local.json" ".claude/.cache/" ".fulcrum/"; do
+    if ! grep -qxF "$entry" .gitignore; then
+      echo "$entry" >> .gitignore
+      echo "  + .gitignore += $entry"
+    fi
+  done
+
+  echo "Done."
+}
+
+# ── hooks ───────────────────────────────────────────────────────────────
+cmd_hooks_list() {
+  echo "Available recipes (in repo):"
+  if [ -d "$REPO_DIR/hooks/recipes" ]; then
+    ls "$REPO_DIR/hooks/recipes/" | sed 's/^/  /'
+  else
+    echo "  (none — repo at $REPO_DIR has no hooks/recipes/)"
+  fi
+  echo
+  echo "Enabled (installed in $RECIPES):"
+  if [ -d "$RECIPES" ] && [ "$(ls "$RECIPES" 2>/dev/null)" ]; then
+    ls "$RECIPES" | sed 's/^/  /'
+  else
+    echo "  (none)"
+  fi
+}
+
+cmd_hooks_enable() {
+  local name="${1:-}"
+  [ -n "$name" ] || die "usage: fulcrum hooks enable <name>"
+  local src="$REPO_DIR/hooks/recipes/${name}.sh"
+  [ -f "$src" ] || die "recipe not found: $src"
+  mkdir -p "$RECIPES"
+  cp "$src" "$RECIPES/${name}.sh"
+  chmod +x "$RECIPES/${name}.sh"
+  echo "Enabled: ~/.fulcrum/hooks/recipes/${name}.sh"
+  echo
+  local snippet="$REPO_DIR/hooks/recipes/${name}.snippet.md"
+  if [ -f "$snippet" ]; then
+    echo "── Registration snippet (copy into the right agent's config) ──"
+    cat "$snippet"
+  else
+    echo "(no registration snippet documented for this recipe — see docs/hooks.md §6)"
+  fi
+}
+
+cmd_hooks_disable() {
+  local name="${1:-}"
+  [ -n "$name" ] || die "usage: fulcrum hooks disable <name>"
+  local f="$RECIPES/${name}.sh"
+  if [ -f "$f" ]; then
+    rm -f "$f"
+    echo "Disabled: $f (file removed; remember to delete the registration entry from each agent's config)"
+  else
+    echo "fulcrum: $name not enabled" >&2
+  fi
+}
+
+# ── skills ──────────────────────────────────────────────────────────────
+cmd_skills_sync()  { exec "$REPO_DIR/scripts/sync-skills.sh" "$@"; }
+cmd_skills_lint()  { exec "$REPO_DIR/scripts/lint-skill.sh"  "$@"; }
+
+# ── dispatch ────────────────────────────────────────────────────────────
+case "${1:-help}" in
+  init)            shift; cmd_init "$@" ;;
+  hooks)
+    shift; sub="${1:-list}"; shift || true
+    case "$sub" in
+      list)    cmd_hooks_list ;;
+      enable)  cmd_hooks_enable "$@" ;;
+      disable) cmd_hooks_disable "$@" ;;
+      *) die "unknown: hooks $sub" ;;
+    esac ;;
+  skills)
+    shift; sub="${1:-sync}"; shift || true
+    case "$sub" in
+      sync) cmd_skills_sync "$@" ;;
+      lint) cmd_skills_lint "$@" ;;
+      *) die "unknown: skills $sub" ;;
+    esac ;;
+  help|-h|--help) usage ;;
+  *) usage; exit 1 ;;
+esac
