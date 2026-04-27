@@ -1,0 +1,22 @@
+[
+  {"query": "Format these Java files to Google style on the command line.", "should_trigger": true},
+  {"query": "Apply consistent style across this Java module before I open the PR.", "should_trigger": true},
+  {"query": "Reformat my Android sources using AOSP indentation.", "should_trigger": true},
+  {"query": "Is there a Java equivalent of prettier or black I can run from the shell?", "should_trigger": true},
+  {"query": "Auto-format every .java file under src/ in place.", "should_trigger": true},
+  {"query": "Add a CI step that fails when Java sources need reformatting.", "should_trigger": true},
+  {"query": "Fix the import ordering in this Java file.", "should_trigger": true},
+  {"query": "Run a dry-run formatter check against the Java module and tell me which files would change.", "should_trigger": true},
+  {"query": "Pre-commit hook to format Java sources before each commit.", "should_trigger": true},
+  {"query": "I'm getting IllegalAccessError when I try to run the Java formatter on JDK 21 — how do I fix it?", "should_trigger": true},
+  {"query": "Reformat one Java file by piping it through stdin and printing to stdout.", "should_trigger": true},
+  {"query": "Set up Spotless in Gradle so the build fails on Java style drift.", "should_trigger": true},
+  {"query": "Format my Kotlin sources to a consistent style.", "should_trigger": false},
+  {"query": "Run a static analyzer to find bugs in this Java code.", "should_trigger": false},
+  {"query": "Format a Scala project with scalafmt.", "should_trigger": false},
+  {"query": "Reformat a TypeScript file with prettier.", "should_trigger": false},
+  {"query": "Apply clang-format to my C++ project.", "should_trigger": false},
+  {"query": "Run checkstyle against my Java module.", "should_trigger": false},
+  {"query": "Type-check this Java code with the compiler.", "should_trigger": false},
+  {"query": "Lint my Groovy build files for style.", "should_trigger": false}
+]

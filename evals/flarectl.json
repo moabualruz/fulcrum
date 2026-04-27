@@ -1,0 +1,22 @@
+[
+  {"query": "Create an A record for staging.example.com on cloudflare pointing to 1.2.3.4.", "should_trigger": true},
+  {"query": "List all DNS records on our cloudflare zone.", "should_trigger": true},
+  {"query": "Purge the cloudflare cache for a specific URL after the deploy.", "should_trigger": true},
+  {"query": "Update the proxied flag on a DNS record in cloudflare.", "should_trigger": true},
+  {"query": "Check the status of our cloudflare zone — is it still pending nameserver delegation?", "should_trigger": true},
+  {"query": "Add a CNAME from www to the apex on cloudflare from the command line.", "should_trigger": true},
+  {"query": "Delete a stale DNS entry on cloudflare via CLI.", "should_trigger": true},
+  {"query": "Pipe cloudflare DNS records into jq to find every A record that's proxied.", "should_trigger": true},
+  {"query": "Lower the TTL on a cloudflare DNS record to 300 before a migration.", "should_trigger": true},
+  {"query": "Look up which cloudflare zones a token can see.", "should_trigger": true},
+  {"query": "Invalidate every cached file on a cloudflare zone after a release.", "should_trigger": true},
+  {"query": "Show me the SSL mode and plan on our cloudflare zone.", "should_trigger": true},
+  {"query": "Deploy a worker to cloudflare.", "should_trigger": false},
+  {"query": "Create a Route 53 A record on AWS.", "should_trigger": false},
+  {"query": "Register a new domain.", "should_trigger": false},
+  {"query": "Create a kubernetes ingress for the staging service.", "should_trigger": false},
+  {"query": "Configure nginx to proxy /api to the upstream.", "should_trigger": false},
+  {"query": "Push a Cloudflare Pages preview from the command line.", "should_trigger": false},
+  {"query": "Update KV namespace bindings on a Cloudflare Worker.", "should_trigger": false},
+  {"query": "Set up a Hetzner DNS zone for example.com.", "should_trigger": false}
+]

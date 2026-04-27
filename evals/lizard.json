@@ -1,0 +1,22 @@
+[
+  {"query": "Find every function in this repo with a cyclomatic complexity over 15.", "should_trigger": true},
+  {"query": "I want to audit which functions are too long across our codebase.", "should_trigger": true},
+  {"query": "Generate a complexity report across this multi-language codebase.", "should_trigger": true},
+  {"query": "Fail CI when any function exceeds 60 lines or has more than 5 parameters.", "should_trigger": true},
+  {"query": "Which functions in src/ have the highest McCabe complexity?", "should_trigger": true},
+  {"query": "List the top 20 most complex functions in this Python and C++ project.", "should_trigger": true},
+  {"query": "Add a pre-merge gate that rejects PRs introducing functions with CCN above 10.", "should_trigger": true},
+  {"query": "Export per-function complexity metrics to CSV so I can chart them.", "should_trigger": true},
+  {"query": "Identify hotspot functions for refactoring based on branch count and length.", "should_trigger": true},
+  {"query": "Measure cyclomatic complexity for a Java + Kotlin codebase using a single tool.", "should_trigger": true},
+  {"query": "I need NLOC and CCN per function across the repo.", "should_trigger": true},
+  {"query": "Produce an HTML report of overly complex functions for the team review.", "should_trigger": true},
+  {"query": "Count the lines of code in this repository, broken down by language.", "should_trigger": false},
+  {"query": "Find duplicate code blocks across our JavaScript files.", "should_trigger": false},
+  {"query": "Run static analysis to look for security bugs in this codebase.", "should_trigger": false},
+  {"query": "Format my Python code automatically.", "should_trigger": false},
+  {"query": "Lint our TypeScript files for style issues.", "should_trigger": false},
+  {"query": "Benchmark how fast this CLI runs compared to the previous version.", "should_trigger": false},
+  {"query": "Generate a flamegraph to find CPU hotspots inside one function.", "should_trigger": false},
+  {"query": "Check our dependencies for known CVEs.", "should_trigger": false}
+]

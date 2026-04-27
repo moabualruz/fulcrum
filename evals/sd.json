@@ -1,0 +1,22 @@
+[
+  {"query": "Find and replace 'oldName' with 'newName' in this file.", "should_trigger": true},
+  {"query": "Rename a symbol across all .ts files using a regex.", "should_trigger": true},
+  {"query": "Do a multiline regex replace in this YAML config.", "should_trigger": true},
+  {"query": "Preview the replacements before writing them to disk.", "should_trigger": true},
+  {"query": "Swap 'from \"react\"' for 'from \"preact\"' across the src tree.", "should_trigger": true},
+  {"query": "I have to substitute a URL in twenty config files and the sed escaping is killing me.", "should_trigger": true},
+  {"query": "Replace every TODO with FIXME in this file, case-insensitively.", "should_trigger": true},
+  {"query": "Use a capture group to rewrite '(\\d+).bak' to just the number across these logs.", "should_trigger": true},
+  {"query": "Strip trailing whitespace from every line of this file.", "should_trigger": true},
+  {"query": "I need a non-regex literal find-and-replace because the pattern has tons of brackets.", "should_trigger": true},
+  {"query": "Do an in-place text replacement across all markdown files in docs/.", "should_trigger": true},
+  {"query": "Update an environment variable name in every shell script under scripts/.", "should_trigger": true},
+  {"query": "Delete the third line of this file.", "should_trigger": false},
+  {"query": "Convert tabs to spaces in this YAML file.", "should_trigger": false},
+  {"query": "Find all files matching 'config.*' under the repo.", "should_trigger": false},
+  {"query": "Search the codebase for any line containing TODO.", "should_trigger": false},
+  {"query": "Rename the file foo.txt to bar.txt.", "should_trigger": false},
+  {"query": "Refactor this function name across the project but only at call sites, not in strings or comments.", "should_trigger": false},
+  {"query": "Pretty-print this JSON file.", "should_trigger": false},
+  {"query": "Sort the lines of this text file alphabetically.", "should_trigger": false}
+]

@@ -1,0 +1,22 @@
+[
+  {"query": "Extract the image field from a kubernetes deployment yaml on the command line.", "should_trigger": true},
+  {"query": "Edit replicas in place in this manifest without trashing the comments.", "should_trigger": true},
+  {"query": "Merge two yaml configs while preserving comments and key order.", "should_trigger": true},
+  {"query": "Convert this yaml file to json from the shell.", "should_trigger": true},
+  {"query": "I have a multi-document kubernetes manifest — pull just the Deployment out.", "should_trigger": true},
+  {"query": "Round-trip a TOML file to YAML and back.", "should_trigger": true},
+  {"query": "Split a big helm template output into one file per kind.", "should_trigger": true},
+  {"query": "Bump the image tag in values.yaml to v1.2.3.", "should_trigger": true},
+  {"query": "Read a nested field out of a docker-compose file in bash.", "should_trigger": true},
+  {"query": "Convert this JSON config back to YAML for a PR.", "should_trigger": true},
+  {"query": "Delete an annotation from a kubernetes resource on disk.", "should_trigger": true},
+  {"query": "I need to override a value in base.yaml with override.yaml at the CLI.", "should_trigger": true},
+  {"query": "Filter a JSON array on the command line and grab the IDs.", "should_trigger": false},
+  {"query": "Edit an XML file using XPath on the command line.", "should_trigger": false},
+  {"query": "Format a yaml file with consistent indentation.", "should_trigger": false},
+  {"query": "Read a properties file from a Java application.", "should_trigger": false},
+  {"query": "Parse a config file inside a Python script using PyYAML.", "should_trigger": false},
+  {"query": "Extract a column from a CSV file in bash.", "should_trigger": false},
+  {"query": "Search for a string across files in this repo.", "should_trigger": false},
+  {"query": "Apply a kubernetes manifest to the cluster.", "should_trigger": false}
+]

@@ -1,0 +1,21 @@
+[
+  {"query": "I want DATABASE_URL to be set automatically only when I'm inside this project's directory and unset when I leave.", "should_trigger": true},
+  {"query": "How do I load environment variables from a file in my repo whenever I cd into it?", "should_trigger": true},
+  {"query": "Scope an API token to one repository so it doesn't leak into other shells.", "should_trigger": true},
+  {"query": "Auto-add a project-local bin directory to PATH whenever I'm working in this folder.", "should_trigger": true},
+  {"query": "I want to load a .envrc when I enter a directory — how do I set this up in zsh?", "should_trigger": true},
+  {"query": "How do I make a per-project Python virtualenv activate automatically on cd?", "should_trigger": true},
+  {"query": "Set AWS_PROFILE differently per repo without editing my global shell rc.", "should_trigger": true},
+  {"query": "I edited the file that sets my project env vars but the shell isn't picking up the new values — what do I run?", "should_trigger": true},
+  {"query": "Inherit env vars from a parent monorepo directory into each service folder.", "should_trigger": true},
+  {"query": "Keep secrets out of the committed env file but still load them locally per developer.", "should_trigger": true},
+  {"query": "Load env vars per project inside a CI runner where there's no interactive shell.", "should_trigger": true},
+  {"query": "Set FOO=bar globally so every shell on my machine has it forever.", "should_trigger": false},
+  {"query": "Pin the Node version for this project to 20.11.", "should_trigger": false},
+  {"query": "Fetch a database password from HashiCorp Vault at app startup.", "should_trigger": false},
+  {"query": "Configure environment variables for a docker compose service using env_file.", "should_trigger": false},
+  {"query": "Add a permanent shell alias for git status.", "should_trigger": false},
+  {"query": "Set Ruby to 3.3 for one specific project.", "should_trigger": false},
+  {"query": "How do I export an env var inside a GitHub Actions step?", "should_trigger": false},
+  {"query": "Configure systemd service environment variables.", "should_trigger": false}
+]

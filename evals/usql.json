@@ -1,0 +1,22 @@
+[
+  {"query": "Run a quick SELECT on our postgres database from the shell.", "should_trigger": true},
+  {"query": "I need to query a sqlite file with one tool — list tables and grab a few rows.", "should_trigger": true},
+  {"query": "Run an ad-hoc SQL script against our mysql staging database.", "should_trigger": true},
+  {"query": "Connect to a snowflake warehouse and run a query from the command line.", "should_trigger": true},
+  {"query": "I have a DATABASE_URL in my env — can you run a one-shot query and pipe the results into jq?", "should_trigger": true},
+  {"query": "Open an interactive SQL REPL against the cockroachdb cluster and inspect the schema.", "should_trigger": true},
+  {"query": "I need a psql-like CLI that also works for mysql and sqlite — what should I use?", "should_trigger": true},
+  {"query": "Run a SELECT count(*) against the production redshift cluster from a CI step.", "should_trigger": true},
+  {"query": "Spin up a duckdb in-memory session and load a parquet file to query it.", "should_trigger": true},
+  {"query": "Switch between postgres and mysql connections inside one shell session and run the same query.", "should_trigger": true},
+  {"query": "Get the result of a SQL query as CSV so I can paste it into a spreadsheet.", "should_trigger": true},
+  {"query": "Run a database migration to create a new users table on production.", "should_trigger": false},
+  {"query": "Bulk import a 10GB CSV into postgres for a production load.", "should_trigger": false},
+  {"query": "Run a kafka consumer to read messages from a topic.", "should_trigger": false},
+  {"query": "Connect to redis and look up a key.", "should_trigger": false},
+  {"query": "Run a graphql query against our internal API.", "should_trigger": false},
+  {"query": "Set up version-tracked schema migrations with rollback support.", "should_trigger": false},
+  {"query": "Search elasticsearch for documents matching a phrase.", "should_trigger": false},
+  {"query": "Generate a Prisma migration from a schema change.", "should_trigger": false},
+  {"query": "Browse a mongo collection and find documents matching a filter.", "should_trigger": false}
+]

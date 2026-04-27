@@ -1,0 +1,22 @@
+[
+  {"query": "Find code smells in this Java module before I open the PR.", "should_trigger": true},
+  {"query": "Scan our Java service for unused imports and dead code blocks.", "should_trigger": true},
+  {"query": "Detect duplicated code across the src tree of this Java project.", "should_trigger": true},
+  {"query": "Run a static analyzer over our Java repo with a custom ruleset we vendor.", "should_trigger": true},
+  {"query": "I want to find empty catch blocks and god classes in our codebase.", "should_trigger": true},
+  {"query": "We have a Salesforce Apex repo — analyze it for bug patterns with a category ruleset.", "should_trigger": true},
+  {"query": "Set up a CI job that fails the build when new Java code-quality violations are introduced.", "should_trigger": true},
+  {"query": "Find copy-pasted blocks of at least 100 tokens across this Java project.", "should_trigger": true},
+  {"query": "Generate a SARIF report of Java static-analysis findings so we can upload it to GitHub Code Scanning.", "should_trigger": true},
+  {"query": "Audit a legacy Java module for design issues like cyclomatic complexity and tight coupling.", "should_trigger": true},
+  {"query": "Suppress a specific Java static-analysis rule on one method without disabling the whole tool.", "should_trigger": true},
+  {"query": "Lint our Python codebase for style issues.", "should_trigger": false},
+  {"query": "Scan the application for SQL injection vulnerabilities.", "should_trigger": false},
+  {"query": "Format the Java code to a consistent style.", "should_trigger": false},
+  {"query": "Find type errors in our TypeScript project.", "should_trigger": false},
+  {"query": "Scan our npm dependencies for known CVEs.", "should_trigger": false},
+  {"query": "Run ESLint on the JavaScript source.", "should_trigger": false},
+  {"query": "Find memory leaks in this C++ program.", "should_trigger": false},
+  {"query": "Detect secrets accidentally committed to the git history.", "should_trigger": false},
+  {"query": "Measure code coverage of the Java unit tests.", "should_trigger": false}
+]
