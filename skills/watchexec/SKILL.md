@@ -45,7 +45,7 @@ watchexec -r -- cargo run
 
 # Clear screen between runs; debounce; don't run on startup
 watchexec -c -- cargo check
-watchexec -d 500 -- pytest                # 500 ms debounce (default 100)
+watchexec -d 500 -- pytest                # 500 ms debounce (default 50)
 watchexec --postpone -- make               # wait for first change before running
 
 # Pull ignore patterns from a file

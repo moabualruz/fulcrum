@@ -22,10 +22,10 @@ description: Use this skill whenever the user wants to scan compiled Java byteco
 mvn package -DskipTests          # or: ./gradlew assemble
 
 # Text UI scan, XML report (canonical CI shape)
-spotbugs -textui -xml:withMessages -output bugs.xml target/myapp.jar
+spotbugs -textui -xml:withMessages=bugs.xml target/myapp.jar
 
 # Scan a class directory (no jar yet)
-spotbugs -textui -xml:withMessages -output bugs.xml target/classes
+spotbugs -textui -xml:withMessages=bugs.xml target/classes
 
 # Interactive review (developer triage)
 spotbugs -gui
@@ -40,17 +40,17 @@ spotbugs -textui -medium target/myapp.jar            # HIGH + MEDIUM (default)
 spotbugs -textui -low    target/myapp.jar            # everything
 
 # Output formats
-spotbugs -textui -xml:withMessages -output bugs.xml   target/app.jar
-spotbugs -textui -html             -output bugs.html  target/app.jar
-spotbugs -textui -emacs                                target/app.jar
-spotbugs -textui -sarif            -output bugs.sarif target/app.jar
+spotbugs -textui -xml:withMessages=bugs.xml   target/app.jar
+spotbugs -textui -html=bugs.html              target/app.jar
+spotbugs -textui -emacs                       target/app.jar
+spotbugs -textui -sarif=bugs.sarif            target/app.jar
 
 # Plugins — security and extra rules
-spotbugs -textui -pluginList find-sec-bugs.jar,fb-contrib.jar -output bugs.xml app.jar
+spotbugs -textui -pluginList find-sec-bugs.jar,fb-contrib.jar -xml=bugs.xml app.jar
 
 # Filter scope (XML filter file, not ruleset list)
-spotbugs -textui -include  include-filter.xml -output bugs.xml app.jar
-spotbugs -textui -exclude  exclude-filter.xml -output bugs.xml app.jar
+spotbugs -textui -include  include-filter.xml -xml=bugs.xml app.jar
+spotbugs -textui -exclude  exclude-filter.xml -xml=bugs.xml app.jar
 ```
 
 `-textui` runs headless. Without it, spotbugs launches the Swing GUI, which fails in CI containers without a display.
@@ -60,7 +60,7 @@ spotbugs -textui -exclude  exclude-filter.xml -output bugs.xml app.jar
 ### Pattern A — first-look scan on a built jar
 
 ```bash
-spotbugs -textui -effort:default -xml:withMessages -output bugs.xml target/myapp.jar
+spotbugs -textui -effort:default -xml:withMessages=bugs.xml target/myapp.jar
 ```
 
 Default effort + medium confidence is the sweet spot for an initial audit. `withMessages` embeds human-readable rule descriptions in the XML so the output is self-contained for review tools.
@@ -83,7 +83,7 @@ Filter via the `<Bug category="..."/>` element in the include/exclude XML (Patte
 ### Pattern C — SARIF for GitHub Code Scanning
 
 ```bash
-spotbugs -textui -sarif -output spotbugs.sarif target/myapp.jar
+spotbugs -textui -sarif=spotbugs.sarif target/myapp.jar
 ```
 
 Then upload via `github/codeql-action/upload-sarif@v3` in the workflow. Findings appear inline on PRs in the Code Scanning UI — far better signal than a buried HTML report.
@@ -93,7 +93,7 @@ Then upload via `github/codeql-action/upload-sarif@v3` in the workflow. Findings
 ```bash
 spotbugs -textui \
   -pluginList /opt/plugins/findsecbugs-plugin.jar,/opt/plugins/fb-contrib.jar \
-  -xml:withMessages -output bugs.xml target/app.jar
+  -xml:withMessages=bugs.xml target/app.jar
 ```
 
 `find-sec-bugs` adds ~140 security rules (SQLi, XSS, weak crypto, deserialisation gadgets) — essential for any service that handles untrusted input. `fb-contrib` adds ~300 additional general-purpose rules. Plugins are jars; pass absolute paths.
@@ -117,7 +117,7 @@ spotbugs -textui \
 ```
 
 ```bash
-spotbugs -textui -exclude exclude-filter.xml -output bugs.xml target/app.jar
+spotbugs -textui -exclude exclude-filter.xml -xml=bugs.xml target/app.jar
 ```
 
 `-include` keeps only matches; `-exclude` drops them. Either / both. The filter format is the same as findbugs — match on `Bug pattern`, `Bug category`, `Class`, `Method`, `Field`, `Source` regex.
@@ -155,10 +155,10 @@ Gradle plugin: `com.github.spotbugs`. Maven plugin: `com.github.spotbugs:spotbug
 
 ```bash
 # PR (fast)
-spotbugs -textui -effort:less -high -sarif -output sb.sarif target/app.jar
+spotbugs -textui -effort:less -high -sarif=sb.sarif target/app.jar
 
 # Nightly (thorough)
-spotbugs -textui -effort:max  -low  -sarif -output sb.sarif target/app.jar
+spotbugs -textui -effort:max  -low  -sarif=sb.sarif target/app.jar
 ```
 
 `-effort:max` runs the full inter-procedural data-flow analysis; on large jars (>50 MB) it can take 10–30 minutes. PR jobs should run `-effort:less` with `-high` confidence; the nightly job runs `-effort:max -low` and posts to the dashboard.
@@ -173,6 +173,7 @@ spotbugs -textui -effort:max  -low  -sarif -output sb.sarif target/app.jar
 - **Don't ignore SARIF output for GitHub repos.** `-sarif` uploaded via the code-scanning workflow surfaces findings inline on PR review — vastly higher signal than an HTML report nobody opens. JSON / XML are for in-house dashboards; SARIF is for the platform.
 - **Don't run only spotbugs and call Java analysis "done".** Spotbugs reads bytecode; PMD reads source AST. They catch different classes of bug — spotbugs catches null-deref via flow analysis and concurrency mistakes; PMD catches API misuse, code smells, and structural rules. Run both.
 - **Don't omit `-textui` in CI.** Without it spotbugs launches the Swing GUI; on a headless runner the process hangs or errors with `HeadlessException`.
+- **Don't use `-output FILE` as a separate flag.** It's deprecated since SpotBugs 4.5.0; use the `-xml=FILE` / `-sarif=FILE` / `-html=FILE` single-token form instead. The old form still works but emits a deprecation warning.
 
 ## Cross-refs
 

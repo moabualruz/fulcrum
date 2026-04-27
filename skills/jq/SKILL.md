@@ -87,7 +87,7 @@ jq -r '.items[] | [.id, .name, .price] | @csv' data.json   # quoted CSV
 jq -r '.items[] | [.id, .name, .price] | @tsv' data.json   # tab-separated
 ```
 
-`@csv` quotes strings and escapes embedded commas; `@tsv` does not.
+`@csv` quotes strings and escapes embedded commas. `@tsv` doesn't quote, but it DOES escape control characters (`\n`, `\r`, `\t`, `\\`) so embedded tabs/newlines round-trip safely.
 
 ### Pattern F — defaults and conditionals
 
@@ -97,7 +97,7 @@ jq 'if .status == "ok" then .value else null end'
 jq '.items[]?'                                          # tolerate missing
 ```
 
-`//` is null-or-empty fallback. `?` after a path swallows "Cannot index" errors.
+`//` is null-or-false fallback (LHS produces a non-null, non-false value, or RHS wins). `?` after a path swallows "Cannot index" errors.
 
 ### Pattern G — paths, walk, deep edits
 

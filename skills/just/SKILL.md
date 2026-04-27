@@ -100,7 +100,7 @@ test:
 ### Pattern D — variables, env, dotenv
 
 ```just
-set dotenv-load                      # load `.env` from justfile's dir (default in modern just)
+set dotenv-load                      # load `.env` from justfile's dir (DEFAULT IS FALSE — must be explicitly set)
 set dotenv-required                  # error if .env missing
 set dotenv-filename := ".env.local"  # alternative filename
 set export                           # export every recipe-set variable as an env var
@@ -115,7 +115,7 @@ just --evaluate                      # dump all variables and resolved values
 just --set version=1.2.3 build       # override at the CLI
 ```
 
-`.env` is read from the justfile's directory by default. To disable, remove `set dotenv-load` or pass `--no-dotenv`.
+.env is NOT read by default. To enable, add `set dotenv-load := true` (or just `set dotenv-load`) at the top of the justfile. To override the location, use `set dotenv-filename := "..."` or `set dotenv-path := "..."`. Pass `--no-dotenv` to disable for one invocation.
 
 ### Pattern E — choose a different shell
 

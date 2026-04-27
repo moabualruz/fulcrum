@@ -22,8 +22,11 @@ The binary is **`difft`** (not `difftastic`). Agents frequently guess `difftasti
 # Two-file structural diff
 difft a.rs b.rs
 
-# Force a language when the extension is ambiguous or wrong
-difft --language TypeScript old.txt new.txt
+# Force a language when the extension is ambiguous or wrong (use --override GLOB:LANG)
+difft --override 'old.txt:TypeScript' --override 'new.txt:TypeScript' old.txt new.txt
+
+# Or scope the override by glob (one form fits many files)
+difft --override '*.in:Rust' template.in template.out
 
 # Side-by-side, full unchanged context, no syntax highlight (terminals/logs)
 difft --display side-by-side --context 999 --syntax-highlight off a.py b.py
@@ -88,12 +91,12 @@ Default is auto: side-by-side when the terminal is wide enough, otherwise inline
 ### Pattern E — language override for unusual extensions
 
 ```bash
-difft --language Rust template.in template.out      # no .rs extension
-difft --language "JSON with comments" tsconfig.json tsconfig.json.bak
-difft --list-languages | grep -i kotlin             # find the exact name
+difft --override '*.in:Rust' template.in template.out                          # glob-scoped
+difft --override 'tsconfig.json:JSON with comments' tsconfig.json.bak tsconfig.json
+difft --list-languages | grep -i kotlin                                        # find the exact name
 ```
 
-Pass the language **name as printed by `--list-languages`**, not a guessed string. Without `--language`, files with no/unknown extension fall back to text diff.
+The flag is `--override GLOB:LANGUAGE`, not `--language NAME`. Use the language name as printed by `--list-languages` (case-sensitive). Without an override, files with no/unknown extension fall back to text diff.
 
 ### Pattern F — performance fallback
 
@@ -113,7 +116,7 @@ difft is slower than `diff` and noisier on lockfiles, minified bundles, and gene
 - **Don't `git config --global diff.external difft`** without thinking. It silently slows every `git diff` everywhere — including lockfiles, vendored code, and CI logs. Scope with `git config --local` or `GIT_EXTERNAL_DIFF=difft` for one command.
 - **Don't run difft on multi-MB generated files** (lockfiles, minified JS, build outputs). It parses both sides and will be much slower than `diff -u`. Exclude generated paths from the diff or use `--no-ext-diff`.
 - **Don't use difft to resolve merge conflicts.** difft is a *viewer*. There is no `--merge` mode. Use `git mergetool` (vimdiff, kdiff3, meld, …).
-- **Don't assume language autodetect for unusual extensions** (`.in`, `.tmpl`, `.txt` source files, `.h` ambiguous between C and C++). Pass `--language <name>` from `difft --list-languages`, or difft falls back to text diff with no structural benefit.
+- **Don't assume language autodetect for unusual extensions** (`.in`, `.tmpl`, `.txt` source files, `.h` ambiguous between C and C++). Pass `--override 'glob:LANGUAGE'` using a name from `difft --list-languages`. There is no `--language` flag — that's a common guess but it doesn't exist.
 - **Don't pipe difft output into a tool that reflows lines.** Side-by-side mode aligns columns by character; `less -S` (chop) is safe, plain `less` and most pagers wrap and break alignment. Use `--display inline` when piping.
 - **Don't use difft for binary or non-text artifacts** (images, PDFs, sqlite). difft refuses; reach for `diff-pdf`, `imagediff`, or a domain tool.
 - **Don't expect identical output across versions.** difft's parser and display heuristics evolve. Pin the version in CI (`difft --version`) if you compare output across runs.

@@ -1,18 +1,18 @@
 ---
 name: biome
-description: Use this skill whenever the user wants to format or lint JavaScript, TypeScript, JSX, TSX, JSON, JSONC, CSS, or Markdown — biome is the unified Rust-based replacement for prettier + eslint, doing both with one binary and one config file. Trigger phrases include "format a TS/JS file", "lint a TypeScript file", "replacement for prettier and eslint", "format JSON", "run a JS linter", "fix code style in javascript", "format this jsx in place", "lint and format together", "migrate from prettier and eslint", "one tool to format and lint". Reach for biome before installing prettier or eslint on a fresh project, and run `biome migrate` to import existing prettier/eslint configs. Skip for Python (use ruff), Rust (rustfmt + clippy), Go (gofmt + golangci-lint), Vue/Svelte/Astro single-file components (still prettier territory as of 2026), and TypeScript type-checking (that is `tsc --noEmit`).
+description: Use this skill whenever the user wants to format or lint JavaScript, TypeScript, JSX, TSX, JSON, JSONC, CSS, GraphQL, HTML, Vue, Svelte, or Astro — biome is the unified Rust-based replacement for prettier + eslint, doing both with one binary and one config file. Trigger phrases include "format a TS/JS file", "lint a TypeScript file", "replacement for prettier and eslint", "format JSON", "run a JS linter", "fix code style in javascript", "format this jsx in place", "lint and format together", "migrate from prettier and eslint", "one tool to format and lint". Reach for biome before installing prettier or eslint on a fresh project, and run `biome migrate` to import existing prettier/eslint configs. Skip for Python (use ruff), Rust (rustfmt + clippy), Go (gofmt + golangci-lint), and TypeScript type-checking (that is `tsc --noEmit`). Markdown formatting is in progress upstream; biome cannot lint Markdown today.
 ---
 
 # biome
 
 ## When to use
 
-- The user wants to format or lint JS / TS / JSX / TSX / JSON / JSONC / CSS / Markdown — biome handles all of these with one binary, one config (`biome.json`).
+- The user wants to format or lint JS / TS / JSX / TSX / JSON / JSONC / CSS / GraphQL / HTML — biome handles all of these with one binary, one config (`biome.json`). Vue / Svelte / Astro single-file components are also supported since biome v2.3.0 (experimental but stable enough for daily use).
 - The user asks for "the prettier-and-eslint replacement" or wants to drop both in favor of one tool. `biome migrate eslint` and `biome migrate prettier` read the existing configs and emit `biome.json`.
 - The agent is wiring CI for a JS/TS repo and needs a non-mutating linter+formatter check — `biome ci` is the dedicated entry point (no autofix, exits non-zero on any issue).
 - A pre-commit hook wants to fix style issues on staged files — `biome check --write --staged` is the canonical shape.
 
-**Skip** for: Python (use `ruff`), Rust (`rustfmt` + `clippy`), Go (`gofmt` + `golangci-lint`), YAML (`prettier` or `yamllint`), Vue / Svelte / Astro single-file components (prettier — biome has no parser for these as of 2026), and TypeScript **type** errors (that is `tsc --noEmit`; biome does not do type-checking).
+**Skip** for: Python (use `ruff`), Rust (`rustfmt` + `clippy`), Go (`gofmt` + `golangci-lint`), YAML (`prettier` or `yamllint`), Markdown lint (biome only parses/formats markdown — no lint rules; use `markdownlint` if you need lint), and TypeScript **type** errors (that is `tsc --noEmit`; biome does not do type-checking).
 
 ## Invocation
 
@@ -151,7 +151,7 @@ biome check --write src/                      # NEW (≥ 1.8) — preferred
 
 - **Don't run `biome format file.ts` and assume the file changed.** Without `--write` it only prints to stdout. Use `biome format --write` or, better, `biome check --write` for lint+format together.
 - **Don't keep prettier and eslint installed alongside biome.** The whole point is one tool, one config; double-formatting fights itself. Run `biome migrate prettier` and `biome migrate eslint`, then uninstall both and delete their configs.
-- **Don't expect Vue / Svelte / Astro single-file component support.** As of 2026, biome's parsers cover JS/TS/JSX/TSX/JSON/CSS/Markdown only. Keep prettier (or each framework's official formatter) for `.vue` / `.svelte` / `.astro`.
+- **Don't assume Vue / Svelte / Astro support is on by default for old biome.** Support landed in biome v2.3.0 and is still experimental — verify your installed version (`biome --version`) before relying on it in CI. Pin a 2.3.0+ version in `package.json` if you depend on it.
 - **Don't run `biome lint` and skip formatting.** That ships unformatted code. Use `biome check --write` so a single command covers both.
 - **Don't use `--apply` in scripts pinned to "latest" biome.** The flag was renamed `--write`; older docs and snippets still show `--apply`. Either pin the biome version or use `--write` (accepted by every recent release).
 - **Don't reach for biome to catch type errors.** `noUnusedVariables`, `noExplicitAny`, etc. are syntactic. For "is this assignable to that?" you still need `tsc --noEmit`.
@@ -161,7 +161,7 @@ biome check --write src/                      # NEW (≥ 1.8) — preferred
 ## Cross-refs
 
 - Behavioral rule: see `rules/AGENTS.md` — "use biome for JS/TS/JSON/CSS formatting and linting; one tool replaces prettier + eslint".
-- Hook recipe: `format` (in `docs/hooks.md`) wires biome as the JS/TS formatter, with prettier as the fallback for Vue/Svelte/Astro.
+- Hook recipe: `format` (in `docs/hooks.md`) wires biome as the JS/TS formatter, with prettier as the fallback when biome isn't installed or for Markdown lint.
 - Sister skill: `skills/ruff/SKILL.md` — biome's Python counterpart (Rust-based linter + formatter, replaces flake8 + black).
 - JSON pipelines: `skills/jq/SKILL.md` — `biome check --reporter=json | jq` is the canonical analysis shape.
 - Type-checking partner: `tsc --noEmit` for TypeScript types; biome only handles syntax + style.

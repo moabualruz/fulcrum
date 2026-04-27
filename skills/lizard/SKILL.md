@@ -31,8 +31,11 @@ lizard -x './build/*' -x './vendor/*' .
 # Thresholds (CCN / length / parameter count)
 lizard -C 10 -L 60 -a 5 src/
 
-# Top-N most complex functions
-lizard -i 20 src/
+# CI budget: tolerate up to N existing warnings without failing
+lizard -C 10 -L 60 --warnings_only --ignore_warnings 5 src/
+
+# Top-N most complex functions (lizard has no native top-N flag — sort + head)
+lizard --csv src/ | sort -t, -k2 -nr | head -20      # CSV columns: NLOC,CCN,token,...
 
 # Warnings-only mode (CI gate — exits non-zero on threshold violation)
 lizard -C 10 -L 60 -a 5 --warnings_only src/
@@ -51,10 +54,11 @@ lizard --working_threads 8 .
 ### Pattern A — first-look audit
 
 ```bash
-lizard -i 20 .
+lizard .                                             # full per-function table + module summary
+lizard --csv . | sort -t, -k2 -nr | head -20         # top 20 by CCN
 ```
 
-Prints the 20 functions with the highest CCN, plus a module summary (avg NLOC, avg CCN, function count, warning count). Default CCN warning threshold is 15.
+`lizard` has no native top-N flag. The default CCN warning threshold is 15; `-C N` overrides. The summary prints avg NLOC, avg CCN, function count, and warning count at the end.
 
 ### Pattern B — CI gate
 
@@ -67,10 +71,10 @@ Tightens to CCN ≤ 10, length ≤ 60 NLOC, ≤ 5 parameters. `--warnings_only` 
 ### Pattern C — single-language drill-down
 
 ```bash
-lizard -l python -x './tests/*' -i 30 src/
+lizard -l python -x './tests/*' -C 10 src/           # tighter CCN threshold for one language
 ```
 
-`-l <lang>` restricts the parser; lizard's language list (`lizard -l ?` shows it) covers C/C++, C#, Java, JS, TS, Python, Go, Rust, Swift, Objective-C, Kotlin, PHP, Lua, Scala, Ruby, Fortran, Erlang, Solidity, Zig, and more.
+`-l <lang>` restricts the parser; lizard's language list is documented at <https://github.com/terryyin/lizard#languages> (C/C++, C#, Java, JS, TS, Python, Go, Rust, Swift, Objective-C, Kotlin, PHP, Lua, Scala, Ruby, and several more depending on the installed version). There is no `-l ?` query syntax — consult the README or `pip show lizard`.
 
 ### Pattern D — structured output → spreadsheet or CI artefact
 
@@ -116,6 +120,7 @@ No native diff mode — capture two CSVs and diff. Pair with hyperfine or git pr
 - **Don't pipe `--csv` through `jq`.** It's CSV, not JSON. Use `awk`, `miller`, `csvkit`, or `--xml` if you need structured parsing. lizard does not emit JSON.
 - **Don't confuse this with the `cyclomatic` PyPI package.** That's Python-only and unmaintained. `lizard` is the cross-language one — install via `pip install lizard` or `brew install lizard`.
 - **Don't run lizard on `node_modules/`, `vendor/`, `target/`, or `build/`.** The defaults walk everything; always pass `-x` exclusions or your numbers will be dominated by third-party code.
+- **Don't pass `-i N` thinking it limits to top-N functions.** `-i / --ignore_warnings N` is a CI exit-code budget — it lets `N` warnings through before failing. To get top-N by CCN, use `--csv | sort -t, -k2 -nr | head -N`.
 - **Don't read the CCN as strict McCabe.** lizard uses a *modified* McCabe: switch arms each add 1, but some short-circuit edges are merged. Numbers are comparable across files inside one run; not 1:1 with other tools.
 
 ## Cross-refs
