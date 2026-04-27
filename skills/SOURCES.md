@@ -1,25 +1,12 @@
 # Skill sources
 
-> Tool skills are **sourced**, not authored. This file lists the upstream skills that fulcrum installs alongside its own (`adr`, `wrap`, `promote`, `postmortem`, `plan-to-plane`, `in-flight`).
+> Tool skills are **sourced**, not authored. This file lists the upstream skills that fulcrum installs.
 >
 > 🚧 **Verification pending.** Slugs and paths below are starting points; many need primary-source confirmation before `scripts/install.sh` can fetch them. Verify each before relying on it.
 
 ## Selection principle
 
 Don't write a SKILL.md for a tool when the upstream community already publishes one. Re-authoring fragments the ecosystem and rots when the tool's flags change. Source upstream; pin a known-good commit; re-source on update.
-
-## Authored in this repo
-
-These are fulcrum-specific (no upstream); they live in `skills/`:
-
-| Skill | Purpose |
-|---|---|
-| `adr` | Vibe ADR capture |
-| `wrap` | Session-end extraction |
-| `promote` | Pending-global review |
-| `postmortem` | Two-document post-mortem |
-| `plan-to-plane` | Markdown plan → Plane issues |
-| `in-flight` | Mid-thought capture |
 
 ## Sourced upstream — to verify and install
 
@@ -31,7 +18,7 @@ Repo: <https://github.com/anthropics/skills>. Includes document work, webapp tes
 
 Repo: <https://github.com/obra/superpowers>. Installs as a Claude Code plugin (`claude plugin install obra/superpowers`); also has `.codex-plugin/`, `.opencode/`, `gemini-extension.json`. Confirmed cross-agent installer.
 
-Skills we want enabled (per `docs/skills.md` §4):
+Skills we want enabled (per `docs/skills.md` §3):
 - `brainstorming` · `writing-plans` · `systematic-debugging` · `code-review` · `worktrees` · `using-skills`
 
 Skip the heavy TDD-orchestrator skills.

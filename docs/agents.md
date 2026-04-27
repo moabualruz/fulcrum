@@ -1,6 +1,6 @@
 # Cross-Agent Generalization
 
-> The architecture from [context.md](context.md), [hooks.md](hooks.md), [capabilities.md](capabilities.md), [skills.md](skills.md), [mcp.md](mcp.md), [memory.md](memory.md), [tasks.md](tasks.md) applies to all agents. This doc translates each layer to agent-specific config. All data verified from primary sources 2026-04-27.
+> The architecture from [context.md](context.md), [hooks.md](hooks.md), [capabilities.md](capabilities.md), [skills.md](skills.md), [mcp.md](mcp.md) applies to all agents. This doc translates each layer to agent-specific config. All data verified from primary sources 2026-04-27.
 
 ## 1. Comparison matrix
 
@@ -43,24 +43,20 @@ Six events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PermissionRequest
 
 Non-zero exit code (2) blocks the triggering action with stderr as the reason.
 
-`~/.codex/hooks.json` for fulcrum hooks (index + memory):
+`~/.codex/hooks.json` for fulcrum index hooks:
 
 ```json
 {
   "hooks": {
     "Stop": [
-      {"hooks": [{"type": "command", "command": "~/.fulcrum/hooks/index-rebuild.sh"}]},
-      {"hooks": [{"type": "command", "command": "~/.fulcrum/hooks/session-stop.sh"}]}
+      {"hooks": [{"type": "command", "command": "~/.fulcrum/hooks/index-rebuild.sh"}]}
     ],
     "SessionStart": [
-      {"hooks": [{"type": "command", "command": "~/.fulcrum/hooks/index-check.sh"}]},
-      {"hooks": [{"type": "command", "command": "~/.fulcrum/hooks/session-start.sh"}]}
+      {"hooks": [{"type": "command", "command": "~/.fulcrum/hooks/index-check.sh"}]}
     ]
   }
 }
 ```
-
-Set `FULCRUM_AGENT=codex` in the Codex shell environment so the vault commit messages are stamped correctly.
 
 ### 2.3 Skills
 
@@ -112,24 +108,20 @@ Eleven events: `SessionStart`, `SessionEnd`, `BeforeModel`, `AfterModel`, `Befor
 
 Hooks return JSON; can inject context via `hookSpecificOutput.additionalContext`, control tool access via `toolConfig`. Exit code 2 = emergency block.
 
-Combined index + memory hooks — add to `~/.gemini/settings.json`:
+Index hooks — add to `~/.gemini/settings.json`:
 
 ```json
 {
   "hooks": {
     "SessionStart": [
-      {"type": "command", "command": "~/.fulcrum/hooks/index-check.sh"},
-      {"type": "command", "command": "~/.fulcrum/hooks/session-start.sh"}
+      {"type": "command", "command": "~/.fulcrum/hooks/index-check.sh"}
     ],
     "SessionEnd": [
-      {"type": "command", "command": "~/.fulcrum/hooks/index-rebuild.sh"},
-      {"type": "command", "command": "~/.fulcrum/hooks/session-stop.sh"}
+      {"type": "command", "command": "~/.fulcrum/hooks/index-rebuild.sh"}
     ]
   }
 }
 ```
-
-Set `FULCRUM_AGENT=gemini` in the Gemini shell environment.
 
 **Known bug:** Underscores in MCP server alias names break Gemini's policy engine — use hyphens (`deepwiki` not `deep_wiki`).
 
@@ -146,8 +138,6 @@ Skills in Gemini CLI live **inside Extensions**, not as standalone files. Extens
 ```
 
 There is no direct `~/.agents/skills/` discovery in Gemini CLI. Each skill must be wrapped in an extension. SKILL.md frontmatter: `name` and `description` required.
-
-For our memory + task skills, create one wrapper extension (`~/.gemini/extensions/fulcrum-skills/`) containing all of them. See [memory.md](memory.md) §10.
 
 ### 3.4 MCP
 
@@ -187,22 +177,16 @@ TypeScript plugins, not shell hooks. Locations: `~/.config/opencode/plugins/` (g
 
 Key events: `session.created`, `session.idle`, `session.compacted`, `tool.execute.before`, `tool.execute.after`, `file.edited`, `shell.env`, `permission.asked/replied`.
 
-Combined index + memory plugin:
+Index plugin:
 
 ```typescript
 // ~/.config/opencode/plugins/fulcrum.ts
 export const FulcrumPlugin = async ({ $ }) => ({
   "session.idle": async () => {
     await $`~/.fulcrum/hooks/index-rebuild.sh`
-    await $({ env: { FULCRUM_AGENT: "opencode" } })`~/.fulcrum/hooks/session-stop.sh`
   },
-  "session.created": async ({ inject }) => {
+  "session.created": async () => {
     await $`~/.fulcrum/hooks/index-check.sh`
-    const out = await $`~/.fulcrum/hooks/session-start.sh`
-    if (out.stdout) {
-      const ctx = JSON.parse(out.stdout)?.hookSpecificOutput?.additionalContext
-      if (ctx) inject(ctx)
-    }
   }
 })
 ```
@@ -252,7 +236,7 @@ Pi has a **first-class extension event system** that is functionally equivalent 
 ```json
 {
   "packages": ["npm:@foo/bar@1.0.0", "git:github.com/user/repo@v1"],
-  "extensions": ["~/.pi/agent/extensions/memory.ts"]
+  "extensions": ["~/.pi/agent/extensions/index.ts"]
 }
 ```
 
@@ -268,16 +252,14 @@ Pi has a **first-class extension event system** that is functionally equivalent 
 
 The Bash tool also exposes a `spawnHook` for command/cwd/env mutation.
 
-### 5.3 Memory hook mapping
+### 5.3 Index hook mapping
 
 | Claude Code hook | Pi extension event |
 |---|---|
-| `SessionStart` | `session_start` (set up context) + `before_agent_start` (inject context messages, rewrite system prompt to include vault index, recent ADRs, `/wrap` notice) |
-| `Stop` | `session_shutdown` (push vault, mark substantive activity) |
+| `SessionStart` | `session_start` |
+| `Stop` | `session_shutdown` |
 
-A single TS file at `~/.pi/agent/extensions/memory.ts` handles both, calling out to the same `~/.fulcrum/hooks/session-start.sh` and `session-stop.sh` scripts via `child_process.execSync` for shell parity. Full code in [memory.md](memory.md) §11.
-
-Set `FULCRUM_AGENT=pi` in the Pi shell environment.
+A TS file at `~/.pi/agent/extensions/index.ts` shells out to `~/.fulcrum/hooks/index-check.sh` and `index-rebuild.sh` via `child_process.execSync`.
 
 ### 5.4 Skills
 

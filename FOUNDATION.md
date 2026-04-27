@@ -10,7 +10,6 @@
 - **MCPs off by default.** Register MCPs disabled; enable per-session when genuinely needed.
 - **Behavioral rules, not knowledge.** CLAUDE.md changes what the agent *does*, not what it *knows*. `"Use ruff, never flake8"` works. `"Write clean code"` does nothing.
 - **Agent-friendly tools output JSON.** `--json` / `--format json` is the selection criterion for every CLI in this stack.
-- **Persist state outside the agent.** Agents are stateless across sessions; vaults, ADRs, and Plane issues are how knowledge survives. Hooks bridge the gap.
 
 ---
 
@@ -22,8 +21,6 @@
 | **Automation** | Deterministic enforcement (cannot be ignored) | Hooks in `~/.claude/settings.json` |
 | **Capability** | What the agent can do | CLI tools + `SKILL.md` files |
 | **MCPs** | Opt-in only | Registered disabled, enable when needed |
-| **Memory** | Cross-session, cross-agent, cross-machine knowledge | Git-backed Obsidian vault at `~/vault/` |
-| **Tasks** | Project-scoped work with completion states | Self-hosted Plane (configurable endpoint) |
 
 ---
 
@@ -38,8 +35,6 @@ Each topic is its own foundation document. Read them in dependency order:
 | [docs/capabilities.md](docs/capabilities.md) | Capability layer — CLI tool catalogue | ✅ |
 | [docs/skills.md](docs/skills.md) | Skills — per-agent paths, catalogue, adoption strategy | ✅ |
 | [docs/mcp.md](docs/mcp.md) | MCP policy — opt-in only | ✅ |
-| [docs/memory.md](docs/memory.md) | Memory + handover — vault, ADRs, hooks, capture rules | ✅ design-complete; execution pending |
-| [docs/tasks.md](docs/tasks.md) | Task management — Plane setup, `/plan-to-plane`, working docs | ✅ design-complete; first-run pending |
 | [docs/agents.md](docs/agents.md) | Cross-agent translation — Codex, Gemini, OpenCode, Pi | ✅ |
 
 ---
@@ -51,9 +46,7 @@ Each topic is its own foundation document. Read them in dependency order:
 3. **[hooks.md](docs/hooks.md)** — wire up index maintenance hooks.
 4. **[skills.md](docs/skills.md)** — install superpowers as the cross-agent base.
 5. **[mcp.md](docs/mcp.md)** — register `deepwiki` as the only always-on MCP.
-6. **[memory.md](docs/memory.md)** — bootstrap the vault, install fulcrum hooks and custom skills.
-7. **[tasks.md](docs/tasks.md)** — bring up local Plane Docker, configure endpoint.
-8. **[agents.md](docs/agents.md)** — replicate the setup on Codex, Gemini, OpenCode, Pi as needed.
+6. **[agents.md](docs/agents.md)** — replicate the setup on Codex, Gemini, OpenCode, Pi as needed.
 
 ---
 

@@ -1,10 +1,6 @@
 # Automation Layer — Index Hooks
 
-> Deterministic enforcement that cannot be ignored. Hooks for **index maintenance** only — memory + handover hooks (`session-start.sh`, `session-stop.sh`) live in [memory.md](memory.md).
-
-Hooks have two legitimate jobs:
-1. **Index maintenance** (this doc) — keep tool indexes current after code changes.
-2. **Dynamic context injection** ([memory.md](memory.md)) — inject what the agent cannot retrieve itself.
+> Deterministic enforcement that cannot be ignored. Hooks for **index maintenance** — keeping tool indexes current after code changes.
 
 ## 1. Index-aware events
 
@@ -22,8 +18,6 @@ Tools with indexes that need maintenance:
 | `repomix` | cached pack at `/tmp/<slug>.xml` | `repomix --compress -o /tmp/<slug>.xml` |
 
 ## 2. Settings — `~/.claude/settings.json`
-
-Index hooks are registered alongside memory hooks (see [memory.md](memory.md) for the combined block). Index-only registration:
 
 ```json
 {
