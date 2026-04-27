@@ -11,21 +11,21 @@ tail ~/.fulcrum/state/$(basename "$PWD")/shell-commands.log
 ```json
 { "hooks": { "PostToolUse": [
   { "matcher": "Bash",
-    "hooks": [{ "type": "command", "command": "~/.fulcrum/hooks/recipes/audit-log.sh", "timeout": 2000 }] }
+    "hooks": [{ "type": "command", "command": "fulcrum hook audit-log", "timeout": 2000 }] }
 ] } }
 ```
 
 **Codex CLI** — `~/.codex/hooks.json`
 ```json
 { "hooks": { "PostToolUse": [
-  { "hooks": [{ "type": "command", "command": "~/.fulcrum/hooks/recipes/audit-log.sh" }] }
+  { "hooks": [{ "type": "command", "command": "fulcrum hook audit-log" }] }
 ] } }
 ```
 
 **Gemini CLI** — `~/.gemini/settings.json`
 ```json
 { "hooks": { "AfterTool": [
-  { "type": "command", "command": "~/.fulcrum/hooks/recipes/audit-log.sh" }
+  { "type": "command", "command": "fulcrum hook audit-log" }
 ] } }
 ```
 
@@ -33,15 +33,15 @@ tail ~/.fulcrum/state/$(basename "$PWD")/shell-commands.log
 ```ts
 "tool.execute.after": async ({ $, tool, input, output }) => {
   if (tool !== "bash") return
-  await $({ env: { HOOK_INPUT: JSON.stringify({ tool_input: input, tool_response: output }) } })`~/.fulcrum/hooks/recipes/audit-log.sh`
+  await $({ env: { HOOK_INPUT: JSON.stringify({ tool_input: input, tool_response: output }) } })`fulcrum hook audit-log`
 }
 ```
 
-**Pi CLI** — `~/.pi/agent/extensions/audit-log.ts`
+**Pi CLI** — `~/.pi/agent/extensions/fulcrum.ts`
 ```ts
 import { execSync } from "child_process"
 pi.on("tool_result", (e) => {
   if (e.tool_name !== "bash") return
-  execSync("~/.fulcrum/hooks/recipes/audit-log.sh", { input: JSON.stringify(e) })
+  execSync("fulcrum hook audit-log", { input: JSON.stringify(e) })
 })
 ```

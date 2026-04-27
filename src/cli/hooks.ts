@@ -29,7 +29,7 @@ function snippetPath(name: string): string[] {
   const home = homeFulcrum();
   const candidates: string[] = [];
   if (repo) candidates.push(`${repo}/hooks/recipes/${name}.snippet.md`);
-  candidates.push(`${home}/hooks/recipes-available/${name}.snippet.md`);
+  candidates.push(`${home}/hooks/snippets/${name}.snippet.md`);
   return candidates;
 }
 
