@@ -17,26 +17,28 @@ description: Use this skill whenever the user wants to scan a project's dependen
 
 ## Invocation
 
+osv-scanner v2 introduced a `scan` subcommand. The legacy v1 form (`osv-scanner -r .`) still works on most installs but is deprecated; prefer the v2 form.
+
 ```bash
 # Recursive scan of cwd: walks subdirs, finds every lockfile
-osv-scanner -r .
+osv-scanner scan source -r .
 
 # Single lockfile
-osv-scanner -L path/to/package-lock.json
-osv-scanner -L path/to/Cargo.lock
-osv-scanner -L path/to/go.mod
+osv-scanner scan source -L path/to/package-lock.json
+osv-scanner scan source -L path/to/Cargo.lock
+osv-scanner scan source -L path/to/go.mod
 
 # SBOM input
-osv-scanner --sbom sbom.spdx.json
-osv-scanner --sbom sbom.cdx.json
+osv-scanner scan source --sbom sbom.spdx.json
+osv-scanner scan source --sbom sbom.cdx.json
 
-# Container image (newer subcommand: sniffs OS + lockfiles inside layers)
-osv-scanner image alpine:3.19
+# Container image — sniffs OS + lockfiles inside layers
+osv-scanner scan image alpine:3.19
 
 # Machine-readable output
-osv-scanner -r . --format=json   --output=osv.json
-osv-scanner -r . --format=sarif  --output=osv.sarif
-osv-scanner -r . --format=markdown
+osv-scanner scan source -r . --format=json   --output=osv.json
+osv-scanner scan source -r . --format=sarif  --output=osv.sarif
+osv-scanner scan source -r . --format=markdown
 ```
 
 Exit codes: `0` clean, `1` vulnerabilities found, anything else is a tool error. Wire CI on `1` exactly — don't `|| true`.
@@ -48,27 +50,27 @@ Exit codes: `0` clean, `1` vulnerabilities found, anything else is a tool error.
 `-r .` walks the tree and discovers every supported manifest. Use it for monorepos and unfamiliar trees. Use `-L <path>` when you want a focused, deterministic scan (one service, one CI job per ecosystem):
 
 ```bash
-osv-scanner -r .                                      # discover everything
-osv-scanner -L services/api/package-lock.json         # one lockfile
-osv-scanner -L services/api/package-lock.json \
-            -L services/billing/Cargo.lock            # multiple
+osv-scanner scan source -r .                                      # discover everything
+osv-scanner scan source -L services/api/package-lock.json         # one lockfile
+osv-scanner scan source -L services/api/package-lock.json \
+                        -L services/billing/Cargo.lock            # multiple
 ```
 
 ### Pattern B — output formats
 
 ```bash
-osv-scanner -r . --format=table                       # human (default)
-osv-scanner -r . --format=json    --output=osv.json   # pipe to jq
-osv-scanner -r . --format=sarif   --output=osv.sarif  # GitHub Code Scanning
-osv-scanner -r . --format=markdown                    # PR comments
-osv-scanner -r . --format=gh-annotations              # inline PR annotations
-osv-scanner -r . --format=cyclonedx-1-5 --output=vex.cdx.json
+osv-scanner scan source -r . --format=table                       # human (default)
+osv-scanner scan source -r . --format=json    --output=osv.json   # pipe to jq
+osv-scanner scan source -r . --format=sarif   --output=osv.sarif  # GitHub Code Scanning
+osv-scanner scan source -r . --format=markdown                    # PR comments
+osv-scanner scan source -r . --format=gh-annotations              # inline PR annotations
+osv-scanner scan source -r . --format=cyclonedx-1-5 --output=vex.cdx.json
 ```
 
 JSON pipes cleanly into jq:
 
 ```bash
-osv-scanner -r . --format=json | jq '.results[].packages[] | select(.vulnerabilities) | {pkg: .package.name, ids: [.vulnerabilities[].id]}'
+osv-scanner scan source -r . --format=json | jq '.results[].packages[] | select(.vulnerabilities) | {pkg: .package.name, ids: [.vulnerabilities[].id]}'
 ```
 
 ### Pattern C — `osv-scanner.toml` for ignores
@@ -96,8 +98,8 @@ reason = "Pinned to internal fork; CVEs already patched in fork."
 When the project ships an SBOM (release artifact, supply-chain attestation), scan against the SBOM rather than re-reading lockfiles. Faster, and matches what consumers will see:
 
 ```bash
-osv-scanner --sbom build/sbom.spdx.json
-osv-scanner --sbom build/sbom.cdx.json --format=sarif --output=osv.sarif
+osv-scanner scan source --sbom build/sbom.spdx.json
+osv-scanner scan source --sbom build/sbom.cdx.json --format=sarif --output=osv.sarif
 ```
 
 ### Pattern E — container images
@@ -105,8 +107,8 @@ osv-scanner --sbom build/sbom.cdx.json --format=sarif --output=osv.sarif
 The `image` subcommand sniffs both the OS package DB (apk/dpkg/rpm) and any application lockfiles baked into layers. Useful for triaging a "is this image safe to run" question without `trivy`:
 
 ```bash
-osv-scanner image alpine:3.19
-osv-scanner image ghcr.io/acme/api:1.4.2 --format=json --output=image-osv.json
+osv-scanner scan image alpine:3.19
+osv-scanner scan image ghcr.io/acme/api:1.4.2 --format=json --output=image-osv.json
 ```
 
 ### Pattern F — Java caveats and `--no-resolve`
@@ -114,14 +116,14 @@ osv-scanner image ghcr.io/acme/api:1.4.2 --format=json --output=image-osv.json
 For Maven (`pom.xml`) and Gradle (`build.gradle*`), osv-scanner needs to resolve the dependency tree to enumerate transitive deps. That's slow and requires Maven/Gradle on PATH. `--no-resolve` skips it — fast, but **only safe when a vendored lockfile (`gradle.lockfile`, dependency-locking enabled, or a CycloneDX SBOM) lists the resolved versions**. Otherwise you'll silently scan zero transitive deps.
 
 ```bash
-osv-scanner -r . --no-resolve     # only OK if gradle.lockfile / SBOM present
+osv-scanner scan source -r . --no-resolve     # only OK if gradle.lockfile / SBOM present
 ```
 
 ### Pattern G — license policy hints
 
 ```bash
-osv-scanner -r . --licenses                                 # report all licenses
-osv-scanner -r . --licenses=MIT,Apache-2.0,BSD-3-Clause     # flag others
+osv-scanner scan source -r . --licenses                                 # report all licenses
+osv-scanner scan source -r . --licenses=MIT,Apache-2.0,BSD-3-Clause     # flag others
 ```
 
 This is a triage hint, not legal compliance — license strings in package metadata are inconsistent (`SEE LICENSE IN file`, mis-tagged dual licenses, vendored sub-deps with their own terms). Use it to surface candidates for review, not to gate a release.
@@ -130,11 +132,11 @@ This is a triage hint, not legal compliance — license strings in package metad
 
 ```bash
 # Fail the build on any unignored vuln; emit SARIF for Code Scanning
-osv-scanner -r . --format=sarif --output=osv.sarif
+osv-scanner scan source -r . --format=sarif --output=osv.sarif
 # Then upload osv.sarif via github/codeql-action/upload-sarif
 ```
 
-For PR-only diffs use `osv-scanner --recursive --call-analysis=all` on the changed paths, but baseline-style filtering (only-new-vulns) currently lives in the GitHub Action wrapper, not the binary — see <https://github.com/google/osv-scanner-action>.
+For PR-only diffs use `osv-scanner scan source --recursive --call-analysis=all` on the changed paths, but baseline-style filtering (only-new-vulns) currently lives in the GitHub Action wrapper, not the binary — see <https://github.com/google/osv-scanner-action>.
 
 ## Anti-patterns
 

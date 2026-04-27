@@ -27,9 +27,10 @@ ktlint -F                                       # short form
 ktlint --format                                 # long form
 ktlint -F 'src/**/*.kt'
 
-# Android coding conventions (stricter — for Android projects)
-ktlint --android
-ktlint --android -F 'app/src/**/*.kt'
+# Android coding conventions — set in .editorconfig (the --android flag was removed in ktlint 1.0)
+# [*.{kt,kts}]
+# ktlint_code_style = android_studio
+ktlint -F 'app/src/**/*.kt'                          # picks up android_studio style from .editorconfig
 
 # Reporters (CI / pipelines)
 ktlint --reporter=plain                         # default human
@@ -64,10 +65,11 @@ ktlint -F 'src/**/*.kt' 'src/**/*.kts'          # safe to run pre-commit
 ### Pattern B — Android conventions
 
 ```bash
-ktlint --android -F 'app/src/**/*.kt'
+# Set ktlint_code_style = android_studio in .editorconfig, then:
+ktlint -F 'app/src/**/*.kt'
 ```
 
-Android mode enables stricter rules (e.g. `final-newline` enforcement, no wildcard imports beyond a low threshold, max-line-length defaults). Set `ktlint_code_style = android_studio` in `.editorconfig` so the IDE matches. Don't toggle `--android` per-invocation — fix it in config.
+Setting `ktlint_code_style = android_studio` in `.editorconfig` enables Android-specific rules (final-newline, no wildcard imports beyond a low threshold, max-line-length). The standalone `--android` CLI flag was removed in ktlint 1.0 — config is the only path.
 
 ### Pattern C — JSON reporter piped to jq
 
@@ -149,7 +151,7 @@ Don't run `-F` in CI — the runner should fail the build, not silently rewrite.
 - **Don't put rule configuration in CLI flags.** `--disabled_rules` / `--editorconfig-override` were deprecated and partially removed; the IDE ignores them anyway. Put rules in `.editorconfig` so IntelliJ and the CLI agree.
 - **Don't use `// ktlint-disable <rule-id>` block comments on ktlint ≥ 1.0.** That syntax is deprecated and removed in 2.0. Use `@Suppress("ktlint:standard:<rule-id>")` (or `@file:Suppress(...)` for whole files) instead.
 - **Don't skip `--baseline` when adopting ktlint on a legacy project.** A first run on an unprepared codebase floods the report with thousands of pre-existing issues, masking new ones. Baseline once, fix incrementally.
-- **Don't forget Android.** A plain `ktlint -F` on an Android project misses Android-specific rules and may even fight `android_studio` IDE settings. Use `ktlint --android` (or `ktlint_code_style = android_studio` in `.editorconfig`) for any Android module.
+- **Don't pass `--android` on the CLI.** It was removed in ktlint 1.0 (Sept 2023). Set `ktlint_code_style = android_studio` in `.editorconfig` so the IDE and CLI agree.
 - **Don't reach for ktlint to type-check Kotlin.** "Unresolved reference", "type mismatch", "smart-cast impossible" come from `kotlinc` / the IDE, not ktlint. ktlint is style-only.
 - **Don't `grep` ktlint plain output.** Use `--reporter=json` and pipe to `jq` — the human renderer changes between releases; the JSON shape is stable.
 

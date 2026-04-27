@@ -31,7 +31,7 @@ java -jar google-java-format.jar --aosp --replace src/**/*.java
 cat Foo.java | java -jar google-java-format.jar -
 
 # Skip the import sorter / unused-import remover / long-string reflow
-java -jar google-java-format.jar --replace --skip-sorting-imports --skip-removing-unused-imports Foo.java
+java -jar google-java-format.jar --replace --skip-sorting-imports --skip-removing-unused-import Foo.java
 
 # Homebrew bottle exposes a wrapper binary
 google-java-format --replace src/**/*.java
@@ -80,14 +80,14 @@ The single dash `-` means "read stdin, write stdout". Useful for editor integrat
 ```bash
 java -jar google-java-format.jar --replace \
   --skip-sorting-imports \
-  --skip-removing-unused-imports \
+  --skip-removing-unused-import \
   --skip-reflowing-long-strings \
   src/**/*.java
 ```
 
 Each flag turns off one transformation. Use sparingly — most teams want all three on. Skip-sorting is sometimes useful when the project has a non-standard import grouping enforced elsewhere.
 
-### Pattern F — JDK 17+ `--add-exports` requirement
+### Pattern F — JDK 16+ `--add-exports` requirement
 
 ```bash
 java \
@@ -100,7 +100,7 @@ java \
   -jar google-java-format.jar --replace src/**/*.java
 ```
 
-JDK ≥11 is required (older releases supported JDK 8). On JDK 17+ the JVM seals `jdk.compiler` internals; recent jar releases ship a manifest that handles this transparently, but if you see `IllegalAccessError` or `module jdk.compiler does not export ...`, add the six `--add-exports` flags above.
+JDK 21+ is required (older 1.x lines supported JDK 11; recent releases ≥1.22 require JDK 21). On JDK 16+ the JVM seals `jdk.compiler` internals; recent jar releases ship a manifest that handles this transparently, but if you see `IllegalAccessError` or `module jdk.compiler does not export ...`, add the six `--add-exports` flags above.
 
 ### Pattern G — build integration
 
@@ -123,7 +123,7 @@ Spotless wraps multiple formatters (google-java-format, palantir-java-format, pr
 - **Don't look for a config file.** google-java-format is intentionally non-configurable — no `.google-java-format`, no `pyproject.toml`-style block, no per-rule toggles. Style is fixed. The only knobs are the CLI flags listed above (`--aosp`, `--skip-*`). This is the philosophy; fighting it wastes hours.
 - **Don't mix with `palantir-java-format`.** Both reformat braces, line wrapping, and import order — they fight on every save and produce churn. Pick one and remove the other from the build.
 - **Don't treat google-java-format as a substitute for `checkstyle`, `pmd`, or `spotbugs`.** Those are linters and bug detectors; google-java-format is a formatter. They serve different purposes and run side-by-side. Don't disable checkstyle just because gjf passes.
-- **Don't run on JDK 17+ without the `--add-exports` flags** (or a recent jar with the bundled manifest). Older jars throw `IllegalAccessError` and silently format nothing.
+- **Don't run on JDK 16+ without the `--add-exports` flags** (or a recent jar with the bundled manifest). Older jars throw `IllegalAccessError` and silently format nothing.
 - **Don't invoke without `--replace` and expect file mutation.** Without it, the tool writes to stdout — easy to miss in a script, agents commonly run it and assume "no change = clean" when in fact the formatted text was discarded.
 - **Don't apply mid-PR.** Auto-formatting a feature branch mid-review balloons the diff and reviewers can't tell intent from style. Run once at the PR boundary (or pin to a pre-commit hook so every commit is already formatted).
 - **Don't run gjf inside the IDE *and* on save *and* in CI with different versions.** Pin one version (the jar SHA or the Spotless coordinate) and use the matching IntelliJ/Eclipse plugin so all three agree.

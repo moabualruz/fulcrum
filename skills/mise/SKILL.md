@@ -47,8 +47,12 @@ mise exec -- pytest     # uses the resolved version from .mise.toml
 mise env
 mise env -s bash        # eval-able
 
-# Drop into a subshell with the project's tools on PATH
-mise sh
+# Set tool versions for the current shell session (alias: `mise sh`).
+# Prints export statements; must be eval'd. Does NOT spawn a subshell.
+eval "$(mise shell node@22 python@3.12)"
+
+# To actually launch a subshell with the tools active, use `mise exec`:
+mise exec node@22 -- bash
 ```
 
 ## Patterns

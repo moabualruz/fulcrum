@@ -8,7 +8,7 @@ description: Use this skill whenever the user wants to run ad-hoc SQL against a 
 ## When to use
 
 - The user wants to run a SQL query, script, or REPL session against any of usql's 30+ supported drivers.
-- The agent needs a one-shot `SELECT` from CI or a hook script and only has `$DATABASE_URL` to work with.
+- The agent needs a one-shot `SELECT` from CI or a hook script with a connection URL in hand (pass it as a positional arg or via `-f conn-url-file`).
 - The user is jumping between postgres, mysql, and sqlite and wants one tool with consistent flags and history.
 - The user asks for a "psql-like" experience against a non-postgres database.
 
@@ -29,11 +29,11 @@ usql -c 'SELECT now()' pg://...
 # Run a SQL script
 usql -f migrations/check.sql pg://...
 
-# Honor $DATABASE_URL with no positional arg
-DATABASE_URL='pg://...' usql -c 'SELECT 1'
+# JSON output → pipe to jq (-J selects JSON; -o is OUTPUT FILE, not format)
+usql -J -c 'SELECT id, name FROM users LIMIT 5' pg://... | jq '.[].name'
 
-# JSON output → pipe to jq
-usql -o json -c 'SELECT id, name FROM users LIMIT 5' pg://... | jq '.[].name'
+# Write the JSON to a file instead of stdout
+usql -J -o results.json -c 'SELECT * FROM users' pg://...
 ```
 
 ## Patterns
@@ -64,15 +64,20 @@ Use `-f script.sql` whenever your SQL contains semicolons inside string literals
 
 ### Pattern C — output formats
 
+`-o, --out FILE` is the **output destination file**, NOT a format selector. Format flags are independent:
+
 ```bash
-usql -o table     -c 'SELECT ...' pg://...    # default — psql-style ASCII
-usql -o expanded  -c 'SELECT ...' pg://...    # one-row-per-line, like psql \x
-usql -o csv       -c 'SELECT ...' pg://...    # RFC-4180 CSV
-usql -o html      -c 'SELECT ...' pg://...    # HTML table
-usql -o json      -c 'SELECT ...' pg://... | jq '.[0]'
+usql            -c 'SELECT ...' pg://...    # default — psql-style aligned ASCII
+usql -x         -c 'SELECT ...' pg://...    # expanded (one-row-per-line; psql \x)
+usql -C         -c 'SELECT ...' pg://...    # CSV (RFC-4180-style)
+usql -H         -c 'SELECT ...' pg://...    # HTML table
+usql -G         -c 'SELECT ...' pg://...    # vertical
+usql -A         -c 'SELECT ...' pg://...    # unaligned (no column padding)
+usql -t         -c 'SELECT ...' pg://...    # tuples only (no header/footer)
+usql -J         -c 'SELECT ...' pg://... | jq '.[0]'   # JSON for jq pipelines
 ```
 
-JSON pairs naturally with the `jq` skill. CSV is the safe shape for spreadsheet import.
+Long forms: `--json`, `--csv`, `--html`, `--expanded`, `--vertical`, `--no-align`, `--tuples-only`. Combine with `-o results.json` to write to a file instead of stdout. JSON pairs naturally with the `jq` skill.
 
 ### Pattern D — switch connections inside a session
 
@@ -125,18 +130,18 @@ Some commands are driver-specific — `\d` works against postgres / mysql / sqli
 
 ## Anti-patterns
 
-- **Don't put credentials in argv.** `usql 'pg://user:pass@host/db'` shows up in `ps`, shell history, and CI logs. Use `$DATABASE_URL` (auto-honored), a `.pgpass`-style file, or a connection URL file with `usql -f`.
+- **Don't put credentials in argv.** `usql 'pg://user:pass@host/db'` shows up in `ps`, shell history, and CI logs. Read the DSN from a file (`usql "$(cat conn-url)" ...`), a `.pgpass`-style file, or `~/.config/usql/config.yaml` named connections (`usql my-db`).
 - **Don't rely on cross-driver SQL.** usql normalises *connection* but not *dialect* — `SHOW DATABASES` is mysql, `\l` lists databases on postgres, `LIMIT` syntax differs on mssql/oracle. Test the SQL against the target engine.
 - **Don't use usql for production migrations.** No version tracking, no down-migrations, no checksum verification. Use `atlas`, `dbmate`, `golang-migrate`, or `sqitch`.
 - **Don't trust `\copy` to behave identically across drivers.** It is a psql concept partially emulated for mysql/sqlite/etc.; quoting, NULL handling, and header detection differ. For large or repeatable loads use the driver's native bulk path (`COPY`, `LOAD DATA INFILE`, `bcp`).
 - **Don't pass multi-statement input to `-c` when statements contain semicolons in string literals.** The split is naive (`strings.Split(input, ";")`), so `-c "INSERT INTO t VALUES ('a;b')"` corrupts. Use `-f script.sql`.
 - **Don't assume connection URLs are interchangeable across drivers.** `sslmode=require` is postgres; mysql uses `tls=true`. Ports default differently (5432 / 3306 / 1433). Encoding parameters (`charset`, `client_encoding`) are driver-specific.
-- **Don't pipe `-o table` into another tool.** ASCII borders break parsers. Use `-o csv` or `-o json` for downstream pipelines.
+- **Don't pipe the default aligned output into another tool.** ASCII borders break parsers. Use `-C` (CSV) or `-J` (JSON) for downstream pipelines. Remember: `-o` writes to a file; format is selected separately.
 - **Don't reach for usql when only one engine is in play and a native client is already installed.** `psql`, `sqlite3`, and `duckdb` have richer driver-specific features (psql's `\watch`, sqlite's `.dump`); usql's value is the multi-driver shape.
 
 ## Cross-refs
 
 - Behavioral rule: see `rules/AGENTS.md` — data-access section ("never hard-code credentials in argv; prefer `$DATABASE_URL`").
-- JSON output: `skills/jq/SKILL.md` — `usql -o json | jq` is the canonical agent shape.
+- JSON output: `skills/jq/SKILL.md` — `usql -J | jq` is the canonical agent shape.
 - Upstream: <https://github.com/xo/usql>
 - Driver list: <https://github.com/xo/usql#database-support>

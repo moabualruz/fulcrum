@@ -35,11 +35,13 @@ fzf -fe alpha < candidates.txt
 # Case-insensitive (default in -f is smart-case; force with -i)
 fzf -i -f Auth < branches.txt
 
-# Treat the query literally — no fuzzy expansion of spaces or special chars
-fzf -f 'foo bar' --literal < lines.txt
+# Disable Latin-script normalization (so 'café' ≠ 'cafe')
+fzf --literal -f 'café' < items
+# `--literal` disables diacritic-folding so `café` doesn't match `cafe`. It does **not** affect shell metacharacters — quote your shell input normally.
 
-# Force non-tty mode in odd environments where fzf still tries to open /dev/tty
+# Use stderr's TTY instead of /dev/tty (for emacsclient and similar wrappers)
 fzf --no-tty -f query < input.txt
+# `--no-tty` makes fzf find the TTY via stderr instead of `/dev/tty`. Useful inside `emacsclient` and similar wrappers. In `--filter`/`-f` mode fzf already does not open a TTY, so `--no-tty` is unnecessary there.
 ```
 
 The `-f`/`--filter` flag is the single switch that turns fzf into a batch ranker — it prints matches to stdout in score order and exits. Without it, fzf opens an interactive picker.
@@ -118,7 +120,7 @@ gh issue list --json number,title,labels \
 - **Don't use fzf to search file contents.** fzf ranks lines, not files-with-matches. Use `rg pattern` (or `rg -l pattern` for filenames only).
 - **Don't forget `--no-sort`** when input order is already meaningful (`git log`, version-sorted tags, time-ordered logs). Default fzf re-sorts by fuzzy score and you'll lose the chronology.
 - **Don't pass `--height`, `--preview`, `--bind`, `--header`** in batch mode — they're inert with `-f` and add noise. They only matter in the interactive UI, which agents shouldn't invoke.
-- **Don't shell-interpolate the query unsafely.** `fzf -f "$Q"` is fine for one token, but quoted multi-word queries with shell metacharacters can surprise. Use `--literal` if the query may contain `'`, `\`, or spaces meant literally.
+- **Don't shell-interpolate the query unsafely.** `fzf -f "$Q"` is fine for one token, but quoted multi-word queries with shell metacharacters can surprise. Quote at the shell level — `--literal` is about diacritic-folding, not shell escaping.
 - **Don't rely on exit code 0 to mean "match found".** `-f` exits 1 when nothing matched and 130 on interrupt. Check both stdout and `$?`.
 
 ## Cross-refs

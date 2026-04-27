@@ -19,32 +19,32 @@ description: Use this skill whenever the user wants to find secrets, credentials
 
 ```bash
 # Full git history scan (default, run from repo root)
-gitleaks detect --no-banner
+gitleaks git --no-banner                  # scan commit history (replaces deprecated `detect`)
 
 # Pre-commit / pre-push: only what's staged
-gitleaks protect --staged --no-banner
+gitleaks git --staged --no-banner
 
 # Non-git directory (tarball, vendored snapshot)
 gitleaks dir ./extracted --no-banner
 
 # Machine-readable output for piping or CI
-gitleaks detect --report-format json --report-path leaks.json --no-banner --redact
+gitleaks git --report-format json --report-path leaks.json --no-banner --redact
 
 # SARIF for GitHub Code Scanning
-gitleaks detect --report-format sarif --report-path gitleaks.sarif --no-banner
+gitleaks git --report-format sarif --report-path gitleaks.sarif --no-banner
 ```
 
 Exit codes: `0` clean, `1` leaks found, anything else is a tool error. Wire hooks and CI on `1` exactly — don't `|| true`.
 
 ## Patterns
 
-### Pattern A — `detect` vs `protect`
+### Pattern A — `git` (history) vs `git --staged` (pre-commit)
 
-`detect` scans **commit history** (what's already in the graph). `protect` scans the **working tree** or **staged diff** only — it cannot see history. Use `protect --staged` for pre-commit hooks (fast, scoped to the diff); use `detect` for CI on PRs and for periodic audits. Running only `protect` and never `detect` will miss anything already merged — including leaks the hook itself once let through.
+`gitleaks git` scans **commit history** (what's already in the graph). `gitleaks git --staged` scans the **staged diff** only — it cannot see history. Use `git --staged` for pre-commit hooks (fast, scoped to the diff); use `git` for CI on PRs and for periodic audits. Running only `--staged` and never the full history scan will miss anything already merged — including leaks the hook itself once let through. (Note: `detect` and `protect` are deprecated aliases since v8.19.0 — older docs may still mention them; both still work but are hidden in `--help`.)
 
 ```bash
-gitleaks detect --no-banner                        # all of history
-gitleaks protect --staged --no-banner              # pre-commit
+gitleaks git --no-banner                           # all of history
+gitleaks git --staged --no-banner                  # pre-commit
 ```
 
 ### Pattern B — scope the history scan
@@ -52,18 +52,18 @@ gitleaks protect --staged --no-banner              # pre-commit
 Full-history scans get slow on old repos. `-l/--log-opts` accepts any `git log` flag set:
 
 ```bash
-gitleaks detect -l "--all --since=2025-01-01" --no-banner
-gitleaks detect -l "main..HEAD" --no-banner        # PR diff only
-gitleaks detect -l "<sha1>..<sha2>" --no-banner    # CI: just this push
+gitleaks git --log-opts="--all --since=2025-01-01" --no-banner
+gitleaks git --log-opts="main..HEAD" --no-banner        # PR diff only
+gitleaks git --log-opts="<sha1>..<sha2>" --no-banner    # CI: just this push
 ```
 
 ### Pattern C — JSON / SARIF / JUnit reporting
 
 ```bash
-gitleaks detect --report-format json   --report-path leaks.json   --no-banner
-gitleaks detect --report-format sarif  --report-path gitleaks.sarif --no-banner
-gitleaks detect --report-format junit  --report-path gitleaks.xml  --no-banner
-gitleaks detect --report-format csv    --report-path leaks.csv    --no-banner
+gitleaks git --report-format json   --report-path leaks.json   --no-banner
+gitleaks git --report-format sarif  --report-path gitleaks.sarif --no-banner
+gitleaks git --report-format junit  --report-path gitleaks.xml  --no-banner
+gitleaks git --report-format csv    --report-path leaks.csv    --no-banner
 ```
 
 JSON pipes cleanly into `jq` (`jq '.[] | {file: .File, rule: .RuleID, commit: .Commit}' leaks.json`). SARIF uploads to GitHub Code Scanning via `github/codeql-action/upload-sarif`. JUnit lets Jenkins/GitLab render findings as test failures.
@@ -74,10 +74,10 @@ Some leaks are intentional fixtures (test keys, expired tokens). Snapshot them o
 
 ```bash
 # Generate baseline once, review carefully, commit
-gitleaks detect --report-format json --report-path .gitleaks-baseline.json --no-banner
+gitleaks git --report-format json --report-path .gitleaks-baseline.json --no-banner
 
 # Subsequent runs ignore anything in the baseline
-gitleaks detect --baseline-path .gitleaks-baseline.json --no-banner
+gitleaks git --baseline-path .gitleaks-baseline.json --no-banner
 ```
 
 Re-generate the baseline whenever fixtures change. Review every entry before committing the file — a baseline is a security artifact.
@@ -119,7 +119,7 @@ Run with `--config .gitleaks.toml` if not at repo root, or `gitleaks` finds it a
 ```bash
 # .git/hooks/pre-commit  (or via the `pre-commit` framework)
 #!/usr/bin/env bash
-gitleaks protect --staged --redact --no-banner || {
+gitleaks git --staged --redact --no-banner || {
   echo "gitleaks: secret detected in staged changes — abort." >&2
   exit 1
 }
@@ -130,16 +130,17 @@ Use `--redact` in the hook so the leaked value isn't echoed into terminal scroll
 ### Pattern G — performance and CI ergonomics
 
 ```bash
-gitleaks detect --max-target-megabytes 50 --no-banner   # skip huge blobs
-gitleaks detect --no-color --no-banner                  # plain text for logs
-gitleaks detect --source ./services/api --no-banner     # subtree only
+gitleaks git --max-target-megabytes 50 --no-banner      # skip huge blobs
+gitleaks git --no-color --no-banner                     # plain text for logs
+gitleaks git ./services/api --no-banner                 # subtree only (path is positional)
 ```
 
-For monorepos, scope `--source` per service and run jobs in parallel. `--max-target-megabytes` skips large vendored blobs that would otherwise dominate runtime.
+For monorepos, scope by passing the subtree path positionally per service and run jobs in parallel. `--max-target-megabytes` skips large vendored blobs that would otherwise dominate runtime.
 
 ## Anti-patterns
 
-- **Don't** scan only with `protect` and call it a day. `protect` cannot see history; a leak that landed before the hook existed is invisible until you run `detect`. Schedule `detect` in CI on a cron, not just on PRs.
+- **Don't** scan only with `--staged` and call it a day. `gitleaks git --staged` cannot see history; a leak that landed before the hook existed is invisible until you run `gitleaks git` on the full repo. Schedule a full-history scan in CI on a cron, not just on PRs.
+- **Don't use `gitleaks detect` / `gitleaks protect` on new code.** Both were deprecated in gitleaks v8.19.0 (still work but hidden in `--help`). Use `gitleaks git` (history) and `gitleaks git --staged` (working tree) instead.
 - **Don't** silently `--redact` everywhere. CI logs benefit from redaction, but when you're remediating you need the literal value to grep, rotate, and confirm. Run unredacted locally during cleanup.
 - **Don't** allowlist by full secret value. `regexes = ['''ghp_aBcD…the actual key''']` becomes wrong the moment someone rotates the key — and rotations are exactly when you can't afford a noisy false negative. Allowlist by **shape** (path, rule id, fixture-prefix regex), not literal value.
 - **Don't** assume "leak found" = "leak in HEAD". Git history is forever. Removing the line in a new commit does **not** purge the blob — you need `git-filter-repo` (or BFG), force-push, then **rotate the credential** because anyone who cloned still has it.

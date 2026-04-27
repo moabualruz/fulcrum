@@ -19,11 +19,11 @@ description: Use this skill whenever the user wants to manage Cloudflare DNS, zo
 
 ```bash
 # Auth (preferred): scoped API token
-export CLOUDFLARE_API_TOKEN='<scoped-token>'
+export CF_API_TOKEN='<scoped-token>'
 
 # Auth (legacy, account-wide — avoid)
-export CLOUDFLARE_API_KEY='<global-key>'
-export CLOUDFLARE_EMAIL='you@example.com'
+export CF_API_KEY='<global-key>'
+export CF_API_EMAIL='you@example.com'
 
 # Sanity check — lists zones the token can see
 flarectl zone list
@@ -103,10 +103,10 @@ flarectl zone purge --zone example.com --everything
 
 ```bash
 flarectl user info                          # whoami for the active token/key
-flarectl user invite --email new@example.com --roles "Administrator"
+flarectl user update --first-name Mo        # update profile fields
 ```
 
-Useful for verifying a token is alive and which account/email it represents before a destructive command.
+Useful for verifying a token is alive and which account/email it represents before a destructive command. (Account-member invitations are not in flarectl — use the dashboard or the `cloudflare-go` SDK directly.)
 
 ### Pattern F — `flarectl` vs `wrangler` vs raw API
 
@@ -118,19 +118,19 @@ If a single workflow needs both DNS and a Worker route, run `flarectl` for DNS a
 
 ## Anti-patterns
 
-- **Don't** use `CLOUDFLARE_API_KEY` (the global key) — it has account-wide permission across every zone, billing, and member action. Use `CLOUDFLARE_API_TOKEN` with the minimum scope (e.g. `Zone:DNS:Edit` for one zone) and rotate.
+- **Don't** use `CF_API_KEY` (the global key) — it has account-wide permission across every zone, billing, and member action. Use `CF_API_TOKEN` with the minimum scope (e.g. `Zone:DNS:Edit` for one zone) and rotate. Note: flarectl reads `CF_API_TOKEN` / `CF_API_KEY` / `CF_API_EMAIL` — NOT the `CLOUDFLARE_*` names used by `wrangler` and the `cloudflare-go` SDK. Wrong env var = silent auth failure.
 - **Don't** `--purge --everything` on a high-traffic zone without warning the team — the origin gets every miss at once. Prefer `--files` / `--tags`.
 - **Don't** create DNS records without an explicit `--ttl` (300 for staging, `1` for "auto"). The default may be longer than you want, and a misconfigured record at TTL 86400 is a 24-hour outage.
 - **Don't** use `flarectl` for Workers / Pages deployment — the subcommands exist but lag `wrangler` on features and won't do bundling, secrets, or env management. Use `wrangler` for compute.
 - **Don't** assume `--proxy=true` is correct for every record. MX, SRV, raw TCP, and most mail records must be DNS-only — proxying breaks them silently.
-- **Don't** run `flarectl` in CI with the global key in the environment — leak surface is the entire account. Issue a scoped token per pipeline, scope it to the smallest set of zones/permissions, and rotate.
+- **Don't** run `flarectl` in CI with the global key (`CF_API_KEY`) in the environment — leak surface is the entire account. Issue a scoped token (`CF_API_TOKEN`) per pipeline, scope it to the smallest set of zones/permissions, and rotate.
 - **Don't** parse the human table output with `awk`/`grep` — column widths shift with longer record names. Pass `--json` and use `jq`.
 - **Don't** delete a zone to "reset DNS" — every record is gone and re-adding the zone re-issues nameservers, breaking propagation. Delete records, not zones.
 
 ## Cross-refs
 
-- Behavioral rule: see `rules/AGENTS.md` deploy section — "DNS via flarectl, compute via wrangler, never the global API key in CI".
-- Companion: `skills/wrangler` (third-party shipped per `skills/SOURCES.md`) — different scope; reach for it for Workers/Pages/KV/R2/D1.
+- Behavioral rule: see `rules/AGENTS.md` deploy section — "DNS via flarectl, compute via wrangler, never `CF_API_KEY` in CI".
+- Companion: `skills/wrangler` (third-party shipped per `skills/SOURCES.md`) — different scope; reach for it for Workers/Pages/KV/R2/D1. Note: `wrangler` reads `CLOUDFLARE_API_TOKEN`, `flarectl` reads `CF_API_TOKEN` — different envs, intentionally not unified.
 - JSON pipelines: `skills/jq/SKILL.md` — `flarectl --json | jq` is the canonical scripting shape.
 - Upstream: <https://github.com/cloudflare/cloudflare-go/tree/master/cmd/flarectl>
 - Token scopes reference: <https://developers.cloudflare.com/fundamentals/api/get-started/create-token/>

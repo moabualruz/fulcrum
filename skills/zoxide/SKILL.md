@@ -37,7 +37,8 @@ The binary itself works regardless of init:
 zoxide query foo [--list] [--score]   # print top match / ranked / with scores
 zoxide add /path                      # bump manually
 zoxide remove /path                   # forget
-zoxide import --from auto <db>        # autojump / z / fasd
+zoxide import --from autojump ~/.local/share/autojump/autojump.txt
+zoxide import --from z ~/.z                              # also handles fasd / z.lua / zsh-z
 ```
 
 ## Patterns
