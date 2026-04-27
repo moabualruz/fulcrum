@@ -1,6 +1,6 @@
 # Fulcrum — AI-Assisted Development Environment
 
-> Reference implementation: Claude Code. Cross-agent translations in [docs/agents.md](docs/agents.md).
+> Multi-agent foundation. Reference shapes are taken from Claude Code's docs (richest primary sources); the same setup is wired into Codex CLI, Gemini CLI, OpenCode, and Pi CLI. Per-agent translations in [docs/agents.md](docs/agents.md).
 
 ---
 
@@ -8,7 +8,7 @@
 
 - **CLI and skills over MCP.** MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead.
 - **MCPs off by default.** Register MCPs disabled; enable per-session when genuinely needed.
-- **Behavioral rules, not knowledge.** CLAUDE.md changes what the agent *does*, not what it *knows*. `"Use ruff, never flake8"` works. `"Write clean code"` does nothing.
+- **Behavioral rules, not knowledge.** Rules change what the agent *does*, not what it *knows*. `"Use ruff, never flake8"` works. `"Write clean code"` does nothing. One body in `rules/AGENTS.md`, installed into each agent's primary rules file.
 - **Agent-friendly tools output JSON.** `--json` / `--format json` is the selection criterion for every CLI in this stack.
 
 ---
@@ -17,10 +17,10 @@
 
 | Layer | Job | Mechanism |
 |---|---|---|
-| **Context** | Always-on rules and conventions | `~/.claude/CLAUDE.md` + `AGENTS.md` |
-| **Automation** | Deterministic enforcement (cannot be ignored) | Hooks in `~/.claude/settings.json` |
-| **Capability** | What the agent can do | CLI tools + `SKILL.md` files |
-| **MCPs** | Opt-in only | Registered disabled, enable when needed |
+| **Context** | Always-on rules and conventions | `rules/AGENTS.md` body installed per-agent (CLAUDE.md / AGENTS.md / GEMINI.md+@AGENTS.md) |
+| **Automation** | Deterministic enforcement (cannot be ignored) | Bash hooks in `~/.fulcrum/hooks/`, registered per-agent (settings.json / hooks.json / TS plugin / TS extension) |
+| **Capability** | What the agent can do | CLI tools + `SKILL.md` files installed per-agent |
+| **MCPs** | Opt-in only | Registered disabled, enable when needed (Pi: not supported by design) |
 
 ---
 
