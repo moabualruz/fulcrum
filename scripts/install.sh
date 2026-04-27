@@ -1,161 +1,92 @@
 #!/usr/bin/env bash
-# Fulcrum installer — machine-level setup.
-# Idempotent: safe to re-run.
+# Fulcrum bootstrap installer.
 #
-# What this DOES:
-#   - Copies hooks/* (and hooks/recipes/*) to ~/.fulcrum/hooks/ and chmods +x
-#   - Copies bin/fulcrum to ~/.local/bin (if on PATH) or ~/.fulcrum/bin
-#   - Splices rules/AGENTS.md body into each detected agent's primary rules file
-#     using <!-- BEGIN/END FULCRUM RULES --> sentinel markers. Re-runs replace
-#     just the block; user content outside the markers is preserved.
-#   - Creates ~/.fulcrum/state/ and seeds ~/.fulcrum/tool-output-policy.toml from config/
-#   - Optional: --with-project [DIR]  also runs `fulcrum init` on DIR (default cwd).
+# What this DOES (in order):
+#   1. Detects platform (darwin/linux × arm64/x64; windows handled separately).
+#   2. Resolves the fulcrum binary:
+#        a. If FULCRUM_BIN is set, uses that.
+#        b. Else if a prebuilt binary exists at dist/fulcrum-<os>-<arch>, uses it.
+#        c. Else if `bun` is on PATH and we're inside a clone, builds from source.
+#        d. Else: prints clear instructions and exits 1.
+#      (Future: a 'release' branch fetches from GitHub Releases.)
+#   3. Installs the binary to ~/.fulcrum/bin/fulcrum and (if possible) symlinks
+#      to ~/.local/bin/fulcrum.
+#   4. Delegates the rest to `fulcrum install` — sentinel-block rules splice,
+#      recipe vendoring, policy seed, optional --with-project DIR.
 #
-# What this DOES NOT do:
-#   - Modify any agent's settings.json / hooks.json / plugins (manual review)
-#   - Install plugins or extensions
-#   - Push or sync skills — use `fulcrum skills sync` after authoring
+# Pass --with-project [DIR] to also bootstrap a project after install.
 
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WITH_PROJECT=""
-PROJECT_DIR=""
+WITH_PROJECT_ARGS=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --with-project) WITH_PROJECT=1; PROJECT_DIR="${2:-$PWD}"; [ "${2:-}" != "" ] && shift; shift ;;
+    --with-project)
+      WITH_PROJECT_ARGS=(--with-project "${2:-$PWD}")
+      [ "${2:-}" != "" ] && shift
+      shift ;;
     -h|--help)
       grep '^#' "$0" | sed 's/^# \?//'
       exit 0 ;;
-    *) echo "unknown arg: $1" >&2; exit 1 ;;
+    *) echo "fulcrum install: unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
-echo "Fulcrum install — source: $REPO_DIR"
-echo
+# ── 1. Detect platform ────────────────────────────────────────────────
+case "$(uname -s)" in
+  Darwin) os="darwin" ;;
+  Linux)  os="linux" ;;
+  *)      echo "fulcrum: unsupported OS $(uname -s) (only darwin/linux are bootstrapped via this script)" >&2; exit 1 ;;
+esac
+case "$(uname -m)" in
+  arm64|aarch64) arch="arm64" ;;
+  x86_64|amd64)  arch="x64" ;;
+  *)             echo "fulcrum: unsupported arch $(uname -m)" >&2; exit 1 ;;
+esac
+plat="${os}-${arch}"
+echo "fulcrum bootstrap — platform: $plat"
 
-# ── 1. Hooks ────────────────────────────────────────────────────────────
-# Two pools:
-#   recipes-available/  — every recipe shipped by fulcrum (vendored from repo)
-#   recipes/            — only those enabled via `fulcrum hooks enable <name>`
-# Agents register paths inside `recipes/`; presence in `recipes-available/`
-# alone does nothing.
-echo "1/5  Vendoring hook recipes → ~/.fulcrum/hooks/recipes-available/"
-mkdir -p "$HOME/.fulcrum/hooks/recipes" "$HOME/.fulcrum/hooks/recipes-available" "$HOME/.fulcrum/state"
-if [ -d "$REPO_DIR/hooks/recipes" ]; then
-  cp "$REPO_DIR/hooks/recipes/"*.sh "$HOME/.fulcrum/hooks/recipes-available/" 2>/dev/null || true
-  cp "$REPO_DIR/hooks/recipes/"*.snippet.md "$HOME/.fulcrum/hooks/recipes-available/" 2>/dev/null || true
-fi
-chmod +x "$HOME/.fulcrum/hooks/recipes-available/"*.sh 2>/dev/null || true
-echo "     available: $(ls "$HOME/.fulcrum/hooks/recipes-available/" 2>/dev/null | grep -E '\.sh$' | tr '\n' ' ')"
-echo "     enabled:   $(ls "$HOME/.fulcrum/hooks/recipes/" 2>/dev/null | grep -E '\.sh$' | tr '\n' ' ' || echo '(none — fulcrum hooks enable <name>)')"
-echo
-
-# ── 2. Tool-output policy (default config) ─────────────────────────────
-echo "2/5  Seeding ~/.fulcrum/tool-output-policy.toml"
-if [ -f "$REPO_DIR/config/tool-output-policy.toml" ] && [ ! -f "$HOME/.fulcrum/tool-output-policy.toml" ]; then
-  cp "$REPO_DIR/config/tool-output-policy.toml" "$HOME/.fulcrum/tool-output-policy.toml"
-  echo "     installed default policy"
-elif [ -f "$HOME/.fulcrum/tool-output-policy.toml" ]; then
-  echo "     existing policy left intact"
+# ── 2. Resolve binary ─────────────────────────────────────────────────
+if [ -n "${FULCRUM_BIN:-}" ] && [ -x "$FULCRUM_BIN" ]; then
+  src_bin="$FULCRUM_BIN"
+  echo "  using FULCRUM_BIN=$src_bin"
+elif [ -x "$REPO_DIR/dist/fulcrum-$plat" ]; then
+  src_bin="$REPO_DIR/dist/fulcrum-$plat"
+  echo "  using prebuilt: $src_bin"
+elif command -v bun >/dev/null 2>&1; then
+  echo "  building from source via bun..."
+  cd "$REPO_DIR"
+  mkdir -p dist
+  bun build --compile --minify --target="bun-$plat" src/index.ts --outfile="dist/fulcrum-$plat" >/dev/null
+  src_bin="$REPO_DIR/dist/fulcrum-$plat"
+  echo "  built: $src_bin"
 else
-  echo "     no default config shipped (skip)"
-fi
-echo
+  cat >&2 <<EOF
+fulcrum: cannot resolve a binary.
 
-# ── 3. fulcrum CLI ─────────────────────────────────────────────────────
-echo "3/5  Installing fulcrum CLI"
+Either:
+  - install Bun and re-run:  curl -fsSL https://bun.sh/install | bash
+  - set FULCRUM_BIN=/path/to/fulcrum and re-run
+  - drop a prebuilt binary at $REPO_DIR/dist/fulcrum-$plat
+EOF
+  exit 1
+fi
+
+# ── 3. Install binary ────────────────────────────────────────────────
 mkdir -p "$HOME/.fulcrum/bin"
-cp "$REPO_DIR/bin/fulcrum" "$HOME/.fulcrum/bin/fulcrum"
+cp "$src_bin" "$HOME/.fulcrum/bin/fulcrum"
 chmod +x "$HOME/.fulcrum/bin/fulcrum"
 if [ -d "$HOME/.local/bin" ] && echo "$PATH" | tr ':' '\n' | grep -qx "$HOME/.local/bin"; then
   ln -sf "$HOME/.fulcrum/bin/fulcrum" "$HOME/.local/bin/fulcrum"
-  echo "     linked to ~/.local/bin/fulcrum (on PATH)"
+  echo "  linked to ~/.local/bin/fulcrum (on PATH)"
 else
-  echo "     installed to ~/.fulcrum/bin/fulcrum"
-  echo "     add to PATH:  export PATH=\"\$HOME/.fulcrum/bin:\$PATH\""
+  echo "  installed to ~/.fulcrum/bin/fulcrum"
+  echo "  add to PATH:  export PATH=\"\$HOME/.fulcrum/bin:\$PATH\""
 fi
 echo
 
-# ── 4. Rules — sentinel-block splice into each detected agent ──────────
-echo "4/5  Splicing rules/AGENTS.md into per-agent rules files"
-RULES="$REPO_DIR/rules/AGENTS.md"
-
-splice_sentinel() {
-  local target="$1" label="$2"
-  local begin="<!-- BEGIN FULCRUM RULES -->"
-  local end="<!-- END FULCRUM RULES -->"
-  mkdir -p "$(dirname "$target")"
-  if [ -f "$target" ] && grep -q "$begin" "$target"; then
-    # Refuse on corrupted markers (counts must match and equal 1).
-    local nb ne
-    nb=$(grep -c "$begin" "$target" || true)
-    ne=$(grep -c "$end"   "$target" || true)
-    if [ "$nb" -ne 1 ] || [ "$ne" -ne 1 ]; then
-      echo "     ✗ $label  refused: $target has $nb BEGIN / $ne END markers (expected 1/1). Fix manually." >&2
-      return 1
-    fi
-    # Replace existing block.
-    awk -v begin="$begin" -v end="$end" -v body_file="$RULES" '
-      BEGIN { inblock=0 }
-      $0 ~ begin { print; while ((getline line < body_file) > 0) print line; print end; inblock=1; next }
-      $0 ~ end   { inblock=0; next }
-      !inblock   { print }
-    ' "$target" > "$target.fulcrum.tmp" && mv "$target.fulcrum.tmp" "$target"
-    echo "     ↻ $label  (block replaced) → $target"
-  else
-    {
-      [ -f "$target" ] && cat "$target"
-      [ -f "$target" ] && [ -s "$target" ] && echo
-      echo "$begin"
-      cat "$RULES"
-      echo "$end"
-    } > "$target.fulcrum.tmp" && mv "$target.fulcrum.tmp" "$target"
-    echo "     + $label  (block appended) → $target"
-  fi
-}
-
-# Each agent's parent dir must exist for us to splice — don't create unrelated dirs.
-declare -a TARGETS=(
-  "$HOME/.claude/CLAUDE.md|Claude Code"
-  "$HOME/.codex/AGENTS.md|Codex CLI"
-  "$HOME/.config/opencode/AGENTS.md|OpenCode"
-  "$HOME/.pi/agent/AGENTS.md|Pi CLI"
-  "$HOME/AGENTS.md|Gemini source (referenced via @AGENTS.md)"
-)
-
-for entry in "${TARGETS[@]}"; do
-  path="${entry%%|*}"
-  label="${entry##*|}"
-  if [ -d "$(dirname "$path")" ] || [ -f "$path" ] || [ "$path" = "$HOME/AGENTS.md" ]; then
-    splice_sentinel "$path" "$label"
-  else
-    echo "     · skip $label (parent dir not present)"
-  fi
-done
-
-# Gemini import shim
-if [ -d "$HOME/.gemini" ]; then
-  if [ ! -f "$HOME/.gemini/GEMINI.md" ] || ! grep -q '@AGENTS.md' "$HOME/.gemini/GEMINI.md" 2>/dev/null; then
-    echo "@AGENTS.md" >> "$HOME/.gemini/GEMINI.md"
-    echo "     ✓ Gemini GEMINI.md updated with @AGENTS.md import"
-  fi
-fi
-echo
-
-# ── 5. Optional project bootstrap ──────────────────────────────────────
-if [ -n "$WITH_PROJECT" ]; then
-  echo "5/5  fulcrum init $PROJECT_DIR"
-  "$HOME/.fulcrum/bin/fulcrum" init "$PROJECT_DIR"
-else
-  echo "5/5  Skipping project init (use:  fulcrum init <dir>  or re-run with --with-project)"
-fi
-echo
-echo "Done."
-echo
-echo "Next:"
-echo "  • Register hooks per agent — see docs/hooks.md §6 for snippets."
-echo "  • Sync skills:               fulcrum skills sync"
-echo "  • Enable a hook recipe:      fulcrum hooks enable <name>"
-echo "  • Bootstrap a project:       fulcrum init <dir>"
+# ── 4. Delegate to `fulcrum install` ────────────────────────────────
+# Bash 3.2 + `set -u` expands an empty `${arr[@]}` to "unbound" — guard it.
+FULCRUM_REPO_DIR="$REPO_DIR" exec "$HOME/.fulcrum/bin/fulcrum" install ${WITH_PROJECT_ARGS[@]+"${WITH_PROJECT_ARGS[@]}"}
