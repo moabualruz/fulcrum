@@ -11,7 +11,8 @@ Usage:
   fulcrum hooks list                 List available hook recipes.
   fulcrum hooks enable <name>        Print the per-agent registration snippet for <name>.
   fulcrum skills sync                Mirror skills/<name>/ to every agent's skills path.
-  fulcrum skills lint <path>         Validate a SKILL.md frontmatter against all 5 agents.
+  fulcrum skills lint <path>         Validate a SKILL.md (frontmatter + required body sections).
+  fulcrum skills list                Enumerate authored skills with eval coverage.
   fulcrum install [--with-project DIR]
                                      Splice rules into agent files; vendor recipe pool.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.

@@ -15,7 +15,8 @@
     "test": "bun test",
     "lint": "bun run --bun tsc --noEmit",
     "ci": "bun run scripts/ci.ts",
-    "changelog": "git-cliff -o CHANGELOG.md"
+    "changelog": "git-cliff -o CHANGELOG.md",
+    "release": "bun run scripts/release.ts"
   },
   "engines": {
     "bun": ">=1.3.0"
