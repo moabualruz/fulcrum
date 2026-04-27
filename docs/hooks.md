@@ -1,8 +1,10 @@
 # Hooks
 
-> Deterministic, lifecycle-driven shell hooks for the Claude Code harness (and equivalents in Codex, Gemini, OpenCode, Pi). Hooks run *outside* the model loop — they cannot be ignored, prompt-injected, or forgotten. Use them for things the agent must *not* be trusted to remember: format, lint, secret-scan, refresh tool indexes, block destructive shell, inject session-time context.
+> Deterministic, lifecycle-driven hooks. Run *outside* the model loop — cannot be ignored, prompt-injected, or forgotten. Use them for things the agent must *not* be trusted to remember: format, lint, secret-scan, refresh tool indexes, block destructive shell, inject session-time context.
+>
+> **Cross-agent.** Recipes are universal bash; every agent registers them differently. Section 1 catalogs Claude Code events as the reference; section 6 maps the same recipes onto Codex, Gemini, OpenCode, Pi. Per-agent registration syntax lives in [agents.md](agents.md).
 
-## 1. Event catalogue
+## 1. Claude Code event catalogue (reference shape)
 
 All shapes from primary docs, fetched 2026-04-27 [source: https://code.claude.com/docs/en/hooks]. Default timeout is **600s** for every command hook — set an explicit lower `timeout` (ms) on hot-path hooks. Stdin is JSON; common fields on every event: `session_id`, `transcript_path`, `cwd`, `hook_event_name`. `permission_mode` is added on tool/prompt events.
 
@@ -272,7 +274,52 @@ Add `.claude/bash-commands.log` to `.gitignore`.
 
 ## 6. Cross-agent
 
-Every other agent has an equivalent surface but different syntax: Codex (`~/.codex/hooks.json`, 6 events), Gemini (`settings.json` `hooks`, 11 events incl. `BeforeModel`/`AfterModel`), OpenCode (TypeScript plugins, 30+ events), Pi (TS extensions, `pi.on(event, …)`, 20+ events incl. blockable `tool_call`). Same shell scripts can back all of them — wrap once, register per agent. Full matrix in [agents.md](agents.md).
+### 6.1 Hook system per agent
+
+| Agent | Config | Events count | Mechanism | Blocking tool? |
+|---|---|---|---|---|
+| Claude Code | `~/.claude/settings.json` `hooks` block | ~25 | shell command | yes (PreToolUse exit 2 / `permissionDecision: deny`) |
+| Codex CLI | `~/.codex/hooks.json` (JSON recommended over TOML) | 6 | shell command | yes (exit 2) |
+| Gemini CLI | `~/.gemini/settings.json` `hooks` | 11 | shell command, returns JSON | yes (exit 2; `toolConfig` to mutate) |
+| OpenCode | `~/.config/opencode/plugins/*.ts` | 30+ | TypeScript plugin | yes (`tool.execute.before` returns `{deny: true}`) |
+| Pi CLI | `~/.pi/agent/extensions/*.ts` | 20+ | TypeScript extension (`pi.on(event, …)`) | yes (`tool_call` returns `{block: true, reason}`) |
+
+Every agent supports the same five categories: session lifecycle, before-tool, after-tool, before-prompt, end-of-turn. The names differ; the bash scripts behind them don't.
+
+### 6.2 Recipe → event mapping
+
+Same script, different registration. Use this table to wire each recipe in §5 across agents.
+
+| Recipe | Claude Code | Codex | Gemini | OpenCode | Pi |
+|---|---|---|---|---|---|
+| Index check (5.1) | `SessionStart` | `SessionStart` | `SessionStart` | `session.created` | `session_start` |
+| Index rebuild (5.1) | `Stop` | `Stop` | `SessionEnd` | `session.idle` | `session_shutdown` |
+| Format on edit (5.2) | `PostToolUse` matcher `Write\|Edit` | `PostToolUse` (filter on `tool_name` in script) | `AfterTool` | `tool.execute.after` (or `file.edited`) | `tool_result` (filter on tool name) |
+| Lint gate (5.3) | `PostToolUse Write\|Edit`, exit 2 | `PostToolUse`, exit 2 | `AfterTool`, exit 2 | `tool.execute.after`, throw / return error | `tool_result`, return `{block:true,reason}` |
+| Block destructive bash (5.4) | `PreToolUse Bash`, exit 2 | `PreToolUse`, exit 2 | `BeforeTool`, exit 2 | `tool.execute.before` returns `{deny}` | `tool_call` returns `{block:true,reason}` |
+| Secret scan (5.5) | `PreToolUse Bash` | `PreToolUse` | `BeforeTool` | `tool.execute.before` | `tool_call` |
+| Protected paths (5.6) | `PreToolUse Edit\|Write` | `PreToolUse` | `BeforeTool` | `tool.execute.before` | `tool_call` |
+| Package-manager policy (5.7) | `PreToolUse Bash` | `PreToolUse` | `BeforeTool` | `tool.execute.before` | `tool_call` |
+| MCP truncation (5.8) | `PostToolUse mcp__.*` | `PostToolUse` | `AfterTool` | `tool.execute.after` | **N/A** — Pi has no MCP |
+| Background tests (5.9) | `PostToolUse Write\|Edit`, `nohup … &` | `PostToolUse`, `nohup … &` | `AfterTool`, `nohup … &` | `tool.execute.after`, spawn detached | `tool_result`, spawn detached |
+| Long-session notify (5.10) | `UserPromptSubmit` + `Stop` | `UserPromptSubmit` + `Stop` | hooks combo | `session.created` + `session.idle` | `turn_start` + `turn_end` |
+| Bash audit log (5.11) | `PostToolUse Bash` | `PostToolUse` | `AfterTool` | `tool.execute.after` | `tool_result` |
+
+### 6.3 Per-agent gotchas
+
+- **Codex** — `Stop` must return JSON, not plain text; other events accept stdout text. JSON config recommended over inline TOML (known startup bug).
+- **Gemini** — MCP server names break with underscores; use hyphens. `additionalContext` injection only works on hooks that return JSON.
+- **OpenCode** — TypeScript plugin, not shell; the bash recipes in §5 must be invoked via `await $\`…\`` template tag from the plugin file. The wrapper:
+  ```ts
+  // ~/.config/opencode/plugins/fulcrum.ts
+  export const FulcrumPlugin = async ({ $ }) => ({
+    "tool.execute.before": async ({ tool, input }) => {
+      if (tool === "bash") await $({ env: { HOOK_INPUT: JSON.stringify({ tool_input: input }) } })`~/.fulcrum/hooks/bash-guard.sh`
+    }
+  })
+  ```
+- **Pi** — TS extensions, hot-reloadable via `/reload`. `before_agent_start` can rewrite the system prompt; equivalent power to Claude Code's SessionStart context injection. No MCP support — recipes that target `mcp__.*` simply don't apply.
+- **All agents** — keep the bash scripts at `~/.fulcrum/hooks/` and shell out from each agent's native config. One copy of the logic, five registrations. Per-agent registration snippets in [agents.md](agents.md).
 
 ---
 

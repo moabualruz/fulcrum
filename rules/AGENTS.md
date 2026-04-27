@@ -1,6 +1,20 @@
 # Fulcrum global rules
 
-> Append to `~/.claude/CLAUDE.md`. Behavioral rules — what the agent *does*, not knowledge. Skill files are sourced upstream; see `skills/SOURCES.md`. Target: under 200 lines [source: https://code.claude.com/docs/en/memory]. Each rule states WHEN it applies, WHY (the failure mode it prevents), and INSTEAD-OF what.
+> Behavioral rules — what the agent *does*, not knowledge. Cross-agent: install into your agent's primary rules file. Each rule states WHEN it applies, WHY (the failure mode it prevents), and INSTEAD-OF what. Target: under 200 lines [source: https://code.claude.com/docs/en/memory] — the same threshold applies in every agent; bloated rules get silently ignored.
+
+## Install per agent
+
+| Agent | Primary rules file | Method |
+|---|---|---|
+| Claude Code | `~/.claude/CLAUDE.md` | append this file's body |
+| Codex CLI | `~/.codex/AGENTS.md` | append this file's body |
+| OpenCode | `~/.config/opencode/AGENTS.md` (also reads `~/.claude/CLAUDE.md`) | append once into either |
+| Pi CLI | `~/.pi/agent/AGENTS.md` or `CLAUDE.md` | append this file's body |
+| Gemini CLI | `~/.gemini/GEMINI.md` | place body at `~/AGENTS.md`, then make `~/.gemini/GEMINI.md` a single line: `@AGENTS.md` (Gemini inlines `@` imports) |
+
+Project-level: drop a copy at `<repo>/AGENTS.md` for every agent except Gemini, which needs `<repo>/GEMINI.md` with `@AGENTS.md`.
+
+Skill files are sourced upstream; see `skills/SOURCES.md`. Hooks are in `docs/hooks.md`.
 
 ## 0. Precedence (read first)
 
