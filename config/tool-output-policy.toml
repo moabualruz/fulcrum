@@ -1,5 +1,5 @@
 # Fulcrum tool-output policy.
-# Drives hooks/recipes/tool-output-router.sh and `fulcrum hook router`.
+# Drives `fulcrum hook tool-output-router` (src/hooks/tool-output-router.ts).
 # Default: leave-as-is. Never blanket-truncate. Per-tool overrides only.
 #
 # Profile / per-tool keys:

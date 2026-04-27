@@ -11,10 +11,6 @@ function repoRoot(): string {
   return process.env["FULCRUM_REPO_DIR"] ?? process.cwd();
 }
 
-function homeFulcrum(): string {
-  return process.env["FULCRUM_HOME"] ?? `${process.env["HOME"]}/.fulcrum`;
-}
-
 async function exists(p: string): Promise<boolean> {
   try { await stat(p); return true; } catch { return false; }
 }
@@ -107,7 +103,6 @@ async function cmdSync(): Promise<void> {
     console.log("· skip Gemini (~/.gemini not present)");
   }
   console.log("Done.");
-  void homeFulcrum;
 }
 
 // ── lint ───────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 > The value of any tool is its output. Default behavior: **leave-as-is** — never blanket-truncate. Per-tool overrides only, justified by the output's typical shape.
 >
-> Implemented by `hooks/recipes/tool-output-router.sh`, driven by `~/.fulcrum/tool-output-policy.toml` (seed config in `config/tool-output-policy.toml`).
+> Implemented by `fulcrum hook tool-output-router` (source: `src/hooks/tool-output-router.ts`), driven by `~/.fulcrum/tool-output-policy.toml` (seed config in `config/tool-output-policy.toml`).
 
 ## Tiers
 
@@ -51,5 +51,5 @@ Input on stdin is the agent's PostToolUse JSON envelope. The router:
 
 ## Cross-refs
 
-- Hook recipe: `hooks/recipes/tool-output-router.sh`
+- Hook recipe: `fulcrum hook tool-output-router` (`src/hooks/tool-output-router.ts`)
 - Per-agent registration: see `docs/hooks.md` §6 for the matrix.

@@ -6,7 +6,6 @@
 // We also drop a marker file at ~/.fulcrum/hooks/enabled/<name> for state.
 
 import { mkdir, writeFile, unlink, readdir, readFile, stat } from "node:fs/promises";
-import { resolve } from "node:path";
 
 const RECIPE_NAMES = [
   "format",
@@ -114,7 +113,4 @@ export async function run(args: string[]): Promise<void> {
       console.error(`fulcrum hooks: unknown subcommand '${sub}'`);
       process.exit(2);
   }
-  // Side note: we record `repoDir` resolution as best-effort for snippet
-  // lookup. A clone of fulcrum on disk is the source of truth.
-  void resolve; // silence unused import linter rule (resolve isn't used)
 }
