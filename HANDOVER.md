@@ -86,6 +86,14 @@ Approach: 5 parallel audit-agent batches drilled into ~3-4 skills each via WebFe
 
 **Docs aligned with the `fulcrum/` namespace:** `docs/skills.md` §1 now lists fulcrum-managed paths separately from custom user skill paths; §4 clarifies that the `fulcrum:` prefix is path-based today (frontmatter `name:` stays clean) and reserved for future plugin/extension addressing. `docs/agents.md` cross-agent matrix updated.
 
+**Eval harness rewritten to use `claude` CLI (no API key needed).** `scripts/eval-skill-claude.sh` was reworked to call `claude --print --output-format=json --no-session-persistence "<query>"` per entry instead of importing the Anthropic SDK via skill-creator's `run_loop.py`. Auth is handled by Claude Code itself (OAuth / keychain) — no `ANTHROPIC_API_KEY` in the environment.
+
+Trigger detection uses two paths: (1) the response JSON contains a `Skill` tool-use entry naming the skill (definitive), or (2) the response text matches the skill's frontmatter `name:` or its first invocation command (heuristic; `--match-words "..."` extends it). Pass criteria: ≥80% trigger rate on `should_trigger=true`, ≤20% false-trigger on `should_trigger=false`.
+
+Smoke-tested on jq (Sonnet, 1 run/query, 20 entries): 75% trigger / 25% false-trigger — both miss target by 5pp. The harness works; jq's description likely needs imperative phrasing tightening (or the heuristic match-words list extending) to clear the bar. Run with `--runs-per-query 3` for stability before iterating.
+
+`evals/README.md` updated with the new requirements (claude CLI on PATH, `fulcrum skills sync` first; no Python, no API key).
+
 **Still outstanding (P3 / low priority)**
 - Trigger-rate evals for the 27 newly-shipped skills (Claude-Code-only via `scripts/eval-skill-claude.sh`; needs Python 3.10+ and `ANTHROPIC_API_KEY`). Lint passes for all; trigger rates not yet measured.
 - Manual cross-agent smoke for the 27 new skills per `docs/skill-smoke-test.md` (only Claude Code can be auto-eval'd).

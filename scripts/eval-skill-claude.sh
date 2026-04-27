@@ -1,100 +1,209 @@
 #!/usr/bin/env bash
-# Fulcrum eval-skill-claude — wrap Anthropic's skill-creator run_loop.py to
-# measure a skill's trigger rate on Claude Code. Claude-Code-only by design.
+# Fulcrum eval-skill-claude — measure a skill's trigger rate via the Claude
+# Code CLI. Auth is handled by `claude` itself (OAuth via `claude login`,
+# keychain on macOS, etc.) — no ANTHROPIC_API_KEY needed in the environment.
+#
+# Why not skill-creator's run_loop.py: that harness imports the Anthropic SDK
+# and calls the API directly, which requires ANTHROPIC_API_KEY. Going through
+# the `claude` CLI keeps the secret in the OS keychain and matches the agent's
+# real-world execution path (skills loaded from ~/.claude/skills/...).
 #
 # Usage:
-#   scripts/eval-skill-claude.sh <skill-name> [--queries FILE] [--model NAME]
+#   scripts/eval-skill-claude.sh <skill-name> [--queries FILE]
+#                                              [--model NAME]
+#                                              [--runs-per-query N]
+#                                              [--results-dir DIR]
+#                                              [--match-words "w1,w2,..."]
 #
 # Eval set format (JSON array, default at evals/<skill>.json):
 #   [
-#     {"query": "how do I select fields from a JSON file", "should_trigger": true},
-#     {"query": "how do I select cells in a CSV",          "should_trigger": false},
-#     ...
+#     {"query": "extract emails from this JSON file", "should_trigger": true},
+#     {"query": "extract emails from this CSV file",  "should_trigger": false}
 #   ]
 #
-# Flags surfaced from skill-creator's run_loop.py (verified 2026-04-27):
-#   --eval-set FILE          required (JSON array)
-#   --skill-path DIR         required (skill DIRECTORY, not the .md)
-#   --model NAME             required ("claude-opus-4-7", "claude-sonnet-4-6", etc.)
-#   --max-iterations N       default 5; pass 1 to measure once without rewriting
-#   --runs-per-query N       default 3
-#   --holdout FRAC           default 0.4 (set 0 to disable train/test split)
-#   --report PATH|auto|none  default "auto" (HTML report at temp file)
-#   --results-dir DIR        save results.json + report.html + log.txt
-# Set FULCRUM_EVAL_MAX_ITER=N to override --max-iterations.
+# Trigger detection (in order):
+#   1. The Claude response's JSON contains a Skill tool-use entry naming the
+#      skill (definitive signal — the agent loaded the skill).
+#   2. The response text mentions any of the match words (default: skill name +
+#      first command in the SKILL.md Invocation block; override with
+#      --match-words). This is a fallback heuristic; cross-check the saved
+#      transcripts before drawing strong conclusions.
+#
+# Pass criteria (matches docs/skills.md §7):
+#   - trigger rate ≥ 80% on should_trigger=true entries
+#   - activation  ≤ 20% on should_trigger=false entries
 
 set -euo pipefail
 
-SKILL="${1:-}"
-[ -n "$SKILL" ] || { echo "usage: $0 <skill-name> [--queries FILE] [--model NAME]" >&2; exit 2; }
-shift || true
+# Help / usage. Handle before treating $1 as a skill name.
+case "${1:-}" in
+  -h|--help|"")
+    sed -n '2,32p' "$0" | sed 's/^# \?//'
+    exit 0 ;;
+esac
+
+SKILL="$1"
+shift
 
 QUERIES=""
-MODEL="${FULCRUM_EVAL_MODEL:-claude-opus-4-7}"
-MAX_ITER="${FULCRUM_EVAL_MAX_ITER:-1}"
-EXTRA_ARGS=()
+MODEL=""                              # default: claude's default model
+RUNS=1                                # repeat each query N times for stability
+RESULTS_DIR=""
+EXTRA_MATCH=""                        # extra match words (comma-separated)
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --queries) QUERIES="$2"; shift 2 ;;
-    --model)   MODEL="$2";   shift 2 ;;
-    *)         EXTRA_ARGS+=("$1"); shift ;;
+    --queries)         QUERIES="$2"; shift 2 ;;
+    --model)           MODEL="$2"; shift 2 ;;
+    --runs-per-query)  RUNS="$2"; shift 2 ;;
+    --results-dir)     RESULTS_DIR="$2"; shift 2 ;;
+    --match-words)     EXTRA_MATCH="$2"; shift 2 ;;
+    -h|--help)
+      sed -n '2,40p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILL_DIR="$REPO_DIR/skills/$SKILL"
-[ -f "$SKILL_DIR/SKILL.md" ] || { echo "no such skill: $SKILL_DIR/SKILL.md" >&2; exit 1; }
+SKILL_FILE="$SKILL_DIR/SKILL.md"
+[ -f "$SKILL_FILE" ] || { echo "no such skill: $SKILL_FILE" >&2; exit 1; }
 
 [ -z "$QUERIES" ] && QUERIES="$REPO_DIR/evals/$SKILL.json"
-if [ ! -f "$QUERIES" ]; then
-  echo "no eval queries at $QUERIES" >&2
-  echo "create a JSON array (10+ entries):" >&2
-  echo '  [{"query":"…","should_trigger":true}, {"query":"…","should_trigger":false}, …]' >&2
-  exit 1
-fi
+[ -f "$QUERIES" ] || { echo "no eval queries at $QUERIES" >&2; exit 1; }
 
-# Locate skill-creator. Plugins now live under ~/.claude/plugins/cache/...
-CREATOR_DIR=$(find "$HOME/.claude/plugins" -type d -name skill-creator 2>/dev/null \
-  | grep -E '/skills/skill-creator$' | head -n1)
-if [ -z "$CREATOR_DIR" ] || [ ! -f "$CREATOR_DIR/scripts/run_loop.py" ]; then
-  echo "skill-creator not found. Install via:  /plugin install skill-creator" >&2
-  echo "Looked under: $HOME/.claude/plugins (need scripts/run_loop.py inside)" >&2
+command -v claude >/dev/null 2>&1 || {
+  echo "fulcrum: \`claude\` CLI not on PATH. Install Claude Code." >&2
   exit 1
-fi
+}
+command -v jq >/dev/null 2>&1 || { echo "fulcrum: jq required" >&2; exit 1; }
 
-# Resolve a Python 3.10+ — skill-creator uses PEP-604 `X | Y` type syntax.
-PY="${FULCRUM_PYTHON:-}"
-if [ -z "$PY" ]; then
-  for cand in python3.13 python3.12 python3.11 python3.10 python3; do
-    if command -v "$cand" >/dev/null 2>&1; then
-      v=$("$cand" -c 'import sys; print(sys.version_info >= (3,10))' 2>/dev/null)
-      [ "$v" = "True" ] && PY="$cand" && break
-    fi
-  done
+# Derive match words from the skill itself: frontmatter name + first invocation command.
+SKILL_NAME=$(awk -F': *' '/^name:/{print $2; exit}' "$SKILL_FILE" | tr -d '"')
+FIRST_CMD=$(awk '
+  /^```/ { in_code = !in_code; next }
+  in_code && /^[a-zA-Z][a-zA-Z0-9_.-]*([ \t]|$)/ { print $1; exit }
+' "$SKILL_FILE" | tr -d '`')
+
+MATCH_WORDS="$SKILL_NAME"
+[ -n "$FIRST_CMD" ] && [ "$FIRST_CMD" != "$SKILL_NAME" ] && MATCH_WORDS="$MATCH_WORDS,$FIRST_CMD"
+[ -n "$EXTRA_MATCH" ] && MATCH_WORDS="$MATCH_WORDS,$EXTRA_MATCH"
+
+# Results dir
+if [ -z "$RESULTS_DIR" ]; then
+  RESULTS_DIR="$(mktemp -d -t "fulcrum-eval-$SKILL-XXXXXX")"
 fi
-if [ -z "$PY" ]; then
+mkdir -p "$RESULTS_DIR"
+RAW="$RESULTS_DIR/results.jsonl"
+LOG="$RESULTS_DIR/log.txt"
+SUMMARY="$RESULTS_DIR/summary.txt"
+: > "$RAW"; : > "$LOG"
+
+{
+  echo "fulcrum eval — $SKILL"
+  echo "  queries   : $QUERIES"
+  echo "  model     : ${MODEL:-claude default}"
+  echo "  runs/query: $RUNS"
+  echo "  match     : $MATCH_WORDS"
+  echo "  results   : $RESULTS_DIR"
+  echo
+} | tee "$SUMMARY"
+
+# Sanity: confirm the skill is actually present in ~/.claude/skills (or under fulcrum/).
+SKILL_INSTALLED=""
+for cand in "$HOME/.claude/skills/$SKILL/SKILL.md" "$HOME/.claude/skills/fulcrum/$SKILL/SKILL.md"; do
+  [ -f "$cand" ] && { SKILL_INSTALLED="$cand"; break; }
+done
+if [ -z "$SKILL_INSTALLED" ]; then
   cat >&2 <<EOF
-fulcrum: no Python 3.10+ found on PATH.
-skill-creator's run_loop.py uses 'str | None' syntax (PEP 604) which needs 3.10+.
-macOS ships 3.9 by default. Install one of:
-  brew install python@3.12
-  mise use -g python@3.12
-Or set FULCRUM_PYTHON=/full/path/to/python3.12 and re-run.
+fulcrum: skill '$SKILL' is not installed under ~/.claude/skills/.
+Run: fulcrum skills sync   (puts every authored skill at ~/.claude/skills/fulcrum/<name>)
+The agent must be able to discover the skill at runtime; otherwise nothing will trigger.
 EOF
   exit 1
 fi
+echo "  installed at: $SKILL_INSTALLED" | tee -a "$SUMMARY"
+echo | tee -a "$SUMMARY"
 
-echo "Evaluating '$SKILL' against $QUERIES (model=$MODEL, max-iterations=$MAX_ITER)"
-echo "Harness: $CREATOR_DIR/scripts/run_loop.py"
-echo "Python : $($PY --version) ($(command -v $PY))"
-echo
+# Detection helper: returns 1 if the Claude response indicates the skill triggered.
+# Inspects both the JSON envelope (for Skill tool-use) and the response text.
+detect_trigger() {
+  local response_json="$1"
+  # 1) Skill tool-use entries naming our skill.
+  local skill_used
+  skill_used=$(echo "$response_json" | jq -r --arg n "$SKILL_NAME" '
+    [.. | objects | select(.type == "tool_use" and (.name // "") == "Skill")
+      | .input.skill_name? // .input.name? // empty] | map(select(. == $n)) | length' 2>/dev/null || echo 0)
+  if [ "${skill_used:-0}" -gt 0 ] 2>/dev/null; then echo 1; return; fi
 
-cd "$CREATOR_DIR"
-"$PY" -m scripts.run_loop \
-  --eval-set "$QUERIES" \
-  --skill-path "$SKILL_DIR" \
-  --model "$MODEL" \
-  --max-iterations "$MAX_ITER" \
-  --verbose \
-  "${EXTRA_ARGS[@]}"
+  # 2) Fallback heuristic: word match against the assistant's text response.
+  local text
+  text=$(echo "$response_json" | jq -r '.result // .text // empty' 2>/dev/null || true)
+  [ -z "$text" ] && text="$response_json"
+  local lc
+  lc=$(echo "$text" | tr '[:upper:]' '[:lower:]')
+  local IFS=','
+  for w in $MATCH_WORDS; do
+    w=$(echo "$w" | tr '[:upper:]' '[:lower:]' | xargs)
+    [ -z "$w" ] && continue
+    if echo "$lc" | grep -qw -- "$w"; then echo 1; return; fi
+  done
+  echo 0
+}
+
+TOTAL_ENTRIES=$(jq 'length' "$QUERIES")
+TRIG_TOTAL=0; TRIG_HIT=0
+NEG_TOTAL=0;  NEG_FAIL=0
+ENTRY_IDX=0
+
+while IFS= read -r entry; do
+  Q=$(echo "$entry" | jq -r '.query')
+  EXPECT=$(echo "$entry" | jq -r '.should_trigger')
+
+  for run in $(seq 1 "$RUNS"); do
+    WORK=$(mktemp -d)
+    CLAUDE_ARGS=(--print --output-format=json --no-session-persistence)
+    [ -n "$MODEL" ] && CLAUDE_ARGS+=(--model "$MODEL")
+    RESP=$( (cd "$WORK" && claude "${CLAUDE_ARGS[@]}" "$Q" </dev/null) 2>>"$LOG" || true)
+    rm -rf "$WORK"
+
+    TRIG=$(detect_trigger "$RESP")
+    jq -nc \
+      --arg q "$Q" --argjson exp "$EXPECT" --argjson trig "$TRIG" \
+      --argjson idx "$ENTRY_IDX" --argjson run "$run" \
+      --arg resp "$RESP" \
+      '{idx:$idx, run:$run, query:$q, expected:$exp, triggered:($trig==1), response:$resp}' \
+      >> "$RAW"
+
+    if [ "$EXPECT" = "true" ]; then
+      TRIG_TOTAL=$((TRIG_TOTAL+1))
+      [ "$TRIG" = "1" ] && TRIG_HIT=$((TRIG_HIT+1))
+    else
+      NEG_TOTAL=$((NEG_TOTAL+1))
+      [ "$TRIG" = "1" ] && NEG_FAIL=$((NEG_FAIL+1))
+    fi
+
+    printf "  [entry %2d/%d run %d/%d] expect=%-5s triggered=%s — %s\n" \
+      $((ENTRY_IDX+1)) "$TOTAL_ENTRIES" "$run" "$RUNS" "$EXPECT" \
+      $([ "$TRIG" = "1" ] && echo yes || echo no) \
+      "${Q:0:64}" | tee -a "$SUMMARY"
+  done
+
+  ENTRY_IDX=$((ENTRY_IDX+1))
+done < <(jq -c '.[]' "$QUERIES")
+
+# Summary
+trig_pct=$([ "$TRIG_TOTAL" -gt 0 ] && echo $((100 * TRIG_HIT / TRIG_TOTAL)) || echo 0)
+neg_pct=$([ "$NEG_TOTAL"  -gt 0 ] && echo $((100 * NEG_FAIL / NEG_TOTAL)) || echo 0)
+{
+  echo
+  echo "Summary"
+  echo "  trigger rate (should_trigger=true)   : $TRIG_HIT/$TRIG_TOTAL  (${trig_pct}%)   target ≥ 80%"
+  echo "  false-trigger (should_trigger=false) : $NEG_FAIL/$NEG_TOTAL  (${neg_pct}%)   target ≤ 20%"
+  echo
+  echo "Raw results: $RAW"
+  echo "Log        : $LOG"
+} | tee -a "$SUMMARY"
+
+# Exit code: 0 if both pass criteria met, 1 otherwise.
+[ "$trig_pct" -ge 80 ] && [ "$neg_pct" -le 20 ]
