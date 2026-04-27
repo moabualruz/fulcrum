@@ -13,21 +13,21 @@ Example `.fulcrum/test-on-edit.toml`:
 ```json
 { "hooks": { "PostToolUse": [
   { "matcher": "Write|Edit",
-    "hooks": [{ "type": "command", "command": "~/.fulcrum/hooks/recipes/test-on-edit.sh", "timeout": 5000 }] }
+    "hooks": [{ "type": "command", "command": "fulcrum hook test-on-edit", "timeout": 5000 }] }
 ] } }
 ```
 
 **Codex CLI** — `~/.codex/hooks.json`
 ```json
 { "hooks": { "PostToolUse": [
-  { "hooks": [{ "type": "command", "command": "~/.fulcrum/hooks/recipes/test-on-edit.sh" }] }
+  { "hooks": [{ "type": "command", "command": "fulcrum hook test-on-edit" }] }
 ] } }
 ```
 
 **Gemini CLI** — `~/.gemini/settings.json`
 ```json
 { "hooks": { "AfterTool": [
-  { "type": "command", "command": "~/.fulcrum/hooks/recipes/test-on-edit.sh" }
+  { "type": "command", "command": "fulcrum hook test-on-edit" }
 ] } }
 ```
 
@@ -35,15 +35,15 @@ Example `.fulcrum/test-on-edit.toml`:
 ```ts
 "tool.execute.after": async ({ $, tool, input }) => {
   if (tool !== "edit" && tool !== "write") return
-  await $({ env: { HOOK_INPUT: JSON.stringify({ tool_input: input }) } })`~/.fulcrum/hooks/recipes/test-on-edit.sh`
+  await $({ env: { HOOK_INPUT: JSON.stringify({ tool_input: input }) } })`fulcrum hook test-on-edit`
 }
 ```
 
-**Pi CLI** — `~/.pi/agent/extensions/test-on-edit.ts`
+**Pi CLI** — `~/.pi/agent/extensions/fulcrum.ts`
 ```ts
 import { execSync } from "child_process"
 pi.on("tool_result", (e) => {
   if (e.tool_name !== "edit" && e.tool_name !== "write") return
-  execSync("~/.fulcrum/hooks/recipes/test-on-edit.sh", { input: JSON.stringify(e) })
+  execSync("fulcrum hook test-on-edit", { input: JSON.stringify(e) })
 })
 ```

@@ -5,31 +5,31 @@ Runs at session start; warns if `tags` / `graphify-out/` are stale or missing.
 **Claude Code** — `~/.claude/settings.json`
 ```json
 { "hooks": { "SessionStart": [
-  { "hooks": [{ "type": "command", "command": "~/.fulcrum/hooks/recipes/index-check.sh", "timeout": 5000 }] }
+  { "hooks": [{ "type": "command", "command": "fulcrum hook index-check", "timeout": 5000 }] }
 ] } }
 ```
 
 **Codex CLI** — `~/.codex/hooks.json`
 ```json
 { "hooks": { "SessionStart": [
-  { "hooks": [{ "type": "command", "command": "~/.fulcrum/hooks/recipes/index-check.sh" }] }
+  { "hooks": [{ "type": "command", "command": "fulcrum hook index-check" }] }
 ] } }
 ```
 
 **Gemini CLI** — `~/.gemini/settings.json`
 ```json
 { "hooks": { "SessionStart": [
-  { "type": "command", "command": "~/.fulcrum/hooks/recipes/index-check.sh" }
+  { "type": "command", "command": "fulcrum hook index-check" }
 ] } }
 ```
 
 **OpenCode** — `~/.config/opencode/plugins/fulcrum.ts`
 ```ts
-"session.created": async ({ $ }) => { await $`~/.fulcrum/hooks/recipes/index-check.sh` }
+"session.created": async ({ $ }) => { await $`fulcrum hook index-check` }
 ```
 
-**Pi CLI** — `~/.pi/agent/extensions/index.ts`
+**Pi CLI** — `~/.pi/agent/extensions/fulcrum.ts`
 ```ts
 import { execSync } from "child_process"
-pi.on("session_start", () => execSync("~/.fulcrum/hooks/recipes/index-check.sh"))
+pi.on("session_start", () => execSync("fulcrum hook index-check"))
 ```

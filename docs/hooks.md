@@ -104,14 +104,14 @@ Rule of thumb: **PreToolUse for prevention, PostToolUse for reaction, SessionSta
 4. **Exit 0 by default.** Only exit 2 when you genuinely intend to block. Other non-zero exit codes show as user-visible non-blocking errors.
 5. **Logs to stderr.** PreToolUse/PostToolUse stdout is *ignored* outside specific output fields — use stderr for diagnostics.
 6. **Never touch repo files.** Cache in `/tmp/`, `$XDG_STATE_HOME`, or `~/.cache/`. The index hooks store SHA in `/tmp/<slug>.index-sha` — follow that pattern.
-7. **Quote everything.** `"$CLAUDE_PROJECT_DIR"`, `set -euo pipefail`, `jq -r` over manual string parsing of stdin.
-8. **Hooks run with full shell privileges.** No sandbox. Treat `.claude/hooks/*` as production code; review before adding.
+7. **Trust typed code over shell glue.** Recipes live inside the `fulcrum` binary as TypeScript subcommands; agent envelopes are parsed via `serde`-equivalent type guards, not `jq` shell-out. The binary spawns external CLIs only when actually needed (formatters, ctags, etc).
+8. **Hooks run with full shell privileges.** No sandbox. Treat any custom hooks you write as production code; review before adding.
 
 ---
 
 ## 5. Recipe library
 
-Every recipe ships as a script in `hooks/recipes/<name>.sh`. Enable with `fulcrum hooks enable <name>` — that copies the script into `~/.fulcrum/hooks/recipes/` and prints the registration snippet for each agent's native config. Disable with `fulcrum hooks disable <name>`. Read the source for the full implementation; this section explains *what each one does and when to use it.*
+Every recipe is a subcommand of the `fulcrum` binary: `fulcrum hook <name>`. Enable with `fulcrum hooks enable <name>` — records intent at `~/.fulcrum/hooks/enabled/<name>` and prints the per-agent registration snippet. Disable with `fulcrum hooks disable <name>`. Implementation lives in `src/hooks/<name>.ts`; this section explains *what each one does and when to use it.*
 
 | Recipe | Lifecycle | Purpose | Blocks? |
 |---|---|---|---|

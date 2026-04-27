@@ -61,10 +61,10 @@ const TARGETS: Array<{ path: string; label: string; alwaysCreate?: boolean }> = 
   { path: `${process.env["HOME"]}/AGENTS.md`,                        label: "Gemini source (referenced via @AGENTS.md)", alwaysCreate: true },
 ];
 
-async function vendorHookRecipes(): Promise<void> {
+async function vendorHookSnippets(): Promise<void> {
   const root = repoRoot();
   const src = `${root}/hooks/recipes`;
-  const dst = `${fulcrumHome()}/hooks/recipes-available`;
+  const dst = `${fulcrumHome()}/hooks/snippets`;
   if (!(await isDir(src))) {
     console.log(`     · no hook recipes in ${src} (skip)`);
     return;
@@ -72,11 +72,12 @@ async function vendorHookRecipes(): Promise<void> {
   await mkdir(dst, { recursive: true });
   for (const entry of await readdir(src, { withFileTypes: true })) {
     if (!entry.isFile()) continue;
-    if (entry.name.endsWith(".sh") || entry.name.endsWith(".snippet.md")) {
+    if (entry.name.endsWith(".snippet.md")) {
       await copyFile(`${src}/${entry.name}`, `${dst}/${entry.name}`);
     }
   }
-  console.log(`     vendored: ${(await readdir(dst)).filter((f) => f.endsWith(".sh") || f.endsWith(".snippet.md")).join(", ")}`);
+  const installed = (await readdir(dst)).filter((f) => f.endsWith(".snippet.md"));
+  console.log(`     vendored ${installed.length} snippet(s)`);
 }
 
 async function seedPolicy(): Promise<void> {
@@ -126,8 +127,8 @@ export async function run(args: string[]): Promise<void> {
   const root = repoRoot();
   console.log(`Fulcrum install — source: ${root}\n`);
 
-  console.log("1/4  Vendoring hook recipes → ~/.fulcrum/hooks/recipes-available/");
-  await vendorHookRecipes();
+  console.log("1/4  Vendoring hook registration snippets → ~/.fulcrum/hooks/snippets/");
+  await vendorHookSnippets();
   console.log();
 
   console.log("2/4  Seeding ~/.fulcrum/tool-output-policy.toml");
