@@ -63,12 +63,35 @@ if [ -z "$CREATOR_DIR" ] || [ ! -f "$CREATOR_DIR/scripts/run_loop.py" ]; then
   exit 1
 fi
 
+# Resolve a Python 3.10+ — skill-creator uses PEP-604 `X | Y` type syntax.
+PY="${FULCRUM_PYTHON:-}"
+if [ -z "$PY" ]; then
+  for cand in python3.13 python3.12 python3.11 python3.10 python3; do
+    if command -v "$cand" >/dev/null 2>&1; then
+      v=$("$cand" -c 'import sys; print(sys.version_info >= (3,10))' 2>/dev/null)
+      [ "$v" = "True" ] && PY="$cand" && break
+    fi
+  done
+fi
+if [ -z "$PY" ]; then
+  cat >&2 <<EOF
+fulcrum: no Python 3.10+ found on PATH.
+skill-creator's run_loop.py uses 'str | None' syntax (PEP 604) which needs 3.10+.
+macOS ships 3.9 by default. Install one of:
+  brew install python@3.12
+  mise use -g python@3.12
+Or set FULCRUM_PYTHON=/full/path/to/python3.12 and re-run.
+EOF
+  exit 1
+fi
+
 echo "Evaluating '$SKILL' against $QUERIES (model=$MODEL, max-iterations=$MAX_ITER)"
 echo "Harness: $CREATOR_DIR/scripts/run_loop.py"
+echo "Python : $($PY --version) ($(command -v $PY))"
 echo
 
 cd "$CREATOR_DIR"
-python3 -m scripts.run_loop \
+"$PY" -m scripts.run_loop \
   --eval-set "$QUERIES" \
   --skill-path "$SKILL_DIR" \
   --model "$MODEL" \
