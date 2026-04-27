@@ -2,6 +2,45 @@
 
 > Snapshot at branch `feat/agent-foundation-clean` (HEAD: see `git log -1`). Everything you need to pick up the work.
 
+## 0. Session 2026-04-28 — progress update
+
+This session worked the P2 backlog and shipped most of it. Net change since `991669c`:
+
+**Added**
+- `scripts/ci.ts` + `bun run ci` — local CI gate (install → tsc → test → build:all → skills lint). User opted out of GitHub Actions.
+- 7 new hook test files in `src/hooks/*.test.ts` — `pm-policy`, `format`, `test-on-edit`, `audit-log`, `index-rebuild`, `index-check`, `lint-gate`. Test count went from **8 → 38**, all green.
+- 4 new skills shipped: `gh` (8 patterns, 20-entry eval), `fzf` non-interactive (7 patterns, 20-entry eval), `just` (7 patterns, 20-entry eval), `xh` (7 patterns, 20-entry eval). Total: **5 of ~25** authored.
+- `fulcrum doctor` subcommand (`src/cli/doctor.ts`) — bun version, agent dirs detection (rules-spliced check), 22 tool checks with hook-by-hook fail-open notes, policy file health, skill count.
+- `LICENSE` (MIT).
+- `cliff.toml` + `CHANGELOG.md` stub + `bun run changelog` script. git-cliff itself is not installed; cliff.toml is wired so a single `brew install git-cliff && bun run changelog` populates the file.
+
+**Fixed**
+- `src/utils/proc.ts:exists()` — was using `Bun.file().exists()` which silently returns `false` for directories, breaking `index-check`'s `graphify-out` probe. Now uses `node:fs/promises::stat`.
+- `src/hooks/format.ts` — added `*.php → php-cs-fixer fix` row.
+- `src/hooks/index-rebuild.ts` — `Promise.allSettled` rejections now surface to stderr under `FULCRUM_DEBUG` (was silent).
+
+**Verified (no change needed)**
+- `repomix --skill-generate` — confirmed real flag (introduced ~v1.10, experimental). `docs/skills.md:31` stands.
+- OpenCode shim `${name}` interpolation at `shims/opencode/fulcrum.ts:33` — Bun's `$` template tag escapes interpolations as discrete args (no shell parsing); plus `ENABLED.has(name)` guard one line above further constrains the input. Safe.
+
+**Skipped per user instruction**
+- `.github/workflows/*` — user opted out of GitHub Actions. Local `bun run ci` covers the same checks.
+
+**Manual follow-ups for the user**
+- `fulcrum skills sync` was NOT run in this session (would mutate `~/.claude`, `~/.codex`, etc.). Run it locally to propagate the 4 new skills (`gh`, `fzf`, `just`, `xh`) to all 5 agents.
+- `brew install git-cliff` (or `cargo install git-cliff`), then `bun run changelog` to populate CHANGELOG.md from commit history.
+
+**Test scope note:** Hook tests spawn `bun src/index.ts hook ...` directly — they exercise the TypeScript source, not the cross-compiled binaries. Same property as the original router test.
+
+**Still outstanding (P3 / low priority)**
+- Release pipeline (no auto-actions allowed; could be a local `scripts/release.ts` later).
+- README Rosetta hint, `bunfig.toml` lockfile assert.
+- 20+ skills in the long tail (`ruff`, `biome`, `gitleaks`, `watchexec`, `hyperfine`, `direnv`, `mise`, `git-cliff`, `bat`, `eza`, `sd`, `zoxide`, `lizard`, JVM stack, etc.).
+
+Original audit follows below — kept as the historical record.
+
+---
+
 ## 1. Current state — one-paragraph summary
 
 Fulcrum is a multi-agent (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI) developer-tooling foundation. It ships as a single Bun-compiled TypeScript binary (`fulcrum`) with eight hook-recipe subcommands, a CLI orchestrator (`init`, `install`, `hooks`, `skills`), a per-tool output-handling policy, a sentinel-block rules splicer, and a per-agent skill sync layer. The repo is on a clean branch (`feat/agent-foundation-clean`) cut from `feat/agent-memory-foundation`; **memory / PM / task-management content has been intentionally stripped**. The binary builds end-to-end (`bun build --compile`), all 8 router tests pass, the install path was smoke-tested in a scratch HOME, and `fulcrum skills sync` propagates skills to all 5 agent layouts including Gemini's extension manifest. **One skill is authored** (`jq`); 25+ are queued.
@@ -110,19 +149,19 @@ Audit findings beyond drift, kept as P1 for next session:
 | `repomix --skill-generate` flag | `docs/skills.md:29` | Flag not verified in any repomix release. Either confirm or strike from the catalogue. |
 | OpenCode shim shell-injection surface | `shims/opencode/fulcrum.ts:33` | Template-tag `${name}` interpolation — verify OpenCode's `$` escapes safely. Hooks are first-party so risk is low, but worth confirming. |
 
-### P2 — production-readiness
+### P2 — production-readiness (status as of 2026-04-28; see §0 for details)
 
-| Gap | File / location | Action |
-|---|---|---|
-| 7 of 8 hooks lack tests | only `tool-output-router.test.ts` | Add `pm-policy.test.ts`, `format.test.ts`, `test-on-edit.test.ts`, `audit-log.test.ts`, `index-rebuild.test.ts`, `index-check.test.ts`, `lint-gate.test.ts`. Mirror the pattern in router tests (spawn binary, pipe stdin, assert stdout/exit). |
-| No CI | no `.github/workflows/` | Add `ci.yml`: bun setup → `bun install` → `bun run --bun tsc --noEmit` → `bun test` → `bun run scripts/build-all.ts` (sanity) → `fulcrum skills lint skills/`. |
-| No release pipeline | install.sh expects local clone | Add `release.yml` on tag push: `bun run scripts/build-all.ts` → upload `dist/*` to GitHub release. Update `install.sh` to fetch prebuilt instead of requiring Bun on host. Stub TODO already noted in `scripts/build-all.ts:39`. |
-| `format` table missing PHP/Kotlin | `src/hooks/format.ts:11-21` | Add `*.php → php-cs-fixer`, expand `*.kt`/`*.kts` row (currently uses ktlint). Mirror what `docs/capabilities.md §5` lists. |
-| `index-rebuild` swallows individual task failures | `src/hooks/index-rebuild.ts:30` (`Promise.allSettled`) | Surface failures via stderr in `FULCRUM_DEBUG`; otherwise silent index drift is hard to diagnose. |
-| Hook envelope parse failure is silent | `src/utils/io.ts:14-22` | Already gated on `FULCRUM_DEBUG`. Optional: stderr a one-liner unconditionally for malformed envelopes. |
-| No `fulcrum doctor` command | n/a | Detects bun version, tool presence (ctags / graphify / repomix / biome / ruff), reports which hooks would fail-open, prints policy file path + size. High-value handover-time check. |
-| No LICENSE | repo root | Add `LICENSE` (MIT or whichever you prefer). |
-| No CHANGELOG | repo root | `git-cliff cliff.toml` is mentioned in rules but unwired. One-liner setup. |
+| Gap | Status |
+|---|---|
+| 7 of 8 hooks lack tests | ✅ done — 38 tests, all green |
+| No CI | ✅ done as `scripts/ci.ts` (`bun run ci`); GitHub Actions opted out |
+| No release pipeline | ⏸ deferred (no auto-actions per user) |
+| `format` table missing PHP/Kotlin | ✅ done — `php-cs-fixer` added; kotlin row was already ktlint |
+| `index-rebuild` swallows individual task failures | ✅ done — surfaces via stderr under `FULCRUM_DEBUG` |
+| Hook envelope parse failure is silent | ⏸ low priority; still `FULCRUM_DEBUG`-gated |
+| No `fulcrum doctor` command | ✅ done — `src/cli/doctor.ts` |
+| No LICENSE | ✅ done — MIT |
+| No CHANGELOG | ✅ wired — `cliff.toml` + `bun run changelog`; user must `brew install git-cliff` to populate |
 
 ### Already applied in this commit (P2 small fixes)
 

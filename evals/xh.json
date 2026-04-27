@@ -1,0 +1,22 @@
+[
+  {"query": "POST a JSON body to the user-create endpoint with a bearer token from $TOKEN.", "should_trigger": true},
+  {"query": "How do I check whether this webhook URL returns 200 from the shell?", "should_trigger": true},
+  {"query": "Fetch only the response headers of an API endpoint without showing the body.", "should_trigger": true},
+  {"query": "Make a request that fails the script if the status is 4xx or 5xx.", "should_trigger": true},
+  {"query": "Send a multipart upload of a PDF file to the /upload endpoint.", "should_trigger": true},
+  {"query": "Hit a REST endpoint with basic auth and a query parameter from bash.", "should_trigger": true},
+  {"query": "Persist cookies across two HTTP calls to the same API in one script.", "should_trigger": true},
+  {"query": "Download a release tarball from a URL to a specific filename.", "should_trigger": true},
+  {"query": "Do a POST with a nested JSON object as the body from the command line.", "should_trigger": true},
+  {"query": "Talk to a staging API that uses a self-signed certificate without curl.", "should_trigger": true},
+  {"query": "Call an internal HTTPS service through a corporate HTTP proxy from the shell.", "should_trigger": true},
+  {"query": "Inspect the response body of an API call and pipe it into jq.", "should_trigger": true},
+  {"query": "Open an SSH tunnel to a remote server for port forwarding.", "should_trigger": false},
+  {"query": "Download a large file with wget and resume on failure.", "should_trigger": false},
+  {"query": "Connect to a websocket server and send a message.", "should_trigger": false},
+  {"query": "Send an email through an SMTP server from a shell script.", "should_trigger": false},
+  {"query": "List the DNS records for a domain from the command line.", "should_trigger": false},
+  {"query": "Make an HTTP/3 request to a QUIC-enabled endpoint.", "should_trigger": false},
+  {"query": "Connect to a Docker daemon over a Unix domain socket.", "should_trigger": false},
+  {"query": "Parse a JSON file already on disk into individual fields.", "should_trigger": false}
+]

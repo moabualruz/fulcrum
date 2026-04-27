@@ -1,5 +1,7 @@
 // Subprocess helpers shared across hooks. Wraps Bun.spawn for common patterns.
 
+import { stat } from "node:fs/promises";
+
 export async function which(cmd: string): Promise<string | null> {
   const proc = Bun.spawn(["sh", "-c", `command -v ${cmd}`], {
     stdout: "pipe",
@@ -10,8 +12,10 @@ export async function which(cmd: string): Promise<string | null> {
   return out || null;
 }
 
+// Path-exists check that returns true for files OR directories. Bun.file().exists()
+// returns false for directories, which silently broke index-check's graphify-out probe.
 export async function exists(path: string): Promise<boolean> {
-  return await Bun.file(path).exists();
+  try { await stat(path); return true; } catch { return false; }
 }
 
 export interface RunResult {

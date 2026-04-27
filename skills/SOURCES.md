@@ -33,13 +33,13 @@
 | `ast-grep` | ✅ | [ast-grep/agent-skill](https://github.com/ast-grep/agent-skill) | Tool-author. 644 stars. Distributed via Claude plugin marketplace. |
 | `tmux` | ☑ | [obra/superpowers-lab — using-tmux-for-interactive-commands](https://github.com/obra/superpowers-lab) · [mitsuhiko/agent-stuff/tmux](https://github.com/mitsuhiko/agent-stuff/blob/main/skills/tmux/SKILL.md) | Two strong sources. superpowers-lab is sharper for interactive REPL driving. |
 | `universal-ctags` | ☑ | [DevonMorris/claude-ctags](https://github.com/DevonMorris/claude-ctags) | Auto-index + usage. ~80% token reduction vs grep. MIT. |
-| `gh` | ☑ | [mitsuhiko/agent-stuff/github](https://github.com/mitsuhiko/agent-stuff/tree/main/skills/github) | 2.1k stars. No upstream from `cli/cli`. |
+| `gh` | ✍️ shipped | [`skills/gh/SKILL.md`](gh/SKILL.md) + [`evals/gh.json`](../evals/gh.json) | Authored 2026-04-28. 8 patterns + 8 anti-patterns. 20-entry trigger eval (13/7 split). |
 | `mise` | ☑ | [ray-manaloto/claude-code-marketplace/mise-toolkit](https://github.com/ray-manaloto/claude-code-marketplace/tree/main/mise-toolkit) | Multi-SKILL toolkit. 1 star — usable but consider re-authoring for our pin. |
 | `jq` | ✍️ shipped | [`skills/jq/SKILL.md`](jq/SKILL.md) + [`evals/jq.json`](../evals/jq.json) | **#1 friction.** Authored 2026-04-27. 7 patterns + 7 anti-patterns covering extract / filter / reshape / aggregate / CSV / defaults / paths. 20-entry trigger eval set (12 trigger / 8 anti-trigger). |
 | `yq` | ✍️ | `skills/yq/SKILL.md` (to author) | YAML/TOML/XML round-trip; preserve comments; `eval-all` for multi-doc; differences from jq. |
-| `fzf` | ✍️ | `skills/fzf/SKILL.md` (to author) | **Non-interactive mode for agents** (`--filter`, `--no-tty`); piping from `gh`/`git`/`fd`; ranking semantics. Interactive UI is N/A in agent shells. |
-| `xh` | ✍️ | `skills/xh/SKILL.md` (to author) | `--check-status`, `--json`, sessions, `--auth-type bearer`, when to fall back to curl. |
-| `just` | ✍️ | `skills/just/SKILL.md` (to author) | `just --list`, `just --show <recipe>`, parameter syntax, recipe deps, dotenv loading, exit semantics. |
+| `fzf` | ✍️ shipped | [`skills/fzf/SKILL.md`](fzf/SKILL.md) + [`evals/fzf.json`](../evals/fzf.json) | Authored 2026-04-28. Non-interactive `--filter` mode; 7 patterns + 7 anti-patterns. 20-entry eval (11/9). |
+| `xh` | ✍️ shipped | [`skills/xh/SKILL.md`](xh/SKILL.md) + [`evals/xh.json`](../evals/xh.json) | Authored 2026-04-28. Four operators, `--check-status`, sessions, auth, uploads. 20-entry eval (12/8). |
+| `just` | ✍️ shipped | [`skills/just/SKILL.md`](just/SKILL.md) + [`evals/just.json`](../evals/just.json) | Authored 2026-04-28. Discovery-first (`--list`, `--show`); 7 patterns + 7 anti-patterns. 20-entry eval (12/8). |
 | `bat` | ✍️ | `skills/bat/SKILL.md` (to author) | `--paging=never` for piping, `--language=` for stdin, `--diff`. |
 | `eza` | ✍️ | `skills/eza/SKILL.md` (to author) | `--git`, `--tree`, `--git-ignore`, `-l --no-quotes`. Short — keep tight. |
 | `sd` | ✍️ | `skills/sd/SKILL.md` (to author) | Pattern syntax differences from sed; capture groups; in-place vs stdout; multi-line. |
@@ -110,11 +110,11 @@
 
 Ordered by per-session friction (how often agents trip without the skill):
 
-1. `jq` — invoked dozens of times per session
-2. `gh` — currently third-party; consider in-repo if mitsuhiko's drifts
-3. `fzf` — non-interactive mode is non-obvious
-4. `just` — encountered in most modern repos
-5. `xh` — small surface, big payoff
+1. `jq` — ✅ shipped
+2. `gh` — ✅ shipped
+3. `fzf` — ✅ shipped
+4. `just` — ✅ shipped
+5. `xh` — ✅ shipped
 6. `ruff` + `biome` — highest-velocity formatters of 2025-2026
 7. `gitleaks` — referenced from hooks recipe (5.5)
 8. `watchexec`, `hyperfine` — refactor-loop tools

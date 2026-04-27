@@ -19,6 +19,7 @@ const TABLE: Array<{ pattern: RegExp; formatter: Formatter; alt?: Formatter }> =
   { pattern: /\.java$/,                             formatter: { cmd: "google-java-format", args: (f) => ["--replace", f] } },
   { pattern: /\.kts?$/,                             formatter: { cmd: "ktlint",      args: (f) => ["--format", f] } },
   { pattern: /\.dart$/,                             formatter: { cmd: "dart",        args: (f) => ["format", f] } },
+  { pattern: /\.php$/,                              formatter: { cmd: "php-cs-fixer", args: (f) => ["fix", f] } },
 ];
 
 export async function runHook(): Promise<void> {
