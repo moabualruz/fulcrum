@@ -31,10 +31,12 @@ Each topic is its own foundation document. Read them in dependency order:
 | Doc | Topic | Status |
 |---|---|---|
 | [docs/context.md](docs/context.md) | Context layer — `CLAUDE.md`, `AGENTS.md` conventions | ✅ |
-| [docs/hooks.md](docs/hooks.md) | Automation layer — index-maintenance hooks | ✅ |
+| [docs/hooks.md](docs/hooks.md) | Automation layer — full event surface + 8 shipped recipes (index, format, lint-gate, pm-policy, test-on-edit, audit-log, tool-output-router) | ✅ |
+| [docs/tool-output-policy.md](docs/tool-output-policy.md) | Per-tool output strategies (raw / status / summary / file) — drives `tool-output-router` | ✅ |
 | [docs/capabilities.md](docs/capabilities.md) | Capability layer — CLI tool catalogue | ✅ |
-| [docs/skills.md](docs/skills.md) | Skills — per-agent paths, catalogue, adoption strategy | ✅ |
-| [docs/mcp.md](docs/mcp.md) | MCP policy — opt-in only | ✅ |
+| [docs/skills.md](docs/skills.md) | Skills — paths, authoring template, fork policy, verification tiers | ✅ |
+| [docs/skill-smoke-test.md](docs/skill-smoke-test.md) | Manual cross-agent verification checklist | ✅ |
+| [docs/mcp.md](docs/mcp.md) | MCP policy — opt-in only; account-disconnect for claude.ai integrated MCPs | ✅ |
 | [docs/agents.md](docs/agents.md) | Cross-agent translation — Codex, Gemini, OpenCode, Pi | ✅ |
 
 ---

@@ -8,7 +8,19 @@ MCPs spawn long-running processes and consume 55k–100k tokens at startup with 
 
 ## 2. Disable claude.ai defaults
 
-The claude.ai integrated MCPs (Gmail, Drive, Calendar) auto-inject into every Claude Code session consuming tokens regardless of relevance. 🚧 Disable mechanism pending confirmation.
+The claude.ai integrated MCPs (Gmail, Drive, Calendar) auto-inject into every Claude Code session, consuming 55-100k tokens at startup regardless of relevance. As of 2026-04-27 there is **no supported per-surface toggle** — Anthropic tracks this in [issue #47881](https://github.com/anthropics/claude-code/issues/47881) (open). `permissions.deny: ["mcp__claude_ai_*"]` blocks tool calls but the connector definitions still load (verified in [issue #29804](https://github.com/anthropics/claude-code/issues/29804)). `ENABLE_CLAUDEAI_MCP_SERVERS=false` and `claude mcp remove` are also non-functional for these integrated connectors.
+
+**Recommended: account-level disconnect.** Go to claude.ai → Settings → Connectors and remove Gmail / Drive / Calendar. Durable, official, kills the auto-injection at the source. Tradeoff: also removes them from Chat. The honest workaround is **two accounts** — a clean account (no integrations) for API-key Claude Code sessions, the integrated account for Chat.
+
+**Escape hatch (advanced, may break on update):** the undocumented GrowthBook flag in `~/.claude.json`:
+```json
+{
+  "cachedGrowthBookFeatures": {
+    "tengu_claudeai_mcp_connectors": false
+  }
+}
+```
+Currently the only mechanism that drops the tokens without removing the connectors from the account ([issue #44112](https://github.com/anthropics/claude-code/issues/44112)). The flag name is undocumented and Anthropic can change it any release. Do not rely on this in shared / managed configs.
 
 ## 3. MCP catalogue — opt-in only
 
