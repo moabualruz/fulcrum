@@ -62,3 +62,40 @@ Don't install. Borrow:
 **Skill name equals slash trigger.** Skill `<name>` → `/<name>`. The folder name, the `name:` field in frontmatter, and the slash command are all the same string.
 
 **No prefix.** Use clean names. Rename after the fact only if a future collision appears — premature namespacing harms ergonomics.
+
+## 5. Authoring template
+
+In-repo skills follow Anthropic's spec-compliant frontmatter + a body skeleton proven by superpowers across its 14 skills. Template at `skills/_template/SKILL.md`:
+
+- **Frontmatter** — `name` (lowercase + digits + hyphens, ≤64 chars, no reserved words `anthropic`/`claude`, dir-name match) and `description` (≤1024 chars, no XML, third-person trigger sentence).
+- **Body** — `## When to use` / `## Invocation` / `## Patterns` / `## Anti-patterns` / `## Cross-refs`.
+
+Validate with `fulcrum skills lint <path>` (alias for `scripts/lint-skill.sh`). Lints against the strictest union of all 5 agents' frontmatter rules.
+
+## 6. When to fork upstream skills
+
+Pin third-party skills in `skills/upstream.lock` (TOML) when ALL of:
+
+- author is the tool vendor / Anthropic / a foundation org (verified via `author_class`),
+- repo has a release or commit within the last 180 days,
+- license is permissive (MIT / Apache-2.0 / BSD / CC0).
+
+**Fork into `skills/<name>/` the moment ANY of these triggers fires:**
+
+- 90-day commit silence on the upstream repo,
+- unresolved CVE older than 14 days,
+- license drift / clarity issue,
+- more than 2 of our patches diverge from upstream,
+- maintainer unresponsive to a PR for more than 30 days.
+
+Always vendor (never pin) for individual-author repos like `mitsuhiko/agent-stuff`, `obra/superpowers-lab`, `DevonMorris/claude-ctags` — track them in the lockfile and replay diffs quarterly.
+
+## 7. Verification
+
+Tiered:
+
+1. **Lint everywhere (CI):** `scripts/lint-skill.sh skills/` validates every authored skill on the strictest frontmatter union. Cheap; catches the 80% of cross-agent failures.
+2. **Trigger eval on Claude Code:** wrap Anthropic's `skill-creator/scripts/run_loop.py` in `scripts/eval-skill-claude.sh` (TODO) — runs each skill's trigger phrase 3× through `claude -p`, scores activation rate, splits 60/40 train/test. Claude-Code-only because no equivalent harness exists for the other agents.
+3. **Manual smoke on the other 4:** for Gemini run `gemini extensions link <ext>` + `--debug`; for OpenCode and Codex copy the trigger phrase into a fresh session; for Pi invoke `/skill:<name>` directly. Checklist template at `docs/skill-smoke-test.md`.
+
+We're honest about the asymmetry: trigger-rate measurement only exists for Claude Code today.
