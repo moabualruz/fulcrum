@@ -95,7 +95,7 @@ Always vendor (never pin) for individual-author repos like `mitsuhiko/agent-stuf
 Tiered:
 
 1. **Lint everywhere (CI):** `scripts/lint-skill.sh skills/` validates every authored skill on the strictest frontmatter union. Cheap; catches the 80% of cross-agent failures.
-2. **Trigger eval on Claude Code:** wrap Anthropic's `skill-creator/scripts/run_loop.py` in `scripts/eval-skill-claude.sh` (TODO) — runs each skill's trigger phrase 3× through `claude -p`, scores activation rate, splits 60/40 train/test. Claude-Code-only because no equivalent harness exists for the other agents.
+2. **Trigger eval on Claude Code:** `scripts/eval-skill-claude.sh <name>` wraps Anthropic's `skill-creator/scripts/run_loop.py` — runs each query 3× through the live model, scores activation rate, splits 60/40 train/test, emits an HTML report. Eval set lives at `evals/<name>.json` (see `evals/README.md` for the format). Claude-Code-only because no equivalent harness exists for the other agents.
 3. **Manual smoke on the other 4:** for Gemini run `gemini extensions link <ext>` + `--debug`; for OpenCode and Codex copy the trigger phrase into a fresh session; for Pi invoke `/skill:<name>` directly. Checklist template at `docs/skill-smoke-test.md`.
 
 We're honest about the asymmetry: trigger-rate measurement only exists for Claude Code today.

@@ -14,13 +14,16 @@
 set -euo pipefail
 
 FULCRUM_HOME="${FULCRUM_HOME:-$HOME/.fulcrum}"
-RECIPES="$FULCRUM_HOME/hooks/recipes"
+AVAILABLE="$FULCRUM_HOME/hooks/recipes-available"   # vendored pool (read-only)
+ENABLED="$FULCRUM_HOME/hooks/recipes"               # active recipes (registered in agents)
 REPO_DIR="${FULCRUM_REPO_DIR:-}"
 
-# Resolve repo dir relative to this script (when invoked from a clone).
+# Resolve repo dir for skills sync/lint (those still need the source tree).
+# Falls back to $FULCRUM_HOME when invoked from outside a clone — skills
+# subcommands print a clear error if the source tree is unreachable.
 if [ -z "$REPO_DIR" ]; then
   self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
-  REPO_DIR="$(cd "$(dirname "$self")/.." 2>/dev/null && pwd || echo "$HOME/.fulcrum")"
+  REPO_DIR="$(cd "$(dirname "$self")/.." 2>/dev/null && pwd || echo "$FULCRUM_HOME")"
 fi
 
 die() { echo "fulcrum: $*" >&2; exit 1; }
@@ -99,47 +102,47 @@ EOF
 
 # ── hooks ───────────────────────────────────────────────────────────────
 cmd_hooks_list() {
-  echo "Available recipes (in repo):"
-  if [ -d "$REPO_DIR/hooks/recipes" ]; then
-    ls "$REPO_DIR/hooks/recipes/" | sed 's/^/  /'
+  echo "Available recipes (~/.fulcrum/hooks/recipes-available/):"
+  if [ -d "$AVAILABLE" ] && ls "$AVAILABLE"/*.sh >/dev/null 2>&1; then
+    for f in "$AVAILABLE"/*.sh; do
+      name="$(basename "${f%.sh}")"
+      if [ -f "$ENABLED/$name.sh" ]; then
+        echo "  ✓ $name  (enabled)"
+      else
+        echo "    $name"
+      fi
+    done
   else
-    echo "  (none — repo at $REPO_DIR has no hooks/recipes/)"
-  fi
-  echo
-  echo "Enabled (installed in $RECIPES):"
-  if [ -d "$RECIPES" ] && [ "$(ls "$RECIPES" 2>/dev/null)" ]; then
-    ls "$RECIPES" | sed 's/^/  /'
-  else
-    echo "  (none)"
+    echo "  (none — run scripts/install.sh)"
   fi
 }
 
 cmd_hooks_enable() {
   local name="${1:-}"
   [ -n "$name" ] || die "usage: fulcrum hooks enable <name>"
-  local src="$REPO_DIR/hooks/recipes/${name}.sh"
-  [ -f "$src" ] || die "recipe not found: $src"
-  mkdir -p "$RECIPES"
-  cp "$src" "$RECIPES/${name}.sh"
-  chmod +x "$RECIPES/${name}.sh"
-  echo "Enabled: ~/.fulcrum/hooks/recipes/${name}.sh"
+  local src="$AVAILABLE/${name}.sh"
+  [ -f "$src" ] || die "recipe not found in pool: $src — run scripts/install.sh, or check 'fulcrum hooks list'"
+  mkdir -p "$ENABLED"
+  cp "$src" "$ENABLED/${name}.sh"
+  chmod +x "$ENABLED/${name}.sh"
+  echo "Enabled: $ENABLED/${name}.sh"
   echo
-  local snippet="$REPO_DIR/hooks/recipes/${name}.snippet.md"
+  local snippet="$AVAILABLE/${name}.snippet.md"
   if [ -f "$snippet" ]; then
-    echo "── Registration snippet (copy into the right agent's config) ──"
+    echo "── Registration snippet (paste into each agent's config) ──"
     cat "$snippet"
   else
-    echo "(no registration snippet documented for this recipe — see docs/hooks.md §6)"
+    echo "(no registration snippet documented — see docs/hooks.md §6 for the cross-agent mapping)"
   fi
 }
 
 cmd_hooks_disable() {
   local name="${1:-}"
   [ -n "$name" ] || die "usage: fulcrum hooks disable <name>"
-  local f="$RECIPES/${name}.sh"
+  local f="$ENABLED/${name}.sh"
   if [ -f "$f" ]; then
     rm -f "$f"
-    echo "Disabled: $f (file removed; remember to delete the registration entry from each agent's config)"
+    echo "Disabled: $f (file removed; also delete the registration entry from each agent's config)"
   else
     echo "fulcrum: $name not enabled" >&2
   fi
