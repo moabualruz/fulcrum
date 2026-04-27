@@ -1,0 +1,102 @@
+# Fulcrum tool-output policy.
+# Drives hooks/recipes/tool-output-router.sh.
+# Default: leave-as-is. Never blanket-truncate. Per-tool overrides only.
+#
+# Profile / per-tool keys:
+#   tier                 = "raw" | "status-only" | "summary+head"
+#                          | "summary+file" | "file-only" | "leave-as-is"
+#   tier_under / tier_over + threshold_bytes  = size-based switch.
+#   profile              = reference a [profiles.<name>] entry.
+#
+# Per-tool overrides win over profile values (jq merge: tool * profile, tool last).
+
+[default]
+tier = "leave-as-is"
+
+# ── Profiles ───────────────────────────────────────────────────────────
+[profiles.raw_then_head]
+tier_under = "raw"
+tier_over  = "summary+head"
+threshold_bytes = 16384
+
+[profiles.raw_then_file]
+tier_under = "raw"
+tier_over  = "summary+file"
+threshold_bytes = 32768
+
+[profiles.always_file]
+tier = "file-only"
+
+[profiles.status_only]
+tier = "status-only"
+
+[profiles.summary_file]
+tier = "summary+file"
+threshold_bytes = 32768
+
+# ── Foundation tools ───────────────────────────────────────────────────
+[tools.rg]            profile = "raw_then_head"  threshold_bytes = 8192
+[tools.fd]            tier    = "raw"
+[tools.fzf]           tier    = "leave-as-is"
+[tools.jq]            profile = "raw_then_file"
+[tools.yq]            profile = "raw_then_file"
+[tools.bat]           tier    = "leave-as-is"
+[tools.sd]            profile = "status_only"
+[tools.eza]           tier    = "raw"
+[tools.zoxide]        tier    = "raw"
+[tools.xh]            profile = "raw_then_file"  threshold_bytes = 65536
+[tools.gh]            profile = "raw_then_file"  threshold_bytes = 65536
+[tools.just]          profile = "raw_then_head"  threshold_bytes = 8192
+[tools.mise]          profile = "status_only"
+[tools.direnv]        profile = "status_only"
+[tools.tmux]          tier    = "leave-as-is"
+[tools.difft]         profile = "summary_file"   threshold_bytes = 16384
+[tools.difftastic]    profile = "summary_file"   threshold_bytes = 16384
+[tools.ctags]         profile = "status_only"
+[tools.hyperfine]     tier    = "raw"
+[tools.watchexec]     tier    = "leave-as-is"
+[tools.sg]            profile = "raw_then_head"  threshold_bytes = 16384
+[tools."ast-grep"]    profile = "raw_then_head"  threshold_bytes = 16384
+[tools.gitleaks]      profile = "raw_then_file"
+[tools."git-cliff"]   profile = "raw_then_file"  threshold_bytes = 65536
+
+# ── Code intelligence ──────────────────────────────────────────────────
+[tools.repomix]       profile = "always_file"
+[tools.graphify]      profile = "always_file"
+[tools.semgrep]       profile = "summary_file"
+[tools.lizard]        profile = "raw_then_head"
+
+# ── Web / docs ─────────────────────────────────────────────────────────
+[tools.ctx7]          profile = "raw_then_file"  threshold_bytes = 65536
+[tools.tvly]          profile = "summary_file"
+[tools."playwright-cli"] profile = "summary_file"
+[tools.playwright]    profile = "summary_file"
+
+# ── Cloud services ─────────────────────────────────────────────────────
+[tools.gws]           profile = "raw_then_file"
+[tools.hcloud]        tier    = "raw"
+[tools.wrangler]      profile = "raw_then_head"  threshold_bytes = 16384
+[tools.flarectl]      tier    = "raw"
+[tools.usql]          profile = "raw_then_file"  threshold_bytes = 65536
+
+# ── Linters ────────────────────────────────────────────────────────────
+[tools.ruff]          profile = "raw_then_file"
+[tools.biome]         profile = "raw_then_file"
+[tools.knip]          profile = "raw_then_file"
+[tools."cargo-clippy"] profile = "raw_then_head"
+[tools.clippy]        profile = "raw_then_head"
+[tools."golangci-lint"] profile = "raw_then_file"
+[tools."php-cs-fixer"] profile = "status_only"
+[tools.phpstan]       profile = "raw_then_file"
+[tools.ktlint]        profile = "raw_then_file"  threshold_bytes = 16384
+[tools."google-java-format"] profile = "status_only"
+[tools.pmd]           profile = "summary_file"
+[tools.spotbugs]      profile = "summary_file"
+[tools.dart]          profile = "raw_then_head"   # covers `dart format` / `dart analyze`
+[tools."osv-scanner"] profile = "raw_then_file"
+
+# ── MCP families ───────────────────────────────────────────────────────
+# MCP tool names are namespaced as mcp__<server>__<tool>; route by suffix below.
+[tools.mcp__deepwiki__read_wiki_contents]  profile = "summary_file"
+[tools.mcp__deepwiki__ask_question]        tier    = "raw"
+[tools.mcp__deepwiki__read_wiki_structure] tier    = "raw"
