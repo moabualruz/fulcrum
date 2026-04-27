@@ -36,11 +36,49 @@ This session worked the P2 backlog and shipped most of it. Net change since `991
 
 **Test scope note:** Hook tests spawn `bun src/index.ts hook ...` directly — they exercise the TypeScript source, not the cross-compiled binaries. Same property as the original router test.
 
+**Added in this batch**
+- `scripts/release.ts` + `bun run release vX.Y.Z [--gh]` — local release runner. Verifies clean tree + unique tag → runs `bun run ci` → updates CHANGELOG via git-cliff (skipped if not installed) → creates `chore(release): vX.Y.Z` commit → annotated tag → cross-compile → optionally `gh release create` and upload dist/*. Does NOT push (you push the commit and tag explicitly).
+- `scripts/install.sh` now supports `FULCRUM_RELEASE_TAG=vX.Y.Z bash …/install.sh` to fetch a prebuilt binary via curl when no clone or Bun is available. The "Future: a 'release' branch fetches from GitHub Releases" TODO is wired.
+- `README.md` rewritten — both install paths (clone-and-build + release fetch), Apple Silicon vs Intel note (no Rosetta needed; binaries are native per-arch), `fulcrum doctor`, `bun run ci`, `bun run release`, list of 28 shipped skills.
+
+**Skill content audit + fixes (this batch's biggest find)**
+
+Lint passes for shape; it does NOT verify content correctness. A 5-round audit pass against upstream READMEs/docs found content bugs in 13 of 28 skills (46% bug rate). Fixed in-place:
+
+| Skill | Critical fix |
+|---|---|
+| `flarectl` | Env var names `CLOUDFLARE_API_*` → `CF_API_*`; removed nonexistent `user invite` subcommand. |
+| `usql` | `-o FORMAT` was wrong — `-o` is OUTPUT FILE; format flags are `-J`/`-C`/`-H`/`-x`/`-G`/`-A`/`-t`. Removed unsubstantiated `$DATABASE_URL` auto-honor claim. |
+| `osv-scanner` | v1 syntax → v2: `osv-scanner scan source -r .` and `osv-scanner scan image <ref>`. |
+| `mise` | `mise sh` does NOT spawn a subshell — it's an alias for `mise shell` which prints export statements. Use `eval "$(mise shell ...)"` or `mise exec`. |
+| `biome` | Vue/Svelte/Astro ARE supported (since v2.3.0); Markdown is parse/format-only — biome cannot lint Markdown. Updated description and skip-list. |
+| `watchexec` | Debounce default is 50ms not 100ms. |
+| `spotbugs` | `-output FILE` deprecated since 4.5.0 — use single-token `-xml=FILE` / `-sarif=FILE` / `-html=FILE` instead. |
+| `gitleaks` | `detect`/`protect` deprecated since v8.19.0 — use `gitleaks git` / `gitleaks git --staged`. `-l` was for log-level not log-opts; use `--log-opts=`. `--source` replaced with positional path. |
+| `ktlint` | `--android` flag was REMOVED in ktlint 1.0 (Sept 2023) — must configure via `.editorconfig` (`ktlint_code_style = android_studio`). |
+| `dart-toolchain` | `dart analyze --format=json` doesn't exist — use `--format=machine` (pipe-delimited). `flutter format` was removed in Flutter 3.x — use `dart format`. `formatter: exclude:` is not a real config key. |
+| `difftastic` | `--language` doesn't exist — flag is `--override GLOB:LANGUAGE`. |
+| `lizard` | `-i N` is NOT top-N — it's an `--ignore_warnings` budget. For top-N, use `--csv | sort | head`. `-l ?` is not a query syntax. |
+| `fzf` | `--literal` disables Latin-script diacritic-folding (so `café` ≠ `cafe`), NOT shell-metacharacter handling. `--no-tty` makes fzf find TTY via stderr; in `--filter` mode it's irrelevant. |
+| `just` | `set dotenv-load` defaults to `false` — `.env` is NOT loaded automatically. |
+| `jq` | `//` is null-or-FALSE fallback (not "null-or-empty"). `@tsv` does escape control chars (`\n\r\t\\`), unlike skill's claim. |
+| `yq` | `-V` is `--version` not vars; `--argjson` and `--doc N` don't exist in mikefarah/yq — use envvar export + `strenv()`/`env()` and `select(documentIndex == N)`. |
+| `google-java-format` | Flag is `--skip-removing-unused-import` (singular, not plural). JDK floor is 21 (was 11 on older 1.x lines). |
+| `eza` | `--sort=version` is not a valid key; `-h` means `--header` (NOT human-readable size — eza is human by default with `-l`). |
+| `zoxide` | `zoxide import --from auto` is invalid — must be `--from autojump` or `--from z`. |
+
+Approach: 5 parallel audit-agent batches drilled into ~3-4 skills each via WebFetch on upstream README/docs. One consolidated fix-agent applied ~50 line-level edits.
+
+**Lint also tightened** — `fulcrum skills lint` now validates that the body has all 5 required H2 sections (`When to use`, `Invocation`, `Patterns`, `Anti-patterns`, `Cross-refs`) in order, not just the frontmatter. Catches missing/reordered sections in future skills.
+
+**New CLI subcommand:** `fulcrum skills list` — enumerates authored skills with eval-entry counts and description previews. Useful for inventory + finding skills that lack evals.
+
+**git-cliff installed** (`brew install git-cliff`); `CHANGELOG.md` populated via `bun run changelog` for the first time.
+
 **Still outstanding (P3 / low priority)**
-- Local release script (`scripts/release.ts`) — no GitHub actions allowed; would tag → build:all → tarball → optionally call `gh release create`.
-- README Rosetta hint, `bunfig.toml` lockfile assert.
 - Trigger-rate evals for the 27 newly-shipped skills (Claude-Code-only via `scripts/eval-skill-claude.sh`; needs Python 3.10+ and `ANTHROPIC_API_KEY`). Lint passes for all; trigger rates not yet measured.
 - Manual cross-agent smoke for the 27 new skills per `docs/skill-smoke-test.md` (only Claude Code can be auto-eval'd).
+- Cutting v0.1.0: `bun run release v0.1.0 --gh` (when ready). Needs git-cliff installed for the changelog step (else it skips with a note).
 
 Original audit follows below — kept as the historical record.
 

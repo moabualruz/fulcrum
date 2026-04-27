@@ -1,6 +1,7 @@
 // fulcrum skills sync — fan out skills/<name>/SKILL.md to every agent's path.
-// fulcrum skills lint <path> — validate frontmatter against the strictest
-// union of all 5 agents' rules.
+// fulcrum skills lint <path> — validate frontmatter (+ body section presence)
+// against the strictest union of all 5 agents' rules.
+// fulcrum skills list — enumerate authored skills with name, desc preview, eval coverage.
 
 import { mkdir, readdir, readFile, copyFile, writeFile, stat } from "node:fs/promises";
 import { join, basename, dirname } from "node:path";
@@ -20,6 +21,14 @@ async function isDir(p: string): Promise<boolean> {
 }
 
 // ── sync ───────────────────────────────────────────────────────────────
+//
+// Skills install under a `fulcrum/` subfolder in each agent's skills directory:
+//   ~/.claude/skills/fulcrum/<name>/SKILL.md   etc.
+// This sets up the `fulcrum:<skill-name>` invocation pattern that aligns with how
+// plugin/extension systems namespace third-party content. When we ship plugins
+// or extensions later, the path layout already matches the prefixing convention.
+
+const NAMESPACE = "fulcrum";
 
 const TARGETS: Array<{ path: string; label: string }> = [
   { path: `${process.env["HOME"]}/.claude/skills`,           label: "Claude Code" },
@@ -70,17 +79,19 @@ async function cmdSync(): Promise<void> {
       console.log(`· skip ${t.label} (parent dir not present)`);
       continue;
     }
-    console.log(`→ ${t.label} (${t.path})`);
-    await mkdir(t.path, { recursive: true });
+    const nsPath = `${t.path}/${NAMESPACE}`;
+    console.log(`→ ${t.label} (${nsPath})`);
+    await mkdir(nsPath, { recursive: true });
     for (const name of skills) {
-      const dst = `${t.path}/${name}`;
+      const dst = `${nsPath}/${name}`;
       await copyTree(`${skillsSrc}/${name}`, dst);
-      console.log(`    ${name}`);
+      console.log(`    ${NAMESPACE}/${name}`);
     }
     console.log();
   }
 
-  // Gemini wrapping.
+  // Gemini's extension manifest already namespaces under "fulcrum-skills",
+  // which serves the same role as the `fulcrum/` subfolder for the other agents.
   const gemRoot = `${process.env["HOME"]}/.gemini`;
   if (await exists(gemRoot)) {
     const ext = `${gemRoot}/extensions/fulcrum-skills`;
@@ -127,6 +138,9 @@ function parseFrontmatter(text: string): Record<string, string> | null {
   return out;
 }
 
+// Required H2 section headings, in order. Mirrors skills/_template/SKILL.md.
+const REQUIRED_SECTIONS = ["When to use", "Invocation", "Patterns", "Anti-patterns", "Cross-refs"];
+
 async function lintOne(file: string): Promise<LintResult> {
   const issues: LintIssue[] = [];
   const dir = basename(dirname(file));
@@ -153,6 +167,23 @@ async function lintOne(file: string): Promise<LintResult> {
   else {
     if (desc.length > 1024) issues.push({ msg: `description length ${desc.length} exceeds 1024` });
     if (/<[a-zA-Z/]/.test(desc)) issues.push({ msg: "description contains XML-like tags" });
+  }
+
+  // Body section structure. Headings at H2 only (skip H1 title and H3 sub-sections).
+  const body = text.replace(/^---\r?\n[\s\S]*?\r?\n---/, "");
+  const headings: string[] = [];
+  for (const line of body.split(/\r?\n/)) {
+    const m = line.match(/^##\s+(.+?)\s*$/);
+    if (m && m[1]) headings.push(m[1]);
+  }
+  let cursor = 0;
+  for (const required of REQUIRED_SECTIONS) {
+    const idx = headings.indexOf(required, cursor);
+    if (idx < 0) {
+      issues.push({ msg: `missing or out-of-order H2 section '## ${required}' (expected after position ${cursor})` });
+      break;
+    }
+    cursor = idx + 1;
   }
 
   return { file, ok: issues.length === 0, issues, name: name ?? "", descLen: desc?.length ?? 0 };
@@ -191,11 +222,53 @@ async function cmdLint(target: string | undefined): Promise<void> {
   if (bad > 0) process.exit(1);
 }
 
+// ── list ───────────────────────────────────────────────────────────────
+
+async function cmdList(): Promise<void> {
+  const root = repoRoot();
+  const skillsSrc = `${root}/skills`;
+  const evalsSrc = `${root}/evals`;
+  if (!(await isDir(skillsSrc))) {
+    console.error(`fulcrum skills list: ${skillsSrc} not found.`);
+    process.exit(1);
+  }
+
+  const rows: Array<{ name: string; descLen: number; descPreview: string; evalEntries: number | null }> = [];
+  for (const entry of await readdir(skillsSrc, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name === "_template") continue;
+    const skillPath = `${skillsSrc}/${entry.name}/SKILL.md`;
+    if (!(await exists(skillPath))) continue;
+    const text = await readFile(skillPath, "utf8");
+    const fm = parseFrontmatter(text) ?? {};
+    const desc = fm["description"] ?? "";
+    const descPreview = desc.replace(/\s+/g, " ").slice(0, 80);
+
+    let evalEntries: number | null = null;
+    const evalPath = `${evalsSrc}/${entry.name}.json`;
+    if (await exists(evalPath)) {
+      try {
+        const arr = JSON.parse(await readFile(evalPath, "utf8")) as unknown[];
+        if (Array.isArray(arr)) evalEntries = arr.length;
+      } catch { /* malformed; report 0 */ evalEntries = 0; }
+    }
+    rows.push({ name: entry.name, descLen: desc.length, descPreview, evalEntries });
+  }
+
+  rows.sort((a, b) => a.name.localeCompare(b.name));
+  const nameWidth = Math.max(4, ...rows.map((r) => r.name.length));
+  console.log(`${rows.length} authored skills in ${skillsSrc}:\n`);
+  for (const r of rows) {
+    const evalCol = r.evalEntries === null ? "no eval" : `${r.evalEntries} eval entries`;
+    console.log(`  ${r.name.padEnd(nameWidth)}  ${evalCol.padEnd(16)}  ${r.descPreview}…`);
+  }
+}
+
 export async function run(args: string[]): Promise<void> {
   const sub = args[0] ?? "sync";
   switch (sub) {
     case "sync":  return cmdSync();
     case "lint":  return cmdLint(args[1]);
+    case "list":  return cmdList();
     default:
       console.error(`fulcrum skills: unknown subcommand '${sub}'`);
       process.exit(2);

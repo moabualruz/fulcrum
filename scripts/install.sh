@@ -5,10 +5,12 @@
 #   1. Detects platform (darwin/linux × arm64/x64; windows handled separately).
 #   2. Resolves the fulcrum binary:
 #        a. If FULCRUM_BIN is set, uses that.
-#        b. Else if a prebuilt binary exists at dist/fulcrum-<os>-<arch>, uses it.
-#        c. Else if `bun` is on PATH and we're inside a clone, builds from source.
-#        d. Else: prints clear instructions and exits 1.
-#      (Future: a 'release' branch fetches from GitHub Releases.)
+#        b. Else if FULCRUM_RELEASE_TAG is set, fetches the prebuilt asset from
+#           https://github.com/moabualruz/fulcrum/releases/download/<tag>/fulcrum-<plat>
+#           via curl. Use this when you don't have a clone.
+#        c. Else if a prebuilt binary exists at dist/fulcrum-<os>-<arch>, uses it.
+#        d. Else if `bun` is on PATH and we're inside a clone, builds from source.
+#        e. Else: prints clear instructions and exits 1.
 #   3. Installs the binary to ~/.fulcrum/bin/fulcrum and (if possible) symlinks
 #      to ~/.local/bin/fulcrum.
 #   4. Delegates the rest to `fulcrum install` — sentinel-block rules splice,
@@ -52,6 +54,22 @@ echo "fulcrum bootstrap — platform: $plat"
 if [ -n "${FULCRUM_BIN:-}" ] && [ -x "$FULCRUM_BIN" ]; then
   src_bin="$FULCRUM_BIN"
   echo "  using FULCRUM_BIN=$src_bin"
+elif [ -n "${FULCRUM_RELEASE_TAG:-}" ]; then
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "fulcrum: FULCRUM_RELEASE_TAG set but curl is not on PATH" >&2
+    exit 1
+  fi
+  asset="fulcrum-$plat"
+  url="https://github.com/moabualruz/fulcrum/releases/download/$FULCRUM_RELEASE_TAG/$asset"
+  echo "  fetching prebuilt: $url"
+  tmp="$(mktemp -t fulcrum.XXXXXX)"
+  if ! curl -fSL --retry 3 -o "$tmp" "$url"; then
+    rm -f "$tmp"
+    echo "fulcrum: failed to download $url" >&2
+    exit 1
+  fi
+  chmod +x "$tmp"
+  src_bin="$tmp"
 elif [ -x "$REPO_DIR/dist/fulcrum-$plat" ]; then
   src_bin="$REPO_DIR/dist/fulcrum-$plat"
   echo "  using prebuilt: $src_bin"
@@ -66,10 +84,11 @@ else
   cat >&2 <<EOF
 fulcrum: cannot resolve a binary.
 
-Either:
-  - install Bun and re-run:  curl -fsSL https://bun.sh/install | bash
-  - set FULCRUM_BIN=/path/to/fulcrum and re-run
-  - drop a prebuilt binary at $REPO_DIR/dist/fulcrum-$plat
+Options (any one):
+  - install Bun + clone the repo:  curl -fsSL https://bun.sh/install | bash
+  - fetch a published release:     FULCRUM_RELEASE_TAG=v0.1.0 bash scripts/install.sh
+  - point at a prebuilt:           FULCRUM_BIN=/path/to/fulcrum bash scripts/install.sh
+  - drop a prebuilt at:            $REPO_DIR/dist/fulcrum-$plat
 EOF
   exit 1
 fi
