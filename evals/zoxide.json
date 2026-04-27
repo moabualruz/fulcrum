@@ -1,0 +1,22 @@
+[
+  {"query": "How do I jump to my fulcrum project directory by typing one word in the terminal?", "should_trigger": true},
+  {"query": "I want a smarter cd that learns my frequently visited folders — what should I install?", "should_trigger": true},
+  {"query": "Cd to a project I've used recently by partial name from anywhere in the shell.", "should_trigger": true},
+  {"query": "How do I navigate to a frequently visited folder fast without typing the full path?", "should_trigger": true},
+  {"query": "What is frecency-based directory navigation and how do I set it up?", "should_trigger": true},
+  {"query": "I'm migrating off autojump — what's the modern replacement and how do I import my db?", "should_trigger": true},
+  {"query": "My `z` command isn't working in a bash script — how do I look up a directory programmatically?", "should_trigger": true},
+  {"query": "How can I rebind the directory-jumping command to `j` instead of `z`?", "should_trigger": true},
+  {"query": "Show me the ranked list of directories that match a partial name without changing into one.", "should_trigger": true},
+  {"query": "How do I manually add a path to my directory-jumping database?", "should_trigger": true},
+  {"query": "Why does `z foo` say nothing matches on a brand-new shell install?", "should_trigger": true},
+  {"query": "How do I find a file by name across the repo from the command line?", "should_trigger": false},
+  {"query": "List the contents of the current directory with git status.", "should_trigger": false},
+  {"query": "Search through my bash history for a previous command I ran.", "should_trigger": false},
+  {"query": "Open the current folder in Finder from the terminal.", "should_trigger": false},
+  {"query": "Set the working directory at the top of a deploy script.", "should_trigger": false},
+  {"query": "How do I view a config file in the terminal with syntax highlighting?", "should_trigger": false},
+  {"query": "Pick an item from a list interactively in the shell.", "should_trigger": false},
+  {"query": "How do I follow a log file in real time?", "should_trigger": false},
+  {"query": "Show all symlinks under a directory tree.", "should_trigger": false}
+]

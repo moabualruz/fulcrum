@@ -1,0 +1,23 @@
+[
+  {"query": "Format this TypeScript file in place — fix indentation and quote style.", "should_trigger": true},
+  {"query": "I want one tool that replaces both prettier and eslint for our JS project.", "should_trigger": true},
+  {"query": "Lint a JavaScript file and apply safe autofixes.", "should_trigger": true},
+  {"query": "Format a JSON config file with two-space indent.", "should_trigger": true},
+  {"query": "Fix code style across every .ts and .tsx file under src/.", "should_trigger": true},
+  {"query": "Run a JS linter on the staged files in this commit and report problems as JSON.", "should_trigger": true},
+  {"query": "Migrate our existing .prettierrc and .eslintrc into a single config file.", "should_trigger": true},
+  {"query": "Set up a CI step that fails the build if any TypeScript file is unformatted or has lint warnings.", "should_trigger": true},
+  {"query": "Format a JSX component and an MDX-style markdown doc with the same tool.", "should_trigger": true},
+  {"query": "Apply both lint fixes and formatter changes to this React project in one command.", "should_trigger": true},
+  {"query": "Lint and format a CSS stylesheet with one binary instead of stylelint plus prettier.", "should_trigger": true},
+  {"query": "Generate a JSON report of style diagnostics on a TypeScript repo so I can pipe it to jq.", "should_trigger": true},
+  {"query": "Write a pre-commit hook that auto-fixes JavaScript style on staged files.", "should_trigger": true},
+  {"query": "Format a Python script with the standard Python formatter.", "should_trigger": false},
+  {"query": "Lint a Rust file and apply suggested fixes.", "should_trigger": false},
+  {"query": "Type-check a TypeScript project to catch assignability errors.", "should_trigger": false},
+  {"query": "Format a YAML CI workflow file.", "should_trigger": false},
+  {"query": "Lint a Vue single-file component.", "should_trigger": false},
+  {"query": "Format a Svelte component file with the right tool.", "should_trigger": false},
+  {"query": "Run a Go formatter across the repo.", "should_trigger": false},
+  {"query": "Format an Astro page so the script and template are tidied.", "should_trigger": false}
+]

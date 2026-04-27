@@ -1,0 +1,22 @@
+[
+  {"query": "List the files in this directory and show the git status of each one in a column.", "should_trigger": true},
+  {"query": "Give me a tree view of this project two levels deep on the command line.", "should_trigger": true},
+  {"query": "I want a directory listing that ignores files matched by .gitignore.", "should_trigger": true},
+  {"query": "Show file sizes in this folder in a human-readable form like K and M.", "should_trigger": true},
+  {"query": "Long-format listing with owner, permissions, and ISO timestamps in the terminal.", "should_trigger": true},
+  {"query": "List directory contents with Nerd Font icons next to each filename.", "should_trigger": true},
+  {"query": "Sort files by most recently modified, newest first, with full metadata.", "should_trigger": true},
+  {"query": "I want a colorful ls replacement that puts directories before files.", "should_trigger": true},
+  {"query": "Show a tree of this folder but skip everything in .gitignore.", "should_trigger": true},
+  {"query": "Print recursive total size for each directory in a long listing.", "should_trigger": true},
+  {"query": "Show column headers above a long file listing in the shell.", "should_trigger": true},
+  {"query": "Find every file named `package.json` recursively under this repo.", "should_trigger": false},
+  {"query": "Search inside files for the string `TODO` across the repo.", "should_trigger": false},
+  {"query": "Show the dependency tree of installed npm packages.", "should_trigger": false},
+  {"query": "Show disk usage by directory, biggest first.", "should_trigger": false},
+  {"query": "List the files inside a zip archive without extracting it.", "should_trigger": false},
+  {"query": "Open a file in a syntax-highlighted pager.", "should_trigger": false},
+  {"query": "Find files modified in the last 24 hours by name pattern.", "should_trigger": false},
+  {"query": "Search a tar.gz archive for a specific filename.", "should_trigger": false},
+  {"query": "Show which lines in a Python file contain a regex match.", "should_trigger": false}
+]

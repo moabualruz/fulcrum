@@ -1,0 +1,22 @@
+[
+  {"query": "I want my tests to rerun automatically every time I save a source file — what's the cleanest way?", "should_trigger": true},
+  {"query": "How do I auto-rebuild this Rust project whenever I edit a .rs file?", "should_trigger": true},
+  {"query": "Watch the src directory and re-run the linter on every edit.", "should_trigger": true},
+  {"query": "Set up a dev loop that restarts my Bun server whenever a TypeScript file changes.", "should_trigger": true},
+  {"query": "Auto-run pytest whenever any .py file under tests/ changes.", "should_trigger": true},
+  {"query": "I want to trigger a build script every time files in this folder change.", "should_trigger": true},
+  {"query": "How do I rerun `cargo test` on save without setting up cargo-watch?", "should_trigger": true},
+  {"query": "Watch a directory and run a shell command when anything in it is modified.", "should_trigger": true},
+  {"query": "Need to clear the screen and rerun typecheck every time I save a TS file.", "should_trigger": true},
+  {"query": "Re-execute this script automatically whenever the input JSON file is overwritten.", "should_trigger": true},
+  {"query": "Rebuild my project on save with a 500ms debounce so editor write-bursts don't spam runs.", "should_trigger": true},
+  {"query": "Run my test suite one time and report the result.", "should_trigger": false},
+  {"query": "Schedule a database backup to run every night at 2am.", "should_trigger": false},
+  {"query": "Tail the application log file and show me new lines as they arrive.", "should_trigger": false},
+  {"query": "Set up a CI build that runs on every push to main.", "should_trigger": false},
+  {"query": "How do I write a cron job that emails me when disk is full?", "should_trigger": false},
+  {"query": "Monitor system CPU usage and alert me when it crosses 80%.", "should_trigger": false},
+  {"query": "Compile this single C file with gcc and run it once.", "should_trigger": false},
+  {"query": "Install npm dependencies for this project.", "should_trigger": false},
+  {"query": "Open the latest entry in my changelog file.", "should_trigger": false}
+]

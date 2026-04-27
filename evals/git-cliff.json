@@ -1,0 +1,22 @@
+[
+  {"query": "Generate a changelog from the conventional commits in this repo.", "should_trigger": true},
+  {"query": "Create release notes from git history before I tag the next version.", "should_trigger": true},
+  {"query": "Update CHANGELOG.md before release — we're cutting v0.4 today.", "should_trigger": true},
+  {"query": "Produce release notes from the last 20 commits.", "should_trigger": true},
+  {"query": "Generate a changelog before tagging v0.2.", "should_trigger": true},
+  {"query": "Summarize all commits between v1.0 and HEAD into a changelog.", "should_trigger": true},
+  {"query": "Update CHANGELOG.md with the unreleased section.", "should_trigger": true},
+  {"query": "Summarize commits since the last tag in changelog form.", "should_trigger": true},
+  {"query": "What changed since v1.2.0? Group by feature/fix and write it to CHANGELOG.md.", "should_trigger": true},
+  {"query": "Bump the version automatically based on the conventional commits and write the changelog.", "should_trigger": true},
+  {"query": "Add a parser to cliff.toml so docs commits show up under Documentation.", "should_trigger": true},
+  {"query": "Prepend the new release section to the existing CHANGELOG without regenerating history.", "should_trigger": true},
+  {"query": "Show me git log since main.", "should_trigger": false},
+  {"query": "Open a GitHub release in the browser.", "should_trigger": false},
+  {"query": "List contributors with git shortlog.", "should_trigger": false},
+  {"query": "Write a manual release announcement post for the blog.", "should_trigger": false},
+  {"query": "Run gh release create for v1.0.", "should_trigger": false},
+  {"query": "Lint commit messages so they follow conventional commits going forward.", "should_trigger": false},
+  {"query": "Tag the current commit as v1.2.0.", "should_trigger": false},
+  {"query": "Show the diff between two tags.", "should_trigger": false}
+]

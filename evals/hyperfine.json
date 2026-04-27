@@ -1,0 +1,22 @@
+[
+  {"query": "Benchmark whether ripgrep is faster than grep on this corpus.", "should_trigger": true},
+  {"query": "Measure the runtime regression after this refactor — old binary vs new binary.", "should_trigger": true},
+  {"query": "Compare two shell commands' speed with proper statistics, not just one `time` run.", "should_trigger": true},
+  {"query": "Run a CLI benchmark with warmup runs and export JSON for later analysis.", "should_trigger": true},
+  {"query": "Is the new sort implementation actually faster? I want mean and stddev, not eyeballing.", "should_trigger": true},
+  {"query": "Sweep thread counts 1, 2, 4, 8 and chart how this command scales.", "should_trigger": true},
+  {"query": "Time this build script across ten runs and tell me the median.", "should_trigger": true},
+  {"query": "I need to compare a Python script against a Rust rewrite at the command line.", "should_trigger": true},
+  {"query": "Measure cold-cache vs warm-cache read time for this file-processing tool.", "should_trigger": true},
+  {"query": "Export a markdown table comparing the runtime of three CLI tools.", "should_trigger": true},
+  {"query": "How do I measure performance regression of a binary between two git commits?", "should_trigger": true},
+  {"query": "Compare the speed of `xz` vs `zstd` compressing this 1GB file with warmup.", "should_trigger": true},
+  {"query": "Profile a slow function inside a Python program to find the hot loop.", "should_trigger": false},
+  {"query": "Run cargo bench on this Rust crate's microbenchmarks.", "should_trigger": false},
+  {"query": "Set up CI for tracking performance over time across PRs.", "should_trigger": false},
+  {"query": "Measure the peak memory usage of a long-running process.", "should_trigger": false},
+  {"query": "Trace the syscalls a process makes to debug an EACCES error.", "should_trigger": false},
+  {"query": "Generate a flamegraph showing where my web server spends its CPU time.", "should_trigger": false},
+  {"query": "Use pytest-benchmark to time individual functions in my test suite.", "should_trigger": false},
+  {"query": "Benchmark a single SQL query inside Postgres with EXPLAIN ANALYZE.", "should_trigger": false}
+]

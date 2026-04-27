@@ -1,0 +1,22 @@
+[
+  {"query": "Fix style issues in this Python file and remove unused imports.", "should_trigger": true},
+  {"query": "Format these python sources to a consistent style.", "should_trigger": true},
+  {"query": "Lint a python module for undefined names and dead code.", "should_trigger": true},
+  {"query": "Show me what would change before reformatting these python files — don't write anything yet.", "should_trigger": true},
+  {"query": "I want to replace flake8, black, and isort with one tool in my Python project.", "should_trigger": true},
+  {"query": "Auto-sort the imports in this Python package.", "should_trigger": true},
+  {"query": "Configure pyproject.toml so my Python codebase has a 100-character line length and ignores E501 in tests.", "should_trigger": true},
+  {"query": "Run a python linter in CI mode that fails the build if any file needs reformatting.", "should_trigger": true},
+  {"query": "Apply only safe autofixes to my Python sources, then show me the diff of unsafe fixes.", "should_trigger": true},
+  {"query": "Pyupgrade my Python code to use modern syntax for Python 3.12.", "should_trigger": true},
+  {"query": "I get JSON output from a python linter and want to count findings by rule code.", "should_trigger": true},
+  {"query": "Add a pre-commit step that lints and formats Python before each commit.", "should_trigger": true},
+  {"query": "Format JavaScript files with prettier.", "should_trigger": false},
+  {"query": "Lint a Go file for unused variables.", "should_trigger": false},
+  {"query": "Run mypy to type-check my Python project.", "should_trigger": false},
+  {"query": "Lint a Rust file with clippy.", "should_trigger": false},
+  {"query": "Type-check a Python codebase with pyright.", "should_trigger": false},
+  {"query": "Format a YAML file with consistent indentation.", "should_trigger": false},
+  {"query": "Run pytest against my Python test suite.", "should_trigger": false},
+  {"query": "Scan Python dependencies for known CVEs.", "should_trigger": false}
+]

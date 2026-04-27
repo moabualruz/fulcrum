@@ -1,0 +1,23 @@
+[
+  {"query": "Find any null-pointer dereference bugs in this compiled Java jar.", "should_trigger": true},
+  {"query": "Audit the build output of our Java service for concurrency bugs before release.", "should_trigger": true},
+  {"query": "Run a bytecode static analyzer on target/myapp.jar and produce a report.", "should_trigger": true},
+  {"query": "Produce a SARIF report from a Java jar so I can upload it to GitHub Code Scanning.", "should_trigger": true},
+  {"query": "We're still using findbugs in our pipeline — what's the modern replacement?", "should_trigger": true},
+  {"query": "Generate an HTML bug report for the compiled classes under build/classes.", "should_trigger": true},
+  {"query": "Add the find-sec-bugs plugin to our Java static analysis to catch SQL injection and weak crypto in compiled code.", "should_trigger": true},
+  {"query": "Set up a CI gate that fails the build when high-confidence correctness bugs land in the jar.", "should_trigger": true},
+  {"query": "How do I suppress a specific spotbugs rule on one method without disabling it globally?", "should_trigger": true},
+  {"query": "Tune the effort level so PR scans are fast but nightly catches deeper issues in the build artifact.", "should_trigger": true},
+  {"query": "Write an exclude filter XML so generated classes aren't reported as buggy.", "should_trigger": true},
+  {"query": "Detect potential infinite recursion or unclosed streams in our compiled Java application.", "should_trigger": true},
+  {"query": "Format this Java source file according to the Google Java style guide.", "should_trigger": false},
+  {"query": "Find code smells and structural issues in our Java source tree.", "should_trigger": false},
+  {"query": "Lint a Kotlin codebase against the official Kotlin coding conventions.", "should_trigger": false},
+  {"query": "Scan our Maven dependencies for known CVEs.", "should_trigger": false},
+  {"query": "Audit a Docker image for vulnerabilities before publishing.", "should_trigger": false},
+  {"query": "Check our package-lock.json for outdated dependencies.", "should_trigger": false},
+  {"query": "Run cyclomatic complexity analysis across our Java source files.", "should_trigger": false},
+  {"query": "Format Python code with Black.", "should_trigger": false},
+  {"query": "Find duplicated code blocks across the repo.", "should_trigger": false}
+]

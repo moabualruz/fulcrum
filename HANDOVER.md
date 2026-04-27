@@ -9,7 +9,11 @@ This session worked the P2 backlog and shipped most of it. Net change since `991
 **Added**
 - `scripts/ci.ts` + `bun run ci` — local CI gate (install → tsc → test → build:all → skills lint). User opted out of GitHub Actions.
 - 7 new hook test files in `src/hooks/*.test.ts` — `pm-policy`, `format`, `test-on-edit`, `audit-log`, `index-rebuild`, `index-check`, `lint-gate`. Test count went from **8 → 38**, all green.
-- 4 new skills shipped: `gh` (8 patterns, 20-entry eval), `fzf` non-interactive (7 patterns, 20-entry eval), `just` (7 patterns, 20-entry eval), `xh` (7 patterns, 20-entry eval). Total: **5 of ~25** authored.
+- 27 new skills shipped (jq was already done; total now **28 of ~25** — queue cleared). Each follows the jq template: ≥7 patterns + ≥7 anti-patterns + a ~20-entry trigger eval with ≥30% negatives. Authoring done in 4 parallel batches:
+  - Batch 1 (4): `gh`, `fzf` (non-interactive), `just`, `xh`
+  - Batch 2 (6): `ruff`, `biome`, `gitleaks`, `watchexec`, `hyperfine`, `git-cliff`
+  - Batch 3 (8): `direnv`, `mise`, `difftastic`, `bat`, `eza`, `sd`, `zoxide`, `lizard`
+  - Batch 4 (9): `yq`, `ktlint`, `google-java-format`, `pmd`, `spotbugs`, `dart-toolchain`, `osv-scanner`, `flarectl`, `usql`
 - `fulcrum doctor` subcommand (`src/cli/doctor.ts`) — bun version, agent dirs detection (rules-spliced check), 22 tool checks with hook-by-hook fail-open notes, policy file health, skill count.
 - `LICENSE` (MIT).
 - `cliff.toml` + `CHANGELOG.md` stub + `bun run changelog` script. git-cliff itself is not installed; cliff.toml is wired so a single `brew install git-cliff && bun run changelog` populates the file.
@@ -33,9 +37,10 @@ This session worked the P2 backlog and shipped most of it. Net change since `991
 **Test scope note:** Hook tests spawn `bun src/index.ts hook ...` directly — they exercise the TypeScript source, not the cross-compiled binaries. Same property as the original router test.
 
 **Still outstanding (P3 / low priority)**
-- Release pipeline (no auto-actions allowed; could be a local `scripts/release.ts` later).
+- Local release script (`scripts/release.ts`) — no GitHub actions allowed; would tag → build:all → tarball → optionally call `gh release create`.
 - README Rosetta hint, `bunfig.toml` lockfile assert.
-- 20+ skills in the long tail (`ruff`, `biome`, `gitleaks`, `watchexec`, `hyperfine`, `direnv`, `mise`, `git-cliff`, `bat`, `eza`, `sd`, `zoxide`, `lizard`, JVM stack, etc.).
+- Trigger-rate evals for the 27 newly-shipped skills (Claude-Code-only via `scripts/eval-skill-claude.sh`; needs Python 3.10+ and `ANTHROPIC_API_KEY`). Lint passes for all; trigger rates not yet measured.
+- Manual cross-agent smoke for the 27 new skills per `docs/skill-smoke-test.md` (only Claude Code can be auto-eval'd).
 
 Original audit follows below — kept as the historical record.
 

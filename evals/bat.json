@@ -1,0 +1,20 @@
+[
+  {"query": "Show me a json config with syntax colors in the terminal.", "should_trigger": true},
+  {"query": "View a python file with line numbers in the terminal.", "should_trigger": true},
+  {"query": "Print a yaml file with highlighting so I can read it.", "should_trigger": true},
+  {"query": "Cat this Rust source but with colors.", "should_trigger": true},
+  {"query": "Pipe kubectl get -o yaml output to something that highlights it.", "should_trigger": true},
+  {"query": "I want a syntax-aware diff between two TypeScript files at the shell.", "should_trigger": true},
+  {"query": "Preview lines 40 to 80 of a Go file with syntax highlighting.", "should_trigger": true},
+  {"query": "Print this Dockerfile to the terminal with colors and line numbers.", "should_trigger": true},
+  {"query": "Render piped JSON in the terminal with colors but without a pager.", "should_trigger": true},
+  {"query": "Show a markdown file in the terminal with syntax styling.", "should_trigger": true},
+  {"query": "Pretty-print a config file with line numbers from the command line.", "should_trigger": true},
+  {"query": "Concatenate three text files into one combined file.", "should_trigger": false},
+  {"query": "Tail a log file live as new lines arrive.", "should_trigger": false},
+  {"query": "View a binary file as a hex dump.", "should_trigger": false},
+  {"query": "Open a file in vim to edit it.", "should_trigger": false},
+  {"query": "Search file contents for the word 'TODO' across the repo.", "should_trigger": false},
+  {"query": "Count the lines in a text file.", "should_trigger": false},
+  {"query": "Page through a 2GB log file efficiently.", "should_trigger": false}
+]
