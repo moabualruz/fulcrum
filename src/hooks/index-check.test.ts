@@ -1,0 +1,85 @@
+// Tests for the index-check hook — warns on missing/stale ctags + graphify-out.
+
+import { describe, expect, test, beforeAll, afterAll } from "bun:test";
+import { mkdtemp, rm, writeFile, mkdir, utimes, unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+
+let TMP: string;
+const FULCRUM_REPO = resolve(import.meta.dir, "../..");
+
+beforeAll(async () => {
+  TMP = await mkdtemp(join(tmpdir(), "fulcrum-idx-check-"));
+});
+
+afterAll(async () => {
+  await rm(TMP, { recursive: true, force: true });
+});
+
+async function reset() {
+  for (const p of ["tags", "graphify-out"]) {
+    const full = join(TMP, p);
+    if (existsSync(full)) {
+      try { await rm(full, { recursive: true, force: true }); } catch {}
+      try { await unlink(full); } catch {}
+    }
+  }
+}
+
+async function runIdxCheck(): Promise<{ stdout: string; exit: number; stderr: string }> {
+  const stdinFile = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
+  await Bun.write(stdinFile, "{}");
+  const proc = Bun.spawn(["bun", join(FULCRUM_REPO, "src/index.ts"), "hook", "index-check"], {
+    stdin: Bun.file(stdinFile),
+    stdout: "pipe",
+    stderr: "pipe",
+    cwd: TMP,
+    env: { ...process.env, HOME: TMP, CLAUDE_PROJECT_DIR: TMP },
+  });
+  const stdout = await new Response(proc.stdout).text();
+  const stderr = await new Response(proc.stderr).text();
+  const exit = await proc.exited;
+  return { stdout, exit, stderr };
+}
+
+describe("index-check", () => {
+  test("no tags file in cwd → stdout contains 'No ctags index'", async () => {
+    await reset();
+    const r = await runIdxCheck();
+    expect(r.exit).toBe(0);
+    expect(r.stdout).toContain("No ctags index");
+  });
+
+  test("no graphify-out dir in cwd → stdout contains 'No graphify graph'", async () => {
+    await reset();
+    const r = await runIdxCheck();
+    expect(r.exit).toBe(0);
+    expect(r.stdout).toContain("No graphify graph");
+  });
+
+  test("fresh tags + graphify-out dir → both warnings suppressed, no output", async () => {
+    await reset();
+    await writeFile(join(TMP, "tags"), "");
+    await mkdir(join(TMP, "graphify-out"), { recursive: true });
+    const r = await runIdxCheck();
+    expect(r.exit).toBe(0);
+    expect(r.stdout).not.toContain("ctags index is");
+    expect(r.stdout).not.toContain("No ctags index");
+    expect(r.stdout).not.toContain("No graphify graph");
+    expect(r.stdout.trim()).toBe("");
+  });
+
+  test("stale tags file (mtime 2h old) → stdout contains 'ctags index is' and 'min old'", async () => {
+    await reset();
+    const tagsPath = join(TMP, "tags");
+    await writeFile(tagsPath, "");
+    await mkdir(join(TMP, "graphify-out"), { recursive: true });
+    const old = new Date(Date.now() - 2 * 3600 * 1000);
+    await utimes(tagsPath, old, old);
+    const r = await runIdxCheck();
+    expect(r.exit).toBe(0);
+    expect(r.stdout).toContain("ctags index is");
+    expect(r.stdout).toContain("min old");
+  });
+});

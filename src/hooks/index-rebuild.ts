@@ -34,6 +34,13 @@ export async function runHook(): Promise<void> {
     tasks.push(run(["repomix", "--compress", "-o", `${tmpdir()}/${slug}.xml`]));
   }
 
-  await Promise.allSettled(tasks);
+  const results = await Promise.allSettled(tasks);
+  if (process.env["FULCRUM_DEBUG"]) {
+    for (const r of results) {
+      if (r.status === "rejected") {
+        process.stderr.write(`[index-rebuild] task failed: ${String(r.reason)}\n`);
+      }
+    }
+  }
   await Bun.write(shaFile, currSha);
 }

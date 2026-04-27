@@ -1,0 +1,22 @@
+[
+  {"query": "What tasks does this repo expose at the command line? It has a justfile at the root.", "should_trigger": true},
+  {"query": "Run the build recipe with the argument 'release'.", "should_trigger": true},
+  {"query": "List all the project tasks I can run.", "should_trigger": true},
+  {"query": "Show me the body of the deploy recipe before executing it.", "should_trigger": true},
+  {"query": "This repo has a Justfile — how do I run the lint task?", "should_trigger": true},
+  {"query": "I'm in a subdirectory of a project that uses just — how do I run a task from up the tree?", "should_trigger": true},
+  {"query": "How do I pass a parameter to a recipe in a justfile?", "should_trigger": true},
+  {"query": "What's the modern Makefile alternative this repo seems to be using?", "should_trigger": true},
+  {"query": "How do I see all the variables a justfile defines and their resolved values?", "should_trigger": true},
+  {"query": "Override a variable defined in the justfile from the command line when running a recipe.", "should_trigger": true},
+  {"query": "Run the test recipe and then the build recipe, fail fast if either errors.", "should_trigger": true},
+  {"query": "How do I make a recipe depend on another recipe so it always runs first?", "should_trigger": true},
+  {"query": "Run the makefile target build using make.", "should_trigger": false},
+  {"query": "Run the npm script called dev.", "should_trigger": false},
+  {"query": "List all npm scripts defined in package.json.", "should_trigger": false},
+  {"query": "Execute a shell script located at scripts/release.sh.", "should_trigger": false},
+  {"query": "Run a Python module from the command line with python -m.", "should_trigger": false},
+  {"query": "Run a cargo task like cargo test --release.", "should_trigger": false},
+  {"query": "What does the Taskfile.yml in this repo expose? I want to run a task with `task`.", "should_trigger": false},
+  {"query": "Run a gradle task in this Java project.", "should_trigger": false}
+]

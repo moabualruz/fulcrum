@@ -1,0 +1,22 @@
+[
+  {"query": "I have a list of git branch names — rank them by similarity to the word 'auth' from the command line.", "should_trigger": true},
+  {"query": "From a TSV of pull requests, find the entries whose title best matches 'bugfix' without an interactive picker.", "should_trigger": true},
+  {"query": "Pipe a list of file paths in and get the closest fuzzy match to 'utils' as a single line back.", "should_trigger": true},
+  {"query": "I have candidate strings in a file and want a non-interactive fuzzy ranking by similarity to a query, top 5 only.", "should_trigger": true},
+  {"query": "Take the JSON output of `gh pr list` and rank PRs by title similarity to 'flaky' in a shell script.", "should_trigger": true},
+  {"query": "Score a list of kubectl pod names against a query string and pick the best match in a non-interactive way.", "should_trigger": true},
+  {"query": "Given a TSV stream where column 2 is the searchable label, rank rows by fuzzy match against 'web' and keep the original ID column.", "should_trigger": true},
+  {"query": "I have an already time-sorted git log and want to fuzzy-filter it by 'refactor' without re-sorting.", "should_trigger": true},
+  {"query": "Find the closest matching filename to 'config' from a list piped in over stdin, in a script.", "should_trigger": true},
+  {"query": "Rank candidate strings, breaking ties by which match is shorter, from a non-interactive shell command.", "should_trigger": true},
+  {"query": "I want batch fuzzy ranking — give me the top hits for a query against this candidate list inside a pipeline.", "should_trigger": true},
+  {"query": "Search every .go file in the repo for the regex `func main`.", "should_trigger": false},
+  {"query": "Use ag or ack to find a regular expression across a project tree.", "should_trigger": false},
+  {"query": "I need exact substring matching across a list — order doesn't matter, just keep the lines that contain the literal word.", "should_trigger": false},
+  {"query": "Open an interactive file picker inside Vim to choose a file to edit.", "should_trigger": false},
+  {"query": "Use rg to find all tests that mention the word 'flaky' inside the repo.", "should_trigger": false},
+  {"query": "Find files whose name matches the glob `*.test.ts` under the src directory.", "should_trigger": false},
+  {"query": "Show me the lines in this log file that contain the literal IP `10.0.0.5`.", "should_trigger": false},
+  {"query": "Filter a CSV file by an exact value in column 3 from the command line.", "should_trigger": false},
+  {"query": "Open a TUI menu in the terminal to let me browse and pick a branch to check out.", "should_trigger": false}
+]

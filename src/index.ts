@@ -14,6 +14,7 @@ Usage:
   fulcrum skills lint <path>         Validate a SKILL.md frontmatter against all 5 agents.
   fulcrum install [--with-project DIR]
                                      Splice rules into agent files; vendor recipe pool.
+  fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
 
@@ -57,6 +58,11 @@ async function main() {
     case "install": {
       const { run: runInstall } = await import("./cli/install.ts");
       await runInstall(rest);
+      return;
+    }
+    case "doctor": {
+      const { run: runDoctor } = await import("./cli/doctor.ts");
+      await runDoctor(rest);
       return;
     }
     case "version":

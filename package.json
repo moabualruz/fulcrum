@@ -13,7 +13,9 @@
     "build": "bun build --compile --minify --target=bun-darwin-arm64 src/index.ts --outfile=dist/fulcrum-darwin-arm64",
     "build:all": "bun run scripts/build-all.ts",
     "test": "bun test",
-    "lint": "bun run --bun tsc --noEmit"
+    "lint": "bun run --bun tsc --noEmit",
+    "ci": "bun run scripts/ci.ts",
+    "changelog": "git-cliff -o CHANGELOG.md"
   },
   "engines": {
     "bun": ">=1.3.0"
