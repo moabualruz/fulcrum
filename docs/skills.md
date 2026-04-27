@@ -30,15 +30,9 @@ Install a skill to the agents that need it. If a skill is relevant to all agents
 
 > `repomix` skill: `repomix --skill-generate <name> --skill-output <agent-skills-path>/<name>` generates a SKILL.md from any packed output.
 
-## 3. Memory + task-management skills
+## 3. Adoption strategy — install one, cherry-pick the rest
 
-Custom skills live in [memory.md](memory.md) (`adr`, `wrap`, `promote`, `in-flight`, `postmortem`) and [tasks.md](tasks.md) (`plan-to-plane`). Skill name **equals** slash command — e.g. skill `adr` is invoked as `/adr`. All ship as `~/.claude/skills/<name>/SKILL.md` and are mirrored to other agents per the cross-agent install in [memory.md](memory.md).
-
-## 4. Adoption strategy — install one, cherry-pick the rest
-
-None of the existing skill frameworks (superpowers, mattpocock/skills, SpecKit, GSD) covers our memory/handover gaps end-to-end. They target *forward* work (planning, executing); memory work is *backward* (extracting, persisting, replaying).
-
-**Strategy: install one as the cross-agent distribution platform, cherry-pick skills and patterns from the others, build the remaining gaps custom.**
+**Strategy: install one as the cross-agent distribution platform, cherry-pick skills and patterns from the others.**
 
 ### Install: superpowers (obra/superpowers)
 
@@ -49,41 +43,22 @@ The only candidate with real, working cross-agent installers (`.claude-plugin/`,
 | Skill | Why |
 |---|---|
 | `brainstorming` | Structured exploration mode for the "process, not destination" problem |
-| `writing-plans` | Plan-doc generation that maps cleanly to Plane Pages |
-| `systematic-debugging` | General-purpose; orthogonal to memory |
+| `writing-plans` | Plan-doc generation |
+| `systematic-debugging` | General-purpose debugging methodology |
 | `code-review` | General-purpose |
 | `worktrees` | Parallel agent dispatch — relevant for multi-session orchestration |
 | `using-skills` | Meta-skill for skill authorship, used when writing custom skills |
 
 Skip the heavy TDD-orchestrator skills if they don't fit the project shape.
 
-### Cherry-pick from mattpocock/skills
-
-Don't install the repo. Copy these skills as **references** for our custom skills:
-
-| Skill | Use as reference for |
-|---|---|
-| `to-prd` | The conversation-extraction pattern — base shape for our Vibe ADR skill |
-| `to-issues` | Direct Plane integration — see [tasks.md](tasks.md) `plan-to-plane` |
-| `obsidian-vault` | Vault read/write conventions |
-| `triage-issue` | Plane issue triage workflow |
-
 ### Cherry-pick patterns from SpecKit
 
 Don't install. Borrow:
 - The **`AGENTS.md` + per-agent directory** convention (see [agents.md](agents.md)).
-- The **4-phase artifact lifecycle** (`spec → plan → tasks → implement`) as the structure for project-scoped Plane Pages.
 - The `constitution.md` concept maps to our per-project `AGENTS.md`.
 
-### Cherry-pick patterns from GSD
+## 4. Skill name policy
 
-Don't install. Borrow:
-- The **on-disk markdown handoff** between phase orchestrators — direct model for our Stop → SessionStart handoff via the vault.
-- The **`/gsd-forensics`** pattern — model for our post-mortem lesson-extraction skill.
-- The **context-rot mitigation principle**: persist state, let a fresh agent resume.
+**Skill name equals slash trigger.** Skill `<name>` → `/<name>`. The folder name, the `name:` field in frontmatter, and the slash command are all the same string.
 
-## 5. Skill name policy
-
-**Skill name equals slash trigger.** Skill `adr` → `/adr`, skill `wrap` → `/wrap`, etc. The folder name, the `name:` field in frontmatter, and the slash command are all the same string.
-
-**No prefix.** Use clean names (`adr`, not `fulcrum-adr`). Verified no current overlap with superpowers' 14 skills. Rename after the fact only if a future collision appears — premature namespacing harms ergonomics.
+**No prefix.** Use clean names. Rename after the fact only if a future collision appears — premature namespacing harms ergonomics.
