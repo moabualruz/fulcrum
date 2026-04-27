@@ -30,6 +30,7 @@ Skill files are sourced upstream; see `skills/SOURCES.md`. Hooks are in `docs/ho
 - `bat <file>` — when reading code for a human. Instead of `cat` for display. Why: line numbers + syntax = fewer "which line?" round-trips. Use plain `cat` only for piping.
 - `eza -l` / `eza --tree` — when listing a directory for orientation. Instead of `ls -la`, `tree`. Why: gitignore-aware, git-status column.
 - `z <fragment>` — when `cd`ing to a previously-visited path. Instead of typing the full path. Why: a wrong `cd` followed by a wrong relative path is a common source of "file not found" loops.
+- `fzf --filter <q>` — for non-interactive selection from a piped list. Instead of `grep -F` against a literal. Why: fuzzy match handles minor typos and ranks by relevance. Skip the interactive UI in agent shells (no TTY); always use `--filter` mode.
 
 ## 2. HTTP & APIs
 
@@ -65,6 +66,11 @@ Skill files are sourced upstream; see `skills/SOURCES.md`. Hooks are in `docs/ho
 ## 7. Performance
 
 - `hyperfine --warmup 3 'A' 'B'` — whenever you claim X is faster than Y. Instead of "feels faster" or one `time` run. Why: a single `time` measurement is dominated by cold-cache and noise; hyperfine reports mean ± stddev with warmup.
+
+## 7b. Iteration & interactive processes
+
+- `watchexec -e <ext> -- <cmd>` — when iterating with auto-rerun (test on save, rebuild on change). Instead of `while true; do …; sleep 1; done`. Why: filesystem events are immediate and don't burn CPU on polling.
+- `tmux new -d -s <name>` + `tmux send-keys` — when driving a stateful interactive process (psql, ipython, gdb, a dev server you need to feed commands to). Instead of `bash -c 'echo … | tool'` or `expect`. Why: REPLs need persistent stdin/stdout; one-shot pipes lose the session. [source: obra/superpowers-lab — using-tmux-for-interactive-commands]
 
 ## 8. Codebase exploration
 
