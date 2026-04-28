@@ -1,0 +1,27 @@
+# Archived upstream skill entries — removed from active upstream.lock.
+#
+# Reason: superseded by an official vendor asset (MCP server or plugin).
+# Preserved here as a historical record.
+#
+# Format: same TOML as upstream.lock.
+
+# ── ctx7 — community fork superseded by official upstash MCP ───────────────
+#
+# Removed on 2026-04-28 (W3.4). The community fork `edxeth/superlight-context7-skill`
+# is superseded by the official upstash/context7 remote MCP at mcp.context7.com.
+# `fulcrum install` now registers the HTTP MCP server as `context7` in the registry.
+# No official SKILL.md exists from upstash; the MCP is the only official surface.
+
+[skills.ctx7]
+source = "https://github.com/edxeth/superlight-context7-skill"
+subpath = "SKILL.md"
+ref = "main"
+tree_sha = "f4464eea215615ef020eaa4af3a572bad3fb2724"
+license = "MIT"
+author_class = "individual"
+pinned_on = "2026-04-28"
+review_due = "2026-07-27"
+subpath_sha256 = "741b053ce2ba4b405767d8a7a07997d992a59e24db5474ff9d16535a4f211db6"
+subpath_size = 1995
+archived_on = "2026-04-28"
+archive_reason = "superseded by official upstash/context7 MCP at https://mcp.context7.com/mcp (W3.4)"

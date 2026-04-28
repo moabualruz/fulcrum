@@ -19,6 +19,17 @@ import {
   ALL_AGENT_IDS,
   type Registry,
 } from "./mcp-registry.ts";
+import {
+  DEFAULT_SEMGREP_SERVER,
+  DEFAULT_CONTEXT7_SERVER,
+  DEFAULT_TAVILY_SERVER,
+  DEFAULT_PLAYWRIGHT_SERVER,
+  DEFAULT_DART_SERVER,
+  DEFAULT_CLOUDFLARE_DOCS_SERVER,
+  DEFAULT_CLOUDFLARE_WORKERS_BINDINGS_SERVER,
+  DEFAULT_CLOUDFLARE_RADAR_SERVER,
+  BUILTIN_MCPS,
+} from "./mcp-builtins.ts";
 
 let TMP: string;
 let origHome: string | undefined;
@@ -264,5 +275,189 @@ describe("removeFromAgents", () => {
     await applyToAgents("github");
     await removeFromAgents("github");
     await expect(removeFromAgents("github")).resolves.toBeUndefined();
+  });
+});
+
+// ── W3 server specs ─────────────────────────────────────────────────────────
+
+describe("W3 server registrations", () => {
+  // ── semgrep ──────────────────────────────────────────────────────────────
+  test("semgrep: stdio transport, correct command, no auth", async () => {
+    await registerServer("semgrep", DEFAULT_SEMGREP_SERVER);
+    const reg = await loadRegistry();
+    const s = reg.servers["semgrep"]!;
+    expect(s.transport).toBe("stdio");
+    expect(s.command).toBe("semgrep --experimental mcp");
+    expect(s.vendor).toBe("semgrep");
+    expect(s.default_enabled).toBe(false);
+    expect(s.auth_env_vars).toHaveLength(0);
+    for (const id of ALL_AGENT_IDS) expect(s.agent_visibility[id]).toBe(true);
+  });
+
+  // ── context7 ─────────────────────────────────────────────────────────────
+  test("context7: http transport, correct URL, optional API key", async () => {
+    await registerServer("context7", DEFAULT_CONTEXT7_SERVER);
+    const reg = await loadRegistry();
+    const s = reg.servers["context7"]!;
+    expect(s.transport).toBe("http");
+    expect(s.url).toBe("https://mcp.context7.com/mcp");
+    expect(s.vendor).toBe("upstash");
+    expect(s.default_enabled).toBe(false);
+    expect(s.auth_env_vars).toContain("CONTEXT7_API_KEY");
+    for (const id of ALL_AGENT_IDS) expect(s.agent_visibility[id]).toBe(true);
+  });
+
+  // ── tavily ───────────────────────────────────────────────────────────────
+  test("tavily: http transport, correct URL, requires TAVILY_API_KEY", async () => {
+    await registerServer("tavily", DEFAULT_TAVILY_SERVER);
+    const reg = await loadRegistry();
+    const s = reg.servers["tavily"]!;
+    expect(s.transport).toBe("http");
+    expect(s.url).toBe("https://mcp.tavily.com/mcp/");
+    expect(s.vendor).toBe("tavily-ai");
+    expect(s.default_enabled).toBe(false);
+    expect(s.auth_env_vars).toContain("TAVILY_API_KEY");
+    for (const id of ALL_AGENT_IDS) expect(s.agent_visibility[id]).toBe(true);
+  });
+
+  // ── playwright ───────────────────────────────────────────────────────────
+  test("playwright: stdio transport, npx command, no auth", async () => {
+    await registerServer("playwright", DEFAULT_PLAYWRIGHT_SERVER);
+    const reg = await loadRegistry();
+    const s = reg.servers["playwright"]!;
+    expect(s.transport).toBe("stdio");
+    expect(s.command).toBe("npx -y @playwright/mcp@latest");
+    expect(s.vendor).toBe("microsoft");
+    expect(s.default_enabled).toBe(false);
+    expect(s.auth_env_vars).toHaveLength(0);
+    for (const id of ALL_AGENT_IDS) expect(s.agent_visibility[id]).toBe(true);
+  });
+
+  // ── dart ─────────────────────────────────────────────────────────────────
+  test("dart: stdio transport, dart mcp-server command, no auth", async () => {
+    await registerServer("dart", DEFAULT_DART_SERVER);
+    const reg = await loadRegistry();
+    const s = reg.servers["dart"]!;
+    expect(s.transport).toBe("stdio");
+    expect(s.command).toBe("dart mcp-server");
+    expect(s.vendor).toBe("dart-lang");
+    expect(s.default_enabled).toBe(false);
+    expect(s.auth_env_vars).toHaveLength(0);
+    for (const id of ALL_AGENT_IDS) expect(s.agent_visibility[id]).toBe(true);
+  });
+
+  // ── cloudflare-docs (public, no auth) ───────────────────────────────────
+  test("cloudflare-docs: http, public URL, no auth", async () => {
+    await registerServer("cloudflare-docs", DEFAULT_CLOUDFLARE_DOCS_SERVER);
+    const reg = await loadRegistry();
+    const s = reg.servers["cloudflare-docs"]!;
+    expect(s.transport).toBe("http");
+    expect(s.url).toBe("https://docs.mcp.cloudflare.com/mcp");
+    expect(s.vendor).toBe("cloudflare");
+    expect(s.default_enabled).toBe(false);
+    expect(s.auth_env_vars).toHaveLength(0);
+  });
+
+  // ── cloudflare-workers-bindings (requires auth) ──────────────────────────
+  test("cloudflare-workers-bindings: http, requires CLOUDFLARE_API_TOKEN", async () => {
+    await registerServer("cloudflare-workers-bindings", DEFAULT_CLOUDFLARE_WORKERS_BINDINGS_SERVER);
+    const reg = await loadRegistry();
+    const s = reg.servers["cloudflare-workers-bindings"]!;
+    expect(s.transport).toBe("http");
+    expect(s.url).toBe("https://bindings.mcp.cloudflare.com/mcp");
+    expect(s.vendor).toBe("cloudflare");
+    expect(s.auth_env_vars).toContain("CLOUDFLARE_API_TOKEN");
+  });
+
+  // ── cloudflare-radar ─────────────────────────────────────────────────────
+  test("cloudflare-radar: http, correct URL, requires auth", async () => {
+    await registerServer("cloudflare-radar", DEFAULT_CLOUDFLARE_RADAR_SERVER);
+    const reg = await loadRegistry();
+    const s = reg.servers["cloudflare-radar"]!;
+    expect(s.url).toBe("https://radar.mcp.cloudflare.com/mcp");
+    expect(s.auth_env_vars).toContain("CLOUDFLARE_API_TOKEN");
+  });
+
+  // ── BUILTIN_MCPS completeness ────────────────────────────────────────────
+  test("BUILTIN_MCPS contains all 16 entries with unique names", () => {
+    expect(BUILTIN_MCPS.length).toBe(16);
+    const names = BUILTIN_MCPS.map((e) => e.name);
+    expect(new Set(names).size).toBe(16); // all unique
+    // Spot-check key entries are present
+    expect(names).toContain("github");
+    expect(names).toContain("repomix");
+    expect(names).toContain("semgrep");
+    expect(names).toContain("context7");
+    expect(names).toContain("tavily");
+    expect(names).toContain("playwright");
+    expect(names).toContain("dart");
+    expect(names).toContain("cloudflare-docs");
+    expect(names).toContain("cloudflare-workers-bindings");
+    expect(names).toContain("cloudflare-workers-builds");
+    expect(names).toContain("cloudflare-observability");
+    expect(names).toContain("cloudflare-radar");
+    expect(names).toContain("cloudflare-logpush");
+    expect(names).toContain("cloudflare-browser");
+    expect(names).toContain("cloudflare-containers");
+    expect(names).toContain("cloudflare-ai-gateway");
+  });
+
+  // ── round-trip: register all builtins, applyToAgents (Codex), removeFromAgents ──
+  test("round-trip: register all builtins, apply to Codex, remove", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+
+    // Register all
+    for (const { name, spec } of BUILTIN_MCPS) {
+      await registerServer(name, spec);
+    }
+
+    // Enable context7 for codex and apply
+    await setEnabled("context7", true, { agents: ["codex"] });
+    await applyToAgents("context7");
+
+    const toml = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(toml).toContain("[mcp_servers.context7]");
+    expect(toml).toContain("https://mcp.context7.com/mcp");
+
+    // Remove
+    await removeFromAgents("context7");
+    const tomlAfter = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(tomlAfter).not.toContain("[mcp_servers.context7]");
+  });
+
+  test("round-trip: register tavily, apply to Gemini, remove", async () => {
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
+    await registerServer("tavily", DEFAULT_TAVILY_SERVER);
+    await setEnabled("tavily", true, { agents: ["gemini"] });
+    await applyToAgents("tavily");
+
+    const raw = await readFile(join(TMP, ".gemini", "settings.json"), "utf8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const mcpServers = parsed["mcpServers"] as Record<string, unknown>;
+    expect(mcpServers["tavily"]).toBeDefined();
+
+    await removeFromAgents("tavily");
+    const rawAfter = await readFile(join(TMP, ".gemini", "settings.json"), "utf8");
+    const parsedAfter = JSON.parse(rawAfter) as Record<string, unknown>;
+    const mcpAfter = (parsedAfter["mcpServers"] ?? {}) as Record<string, unknown>;
+    expect(mcpAfter["tavily"]).toBeUndefined();
+  });
+
+  test("round-trip: register playwright, apply to OpenCode, remove", async () => {
+    await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
+    await registerServer("playwright", DEFAULT_PLAYWRIGHT_SERVER);
+    await setEnabled("playwright", true, { agents: ["opencode"] });
+    await applyToAgents("playwright");
+
+    const raw = await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const mcp = parsed["mcp"] as Record<string, unknown>;
+    expect(mcp["playwright"]).toBeDefined();
+
+    await removeFromAgents("playwright");
+    const rawAfter = await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8");
+    const parsedAfter = JSON.parse(rawAfter) as Record<string, unknown>;
+    const mcpAfter = (parsedAfter["mcp"] ?? {}) as Record<string, unknown>;
+    expect(mcpAfter["playwright"]).toBeUndefined();
   });
 });
