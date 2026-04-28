@@ -78,16 +78,62 @@ command -v claude >/dev/null 2>&1 || {
 }
 command -v jq >/dev/null 2>&1 || { echo "fulcrum: jq required" >&2; exit 1; }
 
-# Derive match words from the skill itself: frontmatter name + first invocation command.
+# Derive match words from the skill itself.
+#   1. frontmatter `name:`
+#   2. every distinct top-level command inside fenced code blocks within the
+#      `## Invocation` section (top-level = first non-comment word of a line
+#      that doesn't start with whitespace; env-assignments like FOO=bar are skipped)
+#   3. every distinct command immediately after a `|` pipe in the Invocation block
+#   4. anything passed via --match-words
 SKILL_NAME=$(awk -F': *' '/^name:/{print $2; exit}' "$SKILL_FILE" | tr -d '"')
-FIRST_CMD=$(awk '
-  /^```/ { in_code = !in_code; next }
-  in_code && /^[a-zA-Z][a-zA-Z0-9_.-]*([ \t]|$)/ { print $1; exit }
-' "$SKILL_FILE" | tr -d '`')
 
-MATCH_WORDS="$SKILL_NAME"
-[ -n "$FIRST_CMD" ] && [ "$FIRST_CMD" != "$SKILL_NAME" ] && MATCH_WORDS="$MATCH_WORDS,$FIRST_CMD"
-[ -n "$EXTRA_MATCH" ] && MATCH_WORDS="$MATCH_WORDS,$EXTRA_MATCH"
+INVOCATION_BLOCK=$(awk '
+  /^## Invocation/ { in_inv=1; next }
+  in_inv && /^## / { in_inv=0; next }
+  in_inv { print }
+' "$SKILL_FILE")
+
+# Top-level commands inside fenced code blocks.
+TOP_CMDS=$(echo "$INVOCATION_BLOCK" | awk '
+  /^```/ { in_code = !in_code; next }
+  in_code {
+    line = $0
+    if (line ~ /^[ \t]*#/) next        # skip comment-only line
+    n = split(line, a, /[ \t]+/)
+    if (n == 0) next
+    cmd = a[1]
+    gsub(/[`"<>]/, "", cmd)
+    if (cmd ~ /=/) next                 # skip env-assignments (FOO=bar yq ...)
+    if (cmd !~ /^[a-zA-Z]/) next        # skip $vars, brackets, etc.
+    if (!seen[cmd]++) print cmd
+  }
+')
+
+# Commands appearing after a `|` pipe inside fenced code blocks.
+PIPE_CMDS=$(echo "$INVOCATION_BLOCK" | awk '
+  /^```/ { in_code = !in_code; next }
+  in_code {
+    rest = $0
+    while (match(rest, /\|[ \t]*[a-zA-Z][a-zA-Z0-9_.-]*/)) {
+      tok = substr(rest, RSTART, RLENGTH)
+      sub(/^\|[ \t]*/, "", tok)
+      if (!seen[tok]++) print tok
+      rest = substr(rest, RSTART + RLENGTH)
+    }
+  }
+')
+
+MATCH_LIST="$SKILL_NAME"
+for cmd in $TOP_CMDS $PIPE_CMDS; do
+  case ",$MATCH_LIST," in
+    *",$cmd,"*) ;;
+    *) MATCH_LIST="$MATCH_LIST,$cmd" ;;
+  esac
+done
+if [ -n "$EXTRA_MATCH" ]; then
+  MATCH_LIST="$MATCH_LIST,$EXTRA_MATCH"
+fi
+MATCH_WORDS="$MATCH_LIST"
 
 # Results dir
 if [ -z "$RESULTS_DIR" ]; then

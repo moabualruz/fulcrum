@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# Run scripts/eval-skill-claude.sh across every authored skill and emit a
+# leaderboard at <results-dir>/leaderboard.md.
+#
+# Usage:
+#   scripts/eval-all.sh [--model NAME] [--runs-per-query N] [--results-dir DIR]
+#                       [--only skill1,skill2,...] [--skip skill1,skill2,...]
+#
+# Auth: handled by the `claude` CLI (no API key needed).
+# Cost: ~5–10s per query × 20 queries × N skills × runs-per-query. With
+#       defaults (N=28, runs=1) plan ~30–60 minutes on Sonnet.
+
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HARNESS="$REPO_DIR/scripts/eval-skill-claude.sh"
+
+MODEL=""
+RUNS=1
+RESULTS_DIR=""
+ONLY=""
+SKIP=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --model)          MODEL="$2"; shift 2 ;;
+    --runs-per-query) RUNS="$2"; shift 2 ;;
+    --results-dir)    RESULTS_DIR="$2"; shift 2 ;;
+    --only)           ONLY="$2"; shift 2 ;;
+    --skip)           SKIP="$2"; shift 2 ;;
+    -h|--help)
+      sed -n '2,15p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$RESULTS_DIR" ]; then
+  RESULTS_DIR="$REPO_DIR/eval-results/$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$RESULTS_DIR"
+LEADERBOARD="$RESULTS_DIR/leaderboard.md"
+
+# Discover skills.
+SKILLS=()
+for dir in "$REPO_DIR"/skills/*/; do
+  name=$(basename "$dir")
+  [ "$name" = "_template" ] && continue
+  [ -f "$dir/SKILL.md" ] || continue
+  if [ -n "$ONLY" ]; then
+    case ",$ONLY," in *",$name,"*) ;; *) continue ;; esac
+  fi
+  if [ -n "$SKIP" ]; then
+    case ",$SKIP," in *",$name,"*) continue ;; esac
+  fi
+  SKILLS+=("$name")
+done
+
+echo "fulcrum eval-all"
+echo "  model        : ${MODEL:-claude default}"
+echo "  runs/query   : $RUNS"
+echo "  results dir  : $RESULTS_DIR"
+echo "  skills       : ${#SKILLS[@]} (${SKILLS[*]})"
+echo
+
+START_TS=$(date +%s)
+
+# Init leaderboard
+{
+  echo "# Fulcrum skill eval leaderboard"
+  echo
+  echo "_Run: $(date -u +%Y-%m-%dT%H:%M:%SZ); model=${MODEL:-default}; runs/query=$RUNS_"
+  echo
+  echo "Pass criteria: trigger ≥ 80%, false-trigger ≤ 20%."
+  echo
+  printf "| Skill | Trigger %% | False-trigger %% | Pass | Notes |\n"
+  printf "|---|---:|---:|---|---|\n"
+} > "$LEADERBOARD"
+
+# Run each skill.
+for skill in "${SKILLS[@]}"; do
+  echo "→ $skill"
+  out_dir="$RESULTS_DIR/$skill"
+  mkdir -p "$out_dir"
+
+  args=(--results-dir "$out_dir" --runs-per-query "$RUNS")
+  [ -n "$MODEL" ] && args+=(--model "$MODEL")
+
+  if "$HARNESS" "$skill" "${args[@]}" >/dev/null 2>&1; then
+    pass="✓"
+  else
+    pass="✗"
+  fi
+
+  # Parse summary.txt for the trigger / false-trigger percentages.
+  trig=$(awk '/trigger rate.*should_trigger=true/ { match($0, /\(([0-9]+)%\)/, a); print a[1] }' "$out_dir/summary.txt" 2>/dev/null || true)
+  false=$(awk '/false-trigger.*should_trigger=false/ { match($0, /\(([0-9]+)%\)/, a); print a[1] }' "$out_dir/summary.txt" 2>/dev/null || true)
+  trig=${trig:-?}; false=${false:-?}
+
+  notes=""
+  if [ "$trig" != "?" ] && [ "$trig" -lt 80 ] 2>/dev/null; then
+    notes="trigger below 80%; "
+  fi
+  if [ "$false" != "?" ] && [ "$false" -gt 20 ] 2>/dev/null; then
+    notes="${notes}false-trigger above 20%; "
+  fi
+  notes=${notes%; }
+  [ -z "$notes" ] && notes="ok"
+
+  printf "| %s | %s | %s | %s | %s |\n" \
+    "$skill" "${trig}%" "${false}%" "$pass" "$notes" >> "$LEADERBOARD"
+
+  printf "  %-22s trig=%-4s false=%-4s %s\n" "$skill" "${trig}%" "${false}%" "$pass"
+done
+
+END_TS=$(date +%s)
+ELAPSED=$((END_TS - START_TS))
+
+{
+  echo
+  echo "_Elapsed: $((ELAPSED/60))m $((ELAPSED%60))s_"
+} >> "$LEADERBOARD"
+
+echo
+echo "Leaderboard: $LEADERBOARD"
+echo "Per-skill data: $RESULTS_DIR/<skill>/summary.txt + results.jsonl"
+echo "Elapsed: $((ELAPSED/60))m $((ELAPSED%60))s"
