@@ -209,7 +209,13 @@ Starting `evals/jq.match-words` was too narrow (`jq 'select(`). Trigger rate: 8%
    scripts/eval-all.sh --model sonnet --runs-per-query 3
    ```
 
-**Queue — 27 remaining skills** (jq done): `ast-grep`, `bat`, `caveman`, `ctags`, `dart-toolchain`, `difft`, `direnv`, `eza`, `fd`, `fzf`, `gh`, `git-cliff`, `gitleaks`, `graphify`, `hyperfine`, `lizard`, `playwright-cli`, `repomix`, `rg`, `sd`, `semgrep`, `tmux`, `usql`, `watchexec`, `xh`, `yq`. (Verify with `fulcrum skills list`.)
+**Queue — 27 remaining in-repo skills** (jq verified at 83/0 in `/tmp/jq-sanity4`):
+
+`bat`, `biome`, `dart-toolchain`, `difftastic`, `direnv`, `eza`, `flarectl`, `fzf`, `gh`, `git-cliff`, `gitleaks`, `google-java-format`, `hyperfine`, `just`, `ktlint`, `lizard`, `mise`, `osv-scanner`, `pmd`, `ruff`, `sd`, `spotbugs`, `usql`, `watchexec`, `xh`, `yq`, `zoxide`.
+
+(Verify with `fulcrum skills list` — list reflects the actual 28 authored in `skills/`.)
+
+**Re-verify subset under new methodology:** 5 skills passed under the OLD broken harness (`difftastic`, `lizard`, `mise`, `watchexec`, `zoxide`). They MUST be re-run with the new match-words + inline-data queries — the score may regress (e.g. tighter match-words could drop a passing trigger). Treat them like any other skill: pass at runs=1 → move on; fail → iterate per the procedure.
 
 Reference: `/tmp/jq-sanity4` — evidence that the new procedure works (83/0).
 
@@ -217,11 +223,22 @@ Reference: `/tmp/jq-sanity4` — evidence that the new procedure works (83/0).
 
 ### 6.3 Foundation polish (after 6.2)
 
-- **Opus leaderboard** — run `scripts/eval-all.sh --model opus --runs-per-query 1` to see if trigger rates hold on the model real sessions use.
+- **Opus leaderboard** — run `scripts/eval-all.sh --model opus --runs-per-query 1` after all 28 skills pass at runs=3 on Sonnet. Confirms trigger rates hold on the model real sessions use.
 
 ---
 
-### 6.4 Outstanding small items
+### 6.4 Ship the branch (after 6.2 + 6.3)
+
+Branch is currently unpushed. After §6.2 + §6.3 close:
+
+1. **Final CI:** `bun run ci` — must be green.
+2. **Push:** `git push -u origin feat/agent-foundation-clean`.
+3. **Open PR:** `gh pr create --title "..." --body "..."` summarizing the foundation + caveman integration + eval methodology fix. Reference HANDOVER §6.x as the change log.
+4. **Cut release** (when PR merges to `main`): `bun run release vX.Y.Z [--gh]`. Pre-release at `v0.1.0` is reasonable for the foundation tag.
+
+---
+
+### 6.5 Outstanding small items
 
 - **README Rosetta hint** — generic; expand only if specific Intel-Mac users report issues.
 
