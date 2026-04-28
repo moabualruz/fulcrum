@@ -26,11 +26,13 @@ async function runFormat(envelope: object, env: Record<string, string> = {}): Pr
   const json = JSON.stringify(envelope);
   const stdinFile = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
   await Bun.write(stdinFile, json);
+  const processEnv = { ...process.env, HOME: TMP, ...env } as Record<string, string>;
+  delete processEnv["FULCRUM_DEBUG"];
   const proc = Bun.spawn(["bun", "src/index.ts", "hook", "format"], {
     stdin: Bun.file(stdinFile),
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, HOME: TMP, ...env },
+    env: processEnv,
   });
   const stdout = await new Response(proc.stdout).text();
   const stderr = await new Response(proc.stderr).text();
@@ -67,5 +69,47 @@ describe("format", () => {
       tool_input: { file_path: join(TMP, "does-not-exist.py") },
     });
     expect(r.exit).toBe(0);
+  });
+
+  test("invalid JSON envelope → exit 0 + one-liner to stderr (fail-open)", async () => {
+    const stdinFile = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
+    await Bun.write(stdinFile, "{ invalid json }");
+    const processEnv = { ...process.env, HOME: TMP } as Record<string, string>;
+    delete processEnv["FULCRUM_DEBUG"];
+    const proc = Bun.spawn(["bun", "src/index.ts", "hook", "format"], {
+      stdin: Bun.file(stdinFile),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: processEnv,
+    });
+    const stdout = await new Response(proc.stdout).text();
+    const stderr = await new Response(proc.stderr).text();
+    const exit = await proc.exited;
+
+    expect(exit).toBe(0);
+    expect(stdout).toBe(""); // no output to stdout
+    // Check for the one-liner in stderr (unconditional on envelope parse failure)
+    expect(stderr).toContain("fulcrum hook format: envelope parse failed (invalid JSON):");
+    expect(stderr).toContain("invalid json");
+  });
+
+  test("empty stdin → exit 0, no stderr output (fail-open)", async () => {
+    const stdinFile = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
+    await Bun.write(stdinFile, "");
+    const processEnv = { ...process.env, HOME: TMP } as Record<string, string>;
+    delete processEnv["FULCRUM_DEBUG"];
+    const proc = Bun.spawn(["bun", "src/index.ts", "hook", "format"], {
+      stdin: Bun.file(stdinFile),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: processEnv,
+    });
+    const stdout = await new Response(proc.stdout).text();
+    const stderr = await new Response(proc.stderr).text();
+    const exit = await proc.exited;
+
+    expect(exit).toBe(0);
+    expect(stdout).toBe("");
+    expect(stderr).toBe(""); // empty stdin is silent no-op (not an error)
   });
 });

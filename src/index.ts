@@ -84,6 +84,9 @@ async function main() {
 }
 
 async function runHook(name: string, _args: string[]) {
+  // Set hook name for error reporting in readHookEvent()
+  process.env["FULCRUM_HOOK_NAME"] = name;
+
   switch (name) {
     case "router":
     case "tool-output-router": {

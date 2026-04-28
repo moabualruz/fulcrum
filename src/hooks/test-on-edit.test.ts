@@ -28,11 +28,13 @@ async function runTOE(envelope: object): Promise<{ stdout: string; exit: number;
   const json = JSON.stringify(envelope);
   const stdinFile = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
   await Bun.write(stdinFile, json);
+  const env = { ...process.env, CLAUDE_PROJECT_DIR: TMP, HOME: TMP } as Record<string, string>;
+  delete env["FULCRUM_DEBUG"];
   const proc = Bun.spawn(["bun", "src/index.ts", "hook", "test-on-edit"], {
     stdin: Bun.file(stdinFile),
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, HOME: TMP },
+    env,
   });
   const stdout = await new Response(proc.stdout).text();
   const stderr = await new Response(proc.stderr).text();
