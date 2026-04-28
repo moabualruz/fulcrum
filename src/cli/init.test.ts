@@ -39,7 +39,7 @@ describe("AGENTS.md idempotent", () => {
   test("creates AGENTS.md on first run", async () => {
     const { run, setDryRun } = await import("./init.ts");
     setDryRun(false);
-    const mod = await import("./init-vendor.ts");
+    const mod = await import("./vendor-installs.ts");
     const spy = spyOn(mod, "runVendorIntegrations").mockResolvedValue(undefined);
     try {
       await run([dir]);
@@ -54,7 +54,7 @@ describe("AGENTS.md idempotent", () => {
     const { run, setDryRun } = await import("./init.ts");
     setDryRun(false);
     // Mock vendor integrations to prevent real subprocess spawns.
-    const mod = await import("./init-vendor.ts");
+    const mod = await import("./vendor-installs.ts");
     const spy = spyOn(mod, "runVendorIntegrations").mockResolvedValue(undefined);
     try {
       await run([dir]);
@@ -72,7 +72,7 @@ describe("AGENTS.md idempotent", () => {
 
     const { run, setDryRun } = await import("./init.ts");
     setDryRun(false);
-    const mod = await import("./init-vendor.ts");
+    const mod = await import("./vendor-installs.ts");
     const spy = spyOn(mod, "runVendorIntegrations").mockResolvedValue(undefined);
     try {
       await run([dir]);
@@ -107,7 +107,7 @@ describe(".claude/CLAUDE.md @import written once", () => {
   test("creates .claude/CLAUDE.md with @AGENTS.md import", async () => {
     const { run, setDryRun } = await import("./init.ts");
     setDryRun(false);
-    const mod = await import("./init-vendor.ts");
+    const mod = await import("./vendor-installs.ts");
     const spy = spyOn(mod, "runVendorIntegrations").mockResolvedValue(undefined);
     try {
       await run([dir]);
@@ -147,7 +147,7 @@ describe(".gitignore appended once (idempotent)", () => {
   test("appends gitignore lines on first run, skips on second run", async () => {
     const { run, setDryRun } = await import("./init.ts");
     setDryRun(false);
-    const mod = await import("./init-vendor.ts");
+    const mod = await import("./vendor-installs.ts");
     const spy = spyOn(mod, "runVendorIntegrations").mockResolvedValue(undefined);
     try {
       await run([dir]);
@@ -200,7 +200,7 @@ describe("runVendorIntegrations — graphify", () => {
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
 
     try {
-      const { runVendorIntegrations } = await import("./init-vendor.ts");
+      const { runVendorIntegrations } = await import("./vendor-installs.ts");
       await runVendorIntegrations(dir, home, { dryRun: false });
 
       const calls = runSpy.mock.calls;
@@ -233,7 +233,7 @@ describe("runVendorIntegrations — graphify", () => {
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
 
     try {
-      const { runVendorIntegrations } = await import("./init-vendor.ts");
+      const { runVendorIntegrations } = await import("./vendor-installs.ts");
       await runVendorIntegrations(dir, home, { dryRun: false });
 
       const calls = runSpy.mock.calls;
@@ -280,7 +280,7 @@ describe("runVendorIntegrations — npx skills add commands", () => {
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
 
     try {
-      const { runVendorIntegrations } = await import("./init-vendor.ts");
+      const { runVendorIntegrations } = await import("./vendor-installs.ts");
       await runVendorIntegrations(dir, home, { dryRun: false });
       return runSpy.mock.calls.map((c) => c[0]);
     } finally {
@@ -352,7 +352,7 @@ describe("runVendorIntegrations — context7 deferred (no spawn)", () => {
     });
 
     try {
-      const { runVendorIntegrations } = await import("./init-vendor.ts");
+      const { runVendorIntegrations } = await import("./vendor-installs.ts");
       await runVendorIntegrations(dir, home, { dryRun: false });
 
       // Must print deferred note.
@@ -407,7 +407,7 @@ describe("runVendorIntegrations — pi-mcp-adapter", () => {
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
 
     try {
-      const { runVendorIntegrations } = await import("./init-vendor.ts");
+      const { runVendorIntegrations } = await import("./vendor-installs.ts");
       await runVendorIntegrations(dir, home, { dryRun: false });
 
       const calls = runSpy.mock.calls.map((c) => Array.isArray(c[0]) ? c[0].join(" ") : "");
@@ -461,7 +461,7 @@ describe("--dry-run: preview only, no spawns", () => {
     });
 
     try {
-      const { runVendorIntegrations } = await import("./init-vendor.ts");
+      const { runVendorIntegrations } = await import("./vendor-installs.ts");
       await runVendorIntegrations(dir, home, { dryRun: true });
 
       // Should have dry-run preview lines.
@@ -594,7 +594,7 @@ describe("vendor command failure is fail-soft", () => {
     });
 
     try {
-      const { runVendorIntegrations } = await import("./init-vendor.ts");
+      const { runVendorIntegrations } = await import("./vendor-installs.ts");
       // Must not throw.
       await expect(
         runVendorIntegrations(dir, home, { dryRun: false })
@@ -644,7 +644,7 @@ describe("NO --output flag in any graphify or repomix spawn", () => {
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
 
     try {
-      const { runVendorIntegrations } = await import("./init-vendor.ts");
+      const { runVendorIntegrations } = await import("./vendor-installs.ts");
       await runVendorIntegrations(dir, home, { dryRun: false });
 
       for (const call of runSpy.mock.calls) {

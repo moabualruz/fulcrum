@@ -5,7 +5,6 @@
 
 import { stat, mkdir, readFile, writeFile, appendFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { which, run as runProc } from "../utils/proc.ts";
 
 const AGENTS_TEMPLATE = `# AGENTS.md
 
@@ -50,35 +49,27 @@ async function exists(p: string): Promise<boolean> {
   try { await stat(p); return true; } catch { return false; }
 }
 
-/** Run `repomix --compress` in dir with NO --output flag (vendor default = repomix-output.xml). */
-async function runReindex(dir: string): Promise<void> {
-  if (!(await which("repomix"))) {
-    console.log("  · repomix not on PATH — skipping reindex");
-    return;
-  }
-  if (DRY_RUN) {
-    console.log(`  [dry-run] would run: repomix --compress  (cwd=${dir})`);
-    return;
-  }
-  const r = await runProc(["repomix", "--compress"], { cwd: dir });
-  if (r.exit !== 0) {
-    console.warn(`  ⚠ repomix --compress failed (exit ${r.exit}): ${r.stderr.trim()}`);
-  } else {
-    console.log("  ✓ repomix --compress done");
-  }
-}
+// Project-index commands (repomix, graphify update) live in project-index.ts.
 
 export async function run(args: string[]): Promise<void> {
   // Handle `fulcrum init reindex [DIR]` subcommand.
   if (args[0] === "reindex") {
-    const dir = resolve(args[1] ?? process.cwd());
+    DRY_RUN = false;
+    const tail = args.slice(1);
+    const filtered: string[] = [];
+    for (const a of tail) {
+      if (a === "--dry-run") DRY_RUN = true;
+      else filtered.push(a);
+    }
+    const dir = resolve(filtered[0] ?? process.cwd());
     if (!(await exists(dir))) {
       console.error(`fulcrum init reindex: not a directory: ${dir}`);
       process.exit(1);
     }
     console.log(`fulcrum init reindex → ${dir}`);
-    await runReindex(dir);
-    console.log("Done.");
+    const { runProjectIndex } = await import("./project-index.ts");
+    await runProjectIndex(dir, { dryRun: DRY_RUN });
+    console.log("\nDone.");
     return;
   }
 
@@ -148,9 +139,15 @@ export async function run(args: string[]): Promise<void> {
   }
   if (!added) console.log("  · .gitignore  (kept)");
 
-  // Vendor integrations — run canonical per-tool commands for each detected agent.
-  const { runVendorIntegrations } = await import("./init-vendor.ts");
+  // Vendor integrations — per-agent skill/plugin/extension/hook installers.
+  const { runVendorIntegrations } = await import("./vendor-installs.ts");
   await runVendorIntegrations(dir, home, { dryRun: DRY_RUN });
+
+  // Project indices — vendor-default index builds for tools that produce a
+  // precomputed artifact (graphify-out/, repomix-output.xml). Live pattern-
+  // matchers (rg, fd, ast-grep, …) need no index, so they are NOT here.
+  const { runProjectIndex } = await import("./project-index.ts");
+  await runProjectIndex(dir, { dryRun: DRY_RUN });
 
   console.log("\nDone.");
 }

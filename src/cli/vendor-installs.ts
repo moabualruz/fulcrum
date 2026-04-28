@@ -1,17 +1,24 @@
-// init-vendor.ts — run vendor-canonical integration commands for each detected
-// agent during `fulcrum init <dir>`.
+// vendor-installs.ts — run vendor-canonical AGENT-INTEGRATION installers for
+// each detected agent during `fulcrum init <dir>`.
+//
+// Scope: per-agent skill / plugin / extension / hook installs whose vendor
+// publishes a CLI installer (`graphify install --platform <agent>`,
+// `npx skills add <pkg>`, `pi-mcp-adapter init`). Project-INDEX builds
+// (`graphify update .`, `repomix --compress`) live in `project-index.ts` —
+// different concern.
 //
 // Rules:
-//   - Never pass --output or any path override to graphify or repomix.
+//   - Never pass --output / path-override flags.
 //   - Never spawn interactive auth flows (context7 is deferred).
-//   - Never write hook registrations or skill copies here — those belong to
-//     `fulcrum install`. This module only runs what the vendors document as
-//     the project-level setup step.
+//   - Never write hook registrations or skill files here — vendor CLIs do that.
+//   - Live pattern-matchers (rg, fd, ast-grep, bat, jq, …) need NO install
+//     command beyond the BYO toolchain; they are not handled here.
 //   - Fail-soft per tool: log warning and continue on any error.
 
 import { stat } from "node:fs/promises";
 import { AGENTS } from "../agents/registry.ts";
 import { which, run as runProc } from "../utils/proc.ts";
+import { stripVendorRuleBlocks } from "./install.ts";
 
 async function isDir(p: string): Promise<boolean> {
   try { return (await stat(p)).isDirectory(); } catch { return false; }
@@ -93,6 +100,8 @@ export async function runVendorIntegrations(
       // fulcrum-upstream skill copy (via upstream-skills.ts) covers the fallback.
       console.log("  · graphify: Pi not supported by graphify CLI; skipping (file copy via fulcrum-upstream covers fallback)");
     }
+    // NOTE: project-index BUILD (`graphify update .`) runs in project-index.ts,
+    // not here. This module only handles per-agent integration installers.
   } else {
     console.log("  · graphify not on PATH — skipping graphify integrations");
   }
@@ -136,7 +145,7 @@ export async function runVendorIntegrations(
   // ── repomix ───────────────────────────────────────────────────────────────
   // Claude Code plugins handled by install.ts (W2 logic — 3 plugins via
   // `claude plugin install`). MCP registration via mcp-registry for all agents.
-  // Nothing extra to do here beyond what install already covers.
+  // Project-index BUILD (`repomix --compress`) lives in project-index.ts.
   if (hasClaude && detected.has("claude-code")) {
     console.log("  · repomix: Claude Code plugins handled by fulcrum install (W2)");
   }
@@ -163,5 +172,18 @@ export async function runVendorIntegrations(
     );
   } else if (detected.has("pi") && !hasPi) {
     console.log("  · pi detected but pi binary not on PATH — skipping pi-mcp-adapter init");
+  }
+
+  // ── Strip duplicate vendor rule blocks ────────────────────────────────────
+  // Vendor CLIs (e.g. `graphify install`) write rule text directly into each
+  // agent's primary rules file. The same text lives in rules/AGENTS.md and is
+  // spliced into the FULCRUM sentinel block by `fulcrum install`. Strip the
+  // duplicates that live outside the sentinel so agents don't load the rule
+  // twice. Runs AFTER vendor commands so hooks/settings written by the vendor
+  // (PreToolUse, hooks.json) are preserved — only the rule TEXT block is removed.
+  console.log("\nStripping duplicate vendor rule blocks (outside FULCRUM sentinel):");
+  for (const agent of AGENTS) {
+    const rulesFile = agent.rulesFile(home);
+    await stripVendorRuleBlocks(rulesFile, dryRun);
   }
 }
