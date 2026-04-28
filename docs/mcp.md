@@ -91,6 +91,69 @@ Default adapter behavior exposes a proxy-style `mcp(...)` tool. `fulcrum hook to
 
 `fulcrum install` runs `pi install npm:pi-mcp-adapter` (when `pi` is on PATH) and writes the deepwiki entry into `~/.pi/agent/mcp.json`, preserving other servers. `fulcrum doctor --json` reports `piMcpAdapter.adapterPresent` and `piMcpAdapter.deepwikiPresent`.
 
+### 3.4 github (W2.1)
+
+Official GitHub MCP server via `github/github-mcp-server`. **Default-disabled** — requires auth.
+
+- Transport: HTTP `https://api.githubcopilot.com/mcp/`
+- Auth: `GITHUB_TOKEN` env var (GitHub PAT with repo scope) or `gh auth login` OAuth
+- Vendor: `github`
+
+To enable: `fulcrum mcp enable github`
+
+Auth note: pass token via `Authorization: Bearer $GITHUB_TOKEN` header — the remote server validates on each request. `fulcrum doctor` reports `auth:ok` when `GITHUB_TOKEN` is set.
+
+Supersedes: `skills/gh/SKILL.md` (moved to `skills/_archive/gh-authored/`; skill is still functional as fallback when MCP is disabled).
+
+### 3.5 repomix (W2.2)
+
+Repomix MCP server via `yamadashy/repomix`. **Default-disabled.**
+
+- Transport: stdio `npx -y repomix --mcp`
+- Auth: none required
+- Vendor: `yamadashy`
+- Claude Code additionally gets 3 official vendor plugins: `repomix-mcp`, `repomix-commands`, `repomix-explorer`
+
+To enable: `fulcrum mcp enable repomix`
+
+Plugin install (Claude Code, idempotent):
+```bash
+claude plugin marketplace add yamadashy/repomix
+claude plugin install repomix-mcp@repomix
+claude plugin install repomix-commands@repomix
+claude plugin install repomix-explorer@repomix
+```
+
+Uninstall removes all 3 plugins and the registry entry.
+
+## 4. fulcrum mcp registry CLI
+
+The MCP registry lives at `~/.fulcrum/state/global/mcp-registry.toml`. Schema version 1.
+
+```bash
+# List all registered servers
+fulcrum mcp list [--json]
+
+# Register a new server (added but not enabled)
+fulcrum mcp register myserver --http https://example.com/mcp --vendor example --description "..."
+fulcrum mcp register myserver --stdio "npx -y mypkg --mcp" --vendor example
+
+# Remove from registry + all agents
+fulcrum mcp unregister myserver
+
+# Enable (push to agent native config)
+fulcrum mcp enable myserver [--agent claude-code] [--agent codex] [--all-agents]
+
+# Disable (remove from agent native config)
+fulcrum mcp disable myserver [--all-agents]
+```
+
+Agent IDs: `claude-code`, `codex`, `gemini`, `opencode`, `pi`.
+
+`fulcrum install` registers `github` and `repomix` (default-disabled). `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
+
+`fulcrum doctor` reports each registered server: enabled-on-which-agents, env-var auth status, and HEAD-probe reachability for HTTP servers.
+
 ## Cross-agent
 
 Per-agent MCP config syntax differs by transport:

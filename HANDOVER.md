@@ -84,7 +84,11 @@ src/
 │   ├── upstream-skills.ts             # pinned curated third-party skill installer w/ subpath SHA-256
 │   ├── upstream-skills.test.ts
 │   ├── mcp.ts                         # DeepWiki MCP registration + Pi adapter management
-│   ├── doctor.ts                      # 47-tool + caveman + piMcpAdapter health; --json flag
+│   ├── mcp-registry.ts                # MCP registry TOML store + applyToAgents/removeFromAgents
+│   ├── mcp-cmd.ts                     # fulcrum mcp list/register/unregister/enable/disable
+│   ├── mcp-registry.test.ts           # registry round-trip + enable/disable + apply/remove
+│   ├── mcp-cmd.test.ts                # CLI verb round-trip
+│   ├── doctor.ts                      # 47-tool + caveman + piMcpAdapter + mcp section health; --json flag
 │   └── doctor.test.ts
 └── hooks/
     ├── audit-log.ts     format.ts     index-check.ts     index-rebuild.ts
@@ -217,8 +221,18 @@ Doctor must report Wave-1 invariants: caveman uninstall leaves zero registry ent
 
 | # | Item | Source | Action |
 |---|---|---|---|
-| W2.1 | Replace authored `skills/gh/` with `github/github-mcp-server` MCP across 5 agents (managed-but-default-disabled per new policy); deprecate `skills/gh/` (keep as `skills/_archive/gh-authored/` or delete after one minor version) | `github/github-mcp-server` 29.3k stars | new `installGithubMcp` in `src/cli/mcp.ts`; entry in `~/.fulcrum/mcp-registry.toml`; doctor reports |
-| W2.2 | Repomix official Claude plugin + MCP — `yamadashy/repomix` ships both. Manage them. Mirror vendor SKILL.md (or equivalent) verbatim into agents that lack a published asset (Codex/OpenCode/Pi as needed). | `yamadashy/repomix` | `installRepomixOfficial` covering plugin + MCP + mirrored skill copy; pin via subpath_sha256 |
+| W2.1 | DONE — `github` MCP registered (HTTP, `https://api.githubcopilot.com/mcp/`, default-disabled, auth_env_vars=GITHUB_TOKEN) via `src/cli/mcp-registry.ts`; `skills/gh/` archived to `skills/_archive/gh-authored/`; skills sync + lint + list all skip `_archive`; doctor `skillsCount` excludes archive; `SOURCES.md` updated | `github/github-mcp-server` | `src/cli/mcp-registry.ts` (DEFAULT_GITHUB_SERVER), `src/cli/install.ts:installMcpRegistryEntries`, `src/cli/doctor.ts` mcp section, `skills/_archive/gh-authored/` |
+| W2.2 | DONE — `repomix` MCP registered (stdio `npx -y repomix --mcp`, default-disabled) via registry; Claude Code gets 3 vendor plugins (`repomix-mcp`, `repomix-commands`, `repomix-explorer`) installed via `claude plugin` with idempotency marker; uninstall removes all 3 plugins + registry; doctor reports repomix in mcp section | `yamadashy/repomix` | `src/cli/mcp-registry.ts` (DEFAULT_REPOMIX_SERVER), `src/cli/install.ts:installMcpRegistryEntries`, `src/cli/uninstall.ts:uninstallRepomixClaudePlugins` |
+
+**Shared infra shipped in W2:**
+- `src/cli/mcp-registry.ts` — TOML registry at `~/.fulcrum/state/global/mcp-registry.toml`; `registerServer`, `unregisterServer`, `setEnabled`, `applyToAgents`, `removeFromAgents`, `isEnabled`
+- `src/cli/mcp-cmd.ts` — `fulcrum mcp list/register/unregister/enable/disable`
+- `src/index.ts` — wired `case "mcp"`
+- `src/cli/doctor.ts` — `DoctorReport.mcp` section; "Managed MCPs" human output
+- `src/cli/install.ts` — step 8b registers github+repomix; installs repomix Claude plugins
+- `src/cli/uninstall.ts` — step 5b clears registry entries + repomix plugins; `--keep-state` flag
+
+Tests: `mcp-registry.test.ts`, `mcp-cmd.test.ts` + doctor/install/uninstall test additions.
 
 **Wave 3 — every remaining tool with official vendor agent assets**
 
@@ -244,7 +258,7 @@ Discovery audit (`a37fce37255978aac`) ran 2026-04-28. Full inventory:
 
 ### W3 mechanics
 
-- New CLI: `fulcrum mcp list/enable/disable/register/unregister`. State in `~/.fulcrum/state/global/mcp-registry.toml` listing every registered MCP per agent with `enabled: bool`. Default-enabled set: `deepwiki`, `context-mode`. Default-disabled set: every W3 entry above (user runs `fulcrum mcp enable github-mcp` per session-or-permanently).
+- `fulcrum mcp list/enable/disable/register/unregister` CLI is DONE (shipped in W2). State in `~/.fulcrum/state/global/mcp-registry.toml`. Default-enabled set: `deepwiki`, `context-mode`. Default-disabled set: every W2/W3 entry (`github`, `repomix`, and below) — user runs `fulcrum mcp enable github` per session-or-permanently.
 - `fulcrum install` registers the W3 MCPs as available for every detected agent but does not enable them automatically (avoids the 55–100k-tokens-at-startup foot-gun warned about in `docs/mcp.md` §2).
 - `fulcrum uninstall` removes every W3 registration regardless of enabled state.
 - `fulcrum doctor` adds an `mcp` section: per registered MCP shows `enabled`, `agent_visibility[5]`, `auth_status` (env-var presence checks where applicable), `endpoint_reachable` (HEAD on remote URL or `which` on stdio command).
