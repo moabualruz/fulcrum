@@ -190,9 +190,59 @@ The branch is being fast-forward-merged into `main` without a PR; no release yet
 
 ---
 
-## 6. Remaining work — Agent OS layers (post-foundation)
+## 6. Remaining work
 
-The foundation gaps tracked here in earlier revisions (Pi MCP adapter, install.sh flag pass-through, detection-aware hooks, cross-agent eval harnesses, hard compress gate, subpath-level upstream pins) are all closed. CI green, doctor verdict `"ok"`. `git log` is the durable record.
+### 6.0 Official-first migration (current focus)
+
+The audits run on 2026-04-28 surfaced gaps from a recent policy reversal: managed scope is now **official-first** across every vendor-published agent asset. The earlier "narrow MCP" stance is dropped. New rule (also captured in §4 and `docs/mcp.md` §1):
+
+> Manage every official vendor-published asset for tools in `docs/capabilities.md`: Claude plugin, MCP server, Gemini extension, OpenCode plugin, Pi package, vendor SKILL.md. Mirror vendor content verbatim into agents the vendor does not ship for. Never re-author content the vendor already publishes. MCPs with non-trivial startup cost are registered-but-disabled by default; per-session toggle via `fulcrum mcp enable/disable`.
+
+The migration ships in three waves. Each wave is a separate branch off `main` (post-merge) with its own commits. Wave-1 is the bug+canonical-method fix set; Wave-2 introduces the new MCP/skill management surfaces; Wave-3 broadens to every other tool with vendor assets.
+
+**Wave 1 — caveman canonical install/uninstall + first official skill swap**
+
+| # | Item | Source | Action |
+|---|---|---|---|
+| W1.1 | caveman Claude uninstall — call `claude plugin uninstall caveman@caveman` | upstream README | extend `removeCavemanCopies` in `src/cli/uninstall.ts` |
+| W1.2 | caveman Gemini uninstall — call `gemini extensions uninstall caveman` | upstream README | same file |
+| W1.3 | caveman Codex/OpenCode/Pi install — switch from clone+copy to `npx skills add JuliusBrussee/caveman -a <agent>` | upstream README "Install for any agent" | rewrite `installCaveman` non-Claude/non-Gemini branches in `src/cli/install.ts` |
+| W1.4 | caveman Codex/OpenCode/Pi uninstall — `npx skills remove caveman` | upstream README | extend `removeCavemanCopies` |
+| W1.5 | Wrangler skill — pin `cloudflare/skills` subpath `skills/wrangler/SKILL.md` in `skills/upstream.lock` (subpath_sha256 + subpath_size); sync to all 5 agents under `fulcrum-upstream/wrangler/` | `cloudflare/skills` | add lockfile entry + run `fulcrum skills upstream --update-pins` |
+| W1.6 | ast-grep Claude path — switch from clone+copy to `claude plugin install ast-grep@ast-grep/agent-skill` for Claude Code only; other 4 agents keep upstream-skill copy as today | `ast-grep/agent-skill` | special-case in upstream-skills.ts when `kind: "claude-plugin"` is set in lock |
+
+Doctor must report Wave-1 invariants: caveman uninstall leaves zero registry entries on Claude/Gemini; `fulcrum doctor --json caveman.agents[*].installed` reflects post-uninstall reality.
+
+**Wave 2 — switch authored `gh` to `github-mcp-server` + add Repomix official assets**
+
+| # | Item | Source | Action |
+|---|---|---|---|
+| W2.1 | Replace authored `skills/gh/` with `github/github-mcp-server` MCP across 5 agents (managed-but-default-disabled per new policy); deprecate `skills/gh/` (keep as `skills/_archive/gh-authored/` or delete after one minor version) | `github/github-mcp-server` 29.3k stars | new `installGithubMcp` in `src/cli/mcp.ts`; entry in `~/.fulcrum/mcp-registry.toml`; doctor reports |
+| W2.2 | Repomix official Claude plugin + MCP — `yamadashy/repomix` ships both. Manage them. Mirror vendor SKILL.md (or equivalent) verbatim into agents that lack a published asset (Codex/OpenCode/Pi as needed). | `yamadashy/repomix` | `installRepomixOfficial` covering plugin + MCP + mirrored skill copy; pin via subpath_sha256 |
+
+**Wave 3 — every remaining tool with official vendor agent assets**
+
+Driven by the discovery audit (`a37fce37255978aac` — see audit results when complete). Once that JSONL inventory lands, expand W3 inline below as a per-tool checklist, e.g.:
+
+| # | Tool | Asset | Source URL | Per-agent canonical method | Action |
+|---|---|---|---|---|---|
+| W3.1 | Cloudflare services | remote MCP servers (~15 endpoints: docs, Workers, D1, R2, KV, queues, browser-rendering, AI gateway, etc.) | `cloudflare/mcp-server-cloudflare` + `https://*.mcp.cloudflare.com/mcp` | `claude mcp add --transport http <url>` per service; Codex TOML; Gemini settings.json `httpUrl`; OpenCode `type: remote`; Pi via adapter mcp.json | new `installCloudflareMcps`; one-flag opt-in (`--with-cloudflare`); per-session enable |
+| W3.2 | Google Workspace | ~100 official SKILL.md files | `googleworkspace/cli/tree/main/skills` | pin selection (gmail, calendar, drive, docs, slides, people) in upstream.lock; same fan-out as existing 20 | grow upstream.lock |
+| W3.3 | (TBD from discovery) | … | … | … | … |
+
+The `(TBD from discovery)` rows fill in once the discovery agent reports. Every new entry follows the same shape: tool name, asset kind, vendor URL, per-agent canonical method, action item. Mirror policy applies — if the vendor only publishes for Claude, copy the exact SKILL.md/manifest into the other 4 agents, no rewriting.
+
+**Ship discipline.** Every wave change carries:
+- Test in `src/cli/<file>.test.ts` for install + uninstall round-trip in a scratch HOME.
+- Doctor delta (new fields in `DoctorReport`, displayed in human + json output).
+- Docs delta in the relevant `docs/<area>.md` (mcp / agents / skills / capabilities).
+- Conventional-commit message naming the vendor + agent.
+
+Once W1+W2+W3 land, §6 collapses again to only §6.1+ (Agent OS layers) below.
+
+---
+
+### 6.1+ Agent OS layers (post-foundation, post-migration)
 
 Below is the trajectory layer — the seven Agent OS layers named in `README.md` and `AGENTS.md`. Each entry has scope, dependencies on prior layers, data model sketch, CLI surface, persistence target, and success signals. None are implemented yet. Build order goes top-down because later layers consume earlier layers' state.
 
@@ -519,7 +569,7 @@ fulcrum doctor --json | jq '.caveman, .piMcpAdapter'
 ## 8. Known limitations (current)
 
 - **Uninstall is conservative.** It does not remove caveman by default and keeps modified policy files unless `--purge`.
-- **Managed MCP scope is intentionally narrow.** Fulcrum manages DeepWiki and context-mode. Other MCPs remain opt-in.
+- **Managed scope is OFFICIAL-FIRST.** Fulcrum manages every vendor-published agent asset (Claude plugin, MCP server, Gemini extension, OpenCode plugin, Pi package, vendor SKILL.md) for tools in `docs/capabilities.md`. We mirror vendor SKILL.md into agents the vendor does not ship for, verbatim, never re-authored. MCPs with non-trivial startup cost are registered as available but disabled by default; user toggles per session via `fulcrum mcp enable/disable`. (Policy reversal from earlier "narrow" stance — see `docs/mcp.md` §1, dated 2026-04-28.)
 - **Claude Code MCP removal is manual.** Install can call `claude mcp add`, but uninstall prints `claude mcp remove -s user deepwiki` instead of invoking it.
 - **OpenCode is archived** (2025-09-18). Successor: Charm's Crush. `shims/opencode/fulcrum.ts` is written against last-stable OpenCode; Crush's plugin contract may differ.
 - **`dist/` is gitignored.** Every fresh clone needs Bun to run `bash scripts/install.sh` (or set `FULCRUM_RELEASE_TAG=...` to fetch a release artifact).

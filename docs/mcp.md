@@ -1,10 +1,25 @@
 # MCP Policy
 
-> Fulcrum manages two MCP integrations by default: DeepWiki for repository documentation and context-mode for context routing/session continuity. Everything else stays opt-in. CLI + skills remain preferred when they provide the same result with less startup overhead.
+> Fulcrum manages every OFFICIAL VENDOR-PUBLISHED agent asset (Claude plugin, MCP server, Gemini extension, OpenCode plugin, Pi package/extension, vendor SKILL.md) for tools listed in `docs/capabilities.md`. We never re-author content the vendor already publishes. When a vendor only ships for some agents, we mirror the vendor's exact content into the others without rewriting it. Random community forks are NOT used unless no official asset exists and the gap is critical.
 
-## 1. Why default-off
+## 1. Scope (official-first)
 
-MCPs spawn long-running processes, eat 55k–100k tokens at startup with 5+ servers active — before first message. CLI + skill same result, zero overhead. Register arbitrary third-party MCPs disabled; enable per-session when needed. Managed exceptions must justify their always-on cost: DeepWiki has no CLI equivalent, and context-mode provides routing/session-continuity hooks rather than only another tool surface.
+Manage officially: an asset counts as "official" only if published by the tool vendor's own org (e.g. `github/`, `cloudflare/`, `googleworkspace/`, `tavily-ai/`, `semgrep/`, `ast-grep/`, `anthropic/`, `JuliusBrussee/caveman`, `mksglu/context-mode`) — or by a long-maintained primary maintainer of the tool. Random one-star community forks do NOT qualify.
+
+Per-agent install method follows the vendor's docs verbatim:
+- Claude Code: `claude plugin install …` / `claude mcp add …`
+- Gemini CLI: `gemini extensions install …` / settings.json `mcpServers`
+- OpenCode: `opencode.json` `plugin` array / `mcp` block
+- Pi CLI: `pi install npm:<pkg>` / `~/.pi/agent/mcp.json` (via `pi-mcp-adapter` for stdio/HTTP MCPs)
+- Codex CLI: `~/.codex/config.toml` MCP block / `~/.codex/hooks.json` / canonical `npx skills add <repo> -a codex` for skill packs that publish that path
+
+Mirror policy: when an asset is published only for some agents (e.g. Claude plugin only, no Gemini extension), copy the vendor's exact SKILL.md / manifest into the other agents' skill paths verbatim. Do NOT rewrite, summarise, or "improve" upstream content — that introduces drift and authoring debt.
+
+`fulcrum uninstall` must remove every artifact each official install command created — registry entry, package, MCP block, file copy. Anything that the vendor's docs say to call (`claude plugin uninstall …`, `gemini extensions uninstall …`, `npx skills remove …`) is called from `uninstall`. Things the vendor explicitly leaves to the user (e.g. `npm uninstall -g context-mode` because there is no upstream contract) are documented but not auto-run.
+
+## 2. Why we still warn about MCP cost
+
+MCPs spawn long-running processes; 5+ active can eat 55–100k tokens at session start before the first message. The "official-first" policy above does not mean every MCP is always-on — it means we **manage** every official MCP (install/uninstall correctly) but the **enable** state is per-session/per-agent. Specifically: `fulcrum mcp enable <name>` registers; `fulcrum mcp disable <name>` deregisters; doctor reports startup-cost estimates per registered MCP. Default for new users: enable only DeepWiki + context-mode. Other official MCPs (github-mcp-server, cloudflare/mcp-server-cloudflare, vendor MCPs) are registered as available but disabled by default.
 
 ## 2. Disable claude.ai defaults
 
