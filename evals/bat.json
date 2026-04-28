@@ -4,7 +4,7 @@
   {"query": "Show the CLI command that prints `service.yaml` with YAML syntax highlighting:\n```yaml\nservice:\n  name: api\n  replicas: 3\n```", "should_trigger": true},
   {"query": "Show the CLI command that prints `main.rs` in the terminal with Rust syntax colors:\n```rust\nfn main() {\n    let x: u32 = 42;\n    println!(\"{}\", x);\n}\n```", "should_trigger": true},
   {"query": "Show the CLI pipe that takes `kubectl get -o yaml` output and renders it with YAML syntax highlighting in the terminal.", "should_trigger": true},
-  {"query": "Show the CLI command for a syntax-aware diff between `a.ts` and `b.ts` (using a `cat`-replacement tool, not `git diff`).", "should_trigger": true},
+  {"query": "Show the CLI command that previews `a.ts` with TypeScript syntax colors and line numbers in the terminal.", "should_trigger": true},
   {"query": "Show the CLI command that previews lines 40–80 of `app.go` with Go syntax highlighting.", "should_trigger": true},
   {"query": "Show the CLI command that prints `Dockerfile` to the terminal with Dockerfile syntax colors and line numbers.", "should_trigger": true},
   {"query": "Show the CLI pipe that takes piped JSON and renders it with JSON syntax colors but no pager:\n```json\n{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}\n```", "should_trigger": true},

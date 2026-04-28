@@ -83,8 +83,10 @@ docs/                                  # context, hooks, skills, mcp, agents, ca
 rules/AGENTS.md                        # ~91-line pure behavioral rules; lint enforces ≤ 200 lines
 skills/
 ├── _template/SKILL.md                 # required shape
-├── <name>/SKILL.md × 28              # caveman-compressed; .original.md beside each
-├── <name>/SKILL.md.original.md × 28  # pre-compression human-edit form
+├── <name>/SKILL.md × 28              # compact trigger/routing file; .original.md beside each
+├── <name>/SKILL.original.md × 28     # human-edit form
+├── <name>/references/*.md            # direct, progressively loaded section detail
+├── <name>/references/*.original.md   # human-edit reference source
 ├── SOURCES.md                         # registry + queue + caveman requirement
 └── upstream.lock                      # populated when sourcing remote skills
 evals/<name>.json × 28                 # 18–21-entry trigger sets per skill (inline-data queries)
@@ -198,7 +200,7 @@ Starting `evals/jq.match-words` was too narrow (`jq 'select(`). Trigger rate: 8%
    - **a. Misses where Claude correctly declined** ("no X file", "which file?"): inline data in `evals/<skill>.json` is missing or insufficient. Edit that query to embed concrete data inside a markdown fence.
    - **b. Misses where Claude DID demo the tool but match-words missed it**: edit `evals/<skill>.match-words` to broaden tokens. Keep them word-bounded — `grep -qw` matches whole words only.
    - **c. False-trigger where Claude declined but match-word still matched a response substring**: tighten `evals/<skill>.match-words` — drop or narrow the offending token.
-   - **d. Genuine description failure** (the skill body didn't help Claude pick the right tool): only THEN edit `skills/<skill>/SKILL.md.original.md`, run `bun run compress -- skills/<skill>/SKILL.md` to regenerate the compressed form, then `bun run src/index.ts skills sync` to propagate.
+   - **d. Genuine description failure** (the skill body didn't help Claude pick the right tool): only THEN edit `skills/<skill>/SKILL.original.md` and/or `skills/<skill>/references/*.original.md`, refresh the shipped `.md` form, then `bun run src/index.ts skills sync` to propagate.
 
 5. Re-run that one skill until it passes 80/20.
 
@@ -208,6 +210,8 @@ Starting `evals/jq.match-words` was too narrow (`jq 'select(`). Trigger rate: 8%
    ```bash
    scripts/eval-all.sh --model sonnet --runs-per-query 3
    ```
+
+Codex parity: `scripts/eval-skill-codex.sh <skill> --model <codex-model>` uses `codex exec --json --ephemeral` against `~/.codex/skills/fulcrum/<skill>`. Use it after `fulcrum skills sync` when changing frontmatter description length, YAML quoting, or progressive-disclosure layout.
 
 **Queue — 27 remaining in-repo skills** (jq verified at 83/0 in `/tmp/jq-sanity4`):
 

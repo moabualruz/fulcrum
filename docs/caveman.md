@@ -34,6 +34,7 @@ Every in-repo markdown → two files: `.original.md` (human-edit) and `.md` (age
 
 Targets:
 - `skills/<name>/SKILL.md` (all 28 skills)
+- `skills/<name>/references/*.md` (progressive section detail)
 - `rules/AGENTS.md` (behavioral rules)
 - Project `AGENTS.md`
 - `skills/SOURCES.md` (registry)
@@ -78,8 +79,9 @@ Caveman defaultMode:      ultra (from ~/.config/caveman/config.json)
 New `skills/<name>/SKILL.md`:
 
 1. Write uncompressed version.
-2. Run `bun run compress` or `scripts/compress-with-caveman.sh skills/<name>/SKILL.md`.
-3. Commit both `SKILL.md` and `SKILL.md.original.md`.
+2. Keep verbose section detail in `references/<section>.original.md` and shipped copy in `references/<section>.md`.
+3. Run `bun run compress` or `scripts/compress-with-caveman.sh skills/<name>/SKILL.md skills/<name>/references/*.md`.
+4. Commit shipped `.md` files and their `.original.md` siblings.
 
 Lint passes either form. CI `bun run compress -- --check` rejects commits where new `.md` lacks `.original.md` sibling.
 
