@@ -144,9 +144,21 @@ Two priorities, both grounded in concrete commits already on the branch (which m
 1. **Always-on agent compression.** Caveman is installed into every agent fulcrum installs into, with `/caveman ultra` as the default mode. This is a managed third-party skill, the same pattern as `obra/superpowers` and `anthropics/skills`. `fulcrum install` is the natural place to call the install command for each agent.
 2. **Compress all in-repo skills + rules at authoring time.** Every `skills/<name>/SKILL.md` and `rules/AGENTS.md` is rewritten into caveman-compressed form via `/caveman:compress <file>` (the resulting `<file>.original.md` backup is what humans edit; the compressed file is what agents read). New skills and rules go through the same compression pass before being committed.
 
+**Already installed on this host (verified end of last session):**
+
+| Agent | Where | Install command used |
+|---|---|---|
+| Claude Code | plugin `caveman@caveman` from marketplace `caveman` | `claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman` |
+| Gemini CLI | `~/.gemini/extensions/caveman/` | `gemini extensions install https://github.com/JuliusBrussee/caveman` |
+| Codex CLI | 6 skills under `~/.agents/skills/{caveman,caveman-compress,caveman-commit,caveman-help,caveman-review,compress}` (skills.sh cross-agent root) | `npx -y skills add JuliusBrussee/caveman -a codex -y -g` |
+| OpenCode | same `~/.agents/skills/` root, also copied for OpenCode | `npx -y skills add JuliusBrussee/caveman -a opencode -y -g` |
+| Pi CLI | dir not present on host | (skip) |
+
+Confirm `/caveman` and `/caveman:compress` are reachable in a fresh Claude Code session before scripting the rest.
+
 **Integration plan (concrete steps for the next session):**
 
-1. **Install caveman locally.** `claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman`. Verify the `/caveman` and `/caveman:compress` commands work in a Claude Code session.
+1. **Verify the local installs in a fresh agent session.** `/caveman` and `/caveman:compress <file>` should be invokable in Claude Code; `gemini` should pick up the extension; codex/opencode should resolve `~/.agents/skills/caveman/`. If any of the four didn't take, reinstall (commands above). The npx skills installer hangs on an interactive picker without `-y -g` — pin those flags.
 2. **Add caveman to `fulcrum install`.** New step in `src/cli/install.ts` that, per detected agent, runs the agent-native install command (Claude plugin install / Gemini extension install / `npx skills add JuliusBrussee/caveman -a <agent>` / `.codex/hooks.json` patch). Fail-soft if the agent's CLI isn't on PATH; log the manual command for the user.
 3. **Compress the 28 in-repo skills + rules.** New `bun run` script (e.g. `scripts/compress-with-caveman.sh`) that walks `skills/*/SKILL.md` and `rules/AGENTS.md`, runs `/caveman:compress` (or the underlying caveman binary) on each in `--ultra` mode, commits the compressed forms beside the originals (the `.original.md` backup pattern caveman uses). Update the lint to allow either form. After this lands, `fulcrum skills sync` deploys the compressed form to each agent — same path layout, just denser content.
 4. **Lock `/caveman ultra` as the default.** During `fulcrum install`, after the plugin/extension install succeeds, write the activation marker each agent uses (Claude Code SessionStart hook, Codex `.codex/hooks.json`, Gemini extension config) so caveman ultra is always-on without per-session opt-in.
