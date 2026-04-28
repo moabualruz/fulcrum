@@ -22,6 +22,14 @@ Usage:
                                      Remove Fulcrum-managed install artifacts.
   fulcrum compress [--check] [FILES...]
                                      Compress markdown with caveman; default targets shown in help.
+  fulcrum mcp list [--json]          List registered MCP servers.
+  fulcrum mcp register <name> [--http URL | --stdio CMD] [--vendor V] ...
+                                     Register an MCP server in the registry.
+  fulcrum mcp unregister <name>      Unregister and remove from all agents.
+  fulcrum mcp enable <name> [--agent <id> ...] [--all-agents]
+                                     Enable server and push to agents.
+  fulcrum mcp disable <name> [--agent <id> ...] [--all-agents]
+                                     Disable server and remove from agents.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -81,6 +89,11 @@ async function main() {
     case "compress": {
       const { run: runCompress } = await import("./cli/compress.ts");
       await runCompress(rest);
+      return;
+    }
+    case "mcp": {
+      const { run: runMcp } = await import("./cli/mcp-cmd.ts");
+      await runMcp(rest);
       return;
     }
     case "version":
