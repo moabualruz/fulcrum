@@ -196,81 +196,124 @@ The branch is being fast-forward-merged into `main` without a PR; no release yet
 
 ## 6. Remaining work
 
-### 6.0 Official-first migration (current focus)
+### 6.0 Official-first migration (DONE — for archive)
 
-The audits run on 2026-04-28 surfaced gaps from a recent policy reversal: managed scope is now **official-first** across every vendor-published agent asset. The earlier "narrow MCP" stance is dropped. New rule (also captured in §4 and `docs/mcp.md` §1):
+Policy reversal landed 2026-04-28: managed scope is **official-first** across every vendor-published agent asset. Captured in §4 and `docs/mcp.md` §1:
 
 > Manage every official vendor-published asset for tools in `docs/capabilities.md`: Claude plugin, MCP server, Gemini extension, OpenCode plugin, Pi package, vendor SKILL.md. Mirror vendor content verbatim into agents the vendor does not ship for. Never re-author content the vendor already publishes. MCPs with non-trivial startup cost are registered-but-disabled by default; per-session toggle via `fulcrum mcp enable/disable`.
 
-The migration ships in three waves. Each wave is a separate branch off `main` (post-merge) with its own commits. Wave-1 is the bug+canonical-method fix set; Wave-2 introduces the new MCP/skill management surfaces; Wave-3 broadens to every other tool with vendor assets.
+**All three waves shipped.** Summary:
 
-**Wave 1 — caveman canonical install/uninstall + first official skill swap**
+| Wave | Items | Outcome |
+|---|---|---|
+| W1 | Caveman canonical install/uninstall (`claude plugin uninstall`, `gemini extensions uninstall`, `npx skills add/remove`); Wrangler vendor skill pinned; ast-grep Claude plugin install path | `src/cli/install.ts`, `src/cli/uninstall.ts`, `src/cli/upstream-skills.ts`, `skills/upstream.lock` |
+| W2 | MCP registry infra (`mcp-registry.ts`, `mcp-cmd.ts`, doctor `mcp` section); github MCP; repomix MCP + 3 Claude plugins; authored `gh` skill archived to `skills/_archive/gh-authored/` | `src/cli/mcp-registry.ts`, `src/cli/mcp-cmd.ts`, `src/cli/mcp-builtins.ts`, `src/cli/doctor.ts` |
+| W3 | semgrep / context7 / tavily / playwright / dart MCPs; Cloudflare 9-endpoint suite | `src/cli/mcp-builtins.ts` (16 builtin servers total) |
 
-| # | Item | Source | Action |
-|---|---|---|---|
-| W1.1 | DONE — `claude plugin uninstall caveman@caveman` called in `removeCavemanCopies` when `.claude` exists + `claude` on PATH; best-effort log+continue | upstream README | `src/cli/uninstall.ts:removeCavemanCopies` |
-| W1.2 | DONE — `gemini extensions uninstall caveman` called in `removeCavemanCopies` when `.gemini` exists + `gemini` on PATH; best-effort | upstream README | `src/cli/uninstall.ts:removeCavemanCopies` |
-| W1.3 | DONE — Codex/OpenCode/Pi use `npx skills add JuliusBrussee/caveman -a <agent>` as canonical path; clone+copy fallback when npx absent; idempotency via caveman dir check | upstream README | `src/cli/install.ts:installCaveman` (npxAgentDefs loop) |
-| W1.4 | DONE — `npx skills remove caveman --yes` called per detected Codex/OpenCode/Pi agent; `removePath` fs fallback when npx absent | upstream README | `src/cli/uninstall.ts:removeCavemanCopies` |
-| W1.5 | DONE — `[skills.wrangler]` entry added to `skills/upstream.lock` (source=cloudflare/skills, Apache-2.0, tree_sha=7c449def, subpath_sha256+subpath_size computed via --update-pins) | `cloudflare/skills` | `skills/upstream.lock` |
-| W1.6 | DONE — `claude_plugin` optional sub-table added to `[skills.ast-grep]` in `skills/upstream.lock`; `UpstreamSkillLockEntry.claude_plugin` interface field added; `syncUpstreamSkills` special-cases Claude Code: calls `claude plugin marketplace add` + `claude plugin install` when `claude_plugin` set; other 4 agents keep file-copy; uninstall in `removeSkillNamespaces` calls `claude plugin uninstall <name>` for each entry with `claude_plugin` | `ast-grep/agent-skill` | `src/cli/upstream-skills.ts:syncUpstreamSkills`, `skills/upstream.lock` |
+**Built-in managed MCPs (16):** `github`, `repomix`, `semgrep`, `context7`, `tavily`, `playwright`, `dart`, `cloudflare-docs`, `cloudflare-workers-bindings`, `cloudflare-workers-builds`, `cloudflare-observability`, `cloudflare-radar`, `cloudflare-logpush`, `cloudflare-browser`, `cloudflare-containers`, `cloudflare-ai-gateway`. All default-disabled. Plus always-on `deepwiki` + `context-mode`.
 
-Doctor must report Wave-1 invariants: caveman uninstall leaves zero registry entries on Claude/Gemini; `fulcrum doctor --json caveman.agents[*].installed` reflects post-uninstall reality.
+**Tools with NO official vendor agent assets (authored skills retained):**
+- §1 Foundation: ripgrep, fd, fzf, jq, yq, bat, sd, eza, zoxide, xh, just, mise, direnv, tmux, difftastic, hyperfine, watchexec, universal-ctags, gitleaks, git-cliff
+- §2 Code intel: ast-grep (vendor skill pinned + Claude plugin path), lizard
+- §4 Services: gws, hcloud (no vendor MCP; community sources rejected), usql
+- §5 Language tools: every tool — vendors publish nothing for agents. Authored skills cover editor surface; CI tooling stays BYO per `docs/capabilities.md`.
 
-**Wave 2 — switch authored `gh` to `github-mcp-server` + add Repomix official assets**
+**Mirror policy.** When a vendor publishes only for some agents (e.g. repomix's 3 Claude plugins, cloudflare's `skills/` subtree, ast-grep's `.claude-plugin/` content), the vendor's exact bytes must be copied into the other agents' skill paths without rewriting. Source-truth lives in `~/.fulcrum/cache/<vendor>/`; mirror copies are byte-identical.
 
-| # | Item | Source | Action |
-|---|---|---|---|
-| W2.1 | DONE — `github` MCP registered (HTTP, `https://api.githubcopilot.com/mcp/`, default-disabled, auth_env_vars=GITHUB_TOKEN) via `src/cli/mcp-registry.ts`; `skills/gh/` archived to `skills/_archive/gh-authored/`; skills sync + lint + list all skip `_archive`; doctor `skillsCount` excludes archive; `SOURCES.md` updated | `github/github-mcp-server` | `src/cli/mcp-registry.ts` (DEFAULT_GITHUB_SERVER), `src/cli/install.ts:installMcpRegistryEntries`, `src/cli/doctor.ts` mcp section, `skills/_archive/gh-authored/` |
-| W2.2 | DONE — `repomix` MCP registered (stdio `npx -y repomix --mcp`, default-disabled) via registry; Claude Code gets 3 vendor plugins (`repomix-mcp`, `repomix-commands`, `repomix-explorer`) installed via `claude plugin` with idempotency marker; uninstall removes all 3 plugins + registry; doctor reports repomix in mcp section | `yamadashy/repomix` | `src/cli/mcp-registry.ts` (DEFAULT_REPOMIX_SERVER), `src/cli/install.ts:installMcpRegistryEntries`, `src/cli/uninstall.ts:uninstallRepomixClaudePlugins` |
+> ⚠ Mirror execution is incomplete as of 2026-04-29. W2/W3 registered MCP servers across all 5 agents, but the per-vendor SKILL.md / slash-command / explorer content from Claude-only assets has NOT yet been copied to the other 4 agents. Tracking under §6.0b below.
 
-**Shared infra shipped in W2:**
-- `src/cli/mcp-registry.ts` — TOML registry at `~/.fulcrum/state/global/mcp-registry.toml`; `registerServer`, `unregisterServer`, `setEnabled`, `applyToAgents`, `removeFromAgents`, `isEnabled`
-- `src/cli/mcp-cmd.ts` — `fulcrum mcp list/register/unregister/enable/disable`
-- `src/index.ts` — wired `case "mcp"`
-- `src/cli/doctor.ts` — `DoctorReport.mcp` section; "Managed MCPs" human output
-- `src/cli/install.ts` — step 8b registers github+repomix; installs repomix Claude plugins
-- `src/cli/uninstall.ts` — step 5b clears registry entries + repomix plugins; `--keep-state` flag
+---
 
-Tests: `mcp-registry.test.ts`, `mcp-cmd.test.ts` + doctor/install/uninstall test additions.
+### 6.0b Mirror translation gap (in flight)
 
-**Wave 3 — every remaining tool with official vendor agent assets**
+W2/W3 registered MCP endpoints across all 5 agents but stopped at MCP registration. For vendors that publish more than just an MCP server — slash commands, explorer skills, multi-skill `skills/` subtrees — the vendor content is currently installed only on the agent the vendor explicitly published for (typically Claude Code via plugin), not mirrored verbatim into the other 4 agents per the policy above.
 
-Discovery audit (`a37fce37255978aac`) ran 2026-04-28. Full inventory:
+Confirmed gaps (from 2026-04-29 audit):
 
-| # | Tool | Asset kind | Source URL | Per-agent canonical method | Notes |
-|---|---|---|---|---|---|
-| W3.1 | `gh` | MCP (HTTP) | `github/github-mcp-server` → `https://api.githubcopilot.com/mcp/` | Claude: `claude mcp add -s user -t http github-mcp https://api.githubcopilot.com/mcp/`. Codex: `[mcp_servers.github-mcp] url = "..."`. Gemini: `mcpServers.github-mcp.httpUrl`. OpenCode: `mcp.github-mcp.type=remote+url`. Pi: `~/.pi/agent/mcp.json` via adapter. Auth: GitHub PAT via `GITHUB_TOKEN` env or `gh auth login`. | Replaces authored `skills/gh/`. Same as W2.1; merged here for one cohesive table. Default-disabled (auth required). |
-| W3.2 | `repomix` | Claude plugin × 3 + MCP | `yamadashy/repomix/.claude-plugin/marketplace.json` (plugins: `repomix-mcp`, `repomix-commands`, `repomix-explorer`) + `npx repomix --mcp` | Claude: `claude plugin marketplace add yamadashy/repomix && claude plugin install repomix-mcp@repomix && claude plugin install repomix-commands@repomix && claude plugin install repomix-explorer@repomix`. Other 4 agents: register `repomix --mcp` via stdio MCP entry in respective config (Codex TOML `command`, Gemini `command`, OpenCode `type: local`, Pi `command`). | Same as W2.2; merged. Repomix CLI install is BYO (`npm i -g repomix`); doctor already tracks. |
-| W3.3 | `semgrep` | MCP (in-binary) | `semgrep/semgrep` (develop branch) — `semgrep --experimental mcp` | Stdio MCP entry per agent invoking `semgrep --experimental mcp`. | **DONE** — registered as `semgrep` in registry (`src/cli/mcp-builtins.ts`). 3 vendor skills kept in `upstream.lock`. |
-| W3.4 | `ctx7` | MCP (HTTP + npm) | `upstash/context7` → remote `https://mcp.context7.com/mcp` (HTTP) | HTTP MCP. Auth: `CONTEXT7_API_KEY` optional. | **DONE** — registered as `context7`. Community fork `edxeth/superlight-context7-skill` archived to `skills/_archive/upstream-removed.lock`. |
-| W3.5 | `tvly` (Tavily) | MCP (HTTP + npm) | `tavily-ai/tavily-mcp` → remote `https://mcp.tavily.com/mcp/` (HTTP) | HTTP MCP. Auth: `TAVILY_API_KEY`. | **DONE** — registered as `tavily`. 7 vendor skills kept in `upstream.lock`. |
-| W3.6 | `playwright-cli` | MCP (npm) | `microsoft/playwright-mcp` → npm `@playwright/mcp@latest` (stdio) | Stdio MCP `npx -y @playwright/mcp@latest`. | **DONE** — registered as `playwright`. Vendor `playwright-cli` skill kept in `upstream.lock`. |
-| W3.7 | `wrangler` + `flarectl` | MCP (HTTP, multi-suite) | `cloudflare/mcp-server-cloudflare` → 9 remote endpoints | 9 separate registry entries with `cloudflare-` prefix. | **DONE** — registered as `cloudflare-docs` (no auth), `cloudflare-workers-bindings`, `cloudflare-workers-builds`, `cloudflare-observability`, `cloudflare-radar`, `cloudflare-logpush`, `cloudflare-browser`, `cloudflare-containers`, `cloudflare-ai-gateway`. Wrangler skill kept. |
-| W3.8 | `dart` | MCP (in-package) | `dart-lang/ai/pkgs/dart_mcp_server` | Stdio MCP `dart mcp-server`. | **DONE** — registered as `dart`. Doctor hints when `dart` not on PATH. |
+- **repomix** — vendor publishes 3 Claude plugins (`repomix-mcp`, `repomix-commands`, `repomix-explorer`). `repomix-mcp` ≡ MCP server (mirrored via stdio MCP entry across 5 agents). `repomix-commands` (slash-command pack) and `repomix-explorer` (skill) are installed only on Claude Code; not yet copied to Codex / Gemini / OpenCode / Pi.
+- **cloudflare/skills** — vendor publishes a `skills/` subtree with one SKILL.md per service (Workers, KV, R2, Workers Bindings, AI Gateway, Browser, Containers, etc.). We pin only `wrangler` from this set. The other vendor skills are unpinned.
+- **ast-grep/agent-skill** — vendor ships content under `.claude-plugin/` beyond the single SKILL.md we pin. Slash-command + skill content for non-Claude agents still needs to be inventoried and pinned.
+- **Other vendors** — full audit pending (see Phase A in the in-flight remediation task).
 
-### Tools with NO official vendor agent assets (keep authored skills as-is)
+The remediation pass: clone each vendor at the pinned SHA, walk every published agent asset, add a lockfile entry per asset (subpath_sha256 + subpath_size), let `fulcrum skills upstream` fan out to all 5 agents under `fulcrum-upstream/<asset>/`. No rewriting — vendor bytes only. When this lands, §6.0b collapses and `docs/mcp.md` §3 grows the per-vendor "skills also pinned" lines.
 
-§1 Foundation: `ripgrep`, `fd`, `fzf`, `jq`, `yq`, `bat`, `sd`, `eza`, `zoxide`, `xh`, `just`, `mise`, `direnv`, `tmux`, `difftastic`, `hyperfine`, `watchexec`, `universal-ctags`, `gitleaks`, `git-cliff`
-§2 Code intel: `ast-grep` (vendor-published skill at `ast-grep/agent-skill` — already pinned; W1.6 switches Claude path to plugin install), `lizard`
-§4 Services: `gws` (verify URL — earlier audit B claimed `googleworkspace/cli/tree/main/skills` exists; discovery agent could not confirm. Re-fetch before pinning), `hcloud` (Hetzner publishes nothing; honor "no community-only" rule), `usql`, `pi-mcp-adapter` (community publisher; keep using as Pi MCP infrastructure but does not count as a "managed official asset")
-§5 Language tools: every tool — vendors publish nothing. Authored skills cover the editor surface; CI tooling stays BYO per `docs/capabilities.md`.
+Until §6.0b clears, do not claim "official-first mirror policy is complete" — only "official-first MCPs are managed; per-vendor skill content is partial."
 
-### W3 mechanics
+---
 
-- `fulcrum mcp list/enable/disable/register/unregister` CLI is DONE (shipped in W2). State in `~/.fulcrum/state/global/mcp-registry.toml`. Default-enabled set: `deepwiki`, `context-mode`. Default-disabled set: every W2/W3 entry (`github`, `repomix`, and below) — user runs `fulcrum mcp enable github` per session-or-permanently.
-- `fulcrum install` registers the W3 MCPs as available for every detected agent but does not enable them automatically (avoids the 55–100k-tokens-at-startup foot-gun warned about in `docs/mcp.md` §2).
-- `fulcrum uninstall` removes every W3 registration regardless of enabled state.
-- `fulcrum doctor` adds an `mcp` section: per registered MCP shows `enabled`, `agent_visibility[5]`, `auth_status` (env-var presence checks where applicable), `endpoint_reachable` (HEAD on remote URL or `which` on stdio command).
-- Mirror policy (the user's "mimic to other agents that don't have full support, no new content" rule): when a vendor publishes only for some agents (e.g. repomix's 3 Claude plugins), copy the vendor's exact `SKILL.md` and command spec into the other 4 agents' skills/MCP config without rewriting. Source-truth lives in `~/.fulcrum/cache/<vendor>/` (already used for caveman + upstream skills); mirror copies are the same bytes.
+### 6.0a Manual setup checklist (per machine)
 
-**Ship discipline.** Every wave change carries:
-- Test in `src/cli/<file>.test.ts` for install + uninstall round-trip in a scratch HOME.
-- Doctor delta (new fields in `DoctorReport`, displayed in human + json output).
-- Docs delta in the relevant `docs/<area>.md` (mcp / agents / skills / capabilities).
-- Conventional-commit message naming the vendor + agent.
+`fulcrum install` does the file/config side. Auth and binary-toolchain setup remains the operator's responsibility per `docs/capabilities.md` (BYO toolchain). The list below covers everything a fresh machine needs to bring `fulcrum doctor --json` to `verdict: "ok"` with all 16 managed MCPs reachable.
 
-W1+W2+W3 all landed. §6.0 is complete. See §6.1+ (Agent OS layers) for remaining work.
+#### A. One-time, before `fulcrum install`
+
+- [ ] Install [Bun](https://bun.sh) (`curl -fsSL https://bun.sh/install | bash`) — required to build/run from clone.
+- [ ] Install the workstation toolchain per `docs/capabilities.md` §1 (rg, fd, fzf, jq, yq, bat, sd, eza, zoxide, xh, gh, just, mise, direnv, tmux, difftastic, hyperfine, watchexec, universal-ctags, gitleaks, git-cliff). `brew install` line is in the doc.
+- [ ] Install `flarectl` (`go install github.com/cloudflare/cloudflare-go/cmd/flarectl@latest`) if you want the authored Cloudflare DNS skill.
+- [ ] Install `usql` (`brew install usql`) if you want the authored DB skill.
+- [ ] (Optional) `pip install semgrep lizard pip-audit` for §2 + §5 security tools.
+- [ ] (Optional) `cargo install cargo-deny` for Rust supply-chain checks.
+
+#### B. Run `fulcrum install`
+
+```
+bash scripts/install.sh
+```
+
+This step is fully automated — splices rules, vendors hook snippets, seeds policy, installs caveman per agent (canonical vendor commands), installs context-mode, syncs 27 authored skills + 20 upstream skills, registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`), and registers all 16 builtin MCPs in the registry as default-disabled.
+
+#### C. Auth — required for managed MCPs you plan to enable
+
+Recommended layout (mirrors what `fulcrum doctor` checks):
+
+```bash
+mkdir -p ~/.config/fulcrum-secrets
+cat > ~/.config/fulcrum-secrets/env.sh <<'EOF'
+# Required for the MCPs you actually use
+export TAVILY_API_KEY="..."             # tavily
+export CLOUDFLARE_API_TOKEN="..."       # all cloudflare-* MCPs
+export CLOUDFLARE_ACCOUNT_ID="..."      # all cloudflare-* MCPs except cloudflare-docs / cloudflare-radar
+# Optional
+# export CONTEXT7_API_KEY="..."         # context7 (free tier works without)
+# export SEMGREP_APP_TOKEN="..."        # only for Semgrep AppSec cloud features
+# export GWS_CLIENT_SECRETS="..."       # Google Workspace OAuth client_secret JSON path
+# export GOOGLE_APPLICATION_CREDENTIALS="..." # gcloud ADC path
+EOF
+chmod 600 ~/.config/fulcrum-secrets/env.sh
+grep -q "fulcrum-secrets/env.sh" ~/.zshrc \
+  || echo '[ -f ~/.config/fulcrum-secrets/env.sh ] && source ~/.config/fulcrum-secrets/env.sh' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Per-token sources are in `docs/mcp.md` §5 (one row per managed MCP).
+
+#### D. Adjacent CLI auth (for skills, not MCPs)
+
+- [ ] `gh auth login` — covers the `gh` skill + git operations (alternative: `GITHUB_TOKEN` env).
+- [ ] `gcloud auth login` and `gcloud auth application-default login` — for Google Cloud SDK + ADC.
+- [ ] `wrangler login` — Cloudflare Workers CLI OAuth (independent of the Cloudflare MCP API token).
+- [ ] Anthropic / Claude — Claude Code uses macOS Keychain or platform secret store; no env var needed for the Claude CLI itself.
+
+#### E. Enable the MCPs you actually want active
+
+Default state after install: every builtin MCP is registered but disabled. Per `docs/mcp.md` §1a, leaving 16 MCPs enabled costs ~150–300k tokens at session start. Enable selectively:
+
+```bash
+# Enable per agent (or omit --agent for current default)
+fulcrum mcp enable github --all-agents
+fulcrum mcp enable tavily --agent claude-code
+fulcrum mcp list                 # see state
+fulcrum mcp disable <name> --all-agents  # turn off again
+```
+
+#### F. Verify
+
+```
+fulcrum doctor                              # human; verdict line at the end
+fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, auth_status}'
+```
+
+All five agents should be detected, rules spliced, caveman installed, Pi adapter present, and `auth_status` should be `ok` for every MCP whose env var you set (or `n/a` for MCPs that don't need auth).
 
 ---
 

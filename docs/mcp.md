@@ -17,7 +17,7 @@ Mirror policy: when an asset is published only for some agents (e.g. Claude plug
 
 `fulcrum uninstall` must remove every artifact each official install command created — registry entry, package, MCP block, file copy. Anything that the vendor's docs say to call (`claude plugin uninstall …`, `gemini extensions uninstall …`, `npx skills remove …`) is called from `uninstall`. Things the vendor explicitly leaves to the user (e.g. `npm uninstall -g context-mode` because there is no upstream contract) are documented but not auto-run.
 
-## 2. Why we still warn about MCP cost
+## 1a. Cost rationale (why default-disabled)
 
 MCPs spawn long-running processes; 5+ active can eat 55–100k tokens at session start before the first message. The "official-first" policy above does not mean every MCP is always-on — it means we **manage** every official MCP (install/uninstall correctly) but the **enable** state is per-session/per-agent. Specifically: `fulcrum mcp enable <name>` registers; `fulcrum mcp disable <name>` deregisters; doctor reports startup-cost estimates per registered MCP. Default for new users: enable only DeepWiki + context-mode. Other official MCPs (github-mcp-server, cloudflare/mcp-server-cloudflare, vendor MCPs) are registered as available but disabled by default.
 
@@ -239,6 +239,93 @@ Agent IDs: `claude-code`, `codex`, `gemini`, `opencode`, `pi`.
 `fulcrum install` registers all 16 builtin servers (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart) — all default-disabled. `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
 
 `fulcrum doctor` reports each registered server: enabled-on-which-agents, env-var auth status, and HEAD-probe reachability for HTTP servers.
+
+## 5. Auth requirements per managed MCP
+
+Every managed MCP is registered by `fulcrum install`. Auth is your responsibility — Fulcrum does not store secrets. Recommended layout:
+
+```
+~/.config/fulcrum-secrets/
+└── env.sh        # chmod 600; sourced from your shell rc (~/.zshrc, etc)
+```
+
+Add a single source line to your shell rc:
+
+```bash
+# ~/.zshrc (or ~/.bashrc)
+[ -f ~/.config/fulcrum-secrets/env.sh ] && source ~/.config/fulcrum-secrets/env.sh
+```
+
+`fulcrum doctor --json | jq '.mcp.servers[] | {name, auth_status}'` reports which managed MCPs have their env vars set.
+
+| MCP | Env var(s) | How to obtain |
+|---|---|---|
+| `deepwiki` | none | always-on |
+| `context-mode` | none | always-on |
+| `github` | `GITHUB_TOKEN` (or `gh auth login` — many tools read either) | [github.com/settings/tokens](https://github.com/settings/tokens) — fine-grained PAT with `repo`, `read:org`, `gist` |
+| `repomix` | none | stdio MCP via `npx`; no auth |
+| `semgrep` | none for local scans; `SEMGREP_APP_TOKEN` only for Semgrep AppSec Platform | [semgrep.dev/orgs/-/settings/tokens](https://semgrep.dev/orgs/-/settings/tokens) (only if using cloud features) |
+| `context7` | `CONTEXT7_API_KEY` (optional — free tier works without; key raises rate limit) | [context7.com](https://context7.com) → run `npx ctx7@latest login` and copy generated key |
+| `tavily` | `TAVILY_API_KEY` (required) | [app.tavily.com](https://app.tavily.com) → API Keys |
+| `playwright` | none | stdio MCP via `npx`; first run downloads chromium (~170 MB) |
+| `dart` | none | requires Dart SDK ≥ 3.9.0-163.0.dev with `dart mcp-server` subcommand |
+| `cloudflare-docs` | none (public) | always-on for the public docs MCP |
+| `cloudflare-workers-bindings` | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens). Account id from the dashboard sidebar or `curl -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts \| jq '.result[].id'` |
+| `cloudflare-workers-builds` | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | same |
+| `cloudflare-observability` | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | same |
+| `cloudflare-radar` | `CLOUDFLARE_API_TOKEN` | same |
+| `cloudflare-logpush` | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | same |
+| `cloudflare-browser` | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | same |
+| `cloudflare-containers` | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | same |
+| `cloudflare-ai-gateway` | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | same |
+
+The Cloudflare suite reuses one `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` for every endpoint — set them once.
+
+### Adjacent CLI auth (not MCP, but used by skills)
+
+| Tool | Auth path | Note |
+|---|---|---|
+| `gh` (GitHub CLI) | `gh auth login` (web flow); macOS keychain or `~/.config/gh/hosts.yml` on Linux | covers `gh` skill + git operations; `GITHUB_TOKEN` env var works as alternative |
+| `gcloud` (Google Cloud SDK) | `gcloud auth login` + `gcloud auth application-default login` | the second populates `~/.config/gcloud/...adc.json` for Application Default Credentials |
+| `wrangler` (Cloudflare Workers CLI) | `wrangler login` | OAuth flow; stores token in `~/.wrangler/config/default.toml` (Linux) or platform equivalent. Wrangler CLI is independent of the Cloudflare MCP API token. |
+| Google Workspace OAuth client | place client_secret JSON at a path of your choice; export `GWS_CLIENT_SECRETS` to point at it | for any tool using Google Workspace OAuth flows |
+| Anthropic / Claude | macOS Keychain (Claude Code itself) or `ANTHROPIC_API_KEY` for SDK callers | Fulcrum does not read this; `scripts/eval-skill-claude.sh` uses the keychain via `claude` CLI |
+
+### Setting it all up the first time
+
+```bash
+# 1. Create the secrets file
+mkdir -p ~/.config/fulcrum-secrets
+cat > ~/.config/fulcrum-secrets/env.sh <<'EOF'
+# Required
+export TAVILY_API_KEY="..."
+export CLOUDFLARE_API_TOKEN="..."
+export CLOUDFLARE_ACCOUNT_ID="..."
+
+# Optional (uncomment what you use)
+# export CONTEXT7_API_KEY="..."
+# export SEMGREP_APP_TOKEN="..."
+# export GWS_CLIENT_SECRETS="$HOME/path/to/client_secret.json"
+# export GOOGLE_APPLICATION_CREDENTIALS="$HOME/path/to/adc.json"
+EOF
+chmod 600 ~/.config/fulcrum-secrets/env.sh
+
+# 2. Source from your shell rc (idempotent)
+grep -q "fulcrum-secrets/env.sh" ~/.zshrc \
+  || echo '[ -f ~/.config/fulcrum-secrets/env.sh ] && source ~/.config/fulcrum-secrets/env.sh' >> ~/.zshrc
+source ~/.zshrc
+
+# 3. Run interactive logins for adjacent CLI tools as needed
+gh auth login                                 # GitHub
+gcloud auth login                             # Google Cloud (interactive)
+gcloud auth application-default login         # ADC for libraries
+wrangler login                                # Cloudflare Workers CLI
+
+# 4. Verify
+fulcrum doctor --json | jq '.mcp.servers[] | {name, auth_status}'
+```
+
+`auth_status: "ok"` means the env var is set; `missing-env` means a required env var is absent; `n/a` means no auth needed.
 
 ## Cross-agent
 
