@@ -1,23 +1,13 @@
 // Tests for caveman install logic in install.ts.
-// Uses Bun test runner; no GitHub network access (file:// fixture repo).
+// Uses Bun test runner; no GitHub network access.
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach, afterEach, spyOn } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { assertNotAgentsPath, installCavemanByCopy, lockCavemanUltra, spliceSentinel, setDryRun } from "./install.ts";
+import { assertNotAgentsPath, lockCavemanUltra, spliceSentinel, setDryRun } from "./install.ts";
 import { run as runProc } from "../utils/proc.ts";
 import * as proc from "../utils/proc.ts";
-
-let TMP: string;
-
-beforeAll(async () => {
-  TMP = await mkdtemp(join(tmpdir(), "fulcrum-install-"));
-});
-
-afterAll(async () => {
-  await rm(TMP, { recursive: true, force: true });
-});
 
 // ---------------------------------------------------------------------------
 // 1. ~/.agents/ guard
@@ -53,80 +43,7 @@ describe("assertNotAgentsPath", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. installCavemanByCopy — idempotency + local file:// repo fixture
-// ---------------------------------------------------------------------------
-
-/** Build a minimal local git repo that mimics the caveman upstream layout. */
-async function buildFixtureRepo(dir: string): Promise<void> {
-  // git init
-  await runProc(["git", "init", dir]);
-  await runProc(["git", "-C", dir, "config", "user.email", "test@test.com"]);
-  await runProc(["git", "-C", dir, "config", "user.name", "Test"]);
-
-  // create skills/<name>/SKILL.md for each caveman skill
-  const skills = ["caveman", "caveman-commit", "caveman-help", "caveman-review", "compress"];
-  for (const skill of skills) {
-    const skillDir = join(dir, "skills", skill);
-    await mkdir(skillDir, { recursive: true });
-    await writeFile(join(skillDir, "SKILL.md"), `---\nname: ${skill}\n---\n# ${skill}\n`);
-  }
-
-  // initial commit
-  await runProc(["git", "-C", dir, "add", "."]);
-  await runProc(["git", "-C", dir, "commit", "-m", "init"]);
-}
-
-describe("installCavemanByCopy", () => {
-  test("copies all skill subfolders into agent skills root", async () => {
-    const cloneDir = join(TMP, "fixture-repo");
-    await buildFixtureRepo(cloneDir);
-
-    const agentSkillsRoot = join(TMP, "agent-skills-1");
-    const fakeHome = TMP;
-
-    await installCavemanByCopy(agentSkillsRoot, { cloneDir, home: fakeHome });
-
-    // verify each skill subfolder was created
-    const skills = ["caveman", "caveman-commit", "caveman-help", "caveman-review", "compress"];
-    for (const skill of skills) {
-      const skillMd = join(agentSkillsRoot, skill, "SKILL.md");
-      const f = Bun.file(skillMd);
-      expect(await f.exists()).toBe(true);
-    }
-  });
-
-  test("second call (idempotent) — no error, files still present", async () => {
-    const cloneDir = join(TMP, "fixture-repo");
-    // reuse the same cloneDir from previous test (already committed)
-
-    const agentSkillsRoot = join(TMP, "agent-skills-2");
-    const fakeHome = TMP;
-
-    // first call
-    await installCavemanByCopy(agentSkillsRoot, { cloneDir, home: fakeHome });
-    // second call — must not throw
-    await expect(
-      installCavemanByCopy(agentSkillsRoot, { cloneDir, home: fakeHome })
-    ).resolves.toBeUndefined();
-
-    // files still present after second call
-    const skillMd = join(agentSkillsRoot, "caveman", "SKILL.md");
-    expect(await Bun.file(skillMd).exists()).toBe(true);
-  });
-
-  test("throws if agentSkillsRoot is under ~/.agents/", async () => {
-    const cloneDir = join(TMP, "fixture-repo");
-    const fakeHome = TMP;
-    const forbidden = join(fakeHome, ".agents", "skills");
-
-    await expect(
-      installCavemanByCopy(forbidden, { cloneDir, home: fakeHome })
-    ).rejects.toThrow("HARD RULE VIOLATION");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 3. lockCavemanUltra
+// 2. lockCavemanUltra
 // ---------------------------------------------------------------------------
 
 describe("lockCavemanUltra", () => {
@@ -287,10 +204,9 @@ describe("installCaveman W1.3 — npx skills add canonical path", () => {
     try {
       const { run: installRun } = await import("./install.ts");
       await installRun(["--no-upstream-skills"]);
-      // Either npx path or clone fallback must be logged for Codex.
+      // Either npx path or skip must be logged for Codex.
       const codexHandled = logs.some((l) =>
         (l.includes("npx") && l.includes("JuliusBrussee/caveman")) ||
-        l.includes("clone+copy fallback") ||
         l.includes("npx not on PATH") ||
         l.includes("Codex CLI caveman")
       );
@@ -321,43 +237,8 @@ describe("installCaveman W1.3 — npx skills add canonical path", () => {
 
 });
 
-// Test installCavemanByCopy fallback outside dry-run scope.
-describe("installCaveman W1.3 — clone+copy fallback (non-dry-run)", () => {
-  let testHome: string;
-
-  beforeEach(async () => {
-    testHome = await mkdtemp(join(tmpdir(), "caveman-fallback-"));
-    setDryRun(false);
-  });
-
-  afterEach(async () => {
-    setDryRun(false);
-    await rm(testHome, { recursive: true, force: true });
-  });
-
-  test("installCavemanByCopy fallback: copies all 5 skills when clone succeeds", async () => {
-    const cloneDir = join(testHome, "fixture-caveman");
-    await runProc(["git", "init", cloneDir]);
-    await runProc(["git", "-C", cloneDir, "config", "user.email", "test@test.com"]);
-    await runProc(["git", "-C", cloneDir, "config", "user.name", "Test"]);
-    for (const skill of ["caveman", "caveman-commit", "caveman-help", "caveman-review", "compress"]) {
-      await mkdir(join(cloneDir, "skills", skill), { recursive: true });
-      await writeFile(join(cloneDir, "skills", skill, "SKILL.md"), `# ${skill}\n`);
-    }
-    await runProc(["git", "-C", cloneDir, "add", "."]);
-    await runProc(["git", "-C", cloneDir, "commit", "-m", "test"]);
-
-    const agentSkillsRoot = join(testHome, "fallback-agent-skills");
-    await installCavemanByCopy(agentSkillsRoot, { cloneDir, home: testHome });
-
-    for (const skill of ["caveman", "caveman-commit", "caveman-help", "caveman-review", "compress"]) {
-      expect(await Bun.file(join(agentSkillsRoot, skill, "SKILL.md")).exists()).toBe(true);
-    }
-  });
-});
-
 // ---------------------------------------------------------------------------
-// 4. dry-run mode
+// 3b. dry-run mode
 // ---------------------------------------------------------------------------
 
 describe("dry-run mode", () => {

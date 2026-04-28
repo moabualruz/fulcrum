@@ -16,19 +16,6 @@ const AUTHOR_CLASSES = new Set(["tool-vendor", "foundation", "individual"] as co
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TREE_SHA = /^[0-9a-f]{40}$/i;
 
-/**
- * Optional Claude plugin descriptor for skills that have an official Claude
- * plugin marketplace entry (W1.6).  When present, Claude Code uses
- * `claude plugin marketplace add <marketplace>` + `claude plugin install <name>`
- * instead of the file-copy path.  Other agents always use the file-copy path.
- */
-export interface ClaudePluginDescriptor {
-  /** Marketplace identifier, e.g. "ast-grep/agent-skill". */
-  marketplace: string;
-  /** Plugin name passed to `claude plugin install`, e.g. "ast-grep@ast-grep/agent-skill". */
-  name: string;
-}
-
 export interface UpstreamSkillLockEntry {
   source: string;
   subpath: string;
@@ -43,11 +30,18 @@ export interface UpstreamSkillLockEntry {
   /** Total byte-size of files included in the subtree hash (sanity check). */
   subpath_size?: number;
   /**
-   * Optional: when set, Claude Code installs via `claude plugin` instead of
-   * file copy.  Other agents always use the file-copy path.  Additive optional;
-   * entries without this field behave identically to before W1.6.
+   * Optional: vendor-canonical install via `claude plugin` instead of file copy.
+   * Retained for uninstall/audit purposes even after the install path moved to
+   * `npx skills add` in init-vendor.ts.
    */
   claude_plugin?: ClaudePluginDescriptor;
+}
+
+export interface ClaudePluginDescriptor {
+  /** Marketplace identifier, e.g. "ast-grep/agent-skill". */
+  marketplace: string;
+  /** Plugin name passed to `claude plugin install`, e.g. "ast-grep@ast-grep/agent-skill". */
+  name: string;
 }
 
 export interface UpstreamSkill extends UpstreamSkillLockEntry {

@@ -20,7 +20,7 @@
 
 import { mkdir, readFile, writeFile, copyFile, readdir, stat, appendFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { which, run as runProc, cloneOrUpdate } from "../utils/proc.ts";
+import { which, run as runProc } from "../utils/proc.ts";
 import { AGENTS } from "../agents/registry.ts";
 
 // ---------------------------------------------------------------------------
@@ -66,14 +66,6 @@ async function runProcDry(cmd: string[]): Promise<{ exit: number; stdout: string
   return runProc(cmd);
 }
 
-/** cloneOrUpdate wrapper — skips in dry-run. */
-async function cloneOrUpdateDry(url: string, dir: string): Promise<{ exit: number; stdout: string; stderr: string }> {
-  if (DRY_RUN) {
-    console.log(`     [dry-run] would run: git clone/update ${url} → ${dir}`);
-    return { exit: 0, stdout: "", stderr: "" };
-  }
-  return cloneOrUpdate(url, dir);
-}
 
 const BEGIN = "<!-- BEGIN FULCRUM RULES -->";
 const END   = "<!-- END FULCRUM RULES -->";
@@ -174,11 +166,6 @@ async function seedPolicy(): Promise<void> {
   console.log(`     installed default policy: ${dst}`);
 }
 
-// Skill subfolders from caveman upstream to copy into each agent's skills root.
-// Source: HANDOVER.md §6.1 / task spec. 5 folders (caveman-compress is excluded
-// per task spec — upstream ships it nested differently; we carry the usable 5).
-const CAVEMAN_SKILLS = ["caveman", "caveman-commit", "caveman-help", "caveman-review", "compress"] as const;
-
 const CAVEMAN_REPO = "https://github.com/JuliusBrussee/caveman";
 
 /**
@@ -211,57 +198,12 @@ async function geminiShim(): Promise<void> {
 }
 
 /**
- * Copy all CAVEMAN_SKILLS subfolders from a cloned caveman repo into agentSkillsRoot.
- * assertNotAgentsPath guards each target before any write.
- */
-export async function installCavemanByCopy(
-  agentSkillsRoot: string,
-  opts: { cloneDir: string; home: string }
-): Promise<void> {
-  assertNotAgentsPath(agentSkillsRoot, opts.home);
-  await mk(agentSkillsRoot);
-  for (const skill of CAVEMAN_SKILLS) {
-    const src = `${opts.cloneDir}/skills/${skill}`;
-    const dst = `${agentSkillsRoot}/${skill}`;
-    assertNotAgentsPath(dst, opts.home);
-    // In dry-run the clone hasn't happened, so skip the isDir check and just
-    // report what would be copied.
-    if (DRY_RUN) {
-      console.log(`     [dry-run] would copy skill: ${src} → ${dst}`);
-      continue;
-    }
-    if (!(await isDir(src))) {
-      console.log(`     · caveman skill '${skill}' not found in clone (skip)`);
-      continue;
-    }
-    await copyDirRecursive(src, dst);
-  }
-}
-
-/** Recursively copy a directory tree src → dst (overwrites; dst created if absent). */
-async function copyDirRecursive(src: string, dst: string): Promise<void> {
-  await mk(dst);
-  for (const entry of await readdir(src, { withFileTypes: true })) {
-    const s = `${src}/${entry.name}`;
-    const d = `${dst}/${entry.name}`;
-    if (entry.isDirectory()) {
-      await copyDirRecursive(s, d);
-    } else if (entry.isFile()) {
-      await cp(s, d);
-    }
-  }
-}
-
-/**
  * Install caveman into all detected agents.
  * Fail-soft per agent: log and continue on any error.
  *
  * HARD RULE: never write to ~/.agents/ — enforced via assertNotAgentsPath.
  */
 async function installCaveman(home: string): Promise<void> {
-  const fHome = process.env["FULCRUM_HOME"] ?? `${home}/.fulcrum`;
-  const cloneDir = `${fHome}/cache/caveman`;
-
   // --- Claude Code ---
   const claudeDir = `${home}/.claude`;
   if (await isDir(claudeDir)) {
@@ -307,40 +249,17 @@ async function installCaveman(home: string): Promise<void> {
     console.log("     · skip Gemini CLI (not detected)");
   }
 
-  // --- W1.3: Codex, OpenCode, Pi — canonical `npx skills add` path ---
-  // Per upstream README "Install for any agent":
-  //   npx skills add JuliusBrussee/caveman -a <agent>
-  // Fallback: clone-and-copy when npx is not on PATH.
-  // Idempotency: skip if the install dir already exists.
+  // --- W1.3: Codex, OpenCode, Pi — canonical `npx skills add` path (no -a flag) ---
+  // Per upstream README canonical path: `npx skills add JuliusBrussee/caveman`
+  // skills.sh auto-detects the agent from cwd/env — the -a flag is not needed.
+  // Clone-and-copy fallback removed: the vendor CLI is the only install path.
   const npxPath = await which("npx");
 
-  const npxAgentDefs: Array<{
-    id: string;
-    dir: string;
-    label: string;
-    agentFlag: string;
-    skillsRoot: string;
-  }> = [
-    { id: "codex",    dir: `${home}/.codex`,          label: "Codex CLI", agentFlag: "codex",    skillsRoot: `${home}/.codex/skills` },
-    { id: "opencode", dir: `${home}/.config/opencode`, label: "OpenCode",  agentFlag: "opencode", skillsRoot: `${home}/.config/opencode/skills` },
-    { id: "pi",       dir: `${home}/.pi/agent`,        label: "Pi CLI",    agentFlag: "pi",       skillsRoot: `${home}/.pi/agent/skills` },
+  const npxAgentDefs: Array<{ id: string; dir: string; label: string; skillsRoot: string }> = [
+    { id: "codex",    dir: `${home}/.codex`,          label: "Codex CLI", skillsRoot: `${home}/.codex/skills` },
+    { id: "opencode", dir: `${home}/.config/opencode`, label: "OpenCode",  skillsRoot: `${home}/.config/opencode/skills` },
+    { id: "pi",       dir: `${home}/.pi/agent`,        label: "Pi CLI",    skillsRoot: `${home}/.pi/agent/skills` },
   ];
-
-  // Clone is still needed as the fallback; defer it until at least one agent
-  // needs it to avoid unnecessary network traffic.
-  let cloneOk: boolean | null = null; // null = not yet attempted
-
-  async function ensureClone(): Promise<boolean> {
-    if (cloneOk !== null) return cloneOk;
-    const r = await cloneOrUpdateDry(CAVEMAN_REPO, cloneDir);
-    if (r.exit !== 0) {
-      console.log(`     ✗ caveman clone/update failed: ${r.stderr.trim()} — manual: git clone ${CAVEMAN_REPO} ${cloneDir}`);
-      cloneOk = false;
-    } else {
-      cloneOk = true;
-    }
-    return cloneOk;
-  }
 
   for (const ag of npxAgentDefs) {
     if (!(await isDir(ag.dir))) {
@@ -356,37 +275,15 @@ async function installCaveman(home: string): Promise<void> {
     }
 
     if (npxPath) {
-      // Canonical npx path.
-      const r = await runProcDry(["npx", "skills", "add", "JuliusBrussee/caveman", "-a", ag.agentFlag]);
+      // Canonical vendor path — no -a flag; skills.sh auto-detects agent.
+      const r = await runProcDry(["npx", "skills", "add", "JuliusBrussee/caveman"]);
       if (r.exit !== 0) {
-        console.log(`     ✗ ${ag.label} caveman npx install failed: ${r.stderr.trim()} — falling back to clone+copy`);
-        // Fallback on npx failure.
-        if (await ensureClone()) {
-          try {
-            await installCavemanByCopy(ag.skillsRoot, { cloneDir, home });
-            console.log(`     ✓ ${ag.label} caveman skills installed (fallback copy)`);
-          } catch (e) {
-            console.log(`     ✗ ${ag.label} caveman fallback install failed: ${String(e)}`);
-          }
-        } else {
-          console.log(`     ✗ ${ag.label} caveman skipped (clone also failed)`);
-        }
+        console.log(`     ✗ ${ag.label} caveman npx install failed: ${r.stderr.trim()} — manual: npx skills add JuliusBrussee/caveman`);
       } else {
         console.log(`     ✓ ${ag.label} caveman installed via npx skills add`);
       }
     } else {
-      // npx not on PATH — use clone-and-copy fallback directly.
-      console.log(`     · ${ag.label}: npx not on PATH — using clone+copy fallback`);
-      if (await ensureClone()) {
-        try {
-          await installCavemanByCopy(ag.skillsRoot, { cloneDir, home });
-          console.log(`     ✓ ${ag.label} caveman skills installed (copy fallback)`);
-        } catch (e) {
-          console.log(`     ✗ ${ag.label} caveman install failed: ${String(e)} — manual: npx skills add JuliusBrussee/caveman -a ${ag.agentFlag}`);
-        }
-      } else {
-        console.log(`     ✗ ${ag.label} caveman skipped (clone failed and npx not available)`);
-      }
+      console.log(`     · ${ag.label}: npx not on PATH — manual: npx skills add JuliusBrussee/caveman`);
     }
   }
 
