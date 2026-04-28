@@ -186,19 +186,271 @@ feat(hooks): detection-aware enable/disable
 feat(mcp): manage Pi DeepWiki via pi-mcp-adapter
 ```
 
-The branch should stay on `feat/agent-foundation-clean`. User does not want a PR or release from this branch right now; keep work local unless explicitly asked to push.
+The branch is being fast-forward-merged into `main` without a PR; no release yet. Once on `main`, layer work below proceeds on a new branch per layer.
 
 ---
 
-## 6. Remaining work
+## 6. Remaining work — Agent OS layers (post-foundation)
 
-The foundation gaps that were tracked here (Pi MCP adapter, install.sh flag pass-through, detection-aware hooks, cross-agent eval harnesses, hard compress gate, subpath-level upstream pins) are all closed. CI is green, doctor reports `verdict: "ok"` on the developer's full setup. `git log` is the source of truth for what landed when.
+The foundation gaps tracked here in earlier revisions (Pi MCP adapter, install.sh flag pass-through, detection-aware hooks, cross-agent eval harnesses, hard compress gate, subpath-level upstream pins) are all closed. CI green, doctor verdict `"ok"`. `git log` is the durable record.
 
-The one outstanding scope item is the trajectory layer:
+Below is the trajectory layer — the seven Agent OS layers named in `README.md` and `AGENTS.md`. Each entry has scope, dependencies on prior layers, data model sketch, CLI surface, persistence target, and success signals. None are implemented yet. Build order goes top-down because later layers consume earlier layers' state.
 
-1. **Future Agent OS layers are placeholders.** Repository supervisor, durable task system, agent runs, context engine, memory, artifacts, and plugins/extensions are named for alignment but not implemented. They sit on top of the foundation and are out of scope for this branch. Details: [README.md](README.md) "What's not shipped yet", [AGENTS.md](AGENTS.md) "Where we are going". Designing each layer (data model, schema, CLI surface, persistence) is the next branch's work, not this one.
+### Conventions for all layers below
 
-If a regression surfaces in the foundation layer, add it here with `<concrete reproduction>` + `<root cause>` + `<owner>` and re-open the branch. Otherwise §6 is empty for shipping purposes.
+- **Persistence root:** `~/.fulcrum/state/<project-slug>/` for per-project state (already used by `audit-log`); `~/.fulcrum/state/global/` for cross-project facts. Project slug = `projectSlug()` from `src/utils/io.ts`.
+- **Storage format:** SQLite (one file per layer or one shared file with per-layer tables; pick once when implementing layer 1). Bun's `bun:sqlite` is built-in — no external dep. Schema versioning via `PRAGMA user_version`. Migrations in `src/<layer>/migrations/NNNN-name.sql` applied on first read.
+- **CLI surface convention:** `fulcrum <layer> <verb> [args] [--json]`. Every list/get verb supports `--json` for machine consumption. State-changing verbs are idempotent.
+- **Cross-layer references:** every layer entity has an opaque ULID id (`01H…` 26-char). Foreign keys are ULIDs as text columns. No autoincrement integers.
+- **Test convention:** every layer has a `<layer>.test.ts` with at least migration smoke + happy-path round-trip + idempotency.
+- **Docs:** every shipped layer adds a `docs/<layer>.md` (data model, CLI verbs, hook integration, edge cases).
+
+### 6.1 Repository supervisor — `fulcrum repo …`
+
+**Goal.** Track which repos the user works in, their working-tree posture, branch state, and per-repo settings; provide one place to ask "what's the state of repo X" without re-running shell commands in every session.
+
+**Why first.** Every later layer (tasks, runs, artifacts) is keyed by repo. Without a supervisor there is no canonical repo identity to attach work to.
+
+**Depends on.** Foundation only.
+
+**Data model.**
+```
+repos(id, slug, root_path, default_branch, remote_url, registered_at, last_seen_at)
+repo_status(repo_id, current_branch, head_sha, ahead, behind, dirty, untracked, last_checked_at)
+repo_settings(repo_id, key, value)   # k/v overrides per repo
+```
+- `slug` is the existing `projectSlug()` value; primary lookup key.
+- `repo_status` is updated by `fulcrum repo refresh` and by hooks (see below).
+
+**CLI surface.**
+- `fulcrum repo register [DIR]` — record a repo at DIR (defaults to PWD); idempotent.
+- `fulcrum repo list [--json]` — every registered repo with last-seen state.
+- `fulcrum repo show <slug-or-path> [--json]` — detail.
+- `fulcrum repo refresh <slug-or-path>` — re-stat git posture.
+- `fulcrum repo forget <slug>` — remove from supervisor (does not touch the working tree).
+- `fulcrum repo set <slug> <key> <value>` / `fulcrum repo get <slug> <key>` — per-repo settings.
+
+**Persistence.** `~/.fulcrum/state/global/repos.db` (shared SQLite for cross-project queries).
+
+**Hook integration.** Add a new `repo-track` hook that runs on `SessionStart` (and equivalents) and calls `fulcrum repo register` + `repo refresh` for the cwd. Wire into `src/cli/hooks.ts` recipe table.
+
+**Success.** `fulcrum repo list --json` returns deterministic JSON for ≥2 distinct registered repos; `fulcrum doctor` reports `repos.count` + warns if any registered repo path no longer exists.
+
+### 6.2 Memory — `fulcrum memory …`
+
+**Goal.** Persistent facts, decisions, and references across sessions. The agent answer to "what did we decide about X last week" without re-deriving from chat history.
+
+**Why second.** Independent of repos but tasks/runs/context-engine all read from memory, so it must exist before they reference it.
+
+**Depends on.** Foundation.
+
+**Data model.**
+```
+memories(id, scope, kind, key, body, source, created_at, updated_at)
+memory_links(memory_id, ref_kind, ref_id)   # link memories to repo, task, run, artifact
+```
+- `scope`: `global` | `repo:<slug>` | `task:<id>` (FK enforced by app, not DB, since tasks are layer 6.3).
+- `kind`: free-form tag (`decision`, `fact`, `reference`, `convention`, …).
+- `key`: dotted path (`auth.token-storage`, `release.cadence`).
+- `body`: markdown; ≤8 KB recommended.
+- `source`: `cli` | `hook` | `agent`.
+
+**CLI surface.**
+- `fulcrum memory put <scope> <key> [--kind=…] [--from-file PATH | --body STRING]`
+- `fulcrum memory get <scope> <key> [--json]`
+- `fulcrum memory list [--scope=…] [--kind=…] [--json]`
+- `fulcrum memory rm <id-or-key>`
+- `fulcrum memory link <id> <ref-kind>:<ref-id>`
+- `fulcrum memory search <query> [--scope=…]` — FTS5 over `body`.
+
+**Persistence.** `~/.fulcrum/state/global/memory.db`. FTS5 virtual table on `body`.
+
+**Hook integration.** Optional `memory-inject` hook (`SessionStart`) that loads memories whose scope matches current repo and emits them as context (mirror of how `context-mode` works). Cap at top-N by recency to bound stdout.
+
+**Success.** `fulcrum memory put global onboarding.contact "alice@example.com"` survives shell restart; FTS hits expected term.
+
+### 6.3 Task system — `fulcrum tasks …`
+
+**Goal.** Durable units of work tracked across agent sessions. Distinct from in-process `TaskCreate` (per-session): these are the shareable, resumable items.
+
+**Why third.** Tasks live in a repo; tasks accumulate runs (6.4) and produce artifacts (6.6); their state is a frequent target of memory references.
+
+**Depends on.** §6.1 (repo identity), §6.2 (memory links).
+
+**Data model.**
+```
+tasks(id, repo_id, parent_id, title, description, status, priority,
+      created_at, updated_at, due_at, owner)
+task_blocks(blocker_id, blocked_id)   # graph edges (blocker -> blocked)
+task_tags(task_id, tag)
+```
+- `status`: `pending` | `in_progress` | `blocked` | `completed` | `cancelled`.
+- Trees via `parent_id` (subtasks); arbitrary blocking via `task_blocks`.
+
+**CLI surface.**
+- `fulcrum tasks add <title> [--repo=…] [--parent=…] [--description-file PATH] [--priority=…] [--due=…] [--tag …]`
+- `fulcrum tasks list [--repo=…] [--status=…] [--tag=…] [--owner=…] [--json]`
+- `fulcrum tasks show <id> [--json]`
+- `fulcrum tasks update <id> [--status=…] [--priority=…] [--description-file PATH] [--add-tag …] [--rm-tag …]`
+- `fulcrum tasks block <blocked-id> --by <blocker-id>` / `fulcrum tasks unblock …`
+- `fulcrum tasks tree <id>` — print subtree.
+- `fulcrum tasks done <id>` — convenience for `update --status completed`.
+
+**Persistence.** `~/.fulcrum/state/<slug>/tasks.db` (per-repo). Global query path (`fulcrum tasks list --all-repos`) walks all repo dbs.
+
+**Hook integration.** None mandatory. Optional `task-context` hook injects `pending` + `in_progress` task summary on `SessionStart`.
+
+**Success.** Add a task, restart shell, list tasks → same id; status transitions invariant under repeated calls.
+
+### 6.4 Agent runs — `fulcrum runs …`
+
+**Goal.** First-class invocations of an agent: input prompt, agent type, model, context attached, output, exit status, cost, transcript path. The audit + replay layer.
+
+**Why fourth.** Tasks reference runs; artifacts reference runs; context-engine selects past runs to surface.
+
+**Depends on.** §6.1, §6.2, §6.3.
+
+**Data model.**
+```
+runs(id, task_id, repo_id, agent, model, prompt, started_at, ended_at,
+     status, exit_code, transcript_path, total_tokens, cost_usd, parent_run_id)
+run_inputs(run_id, kind, ref_id)   # which memories, artifacts, files were attached
+run_events(run_id, ts, kind, payload_json)   # tool_use, content_block, error
+```
+- `agent`: `claude-code` | `codex` | `gemini` | `opencode` | `pi`.
+- `parent_run_id`: retries / sub-agent spawns.
+- Transcripts on disk: `~/.fulcrum/state/<slug>/runs/<id>.jsonl`.
+
+**CLI surface.**
+- `fulcrum runs start --agent=<…> --model=<…> --prompt-file PATH [--task=<id>] [--attach memory:<id> --attach artifact:<id>] [--detach]`
+- `fulcrum runs list [--repo=…] [--task=…] [--agent=…] [--status=…] [--json]`
+- `fulcrum runs show <id> [--json]` — metadata.
+- `fulcrum runs transcript <id>` — pipes the JSONL.
+- `fulcrum runs retry <id> [--model=<…>]` — start a new run with the same inputs; sets `parent_run_id`.
+- `fulcrum runs cancel <id>`.
+- `fulcrum runs cost [--repo=…] [--since=…]` — aggregate cost.
+
+**Persistence.** `~/.fulcrum/state/<slug>/runs.db`; transcripts in `runs/<id>.jsonl`.
+
+**Hook integration.** `run-record` hook on `SessionEnd` writes a row + transcript using the agent's session id.
+
+**Success.** `fulcrum runs list --repo=fulcrum --json | jq length` increases by 1 after each session; transcript replay reproduces the session.
+
+### 6.5 Context engine — `fulcrum context …`
+
+**Goal.** Select and assemble what a run sees: which memories, which prior-run snippets, which files. Replaces ad-hoc "paste the right things into the prompt" rituals.
+
+**Why fifth.** Needs runs (6.4) and memories (6.2) to draw from.
+
+**Depends on.** §6.1, §6.2, §6.3, §6.4.
+
+**Data model.**
+```
+context_profiles(id, name, repo_id, body_yaml)
+context_assemblies(id, run_id, profile_id, body_md, token_count, created_at)
+```
+- `body_yaml` describes selectors: `memories: scope=repo:foo, kind=decision, top=5; runs: task=<id>, top=3, fields=prompt+summary; files: glob=src/**/*.ts, max=20`.
+- `context_assemblies` is a materialised view per run for replay/audit.
+
+**CLI surface.**
+- `fulcrum context profile add <name> --from-file PATH [--repo=…]`
+- `fulcrum context profile list [--repo=…] [--json]`
+- `fulcrum context profile show <name>`
+- `fulcrum context assemble --profile=<name> [--task=<id>] [--out PATH]` — emits the assembled markdown to stdout or PATH.
+- `fulcrum context attach --run=<id> --profile=<name>` — record the assembly used for a run.
+
+**Persistence.** `~/.fulcrum/state/<slug>/context.db` + assembled bodies in `context/<id>.md`.
+
+**Hook integration.** None forced. `UserPromptSubmit`-style hook can call `fulcrum context assemble --profile=default` and inject the result, mirroring `context-mode`.
+
+**Success.** Same profile + same inputs ⇒ byte-identical assembly (deterministic ordering); token count within ±1 of actual `claude tokens` count.
+
+### 6.6 Artifacts — `fulcrum artifacts …`
+
+**Goal.** Outputs of runs (diffs, plans, reports, generated code) tracked as first-class objects, addressable by id, queryable by tag/run/task.
+
+**Why sixth.** Needs runs + tasks. Could ship before context engine, but engine often references artifacts, so engine first is cleaner.
+
+**Depends on.** §6.1, §6.3, §6.4.
+
+**Data model.**
+```
+artifacts(id, run_id, task_id, kind, title, body_path, sha256, size, mime, created_at)
+artifact_tags(artifact_id, tag)
+```
+- `kind`: `diff` | `plan` | `report` | `code` | `note` | …
+- `body_path`: `~/.fulcrum/state/<slug>/artifacts/<id>.<ext>` (content-addressed by sha256 in filename if reused).
+
+**CLI surface.**
+- `fulcrum artifacts put --kind=<…> --title=<…> --from-file PATH [--run=<id>] [--task=<id>] [--tag …]`
+- `fulcrum artifacts list [--run=…] [--task=…] [--kind=…] [--tag=…] [--json]`
+- `fulcrum artifacts show <id> [--json]`
+- `fulcrum artifacts cat <id>` — pipe contents.
+- `fulcrum artifacts diff <id-a> <id-b>` — `difft` between two artifacts.
+- `fulcrum artifacts gc` — drop unreferenced rows + body files.
+
+**Persistence.** `~/.fulcrum/state/<slug>/artifacts.db` + body files.
+
+**Hook integration.** `Stop`/`SessionEnd` hook can ingest a final agent diff as an artifact tagged `auto`.
+
+**Success.** Round-trip: write → list by tag → cat → matches input bytes; sha256 stable.
+
+### 6.7 Plugins / extensions — `fulcrum plugins …`
+
+**Goal.** Third-party drop-ins under each agent's namespacing convention. Already prepared at the filesystem layer (`fulcrum/<name>/`, `fulcrum-upstream/<name>/`); this layer adds the manifest + lifecycle.
+
+**Why last.** Sits on top of all prior layers; needs supervisor to know which repos a plugin is enabled for, runs/artifacts/memory APIs to be stable so plugins can target them.
+
+**Depends on.** All prior layers.
+
+**Data model.**
+```
+plugins(id, name, source_repo, source_sha, manifest_json, installed_at)
+plugin_enables(plugin_id, scope)   # scope: global | repo:<slug>
+plugin_capabilities(plugin_id, capability)   # hook | skill | command | mcp
+```
+- Manifest schema published in `docs/plugins.md`; pinned per-source-sha (subpath-SHA pattern from §6 item 6 above).
+
+**CLI surface.**
+- `fulcrum plugins add <git-url-or-path> [--ref=<sha>]`
+- `fulcrum plugins list [--repo=…] [--json]`
+- `fulcrum plugins enable <name> [--repo=…]` / `fulcrum plugins disable …`
+- `fulcrum plugins update <name>` — refresh from upstream + verify subpath SHAs.
+- `fulcrum plugins rm <name>`
+
+**Persistence.** `~/.fulcrum/state/global/plugins.db`; sources cached at `~/.fulcrum/cache/plugins/<name>/`.
+
+**Hook integration.** Plugins themselves can declare hooks/skills/commands/mcp; `fulcrum install` should iterate enabled plugins and apply.
+
+**Success.** Install a fixture plugin, enable it for one repo, observe its hook fires only in that repo; remove the plugin and observe full cleanup (mirrors uninstall semantics for the foundation).
+
+---
+
+### Build order + branch plan
+
+Recommended branch sequence; each branch lands solo via fast-forward merge to `main`.
+
+| # | Branch name | Layer | Depends on |
+|---|---|---|---|
+| 1 | `feat/repo-supervisor` | §6.1 | foundation |
+| 2 | `feat/memory` | §6.2 | foundation |
+| 3 | `feat/task-system` | §6.3 | 1, 2 |
+| 4 | `feat/agent-runs` | §6.4 | 1, 2, 3 |
+| 5 | `feat/context-engine` | §6.5 | 1–4 |
+| 6 | `feat/artifacts` | §6.6 | 1, 3, 4 |
+| 7 | `feat/plugins` | §6.7 | 1–6 |
+
+§6.2 (memory) can be developed in parallel with §6.1 (repo supervisor); both have no inter-dependency. After both land, §6.3 starts. §6.5 and §6.6 can be parallelised after §6.4 lands.
+
+### Cross-layer rules
+
+- **Every layer has a `fulcrum doctor` integration.** Each adds a section: row count, latest activity, missing bodies, schema version. Update `DoctorReport` interface accordingly.
+- **Every layer has an `uninstall` story.** Add removal/keep policy to `src/cli/uninstall.ts`. Default = keep state on uninstall; `--purge` removes.
+- **Every layer respects the "never use `~/.agents/`" guard.** Do not invent new shared dirs.
+- **Every layer adds a `--json` flag to every read verb** so it composes with skills like `jq`.
+- **Every layer ships docs in the same shape:** `docs/<layer>.md` with §1 Data model, §2 CLI verbs, §3 Hook integration, §4 Edge cases, §5 Tests.
+
+If a foundation regression surfaces, add it back to this section with `<concrete reproduction>` + `<root cause>` + `<owner>` and re-open the relevant area.
 
 ---
 
