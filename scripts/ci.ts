@@ -12,7 +12,7 @@ const STEPS: Step[] = [
   { name: "test",        cmd: ["bun", "test"] },
   { name: "build:all",   cmd: ["bun", "run", "scripts/build-all.ts"] },
   { name: "skills:lint", cmd: ["bun", "run", "src/index.ts", "skills", "lint", "skills/"] },
-  { name: "compress:check", cmd: ["bash", "scripts/compress-with-caveman.sh", "--check"], soft: true },
+  { name: "compress:check", cmd: ["bash", "scripts/compress-with-caveman.sh", "--check"] },
 ];
 
 interface Result { step: string; ok: boolean; soft?: boolean; skipped?: boolean; pending?: number; ms: number; }

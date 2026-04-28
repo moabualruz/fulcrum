@@ -83,7 +83,7 @@ New `skills/<name>/SKILL.md`:
 3. Run `bun run compress` or `scripts/compress-with-caveman.sh skills/<name>/SKILL.md skills/<name>/references/*.md`.
 4. Commit shipped `.md` files and their `.original.md` siblings.
 
-Lint passes either form. CI `bun run compress -- --check` rejects commits where new `.md` lacks `.original.md` sibling.
+Lint passes either form. CI `bun run compress -- --check` fails (hard gate) if any `.md` lacks `.original.md` sibling — adding uncompressed files blocks CI pass.
 
 ## Opt-out
 
