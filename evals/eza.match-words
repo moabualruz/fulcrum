@@ -1,5 +1,6 @@
 # match-words for eza
-# "eza" is specific enough; key flags reinforce
+# "eza" is specific enough — not a common English word in any other context
+eza
 eza -l
 eza --tree
 eza --git

@@ -197,11 +197,23 @@ detect_trigger() {
   if [ "${skill_used:-0}" -gt 0 ] 2>/dev/null; then echo 1; return; fi
 
   # 2) Fallback heuristic: word match against the assistant's text response.
+  # Try the standard single-object shape first; fall back to stream-json by
+  # concatenating every assistant text block. Last fallback is the raw blob.
   local text
   text=$(echo "$response_json" | jq -r '.result // .text // empty' 2>/dev/null || true)
+  if [ -z "$text" ]; then
+    text=$(echo "$response_json" | jq -r '
+      if type == "array"
+      then [.[] | select(.type=="assistant") | .message.content[]? | select(.type=="text") | .text] | join("\n")
+      else empty
+      end' 2>/dev/null || true)
+  fi
   [ -z "$text" ] && text="$response_json"
+  # Decode JSON-string escapes (\n, \t) so word boundaries land where humans
+  # expect — without this, `\npmd check` registers as a single word run and
+  # `grep -qw "pmd check"` silently misses.
   local lc
-  lc=$(echo "$text" | tr '[:upper:]' '[:lower:]')
+  lc=$(printf '%s' "$text" | sed 's/\\n/ /g; s/\\t/ /g; s/\\r/ /g' | tr '[:upper:]' '[:lower:]')
   local IFS=','
   for w in $MATCH_WORDS; do
     w=$(echo "$w" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')

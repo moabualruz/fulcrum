@@ -1,5 +1,6 @@
 # match-words for lizard
-# "lizard" is specific enough as a tool name
+# "lizard" alone is specific enough — bare tool name appears in most responses
+lizard
 lizard -C
 lizard -L
 lizard --warnings_only

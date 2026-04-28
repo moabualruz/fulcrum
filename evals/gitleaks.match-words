@@ -1,6 +1,9 @@
 # match-words for gitleaks
+# standalone gitleaks catches cases where Claude runs it as a tool then mentions it in result text
+gitleaks
+gitleaks detect
+gitleaks protect
 gitleaks git
-gitleaks git --staged
 gitleaks dir
 gitleaks --report-format
 gitleaks --no-banner
