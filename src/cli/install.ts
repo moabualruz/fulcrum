@@ -479,20 +479,28 @@ async function installRepomixClaudePlugins(home: string): Promise<void> {
 }
 
 /**
- * Register github and repomix in the MCP registry (default-disabled).
- * Apply to agents only when default_enabled=true (neither W2 entry is, so
- * this step is registry-only). Claude Code repomix plugins installed here.
+ * Register all builtin MCPs in the registry (default-disabled).
+ * Apply to agents only when default_enabled=true (none of the W2/W3 entries
+ * are, so this step is registry-only — avoids 55-100k token startup cost).
+ *
+ * Dart hint: if `dart` is not on PATH, log a hint that dart_mcp_server
+ * requires Dart SDK ≥ 3.9.0-163.0.dev and the command `dart mcp-server`.
+ *
+ * Claude Code repomix plugins are installed here as the repomix vendor entry.
  */
 export async function installMcpRegistryEntries(home: string): Promise<void> {
-  const { registerServer, DEFAULT_GITHUB_SERVER, DEFAULT_REPOMIX_SERVER } = await import("./mcp-registry.ts");
+  const { registerServer } = await import("./mcp-registry.ts");
+  const { BUILTIN_MCPS } = await import("./mcp-builtins.ts");
 
-  // Register github (HTTP, default-disabled).
-  await registerServer("github", DEFAULT_GITHUB_SERVER);
-  console.log("     ✓ github MCP registered (default-disabled; enable with: fulcrum mcp enable github)");
+  for (const { name, spec } of BUILTIN_MCPS) {
+    await registerServer(name, spec);
+    console.log(`     ✓ ${name} MCP registered (default-disabled; enable with: fulcrum mcp enable ${name})`);
+  }
 
-  // Register repomix (stdio, default-disabled).
-  await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
-  console.log("     ✓ repomix MCP registered (default-disabled; enable with: fulcrum mcp enable repomix)");
+  // Dart hint: doctor also reports this, but surface it at install time too.
+  if (!(await which("dart"))) {
+    console.log("     · dart not on PATH — dart MCP requires Dart SDK ≥ 3.9.0-163.0.dev; see: https://github.com/dart-lang/ai/tree/main/pkgs/dart_mcp_server");
+  }
 
   // Install repomix Claude plugins (Claude-specific vendor install).
   await installRepomixClaudePlugins(home);
@@ -591,7 +599,7 @@ export async function run(args: string[]): Promise<void> {
   await installDeepwikiMcp({ dryRun: DRY_RUN });
   console.log();
 
-  console.log("8b/9 Registering MCP registry entries (github, repomix)");
+  console.log("8b/9 Registering MCP registry entries (github, repomix, semgrep, context7, tavily, playwright, cloudflare-*, dart)");
   await installMcpRegistryEntries(home);
   console.log();
 

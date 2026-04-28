@@ -1,11 +1,12 @@
-// MCP registry — shared infrastructure for Wave 2 (and Wave 3).
+// MCP registry — shared infrastructure for Wave 2 and Wave 3.
 //
 // Owns a TOML-formatted registry at ~/.fulcrum/state/global/mcp-registry.toml.
 // Provides load/save, register/unregister, enable/disable, and applyToAgents /
 // removeFromAgents — which push entries into each agent's native MCP config.
 //
-// Wave 2 registers: github (HTTP, default-disabled) + repomix (stdio, default-disabled).
-// Wave 3 will register more entries without changing this module.
+// The canonical list of managed servers lives in mcp-builtins.ts (BUILTIN_MCPS).
+// DEFAULT_GITHUB_SERVER and DEFAULT_REPOMIX_SERVER are re-exported from there
+// for backward compatibility with existing tests and callers.
 
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -521,28 +522,6 @@ export async function removeFromAgents(name: string, opts: { dryRun?: boolean } 
   if (await exists(`${home}/.pi/agent`)) await removeFromPi(server, home);
 }
 
-// ── default servers ────────────────────────────────────────────────────────
+// ── default servers (re-exported from mcp-builtins for backward compat) ───
 
-export const DEFAULT_GITHUB_SERVER: McpServerSpec = {
-  transport: "http",
-  url: "https://api.githubcopilot.com/mcp/",
-  description: "Official GitHub MCP server — repos, issues, PRs, Actions, code search",
-  vendor: "github",
-  default_enabled: false,
-  auth_env_vars: ["GITHUB_TOKEN"],
-  agent_visibility: {
-    "claude-code": true, codex: true, gemini: true, opencode: true, pi: true,
-  },
-};
-
-export const DEFAULT_REPOMIX_SERVER: McpServerSpec = {
-  transport: "stdio",
-  command: "npx -y repomix --mcp",
-  description: "Repomix MCP server — pack repo into AI-friendly format",
-  vendor: "yamadashy",
-  default_enabled: false,
-  auth_env_vars: [],
-  agent_visibility: {
-    "claude-code": true, codex: true, gemini: true, opencode: true, pi: true,
-  },
-};
+export { DEFAULT_GITHUB_SERVER, DEFAULT_REPOMIX_SERVER } from "./mcp-builtins.ts";
