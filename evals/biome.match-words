@@ -1,4 +1,5 @@
 # match-words for biome
+# "biome" alone is specific enough — not a common English word in tool contexts
 biome check
 biome format
 biome lint
@@ -6,3 +7,4 @@ biome ci
 biome migrate
 biome init
 biome --write
+biome

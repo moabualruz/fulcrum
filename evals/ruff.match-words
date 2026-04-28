@@ -1,8 +1,18 @@
 # match-words for ruff
 # "ruff" is sufficiently unique; specific subcommands reinforce
+# Note: ruff alone used as fallback since JSON-encoded responses embed ruff
+# inside escaped strings where grep -w may fail on multi-word patterns
+ruff
 ruff check
 ruff format
 ruff check --fix
 ruff format --check
 ruff check --output-format=json
+ruff check --output-format
 ruff check --diff
+ruff-format
+ruff --select
+ruff --extend-select
+ruff --ignore
+ruff --line-length
+tool.ruff

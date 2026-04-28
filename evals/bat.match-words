@@ -3,7 +3,14 @@
 bat --paging=never
 bat -pp
 bat --style=numbers
+bat --style=plain
+bat --style
 bat --line-range
 bat --list-languages
 bat --color=always
+bat --language
 bat -l json
+bat -l
+bat -p
+bat -n
+| bat

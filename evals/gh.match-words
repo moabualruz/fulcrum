@@ -7,3 +7,4 @@ gh release
 gh api
 gh repo
 gh search
+gh auth

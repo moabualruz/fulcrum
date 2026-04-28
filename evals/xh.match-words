@@ -6,3 +6,15 @@ xh --download
 xh --auth-type=bearer
 xh --multipart
 xh --form
+xh GET
+xh POST
+xh PUT
+xh DELETE
+xh PATCH
+xh HEAD
+xh --session
+xh --json
+xh --pretty
+xh --verify
+xh https
+xh -d

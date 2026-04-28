@@ -1,7 +1,12 @@
 # match-words for hyperfine
-hyperfine
+# bare "hyperfine" excluded — appears in skill-list init banner, causes false-triggers
 hyperfine --warmup
 hyperfine --runs
 hyperfine --export-json
 hyperfine --prepare
 hyperfine -L
+hyperfine --shell
+hyperfine --min-runs
+hyperfine --max-runs
+hyperfine -i
+hyperfine --setup
