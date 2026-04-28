@@ -7,12 +7,12 @@ description: Use this skill when viewing or printing source/config files to the 
 
 ## When to use
 
-- The user wants to *read* a source file, config, or small log with syntax colors and line numbers.
-- The agent prints a file back to the user as part of an explanation — `bat` produces far more legible output than `cat`.
-- Piping JSON / YAML / a diff to the terminal and wanting it colorized (with `--paging=never --color=always`).
-- A syntax-aware diff between two files (`bat --diff` or `bat -d`).
+- User want *read* source file, config, small log with syntax colors + line numbers.
+- Agent print file back to user in explanation — `bat` way more legible than `cat`.
+- Pipe JSON / YAML / diff to terminal, want colorized (with `--paging=never --color=always`).
+- Syntax-aware diff between two files (`bat --diff` or `bat -d`).
 
-**Skip** for: plain concatenation (`cat a b > c`), `tail -f`, hex/binary inspection, in-editor reads, and content search (jobs for `rg`/`grep`).
+**Skip** for: plain concat (`cat a b > c`), `tail -f`, hex/binary inspect, in-editor read, content search (jobs for `rg`/`grep`).
 
 ## Invocation
 
@@ -31,7 +31,7 @@ bat --list-languages                     # what bat can highlight
 bat --list-themes                        # what themes are available
 ```
 
-On Debian/Ubuntu the binary is `batcat` (collision with an old utility). Either call `batcat …` or `mkdir -p ~/.local/bin && ln -s "$(which batcat)" ~/.local/bin/bat`.
+On Debian/Ubuntu binary is `batcat` (collision with old utility). Either call `batcat …` or `mkdir -p ~/.local/bin && ln -s "$(which batcat)" ~/.local/bin/bat`.
 
 ## Patterns
 
@@ -39,14 +39,14 @@ On Debian/Ubuntu the binary is `batcat` (collision with an old utility). Either 
 ```bash
 bat ~/.config/nvim/init.lua
 ```
-Default style (`numbers,changes,header,grid`) is fine for a human reader at the terminal.
+Default style (`numbers,changes,header,grid`) fine for human reader at terminal.
 
 ### Pattern B — colorize stdin from a tool that emits JSON/YAML
 ```bash
 kubectl get pod foo -o yaml | bat -l yaml --paging=never
 gh pr view 42 --json title,body | bat -l json -pp
 ```
-`bat` cannot sniff the language from a pipe — pass `-l <lang>` (see `--list-languages`).
+`bat` cannot sniff language from pipe — pass `-l <lang>` (see `--list-languages`).
 
 ### Pattern C — syntax-aware diff
 ```bash
@@ -63,15 +63,15 @@ bat --line-range 120:160 --style=numbers,header src/parser.rs
 ```bash
 bat --color=always huge.log | less -R
 ```
-Without `--color=always`, `bat` strips ANSI when stdout isn't a TTY.
+Without `--color=always`, `bat` strip ANSI when stdout not TTY.
 
 ## Anti-patterns
 
-- **Don't** pipe `bat` into `grep`/`jq`/`awk` without `--paging=never --color=never` (or `bat -p`) — the pager hijacks the TTY and ANSI escapes corrupt downstream parsing.
-- **Don't** rely on autodetect for stdin — `bat` can't sniff a pipe. Pass `-l json|yaml|diff|...`.
-- **Don't** alias `cat=bat` system-wide — first-run latency and missing themes break unconfigured shells and CI scripts that pipe `cat`.
-- **Don't** assume the binary is `bat` on Debian/Ubuntu — it ships as `batcat`. Check with `command -v bat || command -v batcat` before scripting.
-- **Don't** reach for `bat` to read a 200 MB log — pager startup and highlighter cost dominate. Use `less` / `tail` / `rg` instead.
+- **Don't** pipe `bat` into `grep`/`jq`/`awk` without `--paging=never --color=never` (or `bat -p`) — pager hijack TTY, ANSI escapes corrupt downstream parsing.
+- **Don't** rely on autodetect for stdin — `bat` can't sniff pipe. Pass `-l json|yaml|diff|...`.
+- **Don't** alias `cat=bat` system-wide — first-run latency + missing themes break unconfigured shells, CI scripts that pipe `cat`.
+- **Don't** assume binary is `bat` on Debian/Ubuntu — ships as `batcat`. Check with `command -v bat || command -v batcat` before scripting.
+- **Don't** reach for `bat` to read 200 MB log — pager startup + highlighter cost dominate. Use `less` / `tail` / `rg` instead.
 
 ## Cross-refs
 

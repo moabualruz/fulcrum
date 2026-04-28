@@ -7,11 +7,11 @@ description: Use this skill whenever the user works with GitHub from the command
 
 ## When to use
 
-- The user wants to interact with a GitHub artifact: pull request, issue, release, workflow run, gist, or repo metadata.
-- The agent is about to call the GitHub REST or GraphQL API — `gh api` carries auth, paging, and rate-limit handling for free.
-- The user pipes `curl` against `api.github.com` or scrapes `github.com/...` HTML — almost always wants `gh`.
-- A workflow needs watching, a release needs publishing, or a PR body is longer than a tweet (use `--body-file`).
-- The user asks to search code/repos/issues across GitHub (`gh search`).
+- User want interact with GitHub artifact: pull request, issue, release, workflow run, gist, repo metadata.
+- Agent about call GitHub REST/GraphQL API — `gh api` carry auth, paging, rate-limit free.
+- User pipe `curl` against `api.github.com` or scrape `github.com/...` HTML — almost always want `gh`.
+- Workflow need watching, release need publishing, PR body longer than tweet (use `--body-file`).
+- User search code/repos/issues across GitHub (`gh search`).
 
 **Skip** for: local-only git work (`git commit`, `git rebase`, `git log`); non-GitHub remotes (GitLab → `glab`, Gitea → `tea`, Bitbucket); CI providers other than GitHub Actions (Jenkins, CircleCI, Buildkite).
 
@@ -49,7 +49,7 @@ gh pr merge 123 --squash --delete-branch
 gh pr comment 123 --body-file note.md
 ```
 
-`--squash` / `--rebase` / `--merge` pick the strategy; pair with `--auto` to queue once checks pass.
+`--squash` / `--rebase` / `--merge` pick strategy; pair `--auto` to queue once checks pass.
 
 ### Pattern B — issues
 
@@ -92,7 +92,7 @@ gh run rerun <run-id> --failed          # re-run only failed jobs
 gh run download <run-id> --name artifact-name --dir ./out
 ```
 
-`gh run watch` replaces `while sleep 30; do gh run list ...; done` — it streams status and exits with the run's conclusion.
+`gh run watch` replace `while sleep 30; do gh run list ...; done` — stream status, exit with run conclusion.
 
 ### Pattern E — releases
 
@@ -104,7 +104,7 @@ gh release create v1.5.0 --notes-file CHANGELOG.md --target main ./dist/*.tar.gz
 gh release create v1.5.0-rc1 --prerelease --generate-notes
 ```
 
-`--generate-notes` lets GitHub auto-render commit summaries; `--notes-file -` reads stdin.
+`--generate-notes` let GitHub auto-render commit summaries; `--notes-file -` read stdin.
 
 ### Pattern F — JSON shaping with `--jq` and `--template`
 
@@ -117,7 +117,7 @@ gh pr list --json number,title,author \
   --template '{{range .}}#{{.number}} ({{.author.login}}) {{.title}}{{"\n"}}{{end}}'
 ```
 
-Use `--jq` when piping to another tool, `--template` when rendering for humans. List queryable fields with `gh pr list --json 2>&1 | head` (any unknown `--json` arg prints the available set).
+Use `--jq` when pipe to another tool, `--template` when render for humans. List queryable fields with `gh pr list --json 2>&1 | head` (any unknown `--json` arg print available set).
 
 ### Pattern G — search, repo, and clone
 
@@ -140,22 +140,22 @@ gh config set editor 'code --wait'
 gh config set git_protocol ssh --host github.com
 ```
 
-`--fill` populates title/body from the latest commit — handy for stacked-PR workflows.
+`--fill` populate title/body from latest commit — handy for stacked-PR workflows.
 
 ## Anti-patterns
 
-- **Don't pass markdown bodies through `-b "$VAR"`.** Backticks, quotes, and `$` in the body get eaten by the shell. Use `--body-file path.md` or `--body-file -` and read from stdin.
-- **Don't `grep` `gh ... --json` output.** The order of keys is not stable and values may contain newlines. Use `--jq` (built-in) or pipe to `jq`.
-- **Don't poll a workflow with `while sleep 10; do gh run list ...`.** Use `gh run watch <id>` — it streams progress and exits with the run's conclusion code.
-- **Don't paginate by hand** with `--page 2`, `--page 3`, … `--paginate` walks the `Link: rel="next"` headers and concatenates results into one stream.
-- **Don't put tokens on argv.** `gh auth login --with-token < token.txt` keeps the secret out of `ps`, shell history, and command logs. Never `gh auth login --with-token "$TOKEN"`.
-- **Don't reach for `gh api repos/o/r/pulls/123`** when `gh pr view 123` exists. Subcommands carry sensible field selection, terminal formatting, and errors; raw `gh api` is for endpoints with no dedicated wrapper.
-- **Don't shell out to `curl https://api.github.com/...`** in a script that already has `gh` available — you'll re-implement auth, paging, retries, and rate-limit handling badly. `gh api` does all four.
-- **Don't assume the default branch is `main`.** `gh pr create --base $(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)` or omit `--base` and let `gh` infer.
+- **Don't pass markdown bodies through `-b "$VAR"`.** Backticks, quotes, `$` in body get eaten by shell. Use `--body-file path.md` or `--body-file -` and read from stdin.
+- **Don't `grep` `gh ... --json` output.** Key order not stable, values may contain newlines. Use `--jq` (built-in) or pipe to `jq`.
+- **Don't poll workflow with `while sleep 10; do gh run list ...`.** Use `gh run watch <id>` — stream progress, exit with run conclusion code.
+- **Don't paginate by hand** with `--page 2`, `--page 3`, … `--paginate` walk `Link: rel="next"` headers, concatenate results into one stream.
+- **Don't put tokens on argv.** `gh auth login --with-token < token.txt` keep secret out of `ps`, shell history, command logs. Never `gh auth login --with-token "$TOKEN"`.
+- **Don't reach for `gh api repos/o/r/pulls/123`** when `gh pr view 123` exist. Subcommands carry sensible field selection, terminal formatting, errors; raw `gh api` for endpoints with no dedicated wrapper.
+- **Don't shell out to `curl https://api.github.com/...`** in script that already have `gh` — re-implement auth, paging, retries, rate-limit handling badly. `gh api` do all four.
+- **Don't assume default branch `main`.** `gh pr create --base $(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)` or omit `--base` and let `gh` infer.
 
 ## Cross-refs
 
 - Behavioral rule: see `rules/AGENTS.md` — "use `gh` for any GitHub interaction; never scrape the web UI".
-- JSON pipelines: `skills/jq/SKILL.md` — `gh ... --json | jq` is the canonical agent shape; `--jq` skips the pipe entirely.
+- JSON pipelines: `skills/jq/SKILL.md` — `gh ... --json | jq` canonical agent shape; `--jq` skip pipe entirely.
 - Manual: <https://cli.github.com/manual/>
 - API helper reference: <https://cli.github.com/manual/gh_api>

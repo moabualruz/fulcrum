@@ -7,14 +7,14 @@ description: Use this skill when the user wants to jump between directories by p
 
 ## When to use
 
-- The user wants to *cd* somewhere by typing a fragment of the path — `z fulc` instead of `cd ~/workspace/fulcrum`.
-- The user asks about "frecency", autojump, fasd, or "that thing that remembers directories".
+- User want *cd* by path fragment — `z fulc` not `cd ~/workspace/fulcrum`.
+- User ask about "frecency", autojump, fasd, or "thing that remember directories".
 
-**Skip** for: file search (`fd`), listing dirs (`eza`/`ls`), shell-history search (`fzf` over `~/.zsh_history`), GUI-open, or scripts that already know their target (just `cd`).
+**Skip** for: file search (`fd`), list dirs (`eza`/`ls`), shell-history search (`fzf` over `~/.zsh_history`), GUI-open, or scripts that know target (just `cd`).
 
 ## Invocation
 
-`z` and `zi` are **shell functions**, not binaries — they only exist after `zoxide init` runs:
+`z` and `zi` are **shell functions**, not binaries — exist only after `zoxide init` runs:
 
 ```bash
 # Last line of ~/.bashrc / ~/.zshrc / config.fish
@@ -22,7 +22,7 @@ eval "$(zoxide init bash)"           # or zsh / fish / posix / nushell / xonsh /
 eval "$(zoxide init bash --cmd j)"   # rebind to `j` (avoids autojump clash)
 ```
 
-Once initialized:
+Once init:
 
 ```bash
 z foo            # cd to highest-frecency dir matching `foo`
@@ -31,7 +31,7 @@ z -              # toggle to previous directory (like `cd -`)
 zi foo           # interactive fzf picker among matches
 ```
 
-The binary itself works regardless of init:
+Binary work regardless of init:
 
 ```bash
 zoxide query foo [--list] [--score]   # print top match / ranked / with scores
@@ -43,12 +43,12 @@ zoxide import --from z ~/.z                              # also handles fasd / z
 
 ## Patterns
 
-### Pattern A — jump to a known project
+### Pattern A — jump to known project
 ```bash
 z fulcrum         # any prior `cd ~/workspace/fulcrum` makes this work
 ```
 
-### Pattern B — disambiguate with a second token
+### Pattern B — disambiguate with second token
 ```bash
 z work fulc       # match contains both, in order — cheaper than long substrings
 ```
@@ -57,17 +57,17 @@ z work fulc       # match contains both, in order — cheaper than long substrin
 ```bash
 target=$(zoxide query fulc) && cd "$target"
 ```
-The shell function `z` isn't visible in `bash -c`, scripts, or non-interactive subshells — go through the binary.
+Shell function `z` not visible in `bash -c`, scripts, non-interactive subshells — go through binary.
 
 ## Anti-patterns
 
-- **Don't** call `z` from a script or `bash -c` — it's a shell function defined by `zoxide init`, not on `$PATH`. Use `cd "$(zoxide query foo)"`.
-- **Don't** assume `z foo` works on a cold install — the database is empty until you `cd` around (or `zoxide add`).
-- **Don't** rely on `zi` in agent / CI / non-TTY shells — it spawns `fzf` and needs a TTY. Use `zoxide query foo --list` and pick programmatically.
-- **Don't** run zoxide and autojump with default names side-by-side — both bind prompt hooks and the `j` command. Pick one, or rebind with `--cmd`.
+- **Don't** call `z` from script or `bash -c` — shell function defined by `zoxide init`, not on `$PATH`. Use `cd "$(zoxide query foo)"`.
+- **Don't** assume `z foo` work on cold install — database empty until you `cd` around (or `zoxide add`).
+- **Don't** rely on `zi` in agent / CI / non-TTY shells — spawns `fzf`, need TTY. Use `zoxide query foo --list`, pick programmatically.
+- **Don't** run zoxide and autojump with default names side-by-side — both bind prompt hooks and `j` command. Pick one, or rebind with `--cmd`.
 - **Don't** edit `~/.local/share/zoxide/db.zo` by hand — binary format. Use `zoxide add` / `zoxide remove`.
 
 ## Cross-refs
 
-- `skills/fzf/SKILL.md` — `zi` is fzf-driven; same TTY caveat applies.
+- `skills/fzf/SKILL.md` — `zi` fzf-driven; same TTY caveat apply.
 - Upstream: <https://github.com/ajeetdsouza/zoxide>

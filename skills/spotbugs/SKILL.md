@@ -7,13 +7,13 @@ description: Use this skill whenever the user wants to scan compiled Java byteco
 
 ## When to use
 
-- The user wants to scan a built Java artifact (`.jar`, `.war`, `target/classes/`, `build/classes/`) for bug patterns: null deref, infinite recursion, unclosed streams, broken `equals`/`hashCode`, wrong synchronisation, suspicious casts.
-- The user mentions findbugs — it has been unmaintained since 2016; spotbugs is the drop-in fork and what every modern build uses.
-- CI needs a Java static-analysis gate that emits SARIF for GitHub Code Scanning, or HTML / XML for a build-artifact dashboard.
-- The user wants to combine the security plugin (`find-sec-bugs`) or the extra-rules plugin (`fb-contrib`) with the core detectors.
-- The user wants to suppress findings inline with `@SuppressFBWarnings("RULE_ID")` rather than disabling whole rules.
+- User want scan built Java artifact (`.jar`, `.war`, `target/classes/`, `build/classes/`) for bug patterns: null deref, infinite recursion, unclosed streams, broken `equals`/`hashCode`, wrong synchronisation, suspicious casts.
+- User mention findbugs — unmaintained since 2016; spotbugs drop-in fork, what every modern build use.
+- CI need Java static-analysis gate emit SARIF for GitHub Code Scanning, or HTML / XML for build-artifact dashboard.
+- User want combine security plugin (`find-sec-bugs`) or extra-rules plugin (`fb-contrib`) with core detectors.
+- User want suppress findings inline with `@SuppressFBWarnings("RULE_ID")` instead of disable whole rules.
 
-**Skip** for: source-only AST checks (use `pmd`), Java formatting (`google-java-format`), Kotlin lint (`ktlint`), dependency CVEs (`osv-scanner` / `dependency-check`), Docker image scans (`trivy` / `grype`), runtime profiling, or anything that requires reading `.java` files directly — spotbugs analyses the compiled `.class`.
+**Skip** for: source-only AST checks (use `pmd`), Java formatting (`google-java-format`), Kotlin lint (`ktlint`), dependency CVEs (`osv-scanner` / `dependency-check`), Docker image scans (`trivy` / `grype`), runtime profiling, or anything need read `.java` directly — spotbugs analyse compiled `.class`.
 
 ## Invocation
 
@@ -53,7 +53,7 @@ spotbugs -textui -include  include-filter.xml -xml=bugs.xml app.jar
 spotbugs -textui -exclude  exclude-filter.xml -xml=bugs.xml app.jar
 ```
 
-`-textui` runs headless. Without it, spotbugs launches the Swing GUI, which fails in CI containers without a display.
+`-textui` run headless. Without it, spotbugs launch Swing GUI — fail in CI containers without display.
 
 ## Patterns
 
@@ -63,22 +63,22 @@ spotbugs -textui -exclude  exclude-filter.xml -xml=bugs.xml app.jar
 spotbugs -textui -effort:default -xml:withMessages=bugs.xml target/myapp.jar
 ```
 
-Default effort + medium confidence is the sweet spot for an initial audit. `withMessages` embeds human-readable rule descriptions in the XML so the output is self-contained for review tools.
+Default effort + medium confidence = sweet spot for initial audit. `withMessages` embed human-readable rule descriptions in XML so output self-contained for review tools.
 
 ### Pattern B — categories overview
 
-Categories spotbugs reports against:
+Categories spotbugs report against:
 
 - `CORRECTNESS` — likely bugs (null deref, infinite recursion, unreachable code).
 - `MT_CORRECTNESS` — multithreading mistakes (unsynchronised access, double-checked locking).
 - `PERFORMANCE` — wasteful patterns (boxing in loops, `String.indexOf("c")`).
-- `SECURITY` — surfaced mostly via `find-sec-bugs`; spotbugs core covers a smaller set.
+- `SECURITY` — surfaced mostly via `find-sec-bugs`; spotbugs core covers smaller set.
 - `BAD_PRACTICE` — `equals` without `hashCode`, `Cloneable` without `clone`, `finalize` misuse.
 - `DODGY_CODE` — suspicious-but-not-clearly-wrong (unused vars, redundant null checks).
 - `MALICIOUS_CODE` — exposing mutable state to untrusted callers.
 - `EXPERIMENTAL`, `INTERNATIONALIZATION`, `STYLE` — opt-in / niche.
 
-Filter via the `<Bug category="..."/>` element in the include/exclude XML (Pattern E).
+Filter via `<Bug category="..."/>` in include/exclude XML (Pattern E).
 
 ### Pattern C — SARIF for GitHub Code Scanning
 
@@ -86,7 +86,7 @@ Filter via the `<Bug category="..."/>` element in the include/exclude XML (Patte
 spotbugs -textui -sarif=spotbugs.sarif target/myapp.jar
 ```
 
-Then upload via `github/codeql-action/upload-sarif@v3` in the workflow. Findings appear inline on PRs in the Code Scanning UI — far better signal than a buried HTML report.
+Then upload via `github/codeql-action/upload-sarif@v3` in workflow. Findings appear inline on PRs in Code Scanning UI — far better signal than buried HTML report.
 
 ### Pattern D — plugins (`find-sec-bugs`, `fb-contrib`)
 
@@ -96,7 +96,7 @@ spotbugs -textui \
   -xml:withMessages=bugs.xml target/app.jar
 ```
 
-`find-sec-bugs` adds ~140 security rules (SQLi, XSS, weak crypto, deserialisation gadgets) — essential for any service that handles untrusted input. `fb-contrib` adds ~300 additional general-purpose rules. Plugins are jars; pass absolute paths.
+`find-sec-bugs` add ~140 security rules (SQLi, XSS, weak crypto, deserialisation gadgets) — essential for any service handling untrusted input. `fb-contrib` add ~300 extra general-purpose rules. Plugins are jars; pass absolute paths.
 
 ### Pattern E — include / exclude filter XML
 
@@ -120,7 +120,7 @@ spotbugs -textui \
 spotbugs -textui -exclude exclude-filter.xml -xml=bugs.xml target/app.jar
 ```
 
-`-include` keeps only matches; `-exclude` drops them. Either / both. The filter format is the same as findbugs — match on `Bug pattern`, `Bug category`, `Class`, `Method`, `Field`, `Source` regex.
+`-include` keep only matches; `-exclude` drop them. Either / both. Filter format same as findbugs — match on `Bug pattern`, `Bug category`, `Class`, `Method`, `Field`, `Source` regex.
 
 ### Pattern F — inline suppression with annotations
 
@@ -134,7 +134,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 public byte[] payload() { return raw; }
 ```
 
-Add the `spotbugs-annotations` artifact to the build. Always include `justification` — code review needs to see why the rule was overridden. **Do not** use `@SuppressWarnings("all")` — that is the javac annotation and spotbugs ignores it.
+Add `spotbugs-annotations` artifact to build. Always include `justification` — code review need see why rule overridden. **Do not** use `@SuppressWarnings("all")` — that javac annotation, spotbugs ignore it.
 
 ### Pattern G — build-tool integration
 
@@ -149,7 +149,7 @@ spotbugs {
 }
 ```
 
-Gradle plugin: `com.github.spotbugs`. Maven plugin: `com.github.spotbugs:spotbugs-maven-plugin` (goal `spotbugs:check`). Both wrap the same engine — config keys mirror the CLI flags.
+Gradle plugin: `com.github.spotbugs`. Maven plugin: `com.github.spotbugs:spotbugs-maven-plugin` (goal `spotbugs:check`). Both wrap same engine — config keys mirror CLI flags.
 
 ### Pattern H — performance: tiered effort
 
@@ -161,25 +161,25 @@ spotbugs -textui -effort:less -high -sarif=sb.sarif target/app.jar
 spotbugs -textui -effort:max  -low  -sarif=sb.sarif target/app.jar
 ```
 
-`-effort:max` runs the full inter-procedural data-flow analysis; on large jars (>50 MB) it can take 10–30 minutes. PR jobs should run `-effort:less` with `-high` confidence; the nightly job runs `-effort:max -low` and posts to the dashboard.
+`-effort:max` run full inter-procedural data-flow analysis; on large jars (>50 MB) can take 10–30 minutes. PR jobs run `-effort:less` with `-high` confidence; nightly run `-effort:max -low` and post to dashboard.
 
 ## Anti-patterns
 
-- **Don't point spotbugs at `src/main/java/`.** It analyses bytecode. Build first (`mvn package` / `./gradlew assemble`) and pass the jar or `target/classes` directory. Pointing at `.java` either errors out or silently scans nothing.
-- **Don't run `-effort:max` on every commit.** It's slow. Use `-effort:less` (or `default`) with `-high` confidence on PR gates and reserve `-effort:max -low` for a nightly job.
-- **Don't confuse `-include` with PMD's `--rulesets`.** Spotbugs `-include` takes an XML *filter* scoping which findings to keep; you cannot enumerate ruleset jars there. Plugins load via `-pluginList`; rule scope goes in the filter XML.
-- **Don't keep using findbugs.** Findbugs has been unmaintained since 2016 — no Java 11+ support, no modern bytecode handling. Spotbugs is the drop-in fork; same rule IDs, same filter XML, active releases. Migrate.
-- **Don't suppress with `@SuppressWarnings("all")`.** That's javac's annotation. Use `@SuppressFBWarnings("RULE_ID")` from `spotbugs-annotations`, pin the specific rule, and write a `justification`. A blanket suppression is invisible to spotbugs and to the next reviewer.
-- **Don't ignore SARIF output for GitHub repos.** `-sarif` uploaded via the code-scanning workflow surfaces findings inline on PR review — vastly higher signal than an HTML report nobody opens. JSON / XML are for in-house dashboards; SARIF is for the platform.
-- **Don't run only spotbugs and call Java analysis "done".** Spotbugs reads bytecode; PMD reads source AST. They catch different classes of bug — spotbugs catches null-deref via flow analysis and concurrency mistakes; PMD catches API misuse, code smells, and structural rules. Run both.
-- **Don't omit `-textui` in CI.** Without it spotbugs launches the Swing GUI; on a headless runner the process hangs or errors with `HeadlessException`.
-- **Don't use `-output FILE` as a separate flag.** It's deprecated since SpotBugs 4.5.0; use the `-xml=FILE` / `-sarif=FILE` / `-html=FILE` single-token form instead. The old form still works but emits a deprecation warning.
+- **Don't point spotbugs at `src/main/java/`.** It analyse bytecode. Build first (`mvn package` / `./gradlew assemble`) and pass jar or `target/classes` dir. Pointing at `.java` either error out or silently scan nothing.
+- **Don't run `-effort:max` on every commit.** Slow. Use `-effort:less` (or `default`) with `-high` confidence on PR gates; reserve `-effort:max -low` for nightly job.
+- **Don't confuse `-include` with PMD's `--rulesets`.** Spotbugs `-include` take XML *filter* scoping which findings to keep; cannot enumerate ruleset jars there. Plugins load via `-pluginList`; rule scope go in filter XML.
+- **Don't keep using findbugs.** Unmaintained since 2016 — no Java 11+ support, no modern bytecode handling. Spotbugs drop-in fork; same rule IDs, same filter XML, active releases. Migrate.
+- **Don't suppress with `@SuppressWarnings("all")`.** That javac's annotation. Use `@SuppressFBWarnings("RULE_ID")` from `spotbugs-annotations`, pin specific rule, write `justification`. Blanket suppression invisible to spotbugs and next reviewer.
+- **Don't ignore SARIF output for GitHub repos.** `-sarif` uploaded via code-scanning workflow surface findings inline on PR review — vastly higher signal than HTML report nobody open. JSON / XML for in-house dashboards; SARIF for the platform.
+- **Don't run only spotbugs and call Java analysis "done".** Spotbugs read bytecode; PMD read source AST. Catch different classes of bug — spotbugs catch null-deref via flow analysis + concurrency mistakes; PMD catch API misuse, code smells, structural rules. Run both.
+- **Don't omit `-textui` in CI.** Without it spotbugs launch Swing GUI; on headless runner process hang or error with `HeadlessException`.
+- **Don't use `-output FILE` as separate flag.** Deprecated since SpotBugs 4.5.0; use `-xml=FILE` / `-sarif=FILE` / `-html=FILE` single-token form. Old form still work but emit deprecation warning.
 
 ## Cross-refs
 
 - Behavioral rule: see `rules/AGENTS.md` — JVM section ("scan compiled artefacts with spotbugs; pair with PMD for source-level rules").
 - Sister skills: `skills/pmd/SKILL.md` (source-AST static analysis — run alongside), `skills/ktlint/SKILL.md` (Kotlin lint), `skills/google-java-format/SKILL.md` (formatting).
-- JSON / SARIF pipelines: `skills/jq/SKILL.md` for post-processing XML→JSON exports; SARIF goes to GitHub Code Scanning directly.
+- JSON / SARIF pipelines: `skills/jq/SKILL.md` for post-processing XML→JSON exports; SARIF go to GitHub Code Scanning directly.
 - Plugins: `find-sec-bugs` <https://find-sec-bugs.github.io/>, `fb-contrib` <https://fb-contrib.sourceforge.net/>.
 - Upstream: <https://spotbugs.github.io/>
 - Bug pattern reference: <https://spotbugs.readthedocs.io/en/latest/bugDescriptions.html>

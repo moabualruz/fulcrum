@@ -7,12 +7,12 @@ description: Use this skill whenever the user lints or formats Kotlin source (`.
 
 ## When to use
 
-- The user wants to lint or format `.kt` / `.kts` sources — find indentation, import-order, wildcard-import, no-semicolon, trailing-comma, naming, and chain-wrapping issues, then fix them.
-- The user mentions Kotlin coding conventions, the official Kotlin style guide, Android's Kotlin style, or "the strict subset of IntelliJ formatter that ktlint enforces".
-- The agent is wiring CI for a Kotlin/Android repo and needs a check that fails on style drift, plus a `--format` step for local pre-commit.
-- The user wants `.editorconfig` to be the single source of truth so IntelliJ and the CLI agree.
+- User want lint/format `.kt` / `.kts` — find indentation, import-order, wildcard-import, no-semicolon, trailing-comma, naming, chain-wrapping issues, fix.
+- User mention Kotlin coding conventions, official Kotlin style guide, Android Kotlin style, or "strict subset of IntelliJ formatter ktlint enforce".
+- Agent wiring CI for Kotlin/Android repo, need check fail on style drift, plus `--format` step for local pre-commit.
+- User want `.editorconfig` as single source of truth so IntelliJ and CLI agree.
 
-**Skip** for: Java (use `google-java-format`, `checkstyle`, or `pmd`), Scala (`scalafmt`), Groovy `build.gradle` (use `spotless` or `npm-groovy-lint`), Swift (`swift-format` / `swiftlint`), Kotlin **type errors** (use `kotlinc -Werror` or the IDE — ktlint is purely syntactic), or Android-specific lint rules beyond style (use `lint` / `detekt`).
+**Skip** for: Java (use `google-java-format`, `checkstyle`, or `pmd`), Scala (`scalafmt`), Groovy `build.gradle` (use `spotless` or `npm-groovy-lint`), Swift (`swift-format` / `swiftlint`), Kotlin **type errors** (use `kotlinc -Werror` or IDE — ktlint pure syntactic), Android-specific lint rules beyond style (use `lint` / `detekt`).
 
 ## Invocation
 
@@ -50,7 +50,7 @@ ktlint installGitPreCommitHook
 ktlint --ruleset=path/to/custom-ruleset.jar
 ```
 
-`ktlint` reads `.editorconfig` upward from each target file. Without `-F` ktlint **only reports** — agents that run `ktlint file.kt` and expect formatting are the #1 trip.
+`ktlint` read `.editorconfig` upward from each target file. Without `-F` ktlint **only report** — agents run `ktlint file.kt` expecting format = #1 trip.
 
 ## Patterns
 
@@ -60,7 +60,7 @@ ktlint --ruleset=path/to/custom-ruleset.jar
 ktlint -F 'src/**/*.kt' 'src/**/*.kts'          # safe to run pre-commit
 ```
 
-`-F` applies every fixable rule and rewrites the file. Non-fixable issues (e.g. naming) are still reported. Pair with `installGitPreCommitHook` so the fix runs automatically on staged files.
+`-F` apply every fixable rule, rewrite file. Non-fixable issues (e.g. naming) still reported. Pair with `installGitPreCommitHook` so fix run automatic on staged files.
 
 ### Pattern B — Android conventions
 
@@ -69,7 +69,7 @@ ktlint -F 'src/**/*.kt' 'src/**/*.kts'          # safe to run pre-commit
 ktlint -F 'app/src/**/*.kt'
 ```
 
-Setting `ktlint_code_style = android_studio` in `.editorconfig` enables Android-specific rules (final-newline, no wildcard imports beyond a low threshold, max-line-length). The standalone `--android` CLI flag was removed in ktlint 1.0 — config is the only path.
+Set `ktlint_code_style = android_studio` in `.editorconfig` enable Android-specific rules (final-newline, no wildcard imports beyond low threshold, max-line-length). Standalone `--android` CLI flag removed in ktlint 1.0 — config only path.
 
 ### Pattern C — JSON reporter piped to jq
 
@@ -82,7 +82,7 @@ ktlint --reporter=json . \
   | jq '[.[].errors[].rule] | group_by(.) | map({rule: .[0], n: length}) | sort_by(-.n)'
 ```
 
-JSON is a stable schema (`[{file, errors: [{line, column, message, rule}]}]`). Pair with the `jq` skill for any aggregation.
+JSON = stable schema (`[{file, errors: [{line, column, message, rule}]}]`). Pair with `jq` skill for aggregation.
 
 ### Pattern D — `.editorconfig` as source of truth
 
@@ -107,7 +107,7 @@ ktlint_standard_no-wildcard-imports = disabled
 ktlint_standard_max-line-length = error
 ```
 
-`.editorconfig` is read by **both** ktlint and IntelliJ — keeping rules here is the only way to stop the IDE and CLI from disagreeing. `ktlint_code_style` (≥ 0.49) picks the rule preset; per-rule overrides use the `ktlint_<ruleset>_<rule-name>` key.
+`.editorconfig` read by **both** ktlint and IntelliJ — keep rules here = only way stop IDE and CLI disagreeing. `ktlint_code_style` (≥ 0.49) pick rule preset; per-rule override use `ktlint_<ruleset>_<rule-name>` key.
 
 ### Pattern E — baseline on legacy code
 
@@ -116,7 +116,7 @@ ktlint --baseline=ktlint-baseline.xml           # first run: writes baseline if 
                                                 # later runs: ignores pre-existing issues
 ```
 
-A baseline records every current violation by file + rule + line so adopting ktlint on a multi-thousand-issue codebase doesn't gate every PR. Commit the baseline; new violations still fail. Regenerate (`rm` and rerun) periodically as you fix old issues.
+Baseline record every current violation by file + rule + line so adopting ktlint on multi-thousand-issue codebase no gate every PR. Commit baseline; new violations still fail. Regenerate (`rm` and rerun) periodically as fix old issues.
 
 ### Pattern F — suppress per-call-site
 
@@ -129,7 +129,7 @@ package com.example
 class oddName { /* ... */ }
 ```
 
-ktlint ≥ 1.0 reads `@Suppress("ktlint:<ruleset>:<rule-id>")` annotations. The older `// ktlint-disable <rule-id>` block comment is **deprecated** and removed in 2.0 — migrate to annotations on new code.
+ktlint ≥ 1.0 read `@Suppress("ktlint:<ruleset>:<rule-id>")` annotations. Older `// ktlint-disable <rule-id>` block comment **deprecated**, removed in 2.0 — migrate to annotations on new code.
 
 ### Pattern G — pre-commit + CI shape
 
@@ -142,25 +142,25 @@ ktlint --reporter=checkstyle,output=build/ktlint.xml \
        --reporter=plain                          # second reporter to stderr for the log
 ```
 
-Don't run `-F` in CI — the runner should fail the build, not silently rewrite.
+No run `-F` in CI — runner should fail build, not silent rewrite.
 
 ## Anti-patterns
 
-- **Don't run `ktlint <file>` and expect the file to change.** Without `-F` / `--format` ktlint only reports; the file is untouched. Agents migrating from prettier/black assumptions get this wrong every time.
-- **Don't mix the standalone `ktlint` binary with the gradle plugin (`jlleitschuh/ktlint-gradle`).** They version independently; behavior diverges (different rule presets, different `.editorconfig` reads). Pin one — for repos with a Gradle build, the plugin is usually the source of truth and the CLI mirrors its version.
-- **Don't put rule configuration in CLI flags.** `--disabled_rules` / `--editorconfig-override` were deprecated and partially removed; the IDE ignores them anyway. Put rules in `.editorconfig` so IntelliJ and the CLI agree.
-- **Don't use `// ktlint-disable <rule-id>` block comments on ktlint ≥ 1.0.** That syntax is deprecated and removed in 2.0. Use `@Suppress("ktlint:standard:<rule-id>")` (or `@file:Suppress(...)` for whole files) instead.
-- **Don't skip `--baseline` when adopting ktlint on a legacy project.** A first run on an unprepared codebase floods the report with thousands of pre-existing issues, masking new ones. Baseline once, fix incrementally.
-- **Don't pass `--android` on the CLI.** It was removed in ktlint 1.0 (Sept 2023). Set `ktlint_code_style = android_studio` in `.editorconfig` so the IDE and CLI agree.
-- **Don't reach for ktlint to type-check Kotlin.** "Unresolved reference", "type mismatch", "smart-cast impossible" come from `kotlinc` / the IDE, not ktlint. ktlint is style-only.
-- **Don't `grep` ktlint plain output.** Use `--reporter=json` and pipe to `jq` — the human renderer changes between releases; the JSON shape is stable.
+- **Don't run `ktlint <file>` expecting file change.** Without `-F` / `--format` ktlint only report; file untouched. Agents from prettier/black assumptions get this wrong every time.
+- **Don't mix standalone `ktlint` binary with gradle plugin (`jlleitschuh/ktlint-gradle`).** Version independently; behavior diverge (different rule presets, different `.editorconfig` reads). Pin one — for repos with Gradle build, plugin usually source of truth, CLI mirror its version.
+- **Don't put rule config in CLI flags.** `--disabled_rules` / `--editorconfig-override` deprecated, partially removed; IDE ignore them anyway. Put rules in `.editorconfig` so IntelliJ and CLI agree.
+- **Don't use `// ktlint-disable <rule-id>` block comments on ktlint ≥ 1.0.** Syntax deprecated, removed in 2.0. Use `@Suppress("ktlint:standard:<rule-id>")` (or `@file:Suppress(...)` for whole files) instead.
+- **Don't skip `--baseline` when adopting ktlint on legacy project.** First run on unprepared codebase flood report with thousands of pre-existing issues, mask new ones. Baseline once, fix incrementally.
+- **Don't pass `--android` on CLI.** Removed in ktlint 1.0 (Sept 2023). Set `ktlint_code_style = android_studio` in `.editorconfig` so IDE and CLI agree.
+- **Don't reach for ktlint to type-check Kotlin.** "Unresolved reference", "type mismatch", "smart-cast impossible" come from `kotlinc` / IDE, not ktlint. ktlint style-only.
+- **Don't `grep` ktlint plain output.** Use `--reporter=json` and pipe to `jq` — human renderer change between releases; JSON shape stable.
 
 ## Cross-refs
 
 - Behavioral rule: see `rules/AGENTS.md` — "lint and format Kotlin with ktlint; configure via `.editorconfig` so the IDE matches".
-- Hook recipe: `format` (in `docs/hooks.md`) is wired to run `ktlint -F` on `*.kt` / `*.kts` writes.
+- Hook recipe: `format` (in `docs/hooks.md`) wired to run `ktlint -F` on `*.kt` / `*.kts` writes.
 - Sister skills: `skills/ruff/SKILL.md` (Python equivalent), `skills/biome/SKILL.md` (JS/TS equivalent) — same lint-and-format-in-one-binary shape.
-- JSON pipelines: `skills/jq/SKILL.md` — `ktlint --reporter=json | jq` is the canonical aggregation.
+- JSON pipelines: `skills/jq/SKILL.md` — `ktlint --reporter=json | jq` = canonical aggregation.
 - Upstream docs: <https://pinterest.github.io/ktlint/>
 - Rules reference: <https://pinterest.github.io/ktlint/latest/rules/standard/>
 - `.editorconfig` keys: <https://pinterest.github.io/ktlint/latest/rules/configuration-ktlint/>

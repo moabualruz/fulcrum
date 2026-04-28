@@ -7,13 +7,13 @@ description: Use this skill whenever the user lints or formats Python code from 
 
 ## When to use
 
-- The user wants to lint Python — find unused imports, undefined names, style violations, security issues, complexity warnings — that's `ruff check`.
-- The user wants to format Python — reflow code, normalize quotes, fix indentation, sort imports — that's `ruff format` (and `ruff check --select I --fix` for imports).
-- The user mentions black, flake8, isort, pyupgrade, pylint, or bandit — ruff is the modern single-binary replacement for all six (with caveats for pylint/bandit coverage).
-- The user wants a CI gate that fails on style drift — `ruff check` and `ruff format --check` both exit non-zero on findings.
-- The agent is about to write or modify a `.py` file and should leave it lint-clean and formatted.
+- User want lint Python — find unused imports, undefined names, style violations, security issues, complexity warnings — `ruff check`.
+- User want format Python — reflow code, normalize quotes, fix indent, sort imports — `ruff format` (and `ruff check --select I --fix` for imports).
+- User mention black, flake8, isort, pyupgrade, pylint, or bandit — ruff = modern single-binary replacement for all six (caveats for pylint/bandit coverage).
+- User want CI gate fail on style drift — `ruff check` and `ruff format --check` both exit non-zero on findings.
+- Agent about to write or modify `.py` file, leave lint-clean and formatted.
 
-**Skip** for: non-Python files (`.js`/`.ts` → biome, `.go` → gofmt, `.rs` → rustfmt, `.yaml` → prettier/yamlfmt); type checking (mypy, pyright, pyre); runtime test failures (pytest); dependency vulnerability scans (use `pip-audit` or `osv-scanner`); refactors that need semantic understanding (use `ast-grep` or an LSP).
+**Skip** for: non-Python files (`.js`/`.ts` → biome, `.go` → gofmt, `.rs` → rustfmt, `.yaml` → prettier/yamlfmt); type checking (mypy, pyright, pyre); runtime test failures (pytest); dependency vuln scans (use `pip-audit` or `osv-scanner`); refactors needing semantic understanding (use `ast-grep` or LSP).
 
 ## Invocation
 
@@ -44,7 +44,7 @@ ruff check --config path/to/pyproject.toml .
 ruff check --no-cache .
 ```
 
-`ruff check` and `ruff format` are **separate subcommands** — running one does not run the other. A typical pre-commit pass is `ruff check --fix . && ruff format .`.
+`ruff check` and `ruff format` = **separate subcommands** — running one no run other. Typical pre-commit pass: `ruff check --fix . && ruff format .`.
 
 ## Patterns
 
@@ -55,7 +55,7 @@ ruff check --fix .                              # apply safe fixes only
 ruff check --fix --show-fixes .                 # log each fix (rule code + line)
 ```
 
-Safe fixes don't change runtime behaviour (remove unused imports, sort imports, add trailing commas). Use this in pre-commit and editor-on-save.
+Safe fixes no change runtime behaviour (remove unused imports, sort imports, add trailing commas). Use in pre-commit and editor-on-save.
 
 ### Pattern B — unsafe fixes (review the diff)
 
@@ -64,7 +64,7 @@ ruff check --fix --unsafe-fixes --diff .        # preview first
 ruff check --fix --unsafe-fixes .               # then apply
 ```
 
-Unsafe fixes can change semantics — e.g. rewriting `unittest` `assertEqual(a, b)` to `assert a == b`, or removing what looks like dead code. Always preview the diff before applying in CI or on a shared branch.
+Unsafe fixes can change semantics — e.g. rewrite `unittest` `assertEqual(a, b)` to `assert a == b`, or remove what looks like dead code. Always preview diff before apply in CI or shared branch.
 
 ### Pattern C — format and format-check
 
@@ -74,7 +74,7 @@ ruff format --check .                           # CI: exit 1 if anything would c
 ruff format --diff src/                         # show what would change
 ```
 
-`ruff format` is Black-compatible by default. `--check` is the canonical CI invocation; pair with `ruff check` for full coverage.
+`ruff format` Black-compatible by default. `--check` = canonical CI invocation; pair with `ruff check` for full coverage.
 
 ### Pattern D — rule selection
 
@@ -118,7 +118,7 @@ indent-style = "space"
 docstring-code-format = true
 ```
 
-`target-version` controls which `UP` (pyupgrade) rewrites apply — set it to your minimum supported Python.
+`target-version` controls which `UP` (pyupgrade) rewrites apply — set to minimum supported Python.
 
 ### Pattern F — JSON output piped to jq
 
@@ -130,7 +130,7 @@ ruff check --output-format=json . | jq 'group_by(.code) | map({code: .[0].code, 
 ruff check --output-format=json . | jq -r '.[].filename' | sort -u
 ```
 
-`--output-format=json` returns a stable schema: `code`, `message`, `filename`, `location`, `fix`. Pair with the `jq` skill for any aggregation.
+`--output-format=json` returns stable schema: `code`, `message`, `filename`, `location`, `fix`. Pair with `jq` skill for any aggregation.
 
 ### Pattern G — pre-commit / CI shape
 
@@ -142,24 +142,24 @@ ruff check --fix . && ruff format .
 ruff check . && ruff format --check .
 ```
 
-Don't run with `--fix` in CI — the runner should fail on drift, not silently rewrite the tree.
+No run `--fix` in CI — runner should fail on drift, not silently rewrite tree.
 
 ## Anti-patterns
 
-- **Don't keep `black`, `flake8`, or `isort` alongside ruff.** They duplicate work, fight each other on edge cases, and slow CI by 10x. Pick ruff and remove the others from `pyproject.toml` / `requirements-dev.txt` / pre-commit config.
-- **Don't run `--select ALL` without `--ignore`.** `D` (docstrings), `ANN` (annotations), `N` (naming), `COM` (commas) will swamp output on any existing codebase. Start with `select = ["F", "E", "W", "I", "B", "UP", "RUF"]` and grow.
-- **Don't apply `--unsafe-fixes` blindly in CI.** They can change semantics — `assertEqual` → bare `assert`, removed `pass` statements, rewritten exception handlers. Always `--diff` first and review.
+- **Don't keep `black`, `flake8`, or `isort` alongside ruff.** Duplicate work, fight on edge cases, slow CI 10x. Pick ruff, remove others from `pyproject.toml` / `requirements-dev.txt` / pre-commit config.
+- **Don't run `--select ALL` without `--ignore`.** `D` (docstrings), `ANN` (annotations), `N` (naming), `COM` (commas) swamp output on any existing codebase. Start with `select = ["F", "E", "W", "I", "B", "UP", "RUF"]` and grow.
+- **Don't apply `--unsafe-fixes` blindly in CI.** Can change semantics — `assertEqual` → bare `assert`, removed `pass` statements, rewritten exception handlers. Always `--diff` first and review.
 - **Don't use `ruff check` and expect reformatting.** `check` runs lint rules and applies fixes for those rules; whitespace/quotes/line-wrapping live in `ruff format`. Run both.
-- **Don't skip `--diff` on a destructive run.** Before `ruff check --fix --unsafe-fixes` or `ruff format` against a repo you don't own, preview with `--diff` and read the output.
-- **Don't reach for ruff to type-check.** ruff is static, AST-level, and intentionally has no type system. Use mypy, pyright, or pyre for type errors. ruff complements them; it does not replace them.
-- **Don't put `# noqa` everywhere to silence ruff.** Configure `per-file-ignores` in `pyproject.toml` instead — `# noqa` rots, configuration is reviewed.
-- **Don't run `ruff check` against a virtualenv or `node_modules`.** Add them to `extend-exclude`; otherwise ruff will lint thousands of files in `.venv/lib/python3.12/site-packages/...`.
+- **Don't skip `--diff` on destructive run.** Before `ruff check --fix --unsafe-fixes` or `ruff format` against repo you don't own, preview with `--diff` and read output.
+- **Don't reach for ruff to type-check.** ruff static, AST-level, intentionally no type system. Use mypy, pyright, or pyre for type errors. ruff complement them; no replace.
+- **Don't put `# noqa` everywhere to silence ruff.** Configure `per-file-ignores` in `pyproject.toml` instead — `# noqa` rots, configuration reviewed.
+- **Don't run `ruff check` against virtualenv or `node_modules`.** Add to `extend-exclude`; else ruff lint thousands of files in `.venv/lib/python3.12/site-packages/...`.
 
 ## Cross-refs
 
 - Behavioral rule: see `rules/AGENTS.md` — "lint and format Python with ruff; never `black` + `flake8` separately".
-- Hook recipe: `format` (in `docs/hooks.md`) is wired to run `ruff format` on `*.py` writes; `lint` runs `ruff check --fix`.
-- JSON pipelines: `skills/jq/SKILL.md` — `ruff check --output-format=json | jq` is the canonical aggregation shape.
+- Hook recipe: `format` (in `docs/hooks.md`) wired to run `ruff format` on `*.py` writes; `lint` runs `ruff check --fix`.
+- JSON pipelines: `skills/jq/SKILL.md` — `ruff check --output-format=json | jq` = canonical aggregation shape.
 - Upstream docs: <https://docs.astral.sh/ruff/>
 - Rules reference: <https://docs.astral.sh/ruff/rules/>
 - Configuration: <https://docs.astral.sh/ruff/configuration/>

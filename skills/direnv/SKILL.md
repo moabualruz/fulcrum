@@ -7,13 +7,13 @@ description: Use this skill whenever the user wants to load environment variable
 
 ## When to use
 
-- The user wants env vars (e.g. `DATABASE_URL`, `AWS_PROFILE`, `API_TOKEN`) to load only inside one repo and unload on `cd ..`.
-- The user wants to prepend a project-local `bin/` or `node_modules/.bin` to `PATH` automatically.
-- The user mentions `.envrc`, "auto-load .env", "scoped env per directory", or "envrc allow".
-- The user wants `dotenv` behavior (`.env` file) but extended with shell expressions, conditionals, or PATH composition.
-- The agent itself is about to `cd` into a project that has a `.envrc` and needs the project env to apply (use `direnv exec` — hooks don't fire in agent shells).
+- User want env vars (e.g. `DATABASE_URL`, `AWS_PROFILE`, `API_TOKEN`) load only inside one repo, unload on `cd ..`.
+- User want prepend project-local `bin/` or `node_modules/.bin` to `PATH` auto.
+- User mention `.envrc`, "auto-load .env", "scoped env per directory", or "envrc allow".
+- User want `dotenv` behavior (`.env` file) extended with shell expressions, conditionals, or PATH composition.
+- Agent about to `cd` into project with `.envrc`, need project env apply (use `direnv exec` — hooks no fire in agent shells).
 
-**Skip** for: setting **tool versions** per project (use `mise` or `asdf`); permanent global env (`~/.zshrc` / `~/.profile`); runtime secret fetching from a vault inside an app (use the vault SDK); `docker compose` per-service env (`env_file:` / `environment:`); shell aliases or functions (use rc files).
+**Skip** for: **tool versions** per project (use `mise` or `asdf`); permanent global env (`~/.zshrc` / `~/.profile`); runtime secret fetch from vault inside app (use vault SDK); `docker compose` per-service env (`env_file:` / `environment:`); shell aliases or functions (use rc files).
 
 ## Invocation
 
@@ -36,7 +36,7 @@ direnv exec . <command>          # use the .envrc in this dir
 direnv exec /path/to/proj make   # or any other dir
 ```
 
-`direnv allow` records a hash of the current `.envrc` contents. Any edit invalidates the allow and the env unloads until you re-allow — that is the entire security model.
+`direnv allow` record hash of current `.envrc` contents. Any edit invalidate allow, env unload until re-allow — that whole security model.
 
 ## Patterns
 
@@ -64,7 +64,7 @@ dotenv .env.local       # specific file
 dotenv_if_exists .env.local   # tolerate missing
 ```
 
-`dotenv` understands KEY=value pairs; it does not run shell. Use it when you already have a `.env` and want direnv to apply it on cd.
+`dotenv` parse KEY=value pairs; no run shell. Use when already have `.env`, want direnv apply on cd.
 
 ### Pattern C — compose `PATH` and other path-like vars
 
@@ -76,7 +76,7 @@ MANPATH_add share/man                # same for MANPATH
 path_add PYTHONPATH src              # generic: prepend to any colon-list var
 ```
 
-`PATH_add` resolves to an absolute path, dedupes, and prepends. Use it instead of `export PATH="./bin:$PATH"` (relative paths break when cwd changes mid-session).
+`PATH_add` resolve to absolute path, dedupe, prepend. Use instead of `export PATH="./bin:$PATH"` (relative path break when cwd change mid-session).
 
 ### Pattern D — layout helpers (per-language scratch dirs)
 
@@ -89,7 +89,7 @@ layout pyenv 3.12.2          # uses pyenv-managed interpreter
 use nix                      # delegates to nix-shell / flake.nix
 ```
 
-Layouts live under `.direnv/` (gitignore it). `layout python` is the simplest way to get a project-local venv that activates on cd and deactivates on cd-out.
+Layouts live under `.direnv/` (gitignore it). `layout python` simplest way get project-local venv, activate on cd, deactivate on cd-out.
 
 ### Pattern E — inherit a parent `.envrc`
 
@@ -99,7 +99,7 @@ source_up               # load monorepo/.envrc first
 export SERVICE_NAME=api
 ```
 
-`source_up` walks up looking for the next `.envrc` and sources it. Use this so leaf services inherit org-wide vars (region, account ID) without duplicating.
+`source_up` walk up, find next `.envrc`, source it. Use so leaf service inherit org-wide vars (region, account ID), no duplicate.
 
 ### Pattern F — local overrides without committing
 
@@ -113,7 +113,7 @@ export DATABASE_URL="postgres://me:secret@localhost/myapp_dev"
 export STRIPE_SECRET_KEY="sk_test_…"
 ```
 
-`source_env_if_exists` is a no-op if the file is missing. Add `.envrc.local` and `.direnv/` to `.gitignore`. Each developer runs `direnv allow` once on their checkout.
+`source_env_if_exists` no-op if file missing. Add `.envrc.local` and `.direnv/` to `.gitignore`. Each dev run `direnv allow` once on checkout.
 
 ### Pattern G — agent / CI invocation
 
@@ -122,21 +122,21 @@ direnv exec . bun test            # apply .envrc, then run command
 direnv exec /repo/api ./deploy.sh
 ```
 
-In non-interactive shells (CI runners, agent subshells, scripts), the prompt hook never fires. `direnv exec` is the explicit form: it reads `.envrc`, exports its env, and execs the command. `direnv allow` must already have been run on the file.
+Non-interactive shells (CI runners, agent subshells, scripts): prompt hook never fire. `direnv exec` explicit form: read `.envrc`, export env, exec command. `direnv allow` must already run on file.
 
 ## Anti-patterns
 
-- **Don't** put secrets in a committed `.envrc`. Use `.envrc.local` (gitignored) with `source_env_if_exists`, or fetch from a vault (`export DB_PASS=$(op read 'op://vault/db/password')`). The hash check protects you against tampering, not exposure.
-- **Don't** run `direnv allow` without reading the `.envrc` first — it's an allowlist for *arbitrary shell code*. Treat a fresh `.envrc` from a clone or a PR like any untrusted script: read it, then allow it.
-- **Don't** use direnv to pin tool versions (`export PATH=/opt/node-18/bin:$PATH`). That's `mise` / `asdf` / `nix` territory — they handle install, version drift, and platform binaries. direnv composes well with them (`use mise` / `use asdf`); don't reinvent them.
-- **Don't** forget the shell hook. Without `eval "$(direnv hook <shell>)"` in your shell rc, `cd` does nothing and you'll think `.envrc` is broken. Verify with `direnv status` — it reports "Found RC path" but "Loaded RC path" empty if the hook is missing.
-- **Don't** assume `cd` triggers direnv inside a script or agent shell. The hook fires on prompt redraw, not on subshell `cd`. Use `direnv exec . <cmd>` to apply env explicitly.
-- **Don't** edit `.envrc` and expect the shell to pick it up automatically. The hash changes — direnv unloads and prints "direnv: error .envrc is blocked. Run `direnv allow` to approve its content". Run `direnv allow` (or `direnv reload`).
-- **Don't** ship a `.envrc` that calls `dotenv` without committing the `.env` *template*. Provide `.env.example` and gitignore the real `.env`.
+- **Don't** put secrets in committed `.envrc`. Use `.envrc.local` (gitignored) with `source_env_if_exists`, or fetch from vault (`export DB_PASS=$(op read 'op://vault/db/password')`). Hash check protect against tampering, not exposure.
+- **Don't** run `direnv allow` without read `.envrc` first — it allowlist for *arbitrary shell code*. Treat fresh `.envrc` from clone or PR like untrusted script: read, then allow.
+- **Don't** use direnv to pin tool versions (`export PATH=/opt/node-18/bin:$PATH`). That `mise` / `asdf` / `nix` territory — they handle install, version drift, platform binaries. direnv compose well with them (`use mise` / `use asdf`); no reinvent.
+- **Don't** forget shell hook. Without `eval "$(direnv hook <shell>)"` in shell rc, `cd` do nothing, will think `.envrc` broken. Verify with `direnv status` — report "Found RC path" but "Loaded RC path" empty if hook missing.
+- **Don't** assume `cd` trigger direnv inside script or agent shell. Hook fire on prompt redraw, not on subshell `cd`. Use `direnv exec . <cmd>` apply env explicit.
+- **Don't** edit `.envrc` and expect shell pick up auto. Hash change — direnv unload, print "direnv: error .envrc is blocked. Run `direnv allow` to approve its content". Run `direnv allow` (or `direnv reload`).
+- **Don't** ship `.envrc` that call `dotenv` without commit `.env` *template*. Provide `.env.example`, gitignore real `.env`.
 
 ## Cross-refs
 
 - Behavioral rule: see `rules/AGENTS.md` — env scoping, secrets-in-repo policy.
-- Pairs with `mise` (tool versions) — they coexist; `mise` can call `use direnv` and direnv can call `use mise`. Loads tools via mise, env via direnv.
-- Stdlib reference (every helper, including the ones above): <https://direnv.net/man/direnv-stdlib.1.html>
+- Pair with `mise` (tool versions) — coexist; `mise` can call `use direnv`, direnv can call `use mise`. Load tools via mise, env via direnv.
+- Stdlib reference (every helper, including ones above): <https://direnv.net/man/direnv-stdlib.1.html>
 - Upstream: <https://direnv.net/>

@@ -1,6 +1,6 @@
 # Capability Layer
 
-> What the agent can do. CLI tools that output JSON, paired with skills (see [skills.md](skills.md)).
+> What agent can do. CLI tools output JSON, paired with skills (see [skills.md](skills.md)).
 
 ## 1. Foundation — install once per machine
 
@@ -27,7 +27,7 @@ uv tool install graphifyy tavily-cli
 | `xh` | curl | HTTP/API calls, readable JSON output by default |
 | `gh` | browser | PRs, issues, CI status, code search |
 | `just` | make | Project task runner — AGENTS.md documents just recipes |
-| `mise` | nvm/pyenv/rbenv | Runtime version management, eliminates "wrong version" failures |
+| `mise` | nvm/pyenv/rbenv | Runtime version mgmt, kills "wrong version" failures |
 | `direnv` | manual exports | Per-directory env vars, transparent to agent |
 | `tmux` | — | Required for Claude Code multi-agent parallel sessions |
 | `difftastic` | git diff | Syntax-aware structural diff — better signal for agents reading changes |
@@ -38,7 +38,7 @@ uv tool install graphifyy tavily-cli
 | `zoxide` | cd | Smart directory jump |
 | `hyperfine` | time | Statistical benchmarking, JSON output |
 | `watchexec` | polling | Re-run on file change |
-| `universal-ctags` | — | Symbol index — where is X defined, across all languages |
+| `universal-ctags` | — | Symbol index — where X defined, all languages |
 | `gitleaks` | — | Secrets in git history |
 | `git-cliff` | — | Changelog from conventional commits |
 
@@ -49,7 +49,7 @@ uv tool install graphifyy tavily-cli
 | `ast-grep` | `brew install ast-grep` | Structural AST pattern search + skill |
 | `repomix` | `npm install -g repomix` | Pack repo into context + skill |
 | `graphify` | `uv tool install graphifyy` | Code knowledge graph + skill |
-| `semgrep` | `pip install semgrep` | SAST scan, 1000+ rules, no account needed, local |
+| `semgrep` | `pip install semgrep` | SAST scan, 1000+ rules, no account, local |
 | `lizard` | `pip install lizard` | Cyclomatic complexity + function length, JSON output, 27 languages |
 
 ## 3. Web + Docs
@@ -60,14 +60,14 @@ uv tool install graphifyy tavily-cli
 | `tvly` | `uv tool install tavily-cli` | Web search + research + skill |
 | `playwright-cli` | `npm install -g @playwright/cli && npx playwright install chromium` | Browser automation + skill |
 
-## 4. Services — install when the project needs it
+## 4. Services — install when project needs
 
 | Tool | Install | Covers |
 |---|---|---|
 | `gws` | see gws docs | Gmail, Google Drive, Google Calendar |
 | `hcloud` | `brew install hcloud` | Hetzner Cloud — servers, volumes, firewalls, networks, load balancers (`-o json` on all commands) |
 | `wrangler` | `npm install -g wrangler` | Cloudflare Workers, Pages, D1, KV, R2 |
-| `flarectl` | `go install github.com/cloudflare/cloudflare-go/cmd/flarectl@latest` | Cloudflare DNS + zone management (no JSON — use `xh` + Cloudflare REST API for scripted DNS ops) |
+| `flarectl` | `go install github.com/cloudflare/cloudflare-go/cmd/flarectl@latest` | Cloudflare DNS + zone mgmt (no JSON — use `xh` + Cloudflare REST API for scripted DNS ops) |
 | `usql` | `brew install usql` | All databases — Postgres, MySQL, SQLite, 50+ others |
 
 ## 5. Language-specific — install per project, not globally

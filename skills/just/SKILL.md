@@ -7,12 +7,12 @@ description: Use this skill whenever the user wants to run a project task, list 
 
 ## When to use
 
-- The repo has a `justfile`, `Justfile`, or `.justfile` and the user (or you) wants to run, list, or inspect a recipe.
-- The user asks "what tasks does this project expose?" or "how do I build/test/lint this repo?" — `just --list` is the answer.
-- The user asks for a Makefile-style runner but the repo uses just (recipe args go after the recipe, not as `VAR=value`).
-- The agent is about to run a script that already exists as a recipe — prefer the recipe so dependencies and shell config apply.
+- Repo has `justfile`, `Justfile`, or `.justfile` and user (or you) want run, list, or inspect recipe.
+- User ask "what tasks does this project expose?" or "how do I build/test/lint this repo?" — `just --list` answer.
+- User ask Makefile-style runner but repo use just (recipe args go after recipe, not as `VAR=value`).
+- Agent about run script that already exist as recipe — prefer recipe so deps and shell config apply.
 
-**Skip** for: plain `Makefile` (use `make`), `package.json` scripts (use `npm run` / `pnpm run` / `bun run`), `Taskfile.yml` (use `task`), language task runners (`cargo`, `gradle`, `mix`, `dotnet run`), or one-off shell commands that aren't in the justfile.
+**Skip** for: plain `Makefile` (use `make`), `package.json` scripts (use `npm run` / `pnpm run` / `bun run`), `Taskfile.yml` (use `task`), language task runners (`cargo`, `gradle`, `mix`, `dotnet run`), or one-off shell commands not in justfile.
 
 ## Invocation
 
@@ -42,7 +42,7 @@ just --shell bash <recipe>
 just --working-directory /tmp <recipe>
 ```
 
-just walks up from the current directory looking for `justfile` / `.justfile` / `Justfile` (case-insensitive on case-insensitive filesystems), so you can invoke from any subdirectory.
+just walk up from current dir looking for `justfile` / `.justfile` / `Justfile` (case-insensitive on case-insensitive FS), so invoke from any subdir.
 
 ## Patterns
 
@@ -54,7 +54,7 @@ just --show deploy                   # read the body of `deploy` first
 just deploy production               # then run with the right args
 ```
 
-The doc comment above each recipe (`# deploy to <env>`) shows up in `--list`. If a recipe is private (name starts with `_`), it won't appear; pass `--list` `--unsorted` for source order.
+Doc comment above each recipe (`# deploy to <env>`) show up in `--list`. Private recipe (name start `_`) not appear; pass `--list` `--unsorted` for source order.
 
 ### Pattern B — recipe parameters
 
@@ -78,7 +78,7 @@ just logs                            # no args
 just logs --since '1h ago'
 ```
 
-Recipe args go **after** the recipe name, positionally. They are not Make-style `VAR=value` overrides — for those, use `--set name=value` against a recipe variable.
+Recipe args go **after** recipe name, positional. Not Make-style `VAR=value` overrides — for those, use `--set name=value` against recipe variable.
 
 ### Pattern C — recipe dependencies
 
@@ -95,7 +95,7 @@ test:
     cargo test
 ```
 
-`just default` → `format` → `lint` → `test`. Deps run once per invocation, in declaration order, before the recipe body.
+`just default` → `format` → `lint` → `test`. Deps run once per invocation, declaration order, before recipe body.
 
 ### Pattern D — variables, env, dotenv
 
@@ -115,7 +115,7 @@ just --evaluate                      # dump all variables and resolved values
 just --set version=1.2.3 build       # override at the CLI
 ```
 
-.env is NOT read by default. To enable, add `set dotenv-load := true` (or just `set dotenv-load`) at the top of the justfile. To override the location, use `set dotenv-filename := "..."` or `set dotenv-path := "..."`. Pass `--no-dotenv` to disable for one invocation.
+.env NOT read by default. Enable: add `set dotenv-load := true` (or `set dotenv-load`) at top of justfile. Override location: `set dotenv-filename := "..."` or `set dotenv-path := "..."`. Pass `--no-dotenv` disable for one invocation.
 
 ### Pattern E — choose a different shell
 
@@ -124,7 +124,7 @@ set shell := ["bash", "-cu"]         # bash with -u (treat unset as error)
 # default is ["sh", "-cu"] — POSIX sh, NOT bash
 ```
 
-If a recipe uses bashisms (`[[`, arrays, `<()`) without `set shell := ["bash", ...]`, it will fail under sh on a stock Debian/Alpine container.
+Recipe use bashisms (`[[`, arrays, `<()`) without `set shell := ["bash", ...]` → fail under sh on stock Debian/Alpine container.
 
 ### Pattern F — combine in scripts and CI
 
@@ -133,7 +133,7 @@ just lint && just test && just build
 just --justfile $REPO/justfile ci    # absolute path, no chdir surprises
 ```
 
-Each `just` invocation exits with the recipe's exit code; chain with `&&` for fail-fast pipelines. In CI, prefer `--justfile` with an absolute path so the working directory is unambiguous.
+Each `just` invocation exit with recipe's exit code; chain `&&` for fail-fast pipelines. In CI, prefer `--justfile` with absolute path so working dir unambiguous.
 
 ### Pattern G — sub-justfiles
 
@@ -142,21 +142,21 @@ just -d services/api deploy          # run the api/justfile's deploy recipe
 just --justfile services/api/justfile deploy
 ```
 
-Both work; `-d` cd's first (recipes resolve paths relative to that dir), `--justfile` does not chdir (recipes resolve relative to the justfile's location anyway, but stdout/stderr cwd is yours).
+Both work; `-d` cd first (recipes resolve paths relative to that dir), `--justfile` no chdir (recipes resolve relative to justfile's location anyway, but stdout/stderr cwd is yours).
 
 ## Anti-patterns
 
-- **Don't guess recipe names.** Run `just --list` (or `just -l`) first. Recipes are repo-specific and frequently renamed.
-- **Don't run `just <recipe>` blind on something that might deploy, migrate, or push.** Preview with `just --show <recipe>` and read the body first.
-- **Don't assume bash.** The default shell is POSIX `sh`. Check for `set shell := [...]` at the top of the justfile before relying on bash features.
-- **Don't override `--working-directory`** unless you understand it. Recipes typically assume the justfile's directory; overriding breaks any relative path inside.
-- **Don't confuse with `make`.** `make test FOO=foo` becomes `just test foo` (positional). For variable overrides use `just --set FOO=foo test`, not `FOO=foo just test` (the env var won't bind to a recipe variable unless `set export` or the recipe reads `env_var("FOO")`).
-- **Don't ignore exit codes.** A failed recipe exits non-zero; chain with `&&` rather than `;` if subsequent steps depend on success.
-- **Don't edit a recipe to "test" something.** Use `just --set name=value` or pass arguments — keep the justfile clean for everyone else.
+- **Don't guess recipe names.** Run `just --list` (or `just -l`) first. Recipes repo-specific, often renamed.
+- **Don't run `just <recipe>` blind on something might deploy, migrate, or push.** Preview with `just --show <recipe>` and read body first.
+- **Don't assume bash.** Default shell POSIX `sh`. Check for `set shell := [...]` at top of justfile before relying on bash features.
+- **Don't override `--working-directory`** unless understand it. Recipes assume justfile's dir; overriding break any relative path inside.
+- **Don't confuse with `make`.** `make test FOO=foo` become `just test foo` (positional). For variable overrides use `just --set FOO=foo test`, not `FOO=foo just test` (env var won't bind to recipe variable unless `set export` or recipe read `env_var("FOO")`).
+- **Don't ignore exit codes.** Failed recipe exit non-zero; chain `&&` not `;` if next steps depend on success.
+- **Don't edit recipe to "test" something.** Use `just --set name=value` or pass args — keep justfile clean for everyone else.
 
 ## Cross-refs
 
-- `pm-policy` hook (in `docs/hooks.md`) routes recipe-driven repos through `just` instead of running the underlying script directly — the hook checks for a justfile and prefers `just <recipe>` when one exists.
+- `pm-policy` hook (in `docs/hooks.md`) routes recipe-driven repos through `just` instead of running underlying script directly — hook checks for justfile and prefers `just <recipe>` when one exists.
 - Upstream: <https://just.systems/>
 - Manual: <https://just.systems/man/en/>
-- Cheatsheet (`just --list` and `just --show` are the two commands you'll use 90% of the time).
+- Cheatsheet (`just --list` and `just --show` are two commands you'll use 90% of time).

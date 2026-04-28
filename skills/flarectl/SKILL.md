@@ -7,13 +7,13 @@ description: Use this skill whenever the user wants to manage Cloudflare DNS, zo
 
 ## When to use
 
-- The user wants to inspect or mutate Cloudflare DNS — list records, create an A/CNAME/MX, flip the proxied flag, change TTL, delete a stale entry.
-- The user asks about zone state — pending nameservers, plan, status, settings — for a domain on Cloudflare.
-- The user wants to purge the Cloudflare edge cache, by URL or wholesale, after a deploy.
-- The agent is about to script against `api.cloudflare.com` for DNS/zone CRUD — `flarectl` handles auth, paging, and JSON without bespoke curl.
-- The user wants `--json` output to pipe into `jq` for further filtering.
+- User want inspect/mutate Cloudflare DNS — list records, create A/CNAME/MX, flip proxied flag, change TTL, delete stale entry.
+- User ask zone state — pending nameservers, plan, status, settings — for domain on Cloudflare.
+- User want purge Cloudflare edge cache, by URL or wholesale, after deploy.
+- Agent about to script against `api.cloudflare.com` for DNS/zone CRUD — `flarectl` handle auth, paging, JSON without bespoke curl.
+- User want `--json` output to pipe into `jq` for filtering.
 
-**Skip** for: Workers / Pages / KV / R2 / D1 / Queues — that's `wrangler` (different scope, supported tool for compute). Domain registration. Non-Cloudflare DNS providers (`aws route53`, `hcloud dns`, `gcloud dns`). In-app SDK calls from Go/TS source — use `cloudflare-go` / `cloudflare-typescript` directly.
+**Skip** for: Workers / Pages / KV / R2 / D1 / Queues — that `wrangler` (different scope, supported tool for compute). Domain registration. Non-Cloudflare DNS providers (`aws route53`, `hcloud dns`, `gcloud dns`). In-app SDK calls from Go/TS source — use `cloudflare-go` / `cloudflare-typescript` direct.
 
 ## Invocation
 
@@ -32,7 +32,7 @@ flarectl zone list
 flarectl --json dns list --zone example.com | jq '.[] | select(.Type=="A")'
 ```
 
-Exit codes: `0` success, `1` error. The API error message lands on stderr — capture it for diagnostics (`2> err.log` or `2>&1`).
+Exit codes: `0` success, `1` error. API error message land on stderr — capture for diagnostics (`2> err.log` or `2>&1`).
 
 ## Patterns
 
@@ -46,7 +46,7 @@ flarectl zone delete --zone example.com             # destructive — confirm tw
 flarectl zone settings --zone example.com           # SSL mode, min TLS, brotli, etc.
 ```
 
-Zone status `pending` means Cloudflare hasn't seen the registrar's nameserver delegation yet — `zone info` is the source of truth.
+Zone status `pending` mean Cloudflare not yet seen registrar's nameserver delegation — `zone info` is source of truth.
 
 ### Pattern B — DNS records (CRUD)
 
@@ -69,7 +69,7 @@ flarectl dns update --zone example.com \
 flarectl dns delete --zone example.com --id 1a2b3c4d5e...
 ```
 
-`--proxy=true` routes through Cloudflare (orange cloud); `--proxy=false` is DNS-only (grey cloud). MX, SRV, raw-TCP, and most mail records **must** be DNS-only.
+`--proxy=true` route through Cloudflare (orange cloud); `--proxy=false` is DNS-only (grey cloud). MX, SRV, raw-TCP, most mail records **must** be DNS-only.
 
 ### Pattern C — JSON output for scripts
 
@@ -84,7 +84,7 @@ flarectl --json dns list --zone staging.example.com \
   | xargs -I{} flarectl dns delete --zone staging.example.com --id {}
 ```
 
-Without `--json`, output is a human table — useful interactively, brittle for scripts.
+Without `--json`, output is human table — fine interactively, brittle for scripts.
 
 ### Pattern D — cache purge
 
@@ -97,7 +97,7 @@ flarectl zone purge --zone example.com \
 flarectl zone purge --zone example.com --everything
 ```
 
-`--everything` causes a thundering-herd hit on the origin. On a high-traffic zone, prefer `--files` (URL list) or `--tags` (cache-tag, Enterprise) and warn the team before running.
+`--everything` cause thundering-herd hit on origin. On high-traffic zone, prefer `--files` (URL list) or `--tags` (cache-tag, Enterprise) and warn team before run.
 
 ### Pattern E — user / account
 
@@ -106,31 +106,31 @@ flarectl user info                          # whoami for the active token/key
 flarectl user update --first-name Mo        # update profile fields
 ```
 
-Useful for verifying a token is alive and which account/email it represents before a destructive command. (Account-member invitations are not in flarectl — use the dashboard or the `cloudflare-go` SDK directly.)
+Useful for verify token alive and which account/email it represent before destructive command. (Account-member invitations not in flarectl — use dashboard or `cloudflare-go` SDK direct.)
 
 ### Pattern F — `flarectl` vs `wrangler` vs raw API
 
-- `flarectl` — DNS, zones, cache purge, user/account ops. Stable, Go binary, ships from the `cloudflare-go` repo.
-- `wrangler` — Workers, Pages, KV, R2, D1, Queues, Workflows, Pipelines. The supported tool for everything compute / storage.
-- `gh api`-style raw curl — only when neither tool wraps the endpoint (rare). Construct with `curl -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"` and pipe through `jq`.
+- `flarectl` — DNS, zones, cache purge, user/account ops. Stable, Go binary, ships from `cloudflare-go` repo.
+- `wrangler` — Workers, Pages, KV, R2, D1, Queues, Workflows, Pipelines. Supported tool for everything compute / storage.
+- `gh api`-style raw curl — only when neither tool wraps endpoint (rare). Construct with `curl -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"` and pipe through `jq`.
 
-If a single workflow needs both DNS and a Worker route, run `flarectl` for DNS and `wrangler` for the Worker — don't try to do it all from one CLI.
+If single workflow need both DNS and Worker route, run `flarectl` for DNS and `wrangler` for Worker — don't try do all from one CLI.
 
 ## Anti-patterns
 
-- **Don't** use `CF_API_KEY` (the global key) — it has account-wide permission across every zone, billing, and member action. Use `CF_API_TOKEN` with the minimum scope (e.g. `Zone:DNS:Edit` for one zone) and rotate. Note: flarectl reads `CF_API_TOKEN` / `CF_API_KEY` / `CF_API_EMAIL` — NOT the `CLOUDFLARE_*` names used by `wrangler` and the `cloudflare-go` SDK. Wrong env var = silent auth failure.
-- **Don't** `--purge --everything` on a high-traffic zone without warning the team — the origin gets every miss at once. Prefer `--files` / `--tags`.
-- **Don't** create DNS records without an explicit `--ttl` (300 for staging, `1` for "auto"). The default may be longer than you want, and a misconfigured record at TTL 86400 is a 24-hour outage.
-- **Don't** use `flarectl` for Workers / Pages deployment — the subcommands exist but lag `wrangler` on features and won't do bundling, secrets, or env management. Use `wrangler` for compute.
-- **Don't** assume `--proxy=true` is correct for every record. MX, SRV, raw TCP, and most mail records must be DNS-only — proxying breaks them silently.
-- **Don't** run `flarectl` in CI with the global key (`CF_API_KEY`) in the environment — leak surface is the entire account. Issue a scoped token (`CF_API_TOKEN`) per pipeline, scope it to the smallest set of zones/permissions, and rotate.
-- **Don't** parse the human table output with `awk`/`grep` — column widths shift with longer record names. Pass `--json` and use `jq`.
-- **Don't** delete a zone to "reset DNS" — every record is gone and re-adding the zone re-issues nameservers, breaking propagation. Delete records, not zones.
+- **Don't** use `CF_API_KEY` (global key) — has account-wide permission across every zone, billing, member action. Use `CF_API_TOKEN` with min scope (e.g. `Zone:DNS:Edit` for one zone) and rotate. Note: flarectl reads `CF_API_TOKEN` / `CF_API_KEY` / `CF_API_EMAIL` — NOT the `CLOUDFLARE_*` names used by `wrangler` and `cloudflare-go` SDK. Wrong env var = silent auth failure.
+- **Don't** `--purge --everything` on high-traffic zone without warning team — origin gets every miss at once. Prefer `--files` / `--tags`.
+- **Don't** create DNS records without explicit `--ttl` (300 for staging, `1` for "auto"). Default may be longer than want, misconfigured record at TTL 86400 = 24-hour outage.
+- **Don't** use `flarectl` for Workers / Pages deployment — subcommands exist but lag `wrangler` on features, won't do bundling, secrets, env management. Use `wrangler` for compute.
+- **Don't** assume `--proxy=true` correct for every record. MX, SRV, raw TCP, most mail records must be DNS-only — proxying break them silently.
+- **Don't** run `flarectl` in CI with global key (`CF_API_KEY`) in environment — leak surface is entire account. Issue scoped token (`CF_API_TOKEN`) per pipeline, scope to smallest set of zones/permissions, rotate.
+- **Don't** parse human table output with `awk`/`grep` — column widths shift with longer record names. Pass `--json` and use `jq`.
+- **Don't** delete zone to "reset DNS" — every record gone and re-adding zone re-issues nameservers, break propagation. Delete records, not zones.
 
 ## Cross-refs
 
 - Behavioral rule: see `rules/AGENTS.md` deploy section — "DNS via flarectl, compute via wrangler, never `CF_API_KEY` in CI".
 - Companion: `skills/wrangler` (third-party shipped per `skills/SOURCES.md`) — different scope; reach for it for Workers/Pages/KV/R2/D1. Note: `wrangler` reads `CLOUDFLARE_API_TOKEN`, `flarectl` reads `CF_API_TOKEN` — different envs, intentionally not unified.
-- JSON pipelines: `skills/jq/SKILL.md` — `flarectl --json | jq` is the canonical scripting shape.
+- JSON pipelines: `skills/jq/SKILL.md` — `flarectl --json | jq` is canonical scripting shape.
 - Upstream: <https://github.com/cloudflare/cloudflare-go/tree/master/cmd/flarectl>
 - Token scopes reference: <https://developers.cloudflare.com/fundamentals/api/get-started/create-token/>

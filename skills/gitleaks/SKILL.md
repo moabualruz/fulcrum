@@ -7,13 +7,13 @@ description: Use this skill whenever the user wants to find secrets, credentials
 
 ## When to use
 
-- The user asks to scan a repo for committed secrets — keys, tokens, passwords, private keys.
-- The user wants a pre-commit / pre-push gate that blocks accidentally staged credentials.
-- The user is preparing a repo for open-sourcing and needs to audit history (not just HEAD) for leaks.
-- The user wants CI to fail when a PR introduces a credential pattern.
-- The user has a non-git directory (a tarball, a vendored snapshot) and wants the same rule pack applied.
+- User ask scan repo for committed secrets — keys, tokens, passwords, private keys.
+- User want pre-commit / pre-push gate block staged credentials.
+- User prep repo for open-source, audit history (not just HEAD) for leaks.
+- User want CI fail when PR introduce credential pattern.
+- User have non-git directory (tarball, vendored snapshot), want same rule pack.
 
-**Skip** for: code-quality / SAST scans (use `semgrep`); dependency vulnerabilities (use `osv-scanner`, `npm audit`, `pip-audit`); license checks; secrets that already escaped to runtime logs (rotate first, then audit upstream); generic `grep` for one specific known string.
+**Skip** for: code-quality / SAST scans (use `semgrep`); dependency vulns (use `osv-scanner`, `npm audit`, `pip-audit`); license checks; secrets already escaped to runtime logs (rotate first, audit upstream); generic `grep` for one known string.
 
 ## Invocation
 
@@ -34,13 +34,13 @@ gitleaks git --report-format json --report-path leaks.json --no-banner --redact
 gitleaks git --report-format sarif --report-path gitleaks.sarif --no-banner
 ```
 
-Exit codes: `0` clean, `1` leaks found, anything else is a tool error. Wire hooks and CI on `1` exactly — don't `|| true`.
+Exit codes: `0` clean, `1` leaks found, else tool error. Wire hooks + CI on `1` exact — no `|| true`.
 
 ## Patterns
 
 ### Pattern A — `git` (history) vs `git --staged` (pre-commit)
 
-`gitleaks git` scans **commit history** (what's already in the graph). `gitleaks git --staged` scans the **staged diff** only — it cannot see history. Use `git --staged` for pre-commit hooks (fast, scoped to the diff); use `git` for CI on PRs and for periodic audits. Running only `--staged` and never the full history scan will miss anything already merged — including leaks the hook itself once let through. (Note: `detect` and `protect` are deprecated aliases since v8.19.0 — older docs may still mention them; both still work but are hidden in `--help`.)
+`gitleaks git` scan **commit history** (already in graph). `gitleaks git --staged` scan **staged diff** only — no history. Use `git --staged` for pre-commit hooks (fast, scoped); use `git` for CI on PRs and periodic audits. Only `--staged` and never full scan miss anything already merged — including leaks hook once let through. (Note: `detect` and `protect` deprecated aliases since v8.19.0 — old docs may mention; both work but hidden in `--help`.)
 
 ```bash
 gitleaks git --no-banner                           # all of history
@@ -49,7 +49,7 @@ gitleaks git --staged --no-banner                  # pre-commit
 
 ### Pattern B — scope the history scan
 
-Full-history scans get slow on old repos. `-l/--log-opts` accepts any `git log` flag set:
+Full-history scans slow on old repos. `-l/--log-opts` accept any `git log` flag set:
 
 ```bash
 gitleaks git --log-opts="--all --since=2025-01-01" --no-banner
@@ -66,11 +66,11 @@ gitleaks git --report-format junit  --report-path gitleaks.xml  --no-banner
 gitleaks git --report-format csv    --report-path leaks.csv    --no-banner
 ```
 
-JSON pipes cleanly into `jq` (`jq '.[] | {file: .File, rule: .RuleID, commit: .Commit}' leaks.json`). SARIF uploads to GitHub Code Scanning via `github/codeql-action/upload-sarif`. JUnit lets Jenkins/GitLab render findings as test failures.
+JSON pipe clean into `jq` (`jq '.[] | {file: .File, rule: .RuleID, commit: .Commit}' leaks.json`). SARIF upload to GitHub Code Scanning via `github/codeql-action/upload-sarif`. JUnit let Jenkins/GitLab render findings as test failures.
 
 ### Pattern D — baseline known-and-accepted leaks
 
-Some leaks are intentional fixtures (test keys, expired tokens). Snapshot them once, then ignore on subsequent runs:
+Some leaks intentional fixtures (test keys, expired tokens). Snapshot once, ignore on next runs:
 
 ```bash
 # Generate baseline once, review carefully, commit
@@ -80,11 +80,11 @@ gitleaks git --report-format json --report-path .gitleaks-baseline.json --no-ban
 gitleaks git --baseline-path .gitleaks-baseline.json --no-banner
 ```
 
-Re-generate the baseline whenever fixtures change. Review every entry before committing the file — a baseline is a security artifact.
+Re-gen baseline when fixtures change. Review every entry before commit — baseline is security artifact.
 
 ### Pattern E — `.gitleaks.toml` config
 
-Default rules cover most providers. Extend with allowlists and custom rules:
+Default rules cover most providers. Extend with allowlists + custom rules:
 
 ```toml
 # .gitleaks.toml
@@ -112,7 +112,7 @@ entropy = 3.5
 path = '''.*\.(go|ts|py)$'''
 ```
 
-Run with `--config .gitleaks.toml` if not at repo root, or `gitleaks` finds it automatically when sitting beside `.git/`.
+Run with `--config .gitleaks.toml` if not at repo root, or `gitleaks` find auto when beside `.git/`.
 
 ### Pattern F — pre-commit hook
 
@@ -125,7 +125,7 @@ gitleaks git --staged --redact --no-banner || {
 }
 ```
 
-Use `--redact` in the hook so the leaked value isn't echoed into terminal scrollback. When *fixing* a leak, re-run without `--redact` so you can see exactly what to rotate.
+Use `--redact` in hook so leaked value not echo into terminal scrollback. When *fixing* leak, re-run without `--redact` to see exact value to rotate.
 
 ### Pattern G — performance and CI ergonomics
 
@@ -135,23 +135,23 @@ gitleaks git --no-color --no-banner                     # plain text for logs
 gitleaks git ./services/api --no-banner                 # subtree only (path is positional)
 ```
 
-For monorepos, scope by passing the subtree path positionally per service and run jobs in parallel. `--max-target-megabytes` skips large vendored blobs that would otherwise dominate runtime.
+Monorepos: scope by passing subtree path positional per service, run jobs parallel. `--max-target-megabytes` skip large vendored blobs that else dominate runtime.
 
 ## Anti-patterns
 
-- **Don't** scan only with `--staged` and call it a day. `gitleaks git --staged` cannot see history; a leak that landed before the hook existed is invisible until you run `gitleaks git` on the full repo. Schedule a full-history scan in CI on a cron, not just on PRs.
-- **Don't use `gitleaks detect` / `gitleaks protect` on new code.** Both were deprecated in gitleaks v8.19.0 (still work but hidden in `--help`). Use `gitleaks git` (history) and `gitleaks git --staged` (working tree) instead.
-- **Don't** silently `--redact` everywhere. CI logs benefit from redaction, but when you're remediating you need the literal value to grep, rotate, and confirm. Run unredacted locally during cleanup.
-- **Don't** allowlist by full secret value. `regexes = ['''ghp_aBcD…the actual key''']` becomes wrong the moment someone rotates the key — and rotations are exactly when you can't afford a noisy false negative. Allowlist by **shape** (path, rule id, fixture-prefix regex), not literal value.
-- **Don't** assume "leak found" = "leak in HEAD". Git history is forever. Removing the line in a new commit does **not** purge the blob — you need `git-filter-repo` (or BFG), force-push, then **rotate the credential** because anyone who cloned still has it.
-- **Don't** ignore exit code 1 with `|| true` to make CI green. That's the entire point of the tool. If the finding is a fixture, allowlist it; if it's real, rotate and remediate.
-- **Don't** treat low-entropy strings as automatically safe. Many real keys have structure, not randomness — `AKIA…` (AWS access key) is 20 chars of base32 with a fixed prefix, not high-entropy noise. Keyword + regex matters as much as Shannon entropy.
-- **Don't** reach for `git-secrets` or `trufflehog` first in 2025-2026. `git-secrets` is unmaintained; `trufflehog` is heavier (verifies live keys against provider APIs — useful, but slower and network-dependent). `gitleaks` is the modern default for fast, offline rule-based scanning. Reach for `trufflehog` when you specifically want validation against the issuing provider.
+- **Don't** scan only with `--staged` and call done. `gitleaks git --staged` no see history; leak landed before hook existed invisible until run `gitleaks git` on full repo. Schedule full-history scan in CI on cron, not just PRs.
+- **Don't use `gitleaks detect` / `gitleaks protect` on new code.** Both deprecated in gitleaks v8.19.0 (work but hidden in `--help`). Use `gitleaks git` (history) and `gitleaks git --staged` (working tree).
+- **Don't** silently `--redact` everywhere. CI logs benefit redaction, but when remediating need literal value to grep, rotate, confirm. Run unredacted local during cleanup.
+- **Don't** allowlist by full secret value. `regexes = ['''ghp_aBcD…the actual key''']` wrong moment someone rotate key — and rotation exactly when can't afford noisy false negative. Allowlist by **shape** (path, rule id, fixture-prefix regex), not literal value.
+- **Don't** assume "leak found" = "leak in HEAD". Git history forever. Removing line in new commit do **not** purge blob — need `git-filter-repo` (or BFG), force-push, then **rotate credential** because anyone who cloned still has it.
+- **Don't** ignore exit code 1 with `|| true` to make CI green. That entire point of tool. Fixture → allowlist; real → rotate and remediate.
+- **Don't** treat low-entropy strings as auto safe. Many real keys have structure, not randomness — `AKIA…` (AWS access key) 20 chars base32 fixed prefix, not high-entropy noise. Keyword + regex matter as much as Shannon entropy.
+- **Don't** reach for `git-secrets` or `trufflehog` first in 2025-2026. `git-secrets` unmaintained; `trufflehog` heavier (verify live keys against provider APIs — useful, but slower and network-dependent). `gitleaks` modern default for fast offline rule-based scanning. Reach for `trufflehog` when specifically want validation against issuing provider.
 
 ## Cross-refs
 
 - Behavioral rule: see `rules/AGENTS.md` — security section, "scan before push, scan in CI, never bypass exit code 1".
-- Hook recipe: `docs/hooks.md` §5.5 — wiring `gitleaks protect --staged` as a pre-commit guard.
+- Hook recipe: `docs/hooks.md` §5.5 — wiring `gitleaks protect --staged` as pre-commit guard.
 - Companion tools: `semgrep` (SAST), `osv-scanner` (deps), `trufflehog` (live-key validation).
 - Upstream: <https://github.com/gitleaks/gitleaks>
 - Config reference: <https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml>

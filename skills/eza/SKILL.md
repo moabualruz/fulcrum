@@ -7,12 +7,12 @@ description: Use this skill when listing directory contents with more informatio
 
 ## When to use
 
-- Directory contents with richer columns than `ls`: per-file git status, gitignore-aware listing, owner/perms/time, icons, or a depth-limited tree.
+- Directory contents with richer columns than `ls`: per-file git status, gitignore-aware listing, owner/perms/time, icons, or depth-limited tree.
 - Phrases like "list files showing git status", "tree two levels deep", "ls but skip gitignored files", "human-readable sizes", "list with icons".
 
-**Skip** for: finding files by name (`fd`), searching file contents (`rg`), dependency trees (`npm ls`), archive contents (`unzip -l`, `tar -tf`), disk usage (`du`, `dust`).
+**Skip** for: find files by name (`fd`), search file contents (`rg`), dependency trees (`npm ls`), archive contents (`unzip -l`, `tar -tf`), disk usage (`du`, `dust`).
 
-> Note: `eza` is the maintained fork of the unmaintained `exa` — update old docs/aliases.
+> Note: `eza` = maintained fork of unmaintained `exa` — update old docs/aliases.
 
 ## Invocation
 
@@ -39,7 +39,7 @@ eza -l --color=never                 # plain output for pipes/parsers
 eza -l --git --git-ignore
 ```
 
-`--git` adds a per-entry status column; `--git-ignore` skips files matched by `.gitignore`. Combine for a clean repo overview.
+`--git` add per-entry status column; `--git-ignore` skip `.gitignore` matches. Combine for clean repo overview.
 
 ### Pattern B — depth-limited tree
 
@@ -47,7 +47,7 @@ eza -l --git --git-ignore
 eza --tree --level=2 --git-ignore
 ```
 
-Always pass `--level` so the tree doesn't recurse into `node_modules` / `target`.
+Always pass `--level` so tree no recurse into `node_modules` / `target`.
 
 ### Pattern C — newest first with ISO timestamps
 
@@ -61,16 +61,16 @@ eza -l --sort=modified --reverse --time-style=iso --header
 eza -l --color=never --no-quotes | awk '{print $NF}'
 ```
 
-Without `--color=never`, ANSI escapes leak into downstream parsers; `--no-quotes` drops the quoting around filenames so paths are copy-pasteable.
+Without `--color=never`, ANSI escapes leak into downstream parsers; `--no-quotes` drop quoting around filenames so paths copy-pasteable.
 
 ## Anti-patterns
 
-- **Don't `alias ls=eza` in scripts** that depend on POSIX `ls` output — column layout, color codes, and date format differ; `awk`/`cut` parsers break.
-- **Don't assume `--git` is fast** in big repos — eza shells out to git per entry; on huge monorepos it's visibly slow. Drop the flag if you only need names.
-- **Don't rely on `--icons`** in agent/CI shells without a Nerd Font — icons render as `?` or tofu and break column alignment. Force `--icons=never`.
+- **Don't `alias ls=eza` in scripts** depending on POSIX `ls` output — column layout, color codes, date format differ; `awk`/`cut` parsers break.
+- **Don't assume `--git` fast** in big repos — eza shells out to git per entry; huge monorepos visibly slow. Drop flag if only names needed.
+- **Don't rely on `--icons`** in agent/CI shells without Nerd Font — icons render as `?` or tofu, break column alignment. Force `--icons=never`.
 - **Don't pipe colored output** without `--color=never` — ANSI escapes corrupt grep/awk/cut and HTML log captures.
-- **Don't use `--total-size`** on huge trees — it walks every subdirectory; use `du -sh` or `dust` for one-shot totals.
-- **Don't reach for `eza --tree`** when you want a name-pattern search — use `fd`. Trees are for orientation, not lookup.
+- **Don't use `--total-size`** on huge trees — walks every subdirectory; use `du -sh` or `dust` for one-shot totals.
+- **Don't reach for `eza --tree`** for name-pattern search — use `fd`. Trees for orientation, not lookup.
 
 ## Cross-refs
 
