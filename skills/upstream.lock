@@ -94,6 +94,10 @@ review_due = "2026-07-27"
 subpath_sha256 = "1e79c1ceffc242adc0d477d8625ed0c91999f18efe1bc54deec09f59bb250555"
 subpath_size = 20131
 
+[skills.ast-grep.claude_plugin]
+marketplace = "ast-grep/agent-skill"
+name = "ast-grep@ast-grep/agent-skill"
+
 [skills.tavily-best-practices]
 source = "https://github.com/tavily-ai/skills"
 subpath = "skills/tavily-best-practices"
@@ -249,3 +253,15 @@ pinned_on = "2026-04-28"
 review_due = "2026-07-27"
 subpath_sha256 = "741b053ce2ba4b405767d8a7a07997d992a59e24db5474ff9d16535a4f211db6"
 subpath_size = 1995
+
+[skills.wrangler]
+source = "https://github.com/cloudflare/skills"
+subpath = "skills/wrangler"
+ref = "main"
+tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"
+license = "Apache-2.0"
+author_class = "tool-vendor"
+pinned_on = "2026-04-28"
+review_due = "2026-07-27"
+subpath_sha256 = "caf41e1984ffb9a62102db3f4101fe0510369cb0ae5787ef6546b35781e31677"
+subpath_size = 18359

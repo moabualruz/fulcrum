@@ -9,12 +9,25 @@ import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/pro
 import { dirname, join, relative } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { AGENTS } from "../agents/registry.ts";
-import { run as runProc } from "../utils/proc.ts";
+import { run as runProc, which } from "../utils/proc.ts";
 
 const UPSTREAM_NAMESPACE = "fulcrum-upstream";
 const AUTHOR_CLASSES = new Set(["tool-vendor", "foundation", "individual"] as const);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TREE_SHA = /^[0-9a-f]{40}$/i;
+
+/**
+ * Optional Claude plugin descriptor for skills that have an official Claude
+ * plugin marketplace entry (W1.6).  When present, Claude Code uses
+ * `claude plugin marketplace add <marketplace>` + `claude plugin install <name>`
+ * instead of the file-copy path.  Other agents always use the file-copy path.
+ */
+export interface ClaudePluginDescriptor {
+  /** Marketplace identifier, e.g. "ast-grep/agent-skill". */
+  marketplace: string;
+  /** Plugin name passed to `claude plugin install`, e.g. "ast-grep@ast-grep/agent-skill". */
+  name: string;
+}
 
 export interface UpstreamSkillLockEntry {
   source: string;
@@ -29,6 +42,12 @@ export interface UpstreamSkillLockEntry {
   subpath_sha256?: string;
   /** Total byte-size of files included in the subtree hash (sanity check). */
   subpath_size?: number;
+  /**
+   * Optional: when set, Claude Code installs via `claude plugin` instead of
+   * file copy.  Other agents always use the file-copy path.  Additive optional;
+   * entries without this field behave identically to before W1.6.
+   */
+  claude_plugin?: ClaudePluginDescriptor;
 }
 
 export interface UpstreamSkill extends UpstreamSkillLockEntry {
@@ -117,6 +136,18 @@ function normalizeEntry(name: string, raw: unknown): { skill?: UpstreamSkill; pr
   const subpathSizeRaw = entry["subpath_size"];
   const subpathSize = typeof subpathSizeRaw === "number" ? subpathSizeRaw : undefined;
 
+  // Parse optional claude_plugin table (W1.6).
+  let claudePlugin: ClaudePluginDescriptor | undefined;
+  const rawClaudePlugin = entry["claude_plugin"];
+  if (rawClaudePlugin && typeof rawClaudePlugin === "object" && !Array.isArray(rawClaudePlugin)) {
+    const cp = rawClaudePlugin as Record<string, unknown>;
+    const cpMarketplace = asString(cp["marketplace"]);
+    const cpName = asString(cp["name"]);
+    if (cpMarketplace && cpName) {
+      claudePlugin = { marketplace: cpMarketplace, name: cpName };
+    }
+  }
+
   if (!source) problems.push("source is required");
   if (!subpath) problems.push("subpath is required");
   if (!ref) problems.push("ref is required");
@@ -154,6 +185,7 @@ function normalizeEntry(name: string, raw: unknown): { skill?: UpstreamSkill; pr
       kind: resolvedKind,
       ...(subpathSha256 ? { subpath_sha256: subpathSha256 } : {}),
       ...(subpathSize !== undefined ? { subpath_size: subpathSize } : {}),
+      ...(claudePlugin ? { claude_plugin: claudePlugin } : {}),
     },
     problems,
   };
@@ -285,20 +317,27 @@ async function writeLockfileWithPins(
 
   while (i < lines.length) {
     const line = lines[i] ?? "";
-    // Detect a skill header like [skills.foo-bar]
-    const headerMatch = line.match(/^\[skills\.([^\]]+)\]$/);
+    // Detect a top-level skill header like [skills.foo-bar]
+    // but NOT a sub-table header like [skills.foo-bar.claude_plugin]
+    const headerMatch = line.match(/^\[skills\.([^\]\.]+)\]$/);
     if (headerMatch) {
       const skillName = headerMatch[1] ?? "";
-      // Collect the block lines (until next [ header or EOF), stripping old pins.
+      const isNewPin = pins.has(skillName);
+
+      // Collect the block lines (until next top-level [ header or EOF).
+      // Only strip old pin lines when we have a new pin to write.
       const blockLines: string[] = [line];
       i++;
       while (i < lines.length) {
         const bl = lines[i] ?? "";
-        if (bl.startsWith("[")) break;
-        // Drop existing subpath_sha256 / subpath_size lines so we can rewrite.
-        if (!bl.match(/^subpath_sha256\s*=/) && !bl.match(/^subpath_size\s*=/)) {
-          blockLines.push(bl);
+        // Stop at any new top-level [skills.*] header (not sub-table headers).
+        if (bl.match(/^\[/) && !bl.match(/^\[skills\.[^\]\.]+\.[^\]]+\]/)) break;
+        // Only strip existing subpath_sha256/subpath_size when we have a new pin.
+        if (isNewPin && (bl.match(/^subpath_sha256\s*=/) || bl.match(/^subpath_size\s*=/))) {
+          i++;
+          continue;
         }
+        blockLines.push(bl);
         i++;
       }
       // Trim trailing blank lines from block.
@@ -478,6 +517,10 @@ export async function syncUpstreamSkills(
   }
 
   // Phase 3: copy skills to each agent target.
+  // W1.6: for Claude Code, skills with `claude_plugin` set use
+  // `claude plugin marketplace add` + `claude plugin install` instead of copy.
+  const claudeAvailable = !dryRun ? !!(await which("claude")) : false;
+
   for (const target of agentTargets(home)) {
     if (!target.extensionRoot && !(await isDir(target.baseRoot))) {
       console.log(`· skip ${target.label} (agent skills parent not present)`);
@@ -504,9 +547,54 @@ export async function syncUpstreamSkills(
         continue;
       }
     }
+
+    const isClaudeAgent = target.label === "Claude Code";
+
     for (const skill of skills) {
       const repoDir = repoDirs.get(skill.source);
       if (!repoDir) continue;
+
+      // W1.6: Claude Code with claude_plugin field — use plugin install path.
+      if (isClaudeAgent && skill.claude_plugin) {
+        if (dryRun) {
+          console.log(`    [dry-run] would run: claude plugin marketplace add ${skill.claude_plugin.marketplace}`);
+          console.log(`    [dry-run] would run: claude plugin install ${skill.claude_plugin.name}`);
+          console.log(`    ${UPSTREAM_NAMESPACE}/${skill.name} (via claude plugin)`);
+          continue;
+        }
+        if (!claudeAvailable) {
+          console.log(`    · ${skill.name}: claude not on PATH — skipping plugin install (manual: claude plugin marketplace add ${skill.claude_plugin.marketplace} && claude plugin install ${skill.claude_plugin.name})`);
+          continue;
+        }
+        // Check idempotency: if plugin cache dir exists, skip.
+        const pluginCacheDir = `${home}/.claude/plugins/cache/${skill.claude_plugin.marketplace.replace(/\//g, "__")}`;
+        if (await isDir(pluginCacheDir)) {
+          console.log(`    · ${skill.name}: already installed via claude plugin (skip)`);
+          continue;
+        }
+        const r1 = await runProc(["claude", "plugin", "marketplace", "add", skill.claude_plugin.marketplace]);
+        if (r1.exit !== 0) {
+          console.log(`    ✗ ${skill.name}: claude plugin marketplace add failed: ${r1.stderr.trim()}`);
+          // Fallback to file copy.
+          const src = `${repoDir}/${skill.subpath}`;
+          const ok = await copySkill(src, `${target.skillsRoot}/${skill.name}`, skill.kind, dryRun);
+          if (ok) console.log(`    ${UPSTREAM_NAMESPACE}/${skill.name} (file copy fallback)`);
+        } else {
+          const r2 = await runProc(["claude", "plugin", "install", skill.claude_plugin.name]);
+          if (r2.exit !== 0) {
+            console.log(`    ✗ ${skill.name}: claude plugin install failed: ${r2.stderr.trim()}`);
+            // Fallback to file copy.
+            const src = `${repoDir}/${skill.subpath}`;
+            const ok = await copySkill(src, `${target.skillsRoot}/${skill.name}`, skill.kind, dryRun);
+            if (ok) console.log(`    ${UPSTREAM_NAMESPACE}/${skill.name} (file copy fallback)`);
+          } else {
+            console.log(`    ${UPSTREAM_NAMESPACE}/${skill.name} (via claude plugin install)`);
+          }
+        }
+        continue;
+      }
+
+      // Default: file copy path (all agents, or Claude Code without claude_plugin).
       const src = `${repoDir}/${skill.subpath}`;
       const ok = await copySkill(src, `${target.skillsRoot}/${skill.name}`, skill.kind, dryRun);
       if (ok) console.log(`    ${UPSTREAM_NAMESPACE}/${skill.name}`);

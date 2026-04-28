@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { computeSubpathSha256, loadUpstreamSkills, syncUpstreamSkills } from "./upstream-skills.ts";
+import * as proc from "../utils/proc.ts";
 
 let TMP: string;
 let originalHome: string | undefined;
@@ -334,5 +335,213 @@ describe("subpath integrity in syncUpstreamSkills", () => {
     expect(skills).toHaveLength(1);
     expect(skills[0]?.subpath_sha256).toEqual(expectedHash);
     expect(skills[0]?.subpath_size).toEqual(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W1.5 — wrangler entry: lockfile loads correctly
+// ---------------------------------------------------------------------------
+
+describe("W1.5 wrangler lockfile entry", () => {
+  test("loadUpstreamSkills parses wrangler entry with all required fields", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      'last_audit = "2026-04-28"',
+      "",
+      "[skills.wrangler]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/wrangler"',
+      'ref = "main"',
+      'tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      'subpath_sha256 = "caf41e1984ffb9a62102db3f4101fe0510369cb0ae5787ef6546b35781e31677"',
+      "subpath_size = 18359",
+      "",
+    ].join("\n"));
+
+    const skills = await loadUpstreamSkills(lockPath);
+    expect(skills).toHaveLength(1);
+    const wrangler = skills[0]!;
+    expect(wrangler.name).toBe("wrangler");
+    expect(wrangler.source).toBe("https://github.com/cloudflare/skills");
+    expect(wrangler.subpath).toBe("skills/wrangler");
+    expect(wrangler.license).toBe("Apache-2.0");
+    expect(wrangler.author_class).toBe("tool-vendor");
+    expect(wrangler.kind).toBe("dir");
+    expect(wrangler.subpath_sha256).toBe("caf41e1984ffb9a62102db3f4101fe0510369cb0ae5787ef6546b35781e31677");
+    expect(wrangler.subpath_size).toBe(18359);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W1.6 — ast-grep claude_plugin: lockfile schema + install path
+// ---------------------------------------------------------------------------
+
+describe("W1.6 ast-grep claude_plugin schema", () => {
+  test("loadUpstreamSkills parses claude_plugin sub-table correctly", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      'last_audit = "2026-04-28"',
+      "",
+      "[skills.ast-grep]",
+      'source = "https://github.com/ast-grep/agent-skill"',
+      'subpath = "ast-grep/skills/ast-grep"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "MIT"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      'subpath_sha256 = "1e79c1ceffc242adc0d477d8625ed0c91999f18efe1bc54deec09f59bb250555"',
+      "subpath_size = 20131",
+      "",
+      "[skills.ast-grep.claude_plugin]",
+      'marketplace = "ast-grep/agent-skill"',
+      'name = "ast-grep@ast-grep/agent-skill"',
+      "",
+    ].join("\n"));
+
+    const skills = await loadUpstreamSkills(lockPath);
+    expect(skills).toHaveLength(1);
+    const astGrep = skills[0]!;
+    expect(astGrep.name).toBe("ast-grep");
+    expect(astGrep.claude_plugin).toBeDefined();
+    expect(astGrep.claude_plugin?.marketplace).toBe("ast-grep/agent-skill");
+    expect(astGrep.claude_plugin?.name).toBe("ast-grep@ast-grep/agent-skill");
+  });
+
+  test("entries without claude_plugin have claude_plugin undefined", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      'last_audit = "2026-04-28"',
+      "",
+      "[skills.plain-skill]",
+      'source = "https://github.com/example/repo"',
+      'subpath = "skills/plain"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "MIT"',
+      'author_class = "individual"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+
+    const skills = await loadUpstreamSkills(lockPath);
+    expect(skills[0]?.claude_plugin).toBeUndefined();
+  });
+
+  test("syncUpstreamSkills uses claude plugin install for Claude Code when claude_plugin set", async () => {
+    // Build a fake cached repo dir with the skill subpath.
+    const repoSlug = "ast-grep__agent-skill";
+    const cacheDir = join(TMP, ".fulcrum", "cache", "upstream-skills", repoSlug);
+    const skillSrc = join(cacheDir, "ast-grep", "skills", "ast-grep");
+    await mkdir(skillSrc, { recursive: true });
+    await writeFile(join(skillSrc, "SKILL.md"), "---\nname: ast-grep\n---\n");
+
+    const { sha256, size } = await computeSubpathSha256(skillSrc, "dir");
+
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      'last_audit = "2026-04-28"',
+      "",
+      "[skills.ast-grep]",
+      'source = "https://github.com/ast-grep/agent-skill"',
+      'subpath = "ast-grep/skills/ast-grep"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "MIT"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      `subpath_sha256 = "${sha256}"`,
+      `subpath_size = ${size}`,
+      "",
+      "[skills.ast-grep.claude_plugin]",
+      'marketplace = "ast-grep/agent-skill"',
+      'name = "ast-grep@ast-grep/agent-skill"',
+      "",
+    ].join("\n"));
+
+    // Create Claude agent skills dir.
+    await mkdir(join(TMP, ".claude", "skills"), { recursive: true });
+
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
+      if (cmd === "claude") return "/usr/local/bin/claude";
+      return null;
+    });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(String(args[0]));
+    });
+
+    try {
+      const skills = await loadUpstreamSkills(lockPath);
+      await syncUpstreamSkills({ dryRun: false, skills, lockPath });
+
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const marketplaceAdd = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd.includes("marketplace") && cmd.includes("add"),
+      );
+      const pluginInstall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd.includes("plugin") && cmd.includes("install"),
+      );
+      expect(marketplaceAdd).toBeDefined();
+      expect(pluginInstall).toBeDefined();
+      // Should NOT have done a file copy for Claude.
+      const claudeSkillDir = join(TMP, ".claude", "skills", "fulcrum-upstream", "ast-grep");
+      expect(logs.some((l) => l.includes("via claude plugin install"))).toBe(true);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
+  test("syncUpstreamSkills uses dry-run log for claude_plugin path", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      'last_audit = "2026-04-28"',
+      "",
+      "[skills.ast-grep]",
+      'source = "https://github.com/ast-grep/agent-skill"',
+      'subpath = "ast-grep/skills/ast-grep"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "MIT"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+      "[skills.ast-grep.claude_plugin]",
+      'marketplace = "ast-grep/agent-skill"',
+      'name = "ast-grep@ast-grep/agent-skill"',
+      "",
+    ].join("\n"));
+
+    await mkdir(join(TMP, ".claude", "skills"), { recursive: true });
+
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(String(args[0]));
+    });
+
+    try {
+      const skills = await loadUpstreamSkills(lockPath);
+      await syncUpstreamSkills({ dryRun: true, skills, lockPath });
+      expect(logs.some((l) => l.includes("claude plugin marketplace add"))).toBe(true);
+      expect(logs.some((l) => l.includes("claude plugin install"))).toBe(true);
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 });
