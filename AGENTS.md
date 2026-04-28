@@ -14,13 +14,14 @@ Shipped on `feat/agent-foundation-clean`:
 
 - One Bun-compiled `fulcrum` binary, eight hook subcommands (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`).
 - Orchestrator (`fulcrum init / install / hooks / skills / doctor / compress`) wires hooks into five agent runtimes (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI).
+- Managed `context-mode` integration (`src/cli/context-mode.ts`) follows upstream install contracts: Claude plugin, Codex/Gemini/OpenCode MCP+hooks, Pi package+MCP, and per-agent routing rules with uninstall cleanup.
 - Sentinel-block rules splicer for cross-agent rules distribution.
 - Per-tool output-handling policy (`config/tool-output-policy.toml`) drives `tool-output-router` hook.
 - 28 in-repo skills caveman-compressed (`.original.md` beside each), 20-entry trigger evals each, content-verified against upstream sources.
 - `src/agents/registry.ts` — canonical `Agent` interface + `AGENTS[5]` array; single source of truth consumed by install, doctor, skills. No more inline agent configs scattered across files.
 - `fulcrum install --dry-run` support; `fulcrum doctor --json` for machine-readable health output.
 - `bun run compress` (`src/cli/compress.ts`) — idempotent caveman compression of in-repo content; `--check` for CI.
-- Local CI runner (`bun run ci`) — 6 stages: install / typecheck / test (113 tests) / build:all / skills:lint / compress:check (soft gate). Local release runner (`bun run release vX.Y.Z`). `fulcrum doctor` shows caveman `defaultMode`. Skills lint enforces rules ≤ 200 lines. CHANGELOG via `git-cliff`.
+- Local CI runner (`bun run ci`) — 6 stages: install / typecheck / test (115 tests) / build:all / skills:lint / compress:check (soft gate). Local release runner (`bun run release vX.Y.Z`). `fulcrum doctor` shows caveman `defaultMode`. Skills lint enforces rules ≤ 200 lines. CHANGELOG via `git-cliff`.
 
 ## Where we are going (placeholders, not implementations)
 

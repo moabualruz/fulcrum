@@ -131,7 +131,7 @@ export async function installDeepwikiMcp(opts: { dryRun?: boolean } = {}): Promi
   } else {
     console.log("     · skip OpenCode DeepWiki MCP (not detected)");
   }
-  console.log("     · skip Pi CLI DeepWiki MCP (no MCP support)");
+  console.log("     · skip Pi CLI DeepWiki MCP (pi-mcp-adapter support is documented but not Fulcrum-managed yet)");
 }
 
 export async function uninstallDeepwikiMcp(opts: { dryRun?: boolean } = {}): Promise<void> {

@@ -15,6 +15,7 @@
 | Skills path (fulcrum-managed) | `~/.codex/skills/fulcrum/` (user) · `.codex/skills/` (project) | `~/.gemini/extensions/fulcrum-skills/skills/` | `~/.config/opencode/skills/fulcrum/` | `~/.pi/agent/skills/fulcrum/` |
 | MCP | Yes — `config.toml` | Yes — `settings.json` | Yes — `opencode.json` | Via `pi-mcp-adapter` |
 | DeepWiki | Yes | Yes | Yes | Via adapter; not Fulcrum-managed yet |
+| context-mode | MCP + hooks + routing rules | MCP + hooks + routing rules | MCP + plugin + routing rules | `pi install npm:context-mode` + MCP + routing rules |
 
 ---
 
@@ -300,5 +301,5 @@ Fulcrum does not yet install `pi-mcp-adapter`, write Pi MCP config, or check ada
 
 | Gap | Detail |
 |---|---|
-| **MCP adapter not managed** | DeepWiki works through `pi-mcp-adapter`, but Fulcrum does not yet install/configure/verify it |
+| **Generic MCP adapter not managed** | DeepWiki works through `pi-mcp-adapter`, but Fulcrum does not yet install/configure/verify it. Managed context-mode uses Pi's native `pi install npm:context-mode` package path. |
 | **Extension language is TypeScript** | Shell hooks must be wrapped in a TS extension that shells out — adds one layer of indirection but preserves shell-script reuse |

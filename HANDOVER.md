@@ -31,6 +31,7 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 ├── fulcrum install [--with-project DIR] [--no-skills] [--no-upstream-skills]
 │                            — sentinel-splice rules, vendor snippets, seed policy,
 │                              caveman per-agent install, caveman ultra lock,
+│                              context-mode managed integration,
 │                              sync authored + curated upstream skills unless opted out,
 │                              register DeepWiki MCP for supported detected agents
 ├── fulcrum uninstall [--dry-run] [--purge] [--include-caveman]
@@ -65,6 +66,7 @@ src/
 ├── cli/
 │   ├── init.ts          install.ts    # bootstrap + sentinel splice + caveman install + --dry-run
 │   ├── uninstall.ts                   # conservative removal of managed artifacts
+│   ├── context-mode.ts                # managed context-mode install/uninstall across 5 agents
 │   ├── install.test.ts  uninstall.test.ts
 │   ├── compress.ts                    # fulcrum compress subcommand (267 lines)
 │   ├── hooks.ts         skills.ts     # native hook config + skill orchestration
@@ -111,12 +113,12 @@ LICENSE (MIT)  AGENTS.md  README.md
 
 ## 3. What works (verified)
 
-- `bun run ci` — green in the latest local run: install + tsc + 113 tests + 5 platform builds + skills:lint (28/28) + compress:check (soft, 0 pending).
+- `bun run ci` — green in the latest local run: install + tsc + 115 tests + 5 platform builds + skills:lint (28/28) + compress:check (soft, 0 pending).
 - `bun run scripts/build-all.ts` — 5 targets (`darwin-arm64` 63 MB, `darwin-x64` 68 MB, `linux-x64`/`linux-arm64` ~101 MB, `windows-x64` 118 MB).
 - `bash scripts/install.sh` — splices rules, vendors snippets, seeds policy. Idempotent. `FULCRUM_RELEASE_TAG=vX.Y.Z` fetches a prebuilt binary from GitHub Releases.
 - `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG → tag → cross-compile → optional `gh release create`. Does NOT push.
-- `fulcrum install` — 8 steps: rules spliced into Claude Code / Codex CLI / OpenCode / Gemini; policy seeded; caveman per-agent; `~/.config/caveman/config.json` written `{"defaultMode":"ultra"}`; authored in-repo skills synced unless `--no-skills`; curated upstream skills synced unless `--no-upstream-skills`; DeepWiki MCP registered for supported detected agents. Respects `--dry-run`.
-- `fulcrum uninstall` — removes Fulcrum-managed rules blocks, native hook registrations, hook snippets/markers, managed `skills/fulcrum/` and `skills/fulcrum-upstream/` namespaces, Gemini managed skill extensions, generated Gemini import, and unmodified seeded policy. Keeps edited policy by default and keeps caveman unless `--include-caveman`.
+- `fulcrum install` — 9 steps: rules spliced into Claude Code / Codex CLI / OpenCode / Gemini; policy seeded; caveman per-agent; `~/.config/caveman/config.json` written `{"defaultMode":"ultra"}`; context-mode installed/configured per detected agent; authored in-repo skills synced unless `--no-skills`; curated upstream skills synced unless `--no-upstream-skills`; DeepWiki MCP registered for supported detected agents. Respects `--dry-run`.
+- `fulcrum uninstall` — removes Fulcrum-managed rules blocks, native hook registrations, hook snippets/markers, managed `skills/fulcrum/` and `skills/fulcrum-upstream/` namespaces, Gemini managed skill extensions, generated Gemini import, managed context-mode registrations, and unmodified seeded policy. Keeps edited policy by default and keeps caveman unless `--include-caveman`; keeps the global `context-mode` npm package because upstream has no uninstall contract.
 - `fulcrum skills upstream` — reads `skills/upstream.lock`, checks out pinned upstream SHAs into `~/.fulcrum/cache/upstream-skills`, and installs 20 selected skills under `fulcrum-upstream/` (Gemini: `fulcrum-upstream-skills` extension).
 - `fulcrum hooks enable/disable` — registers/removes native configs for Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi CLI; records/removes intent markers; still prints registration snippets for review.
 - `fulcrum doctor [--json]` — 32/32 tools detected; "Caveman" section with `defaultMode` display; `DoctorReport` JSON on `--json`.
@@ -178,7 +180,7 @@ Branch should stay on `feat/agent-foundation-clean` for now. User does not want 
 
 These are the not-done or not-fully-covered items that still matter for the documented foundation target. They are not PR/release steps.
 
-1. **Pi MCP adapter integration is documented but not implemented.** Pi can serve MCPs through `pi install npm:pi-mcp-adapter`, reading `.mcp.json`, `~/.config/mcp/mcp.json`, `~/.pi/agent/mcp.json`, or `.pi/mcp.json`. Fulcrum does not yet install that adapter, configure `deepwiki` for Pi, verify adapter health in doctor, or account for the adapter's default `mcp(...)` proxy shape in `tool-output-router`. Details: [docs/mcp.md](docs/mcp.md), [docs/agents.md](docs/agents.md), [docs/capabilities.md](docs/capabilities.md). Likely code touch points: `src/cli/mcp.ts`, `src/cli/install.ts`, `src/cli/doctor.ts`, `src/hooks/tool-output-router.ts`.
+1. **Pi MCP adapter integration for DeepWiki is documented but not implemented.** Pi can serve generic MCPs through `pi install npm:pi-mcp-adapter`, reading `.mcp.json`, `~/.config/mcp/mcp.json`, `~/.pi/agent/mcp.json`, or `.pi/mcp.json`. Fulcrum does not yet install that adapter, configure `deepwiki` for Pi, verify adapter health in doctor, or account for the adapter's default `mcp(...)` proxy shape in `tool-output-router`. `context-mode` is separate and now managed via Pi's own `pi install npm:context-mode` package path. Details: [docs/mcp.md](docs/mcp.md), [docs/agents.md](docs/agents.md), [docs/capabilities.md](docs/capabilities.md). Likely code touch points for DeepWiki adapter work: `src/cli/mcp.ts`, `src/cli/doctor.ts`, `src/hooks/tool-output-router.ts`.
 2. **`scripts/install.sh` does not pass through CLI install flags.** README documents `fulcrum install --no-skills` and `--no-upstream-skills`, but the bootstrap script only accepts `--with-project` and `--help`. Either add pass-through support for safe install flags or keep smoke recipes calling the installed `fulcrum` binary directly. Details: [README.md](README.md), [scripts/install.sh](scripts/install.sh), §7 below.
 3. **Hook enable/disable writes all five supported agent configs.** `fulcrum hooks enable` currently creates native config files for Claude, Codex, Gemini, OpenCode, and Pi rather than filtering to detected agent roots. Docs now describe that behavior, but the product decision is still open: keep all-agent writes as the cross-agent default, or make implementation detection-aware. Details: [docs/hooks.md](docs/hooks.md), [docs/agents.md](docs/agents.md). Code: `src/cli/hooks.ts`.
 4. **Cross-agent skill smoke remains incomplete.** Trigger-rate harnesses exist for Claude Code and Codex only. Gemini, OpenCode, and Pi skill loading remain manual smoke. Details: [docs/skill-smoke-test.md](docs/skill-smoke-test.md), [docs/skills.md](docs/skills.md), `evals/README.md`.
@@ -258,10 +260,10 @@ fulcrum doctor --json | jq .verdict
 - **Trigger-rate eval exists for Claude Code and Codex only.** No equivalent harness for Gemini / OpenCode / Pi; those remain manual smoke.
 - **Uninstall is conservative.** It does not remove caveman by default and keeps modified policy files unless `--purge`.
 - **Third-party upstream sync uses repo-level pins.** `skills/upstream.lock` pins reviewed repository SHAs and metadata. It does not pin each subpath independently.
-- **DeepWiki is the only managed default MCP.** Other MCPs remain opt-in.
+- **Managed MCP scope is intentionally narrow.** Fulcrum manages DeepWiki and context-mode. Other MCPs remain opt-in.
 - **Claude Code MCP removal is manual.** Install can call `claude mcp add`, but uninstall prints `claude mcp remove -s user deepwiki` instead of invoking it.
 - **OpenCode is archived** (2025-09-18). Successor: Charm's Crush. `shims/opencode/fulcrum.ts` is written against last-stable OpenCode; Crush's plugin contract may differ.
-- **Pi MCP requires `pi-mcp-adapter`.** Fulcrum documents the adapter path but does not yet install/configure it or verify its tool-output shape (`docs/agents.md` §5.6, `docs/mcp.md` §3.1).
+- **Pi DeepWiki MCP requires `pi-mcp-adapter`.** Fulcrum documents the adapter path but does not yet install/configure it or verify its tool-output shape (`docs/agents.md` §5.6, `docs/mcp.md` §3.1). This does not block managed context-mode on Pi, which uses `pi install npm:context-mode`.
 - **`dist/` is gitignored.** Every fresh clone needs Bun to run `bash scripts/install.sh` (or set `FULCRUM_RELEASE_TAG=...` to fetch a release artifact).
 - **Skill content correctness is the author's job.** Lint passes do not imply upstream-correct content. Fix commit `08101c6` corrected 19 skills after the fact; future authoring should verify inline.
 - **Caveman ultra is mandatory but not enforced for new skills.** Any new `SKILL.md` added without a compression pass will deploy verbose content. Run `/caveman:compress skills/<name>/SKILL.md` before committing.
