@@ -15,6 +15,8 @@ Usage:
   fulcrum skills list                Enumerate authored skills with eval coverage.
   fulcrum install [--with-project DIR]
                                      Splice rules into agent files; vendor recipe pool.
+  fulcrum compress [--check] [FILES...]
+                                     Compress markdown with caveman; default targets shown in help.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -64,6 +66,11 @@ async function main() {
     case "doctor": {
       const { run: runDoctor } = await import("./cli/doctor.ts");
       await runDoctor(rest);
+      return;
+    }
+    case "compress": {
+      const { run: runCompress } = await import("./cli/compress.ts");
+      await runCompress(rest);
       return;
     }
     case "version":
