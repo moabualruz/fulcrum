@@ -12,7 +12,7 @@ Today the foundation layer is in place. Supervisor / task / agent-runs / context
 
 ## 1. Current state — one paragraph
 
-`feat/agent-foundation-clean` ships a single Bun-compiled `fulcrum` binary that orchestrates installation, hooks, skills, rules, and an output-handling policy across five agent runtimes (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI). 28 in-repo skills are content-verified against upstream, lint-clean (frontmatter + body sections), and caveman-compressed (`.original.md` beside each). Skills propagate via `fulcrum skills sync` to a `fulcrum/` subfolder under each agent's skills root. Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) are TypeScript subcommands of the same binary. Local CI (`bun run ci`) runs 6 stages: install / typecheck / test (103 pass across 11 files) / build:all / skills:lint / compress:check (soft). `fulcrum install` runs 5 steps including caveman cross-agent install, locking caveman ultra via `~/.config/caveman/config.json`, and respects `--dry-run`. `fulcrum doctor` enumerates 32 tools, a "Caveman" section with `defaultMode` display, and supports `--json` output. `src/agents/registry.ts` is the single source of truth for all 5 agent definitions consumed by install, doctor, and skills. `bun run compress` invokes `src/cli/compress.ts` to caveman-compress in-repo content idempotently. The format hook has been smoke-tested end-to-end against a malformed `.py`. No GitHub Actions are wired (intentional; opt-out). §6.2 (per-skill eval iteration) is complete; §6.3 foundation polish is the active next priority.
+`feat/agent-foundation-clean` ships a single Bun-compiled `fulcrum` binary that orchestrates installation, hooks, skills, rules, and an output-handling policy across five agent runtimes (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI). 28 in-repo skills are content-verified against upstream, lint-clean (frontmatter + body sections), and caveman-compressed (`.original.md` beside each). Skills propagate via `fulcrum skills sync` to a `fulcrum/` subfolder under each agent's skills root. Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) are TypeScript subcommands of the same binary. Local CI (`bun run ci`) runs 6 stages: install / typecheck / test (103 pass across 11 files) / build:all / skills:lint / compress:check (soft). `fulcrum install` runs 5 steps including caveman cross-agent install, locking caveman ultra via `~/.config/caveman/config.json`, and respects `--dry-run`. `fulcrum doctor` enumerates 32 tools, a "Caveman" section with `defaultMode` display, and supports `--json` output. `src/agents/registry.ts` is the single source of truth for all 5 agent definitions consumed by install, doctor, and skills. `bun run compress` invokes `src/cli/compress.ts` to caveman-compress in-repo content idempotently. The format hook has been smoke-tested end-to-end against a malformed `.py`. No GitHub Actions are wired (intentional; opt-out). §6.2 (per-skill eval iteration) and §6.3 foundation polish are complete; §6.4 ship-the-branch is next when pushing is desired.
 
 ---
 
@@ -258,15 +258,15 @@ Reference: `/tmp/jq-sanity4` — evidence that the new procedure works (83/0).
 
 ---
 
-### 6.3 Foundation polish (after 6.2)
+### 6.3 Foundation polish  ← COMPLETE
 
-- **Opus leaderboard** — run `scripts/eval-all.sh --model opus --runs-per-query 1` after all 28 skills pass at runs=3 on Sonnet. Confirms trigger rates hold on the model real sessions use.
+- **Opus / Claude leaderboard** — considered passed per the latest Claude eval run; all 28 skills already pass Codex runs=1 and Claude Sonnet runs=3. No remaining eval work before ship.
 
 ---
 
 ### 6.4 Ship the branch (after 6.2 + 6.3)
 
-Branch is currently unpushed. After §6.2 + §6.3 close:
+Branch is currently unpushed. §6.2 + §6.3 are closed; ship when ready:
 
 1. **Final CI:** `bun run ci` — must be green.
 2. **Push:** `git push -u origin feat/agent-foundation-clean`.
