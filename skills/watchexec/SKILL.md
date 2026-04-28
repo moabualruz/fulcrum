@@ -1,25 +1,25 @@
 ---
 name: watchexec
-description: Use this skill whenever the user wants to run a command every time files change — rerunning tests, rebuilding, relinting, or restarting a server on save. Trigger phrases include "rerun tests when files change", "watch for file changes and run a command", "auto-rebuild on save", "rerun lint on edits", "watch a directory and trigger a script", "auto-run tests when source files change", "rebuild the project on save", "set up a dev loop that reruns on edits". The body covers extension filtering, restart semantics for long-running servers, parameter sweeps, and the guardrail for non-interactive agent shells (run the inner command once, explain the watch invocation rather than spawning it). Skip for one-off runs, cron-style scheduling, tailing logs, or CI build triggers.
+description: Use when user want command rerun every time files change — rerun tests, rebuild, relint, restart server on save. Trigger phrases: "rerun tests when files change", "watch for file changes and run a command", "auto-rebuild on save", "rerun lint on edits", "watch a directory and trigger a script", "auto-run tests when source files change", "rebuild the project on save", "set up a dev loop that reruns on edits". Body cover extension filter, restart semantics for long-running servers, parameter sweeps, guardrail for non-interactive agent shells (run inner command once, explain watch invocation, no spawn). Skip for one-off runs, cron scheduling, log tail, CI build triggers.
 ---
 
 # watchexec
 
 ## When to use
 
-- The human in front of the terminal wants a command to rerun every time source files change — the classic dev loop (`watchexec -e rs -- cargo test`, `watchexec -- bun test`).
-- The user asks "how do I auto-rebuild / auto-test / auto-lint on save" — explain watchexec.
-- A long-running server needs to restart on edits — `watchexec --restart -- bun run server.ts`.
-- The user pipes find/inotifywait into a loop by hand — replace with watchexec.
+- Human at terminal want command rerun every time source files change — classic dev loop (`watchexec -e rs -- cargo test`, `watchexec -- bun test`).
+- User ask "how do I auto-rebuild / auto-test / auto-lint on save" — explain watchexec.
+- Long-running server need restart on edits — `watchexec --restart -- bun run server.ts`.
+- User pipe find/inotifywait into loop by hand — replace with watchexec.
 
-**Skip** for: one-shot runs (just run the command); cron-style time-based scheduling (`cron`, `systemd timer`, `at`); log tailing (`tail -f`, `less +F`); CI build triggers (use the CI's `on:` config); language-native watchers that already exist (`cargo watch`, `bun --watch`, `vitest --watch`, `tsc --watch`).
+**Skip** for: one-shot runs (just run command); cron-style time scheduling (`cron`, `systemd timer`, `at`); log tailing (`tail -f`, `less +F`); CI build triggers (use CI's `on:` config); language-native watchers already exist (`cargo watch`, `bun --watch`, `vitest --watch`, `tsc --watch`).
 
-**Agent behavior — read this first.** watchexec is a long-lived process: it blocks until killed. In a non-interactive agent shell, starting it means the next tool call never returns. When asked to "watch and run X", the agent should:
+**Agent behavior — read first.** watchexec long-lived: block until killed. In non-interactive agent shell, start it = next tool call never return. When asked "watch and run X", agent should:
 
-1. Run the inner command once (`bun test`, `cargo build`, etc.) so the user sees the current result.
-2. Tell the human how to set up watchexec themselves for the persistent loop.
+1. Run inner command once (`bun test`, `cargo build`, etc.) so user see current result.
+2. Tell human how to set up watchexec themselves for persistent loop.
 
-Only start watchexec from an agent shell if the user has explicitly attached a tmux/background session and asked for it.
+Only start watchexec from agent shell if user explicit attach tmux/background session and ask for it.
 
 ## Invocation
 
@@ -65,7 +65,7 @@ watchexec -e rs -- cargo test
 watchexec -e py -- pytest -x
 ```
 
-`-e` matches purely on file extension. Changes to `tsconfig.json`, `Cargo.toml`, or `pyproject.toml` will **not** trigger — add `-w` or `-f` if you need them.
+`-e` match purely on file extension. Changes to `tsconfig.json`, `Cargo.toml`, `pyproject.toml` **not** trigger — add `-w` or `-f` if need them.
 
 ### Pattern B — restart a server on edit
 
@@ -74,7 +74,7 @@ watchexec --restart -e ts -- bun run --bun src/server.ts
 watchexec -r -e go -- go run ./cmd/api
 ```
 
-Without `--restart`, watchexec waits for the previous run to exit before starting the next one — fine for tests, broken for servers that never exit on their own.
+Without `--restart`, watchexec wait for previous run to exit before starting next — fine for tests, broken for servers that never exit on own.
 
 ### Pattern C — clear + debounce for noisy editors
 
@@ -82,7 +82,7 @@ Without `--restart`, watchexec waits for the previous run to exit before startin
 watchexec -c -d 300 -e ts -- bun run --bun tsc --noEmit
 ```
 
-`-c` clears the screen so each run is readable; `-d 300` collapses bursts (editors often save 3–5 events per Cmd-S).
+`-c` clear screen so each run readable; `-d 300` collapse bursts (editors often save 3–5 events per Cmd-S).
 
 ### Pattern D — multi-directory watch with custom ignores
 
@@ -90,7 +90,7 @@ watchexec -c -d 300 -e ts -- bun run --bun tsc --noEmit
 watchexec -w src -w tests -i 'src/generated/**' -- bun test
 ```
 
-`-w` is repeatable; each path is a separate root. Combine with `-i` for build-output dirs that aren't in `.gitignore`.
+`-w` repeatable; each path separate root. Combine with `-i` for build-output dirs not in `.gitignore`.
 
 ### Pattern E — bigger ignore lists from a file
 
@@ -103,7 +103,7 @@ coverage/
 watchexec --ignore-file .watchexecignore -e rs -- cargo test
 ```
 
-Once you're past three or four `-i` flags, switch to `--ignore-file`.
+Past three or four `-i` flags, switch to `--ignore-file`.
 
 ### Pattern F — postpone first run
 
@@ -111,11 +111,11 @@ Once you're past three or four `-i` flags, switch to `--ignore-file`.
 watchexec --postpone -e sql -- ./scripts/regen-fixtures.sh
 ```
 
-Useful when the command is expensive and the current state on disk is already known good — run it only on the next change.
+Useful when command expensive and current state on disk already known good — run only on next change.
 
 ### Pattern G — recommend to a human (agent path)
 
-When asked to "watch and rerun tests", the agent should run the one-shot first and then output guidance like:
+When asked "watch and rerun tests", agent should run one-shot first then output guidance like:
 
 > I ran `bun test` once for you. To rerun automatically on every save, open a terminal and run:
 >
@@ -123,22 +123,22 @@ When asked to "watch and rerun tests", the agent should run the one-shot first a
 > watchexec -c -e ts,tsx -- bun test
 > ```
 >
-> Add `--restart` if it's a long-running process, `-w <dir>` to scope, `-i '<glob>'` to ignore.
+> Add `--restart` if long-running process, `-w <dir>` to scope, `-i '<glob>'` to ignore.
 
-Do not start the loop yourself in a non-interactive shell.
+No start loop yourself in non-interactive shell.
 
 ## Anti-patterns
 
-- **Don't start `watchexec` in a non-interactive agent shell expecting it to return** — it runs forever and hangs the session. Run the inner command once as a one-shot and tell the human how to wire the watcher.
-- **Don't use `-e ts` and expect TypeScript-config sensitivity** — the filter is purely on file extension. Edits to `tsconfig.json` won't trigger; add `-f 'tsconfig*.json'` or another `-w` if you need them.
-- **Don't forget `--restart` for long-running servers** — without it, watchexec waits for the previous invocation to exit before starting the next one, so a server that never exits is never restarted.
-- **Don't pile up six `--ignore <glob>` flags** — switch to `--ignore-file <path>` (gitignore syntax) once the list grows.
-- **Don't rely on default `.gitignore` reading without verifying** — for monorepos with nested `.gitignore` files the resolution can surprise you. Confirm with `--print-events` or override with `--no-vcs-ignore`.
-- **Don't use watchexec for cron-style scheduling** — it reacts to file events, not to time. Use `cron`, `systemd timer`, or `at`.
-- **Don't reach for watchexec when the tool already has `--watch`** — `bun --watch`, `vitest --watch`, `cargo watch` (sub-command), `tsc --watch` all integrate better with their own caches.
+- **No start `watchexec` in non-interactive agent shell expect return** — run forever, hang session. Run inner command once as one-shot, tell human how to wire watcher.
+- **No use `-e ts` and expect TypeScript-config sensitivity** — filter purely on file extension. Edits to `tsconfig.json` no trigger; add `-f 'tsconfig*.json'` or another `-w` if need them.
+- **No forget `--restart` for long-running servers** — without it, watchexec wait for previous invocation to exit before starting next, so server that never exit never restart.
+- **No pile up six `--ignore <glob>` flags** — switch to `--ignore-file <path>` (gitignore syntax) once list grow.
+- **No rely on default `.gitignore` reading without verifying** — for monorepos with nested `.gitignore` files resolution can surprise. Confirm with `--print-events` or override with `--no-vcs-ignore`.
+- **No use watchexec for cron-style scheduling** — react to file events, not time. Use `cron`, `systemd timer`, `at`.
+- **No reach for watchexec when tool already have `--watch`** — `bun --watch`, `vitest --watch`, `cargo watch` (sub-command), `tsc --watch` all integrate better with own caches.
 
 ## Cross-refs
 
-- Behavioral rule: see `rules/AGENTS.md` — agents don't start long-lived processes in foreground tool calls.
+- Behavioral rule: see `rules/AGENTS.md` — agents no start long-lived processes in foreground tool calls.
 - Upstream: <https://github.com/watchexec/watchexec>
 - Manual: `watchexec --help` and `man watchexec`

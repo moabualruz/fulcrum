@@ -7,13 +7,13 @@ description: Use this skill whenever the user formats or lints Dart or Flutter s
 
 ## When to use
 
-- The user wants to format Dart — `dart format .` rewrites every `.dart` file under cwd in place; `dart format --output=none --set-exit-if-changed .` is the CI gate (no writes, exits 1 on any diff).
-- The user wants to lint or statically check Dart — `dart analyze` reads `analysis_options.yaml` and reports errors, warnings, and info-level lints in one pass.
-- The user wants to apply lint auto-fixes (add `const`, remove unused imports, sort imports) — `dart fix --apply`; preview first with `--dry-run`.
-- The user mentions `dartfmt` or `dartanalyzer` — those are legacy Dart 2.9- commands. Steer to `dart format` / `dart analyze` (Dart 2.10+).
-- The repo is pure Flutter — use `dart format` (the `flutter format` wrapper was removed in Flutter 3.x; only `flutter analyze` remains as a wrapper).
+- User want format Dart — `dart format .` rewrite every `.dart` file under cwd in place; `dart format --output=none --set-exit-if-changed .` = CI gate (no write, exit 1 on any diff).
+- User want lint or static check Dart — `dart analyze` read `analysis_options.yaml`, report errors, warnings, info-level lints in one pass.
+- User want apply lint auto-fix (add `const`, remove unused imports, sort imports) — `dart fix --apply`; preview first with `--dry-run`.
+- User mention `dartfmt` or `dartanalyzer` — legacy Dart 2.9- commands. Steer to `dart format` / `dart analyze` (Dart 2.10+).
+- Repo pure Flutter — use `dart format` (`flutter format` wrapper removed in Flutter 3.x; only `flutter analyze` remain as wrapper).
 
-**Skip** for: Kotlin (`ktlint`), Swift (`swiftformat` / `swiftlint`), JS/TS (`biome`), Python (`ruff`), Flutter app compilation (`flutter build`, `flutter run`), unit tests (`dart test`, `flutter test`), package publishing (`dart pub publish`).
+**Skip** for: Kotlin (`ktlint`), Swift (`swiftformat` / `swiftlint`), JS/TS (`biome`), Python (`ruff`), Flutter app compile (`flutter build`, `flutter run`), unit tests (`dart test`, `flutter test`), package publish (`dart pub publish`).
 
 ## Invocation
 
@@ -42,7 +42,7 @@ dart format .
 flutter analyze                                     # still wraps `dart analyze`
 ```
 
-`dart format` and `dart analyze` are **separate subcommands** — running one does not run the other. The canonical pre-commit shape is `dart format . && dart analyze`.
+`dart format` and `dart analyze` = **separate subcommands** — running one no run other. Canonical pre-commit shape: `dart format . && dart analyze`.
 
 ## Patterns
 
@@ -52,7 +52,7 @@ flutter analyze                                     # still wraps `dart analyze`
 dart format .
 ```
 
-`dart format` mutates by default — there is no `--write` flag because writing **is** the default. To preview without writing, use `--output=show` (stdout) or `--output=none --set-exit-if-changed` (CI).
+`dart format` mutate by default — no `--write` flag because writing **is** default. Preview without write: `--output=show` (stdout) or `--output=none --set-exit-if-changed` (CI).
 
 ### Pattern B — CI format gate
 
@@ -60,7 +60,7 @@ dart format .
 dart format --output=none --set-exit-if-changed .
 ```
 
-`--output=none` suppresses the write; `--set-exit-if-changed` makes the command exit 1 if any file would be reformatted. Pair with `dart analyze` for full coverage:
+`--output=none` suppress write; `--set-exit-if-changed` make command exit 1 if any file would reformat. Pair with `dart analyze` for full coverage:
 
 ```bash
 dart format --output=none --set-exit-if-changed . && dart analyze --fatal-warnings
@@ -88,7 +88,7 @@ analyzer:
     - "build/**"
 ```
 
-Then `dart analyze` reads this file automatically. Severity overrides in `analyzer: errors:` are how you make a CI-blocking lint.
+Then `dart analyze` read this file auto. Severity overrides in `analyzer: errors:` = how you make CI-blocking lint.
 
 ### Pattern D — auto-fix lint findings
 
@@ -97,7 +97,7 @@ dart fix --dry-run                                  # show every fix that would 
 dart fix --apply                                    # apply them
 ```
 
-`dart fix` reads the same lints as `dart analyze` and applies the machine-fixable subset (add `const`, remove unused imports, prefer single quotes, …). Always preview with `--dry-run` first; some fixes change semantics (e.g. nullable demotions). Commit before running `--apply`.
+`dart fix` read same lints as `dart analyze`, apply machine-fixable subset (add `const`, remove unused imports, prefer single quotes, …). Always preview with `--dry-run` first; some fixes change semantics (e.g. nullable demotions). Commit before run `--apply`.
 
 ### Pattern E — pubspec.yaml integration
 
@@ -108,7 +108,7 @@ dev_dependencies:
   # flutter_lints: ^4.0.0                           # Flutter (already includes `lints`)
 ```
 
-After `dart pub get`, the `package:lints/recommended.yaml` (or `package:flutter_lints/flutter.yaml`) include in `analysis_options.yaml` resolves. Without the dev-dep declared, the include silently no-ops.
+After `dart pub get`, `package:lints/recommended.yaml` (or `package:flutter_lints/flutter.yaml`) include in `analysis_options.yaml` resolve. Without dev-dep declared, include silent no-op.
 
 ### Pattern F — machine-readable output for tooling
 
@@ -120,7 +120,7 @@ dart analyze --format=machine .
 dart analyze --format=machine . | awk -F'|' '{print $3}' | sort | uniq -c | sort -rn
 ```
 
-`dart analyze` only emits `default` (human) and `machine` (pipe-delimited) formats. There is no `--format=json`. For JSON-shaped diagnostics, run the LSP via `dart language-server` or post-process the `machine` output through `awk`/`miller`.
+`dart analyze` only emit `default` (human) and `machine` (pipe-delimited) formats. No `--format=json`. For JSON-shaped diagnostics, run LSP via `dart language-server` or post-process `machine` output through `awk`/`miller`.
 
 ### Pattern G — pre-commit / CI shape
 
@@ -132,25 +132,25 @@ dart format . && dart analyze
 dart format --output=none --set-exit-if-changed . && dart analyze --fatal-warnings --fatal-infos
 ```
 
-Don't run `dart format .` (mutating) in CI — the runner should fail on drift, not silently rewrite the tree.
+No run `dart format .` (mutating) in CI — runner should fail on drift, not silent rewrite tree.
 
 ## Anti-patterns
 
-- **Don't invoke `dart format .` without committing first** if you don't trust its choices. There is no `--write` flag because writing is the default; the only way to preview is `--output=show` (stdout) or `--output=none --set-exit-if-changed`. Stage your work first.
-- **Don't pass `--line-length=120` if `analysis_options.yaml` says 80** (or vice versa). The formatter and the analyzer must agree on width — disagreements show up as a permanent format-then-lint diff loop. Set the width in one place; if `pubspec.yaml`/IDE config also pins it, line them all up.
-- **Don't stack `lints` and `flutter_lints`.** `flutter_lints` already pulls `lints` transitively and re-tunes the rule set for Flutter. Pick one `include:` line in `analysis_options.yaml` and one dev-dependency.
-- **Don't run `dart fix --apply` blindly in CI.** Some auto-fixes change semantics (nullable demotions, removing what looks like dead code). Preview with `--dry-run`, review the diff, then apply on a feature branch — never on `main` from a workflow.
-- **Don't use `dartfmt` or `dartanalyzer`.** Those are legacy commands removed in Dart 2.10+. Use `dart format` and `dart analyze` — and update any CI/Makefile/just recipe that still references the old names.
-- **Don't duplicate format/analyze excludes between CLI flags and `analysis_options.yaml`.** Duplication drifts. The `analyzer: exclude:` block governs both the analyzer and the formatter (the formatter respects analyzer excludes); keep paths there and only pass explicit CLI paths when overriding.
-- **Don't run `dart format` and skip `dart analyze`.** Format only handles whitespace/wrapping; lints (`prefer_const_constructors`, `avoid_print`, `unused_import`) live in the analyzer. A format-only pre-commit ships unlinted code.
-- **Don't use `dart analyze` to find runtime errors or test failures.** It is static and AST-level. Use `dart test` / `flutter test` for behavior; `dart analyze` complements them, it does not replace them.
+- **No invoke `dart format .` without commit first** if no trust its choices. No `--write` flag because writing is default; only preview = `--output=show` (stdout) or `--output=none --set-exit-if-changed`. Stage work first.
+- **No pass `--line-length=120` if `analysis_options.yaml` say 80** (or vice versa). Formatter and analyzer must agree on width — disagreement show up as permanent format-then-lint diff loop. Set width in one place; if `pubspec.yaml`/IDE config also pin it, line them all up.
+- **No stack `lints` and `flutter_lints`.** `flutter_lints` already pull `lints` transitively, re-tune rule set for Flutter. Pick one `include:` line in `analysis_options.yaml` and one dev-dependency.
+- **No run `dart fix --apply` blind in CI.** Some auto-fixes change semantics (nullable demotions, removing what look like dead code). Preview with `--dry-run`, review diff, then apply on feature branch — never on `main` from workflow.
+- **No use `dartfmt` or `dartanalyzer`.** Legacy commands removed in Dart 2.10+. Use `dart format` and `dart analyze` — update any CI/Makefile/just recipe still reference old names.
+- **No duplicate format/analyze excludes between CLI flags and `analysis_options.yaml`.** Duplication drift. `analyzer: exclude:` block govern both analyzer and formatter (formatter respect analyzer excludes); keep paths there, only pass explicit CLI paths when overriding.
+- **No run `dart format` and skip `dart analyze`.** Format only handle whitespace/wrapping; lints (`prefer_const_constructors`, `avoid_print`, `unused_import`) live in analyzer. Format-only pre-commit ship unlinted code.
+- **No use `dart analyze` to find runtime errors or test failures.** Static and AST-level. Use `dart test` / `flutter test` for behavior; `dart analyze` complement them, no replace.
 
 ## Cross-refs
 
 - Behavioral rule: see `rules/AGENTS.md` — "format Dart with `dart format`; lint with `dart analyze`; both ship with the SDK".
-- Hook recipe: `format` (in `docs/hooks.md`) is wired to run `dart format` on `*.dart` writes; lint hook runs `dart analyze`.
+- Hook recipe: `format` (in `docs/hooks.md`) wired to run `dart format` on `*.dart` writes; lint hook run `dart analyze`.
 - Sister skills: `skills/ruff/SKILL.md` (Python check + format), `skills/biome/SKILL.md` (JS/TS check + format) — same combined-tool shape.
-- Machine-readable analyzer output: `dart analyze --format=machine` is pipe-delimited; pipe through `awk -F'|'` for further processing. There is no JSON format on `dart analyze` — for JSON-shaped diagnostics use `dart language-server` (LSP).
+- Machine-readable analyzer output: `dart analyze --format=machine` pipe-delimited; pipe through `awk -F'|'` for further processing. No JSON format on `dart analyze` — for JSON-shaped diagnostics use `dart language-server` (LSP).
 - Upstream: <https://dart.dev/tools/dart-format>, <https://dart.dev/tools/dart-analyze>
 - Lints index: <https://dart.dev/tools/linter-rules>
 - Flutter wrappers: <https://docs.flutter.dev/reference/flutter-cli>

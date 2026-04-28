@@ -7,12 +7,12 @@ description: Use this skill whenever the user works with JSON on the command lin
 
 ## When to use
 
-- The user has JSON in front of them — a file, an API response, an HTTP body, CLI tool output (`gh`, `kubectl`, `aws`, `terraform output -json`, `npm pkg get`, `cargo metadata`) — and wants to query, filter, reshape, or convert it.
-- The agent itself is about to invoke a tool with JSON output (anything with `--json`, `--format json`, `-o json`) and needs a specific value.
-- The user asks how to count, sort, group, or aggregate items inside a JSON array.
-- The user pipes JSON through `grep` or `awk` — that almost always wants jq.
+- User has JSON in front — file, API response, HTTP body, CLI tool output (`gh`, `kubectl`, `aws`, `terraform output -json`, `npm pkg get`, `cargo metadata`) — wants query, filter, reshape, convert.
+- Agent about to invoke tool with JSON output (anything with `--json`, `--format json`, `-o json`) needs specific value.
+- User ask how to count, sort, group, aggregate items in JSON array.
+- User pipe JSON through `grep` or `awk` — almost always want jq.
 
-**Skip** for: YAML / TOML / XML (use `yq` or `xmlstarlet`); CSV (use `awk` / `miller` / `csvkit`); JSON parsing inside Python/Go/Node *source code* (use the language's stdlib).
+**Skip** for: YAML / TOML / XML (use `yq` or `xmlstarlet`); CSV (use `awk` / `miller` / `csvkit`); JSON parse inside Python/Go/Node *source code* (use language stdlib).
 
 ## Invocation
 
@@ -47,7 +47,7 @@ jq --argjson cutoff 10 '.[] | select(.score >= $cutoff)'
 gh pr list --json number,title,author | jq '.[] | .number'
 ```
 
-Use `-r` to drop the surrounding quotes when piping into another command:
+Use `-r` to drop surrounding quotes when piping to another command:
 
 ```bash
 gh pr list --json number | jq -r '.[].number' | xargs -I{} gh pr view {}
@@ -60,7 +60,7 @@ jq '.items[] | select(.status == "active")' data.json
 jq '.items | map(select(.score > 50))' data.json   # array out
 ```
 
-`select(...)` keeps elements where the condition is truthy. Wrap with `map(...)` to keep array shape.
+`select(...)` keep elements where condition truthy. Wrap with `map(...)` to keep array shape.
 
 ### Pattern C — reshape objects
 
@@ -68,7 +68,7 @@ jq '.items | map(select(.score > 50))' data.json   # array out
 jq '.items | map({id: .id, owner: .user.login, count: (.tags | length)})'
 ```
 
-`{a, b}` is shorthand for `{a: .a, b: .b}`. Computed fields use `(...)` to scope the expression.
+`{a, b}` shorthand for `{a: .a, b: .b}`. Computed fields use `(...)` to scope expression.
 
 ### Pattern D — aggregate
 
@@ -87,7 +87,7 @@ jq -r '.items[] | [.id, .name, .price] | @csv' data.json   # quoted CSV
 jq -r '.items[] | [.id, .name, .price] | @tsv' data.json   # tab-separated
 ```
 
-`@csv` quotes strings and escapes embedded commas. `@tsv` doesn't quote, but it DOES escape control characters (`\n`, `\r`, `\t`, `\\`) so embedded tabs/newlines round-trip safely.
+`@csv` quote strings, escape embedded commas. `@tsv` no quote, but DOES escape control chars (`\n`, `\r`, `\t`, `\\`) so embedded tabs/newlines round-trip safe.
 
 ### Pattern F — defaults and conditionals
 
@@ -97,7 +97,7 @@ jq 'if .status == "ok" then .value else null end'
 jq '.items[]?'                                          # tolerate missing
 ```
 
-`//` is null-or-false fallback (LHS produces a non-null, non-false value, or RHS wins). `?` after a path swallows "Cannot index" errors.
+`//` = null-or-false fallback (LHS produce non-null non-false value, or RHS win). `?` after path swallow "Cannot index" errors.
 
 ### Pattern G — paths, walk, deep edits
 
@@ -109,17 +109,17 @@ jq 'setpath(["meta","fetched_at"]; now | todate)'
 
 ## Anti-patterns
 
-- **Don't `grep '"key"'`** on JSON — breaks on key reordering, multi-line values, escaped quotes. Use `jq '.key'`.
-- **Don't pipe JSON to `awk`** to split on `:` — keys and values can both contain `:`. Use jq.
-- **Don't `python -c 'import json, sys; …'`** for one-shots — startup cost dominates and the script is a security review item. Use jq.
-- **Don't forget `-r`** when piping into another command. Without it, jq emits `"value"` (with quotes) which most tools then mis-handle.
-- **Don't interpolate shell variables into the filter string.** `jq ".[] | select(.x == \"$VAR\")"` breaks on quotes/backslashes/spaces. Use `--arg` (string) or `--argjson` (already-JSON).
-- **Don't write `.[]` when you wanted an array result.** `.[]` streams individual values; wrap with `[...]` or use `map(...)` to keep array shape.
-- **Don't write a 200-character one-liner.** When the filter outgrows one screen, save it to `query.jq` and run `jq -f query.jq`.
+- **Don't `grep '"key"'`** on JSON — break on key reorder, multi-line values, escaped quotes. Use `jq '.key'`.
+- **Don't pipe JSON to `awk`** to split on `:` — keys and values both can contain `:`. Use jq.
+- **Don't `python -c 'import json, sys; …'`** for one-shots — startup cost dominate, script = security review item. Use jq.
+- **Don't forget `-r`** when pipe to another command. Without it, jq emit `"value"` (with quotes), most tools mis-handle.
+- **Don't interpolate shell vars into filter string.** `jq ".[] | select(.x == \"$VAR\")"` break on quotes/backslashes/spaces. Use `--arg` (string) or `--argjson` (already-JSON).
+- **Don't write `.[]` when want array result.** `.[]` stream individual values; wrap with `[...]` or use `map(...)` to keep array shape.
+- **Don't write 200-char one-liner.** Filter outgrow one screen → save to `query.jq`, run `jq -f query.jq`.
 
 ## Cross-refs
 
 - Rule: see `rules/AGENTS.md` §3 — "use jq for any JSON read/transform".
-- Hook recipe: `tool-output-router` (in `docs/tool-output-policy.md`) routes large JSON outputs through the policy file; jq runs against either the raw stdout or the saved `~/.fulcrum/state/.../*.out` file.
+- Hook recipe: `tool-output-router` (in `docs/tool-output-policy.md`) route large JSON outputs through policy file; jq run against raw stdout or saved `~/.fulcrum/state/.../*.out` file.
 - Manual: <https://jqlang.org/manual/>
 - Cookbook: <https://github.com/stedolan/jq/wiki/Cookbook>

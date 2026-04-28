@@ -7,12 +7,12 @@ description: Use this skill whenever the user wants find-and-replace in files or
 
 ## When to use
 
-- The user wants to substitute a string or regex inside one or more files and is reaching for `sed -i 's/.../.../g'`.
-- The agent needs to rename a symbol across a tree (`fd -t f -e ts -x sd 'old' 'new'`).
-- The replacement involves capture groups, slashes, or other characters that make sed quoting painful.
-- The user asks to preview a change before mutating files.
+- User want substitute string/regex in files, reach for `sed -i 's/.../.../g'`.
+- Agent need rename symbol across tree (`fd -t f -e ts -x sd 'old' 'new'`).
+- Replacement has capture groups, slashes, chars make sed quoting painful.
+- User want preview before mutate files.
 
-**Skip** for: deleting/inserting whole lines or address-scoped edits (use `sed`/`awk`); searching without replacing (`rg`); finding files (`fd`); refactors that must understand syntax — function renames, type changes (`ast-grep`).
+**Skip** for: delete/insert whole lines or address-scoped edits (use `sed`/`awk`); search without replace (`rg`); find files (`fd`); refactor need syntax — function rename, type change (`ast-grep`).
 
 ## Invocation
 
@@ -49,17 +49,17 @@ sd 'from "react"' 'from "preact"' src/**/*.tsx
 sd -A -f s 'BEGIN.*END' '' notes.md                 # `.` matches newlines (dotall) + cross-line
 ```
 
-Without `-A`, sd is line-by-line and patterns can't cross `\n`. `-f m` toggles per-line `^`/`$`; `-f s` makes `.` match newlines.
+Without `-A`, sd line-by-line, pattern no cross `\n`. `-f m` toggle per-line `^`/`$`; `-f s` make `.` match newlines.
 
 ## Anti-patterns
 
-- **Don't translate sed `\1` to `\1` in sd** — sd's Rust `regex` engine uses `$1` for backrefs; `\1` matches a literal.
-- **Don't reach for `sd -i`** — that flag does not exist. sd writes in-place by default.
-- **Don't double-quote the pattern.** `"$1"` lets the shell eat your backreference. Single-quote.
+- **Don't translate sed `\1` to `\1` in sd** — sd Rust `regex` engine use `$1` for backrefs; `\1` match literal.
+- **Don't reach for `sd -i`** — flag not exist. sd write in-place by default.
+- **Don't double-quote pattern.** `"$1"` let shell eat backreference. Single-quote.
 - **Don't use sd for non-replacement edits** (delete line N, append, conditional ops) — sed/awk.
-- **Don't run sd across a repo without `-p` first.** Preview on a sample file, then batch with fd.
-- **Don't reach for sd when ast-grep would be safer.** For code refactors that must respect syntax, `ast-grep` > `sd` > `sed`. sd is text-level — it rewrites inside strings and comments too.
-- **Don't assume `-l` means literal.** The flag is `-F` / `--fixed-strings` (alias `-s` / `--string-mode`).
+- **Don't run sd across repo without `-p` first.** Preview on sample, then batch with fd.
+- **Don't reach for sd when ast-grep safer.** Code refactor need syntax: `ast-grep` > `sd` > `sed`. sd text-level — rewrite inside strings and comments too.
+- **Don't assume `-l` mean literal.** Flag is `-F` / `--fixed-strings` (alias `-s` / `--string-mode`).
 
 ## Cross-refs
 

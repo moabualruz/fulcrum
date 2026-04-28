@@ -7,13 +7,13 @@ description: Use this skill whenever the user wants to benchmark, time, or compa
 
 ## When to use
 
-- The user wants to compare the wall-clock runtime of two or more whole commands and asks for ratios, mean ± stddev, or "is X faster than Y".
-- A refactor, version bump, or compiler flag change needs a regression check — run the old and new binary side-by-side.
-- The user pipes `time cmd1; time cmd2` and eyeballs the numbers — that's a single sample with no warmup. Replace with hyperfine.
-- A parameter sweep is needed: thread count, batch size, input file, optimisation flag.
-- The agent needs machine-readable timing data (`--export-json`) for downstream analysis with jq.
+- User want compare wall-clock runtime of two+ whole commands. Ask ratios, mean ± stddev, "is X faster than Y".
+- Refactor, version bump, compiler flag change need regression check — run old + new binary side-by-side.
+- User pipe `time cmd1; time cmd2` + eyeball numbers — single sample, no warmup. Replace with hyperfine.
+- Parameter sweep: thread count, batch size, input file, optimisation flag.
+- Agent need machine-readable timing data (`--export-json`) for downstream jq analysis.
 
-**Skip** for: sub-millisecond microbenchmarks (`cargo bench`, `pytest-benchmark`, `tachometer`, `criterion`); in-process CPU profiling (`perf`, `py-spy`, `flamegraph`, `cargo flamegraph`); memory/RSS measurement (`/usr/bin/time -v`, `valgrind --tool=massif`, `heaptrack`); syscall tracing (`strace`, `dtrace`, `bpftrace`); CI performance dashboards (use `bencher`, `codspeed`, or roll your own around hyperfine's JSON).
+**Skip** for: sub-millisecond microbenchmarks (`cargo bench`, `pytest-benchmark`, `tachometer`, `criterion`); in-process CPU profiling (`perf`, `py-spy`, `flamegraph`, `cargo flamegraph`); memory/RSS measurement (`/usr/bin/time -v`, `valgrind --tool=massif`, `heaptrack`); syscall tracing (`strace`, `dtrace`, `bpftrace`); CI perf dashboards (use `bencher`, `codspeed`, or roll own around hyperfine JSON).
 
 ## Invocation
 
@@ -54,7 +54,7 @@ hyperfine --warmup 3 --runs 30 \
   'grep -r foo .'
 ```
 
-Output ends with `Summary` showing the fastest and the ratio (e.g. `rg ran 12.3 ± 0.4 times faster than grep`). Aim for stddev/mean ratio under 5%; rerun if not.
+Output end with `Summary` show fastest + ratio (e.g. `rg ran 12.3 ± 0.4 times faster than grep`). Aim stddev/mean ratio under 5%; rerun if not.
 
 ### Pattern B — warmup for cache-sensitive workloads
 
@@ -62,7 +62,7 @@ Output ends with `Summary` showing the fastest and the ratio (e.g. `rg ran 12.3 
 hyperfine --warmup 5 'cat 4gb.bin > /dev/null'
 ```
 
-The first read populates the page cache; subsequent runs hit RAM. Without warmup the mean is dominated by the cold-cache outlier. For the *cold* case, use `--prepare` to drop caches between runs (Linux only).
+First read populate page cache; later runs hit RAM. No warmup → mean dominated by cold-cache outlier. For *cold* case, use `--prepare` drop caches between runs (Linux only).
 
 ### Pattern C — regression check across versions
 
@@ -73,7 +73,7 @@ hyperfine --warmup 3 --runs 50 \
   -n new './bin-new --process input.txt'
 ```
 
-`-n/--command-name` labels each command in the report and JSON. Then:
+`-n/--command-name` label each command in report + JSON. Then:
 
 ```bash
 jq '.results | map({name, mean, stddev}) | sort_by(.mean)' bench.json
@@ -85,7 +85,7 @@ jq '.results | map({name, mean, stddev}) | sort_by(.mean)' bench.json
 hyperfine -L threads 1,2,4,8,16 'sort --parallel={threads} big.txt'
 ```
 
-`{threads}` is interpolated into each command. Multiple `-L` flags create the cross-product:
+`{threads}` interpolated into each command. Multiple `-L` flags = cross-product:
 
 ```bash
 hyperfine \
@@ -101,7 +101,7 @@ hyperfine --warmup 2 --export-json b.json 'a' 'b' 'c'
 jq -r '.results | sort_by(.mean) | .[] | "\(.command)\t\(.mean)"' b.json
 ```
 
-The JSON schema includes `command`, `mean`, `stddev`, `median`, `min`, `max`, `times[]`, and `exit_codes[]`. Pipe through jq for custom comparison logic.
+JSON schema include `command`, `mean`, `stddev`, `median`, `min`, `max`, `times[]`, `exit_codes[]`. Pipe through jq for custom compare logic.
 
 ### Pattern F — tolerate failure (e.g. negative-test benchmark)
 
@@ -109,7 +109,7 @@ The JSON schema includes `command`, `mean`, `stddev`, `median`, `min`, `max`, `t
 hyperfine -i 'cmd-that-may-fail'
 ```
 
-`-i/--ignore-failure` keeps measuring even when the command exits non-zero. Without it, hyperfine aborts the whole run on the first failure.
+`-i/--ignore-failure` keep measuring even when command exit non-zero. Without it, hyperfine abort whole run on first failure.
 
 ### Pattern G — choose the shell (or skip it)
 
@@ -118,23 +118,23 @@ hyperfine --shell=none 'rg foo' 'grep foo'        # ~1ms shell overhead saved
 hyperfine --shell=bash 'shopt -s globstar; ls **/*.rs | wc -l'   # need bash features
 ```
 
-`--shell=none` execs the command directly (faster, more accurate for short commands but no `|`, `>`, glob expansion, or env interpolation). hyperfine measures shell startup once and subtracts it; for sub-10 ms commands, prefer `--shell=none`.
+`--shell=none` exec command direct (faster, more accurate for short commands but no `|`, `>`, glob expansion, env interpolation). hyperfine measure shell startup once + subtract; for sub-10 ms commands, prefer `--shell=none`.
 
 ## Anti-patterns
 
-- **Don't skip `--warmup`** for I/O- or compile-heavy commands. The first run pays cold page-cache, JIT, or DNS costs and distorts the mean by 10×+. Use `--warmup 3` minimum; `--warmup 10` for filesystem traversal.
-- **Don't benchmark inside the shell that runs your editor / IDE / browser.** Background CPU and disk activity inject noise. Quiet the box: close other apps, disable Spotlight indexing, plug laptops in (battery throttles), check Activity Monitor / `htop` for idle.
-- **Don't trust `--runs 1`.** That's not a benchmark — it's a single sample with infinite variance. The default ≥10 is the floor.
-- **Don't measure microsecond-scale work.** hyperfine's process-spawn and OS scheduler jitter dominate below ~1 ms. For sub-ms work use `cargo bench` (Rust), `pytest-benchmark` (Python), `tachometer` (JS), or `criterion`.
-- **Don't compare commands that produce different output.** A "fast" command that does less work isn't faster. Run once with `--show-output` and diff the results before believing the ratio.
-- **Don't trust ratios on noisy hardware.** If stddev/mean exceeds ~5%, the result is unreliable. Re-run, increase `--runs`, or quiet the machine. Thermal throttling on laptops is a silent killer — hyperfine corrects for shell startup but not for CPU frequency scaling.
-- **Don't conflate hyperfine with profiling.** It tells you *how long* — not *where* the time went. Pair with `perf record` / `py-spy record` / `cargo flamegraph` to find hotspots.
-- **Don't use `time cmd1; time cmd2`** and call it a benchmark. No warmup, no repeats, no statistics.
+- **No skip `--warmup`** for I/O- or compile-heavy commands. First run pay cold page-cache, JIT, DNS cost — distort mean 10×+. Use `--warmup 3` minimum; `--warmup 10` for filesystem traversal.
+- **No benchmark inside shell running editor / IDE / browser.** Background CPU + disk inject noise. Quiet box: close other apps, disable Spotlight indexing, plug laptops in (battery throttle), check Activity Monitor / `htop` for idle.
+- **No trust `--runs 1`.** Not benchmark — single sample, infinite variance. Default ≥10 is floor.
+- **No measure microsecond work.** hyperfine process-spawn + OS scheduler jitter dominate below ~1 ms. For sub-ms work use `cargo bench` (Rust), `pytest-benchmark` (Python), `tachometer` (JS), `criterion`.
+- **No compare commands producing different output.** "Fast" command doing less work not faster. Run once with `--show-output` + diff results before trust ratio.
+- **No trust ratios on noisy hardware.** stddev/mean over ~5% = unreliable. Re-run, increase `--runs`, or quiet machine. Thermal throttling on laptops silent killer — hyperfine correct for shell startup but not CPU frequency scaling.
+- **No conflate hyperfine with profiling.** Tells *how long* — not *where* time went. Pair with `perf record` / `py-spy record` / `cargo flamegraph` find hotspots.
+- **No use `time cmd1; time cmd2`** + call benchmark. No warmup, no repeats, no statistics.
 
 ## Cross-refs
 
 - Behavioral rule: see `rules/AGENTS.md` — performance section ("benchmark before claiming a speedup").
-- Pairs with `cargo bench` / `pytest-benchmark` / `tachometer` for sub-millisecond microbenchmarks; hyperfine is for whole-process timing.
-- JSON output → jq: see `skills/jq/SKILL.md` Pattern D (aggregate) for postprocessing `bench.json`.
+- Pair with `cargo bench` / `pytest-benchmark` / `tachometer` for sub-millisecond microbenchmarks; hyperfine for whole-process timing.
+- JSON output → jq: see `skills/jq/SKILL.md` Pattern D (aggregate) for postprocess `bench.json`.
 - Upstream: <https://github.com/sharkdp/hyperfine>
 - Manual: `man hyperfine` and <https://github.com/sharkdp/hyperfine#detailed-usage>

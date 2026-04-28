@@ -1,6 +1,6 @@
 # Cross-Agent Generalization
 
-> The architecture from [context.md](context.md), [hooks.md](hooks.md), [capabilities.md](capabilities.md), [skills.md](skills.md), [mcp.md](mcp.md) applies to all agents. This doc translates each layer to agent-specific config. All data verified from primary sources 2026-04-27.
+> Architecture from [context.md](context.md), [hooks.md](hooks.md), [capabilities.md](capabilities.md), [skills.md](skills.md), [mcp.md](mcp.md) apply all agents. This doc translate each layer to agent-specific config. All data verified from primary sources 2026-04-27.
 
 ## 1. Comparison matrix
 
@@ -32,7 +32,7 @@ Sources: [developers.openai.com/codex/config-reference](https://developers.opena
 
 ### 2.2 Hooks
 
-Hooks config: `~/.codex/hooks.json` (user) or `.codex/hooks.json` (project). Both TOML inline and JSON are supported but **JSON is the recommended format** — TOML inline hooks have a known startup bug in recent versions where they conflict with the JSON loader.
+Hooks config: `~/.codex/hooks.json` (user) or `.codex/hooks.json` (project). Both TOML inline + JSON supported but **JSON recommended format** — TOML inline hooks have known startup bug recent versions, conflict with JSON loader.
 
 Six events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `Stop`.
 
@@ -41,7 +41,7 @@ Six events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PermissionRequest
 - `PreToolUse`, `PostToolUse`, `PermissionRequest` — stdout ignored; use stderr for logs
 - `Stop` — must return JSON (plain text invalid)
 
-Non-zero exit code (2) blocks the triggering action with stderr as the reason.
+Non-zero exit code (2) blocks triggering action with stderr as reason.
 
 `~/.codex/hooks.json` for fulcrum index hooks:
 
@@ -60,9 +60,9 @@ Non-zero exit code (2) blocks the triggering action with stderr as the reason.
 
 ### 2.3 Skills
 
-**Path rule: Codex uses Codex-namespaced paths only. Never `~/.agents/` or `.agents/` — shared paths collide with other agents.**
+**Path rule: Codex use Codex-namespaced paths only. Never `~/.agents/` or `.agents/` — shared paths collide with other agents.**
 
-Use `~/.codex/skills/<name>/SKILL.md` (user) and `.codex/skills/<name>/SKILL.md` (project). If Codex's default discovery order does not include these paths, configure it via `~/.codex/config.toml`:
+Use `~/.codex/skills/fulcrum/<name>/SKILL.md` (user) and `.codex/skills/fulcrum/<name>/SKILL.md` (project). If Codex default discovery order not include these paths, configure via `~/.codex/config.toml`:
 
 ```toml
 [skills]
@@ -94,13 +94,13 @@ Sources: [github.com/google-gemini/gemini-cli/docs/reference/configuration.md](h
 | `GEMINI.md` | Project root (project-level) |
 | `.gemini/GEMINI.md` | Project-level (alternative location) |
 
-**`AGENTS.md` is not natively read by Gemini CLI.** Only `GEMINI.md` files are discovered. Keep `AGENTS.md` as the single source of truth and make `GEMINI.md` a one-line import:
+**`AGENTS.md` not natively read by Gemini CLI.** Only `GEMINI.md` files discovered. Keep `AGENTS.md` as single source of truth, make `GEMINI.md` one-line import:
 
 ```markdown
 @AGENTS.md
 ```
 
-Gemini CLI's memory import processor inlines the referenced file at load time. All other agents read `AGENTS.md` directly — no duplication, no drift.
+Gemini CLI memory import processor inlines referenced file at load time. All other agents read `AGENTS.md` directly — no duplication, no drift.
 
 ### 3.2 Hooks
 
@@ -123,11 +123,11 @@ Index hooks — add to `~/.gemini/settings.json`:
 }
 ```
 
-**Known bug:** Underscores in MCP server alias names break Gemini's policy engine — use hyphens (`deepwiki` not `deep_wiki`).
+**Known bug:** Underscores in MCP server alias names break Gemini policy engine — use hyphens (`deepwiki` not `deep_wiki`).
 
 ### 3.3 Skills
 
-Skills in Gemini CLI live **inside Extensions**, not as standalone files. Extension structure:
+Skills in Gemini CLI live **inside Extensions**, not standalone files. Extension structure:
 
 ```
 ~/.gemini/extensions/<ext-name>/
@@ -137,7 +137,7 @@ Skills in Gemini CLI live **inside Extensions**, not as standalone files. Extens
         └── SKILL.md
 ```
 
-There is no direct `~/.agents/skills/` discovery in Gemini CLI. Each skill must be wrapped in an extension. SKILL.md frontmatter: `name` and `description` required.
+No direct `~/.agents/skills/` discovery in Gemini CLI. Each skill must wrap in extension. SKILL.md frontmatter: `name` and `description` required.
 
 ### 3.4 MCP
 
@@ -157,7 +157,7 @@ There is no direct `~/.agents/skills/` discovery in Gemini CLI. Each skill must 
 
 ## 4. OpenCode
 
-> **Note: `opencode-ai/opencode` was archived on 2025-09-18 and is no longer maintained.** The successor project is **Crush** (by the original author + Charm team). Documentation below reflects the last stable OpenCode release; Crush may have different paths and APIs.
+> **Note: `opencode-ai/opencode` archived 2025-09-18, no longer maintained.** Successor project = **Crush** (by original author + Charm team). Docs below reflect last stable OpenCode release; Crush may have different paths + APIs.
 
 Sources: [opencode.ai/docs](https://opencode.ai/docs), plugins, skills, mcp-servers, rules references. Verified 2026-04-27.
 
@@ -169,11 +169,11 @@ Sources: [opencode.ai/docs](https://opencode.ai/docs), plugins, skills, mcp-serv
 | `~/.claude/CLAUDE.md` | Also loaded natively — shared with Claude Code |
 | `AGENTS.md` | Project-level (walked up from cwd) |
 
-At the same level, `AGENTS.md` takes precedence over `CLAUDE.md`. OpenCode reads `~/.claude/CLAUDE.md` as a fallback — a single global rules file covers both Claude Code and OpenCode.
+At same level, `AGENTS.md` take precedence over `CLAUDE.md`. OpenCode read `~/.claude/CLAUDE.md` as fallback — single global rules file cover both Claude Code + OpenCode.
 
 ### 4.2 Plugins (hooks equivalent)
 
-TypeScript plugins, not shell hooks. Locations: `~/.config/opencode/plugins/` (global) or `.opencode/plugins/` (project). npm packages declared in `opencode.json` under `"plugin"` are auto-installed.
+TypeScript plugins, not shell hooks. Locations: `~/.config/opencode/plugins/` (global) or `.opencode/plugins/` (project). npm packages declared in `opencode.json` under `"plugin"` auto-installed.
 
 Key events: `session.created`, `session.idle`, `session.compacted`, `tool.execute.before`, `tool.execute.after`, `file.edited`, `shell.env`, `permission.asked/replied`.
 
@@ -193,13 +193,13 @@ export const FulcrumPlugin = async ({ $ }) => ({
 
 ### 4.3 Skills
 
-Install path: `~/.config/opencode/skills/<name>/SKILL.md`. Also scans `~/.claude/skills/<name>/SKILL.md` (Claude Code compatibility). Each agent gets its own copy — do not share via a common path.
+Install path: `~/.config/opencode/skills/fulcrum/<name>/SKILL.md`. Also scans `~/.claude/skills/<name>/SKILL.md` (Claude Code compat). Each agent gets own copy — do not share via common path.
 
 SKILL.md: `name` (lowercase alphanumeric + hyphens, 1–64 chars) and `description` (1–1024 chars) required. Skill directory name must match `name` field.
 
 ### 4.4 MCP
 
-`type` is required. Values: `"local"` (stdio subprocess) or `"remote"` (HTTP). Config at `~/.config/opencode/opencode.json`:
+`type` required. Values: `"local"` (stdio subprocess) or `"remote"` (HTTP). Config at `~/.config/opencode/opencode.json`:
 
 ```json
 {
@@ -230,7 +230,7 @@ Sources: [github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono), [ex
 
 ### 5.2 Hooks (via Extensions)
 
-Pi has a **first-class extension event system** that is functionally equivalent to (and richer than) Claude Code's hooks. TypeScript files at `~/.pi/agent/extensions/*.ts` (global) or `.pi/extensions/*.ts` (project) are auto-discovered, hot-reloadable via `/reload`, and register handlers with `pi.on("event_name", handler)`.
+Pi have **first-class extension event system** functionally equivalent to (and richer than) Claude Code hooks. TypeScript files at `~/.pi/agent/extensions/*.ts` (global) or `.pi/extensions/*.ts` (project) auto-discovered, hot-reloadable via `/reload`, register handlers with `pi.on("event_name", handler)`.
 
 **Settings — `~/.pi/agent/settings.json`:**
 ```json
@@ -250,7 +250,7 @@ Pi has a **first-class extension event system** that is functionally equivalent 
 | Tool | `tool_call` (returns `{block: true, reason}` to deny — equivalent to PreToolUse blocking), `tool_result`, `tool_execution_start/update/end`, `user_bash`, `input` |
 | Resource | `resources_discover` (contributes skill/prompt/theme paths) |
 
-The Bash tool also exposes a `spawnHook` for command/cwd/env mutation.
+Bash tool also expose `spawnHook` for command/cwd/env mutation.
 
 ### 5.3 Index hook mapping
 
@@ -259,23 +259,23 @@ The Bash tool also exposes a `spawnHook` for command/cwd/env mutation.
 | `SessionStart` | `session_start` |
 | `Stop` | `session_shutdown` |
 
-A TS file at `~/.pi/agent/extensions/index.ts` shells out to `fulcrum hook index-check` and `index-rebuild.sh` via `child_process.execSync`.
+TS file at `~/.pi/agent/extensions/index.ts` shells out to `fulcrum hook index-check` and `index-rebuild.sh` via `child_process.execSync`.
 
 ### 5.4 Skills
 
-Install path: `~/.pi/agent/skills/<name>/SKILL.md` (user-level). Project-level: `.pi/skills/` (Pi-namespaced; never shared `.agents/`). Skills invoked via `/skill:name` syntax.
+Install path: `~/.pi/agent/skills/fulcrum/<name>/SKILL.md` (user-level). Project-level: `.pi/skills/` (Pi-namespaced; never shared `.agents/`). Skills invoked via `/skill:name` syntax.
 
 ### 5.5 Packages
 
-`pi install npm:<pkg>` or `pi install git:<repo>` adds entries to `settings.json` `packages`. Examples in the repo: `bash-spawn-hook.ts`, `model-status.ts`, `interactive-shell.ts`.
+`pi install npm:<pkg>` or `pi install git:<repo>` adds entries to `settings.json` `packages`. Examples in repo: `bash-spawn-hook.ts`, `model-status.ts`, `interactive-shell.ts`.
 
 ### 5.6 MCP
 
-**No built-in MCP support** — explicit design decision. DeepWiki unavailable via MCP. Workaround: `xh` or `curl` against the DeepWiki REST API directly from the shell tool.
+**No built-in MCP support** — explicit design decision. DeepWiki unavailable via MCP. Workaround: `xh` or `curl` against DeepWiki REST API directly from shell tool.
 
 ### 5.7 Parity Gaps vs Claude Code
 
 | Gap | Detail |
 |---|---|
 | **No MCP** | DeepWiki unavailable; REST workaround only |
-| **Extension language is TypeScript** | Shell hooks must be wrapped in a TS extension that shells out — adds one layer of indirection but preserves shell-script reuse |
+| **Extension language is TypeScript** | Shell hooks must wrap in TS extension that shells out — adds one layer indirection but preserves shell-script reuse |

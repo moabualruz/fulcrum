@@ -4,19 +4,19 @@
 
 ## 1. Global: `~/.claude/CLAUDE.md`
 
-Loaded into every session. User-level preferences, style rules, anti-patterns.
+Loaded every session. User prefs, style rules, anti-patterns.
 
-**Include:** non-obvious commands (`uv run pytest`, not `npm test`), style rules that differ from defaults, explicit anti-patterns, git conventions, environment quirks.
+**Include:** non-obvious commands (`uv run pytest`, not `npm test`), style rules differ from defaults, explicit anti-patterns, git conventions, env quirks.
 
-**Exclude:** standard conventions Claude already knows, API docs (link instead), anything self-evident.
+**Exclude:** standard conventions Claude know, API docs (link instead), self-evident stuff.
 
-**Keep under 200 lines.** Bloated files cause Claude to silently ignore rules. Use `IMPORTANT:` or `YOU MUST` for rules that keep getting missed.
+**Keep under 200 lines.** Bloat = Claude silent ignore rules. Use `IMPORTANT:` or `YOU MUST` for rules keep getting missed.
 
-Bootstrap: `/init` in any project → prune aggressively.
+Bootstrap: `/init` in any project → prune hard.
 
 ## 2. Per-project: `AGENTS.md`
 
-Versioned with the code. Read by every agent. Contains only what's true for this branch.
+Versioned with code. Every agent read. Only what true for this branch.
 
 ```markdown
 # AGENTS.md
@@ -49,4 +49,4 @@ Versioned with the code. Read by every agent. Contains only what's true for this
 
 ## Cross-agent
 
-Each agent has its own primary context file. See [agents.md](agents.md) for per-agent paths and the `GEMINI.md → @AGENTS.md` import trick that unifies the source of truth.
+Each agent own primary context file. See [agents.md](agents.md) for per-agent paths and `GEMINI.md → @AGENTS.md` import trick that unify source of truth.
