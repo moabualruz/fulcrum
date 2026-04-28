@@ -244,6 +244,12 @@ Policy reversal landed 2026-04-28: managed scope is **official-first** across ev
 | context7 | (deferred note printed only) | OAuth is interactive; never spawned |
 | pi-mcp-adapter | `pi install npm:pi-mcp-adapter` + `pi-mcp-adapter init` | only when Pi detected and `pi` on PATH |
 
+**Post-vendor step — duplicate rule block strip:**
+
+After all vendor commands run, `runVendorIntegrations` calls `stripVendorRuleBlocks` for every detected agent's primary rules file. This removes any vendor-installed rule TEXT blocks that live outside the `<!-- BEGIN FULCRUM RULES -->` sentinel. Vendor hooks/settings files (PreToolUse, `.codex/hooks.json`) are NOT touched — only the duplicate rule text is removed.
+
+Rationale: `graphify install` writes a `# graphify` heading block into `~/.claude/CLAUDE.md`. The same rule text lives in `rules/AGENTS.md` §12 and is spliced into the FULCRUM sentinel by `fulcrum install`. The duplicate wastes context. `stripVendorRuleBlocks` (in `src/cli/install.ts`) strips blocks whose headings appear in `VENDOR_RULE_HEADINGS`. Conservative: only exact heading matches; sentinel content is never touched; idempotent.
+
 **DO NOT** list (hard constraints):
 - Never pass `--output` or any path override to graphify or repomix.
 - Never spawn interactive auth flows (context7 setup).

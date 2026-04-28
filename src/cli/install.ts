@@ -168,6 +168,104 @@ async function seedPolicy(): Promise<void> {
 
 const CAVEMAN_REPO = "https://github.com/JuliusBrussee/caveman";
 
+// ---------------------------------------------------------------------------
+// Known vendor rule headings whose duplicate blocks we own and strip.
+// Add new vendors here when their rule text is mirrored into rules/AGENTS.md.
+// ---------------------------------------------------------------------------
+const VENDOR_RULE_HEADINGS: ReadonlyArray<string> = [
+  "# graphify",
+];
+
+/**
+ * Strip vendor-installed rule blocks that live OUTSIDE the FULCRUM sentinel.
+ *
+ * Vendor installers (e.g. `graphify install`) write a rule block directly into
+ * the agent's primary rules file. The same rule text lives in rules/AGENTS.md
+ * and is spliced into the FULCRUM sentinel block by `fulcrum install`. The
+ * duplicate outside the sentinel wastes context and can conflict.
+ *
+ * Rules:
+ * - Only strips blocks whose first line exactly matches a heading in
+ *   VENDOR_RULE_HEADINGS (conservative: prevents stripping user content).
+ * - Never touches content inside the FULCRUM sentinel block.
+ * - Idempotent: re-running when no duplicate exists is a no-op.
+ * - dryRun=true logs what would be removed without writing.
+ *
+ * @param filePath  Absolute path to the agent's primary rules file.
+ * @param dryRun    When true, log but do not write.
+ */
+export async function stripVendorRuleBlocks(filePath: string, dryRun: boolean): Promise<void> {
+  let content: string;
+  try {
+    content = await readFile(filePath, "utf8");
+  } catch {
+    return; // file doesn't exist — nothing to do
+  }
+
+  // Split content into "inside sentinel" and "outside sentinel" regions.
+  // We only operate on the outside regions.
+  const hasSentinel = content.includes(BEGIN) && content.includes(END);
+
+  let beforeSentinel: string;
+  let sentinel: string;
+  let afterSentinel: string;
+
+  if (hasSentinel) {
+    const bIdx = content.indexOf(BEGIN);
+    const eIdx = content.indexOf(END) + END.length;
+    beforeSentinel = content.slice(0, bIdx);
+    sentinel = content.slice(bIdx, eIdx);
+    afterSentinel = content.slice(eIdx);
+  } else {
+    beforeSentinel = content;
+    sentinel = "";
+    afterSentinel = "";
+  }
+
+  /**
+   * Strip all known vendor blocks from a text region.
+   * A block is: the heading line + all following lines until the next
+   * top-level `^# ` heading or a blank line followed by non-continuation
+   * content (two consecutive blank lines = end of block).
+   */
+  function stripVendorBlocks(region: string): string {
+    for (const heading of VENDOR_RULE_HEADINGS) {
+      // Match: heading line + the lines that follow it until next ^# heading
+      // or double-blank-line gap (conservative block boundary).
+      // Uses a regex: heading must be at line start, followed by lines until
+      // the next top-level heading or end-of-string.
+      const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const pattern = new RegExp(
+        // optional leading newline, then the heading, then all lines until
+        // next top-level heading or EOS
+        `\\n?${escaped}\\n(?:(?!^# )[^\\n]*\\n)*`,
+        "gm",
+      );
+      region = region.replace(pattern, "\n");
+    }
+    // Collapse triple+ blank lines left by removal.
+    return region.replace(/\n{3,}/g, "\n\n");
+  }
+
+  const strippedBefore = stripVendorBlocks(beforeSentinel);
+  const strippedAfter = stripVendorBlocks(afterSentinel);
+
+  if (strippedBefore === beforeSentinel && strippedAfter === afterSentinel) {
+    return; // nothing changed
+  }
+
+  const result = strippedBefore + sentinel + strippedAfter;
+  // Normalize trailing newline.
+  const out = result.trimEnd() + "\n";
+
+  if (dryRun) {
+    console.log(`     [dry-run] would strip vendor rule blocks from: ${filePath}`);
+    return;
+  }
+  await wf(filePath, out);
+  console.log(`     ✓ stripped vendor rule blocks from: ${filePath}`);
+}
+
 /**
  * Guard: throw if path is under $HOME/.agents/.
  * Prevents writing to the forbidden shared agent folder.

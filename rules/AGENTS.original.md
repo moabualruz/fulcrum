@@ -88,3 +88,13 @@
 - **Prefer editing existing files to creating new ones.** When a fix can land in an existing module. Instead of a new `utils2.py`. Why: parallel utilities diverge; the next reader has to learn both.
 - **Don't claim done without verification.** Run the project's test/lint command before saying "done". Instead of "this should work". Why: model-graded "looks correct" is the #1 source of regressions. [source: https://code.claude.com/docs/en/best-practices]
 - **Prune this file when a rule stops mattering.** When you notice a rule being followed reflexively for weeks, or being ignored, delete it. Why: every line here is loaded into every session — dead rules crowd out live ones. Anthropic's test: "Would removing this cause Claude to make mistakes?" If no, cut it.
+
+## 12. Vendor-tool behavioral rules
+
+Rule text owned here; same content spliced into every agent via FULCRUM sentinel block. Vendor installers may write hooks in settings files (PreToolUse, `.codex/hooks.json`, etc.) — those stay. Duplicate rule TEXT written outside the sentinel block is stripped by `fulcrum install` automatically.
+
+- **graphify** — when a `graphify-out/` directory exists in the project, read `graphify-out/GRAPH_REPORT.md` before answering architecture or codebase questions; navigate `graphify-out/wiki/index.md` instead of reading raw files when it exists. Why: graph answers structural questions in 71× fewer tokens than grepping raw files. Trigger: architecture question + `graphify-out/` present. [source: https://github.com/safishamsi/graphify]
+  - (graphify also installs a PreToolUse hook that fires before every Glob/Grep call — that hook config is managed by `graphify install`, not by this file.)
+- **repomix** — (TBD: vendor publishes no standalone behavioral rule for agent rules files; rule is `repomix --compress .` in §8 above.)
+- **ast-grep** — (TBD: vendor skill installs a slash-command trigger; no separate rules-file behavioral rule published.)
+- **caveman** — (rule is §0b above: always-on caveman ultra; vendor config lock in `~/.config/caveman/config.json`.)
