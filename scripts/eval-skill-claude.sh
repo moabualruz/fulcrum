@@ -24,10 +24,12 @@
 # Trigger detection (in order):
 #   1. The Claude response's JSON contains a Skill tool-use entry naming the
 #      skill (definitive signal — the agent loaded the skill).
-#   2. The response text mentions any of the match words (default: skill name +
-#      first command in the SKILL.md Invocation block; override with
-#      --match-words). This is a fallback heuristic; cross-check the saved
-#      transcripts before drawing strong conclusions.
+#   2. The response text mentions any of the match words. Source (precedence):
+#      a. --match-words CLI flag (if passed)
+#      b. evals/<skill>.match-words file (if exists; one word/phrase per line)
+#      c. Auto-derived: skill name + first command in SKILL.md Invocation block
+#      This is a fallback heuristic; cross-check the saved transcripts before
+#      drawing strong conclusions.
 #
 # Pass criteria (matches docs/skills.md §7):
 #   - trigger rate ≥ 80% on should_trigger=true entries
@@ -78,13 +80,12 @@ command -v claude >/dev/null 2>&1 || {
 }
 command -v jq >/dev/null 2>&1 || { echo "fulcrum: jq required" >&2; exit 1; }
 
-# Derive match words from the skill itself.
-#   1. frontmatter `name:`
-#   2. every distinct top-level command inside fenced code blocks within the
-#      `## Invocation` section (top-level = first non-comment word of a line
-#      that doesn't start with whitespace; env-assignments like FOO=bar are skipped)
-#   3. every distinct command immediately after a `|` pipe in the Invocation block
-#   4. anything passed via --match-words
+# Derive match words (in precedence order):
+#   1. CLI flag --match-words (highest priority)
+#   2. File evals/<skill>.match-words (one word/phrase per line, ignoring
+#      blank lines and # comments)
+#   3. Auto-derived (lowest priority): skill name + top-level commands in
+#      Invocation block + piped commands
 SKILL_NAME=$(awk -F': *' '/^name:/{print $2; exit}' "$SKILL_FILE" | tr -d '"')
 
 INVOCATION_BLOCK=$(awk '
@@ -123,6 +124,7 @@ PIPE_CMDS=$(echo "$INVOCATION_BLOCK" | awk '
   }
 ')
 
+# Build auto-derived match list.
 MATCH_LIST="$SKILL_NAME"
 for cmd in $TOP_CMDS $PIPE_CMDS; do
   case ",$MATCH_LIST," in
@@ -130,6 +132,18 @@ for cmd in $TOP_CMDS $PIPE_CMDS; do
     *) MATCH_LIST="$MATCH_LIST,$cmd" ;;
   esac
 done
+
+# Check for per-skill override file (evals/<skill>.match-words).
+MATCH_WORDS_FILE="$REPO_DIR/evals/$SKILL.match-words"
+if [ -f "$MATCH_WORDS_FILE" ]; then
+  # Read file, strip comments and blank lines, join with commas.
+  FILE_MATCH=$(grep -v '^[[:space:]]*#' "$MATCH_WORDS_FILE" | grep -v '^[[:space:]]*$' | tr '\n' ',' | sed 's/,$//')
+  if [ -n "$FILE_MATCH" ]; then
+    MATCH_LIST="$FILE_MATCH"
+  fi
+fi
+
+# CLI flag takes precedence over file.
 if [ -n "$EXTRA_MATCH" ]; then
   MATCH_LIST="$MATCH_LIST,$EXTRA_MATCH"
 fi
