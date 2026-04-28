@@ -1,8 +1,8 @@
 # Capability Layer
 
-> What the agent can do. CLI tools that output JSON, paired with skills (see [skills.md](skills.md)).
+> What an agent can do. These are bring-your-own CLI tools; Fulcrum does not install or pin them. Use `fulcrum doctor` to verify what is present, then pair them with skills (see [skills.md](skills.md)).
 
-## 1. Foundation — install once per machine
+## 1. Foundation — bring your own toolchain
 
 ```bash
 brew install \
@@ -41,6 +41,8 @@ uv tool install graphifyy tavily-cli
 | `universal-ctags` | — | Symbol index — where is X defined, across all languages |
 | `gitleaks` | — | Secrets in git history |
 | `git-cliff` | — | Changelog from conventional commits |
+
+Fulcrum treats the toolchain above as external setup. `fulcrum doctor` reports presence, missing binaries, and related policy checks, but it does not install these tools for you.
 
 ## 2. Code Intelligence
 

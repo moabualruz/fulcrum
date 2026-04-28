@@ -24,7 +24,7 @@ Runs after the agent edits a file; formats with the right per-language tool. Non
 ] } }
 ```
 
-**OpenCode** — `~/.config/opencode/plugins/fulcrum.ts`
+**OpenCode** — `~/.config/opencode/plugins/fulcrum-format.ts`
 ```ts
 "tool.execute.after": async ({ $, tool, input }) => {
   if (tool === "edit" || tool === "write") {
@@ -33,7 +33,7 @@ Runs after the agent edits a file; formats with the right per-language tool. Non
 }
 ```
 
-**Pi CLI** — `~/.pi/agent/extensions/fulcrum.ts`
+**Pi CLI** — `~/.pi/agent/extensions/fulcrum-format.ts`
 ```ts
 import { execSync } from "child_process"
 pi.on("tool_result", (e) => {

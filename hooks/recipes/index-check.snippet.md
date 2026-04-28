@@ -23,12 +23,12 @@ Runs at session start; warns if `tags` / `graphify-out/` are stale or missing.
 ] } }
 ```
 
-**OpenCode** — `~/.config/opencode/plugins/fulcrum.ts`
+**OpenCode** — `~/.config/opencode/plugins/fulcrum-index-check.ts`
 ```ts
 "session.created": async ({ $ }) => { await $`fulcrum hook index-check` }
 ```
 
-**Pi CLI** — `~/.pi/agent/extensions/fulcrum.ts`
+**Pi CLI** — `~/.pi/agent/extensions/fulcrum-index-check.ts`
 ```ts
 import { execSync } from "child_process"
 pi.on("session_start", () => execSync("fulcrum hook index-check"))

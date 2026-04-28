@@ -23,12 +23,12 @@ Runs after the agent finishes a turn; rebuilds ctags / graphify / repomix only w
 ] } }
 ```
 
-**OpenCode** — `~/.config/opencode/plugins/fulcrum.ts`
+**OpenCode** — `~/.config/opencode/plugins/fulcrum-index-rebuild.ts`
 ```ts
 "session.idle": async ({ $ }) => { await $`fulcrum hook index-rebuild` }
 ```
 
-**Pi CLI** — `~/.pi/agent/extensions/fulcrum.ts`
+**Pi CLI** — `~/.pi/agent/extensions/fulcrum-index-rebuild.ts`
 ```ts
 import { execSync } from "child_process"
 pi.on("session_shutdown", () => execSync("fulcrum hook index-rebuild"))

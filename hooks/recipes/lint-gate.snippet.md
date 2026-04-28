@@ -24,7 +24,7 @@ Blocks the next agent turn if lint fails on the just-edited file. Stderr feeds t
 ] } }
 ```
 
-**OpenCode** — `~/.config/opencode/plugins/fulcrum.ts`
+**OpenCode** — `~/.config/opencode/plugins/fulcrum-lint-gate.ts`
 ```ts
 "tool.execute.after": async ({ $, tool, input }) => {
   if (tool !== "edit" && tool !== "write") return
@@ -36,7 +36,7 @@ Blocks the next agent turn if lint fails on the just-edited file. Stderr feeds t
 }
 ```
 
-**Pi CLI** — `~/.pi/agent/extensions/fulcrum.ts`
+**Pi CLI** — `~/.pi/agent/extensions/fulcrum-lint-gate.ts`
 ```ts
 import { execSync } from "child_process"
 pi.on("tool_result", (e) => {

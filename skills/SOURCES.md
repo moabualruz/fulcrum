@@ -18,7 +18,7 @@
 ## Cross-agent platforms (not per-tool skills, but distribution layer)
 
 - **`JuliusBrussee/caveman`** — <https://github.com/JuliusBrussee/caveman>. **Mandatory managed install on every fulcrum host.** Compresses agent output (~75% verbosity drop) + rewrites memory files (~46% input-token drop) into terse fragments. Preserves code, paths, commands, semantic intent. Cross-agent: ships Claude Code plugin, Gemini extension, `.codex/hooks.json` SessionStart auto-activation, Cursor/Windsurf SKILL.md. Mandatory mode: `/caveman ultra`. Fulcrum use: (a) compress all in-repo `skills/<name>/SKILL.md` + `rules/AGENTS.md` via `/caveman:compress` so agent reads max-compressed form; (b) ship caveman as always-on default across every agent fulcrum installs into. See HANDOVER "Next session" plan for integration pipeline.
-- **`obra/superpowers`** — <https://github.com/obra/superpowers>. Cross-agent installer (`.claude-plugin`, `.codex-plugin`, `.opencode`, `gemini-extension.json`, `.cursor-plugin`). Enable: `brainstorming`, `writing-plans`, `systematic-debugging`, `code-review`, `worktrees`, `using-skills`. Skip TDD orchestrators.
+- **`obra/superpowers`** — <https://github.com/obra/superpowers>. Source for skill ideas; Fulcrum does not call its native installers in this branch. Mirror any adopted pieces into the filesystem skill namespace.
 - **`obra/superpowers-lab`** — sibling repo (309 stars). Source for dedicated `tmux` skill (`using-tmux-for-interactive-commands`).
 - **`anthropics/skills`** — Anthropic-official. Document work, webapp testing, mcp-builder, skill-creator. No CLI-tool skills; pick sub-skills as needed.
 - **`gh skill` (GitHub-native)** — <https://github.blog/changelog/2026-04-16-manage-agent-skills-with-github-cli/>. Skill package manager, shipped 2026-04-16. Use `gh skill install <repo>` once sources below pinned.
@@ -58,7 +58,7 @@
 
 | Tool | Status | Source / Plan | Notes |
 |---|---|---|---|
-| `repomix` | ✅ | [yamadashy/repomix — repomix-explorer](https://github.com/yamadashy/repomix/tree/main/.claude/skills/repomix-explorer) | `npx repomix@latest` recipes. |
+| `repomix` | ✍️ planned | [yamadashy/repomix — repomix-explorer](https://github.com/yamadashy/repomix/tree/main/.claude/skills/repomix-explorer) | Upstream layout is guide markdown today, not a clean installable skill folder. Track as authored `skills/repomix/` work instead of promising upstream install. |
 | `graphify` | ✅ | [safishamsi/graphify — skill.md](https://github.com/safishamsi/graphify/blob/v5/graphify/skill.md) | Per-agent variants. Knowledge-graph extraction + BFS/DFS. |
 | `semgrep` | ✅ | [semgrep/skills](https://github.com/semgrep/skills) | Three SKILL.md: `semgrep`, `code-security`, `llm-security`. |
 | `lizard` | ✍️ shipped | [`skills/lizard/SKILL.md`](lizard/SKILL.md) + [`evals/lizard.json`](../evals/lizard.json) | Authored 2026-04-28. 7 patterns + 7 anti-patterns; CCN, length, params, baseline diff. 20-entry eval (12/8). |
@@ -168,14 +168,12 @@ Skills authored here mirror to every agent's skills path via `fulcrum skills syn
 ## Install flow (current state)
 
 ```bash
-# 1. Cross-agent platform
-claude plugin install obra/superpowers
+# 1. Cross-agent platform layer
+#    Fulcrum does not call native plugin installers in this branch.
+#    Curated third-party skills land as filesystem folders under `fulcrum-upstream/`.
 
-# 2. Verified upstream skills via gh skill (when supported)
-gh skill install ast-grep/agent-skill
-gh skill install tavily-ai/skills
-gh skill install cloudflare/skills
-gh skill install googleworkspace/cli@main:skills
+# 2. Curated upstream skills
+fulcrum skills upstream
 
 # 3. In-repo authored (once skills/<name>/ folders exist)
 #    `fulcrum skills sync` mirrors skills/* to each agent's skills path.
