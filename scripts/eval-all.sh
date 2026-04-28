@@ -20,6 +20,7 @@ RUNS=1
 RESULTS_DIR=""
 ONLY=""
 SKIP=""
+REGEN=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -28,11 +29,52 @@ while [ $# -gt 0 ]; do
     --results-dir)    RESULTS_DIR="$2"; shift 2 ;;
     --only)           ONLY="$2"; shift 2 ;;
     --skip)           SKIP="$2"; shift 2 ;;
+    --regenerate-only) REGEN=1; shift ;;
     -h|--help)
       sed -n '2,15p' "$0" | sed 's/^# \?//'; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
+
+# --regenerate-only: walk existing $RESULTS_DIR, re-parse each <skill>/summary.txt,
+# rewrite leaderboard.md. No evals run. Required: --results-dir pointing at an
+# existing eval-results/<ts>/ tree.
+if [ "$REGEN" = "1" ]; then
+  if [ -z "$RESULTS_DIR" ] || [ ! -d "$RESULTS_DIR" ]; then
+    echo "--regenerate-only requires --results-dir <existing-dir>" >&2; exit 2
+  fi
+  LEADERBOARD="$RESULTS_DIR/leaderboard.md"
+  {
+    echo "# Fulcrum skill eval leaderboard"
+    echo
+    echo "_Regenerated: $(date -u +%Y-%m-%dT%H:%M:%SZ); source: ${RESULTS_DIR}_"
+    echo
+    echo "Pass criteria: trigger ≥ 80%, false-trigger ≤ 20%."
+    echo
+    printf "| Skill | Trigger %% | False-trigger %% | Pass | Notes |\n"
+    printf "|---|---:|---:|---|---|\n"
+  } > "$LEADERBOARD"
+  for d in "$RESULTS_DIR"/*/; do
+    skill=$(basename "$d")
+    [ "$skill" = "leaderboard.md" ] && continue
+    [ -f "$d/summary.txt" ] || continue
+    trig=$(grep -E "trigger rate.*should_trigger=true"   "$d/summary.txt" | sed -nE 's/.*\(([0-9]+)%\).*/\1/p' | head -1)
+    false=$(grep -E "false-trigger.*should_trigger=false" "$d/summary.txt" | sed -nE 's/.*\(([0-9]+)%\).*/\1/p' | head -1)
+    trig=${trig:-?}; false=${false:-?}
+    pass="?"
+    if [ "$trig" != "?" ] && [ "$false" != "?" ]; then
+      if [ "$trig" -ge 80 ] && [ "$false" -le 20 ]; then pass="✓"; else pass="✗"; fi
+    fi
+    notes=""
+    [ "$trig" != "?" ] && [ "$trig" -lt 80 ] 2>/dev/null && notes="trigger below 80%; "
+    [ "$false" != "?" ] && [ "$false" -gt 20 ] 2>/dev/null && notes="${notes}false-trigger above 20%; "
+    notes=${notes%; }; [ -z "$notes" ] && notes="ok"
+    printf "| %s | %s | %s | %s | %s |\n" "$skill" "${trig}%" "${false}%" "$pass" "$notes" >> "$LEADERBOARD"
+    printf "  %-22s trig=%-4s false=%-4s %s\n" "$skill" "${trig}%" "${false}%" "$pass"
+  done
+  echo "Leaderboard regenerated: $LEADERBOARD"
+  exit 0
+fi
 
 if [ -z "$RESULTS_DIR" ]; then
   RESULTS_DIR="$REPO_DIR/eval-results/$(date +%Y%m%d-%H%M%S)"
@@ -68,7 +110,7 @@ START_TS=$(date +%s)
 {
   echo "# Fulcrum skill eval leaderboard"
   echo
-  echo "_Run: $(date -u +%Y-%m-%dT%H:%M:%SZ); model=${MODEL:-default}; runs/query=$RUNS_"
+  echo "_Run: $(date -u +%Y-%m-%dT%H:%M:%SZ); model=${MODEL:-default}; runs/query=${RUNS}_"
   echo
   echo "Pass criteria: trigger ≥ 80%, false-trigger ≤ 20%."
   echo
@@ -92,8 +134,9 @@ for skill in "${SKILLS[@]}"; do
   fi
 
   # Parse summary.txt for the trigger / false-trigger percentages.
-  trig=$(awk '/trigger rate.*should_trigger=true/ { match($0, /\(([0-9]+)%\)/, a); print a[1] }' "$out_dir/summary.txt" 2>/dev/null || true)
-  false=$(awk '/false-trigger.*should_trigger=false/ { match($0, /\(([0-9]+)%\)/, a); print a[1] }' "$out_dir/summary.txt" 2>/dev/null || true)
+  # grep+sed (portable: macOS BSD awk does not support 3-arg match()).
+  trig=$(grep -E "trigger rate.*should_trigger=true"   "$out_dir/summary.txt" 2>/dev/null | sed -nE 's/.*\(([0-9]+)%\).*/\1/p' | head -1)
+  false=$(grep -E "false-trigger.*should_trigger=false" "$out_dir/summary.txt" 2>/dev/null | sed -nE 's/.*\(([0-9]+)%\).*/\1/p' | head -1)
   trig=${trig:-?}; false=${false:-?}
 
   notes=""
