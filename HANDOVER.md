@@ -87,7 +87,11 @@ scripts/
 ├── install.sh                         # bootstrap (clone or FULCRUM_RELEASE_TAG fetch)
 ├── compress-with-caveman.sh           # idempotent bash compress wrapper; --check for CI
 ├── eval-skill-claude.sh               # single-skill trigger-rate eval; reads evals/<skill>.match-words
-└── eval-all.sh                        # leaderboard runner; --regenerate-only flag
+├── eval-skill-codex.sh                # same shape for Codex CLI
+├── eval-skill-gemini.sh               # same shape for Gemini CLI
+├── eval-skill-opencode.sh             # same shape for OpenCode
+├── eval-skill-pi.sh                   # same shape for Pi CLI
+└── eval-all.sh                        # leaderboard runner; --engine claude|codex|gemini|opencode|pi; --skip-<agent>
 
 config/tool-output-policy.toml         # default tier matrix for ~50 tools
 hooks/recipes/*.snippet.md             # per-agent registration snippets
@@ -113,20 +117,20 @@ LICENSE (MIT)  AGENTS.md  README.md
 
 ## 3. What works (verified)
 
-- `bun run ci` — green in the latest local run: install + tsc + 115 tests + 5 platform builds + skills:lint (28/28) + compress:check (soft, 0 pending).
+- `bun run ci` — green in the latest local run: install + tsc + 144 tests + 5 platform builds + skills:lint (28/28) + compress:check (hard, 0 pending).
 - `bun run scripts/build-all.ts` — 5 targets (`darwin-arm64` 63 MB, `darwin-x64` 68 MB, `linux-x64`/`linux-arm64` ~101 MB, `windows-x64` 118 MB).
 - `bash scripts/install.sh` — splices rules, vendors snippets, seeds policy. Idempotent. `FULCRUM_RELEASE_TAG=vX.Y.Z` fetches a prebuilt binary from GitHub Releases.
 - `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG → tag → cross-compile → optional `gh release create`. Does NOT push.
 - `fulcrum install` — 9 steps: rules spliced into Claude Code / Codex CLI / OpenCode / Gemini; policy seeded; caveman per-agent; `~/.config/caveman/config.json` written `{"defaultMode":"ultra"}`; context-mode installed/configured per detected agent; authored in-repo skills synced unless `--no-skills`; curated upstream skills synced unless `--no-upstream-skills`; DeepWiki MCP registered for supported detected agents. Respects `--dry-run`.
 - `fulcrum uninstall` — removes Fulcrum-managed rules blocks, native hook registrations, hook snippets/markers, managed `skills/fulcrum/` and `skills/fulcrum-upstream/` namespaces, Gemini managed skill extensions, generated Gemini import, managed context-mode registrations, and unmodified seeded policy. Keeps edited policy by default and keeps caveman unless `--include-caveman`; keeps the global `context-mode` npm package because upstream has no uninstall contract.
 - `fulcrum skills upstream` — reads `skills/upstream.lock`, checks out pinned upstream SHAs into `~/.fulcrum/cache/upstream-skills`, and installs 20 selected skills under `fulcrum-upstream/` (Gemini: `fulcrum-upstream-skills` extension).
-- `fulcrum hooks enable/disable` — registers/removes native configs for Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi CLI; records/removes intent markers; still prints registration snippets for review.
-- `fulcrum doctor [--json]` — 32/32 tools detected; "Caveman" section with `defaultMode` display; `DoctorReport` JSON on `--json`.
+- `fulcrum hooks enable/disable` — detection-aware by default (writes only for agents whose `rootDir` exists). `--all` flag opts back into cross-machine/dotfiles writes. Records/removes intent markers; prints registration snippets for review.
+- `fulcrum doctor [--json]` — 32/32 tools detected; "Caveman" section with `defaultMode` display; `Pi MCP adapter` check; `DoctorReport` JSON on `--json` includes `piMcpAdapter.{adapterPresent,deepwikiPresent}`.
 - `assertNotAgentsPath()` / `lockCavemanUltra()` — hard guards in install.ts; both tested.
 - `fulcrum skills sync` — all 28 compressed skills under `<agent>/skills/fulcrum/<name>/`.
 - `fulcrum init <dir>` — seeds AGENTS.md, `.claude/CLAUDE.md` (`@AGENTS.md` import), `.gitignore`.
 - Format-hook smoke: piped a malformed `.py` Edit envelope → ruff rewrote it correctly.
-- `scripts/eval-skill-claude.sh <skill> --runs-per-query 1` — confirmed with new match-words + data-rich queries. jq: 83/0 on `/tmp/jq-sanity4` (baseline was 66/12). Auth via Claude Code keychain — no `ANTHROPIC_API_KEY`.
+- `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <skill>` — five trigger-rate harnesses share `--model`, `--runs-per-query`, `--results-dir`, `--match-words`. Claude auth via keychain (no `ANTHROPIC_API_KEY`). `scripts/eval-all.sh --engine <agent>` and `--skip-<agent>` flags route across them.
 - `bun run compress -- --check` / `scripts/eval-all.sh --regenerate-only` — both verified.
 - `src/agents/registry.ts` — canonical `AGENTS` array; no inline agent configs scattered across files.
 
@@ -150,7 +154,7 @@ Don't relitigate without new information.
 | Caveman ultra mandatory always-on | ~75% output-token reduction; `rules/AGENTS.md` §0b is the contract; `~/.config/caveman/config.json` is the runtime lock. | `rules/AGENTS.md` §0b, `lockCavemanUltra()` |
 | Never use `~/.agents/` for skills | Shared folder pollutes every agent's context; `assertNotAgentsPath()` enforces this at runtime. | `src/cli/install.ts`, `~/.claude/CLAUDE.md` |
 | Agent registry as single source of truth | Without a registry, agent defs drifted independently in install, doctor, and skills. | `src/agents/registry.ts` |
-| Caveman compression of in-repo content is part of CI | Verbose skills waste tokens every session; soft-fail gate prevents accidental uncompressed commits. | `scripts/compress-with-caveman.sh`, `scripts/ci.ts` |
+| Caveman compression of in-repo content is part of CI | Verbose skills waste tokens every session; hard-fail gate blocks accidental uncompressed commits. | `scripts/compress-with-caveman.sh`, `scripts/ci.ts` |
 | Per-skill iteration over batch leaderboard tuning | Batch runs confound measurement between skills; one skill at a time is the safe unit. | `scripts/eval-skill-{claude,codex}.sh` |
 
 ---
@@ -180,12 +184,12 @@ Branch should stay on `feat/agent-foundation-clean` for now. User does not want 
 
 These are the not-done or not-fully-covered items that still matter for the documented foundation target. They are not PR/release steps.
 
-1. **Pi MCP adapter integration for DeepWiki is documented but not implemented.** Pi can serve generic MCPs through `pi install npm:pi-mcp-adapter`, reading `.mcp.json`, `~/.config/mcp/mcp.json`, `~/.pi/agent/mcp.json`, or `.pi/mcp.json`. Fulcrum does not yet install that adapter, configure `deepwiki` for Pi, verify adapter health in doctor, or account for the adapter's default `mcp(...)` proxy shape in `tool-output-router`. `context-mode` is separate and now managed via Pi's own `pi install npm:context-mode` package path. Details: [docs/mcp.md](docs/mcp.md), [docs/agents.md](docs/agents.md), [docs/capabilities.md](docs/capabilities.md). Likely code touch points for DeepWiki adapter work: `src/cli/mcp.ts`, `src/cli/doctor.ts`, `src/hooks/tool-output-router.ts`.
+1. ~~**Pi MCP adapter integration for DeepWiki is documented but not implemented.**~~ **COMPLETE.** `installDeepwikiMcp` now calls `installPiDeepwikiAdapter` when `~/.pi/agent` is detected: runs `pi install npm:pi-mcp-adapter` and writes deepwiki into `~/.pi/agent/mcp.json`. `uninstallDeepwikiMcp` calls `uninstallPiDeepwikiAdapter`. Doctor reports `piMcpAdapter.{adapterPresent,deepwikiPresent}` in `--json`. `deriveTool` in `src/utils/io.ts` normalises Pi proxy-shape `mcp(server,tool)` calls to `mcp__<server>__<tool>` so routing policies match without duplication. Tests in `src/cli/doctor.test.ts` and `src/hooks/tool-output-router.test.ts`.
 2. **`scripts/install.sh` does not pass through CLI install flags.** README documents `fulcrum install --no-skills` and `--no-upstream-skills`, but the bootstrap script only accepts `--with-project` and `--help`. Either add pass-through support for safe install flags or keep smoke recipes calling the installed `fulcrum` binary directly. Details: [README.md](README.md), [scripts/install.sh](scripts/install.sh), §7 below.
-3. **Hook enable/disable writes all five supported agent configs.** `fulcrum hooks enable` currently creates native config files for Claude, Codex, Gemini, OpenCode, and Pi rather than filtering to detected agent roots. Docs now describe that behavior, but the product decision is still open: keep all-agent writes as the cross-agent default, or make implementation detection-aware. Details: [docs/hooks.md](docs/hooks.md), [docs/agents.md](docs/agents.md). Code: `src/cli/hooks.ts`.
-4. **Cross-agent skill smoke remains incomplete.** Trigger-rate harnesses exist for Claude Code and Codex only. Gemini, OpenCode, and Pi skill loading remain manual smoke. Details: [docs/skill-smoke-test.md](docs/skill-smoke-test.md), [docs/skills.md](docs/skills.md), `evals/README.md`.
-5. **New skill compression is a documented requirement, not a hard guard.** Existing skills pass `compress:check`, but adding a new verbose `SKILL.md` still depends on the author running compression before commit. Details: [docs/caveman.md](docs/caveman.md), [skills/SOURCES.md](skills/SOURCES.md), `scripts/compress-with-caveman.sh`.
-6. **Curated upstream skill pins are repo-level, not subpath-level.** `skills/upstream.lock` pins reviewed repositories, but a monorepo skill path is not independently content-addressed. This is acceptable for now, but not full supply-chain immutability. Details: [docs/skills.md](docs/skills.md), [skills/upstream.lock](skills/upstream.lock).
+3. ~~**Hook enable/disable writes all five supported agent configs.**~~ **DONE.** `fulcrum hooks enable/disable` is now detection-aware by default — only writes configs for agents whose `rootDir` exists on disk. Pass `--all` for cross-machine/dotfiles setup. `removeAllHookRegistrations` (uninstall) applies same detection. `rootDir` field added to `Agent` interface and all 5 registry entries. Details: [docs/hooks.md](docs/hooks.md), `src/agents/registry.ts`, `src/cli/hooks.ts`.
+4. ~~**Cross-agent skill smoke remains incomplete.**~~ **COMPLETE.** Trigger-rate harnesses now exist for all five agents: `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh`. Each shares the same flag interface (`--model`, `--runs-per-query`, `--results-dir`, `--match-words`), JSONL output, match-words precedence, and 80/20 pass criteria. `scripts/eval-all.sh` accepts `--engine claude|codex|gemini|opencode|pi` and `--skip-<agent>` flags. Details: [docs/skill-smoke-test.md](docs/skill-smoke-test.md), [docs/skills.md](docs/skills.md) §7, `evals/README.md`.
+5. ~~**New skill compression is a documented requirement, not a hard guard.**~~ **DONE.** Adding a new uncompressed `SKILL.md` now fails CI hard. `bun run compress -- --check` in scripts/ci.ts is no longer soft-fail; any `.md` file lacking a `.original.md` sibling will exit 1 and block the build. Details: [docs/caveman.md](docs/caveman.md), [skills/SOURCES.md](skills/SOURCES.md), `scripts/compress-with-caveman.sh`, `scripts/ci.ts`.
+6. ~~**Curated upstream skill pins are repo-level, not subpath-level.**~~ **COMPLETE.** `skills/upstream.lock` now carries `subpath_sha256` (SHA-256 of canonicalized skill subtree) and `subpath_size` for all 20 locked skills. `fulcrum skills upstream` verifies each skill's subtree hash before copying it; exits non-zero on mismatch. `--update-pins` flag computes and writes new hashes. Default is verify-only. `computeSubpathSha256` exported from `src/cli/upstream-skills.ts` (deterministic across darwin/linux). Details: [docs/skills.md](docs/skills.md) §6, [skills/upstream.lock](skills/upstream.lock), `src/cli/upstream-skills.ts`.
 7. **Future Agent OS layers are placeholders.** Repository supervisor, durable task system, agent runs, context engine, memory, artifacts, and plugins/extensions are named for alignment but not implemented. Details: [README.md](README.md), [AGENTS.md](AGENTS.md).
 
 Before claiming the branch is done, run §7 verification again and update this section so any remaining gaps are explicit.
@@ -257,9 +261,9 @@ fulcrum doctor --json | jq .verdict
 
 ## 8. Known limitations (current)
 
-- **Trigger-rate eval exists for Claude Code and Codex only.** No equivalent harness for Gemini / OpenCode / Pi; those remain manual smoke.
+- **Trigger-rate eval harnesses exist for all five agents.** `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh` — uniform flag interface, match-words detection, JSONL output, 80/20 pass criteria. `eval-all.sh` supports `--engine` and `--skip-<agent>` flags for all five.
 - **Uninstall is conservative.** It does not remove caveman by default and keeps modified policy files unless `--purge`.
-- **Third-party upstream sync uses repo-level pins.** `skills/upstream.lock` pins reviewed repository SHAs and metadata. It does not pin each subpath independently.
+- **Third-party upstream sync uses subpath-level pins.** `skills/upstream.lock` pins both repo-level `tree_sha` and per-skill `subpath_sha256`. Subpath integrity is verified before each install; `--update-pins` refreshes hashes after a deliberate bump.
 - **Managed MCP scope is intentionally narrow.** Fulcrum manages DeepWiki and context-mode. Other MCPs remain opt-in.
 - **Claude Code MCP removal is manual.** Install can call `claude mcp add`, but uninstall prints `claude mcp remove -s user deepwiki` instead of invoking it.
 - **OpenCode is archived** (2025-09-18). Successor: Charm's Crush. `shims/opencode/fulcrum.ts` is written against last-stable OpenCode; Crush's plugin contract may differ.
