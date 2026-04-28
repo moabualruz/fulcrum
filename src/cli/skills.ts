@@ -2,6 +2,7 @@
 // fulcrum skills lint <path> — validate frontmatter (+ body section presence)
 // against the strictest union of all 5 agents' rules.
 // fulcrum skills list — enumerate authored skills with name, desc preview, eval coverage.
+// fulcrum skills upstream — sync curated third-party skills.
 
 import { mkdir, readdir, readFile, copyFile, writeFile, stat } from "node:fs/promises";
 import { join, basename, dirname } from "node:path";
@@ -46,21 +47,29 @@ function shouldSkipForSync(name: string): boolean {
   return false;
 }
 
-async function copyTree(src: string, dst: string): Promise<void> {
-  await mkdir(dst, { recursive: true });
+async function copyTree(src: string, dst: string, opts: { dryRun?: boolean } = {}): Promise<void> {
+  if (opts.dryRun) {
+    console.log(`    [dry-run] would mkdir: ${dst}`);
+  } else {
+    await mkdir(dst, { recursive: true });
+  }
   for (const entry of await readdir(src, { withFileTypes: true })) {
     if (shouldSkipForSync(entry.name)) continue;
     const s = join(src, entry.name);
     const d = join(dst, entry.name);
     if (entry.isDirectory()) {
-      await copyTree(s, d);
+      await copyTree(s, d, opts);
     } else {
-      await copyFile(s, d);
+      if (opts.dryRun) {
+        console.log(`    [dry-run] would copy: ${s} → ${d}`);
+      } else {
+        await copyFile(s, d);
+      }
     }
   }
 }
 
-async function cmdSync(): Promise<void> {
+export async function syncSkills(opts: { dryRun?: boolean } = {}): Promise<void> {
   const root = repoRoot();
   const skillsSrc = `${root}/skills`;
   if (!(await isDir(skillsSrc))) {
@@ -91,10 +100,14 @@ async function cmdSync(): Promise<void> {
     }
     const nsPath = `${t.path}/${NAMESPACE}`;
     console.log(`→ ${t.label} (${nsPath})`);
-    await mkdir(nsPath, { recursive: true });
+    if (opts.dryRun) {
+      console.log(`    [dry-run] would mkdir: ${nsPath}`);
+    } else {
+      await mkdir(nsPath, { recursive: true });
+    }
     for (const name of skills) {
       const dst = `${nsPath}/${name}`;
-      await copyTree(`${skillsSrc}/${name}`, dst);
+      await copyTree(`${skillsSrc}/${name}`, dst, opts);
       console.log(`    ${NAMESPACE}/${name}`);
     }
     console.log();
@@ -109,24 +122,42 @@ async function cmdSync(): Promise<void> {
     const gemSkillsDir = geminiAgent.skillsDir(_skillsHome);
     const ext = gemSkillsDir.replace(/\/skills$/, "");
     console.log(`→ Gemini CLI (${ext})`);
-    await mkdir(gemSkillsDir, { recursive: true });
-    await writeFile(
-      `${ext}/gemini-extension.json`,
-      JSON.stringify(
-        { name: "fulcrum-skills", version: "0.1.0", description: "Fulcrum-authored skills for Gemini CLI." },
-        null,
-        2,
-      ) + "\n",
-    );
+    if (opts.dryRun) {
+      console.log(`    [dry-run] would mkdir: ${gemSkillsDir}`);
+      console.log(`    [dry-run] would write: ${ext}/gemini-extension.json`);
+    } else {
+      await mkdir(gemSkillsDir, { recursive: true });
+      await writeFile(
+        `${ext}/gemini-extension.json`,
+        JSON.stringify(
+          { name: "fulcrum-skills", version: "0.1.0", description: "Fulcrum-authored skills for Gemini CLI." },
+          null,
+          2,
+        ) + "\n",
+      );
+    }
     for (const name of skills) {
       const dst = `${gemSkillsDir}/${name}`;
-      await copyTree(`${skillsSrc}/${name}`, dst);
+      await copyTree(`${skillsSrc}/${name}`, dst, opts);
       console.log(`    ${name}`);
     }
   } else {
     console.log("· skip Gemini (~/.gemini not present)");
   }
   console.log("Done.");
+}
+
+async function cmdSync(args: string[]): Promise<void> {
+  let dryRun = false;
+  for (const arg of args) {
+    if (arg === "--dry-run") {
+      dryRun = true;
+    } else {
+      console.error(`fulcrum skills sync: unknown arg '${arg}'`);
+      process.exit(2);
+    }
+  }
+  return syncSkills({ dryRun });
 }
 
 // ── lint ───────────────────────────────────────────────────────────────
@@ -304,9 +335,21 @@ async function cmdList(): Promise<void> {
 export async function run(args: string[]): Promise<void> {
   const sub = args[0] ?? "sync";
   switch (sub) {
-    case "sync":  return cmdSync();
+    case "sync":  return cmdSync(args.slice(1));
     case "lint":  return cmdLint(args[1]);
     case "list":  return cmdList();
+    case "upstream": {
+      let dryRun = false;
+      for (const arg of args.slice(1)) {
+        if (arg === "--dry-run") dryRun = true;
+        else {
+          console.error(`fulcrum skills upstream: unknown arg '${arg}'`);
+          process.exit(2);
+        }
+      }
+      const { syncUpstreamSkills } = await import("./upstream-skills.ts");
+      return syncUpstreamSkills({ dryRun });
+    }
     default:
       console.error(`fulcrum skills: unknown subcommand '${sub}'`);
       process.exit(2);

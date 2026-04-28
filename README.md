@@ -87,7 +87,7 @@ Two paths, both produce `~/.fulcrum/bin/fulcrum`:
 curl -fsSL https://bun.sh/install | bash      # if Bun isn't installed
 git clone https://github.com/moabualruz/fulcrum ~/code/fulcrum
 cd ~/code/fulcrum
-bash scripts/install.sh                       # builds, installs, splices rules
+bash scripts/install.sh                       # builds, installs, splices rules, syncs skills
 bash scripts/install.sh --with-project ~/code/myproject   # also bootstrap a project
 ```
 
@@ -106,10 +106,12 @@ fulcrum init <dir>            # bootstrap a project's AGENTS.md + .claude/CLAUDE
 fulcrum doctor                # bun, agent dirs, tool presence, policy health
 fulcrum hooks list            # show available hook recipes
 fulcrum hooks enable format   # mark enabled + print per-agent registration snippet
-fulcrum skills sync           # mirror skills/ to each agent's skills/fulcrum/ folder
+fulcrum skills sync           # re-sync skills/ to each agent's skills/fulcrum/ folder
+fulcrum skills upstream       # sync curated third-party skills under fulcrum-upstream/
 fulcrum skills list           # enumerate authored skills with eval coverage
 fulcrum skills lint <path>    # validate frontmatter + body section structure
 fulcrum hook <name>           # run a hook recipe (called by agent runtimes via stdin)
+fulcrum uninstall --dry-run   # preview removal of Fulcrum-managed install artifacts
 ```
 
 ### Verify

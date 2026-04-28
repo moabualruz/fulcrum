@@ -13,6 +13,9 @@
 //                      normally so detection still works; every write/exec is
 //                      replaced by a  [dry-run] would …  log line.
 //   --with-project <dir>  Also run `fulcrum init <dir>` after install.
+//   --no-skills       Do not run authored/upstream skill sync during install.
+//   --no-upstream-skills
+//                      Do not install curated third-party skill packs.
 
 import { mkdir, readFile, writeFile, copyFile, readdir, stat, appendFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -399,6 +402,8 @@ export async function lockCavemanUltra(home: string): Promise<void> {
 
 export async function run(args: string[]): Promise<void> {
   let withProject: string | null = null;
+  let syncAuthoredSkills = true;
+  let syncUpstream = true;
   DRY_RUN = false;
   let i = 0;
   while (i < args.length) {
@@ -409,6 +414,13 @@ export async function run(args: string[]): Promise<void> {
     } else if (a === "--with-project") {
       withProject = args[i + 1] ?? process.cwd();
       i += 2;
+    } else if (a === "--no-skills") {
+      syncAuthoredSkills = false;
+      syncUpstream = false;
+      i += 1;
+    } else if (a === "--no-upstream-skills") {
+      syncUpstream = false;
+      i += 1;
     } else {
       console.error(`fulcrum install: unknown arg '${a}'`);
       process.exit(2);
@@ -422,15 +434,15 @@ export async function run(args: string[]): Promise<void> {
   const root = repoRoot();
   console.log(`Fulcrum install — source: ${root}\n`);
 
-  console.log("1/5  Vendoring hook registration snippets → ~/.fulcrum/hooks/snippets/");
+  console.log("1/8  Vendoring hook registration snippets → ~/.fulcrum/hooks/snippets/");
   await vendorHookSnippets();
   console.log();
 
-  console.log("2/5  Seeding ~/.fulcrum/tool-output-policy.toml");
+  console.log("2/8  Seeding ~/.fulcrum/tool-output-policy.toml");
   await seedPolicy();
   console.log();
 
-  console.log("3/5  Splicing rules/AGENTS.md into per-agent rules files");
+  console.log("3/8  Splicing rules/AGENTS.md into per-agent rules files");
   const rulesPath = `${root}/rules/AGENTS.md`;
   if (!(await exists(rulesPath))) {
     console.error(`fulcrum install: cannot find ${rulesPath}`);
@@ -449,16 +461,39 @@ export async function run(args: string[]): Promise<void> {
   console.log();
 
   const home = process.env["HOME"] ?? "";
-  console.log("4/5  Installing caveman per detected agent");
+  console.log("4/8  Installing caveman per detected agent");
   await installCaveman(home);
   console.log();
 
+  if (syncAuthoredSkills) {
+    console.log("5/8  Syncing in-repo skills per detected agent");
+    const { syncSkills } = await import("./skills.ts");
+    await syncSkills({ dryRun: DRY_RUN });
+  } else {
+    console.log("5/8  Skipping in-repo skill sync (--no-skills)");
+  }
+  console.log();
+
+  if (syncUpstream) {
+    console.log("6/8  Syncing curated third-party skills per detected agent");
+    const { syncUpstreamSkills } = await import("./upstream-skills.ts");
+    await syncUpstreamSkills({ dryRun: DRY_RUN });
+  } else {
+    console.log("6/8  Skipping curated third-party skill sync (--no-upstream-skills)");
+  }
+  console.log();
+
+  console.log("7/8  Registering DeepWiki MCP where supported");
+  const { installDeepwikiMcp } = await import("./mcp.ts");
+  await installDeepwikiMcp({ dryRun: DRY_RUN });
+  console.log();
+
   if (withProject) {
-    console.log(`5/5  fulcrum init ${withProject}`);
+    console.log(`8/8  fulcrum init ${withProject}`);
     const { run: runInit } = await import("./init.ts");
     await runInit([withProject]);
   } else {
-    console.log("5/5  Skipping project init (use:  fulcrum init <dir>  or re-run with --with-project)");
+    console.log("8/8  Skipping project init (use:  fulcrum init <dir>  or re-run with --with-project)");
   }
 
   console.log("\nDone.");

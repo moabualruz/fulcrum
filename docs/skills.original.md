@@ -6,17 +6,17 @@
 
 Each agent uses its own native skills directory. Do not use a shared `~/.agents/` folder — it pollutes every agent's context with skills that may not apply.
 
-Fulcrum-managed skills install under a `fulcrum/` subfolder so the address space matches the `fulcrum:<skill-name>` prefixing convention used by plugin / extension systems. Custom user-authored skills can sit alongside (flat or under their own namespace) — they just won't be touched by `fulcrum skills sync`.
+Fulcrum-authored skills install under `fulcrum/`. Curated upstream skills install under `fulcrum-upstream/`. Both are managed namespaces; custom user-authored skills can sit alongside (flat or under their own namespace) and are not touched by sync/uninstall except explicit Fulcrum-managed paths.
 
-| Agent | Fulcrum-managed skills path | Custom user skills path |
-|---|---|---|
-| Claude Code | `~/.claude/skills/fulcrum/<name>/SKILL.md` | `~/.claude/skills/<name>/SKILL.md` |
-| Codex CLI | `~/.codex/skills/fulcrum/<name>/SKILL.md` | `~/.codex/skills/<name>/SKILL.md` (user) · `.codex/skills/<name>/SKILL.md` (project) |
-| Gemini CLI | `~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md` (extension is the namespace) | `~/.gemini/extensions/<other>/skills/<name>/SKILL.md` |
-| OpenCode | `~/.config/opencode/skills/fulcrum/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` |
-| Pi CLI | `~/.pi/agent/skills/fulcrum/<name>/SKILL.md` | `~/.pi/agent/skills/<name>/SKILL.md` (user) · `.pi/skills/` (project) |
+| Agent | Fulcrum-authored path | Curated upstream path | Custom user skills path |
+|---|---|---|---|
+| Claude Code | `~/.claude/skills/fulcrum/<name>/SKILL.md` | `~/.claude/skills/fulcrum-upstream/<name>/SKILL.md` | `~/.claude/skills/<name>/SKILL.md` |
+| Codex CLI | `~/.codex/skills/fulcrum/<name>/SKILL.md` | `~/.codex/skills/fulcrum-upstream/<name>/SKILL.md` | `~/.codex/skills/<name>/SKILL.md` (user) · `.codex/skills/<name>/SKILL.md` (project) |
+| Gemini CLI | `~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md` | `~/.gemini/extensions/fulcrum-upstream-skills/skills/<name>/SKILL.md` | `~/.gemini/extensions/<other>/skills/<name>/SKILL.md` |
+| OpenCode | `~/.config/opencode/skills/fulcrum/<name>/SKILL.md` | `~/.config/opencode/skills/fulcrum-upstream/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` |
+| Pi CLI | `~/.pi/agent/skills/fulcrum/<name>/SKILL.md` | `~/.pi/agent/skills/fulcrum-upstream/<name>/SKILL.md` | `~/.pi/agent/skills/<name>/SKILL.md` (user) · `.pi/skills/` (project) |
 
-`fulcrum skills sync` propagates `skills/<name>/SKILL.md` from the repo to every agent's `<skills-root>/fulcrum/` subfolder. The `fulcrum/` segment is the convention; **agents themselves still load by frontmatter `name:`** — the namespacing is path-based and recursive scans pick the skill up regardless of depth. The reason the prefix exists today is forward-compat: when fulcrum's plugin / extension layer ships, the install shape already conforms to how third-party content is namespaced in agent ecosystems.
+`fulcrum skills sync` propagates authored `skills/<name>/SKILL.md` from the repo to every agent's `<skills-root>/fulcrum/` subfolder. `fulcrum skills upstream` clones curated upstream repos into `~/.fulcrum/cache/upstream-skills` and propagates selected skills to `fulcrum-upstream/`. **Agents themselves still load by frontmatter `name:`** — the namespacing is path-based and recursive scans pick skills up regardless of depth.
 
 ## 2. Skill catalogue (general-purpose)
 
@@ -35,6 +35,8 @@ Fulcrum-managed skills install under a `fulcrum/` subfolder so the address space
 ## 3. Adoption strategy — install one, cherry-pick the rest
 
 **Strategy: install one as the cross-agent distribution platform, cherry-pick skills and patterns from the others.**
+
+Current CLI support: `fulcrum install` runs both authored sync and curated upstream sync by default. Use `fulcrum install --no-upstream-skills` to skip networked upstream sync, or run `fulcrum skills upstream` later.
 
 ### Install: superpowers (obra/superpowers)
 

@@ -24,7 +24,7 @@ Currently only mechanism that drops tokens without removing connectors from acco
 
 ## 3. MCP catalogue — opt-in only
 
-One MCP always on — `deepwiki`. No CLI or REST alternative; free, no auth, no documented rate limits.
+One MCP always on — `deepwiki`. No CLI or REST alternative; free, no auth, no documented rate limits. `fulcrum install` registers it for detected Codex, Gemini, OpenCode, and Claude Code when the native `claude` command is available; Pi has no MCP support.
 
 ```bash
 claude mcp add -s user deepwiki --transport http https://mcp.deepwiki.com/mcp

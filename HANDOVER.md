@@ -1,18 +1,18 @@
 # Fulcrum — Handover
 
-> Snapshot at branch `feat/agent-foundation-clean` (8 commits ahead of `f92d6c7`). Forward-looking only — historical event logs pruned. For archaeology: `git log` and per-commit messages.
+> Snapshot at branch `feat/agent-foundation-clean` (HEAD `b2ef962`, tracking `origin/feat/agent-foundation-clean`). Forward-looking only — historical event logs pruned. For archaeology: `git log` and per-commit messages.
 
 ## 0. Destination
 
 **Fulcrum is a local-first CLI Agent OS for supervising repositories, tasks, agent runs, context, memory, and artifacts.**
 
-Today the foundation layer is in place. Supervisor / task / agent-runs / context-engine / memory / artifacts / plugins layers are placeholders, not implementations. See `AGENTS.md` for the trajectory framing.
+Today the foundation layer is partly in place. Supervisor / task / agent-runs / context-engine / memory / artifacts / plugins layers are placeholders, not implementations. The installer / skill / MCP surfaces are not merge-ready yet; see §6.4. See `AGENTS.md` for the trajectory framing.
 
 ---
 
 ## 1. Current state — one paragraph
 
-`feat/agent-foundation-clean` ships a single Bun-compiled `fulcrum` binary that orchestrates installation, hooks, skills, rules, and an output-handling policy across five agent runtimes (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI). 28 in-repo skills are content-verified against upstream, lint-clean (frontmatter + body sections), and caveman-compressed (`.original.md` beside each). Skills propagate via `fulcrum skills sync` to a `fulcrum/` subfolder under each agent's skills root. Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) are TypeScript subcommands of the same binary. Local CI (`bun run ci`) runs 6 stages: install / typecheck / test (103 pass across 11 files) / build:all / skills:lint / compress:check (soft). `fulcrum install` runs 5 steps including caveman cross-agent install, locking caveman ultra via `~/.config/caveman/config.json`, and respects `--dry-run`. `fulcrum doctor` enumerates 32 tools, a "Caveman" section with `defaultMode` display, and supports `--json` output. `src/agents/registry.ts` is the single source of truth for all 5 agent definitions consumed by install, doctor, and skills. `bun run compress` invokes `src/cli/compress.ts` to caveman-compress in-repo content idempotently. The format hook has been smoke-tested end-to-end against a malformed `.py`. No GitHub Actions are wired (intentional; opt-out). §6.2 (per-skill eval iteration) and §6.3 foundation polish are complete; §6.4 ship-the-branch is next when pushing is desired.
+`feat/agent-foundation-clean` currently provides a Bun `fulcrum` CLI with project init, hook subcommands, hook snippet vending, rules splicing, non-destructive uninstall, in-repo skill sync during install, curated upstream skill sync, DeepWiki MCP registration, caveman install, caveman compression, doctor, and local CI. 28 in-repo skills are lint-clean, caveman-compressed (`.original.md` beside each), and pass the latest Claude/Codex eval bar. Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) are TypeScript subcommands of the same binary. `src/agents/registry.ts` is the single source of truth for all 5 agent definitions consumed by install, doctor, and skills. No GitHub Actions are wired (intentional; opt-out). This branch is **not merge-ready**: hook registration is still snippet/manual, upstream skill SHAs are not pinned, and docs still need a final drift pass. PR #1 was opened from a temporary main-based branch and closed; continue local work on this branch.
 
 ---
 
@@ -28,11 +28,18 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 │     • tool-output-router               (PostToolUse any) — TOML-driven
 │
 ├── fulcrum init [DIR]      — bootstrap project AGENTS.md + .claude/CLAUDE.md
-├── fulcrum install [--with-project DIR]
+├── fulcrum install [--with-project DIR] [--no-skills]
 │                            — sentinel-splice rules, vendor snippets, seed policy,
-│                              caveman per-agent install, caveman ultra lock
+│                              caveman per-agent install, caveman ultra lock,
+│                              sync authored + curated upstream skills unless opted out,
+│                              register DeepWiki MCP for supported detected agents
+├── fulcrum uninstall [--dry-run] [--purge] [--include-caveman]
+│                            — remove Fulcrum-managed rules blocks, hook state,
+│                              authored/upstream skill namespaces, generated
+│                              Gemini import, unmodified policy; caveman only with flag
 ├── fulcrum hooks list/enable/disable
 ├── fulcrum skills sync     — fan out to <agent>/skills/fulcrum/<name>/
+├── fulcrum skills upstream — fan out curated upstream skills to <agent>/skills/fulcrum-upstream/<name>/
 ├── fulcrum skills lint     — frontmatter + body section structure
 ├── fulcrum skills list     — inventory + eval coverage
 ├── fulcrum compress        — compress in-repo content via caveman CLI; --check for CI
@@ -56,9 +63,12 @@ src/
 │   └── proc.ts                        # which, exists (handles dirs), run, spawnDetached
 ├── cli/
 │   ├── init.ts          install.ts    # bootstrap + sentinel splice + caveman install + --dry-run
-│   ├── install.test.ts                # 103 tests total (across all test files)
+│   ├── uninstall.ts                   # conservative removal of managed artifacts
+│   ├── install.test.ts  uninstall.test.ts
 │   ├── compress.ts                    # fulcrum compress subcommand (267 lines)
 │   ├── hooks.ts         skills.ts     # hook + skill orchestration; rules size lint
+│   ├── upstream-skills.ts             # curated third-party skill installer
+│   ├── mcp.ts                         # DeepWiki MCP registration/removal
 │   └── doctor.ts                      # caveman defaultMode + 32-tool health + --json flag
 └── hooks/
     ├── audit-log.ts     format.ts     index-check.ts     index-rebuild.ts
@@ -100,11 +110,14 @@ LICENSE (MIT)  AGENTS.md  README.md
 
 ## 3. What works (verified)
 
-- `bun run ci` — green: install + tsc + 103 tests (11 files, 183 expect calls) + 5 platform builds + skills:lint (28/28) + compress:check (soft, 0 pending).
+- `bun run ci` — green in the latest local run: install + tsc + 103 tests (11 files, 183 expect calls) + 5 platform builds + skills:lint (28/28) + compress:check (soft, 0 pending).
 - `bun run scripts/build-all.ts` — 5 targets (`darwin-arm64` 63 MB, `darwin-x64` 68 MB, `linux-x64`/`linux-arm64` ~101 MB, `windows-x64` 118 MB).
 - `bash scripts/install.sh` — splices rules, vendors snippets, seeds policy. Idempotent. `FULCRUM_RELEASE_TAG=vX.Y.Z` fetches a prebuilt binary from GitHub Releases.
 - `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG → tag → cross-compile → optional `gh release create`. Does NOT push.
-- `fulcrum install` — 5 steps: rules spliced into Claude Code / Codex CLI / OpenCode / Gemini; policy seeded; caveman per-agent; `~/.config/caveman/config.json` written `{"defaultMode":"ultra"}`. Respects `--dry-run`.
+- `fulcrum install` — 8 steps: rules spliced into Claude Code / Codex CLI / OpenCode / Gemini; policy seeded; caveman per-agent; `~/.config/caveman/config.json` written `{"defaultMode":"ultra"}`; authored in-repo skills synced unless `--no-skills`; curated upstream skills synced unless `--no-upstream-skills`; DeepWiki MCP registered for supported detected agents. Respects `--dry-run`.
+- `fulcrum uninstall` — removes Fulcrum-managed rules blocks, hook snippets/markers, managed `skills/fulcrum/` and `skills/fulcrum-upstream/` namespaces, Gemini managed skill extensions, generated Gemini import, and unmodified seeded policy. Keeps edited policy by default and keeps caveman unless `--include-caveman`.
+- `fulcrum skills upstream` — clones/updates curated upstream repos into `~/.fulcrum/cache/upstream-skills` and installs 20 selected skills under `fulcrum-upstream/` (Gemini: `fulcrum-upstream-skills` extension).
+- `fulcrum hooks enable/disable` — records/removes an intent marker and prints registration snippets. It does not edit agent configs yet.
 - `fulcrum doctor [--json]` — 32/32 tools detected; "Caveman" section with `defaultMode` display; `DoctorReport` JSON on `--json`.
 - `assertNotAgentsPath()` / `lockCavemanUltra()` — hard guards in install.ts; both tested.
 - `fulcrum skills sync` — all 28 compressed skills under `<agent>/skills/fulcrum/<name>/`.
@@ -153,7 +166,7 @@ e88beeb  feat(install,doctor,skills,agents): caveman cross-agent install + agent
 ── f92d6c7  (base: docs(handover): correct caveman install paths…)
 ```
 
-Branch is **not pushed**. No PR.
+Branch is pushed to `origin/feat/agent-foundation-clean` and should stay on this branch for now. PR #1 was closed because the branch is not ready to merge.
 
 ---
 
@@ -264,18 +277,29 @@ Reference: `/tmp/jq-sanity4` — evidence that the new procedure works (83/0).
 
 ---
 
-### 6.4 Ship the branch (after 6.2 + 6.3)
+### 6.4 Foundation gap closure  ← ACTIVE
 
-Branch is currently unpushed. §6.2 + §6.3 are closed; ship when ready:
+Do this before any new PR/release work. README + linked docs promised more than the CLI currently implements.
 
-1. **Final CI:** `bun run ci` — must be green.
-2. **Push:** `git push -u origin feat/agent-foundation-clean`.
-3. **Open PR:** `gh pr create --title "..." --body "..."` summarizing the foundation + caveman integration + eval methodology fix. Reference HANDOVER §6.x as the change log.
-4. **Cut release** (when PR merges to `main`): `bun run release vX.Y.Z [--gh]`. Pre-release at `v0.1.0` is reasonable for the foundation tag.
+1. **Uninstall action.** DONE in `src/cli/uninstall.ts` + `src/cli/uninstall.test.ts`. Conservative default removes only Fulcrum-managed artifacts: sentinel rules blocks, managed hook snippets/markers, seeded policy when unmodified, managed `skills/fulcrum/`, Gemini `fulcrum-skills` extension, and generated Gemini import. Preserves user content outside sentinels, supports `--dry-run`, `--purge`, and `--include-caveman`.
+2. **Third-party skill/plugin installation.** PARTIAL. `fulcrum skills upstream` installs 20 curated upstream skills from `obra/superpowers`, `ast-grep/agent-skill`, `tavily-ai/skills`, `microsoft/playwright-cli`, `semgrep/skills`, `safishamsi/graphify`, and `edxeth/superlight-context7-skill` under `fulcrum-upstream/`; `fulcrum install` runs it by default. Remaining: pin SHAs in `skills/upstream.lock`, add repomix once a spec-compliant `SKILL.md` source is selected, and decide whether native plugin installers are needed beyond skill-folder install.
+3. **DeepWiki MCP registration.** DONE for detected Codex (`~/.codex/config.toml`), Gemini (`~/.gemini/settings.json`), and OpenCode (`~/.config/opencode/opencode.json`); Claude Code requested through `claude mcp add` when `claude` is on PATH; Pi skipped by design. Uninstall removes Fulcrum-managed Codex/Gemini/OpenCode entries and prints the Claude manual removal command.
+4. **Hook registration is manual.** `fulcrum hooks enable` writes markers and prints snippets; it does not wire agent config files. Either make this explicit everywhere or implement config edits/unregistration per agent.
+5. **Install runs skill sync.** DONE. `fulcrum install` now syncs the 28 in-repo skills by default and exposes `--no-skills` for opt-out.
+6. **Capability tools are check-only.** `docs/capabilities.md` lists manual installs; `doctor` checks many tools, but no command installs or pins them. Decide whether Fulcrum owns tool installation or docs must say "bring your own tools."
+7. **Docs/status drift.** README, HANDOVER, `docs/skill-smoke-test.md`, and smoke-test expectations still contain stale claims (`branch unpushed`, Claude-only eval harness, `doctor` verdict text). Keep docs aligned with code after each gap closes.
 
 ---
 
-### 6.5 Outstanding small items
+### 6.5 Ship the branch  ← BLOCKED
+
+Only after §6.4 is done:
+
+1. **Final CI:** `bun run ci` — must be green.
+2. **Open PR:** create a fresh PR from `feat/agent-foundation-clean` when the branch is actually merge-ready.
+3. **Cut release** (when PR merges to `main`): `bun run release vX.Y.Z [--gh]`. Pre-release at `v0.1.0` is reasonable for the foundation tag.
+
+Outstanding small item:
 
 - **README Rosetta hint** — generic; expand only if specific Intel-Mac users report issues.
 
@@ -335,7 +359,10 @@ fulcrum doctor --json | jq .verdict
 
 ## 8. Known limitations (current)
 
-- **Trigger-rate eval is Claude-Code-only.** No equivalent harness for Codex / Gemini / OpenCode / Pi. Documented at `docs/skills.md` §7.
+- **Trigger-rate eval exists for Claude Code and Codex only.** No equivalent harness for Gemini / OpenCode / Pi. Documentation still needs cleanup where it says Claude-only.
+- **Uninstall is conservative.** It does not remove caveman by default and keeps modified policy files unless `--purge`.
+- **Third-party upstream sync is not pinned yet.** It installs curated sources by branch tip; `skills/upstream.lock` still needs real SHA entries and review dates.
+- **Claude Code MCP removal is manual.** Install can call `claude mcp add`, but uninstall prints `claude mcp remove -s user deepwiki` instead of invoking it.
 - **OpenCode is archived** (2025-09-18). Successor: Charm's Crush. `shims/opencode/fulcrum.ts` is written against last-stable OpenCode; Crush's plugin contract may differ.
 - **Pi has no MCP support** by design. Tier rules keyed `mcp__*` will never fire on Pi (`docs/agents.md` §5.6).
 - **`dist/` is gitignored.** Every fresh clone needs Bun to run `bash scripts/install.sh` (or set `FULCRUM_RELEASE_TAG=...` to fetch a release artifact).
