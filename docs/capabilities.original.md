@@ -71,6 +71,7 @@ Fulcrum treats the toolchain above as external setup. `fulcrum doctor` reports p
 | `wrangler` | `npm install -g wrangler` | Cloudflare Workers, Pages, D1, KV, R2 |
 | `flarectl` | `go install github.com/cloudflare/cloudflare-go/cmd/flarectl@latest` | Cloudflare DNS + zone management (no JSON — use `xh` + Cloudflare REST API for scripted DNS ops) |
 | `usql` | `brew install usql` | All databases — Postgres, MySQL, SQLite, 50+ others |
+| `pi-mcp-adapter` | `pi install npm:pi-mcp-adapter` | Optional MCP bridge for Pi CLI; reads `.mcp.json`, `~/.config/mcp/mcp.json`, `~/.pi/agent/mcp.json`, `.pi/mcp.json` |
 
 ## 5. Language-specific — install per project, not globally
 

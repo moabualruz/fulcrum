@@ -1,6 +1,6 @@
 # Cross-Agent Generalization
 
-> Architecture from [context.md](context.md), [hooks.md](hooks.md), [capabilities.md](capabilities.md), [skills.md](skills.md), [mcp.md](mcp.md) apply all agents. This doc translate each layer to agent-specific config. All data verified from primary sources 2026-04-27.
+> Architecture from [context.md](context.md), [hooks.md](hooks.md), [capabilities.md](capabilities.md), [skills.md](skills.md), [mcp.md](mcp.md) apply all agents. This doc translate each layer to agent-specific config. Pi MCP adapter data verified from primary source 2026-04-28; other agent data verified 2026-04-27.
 
 ## 1. Comparison matrix
 
@@ -13,8 +13,8 @@
 | Hook events | 6 | 11 | 30+ plugin events | **20+** — session_start, session_shutdown, before_agent_start, turn_start/end, tool_call (blockable), resources_discover, etc. |
 | Hook context inject | SessionStart + UserPromptSubmit only | Yes | Yes | Yes — `before_agent_start` can inject messages + rewrite system prompt |
 | Skills path (fulcrum-managed) | `~/.codex/skills/fulcrum/` (user) · `.codex/skills/` (project) | `~/.gemini/extensions/fulcrum-skills/skills/` | `~/.config/opencode/skills/fulcrum/` | `~/.pi/agent/skills/fulcrum/` |
-| MCP | Yes — `config.toml` | Yes — `settings.json` | Yes — `opencode.json` | **No** (by design) |
-| DeepWiki | Yes | Yes | Yes | No |
+| MCP | Yes — `config.toml` | Yes — `settings.json` | Yes — `opencode.json` | Via `pi-mcp-adapter` |
+| DeepWiki | Yes | Yes | Yes | Via adapter; not Fulcrum-managed yet |
 
 ---
 
@@ -218,7 +218,7 @@ SKILL.md: `name` (lowercase alphanumeric + hyphens, 1–64 chars) and `descripti
 
 ## 5. Pi CLI
 
-Sources: [github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono), [extensions doc](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md). Verified 2026-04-27 (HEAD `05f79b0`, extensions doc `6580dae`).
+Sources: [github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono), [extensions doc](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md), [nicobailon/pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter). Pi core verified 2026-04-27 (HEAD `05f79b0`, extensions doc `6580dae`); MCP adapter verified 2026-04-28.
 
 ### 5.1 Context Layer
 
@@ -272,11 +272,33 @@ Install path: `~/.pi/agent/skills/fulcrum/<name>/SKILL.md` (user-level, Fulcrum-
 
 ### 5.6 MCP
 
-**No built-in MCP support** — explicit design decision. DeepWiki unavailable via MCP. Workaround: `xh` or `curl` against DeepWiki REST API directly from shell tool.
+Pi does not ship a built-in MCP manager, but it can serve MCPs through [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter):
+
+```bash
+pi install npm:pi-mcp-adapter
+```
+
+Restart Pi after install. The adapter reads MCP config from `.mcp.json`, `~/.config/mcp/mcp.json`, `~/.pi/agent/mcp.json`, or `.pi/mcp.json` and supports stdio plus HTTP MCP servers.
+
+Recommended user-level DeepWiki config for Pi:
+
+```json
+{
+  "mcpServers": {
+    "deepwiki": {
+      "url": "https://mcp.deepwiki.com/mcp"
+    }
+  }
+}
+```
+
+Default adapter behavior exposes MCP servers through a proxy-style `mcp(...)` tool. If direct MCP tool names are required for policy matching, configure and verify the adapter's direct-tool mode before relying on `mcp__*` matchers.
+
+Fulcrum does not yet install `pi-mcp-adapter`, write Pi MCP config, or check adapter health in `doctor`; this is tracked in [HANDOVER.md](../HANDOVER.md) §6.
 
 ### 5.7 Parity Gaps vs Claude Code
 
 | Gap | Detail |
 |---|---|
-| **No MCP** | DeepWiki unavailable; REST workaround only |
+| **MCP adapter not managed** | DeepWiki works through `pi-mcp-adapter`, but Fulcrum does not yet install/configure/verify it |
 | **Extension language is TypeScript** | Shell hooks must wrap in TS extension that shells out — adds one layer indirection but preserves shell-script reuse |

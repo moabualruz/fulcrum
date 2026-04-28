@@ -24,7 +24,7 @@ Currently only mechanism that drops tokens without removing connectors from acco
 
 ## 3. MCP catalogue — managed default plus opt-in extras
 
-`deepwiki` is the only Fulcrum-managed default MCP. No CLI or REST alternative; free, no auth, no documented rate limits. `fulcrum install` registers it for detected Codex, Gemini, OpenCode, and Claude Code when the native `claude` command is available; Pi has no MCP support.
+`deepwiki` is the only Fulcrum-managed default MCP. No CLI or REST alternative; free, no auth, no documented rate limits. `fulcrum install` registers it for detected Codex, Gemini, OpenCode, and Claude Code when the native `claude` command is available. Pi can use DeepWiki through `pi-mcp-adapter`, but Fulcrum does not manage that adapter yet.
 
 ```bash
 claude mcp add -s user deepwiki --transport http https://mcp.deepwiki.com/mcp
@@ -36,12 +36,38 @@ Claude Code removal remains manual: `claude mcp remove -s user deepwiki`.
 
 > MCP and CLI hit same underlying API with same quota — switching protocol does not change rate limits (verified: Context7, Tavily primary docs 2026-04-27). No other MCPs needed.
 
+### 3.1 Pi via adapter
+
+Pi does not ship a built-in MCP manager. Use [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter), verified 2026-04-28:
+
+```bash
+pi install npm:pi-mcp-adapter
+```
+
+Restart Pi after install. The adapter reads `.mcp.json`, `~/.config/mcp/mcp.json`, `~/.pi/agent/mcp.json`, and `.pi/mcp.json`, and supports stdio plus HTTP MCP servers.
+
+Recommended user-level config:
+
+```json
+{
+  "mcpServers": {
+    "deepwiki": {
+      "url": "https://mcp.deepwiki.com/mcp"
+    }
+  }
+}
+```
+
+Default adapter behavior exposes a proxy-style `mcp(...)` tool. `tool-output-router` policies keyed to direct names like `mcp__deepwiki__ask_question` should only be treated as Pi-compatible after direct-tool exposure is configured and verified.
+
+Remaining Fulcrum work: install/configure adapter, add doctor checks, and verify output-routing shape. Tracked in [HANDOVER.md](../HANDOVER.md) §6.
+
 ## Cross-agent
 
 Per-agent MCP config syntax differs:
 - Codex: `~/.codex/config.toml`
 - Gemini: `~/.gemini/settings.json` (use `httpUrl`, hyphens not underscores)
 - OpenCode: `~/.config/opencode/opencode.json` (`type: remote`)
-- Pi: **no MCP support by design** — use REST via `xh`/`curl` instead
+- Pi: `pi install npm:pi-mcp-adapter`, then configure `~/.pi/agent/mcp.json` or project `.pi/mcp.json`
 
 Full configs in [agents.md](agents.md).

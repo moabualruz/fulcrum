@@ -73,7 +73,7 @@ This sets up the `fulcrum:<skill-name>` address space and matches the prefixing 
 | [docs/capabilities.md](docs/capabilities.md) | Capability layer — bring-your-own CLI tool catalogue |
 | [docs/skills.md](docs/skills.md) | Skills — paths, authoring template, fork policy, verification |
 | [docs/skill-smoke-test.md](docs/skill-smoke-test.md) | Manual cross-agent verification checklist |
-| [docs/mcp.md](docs/mcp.md) | MCP policy — opt-in only |
+| [docs/mcp.md](docs/mcp.md) | MCP policy — DeepWiki default, other MCPs opt-in, Pi adapter notes |
 | [docs/agents.md](docs/agents.md) | Cross-agent translation — Codex, Gemini, OpenCode, Pi |
 | [skills/SOURCES.md](skills/SOURCES.md) | Skill registry and authoring queue |
 
@@ -110,7 +110,7 @@ fulcrum install --dry-run     # preview rules, skills, DeepWiki, and project boo
 fulcrum install --no-skills   # skip all skill sync
 fulcrum install --no-upstream-skills  # skip curated upstream skill sync
 fulcrum hooks list            # show available hook recipes
-fulcrum hooks enable format   # register in detected agent configs + print snippet
+fulcrum hooks enable format   # register native agent hook configs + print snippet
 fulcrum skills sync           # re-sync skills/ to each agent's skills/fulcrum/ folder
 fulcrum skills upstream       # sync curated third-party skills under fulcrum-upstream/
 fulcrum skills list           # enumerate authored skills with eval coverage
@@ -156,7 +156,7 @@ See [`skills/SOURCES.md`](skills/SOURCES.md) for the registry and the long-tail 
 
 1. **[capabilities.md](docs/capabilities.md)** — bring your own CLI tools, then verify them with `fulcrum doctor`.
 2. **[context.md](docs/context.md)** — write your global rules and per-project `AGENTS.md`.
-3. **[hooks.md](docs/hooks.md)** — enable the recipes you want; `fulcrum hooks enable` edits detected agent configs and prints each snippet for review.
+3. **[hooks.md](docs/hooks.md)** — enable the recipes you want; `fulcrum hooks enable` edits native agent configs and prints each snippet for review.
 4. **[skills.md](docs/skills.md)** — install superpowers as the cross-agent base; author skills via the template.
 5. **[mcp.md](docs/mcp.md)** — `deepwiki` is the only Fulcrum-managed default MCP.
 6. **[agents.md](docs/agents.md)** — replicate the setup on Codex, Gemini, OpenCode, Pi as needed.

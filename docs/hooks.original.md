@@ -111,7 +111,7 @@ Rule of thumb: **PreToolUse for prevention, PostToolUse for reaction, SessionSta
 
 ## 5. Recipe library
 
-Every recipe is a subcommand of the `fulcrum` binary: `fulcrum hook <name>`. Enable with `fulcrum hooks enable <name>` — writes each detected agent's native hook config, records intent at `~/.fulcrum/hooks/enabled/<name>`, and prints the per-agent registration snippet for review. Disable with `fulcrum hooks disable <name>` — removes Fulcrum-managed native registrations and the marker. Implementation lives in `src/hooks/<name>.ts`; this section explains *what each one does and when to use it.*
+Every recipe is a subcommand of the `fulcrum` binary: `fulcrum hook <name>`. Enable with `fulcrum hooks enable <name>` — writes native hook config for all supported agents, records intent at `~/.fulcrum/hooks/enabled/<name>`, and prints the per-agent registration snippet for review. Disable with `fulcrum hooks disable <name>` — removes Fulcrum-managed native registrations and the marker. Implementation lives in `src/hooks/<name>.ts`; this section explains *what each one does and when to use it.*
 
 | Recipe | Lifecycle | Purpose | Blocks? |
 |---|---|---|---|
@@ -200,7 +200,7 @@ Same script, different registration. Use this table to wire each recipe in §5 a
     }
   })
   ```
-- **Pi** — TS extensions, hot-reloadable via `/reload`. `before_agent_start` can rewrite the system prompt; equivalent power to Claude Code's SessionStart context injection. No MCP support — `tool-output-router` rules for `mcp__.*` won't fire on Pi.
+- **Pi** — TS extensions, hot-reloadable via `/reload`. `before_agent_start` can rewrite the system prompt; equivalent power to Claude Code's SessionStart context injection. MCP requires `pi-mcp-adapter`; default proxy-style `mcp(...)` output may not match direct `mcp__.*` router policies until direct-tool exposure is configured and verified.
 - **All agents** — invoke `fulcrum hook <name>` from each agent's native config. The binary at `~/.fulcrum/bin/fulcrum` (symlinked to `~/.local/bin/fulcrum` on PATH when possible) is the single source of truth. `fulcrum hooks enable <name>` edits detected native config files and also prints the per-agent snippet for review.
 
 ---

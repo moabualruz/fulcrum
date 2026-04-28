@@ -1,6 +1,6 @@
 # Fulcrum — Handover
 
-> Snapshot at branch `feat/agent-foundation-clean` (HEAD `0ca8b88`, local branch 1 commit ahead of `origin/feat/agent-foundation-clean`). Forward-looking only — historical event logs pruned. For archaeology: `git log` and per-commit messages.
+> Snapshot at branch `feat/agent-foundation-clean` after `50aa978`. Forward-looking only — historical event logs pruned. For archaeology: `git log` and per-commit messages.
 
 ## 0. Destination
 
@@ -12,7 +12,7 @@ Today the foundation layer is partly in place. Supervisor / task / agent-runs / 
 
 ## 1. Current state — one paragraph
 
-`feat/agent-foundation-clean` currently provides a Bun `fulcrum` CLI with project init, hook subcommands, hook config registration, hook snippet vending, rules splicing, non-destructive uninstall, in-repo skill sync during install, pinned curated upstream skill sync, DeepWiki MCP registration, caveman install, caveman compression, doctor, and local CI. 28 in-repo skills are lint-clean, caveman-compressed (`.original.md` beside each), and pass the latest Claude/Codex eval bar. Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) are TypeScript subcommands of the same binary. `src/agents/registry.ts` is the single source of truth for all 5 agent definitions consumed by install, doctor, and skills. No GitHub Actions are wired (intentional; opt-out). Remaining pre-PR work is the ship gate in §6: run full CI, scratch install/uninstall smoke, then open a fresh PR from this branch.
+`feat/agent-foundation-clean` currently provides a Bun `fulcrum` CLI with project init, hook subcommands, hook config registration, hook snippet vending, rules splicing, non-destructive uninstall, in-repo skill sync during install, pinned curated upstream skill sync, DeepWiki MCP registration, caveman install, caveman compression, doctor, and local CI. 28 in-repo skills are lint-clean, caveman-compressed (`.original.md` beside each), and pass the latest Claude/Codex eval bar. Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) are TypeScript subcommands of the same binary. `src/agents/registry.ts` is the single source of truth for all 5 agent definitions consumed by install, doctor, and skills. No GitHub Actions are wired (intentional; opt-out). The branch is not in PR/release mode; remaining work means the requirements gaps in §6.
 
 ---
 
@@ -38,7 +38,7 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 │                              authored/upstream skill namespaces, generated
 │                              Gemini import, unmodified policy; caveman only with flag
 ├── fulcrum hooks list/enable/disable
-│                            — edit detected agent hook configs + marker state
+│                            — edit native hook configs for supported agents + marker state
 ├── fulcrum skills sync     — fan out to <agent>/skills/fulcrum/<name>/
 ├── fulcrum skills upstream — fan out curated upstream skills to <agent>/skills/fulcrum-upstream/<name>/
 ├── fulcrum skills lint     — frontmatter + body section structure
@@ -111,7 +111,7 @@ LICENSE (MIT)  AGENTS.md  README.md
 
 ## 3. What works (verified)
 
-- `bun run ci` — green in the latest local run: install + tsc + 108 tests (12 files, 196 expect calls) + 5 platform builds + skills:lint (28/28) + compress:check (soft, 0 pending).
+- `bun run ci` — green in the latest local run: install + tsc + 113 tests + 5 platform builds + skills:lint (28/28) + compress:check (soft, 0 pending).
 - `bun run scripts/build-all.ts` — 5 targets (`darwin-arm64` 63 MB, `darwin-x64` 68 MB, `linux-x64`/`linux-arm64` ~101 MB, `windows-x64` 118 MB).
 - `bash scripts/install.sh` — splices rules, vendors snippets, seeds policy. Idempotent. `FULCRUM_RELEASE_TAG=vX.Y.Z` fetches a prebuilt binary from GitHub Releases.
 - `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG → tag → cross-compile → optional `gh release create`. Does NOT push.
@@ -156,6 +156,7 @@ Don't relitigate without new information.
 ## 5. Branch + commit map
 
 ```
+50aa978  feat(foundation): close branch ship blockers
 0ca8b88  feat(install): close managed setup gaps
 b2ef962  docs: mark foundation polish complete
 313357e  docs: mark skill eval pass complete
@@ -169,21 +170,23 @@ ef5d9e0  feat(eval): per-skill match-words files + data-rich queries for all 28 
 ... older foundation commits below ...
 ```
 
-Branch should stay on `feat/agent-foundation-clean` for now. PR #1 was closed because the branch is not ready to merge. Do not open a new PR until §6 is cleared.
+Branch should stay on `feat/agent-foundation-clean` for now. User does not want a PR or release from this branch right now; keep work local unless explicitly asked to push.
 
 ---
 
-## 6. Remaining work — ship gate
+## 6. Remaining work — requirements gaps
 
-The implementation/docs blockers from the previous queue are cleared: hook registration edits native configs, upstream skills are pinned in `skills/upstream.lock`, third-party support is documented as filesystem skill install, `repomix` is no longer promised as an upstream install, capabilities are bring-your-own tools, DeepWiki is the only managed default MCP, and the skill smoke docs cover Claude and Codex trigger-rate harnesses.
+These are the not-done or not-fully-covered items that still matter for the documented foundation target. They are not PR/release steps.
 
-Before opening a fresh PR:
+1. **Pi MCP adapter integration is documented but not implemented.** Pi can serve MCPs through `pi install npm:pi-mcp-adapter`, reading `.mcp.json`, `~/.config/mcp/mcp.json`, `~/.pi/agent/mcp.json`, or `.pi/mcp.json`. Fulcrum does not yet install that adapter, configure `deepwiki` for Pi, verify adapter health in doctor, or account for the adapter's default `mcp(...)` proxy shape in `tool-output-router`. Details: [docs/mcp.md](docs/mcp.md), [docs/agents.md](docs/agents.md), [docs/capabilities.md](docs/capabilities.md). Likely code touch points: `src/cli/mcp.ts`, `src/cli/install.ts`, `src/cli/doctor.ts`, `src/hooks/tool-output-router.ts`.
+2. **`scripts/install.sh` does not pass through CLI install flags.** README documents `fulcrum install --no-skills` and `--no-upstream-skills`, but the bootstrap script only accepts `--with-project` and `--help`. Either add pass-through support for safe install flags or keep smoke recipes calling the installed `fulcrum` binary directly. Details: [README.md](README.md), [scripts/install.sh](scripts/install.sh), §7 below.
+3. **Hook enable/disable writes all five supported agent configs.** `fulcrum hooks enable` currently creates native config files for Claude, Codex, Gemini, OpenCode, and Pi rather than filtering to detected agent roots. Docs now describe that behavior, but the product decision is still open: keep all-agent writes as the cross-agent default, or make implementation detection-aware. Details: [docs/hooks.md](docs/hooks.md), [docs/agents.md](docs/agents.md). Code: `src/cli/hooks.ts`.
+4. **Cross-agent skill smoke remains incomplete.** Trigger-rate harnesses exist for Claude Code and Codex only. Gemini, OpenCode, and Pi skill loading remain manual smoke. Details: [docs/skill-smoke-test.md](docs/skill-smoke-test.md), [docs/skills.md](docs/skills.md), `evals/README.md`.
+5. **New skill compression is a documented requirement, not a hard guard.** Existing skills pass `compress:check`, but adding a new verbose `SKILL.md` still depends on the author running compression before commit. Details: [docs/caveman.md](docs/caveman.md), [skills/SOURCES.md](skills/SOURCES.md), `scripts/compress-with-caveman.sh`.
+6. **Curated upstream skill pins are repo-level, not subpath-level.** `skills/upstream.lock` pins reviewed repositories, but a monorepo skill path is not independently content-addressed. This is acceptable for now, but not full supply-chain immutability. Details: [docs/skills.md](docs/skills.md), [skills/upstream.lock](skills/upstream.lock).
+7. **Future Agent OS layers are placeholders.** Repository supervisor, durable task system, agent runs, context engine, memory, artifacts, and plugins/extensions are named for alignment but not implemented. Details: [README.md](README.md), [AGENTS.md](AGENTS.md).
 
-1. Run `bun run ci`.
-2. Re-run the scratch install/uninstall smoke in §7.
-3. Open a fresh PR from `feat/agent-foundation-clean`.
-
-Release can happen only after merge to `main` via `bun run release vX.Y.Z [--gh]`.
+Before claiming the branch is done, run §7 verification again and update this section so any remaining gaps are explicit.
 
 ---
 
@@ -210,23 +213,29 @@ HOME=$SCRATCH fulcrum doctor
 head -3 $SCRATCH/.claude/CLAUDE.md   # confirm user content preserved
 rm -rf $SCRATCH
 
-# 4. Install smoke with authored skills disabled
+# 4. Install flag smoke with authored skills disabled
+# NOTE: call fulcrum directly; scripts/install.sh flag pass-through is pending §6.
 SCRATCH=$(mktemp -d)
 HOME=$SCRATCH PATH="$SCRATCH/.local/bin:$HOME/.bun/bin:$PATH" \
-  bash scripts/install.sh --no-skills
+  bash scripts/install.sh
+HOME=$SCRATCH PATH="$SCRATCH/.local/bin:$SCRATCH/.fulcrum/bin:$HOME/.bun/bin:$PATH" \
+  fulcrum install --dry-run --no-skills
 rm -rf $SCRATCH
 
-# 5. Install smoke with upstream skills disabled
+# 5. Install flag smoke with upstream skills disabled
 SCRATCH=$(mktemp -d)
 HOME=$SCRATCH PATH="$SCRATCH/.local/bin:$HOME/.bun/bin:$PATH" \
-  bash scripts/install.sh --no-upstream-skills
+  bash scripts/install.sh
+HOME=$SCRATCH PATH="$SCRATCH/.local/bin:$SCRATCH/.fulcrum/bin:$HOME/.bun/bin:$PATH" \
+  fulcrum install --dry-run --no-upstream-skills
 rm -rf $SCRATCH
 
 # 6. Curated upstream skills sync in a scratch HOME
 SCRATCH=$(mktemp -d)
 HOME=$SCRATCH PATH="$SCRATCH/.local/bin:$HOME/.bun/bin:$PATH" \
-  bash scripts/install.sh --no-skills
-HOME=$SCRATCH fulcrum skills upstream
+  bash scripts/install.sh
+HOME=$SCRATCH PATH="$SCRATCH/.local/bin:$SCRATCH/.fulcrum/bin:$HOME/.bun/bin:$PATH" \
+  fulcrum skills upstream
 rm -rf $SCRATCH
 
 # 7. Uninstall smoke
@@ -252,7 +261,7 @@ fulcrum doctor --json | jq .verdict
 - **DeepWiki is the only managed default MCP.** Other MCPs remain opt-in.
 - **Claude Code MCP removal is manual.** Install can call `claude mcp add`, but uninstall prints `claude mcp remove -s user deepwiki` instead of invoking it.
 - **OpenCode is archived** (2025-09-18). Successor: Charm's Crush. `shims/opencode/fulcrum.ts` is written against last-stable OpenCode; Crush's plugin contract may differ.
-- **Pi has no MCP support** by design. Tier rules keyed `mcp__*` will never fire on Pi (`docs/agents.md` §5.6).
+- **Pi MCP requires `pi-mcp-adapter`.** Fulcrum documents the adapter path but does not yet install/configure it or verify its tool-output shape (`docs/agents.md` §5.6, `docs/mcp.md` §3.1).
 - **`dist/` is gitignored.** Every fresh clone needs Bun to run `bash scripts/install.sh` (or set `FULCRUM_RELEASE_TAG=...` to fetch a release artifact).
 - **Skill content correctness is the author's job.** Lint passes do not imply upstream-correct content. Fix commit `08101c6` corrected 19 skills after the fact; future authoring should verify inline.
 - **Caveman ultra is mandatory but not enforced for new skills.** Any new `SKILL.md` added without a compression pass will deploy verbose content. Run `/caveman:compress skills/<name>/SKILL.md` before committing.
