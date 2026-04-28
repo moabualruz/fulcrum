@@ -34,6 +34,7 @@ Every in-repo markdown is compressed into two files: human-edit `.original.md` f
 
 Target files:
 - `skills/<name>/SKILL.md` (all 28 skills)
+- `skills/<name>/references/*.md` (progressively loaded section detail)
 - `rules/AGENTS.md` (behavioral rules)
 - Project `AGENTS.md` (project-level instructions)
 - `skills/SOURCES.md` (registry and caveman requirement note)
@@ -78,8 +79,9 @@ Caveman defaultMode:      ultra (from ~/.config/caveman/config.json)
 When you author a new `skills/<name>/SKILL.md`:
 
 1. Write the uncompressed version.
-2. Run `bun run compress` or `scripts/compress-with-caveman.sh skills/<name>/SKILL.md` to create `skills/<name>/SKILL.md.original.md` and compress the main file.
-3. Commit both files.
+2. Keep verbose section detail in `references/<section>.original.md` and the shipped copy in `references/<section>.md`.
+3. Run `bun run compress` or `scripts/compress-with-caveman.sh skills/<name>/SKILL.md skills/<name>/references/*.md`.
+4. Commit both shipped `.md` files and their `.original.md` siblings.
 
 Lint passes on either the original or compressed form (frontmatter rules apply to both). CI gate `bun run compress -- --check` will reject commits where new `.md` files lack `.original.md` siblings.
 

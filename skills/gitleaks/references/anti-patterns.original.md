@@ -1,0 +1,10 @@
+## Anti-patterns
+
+- **Don't** scan only with `--staged` and call it a day. `gitleaks git --staged` cannot see history; a leak that landed before the hook existed is invisible until you run `gitleaks git` on the full repo. Schedule a full-history scan in CI on a cron, not just on PRs.
+- **Don't use `gitleaks detect` / `gitleaks protect` on new code.** Both were deprecated in gitleaks v8.19.0 (still work but hidden in `--help`). Use `gitleaks git` (history) and `gitleaks git --staged` (working tree) instead.
+- **Don't** silently `--redact` everywhere. CI logs benefit from redaction, but when you're remediating you need the literal value to grep, rotate, and confirm. Run unredacted locally during cleanup.
+- **Don't** allowlist by full secret value. `regexes = ['''ghp_aBcD…the actual key''']` becomes wrong the moment someone rotates the key — and rotations are exactly when you can't afford a noisy false negative. Allowlist by **shape** (path, rule id, fixture-prefix regex), not literal value.
+- **Don't** assume "leak found" = "leak in HEAD". Git history is forever. Removing the line in a new commit does **not** purge the blob — you need `git-filter-repo` (or BFG), force-push, then **rotate the credential** because anyone who cloned still has it.
+- **Don't** ignore exit code 1 with `|| true` to make CI green. That's the entire point of the tool. If the finding is a fixture, allowlist it; if it's real, rotate and remediate.
+- **Don't** treat low-entropy strings as automatically safe. Many real keys have structure, not randomness — `AKIA…` (AWS access key) is 20 chars of base32 with a fixed prefix, not high-entropy noise. Keyword + regex matters as much as Shannon entropy.
+- **Don't** reach for `git-secrets` or `trufflehog` first in 2025-2026. `git-secrets` is unmaintained; `trufflehog` is heavier (verifies live keys against provider APIs — useful, but slower and network-dependent). `gitleaks` is the modern default for fast, offline rule-based scanning. Reach for `trufflehog` when you specifically want validation against the issuing provider.

@@ -1,181 +1,27 @@
 ---
 name: git-cliff
-description: Use this skill whenever user wants to generate changelog, create release notes from git history, update CHANGELOG.md before tagging release, produce changelog from conventional commits, or summarize commits since last tag. Trigger phrases include "generate a changelog", "create release notes from git history", "update CHANGELOG.md before release", "produce changelog from conventional commits", "summarize commits since last tag", "what changed since v1.0", "bump version and write changelog". git-cliff parses conventional commits via `cliff.toml`, configured per-repo. Skip for raw `git log` surveys, GitHub Releases UI work (use `gh release`), contributor lists (use `git shortlog`), or hand-written announcement copy.
+description: "Use when the user wants to generate a changelog, create release notes from git history, update CHANGELOG.md before tagging a release, produce a changelog from conventional commits, or summarize commits since the last tag."
 ---
+
 
 # git-cliff
 
 ## When to use
 
-- User wants CHANGELOG.md regenerated, prepended, or initialized from conventional commits.
-- Release imminent, unreleased section needs promote to versioned entry — `git-cliff --tag vX.Y.Z`.
-- User asks "what changed since last tag", wants release-quality grouping (Features / Bug Fixes / …), not raw commit list.
-- Agent prepping release commit that must include updated CHANGELOG **before** tag cut.
-- Repo already has `cliff.toml` (this one does — see `/Users/mkh/workspace/fulcrum/cliff.toml`) and `bun run changelog` wired up.
-
-**Skip** for: raw history survey (`git log --oneline`); contributor stats (`git shortlog -sne`); creating GitHub Release page (`gh release create`); free-form release announcements (write prose, not parse commits); commit-message linting (use `commit-msg` hook, not git-cliff).
+See [references/when-to-use.md](references/when-to-use.md). Load only when this section is needed.
 
 ## Invocation
 
-```bash
-# Full history into CHANGELOG.md (default config = ./cliff.toml)
-git-cliff -o CHANGELOG.md
-
-# Label the unreleased section with a version (use just before tagging)
-git-cliff --tag v1.2.0 -o CHANGELOG.md
-
-# Only commits since the last tag
-git-cliff --unreleased
-
-# Only the most recent tag's section
-git-cliff --latest
-
-# Only commits reachable from the current branch
-git-cliff --current
-
-# Arbitrary commit range
-git-cliff v1.0.0..HEAD
-
-# Auto-detect next semver from commit types (feat→minor, fix→patch, !→major)
-git-cliff --bump
-
-# Prepend a new section to the top of an existing file (preserves history)
-git-cliff --unreleased --tag v1.2.0 --prepend CHANGELOG.md
-
-# Override repository for commit links
-git-cliff --repository https://github.com/owner/repo -o CHANGELOG.md
-
-# In this repo
-bun run changelog                                   # = git-cliff -o CHANGELOG.md
-```
-
-Output markdown by default; pipe to stdout by omitting `-o`.
+See [references/invocation.md](references/invocation.md). Load only when this section is needed.
 
 ## Patterns
 
-### Pattern A — pre-release: bump + prepend
-
-```bash
-git-cliff --bump --unreleased --prepend CHANGELOG.md
-git add CHANGELOG.md
-git commit -m "chore(release): vX.Y.Z"
-git tag vX.Y.Z
-```
-
-`--bump` reads commit types since last tag, computes next semver. `--prepend` keeps prior sections intact — never regenerate from scratch on routine release.
-
-### Pattern B — minimal `cliff.toml`
-
-```toml
-[changelog]
-header = "# Changelog\n"
-body = """
-{% if version %}## [{{ version }}] - {{ timestamp | date(format="%Y-%m-%d") }}
-{% else %}## [unreleased]{% endif %}
-{% for group, commits in commits | group_by(attribute="group") %}
-### {{ group | upper_first }}
-{% for commit in commits %}- {{ commit.message | upper_first }}
-{% endfor %}{% endfor %}
-"""
-trim = true
-
-[git]
-conventional_commits = true
-filter_unconventional = false
-tag_pattern = "v[0-9]*"
-sort_commits = "oldest"
-commit_parsers = [
-    { message = "^feat",                group = "Features" },
-    { message = "^fix",                 group = "Bug Fixes" },
-    { message = "^docs?",               group = "Documentation" },
-    { message = "^perf",                group = "Performance" },
-    { message = "^refactor",            group = "Refactor" },
-    { message = "^test",                group = "Tests" },
-    { message = "^chore\\(release\\):", skip  = true },
-    { message = "^Merge ",              skip  = true },
-    { message = "^chore",               group = "Chores" },
-    { message = ".*",                   group = "Other" },
-]
-```
-
-Group order in output mirrors order parsers appear in list. `.*` catch-all + `filter_unconventional = false` keeps free-form commits visible under "Other" instead of dropping silently.
-
-### Pattern C — commit parsers and skipping
-
-```toml
-{ message = "^chore\\(release\\):", skip = true }   # release commits
-{ message = "^Merge ",              skip = true }   # merge commits
-{ message = "^wip",                 skip = true }   # WIP noise
-{ body    = "BREAKING CHANGE",      group = "Breaking" }
-{ message = "^feat\\(api\\)",       group = "API Features" }   # narrower wins if listed first
-```
-
-Each parser row maps regex (`message`, `body`, `footer`) to `group` or `skip = true`. Parsers tried in order — most specific first.
-
-### Pattern D — templating with Tera
-
-`[changelog].body` template is [Tera](https://keats.github.io/tera/docs/) (Rust). Common helpers:
-
-```text
-{{ commit.message | upper_first }}
-{{ commit.id | truncate(length=7, end="") }}
-{{ timestamp | date(format="%Y-%m-%d") }}
-{% if commit.breaking %}[**breaking**] {% endif %}
-{% if commit.scope %}*({{ commit.scope }})* {% endif %}
-{{ remote.url | default(value="https://github.com/owner/repo") }}/commit/{{ commit.id }}
-```
-
-Iterate with `{% for group, commits in commits | group_by(attribute="group") %}`. Filters chain with `|`.
-
-### Pattern E — release workflow
-
-```bash
-# 1. Decide version (or let git-cliff bump)
-NEXT=$(git-cliff --bumped-version)            # prints v0.3.0 etc., no file write
-
-# 2. Update CHANGELOG (prepend so history is stable)
-git-cliff --tag "$NEXT" --unreleased --prepend CHANGELOG.md
-
-# 3. Commit, then tag — the tag points at the commit that CONTAINS the changelog
-git add CHANGELOG.md
-git commit -m "chore(release): $NEXT"
-git tag "$NEXT"
-
-# 4. Push commit + tag, then create the GitHub Release
-git push --follow-tags
-gh release create "$NEXT" --notes "$(git-cliff --latest --strip all)"
-```
-
-Changelog must live in tagged commit so `git show vX.Y.Z:CHANGELOG.md` matches release.
-
-### Pattern F — output ranges and selection
-
-```bash
-git-cliff vX..vY                 # commits between two tags
-git-cliff --include-path 'src/**' --exclude-path 'docs/**'   # path-scoped
-git-cliff --topo-order           # topological order (good for merges)
-git-cliff --strip all            # drop header/footer (for embedding elsewhere)
-```
-
-`--strip` useful when piping to `gh release create --notes` so page doesn't double title.
+See [references/patterns.md](references/patterns.md). Load only when this section is needed.
 
 ## Anti-patterns
 
-- **Don't regenerate `CHANGELOG.md` from scratch each release.** Use `--prepend` or `--unreleased`. Full regen churns diff, risks dropping manual edits.
-- **Don't rely on commit-message linting at release time.** Catch malformed commits at `commit-msg` time (commitlint, conform). At release, bad commit already in history.
-- **Don't include `chore(release):` commits in changelog.** Add `{ message = "^chore\\(release\\):", skip = true }` to `commit_parsers` or each release entry lists own bump commit.
-- **Don't push release tag before regenerating CHANGELOG.md.** Changelog must live IN tagged commit. If tag one commit ahead of changelog edit, `git show TAG:CHANGELOG.md` lies.
-- **Don't mix conventional and free-form messages without configuring.** Either set `filter_unconventional = false` and accept "Other" bucket, or enforce conventional commits at commit time. Default silently drops non-matching.
-- **Don't forget `repository` (or `--repository`) in `cliff.toml`.** Without it, commit links and `remote.url` template var resolve to default not matching repo.
-- **Don't run `git-cliff` against shallow clone.** Needs full history to walk tags. CI: `actions/checkout@v4` with `fetch-depth: 0`.
-- **Don't put most generic regex first in `commit_parsers`.** `.*` swallows everything; specific rules below never fire.
+See [references/anti-patterns.md](references/anti-patterns.md). Load only when this section is needed.
 
 ## Cross-refs
 
-- Behavioral rule: `rules/AGENTS.md` §4 — "use `git-cliff` for CHANGELOGs; conventional commits format".
-- This repo's config: `/Users/mkh/workspace/fulcrum/cliff.toml` (Features / Bug Fixes / Refactor / Documentation / Performance / Tests / Build/CI / Styling / Chores / Other; tags match `v[0-9]*`).
-- This repo's runner: `bun run changelog` → `git-cliff -o CHANGELOG.md`.
-- Pairs with: `release-please`, `semantic-release` (heavier, opinionated). git-cliff = language-agnostic, lightweight option — own `cliff.toml`, own format.
-- Manual: <https://git-cliff.org/docs/>
-- Configuration: <https://git-cliff.org/docs/configuration>
-- Tera templating: <https://keats.github.io/tera/docs/>
+See [references/cross-refs.md](references/cross-refs.md). Load only when this section is needed.

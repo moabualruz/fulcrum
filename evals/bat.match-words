@@ -14,3 +14,11 @@ bat -l
 bat -p
 bat -n
 | bat
+bat -r
+bat config
+bat main
+bat README
+bat Dockerfile
+bat service
+bat app
+batcat

@@ -71,8 +71,9 @@ Colon-prefix invocation pattern (`fulcrum:jq`) reserved for future plugin/extens
 
 In-repo skills follow Anthropic spec-compliant frontmatter + body skeleton proven by superpowers across its 14 skills. Template at `skills/_template/SKILL.md`:
 
-- **Frontmatter** — `name` (lowercase + digits + hyphens, ≤64 chars, no reserved words `anthropic`/`claude`, dir-name match) and `description` (≤1024 chars, no XML, third-person trigger sentence).
-- **Body** — `## When to use` / `## Invocation` / `## Patterns` / `## Anti-patterns` / `## Cross-refs`.
+- **Frontmatter** — `name` (lowercase + digits + hyphens, ≤64 chars, no reserved words `anthropic`/`claude`, dir-name match) and `description` (quoted YAML string, target ≤300 chars, hard cap ≤1024 chars, no XML). Keep description as trigger summary only; don't pack long trigger lists into it.
+- **Body** — `## When to use` / `## Invocation` / `## Patterns` / `## Anti-patterns` / `## Cross-refs`. Keep `SKILL.md` as TOC + minimal routing. Put section detail in directly linked `references/<section>.md`.
+- **References** — mirror each shipped `references/*.md` with `references/*.original.md`. `.original.md` = human-editable; `.md` = agent-loaded. Keep references one hop from `SKILL.md`; no deep chains.
 
 Validate with `fulcrum skills lint <path>`. Lint against strictest union of all 5 agents frontmatter rules.
 
@@ -99,7 +100,8 @@ Always vendor (never pin) for individual-author repos like `mitsuhiko/agent-stuf
 Tiered:
 
 1. **Lint everywhere (CI):** `fulcrum skills lint skills/` validate every authored skill on strictest frontmatter union. Cheap; catch 80% of cross-agent failures.
-2. **Trigger-rate eval:** `scripts/eval-skill-claude.sh <skill>` calls `claude --print --output-format=json --no-session-persistence` per query. Auth via Claude Code keychain — no `ANTHROPIC_API_KEY` env var. Eval set at `evals/<skill>.json` (~20 entries, ~12/8 trigger/anti-trigger split). Leaderboard runner at `scripts/eval-all.sh`.
-3. **Manual smoke on other 4:** Gemini run `gemini extensions link <ext>` + `--debug`; OpenCode and Codex copy trigger phrase into fresh session; Pi invoke `/skill:<name>` directly. Checklist template at `docs/skill-smoke-test.md`.
+2. **Claude trigger-rate eval:** `scripts/eval-skill-claude.sh <skill>` calls `claude --print --output-format=json --no-session-persistence` per query. Auth via Claude Code keychain — no `ANTHROPIC_API_KEY` env var. Eval set at `evals/<skill>.json` (~20 entries, ~12/8 trigger/anti-trigger split). Leaderboard runner at `scripts/eval-all.sh`.
+3. **Codex trigger-rate eval:** `scripts/eval-skill-codex.sh <skill> --model <codex-model>` calls `codex exec --json --ephemeral` against installed `~/.codex/skills/fulcrum/<skill>`. Use when Codex skill loading or description-budget behavior changes. Keep model explicit in result notes.
+4. **Manual smoke on other 3:** Gemini run `gemini extensions link <ext>` + `--debug`; OpenCode copy trigger phrase into fresh session; Pi invoke `/skill:<name>` directly. Checklist template at `docs/skill-smoke-test.md`.
 
-Honest about asymmetry: trigger-rate measurement only exist for Claude Code today.
+Claude and Codex have scriptable trigger-rate measurement. Gemini/OpenCode/Pi remain smoke-tested until stable JSON event streams exist.

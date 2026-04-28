@@ -14,6 +14,7 @@ Usage:
 
 Default targets (if no files given):
   - skills/*/SKILL.md (excluding _template)
+  - skills/*/references/*.md
   - rules/AGENTS.md (if present)
   - ./AGENTS.md (if present)
   - skills/SOURCES.md (if present)
@@ -157,6 +158,33 @@ async function getDefaultTargets(): Promise<string[]> {
         "!",
         "-path",
         "skills/_template/*",
+      ],
+      {
+        stdout: "pipe",
+        stderr: "ignore",
+      }
+    );
+    const output = await new Response(proc.stdout).text();
+    await proc.exited;
+    targets.push(
+      ...output
+        .trim()
+        .split("\n")
+        .filter((f) => f)
+    );
+  } catch {}
+
+  // skills/*/references/*.md (excluding .original.md)
+  try {
+    const proc = Bun.spawn(
+      [
+        "find",
+        "skills",
+        "-path",
+        "*/references/*.md",
+        "!",
+        "-name",
+        "*.original.md",
       ],
       {
         stdout: "pipe",

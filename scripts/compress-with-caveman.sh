@@ -51,6 +51,11 @@ if [ ${#TARGETS[@]} -eq 0 ]; then
         TARGETS+=("$file")
     done < <(find skills -maxdepth 2 -name "SKILL.md" ! -path "skills/_template/*" | sort)
 
+    # skills/*/references/*.md
+    while IFS= read -r file; do
+        TARGETS+=("$file")
+    done < <(find skills -path "*/references/*.md" ! -name "*.original.md" | sort)
+
     # rules/AGENTS.md
     [ -f "rules/AGENTS.md" ] && TARGETS+=("rules/AGENTS.md")
 

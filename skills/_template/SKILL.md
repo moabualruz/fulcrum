@@ -1,49 +1,26 @@
 ---
 name: tool-name
-description: Third-person, imperative trigger sentence. Include the trigger phrases an agent would actually encounter ("when grepping a tree", "when filtering JSON"). Stay under 1024 characters.
+description: "Third-person trigger summary. Quote YAML, target 300 chars or less, hard cap 1024 chars. Include only core use case and key disambiguator."
 ---
 
 # Tool Name
 
 ## When to use
 
-- Trigger phrase 1 → invoke this skill.
-- Trigger phrase 2 → invoke this skill.
-- Counter-trigger (when NOT to use): …
+See [references/when-to-use.md](references/when-to-use.md). Load only when this section is needed.
 
 ## Invocation
 
-Canonical command:
-
-```bash
-<tool> [args]
-```
-
-JSON-friendly variant (parse with `jq`):
-
-```bash
-<tool> --json | jq '<query>'
-```
+See [references/invocation.md](references/invocation.md). Load only when this section is needed.
 
 ## Patterns
 
-### Pattern A — <name>
-What it is, when to reach for it, single example.
-
-```bash
-<example>
-```
-
-### Pattern B — <name>
-…
+See [references/patterns.md](references/patterns.md). Load only when this section is needed.
 
 ## Anti-patterns
 
-- **Don't** `<bad invocation>` — it `<failure mode>`. Use `<good>` instead.
-- **Don't** assume `<X>` — it changes between versions; verify with `<check>`.
+See [references/anti-patterns.md](references/anti-patterns.md). Load only when this section is needed.
 
 ## Cross-refs
 
-- Behavioral rule: see `rules/AGENTS.md` §<n>.
-- Hook recipe: see `docs/hooks.md` §<n> (if applicable).
-- Upstream docs: <https://…>
+See [references/cross-refs.md](references/cross-refs.md). Load only when this section is needed.
