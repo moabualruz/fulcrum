@@ -1,0 +1,8 @@
+# match-words for just
+# why "just" alone excluded: extremely common English word
+just --list
+just --show
+just --summary
+just --evaluate
+justfile
+just -l

@@ -1,0 +1,9 @@
+# match-words for gh
+# why "gh" alone excluded: too short, matches "right", "high", "ghost", etc.
+gh pr
+gh issue
+gh run
+gh release
+gh api
+gh repo
+gh search

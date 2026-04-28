@@ -1,0 +1,7 @@
+# match-words for flarectl
+flarectl zone
+flarectl dns
+flarectl dns list
+flarectl dns create
+flarectl zone purge
+flarectl --json

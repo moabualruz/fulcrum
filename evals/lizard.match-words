@@ -1,0 +1,8 @@
+# match-words for lizard
+# "lizard" is specific enough as a tool name
+lizard -C
+lizard -L
+lizard --warnings_only
+lizard --csv
+lizard --xml
+lizard --working_threads

@@ -1,0 +1,9 @@
+# match-words for bat
+# why "bat" alone excluded: too short, matches "batch", "battery", etc.
+bat --paging=never
+bat -pp
+bat --style=numbers
+bat --line-range
+bat --list-languages
+bat --color=always
+bat -l json

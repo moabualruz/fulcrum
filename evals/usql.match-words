@@ -1,0 +1,7 @@
+# match-words for usql
+usql -c
+usql -f
+usql -J
+usql 'pg://
+usql mysql://
+usql 'sqlite:

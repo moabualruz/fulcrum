@@ -1,0 +1,11 @@
+# match-words for jq — match real invocations: pipe-to-jq, flags, args.
+# 2 misses unavoidable: Claude sometimes prints CSV/table answer directly without showing the jq command.
+| jq
+jq '
+jq -r
+jq -c
+jq -n
+jq -s
+jq -a
+jq @csv
+jq @tsv

@@ -1,0 +1,8 @@
+# match-words for xh
+# why "xh" alone excluded: too short; flags provide the needed specificity
+xh --check-status
+xh -b
+xh --download
+xh --auth-type=bearer
+xh --multipart
+xh --form

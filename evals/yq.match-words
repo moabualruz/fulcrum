@@ -1,0 +1,8 @@
+# match-words for yq
+# "yq" is specific enough as a tool name; key flags reinforce
+yq -i
+yq -o json
+yq -p json
+yq 'select(
+yq ea
+yq --version
