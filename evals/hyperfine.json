@@ -1,0 +1,22 @@
+[
+  {"query": "Use hyperfine to benchmark whether ripgrep is faster than grep on this corpus: `rg 'TODO' .` vs `grep -r 'TODO' .` across ~3k source files.", "should_trigger": true},
+  {"query": "Use hyperfine to measure the runtime regression after this refactor — old `./bin/process-v1` vs new `./bin/process-v2` on the same input file.", "should_trigger": true},
+  {"query": "Use hyperfine to compare these two shell commands' speed with proper statistics, not just one `time` run: `fd -e py .` vs `find . -name '*.py'`.", "should_trigger": true},
+  {"query": "Use hyperfine to run a CLI benchmark with warmup runs and export JSON for later analysis: `./scripts/build.sh release`.", "should_trigger": true},
+  {"query": "Use hyperfine to compare `./sort-old data.csv` vs `./sort-new data.csv` — I want mean and stddev.", "should_trigger": true},
+  {"query": "Use hyperfine to sweep thread counts 1, 2, 4, 8 and report how `./processor --threads {threads} data.bin` scales.", "should_trigger": true},
+  {"query": "Use hyperfine to time `make -j4` across ten runs and report the median.", "should_trigger": true},
+  {"query": "Use hyperfine to compare a Python script against a Rust rewrite at the command line: `python3 parse.py input.json` vs `./parse-rs input.json`.", "should_trigger": true},
+  {"query": "Use hyperfine to measure cold-cache vs warm-cache read time for this file-processing tool: `./indexer scan ./data/`.", "should_trigger": true},
+  {"query": "Use hyperfine to export a markdown table comparing the runtime of these three CLI tools: `rg pattern .`, `ag pattern .`, `grep -r pattern .`.", "should_trigger": true},
+  {"query": "Use hyperfine to measure performance regression of a binary between two git commits, with `--prepare` to swap binaries.", "should_trigger": true},
+  {"query": "Use hyperfine to compare `xz -3 archive.tar` vs `zstd -3 archive.tar` on a 500 MB file with warmup.", "should_trigger": true},
+  {"query": "Profile a slow function inside a Python program to find the hot loop.", "should_trigger": false},
+  {"query": "Run cargo bench on this Rust crate's microbenchmarks.", "should_trigger": false},
+  {"query": "Set up CI for tracking performance over time across PRs.", "should_trigger": false},
+  {"query": "Measure the peak memory usage of a long-running process.", "should_trigger": false},
+  {"query": "Trace the syscalls a process makes to debug an EACCES error.", "should_trigger": false},
+  {"query": "Generate a flamegraph showing where my web server spends its CPU time.", "should_trigger": false},
+  {"query": "Use pytest-benchmark to time individual functions in my test suite.", "should_trigger": false},
+  {"query": "Benchmark a single SQL query inside Postgres with EXPLAIN ANALYZE.", "should_trigger": false}
+]

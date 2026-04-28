@@ -1,0 +1,22 @@
+[
+  {"query": "Format every Dart source file in this Flutter project from the command line. Project tree: lib/main.dart, lib/widgets/button.dart, lib/services/api.dart.", "should_trigger": true},
+  {"query": "Show the exact `dart analyze` command for running the Dart linter with the recommended ruleset on this package; do not run it. Snippet: ```dart\nvoid main() {\n  var x = 42;\n  var unused = 'hello';\n  print(x);\n}\n```", "should_trigger": true},
+  {"query": "How do I check Dart formatting in CI without rewriting files? Package has lib/ and test/ directories.", "should_trigger": true},
+  {"query": "Show the exact `dart fix --apply` command to auto-fix const constructors and unused imports across this Dart codebase; do not run it. Snippet: ```dart\nimport 'dart:math';\nimport 'dart:io';\nclass Box {\n  final int size;\n  Box(this.size);\n}\n```", "should_trigger": true},
+  {"query": "Show the exact Flutter analyzer shell command for static errors and warnings in this Flutter app; do not run it. Snippet: ```dart\nimport 'package:flutter/material.dart';\nvoid main() {\n  String name;\n  print(name);\n}\n```", "should_trigger": true},
+  {"query": "Show the analysis_options.yaml patch for a Dart package that promotes unused_import to an error, then show the exact `dart analyze` command; do not run it. Current analysis_options.yaml: ```yaml\ninclude: package:lints/recommended.yaml\n```", "should_trigger": true},
+  {"query": "I want a pre-commit step that formats and lints my Flutter package. Package has lib/, test/, and pubspec.yaml.", "should_trigger": true},
+  {"query": "Preview what `dart fix` would change before applying anything to: ```dart\nclass Point {\n  final int x;\n  final int y;\n  Point(this.x, this.y);\n  Point.origin() : x = 0, y = 0;\n}\n```", "should_trigger": true},
+  {"query": "Get JSON output from the Dart analyzer on this file so I can pipe it to jq: ```dart\nvoid greet(String name) {\n  var msg = 'Hello';\n  print('$name');\n}\n```", "should_trigger": true},
+  {"query": "What's the modern replacement for dartfmt and dartanalyzer?", "should_trigger": true},
+  {"query": "Lint this Dart project with flutter_lints and exclude generated `.g.dart` files. Project has lib/models/user.dart and lib/models/user.g.dart.", "should_trigger": true},
+  {"query": "Show the exact `dart format --line-length=100` command for formatting this Dart source; do not run it. Snippet: ```dart\nfinal String veryLongVariableName = someFunction(argumentOne, argumentTwo, argumentThree, argumentFour);\n```", "should_trigger": true},
+  {"query": "Format Kotlin source files in an Android module.", "should_trigger": false},
+  {"query": "Lint a TypeScript file with the recommended ruleset.", "should_trigger": false},
+  {"query": "Format Swift code in an iOS project.", "should_trigger": false},
+  {"query": "Compile and run a Flutter app on an iOS simulator.", "should_trigger": false},
+  {"query": "Run unit tests in a Dart package.", "should_trigger": false},
+  {"query": "Publish a Dart package to pub.dev.", "should_trigger": false},
+  {"query": "Format Python code with black or ruff.", "should_trigger": false},
+  {"query": "Lint a Go module with golangci-lint.", "should_trigger": false}
+]

@@ -1,0 +1,22 @@
+[
+  {"query": "Use ktlint -F to format these Kotlin sources for Android conventions:\n```kotlin\nclass MainActivity:AppCompatActivity(){override fun onCreate(b:Bundle?){super.onCreate(b)\nsetContentView(R.layout.activity_main)}}\n```", "should_trigger": true},
+  {"query": "Use ktlint to fix style issues in this Kotlin file and rewrite it in place:\n```kotlin\nfun add(a:Int,b:Int):Int{ return a+b }\nfun main(){println(add(1,2))}\n```", "should_trigger": true},
+  {"query": "Use ktlint to lint a Kotlin module at `app/src/main/kotlin/com/example/` and report coding-convention violations.", "should_trigger": true},
+  {"query": "Use ktlint to check Kotlin code follows the official Kotlin coding conventions in `src/`.", "should_trigger": true},
+  {"query": "Use ktlint -F to auto-fix import order and indentation in every `.kt` file under `src/`.", "should_trigger": true},
+  {"query": "Use ktlint installGitPreCommitHook to wire up a pre-commit hook that formats Kotlin sources before each commit.", "should_trigger": true},
+  {"query": "Show the ktlint `.editorconfig` that drives both IntelliJ and the command-line formatter.", "should_trigger": true},
+  {"query": "Use ktlint --baseline to adopt a Kotlin linter on a legacy codebase without flooding the build with pre-existing issues.", "should_trigger": true},
+  {"query": "Use ktlint --reporter=json to generate a JSON report of Kotlin style violations from `src/` so I can aggregate it with jq.", "should_trigger": true},
+  {"query": "Show the ktlint `.editorconfig` rules to add stricter Android-specific Kotlin style in an Android Studio project.", "should_trigger": true},
+  {"query": "Use ktlint to format this Kotlin gradle build script along with the regular .kt sources:\n```kotlin\nplugins {\nid(\"com.android.application\") version \"8.0.0\"\nkotlin(\"android\") version \"1.9.0\"\n}\n```", "should_trigger": true},
+  {"query": "Use ktlint in CI to fail the build if any Kotlin file is misformatted.", "should_trigger": true},
+  {"query": "Lint Java code with the standard Java style checker.", "should_trigger": false},
+  {"query": "Format a Swift file with swift-format.", "should_trigger": false},
+  {"query": "Lint a Scala source file with scalafmt.", "should_trigger": false},
+  {"query": "Format Groovy build files in our Gradle project.", "should_trigger": false},
+  {"query": "Type-check a Kotlin codebase and surface unresolved references.", "should_trigger": false},
+  {"query": "Run an Android lint pass to catch resource and API-level issues.", "should_trigger": false},
+  {"query": "Format a Python file with consistent indentation.", "should_trigger": false},
+  {"query": "Run detekt for code-smell analysis on a Kotlin project.", "should_trigger": false}
+]

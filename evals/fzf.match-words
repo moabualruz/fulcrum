@@ -1,0 +1,8 @@
+# match-words for fzf
+# why "fzf" alone excluded: might appear in surrounding text; require --filter/-f context
+fzf --filter
+fzf -f
+fzf --no-sort
+fzf --tiebreak
+fzf -d $'\t'
+fzf --nth=

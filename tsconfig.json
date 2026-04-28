@@ -1,17 +1,26 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./packages/core" },
-    { "path": "./packages/memory" },
-    { "path": "./packages/policy" },
-    { "path": "./packages/planning" },
-    { "path": "./packages/teams" },
-    { "path": "./packages/worker" },
-    { "path": "./packages/monitor" },
-    { "path": "./packages/sync" },
-    { "path": "./packages/workflows" },
-    { "path": "./packages/worktrees" },
-    { "path": "./packages/cli" },
-    { "path": "./packages/agent-fanout" }
-  ]
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["bun-types"],
+    "lib": ["ESNext"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

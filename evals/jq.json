@@ -1,0 +1,22 @@
+[
+  {"query": "I have this JSON — how do I get just the email addresses on the command line?\n```json\n[{\"id\":1,\"name\":\"Alice\",\"email\":\"alice@example.com\"},{\"id\":2,\"name\":\"Bob\",\"email\":\"bob@example.com\"}]\n```", "should_trigger": true},
+  {"query": "Show the exact `jq` command to extract only items where status is active; do not solve it manually:\n```json\n{\"items\":[{\"id\":1,\"status\":\"active\"},{\"id\":2,\"status\":\"inactive\"},{\"id\":3,\"status\":\"active\"}]}\n```", "should_trigger": true},
+  {"query": "How do I count the number of objects in this JSON array from the shell?\n```json\n[{\"x\":1},{\"x\":2},{\"x\":3},{\"x\":4}]\n```", "should_trigger": true},
+  {"query": "Show the exact `jq` command to sort this JSON output by created_at and return the latest two; do not solve it manually:\n```json\n[{\"id\":1,\"created_at\":\"2024-01-10\"},{\"id\":2,\"created_at\":\"2024-03-01\"},{\"id\":3,\"created_at\":\"2024-02-15\"}]\n```", "should_trigger": true},
+  {"query": "Show the exact `jq @csv` command to convert this JSON list of records into a CSV file; do not solve it manually:\n```json\n[{\"name\":\"Alice\",\"age\":30,\"city\":\"NYC\"},{\"name\":\"Bob\",\"age\":25,\"city\":\"LA\"}]\n```", "should_trigger": true},
+  {"query": "Pull the third element out of this JSON array in bash:\n```json\n[\"apple\",\"banana\",\"cherry\",\"date\"]\n```", "should_trigger": true},
+  {"query": "Merge these two JSON objects into one at the command line:\n```json\n{\"a\":1,\"b\":2}\n```\nand\n```json\n{\"c\":3,\"d\":4}\n```", "should_trigger": true},
+  {"query": "Show the exact `jq` command to filter this JSON document by nested field `region == \"us-west\"`; do not solve it manually:\n```json\n{\"users\":[{\"profile\":{\"region\":\"us-west\"},\"name\":\"Alice\"},{\"profile\":{\"region\":\"eu\"},\"name\":\"Bob\"}]}\n```", "should_trigger": true},
+  {"query": "Show the exact `jq` command to get the keys of every object in this JSON array; do not solve it manually:\n```json\n[{\"id\":1,\"name\":\"x\"},{\"id\":2,\"score\":99}]\n```", "should_trigger": true},
+  {"query": "Show the exact `jq` command to group these JSON records by kind and count each group; do not solve it manually:\n```json\n[{\"kind\":\"bug\"},{\"kind\":\"feat\"},{\"kind\":\"bug\"},{\"kind\":\"docs\"},{\"kind\":\"feat\"}]\n```", "should_trigger": true},
+  {"query": "I'm piping the output of `gh pr list --json number,title` and need only the numbers:\n```json\n[{\"number\":42,\"title\":\"fix login\"},{\"number\":43,\"title\":\"add dark mode\"}]\n```", "should_trigger": true},
+  {"query": "Show the exact `jq` command to compute the average of the `score` field across this JSON array; do not solve it manually:\n```json\n[{\"name\":\"a\",\"score\":80},{\"name\":\"b\",\"score\":90},{\"name\":\"c\",\"score\":70}]\n```", "should_trigger": true},
+  {"query": "How do I parse a YAML config file in bash?", "should_trigger": false},
+  {"query": "Extract the third column from a CSV file on the command line.", "should_trigger": false},
+  {"query": "How do I read a TOML file from a shell script?", "should_trigger": false},
+  {"query": "Get all elements from an XML document via the command line.", "should_trigger": false},
+  {"query": "How do I parse JSON inside a Python script using the standard library?", "should_trigger": false},
+  {"query": "Filter rows in a SQL table where the country is 'US'.", "should_trigger": false},
+  {"query": "Pretty-print a JavaScript object in the Node REPL.", "should_trigger": false},
+  {"query": "How do I read JSON in Go without unmarshaling into a struct?", "should_trigger": false}
+]

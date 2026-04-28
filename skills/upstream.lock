@@ -1,0 +1,31 @@
+# Fulcrum upstream skill lockfile.
+# Pins third-party SKILL.md sources to a reviewed SHA. Authoritative manifest
+# is skills/SOURCES.md. Update via:  fulcrum skills sync (re-pulls and re-pins).
+#
+# Format: TOML. One [skills.<name>] block per pinned upstream.
+#
+# Fork triggers (per docs/skills.md §"When to fork"). Fork the moment ANY of:
+#   - 90-day commit silence on the upstream repo
+#   - Unresolved CVE > 14 days
+#   - License unclear / non-permissive
+#   - >2 of our patches diverge from upstream
+#   - Maintainer unresponsive to a PR > 30 days
+#
+# Until pins are recorded, this file is intentionally empty — `fulcrum skills
+# sync` will populate entries when sourcing remote SKILL.md files.
+
+[meta]
+schema_version = 1
+last_audit     = ""           # ISO date of last quarterly review
+
+# Example shape (commented — fill in when first remote skill is pinned):
+#
+# [skills.tmux]
+# source        = "https://github.com/obra/superpowers-lab"
+# subpath       = "skills/using-tmux-for-interactive-commands/SKILL.md"
+# ref           = "main"
+# tree_sha      = "<40-char SHA>"
+# license       = "MIT"
+# author_class  = "individual"   # one of: tool-vendor | foundation | individual
+# pinned_on     = "2026-04-27"
+# review_due    = "2026-07-27"

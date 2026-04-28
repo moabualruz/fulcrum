@@ -1,0 +1,20 @@
+[
+  {"query": "Show the CLI command that prints `config.json` to the terminal with syntax colors. Sample contents:\n```json\n{\"server\":{\"host\":\"0.0.0.0\",\"port\":8080},\"debug\":true}\n```", "should_trigger": true},
+  {"query": "Show the CLI command that views `main.py` in the terminal with line numbers and syntax highlighting:\n```python\nimport os\ndef main():\n    print(os.getcwd())\n```", "should_trigger": true},
+  {"query": "Show the CLI command that prints `service.yaml` with YAML syntax highlighting:\n```yaml\nservice:\n  name: api\n  replicas: 3\n```", "should_trigger": true},
+  {"query": "Show the CLI command that prints `main.rs` in the terminal with Rust syntax colors:\n```rust\nfn main() {\n    let x: u32 = 42;\n    println!(\"{}\", x);\n}\n```", "should_trigger": true},
+  {"query": "Show the CLI pipe that takes `kubectl get -o yaml` output and renders it with YAML syntax highlighting in the terminal.", "should_trigger": true},
+  {"query": "Show the CLI command that previews `a.ts` with TypeScript syntax colors and line numbers in the terminal.", "should_trigger": true},
+  {"query": "Show the CLI command that previews lines 40–80 of `app.go` with Go syntax highlighting.", "should_trigger": true},
+  {"query": "Show the CLI command that prints `Dockerfile` to the terminal with Dockerfile syntax colors and line numbers.", "should_trigger": true},
+  {"query": "Show the CLI pipe that takes piped JSON and renders it with JSON syntax colors but no pager:\n```json\n{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}\n```", "should_trigger": true},
+  {"query": "Show the CLI command that renders `README.md` in the terminal with markdown syntax styling.", "should_trigger": true},
+  {"query": "Show the CLI command that pretty-prints `config.ini` with line numbers in the terminal:\n```ini\n[database]\nhost = localhost\nport = 5432\n```", "should_trigger": true},
+  {"query": "Concatenate three text files into one combined file.", "should_trigger": false},
+  {"query": "Tail a log file live as new lines arrive.", "should_trigger": false},
+  {"query": "View a binary file as a hex dump.", "should_trigger": false},
+  {"query": "Open a file in vim to edit it.", "should_trigger": false},
+  {"query": "Search file contents for the word 'TODO' across the repo.", "should_trigger": false},
+  {"query": "Count the lines in a text file.", "should_trigger": false},
+  {"query": "Page through a 2GB log file efficiently.", "should_trigger": false}
+]

@@ -1,206 +1,154 @@
 # Fulcrum
 
-**Local-first agent operating system for multi-agent TypeScript systems.**
+> **Fulcrum is a local-first CLI Agent OS for supervising repositories, tasks, agent runs, context, memory, and artifacts.**
 
-Fulcrum is the persistence, coordination, and execution layer that keeps agents on track. It manages tasks, enforces WIP limits, routes work through teams and workflows, drives real git worktrees through a merge queue, runs subordinate agents via pluggable adapters, and maintains a three-layer semantic memory with profile-aware health, repair, unified context search, query traces, and eval gates.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![SQLite](https://img.shields.io/badge/SQLite-WAL%20+%20FTS5-003B57?logo=sqlite)](https://sqlite.org/)
-[![Tests](https://img.shields.io/badge/tests-pnpm%20test-blue)](#running-tests)
-[![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm)](https://pnpm.io/)
+That is the destination. This branch (`feat/agent-foundation-clean`) is the foundation work — the cross-agent install layer, hooks, skills, rules, output policy, and CLI orchestrator that everything else sits on top of. The agent runtime, task system, memory store, and plugin/extension layer are placeholders, not implementations. See [`AGENTS.md`](AGENTS.md) for the full trajectory and [`HANDOVER.md`](HANDOVER.md) for the current state.
 
 ---
 
-## Why Fulcrum?
+## What's shipped today (foundation)
 
-Multi-agent systems fail in predictable ways: agents go rogue, pile up stale work, duplicate effort, merge broken branches, and lose context across sessions. Fulcrum solves this at the persistence and execution layer, before any of that reaches your agent code.
+| Layer | What it does | Where it lives |
+|---|---|---|
+| **Context** | Always-on rules and conventions, sentinel-spliced into each agent's primary rules file | `rules/AGENTS.md`, `fulcrum install` |
+| **Automation** | Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) registered per-agent | `src/hooks/`, `fulcrum hooks enable` |
+| **Capability** | 28 skills authored in-repo, content-verified against upstream, with 20-entry trigger evals each | `skills/`, `fulcrum skills sync` |
+| **Output policy** | Per-tool output strategy (raw / status / summary / file) driving `tool-output-router` | `config/tool-output-policy.toml` |
+| **Orchestration** | One Bun-compiled cross-platform binary (`init`, `install`, `hooks`, `skills`, `doctor`, `hook`) | `src/`, `dist/fulcrum-<plat>` |
+| **Cross-agent reach** | Same setup wired into Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI | `docs/agents.md`, `shims/` |
 
-- **Local-first** — SQLite on disk, no network dependency in the core loop, zero cold starts
-- **Pluggable agent executor** — built-in stub, subprocess, and claude-code adapters; `registerAgentAdapter()` for any CLI or SDK
-- **Workflow runner** — declarative step graphs with retries, exponential backoff, per-step timeouts, and 29 step handlers
-- **Real git merge queue** — `allocateWorktree` runs `git worktree add`, `processMergeQueue` runs `git merge --no-ff`, detects conflicts, aborts cleanly
-- **Distributed tracing built-in** — `startSpan`/`endSpan` persist to `trace_events`, opt-in OTLP export to any OTel backend
-- **Three-layer memory** — L0 git-backed markdown vault, L1 FTS5 keyword search, L2 Kuzu graph + HNSW vector search, with staged rebuilds, repair planning, and health reports
-- **Unified retrieval surfaces** — `search context`, explainable code search, persisted query traces, and deterministic + live RAG eval suites
-- **24 canonical roles with capability helpers** — `isL1`, `canInvokeTeams`, `canMerge`, `canWriteCode`, `canEditFiles` are the single source of truth
-- **5 system invariants, enforced on every call** — role boundaries cannot be bypassed
-- **3 guard tests** — CHECK-drift, bare-ulid, and role-string guards prevent entire classes of bugs from shipping
-- **Automatic janitor** — marks stale runs, auto-escalates blocked ones, overlapping-cycle safe
+The orchestrator and all hook recipes are TypeScript subcommands of one Bun-compiled binary (60–120MB per platform; cross-compiled via `bun build --compile`). No bash, jq, yq, or Python required at runtime.
+
+## What's not shipped yet (placeholders)
+
+These are the layers the foundation is preparing for. They are **not built**; do not depend on them. They appear here so the trajectory is legible.
+
+- **Repository supervisor** — multi-repo awareness, work-tree state, branch posture.
+- **Task system** — durable units of work tracked across agent sessions.
+- **Agent runs** — first-class agent invocations with inputs, transcripts, retries.
+- **Context engine** — selecting and assembling what each run sees.
+- **Memory** — persistent facts, decisions, references across sessions.
+- **Artifacts** — outputs of runs (diffs, plans, reports) tracked and queryable.
+- **Plugins / extensions** — third-party drop-ins under each agent's native namespacing convention.
 
 ---
 
-## Quick Start
+## Principles
+
+- **CLI and skills over MCP.** MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead.
+- **MCPs off by default.** Register MCPs disabled; enable per-session when genuinely needed.
+- **Behavioral rules, not knowledge.** Rules change what the agent *does*, not what it *knows*. `"Use ruff, never flake8"` works. `"Write clean code"` does nothing.
+- **Agent-friendly tools output JSON.** `--json` / `--format json` is the selection criterion for every CLI in this stack.
+- **Skill content correctness is not implied by lint.** Author against upstream `--help`, not memory.
+
+---
+
+## Skill namespacing — the `fulcrum:` prefix
+
+Skills install under a `fulcrum/` subfolder in each agent's skills directory:
+
+```
+~/.claude/skills/fulcrum/<name>/SKILL.md
+~/.codex/skills/fulcrum/<name>/SKILL.md
+~/.config/opencode/skills/fulcrum/<name>/SKILL.md
+~/.pi/agent/skills/fulcrum/<name>/SKILL.md
+~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md   # extension is the namespace
+```
+
+This sets up the `fulcrum:<skill-name>` address space and matches the prefixing convention used by most plugin / extension systems. When that layer ships, the install shape already conforms.
+
+---
+
+## Documents
+
+| Doc | Topic |
+|---|---|
+| [AGENTS.md](AGENTS.md) | Project-level instructions and trajectory |
+| [HANDOVER.md](HANDOVER.md) | Current state, outstanding work, recent decisions |
+| [docs/context.md](docs/context.md) | Context layer — `CLAUDE.md`, `AGENTS.md` conventions |
+| [docs/hooks.md](docs/hooks.md) | Automation layer — full event surface + 8 shipped recipes |
+| [docs/tool-output-policy.md](docs/tool-output-policy.md) | Per-tool output strategies driving `tool-output-router` |
+| [docs/capabilities.md](docs/capabilities.md) | Capability layer — CLI tool catalogue |
+| [docs/skills.md](docs/skills.md) | Skills — paths, authoring template, fork policy, verification |
+| [docs/skill-smoke-test.md](docs/skill-smoke-test.md) | Manual cross-agent verification checklist |
+| [docs/mcp.md](docs/mcp.md) | MCP policy — opt-in only |
+| [docs/agents.md](docs/agents.md) | Cross-agent translation — Codex, Gemini, OpenCode, Pi |
+| [skills/SOURCES.md](skills/SOURCES.md) | Skill registry and authoring queue |
+
+---
+
+## Install
+
+Two paths, both produce `~/.fulcrum/bin/fulcrum`:
+
+**From a clone (builds locally; needs [Bun](https://bun.sh)):**
 
 ```bash
-# From source
-pnpm install && pnpm run setup
+curl -fsSL https://bun.sh/install | bash      # if Bun isn't installed
+git clone https://github.com/moabualruz/fulcrum ~/code/fulcrum
+cd ~/code/fulcrum
+bash scripts/install.sh                       # builds, installs, splices rules
+bash scripts/install.sh --with-project ~/code/myproject   # also bootstrap a project
 ```
 
-`pnpm run setup` symlinks `fulcrum` to `~/.local/bin`, registers Claude/Gemini/PI integrations, and installs Codex/opencode config, hooks, skills, and rules.
-
-The zero-friction install path (no clone required):
+**From a published release (no Bun needed; only `curl`):**
 
 ```bash
-npx fulcrum-mcp@latest init   # auto-detect Claude Code / Gemini CLI / Cursor / Windsurf
+FULCRUM_RELEASE_TAG=v0.1.0 bash <(curl -fsSL https://raw.githubusercontent.com/moabualruz/fulcrum/main/scripts/install.sh)
 ```
+
+> **Older Macs / Apple Silicon:** binaries are native per-arch (`darwin-x64`, `darwin-arm64`). No Rosetta needed. If the auto-detect picks the wrong arch on an unusual setup, set `FULCRUM_BIN=/path/to/fulcrum-<plat>` explicitly.
+
+After install, common commands:
 
 ```bash
-pnpm run setup:claude     # Claude Code only
-pnpm run setup:gemini     # Gemini CLI only
-pnpm run setup:pi         # PI cockpit only
-fulcrum install plan      # detect plugin/extension/config path per runtime
-fulcrum init --cursor     # project-local Cursor rules + config
-fulcrum init --codex      # project-local Codex config
-pnpm run setup:dry        # Plan the install — show every action without touching disk
-pnpm run setup:check      # Verify an existing install
+fulcrum init <dir>            # bootstrap a project's AGENTS.md + .claude/CLAUDE.md
+fulcrum doctor                # bun, agent dirs, tool presence, policy health
+fulcrum hooks list            # show available hook recipes
+fulcrum hooks enable format   # mark enabled + print per-agent registration snippet
+fulcrum skills sync           # mirror skills/ to each agent's skills/fulcrum/ folder
+fulcrum skills list           # enumerate authored skills with eval coverage
+fulcrum skills lint <path>    # validate frontmatter + body section structure
+fulcrum hook <name>           # run a hook recipe (called by agent runtimes via stdin)
 ```
 
-No explicit init step — every `fulcrum` command auto-initializes `$CWD` on first run:
+### Verify
 
 ```bash
-fulcrum task create --title "Implement OAuth callback"
-fulcrum task list --status running
-fulcrum board show
-fulcrum serve all --port 4721    # MCP + HTTP monitor + web dashboard at :4721
-fulcrum serve mcp-http --port 4722
-fulcrum tui                      # full-screen terminal cockpit (Tab to switch panes)
-fulcrum log                      # last 50 events from DB
-fulcrum log --follow             # tail live SSE stream
-fulcrum workflow start --workflow-name implement_feature --workspace-id ws_1
-fulcrum workflow run --wf-id wfr_01j...
-fulcrum queue merge process --workspace-id ws_1 --actor-role integration_worker
-fulcrum agent spawn --target-role software_engineer --caller-role chief_of_staff \
-  --task-id task_01j... --workspace-id ws_1 --project-id proj_1 --adapter subprocess
-fulcrum doctor --fix             # health check + auto-repair
+bun run ci                    # install → tsc → test → build:all → skills lint
+fulcrum doctor                # post-install environment check
 ```
 
-### RAG Operations
+### Author + release
 
 ```bash
-fulcrum memory doctor --json
-fulcrum memory doctor --repair-plan --profile dev --json
-fulcrum memory rebuild --all --mode plan --profile dev --json
-fulcrum search context "why is vector coverage degraded?" --explain --json
-fulcrum memory trace-query ragtrace_... --json
-fulcrum memory eval --suite live-rag --json
-fulcrum memory runtime-experiments list --json
-```
-
-Use non-install profiles for development and review. Normal repair stays targeted to derived-state differences from canonical sources; clean-slate rebuilds remain explicit. Agent-facing traces, eval artifacts, events, and memory use path fingerprints instead of raw absolute paths.
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Agent CLIs / Runtimes                         │
-│    Claude Code  ·  Gemini CLI  ·  PI  ·  custom subprocess       │
-│          (PreToolUse hooks call `fulcrum hook <runtime>`)        │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────────┐
-│                         fulcrum-worker                           │
-│   spawnAgent → policy gate → adapter.spawn → run lifecycle       │
-│   Built-in: stub · subprocess    Pluggable: registerAgentAdapter │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────────┐
-│                       fulcrum-agent-core                         │
-│   tasks · runs · policy · memory · handoffs · events · CoS       │
-│   roles · capabilities · telemetry spans · advisory locks        │
-│                  SQLite (WAL + FTS5)                             │
-└───┬──────────┬──────────┬──────────┬──────────┬─────────────────┘
-    │          │          │          │          │
-┌───▼──┐  ┌───▼───┐  ┌───▼──┐  ┌───▼───┐  ┌───▼──────┐
-│memory│  │monitor│  │teams │  │policy │  │planning  │
-│ L0   │  │HTTP + │  │slots │  │SYSTEM_│  │epics     │
-│ L1   │  │SSE    │  │sched.│  │INVARI │  │issues    │
-│ L2   │  │control│  │      │  │ANTS   │  │PRDs/plans│
-│kuzu  │  │API    │  │      │  │audit  │  │          │
-└──────┘  └───────┘  └──────┘  └───────┘  └──────────┘
-┌──────────┐  ┌──────────────┐  ┌───────────────┐  ┌─────────────┐
-│workflows │  │   worktrees  │  │     sync      │  │     cli     │
-│runner +  │  │ real git     │  │ Plane adapter │  │ control +   │
-│29 step   │  │ worktree +   │  │ conflict res. │  │ RAG ops +   │
-│handlers  │  │ merge queue  │  │ secret scan   │  │ MCP surfaces │
-└──────────┘  └──────────────┘  └───────────────┘  └─────────────┘
+bun run changelog             # regenerate CHANGELOG.md (needs git-cliff)
+bun run release vX.Y.Z        # gated release: clean tree → ci → changelog → tag → build
+bun run release vX.Y.Z --gh   # also create the GitHub release and upload dist/*
 ```
 
 ---
 
-## Packages
+## Skills authored
 
-| Package | Description |
-|---------|-------------|
-| [`fulcrum-agent-core`](packages/core) | Domain functions, SQLite schema + migrations, role capability helpers, telemetry spans + OTel exporter, embedding providers, handoff protocol, event stream |
-| [`fulcrum-memory`](packages/memory) | Three-layer memory stack plus RAG lifecycle surfaces — profile-aware rebuilds, repair plans, health reports, unified context search, query traces, eval suites, graph/code/vector coverage |
-| [`fulcrum-monitor`](packages/monitor) | Real-time metrics and RAG readouts — daily/project/agent metrics, burndown, SSE event stream, HTTP control API, built-in web dashboard, bearer-token-gated write endpoints |
-| [`fulcrum-planning`](packages/planning) | Project planning domain — epics, issues, PRDs, plans, dependency graph, code review workflows |
-| [`fulcrum-policy`](packages/policy) | Policy engine — 5 system invariants, custom rules, secret guard (12 named patterns, range-based dedup, auto-redact), audit log |
-| [`fulcrum-sync`](packages/sync) | Bidirectional sync — Plane integration with retry/backoff, conflict detection, secret scan before push, priority queue |
-| [`fulcrum-teams`](packages/teams) | Agent team orchestration — typed templates, slot policies, communication/budget/quality/latency classes |
-| [`fulcrum-worker`](packages/worker) | Pluggable agent executor — `AgentAdapter` contract, stub + subprocess + claude-code adapters, `spawnAgent` lifecycle with policy gate and span instrumentation |
-| [`fulcrum-workflows`](packages/workflows) | Workflow engine — declarative step graphs, runner with structured `RetryPolicy`, 29 step handlers, run state machine |
-| [`fulcrum-worktrees`](packages/worktrees) | Worktree lifecycle — real `git worktree add` allocation, artifact tracking, review gating, integration merge queue with `git merge --no-ff` and conflict handling |
-| [`fulcrum-agent-fanout`](packages/agent-fanout) | Canonical skill and rule fanout — emits per-agent artifacts for Claude, Codex, Gemini, opencode, PI, Copilot, Cursor, and Windsurf |
-| [`fulcrum-agent-cli`](packages/cli) | `fulcrum` binary — task/workflow/team control plane, RAG doctor/rebuild/eval/search surfaces, 49 MCP tools, auto-init per project, hook handlers for agent runtimes, cockpit TUI, activity log |
-| [`fulcrum-mcp`](packages/fulcrum-mcp) | Zero-install MCP entry point — `npx fulcrum-mcp` starts the MCP server; `npx fulcrum-mcp init` configures Claude Code, Gemini CLI, Cursor, and Windsurf MCP setup |
+28 in-repo skills (`fulcrum skills list` enumerates them with eval coverage). All content-verified against upstream READMEs and docs:
 
----
-
-## Documentation
-
-| Guide | Contents |
-|-------|----------|
-| [Installation](docs/guides/installation.md) | Global setup, per-runtime install, what gets installed where |
-| [Plugins & Extensions](docs/guides/plugins-and-extensions.md) | Runtime packaging models, adaptive install paths, publishing guidance |
-| [CLI Reference](docs/guides/cli-reference.md) | Full command tree with all flags and examples |
-| [Core API](docs/guides/core-api.md) | Tasks, runs, policy, roles, memory, handoffs, events, locks, DB, janitor, embedding |
-| [Memory System](docs/guides/memory.md) | L0 vault structure, L1 FTS5/RRF scoring, L2 Kuzu graph + HNSW pipeline |
-| [MCP Tools](docs/guides/mcp-tools.md) | All 49 MCP tools with parameters, read/write semantics, and agent lifecycle |
-| [RAG Runtime Experiments](docs/guides/rag-runtime-experiments.md) | Disabled-by-default runtime/store experiments, adoption gates, rollback, and reporting |
-| [Policy Engine](docs/guides/policy.md) | System invariants, custom rules, secret guard patterns, hook system, doctor |
-| [Monitor Server](docs/guides/monitor.md) | All HTTP endpoints, pagination, control API, A2A agent card |
-| [Agent Roles & Teams](docs/guides/agent-roles.md) | 24 roles, capability helpers, agent definitions, A2A cards, team templates |
-| [Worker Adapters](docs/guides/worker-adapters.md) | AgentAdapter contract, built-in adapters, custom adapter walkthrough |
-| [Workflow Authoring](docs/guides/workflow-authoring.md) | Defining workflows, 29 step handlers, runner options |
-| [Worktrees](docs/guides/worktrees.md) | Allocation, merge queue, conflict handling, CLI |
-| [Sync](docs/guides/sync.md) | Plane integration, conflict resolution, retry behavior |
-| [Telemetry](docs/guides/telemetry.md) | Local spans, auto-instrumentation, OTLP export |
-| [Configuration](docs/guides/configuration.md) | `.fulcrum.json` schema, all environment variables |
-| [Sandboxed E2E](docs/guides/sandbox-e2e.md) | Dagger/Docker sandbox for full install, integration, and UI checks with fake home |
-| [Architecture](docs/guides/architecture.md) | System diagram, package ownership, guard tests, project structure |
-
----
-
-## Running Tests
-
-```bash
-pnpm test                          # all packages
-cd packages/core && pnpm test      # single package
-pnpm test:watch                    # watch mode
-FULCRUM_EMBEDDING_TESTS=1 pnpm test  # embedding integration tests
-pnpm build                         # workspace build
-pnpm run check:cycles              # import cycle guard
-git diff --check                   # whitespace / patch hygiene
+```
+bat   biome   dart-toolchain   difftastic   direnv   eza   flarectl   fzf
+gh    git-cliff   gitleaks   google-java-format   hyperfine   jq   just   ktlint
+lizard   mise   osv-scanner   pmd   ruff   sd   spotbugs   usql
+watchexec   xh   yq   zoxide
 ```
 
-Test counts move quickly across the workspace. Run `pnpm test` for the current full-suite count.
+See [`skills/SOURCES.md`](skills/SOURCES.md) for the registry and the long-tail authoring queue.
 
 ---
 
-## Contributing
+## Reading order for a fresh install
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions welcome.
-
-> **Note for native module contributors:** `fulcrum-memory` depends on `kuzu` (Rust native addon). pnpm 10 requires `onlyBuiltDependencies=kuzu` in `.npmrc` to allow the native build.
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
-
-## License
-
-[MIT](LICENSE) — Mo Abualruz
+1. **[capabilities.md](docs/capabilities.md)** — install the foundation CLI tools.
+2. **[context.md](docs/context.md)** — write your global rules and per-project `AGENTS.md`.
+3. **[hooks.md](docs/hooks.md)** — wire up the recipes you want; `fulcrum hooks enable` prints each per-agent snippet.
+4. **[skills.md](docs/skills.md)** — install superpowers as the cross-agent base; author skills via the template.
+5. **[mcp.md](docs/mcp.md)** — register `deepwiki` as the only always-on MCP.
+6. **[agents.md](docs/agents.md)** — replicate the setup on Codex, Gemini, OpenCode, Pi as needed.

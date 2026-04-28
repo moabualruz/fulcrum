@@ -1,0 +1,23 @@
+[
+  {"query": "Show the bytecode static-analyzer CLI command that finds null-pointer dereference bugs in `target/myservice-1.0.jar` (the dedicated Java jar bug-finder, not manual analysis):\n```java\npublic class OrderService {\n  public String getStatus(Order order) {\n    return order.getCustomer().getName().toUpperCase();\n  }\n}\n```", "should_trigger": true},
+  {"query": "Show the CLI command that audits the build output `target/myapp.jar` for concurrency bugs using a bytecode-level Java static analyzer:\n```java\npublic class Counter {\n  private int count = 0;\n  public void increment() { count++; }\n}\n```", "should_trigger": true},
+  {"query": "Show the CLI command that runs a bytecode static analyzer on `target/myapp.jar` and produces a report:\n```java\npublic class ResourceLoader {\n  InputStream open(String path) throws IOException {\n    return new FileInputStream(path);\n  }\n}\n```", "should_trigger": true},
+  {"query": "Show the CLI command that produces a SARIF report from a compiled Java jar at `build/libs/app.jar` for GitHub Code Scanning upload.", "should_trigger": true},
+  {"query": "We're still using findbugs in our pipeline — what's the modern bytecode-analyzer replacement and show the migration command.", "should_trigger": true},
+  {"query": "Show the CLI command that generates an HTML bug report for the compiled classes under `build/classes`:\n```java\npublic class DBConn {\n  Connection c = DriverManager.getConnection(url);\n}\n```", "should_trigger": true},
+  {"query": "Show the Maven config to add the find-sec-bugs plugin to the existing `spotbugs-maven-plugin` to catch SQL injection and weak crypto.", "should_trigger": true},
+  {"query": "Show the CI command that fails the Gradle build when high-confidence correctness bugs are found in `build/libs/*.jar`.", "should_trigger": true},
+  {"query": "How do I suppress the spotbugs rule `NP_NULL_ON_SOME_PATH` on one method without disabling globally? Show the annotation:\n```java\npublic class Processor {\n  public void run(Input input) {\n    process(input.getData());\n  }\n}\n```", "should_trigger": true},
+  {"query": "Show the CLI flag to tune spotbugs effort level so PR scans are fast but nightly runs go deeper. Project builds to `target/app.jar` with `config/spotbugs.xml`.", "should_trigger": true},
+  {"query": "Show the spotbugs exclude-filter XML so generated classes in `com.example.generated.*` aren't reported as buggy.", "should_trigger": true},
+  {"query": "Show the CLI command that detects potential infinite recursion or unclosed streams in the compiled jar at `build/output/app.jar`.", "should_trigger": true},
+  {"query": "Format this Java source file according to the Google Java style guide.", "should_trigger": false},
+  {"query": "Find code smells and structural issues in our Java source tree.", "should_trigger": false},
+  {"query": "Lint a Kotlin codebase against the official Kotlin coding conventions.", "should_trigger": false},
+  {"query": "Scan our Maven dependencies for known CVEs.", "should_trigger": false},
+  {"query": "Audit a Docker image for vulnerabilities before publishing.", "should_trigger": false},
+  {"query": "Check our package-lock.json for outdated dependencies.", "should_trigger": false},
+  {"query": "Run cyclomatic complexity analysis across our Java source files.", "should_trigger": false},
+  {"query": "Format Python code with Black.", "should_trigger": false},
+  {"query": "Find duplicated code blocks across the repo.", "should_trigger": false}
+]

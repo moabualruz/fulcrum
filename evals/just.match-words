@@ -1,0 +1,15 @@
+# match-words for just
+# why "just" alone excluded: extremely common English word
+just --list
+just --show
+just --summary
+just --evaluate
+just -l
+just greet
+just env
+just env=
+just build
+just lint
+just test
+just deploy
+just --justfile

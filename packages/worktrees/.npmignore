@@ -1,7 +1,0 @@
-**/*.test.ts
-**/*.test.tsx
-**/tests/**
-src/tests/**
-tsconfig*.json
-tsup.config.ts
-vitest.config.ts

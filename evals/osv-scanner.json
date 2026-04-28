@@ -1,0 +1,22 @@
+[
+  {"query": "Show the exact osv-scanner command only; do not run it. Scan this `package-lock.json` for known CVEs and print a vulnerability report:\n```json\n{\"name\":\"myapp\",\"lockfileVersion\":3,\"packages\":{\"node_modules/lodash\":{\"version\":\"4.17.20\"}}}\n```", "should_trigger": true},
+  {"query": "Show the exact osv-scanner command only; do not run it. Audit this `Cargo.lock` for known security advisories:\n```toml\n[[package]]\nname = \"openssl\"\nversion = \"0.9.24\"\n```", "should_trigger": true},
+  {"query": "Show the exact osv-scanner command only; do not run it. Scan these Go dependency files for vulnerable packages:\n```\ngo.mod:\nrequire (\n  golang.org/x/net v0.0.0-20210405180319\n  github.com/gin-gonic/gin v1.7.0\n)\n```", "should_trigger": true},
+  {"query": "Show the exact osv-scanner command only; do not run it. Find vulnerable npm packages given this `package.json`:\n```json\n{\"dependencies\":{\"express\":\"4.17.1\",\"axios\":\"0.21.0\",\"minimist\":\"1.2.0\"}}\n```", "should_trigger": true},
+  {"query": "Show the exact osv-scanner command only; do not run it. Run a vulnerability scan over this `pnpm-lock.yaml`:\n```yaml\nlockfileVersion: '6.0'\ndependencies:\n  serialize-javascript:\n    version: 3.0.0\n```", "should_trigger": true},
+  {"query": "Show the exact osv-scanner command only; do not run it. Scan this SPDX SBOM for published vulnerabilities:\n```json\n{\"spdxVersion\":\"SPDX-2.3\",\"packages\":[{\"name\":\"log4j-core\",\"versionInfo\":\"2.14.1\"}]}\n```", "should_trigger": true},
+  {"query": "Show the exact osv-scanner command only; do not run it. Use one CLI gate to audit npm, Go, and Python dependencies in a monorepo with `package-lock.json`, `go.sum`, and `Pipfile.lock` at the root.", "should_trigger": true},
+  {"query": "Show the exact osv-scanner command only; do not run it. Generate a SARIF report of dependency CVEs from this `package-lock.json` for GitHub Code Scanning upload:\n```json\n{\"name\":\"webapp\",\"lockfileVersion\":3,\"packages\":{\"node_modules/ansi-regex\":{\"version\":\"3.0.0\"}}}\n```", "should_trigger": true},
+  {"query": "Show the exact osv-scanner command only; do not run it. Detect vulnerable transitive dependencies in this `Pipfile.lock`:\n```json\n{\"default\":{\"requests\":{\"version\":\"==2.25.0\"},\"pyyaml\":{\"version\":\"==5.3.1\"}}}\n```", "should_trigger": true},
+  {"query": "Show the exact osv-scanner command only; do not run it. Check this `Gemfile.lock` for any GHSA advisories:\n```\nGEM\n  specs:\n    rails (6.1.4)\n    nokogiri (1.11.0)\n```", "should_trigger": true},
+  {"query": "Show the osv-scanner config syntax only; do not run it. Ignore advisory `GHSA-1234-5678-abcd` for 90 days.", "should_trigger": true},
+  {"query": "Show the exact osv-scanner command only; do not run it. Scan the `alpine:3.19` container image for vulnerable OS and language packages.", "should_trigger": true},
+  {"query": "Scan our codebase for SQL injection vulnerabilities.", "should_trigger": false},
+  {"query": "Find leaked AWS keys committed to this repo.", "should_trigger": false},
+  {"query": "Lint our Python code for unused imports.", "should_trigger": false},
+  {"query": "Find unused dependencies in package.json that we can remove.", "should_trigger": false},
+  {"query": "Scan a docker container's filesystem for malware and OS-level CVEs end-to-end.", "should_trigger": false},
+  {"query": "Find type errors in our TypeScript project.", "should_trigger": false},
+  {"query": "Run static analysis to catch memory safety bugs in this C++ code.", "should_trigger": false},
+  {"query": "Format our Go code according to gofmt rules.", "should_trigger": false}
+]

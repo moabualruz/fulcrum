@@ -1,0 +1,22 @@
+[
+  {"query": "Use git-cliff to generate a CHANGELOG.md from these conventional commits:\n```\nfeat(auth): add OAuth2 login\nfix(parser): handle null input\nchore: bump deps\ndocs: update README\n```", "should_trigger": true},
+  {"query": "Show me the git-cliff command to produce release notes before tagging v0.4 from these commits:\n```\nfeat(api): add pagination\nfix(db): fix connection leak\nperf(cache): reduce latency\n```", "should_trigger": true},
+  {"query": "Run git-cliff to update CHANGELOG.md for the v0.4 release from these commits:\n```\nfeat(ui): dark mode\nfix(auth): session expiry bug\nrefactor(core): split module\n```", "should_trigger": true},
+  {"query": "What git-cliff invocation produces release notes from these 5 commits?\n```\nfeat: add export CSV\nfix: off-by-one in pagination\nchore: update CI\ndocs: add API reference\ntest: add integration tests\n```", "should_trigger": true},
+  {"query": "Show the exact `git-cliff` command to generate a changelog before tagging v0.2 from these commits; do not run it:\n```\nfeat: initial release\nfix: startup crash on Windows\nchore: add LICENSE\n```", "should_trigger": true},
+  {"query": "What git-cliff command summarizes commits between v1.0 and HEAD into a changelog?\n```\nfeat(billing): Stripe integration\nfix(email): retry on 503\nperf: cache user lookups\n```", "should_trigger": true},
+  {"query": "Show the exact `git-cliff --unreleased` command to update the unreleased section of CHANGELOG.md with these commits; do not run it:\n```\nfeat(search): full-text index\nfix(upload): reject empty files\n```", "should_trigger": true},
+  {"query": "Run git-cliff --unreleased to summarize commits since last tag, given these recent commits:\n```\nfeat(cli): add --dry-run flag\nfix(config): ignore missing keys\nchore: rotate CI secrets\n```", "should_trigger": true},
+  {"query": "Show me the git-cliff command that groups changes since v1.2.0 by feature/fix for CHANGELOG.md:\n```\nfeat(report): PDF export\nfeat(dashboard): new widgets\nfix(chart): negative axis bug\nfix(login): redirect loop\n```", "should_trigger": true},
+  {"query": "Use git-cliff --bump to infer the next version and write changelog from these conventional commits:\n```\nfeat!: drop Python 3.8 support\nfeat(api): streaming responses\nfix(timeout): increase default\n```", "should_trigger": true},
+  {"query": "Add a parser to cliff.toml so docs commits show up under Documentation. Current config:\n```toml\n[git]\nconventional_commits = true\n```", "should_trigger": true},
+  {"query": "Show the exact `git-cliff --prepend` command to add the new release section to the existing CHANGELOG without regenerating history; do not run it. Existing CHANGELOG starts with:\n```\n# Changelog\n## [0.3.0] - 2024-01-01\n### Features\n- add dark mode\n```", "should_trigger": true},
+  {"query": "Show me git log since main.", "should_trigger": false},
+  {"query": "Open a GitHub release in the browser.", "should_trigger": false},
+  {"query": "List contributors with git shortlog.", "should_trigger": false},
+  {"query": "Write a manual release announcement post for the blog.", "should_trigger": false},
+  {"query": "Run gh release create for v1.0.", "should_trigger": false},
+  {"query": "Lint commit messages so they follow conventional commits going forward.", "should_trigger": false},
+  {"query": "Tag the current commit as v1.2.0.", "should_trigger": false},
+  {"query": "Show the diff between two tags.", "should_trigger": false}
+]

@@ -1,0 +1,13 @@
+# match-words for eza
+eza -l
+eza -la
+eza -lh
+eza -T
+eza --tree
+eza --git
+eza --git-ignore
+eza --level=
+eza --sort=
+eza --icons
+eza --header
+eza --group-directories-first

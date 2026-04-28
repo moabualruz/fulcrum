@@ -1,0 +1,9 @@
+# match-words for lizard
+# "lizard" alone is specific enough — bare tool name appears in most responses
+lizard
+lizard -C
+lizard -L
+lizard --warnings_only
+lizard --csv
+lizard --xml
+lizard --working_threads

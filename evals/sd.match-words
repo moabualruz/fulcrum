@@ -1,0 +1,13 @@
+# match-words for sd
+# sd appears in responses as backtick-wrapped `sd` or in pipelines like fd -x sd
+# "sd" standalone is safe: negative queries in this eval set never produce sd in response
+sd
+sd -p
+sd -F
+sd -f i
+sd -f s
+sd -A
+sd -s
+sd -n
+fd -x sd
+-x sd

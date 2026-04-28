@@ -1,0 +1,22 @@
+[
+  {"query": "Show the exact mise command only; do not run it. Pin python 3.12 for this repo so everyone gets the same version. Currently the project has no `.mise.toml`.", "should_trigger": true},
+  {"query": "How do I install and activate the exact runtime versions for this project? The `.mise.toml` at the root specifies:\n```toml\n[tools]\npython = \"3.11\"\nnode = \"20\"\ngo = \"1.22\"\n```\nI need to make sure all three are available before running the build.", "should_trigger": true},
+  {"query": "Install a specific node version per project without using nvm. I want Node 20 for this repo.", "should_trigger": true},
+  {"query": "I want my tool versions to switch automatically when I cd into the repo. The repo pins Python 3.12.", "should_trigger": true},
+  {"query": "We're moving off asdf — what's the modern replacement that reads `.tool-versions` files?", "should_trigger": true},
+  {"query": "This repo has a `.tool-versions` file but I don't have asdf installed:\n```\nnodejs 20.11.0\npython 3.11.8\n```\nHow do I run it?", "should_trigger": true},
+  {"query": "How do I pin both go 1.23 and terraform 1.9.8 for this project in a single config file?", "should_trigger": true},
+  {"query": "Set the global default node version to 20 on my machine.", "should_trigger": true},
+  {"query": "How do I run a one-off command against python 3.11 without changing the project's pin?", "should_trigger": true},
+  {"query": "What's the right way to make a project's runtimes available in a CI shell that isn't interactive? Project uses `.mise.toml`.", "should_trigger": true},
+  {"query": "Show the exact mise command only; do not run it. Show which versions of each tool are currently active in this directory. `.mise.toml` pins node, python, and go.", "should_trigger": true},
+  {"query": "Show the exact mise command only; do not run it. Check whether the runtimes pinned in this repo's `.mise.toml` are outdated. The file currently has:\n```toml\n[tools]\npython = \"3.11.0\"\nnode = \"20.0.0\"\nrust = \"1.75.0\"\n```\nI want to know if newer stable versions exist for any of these.", "should_trigger": true},
+  {"query": "Install postgres on my system so I can run a database locally.", "should_trigger": false},
+  {"query": "Build and push a docker image for this service.", "should_trigger": false},
+  {"query": "Set DATABASE_URL and API_KEY env vars only when I'm in the project directory.", "should_trigger": false},
+  {"query": "Scan this project's lockfile for vulnerable dependencies.", "should_trigger": false},
+  {"query": "Create and activate a python virtualenv with pip for this project.", "should_trigger": false},
+  {"query": "Install a homebrew formula for ripgrep.", "should_trigger": false},
+  {"query": "Run my project's test recipe defined in the justfile.", "should_trigger": false},
+  {"query": "Update the npm packages in package.json to their latest versions.", "should_trigger": false}
+]

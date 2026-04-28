@@ -1,81 +1,32 @@
 {
   "name": "fulcrum",
-  "version": "0.0.3",
-  "private": true,
-  "packageManager": "pnpm@10.33.0",
-  "description": "Local-first agent control plane — task tracking, WIP enforcement, human-readable memory vault (L0) + hybrid recall (L1 FTS5 + L2 Kuzu graph), and CoS context for multi-agent TypeScript systems",
-  "keywords": [
-    "agent-os",
-    "multi-agent",
-    "sqlite",
-    "local-first",
-    "llm",
-    "ai-agents",
-    "task-management",
-    "typescript",
-    "vault",
-    "kuzu",
-    "graph-database",
-    "entity-graph",
-    "knowledge-graph"
-  ],
-  "author": "Mo Abualruz <moabualruz@github>",
-  "license": "MIT",
-  "homepage": "https://github.com/moabualruz/fulcrum#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/moabualruz/fulcrum.git"
-  },
-  "bugs": {
-    "url": "https://github.com/moabualruz/fulcrum/issues"
-  },
+  "version": "0.1.0",
+  "description": "Multi-agent foundation CLI — hooks, skills, rules across Claude Code, Codex, Gemini, OpenCode, Pi.",
   "type": "module",
+  "private": true,
+  "module": "src/index.ts",
+  "bin": {
+    "fulcrum": "src/index.ts"
+  },
   "scripts": {
-    "test": "pnpm -r test",
-    "build": "pnpm -r build",
-    "check:cycles": "node --import tsx/esm scripts/check-cycles.ts",
-    "gen:agent-mds": "node --import tsx/esm scripts/gen-agent-mds.ts",
-    "gen:claude-md": "node --import tsx/esm scripts/gen-claude-md.ts",
-    "check:claude-md": "node --import tsx/esm scripts/gen-claude-md.ts --check",
-    "sandbox:e2e": "tsx scripts/sandbox-e2e.ts",
-    "sandbox:e2e:plan": "tsx scripts/sandbox-e2e.ts --print-plan",
-    "sandbox:approve": "tsx scripts/sandbox-approval.ts approve",
-    "sandbox:gold:check": "tsx scripts/sandbox-approval.ts check",
-    "e2e:agent-chat": "tsx scripts/sandbox-agent-chat.ts",
-    "e2e:sandbox-scenarios": "tsx scripts/sandbox-scenarios.ts",
-    "e2e:monitor": "playwright test -c tests/e2e/playwright.config.ts",
-    "fulcrum": "node --import tsx/esm packages/cli/src/index.ts",
-    "install-bin": "echo 'Repo symlink install disabled. Use: npm install -g fulcrum-agent-cli'",
-    "setup": "node --import tsx/esm agent-integration/install.ts all",
-    "setup:claude": "node --import tsx/esm agent-integration/install.ts claude",
-    "setup:gemini": "node --import tsx/esm agent-integration/install.ts gemini",
-    "setup:qwen": "node --import tsx/esm agent-integration/install.ts qwen",
-    "setup:pi": "node --import tsx/esm agent-integration/install.ts pi",
-    "setup:check": "node --import tsx/esm agent-integration/install.ts check",
-    "setup:dry": "node --import tsx/esm agent-integration/install.ts all --dry-run",
-    "publish:all": "pnpm build && pnpm -r --filter \"./packages/**\" publish --access public --no-git-checks",
-    "publish:dry": "pnpm build && pnpm -r --filter \"./packages/**\" publish --access public --no-git-checks --dry-run"
+    "dev": "bun run src/index.ts",
+    "build": "bun build --compile --minify --target=bun-darwin-arm64 src/index.ts --outfile=dist/fulcrum-darwin-arm64",
+    "build:all": "bun run scripts/build-all.ts",
+    "test": "bun test",
+    "lint": "bun run --bun tsc --noEmit",
+    "ci": "bun run scripts/ci.ts",
+    "changelog": "git-cliff -o CHANGELOG.md",
+    "compress": "bun run src/index.ts compress",
+    "release": "bun run scripts/release.ts"
   },
-  "peerDependencies": {
-    "@mariozechner/pi-ai": "*",
-    "@mariozechner/pi-coding-agent": "*",
-    "@mariozechner/pi-tui": "*"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "esbuild",
-      "onnxruntime-node",
-      "koffi",
-      "protobufjs",
-      "kuzu"
-    ]
+  "engines": {
+    "bun": ">=1.3.0"
   },
   "devDependencies": {
-    "@dagger.io/dagger": "0.20.6",
-    "@playwright/test": "1.59.1",
-    "madge": "^8.0.0",
-    "tsup": "^8.5.1",
-    "tsx": "^4.21.0"
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "smol-toml": "^1.4.2"
   }
 }

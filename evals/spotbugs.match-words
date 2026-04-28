@@ -1,0 +1,10 @@
+# match-words for spotbugs
+spotbugs
+spotbugs -textui
+spotbugs -effort:
+spotbugs -sarif=
+spotbugs -xml:withMessages
+spotbugs -pluginList
+spotbugs -exclude
+findbugs
+spotbugs-maven-plugin

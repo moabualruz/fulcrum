@@ -1,0 +1,22 @@
+[
+  {"query": "Open a pull request from my current branch feat/login against main in repo myorg/myapp with this body: ```markdown\n## Summary\n- Add OAuth login flow\n- Wire up JWT session\n\n## Test plan\n- [ ] Login with Google\n- [ ] Token refresh\n```", "should_trigger": true},
+  {"query": "Show the exact `gh pr list` command to list every open pull request assigned to me in repo myorg/myapp; do not run it.", "should_trigger": true},
+  {"query": "Show the exact `gh pr merge` command to squash-merge pull request 482 and delete the branch; do not run it. PR title: 'fix: remove stale cache entries'.", "should_trigger": true},
+  {"query": "Show the exact `gh run watch` command for the GitHub Actions run on branch feat/login in repo myorg/myapp; do not run it.", "should_trigger": true},
+  {"query": "Show the exact `gh run` commands to get only failed step logs from the last CI run on this branch; do not run them. Workflow: .github/workflows/ci.yml, branch: feat/auth.", "should_trigger": true},
+  {"query": "Show the exact `gh release download` command to download the tar.gz asset from release v1.4.0 into a dist directory; do not run it. Repo: myorg/myapp.", "should_trigger": true},
+  {"query": "Show the exact `gh release create` command for tag v1.5.0 in repo myorg/myapp with these notes; do not run it: ```markdown\n## What's new\n- Faster builds\n- Bug fixes in auth module\n```", "should_trigger": true},
+  {"query": "Show the exact `gh issue comment` and `gh issue close` commands for issue 42 in repo myorg/myapp; do not run them. Message: ```\nFixed in #45 — deploying to prod now.\n```", "should_trigger": true},
+  {"query": "Show the exact `gh api --paginate` command to list every commit on myorg/myapp since January 1 2024; do not run it.", "should_trigger": true},
+  {"query": "Show the exact `gh search repos` command for Rust repos with more than a thousand stars sorted by recently updated; do not run it.", "should_trigger": true},
+  {"query": "Check out pull request 123 from myorg/myapp locally so I can poke at it.", "should_trigger": true},
+  {"query": "Approve PR 99 in repo myorg/myapp and leave a one-line review saying LGTM.", "should_trigger": true},
+  {"query": "Show me the current GitHub authentication status and which scopes my token has.", "should_trigger": true},
+  {"query": "Show me the local git log for the last ten commits on this branch.", "should_trigger": false},
+  {"query": "Open a merge request on our self-hosted GitLab instance.", "should_trigger": false},
+  {"query": "Watch a Jenkins job and tell me when it turns green.", "should_trigger": false},
+  {"query": "Create an annotated git tag locally and push it to the remote.", "should_trigger": false},
+  {"query": "Rebase my feature branch onto origin/main and resolve conflicts.", "should_trigger": false},
+  {"query": "Run my CircleCI pipeline locally with the circleci CLI.", "should_trigger": false},
+  {"query": "Open a pull request on Bitbucket Cloud from the command line.", "should_trigger": false}
+]

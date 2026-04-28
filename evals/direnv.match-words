@@ -1,0 +1,8 @@
+# match-words for direnv
+# why "direnv" alone is fine: highly specific binary name
+direnv allow
+direnv exec
+direnv hook
+direnv reload
+direnv status
+direnv deny

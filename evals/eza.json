@@ -1,0 +1,22 @@
+[
+  {"query": "List the files in this directory and show the git status of each one in a column using eza. Directory: src/ with files: main.ts (modified), utils.ts (clean), index.ts (new).", "should_trigger": true},
+  {"query": "Give me a tree view of this project two levels deep on the command line. Project root contains: src/, tests/, docs/, package.json, tsconfig.json.", "should_trigger": true},
+  {"query": "I want a directory listing that ignores files matched by .gitignore. .gitignore includes: node_modules/, dist/, *.log.", "should_trigger": true},
+  {"query": "Show file sizes in this folder in a human-readable form like K and M using eza. Folder contains: bundle.js (1.2M), index.html (4K), styles.css (32K), favicon.ico (512).", "should_trigger": true},
+  {"query": "Long-format listing with owner, permissions, and ISO timestamps in the terminal for: src/main.py, src/utils.py, tests/test_main.py.", "should_trigger": true},
+  {"query": "Show the exact `eza --icons` command to list directory contents with Nerd Font icons next to each filename; do not run it. Directory has: README.md, Makefile, src/, tests/, .github/.", "should_trigger": true},
+  {"query": "Sort files by most recently modified, newest first, with full metadata. Directory: logs/ containing app.log, error.log, access.log with different timestamps.", "should_trigger": true},
+  {"query": "I want a colorful ls replacement that puts directories before files for this project layout: src/, tests/, node_modules/, README.md, package.json, .eslintrc.", "should_trigger": true},
+  {"query": "Show a tree of this folder but skip everything in .gitignore. Root has src/, dist/ (ignored), node_modules/ (ignored), package.json.", "should_trigger": true},
+  {"query": "Print a long directory listing with sizes for each entry using eza. Tree: src/ (45K), tests/ (12K), docs/ (8K), node_modules/ (180M).", "should_trigger": true},
+  {"query": "Show column headers above a long file listing in the shell for directory: config/ containing database.yml, redis.yml, app.yml.", "should_trigger": true},
+  {"query": "Find every file named `package.json` recursively under this repo.", "should_trigger": false},
+  {"query": "Show the exact command to search inside files for the string `TODO` across the repo; do not inspect the workspace.", "should_trigger": false},
+  {"query": "Show the exact npm command for the dependency tree of installed packages; do not inspect the workspace.", "should_trigger": false},
+  {"query": "Show disk usage by directory, biggest first.", "should_trigger": false},
+  {"query": "List the files inside a zip archive without extracting it.", "should_trigger": false},
+  {"query": "Show the exact command to open `src/main.py` in a syntax-highlighted pager; do not inspect the workspace.", "should_trigger": false},
+  {"query": "Find files modified in the last 24 hours by name pattern.", "should_trigger": false},
+  {"query": "Show the exact command to search `archive.tar.gz` for `package.json`; do not inspect the workspace.", "should_trigger": false},
+  {"query": "Show the exact command for lines in `app.py` that match the regex `TODO|FIXME`; do not inspect the workspace.", "should_trigger": false}
+]

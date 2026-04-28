@@ -1,0 +1,8 @@
+# match-words for git-cliff
+# why "cliff" alone excluded: too generic (name, geography)
+git-cliff
+git-cliff --tag
+git-cliff --unreleased
+git-cliff --bump
+git-cliff --prepend
+git-cliff --latest

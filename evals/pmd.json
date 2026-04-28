@@ -1,0 +1,22 @@
+[
+  {"query": "Show the exact pmd command only; do not run it. Find code smells in this Java class:\n```java\npublic class OrderService {\n  public void process(Order o) {\n    if (o != null) { if (o.getItems() != null) {\n      for (Item i : o.getItems()) { System.out.println(i); }\n    } }\n  }\n}\n```", "should_trigger": true},
+  {"query": "Show the exact pmd command only; do not run it. Scan this Java file for unused imports and dead code:\n```java\nimport java.util.List;\nimport java.util.Map;\nimport java.io.File;\npublic class UserMapper {\n  public String toJson(List<String> names) { return names.toString(); }\n}\n```", "should_trigger": true},
+  {"query": "Show the exact pmd cpd command only; do not run it. Detect duplicated code across these two Java files:\n```java\n// FileA.java\npublic int calcTax(double price) { return (int)(price * 0.2); }\n// FileB.java\npublic int computeTax(double amount) { return (int)(amount * 0.2); }\n```", "should_trigger": true},
+  {"query": "Show the exact pmd command only; do not run it. Run a static analyzer over this Java file with a custom ruleset at `config/pmd-rules.xml`:\n```java\npublic class PaymentProcessor {\n  public void charge(String card, double amount) throws Exception {\n    try { api.charge(card, amount); } catch (Exception e) {}\n  }\n}\n```", "should_trigger": true},
+  {"query": "Show the exact pmd command only; do not run it. Detect empty catch blocks and god classes in this Java source:\n```java\npublic class AppController {\n  public void save() { try { db.save(); } catch (Exception e) {} }\n  public void load() { try { db.load(); } catch (Exception e) {} }\n}\n```", "should_trigger": true},
+  {"query": "Show the exact pmd command only; do not run it. Analyze this Salesforce Apex class for bug patterns with the Error Prone category ruleset:\n```apex\npublic class LeadHandler {\n  public void updateLead(Lead l) { l.Status = 'Converted'; update l; }\n}\n```", "should_trigger": true},
+  {"query": "Show the exact pmd CI command only; do not run it. Fail the Maven build when new Java code-quality violations are introduced. Project uses src/ layout.", "should_trigger": true},
+  {"query": "Show the exact pmd cpd command only; do not run it. Find copy-pasted blocks of at least 100 tokens across a Java `src/` tree.", "should_trigger": true},
+  {"query": "Show the exact pmd command only; do not run it. Generate a SARIF report of Java static-analysis findings from this file for GitHub Code Scanning upload:\n```java\npublic class Config {\n  public static String SECRET = \"hardcoded-secret-123\";\n}\n```", "should_trigger": true},
+  {"query": "Show the exact pmd command only; do not run it. Audit this Java module for design issues like cyclomatic complexity and tight coupling:\n```java\npublic class ReportEngine {\n  public void generate(String type, boolean draft, boolean email, boolean pdf) { /* nested branches */ }\n}\n```", "should_trigger": true},
+  {"query": "Show the pmd suppression annotation/comment to disable the `EmptyCatchBlock` rule on a single method in this Java file:\n```java\npublic class Loader {\n  public void tryLoad() { try { resource.load(); } catch (IOException e) {} }\n}\n```", "should_trigger": true},
+  {"query": "Lint our Python codebase for style issues.", "should_trigger": false},
+  {"query": "Scan the application for SQL injection vulnerabilities.", "should_trigger": false},
+  {"query": "Format the Java code to a consistent style.", "should_trigger": false},
+  {"query": "Find type errors in our TypeScript project.", "should_trigger": false},
+  {"query": "Scan our npm dependencies for known CVEs.", "should_trigger": false},
+  {"query": "Run ESLint on the JavaScript source.", "should_trigger": false},
+  {"query": "Find memory leaks in this C++ program.", "should_trigger": false},
+  {"query": "Detect secrets accidentally committed to the git history.", "should_trigger": false},
+  {"query": "Measure code coverage of the Java unit tests.", "should_trigger": false}
+]

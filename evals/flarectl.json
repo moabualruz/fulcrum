@@ -1,0 +1,22 @@
+[
+  {"query": "Create an A record for staging.example.com on cloudflare using flarectl, pointing to 1.2.3.4. Zone: example.com, TTL: 300.", "should_trigger": true},
+  {"query": "List all DNS records on our cloudflare zone example.com using flarectl — we have A, CNAME, MX, and TXT records.", "should_trigger": true},
+  {"query": "Purge the cloudflare cache for https://example.com/api/v1/users using flarectl zone purge after the deploy.", "should_trigger": true},
+  {"query": "Update the proxied flag on the DNS record for api.example.com in cloudflare using flarectl — currently proxied: false, want proxied: true.", "should_trigger": true},
+  {"query": "Check the status of our cloudflare zone example.com using flarectl — is it still pending nameserver delegation?", "should_trigger": true},
+  {"query": "Add a CNAME from www.example.com to example.com on cloudflare using flarectl dns create from the command line.", "should_trigger": true},
+  {"query": "Delete this stale DNS entry on cloudflare via flarectl: A record for old-staging.example.com → 10.0.0.5.", "should_trigger": true},
+  {"query": "Pipe flarectl --json dns list output for zone example.com into jq to find every A record that's proxied.", "should_trigger": true},
+  {"query": "Lower the TTL on the A record for example.com in cloudflare to 300 before a migration using flarectl. Current TTL is 3600.", "should_trigger": true},
+  {"query": "Look up which cloudflare zones a token with Zone:Read permission can see using flarectl zone list. Token is set in CF_API_TOKEN env var.", "should_trigger": true},
+  {"query": "Invalidate every cached file on cloudflare zone example.com using flarectl zone purge --everything after a release.", "should_trigger": true},
+  {"query": "Show me the SSL mode and plan on our cloudflare zone example.com using flarectl zone settings.", "should_trigger": true},
+  {"query": "Deploy a worker to cloudflare.", "should_trigger": false},
+  {"query": "Create a Route 53 A record on AWS.", "should_trigger": false},
+  {"query": "Register a new domain.", "should_trigger": false},
+  {"query": "Create a kubernetes ingress for the staging service.", "should_trigger": false},
+  {"query": "Configure nginx to proxy /api to the upstream.", "should_trigger": false},
+  {"query": "Push a Cloudflare Pages preview from the command line.", "should_trigger": false},
+  {"query": "Update KV namespace bindings on a Cloudflare Worker.", "should_trigger": false},
+  {"query": "Set up a Hetzner DNS zone for example.com.", "should_trigger": false}
+]
