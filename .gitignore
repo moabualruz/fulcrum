@@ -4,3 +4,18 @@ dist/
 *.tsbuildinfo
 eval-results/
 .DS_Store
+
+# Vendor agent-integration files written into project root by tools like
+# `graphify install` / `npx skills add`. Same rule text lives in
+# rules/AGENTS.md → spliced user-globally by `fulcrum install`; the
+# vendor's project-root copy is redundant for this repo.
+/CLAUDE.md
+/GEMINI.md
+/.gemini/
+/.opencode/
+
+# Vendor project-index outputs (vendor-controlled paths).
+/graphify-out/
+/repomix-output.xml
+/repomix-output.txt
+/repomix-output.md
