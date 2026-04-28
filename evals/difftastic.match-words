@@ -1,0 +1,8 @@
+# match-words for difftastic
+# binary is "difft" NOT "difftastic" -- both signal the skill
+difft
+GIT_EXTERNAL_DIFF=difft
+difft --display
+difft --override
+difft --list-languages
+difft --ignore-comments

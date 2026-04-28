@@ -1,0 +1,8 @@
+# match-words for biome
+biome check
+biome format
+biome lint
+biome ci
+biome migrate
+biome init
+biome --write

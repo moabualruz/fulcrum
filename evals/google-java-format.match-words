@@ -1,0 +1,6 @@
+# match-words for google-java-format
+google-java-format
+google-java-format --replace
+google-java-format --dry-run
+google-java-format --aosp
+google-java-format -r

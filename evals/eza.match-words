@@ -1,0 +1,8 @@
+# match-words for eza
+# "eza" is specific enough; key flags reinforce
+eza -l
+eza --tree
+eza --git
+eza --git-ignore
+eza --level=
+eza --sort=

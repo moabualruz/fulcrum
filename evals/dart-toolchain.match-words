@@ -1,0 +1,9 @@
+# match-words for dart-toolchain
+# why "dart" alone excluded: matches "darted", "restart", etc.
+dart format
+dart analyze
+dart fix --apply
+dart fix --dry-run
+flutter analyze
+--set-exit-if-changed
+dart format --output=none

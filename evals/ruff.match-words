@@ -1,0 +1,8 @@
+# match-words for ruff
+# "ruff" is sufficiently unique; specific subcommands reinforce
+ruff check
+ruff format
+ruff check --fix
+ruff format --check
+ruff check --output-format=json
+ruff check --diff

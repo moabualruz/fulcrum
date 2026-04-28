@@ -1,0 +1,8 @@
+# match-words for pmd
+# why "pmd" alone excluded: too short, could appear in other contexts
+pmd check
+pmd cpd
+pmd check -d
+pmd check -R
+--minimum-tokens
+pmd cpd --minimum-tokens

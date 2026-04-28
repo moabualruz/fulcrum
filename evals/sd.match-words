@@ -1,0 +1,8 @@
+# match-words for sd
+# why "sd" alone excluded: too short and extremely common (subdomain, etc.)
+# sd invocation is always "sd <pattern> <replacement>" -- flag context disambiguates
+sd -p
+sd -F
+sd -f i
+sd -A
+sd 'old' 'new'

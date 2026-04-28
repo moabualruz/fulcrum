@@ -1,0 +1,7 @@
+# match-words for osv-scanner
+osv-scanner
+osv-scanner scan
+osv-scanner scan source
+osv-scanner scan image
+--format=sarif
+--format=json

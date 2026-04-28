@@ -1,0 +1,7 @@
+# match-words for ktlint
+ktlint
+ktlint -F
+ktlint --format
+ktlint --reporter=json
+ktlint installGitPreCommitHook
+ktlint --baseline=

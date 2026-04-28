@@ -1,0 +1,2 @@
+# Eval fixture: gitleaks skill's own eval queries paste fake tokens to demo detection.
+evals/gitleaks.json:github-pat:3

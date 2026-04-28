@@ -1,0 +1,6 @@
+# match-words for zoxide
+zoxide query
+zoxide add
+zoxide remove
+zoxide init
+zoxide import

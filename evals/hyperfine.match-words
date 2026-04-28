@@ -1,0 +1,7 @@
+# match-words for hyperfine
+hyperfine
+hyperfine --warmup
+hyperfine --runs
+hyperfine --export-json
+hyperfine --prepare
+hyperfine -L

@@ -1,0 +1,7 @@
+# match-words for watchexec
+watchexec
+watchexec -e
+watchexec --restart
+watchexec -r
+watchexec -w
+watchexec --postpone

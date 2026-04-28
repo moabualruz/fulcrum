@@ -1,0 +1,8 @@
+# match-words for mise
+# why "mise" alone is fine: specific tool name (French for "install")
+mise install
+mise use
+mise exec
+mise current
+mise outdated
+mise activate

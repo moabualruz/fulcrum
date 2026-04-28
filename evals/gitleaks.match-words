@@ -1,0 +1,7 @@
+# match-words for gitleaks
+gitleaks git
+gitleaks git --staged
+gitleaks dir
+gitleaks --report-format
+gitleaks --no-banner
+gitleaks --baseline-path
