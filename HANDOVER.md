@@ -185,7 +185,7 @@ Branch should stay on `feat/agent-foundation-clean` for now. User does not want 
 These are the not-done or not-fully-covered items that still matter for the documented foundation target. They are not PR/release steps.
 
 1. ~~**Pi MCP adapter integration for DeepWiki is documented but not implemented.**~~ **COMPLETE.** `installDeepwikiMcp` now calls `installPiDeepwikiAdapter` when `~/.pi/agent` is detected: runs `pi install npm:pi-mcp-adapter` and writes deepwiki into `~/.pi/agent/mcp.json`. `uninstallDeepwikiMcp` calls `uninstallPiDeepwikiAdapter`. Doctor reports `piMcpAdapter.{adapterPresent,deepwikiPresent}` in `--json`. `deriveTool` in `src/utils/io.ts` normalises Pi proxy-shape `mcp(server,tool)` calls to `mcp__<server>__<tool>` so routing policies match without duplication. Tests in `src/cli/doctor.test.ts` and `src/hooks/tool-output-router.test.ts`.
-2. **`scripts/install.sh` does not pass through CLI install flags.** README documents `fulcrum install --no-skills` and `--no-upstream-skills`, but the bootstrap script only accepts `--with-project` and `--help`. Either add pass-through support for safe install flags or keep smoke recipes calling the installed `fulcrum` binary directly. Details: [README.md](README.md), [scripts/install.sh](scripts/install.sh), §7 below.
+2. ~~**`scripts/install.sh` does not pass through CLI install flags.**~~ **DONE.** Bootstrap now forwards `--with-project [DIR]`, `--dry-run`, `--no-skills`, `--no-upstream-skills` to `fulcrum install`. Unknown args still exit 2. Bash 3.2-safe (`+=` array append, kept `${arr[@]+"${arr[@]}"}` empty-array guard on the final `exec`). Details: [scripts/install.sh](scripts/install.sh), §7 below.
 3. ~~**Hook enable/disable writes all five supported agent configs.**~~ **DONE.** `fulcrum hooks enable/disable` is now detection-aware by default — only writes configs for agents whose `rootDir` exists on disk. Pass `--all` for cross-machine/dotfiles setup. `removeAllHookRegistrations` (uninstall) applies same detection. `rootDir` field added to `Agent` interface and all 5 registry entries. Details: [docs/hooks.md](docs/hooks.md), `src/agents/registry.ts`, `src/cli/hooks.ts`.
 4. ~~**Cross-agent skill smoke remains incomplete.**~~ **COMPLETE.** Trigger-rate harnesses now exist for all five agents: `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh`. Each shares the same flag interface (`--model`, `--runs-per-query`, `--results-dir`, `--match-words`), JSONL output, match-words precedence, and 80/20 pass criteria. `scripts/eval-all.sh` accepts `--engine claude|codex|gemini|opencode|pi` and `--skip-<agent>` flags. Details: [docs/skill-smoke-test.md](docs/skill-smoke-test.md), [docs/skills.md](docs/skills.md) §7, `evals/README.md`.
 5. ~~**New skill compression is a documented requirement, not a hard guard.**~~ **DONE.** Adding a new uncompressed `SKILL.md` now fails CI hard. `bun run compress -- --check` in scripts/ci.ts is no longer soft-fail; any `.md` file lacking a `.original.md` sibling will exit 1 and block the build. Details: [docs/caveman.md](docs/caveman.md), [skills/SOURCES.md](skills/SOURCES.md), `scripts/compress-with-caveman.sh`, `scripts/ci.ts`.
@@ -220,20 +220,15 @@ head -3 $SCRATCH/.claude/CLAUDE.md   # confirm user content preserved
 rm -rf $SCRATCH
 
 # 4. Install flag smoke with authored skills disabled
-# NOTE: call fulcrum directly; scripts/install.sh flag pass-through is pending §6.
 SCRATCH=$(mktemp -d)
 HOME=$SCRATCH PATH="$SCRATCH/.local/bin:$HOME/.bun/bin:$PATH" \
-  bash scripts/install.sh
-HOME=$SCRATCH PATH="$SCRATCH/.local/bin:$SCRATCH/.fulcrum/bin:$HOME/.bun/bin:$PATH" \
-  fulcrum install --dry-run --no-skills
+  bash scripts/install.sh --dry-run --no-skills
 rm -rf $SCRATCH
 
 # 5. Install flag smoke with upstream skills disabled
 SCRATCH=$(mktemp -d)
 HOME=$SCRATCH PATH="$SCRATCH/.local/bin:$HOME/.bun/bin:$PATH" \
-  bash scripts/install.sh
-HOME=$SCRATCH PATH="$SCRATCH/.local/bin:$SCRATCH/.fulcrum/bin:$HOME/.bun/bin:$PATH" \
-  fulcrum install --dry-run --no-upstream-skills
+  bash scripts/install.sh --dry-run --no-upstream-skills
 rm -rf $SCRATCH
 
 # 6. Curated upstream skills sync in a scratch HOME

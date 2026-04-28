@@ -92,6 +92,7 @@ git clone https://github.com/moabualruz/fulcrum ~/code/fulcrum
 cd ~/code/fulcrum
 bash scripts/install.sh                       # builds, installs, splices rules, syncs skills
 bash scripts/install.sh --with-project ~/code/myproject   # also bootstrap a project
+bash scripts/install.sh --dry-run --no-skills # preview only; skip skill sync (forwards flags to `fulcrum install`)
 ```
 
 **From a published release (no Bun needed; only `curl`):**

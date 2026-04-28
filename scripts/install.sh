@@ -14,20 +14,33 @@
 #   3. Installs the binary to ~/.fulcrum/bin/fulcrum and (if possible) symlinks
 #      to ~/.local/bin/fulcrum.
 #   4. Delegates the rest to `fulcrum install` — sentinel-block rules splice,
-#      recipe vendoring, policy seed, optional --with-project DIR.
+#      recipe vendoring, policy seed, optional project bootstrap, optional skill sync.
 #
-# Pass --with-project [DIR] to also bootstrap a project after install.
+# Flags forwarded to `fulcrum install`:
+#   --with-project [DIR]    Also bootstrap a project (default: $PWD).
+#   --dry-run               Preview without writing.
+#   --no-skills             Skip authored + upstream skill sync.
+#   --no-upstream-skills    Skip curated upstream skill sync only.
 
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WITH_PROJECT_ARGS=()
+INSTALL_ARGS=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --with-project)
-      WITH_PROJECT_ARGS=(--with-project "${2:-$PWD}")
+      INSTALL_ARGS+=(--with-project "${2:-$PWD}")
       [ "${2:-}" != "" ] && shift
+      shift ;;
+    --dry-run)
+      INSTALL_ARGS+=(--dry-run)
+      shift ;;
+    --no-skills)
+      INSTALL_ARGS+=(--no-skills)
+      shift ;;
+    --no-upstream-skills)
+      INSTALL_ARGS+=(--no-upstream-skills)
       shift ;;
     -h|--help)
       grep '^#' "$0" | sed 's/^# \?//'
@@ -108,4 +121,4 @@ echo
 
 # ── 4. Delegate to `fulcrum install` ────────────────────────────────
 # Bash 3.2 + `set -u` expands an empty `${arr[@]}` to "unbound" — guard it.
-FULCRUM_REPO_DIR="$REPO_DIR" exec "$HOME/.fulcrum/bin/fulcrum" install ${WITH_PROJECT_ARGS[@]+"${WITH_PROJECT_ARGS[@]}"}
+FULCRUM_REPO_DIR="$REPO_DIR" exec "$HOME/.fulcrum/bin/fulcrum" install ${INSTALL_ARGS[@]+"${INSTALL_ARGS[@]}"}
