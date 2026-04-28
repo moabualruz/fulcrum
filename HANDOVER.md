@@ -144,22 +144,30 @@ Two priorities, both grounded in concrete commits already on the branch (which m
 1. **Always-on agent compression.** Caveman is installed into every agent fulcrum installs into, with `/caveman ultra` as the default mode. This is a managed third-party skill, the same pattern as `obra/superpowers` and `anthropics/skills`. `fulcrum install` is the natural place to call the install command for each agent.
 2. **Compress all in-repo skills + rules at authoring time.** Every `skills/<name>/SKILL.md` and `rules/AGENTS.md` is rewritten into caveman-compressed form via `/caveman:compress <file>` (the resulting `<file>.original.md` backup is what humans edit; the compressed file is what agents read). New skills and rules go through the same compression pass before being committed.
 
-**Already installed on this host (verified end of last session):**
+**Hard rule on install paths.** Never use a shared `~/.agents/` folder for skills or rules. Each agent has its own folder; install ONLY there. If a third-party installer defaults to `~/.agents/` (e.g. `npx skills add -g`), refuse the default — either find a per-agent path flag, or clone the upstream skill repo and copy `SKILL.md` files directly into the specific agent's skills root.
 
-| Agent | Where | Install command used |
+**Already installed on this host (per-agent, verified):**
+
+| Agent | Where | How it got there |
 |---|---|---|
 | Claude Code | plugin `caveman@caveman` from marketplace `caveman` | `claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman` |
 | Gemini CLI | `~/.gemini/extensions/caveman/` | `gemini extensions install https://github.com/JuliusBrussee/caveman` |
-| Codex CLI | 6 skills under `~/.agents/skills/{caveman,caveman-compress,caveman-commit,caveman-help,caveman-review,compress}` (skills.sh cross-agent root) | `npx -y skills add JuliusBrussee/caveman -a codex -y -g` |
-| OpenCode | same `~/.agents/skills/` root, also copied for OpenCode | `npx -y skills add JuliusBrussee/caveman -a opencode -y -g` |
+| Codex CLI | `~/.codex/skills/{caveman,caveman-compress,caveman-commit,caveman-help,caveman-review,compress}/` | `npx skills add` initially placed them at the wrong shared `~/.agents/` path; corrected by copy + deletion of `~/.agents/`. Future installs must clone caveman upstream and copy directly into `~/.codex/skills/<name>/`. |
+| OpenCode | `~/.config/opencode/skills/{caveman,caveman-compress,caveman-commit,caveman-help,caveman-review,compress}/` | same correction as Codex — moved from `~/.agents/` into the per-agent folder. Future: clone upstream + copy. |
 | Pi CLI | dir not present on host | (skip) |
 
-Confirm `/caveman` and `/caveman:compress` are reachable in a fresh Claude Code session before scripting the rest.
+`~/.agents/` has been removed. Do not recreate it.
 
 **Integration plan (concrete steps for the next session):**
 
-1. **Verify the local installs in a fresh agent session.** `/caveman` and `/caveman:compress <file>` should be invokable in Claude Code; `gemini` should pick up the extension; codex/opencode should resolve `~/.agents/skills/caveman/`. If any of the four didn't take, reinstall (commands above). The npx skills installer hangs on an interactive picker without `-y -g` — pin those flags.
-2. **Add caveman to `fulcrum install`.** New step in `src/cli/install.ts` that, per detected agent, runs the agent-native install command (Claude plugin install / Gemini extension install / `npx skills add JuliusBrussee/caveman -a <agent>` / `.codex/hooks.json` patch). Fail-soft if the agent's CLI isn't on PATH; log the manual command for the user.
+1. **Verify the local installs in a fresh agent session.** `/caveman` and `/caveman:compress <file>` should be invokable in Claude Code; Gemini should pick up the extension; Codex / OpenCode should resolve `caveman` from their per-agent skills folders (`~/.codex/skills/caveman/SKILL.md`, `~/.config/opencode/skills/caveman/SKILL.md`). If any didn't take, reinstall — but for Codex / OpenCode do NOT use `npx skills add` (it defaults to `~/.agents/`); instead `git clone https://github.com/JuliusBrussee/caveman /tmp/caveman` and copy the relevant skill subfolders directly into the per-agent root.
+2. **Add caveman to `fulcrum install`.** New step in `src/cli/install.ts` that, per detected agent, runs the agent-native install command:
+   - Claude Code: `claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman`
+   - Gemini CLI: `gemini extensions install https://github.com/JuliusBrussee/caveman`
+   - Codex CLI: clone the caveman repo and copy each `skills/<name>/` directly into `~/.codex/skills/<name>/`. Do **not** use `npx skills add` — it defaults to `~/.agents/` which is forbidden.
+   - OpenCode: same approach, target `~/.config/opencode/skills/<name>/`.
+   - Pi CLI: same approach, target `~/.pi/agent/skills/<name>/`.
+   Fail-soft if the agent's CLI isn't on PATH; log the manual command for the user. Verify nothing got written to `~/.agents/`.
 3. **Compress the 28 in-repo skills + rules.** New `bun run` script (e.g. `scripts/compress-with-caveman.sh`) that walks `skills/*/SKILL.md` and `rules/AGENTS.md`, runs `/caveman:compress` (or the underlying caveman binary) on each in `--ultra` mode, commits the compressed forms beside the originals (the `.original.md` backup pattern caveman uses). Update the lint to allow either form. After this lands, `fulcrum skills sync` deploys the compressed form to each agent — same path layout, just denser content.
 4. **Lock `/caveman ultra` as the default.** During `fulcrum install`, after the plugin/extension install succeeds, write the activation marker each agent uses (Claude Code SessionStart hook, Codex `.codex/hooks.json`, Gemini extension config) so caveman ultra is always-on without per-session opt-in.
 5. **Document in `rules/AGENTS.md`.** A precedence rule: "Caveman ultra is the always-on default. Drop articles, hedging, pleasantries; keep code, paths, commands, headings, versions verbatim. If the user says `normal mode`, opt out for that session."
