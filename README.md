@@ -68,6 +68,9 @@ This sets up the `fulcrum:<skill-name>` address space and matches the prefixing 
 |---|---|
 | [AGENTS.md](AGENTS.md) | Project-level instructions and trajectory |
 | [HANDOVER.md](HANDOVER.md) | Current state, outstanding work, recent decisions |
+| [docs/user-guide.md](docs/user-guide.md) | End-user guide — install, daily usage, hooks, skills, MCPs, FAQ |
+| [docs/developer-guide.md](docs/developer-guide.md) | Developer guide — repo layout, architecture, adding hooks/MCPs/skills, testing, release |
+| [docs/contributing.md](docs/contributing.md) | Contributing — commit format, branch policy, CI, compression contract, code style |
 | [docs/context.md](docs/context.md) | Context layer — `CLAUDE.md`, `AGENTS.md` conventions |
 | [docs/hooks.md](docs/hooks.md) | Automation layer — full event surface + 8 shipped recipes |
 | [docs/tool-output-policy.md](docs/tool-output-policy.md) | Per-tool output strategies driving `tool-output-router` |
@@ -107,6 +110,7 @@ After install, common commands:
 
 ```bash
 fulcrum init <dir>            # bootstrap a project's AGENTS.md + .claude/CLAUDE.md
+
 fulcrum doctor                # bun, agent dirs, tool presence, policy health
 fulcrum install --dry-run     # preview rules, skills, DeepWiki, and project bootstrap
 fulcrum install --no-skills   # skip all skill sync

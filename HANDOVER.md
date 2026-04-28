@@ -307,12 +307,33 @@ fulcrum mcp disable <name> --all-agents  # turn off again
 
 #### F. Verify
 
+Canonical post-install verification: **`docs/smoke-test.md`**. Feed it directly to any of the 5 agents:
+
+```bash
+# Claude Code
+claude -p "$(cat docs/smoke-test.md)" --output-format json
+
+# Codex CLI
+codex "$(cat docs/smoke-test.md)"
+
+# Gemini CLI
+gemini -p "$(cat docs/smoke-test.md)" --output-format json --yolo
+
+# OpenCode
+opencode run --format json "$(cat docs/smoke-test.md)"
+
+# Pi CLI
+pi --print "$(cat docs/smoke-test.md)" --mode json --no-session
+```
+
+Or run quick checks manually:
+
 ```
 fulcrum doctor                              # human; verdict line at the end
 fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, auth_status}'
 ```
 
-All five agents should be detected, rules spliced, caveman installed, Pi adapter present, and `auth_status` should be `ok` for every MCP whose env var you set (or `n/a` for MCPs that don't need auth).
+All five agents should be detected, rules spliced, caveman installed, Pi adapter present, and `auth_status` should be `ok` for every MCP whose env var you set (or `n/a` for MCPs that don't need auth). Results are saved to `~/.fulcrum/state/global/smoke-test/<YYYY-MM-DD>.md`.
 
 ---
 
@@ -656,7 +677,10 @@ fulcrum doctor --json | jq '.caveman, .piMcpAdapter'
 - `README.md` — install + usage.
 - `AGENTS.md` — project-level instructions and trajectory.
 - `HANDOVER.md` — this file.
-- `docs/` — per-topic foundation docs.
+- `docs/user-guide.md` — end-user guide: install, daily usage, hooks, skills, MCPs, FAQ, troubleshooting.
+- `docs/developer-guide.md` — developer guide: repo layout, architecture, adding hooks/MCPs/skills, testing, release.
+- `docs/contributing.md` — contributing workflow: commit format, branch policy, CI requirement, compression contract, code style.
+- `docs/` — per-topic foundation docs (context, hooks, skills, mcp, agents, capabilities, caveman, tool-output policy, skill-smoke-test).
 - `rules/AGENTS.md` — body spliced into each agent's primary rules file (90 lines, pure behavioral).
 - `skills/SOURCES.md` — registry, queue, **caveman requirement** (mandatory).
 - `evals/README.md` — eval harness contract.
