@@ -126,6 +126,92 @@ claude plugin install repomix-explorer@repomix
 
 Uninstall removes all 3 plugins and the registry entry.
 
+### 3.6 W3 managed MCPs (Wave 3)
+
+All W3 entries are **default-disabled**. Enable individually with `fulcrum mcp enable <name>`.
+
+#### 3.6.1 semgrep (W3.3)
+
+In-binary stdio MCP from `semgrep/semgrep`. **Default-disabled.** No auth required.
+
+- Transport: stdio `semgrep --experimental mcp`
+- Auth: none (`SEMGREP_APP_TOKEN` may be needed for managed rules — set separately)
+- Vendor: `semgrep`
+- Skills: `upstream.lock` pins `semgrep`, `semgrep-code-security`, `semgrep-llm-security` — both skill and MCP managed
+
+To enable: `fulcrum mcp enable semgrep`
+
+Prerequisite: `pip install semgrep` or `brew install semgrep`. Doctor reports `which semgrep`.
+
+#### 3.6.2 context7 (W3.4)
+
+Official upstash/context7 remote MCP. **Default-disabled.** API key optional (free tier works without it; key raises rate limits per [context7.com/dashboard](https://context7.com/dashboard)).
+
+- Transport: HTTP `https://mcp.context7.com/mcp`
+- Auth: `CONTEXT7_API_KEY` (optional — free tier works without it)
+- Vendor: `upstash`
+
+To enable: `fulcrum mcp enable context7`
+
+Supersedes: community fork `edxeth/superlight-context7-skill` (moved to `skills/_archive/upstream-removed.lock`). No official SKILL.md from upstash; MCP is the only official surface.
+
+#### 3.6.3 tavily (W3.5)
+
+Tavily remote MCP at `https://mcp.tavily.com/mcp/`. **Default-disabled.** Auth required.
+
+- Transport: HTTP `https://mcp.tavily.com/mcp/`
+- Auth: `TAVILY_API_KEY` (required — get at [tavily.com](https://tavily.com))
+- Vendor: `tavily-ai`
+- Skills: `upstream.lock` pins 7 vendor-published `tavily-*` skills — both managed
+
+To enable: `fulcrum mcp enable tavily` (set `TAVILY_API_KEY` first)
+
+#### 3.6.4 playwright (W3.6)
+
+Microsoft Playwright MCP via npx. **Default-disabled.** No auth.
+
+- Transport: stdio `npx -y @playwright/mcp@latest`
+- Auth: none
+- Vendor: `microsoft`
+- Skills: `upstream.lock` pins vendor-published `playwright-cli` skill — both managed
+
+To enable: `fulcrum mcp enable playwright`
+
+Requires Node.js + npx on PATH. Playwright browsers downloaded on first run.
+
+#### 3.6.5 Cloudflare hosted MCP suite (W3.7)
+
+Nine hosted remote MCP endpoints from `cloudflare/mcp-server-cloudflare`. All **default-disabled**.
+
+| Registry name | URL | Auth |
+|---|---|---|
+| `cloudflare-docs` | `https://docs.mcp.cloudflare.com/mcp` | none (public) |
+| `cloudflare-workers-bindings` | `https://bindings.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
+| `cloudflare-workers-builds` | `https://builds.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
+| `cloudflare-observability` | `https://observability.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
+| `cloudflare-radar` | `https://radar.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
+| `cloudflare-logpush` | `https://logpush.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
+| `cloudflare-browser` | `https://browser.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
+| `cloudflare-containers` | `https://containers.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
+| `cloudflare-ai-gateway` | `https://ai-gateway.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
+
+To enable: `fulcrum mcp enable cloudflare-docs` (no auth) or `fulcrum mcp enable cloudflare-workers-bindings` (needs `CLOUDFLARE_API_TOKEN`).
+
+Kept: `upstream.lock` wrangler skill from W1.5 — co-exists with MCP suite.
+
+#### 3.6.6 dart (W3.8)
+
+Dart Tooling MCP server from `dart-lang/ai/pkgs/dart_mcp_server`. **Default-disabled.** Requires Dart SDK ≥ 3.9.0-163.0.dev.
+
+- Transport: stdio `dart mcp-server`
+- Auth: none
+- Vendor: `dart-lang`
+- Prerequisite: Dart SDK installed and `dart` on PATH. The `dart mcp-server` sub-command is built into the SDK (no separate `dart pub global activate` needed in recent SDK versions).
+
+To enable: `fulcrum mcp enable dart`
+
+Doctor reports a hint when `dart` is not on PATH.
+
 ## 4. fulcrum mcp registry CLI
 
 The MCP registry lives at `~/.fulcrum/state/global/mcp-registry.toml`. Schema version 1.
@@ -150,7 +236,7 @@ fulcrum mcp disable myserver [--all-agents]
 
 Agent IDs: `claude-code`, `codex`, `gemini`, `opencode`, `pi`.
 
-`fulcrum install` registers `github` and `repomix` (default-disabled). `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
+`fulcrum install` registers all 16 builtin servers (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart) — all default-disabled. `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
 
 `fulcrum doctor` reports each registered server: enabled-on-which-agents, env-var auth status, and HEAD-probe reachability for HTTP servers.
 

@@ -15,7 +15,7 @@ That is the destination. This branch (`feat/agent-foundation-clean`) is the foun
 | **Capability** | 28 skills authored in-repo, content-verified against upstream, with 20-entry trigger evals each | `skills/`, `fulcrum skills sync` |
 | **Capabilities** | Bring-your-own CLI tools, verified by `fulcrum doctor` | `docs/capabilities.md`, `fulcrum doctor` |
 | **Output policy** | Per-tool output strategy (raw / status / summary / file) driving `tool-output-router` | `config/tool-output-policy.toml` |
-| **Managed MCPs** | DeepWiki + context-mode routing; MCP registry CLI (`fulcrum mcp list/register/enable`) with github (official GitHub MCP) and repomix servers registered default-disabled | `docs/mcp.md`, `src/cli/mcp-registry.ts`, `src/cli/mcp-cmd.ts` |
+| **Managed MCPs** | DeepWiki + context-mode routing; MCP registry CLI (`fulcrum mcp list/register/enable`) with 16 builtin servers registered default-disabled: github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart | `docs/mcp.md`, `src/cli/mcp-registry.ts`, `src/cli/mcp-builtins.ts`, `src/cli/mcp-cmd.ts` |
 | **Orchestration** | One Bun-compiled cross-platform binary (`init`, `install`, `uninstall`, `hooks`, `skills`, `doctor`, `compress`, `hook`) | `src/`, `dist/fulcrum-<plat>` |
 | **Cross-agent reach** | Same setup wired into Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI | `docs/agents.md`, `shims/` |
 
@@ -38,7 +38,7 @@ These are the layers the foundation is preparing for. They are **not built**; do
 ## Principles
 
 - **CLI and skills over MCP.** MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead.
-- **Managed MCPs stay narrow.** Fulcrum manages DeepWiki for repo docs and context-mode for context routing/session continuity. The MCP registry (`fulcrum mcp`) ships github and repomix entries default-disabled — opt-in with `fulcrum mcp enable <name>`.
+- **Managed MCPs stay narrow.** Fulcrum manages DeepWiki for repo docs and context-mode for context routing/session continuity. The MCP registry (`fulcrum mcp`) ships 16 builtin entries default-disabled (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart) — opt-in with `fulcrum mcp enable <name>`.
 - **Capabilities are bring-your-own tools.** Install the workstation toolchain yourself, then use `fulcrum doctor` to verify what is present.
 - **Behavioral rules, not knowledge.** Rules change what the agent *does*, not what it *knows*. `"Use ruff, never flake8"` works. `"Write clean code"` does nothing.
 - **Agent-friendly tools output JSON.** `--json` / `--format json` is the selection criterion for every CLI in this stack.
