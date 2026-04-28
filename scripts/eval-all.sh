@@ -3,8 +3,12 @@
 # leaderboard at <results-dir>/leaderboard.md.
 #
 # Usage:
-#   scripts/eval-all.sh [--engine claude|codex] [--model NAME] [--runs-per-query N] [--results-dir DIR]
+#   scripts/eval-all.sh [--engine claude|codex|gemini|opencode|pi]
+#                       [--model NAME] [--runs-per-query N] [--results-dir DIR]
 #                       [--only skill1,skill2,...] [--skip skill1,skill2,...]
+#                       [--skip-claude] [--skip-codex] [--skip-gemini]
+#                       [--skip-opencode] [--skip-pi]
+#                       [--regenerate-only]
 #
 # Auth: handled by the selected CLI (no API key needed).
 # Cost: ~5–10s per query × 20 queries × N skills × runs-per-query. With
@@ -14,7 +18,6 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENGINE="claude"
-HARNESS="$REPO_DIR/scripts/eval-skill-claude.sh"
 
 MODEL=""
 RUNS=1
@@ -22,6 +25,11 @@ RESULTS_DIR=""
 ONLY=""
 SKIP=""
 REGEN=0
+SKIP_CLAUDE=0
+SKIP_CODEX=0
+SKIP_GEMINI=0
+SKIP_OPENCODE=0
+SKIP_PI=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -31,18 +39,32 @@ while [ $# -gt 0 ]; do
     --results-dir)    RESULTS_DIR="$2"; shift 2 ;;
     --only)           ONLY="$2"; shift 2 ;;
     --skip)           SKIP="$2"; shift 2 ;;
+    --skip-claude)    SKIP_CLAUDE=1; shift ;;
+    --skip-codex)     SKIP_CODEX=1; shift ;;
+    --skip-gemini)    SKIP_GEMINI=1; shift ;;
+    --skip-opencode)  SKIP_OPENCODE=1; shift ;;
+    --skip-pi)        SKIP_PI=1; shift ;;
     --regenerate-only) REGEN=1; shift ;;
     -h|--help)
-      sed -n '2,12p' "$0" | sed 's/^# \?//'; exit 0 ;;
+      sed -n '2,16p' "$0" | sed 's/^# \?//'; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
+# Map engine to harness script.
+HARNESS=""
 case "$ENGINE" in
-  claude) HARNESS="$REPO_DIR/scripts/eval-skill-claude.sh" ;;
-  codex)  HARNESS="$REPO_DIR/scripts/eval-skill-codex.sh" ;;
-  *) echo "--engine must be claude or codex" >&2; exit 2 ;;
+  claude)   [ "$SKIP_CLAUDE"   = "1" ] || HARNESS="$REPO_DIR/scripts/eval-skill-claude.sh" ;;
+  codex)    [ "$SKIP_CODEX"    = "1" ] || HARNESS="$REPO_DIR/scripts/eval-skill-codex.sh" ;;
+  gemini)   [ "$SKIP_GEMINI"   = "1" ] || HARNESS="$REPO_DIR/scripts/eval-skill-gemini.sh" ;;
+  opencode) [ "$SKIP_OPENCODE" = "1" ] || HARNESS="$REPO_DIR/scripts/eval-skill-opencode.sh" ;;
+  pi)       [ "$SKIP_PI"       = "1" ] || HARNESS="$REPO_DIR/scripts/eval-skill-pi.sh" ;;
+  *) echo "--engine must be claude|codex|gemini|opencode|pi" >&2; exit 2 ;;
 esac
+if [ -z "$HARNESS" ]; then
+  echo "engine '$ENGINE' is skipped via --skip-$ENGINE flag; nothing to run." >&2
+  exit 0
+fi
 
 # --regenerate-only: walk existing $RESULTS_DIR, re-parse each <skill>/summary.txt,
 # rewrite leaderboard.md. No evals run. Required: --results-dir pointing at an

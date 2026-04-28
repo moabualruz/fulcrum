@@ -1,6 +1,6 @@
 # Skill eval queries
 
-> Trigger-rate test sets for `scripts/eval-skill-claude.sh`. One JSON array per skill, named `<skill>.json`. Used by Anthropic's `skill-creator/scripts/run_loop.py` (verified 2026-04-27).
+> Trigger-rate test sets for all five agent harnesses (`eval-skill-{claude,codex,gemini,opencode,pi}.sh`). One JSON array per skill, named `<skill>.json`. Used by Anthropic's `skill-creator/scripts/run_loop.py` (verified 2026-04-27).
 
 ## Format
 
@@ -55,6 +55,11 @@ If your skill's name doesn't appear naturally in correct responses (rare — mos
 
 ## Cross-refs
 
-- `scripts/eval-skill-claude.sh` — the harness.
-- `docs/skill-smoke-test.md` — manual cross-agent verification for Codex / Gemini / OpenCode / Pi (no auto-eval there).
+- `scripts/eval-skill-claude.sh` — harness for Claude Code.
+- `scripts/eval-skill-codex.sh` — harness for Codex CLI.
+- `scripts/eval-skill-gemini.sh` — harness for Gemini CLI.
+- `scripts/eval-skill-opencode.sh` — harness for OpenCode.
+- `scripts/eval-skill-pi.sh` — harness for Pi CLI.
+- `scripts/eval-all.sh` — leaderboard runner (`--engine claude|codex|gemini|opencode|pi`).
+- `docs/skill-smoke-test.md` — first-install path verification checklist.
 - `docs/skills.md` §7 — verification policy.

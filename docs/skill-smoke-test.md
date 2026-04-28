@@ -1,6 +1,6 @@
 # Skill smoke-test checklist
 
-> Manual cross-agent check for new in-repo skill. Run after `fulcrum skills lint` pass + `fulcrum skills sync` install. Claude Code and Codex both have statistical trigger-rate harnesses; Gemini, OpenCode, and Pi remain manual smoke.
+> Cross-agent check for new in-repo skill. Run after `fulcrum skills lint` pass + `fulcrum skills sync` install. Claude Code, Codex, Gemini, OpenCode, and Pi all have statistical trigger-rate harnesses (`scripts/eval-skill-<agent>.sh`). Manual smoke steps below remain useful for first-install verification of the extension/skill discovery path before running the full statistical harness.
 
 ## Per skill, prepare
 
@@ -26,18 +26,19 @@ Both plain English; no tool name itself.
 ### Gemini CLI
 
 - [ ] `gemini extensions link ~/.gemini/extensions/fulcrum-skills` (one-time, after `fulcrum skills sync`).
-- [ ] `gemini --debug "<trigger phrase>"` — grep stderr for skill activation log lines.
-- [ ] `gemini --debug "<anti-trigger phrase>"` — should not log activation.
+- [ ] `gemini -p "<trigger phrase>" --output-format json --yolo` — confirm response mentions skill.
+- [ ] Run `scripts/eval-skill-gemini.sh <skill> --runs-per-query 1` for statistical activation rate.
 
 ### OpenCode
 
-- [ ] `opencode "<trigger phrase>"` — observe skill loading in OpenCode status output.
-- [ ] `opencode "<anti-trigger phrase>"` — should not load.
+- [ ] `opencode run --format json "<trigger phrase>"` — observe skill name in JSON event stream.
+- [ ] Run `scripts/eval-skill-opencode.sh <skill> --runs-per-query 1` for statistical activation rate.
 
 ### Pi CLI
 
 - [ ] `pi` (interactive). Type `/skill:<name>` direct — confirms skill exists + body renders.
-- [ ] Fresh session, `pi "<trigger phrase>"` + observe if Pi plan references skill.
+- [ ] `pi --print "<trigger phrase>" --mode json --no-session` — observe if response references skill.
+- [ ] Run `scripts/eval-skill-pi.sh <skill> --runs-per-query 1` for statistical activation rate.
 
 ## Pass criteria
 
@@ -55,6 +56,10 @@ Both plain English; no tool name itself.
 ## Cross-refs
 
 - `fulcrum skills lint` — frontmatter validator (`src/cli/skills.ts`)
-- `scripts/eval-skill-claude.sh` — trigger-rate harness (Claude Code only)
+- `scripts/eval-skill-claude.sh` — trigger-rate harness (Claude Code)
 - `scripts/eval-skill-codex.sh` — trigger-rate harness (Codex CLI)
+- `scripts/eval-skill-gemini.sh` — trigger-rate harness (Gemini CLI)
+- `scripts/eval-skill-opencode.sh` — trigger-rate harness (OpenCode)
+- `scripts/eval-skill-pi.sh` — trigger-rate harness (Pi CLI)
+- `scripts/eval-all.sh` — leaderboard runner (`--engine claude|codex|gemini|opencode|pi`)
 - `docs/skills.md` §7 — verification policy
