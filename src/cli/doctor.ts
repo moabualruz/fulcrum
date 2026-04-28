@@ -43,6 +43,10 @@ interface DoctorReport {
     size: number | null;
     mtime: string | null;
   };
+  piMcpAdapter: {
+    adapterPresent: boolean;
+    deepwikiPresent: boolean;
+  };
   skillsCount: number;
   warnings: number;
   errors: number;
@@ -227,6 +231,27 @@ async function buildReport(): Promise<{ report: DoctorReport; errors: number }> 
     mtime: policyMtime,
   };
 
+  // Pi MCP adapter check (informational; not a warning/error if absent)
+  const piAgentDir = `${process.env["HOME"] ?? ""}/.pi/agent`;
+  let piAdapterPresent = false;
+  let piDeepwikiPresent = false;
+  if (await exists(piAgentDir)) {
+    try {
+      const settingsRaw = await Bun.file(`${piAgentDir}/settings.json`).text();
+      const settings = JSON.parse(settingsRaw);
+      if (settings && typeof settings === "object" && Array.isArray(settings.packages)) {
+        piAdapterPresent = settings.packages.includes("npm:pi-mcp-adapter");
+      }
+    } catch { /* no settings.json or bad JSON */ }
+    try {
+      const mcpRaw = await Bun.file(`${piAgentDir}/mcp.json`).text();
+      const mcp = JSON.parse(mcpRaw);
+      if (mcp && typeof mcp === "object" && mcp.mcpServers && typeof mcp.mcpServers === "object") {
+        piDeepwikiPresent = "deepwiki" in (mcp.mcpServers as Record<string, unknown>);
+      }
+    } catch { /* no mcp.json or bad JSON */ }
+  }
+
   // Skills
   const skillsCount = await countSkills();
 
@@ -246,6 +271,10 @@ async function buildReport(): Promise<{ report: DoctorReport; errors: number }> 
     },
     tools: toolsReport,
     policy: policyReport,
+    piMcpAdapter: {
+      adapterPresent: piAdapterPresent,
+      deepwikiPresent: piDeepwikiPresent,
+    },
     skillsCount,
     warnings,
     errors,
@@ -314,6 +343,15 @@ function printHumanFormat(report: DoctorReport, home: string): void {
     `Skills authored: ${report.skillsCount} (in ${repoRoot()}/skills/)`
   );
   console.log();
+
+  // Pi MCP adapter
+  {
+    const { adapterPresent, deepwikiPresent } = report.piMcpAdapter;
+    const adapterNote = adapterPresent ? "✓  pi-mcp-adapter in settings" : "·  pi-mcp-adapter not installed";
+    const deepwikiNote = deepwikiPresent ? "✓  deepwiki in mcp.json" : "·  deepwiki not in mcp.json";
+    console.log(`Pi MCP adapter:   ${adapterNote}   ${deepwikiNote}`);
+    console.log();
+  }
 
   // Verdict
   if (report.errors > 0) {

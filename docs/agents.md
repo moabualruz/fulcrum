@@ -293,13 +293,13 @@ Recommended user-level DeepWiki config for Pi:
 }
 ```
 
-Default adapter behavior exposes MCP servers through a proxy-style `mcp(...)` tool. If direct MCP tool names are required for policy matching, configure and verify the adapter's direct-tool mode before relying on `mcp__*` matchers.
+Default adapter behavior exposes MCP servers through a proxy-style `mcp(...)` tool. `fulcrum hook tool-output-router` normalises this proxy shape — `tool_name="mcp"` with `tool_input.server` and `tool_input.tool` — to `mcp__<server>__<tool>` before policy lookup, so `mcp__deepwiki__*` rules apply to Pi proxy calls without additional configuration.
 
-Fulcrum does not yet install `pi-mcp-adapter`, write Pi MCP config, or check adapter health in `doctor`; this is tracked in [HANDOVER.md](../HANDOVER.md) §6.
+`fulcrum install` manages the full Pi DeepWiki lifecycle: `pi install npm:pi-mcp-adapter`, settings.json package entry, and `~/.pi/agent/mcp.json` deepwiki entry. `fulcrum doctor --json` reports `piMcpAdapter.adapterPresent` and `piMcpAdapter.deepwikiPresent`.
 
 ### 5.7 Parity Gaps vs Claude Code
 
 | Gap | Detail |
 |---|---|
-| **Generic MCP adapter not managed** | DeepWiki works through `pi-mcp-adapter`, but Fulcrum does not yet install/configure/verify it. Managed context-mode uses Pi's native `pi install npm:context-mode` package path. |
+| **Generic MCP adapter** | `pi-mcp-adapter` is installed and configured by `fulcrum install`; DeepWiki entry written to `~/.pi/agent/mcp.json`. Proxy-shape routing normalised in `deriveTool`. |
 | **Extension language is TypeScript** | Shell hooks must wrap in TS extension that shells out — adds one layer indirection but preserves shell-script reuse |

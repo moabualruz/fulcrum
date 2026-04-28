@@ -70,9 +70,24 @@ export async function stateDir(project = projectSlug()): Promise<string> {
 /**
  * Extract the leaf tool name from an event. For Bash, derive from the first
  * non-flag token in tool_input.command; otherwise return tool_name unchanged.
+ *
+ * Pi adapter proxy shape: tool_name="mcp" with tool_input.server and tool_input.tool
+ * are normalised to mcp__<server>__<tool> to match the canonical policy key format.
  */
 export function deriveTool(event: HookEvent): string {
   const name = event.tool_name ?? "";
+
+  // Pi adapter proxy shape: mcp(server, tool, ...) → mcp__<server>__<tool>
+  if (name === "mcp") {
+    const inp = event.tool_input ?? {};
+    const server = inp["server"] ?? inp["serverName"] ?? "";
+    const tool = inp["tool"] ?? inp["toolName"] ?? "";
+    if (typeof server === "string" && typeof tool === "string" && server && tool) {
+      return `mcp__${server}__${tool}`;
+    }
+    return name;
+  }
+
   if (name !== "Bash") return name;
   const cmd = event.tool_input?.command ?? "";
   const tok = cmd

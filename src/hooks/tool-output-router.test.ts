@@ -51,6 +51,13 @@ afterAll(async () => {
   await rm(TMP, { recursive: true, force: true });
 });
 
+// Write envelope to a temp file; return path.
+async function writeEnvFile(envelope: object): Promise<string> {
+  const p = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
+  await Bun.write(p, JSON.stringify(envelope));
+  return p;
+}
+
 async function runRouterWith(envelope: object): Promise<{ stdout: string; exit: number; stderr: string }> {
   const json = JSON.stringify(envelope);
   const stdinFile = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
@@ -157,5 +164,57 @@ describe("tool-output-router", () => {
     };
     const { stdout } = await runRouterWith(env);
     expect(stdout).toBe("x\n"); // routed as fd, which is "raw"
+  });
+
+  test("Pi proxy-shape mcp tool — normalised to mcp__deepwiki__ask_question, routed as raw", async () => {
+    // Write a fresh policy file for this test to avoid mutation ordering issues.
+    const piPolicy = join(TMP, "pi-ask-policy.toml");
+    await Bun.write(piPolicy, POLICY_TOML + `\n[tools.mcp__deepwiki__ask_question]\ntier = "raw"\n`);
+
+    const env = {
+      tool_name: "mcp",
+      tool_input: { server: "deepwiki", tool: "ask_question", input: { question: "what is this repo?" } },
+      tool_response: { stdout: "This is a monorepo.\n", exit_code: 0 },
+    };
+    const proc = Bun.spawn(["bun", "src/index.ts", "hook", "router"], {
+      stdin: Bun.file(await writeEnvFile(env)),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, FULCRUM_POLICY: piPolicy, HOME: TMP },
+    });
+    const stdout = await new Response(proc.stdout).text();
+    await proc.exited;
+    expect(stdout).toBe("This is a monorepo.\n");
+  });
+
+  test("Pi proxy-shape mcp tool — routes read_wiki_contents to summary+file", async () => {
+    const piPolicy = join(TMP, "pi-read-policy.toml");
+    await Bun.write(piPolicy, POLICY_TOML + `\n[profiles.pi_summary_file]\ntier = "summary+file"\n[tools.mcp__deepwiki__read_wiki_contents]\nprofile = "pi_summary_file"\n`);
+
+    const env = {
+      tool_name: "mcp",
+      tool_input: { server: "deepwiki", tool: "read_wiki_contents", input: {} },
+      tool_response: { stdout: "a".repeat(500), exit_code: 0 },
+    };
+    const proc = Bun.spawn(["bun", "src/index.ts", "hook", "router"], {
+      stdin: Bun.file(await writeEnvFile(env)),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, FULCRUM_POLICY: piPolicy, HOME: TMP },
+    });
+    const stdout = await new Response(proc.stdout).text();
+    await proc.exited;
+    expect(stdout).toContain("file=");
+    expect(stdout).toContain("--- head ---");
+  });
+
+  test("Pi proxy-shape mcp tool — unknown server falls through to leave-as-is", async () => {
+    const env = {
+      tool_name: "mcp",
+      tool_input: { server: "unknown-server", tool: "some_tool" },
+      tool_response: { stdout: "passthrough\n", exit_code: 0 },
+    };
+    const { stdout } = await runRouterWith(env);
+    expect(stdout).toBe("passthrough\n");
   });
 });

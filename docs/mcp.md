@@ -72,9 +72,9 @@ Recommended user-level config:
 }
 ```
 
-Default adapter behavior exposes a proxy-style `mcp(...)` tool. `tool-output-router` policies keyed to direct names like `mcp__deepwiki__ask_question` should only be treated as Pi-compatible after direct-tool exposure is configured and verified.
+Default adapter behavior exposes a proxy-style `mcp(...)` tool. `fulcrum hook tool-output-router` normalises Pi's proxy-shape calls — `tool_name="mcp"` with `tool_input.server` and `tool_input.tool` fields — to the canonical `mcp__<server>__<tool>` form before policy lookup, so existing `mcp__deepwiki__*` rules apply to both direct and Pi proxy calls without duplication.
 
-Remaining Fulcrum work for DeepWiki-on-Pi: install/configure adapter, add doctor checks, and verify output-routing shape. Tracked in [HANDOVER.md](../HANDOVER.md) §6.
+`fulcrum install` runs `pi install npm:pi-mcp-adapter` (when `pi` is on PATH) and writes the deepwiki entry into `~/.pi/agent/mcp.json`, preserving other servers. `fulcrum doctor --json` reports `piMcpAdapter.adapterPresent` and `piMcpAdapter.deepwikiPresent`.
 
 ## Cross-agent
 
