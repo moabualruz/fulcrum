@@ -222,15 +222,33 @@ Doctor must report Wave-1 invariants: caveman uninstall leaves zero registry ent
 
 **Wave 3 — every remaining tool with official vendor agent assets**
 
-Driven by the discovery audit (`a37fce37255978aac` — see audit results when complete). Once that JSONL inventory lands, expand W3 inline below as a per-tool checklist, e.g.:
+Discovery audit (`a37fce37255978aac`) ran 2026-04-28. Full inventory:
 
-| # | Tool | Asset | Source URL | Per-agent canonical method | Action |
+| # | Tool | Asset kind | Source URL | Per-agent canonical method | Notes |
 |---|---|---|---|---|---|
-| W3.1 | Cloudflare services | remote MCP servers (~15 endpoints: docs, Workers, D1, R2, KV, queues, browser-rendering, AI gateway, etc.) | `cloudflare/mcp-server-cloudflare` + `https://*.mcp.cloudflare.com/mcp` | `claude mcp add --transport http <url>` per service; Codex TOML; Gemini settings.json `httpUrl`; OpenCode `type: remote`; Pi via adapter mcp.json | new `installCloudflareMcps`; one-flag opt-in (`--with-cloudflare`); per-session enable |
-| W3.2 | Google Workspace | ~100 official SKILL.md files | `googleworkspace/cli/tree/main/skills` | pin selection (gmail, calendar, drive, docs, slides, people) in upstream.lock; same fan-out as existing 20 | grow upstream.lock |
-| W3.3 | (TBD from discovery) | … | … | … | … |
+| W3.1 | `gh` | MCP (HTTP) | `github/github-mcp-server` → `https://api.githubcopilot.com/mcp/` | Claude: `claude mcp add -s user -t http github-mcp https://api.githubcopilot.com/mcp/`. Codex: `[mcp_servers.github-mcp] url = "..."`. Gemini: `mcpServers.github-mcp.httpUrl`. OpenCode: `mcp.github-mcp.type=remote+url`. Pi: `~/.pi/agent/mcp.json` via adapter. Auth: GitHub PAT via `GITHUB_TOKEN` env or `gh auth login`. | Replaces authored `skills/gh/`. Same as W2.1; merged here for one cohesive table. Default-disabled (auth required). |
+| W3.2 | `repomix` | Claude plugin × 3 + MCP | `yamadashy/repomix/.claude-plugin/marketplace.json` (plugins: `repomix-mcp`, `repomix-commands`, `repomix-explorer`) + `npx repomix --mcp` | Claude: `claude plugin marketplace add yamadashy/repomix && claude plugin install repomix-mcp@repomix && claude plugin install repomix-commands@repomix && claude plugin install repomix-explorer@repomix`. Other 4 agents: register `repomix --mcp` via stdio MCP entry in respective config (Codex TOML `command`, Gemini `command`, OpenCode `type: local`, Pi `command`). | Same as W2.2; merged. Repomix CLI install is BYO (`npm i -g repomix`); doctor already tracks. |
+| W3.3 | `semgrep` | MCP (in-binary) | `semgrep/semgrep` (develop branch) — `semgrep --experimental mcp` (or vendor-canonical command per their docs at run time) | Stdio MCP entry per agent invoking `semgrep --experimental mcp` (verify exact flag from `semgrep --help` at impl time). | Note: standalone `semgrep/mcp` repo is deprecated. We keep our 3 vendor-published `tavily-style` semgrep skills in `upstream.lock` AND register the MCP. |
+| W3.4 | `ctx7` | MCP (HTTP + npm) | `upstash/context7` → npm `@upstash/context7-mcp` (stdio) + remote `https://mcp.context7.com/mcp` (HTTP) | Prefer remote HTTP for zero-binary install. Claude: `claude mcp add -s user -t http ctx7 https://mcp.context7.com/mcp`. Codex/Gemini/OpenCode: corresponding HTTP shape. Pi via adapter. | Drop or supersede `edxeth/superlight-context7-skill` community pin. |
+| W3.5 | `tvly` (Tavily) | MCP (HTTP + npm) | `tavily-ai/tavily-mcp` → npm `tavily-mcp` (stdio) + remote `https://mcp.tavily.com/mcp/` (HTTP) | Prefer remote HTTP. Auth: `TAVILY_API_KEY`. | Keep `tavily-ai/skills` 7-skill pin (vendor-published; teaches when to use). MCP supplies the tool surface. Both managed. |
+| W3.6 | `playwright-cli` | MCP (npm) | `microsoft/playwright-mcp` → npm `@playwright/mcp` v0.0.71 (stdio) | All 5 agents: stdio MCP `npx @playwright/mcp@latest`. | Keep vendor-published `microsoft/playwright-cli/skills/playwright-cli/SKILL.md` upstream pin. |
+| W3.7 | `wrangler` + `flarectl` | MCP (HTTP, multi-suite) | `cloudflare/mcp-server-cloudflare` → ~10+ remote endpoints under `*.mcp.cloudflare.com/mcp` (docs, Workers Bindings, Workers Builds, Observability, Radar, Logpush, Browser, Containers) | `claude mcp add --transport http <name> <url>` per endpoint; corresponding HTTP shape on Codex/Gemini/OpenCode; Pi via adapter. Each endpoint = its own MCP name. | Vendor-published Wrangler skill from `cloudflare/skills/skills/wrangler/SKILL.md` ALSO pinned in upstream.lock (W1.5 already covers). |
+| W3.8 | `dart` | MCP (in-package) | `dart-lang/ai/pkgs/dart_mcp_server` | Per Dart docs at impl time (likely `dart pub global activate dart_mcp_server` then stdio MCP). | Vendor-official; no skill pinning needed beyond keeping authored `skills/dart-toolchain` (no vendor skill exists). |
 
-The `(TBD from discovery)` rows fill in once the discovery agent reports. Every new entry follows the same shape: tool name, asset kind, vendor URL, per-agent canonical method, action item. Mirror policy applies — if the vendor only publishes for Claude, copy the exact SKILL.md/manifest into the other 4 agents, no rewriting.
+### Tools with NO official vendor agent assets (keep authored skills as-is)
+
+§1 Foundation: `ripgrep`, `fd`, `fzf`, `jq`, `yq`, `bat`, `sd`, `eza`, `zoxide`, `xh`, `just`, `mise`, `direnv`, `tmux`, `difftastic`, `hyperfine`, `watchexec`, `universal-ctags`, `gitleaks`, `git-cliff`
+§2 Code intel: `ast-grep` (vendor-published skill at `ast-grep/agent-skill` — already pinned; W1.6 switches Claude path to plugin install), `lizard`
+§4 Services: `gws` (verify URL — earlier audit B claimed `googleworkspace/cli/tree/main/skills` exists; discovery agent could not confirm. Re-fetch before pinning), `hcloud` (Hetzner publishes nothing; honor "no community-only" rule), `usql`, `pi-mcp-adapter` (community publisher; keep using as Pi MCP infrastructure but does not count as a "managed official asset")
+§5 Language tools: every tool — vendors publish nothing. Authored skills cover the editor surface; CI tooling stays BYO per `docs/capabilities.md`.
+
+### W3 mechanics
+
+- New CLI: `fulcrum mcp list/enable/disable/register/unregister`. State in `~/.fulcrum/state/global/mcp-registry.toml` listing every registered MCP per agent with `enabled: bool`. Default-enabled set: `deepwiki`, `context-mode`. Default-disabled set: every W3 entry above (user runs `fulcrum mcp enable github-mcp` per session-or-permanently).
+- `fulcrum install` registers the W3 MCPs as available for every detected agent but does not enable them automatically (avoids the 55–100k-tokens-at-startup foot-gun warned about in `docs/mcp.md` §2).
+- `fulcrum uninstall` removes every W3 registration regardless of enabled state.
+- `fulcrum doctor` adds an `mcp` section: per registered MCP shows `enabled`, `agent_visibility[5]`, `auth_status` (env-var presence checks where applicable), `endpoint_reachable` (HEAD on remote URL or `which` on stdio command).
+- Mirror policy (the user's "mimic to other agents that don't have full support, no new content" rule): when a vendor publishes only for some agents (e.g. repomix's 3 Claude plugins), copy the vendor's exact `SKILL.md` and command spec into the other 4 agents' skills/MCP config without rewriting. Source-truth lives in `~/.fulcrum/cache/<vendor>/` (already used for caveman + upstream skills); mirror copies are the same bytes.
 
 **Ship discipline.** Every wave change carries:
 - Test in `src/cli/<file>.test.ts` for install + uninstall round-trip in a scratch HOME.
