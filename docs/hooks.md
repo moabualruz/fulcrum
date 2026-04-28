@@ -111,7 +111,7 @@ Rule of thumb: **PreToolUse for prevention, PostToolUse for reaction, SessionSta
 
 ## 5. Recipe library
 
-Every recipe = subcommand of `fulcrum` binary: `fulcrum hook <name>`. Enable: `fulcrum hooks enable <name>` — writes native hook config for all supported agents, records intent at `~/.fulcrum/hooks/enabled/<name>`, and prints the per-agent snippet for review. Disable: `fulcrum hooks disable <name>` — removes Fulcrum-managed native registrations and the marker. Implementation in `src/hooks/<name>.ts`; this section explains *what each does and when to use.*
+Every recipe = subcommand of `fulcrum` binary: `fulcrum hook <name>`. Enable: `fulcrum hooks enable <name>` — writes native hook config **only for agents whose root dirs exist on disk** (detection-aware default), records intent at `~/.fulcrum/hooks/enabled/<name>`, and prints the per-agent snippet for review. Pass `--all` to write configs for all 5 supported agents regardless of whether their dirs exist (useful for cross-machine dotfiles setup). Disable: `fulcrum hooks disable <name>` — removes Fulcrum-managed native registrations and the marker, also detection-aware by default (`--all` to target all). Implementation in `src/hooks/<name>.ts`; this section explains *what each does and when to use.*
 
 | Recipe | Lifecycle | Purpose | Blocks? |
 |---|---|---|---|
@@ -201,7 +201,7 @@ Same script, different registration. Use table to wire each recipe in §5 across
   })
   ```
 - **Pi** — TS extensions, hot-reloadable via `/reload`. `before_agent_start` can rewrite system prompt; equivalent power to Claude Code SessionStart context injection. MCP requires `pi-mcp-adapter`; default proxy-style `mcp(...)` output may not match direct `mcp__.*` router policies until direct-tool exposure is configured and verified.
-- **All agents** — invoke `fulcrum hook <name>` from each agent's native config. Binary at `~/.fulcrum/bin/fulcrum` (symlinked to `~/.local/bin/fulcrum` on PATH when possible) = single source of truth. `fulcrum hooks enable <name>` edits detected native config files and also prints the per-agent snippet for review.
+- **All agents** — invoke `fulcrum hook <name>` from each agent's native config. Binary at `~/.fulcrum/bin/fulcrum` (symlinked to `~/.local/bin/fulcrum` on PATH when possible) = single source of truth. `fulcrum hooks enable <name>` edits detected agents' native config files (agents whose root dir exists) and prints the per-agent snippet for review. Use `--all` to write configs for all 5 agents unconditionally.
 
 ---
 

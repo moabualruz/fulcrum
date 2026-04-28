@@ -7,6 +7,17 @@ export interface Agent {
   label: string;
   /** Primary agent config directory, e.g. ~/.claude. */
   baseDir: (home: string) => string;
+  /**
+   * Root directory whose *existence* signals that this agent is installed on
+   * the current machine.  Used by detection-aware commands (hooks enable/disable)
+   * to skip writing config files for agents that are absent.
+   *
+   * For most agents rootDir === baseDir.  Gemini is the exception: baseDir is
+   * ~/.gemini but rulesFile targets ~/AGENTS.md (the @-import shared path).
+   * Using ~ as rootDir would mean Gemini is *always* detected, so we use
+   * ~/.gemini as the canonical presence signal instead.
+   */
+  rootDir: (home: string) => string;
   /** File that receives the <!-- BEGIN/END FULCRUM RULES --> sentinel splice. */
   rulesFile: (home: string) => string;
   /**
@@ -33,6 +44,7 @@ export const AGENTS: readonly Agent[] = [
     id: "claude-code",
     label: "Claude Code",
     baseDir:          (home) => `${home}/.claude`,
+    rootDir:          (home) => `${home}/.claude`,
     rulesFile:        (home) => `${home}/.claude/CLAUDE.md`,
     skillsDir:        (home) => `${home}/.claude/skills`,
     cavemanInstallDir:(home) => `${home}/.claude/plugins/cache/caveman/caveman`,
@@ -42,6 +54,7 @@ export const AGENTS: readonly Agent[] = [
     id: "codex",
     label: "Codex CLI",
     baseDir:          (home) => `${home}/.codex`,
+    rootDir:          (home) => `${home}/.codex`,
     rulesFile:        (home) => `${home}/.codex/AGENTS.md`,
     skillsDir:        (home) => `${home}/.codex/skills`,
     cavemanInstallDir:(home) => `${home}/.codex/skills/caveman`,
@@ -50,6 +63,10 @@ export const AGENTS: readonly Agent[] = [
     id: "gemini",
     label: "Gemini CLI",
     baseDir:          (home) => `${home}/.gemini`,
+    // rootDir is ~/.gemini — the agent's config root and canonical presence
+    // signal. rulesFile targets ~/AGENTS.md (the @-import destination) which
+    // exists on every machine and would cause false-positive detection.
+    rootDir:          (home) => `${home}/.gemini`,
     // The GEMINI.md in ~/.gemini/ contains `@AGENTS.md` — the actual rules
     // content lives in ~/AGENTS.md (the @-import target). Doctor checks that
     // ~/AGENTS.md contains the sentinel to confirm rules are spliced.
@@ -62,6 +79,7 @@ export const AGENTS: readonly Agent[] = [
     id: "opencode",
     label: "OpenCode",
     baseDir:          (home) => `${home}/.config/opencode`,
+    rootDir:          (home) => `${home}/.config/opencode`,
     rulesFile:        (home) => `${home}/.config/opencode/AGENTS.md`,
     skillsDir:        (home) => `${home}/.config/opencode/skills`,
     cavemanInstallDir:(home) => `${home}/.config/opencode/skills/caveman`,
@@ -70,6 +88,7 @@ export const AGENTS: readonly Agent[] = [
     id: "pi",
     label: "Pi CLI",
     baseDir:          (home) => `${home}/.pi/agent`,
+    rootDir:          (home) => `${home}/.pi/agent`,
     rulesFile:        (home) => `${home}/.pi/agent/AGENTS.md`,
     skillsDir:        (home) => `${home}/.pi/agent/skills`,
     cavemanInstallDir:(home) => `${home}/.pi/agent/skills/caveman`,

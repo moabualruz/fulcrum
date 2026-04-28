@@ -1,15 +1,21 @@
 // fulcrum hooks list / enable / disable.
 //
-// `enable <name>` applies the hook registration to each agent's native config
-// file, records the marker under ~/.fulcrum/hooks/enabled/<name>, and prints
-// the per-agent registration snippet for reference.
-// `disable <name>` removes the managed registration and marker state.
+// `enable <name>` applies the hook registration to *detected* agents' native
+// config files by default, records the marker under
+// ~/.fulcrum/hooks/enabled/<name>, and prints the per-agent registration
+// snippet for reference.  Pass `--all` to write configs for all 5 supported
+// agents regardless of whether their root dirs exist (useful for cross-machine
+// setup or dotfiles repos).
+//
+// `disable <name>` removes the managed registration and marker state for
+// detected agents (or all agents with `--all`).
 
 import { mkdir, writeFile, unlink, readdir, readFile, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 import { AGENTS } from "../agents/registry.ts";
 
 type RecipeName = (typeof RECIPE_NAMES)[number];
+type AgentId = "claude-code" | "codex" | "gemini" | "opencode" | "pi";
 type JsonAgentId = "claude-code" | "codex" | "gemini";
 type TsAgentId = "opencode" | "pi";
 
@@ -46,6 +52,27 @@ const RECIPE_NAMES = [
 ] as const;
 
 const LABELS: Map<string, string> = new Map(AGENTS.map((agent) => [agent.id, agent.label]));
+
+/** All 5 supported agent IDs — used when `--all` is passed. */
+const ALL_AGENT_IDS: Set<AgentId> = new Set(AGENTS.map((a) => a.id as AgentId));
+
+/**
+ * Returns the set of agent IDs whose rootDir exists on disk.  Commands use
+ * this to skip writing config files for agents that are not installed on the
+ * current machine.  Pass `--all` to bypass this and target all agents.
+ */
+async function detectedAgents(home: string): Promise<Set<AgentId>> {
+  const detected = new Set<AgentId>();
+  for (const agent of AGENTS) {
+    try {
+      await stat(agent.rootDir(home));
+      detected.add(agent.id as AgentId);
+    } catch {
+      // dir absent — agent not installed
+    }
+  }
+  return detected;
+}
 
 const CLAUDE_RECIPES: Record<RecipeName, JsonRecipeSpec> = {
   "format": {
@@ -668,25 +695,45 @@ async function disableTsHook(agentId: TsAgentId, recipe: RecipeName): Promise<vo
   }
 }
 
-async function enableRecipe(name: RecipeName): Promise<void> {
-  await enableJsonHook("claude-code", name);
-  await enableJsonHook("codex", name);
-  await enableJsonHook("gemini", name);
-  await enableTsHook("opencode", name);
-  await enableTsHook("pi", name);
+async function enableRecipe(name: RecipeName, targetAgents: Set<AgentId>): Promise<void> {
+  for (const agentId of (["claude-code", "codex", "gemini"] as JsonAgentId[])) {
+    if (targetAgents.has(agentId)) {
+      await enableJsonHook(agentId, name);
+    } else {
+      console.log(`     · skip ${labelFor(agentId)} (not detected)`);
+    }
+  }
+  for (const agentId of (["opencode", "pi"] as TsAgentId[])) {
+    if (targetAgents.has(agentId)) {
+      await enableTsHook(agentId, name);
+    } else {
+      console.log(`     · skip ${labelFor(agentId)} (not detected)`);
+    }
+  }
 }
 
-async function disableRecipe(name: RecipeName): Promise<void> {
-  await disableJsonHook("claude-code", name);
-  await disableJsonHook("codex", name);
-  await disableJsonHook("gemini", name);
-  await disableTsHook("opencode", name);
-  await disableTsHook("pi", name);
+async function disableRecipe(name: RecipeName, targetAgents: Set<AgentId>): Promise<void> {
+  for (const agentId of (["claude-code", "codex", "gemini"] as JsonAgentId[])) {
+    if (targetAgents.has(agentId)) {
+      await disableJsonHook(agentId, name);
+    } else {
+      console.log(`     · skip ${labelFor(agentId)} (not detected)`);
+    }
+  }
+  for (const agentId of (["opencode", "pi"] as TsAgentId[])) {
+    if (targetAgents.has(agentId)) {
+      await disableTsHook(agentId, name);
+    } else {
+      console.log(`     · skip ${labelFor(agentId)} (not detected)`);
+    }
+  }
 }
 
 export async function removeAllHookRegistrations(): Promise<void> {
+  const home = process.env["HOME"] ?? "";
+  const target = await detectedAgents(home);
   for (const name of RECIPE_NAMES) {
-    await disableRecipe(name);
+    await disableRecipe(name, target);
   }
 }
 
@@ -714,9 +761,9 @@ async function cmdList(): Promise<void> {
   console.log("`enable <name>` applies the per-agent registration and prints the snippet.");
 }
 
-async function cmdEnable(name: string | undefined): Promise<void> {
+async function cmdEnable(name: string | undefined, allAgents: boolean): Promise<void> {
   if (!name) {
-    console.error("usage: fulcrum hooks enable <name>");
+    console.error("usage: fulcrum hooks enable <name> [--all]");
     process.exit(2);
   }
   if (!isRecipeName(name)) {
@@ -724,7 +771,9 @@ async function cmdEnable(name: string | undefined): Promise<void> {
     process.exit(2);
   }
 
-  await enableRecipe(name);
+  const home = process.env["HOME"] ?? "";
+  const target = allAgents ? ALL_AGENT_IDS : await detectedAgents(home);
+  await enableRecipe(name, target);
   await writeMarker(name);
   console.log(`Marked enabled: ${markerPath(name)}`);
 
@@ -744,9 +793,9 @@ async function cmdEnable(name: string | undefined): Promise<void> {
   process.stdout.write(snippet);
 }
 
-async function cmdDisable(name: string | undefined): Promise<void> {
+async function cmdDisable(name: string | undefined, allAgents: boolean): Promise<void> {
   if (!name) {
-    console.error("usage: fulcrum hooks disable <name>");
+    console.error("usage: fulcrum hooks disable <name> [--all]");
     process.exit(2);
   }
   if (!isRecipeName(name)) {
@@ -754,7 +803,9 @@ async function cmdDisable(name: string | undefined): Promise<void> {
     process.exit(2);
   }
 
-  await disableRecipe(name);
+  const home = process.env["HOME"] ?? "";
+  const target = allAgents ? ALL_AGENT_IDS : await detectedAgents(home);
+  await disableRecipe(name, target);
   await removeMarker(name);
   console.log(`Marked disabled: ${markerPath(name)}`);
 }
@@ -764,10 +815,16 @@ export async function run(args: string[]): Promise<void> {
   switch (sub) {
     case "list":
       return cmdList();
-    case "enable":
-      return cmdEnable(args[1]);
-    case "disable":
-      return cmdDisable(args[1]);
+    case "enable": {
+      const allAgents = args.includes("--all");
+      const name = args.find((a) => a !== "enable" && !a.startsWith("--"));
+      return cmdEnable(name, allAgents);
+    }
+    case "disable": {
+      const allAgents = args.includes("--all");
+      const name = args.find((a) => a !== "disable" && !a.startsWith("--"));
+      return cmdDisable(name, allAgents);
+    }
     default:
       console.error(`fulcrum hooks: unknown subcommand '${sub}'`);
       process.exit(2);

@@ -44,6 +44,12 @@ describe("AGENTS registry — getters return non-empty strings", () => {
         expect(v.length).toBeGreaterThan(0);
       });
 
+      test("rootDir is non-empty", () => {
+        const v = agent.rootDir(FAKE_HOME);
+        expect(typeof v).toBe("string");
+        expect(v.length).toBeGreaterThan(0);
+      });
+
       test("rulesFile is non-empty", () => {
         const v = agent.rulesFile(FAKE_HOME);
         expect(typeof v).toBe("string");
@@ -100,6 +106,11 @@ describe("AGENTS registry — specific path expectations", () => {
     expect(claude.settingsPath!(home)).toBe(`${home}/.claude/settings.json`);
   });
 
+  test("Claude Code: rootDir = ~/.claude", () => {
+    const claude = AGENTS.find((a) => a.id === "claude-code")!;
+    expect(claude.rootDir(home)).toBe(`${home}/.claude`);
+  });
+
   test("Gemini: rulesFile = ~/AGENTS.md (the @-import target)", () => {
     const gemini = AGENTS.find((a) => a.id === "gemini")!;
     expect(gemini.rulesFile(home)).toBe(`${home}/AGENTS.md`);
@@ -115,6 +126,13 @@ describe("AGENTS registry — specific path expectations", () => {
     expect(gemini.cavemanInstallDir(home)).toBe(`${home}/.gemini/extensions/caveman`);
   });
 
+  // Gemini's rootDir must be ~/.gemini (not ~) so detection is not a false
+  // positive on every machine (~/AGENTS.md as rootDir would always exist).
+  test("Gemini: rootDir = ~/.gemini (not ~)", () => {
+    const gemini = AGENTS.find((a) => a.id === "gemini")!;
+    expect(gemini.rootDir(home)).toBe(`${home}/.gemini`);
+  });
+
   test("Codex: rulesFile = ~/.codex/AGENTS.md", () => {
     const codex = AGENTS.find((a) => a.id === "codex")!;
     expect(codex.rulesFile(home)).toBe(`${home}/.codex/AGENTS.md`);
@@ -128,6 +146,11 @@ describe("AGENTS registry — specific path expectations", () => {
   test("Pi CLI: rulesFile = ~/.pi/agent/AGENTS.md", () => {
     const pi = AGENTS.find((a) => a.id === "pi")!;
     expect(pi.rulesFile(home)).toBe(`${home}/.pi/agent/AGENTS.md`);
+  });
+
+  test("Pi CLI: rootDir = ~/.pi/agent", () => {
+    const pi = AGENTS.find((a) => a.id === "pi")!;
+    expect(pi.rootDir(home)).toBe(`${home}/.pi/agent`);
   });
 
   test("Codex: does not have settingsPath", () => {
