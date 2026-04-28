@@ -17,6 +17,7 @@
 
 ## Cross-agent platforms (not per-tool skills, but the distribution layer)
 
+- **`JuliusBrussee/caveman`** — <https://github.com/JuliusBrussee/caveman>. **Mandatory managed install on every fulcrum host.** Compresses agent output (~75% verbosity reduction) and rewrites memory files (~46% input-token reduction) into terse fragments while preserving code, paths, commands, and semantic intent. Cross-agent: ships Claude Code plugin, Gemini extension, `.codex/hooks.json` SessionStart auto-activation, and Cursor/Windsurf SKILL.md. Mandatory mode: `/caveman ultra`. Used by fulcrum to (a) compress all in-repo `skills/<name>/SKILL.md` and `rules/AGENTS.md` files via `/caveman:compress` so the agent reads the maximally-compressed form; (b) ship caveman as the always-on default across every agent fulcrum installs into. See HANDOVER's "Next session" plan for the integration pipeline.
 - **`obra/superpowers`** — <https://github.com/obra/superpowers>. Cross-agent installer (`.claude-plugin`, `.codex-plugin`, `.opencode`, `gemini-extension.json`, `.cursor-plugin`). Skills to enable: `brainstorming`, `writing-plans`, `systematic-debugging`, `code-review`, `worktrees`, `using-skills`. Skip TDD orchestrators.
 - **`obra/superpowers-lab`** — sibling repo (309 stars). Source for the dedicated `tmux` skill (`using-tmux-for-interactive-commands`).
 - **`anthropics/skills`** — Anthropic-official. Document work, webapp testing, mcp-builder, skill-creator. No CLI-tool skills; pick sub-skills as needed.
