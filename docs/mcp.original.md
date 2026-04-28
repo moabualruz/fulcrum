@@ -1,10 +1,10 @@
 # MCP Policy
 
-> All MCPs disabled by default. CLI + skills is the preferred path (see [capabilities.md](capabilities.md), [skills.md](skills.md)).
+> DeepWiki is the only Fulcrum-managed default MCP. Everything else stays opt-in. CLI + skills remain the preferred path (see [capabilities.md](capabilities.md), [skills.md](skills.md)).
 
 ## 1. Why default-off
 
-MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead. Register MCPs disabled; enable per-session when genuinely needed.
+MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead. Register third-party MCPs disabled; enable per-session when genuinely needed. DeepWiki is the Fulcrum-managed exception.
 
 ## 2. Disable claude.ai defaults
 
@@ -22,15 +22,17 @@ The claude.ai integrated MCPs (Gmail, Drive, Calendar) auto-inject into every Cl
 ```
 Currently the only mechanism that drops the tokens without removing the connectors from the account ([issue #44112](https://github.com/anthropics/claude-code/issues/44112)). The flag name is undocumented and Anthropic can change it any release. Do not rely on this in shared / managed configs.
 
-## 3. MCP catalogue — opt-in only
+## 3. MCP catalogue — managed default plus opt-in extras
 
-One MCP is always on — `deepwiki`. It has no CLI or REST alternative; it is free, requires no auth, and has no documented rate limits. `fulcrum install` registers it for detected Codex, Gemini, OpenCode, and Claude Code when the native `claude` command is available; Pi has no MCP support.
+`deepwiki` is the only Fulcrum-managed default MCP. It has no CLI or REST alternative; it is free, requires no auth, and has no documented rate limits. `fulcrum install` registers it for detected Codex, Gemini, OpenCode, and Claude Code when the native `claude` command is available; Pi has no MCP support.
 
 ```bash
 claude mcp add -s user deepwiki --transport http https://mcp.deepwiki.com/mcp
 ```
 
 Tools: `ask_question`, `read_wiki_contents`, `read_wiki_structure` — public repos only.
+
+Claude Code removal remains manual: `claude mcp remove -s user deepwiki`.
 
 > MCP and CLI hit the same underlying API with the same quota — switching protocol does not change rate limits (verified: Context7, Tavily primary docs 2026-04-27). No other MCPs are needed.
 

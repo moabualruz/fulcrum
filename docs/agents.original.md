@@ -6,7 +6,7 @@
 
 | | Codex CLI | Gemini CLI | OpenCode | Pi CLI |
 |---|---|---|---|---|
-| Global rules | `~/.codex/AGENTS.md` | `~/.gemini/GEMINI.md` | `~/.config/opencode/AGENTS.md` | `~/.pi/agent/` (`AGENTS.md` or `CLAUDE.md`) |
+| Global rules | `~/.codex/AGENTS.md` | `~/AGENTS.md` (`~/.gemini/GEMINI.md` imports it when Gemini is detected) | `~/.config/opencode/AGENTS.md` | `~/.pi/agent/AGENTS.md` |
 | Project rules | `AGENTS.md` / `.codex/config.toml` | `GEMINI.md` (project root) | `AGENTS.md` | `AGENTS.md` / `CLAUDE.md` |
 | Reads AGENTS.md natively | Yes | **No** — only GEMINI.md | Yes | Yes |
 | Hook mechanism | `~/.codex/hooks.json` | `hooks` in settings.json | TypeScript plugin | TypeScript extension (`~/.pi/agent/extensions/*.ts`, `pi.on(event, handler)`) |
@@ -90,11 +90,12 @@ Sources: [github.com/google-gemini/gemini-cli/docs/reference/configuration.md](h
 
 | File | Scope |
 |---|---|
-| `~/.gemini/GEMINI.md` | Global user-level |
+| `~/AGENTS.md` | Global user-level Fulcrum target |
+| `~/.gemini/GEMINI.md` | Global user-level import shim (`@AGENTS.md`) when Gemini is detected |
 | `GEMINI.md` | Project root (project-level) |
 | `.gemini/GEMINI.md` | Project-level (alternative location) |
 
-**`AGENTS.md` is not natively read by Gemini CLI.** Only `GEMINI.md` files are discovered. Keep `AGENTS.md` as the single source of truth and make `GEMINI.md` a one-line import:
+**`AGENTS.md` is not natively read by Gemini CLI.** Fulcrum always writes the shared rules block to `~/AGENTS.md`; when `~/.gemini/` exists, install also appends `@AGENTS.md` to `~/.gemini/GEMINI.md` so Gemini resolves the same source of truth at load time. Keep `AGENTS.md` as the single source of truth and make `GEMINI.md` a one-line import:
 
 ```markdown
 @AGENTS.md
@@ -223,7 +224,7 @@ Sources: [github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono), [ex
 
 | File | Scope |
 |---|---|
-| `~/.pi/agent/AGENTS.md` or `~/.pi/agent/CLAUDE.md` | Global user-level |
+| `~/.pi/agent/AGENTS.md` | Global user-level |
 | `AGENTS.md` / `CLAUDE.md` | Project-level (walked up from cwd) |
 | `.pi/SYSTEM.md` | Replaces default system prompt (project) |
 | `APPEND_SYSTEM.md` | Appended to system prompt (project) |
@@ -259,11 +260,11 @@ The Bash tool also exposes a `spawnHook` for command/cwd/env mutation.
 | `SessionStart` | `session_start` |
 | `Stop` | `session_shutdown` |
 
-A TS file at `~/.pi/agent/extensions/index.ts` shells out to `fulcrum hook index-check` and `index-rebuild.sh` via `child_process.execSync`.
+TS files under `~/.pi/agent/extensions/*.ts` can shell out to `fulcrum hook index-check` and `fulcrum hook index-rebuild` via `child_process.execSync`.
 
 ### 5.4 Skills
 
-Install path: `~/.pi/agent/skills/fulcrum/<name>/SKILL.md` (user-level). Project-level: `.pi/skills/` (Pi-namespaced; never shared `.agents/`). Skills invoked via `/skill:name` syntax.
+Install path: `~/.pi/agent/skills/fulcrum/<name>/SKILL.md` (user-level, Fulcrum-managed). Skills invoked via `/skill:name` syntax.
 
 ### 5.5 Packages
 

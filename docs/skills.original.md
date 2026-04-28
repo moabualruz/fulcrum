@@ -30,17 +30,17 @@ Fulcrum-authored skills install under `fulcrum/`. Curated upstream skills instal
 | `think` | Structured reasoning — `/think` trigger |
 | `anthropics/skills` | Document work, webapp testing, mcp-builder, skill-creator |
 
-> `repomix` skill: `repomix --skill-generate <name> --skill-output <agent-skills-path>/<name>` generates a SKILL.md from any packed output.
+> `repomix` is an authored-skill candidate, not an upstream install target yet. Treat it as `skills/repomix/` work once we have a clean foldered skill layout.
 
 ## 3. Adoption strategy — install one, cherry-pick the rest
 
-**Strategy: install one as the cross-agent distribution platform, cherry-pick skills and patterns from the others.**
+**Strategy: install filesystem skill folders as the cross-agent distribution layer, cherry-pick skills and patterns from the others.**
 
-Current CLI support: `fulcrum install` runs both authored sync and curated upstream sync by default. Use `fulcrum install --no-upstream-skills` to skip networked upstream sync, or run `fulcrum skills upstream` later.
+Current CLI support: `fulcrum install` runs both authored sync and curated upstream sync by default. It does not call native plugin or extension installers in this branch. Use `fulcrum install --no-upstream-skills` to skip networked upstream sync, or run `fulcrum skills upstream` later.
 
 ### Install: superpowers (obra/superpowers)
 
-The only candidate with real, working cross-agent installers (`.claude-plugin/`, `.codex-plugin/`, `.opencode/`, `gemini-extension.json`, `.cursor-plugin/`).
+Source repo with useful skill ideas, but Fulcrum does not invoke its native installers in this branch. Any adopted pieces must be mirrored into the filesystem skill namespace.
 
 **Skills to keep enabled from superpowers:**
 

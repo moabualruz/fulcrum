@@ -13,6 +13,7 @@ That is the destination. This branch (`feat/agent-foundation-clean`) is the foun
 | **Context** | Always-on rules and conventions, sentinel-spliced into each agent's primary rules file | `rules/AGENTS.md`, `fulcrum install` |
 | **Automation** | Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) registered per-agent | `src/hooks/`, `fulcrum hooks enable` |
 | **Capability** | 28 skills authored in-repo, content-verified against upstream, with 20-entry trigger evals each | `skills/`, `fulcrum skills sync` |
+| **Capabilities** | Bring-your-own CLI tools, verified by `fulcrum doctor` | `docs/capabilities.md`, `fulcrum doctor` |
 | **Output policy** | Per-tool output strategy (raw / status / summary / file) driving `tool-output-router` | `config/tool-output-policy.toml` |
 | **Orchestration** | One Bun-compiled cross-platform binary (`init`, `install`, `hooks`, `skills`, `doctor`, `hook`) | `src/`, `dist/fulcrum-<plat>` |
 | **Cross-agent reach** | Same setup wired into Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI | `docs/agents.md`, `shims/` |
@@ -36,7 +37,8 @@ These are the layers the foundation is preparing for. They are **not built**; do
 ## Principles
 
 - **CLI and skills over MCP.** MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead.
-- **MCPs off by default.** Register MCPs disabled; enable per-session when genuinely needed.
+- **DeepWiki is the only Fulcrum-managed default MCP.** Everything else stays opt-in, and Claude Code removal remains manual.
+- **Capabilities are bring-your-own tools.** Install the workstation toolchain yourself, then use `fulcrum doctor` to verify what is present.
 - **Behavioral rules, not knowledge.** Rules change what the agent *does*, not what it *knows*. `"Use ruff, never flake8"` works. `"Write clean code"` does nothing.
 - **Agent-friendly tools output JSON.** `--json` / `--format json` is the selection criterion for every CLI in this stack.
 - **Skill content correctness is not implied by lint.** Author against upstream `--help`, not memory.
@@ -68,7 +70,7 @@ This sets up the `fulcrum:<skill-name>` address space and matches the prefixing 
 | [docs/context.md](docs/context.md) | Context layer — `CLAUDE.md`, `AGENTS.md` conventions |
 | [docs/hooks.md](docs/hooks.md) | Automation layer — full event surface + 8 shipped recipes |
 | [docs/tool-output-policy.md](docs/tool-output-policy.md) | Per-tool output strategies driving `tool-output-router` |
-| [docs/capabilities.md](docs/capabilities.md) | Capability layer — CLI tool catalogue |
+| [docs/capabilities.md](docs/capabilities.md) | Capability layer — bring-your-own CLI tool catalogue |
 | [docs/skills.md](docs/skills.md) | Skills — paths, authoring template, fork policy, verification |
 | [docs/skill-smoke-test.md](docs/skill-smoke-test.md) | Manual cross-agent verification checklist |
 | [docs/mcp.md](docs/mcp.md) | MCP policy — opt-in only |
@@ -104,8 +106,11 @@ After install, common commands:
 ```bash
 fulcrum init <dir>            # bootstrap a project's AGENTS.md + .claude/CLAUDE.md
 fulcrum doctor                # bun, agent dirs, tool presence, policy health
+fulcrum install --dry-run     # preview rules, skills, DeepWiki, and project bootstrap
+fulcrum install --no-skills   # skip all skill sync
+fulcrum install --no-upstream-skills  # skip curated upstream skill sync
 fulcrum hooks list            # show available hook recipes
-fulcrum hooks enable format   # mark enabled + print per-agent registration snippet
+fulcrum hooks enable format   # register in detected agent configs + print snippet
 fulcrum skills sync           # re-sync skills/ to each agent's skills/fulcrum/ folder
 fulcrum skills upstream       # sync curated third-party skills under fulcrum-upstream/
 fulcrum skills list           # enumerate authored skills with eval coverage
@@ -119,6 +124,7 @@ fulcrum uninstall --dry-run   # preview removal of Fulcrum-managed install artif
 ```bash
 bun run ci                    # install → tsc → test → build:all → skills lint
 fulcrum doctor                # post-install environment check
+fulcrum uninstall --dry-run   # preview what Fulcrum would remove
 ```
 
 ### Author + release
@@ -148,9 +154,9 @@ See [`skills/SOURCES.md`](skills/SOURCES.md) for the registry and the long-tail 
 
 ## Reading order for a fresh install
 
-1. **[capabilities.md](docs/capabilities.md)** — install the foundation CLI tools.
+1. **[capabilities.md](docs/capabilities.md)** — bring your own CLI tools, then verify them with `fulcrum doctor`.
 2. **[context.md](docs/context.md)** — write your global rules and per-project `AGENTS.md`.
-3. **[hooks.md](docs/hooks.md)** — wire up the recipes you want; `fulcrum hooks enable` prints each per-agent snippet.
+3. **[hooks.md](docs/hooks.md)** — enable the recipes you want; `fulcrum hooks enable` edits detected agent configs and prints each snippet for review.
 4. **[skills.md](docs/skills.md)** — install superpowers as the cross-agent base; author skills via the template.
-5. **[mcp.md](docs/mcp.md)** — register `deepwiki` as the only always-on MCP.
+5. **[mcp.md](docs/mcp.md)** — `deepwiki` is the only Fulcrum-managed default MCP.
 6. **[agents.md](docs/agents.md)** — replicate the setup on Codex, Gemini, OpenCode, Pi as needed.

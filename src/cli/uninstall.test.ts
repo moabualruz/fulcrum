@@ -82,6 +82,13 @@ describe("run", () => {
     await mkdir(join(TMP, ".fulcrum", "hooks", "snippets"), { recursive: true });
     await mkdir(join(TMP, ".fulcrum", "hooks", "enabled"), { recursive: true });
     await writeFile(join(TMP, ".fulcrum", "tool-output-policy.toml"), "default = true\n");
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await writeFile(
+      join(TMP, ".claude", "settings.json"),
+      JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command: "fulcrum hook index-check" }] }] } }, null, 2) + "\n",
+    );
+    await mkdir(join(TMP, ".config", "opencode", "plugins"), { recursive: true });
+    await writeFile(join(TMP, ".config", "opencode", "plugins", "fulcrum-index-check.ts"), "managed\n");
 
     await mkdir(join(TMP, ".codex", "skills", "fulcrum", "jq"), { recursive: true });
     await mkdir(join(TMP, ".codex", "skills", "fulcrum-upstream", "ast-grep"), { recursive: true });
@@ -99,6 +106,8 @@ describe("run", () => {
     expect(await Bun.file(join(TMP, ".gemini", "extensions", "fulcrum-upstream-skills")).exists()).toBe(false);
     expect(await Bun.file(join(TMP, ".fulcrum", "hooks", "snippets")).exists()).toBe(false);
     expect(await Bun.file(join(TMP, ".fulcrum", "hooks", "enabled")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".claude", "settings.json")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".config", "opencode", "plugins", "fulcrum-index-check.ts")).exists()).toBe(false);
     expect(await Bun.file(join(TMP, ".fulcrum", "tool-output-policy.toml")).exists()).toBe(false);
     expect(await readFile(join(TMP, ".codex", "AGENTS.md"), "utf8")).toBe("user\n");
     expect(await readFile(join(TMP, ".gemini", "GEMINI.md"), "utf8")).toBe("");

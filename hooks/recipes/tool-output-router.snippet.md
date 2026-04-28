@@ -24,14 +24,14 @@ Per-tool output handling driven by `~/.fulcrum/tool-output-policy.toml` (seeded 
 ] } }
 ```
 
-**OpenCode** — `~/.config/opencode/plugins/fulcrum.ts`
+**OpenCode** — `~/.config/opencode/plugins/fulcrum-tool-output-router.ts`
 ```ts
 "tool.execute.after": async ({ $, tool, input, output }) => {
   await $({ env: { HOOK_INPUT: JSON.stringify({ tool_name: tool, tool_input: input, tool_response: output }) } })`fulcrum hook tool-output-router`
 }
 ```
 
-**Pi CLI** — `~/.pi/agent/extensions/fulcrum.ts` (Pi has no MCP — entries for `mcp__*` won't fire)
+**Pi CLI** — `~/.pi/agent/extensions/fulcrum-tool-output-router.ts` (Pi has no MCP — entries for `mcp__*` won't fire)
 ```ts
 import { execSync } from "child_process"
 pi.on("tool_result", (e) => {

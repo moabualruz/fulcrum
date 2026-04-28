@@ -31,7 +31,7 @@ Example `.fulcrum/test-on-edit.toml`:
 ] } }
 ```
 
-**OpenCode** — `~/.config/opencode/plugins/fulcrum.ts`
+**OpenCode** — `~/.config/opencode/plugins/fulcrum-test-on-edit.ts`
 ```ts
 "tool.execute.after": async ({ $, tool, input }) => {
   if (tool !== "edit" && tool !== "write") return
@@ -39,7 +39,7 @@ Example `.fulcrum/test-on-edit.toml`:
 }
 ```
 
-**Pi CLI** — `~/.pi/agent/extensions/fulcrum.ts`
+**Pi CLI** — `~/.pi/agent/extensions/fulcrum-test-on-edit.ts`
 ```ts
 import { execSync } from "child_process"
 pi.on("tool_result", (e) => {

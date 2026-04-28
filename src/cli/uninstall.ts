@@ -194,6 +194,8 @@ export async function run(args: string[]): Promise<void> {
   console.log();
 
   console.log("3/6  Removing hook snippets and markers");
+  const { removeAllHookRegistrations } = await import("./hooks.ts");
+  await removeAllHookRegistrations();
   await removePath(`${fulcrumHome()}/hooks/snippets`, "hook snippets");
   await removePath(`${fulcrumHome()}/hooks/enabled`, "hook enable markers");
   console.log();

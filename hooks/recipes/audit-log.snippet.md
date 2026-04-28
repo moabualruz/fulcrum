@@ -29,7 +29,7 @@ tail ~/.fulcrum/state/$(basename "$PWD")/shell-commands.log
 ] } }
 ```
 
-**OpenCode** — `~/.config/opencode/plugins/fulcrum.ts`
+**OpenCode** — `~/.config/opencode/plugins/fulcrum-audit-log.ts`
 ```ts
 "tool.execute.after": async ({ $, tool, input, output }) => {
   if (tool !== "bash") return
@@ -37,7 +37,7 @@ tail ~/.fulcrum/state/$(basename "$PWD")/shell-commands.log
 }
 ```
 
-**Pi CLI** — `~/.pi/agent/extensions/fulcrum.ts`
+**Pi CLI** — `~/.pi/agent/extensions/fulcrum-audit-log.ts`
 ```ts
 import { execSync } from "child_process"
 pi.on("tool_result", (e) => {

@@ -1,6 +1,6 @@
 # Skill smoke-test checklist
 
-> Manual cross-agent verification for any new in-repo skill. Run after `fulcrum skills lint` passes and `fulcrum skills sync` has installed. Trigger-rate measurement only exists for Claude Code (via `skill-creator`); for the other 4 agents, this checklist is the verification.
+> Manual cross-agent verification for any new in-repo skill. Run after `fulcrum skills lint` passes and `fulcrum skills sync` has installed. Claude Code and Codex both have statistical trigger-rate harnesses; Gemini, OpenCode, and Pi remain manual smoke.
 
 ## Per skill, prepare
 
@@ -21,6 +21,7 @@ Both must be plain English; do not include the tool name itself.
 
 - [ ] `codex "<trigger phrase>"` — observe whether the skill is referenced in the tool plan.
 - [ ] `codex "<anti-trigger phrase>"` — should not load.
+- [ ] Run `scripts/eval-skill-codex.sh <skill> --model <codex-model>` for statistical activation rate.
 
 ### Gemini CLI
 
@@ -55,4 +56,5 @@ Both must be plain English; do not include the tool name itself.
 
 - `fulcrum skills lint` — frontmatter validator (`src/cli/skills.ts`)
 - `scripts/eval-skill-claude.sh` — trigger-rate harness (Claude Code only)
+- `scripts/eval-skill-codex.sh` — trigger-rate harness (Codex CLI)
 - `docs/skills.md` §7 — verification policy

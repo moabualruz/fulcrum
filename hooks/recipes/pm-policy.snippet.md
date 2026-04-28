@@ -24,7 +24,7 @@ Refuses `npm`/`yarn` when the repo declares pnpm; refuses `npm` when bun is decl
 ] } }
 ```
 
-**OpenCode** — `~/.config/opencode/plugins/fulcrum.ts`
+**OpenCode** — `~/.config/opencode/plugins/fulcrum-pm-policy.ts`
 ```ts
 "tool.execute.before": async ({ $, tool, input }) => {
   if (tool !== "bash") return
@@ -36,7 +36,7 @@ Refuses `npm`/`yarn` when the repo declares pnpm; refuses `npm` when bun is decl
 }
 ```
 
-**Pi CLI** — `~/.pi/agent/extensions/fulcrum.ts`
+**Pi CLI** — `~/.pi/agent/extensions/fulcrum-pm-policy.ts`
 ```ts
 import { execSync } from "child_process"
 pi.on("tool_call", (e) => {
