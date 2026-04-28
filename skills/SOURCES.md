@@ -34,7 +34,7 @@
 | `ast-grep` | ✅ | [ast-grep/agent-skill](https://github.com/ast-grep/agent-skill) | Tool-author. 644 stars. Distributed via Claude plugin marketplace. |
 | `tmux` | ☑ | [obra/superpowers-lab — using-tmux-for-interactive-commands](https://github.com/obra/superpowers-lab) · [mitsuhiko/agent-stuff/tmux](https://github.com/mitsuhiko/agent-stuff/blob/main/skills/tmux/SKILL.md) | Two strong sources. superpowers-lab sharper for interactive REPL driving. |
 | `universal-ctags` | ☑ | [DevonMorris/claude-ctags](https://github.com/DevonMorris/claude-ctags) | Auto-index + usage. ~80% token reduction vs grep. MIT. |
-| `gh` | ✍️ shipped | [`skills/gh/SKILL.md`](gh/SKILL.md) + [`evals/gh.json`](../evals/gh.json) | Authored 2026-04-28. 8 patterns + 8 anti-patterns. 20-entry trigger eval (13/7 split). |
+| `gh` | ✅ MCP | `github/github-mcp-server` → `https://api.githubcopilot.com/mcp/` (W2.1). Authored skill archived at `skills/_archive/gh-authored/` — use `fulcrum mcp enable github` to activate official MCP. |
 | `mise` | ☑ | [ray-manaloto/claude-code-marketplace/mise-toolkit](https://github.com/ray-manaloto/claude-code-marketplace/tree/main/mise-toolkit) | Multi-SKILL toolkit. 1 star — usable but consider re-authoring for our pin. |
 | `jq` | ✍️ shipped | [`skills/jq/SKILL.md`](jq/SKILL.md) + [`evals/jq.json`](../evals/jq.json) | **#1 friction.** Authored 2026-04-27. 7 patterns + 7 anti-patterns: extract / filter / reshape / aggregate / CSV / defaults / paths. 20-entry eval (12/8). |
 | `yq` | ✍️ shipped | [`skills/yq/SKILL.md`](yq/SKILL.md) + [`evals/yq.json`](../evals/yq.json) | Authored 2026-04-28. mikefarah-vs-kislyuk disambiguation, multi-doc, format conversion. 20-entry eval (12/8). |

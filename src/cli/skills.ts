@@ -81,6 +81,8 @@ export async function syncSkills(opts: { dryRun?: boolean } = {}): Promise<void>
   for (const entry of await readdir(skillsSrc, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     if (entry.name === "_template") continue;
+    // _archive/ holds deprecated/superseded skills — never propagate to agents.
+    if (entry.name === "_archive") continue;
     if (await exists(`${skillsSrc}/${entry.name}/SKILL.md`)) {
       skills.push(entry.name);
     }
@@ -245,6 +247,8 @@ async function cmdLint(target: string | undefined): Promise<void> {
     for (const entry of await readdir(target, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       if (entry.name === "_template") continue;
+      // _archive/ holds deprecated skills — skip in lint.
+      if (entry.name === "_archive") continue;
       const p = `${target}/${entry.name}/SKILL.md`;
       if (await exists(p)) files.push(p);
     }
@@ -304,7 +308,7 @@ async function cmdList(): Promise<void> {
 
   const rows: Array<{ name: string; descLen: number; descPreview: string; evalEntries: number | null }> = [];
   for (const entry of await readdir(skillsSrc, { withFileTypes: true })) {
-    if (!entry.isDirectory() || entry.name === "_template") continue;
+    if (!entry.isDirectory() || entry.name === "_template" || entry.name === "_archive") continue;
     const skillPath = `${skillsSrc}/${entry.name}/SKILL.md`;
     if (!(await exists(skillPath))) continue;
     const text = await readFile(skillPath, "utf8");

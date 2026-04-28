@@ -254,9 +254,65 @@ async function removeCavemanCopies(home: string): Promise<void> {
   await removePath(cfgPath, "caveman config");
 }
 
+const REPOMIX_PLUGINS = ["repomix-mcp", "repomix-commands", "repomix-explorer"] as const;
+const REPOMIX_MARKER_FILE = "repomix-claude.installed";
+
+async function uninstallRepomixClaudePlugins(home: string): Promise<void> {
+  if (!(await exists(`${home}/.claude`))) return;
+  if (!(await which("claude"))) {
+    console.log("     · claude not on PATH — repomix plugins: manual: claude plugin uninstall repomix-mcp@repomix ...");
+    return;
+  }
+  for (const plugin of REPOMIX_PLUGINS) {
+    await runBestEffort(
+      ["claude", "plugin", "uninstall", `${plugin}@repomix`],
+      `Claude Code ${plugin}@repomix plugin uninstall`,
+    );
+  }
+  // Remove marker file.
+  const fHome = process.env["FULCRUM_HOME"] ?? `${home}/.fulcrum`;
+  const markerFile = `${fHome}/state/global/${REPOMIX_MARKER_FILE}`;
+  await removePath(markerFile, "repomix Claude plugins marker");
+}
+
+/**
+ * For every entry in the MCP registry, call removeFromAgents (regardless of
+ * enabled state). Then delete the registry file unless --keep-state is passed.
+ */
+async function uninstallMcpRegistryEntries(home: string, keepState: boolean, dryRun: boolean): Promise<void> {
+  try {
+    const { loadRegistry, removeFromAgents } = await import("./mcp-registry.ts");
+    const reg = await loadRegistry();
+    for (const server of Object.values(reg.servers)) {
+      console.log(`     removing ${server.name} MCP from all agents`);
+      if (!dryRun) {
+        await removeFromAgents(server.name, { dryRun });
+      } else {
+        console.log(`     [dry-run] would remove ${server.name} from all agents`);
+      }
+    }
+  } catch {
+    // Registry may not exist if install was never run
+    console.log("     · MCP registry not present (skip)");
+  }
+
+  // Uninstall repomix Claude plugins.
+  await uninstallRepomixClaudePlugins(home);
+
+  // Delete registry file unless keepState.
+  if (!keepState) {
+    const fHome = process.env["FULCRUM_HOME"] ?? `${home}/.fulcrum`;
+    const registryFile = `${fHome}/state/global/mcp-registry.toml`;
+    await removePath(registryFile, "MCP registry file");
+  } else {
+    console.log("     · keep MCP registry file (--keep-state)");
+  }
+}
+
 export async function run(args: string[]): Promise<void> {
   let purge = false;
   let includeCaveman = false;
+  let keepState = false;
   DRY_RUN = false;
 
   for (const arg of args) {
@@ -266,6 +322,8 @@ export async function run(args: string[]): Promise<void> {
       purge = true;
     } else if (arg === "--include-caveman") {
       includeCaveman = true;
+    } else if (arg === "--keep-state") {
+      keepState = true;
     } else {
       console.error(`fulcrum uninstall: unknown arg '${arg}'`);
       process.exit(2);
@@ -303,6 +361,10 @@ export async function run(args: string[]): Promise<void> {
   console.log("5/7  Removing DeepWiki MCP registrations");
   const { uninstallDeepwikiMcp } = await import("./mcp.ts");
   await uninstallDeepwikiMcp({ dryRun: DRY_RUN });
+  console.log();
+
+  console.log("5b/7 Removing MCP registry entries from agents");
+  await uninstallMcpRegistryEntries(home, keepState, DRY_RUN);
   console.log();
 
   console.log("6/7  Removing context-mode registrations");

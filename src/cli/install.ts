@@ -421,6 +421,83 @@ export async function lockCavemanUltra(home: string): Promise<void> {
   console.log(`     ✓ caveman defaultMode set to 'ultra' (${cfgPath})`);
 }
 
+// ── MCP registry install helpers ────────────────────────────────────────────
+
+const REPOMIX_PLUGINS = ["repomix-mcp", "repomix-commands", "repomix-explorer"] as const;
+const REPOMIX_MARKETPLACE = "yamadashy/repomix";
+const REPOMIX_MARKER_FILE = "repomix-claude.installed";
+
+function fulcrumStateDir(): string {
+  return `${fulcrumHome()}/state/global`;
+}
+
+async function installRepomixClaudePlugins(home: string): Promise<void> {
+  if (!(await isDir(`${home}/.claude`))) {
+    console.log("     · skip repomix Claude plugins (Claude Code not detected)");
+    return;
+  }
+  if (!(await which("claude"))) {
+    console.log("     · skip repomix Claude plugins (claude not on PATH)");
+    return;
+  }
+
+  const markerFile = `${fulcrumStateDir()}/${REPOMIX_MARKER_FILE}`;
+  if (await exists(markerFile)) {
+    console.log("     · repomix Claude plugins already installed (marker present)");
+    return;
+  }
+
+  // Add marketplace.
+  const r1 = await runProcDry(["claude", "plugin", "marketplace", "add", REPOMIX_MARKETPLACE]);
+  if (r1.exit !== 0 && !DRY_RUN) {
+    console.log(`     ✗ repomix marketplace add failed: ${r1.stderr.trim()} — skip plugin installs`);
+    return;
+  }
+  console.log("     ✓ repomix marketplace added");
+
+  // Install each plugin.
+  let allOk = true;
+  for (const plugin of REPOMIX_PLUGINS) {
+    const r = await runProcDry(["claude", "plugin", "install", `${plugin}@repomix`]);
+    if (r.exit !== 0 && !DRY_RUN) {
+      console.log(`     ✗ claude plugin install ${plugin}@repomix failed: ${r.stderr.trim()}`);
+      allOk = false;
+    } else {
+      console.log(`     ✓ claude plugin install ${plugin}@repomix`);
+    }
+  }
+
+  // Write marker only when all succeeded (or dry-run).
+  if (allOk || DRY_RUN) {
+    if (!DRY_RUN) {
+      await mk(fulcrumStateDir());
+      await wf(markerFile, new Date().toISOString() + "\n");
+    } else {
+      console.log(`     [dry-run] would write marker: ${markerFile}`);
+    }
+  }
+}
+
+/**
+ * Register github and repomix in the MCP registry (default-disabled).
+ * Apply to agents only when default_enabled=true (neither W2 entry is, so
+ * this step is registry-only). Claude Code repomix plugins installed here.
+ */
+export async function installMcpRegistryEntries(home: string): Promise<void> {
+  const { registerServer, DEFAULT_GITHUB_SERVER, DEFAULT_REPOMIX_SERVER } = await import("./mcp-registry.ts");
+
+  // Register github (HTTP, default-disabled).
+  await registerServer("github", DEFAULT_GITHUB_SERVER);
+  console.log("     ✓ github MCP registered (default-disabled; enable with: fulcrum mcp enable github)");
+
+  // Register repomix (stdio, default-disabled).
+  await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+  console.log("     ✓ repomix MCP registered (default-disabled; enable with: fulcrum mcp enable repomix)");
+
+  // Install repomix Claude plugins (Claude-specific vendor install).
+  await installRepomixClaudePlugins(home);
+}
+
 export async function run(args: string[]): Promise<void> {
   let withProject: string | null = null;
   let syncAuthoredSkills = true;
@@ -512,6 +589,10 @@ export async function run(args: string[]): Promise<void> {
   console.log("8/9  Registering DeepWiki MCP where supported");
   const { installDeepwikiMcp } = await import("./mcp.ts");
   await installDeepwikiMcp({ dryRun: DRY_RUN });
+  console.log();
+
+  console.log("8b/9 Registering MCP registry entries (github, repomix)");
+  await installMcpRegistryEntries(home);
   console.log();
 
   if (withProject) {

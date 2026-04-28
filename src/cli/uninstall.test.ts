@@ -196,6 +196,42 @@ describe("removeCavemanCopies — W1.1 Claude plugin uninstall", () => {
 });
 
 // ---------------------------------------------------------------------------
+// W2 — MCP registry uninstall
+// ---------------------------------------------------------------------------
+
+import { registerServer, DEFAULT_GITHUB_SERVER, DEFAULT_REPOMIX_SERVER } from "./mcp-registry.ts";
+
+describe("uninstall MCP registry (W2)", () => {
+  test("registry file deleted by default (no --keep-state)", async () => {
+    const stateDir = join(TMP, ".fulcrum", "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    await registerServer("github", DEFAULT_GITHUB_SERVER);
+    await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+
+    await run([]);
+
+    const registryFile = join(TMP, ".fulcrum", "state", "global", "mcp-registry.toml");
+    expect(await Bun.file(registryFile).exists()).toBe(false);
+  });
+
+  test("--keep-state preserves registry file", async () => {
+    const stateDir = join(TMP, ".fulcrum", "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    await registerServer("github", DEFAULT_GITHUB_SERVER);
+
+    await run(["--keep-state"]);
+
+    const registryFile = join(TMP, ".fulcrum", "state", "global", "mcp-registry.toml");
+    expect(await Bun.file(registryFile).exists()).toBe(true);
+  });
+
+  test("uninstall when registry not present does not throw", async () => {
+    // No registry file created.
+    await expect(run([])).resolves.toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // W1.2 — caveman Gemini uninstall: `gemini extensions uninstall caveman`
 // ---------------------------------------------------------------------------
 

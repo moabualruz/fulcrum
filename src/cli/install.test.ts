@@ -416,3 +416,70 @@ describe("dry-run mode", () => {
     expect(await Bun.file(target).exists()).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 5. MCP registry entries (W2)
+// ---------------------------------------------------------------------------
+
+import { installMcpRegistryEntries } from "./install.ts";
+import { loadRegistry } from "./mcp-registry.ts";
+
+describe("installMcpRegistryEntries", () => {
+  let regHome: string;
+  let origFulcrumHome: string | undefined;
+  let origHomeEnv: string | undefined;
+
+  beforeEach(async () => {
+    regHome = await mkdtemp(join(tmpdir(), "fulcrum-mcp-install-"));
+    origFulcrumHome = process.env["FULCRUM_HOME"];
+    origHomeEnv = process.env["HOME"];
+    process.env["FULCRUM_HOME"] = join(regHome, ".fulcrum");
+    process.env["HOME"] = regHome;
+    setDryRun(false);
+  });
+
+  afterEach(async () => {
+    setDryRun(false);
+    if (origFulcrumHome !== undefined) process.env["FULCRUM_HOME"] = origFulcrumHome;
+    else delete process.env["FULCRUM_HOME"];
+    if (origHomeEnv !== undefined) process.env["HOME"] = origHomeEnv;
+    else delete process.env["HOME"];
+    await rm(regHome, { recursive: true, force: true });
+  });
+
+  test("registers github server with correct transport+url", async () => {
+    await installMcpRegistryEntries(regHome);
+    const reg = await loadRegistry();
+    const github = reg.servers["github"];
+    expect(github).toBeDefined();
+    expect(github!.transport).toBe("http");
+    expect(github!.url).toBe("https://api.githubcopilot.com/mcp/");
+    expect(github!.default_enabled).toBe(false);
+    expect(github!.auth_env_vars).toContain("GITHUB_TOKEN");
+  });
+
+  test("registers repomix server with correct transport+command", async () => {
+    await installMcpRegistryEntries(regHome);
+    const reg = await loadRegistry();
+    const repomix = reg.servers["repomix"];
+    expect(repomix).toBeDefined();
+    expect(repomix!.transport).toBe("stdio");
+    expect(repomix!.command).toBe("npx -y repomix --mcp");
+    expect(repomix!.default_enabled).toBe(false);
+  });
+
+  test("idempotent — second call does not duplicate entries", async () => {
+    await installMcpRegistryEntries(regHome);
+    await installMcpRegistryEntries(regHome);
+    const reg = await loadRegistry();
+    expect(Object.keys(reg.servers).filter((k) => k === "github")).toHaveLength(1);
+    expect(Object.keys(reg.servers).filter((k) => k === "repomix")).toHaveLength(1);
+  });
+
+  test("neither github nor repomix are default-enabled", async () => {
+    await installMcpRegistryEntries(regHome);
+    const reg = await loadRegistry();
+    expect(reg.servers["github"]!.default_enabled).toBe(false);
+    expect(reg.servers["repomix"]!.default_enabled).toBe(false);
+  });
+});
