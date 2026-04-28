@@ -1,71 +1,20 @@
 # Fulcrum — Handover
 
-> Snapshot at branch `feat/agent-foundation-clean` (HEAD: `f92d6c7` + uncommitted §6.1 + post-§6.1 polish). Forward-looking only — historical event logs have been pruned. For archaeology, see `git log` and the per-commit messages.
+> Snapshot at branch `feat/agent-foundation-clean` (8 commits ahead of `f92d6c7`). Forward-looking only — historical event logs pruned. For archaeology: `git log` and per-commit messages.
 
 ## 0. Destination
 
 **Fulcrum is a local-first CLI Agent OS for supervising repositories, tasks, agent runs, context, memory, and artifacts.**
 
-Today the foundation layer is in place. The supervisor / task system / agent runs / context engine / memory / artifacts / plugins layers are placeholders, not implementations. See `AGENTS.md` for the trajectory framing.
-
----
-
-## What landed this session (§6.1 — Caveman compression)
-
-All five §6.1 steps are **COMPLETE**. Key files changed:
-
-- **`src/cli/install.ts`** — new steps 4 + 5: per-agent caveman install (Claude Code plugin, Gemini extension, clone-once + copy for Codex/OpenCode/Pi), `lockCavemanUltra()` writes `~/.config/caveman/config.json`, `assertNotAgentsPath()` hard guard throws if any path resolves under `~/.agents/`.
-- **`src/cli/install.test.ts`** — 9 new tests (47 total passing). Added alongside the existing install tests.
-- **`src/cli/doctor.ts`** — new "Caveman (per-agent compression)" section between "Agents detected" and "Tools" (~46 LOC added; 229 lines total).
-- **`rules/AGENTS.md`** — §0b rule added (caveman ultra always-on, verbatim preservation, opt-out, auto-clarity). Split: install table + project-specific paths moved to project `AGENTS.md`; `rules/AGENTS.md` is now 90 lines of pure behavioral rules.
-- **`AGENTS.md`** — new "## Cross-agent rules distribution" section (install table + project-specific paths from the split above).
-- **28 `skills/<name>/SKILL.md`** + `rules/AGENTS.md` + `AGENTS.md` + `skills/SOURCES.md` + 8 `docs/*.md` — all compressed via the caveman python CLI (calls `claude --print`, no API key). `.original.md` siblings saved beside each as the pre-compression human-edit form. Frontmatter (`description:` field) preserved verbatim — lint passes 28/28. Skipped intentionally: HANDOVER.md (next-session pickup), README.md (public-facing).
-- **Doc drift fixes:** `docs/agents.md` 3 stale flat skill paths → namespaced `~/<agent>/skills/fulcrum/<name>/`; `docs/skills.md` line 102 stale `run_loop.py`/Anthropic-SDK reference → current `claude --print` harness; `docs/skill-smoke-test.md` "(when available)" qualifier removed.
-- **`scripts/eval-all.sh` bug fixes:** line 71 `$RUNS_` unbound-var → `${RUNS}_`; lines 96–97 gawk-only `awk match()` → portable grep+sed parse; new `--regenerate-only` flag rewrites `leaderboard.md` from existing `summary.txt` files without rerunning evals.
-
-**CI state at end of §6.1:** `bun run ci` green — install / typecheck / test (47 pass) / build:all (5 platforms) / skills:lint (28/28).
-
-**HEAD pending: §6.1 caveman integration; not yet committed.**
-
----
-
-## What also landed (post-§6.1 scope)
-
-All items below are approved retroactively. Branch still uncommitted.
-
-1. **Hook envelope parse failure logging** — `src/utils/io.ts` `readHookEvent()` now emits `fulcrum hook <name>: envelope parse failed (<reason>): <first-80-chars>` to stderr unconditionally on JSON-parse failure; `FULCRUM_DEBUG` retains verbose logs in addition; `FULCRUM_HOOK_NAME` env var threads the hook name into the log. Tests: `src/utils/io.test.ts` (9 cases) + extensions to `src/hooks/format.test.ts` and `src/hooks/test-on-edit.test.ts`.
-
-2. **Per-skill match-words override** — `scripts/eval-skill-claude.sh` reads `evals/<skill>.match-words` if present (one word/phrase per line, `#` comments + blanks ignored). Precedence: `--match-words` CLI flag > `evals/<skill>.match-words` file > auto-derived defaults. Header comment block updated. No `.match-words` files authored yet — affordance only.
-
-3. **Gemini doctor false-positive fix** — `src/cli/doctor.ts` `agentDirs` now points Gemini's `rulesFile` at `~/AGENTS.md` (where the sentinel actually lives via `@AGENTS.md` import) instead of `~/.gemini/GEMINI.md` (the single-line shim). Doctor now correctly reports `Gemini CLI ✓ rules spliced`.
-
-4. **`lockCavemanUltra` exported + tested** — 5 new tests at `src/cli/install.test.ts` covering fresh install, idempotency, overwrite-non-ultra, malformed JSON recovery, XDG_CONFIG_HOME variant. Function is now `export async function`.
-
-5. **Doctor surfaces caveman defaultMode** — `src/cli/doctor.ts` "Caveman" section adds a final line: `defaultMode: <mode> (env|file|default|malformed)`. Resolution order: env `CAVEMAN_DEFAULT_MODE` > `${XDG_CONFIG_HOME:-$HOME/.config}/caveman/config.json` > "full" default. Warns if not "ultra".
-
-6. **`fulcrum install --dry-run`** — `src/cli/install.ts` respects `--dry-run`. Six wrapper helpers (`wf`, `mk`, `cp`, `ap`, `runProcDry`, `cloneOrUpdateDry`) gate every write/spawn; reads still execute. Output format identical except writes log as `[dry-run] would write/mkdir/copy/append/run: <thing>`. `assertNotAgentsPath` still throws under dry-run. Tests: 4 new cases in `describe("dry-run mode")` in `src/cli/install.test.ts`.
-
-7. **`scripts/compress-with-caveman.sh` + `bun run compress`** — idempotent compress wrapper. Default targets: `skills/*/SKILL.md`, `rules/AGENTS.md`, `AGENTS.md`, `skills/SOURCES.md`, `docs/*.md`. Excludes `_template`, `HANDOVER.md`, `README.md`. `--check` mode exits 1 if pending. `package.json` `scripts.compress` added; `bun run compress` invokes the TS subcommand (see item 13).
-
-8. **`compress:check` CI soft gate** — `scripts/ci.ts` adds a new stage after `skills:lint` running `bash scripts/compress-with-caveman.sh --check`. Soft fail — does NOT abort CI. Summary shows `✓ / ⚠ (N pending) / · (skipped)`.
-
-9. **Rules size lint guardrail** — `src/cli/skills.ts` `cmdLint` now checks `rules/AGENTS.md` line count when target is the `skills/` directory. Fails if > 200 lines, passes with note `(NN lines, under 200-line target)`. Currently 91 lines ✓.
-
-10. **`docs/caveman.md` + `.original.md`** — 97 lines each. Sections: What / Install / Default mode / What gets compressed / What stays verbose / Frontmatter / Doctor / Adding a new skill / Opt-out / Cross-refs.
-
-11. **Agent registry refactor** — `src/agents/registry.ts` (77 lines) is now the single source for the 5 agents. Exports `Agent` interface + `AGENTS` array with `id`, `label`, `baseDir`, `rulesFile`, `skillsDir`, `cavemanInstallDir`, optional `settingsPath`. `src/cli/install.ts`, `src/cli/doctor.ts`, `src/cli/skills.ts` all consume it. Tests: `src/agents/registry.test.ts` (36 tests).
-
-12. **`fulcrum doctor --json`** — `src/cli/doctor.ts` emits a `DoctorReport` object with `bun, platform, agents, caveman, tools, policy, skillsCount, warnings, errors, verdict` when `--json` flag is passed. Human format unchanged when flag absent. Exit codes preserved (1 if errors > 0).
-
-13. **`fulcrum compress` TS subcommand** — `src/cli/compress.ts` (267 lines). Wired into `src/index.ts` dispatcher. Wraps caveman python CLI. `bun run compress` now invokes this TS version. Bash wrapper (`scripts/compress-with-caveman.sh`) kept for portability.
-
-**CI state after post-§6.1 work:** `bun run ci` green — install / typecheck / test (103 pass, 11 test files, 183 expect calls) / build:all / skills:lint / compress:check (soft, 0 pending). tsc clean.
+Today the foundation layer is in place. Supervisor / task / agent-runs / context-engine / memory / artifacts / plugins layers are placeholders, not implementations. See `AGENTS.md` for the trajectory framing.
 
 ---
 
 ## 1. Current state — one paragraph
 
-`feat/agent-foundation-clean` ships a single Bun-compiled `fulcrum` binary that orchestrates installation, hooks, skills, rules, and an output-handling policy across five agent runtimes (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI). 28 in-repo skills are content-verified against upstream, lint-clean (frontmatter + body sections), and caveman-compressed (`.original.md` beside each). Skills propagate via `fulcrum skills sync` to a `fulcrum/` subfolder under each agent's skills root. Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) are TypeScript subcommands of the same binary. Local CI (`bun run ci`) runs 6 stages: install / typecheck / test (103 pass across 11 files) / build:all / skills:lint / compress:check (soft). `fulcrum install` runs 5 steps including caveman cross-agent install, locking caveman ultra via `~/.config/caveman/config.json`, and respects `--dry-run`. `fulcrum doctor` enumerates 32 tools, a "Caveman" section with `defaultMode` display, and supports `--json` output. `src/agents/registry.ts` is the single source of truth for all 5 agent definitions consumed by install, doctor, and skills. `bun run compress` invokes `src/cli/compress.ts` to caveman-compress in-repo content idempotently. The format hook has been smoke-tested end-to-end against a malformed `.py`. No GitHub Actions are wired (intentional; opt-out). §6.2 (eval leaderboard) is the active next priority.
+`feat/agent-foundation-clean` ships a single Bun-compiled `fulcrum` binary that orchestrates installation, hooks, skills, rules, and an output-handling policy across five agent runtimes (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI). 28 in-repo skills are content-verified against upstream, lint-clean (frontmatter + body sections), and caveman-compressed (`.original.md` beside each). Skills propagate via `fulcrum skills sync` to a `fulcrum/` subfolder under each agent's skills root. Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) are TypeScript subcommands of the same binary. Local CI (`bun run ci`) runs 6 stages: install / typecheck / test (103 pass across 11 files) / build:all / skills:lint / compress:check (soft). `fulcrum install` runs 5 steps including caveman cross-agent install, locking caveman ultra via `~/.config/caveman/config.json`, and respects `--dry-run`. `fulcrum doctor` enumerates 32 tools, a "Caveman" section with `defaultMode` display, and supports `--json` output. `src/agents/registry.ts` is the single source of truth for all 5 agent definitions consumed by install, doctor, and skills. `bun run compress` invokes `src/cli/compress.ts` to caveman-compress in-repo content idempotently. The format hook has been smoke-tested end-to-end against a malformed `.py`. No GitHub Actions are wired (intentional; opt-out). §6.2 (per-skill eval iteration) is the active next priority.
+
+---
 
 ## 2. Architecture
 
@@ -124,8 +73,8 @@ scripts/
 ├── release.ts                         # bun run release vX.Y.Z [--gh]
 ├── install.sh                         # bootstrap (clone or FULCRUM_RELEASE_TAG fetch)
 ├── compress-with-caveman.sh           # idempotent bash compress wrapper; --check for CI
-├── eval-skill-claude.sh               # trigger-rate eval; reads evals/<skill>.match-words if present
-└── eval-all.sh                        # leaderboard runner; --regenerate-only flag added
+├── eval-skill-claude.sh               # single-skill trigger-rate eval; reads evals/<skill>.match-words
+└── eval-all.sh                        # leaderboard runner; --regenerate-only flag
 
 config/tool-output-policy.toml         # default tier matrix for ~50 tools
 hooks/recipes/*.snippet.md             # per-agent registration snippets
@@ -138,34 +87,32 @@ skills/
 ├── <name>/SKILL.md.original.md × 28  # pre-compression human-edit form
 ├── SOURCES.md                         # registry + queue + caveman requirement
 └── upstream.lock                      # populated when sourcing remote skills
-evals/<name>.json × 28                 # 18–21-entry trigger sets per skill
-evals/<name>.match-words               # (optional) per-skill match-words overrides
+evals/<name>.json × 28                 # 18–21-entry trigger sets per skill (inline-data queries)
+evals/<name>.match-words × 28          # per-skill match-words overrides (word-bounded grep -qw tokens)
+.gitleaksignore                        # one line — fake token in evals/gitleaks.json suppressed
 cliff.toml + CHANGELOG.md
 LICENSE (MIT)  AGENTS.md  README.md
 ```
 
+---
+
 ## 3. What works (verified)
 
-- `bun run ci` — green: install + tsc + 103 tests (11 files, 183 expect calls) + 5 platform builds + skills:lint of 28 skills + compress:check (soft gate, 0 pending).
-- `bun run scripts/build-all.ts` — produces 5 targets (`darwin-arm64` 63 MB, `darwin-x64` 68 MB, `linux-x64`/`linux-arm64` ~101 MB, `windows-x64` 118 MB).
-- `bash scripts/install.sh` — splices rules, vendors snippets, seeds policy. Idempotent (sentinel block preserves user content).
-- `FULCRUM_RELEASE_TAG=vX.Y.Z bash scripts/install.sh` — fetches a prebuilt binary from the GitHub Releases URL when no clone or Bun is available.
-- `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG via git-cliff → `chore(release):` commit → annotated tag → cross-compile → optional `gh release create` and asset upload. Does NOT push.
-- `fulcrum doctor` — 32/32 tools detected on the current host; "Caveman (per-agent compression)" section surfaces install state per agent.
-- `fulcrum install` — 5 steps: rules spliced into Claude Code / Codex CLI / OpenCode / Gemini (Pi dir not present); policy seeded at `~/.fulcrum/tool-output-policy.toml`; caveman installed per agent (Claude Code plugin, Gemini extension, clone-once+copy for Codex/OpenCode); `~/.config/caveman/config.json` written with `{"defaultMode": "ultra"}`.
-- `assertNotAgentsPath()` — hard guard in install.ts throws if any install path resolves under `~/.agents/`. `~/.agents/` has been removed from this host.
-- `lockCavemanUltra()` — idempotent; caveman resolver order: env `CAVEMAN_DEFAULT_MODE` > `~/.config/caveman/config.json` > "full".
-- `fulcrum skills sync` — all 28 (compressed) skills under `<agent>/skills/fulcrum/<name>/`.
-- `fulcrum skills list` — inventory with eval entry counts per skill.
-- `fulcrum init <dir>` — seeds AGENTS.md (template), `.claude/CLAUDE.md` (`@AGENTS.md` import), `.gitignore` entries.
-- Real format-hook smoke: piped a malformed `.py` Edit envelope through `fulcrum hook format`; ruff rewrote it correctly.
-- `bun run changelog` (git-cliff installed) — populates CHANGELOG.md from conventional-commit history.
-- `scripts/eval-skill-claude.sh <skill>` — trigger-rate eval that calls `claude --print --output-format=json --no-session-persistence` per query. Auth via Claude Code's own keychain/OAuth — no `ANTHROPIC_API_KEY` in env. Smoke-tested on jq (Sonnet, 1 run/query): 72% trigger / 14% false-trigger; the harness works, jq's description needs tightening to clear 80/20.
-- `scripts/eval-all.sh --regenerate-only` — re-parses existing `summary.txt` files and rewrites `leaderboard.md` without rerunning evals.
-- `bun run compress -- --check` — `src/cli/compress.ts` exits 1 if any tracked file has pending compression; 0 if all clean. Used by compress:check CI stage.
-- `fulcrum doctor --json` — emits `DoctorReport` JSON object; parseable with `jq`; exit code 1 if errors > 0.
-- `fulcrum install --dry-run` — all write/spawn paths replaced with log lines; reads still execute; `assertNotAgentsPath` still throws.
-- `src/agents/registry.ts` — canonical `AGENTS` array consumed by install, doctor, and skills; no more inline agent configs scattered across files.
+- `bun run ci` — green: install + tsc + 103 tests (11 files, 183 expect calls) + 5 platform builds + skills:lint (28/28) + compress:check (soft, 0 pending).
+- `bun run scripts/build-all.ts` — 5 targets (`darwin-arm64` 63 MB, `darwin-x64` 68 MB, `linux-x64`/`linux-arm64` ~101 MB, `windows-x64` 118 MB).
+- `bash scripts/install.sh` — splices rules, vendors snippets, seeds policy. Idempotent. `FULCRUM_RELEASE_TAG=vX.Y.Z` fetches a prebuilt binary from GitHub Releases.
+- `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG → tag → cross-compile → optional `gh release create`. Does NOT push.
+- `fulcrum install` — 5 steps: rules spliced into Claude Code / Codex CLI / OpenCode / Gemini; policy seeded; caveman per-agent; `~/.config/caveman/config.json` written `{"defaultMode":"ultra"}`. Respects `--dry-run`.
+- `fulcrum doctor [--json]` — 32/32 tools detected; "Caveman" section with `defaultMode` display; `DoctorReport` JSON on `--json`.
+- `assertNotAgentsPath()` / `lockCavemanUltra()` — hard guards in install.ts; both tested.
+- `fulcrum skills sync` — all 28 compressed skills under `<agent>/skills/fulcrum/<name>/`.
+- `fulcrum init <dir>` — seeds AGENTS.md, `.claude/CLAUDE.md` (`@AGENTS.md` import), `.gitignore`.
+- Format-hook smoke: piped a malformed `.py` Edit envelope → ruff rewrote it correctly.
+- `scripts/eval-skill-claude.sh <skill> --runs-per-query 1` — confirmed with new match-words + data-rich queries. jq: 83/0 on `/tmp/jq-sanity4` (baseline was 66/12). Auth via Claude Code keychain — no `ANTHROPIC_API_KEY`.
+- `bun run compress -- --check` / `scripts/eval-all.sh --regenerate-only` — both verified.
+- `src/agents/registry.ts` — canonical `AGENTS` array; no inline agent configs scattered across files.
+
+---
 
 ## 4. Decisions on the record
 
@@ -173,36 +120,35 @@ Don't relitigate without new information.
 
 | Decision | Why | Where |
 |---|---|---|
-| TypeScript via Bun, not Rust/Go | OpenCode/Pi shims must be TS. Picking TS unifies the codebase and matches 3 of 5 peer-agent runtimes. | `package.json`, `src/` |
+| TypeScript via Bun, not Rust/Go | OpenCode/Pi shims must be TS. Unifies the codebase and matches 3 of 5 peer-agent runtimes. | `package.json`, `src/` |
 | Sentinel-block rules splice | Works on every agent regardless of `@import` support; idempotent; preserves user content. | `src/cli/install.ts`, BEGIN/END FULCRUM RULES markers |
 | Hook recipes ship as binary subcommands | One source of truth; snippets reference `fulcrum hook <name>`. | `src/hooks/`, `hooks/recipes/*.snippet.md` |
-| Skills install under `<agent-skills-root>/fulcrum/<name>/` | Path-based namespace today; matches the prefix convention plugin / extension systems use. Sets up the `fulcrum:<skill-name>` address space for the future plugin layer. Gemini's extension wrapper serves the same role. | `src/cli/skills.ts` (NAMESPACE constant) |
-| Skill `name:` stays prefix-free | Slash command stays short (`/jq`, not `/fulcrum:jq`); the namespace is the parent dir, the agent loads by frontmatter. | `docs/skills.md` §4 |
-| Eval harness uses `claude` CLI, not the Anthropic SDK | Auth lives in the OS keychain via `claude login`. No API-key env-var leak surface. Execution path matches how a real session loads a skill. | `scripts/eval-skill-claude.sh` |
-| No GitHub Actions (release pipeline included) | Local `bun run ci` and `bun run release` are the gates. User opt-out is durable; future workflows must be additive, not the source of truth. | absence of `.github/workflows/` |
-| One tool, one skill | Exception: tightly-coupled CLIs that ship together (`dart format` + `dart analyze` → `dart-toolchain`). | `skills/SOURCES.md`, AGENTS.md |
-| Skill content correctness is NOT implied by lint | Lint verifies frontmatter shape + body section structure. Content (flags, defaults, env vars) must be verified against `--help` / upstream README at authoring time. The 46% bug rate on parallel-authored skills is the cautionary data point. | `AGENTS.md`, fix commit `08101c6` |
-| Removed memory/PM/task layer | This branch is `feat/agent-foundation-clean`. Memory/vault/ADRs/Plane/PM concerns belong on a separate branch. | branch separation |
-| Caveman ultra mandatory always-on | ~75% output-token reduction + no per-session opt-in fragility. `rules/AGENTS.md` §0b is the contract; `~/.config/caveman/config.json` is the runtime lock. | `rules/AGENTS.md` §0b, `src/cli/install.ts` `lockCavemanUltra()`, `~/.config/caveman/config.json` |
-| Never use `~/.agents/` for skills | Shared folder pollutes every agent's context with skills that may not apply. `assertNotAgentsPath()` enforces this at runtime. | `src/cli/install.ts`, `~/.claude/CLAUDE.md` global rule |
-| Agent registry as single source of truth | Without a registry, agent definitions drifted independently in install, doctor, and skills — a three-way sync hazard. One `AGENTS` array in `src/agents/registry.ts` eliminates the drift. | `src/agents/registry.ts`, consumers: `install.ts`, `doctor.ts`, `skills.ts` |
-| Caveman compression of in-repo content is part of CI | Verbose content deployed to agent skills directories wastes tokens every session. A soft-fail CI gate (`compress:check`) prevents accidental uncompressed commits without blocking the build on first-run setup. | `scripts/compress-with-caveman.sh`, `scripts/ci.ts`, `src/cli/compress.ts` |
+| Skills install under `<agent-skills-root>/fulcrum/<name>/` | Path-based namespace; sets up the `fulcrum:<skill-name>` address space for the future plugin layer. | `src/cli/skills.ts` (NAMESPACE constant) |
+| Skill `name:` stays prefix-free | Slash command stays short (`/jq`, not `/fulcrum:jq`); namespace is the parent dir. | `docs/skills.md` §4 |
+| Eval harness uses `claude` CLI, not the Anthropic SDK | Auth lives in the OS keychain. Execution path matches how a real session loads a skill. | `scripts/eval-skill-claude.sh` |
+| No GitHub Actions | Local `bun run ci` and `bun run release` are the gates. Future workflows must be additive. | absence of `.github/workflows/` |
+| One tool, one skill | Exception: tightly-coupled CLIs (`dart format` + `dart analyze` → `dart-toolchain`). | `skills/SOURCES.md`, AGENTS.md |
+| Skill content correctness is NOT implied by lint | Lint verifies frontmatter shape + body structure. Content must be verified against upstream at authoring time. | `AGENTS.md`, fix commit `08101c6` |
+| Caveman ultra mandatory always-on | ~75% output-token reduction; `rules/AGENTS.md` §0b is the contract; `~/.config/caveman/config.json` is the runtime lock. | `rules/AGENTS.md` §0b, `lockCavemanUltra()` |
+| Never use `~/.agents/` for skills | Shared folder pollutes every agent's context; `assertNotAgentsPath()` enforces this at runtime. | `src/cli/install.ts`, `~/.claude/CLAUDE.md` |
+| Agent registry as single source of truth | Without a registry, agent defs drifted independently in install, doctor, and skills. | `src/agents/registry.ts` |
+| Caveman compression of in-repo content is part of CI | Verbose skills waste tokens every session; soft-fail gate prevents accidental uncompressed commits. | `scripts/compress-with-caveman.sh`, `scripts/ci.ts` |
+| Per-skill iteration over batch leaderboard tuning | Batch runs confound measurement between skills; one skill at a time is the safe unit. | `HANDOVER.md` §6.2 procedure |
+
+---
 
 ## 5. Branch + commit map
 
 ```
-HEAD (uncommitted)      §6.1 caveman integration + post-§6.1 polish — not yet committed
-f92d6c7  docs(handover): correct caveman install paths; forbid ~/.agents/ shared folder
-57543dd  docs(handover): record caveman installs on this host (Claude/Gemini/Codex/OpenCode)
-4b2c4be  docs: rewrite HANDOVER for next-session pickup; add caveman requirement
-546ad18  chore(evals): scaffold leaderboard runner + better trigger detection (not yet executed)
-ff61ebf  feat(evals): rewrite trigger-rate harness to call claude CLI (no API key)
-1373c37  feat(foundation): expand doctor coverage to 32 tools; align docs with fulcrum/ namespace
-8241f67  feat(foundation): release script, install fetch path, lint tightening, skills list, fulcrum/ namespace, README+AGENTS framing
-08101c6  fix(skills): correct content errors in 19 skills against upstream
-4426eec  feat(skills): author 23 skills — queue cleared (28 total)
-968f8a2  feat(foundation): P2 work — tests, 4 skills, doctor, license, ci
-…earlier history: phase 1–6 rewrite, jq skill #1, foundation hardening
+ef5d9e0  feat(eval): per-skill match-words files + data-rich queries for all 28 skills
+7a20b01  fix(eval): xargs trim breaks on quoted match-words; use sed
+3c9f604  docs(handover): record §6.1 caveman + post-§6.1 polish landings
+fb49bf5  feat(compress,ci): caveman compression wrapper + ci soft gate + bunfig frozenLockfile
+e88beeb  feat(install,doctor,skills,agents): caveman cross-agent install + agent registry + dry-run + --json
+45dcf3e  feat(eval): portable awk + --regenerate-only + per-skill match-words file
+0131b5d  feat(io): unconditional envelope parse-failure log
+3d1eb8a  chore(content): caveman-compress in-repo content; split rules from project AGENTS
+── f92d6c7  (base: docs(handover): correct caveman install paths…)
 ```
 
 Branch is **not pushed**. No PR.
@@ -213,39 +159,73 @@ Branch is **not pushed**. No PR.
 
 ### ~~6.1 Caveman compression~~ — DONE
 
-Landed this session. See "What landed this session" section above and the relevant files: `src/cli/install.ts`, `src/cli/install.test.ts`, `src/cli/doctor.ts`, `rules/AGENTS.md`, `AGENTS.md`. Commit pending (see §5).
+All five §6.1 steps complete. Key commits: `3d1eb8a`, `e88beeb`, `fb49bf5`. See `src/cli/install.ts`, `src/cli/doctor.ts`, `rules/AGENTS.md`, `AGENTS.md`.
 
-### 6.2 Eval-leaderboard run + jq tightening  ← ACTIVE PRIORITY
+---
 
-Scaffolding was in commits `ff61ebf`, `546ad18`. The eval-all.sh script has since been fixed (unbound-var bug, gawk-only awk replaced with portable grep+sed, `--regenerate-only` flag added). A Sonnet leaderboard run was kicked off at session end (`/tmp/eval-leaderboard.log`); ~3/28 skills done at the time of writing. Initial jq result: 72% trigger / 14% false-trigger (below the 80% trigger bar — description needs tightening).
+### 6.2 Per-skill eval iteration  ← ACTIVE PRIORITY
 
-Steps:
+**Background — what the first full leaderboard run revealed:**
 
-1. Commit the §6.1 work first (`feat(install): caveman cross-agent install + ultra lock` or similar). `bun run ci` is green.
-2. Propagate compressed skills via `fulcrum skills sync` (skills are already compressed in-repo).
-3. Check `/tmp/eval-leaderboard.log` — if the background run is still going, let it finish; if it errored, restart with `scripts/eval-all.sh --model sonnet --runs-per-query 1`.
-4. Inspect `eval-results/<ts>/leaderboard.md`. For any skill below 80/20, open `<skill>/results.jsonl` — the saved Claude responses show whether the description failed to trigger or the heuristic missed a real trigger.
-5. Iterate jq's description as the worked example. Re-run with `--runs-per-query 3` to confirm stability.
-6. Repeat for next-worst-performing skills. Goal: every skill ≥ 80% trigger / ≤ 20% false-trigger.
-7. If you want to re-score an existing run after editing descriptions without re-running evals: `scripts/eval-all.sh --regenerate-only --results-dir eval-results/<ts>`.
+The Sonnet leaderboard run (1 run/query, 28 skills, ~126 min wall) showed scores dominated by harness methodology bugs, not description quality:
 
-### 6.3 Foundation polish (after 6.1 and 6.2)
+- 17/28 skills underreported trigger rate because eval queries said "this Python file" but the harness ran in an empty tempdir — Claude correctly declined ("Which file?") and was marked as a miss.
+- 3/28 skills (`dart-toolchain`, `direnv`, `eza`) showed 100/100 because auto-derived match-words contained substring-loose tokens (`TYPE` matched "TypeScript", `dart` matched "darted") — heuristic false positives with no real skill invocations.
 
-| Item | Status | Notes |
-|---|---|---|
-| ~~Output-policy entries audit~~ | DONE | `config/tool-output-policy.toml` audited — every tool already has an entry. No gaps found. |
-| ~~Doc drift: agents.md flat paths~~ | DONE | 3 stale flat skill paths corrected to namespaced form. |
-| ~~Doc drift: skills.md eval flow~~ | DONE | Line 102 stale `run_loop.py`/Anthropic-SDK reference rewritten. |
-| ~~Doc drift: skill-smoke-test.md qualifier~~ | DONE | "(when available)" removed. |
-| ~~`repomix` for `index-rebuild`~~ | DONE | Smoke-tested in real session: hook exits 0, repomix writes ~4.3 MB `$TMPDIR/fulcrum.xml`, SHA file persists. ctags + graphify also fire under `Promise.allSettled`. v1.14.0. |
-| ~~Hook-recipe enable smoke~~ | DONE | `format` recipe merged into `~/.claude/settings.json` via jq; synthetic `Edit` envelope (malformed `.py`) piped through the snippet's command — ruff reformatted (77B → 81B). Settings.json restored from backup; diff empty. |
-| Trigger-rate evals on Opus | OPEN | The default model in eval scripts is whatever `claude` defaults to. Sonnet is fast; Opus is what real sessions might use. Consider a second leaderboard with `--model opus`. |
+Both bugs were fixed in `ef5d9e0` + `7a20b01`:
+- `evals/<skill>.match-words` files (28) hand-tuned per skill, word-bounded (`grep -qw`).
+- `evals/<skill>.json` entries rewritten with inline sample data inside markdown fences so Claude has a concrete artifact to work on.
+- Harness `xargs` trim replaced with `sed` (xargs choked on match-words containing single quotes).
+
+**Worked example — jq:**
+
+Starting `evals/jq.match-words` was too narrow (`jq 'select(`). Trigger rate: 8%. Loosened to broad-but-bounded tokens: `` `| jq` ``, `` `jq '` ``, `jq -r`, `jq -c`, `jq -n`, `jq -s`, `jq -a`, `jq @csv`, `jq @tsv`. Result on `/tmp/jq-sanity4`: **83/0** (passes the 80/20 bar). Two unavoidable misses: Claude printed the answer (CSV table, count) without showing the command — acceptable at 83%, or addressable by adding "show the command" to those query prompts.
+
+**The procedure (one skill at a time):**
+
+1. Run a single-skill eval:
+   ```bash
+   scripts/eval-skill-claude.sh <skill> --model sonnet --runs-per-query 1 \
+     --results-dir /tmp/<skill>-iter
+   ```
+   ~2–5 min wall.
+
+2. Read `summary.txt` — note trigger rate and false-trigger rate.
+
+3. If passes **80/20** (≥80% trigger, ≤20% false-trigger): move to next skill.
+
+4. If fails — read `results.jsonl` to identify the failure mode:
+   - **a. Misses where Claude correctly declined** ("no X file", "which file?"): inline data in `evals/<skill>.json` is missing or insufficient. Edit that query to embed concrete data inside a markdown fence.
+   - **b. Misses where Claude DID demo the tool but match-words missed it**: edit `evals/<skill>.match-words` to broaden tokens. Keep them word-bounded — `grep -qw` matches whole words only.
+   - **c. False-trigger where Claude declined but match-word still matched a response substring**: tighten `evals/<skill>.match-words` — drop or narrow the offending token.
+   - **d. Genuine description failure** (the skill body didn't help Claude pick the right tool): only THEN edit `skills/<skill>/SKILL.md.original.md`, run `bun run compress -- skills/<skill>/SKILL.md` to regenerate the compressed form, then `bun run src/index.ts skills sync` to propagate.
+
+5. Re-run that one skill until it passes 80/20.
+
+6. Move to the next skill. **NEVER tune multiple skills in parallel** — measurements between them confound.
+
+7. After all skills pass at runs=1, do one final stability pass:
+   ```bash
+   scripts/eval-all.sh --model sonnet --runs-per-query 3
+   ```
+
+**Queue — 27 remaining skills** (jq done): `ast-grep`, `bat`, `caveman`, `ctags`, `dart-toolchain`, `difft`, `direnv`, `eza`, `fd`, `fzf`, `gh`, `git-cliff`, `gitleaks`, `graphify`, `hyperfine`, `lizard`, `playwright-cli`, `repomix`, `rg`, `sd`, `semgrep`, `tmux`, `usql`, `watchexec`, `xh`, `yq`. (Verify with `fulcrum skills list`.)
+
+Reference: `/tmp/jq-sanity4` — evidence that the new procedure works (83/0).
+
+---
+
+### 6.3 Foundation polish (after 6.2)
+
+- **Opus leaderboard** — run `scripts/eval-all.sh --model opus --runs-per-query 1` to see if trigger rates hold on the model real sessions use.
+
+---
 
 ### 6.4 Outstanding small items
 
-- ~~Hook envelope parse failure logging~~ — DONE this session. See "What also landed" item 1.
-- ~~`bunfig.toml` `[install] frozenLockfile = true`~~ — DONE. Pinned. Local `bun install` now matches CI behavior; lockfile drift detected immediately.
-- README Rosetta hint is generic; if specific Intel-Mac users hit issues, expand.
+- **README Rosetta hint** — generic; expand only if specific Intel-Mac users report issues.
+
+---
 
 ## 7. Smoke-test recipes
 
@@ -281,11 +261,12 @@ printf '%s' "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$TMP/bad.py
 cat $TMP/bad.py   # should be ruff-formatted
 rm -rf $TMP
 
-# 5. Trigger-rate eval (single skill, single run; ~2-3 min)
-bun run src/index.ts skills sync   # ensure skill is at ~/.claude/skills/fulcrum/jq
-scripts/eval-skill-claude.sh jq --model sonnet --runs-per-query 1
+# 5. Single-skill eval (the §6.2 inner loop; ~2-5 min)
+bun run src/index.ts skills sync   # ensure skill is at ~/.claude/skills/fulcrum/<skill>
+scripts/eval-skill-claude.sh jq --model sonnet --runs-per-query 1 \
+  --results-dir /tmp/jq-iter
 
-# 6. Leaderboard (all 28 skills; ~30–60 min)
+# 6. Leaderboard (all 28 skills; ~30-60 min)
 scripts/eval-all.sh --model sonnet --runs-per-query 1
 
 # 7. Re-score existing leaderboard run without re-running evals
@@ -296,14 +277,18 @@ fulcrum doctor --json | jq .verdict
 # expect: "ok" (no errors) or "degraded" (errors > 0)
 ```
 
+---
+
 ## 8. Known limitations (current)
 
-- **Trigger-rate eval is Claude-Code-only.** No equivalent harness exists for Codex / Gemini / OpenCode / Pi. Documented at `docs/skills.md` §7.
-- **OpenCode is archived** (2025-09-18). Successor: Charm's Crush. `shims/opencode/fulcrum.ts` is written against last-stable OpenCode; Crush's plugin contract may differ at the outer event-handler level. Recipe wiring is identical.
+- **Trigger-rate eval is Claude-Code-only.** No equivalent harness for Codex / Gemini / OpenCode / Pi. Documented at `docs/skills.md` §7.
+- **OpenCode is archived** (2025-09-18). Successor: Charm's Crush. `shims/opencode/fulcrum.ts` is written against last-stable OpenCode; Crush's plugin contract may differ.
 - **Pi has no MCP support** by design. Tier rules keyed `mcp__*` will never fire on Pi (`docs/agents.md` §5.6).
 - **`dist/` is gitignored.** Every fresh clone needs Bun to run `bash scripts/install.sh` (or set `FULCRUM_RELEASE_TAG=...` to fetch a release artifact).
-- **Skill content correctness is the author's job.** Lint passes do not imply upstream-correct content. The fix commit `08101c6` corrected 19 skills against upstream README/docs after the fact; future authoring should verify inline.
-- **Caveman ultra is mandatory but not enforced for new skills.** Any new `SKILL.md` added without a compression pass will deploy verbose content. The session that adds a skill should run `/caveman:compress skills/<name>/SKILL.md` before committing.
+- **Skill content correctness is the author's job.** Lint passes do not imply upstream-correct content. Fix commit `08101c6` corrected 19 skills after the fact; future authoring should verify inline.
+- **Caveman ultra is mandatory but not enforced for new skills.** Any new `SKILL.md` added without a compression pass will deploy verbose content. Run `/caveman:compress skills/<name>/SKILL.md` before committing.
+
+---
 
 ## 9. How to read this repo
 
