@@ -4,11 +4,49 @@
 
 import { stat, readdir } from "node:fs/promises";
 import { which, exists } from "../utils/proc.ts";
+import { AGENTS } from "../agents/registry.ts";
 
 interface ToolCheck {
   cmd: string;
   usedBy: string;       // human-readable: "format hook (.py)", "index-rebuild hook"
   required: boolean;    // true = hook is broken without it; false = hook fail-opens
+}
+
+// JSON output shape
+interface DoctorReport {
+  bun: string;
+  platform: string;
+  agents: Array<{
+    label: string;
+    detected: boolean;
+    rulesSpliced: boolean;
+  }>;
+  caveman: {
+    agents: Array<{
+      label: string;
+      installed: boolean;
+      activationHookPresent: boolean;
+    }>;
+    defaultMode: string;
+    defaultModeSource: "file" | "env" | "default" | "malformed";
+    configPath: string;
+  };
+  tools: Array<{
+    cmd: string;
+    path: string | null;
+    present: boolean;
+    usedBy: string;
+  }>;
+  policy: {
+    path: string;
+    exists: boolean;
+    size: number | null;
+    mtime: string | null;
+  };
+  skillsCount: number;
+  warnings: number;
+  errors: number;
+  verdict: "ok" | "warning" | "error";
 }
 
 const TOOLS: ToolCheck[] = [
@@ -67,18 +105,20 @@ const TOOLS: ToolCheck[] = [
 interface AgentDir {
   label: string;
   path: string;
-  rulesFile?: string;   // primary file that gets sentinel-spliced
+  rulesFile?: string;      // primary file that gets sentinel-spliced
+  cavemanPath?: string;    // path whose existence signals caveman is installed
+  settingsPath?: string;   // optional settings file (currently Claude Code only)
 }
 
 function agentDirs(): AgentDir[] {
   const home = process.env["HOME"] ?? "";
-  return [
-    { label: "Claude Code", path: `${home}/.claude`,           rulesFile: `${home}/.claude/CLAUDE.md` },
-    { label: "Codex CLI",   path: `${home}/.codex`,            rulesFile: `${home}/.codex/AGENTS.md` },
-    { label: "Gemini CLI",  path: `${home}/.gemini`,           rulesFile: `${home}/.gemini/GEMINI.md` },
-    { label: "OpenCode",    path: `${home}/.config/opencode`,  rulesFile: `${home}/.config/opencode/AGENTS.md` },
-    { label: "Pi CLI",      path: `${home}/.pi/agent`,         rulesFile: `${home}/.pi/agent/AGENTS.md` },
-  ];
+  return AGENTS.map((a) => ({
+    label: a.label,
+    path: a.baseDir(home),
+    rulesFile: a.rulesFile(home),
+    cavemanPath: a.cavemanInstallDir(home),
+    settingsPath: a.settingsPath?.(home),
+  }));
 }
 
 function repoRoot(): string {
@@ -106,85 +146,198 @@ async function countSkills(): Promise<number> {
   return n;
 }
 
-export async function run(_args: string[]): Promise<void> {
+async function buildReport(): Promise<{ report: DoctorReport; errors: number }> {
   let warnings = 0;
   let errors = 0;
 
+  // Bun and platform
+  const bunVersion = Bun.version;
+  const platform = `${process.platform}-${process.arch}`;
+
+  // Agents
+  const agentsList = agentDirs();
+  const agentsReport: DoctorReport["agents"] = [];
+  for (const a of agentsList) {
+    const dirOk = await exists(a.path);
+    const rulesOk = a.rulesFile ? await exists(a.rulesFile) : false;
+
+    if (!dirOk) {
+      agentsReport.push({
+        label: a.label,
+        detected: false,
+        rulesSpliced: false,
+      });
+      continue;
+    }
+
+    let rulesSpliced = false;
+    if (a.rulesFile && rulesOk) {
+      try {
+        const text = await Bun.file(a.rulesFile).text();
+        rulesSpliced = text.includes("BEGIN FULCRUM RULES");
+        if (!rulesSpliced) warnings++;
+      } catch { /* unreadable, ignore */ }
+    } else if (a.rulesFile) {
+      warnings++;
+    }
+
+    agentsReport.push({
+      label: a.label,
+      detected: dirOk,
+      rulesSpliced,
+    });
+  }
+
+  // Tools
+  const toolsReport: DoctorReport["tools"] = [];
+  for (const t of TOOLS) {
+    const path = await which(t.cmd);
+    toolsReport.push({
+      cmd: t.cmd,
+      path: path ?? null,
+      present: path !== null,
+      usedBy: t.usedBy,
+    });
+    if (!path && t.required) {
+      errors++;
+    }
+  }
+
+  // Policy
+  const policyFilePath = await policyPath();
+  let policySize: number | null = null;
+  let policyMtime: string | null = null;
+  let policyExists = false;
+
+  if (await exists(policyFilePath)) {
+    policyExists = true;
+    try {
+      const s = await stat(policyFilePath);
+      policySize = s.size;
+      policyMtime = s.mtime.toISOString();
+    } catch { /* ignore */ }
+  } else {
+    warnings++;
+  }
+
+  const policyReport: DoctorReport["policy"] = {
+    path: policyFilePath,
+    exists: policyExists,
+    size: policySize,
+    mtime: policyMtime,
+  };
+
+  // Skills
+  const skillsCount = await countSkills();
+
+  // Verdict
+  const verdict: "ok" | "warning" | "error" =
+    errors > 0 ? "error" : warnings > 0 ? "warning" : "ok";
+
+  const report: DoctorReport = {
+    bun: bunVersion,
+    platform,
+    agents: agentsReport,
+    caveman: {
+      agents: [],
+      defaultMode: "",
+      defaultModeSource: "default",
+      configPath: "",
+    },
+    tools: toolsReport,
+    policy: policyReport,
+    skillsCount,
+    warnings,
+    errors,
+    verdict,
+  };
+
+  return { report, errors };
+}
+
+function printHumanFormat(report: DoctorReport, home: string): void {
   console.log("fulcrum doctor — environment health check\n");
 
   // Bun
-  console.log(`bun       ${Bun.version}`);
-  console.log(`platform  ${process.platform}-${process.arch}`);
+  console.log(`bun       ${report.bun}`);
+  console.log(`platform  ${report.platform}`);
   console.log();
 
   // Agent dirs
   console.log("Agents detected:");
-  for (const a of agentDirs()) {
-    const dirOk = await exists(a.path);
-    const rulesOk = a.rulesFile ? await exists(a.rulesFile) : false;
-    if (!dirOk) {
-      console.log(`  ${pad(a.label, 14)} ·  not installed`);
+  for (const agent of report.agents) {
+    if (!agent.detected) {
+      console.log(`  ${pad(agent.label, 14)} ·  not installed`);
       continue;
     }
-    let rulesNote = "";
-    if (a.rulesFile && rulesOk) {
-      try {
-        const text = await Bun.file(a.rulesFile).text();
-        rulesNote = text.includes("BEGIN FULCRUM RULES")
-          ? "rules spliced"
-          : "rules NOT spliced — run: fulcrum install";
-        if (!text.includes("BEGIN FULCRUM RULES")) warnings++;
-      } catch { /* unreadable, ignore */ }
-    } else if (a.rulesFile) {
-      rulesNote = "no rules file — run: fulcrum install";
-      warnings++;
-    }
-    console.log(`  ${pad(a.label, 14)} ✓  ${rulesNote}`);
+    const rulesNote = agent.rulesSpliced
+      ? "rules spliced"
+      : "rules NOT spliced — run: fulcrum install";
+    console.log(`  ${pad(agent.label, 14)} ✓  ${rulesNote}`);
   }
   console.log();
 
   // Tools
   console.log("Tools (hooks fail-open when missing unless marked required):");
-  for (const t of TOOLS) {
-    const path = await which(t.cmd);
-    if (path) {
-      console.log(`  ${pad(t.cmd, 22)} ✓  ${path}`);
-    } else if (t.required) {
-      console.log(`  ${pad(t.cmd, 22)} ✗  MISSING — required by ${t.usedBy}`);
-      errors++;
+  for (const tool of report.tools) {
+    if (tool.present) {
+      console.log(`  ${pad(tool.cmd, 22)} ✓  ${tool.path}`);
     } else {
-      console.log(`  ${pad(t.cmd, 22)} ·  not installed — ${t.usedBy} will fail-open`);
+      const toolDef = TOOLS.find((t) => t.cmd === tool.cmd);
+      const isRequired = toolDef?.required ?? false;
+      if (isRequired) {
+        console.log(
+          `  ${pad(tool.cmd, 22)} ✗  MISSING — required by ${tool.usedBy}`
+        );
+      } else {
+        console.log(
+          `  ${pad(tool.cmd, 22)} ·  not installed — ${tool.usedBy} will fail-open`
+        );
+      }
     }
   }
   console.log();
 
   // Policy
-  const policy = await policyPath();
-  console.log(`Tool-output policy: ${policy}`);
-  if (await exists(policy)) {
-    try {
-      const s = await stat(policy);
-      console.log(`  size=${s.size}B  mtime=${s.mtime.toISOString()}`);
-    } catch { /* ignore */ }
+  console.log(`Tool-output policy: ${report.policy.path}`);
+  if (report.policy.exists) {
+    console.log(`  size=${report.policy.size}B  mtime=${report.policy.mtime}`);
   } else {
-    console.log("  · not present — run: fulcrum install (seeds default policy)");
-    warnings++;
+    console.log(
+      "  · not present — run: fulcrum install (seeds default policy)"
+    );
   }
   console.log();
 
   // Skills
-  const skillCount = await countSkills();
-  console.log(`Skills authored: ${skillCount} (in ${repoRoot()}/skills/)`);
+  console.log(
+    `Skills authored: ${report.skillsCount} (in ${repoRoot()}/skills/)`
+  );
   console.log();
 
   // Verdict
+  if (report.errors > 0) {
+    console.log(`✗ ${report.errors} error(s), ${report.warnings} warning(s)`);
+  } else if (report.warnings > 0) {
+    console.log(`⚠ ${report.warnings} warning(s) — see above`);
+  } else {
+    console.log("✓ all checks passed");
+  }
+}
+
+export async function run(args: string[]): Promise<void> {
+  const isJsonOutput = args.includes("--json");
+
+  const { report, errors } = await buildReport();
+
+  if (isJsonOutput) {
+    console.log(JSON.stringify(report, null, 2));
+  } else {
+    const home = process.env["HOME"] ?? "";
+    printHumanFormat(report, home);
+  }
+
   if (errors > 0) {
-    console.log(`✗ ${errors} error(s), ${warnings} warning(s)`);
     process.exit(1);
   }
-  if (warnings > 0) {
-    console.log(`⚠ ${warnings} warning(s) — see above`);
-    return;
-  }
-  console.log("✓ all checks passed");
 }

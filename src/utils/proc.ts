@@ -55,3 +55,16 @@ export function spawnDetached(cmd: string[], opts: { cwd?: string; logFile?: str
     stderr: fd ?? "ignore",
   });
 }
+
+/**
+ * Clone url into dest if absent; pull (ff-only) if already a git repo.
+ * Returns RunResult. Non-zero exit = failure; caller handles fail-soft logging.
+ */
+export async function cloneOrUpdate(url: string, dest: string): Promise<RunResult> {
+  const destExists = await exists(dest);
+  if (destExists) {
+    // already cloned — fast-forward pull to stay current
+    return run(["git", "-C", dest, "pull", "--ff-only"], {});
+  }
+  return run(["git", "clone", "--depth=1", url, dest], {});
+}

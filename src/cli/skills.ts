@@ -5,6 +5,7 @@
 
 import { mkdir, readdir, readFile, copyFile, writeFile, stat } from "node:fs/promises";
 import { join, basename, dirname } from "node:path";
+import { AGENTS } from "../agents/registry.ts";
 
 function repoRoot(): string {
   // When invoked from a clone, this binary's enclosing repo is the source of
@@ -30,16 +31,25 @@ async function isDir(p: string): Promise<boolean> {
 
 const NAMESPACE = "fulcrum";
 
-const TARGETS: Array<{ path: string; label: string }> = [
-  { path: `${process.env["HOME"]}/.claude/skills`,           label: "Claude Code" },
-  { path: `${process.env["HOME"]}/.codex/skills`,            label: "Codex CLI" },
-  { path: `${process.env["HOME"]}/.config/opencode/skills`,  label: "OpenCode" },
-  { path: `${process.env["HOME"]}/.pi/agent/skills`,         label: "Pi CLI" },
-];
+// Agents that use the standard `<skillsDir>/fulcrum/<name>/` layout.
+// Gemini is handled separately below because it uses an extension namespace.
+const _skillsHome = process.env["HOME"] ?? "";
+const TARGETS: Array<{ path: string; label: string }> = AGENTS
+  .filter((a) => a.id !== "gemini")
+  .map((a) => ({ path: a.skillsDir(_skillsHome), label: a.label }));
+
+// Skip patterns: .original.md backups are human-edit source-of-truth — agents
+// read the compressed .md only. Also skip .git, node_modules just in case.
+function shouldSkipForSync(name: string): boolean {
+  if (name.endsWith(".original.md")) return true;
+  if (name === ".git" || name === "node_modules") return true;
+  return false;
+}
 
 async function copyTree(src: string, dst: string): Promise<void> {
   await mkdir(dst, { recursive: true });
   for (const entry of await readdir(src, { withFileTypes: true })) {
+    if (shouldSkipForSync(entry.name)) continue;
     const s = join(src, entry.name);
     const d = join(dst, entry.name);
     if (entry.isDirectory()) {
@@ -90,13 +100,16 @@ async function cmdSync(): Promise<void> {
     console.log();
   }
 
-  // Gemini's extension manifest already namespaces under "fulcrum-skills",
-  // which serves the same role as the `fulcrum/` subfolder for the other agents.
-  const gemRoot = `${process.env["HOME"]}/.gemini`;
+  // Gemini uses an extension namespace: ~/.gemini/extensions/fulcrum-skills/skills/
+  // skillsDir already points to the `skills` subfolder inside that extension.
+  const geminiAgent = AGENTS.find((a) => a.id === "gemini")!;
+  const gemRoot = geminiAgent.baseDir(_skillsHome);
   if (await exists(gemRoot)) {
-    const ext = `${gemRoot}/extensions/fulcrum-skills`;
+    // ext = ~/.gemini/extensions/fulcrum-skills  (parent of skillsDir)
+    const gemSkillsDir = geminiAgent.skillsDir(_skillsHome);
+    const ext = gemSkillsDir.replace(/\/skills$/, "");
     console.log(`→ Gemini CLI (${ext})`);
-    await mkdir(`${ext}/skills`, { recursive: true });
+    await mkdir(gemSkillsDir, { recursive: true });
     await writeFile(
       `${ext}/gemini-extension.json`,
       JSON.stringify(
@@ -106,7 +119,7 @@ async function cmdSync(): Promise<void> {
       ) + "\n",
     );
     for (const name of skills) {
-      const dst = `${ext}/skills/${name}`;
+      const dst = `${gemSkillsDir}/${name}`;
       await copyTree(`${skillsSrc}/${name}`, dst);
       console.log(`    ${name}`);
     }
@@ -195,12 +208,19 @@ async function cmdLint(target: string | undefined): Promise<void> {
     process.exit(2);
   }
   const files: string[] = [];
+  let checkRules = false;
+
   if (await isDir(target)) {
     for (const entry of await readdir(target, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       if (entry.name === "_template") continue;
       const p = `${target}/${entry.name}/SKILL.md`;
       if (await exists(p)) files.push(p);
+    }
+    // When linting a directory (skills/ or <path>/skills), also check rules/AGENTS.md
+    const normalized = target.replace(/\/$/, "");
+    if (normalized === "skills" || normalized.endsWith("/skills")) {
+      checkRules = true;
     }
   } else if (await exists(target)) {
     files.push(target);
@@ -219,6 +239,24 @@ async function cmdLint(target: string | undefined): Promise<void> {
       for (const i of r.issues) console.log(`    - ${i.msg}`);
     }
   }
+
+  // Check rules/AGENTS.md line count when linting the skills directory
+  if (checkRules) {
+    const root = repoRoot();
+    const rulesPath = `${root}/rules/AGENTS.md`;
+    if (await exists(rulesPath)) {
+      const content = await readFile(rulesPath, "utf8");
+      const lineCount = content.split("\n").length;
+      const limit = 200;
+      if (lineCount > limit) {
+        bad++;
+        console.log(`✗ ${rulesPath}  (${lineCount} lines, exceeds 200-line target)`);
+      } else {
+        console.log(`✓ ${rulesPath}  (${lineCount} lines, under 200-line target)`);
+      }
+    }
+  }
+
   if (bad > 0) process.exit(1);
 }
 
