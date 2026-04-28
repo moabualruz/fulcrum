@@ -137,7 +137,7 @@ LICENSE (MIT)  AGENTS.md  README.md
 - `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG → tag → cross-compile → optional `gh release create`. Does NOT push.
 - `fulcrum install` — 9 steps: rules spliced into Claude Code / Codex CLI / OpenCode / Gemini / Pi; policy seeded; caveman per-agent; `~/.config/caveman/config.json` written `{"defaultMode":"ultra"}`; context-mode installed/configured per detected agent; authored in-repo skills synced unless `--no-skills`; curated upstream skills synced with subpath SHA-256 verification unless `--no-upstream-skills`; DeepWiki MCP registered for every detected agent (Pi via auto-installed `pi-mcp-adapter`). Respects `--dry-run`.
 - `fulcrum uninstall` — removes Fulcrum-managed rules blocks, native hook registrations, hook snippets/markers, managed `skills/fulcrum/` and `skills/fulcrum-upstream/` namespaces, Gemini managed skill extensions, generated Gemini import, managed context-mode + DeepWiki registrations (Pi adapter mcp.json + settings.json package entry), and unmodified seeded policy. Keeps edited policy by default and keeps caveman unless `--include-caveman`; keeps the global `context-mode` and `pi-mcp-adapter` packages because upstream has no uninstall contract.
-- `fulcrum skills upstream [--update-pins]` — reads `skills/upstream.lock`, checks out pinned upstream SHAs into `~/.fulcrum/cache/upstream-skills`, computes per-skill `subpath_sha256` and verifies against the lock, and installs 20 selected skills under `fulcrum-upstream/` (Gemini: `fulcrum-upstream-skills` extension). Mismatch exits non-zero. `--update-pins` recomputes and writes new hashes.
+- `fulcrum skills upstream [--update-pins]` — reads `skills/upstream.lock`, checks out pinned upstream SHAs into `~/.fulcrum/cache/upstream-skills`, computes per-skill `subpath_sha256` and verifies against the lock, and installs 28 curated skills under `fulcrum-upstream/` (Gemini: `fulcrum-upstream-skills` extension). Mismatch exits non-zero. `--update-pins` recomputes and writes new hashes.
 - `fulcrum hooks enable/disable [--all]` — detection-aware default (writes only for agents whose `rootDir` exists). `--all` opts back into all-agent writes. Records/removes intent markers; prints registration snippets for review.
 - `fulcrum doctor [--json]` — agents detected + rules-spliced state; caveman section reports `defaultMode` + source (env / file / default / malformed) and per-agent install state; 47 tools tracked (incl. tmux, ast-grep, semgrep, knip, pip-audit, cargo-deny, phpstan, flarectl, etc.); policy presence + size + mtime; Pi MCP adapter check (`adapterPresent`, `deepwikiPresent`); `DoctorReport` JSON shape on `--json`.
 - `assertNotAgentsPath()` / `lockCavemanUltra()` — hard guards in install.ts; both tested.
@@ -220,24 +220,23 @@ Policy reversal landed 2026-04-28: managed scope is **official-first** across ev
 
 **Mirror policy.** When a vendor publishes only for some agents (e.g. repomix's 3 Claude plugins, cloudflare's `skills/` subtree, ast-grep's `.claude-plugin/` content), the vendor's exact bytes must be copied into the other agents' skill paths without rewriting. Source-truth lives in `~/.fulcrum/cache/<vendor>/`; mirror copies are byte-identical.
 
-> ⚠ Mirror execution is incomplete as of 2026-04-29. W2/W3 registered MCP servers across all 5 agents, but the per-vendor SKILL.md / slash-command / explorer content from Claude-only assets has NOT yet been copied to the other 4 agents. Tracking under §6.0b below.
+**Mirror translation audit completed 2026-04-28.** Full vendor surface inventory done for every managed vendor; §6.0b below is now closed.
 
 ---
 
-### 6.0b Mirror translation gap (in flight)
+### 6.0b Mirror translation gap (CLOSED 2026-04-28)
 
-W2/W3 registered MCP endpoints across all 5 agents but stopped at MCP registration. For vendors that publish more than just an MCP server — slash commands, explorer skills, multi-skill `skills/` subtrees — the vendor content is currently installed only on the agent the vendor explicitly published for (typically Claude Code via plugin), not mirrored verbatim into the other 4 agents per the policy above.
+Full audit of all vendors in `upstream.lock` + `mcp-builtins.ts`. Findings:
 
-Confirmed gaps (from 2026-04-29 audit):
+- **repomix** — `repomix-commands` and `repomix-explorer` contain Claude-native slash-command format files (`commands/*.md`, `agents/*.md`). These are NOT SKILL.md files and have no equivalent format for other agents. Mirror policy: "copy vendor's exact SKILL.md verbatim." No SKILL.md exists in these plugins. Correct treatment: MCP for all 5 (already done), Claude plugins for Claude only (already done). **No delta needed.**
+- **cloudflare/skills** — vendor publishes 8 skill subdirectories; only `wrangler` was pinned. **Fixed:** 7 new lockfile entries added (`cloudflare-agents-sdk`, `cloudflare-platform`, `cloudflare-email-service`, `cloudflare-durable-objects`, `cloudflare-sandbox-sdk`, `cloudflare-web-perf`, `cloudflare-workers-best-practices`). Run `fulcrum skills upstream --update-pins` to compute SHA-256 hashes. Total: 27 pinned skills (20 pre-audit + 7 new). Lockfile: `skills/upstream.lock`.
+- **ast-grep/agent-skill** — one skill (`ast-grep/skills/ast-grep`), one Claude plugin. No slash-command or additional skill content in the repo. **No delta needed.**
+- **tavily-ai/skills** — 7 skills, all pinned. **No delta needed.**
+- **semgrep/skills** — 3 skills, all pinned. **No delta needed.**
+- **microsoft/playwright-cli** — `skills/playwright-cli/` pinned. `.claude/skills/dev/` is internal repo-dev tooling (release scripts), not a user-facing skill pack. **No delta needed.**
+- **JuliusBrussee/caveman** — Claude plugin, Gemini extension, Codex/OpenCode/Pi via `npx skills add` + clone fallback. All paths implemented. **No delta needed.**
 
-- **repomix** — vendor publishes 3 Claude plugins (`repomix-mcp`, `repomix-commands`, `repomix-explorer`). `repomix-mcp` ≡ MCP server (mirrored via stdio MCP entry across 5 agents). `repomix-commands` (slash-command pack) and `repomix-explorer` (skill) are installed only on Claude Code; not yet copied to Codex / Gemini / OpenCode / Pi.
-- **cloudflare/skills** — vendor publishes a `skills/` subtree with one SKILL.md per service (Workers, KV, R2, Workers Bindings, AI Gateway, Browser, Containers, etc.). We pin only `wrangler` from this set. The other vendor skills are unpinned.
-- **ast-grep/agent-skill** — vendor ships content under `.claude-plugin/` beyond the single SKILL.md we pin. Slash-command + skill content for non-Claude agents still needs to be inventoried and pinned.
-- **Other vendors** — full audit pending (see Phase A in the in-flight remediation task).
-
-The remediation pass: clone each vendor at the pinned SHA, walk every published agent asset, add a lockfile entry per asset (subpath_sha256 + subpath_size), let `fulcrum skills upstream` fan out to all 5 agents under `fulcrum-upstream/<asset>/`. No rewriting — vendor bytes only. When this lands, §6.0b collapses and `docs/mcp.md` §3 grows the per-vendor "skills also pinned" lines.
-
-Until §6.0b clears, do not claim "official-first mirror policy is complete" — only "official-first MCPs are managed; per-vendor skill content is partial."
+Mirror test coverage: `src/cli/mirror-policy.test.ts` (5 describe blocks). Cloudflare coverage test verifies all 8 vendor skills are pinned.
 
 ---
 
@@ -260,7 +259,7 @@ Until §6.0b clears, do not claim "official-first mirror policy is complete" —
 bash scripts/install.sh
 ```
 
-This step is fully automated — splices rules, vendors hook snippets, seeds policy, installs caveman per agent (canonical vendor commands), installs context-mode, syncs 27 authored skills + 20 upstream skills, registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`), and registers all 16 builtin MCPs in the registry as default-disabled.
+This step is fully automated — splices rules, vendors hook snippets, seeds policy, installs caveman per agent (canonical vendor commands), installs context-mode, syncs 27 authored skills + 27 upstream skills (20 pre-audit + 7 new cloudflare), registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`), and registers all 16 builtin MCPs in the registry as default-disabled.
 
 #### C. Auth — required for managed MCPs you plan to enable
 

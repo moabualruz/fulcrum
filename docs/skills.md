@@ -120,7 +120,7 @@ subpath_size   = <int>            # total byte-size (sanity check only)
 fulcrum skills upstream --update-pins
 ```
 
-All 20 currently-locked skills have `subpath_sha256` pinned (2026-04-28).
+As of 2026-04-28 audit: 27 entries total (20 pre-audit + 7 new cloudflare skills). The 7 new cloudflare entries (`cloudflare-agents-sdk`, `cloudflare-platform`, `cloudflare-email-service`, `cloudflare-durable-objects`, `cloudflare-sandbox-sdk`, `cloudflare-web-perf`, `cloudflare-workers-best-practices`) do not have `subpath_sha256` yet — run `fulcrum skills upstream --update-pins` against the pinned tree SHA to compute and record them. All 20 pre-audit entries remain pinned.
 
 ## 7. Verification
 

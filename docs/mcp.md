@@ -197,7 +197,7 @@ Nine hosted remote MCP endpoints from `cloudflare/mcp-server-cloudflare`. All **
 
 To enable: `fulcrum mcp enable cloudflare-docs` (no auth) or `fulcrum mcp enable cloudflare-workers-bindings` (needs `CLOUDFLARE_API_TOKEN`).
 
-Kept: `upstream.lock` wrangler skill from W1.5 — co-exists with MCP suite.
+Kept: `upstream.lock` cloudflare/skills pins — 8 skills total (all vendor-published at tree `7c449de`): `cloudflare-agents-sdk`, `cloudflare-platform`, `cloudflare-email-service`, `cloudflare-durable-objects`, `cloudflare-sandbox-sdk`, `cloudflare-web-perf`, `cloudflare-workers-best-practices`, `wrangler`. Mirrored to all 5 agent skill paths via `fulcrum skills upstream`.
 
 #### 3.6.6 dart (W3.8)
 

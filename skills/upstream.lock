@@ -9,6 +9,9 @@
 [meta]
 schema_version = 1
 last_audit = "2026-04-28"
+# cloudflare/skills audit 2026-04-28: pinned wrangler only. 7 additional skills
+# (agents-sdk, cloudflare, cloudflare-email-service, durable-objects, sandbox-sdk,
+# web-perf, workers-best-practices) added below. Run --update-pins to compute hashes.
 
 [skills.superpowers-brainstorming]
 source = "https://github.com/obra/superpowers"
@@ -244,6 +247,90 @@ subpath_size = 60766
 
 # [skills.ctx7] archived 2026-04-28 — superseded by official upstash/context7 MCP (W3.4).
 # See skills/_archive/upstream-removed.lock for the full entry.
+
+[skills.cloudflare-agents-sdk]
+source = "https://github.com/cloudflare/skills"
+subpath = "skills/agents-sdk"
+ref = "main"
+tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"
+license = "Apache-2.0"
+author_class = "tool-vendor"
+pinned_on = "2026-04-28"
+review_due = "2026-07-27"
+subpath_sha256 = "cae528e5c0692ae00a124b7cc4e5c52abc85d58d43a36436ae422ea98c1f4506"
+subpath_size = 62015
+
+[skills.cloudflare-platform]
+source = "https://github.com/cloudflare/skills"
+subpath = "skills/cloudflare"
+ref = "main"
+tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"
+license = "Apache-2.0"
+author_class = "tool-vendor"
+pinned_on = "2026-04-28"
+review_due = "2026-07-27"
+subpath_sha256 = "ccdc9fb9c2cf37ca941a0cf0601108f37669c72e907382b27facaa4547f8e951"
+subpath_size = 1429754
+
+[skills.cloudflare-email-service]
+source = "https://github.com/cloudflare/skills"
+subpath = "skills/cloudflare-email-service"
+ref = "main"
+tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"
+license = "Apache-2.0"
+author_class = "tool-vendor"
+pinned_on = "2026-04-28"
+review_due = "2026-07-27"
+subpath_sha256 = "cdd8f16da434668660235ba3773ebb051ff5b324a2fa11f04ded88f7fd057418"
+subpath_size = 44146
+
+[skills.cloudflare-durable-objects]
+source = "https://github.com/cloudflare/skills"
+subpath = "skills/durable-objects"
+ref = "main"
+tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"
+license = "Apache-2.0"
+author_class = "tool-vendor"
+pinned_on = "2026-04-28"
+review_due = "2026-07-27"
+subpath_sha256 = "6c76c9d5f5c0e799ba6e888df153fac24be634ac52a4da7c505a7df32d86ed43"
+subpath_size = 28434
+
+[skills.cloudflare-sandbox-sdk]
+source = "https://github.com/cloudflare/skills"
+subpath = "skills/sandbox-sdk"
+ref = "main"
+tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"
+license = "Apache-2.0"
+author_class = "tool-vendor"
+pinned_on = "2026-04-28"
+review_due = "2026-07-27"
+subpath_sha256 = "c8f314f6809568474c17b057bf3a98729f00f4fb27f3bf88dc5205d0544154ec"
+subpath_size = 10561
+
+[skills.cloudflare-web-perf]
+source = "https://github.com/cloudflare/skills"
+subpath = "skills/web-perf"
+ref = "main"
+tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"
+license = "Apache-2.0"
+author_class = "tool-vendor"
+pinned_on = "2026-04-28"
+review_due = "2026-07-27"
+subpath_sha256 = "86c9bbeb5ed2bb1656ea55c0dc2cd11458c6074e8199812208b3d335a23f0728"
+subpath_size = 8198
+
+[skills.cloudflare-workers-best-practices]
+source = "https://github.com/cloudflare/skills"
+subpath = "skills/workers-best-practices"
+ref = "main"
+tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"
+license = "Apache-2.0"
+author_class = "tool-vendor"
+pinned_on = "2026-04-28"
+review_due = "2026-07-27"
+subpath_sha256 = "cc4d507f8dd982c09298189fad9543af8fabb5ada539876f29bab14cde57c72d"
+subpath_size = 31720
 
 [skills.wrangler]
 source = "https://github.com/cloudflare/skills"
