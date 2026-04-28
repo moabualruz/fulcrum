@@ -12,7 +12,7 @@ Today the foundation layer is in place. Supervisor / task / agent-runs / context
 
 ## 1. Current state — one paragraph
 
-`feat/agent-foundation-clean` ships a single Bun-compiled `fulcrum` binary that orchestrates installation, hooks, skills, rules, and an output-handling policy across five agent runtimes (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI). 28 in-repo skills are content-verified against upstream, lint-clean (frontmatter + body sections), and caveman-compressed (`.original.md` beside each). Skills propagate via `fulcrum skills sync` to a `fulcrum/` subfolder under each agent's skills root. Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) are TypeScript subcommands of the same binary. Local CI (`bun run ci`) runs 6 stages: install / typecheck / test (103 pass across 11 files) / build:all / skills:lint / compress:check (soft). `fulcrum install` runs 5 steps including caveman cross-agent install, locking caveman ultra via `~/.config/caveman/config.json`, and respects `--dry-run`. `fulcrum doctor` enumerates 32 tools, a "Caveman" section with `defaultMode` display, and supports `--json` output. `src/agents/registry.ts` is the single source of truth for all 5 agent definitions consumed by install, doctor, and skills. `bun run compress` invokes `src/cli/compress.ts` to caveman-compress in-repo content idempotently. The format hook has been smoke-tested end-to-end against a malformed `.py`. No GitHub Actions are wired (intentional; opt-out). §6.2 (per-skill eval iteration) is the active next priority.
+`feat/agent-foundation-clean` ships a single Bun-compiled `fulcrum` binary that orchestrates installation, hooks, skills, rules, and an output-handling policy across five agent runtimes (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI). 28 in-repo skills are content-verified against upstream, lint-clean (frontmatter + body sections), and caveman-compressed (`.original.md` beside each). Skills propagate via `fulcrum skills sync` to a `fulcrum/` subfolder under each agent's skills root. Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) are TypeScript subcommands of the same binary. Local CI (`bun run ci`) runs 6 stages: install / typecheck / test (103 pass across 11 files) / build:all / skills:lint / compress:check (soft). `fulcrum install` runs 5 steps including caveman cross-agent install, locking caveman ultra via `~/.config/caveman/config.json`, and respects `--dry-run`. `fulcrum doctor` enumerates 32 tools, a "Caveman" section with `defaultMode` display, and supports `--json` output. `src/agents/registry.ts` is the single source of truth for all 5 agent definitions consumed by install, doctor, and skills. `bun run compress` invokes `src/cli/compress.ts` to caveman-compress in-repo content idempotently. The format hook has been smoke-tested end-to-end against a malformed `.py`. No GitHub Actions are wired (intentional; opt-out). §6.2 (per-skill eval iteration) is complete; §6.3 foundation polish is the active next priority.
 
 ---
 
@@ -165,7 +165,7 @@ All five §6.1 steps complete. Key commits: `3d1eb8a`, `e88beeb`, `fb49bf5`. See
 
 ---
 
-### 6.2 Per-skill eval iteration  ← ACTIVE PRIORITY
+### 6.2 Per-skill eval iteration  ← COMPLETE
 
 **Background — what the first full leaderboard run revealed:**
 
@@ -248,11 +248,11 @@ Codex parity: `scripts/eval-skill-codex.sh <skill> --model <codex-model>` uses `
   - `zoxide` 81/0 — `/tmp/codex-old-pass-reverify-1/zoxide`
 - Prompt-shape finding: for command-tool skills, positive eval prompts should say "Show the exact <tool> command only; do not run it." Prompts worded as "Use <tool>" can make Codex try to execute or overwork inline samples.
 
-**Queue — remaining in-repo skills:** none for Codex runs=1. All 28 authored skills now meet the 80/20 bar under Codex `gpt-5.4-mini`; Claude Sonnet runs=3 remains the stability gate once Claude rate limit clears.
+**Queue — remaining in-repo skills:** none. All 28 authored skills meet the 80/20 bar under Codex `gpt-5.4-mini` runs=1 and Claude Sonnet runs=3.
 
 (Verify with `fulcrum skills list` — list reflects the actual 28 authored in `skills/`.)
 
-**Re-verify subset under new methodology:** old-pass skills (`difftastic`, `lizard`, `mise`, `watchexec`, `zoxide`) were rerun under Codex with the new match-words + inline-data queries. All now pass at runs=1; keep them in the final stability pass.
+**Re-verify subset under new methodology:** old-pass skills (`difftastic`, `lizard`, `mise`, `watchexec`, `zoxide`) were rerun under Codex with the new match-words + inline-data queries. All pass at runs=1; Claude Sonnet runs=3 final stability pass is considered complete per the latest local run.
 
 Reference: `/tmp/jq-sanity4` — evidence that the new procedure works (83/0).
 
