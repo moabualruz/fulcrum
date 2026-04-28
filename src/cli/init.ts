@@ -1,8 +1,11 @@
-// fulcrum init [DIR] — bootstrap a project with cross-agent rules + skills paths.
+// fulcrum init [DIR]          — bootstrap a project with cross-agent rules + skills paths.
+// fulcrum init reindex [DIR]  — run `repomix --compress` in DIR (vendor default output).
+//
 // Idempotent: skips files that already exist.
 
 import { stat, mkdir, readFile, writeFile, appendFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { which, run as runProc } from "../utils/proc.ts";
 
 const AGENTS_TEMPLATE = `# AGENTS.md
 
@@ -35,19 +38,65 @@ const AGENTS_TEMPLATE = `# AGENTS.md
 const GITIGNORE_LINES = [
   ".claude/settings.local.json",
   ".claude/.cache/",
-  ".fulcrum/",
 ];
+
+/** Dry-run state — set by tests or --dry-run flag. */
+let DRY_RUN = false;
+
+/** Toggle dry-run mode (used by tests). */
+export function setDryRun(v: boolean): void { DRY_RUN = v; }
 
 async function exists(p: string): Promise<boolean> {
   try { await stat(p); return true; } catch { return false; }
 }
 
+/** Run `repomix --compress` in dir with NO --output flag (vendor default = repomix-output.xml). */
+async function runReindex(dir: string): Promise<void> {
+  if (!(await which("repomix"))) {
+    console.log("  · repomix not on PATH — skipping reindex");
+    return;
+  }
+  if (DRY_RUN) {
+    console.log(`  [dry-run] would run: repomix --compress  (cwd=${dir})`);
+    return;
+  }
+  const r = await runProc(["repomix", "--compress"], { cwd: dir });
+  if (r.exit !== 0) {
+    console.warn(`  ⚠ repomix --compress failed (exit ${r.exit}): ${r.stderr.trim()}`);
+  } else {
+    console.log("  ✓ repomix --compress done");
+  }
+}
+
 export async function run(args: string[]): Promise<void> {
-  const dir = resolve(args[0] ?? process.cwd());
+  // Handle `fulcrum init reindex [DIR]` subcommand.
+  if (args[0] === "reindex") {
+    const dir = resolve(args[1] ?? process.cwd());
+    if (!(await exists(dir))) {
+      console.error(`fulcrum init reindex: not a directory: ${dir}`);
+      process.exit(1);
+    }
+    console.log(`fulcrum init reindex → ${dir}`);
+    await runReindex(dir);
+    console.log("Done.");
+    return;
+  }
+
+  // Parse --dry-run flag.
+  DRY_RUN = false;
+  const filteredArgs: string[] = [];
+  for (const a of args) {
+    if (a === "--dry-run") { DRY_RUN = true; }
+    else { filteredArgs.push(a); }
+  }
+  if (DRY_RUN) console.log("(dry-run mode — no files will be written)\n");
+
+  const dir = resolve(filteredArgs[0] ?? process.cwd());
   if (!(await exists(dir))) {
     console.error(`fulcrum init: not a directory: ${dir}`);
     process.exit(1);
   }
+  const home = process.env["HOME"] ?? "";
   console.log(`fulcrum init → ${dir}`);
 
   // AGENTS.md
@@ -99,5 +148,9 @@ export async function run(args: string[]): Promise<void> {
   }
   if (!added) console.log("  · .gitignore  (kept)");
 
-  console.log("Done.");
+  // Vendor integrations — run canonical per-tool commands for each detected agent.
+  const { runVendorIntegrations } = await import("./init-vendor.ts");
+  await runVendorIntegrations(dir, home, { dryRun: DRY_RUN });
+
+  console.log("\nDone.");
 }
