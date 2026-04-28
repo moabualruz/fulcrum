@@ -224,6 +224,44 @@ Policy reversal landed 2026-04-28: managed scope is **official-first** across ev
 
 ---
 
+### 6.0c fulcrum init — vendor-canonical integrations (DONE 2026-04-28)
+
+`fulcrum init <dir>` now runs vendor-canonical commands after writing AGENTS.md / .claude/CLAUDE.md / .gitignore. Implemented in `src/cli/init-vendor.ts` (`runVendorIntegrations`).
+
+**Per-tool commands run (exact vendor docs, no Fulcrum path overrides):**
+
+| Tool | Command | Notes |
+|---|---|---|
+| graphify | `graphify claude install` (Claude Code) | cwd=dir; NEVER --output |
+| graphify | `graphify install --platform codex` | when Codex detected |
+| graphify | `graphify install --platform opencode` | when OpenCode detected |
+| graphify | `graphify install --platform gemini` | when Gemini detected |
+| graphify + Pi | (skipped) | vendor CLI does not list Pi; log note only |
+| caveman | `npx skills add JuliusBrussee/caveman` | no -a flag; skills.sh auto-detects agent |
+| ast-grep | `npx skills add ast-grep/agent-skill` | no -a flag; auto-detects agent |
+| tavily | `npx skills add https://github.com/tavily-ai/skills` | covers all 7 tavily skills |
+| repomix | (no-op in init) | Claude Code plugins handled by `fulcrum install` W2; MCP via registry |
+| context7 | (deferred note printed only) | OAuth is interactive; never spawned |
+| pi-mcp-adapter | `pi install npm:pi-mcp-adapter` + `pi-mcp-adapter init` | only when Pi detected and `pi` on PATH |
+
+**DO NOT** list (hard constraints):
+- Never pass `--output` or any path override to graphify or repomix.
+- Never spawn interactive auth flows (context7 setup).
+- Never write hook registrations or skill file copies in `init-vendor.ts` — those belong to `fulcrum install`.
+- No watchers, no PID lockfiles, no `.fulcrum/` scratch dirs, no `--no-indices`/`--no-watchers` flags.
+
+**Additional subcommand:**
+
+`fulcrum init reindex [DIR]` — runs `repomix --compress` in DIR with NO `--output` flag (vendor default output = `repomix-output.xml`). Skips if `repomix` not on PATH.
+
+**Lockfile delta (2026-04-28):**
+- Removed from `skills/upstream.lock`: `[skills.ast-grep]` + `[skills.ast-grep.claude_plugin]`, `[skills.tavily-*]` ×7.
+- Archived to `skills/_archive/upstream-removed.lock` with `archive_reason`.
+- Removed from `src/cli/install.ts`: `installCavemanByCopy`, `copyDirRecursive`, `cloneOrUpdateDry`, `ensureClone` clone-and-copy fallback for Codex/OpenCode/Pi.
+- Removed from `src/cli/upstream-skills.ts`: `ClaudePluginDescriptor` was moved to after `UpstreamSkillLockEntry`; `claude_plugin` field retained for uninstall/audit purposes.
+
+---
+
 ### 6.0b Mirror translation gap (CLOSED 2026-04-28)
 
 Full audit of all vendors in `upstream.lock` + `mcp-builtins.ts`. Findings:

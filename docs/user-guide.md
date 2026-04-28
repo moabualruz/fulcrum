@@ -100,7 +100,19 @@ Full per-MCP auth requirements are in [docs/mcp.md §5](mcp.md). The full machin
 fulcrum init ~/code/myproject
 ```
 
-Creates `AGENTS.md`, `.claude/CLAUDE.md` (`@AGENTS.md` import), and `.gitignore` in the target directory. Edit `AGENTS.md` to describe the project stack, commands, and conventions — every agent reads this file.
+Creates `AGENTS.md`, `.claude/CLAUDE.md` (`@AGENTS.md` import), and `.gitignore` in the target directory. Then runs **vendor-canonical integrations** for each detected agent: graphify (per-agent platform install), caveman + ast-grep + tavily via `npx skills add`, and pi-mcp-adapter init for Pi. context7 OAuth is interactive — the command prints the manual step. Edit `AGENTS.md` to describe the project stack, commands, and conventions — every agent reads this file.
+
+Use `--dry-run` to preview without writing:
+
+```bash
+fulcrum init --dry-run ~/code/myproject
+```
+
+To reindex the project with repomix (no `--output` override — vendor default `repomix-output.xml`):
+
+```bash
+fulcrum init reindex ~/code/myproject
+```
 
 ### Verify
 

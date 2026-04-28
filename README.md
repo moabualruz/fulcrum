@@ -109,7 +109,11 @@ FULCRUM_RELEASE_TAG=v0.1.0 bash <(curl -fsSL https://raw.githubusercontent.com/m
 After install, common commands:
 
 ```bash
-fulcrum init <dir>            # bootstrap a project's AGENTS.md + .claude/CLAUDE.md
+fulcrum init <dir>            # bootstrap project: AGENTS.md + .claude/CLAUDE.md +
+                              # vendor integrations (graphify, caveman, ast-grep, tavily
+                              # via npx skills add; pi-mcp-adapter init for Pi)
+fulcrum init --dry-run <dir>  # preview without writing
+fulcrum init reindex <dir>    # run repomix --compress in <dir> (no --output override)
 
 fulcrum doctor                # bun, agent dirs, tool presence, policy health
 fulcrum install --dry-run     # preview rules, skills, DeepWiki, and project bootstrap
