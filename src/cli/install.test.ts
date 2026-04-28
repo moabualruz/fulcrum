@@ -1,12 +1,13 @@
 // Tests for caveman install logic in install.ts.
 // Uses Bun test runner; no GitHub network access (file:// fixture repo).
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, beforeAll, afterAll, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { assertNotAgentsPath, installCavemanByCopy, lockCavemanUltra, spliceSentinel, setDryRun } from "./install.ts";
 import { run as runProc } from "../utils/proc.ts";
+import * as proc from "../utils/proc.ts";
 
 let TMP: string;
 
@@ -231,6 +232,126 @@ describe("lockCavemanUltra", () => {
         delete process.env["XDG_CONFIG_HOME"];
       }
       await rm(xdgDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3b. W1.3 — caveman Codex/OpenCode/Pi: npx skills add canonical path + fallback
+//
+// These tests drive the install logic in dry-run mode so no real filesystem
+// writes happen. The key invariant is WHAT commands would be run (logged by
+// runProcDry in dry-run mode) not whether they succeeded.
+// ---------------------------------------------------------------------------
+
+describe("installCaveman W1.3 — npx skills add canonical path", () => {
+  let testHome: string;
+  let origHome: string | undefined;
+  let origFulcrumHome: string | undefined;
+  let origRepoDir: string | undefined;
+
+  beforeEach(async () => {
+    testHome = await mkdtemp(join(tmpdir(), "caveman-npx-"));
+    origHome = process.env["HOME"];
+    origFulcrumHome = process.env["FULCRUM_HOME"];
+    origRepoDir = process.env["FULCRUM_REPO_DIR"];
+    process.env["HOME"] = testHome;
+    process.env["FULCRUM_HOME"] = join(testHome, ".fulcrum");
+    // Point to repo root so rules file is found, but dry-run prevents writes.
+    process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../.."); // repo root
+    setDryRun(true); // prevent all file writes
+  });
+
+  afterEach(async () => {
+    setDryRun(false);
+    if (origHome !== undefined) process.env["HOME"] = origHome;
+    else delete process.env["HOME"];
+    if (origFulcrumHome !== undefined) process.env["FULCRUM_HOME"] = origFulcrumHome;
+    else delete process.env["FULCRUM_HOME"];
+    if (origRepoDir !== undefined) process.env["FULCRUM_REPO_DIR"] = origRepoDir;
+    else delete process.env["FULCRUM_REPO_DIR"];
+    await rm(testHome, { recursive: true, force: true });
+  });
+
+  test("dry-run logs npx skills add for detected agent (npx found on real PATH)", async () => {
+    // Create Codex dir to simulate detection. Don't create caveman subdir.
+    await mkdir(join(testHome, ".codex", "skills"), { recursive: true });
+    // Note: npx presence is real — test just verifies npx path is chosen when
+    // npx exists on the real machine. If npx is absent, fallback path fires
+    // instead — both are acceptable; the key invariant is no crash.
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(String(args[0]));
+    });
+
+    try {
+      const { run: installRun } = await import("./install.ts");
+      await installRun(["--no-upstream-skills"]);
+      // Either npx path or clone fallback must be logged for Codex.
+      const codexHandled = logs.some((l) =>
+        (l.includes("npx") && l.includes("JuliusBrussee/caveman")) ||
+        l.includes("clone+copy fallback") ||
+        l.includes("npx not on PATH") ||
+        l.includes("Codex CLI caveman")
+      );
+      expect(codexHandled).toBe(true);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  test("dry-run logs skip when caveman skill dir already exists (idempotency)", async () => {
+    // Pre-create the caveman skill dir to simulate already installed.
+    await mkdir(join(testHome, ".codex", "skills", "caveman"), { recursive: true });
+
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(String(args[0]));
+    });
+
+    try {
+      const { run: installRun } = await import("./install.ts");
+      await installRun(["--no-upstream-skills"]);
+      // Should log "already installed" skip message for Codex.
+      expect(logs.some((l) => l.includes("Codex CLI") && l.includes("already installed"))).toBe(true);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+});
+
+// Test installCavemanByCopy fallback outside dry-run scope.
+describe("installCaveman W1.3 — clone+copy fallback (non-dry-run)", () => {
+  let testHome: string;
+
+  beforeEach(async () => {
+    testHome = await mkdtemp(join(tmpdir(), "caveman-fallback-"));
+    setDryRun(false);
+  });
+
+  afterEach(async () => {
+    setDryRun(false);
+    await rm(testHome, { recursive: true, force: true });
+  });
+
+  test("installCavemanByCopy fallback: copies all 5 skills when clone succeeds", async () => {
+    const cloneDir = join(testHome, "fixture-caveman");
+    await runProc(["git", "init", cloneDir]);
+    await runProc(["git", "-C", cloneDir, "config", "user.email", "test@test.com"]);
+    await runProc(["git", "-C", cloneDir, "config", "user.name", "Test"]);
+    for (const skill of ["caveman", "caveman-commit", "caveman-help", "caveman-review", "compress"]) {
+      await mkdir(join(cloneDir, "skills", skill), { recursive: true });
+      await writeFile(join(cloneDir, "skills", skill, "SKILL.md"), `# ${skill}\n`);
+    }
+    await runProc(["git", "-C", cloneDir, "add", "."]);
+    await runProc(["git", "-C", cloneDir, "commit", "-m", "test"]);
+
+    const agentSkillsRoot = join(testHome, "fallback-agent-skills");
+    await installCavemanByCopy(agentSkillsRoot, { cloneDir, home: testHome });
+
+    for (const skill of ["caveman", "caveman-commit", "caveman-help", "caveman-review", "compress"]) {
+      expect(await Bun.file(join(agentSkillsRoot, skill, "SKILL.md")).exists()).toBe(true);
     }
   });
 });

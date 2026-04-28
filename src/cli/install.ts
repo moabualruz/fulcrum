@@ -307,67 +307,87 @@ async function installCaveman(home: string): Promise<void> {
     console.log("     · skip Gemini CLI (not detected)");
   }
 
-  // --- Clone/update for Codex, OpenCode, Pi (clone-and-copy pattern) ---
-  // Do the clone once; reuse for all three agents.
-  let cloneOk = false;
-  {
+  // --- W1.3: Codex, OpenCode, Pi — canonical `npx skills add` path ---
+  // Per upstream README "Install for any agent":
+  //   npx skills add JuliusBrussee/caveman -a <agent>
+  // Fallback: clone-and-copy when npx is not on PATH.
+  // Idempotency: skip if the install dir already exists.
+  const npxPath = await which("npx");
+
+  const npxAgentDefs: Array<{
+    id: string;
+    dir: string;
+    label: string;
+    agentFlag: string;
+    skillsRoot: string;
+  }> = [
+    { id: "codex",    dir: `${home}/.codex`,          label: "Codex CLI", agentFlag: "codex",    skillsRoot: `${home}/.codex/skills` },
+    { id: "opencode", dir: `${home}/.config/opencode`, label: "OpenCode",  agentFlag: "opencode", skillsRoot: `${home}/.config/opencode/skills` },
+    { id: "pi",       dir: `${home}/.pi/agent`,        label: "Pi CLI",    agentFlag: "pi",       skillsRoot: `${home}/.pi/agent/skills` },
+  ];
+
+  // Clone is still needed as the fallback; defer it until at least one agent
+  // needs it to avoid unnecessary network traffic.
+  let cloneOk: boolean | null = null; // null = not yet attempted
+
+  async function ensureClone(): Promise<boolean> {
+    if (cloneOk !== null) return cloneOk;
     const r = await cloneOrUpdateDry(CAVEMAN_REPO, cloneDir);
     if (r.exit !== 0) {
       console.log(`     ✗ caveman clone/update failed: ${r.stderr.trim()} — manual: git clone ${CAVEMAN_REPO} ${cloneDir}`);
+      cloneOk = false;
     } else {
       cloneOk = true;
     }
+    return cloneOk;
   }
 
-  // Codex CLI
-  const codexDir = `${home}/.codex`;
-  if (await isDir(codexDir)) {
-    if (!cloneOk) {
-      console.log(`     ✗ Codex CLI caveman skipped (clone failed)`);
-    } else {
-      try {
-        await installCavemanByCopy(`${codexDir}/skills`, { cloneDir, home });
-        console.log("     ✓ Codex CLI caveman skills installed");
-      } catch (e) {
-        console.log(`     ✗ Codex CLI caveman install failed: ${String(e)} — manual: copy ${cloneDir}/skills/<name> → ~/.codex/skills/<name>`);
-      }
+  for (const ag of npxAgentDefs) {
+    if (!(await isDir(ag.dir))) {
+      console.log(`     · skip ${ag.label} (not detected)`);
+      continue;
     }
-  } else {
-    console.log("     · skip Codex CLI (not detected)");
-  }
 
-  // OpenCode
-  const opencodeDir = `${home}/.config/opencode`;
-  if (await isDir(opencodeDir)) {
-    if (!cloneOk) {
-      console.log(`     ✗ OpenCode caveman skipped (clone failed)`);
-    } else {
-      try {
-        await installCavemanByCopy(`${opencodeDir}/skills`, { cloneDir, home });
-        console.log("     ✓ OpenCode caveman skills installed");
-      } catch (e) {
-        console.log(`     ✗ OpenCode caveman install failed: ${String(e)} — manual: copy ${cloneDir}/skills/<name> → ~/.config/opencode/skills/<name>`);
-      }
+    // Idempotency: if the caveman skill dir already exists, skip.
+    const cavemanSkillDir = `${ag.skillsRoot}/caveman`;
+    if (await isDir(cavemanSkillDir)) {
+      console.log(`     · skip ${ag.label} caveman (already installed)`);
+      continue;
     }
-  } else {
-    console.log("     · skip OpenCode (not detected)");
-  }
 
-  // Pi CLI
-  const piDir = `${home}/.pi/agent`;
-  if (await isDir(piDir)) {
-    if (!cloneOk) {
-      console.log(`     ✗ Pi CLI caveman skipped (clone failed)`);
+    if (npxPath) {
+      // Canonical npx path.
+      const r = await runProcDry(["npx", "skills", "add", "JuliusBrussee/caveman", "-a", ag.agentFlag]);
+      if (r.exit !== 0) {
+        console.log(`     ✗ ${ag.label} caveman npx install failed: ${r.stderr.trim()} — falling back to clone+copy`);
+        // Fallback on npx failure.
+        if (await ensureClone()) {
+          try {
+            await installCavemanByCopy(ag.skillsRoot, { cloneDir, home });
+            console.log(`     ✓ ${ag.label} caveman skills installed (fallback copy)`);
+          } catch (e) {
+            console.log(`     ✗ ${ag.label} caveman fallback install failed: ${String(e)}`);
+          }
+        } else {
+          console.log(`     ✗ ${ag.label} caveman skipped (clone also failed)`);
+        }
+      } else {
+        console.log(`     ✓ ${ag.label} caveman installed via npx skills add`);
+      }
     } else {
-      try {
-        await installCavemanByCopy(`${piDir}/skills`, { cloneDir, home });
-        console.log("     ✓ Pi CLI caveman skills installed");
-      } catch (e) {
-        console.log(`     ✗ Pi CLI caveman install failed: ${String(e)} — manual: copy ${cloneDir}/skills/<name> → ~/.pi/agent/skills/<name>`);
+      // npx not on PATH — use clone-and-copy fallback directly.
+      console.log(`     · ${ag.label}: npx not on PATH — using clone+copy fallback`);
+      if (await ensureClone()) {
+        try {
+          await installCavemanByCopy(ag.skillsRoot, { cloneDir, home });
+          console.log(`     ✓ ${ag.label} caveman skills installed (copy fallback)`);
+        } catch (e) {
+          console.log(`     ✗ ${ag.label} caveman install failed: ${String(e)} — manual: npx skills add JuliusBrussee/caveman -a ${ag.agentFlag}`);
+        }
+      } else {
+        console.log(`     ✗ ${ag.label} caveman skipped (clone failed and npx not available)`);
       }
     }
-  } else {
-    console.log("     · skip Pi CLI (not detected)");
   }
 
   // Lock caveman default mode to "ultra" across every agent that reads the
