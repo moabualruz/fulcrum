@@ -8,6 +8,7 @@
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { AGENTS } from "../agents/registry.ts";
+import { which, run as runProc } from "../utils/proc.ts";
 
 const BEGIN = "<!-- BEGIN FULCRUM RULES -->";
 const END = "<!-- END FULCRUM RULES -->";
@@ -136,7 +137,48 @@ async function removePolicy(purge: boolean): Promise<void> {
   await removePath(dst, "unmodified tool-output policy");
 }
 
+/**
+ * Run a command best-effort: log + continue on failure, never throw.
+ * Skips in dry-run mode.
+ */
+async function runBestEffort(cmd: string[], label: string): Promise<void> {
+  if (DRY_RUN) {
+    console.log(`     [dry-run] would run: ${cmd.join(" ")}`);
+    return;
+  }
+  const r = await runProc(cmd);
+  if (r.exit !== 0) {
+    console.log(`     · ${label} failed (exit ${r.exit}): ${r.stderr.trim() || r.stdout.trim()} — continuing`);
+  } else {
+    console.log(`     ✓ ${label}`);
+  }
+}
+
 async function removeSkillNamespaces(home: string): Promise<void> {
+  // W1.6: Before removing the fulcrum-upstream namespace for Claude Code,
+  // uninstall any upstream skills that were installed via `claude plugin`.
+  // Load the lockfile and call `claude plugin uninstall <name>` for each entry
+  // with a claude_plugin field. Best-effort: log + continue.
+  const claudeDir = `${home}/.claude`;
+  if (await exists(claudeDir) && (await which("claude"))) {
+    try {
+      const { loadUpstreamSkills } = await import("./upstream-skills.ts");
+      const repoRoot = process.env["FULCRUM_REPO_DIR"] ?? process.cwd();
+      const lockPath = `${repoRoot}/skills/upstream.lock`;
+      const skills = await loadUpstreamSkills(lockPath);
+      for (const skill of skills) {
+        if (skill.claude_plugin) {
+          await runBestEffort(
+            ["claude", "plugin", "uninstall", skill.claude_plugin.name],
+            `Claude Code ${skill.name} plugin uninstall`,
+          );
+        }
+      }
+    } catch {
+      // lockfile may not be present in all contexts — best-effort
+    }
+  }
+
   for (const agent of AGENTS) {
     if (agent.id === "gemini") {
       await removePath(`${home}/.gemini/extensions/fulcrum-skills`, "Gemini fulcrum-skills extension");
@@ -149,9 +191,63 @@ async function removeSkillNamespaces(home: string): Promise<void> {
 }
 
 async function removeCavemanCopies(home: string): Promise<void> {
-  for (const agent of AGENTS) {
-    await removePath(agent.cavemanInstallDir(home), `${agent.label} caveman install`);
+  // W1.1: Claude Code — call `claude plugin uninstall caveman@caveman` when
+  // Claude is detected and `claude` is on PATH. Best-effort: log + continue.
+  const claudeDir = `${home}/.claude`;
+  if (await exists(claudeDir)) {
+    if (await which("claude")) {
+      await runBestEffort(
+        ["claude", "plugin", "uninstall", "caveman@caveman"],
+        "Claude Code caveman plugin uninstall",
+      );
+    } else {
+      console.log("     · Claude Code caveman: `claude` not on PATH — manual: claude plugin uninstall caveman@caveman");
+    }
   }
+
+  // W1.2: Gemini CLI — call `gemini extensions uninstall caveman` when Gemini
+  // is detected and `gemini` is on PATH. Best-effort: log + continue.
+  const geminiDir = `${home}/.gemini`;
+  if (await exists(geminiDir)) {
+    if (await which("gemini")) {
+      await runBestEffort(
+        ["gemini", "extensions", "uninstall", "caveman"],
+        "Gemini CLI caveman extension uninstall",
+      );
+    } else {
+      console.log("     · Gemini CLI caveman: `gemini` not on PATH — manual: gemini extensions uninstall caveman");
+    }
+  }
+
+  // W1.4: Codex/OpenCode/Pi — call `npx skills remove caveman` for each
+  // detected agent. Fallback to removePath when npx is not available.
+  const npxPath = await which("npx");
+  const npxAgents: Array<{ dir: string; label: string; agent: typeof AGENTS[number] }> = [
+    { dir: `${home}/.codex`, label: "Codex CLI", agent: AGENTS.find((a) => a.id === "codex")! },
+    { dir: `${home}/.config/opencode`, label: "OpenCode", agent: AGENTS.find((a) => a.id === "opencode")! },
+    { dir: `${home}/.pi/agent`, label: "Pi CLI", agent: AGENTS.find((a) => a.id === "pi")! },
+  ];
+  for (const { dir, label, agent } of npxAgents) {
+    if (!(await exists(dir))) continue;
+    if (npxPath) {
+      // npx skills remove does not need an -a flag — it auto-detects from cwd/env.
+      // Pass --yes to suppress interactive prompts (Bash 3.2-safe: no arrays).
+      await runBestEffort(
+        ["npx", "skills", "remove", "caveman", "--yes"],
+        `${label} caveman skills remove via npx`,
+      );
+    } else {
+      // Fallback: file-system removal of the install dir.
+      await removePath(agent.cavemanInstallDir(home), `${label} caveman install (fs fallback)`);
+    }
+  }
+
+  // Always remove the file-system copies as cleanup (idempotent: removePath is
+  // a no-op if the path is already gone after npx remove).
+  for (const agent of AGENTS) {
+    await removePath(agent.cavemanInstallDir(home), `${agent.label} caveman install dir`);
+  }
+
   const cfgPath = process.env["XDG_CONFIG_HOME"]
     ? `${process.env["XDG_CONFIG_HOME"]}/caveman/config.json`
     : `${home}/.config/caveman/config.json`;

@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { removeExactLine, removeSentinelBlock, run, setDryRun } from "./uninstall.ts";
+import * as proc from "../utils/proc.ts";
 
 let TMP: string;
 let originalHome: string | undefined;
@@ -122,5 +123,179 @@ describe("run", () => {
     await run([]);
 
     expect(await readFile(join(TMP, ".fulcrum", "tool-output-policy.toml"), "utf8")).toBe("user = true\n");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W1.1 — caveman Claude uninstall: `claude plugin uninstall caveman@caveman`
+// ---------------------------------------------------------------------------
+
+describe("removeCavemanCopies — W1.1 Claude plugin uninstall", () => {
+  test("calls claude plugin uninstall when .claude exists and claude on PATH", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    // Create the caveman install dir so removePath has something to clean up.
+    await mkdir(join(TMP, ".claude", "plugins", "cache", "caveman", "caveman"), { recursive: true });
+
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
+      if (cmd === "claude") return "/usr/local/bin/claude";
+      if (cmd === "npx") return null;
+      return null;
+    });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const claudeUninstall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd.includes("plugin") && cmd.includes("uninstall") && cmd.includes("caveman@caveman"),
+      );
+      expect(claudeUninstall).toBeDefined();
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+  });
+
+  test("skips claude uninstall when .claude dir absent", async () => {
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const claudeUninstall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd.includes("plugin") && cmd.includes("uninstall"),
+      );
+      expect(claudeUninstall).toBeUndefined();
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+  });
+
+  test("logs and continues when claude plugin uninstall exits non-zero (best-effort)", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
+      if (cmd === "claude") return "/usr/local/bin/claude";
+      return null;
+    });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 1, stdout: "", stderr: "not found" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(String(args[0]));
+    });
+    try {
+      // Must not throw even though run returns non-zero.
+      await expect(run(["--include-caveman"])).resolves.toBeUndefined();
+      expect(logs.some((l) => l.includes("continuing"))).toBe(true);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W1.2 — caveman Gemini uninstall: `gemini extensions uninstall caveman`
+// ---------------------------------------------------------------------------
+
+describe("removeCavemanCopies — W1.2 Gemini extension uninstall", () => {
+  test("calls gemini extensions uninstall when .gemini exists and gemini on PATH", async () => {
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
+    await mkdir(join(TMP, ".gemini", "extensions", "caveman"), { recursive: true });
+
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
+      if (cmd === "gemini") return "/usr/local/bin/gemini";
+      if (cmd === "npx") return null;
+      return null;
+    });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const geminiUninstall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd[0] === "gemini" && cmd.includes("uninstall") && cmd.includes("caveman"),
+      );
+      expect(geminiUninstall).toBeDefined();
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+  });
+
+  test("skips gemini uninstall when gemini not on PATH", async () => {
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(String(args[0]));
+    });
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const geminiUninstall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd[0] === "gemini" && cmd.includes("uninstall"),
+      );
+      expect(geminiUninstall).toBeUndefined();
+      expect(logs.some((l) => l.includes("not on PATH"))).toBe(true);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W1.4 — caveman Codex/OpenCode/Pi uninstall via `npx skills remove caveman`
+// ---------------------------------------------------------------------------
+
+describe("removeCavemanCopies — W1.4 npx skills remove", () => {
+  test("calls npx skills remove caveman for each detected agent when npx available", async () => {
+    await mkdir(join(TMP, ".codex", "skills", "caveman"), { recursive: true });
+    await mkdir(join(TMP, ".config", "opencode", "skills", "caveman"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent", "skills", "caveman"), { recursive: true });
+
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
+      if (cmd === "npx") return "/usr/local/bin/npx";
+      return null;
+    });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const npxRemovals = calls.filter(
+        (cmd) => Array.isArray(cmd) && cmd[0] === "npx" && cmd.includes("remove") && cmd.includes("caveman"),
+      );
+      // Should have been called at least once per detected agent (3 agents).
+      expect(npxRemovals.length).toBeGreaterThanOrEqual(3);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+  });
+
+  test("falls back to removePath when npx not on PATH", async () => {
+    await mkdir(join(TMP, ".codex", "skills", "caveman"), { recursive: true });
+
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const npxCall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd[0] === "npx",
+      );
+      expect(npxCall).toBeUndefined();
+      // The caveman skill dir should be removed by fs fallback.
+      expect(await Bun.file(join(TMP, ".codex", "skills", "caveman")).exists()).toBe(false);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
   });
 });
