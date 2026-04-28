@@ -264,14 +264,15 @@ Reference: `/tmp/jq-sanity4` — evidence that the new procedure works (83/0).
 
 ---
 
-### 6.4 Ship the branch (after 6.2 + 6.3)
+### 6.4 Ship the branch  ← COMPLETE
 
-Branch is currently unpushed. §6.2 + §6.3 are closed; ship when ready:
+§6.2 + §6.3 are closed and the branch is shipped for review:
 
-1. **Final CI:** `bun run ci` — must be green.
-2. **Push:** `git push -u origin feat/agent-foundation-clean`.
-3. **Open PR:** `gh pr create --title "..." --body "..."` summarizing the foundation + caveman integration + eval methodology fix. Reference HANDOVER §6.x as the change log.
-4. **Cut release** (when PR merges to `main`): `bun run release vX.Y.Z [--gh]`. Pre-release at `v0.1.0` is reasonable for the foundation tag.
+- **Final CI:** `bun run ci` green on the PR branch.
+- **Pushed:** `origin/feat/agent-foundation-clean-pr`.
+- **Opened PR:** <https://github.com/moabualruz/fulcrum/pull/1>.
+- **Note:** original `feat/agent-foundation-clean` was pushed but has no common history with `main`, so GitHub rejected a direct PR. `feat/agent-foundation-clean-pr` is replayed from `origin/main` and has the same final tree as the original branch.
+- **Cut release** after PR merges to `main`: `bun run release vX.Y.Z [--gh]`. Pre-release at `v0.1.0` is reasonable for the foundation tag.
 
 ---
 
