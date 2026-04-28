@@ -97,13 +97,40 @@ Pin third-party skills in `skills/upstream.lock` (TOML) when ALL of:
 
 Always vendor (never pin) for individual-author repos like `mitsuhiko/agent-stuff`, `obra/superpowers-lab`, `DevonMorris/claude-ctags` — track in lockfile, replay diffs quarterly.
 
+### Subpath integrity pinning
+
+Each `[skills.<name>]` block may carry two optional fields:
+
+```toml
+subpath_sha256 = "<64-char hex>"  # SHA-256 of canonicalized skill subtree
+subpath_size   = <int>            # total byte-size (sanity check only)
+```
+
+**Hash algorithm** (deterministic across darwin/linux): walk all regular files under the skill subpath in lexicographic order; for each file feed `NUL`-terminated relative-path + big-endian uint64 byte-length + raw bytes into SHA-256. Single-file skills (`.md`) use only the basename as the relative path.
+
+**Behavior:**
+- If `subpath_sha256` present: `fulcrum skills upstream` recomputes hash after git checkout and refuses to install on mismatch (`✗ <skill> subpath integrity FAILED — expected … got …`), exits non-zero.
+- If absent: warns (`· <skill> subpath_sha256 not pinned — run with --update-pins to record`) but continues.
+- `--update-pins`: computes missing hashes, writes back to `skills/upstream.lock`. Default is verify-only.
+
+**Updating pins** after a deliberate upstream bump (new `tree_sha`):
+
+```bash
+# Update tree_sha in upstream.lock manually, then:
+fulcrum skills upstream --update-pins
+```
+
+All 20 currently-locked skills have `subpath_sha256` pinned (2026-04-28).
+
 ## 7. Verification
 
 Tiered:
 
 1. **Lint everywhere (CI):** `fulcrum skills lint skills/` validate every authored skill on strictest frontmatter union. Cheap; catch 80% of cross-agent failures.
-2. **Claude trigger-rate eval:** `scripts/eval-skill-claude.sh <skill>` calls `claude --print --output-format=json --no-session-persistence` per query. Auth via Claude Code keychain — no `ANTHROPIC_API_KEY` env var. Eval set at `evals/<skill>.json` (~20 entries, ~12/8 trigger/anti-trigger split). Leaderboard runner at `scripts/eval-all.sh`.
+2. **Claude trigger-rate eval:** `scripts/eval-skill-claude.sh <skill>` calls `claude --print --output-format=json --no-session-persistence` per query. Auth via Claude Code keychain — no `ANTHROPIC_API_KEY` env var. Eval set at `evals/<skill>.json` (~20 entries, ~12/8 trigger/anti-trigger split). Leaderboard runner at `scripts/eval-all.sh --engine claude`.
 3. **Codex trigger-rate eval:** `scripts/eval-skill-codex.sh <skill> --model <codex-model>` calls `codex exec --json --ephemeral` against installed `~/.codex/skills/fulcrum/<skill>`. Use when Codex skill loading or description-budget behavior changes. Keep model explicit in result notes. Long samples can stall; pass `--timeout-seconds N` or set `CODEX_EVAL_TIMEOUT_SECONDS`.
-4. **Manual smoke on other 3:** Gemini run `gemini extensions link <ext>` + `--debug`; OpenCode copy trigger phrase into fresh session; Pi invoke `/skill:<name>` directly. Checklist template at `docs/skill-smoke-test.md`.
+4. **Gemini trigger-rate eval:** `scripts/eval-skill-gemini.sh <skill>` calls `gemini -p "<query>" --output-format json --yolo`. Requires skill at `~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md` and extension linked (`gemini extensions link`). Activation detected by word-boundary grep of stdout+stderr against `evals/<skill>.match-words`. Run via `scripts/eval-all.sh --engine gemini`.
+5. **OpenCode trigger-rate eval:** `scripts/eval-skill-opencode.sh <skill>` calls `opencode run --format json`. Requires skill at `~/.config/opencode/skills/fulcrum/<name>/SKILL.md`. Activation detected by word-boundary grep of JSON event stream against `evals/<skill>.match-words`. Run via `scripts/eval-all.sh --engine opencode`.
+6. **Pi trigger-rate eval:** `scripts/eval-skill-pi.sh <skill>` calls `pi --print --mode json --no-session`. Requires skill at `~/.pi/agent/skills/fulcrum/<name>/SKILL.md`. Activation detected by word-boundary grep of JSON output against `evals/<skill>.match-words`. Run via `scripts/eval-all.sh --engine pi`.
 
-Claude and Codex have scriptable trigger-rate measurement. Gemini/OpenCode/Pi remain smoke-tested until stable JSON event streams exist.
+All five agents have scriptable trigger-rate harnesses sharing the same flag interface, match-words precedence, JSONL output format, and 80/20 pass criteria. Checklist for first-install path verification at `docs/skill-smoke-test.md`.

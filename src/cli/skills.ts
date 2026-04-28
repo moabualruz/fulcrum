@@ -340,15 +340,17 @@ export async function run(args: string[]): Promise<void> {
     case "list":  return cmdList();
     case "upstream": {
       let dryRun = false;
+      let updatePins = false;
       for (const arg of args.slice(1)) {
         if (arg === "--dry-run") dryRun = true;
+        else if (arg === "--update-pins") updatePins = true;
         else {
           console.error(`fulcrum skills upstream: unknown arg '${arg}'`);
           process.exit(2);
         }
       }
       const { syncUpstreamSkills } = await import("./upstream-skills.ts");
-      return syncUpstreamSkills({ dryRun });
+      return syncUpstreamSkills({ dryRun, updatePins });
     }
     default:
       console.error(`fulcrum skills: unknown subcommand '${sub}'`);

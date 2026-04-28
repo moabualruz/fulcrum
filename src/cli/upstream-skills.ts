@@ -4,8 +4,9 @@
 // the listed SKILL.md folders under a separate managed namespace so authored
 // Fulcrum skills (`fulcrum/`) do not mix with vendored packs.
 
+import { createHash } from "node:crypto";
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { AGENTS } from "../agents/registry.ts";
 import { run as runProc } from "../utils/proc.ts";
@@ -24,6 +25,10 @@ export interface UpstreamSkillLockEntry {
   author_class: "tool-vendor" | "foundation" | "individual";
   pinned_on: string;
   review_due: string;
+  /** SHA-256 of the canonicalized skill subtree (see computeSubpathSha256). */
+  subpath_sha256?: string;
+  /** Total byte-size of files included in the subtree hash (sanity check). */
+  subpath_size?: number;
 }
 
 export interface UpstreamSkill extends UpstreamSkillLockEntry {
@@ -108,6 +113,9 @@ function normalizeEntry(name: string, raw: unknown): { skill?: UpstreamSkill; pr
   const pinnedOn = asString(entry["pinned_on"]);
   const reviewDue = asString(entry["review_due"]);
   const kind = asString(entry["kind"]);
+  const subpathSha256 = asString(entry["subpath_sha256"]);
+  const subpathSizeRaw = entry["subpath_size"];
+  const subpathSize = typeof subpathSizeRaw === "number" ? subpathSizeRaw : undefined;
 
   if (!source) problems.push("source is required");
   if (!subpath) problems.push("subpath is required");
@@ -144,6 +152,8 @@ function normalizeEntry(name: string, raw: unknown): { skill?: UpstreamSkill; pr
       pinned_on: pinnedOn,
       review_due: reviewDue,
       kind: resolvedKind,
+      ...(subpathSha256 ? { subpath_sha256: subpathSha256 } : {}),
+      ...(subpathSize !== undefined ? { subpath_size: subpathSize } : {}),
     },
     problems,
   };
@@ -189,6 +199,131 @@ export async function loadUpstreamSkills(lockPath = upstreamLockPath()): Promise
   }
 
   return skills;
+}
+
+// ---------------------------------------------------------------------------
+// Subpath integrity
+// ---------------------------------------------------------------------------
+
+// Walk `dir` and collect all regular files in lexicographic path order.
+async function collectFiles(dir: string, base: string, out: Array<{ rel: string; abs: string }>): Promise<void> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  entries.sort((a, b) => a.name.localeCompare(b.name, "POSIX"));
+  for (const entry of entries) {
+    if (entry.name === ".git" || entry.name === "node_modules") continue;
+    const abs = join(dir, entry.name);
+    const rel = relative(base, abs);
+    if (entry.isDirectory()) {
+      await collectFiles(abs, base, out);
+    } else if (entry.isFile()) {
+      out.push({ rel, abs });
+    }
+  }
+}
+
+/**
+ * Compute a SHA-256 over the canonicalized skill subtree.
+ *
+ * Algorithm (deterministic across darwin/linux):
+ *   For each file in lexicographic relative-path order:
+ *     1. Feed NUL-terminated UTF-8 relative path.
+ *     2. Feed big-endian uint64 of file byte-length.
+ *     3. Feed raw file bytes.
+ *
+ * For a single-file skill (kind === "file"), skillPath points directly to the
+ * .md file.  Only that file is included, using its basename as the relative path.
+ *
+ * Returns { sha256: hex, size: total-bytes }.
+ */
+export async function computeSubpathSha256(
+  skillPath: string,
+  kind: "dir" | "file",
+): Promise<{ sha256: string; size: number }> {
+  const hash = createHash("sha256");
+  let totalSize = 0;
+
+  if (kind === "file") {
+    const basename = skillPath.split("/").pop() ?? "SKILL.md";
+    const bytes = await readFile(skillPath);
+    const lenBuf = Buffer.allocUnsafe(8);
+    lenBuf.writeBigUInt64BE(BigInt(bytes.length));
+    hash.update(basename + "\0");
+    hash.update(lenBuf);
+    hash.update(bytes);
+    totalSize += bytes.length;
+  } else {
+    const files: Array<{ rel: string; abs: string }> = [];
+    await collectFiles(skillPath, skillPath, files);
+    for (const { rel, abs } of files) {
+      const bytes = await readFile(abs);
+      const lenBuf = Buffer.allocUnsafe(8);
+      lenBuf.writeBigUInt64BE(BigInt(bytes.length));
+      hash.update(rel + "\0");
+      hash.update(lenBuf);
+      hash.update(bytes);
+      totalSize += bytes.length;
+    }
+  }
+
+  return { sha256: hash.digest("hex"), size: totalSize };
+}
+
+/**
+ * Serialize the skills table back to TOML, preserving header comments.
+ * We write the lockfile by direct string construction — smol-toml has no
+ * serializer.  The format mirrors what was already in the file.
+ */
+async function writeLockfileWithPins(
+  lockPath: string,
+  _skills: readonly UpstreamSkill[],
+  pins: Map<string, { sha256: string; size: number }>,
+): Promise<void> {
+  const raw = await readFile(lockPath, "utf8");
+  const lines = raw.split("\n");
+  const result: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i] ?? "";
+    // Detect a skill header like [skills.foo-bar]
+    const headerMatch = line.match(/^\[skills\.([^\]]+)\]$/);
+    if (headerMatch) {
+      const skillName = headerMatch[1] ?? "";
+      // Collect the block lines (until next [ header or EOF), stripping old pins.
+      const blockLines: string[] = [line];
+      i++;
+      while (i < lines.length) {
+        const bl = lines[i] ?? "";
+        if (bl.startsWith("[")) break;
+        // Drop existing subpath_sha256 / subpath_size lines so we can rewrite.
+        if (!bl.match(/^subpath_sha256\s*=/) && !bl.match(/^subpath_size\s*=/)) {
+          blockLines.push(bl);
+        }
+        i++;
+      }
+      // Trim trailing blank lines from block.
+      while (blockLines.length > 1 && (blockLines[blockLines.length - 1] ?? "").trim() === "") {
+        blockLines.pop();
+      }
+      // Append new pin fields if we have them.
+      const pin = pins.get(skillName);
+      if (pin) {
+        blockLines.push(`subpath_sha256 = "${pin.sha256}"`);
+        blockLines.push(`subpath_size = ${pin.size}`);
+      }
+      blockLines.push("");
+      result.push(...blockLines);
+      continue;
+    }
+    result.push(line);
+    i++;
+  }
+
+  // Ensure single trailing newline.
+  while (result.length > 0 && (result[result.length - 1] ?? "").trim() === "") result.pop();
+  result.push("");
+
+  await writeFile(lockPath, result.join("\n"), "utf8");
 }
 
 async function copyTree(src: string, dst: string, dryRun: boolean): Promise<void> {
@@ -266,10 +401,18 @@ function agentTargets(home: string): Array<{ label: string; baseRoot: string; sk
   return out;
 }
 
-export async function syncUpstreamSkills(opts: { dryRun?: boolean; skills?: readonly UpstreamSkill[]; lockPath?: string } = {}): Promise<void> {
+export async function syncUpstreamSkills(
+  opts: {
+    dryRun?: boolean;
+    updatePins?: boolean;
+    skills?: readonly UpstreamSkill[];
+    lockPath?: string;
+  } = {},
+): Promise<void> {
   const dryRun = opts.dryRun ?? false;
+  const updatePins = opts.updatePins ?? false;
   const lockPath = opts.lockPath ?? upstreamLockPath();
-  const skills = opts.skills ?? await loadUpstreamSkills(lockPath);
+  const skills = opts.skills ?? (await loadUpstreamSkills(lockPath));
   const home = homeDir();
 
   console.log(`fulcrum upstream skills sync — ${skills.length} curated skill(s)\n`);
@@ -282,6 +425,59 @@ export async function syncUpstreamSkills(opts: { dryRun?: boolean; skills?: read
   }
   console.log();
 
+  // Phase 1: verify (or compute) subpath integrity for each skill.
+  // We do this before any file copies so a tampered skill fails fast.
+  let integrityFailed = false;
+  const newPins = new Map<string, { sha256: string; size: number }>();
+
+  if (!dryRun) {
+    for (const skill of skills) {
+      const repoDir = repoDirs.get(skill.source);
+      if (!repoDir) continue;
+      const src = `${repoDir}/${skill.subpath}`;
+      const srcExists = skill.kind === "file" ? await exists(src) : await isDir(src);
+      if (!srcExists) continue;
+
+      let computed: { sha256: string; size: number };
+      try {
+        computed = await computeSubpathSha256(src, skill.kind);
+      } catch {
+        console.log(`  ✗ ${skill.name} subpath hash computation failed — skip`);
+        integrityFailed = true;
+        continue;
+      }
+
+      if (skill.subpath_sha256) {
+        if (computed.sha256 !== skill.subpath_sha256) {
+          console.log(
+            `  ✗ ${skill.name} subpath integrity FAILED — expected ${skill.subpath_sha256}, got ${computed.sha256}`,
+          );
+          integrityFailed = true;
+        } else {
+          console.log(`  ✓ ${skill.name} subpath integrity ok`);
+        }
+      } else if (updatePins) {
+        console.log(`  · ${skill.name} subpath_sha256 not pinned — computing`);
+        newPins.set(skill.name, computed);
+      } else {
+        console.log(`  · ${skill.name} subpath_sha256 not pinned — run with --update-pins to record`);
+      }
+    }
+    console.log();
+  }
+
+  if (integrityFailed) {
+    console.error("Upstream skill subpath integrity check failed. Aborting install.");
+    process.exit(1);
+  }
+
+  // Phase 2: write updated pins back to lockfile if requested.
+  if (!dryRun && newPins.size > 0) {
+    await writeLockfileWithPins(lockPath, skills, newPins);
+    console.log(`  Wrote ${newPins.size} new subpath pin(s) to ${lockPath}\n`);
+  }
+
+  // Phase 3: copy skills to each agent target.
   for (const target of agentTargets(home)) {
     if (!target.extensionRoot && !(await isDir(target.baseRoot))) {
       console.log(`· skip ${target.label} (agent skills parent not present)`);
@@ -296,7 +492,11 @@ export async function syncUpstreamSkills(opts: { dryRun?: boolean; skills?: read
           await mkdir(target.skillsRoot, { recursive: true });
           await writeFile(
             `${target.extensionRoot}/gemini-extension.json`,
-            JSON.stringify({ name: `${UPSTREAM_NAMESPACE}-skills`, version: "0.1.0", description: "Curated upstream skills managed by Fulcrum." }, null, 2) + "\n",
+            JSON.stringify(
+              { name: `${UPSTREAM_NAMESPACE}-skills`, version: "0.1.0", description: "Curated upstream skills managed by Fulcrum." },
+              null,
+              2,
+            ) + "\n",
           );
         }
       } else {

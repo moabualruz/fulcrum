@@ -11,7 +11,9 @@ Usage:
   fulcrum hooks list                 List available hook recipes.
   fulcrum hooks enable <name>        Register a hook in each detected agent config.
   fulcrum skills sync                Mirror skills/<name>/ to every agent's skills path.
-  fulcrum skills upstream            Mirror curated third-party skills to agents.
+  fulcrum skills upstream [--update-pins]
+                                     Mirror curated third-party skills to agents; --update-pins
+                                     computes and writes subpath_sha256 for unpinned entries.
   fulcrum skills lint <path>         Validate a SKILL.md (frontmatter + required body sections).
   fulcrum skills list                Enumerate authored skills with eval coverage.
   fulcrum install [--with-project DIR] [--no-skills] [--no-upstream-skills]

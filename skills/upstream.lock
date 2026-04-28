@@ -19,6 +19,8 @@ license = "MIT"
 author_class = "individual"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "8103debc96d4c1347e036b3ce0eb3d6ef8c6b2e4ebaae99ac9461b12f4443fcf"
+subpath_size = 51977
 
 [skills.superpowers-writing-plans]
 source = "https://github.com/obra/superpowers"
@@ -29,6 +31,8 @@ license = "MIT"
 author_class = "individual"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "0723be302b5e404201205e99c40547ce71c8130a548d4d670cf227824e330b75"
+subpath_size = 7760
 
 [skills.superpowers-systematic-debugging]
 source = "https://github.com/obra/superpowers"
@@ -39,6 +43,8 @@ license = "MIT"
 author_class = "individual"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "5c14d3d513a00189303ccf1b22940d1c00c442edb28e3dd5bd4bd68feb1f70a2"
+subpath_size = 40755
 
 [skills.superpowers-requesting-code-review]
 source = "https://github.com/obra/superpowers"
@@ -49,6 +55,8 @@ license = "MIT"
 author_class = "individual"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "8f34e04ff487239b65978caac4aaadefabb1cbb890617dfff69df8c25c592d3f"
+subpath_size = 6320
 
 [skills.superpowers-using-git-worktrees]
 source = "https://github.com/obra/superpowers"
@@ -59,6 +67,8 @@ license = "MIT"
 author_class = "individual"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "9b717396e4e825cf0c4a32013fabe3cef4587590c1609f0e863751ec604c689e"
+subpath_size = 5635
 
 [skills.superpowers-using-superpowers]
 source = "https://github.com/obra/superpowers"
@@ -69,6 +79,8 @@ license = "MIT"
 author_class = "individual"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "3a5f6280134c8258e2746d6c6254b82d8a37ea5df05d1c23a0654e22e7b8e6bc"
+subpath_size = 13178
 
 [skills.ast-grep]
 source = "https://github.com/ast-grep/agent-skill"
@@ -79,6 +91,8 @@ license = "MIT"
 author_class = "tool-vendor"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "1e79c1ceffc242adc0d477d8625ed0c91999f18efe1bc54deec09f59bb250555"
+subpath_size = 20131
 
 [skills.tavily-best-practices]
 source = "https://github.com/tavily-ai/skills"
@@ -89,6 +103,8 @@ license = "MIT"
 author_class = "tool-vendor"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "5769e651fa1b40610ac884d4154d825d30e7cc310c379f9ca17170ce3772067b"
+subpath_size = 70473
 
 [skills.tavily-cli]
 source = "https://github.com/tavily-ai/skills"
@@ -99,6 +115,8 @@ license = "MIT"
 author_class = "tool-vendor"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "b907b6b1e1533976a2288d568655a4fc6816e299a10e46a35bb17c00b966d2be"
+subpath_size = 3266
 
 [skills.tavily-crawl]
 source = "https://github.com/tavily-ai/skills"
@@ -109,6 +127,8 @@ license = "MIT"
 author_class = "tool-vendor"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "ab79180359cf7e2c9f1701ae26b33aa07f614432abed4b08b1da762ea69fc745"
+subpath_size = 3982
 
 [skills.tavily-extract]
 source = "https://github.com/tavily-ai/skills"
@@ -119,6 +139,8 @@ license = "MIT"
 author_class = "tool-vendor"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "b582efd6fbe40aa9860518c20f7e29a459ae3b24903224e1f97ca04cd5485f74"
+subpath_size = 2903
 
 [skills.tavily-map]
 source = "https://github.com/tavily-ai/skills"
@@ -129,6 +151,8 @@ license = "MIT"
 author_class = "tool-vendor"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "39b1ad46942a1db8f244d5afb6932d6511a00b534e8e409bf2ecdcf16be5a650"
+subpath_size = 3186
 
 [skills.tavily-research]
 source = "https://github.com/tavily-ai/skills"
@@ -139,6 +163,8 @@ license = "MIT"
 author_class = "tool-vendor"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "d8a40924f1f27266edbd0fccefb318b64a325b31987e908ee7ca1ab45da3c25c"
+subpath_size = 3570
 
 [skills.tavily-search]
 source = "https://github.com/tavily-ai/skills"
@@ -149,6 +175,8 @@ license = "MIT"
 author_class = "tool-vendor"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "569883ce168b144cf3ad6a4d4e3949a99ad257b94e7bfab9584c4628a0e02480"
+subpath_size = 3585
 
 [skills.playwright-cli]
 source = "https://github.com/microsoft/playwright-cli"
@@ -159,6 +187,8 @@ license = "Apache-2.0"
 author_class = "tool-vendor"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "f774a0c461438a05eb983ea9b0b39ead02c41ea6dde8e4d03b2793e20500dd6c"
+subpath_size = 45241
 
 [skills.semgrep]
 source = "https://github.com/semgrep/skills"
@@ -169,6 +199,8 @@ license = "MIT"
 author_class = "tool-vendor"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "9e4f3396acc610e11c002b96a0f22436c21c93d69ae14bde8c75217349a2abbd"
+subpath_size = 29098
 
 [skills.semgrep-code-security]
 source = "https://github.com/semgrep/skills"
@@ -179,6 +211,8 @@ license = "MIT"
 author_class = "tool-vendor"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "b73204b15e29f1c055b4dde589ab4faa7da9dc9731758705977c708e8ec5326f"
+subpath_size = 267524
 
 [skills.semgrep-llm-security]
 source = "https://github.com/semgrep/skills"
@@ -189,6 +223,8 @@ license = "MIT"
 author_class = "tool-vendor"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "9675265687e1bedc9924bb57687cf409c6de76ac4e1ae98caf353ef730b07325"
+subpath_size = 226075
 
 [skills.graphify]
 source = "https://github.com/safishamsi/graphify"
@@ -199,6 +235,8 @@ license = "MIT"
 author_class = "individual"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "65b5d6f8e29b600afae8c4eb2a10b467195702b0982bd4a4a484d6666c20d389"
+subpath_size = 60766
 
 [skills.ctx7]
 source = "https://github.com/edxeth/superlight-context7-skill"
@@ -209,3 +247,5 @@ license = "MIT"
 author_class = "individual"
 pinned_on = "2026-04-28"
 review_due = "2026-07-27"
+subpath_sha256 = "741b053ce2ba4b405767d8a7a07997d992a59e24db5474ff9d16535a4f211db6"
+subpath_size = 1995
