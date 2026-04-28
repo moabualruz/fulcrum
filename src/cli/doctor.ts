@@ -1,10 +1,11 @@
 // fulcrum doctor — environment health check.
 // Reports: bun version, agent dirs detected, tool presence (which hooks fail-open),
-// policy file location + size, skill count.
+// policy file location + size, skill count, managed MCPs.
 
 import { stat, readdir } from "node:fs/promises";
 import { which, exists } from "../utils/proc.ts";
 import { AGENTS } from "../agents/registry.ts";
+import { loadRegistry, ALL_AGENT_IDS, isEnabled, type AgentId } from "./mcp-registry.ts";
 
 interface ToolCheck {
   cmd: string;
@@ -46,6 +47,17 @@ interface DoctorReport {
   piMcpAdapter: {
     adapterPresent: boolean;
     deepwikiPresent: boolean;
+  };
+  mcp: {
+    servers: Array<{
+      name: string;
+      transport: "http" | "stdio";
+      vendor: string;
+      default_enabled: boolean;
+      agent_state: Record<string, "enabled" | "disabled">;
+      auth_status: "ok" | "missing-env" | "n/a";
+      reachable: boolean | null;
+    }>;
   };
   skillsCount: number;
   warnings: number;
@@ -155,7 +167,8 @@ async function countSkills(): Promise<number> {
   if (!(await exists(root))) return 0;
   let n = 0;
   for (const entry of await readdir(root, { withFileTypes: true })) {
-    if (!entry.isDirectory() || entry.name === "_template") continue;
+    // Skip system dirs: _template (template) and _archive (deprecated).
+    if (!entry.isDirectory() || entry.name === "_template" || entry.name === "_archive") continue;
     if (await exists(`${root}/${entry.name}/SKILL.md`)) n++;
   }
   return n;
@@ -308,6 +321,54 @@ async function buildReport(): Promise<{ report: DoctorReport; errors: number }> 
   // Skills
   const skillsCount = await countSkills();
 
+  // Managed MCPs
+  const mcpReport: DoctorReport["mcp"] = { servers: [] };
+  try {
+    const reg = await loadRegistry();
+    for (const server of Object.values(reg.servers)) {
+      // Auth status
+      let authStatus: "ok" | "missing-env" | "n/a" = "n/a";
+      if (server.auth_env_vars.length > 0) {
+        const allPresent = server.auth_env_vars.every((v) => !!process.env[v]);
+        authStatus = allPresent ? "ok" : "missing-env";
+      }
+
+      // Reachability (HEAD probe for HTTP servers; which check for stdio)
+      let reachable: boolean | null = null;
+      if (server.transport === "http" && server.url) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 3000);
+          const res = await fetch(server.url, { method: "HEAD", signal: ctrl.signal });
+          clearTimeout(timer);
+          reachable = res.ok || res.status < 500;
+        } catch {
+          reachable = false;
+        }
+      } else if (server.transport === "stdio" && server.command) {
+        const cmd = server.command.split(/\s+/)[0] ?? "";
+        reachable = cmd === "npx" ? true : !!(await which(cmd));
+      }
+
+      const agentState: Record<string, "enabled" | "disabled"> = {};
+      for (const id of ALL_AGENT_IDS) {
+        agentState[id] = isEnabled(server, id) ? "enabled" : "disabled";
+      }
+
+      mcpReport.servers.push({
+        name: server.name,
+        transport: server.transport,
+        vendor: server.vendor,
+        default_enabled: server.default_enabled,
+        agent_state: agentState,
+        auth_status: authStatus,
+        reachable,
+      });
+    }
+  } catch {
+    // Registry not yet initialised — no entries to report
+  }
+
   // Verdict
   const verdict: "ok" | "warning" | "error" =
     errors > 0 ? "error" : warnings > 0 ? "warning" : "ok";
@@ -328,6 +389,7 @@ async function buildReport(): Promise<{ report: DoctorReport; errors: number }> 
       adapterPresent: piAdapterPresent,
       deepwikiPresent: piDeepwikiPresent,
     },
+    mcp: mcpReport,
     skillsCount,
     warnings,
     errors,
@@ -396,6 +458,22 @@ function printHumanFormat(report: DoctorReport, home: string): void {
     `Skills authored: ${report.skillsCount} (in ${repoRoot()}/skills/)`
   );
   console.log();
+
+  // Managed MCPs
+  if (report.mcp.servers.length > 0) {
+    console.log("Managed MCPs:");
+    for (const s of report.mcp.servers) {
+      const enabledOn = Object.entries(s.agent_state)
+        .filter(([, v]) => v === "enabled")
+        .map(([k]) => k);
+      const enabledStr = enabledOn.length ? enabledOn.join(", ") : "none";
+      const authStr = s.auth_status === "ok" ? "auth:ok" : s.auth_status === "missing-env" ? "auth:missing-env" : "";
+      const reachStr = s.reachable === null ? "" : s.reachable ? "reachable" : "unreachable";
+      const notes = [authStr, reachStr].filter(Boolean).join("  ");
+      console.log(`  ${pad(s.name, 16)}  ${s.transport}  enabled-on:[${enabledStr}]${notes ? "  " + notes : ""}`);
+    }
+    console.log();
+  }
 
   // Pi MCP adapter
   {

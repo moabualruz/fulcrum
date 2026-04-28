@@ -167,3 +167,88 @@ describe("doctor --json caveman section", () => {
     expect(byLabel.get("Pi CLI")).toBe(false);
   });
 });
+
+describe("doctor --json mcp section", () => {
+  test("mcp section present and empty when no registry", async () => {
+    const home = join(TMP, "mcp-no-registry");
+    await mkdir(home, { recursive: true });
+    const report = await runDoctor(home);
+    const mcp = report["mcp"] as Record<string, unknown>;
+    expect(mcp).toBeDefined();
+    expect(Array.isArray(mcp["servers"])).toBe(true);
+    expect((mcp["servers"] as unknown[]).length).toBe(0);
+  });
+
+  test("mcp section lists registered servers", async () => {
+    const home = join(TMP, "mcp-with-registry");
+    await mkdir(home, { recursive: true });
+    // Pre-write a minimal mcp-registry.toml.
+    const fulcrumHome = join(home, ".fulcrum");
+    const stateDir = join(fulcrumHome, "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    const toml = `schema_version = 1
+
+[servers.github]
+transport = "http"
+url = "https://api.githubcopilot.com/mcp/"
+description = "GitHub MCP"
+vendor = "github"
+default_enabled = false
+auth_env_vars = ["GITHUB_TOKEN"]
+
+[servers.github.agent_visibility]
+"claude-code" = true
+"codex" = true
+"gemini" = true
+"opencode" = true
+"pi" = true
+`;
+    await import("node:fs/promises").then((fs) =>
+      fs.writeFile(join(stateDir, "mcp-registry.toml"), toml)
+    );
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const mcp = report["mcp"] as Record<string, unknown>;
+    const servers = mcp["servers"] as Array<Record<string, unknown>>;
+    expect(servers.length).toBeGreaterThan(0);
+    const github = servers.find((s) => s["name"] === "github");
+    expect(github).toBeDefined();
+    expect(github!["transport"]).toBe("http");
+    expect(github!["vendor"]).toBe("github");
+    expect(github!["default_enabled"]).toBe(false);
+    expect(github!["agent_state"]).toBeDefined();
+  });
+
+  test("auth_status missing-env when GITHUB_TOKEN not set", async () => {
+    const home = join(TMP, "mcp-missing-env");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const stateDir = join(fulcrumHome, "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    const toml = `schema_version = 1
+
+[servers.github]
+transport = "http"
+url = "https://api.githubcopilot.com/mcp/"
+description = "GitHub MCP"
+vendor = "github"
+default_enabled = false
+auth_env_vars = ["GITHUB_TOKEN"]
+
+[servers.github.agent_visibility]
+"claude-code" = true
+"codex" = true
+"gemini" = true
+"opencode" = true
+"pi" = true
+`;
+    await import("node:fs/promises").then((fs) =>
+      fs.writeFile(join(stateDir, "mcp-registry.toml"), toml)
+    );
+    // Explicitly unset GITHUB_TOKEN.
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome, GITHUB_TOKEN: undefined });
+    const mcp = report["mcp"] as Record<string, unknown>;
+    const servers = mcp["servers"] as Array<Record<string, unknown>>;
+    const github = servers.find((s) => s["name"] === "github");
+    expect(github!["auth_status"]).toBe("missing-env");
+  });
+});
