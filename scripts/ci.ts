@@ -4,7 +4,7 @@
 
 import { spawn } from "node:child_process";
 
-interface Step { name: string; cmd: string[]; }
+interface Step { name: string; cmd: string[]; soft?: boolean; }
 
 const STEPS: Step[] = [
   { name: "install",     cmd: ["bun", "install", "--frozen-lockfile"] },
@@ -12,29 +12,65 @@ const STEPS: Step[] = [
   { name: "test",        cmd: ["bun", "test"] },
   { name: "build:all",   cmd: ["bun", "run", "scripts/build-all.ts"] },
   { name: "skills:lint", cmd: ["bun", "run", "src/index.ts", "skills", "lint", "skills/"] },
+  { name: "compress:check", cmd: ["bash", "scripts/compress-with-caveman.sh", "--check"], soft: true },
 ];
 
-function run(step: Step): Promise<{ ok: boolean; ms: number }> {
+interface Result { step: string; ok: boolean; soft?: boolean; skipped?: boolean; pending?: number; ms: number; }
+
+function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string }> {
   return new Promise((resolve) => {
     const t0 = Date.now();
-    const proc = spawn(step.cmd[0]!, step.cmd.slice(1), { stdio: "inherit" });
-    proc.on("exit", (code) => resolve({ ok: code === 0, ms: Date.now() - t0 }));
+    let stderr = "";
+    const proc = spawn(step.cmd[0]!, step.cmd.slice(1), { stdio: "pipe" });
+
+    if (proc.stdout) proc.stdout.on("data", (d) => process.stdout.write(d));
+    if (proc.stderr) proc.stderr.on("data", (d) => {
+      stderr += d.toString();
+      process.stderr.write(d);
+    });
+
+    proc.on("exit", (code) => resolve({ ok: code === 0, ms: Date.now() - t0, stderr }));
   });
 }
 
-const results: Array<{ step: string; ok: boolean; ms: number }> = [];
+const results: Array<Result> = [];
 let failed = false;
 
 for (const step of STEPS) {
   console.log(`\n━━━ ${step.name} ━━━ ${step.cmd.join(" ")}`);
   const r = await run(step);
-  results.push({ step: step.name, ok: r.ok, ms: r.ms });
-  if (!r.ok) { failed = true; break; }
+
+  if (step.soft && !r.ok) {
+    // Soft-fail: check if it's caveman not installed
+    if (r.stderr?.includes("Caveman not installed")) {
+      results.push({ step: step.name, ok: true, soft: true, skipped: true, ms: r.ms });
+    } else {
+      // Parse pending count from stdout
+      const output = r.stderr || "";
+      const pendingMatch = output.match(/PENDING/g);
+      const pendingCount = pendingMatch ? pendingMatch.length : 0;
+      results.push({ step: step.name, ok: false, soft: true, pending: pendingCount, ms: r.ms });
+      console.log(`\n⚠ ${step.name}: ${pendingCount} file(s) pending compression. Run: bun run compress`);
+    }
+  } else {
+    results.push({ step: step.name, ok: r.ok, soft: step.soft, ms: r.ms });
+    if (!r.ok && !step.soft) { failed = true; break; }
+  }
 }
 
 console.log("\n━━━ summary ━━━");
 for (const r of results) {
-  const tag = r.ok ? "✓" : "✗";
-  console.log(`  ${tag} ${r.step.padEnd(12)} ${(r.ms / 1000).toFixed(1)}s`);
+  let tag = r.ok ? "✓" : "✗";
+  let suffix = "";
+
+  if (r.soft && r.skipped) {
+    tag = "·";
+    suffix = " (skipped)";
+  } else if (r.soft && r.pending !== undefined && r.pending > 0) {
+    tag = "⚠";
+    suffix = ` (${r.pending} pending)`;
+  }
+
+  console.log(`  ${tag} ${r.step.padEnd(12)} ${(r.ms / 1000).toFixed(1)}s${suffix}`);
 }
 process.exit(failed ? 1 : 0);
