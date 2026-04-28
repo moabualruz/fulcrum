@@ -204,12 +204,12 @@ The migration ships in three waves. Each wave is a separate branch off `main` (p
 
 | # | Item | Source | Action |
 |---|---|---|---|
-| W1.1 | caveman Claude uninstall — call `claude plugin uninstall caveman@caveman` | upstream README | extend `removeCavemanCopies` in `src/cli/uninstall.ts` |
-| W1.2 | caveman Gemini uninstall — call `gemini extensions uninstall caveman` | upstream README | same file |
-| W1.3 | caveman Codex/OpenCode/Pi install — switch from clone+copy to `npx skills add JuliusBrussee/caveman -a <agent>` | upstream README "Install for any agent" | rewrite `installCaveman` non-Claude/non-Gemini branches in `src/cli/install.ts` |
-| W1.4 | caveman Codex/OpenCode/Pi uninstall — `npx skills remove caveman` | upstream README | extend `removeCavemanCopies` |
-| W1.5 | Wrangler skill — pin `cloudflare/skills` subpath `skills/wrangler/SKILL.md` in `skills/upstream.lock` (subpath_sha256 + subpath_size); sync to all 5 agents under `fulcrum-upstream/wrangler/` | `cloudflare/skills` | add lockfile entry + run `fulcrum skills upstream --update-pins` |
-| W1.6 | ast-grep Claude path — switch from clone+copy to `claude plugin install ast-grep@ast-grep/agent-skill` for Claude Code only; other 4 agents keep upstream-skill copy as today | `ast-grep/agent-skill` | special-case in upstream-skills.ts when `kind: "claude-plugin"` is set in lock |
+| W1.1 | DONE — `claude plugin uninstall caveman@caveman` called in `removeCavemanCopies` when `.claude` exists + `claude` on PATH; best-effort log+continue | upstream README | `src/cli/uninstall.ts:removeCavemanCopies` |
+| W1.2 | DONE — `gemini extensions uninstall caveman` called in `removeCavemanCopies` when `.gemini` exists + `gemini` on PATH; best-effort | upstream README | `src/cli/uninstall.ts:removeCavemanCopies` |
+| W1.3 | DONE — Codex/OpenCode/Pi use `npx skills add JuliusBrussee/caveman -a <agent>` as canonical path; clone+copy fallback when npx absent; idempotency via caveman dir check | upstream README | `src/cli/install.ts:installCaveman` (npxAgentDefs loop) |
+| W1.4 | DONE — `npx skills remove caveman --yes` called per detected Codex/OpenCode/Pi agent; `removePath` fs fallback when npx absent | upstream README | `src/cli/uninstall.ts:removeCavemanCopies` |
+| W1.5 | DONE — `[skills.wrangler]` entry added to `skills/upstream.lock` (source=cloudflare/skills, Apache-2.0, tree_sha=7c449def, subpath_sha256+subpath_size computed via --update-pins) | `cloudflare/skills` | `skills/upstream.lock` |
+| W1.6 | DONE — `claude_plugin` optional sub-table added to `[skills.ast-grep]` in `skills/upstream.lock`; `UpstreamSkillLockEntry.claude_plugin` interface field added; `syncUpstreamSkills` special-cases Claude Code: calls `claude plugin marketplace add` + `claude plugin install` when `claude_plugin` set; other 4 agents keep file-copy; uninstall in `removeSkillNamespaces` calls `claude plugin uninstall <name>` for each entry with `claude_plugin` | `ast-grep/agent-skill` | `src/cli/upstream-skills.ts:syncUpstreamSkills`, `skills/upstream.lock` |
 
 Doctor must report Wave-1 invariants: caveman uninstall leaves zero registry entries on Claude/Gemini; `fulcrum doctor --json caveman.agents[*].installed` reflects post-uninstall reality.
 

@@ -10,13 +10,27 @@ Five agents, five paths. Never `~/.agents/` (shared folder pollutes every agent 
 
 | Agent | Install path | Command / method |
 |---|---|---|
-| Claude Code | Plugin system | `claude plugin install caveman@caveman` (fulcrum install runs this) |
+| Claude Code | Plugin system | `claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman` (fulcrum install runs this) |
 | Gemini CLI | Extension system | `gemini extensions install https://github.com/JuliusBrussee/caveman` (fulcrum install runs this) |
-| Codex CLI | `~/.codex/skills/caveman/` + siblings | Clone once, copy 5 skills to `~/.codex/skills/` (fulcrum install does this) |
-| OpenCode | `~/.config/opencode/skills/caveman/` + siblings | Clone once, copy 5 skills to `~/.config/opencode/skills/` (fulcrum install does this) |
-| Pi CLI | `~/.pi/agent/skills/caveman/` + siblings | Clone once, copy 5 skills to `~/.pi/agent/skills/` (fulcrum install does this) |
+| Codex CLI | `~/.codex/skills/caveman/` + siblings | `npx skills add JuliusBrussee/caveman -a codex` (canonical); clone+copy fallback when npx absent |
+| OpenCode | `~/.config/opencode/skills/caveman/` + siblings | `npx skills add JuliusBrussee/caveman -a opencode` (canonical); clone+copy fallback when npx absent |
+| Pi CLI | `~/.pi/agent/skills/caveman/` + siblings | `npx skills add JuliusBrussee/caveman -a pi` (canonical); clone+copy fallback when npx absent |
 
 Five caveman skills: `caveman`, `caveman-commit`, `caveman-help`, `caveman-review`, `compress`. `compress` skill compresses markdown in-place (see "Compression of in-repo content").
+
+## Uninstall
+
+`fulcrum uninstall --include-caveman` calls the canonical vendor uninstall command per detected agent, then removes any remaining filesystem copies.
+
+| Agent | Uninstall command |
+|---|---|
+| Claude Code | `claude plugin uninstall caveman@caveman` (best-effort; log + continue on error) |
+| Gemini CLI | `gemini extensions uninstall caveman` (best-effort) |
+| Codex CLI | `npx skills remove caveman --yes`; fallback to `rm -rf ~/.codex/skills/caveman` |
+| OpenCode | `npx skills remove caveman --yes`; fallback to `rm -rf ~/.config/opencode/skills/caveman` |
+| Pi CLI | `npx skills remove caveman --yes`; fallback to `rm -rf ~/.pi/agent/skills/caveman` |
+
+Always removes `~/.config/caveman/config.json` (the defaultMode lock).
 
 ## Default mode lock
 
