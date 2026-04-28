@@ -21,7 +21,7 @@ Shipped on `feat/agent-foundation-clean`:
 - `src/agents/registry.ts` — canonical `Agent` interface + `AGENTS[5]` array; single source of truth consumed by install, doctor, skills. No more inline agent configs scattered across files.
 - `fulcrum install --dry-run` support; `fulcrum doctor --json` for machine-readable health output.
 - `bun run compress` (`src/cli/compress.ts`) — idempotent caveman compression of in-repo content; `--check` for CI.
-- Local CI runner (`bun run ci`) — 6 stages: install / typecheck / test (115 tests) / build:all / skills:lint / compress:check (soft gate). Local release runner (`bun run release vX.Y.Z`). `fulcrum doctor` shows caveman `defaultMode`. Skills lint enforces rules ≤ 200 lines. CHANGELOG via `git-cliff`.
+- Local CI runner (`bun run ci`) — 6 stages: install / typecheck / test (150 tests) / build:all / skills:lint / compress:check (hard gate). Local release runner (`bun run release vX.Y.Z`). `fulcrum doctor` shows caveman `defaultMode` and per-agent install state. Skills lint enforces rules ≤ 200 lines. CHANGELOG via `git-cliff`.
 
 ## Where we are going (placeholders, not implementations)
 

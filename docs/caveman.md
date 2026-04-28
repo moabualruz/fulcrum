@@ -66,12 +66,12 @@ YAML frontmatter (incl. `description:`) preserved verbatim. Intentional: skill `
 
 Example:
 ```
-Claude Code caveman:      ✓ installed
-Codex CLI caveman:        · skipped (not detected)
-Gemini CLI caveman:       ✓ installed
-OpenCode caveman:         ✓ installed
-Pi CLI caveman:           · skipped (not detected)
-Caveman defaultMode:      ultra (from ~/.config/caveman/config.json)
+Caveman defaultMode: ultra  [file (/Users/<you>/.config/caveman/config.json)]
+  Claude Code    ✓  installed
+  Codex CLI      ·  not installed
+  Gemini CLI     ✓  installed
+  OpenCode       ✓  installed
+  Pi CLI         ·  not installed
 ```
 
 ## Adding a new skill

@@ -16,7 +16,7 @@ That is the destination. This branch (`feat/agent-foundation-clean`) is the foun
 | **Capabilities** | Bring-your-own CLI tools, verified by `fulcrum doctor` | `docs/capabilities.md`, `fulcrum doctor` |
 | **Output policy** | Per-tool output strategy (raw / status / summary / file) driving `tool-output-router` | `config/tool-output-policy.toml` |
 | **Managed MCPs** | DeepWiki plus context-mode routing/session-continuity integration across supported agents | `docs/mcp.md`, `src/cli/context-mode.ts` |
-| **Orchestration** | One Bun-compiled cross-platform binary (`init`, `install`, `hooks`, `skills`, `doctor`, `hook`) | `src/`, `dist/fulcrum-<plat>` |
+| **Orchestration** | One Bun-compiled cross-platform binary (`init`, `install`, `uninstall`, `hooks`, `skills`, `doctor`, `compress`, `hook`) | `src/`, `dist/fulcrum-<plat>` |
 | **Cross-agent reach** | Same setup wired into Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI | `docs/agents.md`, `shims/` |
 
 The orchestrator and all hook recipes are TypeScript subcommands of one Bun-compiled binary (60–120MB per platform; cross-compiled via `bun build --compile`). No bash, jq, yq, or Python required at runtime.

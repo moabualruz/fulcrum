@@ -26,7 +26,7 @@ Currently only mechanism that drops tokens without removing connectors from acco
 
 ### 3.1 DeepWiki
 
-`deepwiki` has no CLI or REST alternative; free, no auth, no documented rate limits. `fulcrum install` registers it for detected Codex, Gemini, OpenCode, and Claude Code when the native `claude` command is available. Pi can use DeepWiki through `pi-mcp-adapter`, but Fulcrum does not manage that adapter yet.
+`deepwiki` has no CLI or REST alternative; free, no auth, no documented rate limits. `fulcrum install` registers it for detected Codex, Gemini, OpenCode, Pi, and Claude Code when the native `claude` command is available. Pi registration goes through `pi-mcp-adapter`, which `fulcrum install` installs and configures automatically when `~/.pi/agent` is detected (see §3.3).
 
 ```bash
 claude mcp add -s user deepwiki --transport http https://mcp.deepwiki.com/mcp
@@ -78,10 +78,12 @@ Default adapter behavior exposes a proxy-style `mcp(...)` tool. `fulcrum hook to
 
 ## Cross-agent
 
-Per-agent MCP config syntax differs:
-- Codex: `~/.codex/config.toml`
-- Gemini: `~/.gemini/settings.json` (use `httpUrl`, hyphens not underscores)
-- OpenCode: `~/.config/opencode/opencode.json` (`type: remote`)
+Per-agent MCP config syntax differs by transport:
+- Codex: `~/.codex/config.toml` (`url = "..."` for HTTP, `command = "..."` for stdio)
+- Gemini: `~/.gemini/settings.json` (`httpUrl` for HTTP — hyphens not underscores; `command` for stdio)
+- OpenCode: `~/.config/opencode/opencode.json` (`type: "remote"` for HTTP, `type: "local"` for stdio)
 - Pi: `pi install npm:pi-mcp-adapter`, then configure `~/.pi/agent/mcp.json` or project `.pi/mcp.json`
+
+Fulcrum-managed examples: DeepWiki uses the HTTP shape on every agent; context-mode uses the stdio shape on Codex/Gemini/OpenCode/Pi.
 
 Full configs in [agents.md](agents.md).
