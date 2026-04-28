@@ -231,8 +231,50 @@ async function buildReport(): Promise<{ report: DoctorReport; errors: number }> 
     mtime: policyMtime,
   };
 
+  // Caveman config + per-agent install detection.
+  // defaultMode resolution: env CAVEMAN_DEFAULT_MODE wins, else config file,
+  // else "" with source "default". Malformed JSON reported with source "malformed".
+  const home = process.env["HOME"] ?? "";
+  const xdg = process.env["XDG_CONFIG_HOME"];
+  const cavemanConfigPath = xdg
+    ? `${xdg}/caveman/config.json`
+    : `${home}/.config/caveman/config.json`;
+  let cavemanDefaultMode = "";
+  let cavemanSource: "file" | "env" | "default" | "malformed" = "default";
+  let cavemanConfigPathOut = "";
+  const envMode = process.env["CAVEMAN_DEFAULT_MODE"];
+  if (envMode) {
+    cavemanDefaultMode = envMode;
+    cavemanSource = "env";
+  }
+  if (await exists(cavemanConfigPath)) {
+    cavemanConfigPathOut = cavemanConfigPath;
+    if (cavemanSource !== "env") {
+      try {
+        const parsed = JSON.parse(await Bun.file(cavemanConfigPath).text());
+        if (parsed && typeof parsed === "object" && typeof parsed.defaultMode === "string") {
+          cavemanDefaultMode = parsed.defaultMode;
+          cavemanSource = "file";
+        } else {
+          cavemanSource = "malformed";
+        }
+      } catch {
+        cavemanSource = "malformed";
+      }
+    }
+  }
+  const cavemanAgents: DoctorReport["caveman"]["agents"] = [];
+  for (const a of agentsList) {
+    const installed = a.cavemanPath ? await exists(a.cavemanPath) : false;
+    cavemanAgents.push({
+      label: a.label,
+      installed,
+      activationHookPresent: false,
+    });
+  }
+
   // Pi MCP adapter check (informational; not a warning/error if absent)
-  const piAgentDir = `${process.env["HOME"] ?? ""}/.pi/agent`;
+  const piAgentDir = `${home}/.pi/agent`;
   let piAdapterPresent = false;
   let piDeepwikiPresent = false;
   if (await exists(piAgentDir)) {
@@ -264,10 +306,10 @@ async function buildReport(): Promise<{ report: DoctorReport; errors: number }> 
     platform,
     agents: agentsReport,
     caveman: {
-      agents: [],
-      defaultMode: "",
-      defaultModeSource: "default",
-      configPath: "",
+      agents: cavemanAgents,
+      defaultMode: cavemanDefaultMode,
+      defaultModeSource: cavemanSource,
+      configPath: cavemanConfigPathOut,
     },
     tools: toolsReport,
     policy: policyReport,
@@ -350,6 +392,22 @@ function printHumanFormat(report: DoctorReport, home: string): void {
     const adapterNote = adapterPresent ? "✓  pi-mcp-adapter in settings" : "·  pi-mcp-adapter not installed";
     const deepwikiNote = deepwikiPresent ? "✓  deepwiki in mcp.json" : "·  deepwiki not in mcp.json";
     console.log(`Pi MCP adapter:   ${adapterNote}   ${deepwikiNote}`);
+    console.log();
+  }
+
+  // Caveman
+  {
+    const { defaultMode, defaultModeSource, configPath, agents } = report.caveman;
+    const modeLabel = defaultMode || "(unset)";
+    const sourceLabel = configPath
+      ? `${defaultModeSource} (${configPath})`
+      : defaultModeSource;
+    console.log(`Caveman defaultMode: ${modeLabel}  [${sourceLabel}]`);
+    for (const agent of agents) {
+      const mark = agent.installed ? "✓" : "·";
+      const note = agent.installed ? "installed" : "not installed";
+      console.log(`  ${pad(agent.label, 14)} ${mark}  ${note}`);
+    }
     console.log();
   }
 
