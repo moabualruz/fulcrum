@@ -1,12 +1,12 @@
 # Fulcrum — Handover
 
-> Snapshot at branch `feat/agent-foundation-clean` (HEAD `b2ef962`, tracking `origin/feat/agent-foundation-clean`). Forward-looking only — historical event logs pruned. For archaeology: `git log` and per-commit messages.
+> Snapshot at branch `feat/agent-foundation-clean` (HEAD `0ca8b88`, local branch 1 commit ahead of `origin/feat/agent-foundation-clean`). Forward-looking only — historical event logs pruned. For archaeology: `git log` and per-commit messages.
 
 ## 0. Destination
 
 **Fulcrum is a local-first CLI Agent OS for supervising repositories, tasks, agent runs, context, memory, and artifacts.**
 
-Today the foundation layer is partly in place. Supervisor / task / agent-runs / context-engine / memory / artifacts / plugins layers are placeholders, not implementations. The installer / skill / MCP surfaces are not merge-ready yet; see §6.4. See `AGENTS.md` for the trajectory framing.
+Today the foundation layer is partly in place. Supervisor / task / agent-runs / context-engine / memory / artifacts / plugins layers are placeholders, not implementations. Remaining merge blockers are listed in §6. See `AGENTS.md` for the trajectory framing.
 
 ---
 
@@ -28,7 +28,7 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 │     • tool-output-router               (PostToolUse any) — TOML-driven
 │
 ├── fulcrum init [DIR]      — bootstrap project AGENTS.md + .claude/CLAUDE.md
-├── fulcrum install [--with-project DIR] [--no-skills]
+├── fulcrum install [--with-project DIR] [--no-skills] [--no-upstream-skills]
 │                            — sentinel-splice rules, vendor snippets, seed policy,
 │                              caveman per-agent install, caveman ultra lock,
 │                              sync authored + curated upstream skills unless opted out,
@@ -110,7 +110,7 @@ LICENSE (MIT)  AGENTS.md  README.md
 
 ## 3. What works (verified)
 
-- `bun run ci` — green in the latest local run: install + tsc + 103 tests (11 files, 183 expect calls) + 5 platform builds + skills:lint (28/28) + compress:check (soft, 0 pending).
+- `bun run ci` — green in the latest local run: install + tsc + 108 tests (12 files, 196 expect calls) + 5 platform builds + skills:lint (28/28) + compress:check (soft, 0 pending).
 - `bun run scripts/build-all.ts` — 5 targets (`darwin-arm64` 63 MB, `darwin-x64` 68 MB, `linux-x64`/`linux-arm64` ~101 MB, `windows-x64` 118 MB).
 - `bash scripts/install.sh` — splices rules, vendors snippets, seeds policy. Idempotent. `FULCRUM_RELEASE_TAG=vX.Y.Z` fetches a prebuilt binary from GitHub Releases.
 - `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG → tag → cross-compile → optional `gh release create`. Does NOT push.
@@ -148,160 +148,41 @@ Don't relitigate without new information.
 | Never use `~/.agents/` for skills | Shared folder pollutes every agent's context; `assertNotAgentsPath()` enforces this at runtime. | `src/cli/install.ts`, `~/.claude/CLAUDE.md` |
 | Agent registry as single source of truth | Without a registry, agent defs drifted independently in install, doctor, and skills. | `src/agents/registry.ts` |
 | Caveman compression of in-repo content is part of CI | Verbose skills waste tokens every session; soft-fail gate prevents accidental uncompressed commits. | `scripts/compress-with-caveman.sh`, `scripts/ci.ts` |
-| Per-skill iteration over batch leaderboard tuning | Batch runs confound measurement between skills; one skill at a time is the safe unit. | `HANDOVER.md` §6.2 procedure |
+| Per-skill iteration over batch leaderboard tuning | Batch runs confound measurement between skills; one skill at a time is the safe unit. | `scripts/eval-skill-{claude,codex}.sh` |
 
 ---
 
 ## 5. Branch + commit map
 
 ```
+0ca8b88  feat(install): close managed setup gaps
+b2ef962  docs: mark foundation polish complete
+313357e  docs: mark skill eval pass complete
+78fd68a  test(skills): tune Codex eval prompts
+d22789d  feat(skills): slim skill loading
+7e4e863  feat(eval): per-skill iteration pass — 20/28 skills meet 80/20 bar
+ce3ca36  docs(handover): correct skill queue, add re-verify list + ship-the-branch section
+cd35aa8  docs(handover): clean stale, document per-skill iteration procedure
+70bbe72  feat(eval): per-skill match-words files + data-rich queries for all 28 skills
 ef5d9e0  feat(eval): per-skill match-words files + data-rich queries for all 28 skills
-7a20b01  fix(eval): xargs trim breaks on quoted match-words; use sed
-3c9f604  docs(handover): record §6.1 caveman + post-§6.1 polish landings
-fb49bf5  feat(compress,ci): caveman compression wrapper + ci soft gate + bunfig frozenLockfile
-e88beeb  feat(install,doctor,skills,agents): caveman cross-agent install + agent registry + dry-run + --json
-45dcf3e  feat(eval): portable awk + --regenerate-only + per-skill match-words file
-0131b5d  feat(io): unconditional envelope parse-failure log
-3d1eb8a  chore(content): caveman-compress in-repo content; split rules from project AGENTS
-── f92d6c7  (base: docs(handover): correct caveman install paths…)
+... older foundation commits below ...
 ```
 
-Branch is pushed to `origin/feat/agent-foundation-clean` and should stay on this branch for now. PR #1 was closed because the branch is not ready to merge.
+Branch should stay on `feat/agent-foundation-clean` for now. PR #1 was closed because the branch is not ready to merge. Do not open a new PR until §6 is cleared.
 
 ---
 
-## 6. Next session — start here
+## 6. Remaining work — start here
 
-### ~~6.1 Caveman compression~~ — DONE
+Do these before opening any new PR. Completed setup work has been moved to §3 and removed from this active queue.
 
-All five §6.1 steps complete. Key commits: `3d1eb8a`, `e88beeb`, `fb49bf5`. See `src/cli/install.ts`, `src/cli/doctor.ts`, `rules/AGENTS.md`, `AGENTS.md`.
-
----
-
-### 6.2 Per-skill eval iteration  ← COMPLETE
-
-**Background — what the first full leaderboard run revealed:**
-
-The Sonnet leaderboard run (1 run/query, 28 skills, ~126 min wall) showed scores dominated by harness methodology bugs, not description quality:
-
-- 17/28 skills underreported trigger rate because eval queries said "this Python file" but the harness ran in an empty tempdir — Claude correctly declined ("Which file?") and was marked as a miss.
-- 3/28 skills (`dart-toolchain`, `direnv`, `eza`) showed 100/100 because auto-derived match-words contained substring-loose tokens (`TYPE` matched "TypeScript", `dart` matched "darted") — heuristic false positives with no real skill invocations.
-
-Both bugs were fixed in `ef5d9e0` + `7a20b01`:
-- `evals/<skill>.match-words` files (28) hand-tuned per skill, word-bounded (`grep -qw`).
-- `evals/<skill>.json` entries rewritten with inline sample data inside markdown fences so Claude has a concrete artifact to work on.
-- Harness `xargs` trim replaced with `sed` (xargs choked on match-words containing single quotes).
-
-**Worked example — jq:**
-
-Starting `evals/jq.match-words` was too narrow (`jq 'select(`). Trigger rate: 8%. Loosened to broad-but-bounded tokens: `` `| jq` ``, `` `jq '` ``, `jq -r`, `jq -c`, `jq -n`, `jq -s`, `jq -a`, `jq @csv`, `jq @tsv`. Result on `/tmp/jq-sanity4`: **83/0** (passes the 80/20 bar). Two unavoidable misses: Claude printed the answer (CSV table, count) without showing the command — acceptable at 83%, or addressable by adding "show the command" to those query prompts.
-
-**The procedure (one skill at a time):**
-
-1. Run a single-skill eval:
-   ```bash
-   scripts/eval-skill-claude.sh <skill> --model sonnet --runs-per-query 1 \
-     --results-dir /tmp/<skill>-iter
-   ```
-   ~2–5 min wall.
-
-2. Read `summary.txt` — note trigger rate and false-trigger rate.
-
-3. If passes **80/20** (≥80% trigger, ≤20% false-trigger): move to next skill.
-
-4. If fails — read `results.jsonl` to identify the failure mode:
-   - **a. Misses where Claude correctly declined** ("no X file", "which file?"): inline data in `evals/<skill>.json` is missing or insufficient. Edit that query to embed concrete data inside a markdown fence.
-   - **b. Misses where Claude DID demo the tool but match-words missed it**: edit `evals/<skill>.match-words` to broaden tokens. Keep them word-bounded — `grep -qw` matches whole words only.
-   - **c. False-trigger where Claude declined but match-word still matched a response substring**: tighten `evals/<skill>.match-words` — drop or narrow the offending token.
-   - **d. Genuine description failure** (the skill body didn't help Claude pick the right tool): only THEN edit `skills/<skill>/SKILL.original.md` and/or `skills/<skill>/references/*.original.md`, refresh the shipped `.md` form, then `bun run src/index.ts skills sync` to propagate.
-
-5. Re-run that one skill until it passes 80/20.
-
-6. Move to the next skill. **NEVER tune multiple skills in parallel** — measurements between them confound.
-
-7. After all skills pass at runs=1, do one final stability pass:
-   ```bash
-   scripts/eval-all.sh --model sonnet --runs-per-query 3
-   ```
-
-Codex parity: `scripts/eval-skill-codex.sh <skill> --model <codex-model>` uses `codex exec --json --ephemeral` against `~/.codex/skills/fulcrum/<skill>`. Use it after `fulcrum skills sync` when changing frontmatter description length, YAML quoting, or progressive-disclosure layout. Long Codex samples can stall; use `--timeout-seconds N` or `CODEX_EVAL_TIMEOUT_SECONDS`.
-
-**Codex resume checkpoint (2026-04-28):**
-
-- Claude Code was rate-limited in the latest session (`resets 7:40am Europe/Berlin`), so continue Claude evals later.
-- Codex harness gained timeout support after `osv-scanner` hung on one sample.
-- Codex `gpt-5.4-mini`, runs=1 verified passes:
-  - `bat` 100/0 — `/tmp/codex-edited-skills-iter-1/bat`
-  - `biome` 100/0 — `/tmp/codex-biome-just-4/biome`
-  - `dart-toolchain` 83/0 — `/tmp/dart-toolchain-codex-iter-2`
-  - `difftastic` 100/11 — `/tmp/codex-difftastic-lizard-mise-2/difftastic`
-  - `direnv` 90/12 — `/tmp/codex-direnv-eza-fzf-1/direnv`
-  - `eza` 81/11 — `/tmp/eza-codex-iter-4`
-  - `flarectl` 83/0 — `/tmp/codex-flare-gh-cliff-leaks-1/flarectl`
-  - `fzf` 100/0 — `/tmp/codex-eza-fzf-iter-2/fzf`
-  - `gh` 84/0 — `/tmp/gh-codex-iter-3`
-  - `git-cliff` 100/0 — `/tmp/codex-gh-cliff-iter-2/git-cliff`
-  - `gitleaks` 84/0 — `/tmp/codex-flare-gh-cliff-leaks-1/gitleaks`
-  - `google-java-format` 83/12 — `/tmp/codex-dart-java-spotbugs-1/google-java-format`
-  - `hyperfine` 91/0 — `/tmp/codex-edited-skills-iter-1/hyperfine`
-  - `jq` 91/0 — `/tmp/jq-codex-iter-3`
-  - `just` 83/0 — `/tmp/codex-biome-just-4/just`
-  - `ktlint` 100/0 — `/tmp/codex-edited-skills-iter-1/ktlint`
-  - `lizard` 91/0 — `/tmp/codex-difftastic-lizard-mise-2/lizard`
-  - `mise` 100/0 — `/tmp/mise-codex-iter-3`
-  - `osv-scanner` 100/12 — `/tmp/osv-codex-iter-3`
-  - `pmd` 81/0 — `/tmp/pmd-codex-iter-2`
-  - `ruff` 100/0 — `/tmp/codex-batch-biome-just-ruff-xh-2/ruff`
-  - `sd` 100/0 — `/tmp/codex-batch-biome-ruff-sd-xh-just-1/sd`
-  - `spotbugs` 83/0 — `/tmp/codex-dart-java-spotbugs-1/spotbugs`
-  - `usql` 100/0 — `/tmp/usql-codex-iter-1`
-  - `watchexec` 90/0 — `/tmp/codex-old-pass-reverify-1/watchexec`
-  - `xh` 83/12 — `/tmp/codex-biome-just-xh-3/xh`
-  - `yq` 100/0 — `/tmp/yq-codex-iter-1`
-  - `zoxide` 81/0 — `/tmp/codex-old-pass-reverify-1/zoxide`
-- Prompt-shape finding: for command-tool skills, positive eval prompts should say "Show the exact <tool> command only; do not run it." Prompts worded as "Use <tool>" can make Codex try to execute or overwork inline samples.
-
-**Queue — remaining in-repo skills:** none. All 28 authored skills meet the 80/20 bar under Codex `gpt-5.4-mini` runs=1 and Claude Sonnet runs=3.
-
-(Verify with `fulcrum skills list` — list reflects the actual 28 authored in `skills/`.)
-
-**Re-verify subset under new methodology:** old-pass skills (`difftastic`, `lizard`, `mise`, `watchexec`, `zoxide`) were rerun under Codex with the new match-words + inline-data queries. All pass at runs=1; Claude Sonnet runs=3 final stability pass is considered complete per the latest local run.
-
-Reference: `/tmp/jq-sanity4` — evidence that the new procedure works (83/0).
-
----
-
-### 6.3 Foundation polish  ← COMPLETE
-
-- **Opus / Claude leaderboard** — considered passed per the latest Claude eval run; all 28 skills already pass Codex runs=1 and Claude Sonnet runs=3. No remaining eval work before ship.
-
----
-
-### 6.4 Foundation gap closure  ← ACTIVE
-
-Do this before any new PR/release work. README + linked docs promised more than the CLI currently implements.
-
-1. **Uninstall action.** DONE in `src/cli/uninstall.ts` + `src/cli/uninstall.test.ts`. Conservative default removes only Fulcrum-managed artifacts: sentinel rules blocks, managed hook snippets/markers, seeded policy when unmodified, managed `skills/fulcrum/`, Gemini `fulcrum-skills` extension, and generated Gemini import. Preserves user content outside sentinels, supports `--dry-run`, `--purge`, and `--include-caveman`.
-2. **Third-party skill/plugin installation.** PARTIAL. `fulcrum skills upstream` installs 20 curated upstream skills from `obra/superpowers`, `ast-grep/agent-skill`, `tavily-ai/skills`, `microsoft/playwright-cli`, `semgrep/skills`, `safishamsi/graphify`, and `edxeth/superlight-context7-skill` under `fulcrum-upstream/`; `fulcrum install` runs it by default. Remaining: pin SHAs in `skills/upstream.lock`, add repomix once a spec-compliant `SKILL.md` source is selected, and decide whether native plugin installers are needed beyond skill-folder install.
-3. **DeepWiki MCP registration.** DONE for detected Codex (`~/.codex/config.toml`), Gemini (`~/.gemini/settings.json`), and OpenCode (`~/.config/opencode/opencode.json`); Claude Code requested through `claude mcp add` when `claude` is on PATH; Pi skipped by design. Uninstall removes Fulcrum-managed Codex/Gemini/OpenCode entries and prints the Claude manual removal command.
-4. **Hook registration is manual.** `fulcrum hooks enable` writes markers and prints snippets; it does not wire agent config files. Either make this explicit everywhere or implement config edits/unregistration per agent.
-5. **Install runs skill sync.** DONE. `fulcrum install` now syncs the 28 in-repo skills by default and exposes `--no-skills` for opt-out.
-6. **Capability tools are check-only.** `docs/capabilities.md` lists manual installs; `doctor` checks many tools, but no command installs or pins them. Decide whether Fulcrum owns tool installation or docs must say "bring your own tools."
-7. **Docs/status drift.** README, HANDOVER, `docs/skill-smoke-test.md`, and smoke-test expectations still contain stale claims (`branch unpushed`, Claude-only eval harness, `doctor` verdict text). Keep docs aligned with code after each gap closes.
-
----
-
-### 6.5 Ship the branch  ← BLOCKED
-
-Only after §6.4 is done:
-
-1. **Final CI:** `bun run ci` — must be green.
-2. **Open PR:** create a fresh PR from `feat/agent-foundation-clean` when the branch is actually merge-ready.
-3. **Cut release** (when PR merges to `main`): `bun run release vX.Y.Z [--gh]`. Pre-release at `v0.1.0` is reasonable for the foundation tag.
-
-Outstanding small item:
-
-- **README Rosetta hint** — generic; expand only if specific Intel-Mac users report issues.
+1. **Hook config auto-registration.** `fulcrum hooks enable/disable` currently records markers and prints snippets. Decide whether to keep hooks intentionally manual and make docs explicit everywhere, or implement per-agent config edits plus clean unregister paths for Codex, Gemini, OpenCode, Pi, and Claude Code.
+2. **Pin curated upstream skills.** `fulcrum skills upstream` installs 20 curated third-party skills from branch tips. Fill `skills/upstream.lock` with real repo SHAs, license fields, pinned dates, and review dates. Keep `fulcrum-upstream/` separate from authored `fulcrum/` skills.
+3. **Repomix upstream skill decision.** `skills/SOURCES.md` lists repomix, but the upstream repo currently exposes guide markdown rather than a clean `SKILL.md` folder in the checked layout. Choose one: generate/vendor an authored repomix skill, adapt the guide into `skills/repomix/`, or remove it from the installable upstream promise.
+4. **Native plugin installer decision.** Current third-party support installs skill folders only. Decide whether Fulcrum should also call native plugin/extension installers for upstream packages such as `obra/superpowers`, or keep the filesystem skill install as the supported cross-agent layer.
+5. **Capability tools policy.** `docs/capabilities.md` lists manual tool installs and `doctor` checks many tools, but Fulcrum does not install or pin those binaries. Decide whether tool installation belongs in Fulcrum, or update docs to say capabilities are bring-your-own-tools plus `doctor`.
+6. **Docs drift pass.** Align README, docs, smoke tests, and HANDOVER with the current code after the above decisions. Known stale spots: `docs/skill-smoke-test.md` still frames trigger-rate measurement as Claude-only; smoke-test snippets should include `fulcrum uninstall`, `skills upstream`, and MCP checks.
+7. **Release/PR only after blockers clear.** Run `bun run ci`, then create a fresh PR from `feat/agent-foundation-clean`. Release can happen only after merge to `main` via `bun run release vX.Y.Z [--gh]`.
 
 ---
 
@@ -339,7 +220,7 @@ printf '%s' "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$TMP/bad.py
 cat $TMP/bad.py   # should be ruff-formatted
 rm -rf $TMP
 
-# 5. Single-skill eval (the §6.2 inner loop; ~2-5 min)
+# 5. Single-skill eval (~2-5 min)
 bun run src/index.ts skills sync   # ensure skill is at ~/.claude/skills/fulcrum/<skill>
 scripts/eval-skill-claude.sh jq --model sonnet --runs-per-query 1 \
   --results-dir /tmp/jq-iter
@@ -352,7 +233,7 @@ scripts/eval-all.sh --regenerate-only --results-dir eval-results/<ts>
 
 # 8. Doctor JSON output
 fulcrum doctor --json | jq .verdict
-# expect: "ok" (no errors) or "degraded" (errors > 0)
+# expect: "ok", "warning", or "error"
 ```
 
 ---
