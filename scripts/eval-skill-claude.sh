@@ -204,7 +204,7 @@ detect_trigger() {
   lc=$(echo "$text" | tr '[:upper:]' '[:lower:]')
   local IFS=','
   for w in $MATCH_WORDS; do
-    w=$(echo "$w" | tr '[:upper:]' '[:lower:]' | xargs)
+    w=$(echo "$w" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     [ -z "$w" ] && continue
     if echo "$lc" | grep -qw -- "$w"; then echo 1; return; fi
   done
