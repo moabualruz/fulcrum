@@ -211,15 +211,48 @@ Starting `evals/jq.match-words` was too narrow (`jq 'select(`). Trigger rate: 8%
    scripts/eval-all.sh --model sonnet --runs-per-query 3
    ```
 
-Codex parity: `scripts/eval-skill-codex.sh <skill> --model <codex-model>` uses `codex exec --json --ephemeral` against `~/.codex/skills/fulcrum/<skill>`. Use it after `fulcrum skills sync` when changing frontmatter description length, YAML quoting, or progressive-disclosure layout.
+Codex parity: `scripts/eval-skill-codex.sh <skill> --model <codex-model>` uses `codex exec --json --ephemeral` against `~/.codex/skills/fulcrum/<skill>`. Use it after `fulcrum skills sync` when changing frontmatter description length, YAML quoting, or progressive-disclosure layout. Long Codex samples can stall; use `--timeout-seconds N` or `CODEX_EVAL_TIMEOUT_SECONDS`.
 
-**Queue — 27 remaining in-repo skills** (jq verified at 83/0 in `/tmp/jq-sanity4`):
+**Codex resume checkpoint (2026-04-28):**
 
-`bat`, `biome`, `dart-toolchain`, `difftastic`, `direnv`, `eza`, `flarectl`, `fzf`, `gh`, `git-cliff`, `gitleaks`, `google-java-format`, `hyperfine`, `just`, `ktlint`, `lizard`, `mise`, `osv-scanner`, `pmd`, `ruff`, `sd`, `spotbugs`, `usql`, `watchexec`, `xh`, `yq`, `zoxide`.
+- Claude Code was rate-limited in the latest session (`resets 7:40am Europe/Berlin`), so continue Claude evals later.
+- Codex harness gained timeout support after `osv-scanner` hung on one sample.
+- Codex `gpt-5.4-mini`, runs=1 verified passes:
+  - `bat` 100/0 — `/tmp/codex-edited-skills-iter-1/bat`
+  - `biome` 100/0 — `/tmp/codex-biome-just-4/biome`
+  - `dart-toolchain` 83/0 — `/tmp/dart-toolchain-codex-iter-2`
+  - `difftastic` 100/11 — `/tmp/codex-difftastic-lizard-mise-2/difftastic`
+  - `direnv` 90/12 — `/tmp/codex-direnv-eza-fzf-1/direnv`
+  - `eza` 81/11 — `/tmp/eza-codex-iter-4`
+  - `flarectl` 83/0 — `/tmp/codex-flare-gh-cliff-leaks-1/flarectl`
+  - `fzf` 100/0 — `/tmp/codex-eza-fzf-iter-2/fzf`
+  - `gh` 84/0 — `/tmp/gh-codex-iter-3`
+  - `git-cliff` 100/0 — `/tmp/codex-gh-cliff-iter-2/git-cliff`
+  - `gitleaks` 84/0 — `/tmp/codex-flare-gh-cliff-leaks-1/gitleaks`
+  - `google-java-format` 83/12 — `/tmp/codex-dart-java-spotbugs-1/google-java-format`
+  - `hyperfine` 91/0 — `/tmp/codex-edited-skills-iter-1/hyperfine`
+  - `jq` 91/0 — `/tmp/jq-codex-iter-3`
+  - `just` 83/0 — `/tmp/codex-biome-just-4/just`
+  - `ktlint` 100/0 — `/tmp/codex-edited-skills-iter-1/ktlint`
+  - `lizard` 91/0 — `/tmp/codex-difftastic-lizard-mise-2/lizard`
+  - `mise` 100/0 — `/tmp/mise-codex-iter-3`
+  - `osv-scanner` 100/12 — `/tmp/osv-codex-iter-3`
+  - `pmd` 81/0 — `/tmp/pmd-codex-iter-2`
+  - `ruff` 100/0 — `/tmp/codex-batch-biome-just-ruff-xh-2/ruff`
+  - `sd` 100/0 — `/tmp/codex-batch-biome-ruff-sd-xh-just-1/sd`
+  - `spotbugs` 83/0 — `/tmp/codex-dart-java-spotbugs-1/spotbugs`
+  - `usql` 100/0 — `/tmp/usql-codex-iter-1`
+  - `watchexec` 90/0 — `/tmp/codex-old-pass-reverify-1/watchexec`
+  - `xh` 83/12 — `/tmp/codex-biome-just-xh-3/xh`
+  - `yq` 100/0 — `/tmp/yq-codex-iter-1`
+  - `zoxide` 81/0 — `/tmp/codex-old-pass-reverify-1/zoxide`
+- Prompt-shape finding: for command-tool skills, positive eval prompts should say "Show the exact <tool> command only; do not run it." Prompts worded as "Use <tool>" can make Codex try to execute or overwork inline samples.
+
+**Queue — remaining in-repo skills:** none for Codex runs=1. All 28 authored skills now meet the 80/20 bar under Codex `gpt-5.4-mini`; Claude Sonnet runs=3 remains the stability gate once Claude rate limit clears.
 
 (Verify with `fulcrum skills list` — list reflects the actual 28 authored in `skills/`.)
 
-**Re-verify subset under new methodology:** 5 skills passed under the OLD broken harness (`difftastic`, `lizard`, `mise`, `watchexec`, `zoxide`). They MUST be re-run with the new match-words + inline-data queries — the score may regress (e.g. tighter match-words could drop a passing trigger). Treat them like any other skill: pass at runs=1 → move on; fail → iterate per the procedure.
+**Re-verify subset under new methodology:** old-pass skills (`difftastic`, `lizard`, `mise`, `watchexec`, `zoxide`) were rerun under Codex with the new match-words + inline-data queries. All now pass at runs=1; keep them in the final stability pass.
 
 Reference: `/tmp/jq-sanity4` — evidence that the new procedure works (83/0).
 

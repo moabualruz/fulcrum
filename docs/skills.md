@@ -101,7 +101,7 @@ Tiered:
 
 1. **Lint everywhere (CI):** `fulcrum skills lint skills/` validate every authored skill on strictest frontmatter union. Cheap; catch 80% of cross-agent failures.
 2. **Claude trigger-rate eval:** `scripts/eval-skill-claude.sh <skill>` calls `claude --print --output-format=json --no-session-persistence` per query. Auth via Claude Code keychain — no `ANTHROPIC_API_KEY` env var. Eval set at `evals/<skill>.json` (~20 entries, ~12/8 trigger/anti-trigger split). Leaderboard runner at `scripts/eval-all.sh`.
-3. **Codex trigger-rate eval:** `scripts/eval-skill-codex.sh <skill> --model <codex-model>` calls `codex exec --json --ephemeral` against installed `~/.codex/skills/fulcrum/<skill>`. Use when Codex skill loading or description-budget behavior changes. Keep model explicit in result notes.
+3. **Codex trigger-rate eval:** `scripts/eval-skill-codex.sh <skill> --model <codex-model>` calls `codex exec --json --ephemeral` against installed `~/.codex/skills/fulcrum/<skill>`. Use when Codex skill loading or description-budget behavior changes. Keep model explicit in result notes. Long samples can stall; pass `--timeout-seconds N` or set `CODEX_EVAL_TIMEOUT_SECONDS`.
 4. **Manual smoke on other 3:** Gemini run `gemini extensions link <ext>` + `--debug`; OpenCode copy trigger phrase into fresh session; Pi invoke `/skill:<name>` directly. Checklist template at `docs/skill-smoke-test.md`.
 
 Claude and Codex have scriptable trigger-rate measurement. Gemini/OpenCode/Pi remain smoke-tested until stable JSON event streams exist.

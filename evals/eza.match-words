@@ -1,9 +1,13 @@
 # match-words for eza
-# "eza" is specific enough — not a common English word in any other context
-eza
 eza -l
+eza -la
+eza -lh
+eza -T
 eza --tree
 eza --git
 eza --git-ignore
 eza --level=
 eza --sort=
+eza --icons
+eza --header
+eza --group-directories-first

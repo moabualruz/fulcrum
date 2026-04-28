@@ -6,6 +6,7 @@
 #                                             [--model NAME]
 #                                             [--runs-per-query N]
 #                                             [--results-dir DIR]
+#                                             [--timeout-seconds N]
 #                                             [--match-words "w1,w2,..."]
 #
 # Pass criteria:
@@ -28,6 +29,7 @@ MODEL=""
 RUNS=1
 RESULTS_DIR=""
 EXTRA_MATCH=""
+TIMEOUT_SECONDS="${CODEX_EVAL_TIMEOUT_SECONDS:-120}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -35,6 +37,7 @@ while [ $# -gt 0 ]; do
     --model)           MODEL="$2"; shift 2 ;;
     --runs-per-query)  RUNS="$2"; shift 2 ;;
     --results-dir)     RESULTS_DIR="$2"; shift 2 ;;
+    --timeout-seconds) TIMEOUT_SECONDS="$2"; shift 2 ;;
     --match-words)     EXTRA_MATCH="$2"; shift 2 ;;
     -h|--help)
       sed -n '2,14p' "$0" | sed 's/^# \?//'; exit 0 ;;
@@ -114,6 +117,7 @@ SUMMARY="$RESULTS_DIR/summary.txt"
   echo "  queries   : $QUERIES"
   echo "  model     : ${MODEL:-codex default}"
   echo "  runs/query: $RUNS"
+  echo "  timeout   : ${TIMEOUT_SECONDS}s"
   echo "  match     : $MATCH_WORDS"
   echo "  results   : $RESULTS_DIR"
   echo
@@ -170,8 +174,30 @@ while IFS= read -r entry; do
     WORK=$(mktemp -d)
     CODEX_ARGS=(exec --json --ephemeral --skip-git-repo-check --sandbox read-only -C "$WORK")
     [ -n "$MODEL" ] && CODEX_ARGS+=(--model "$MODEL")
-    RESP=$(codex "${CODEX_ARGS[@]}" "$Q" </dev/null 2>>"$LOG" || true)
+    RESP_FILE=$(mktemp)
+    TIMED_OUT=0
+    codex "${CODEX_ARGS[@]}" "$Q" </dev/null >"$RESP_FILE" 2>>"$LOG" &
+    CODEX_PID=$!
+    START=$(date +%s)
+    while kill -0 "$CODEX_PID" 2>/dev/null; do
+      NOW=$(date +%s)
+      if [ $((NOW - START)) -ge "$TIMEOUT_SECONDS" ]; then
+        TIMED_OUT=1
+        kill "$CODEX_PID" 2>/dev/null || true
+        sleep 1
+        kill -9 "$CODEX_PID" 2>/dev/null || true
+        break
+      fi
+      sleep 1
+    done
+    wait "$CODEX_PID" 2>/dev/null || true
+    RESP=$(cat "$RESP_FILE")
+    rm -f "$RESP_FILE"
     rm -rf "$WORK"
+    if [ "$TIMED_OUT" = "1" ]; then
+      echo "timeout after ${TIMEOUT_SECONDS}s: $Q" >> "$LOG"
+      RESP='{"type":"result","is_error":true,"error":"timeout"}'
+    fi
 
     TRIG=$(detect_trigger "$RESP")
     jq -nc \

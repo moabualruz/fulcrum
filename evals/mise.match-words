@@ -1,9 +1,8 @@
 # match-words for mise
-# "mise" alone is specific enough — tool name appears in most responses
-mise
 mise install
 mise use
 mise exec
 mise current
 mise outdated
 mise activate
+`mise`

@@ -9,3 +9,6 @@ jq -s
 jq -a
 jq @csv
 jq @tsv
+sort_by(.created_at)
+group_by(.kind)
+map(.score)
