@@ -750,8 +750,18 @@ async function removeMarker(name: RecipeName): Promise<void> {
   }
 }
 
-async function cmdList(): Promise<void> {
+async function cmdList(args: string[] = []): Promise<void> {
   const enabled = await listEnabled();
+  if (args.includes("--json")) {
+    const recipes = RECIPE_NAMES.map((name) => ({
+      name,
+      enabled: enabled.has(name),
+      marker: markerPath(name),
+    }));
+    console.log(JSON.stringify(recipes, null, 2));
+    return;
+  }
+
   console.log("Available hooks (subcommands of `fulcrum hook <name>`):");
   for (const name of RECIPE_NAMES) {
     const mark = enabled.has(name) ? "✓" : " ";
@@ -814,7 +824,7 @@ export async function run(args: string[]): Promise<void> {
   const sub = args[0] ?? "list";
   switch (sub) {
     case "list":
-      return cmdList();
+      return cmdList(args.slice(1));
     case "enable": {
       const allAgents = args.includes("--all");
       const name = args.find((a) => a !== "enable" && !a.startsWith("--"));

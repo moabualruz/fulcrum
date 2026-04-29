@@ -154,7 +154,7 @@ RECORD: row 10; note any agent where false
 
 ---
 
-### Step 11 — Authored skills (27 per detected agent)
+### Step 11 — Authored skills (28 per detected agent)
 
 ```
 CHECK (Claude Code):  jq -r '.plugins | keys[]' ~/.claude/plugins/installed_plugins.json 2>/dev/null | grep -c '^fulcrum@fulcrum$'
@@ -238,7 +238,7 @@ Save completed result table to:
 ```
 
 Create dir if absent. If file for today exists, append `---` separator + new table — never overwrite.
-If the agent sandbox blocks writes to `~/.fulcrum`, print the completed table in the final response and record that the canonical append was blocked; the supervising caller should append the table outside that sandbox.
+If agent sandbox blocks `~/.fulcrum` write, print completed table in final response; note canonical append blocked. Supervising caller append outside sandbox.
 
 ```bash
 mkdir -p ~/.fulcrum/state/global/smoke-test

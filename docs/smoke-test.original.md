@@ -108,7 +108,7 @@ RECORD: row 6 of result table
 ### Step 7 — MCP list: 16 builtin servers registered
 
 ```
-CHECK:  fulcrum mcp list --json | jq '[.[] | select(.builtin == true)] | length'
+CHECK:  fulcrum mcp list --json | jq 'length'
 EXPECT: 16
 RECORD: row 7 of result table
 ```
@@ -147,25 +147,27 @@ RECORD: row 9 of result table; note which agents have 0 or >1
 ### Step 10 — Caveman install state per detected agent
 
 ```
-CHECK:  fulcrum doctor --json | jq '[.agents[] | select(.detected == true) | {id, cavemanInstalled: .caveman.installed}]'
+CHECK:  fulcrum doctor --json | jq '[.caveman.agents[] | {label, cavemanInstalled: .installed}]'
 EXPECT: every detected agent has "cavemanInstalled": true
 RECORD: row 10 of result table; note any agent where cavemanInstalled is false
 ```
 
 ---
 
-### Step 11 — Authored skills present (27 skills, 5 agents)
+### Step 11 — Authored skills present (28 skills, 5 agents)
 
 For each detected agent, verify the authored skill namespace exists:
 
 ```
-CHECK (Claude Code):  ls ~/.claude/skills/fulcrum/ 2>/dev/null | wc -l | tr -d ' '
+CHECK (Claude Code):  jq -r '.plugins | keys[]' ~/.claude/plugins/installed_plugins.json 2>/dev/null | grep -c '^fulcrum@fulcrum$'
+                      # then: ls ~/.claude/plugins/cache/fulcrum/fulcrum/*/skills 2>/dev/null | wc -l | tr -d ' '
 CHECK (Codex CLI):    ls ~/.codex/skills/fulcrum/ 2>/dev/null | wc -l | tr -d ' '
 CHECK (Gemini CLI):   ls ~/.gemini/extensions/fulcrum-skills/skills/ 2>/dev/null | wc -l | tr -d ' '
 CHECK (OpenCode):     ls ~/.config/opencode/skills/fulcrum/ 2>/dev/null | wc -l | tr -d ' '
 CHECK (Pi CLI):       ls ~/.pi/agent/skills/fulcrum/ 2>/dev/null | wc -l | tr -d ' '
 
-EXPECT: 28 for each detected agent
+EXPECT (Claude): 1 (plugin registered) + 28 skill dirs in cached plugin tree
+EXPECT (others): 28 per detected agent
 RECORD: row 11 of result table; note agent name and actual count for any mismatch
 ```
 
@@ -237,7 +239,7 @@ Save the completed result table below to:
 ~/.fulcrum/state/global/smoke-test/<ISO-date>.md
 ```
 
-Where `<ISO-date>` is today's date in `YYYY-MM-DD` format. Create the directory if it does not exist. If a file for today already exists, append a separator (`---`) and the new table after the existing content — never overwrite. The directory itself is a log; each run is a timestamped record.
+Where `<ISO-date>` is today's date in `YYYY-MM-DD` format. Create the directory if it does not exist. If a file for today already exists, append a separator (`---`) and the new table after the existing content — never overwrite. The directory itself is a log; each run is a timestamped record. If the agent sandbox blocks writes to `~/.fulcrum`, print the completed table in the final response and record that the canonical append was blocked; the supervising caller should append the table outside that sandbox.
 
 Create the directory:
 ```bash

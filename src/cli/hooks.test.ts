@@ -148,6 +148,33 @@ describe("fulcrum hooks enable/disable --all", () => {
 // ---------------------------------------------------------------------------
 
 describe("fulcrum hooks enable/disable (detection-aware default)", () => {
+  test("list --json emits machine-readable recipe state", async () => {
+    await run(["enable", "format"]);
+
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => {
+      logs.push(String(args[0]));
+    };
+
+    try {
+      await run(["list", "--json"]);
+    } finally {
+      console.log = originalLog;
+    }
+
+    const parsed = JSON.parse(logs.join("\n")) as Array<{ name: string; enabled: boolean; marker: string }>;
+    expect(parsed).toHaveLength(8);
+    expect(parsed.find((recipe) => recipe.name === "format")).toMatchObject({
+      name: "format",
+      enabled: true,
+    });
+    expect(parsed.find((recipe) => recipe.name === "lint-gate")).toMatchObject({
+      name: "lint-gate",
+      enabled: false,
+    });
+  });
+
   test("enable with no agent dirs → no config files written", async () => {
     // No agent dirs created — none should be detected.
     await run(["enable", "index-check"]);
