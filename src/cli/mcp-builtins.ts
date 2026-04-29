@@ -36,10 +36,10 @@ export const DEFAULT_REPOMIX_SERVER: McpServerSpec = {
 
 // ── Wave 3 ─────────────────────────────────────────────────────────────────
 
-/** W3.3 — Semgrep: in-binary stdio MCP via `semgrep --experimental mcp`. */
+/** W3.3 — Semgrep: in-binary stdio MCP via `semgrep mcp`. */
 export const DEFAULT_SEMGREP_SERVER: McpServerSpec = {
   transport: "stdio",
-  command: "semgrep --experimental mcp",
+  command: "semgrep mcp",
   description: "Semgrep MCP server — static analysis and code security scanning",
   vendor: "semgrep",
   default_enabled: false,
@@ -135,8 +135,8 @@ export const DEFAULT_CLOUDFLARE_RADAR_SERVER: McpServerSpec = {
 
 export const DEFAULT_CLOUDFLARE_LOGPUSH_SERVER: McpServerSpec = {
   transport: "http",
-  url: "https://logpush.mcp.cloudflare.com/mcp",
-  description: "Cloudflare Logpush MCP — log export job management",
+  url: "https://logs.mcp.cloudflare.com/mcp",
+  description: "Cloudflare Logpush MCP — Logpush job health summaries",
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: ["CLOUDFLARE_API_TOKEN"],

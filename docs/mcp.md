@@ -134,7 +134,7 @@ All W3 entries are **default-disabled**. Enable individually with `fulcrum mcp e
 
 In-binary stdio MCP from `semgrep/semgrep`. **Default-disabled.** No auth required.
 
-- Transport: stdio `semgrep --experimental mcp`
+- Transport: stdio `semgrep mcp`
 - Auth: none (`SEMGREP_APP_TOKEN` may be needed for managed rules — set separately)
 - Vendor: `semgrep`
 - Skills: `upstream.lock` pins `semgrep`, `semgrep-code-security`, `semgrep-llm-security` — both skill and MCP managed
@@ -190,7 +190,7 @@ Nine hosted remote MCP endpoints from `cloudflare/mcp-server-cloudflare`. All **
 | `cloudflare-workers-builds` | `https://builds.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
 | `cloudflare-observability` | `https://observability.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
 | `cloudflare-radar` | `https://radar.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
-| `cloudflare-logpush` | `https://logpush.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
+| `cloudflare-logpush` | `https://logs.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
 | `cloudflare-browser` | `https://browser.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
 | `cloudflare-containers` | `https://containers.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |
 | `cloudflare-ai-gateway` | `https://ai-gateway.mcp.cloudflare.com/mcp` | `CLOUDFLARE_API_TOKEN` |

@@ -283,11 +283,33 @@ async function writeJsonFile(file: string, data: Record<string, unknown>): Promi
 
 function mcpValueForAgent(server: McpServer, agentId: AgentId): Record<string, unknown> {
   if (server.transport === "http") {
-    if (agentId === "gemini") return { httpUrl: server.url! };
-    if (agentId === "opencode") return { type: "remote", url: server.url! };
-    if (agentId === "pi") return { url: server.url! };
-    // claude-code uses `claude mcp add` command, codex uses TOML block
-    return { url: server.url! };
+    // Per-agent env-interpolation syntax for Authorization Bearer header.
+    // Gemini, Claude Code: `${VAR}` form (settings.json interpolation).
+    // OpenCode:            `{env:VAR}` form (per opencode.json schema).
+    // Codex doesn't use a `headers` field — it has `bearer_token_env_var`
+    // emitted by `applyToCodex` in TOML, not here.
+    const envVar = server.auth_env_vars.length === 1 ? server.auth_env_vars[0] : null;
+    const bearer = (form: "dollar" | "envcurly") =>
+      form === "dollar" ? `Bearer \${${envVar}}` : `Bearer {env:${envVar}}`;
+    if (agentId === "gemini") {
+      const v: Record<string, unknown> = { httpUrl: server.url! };
+      if (envVar) v.headers = { Authorization: bearer("dollar") };
+      return v;
+    }
+    if (agentId === "opencode") {
+      const v: Record<string, unknown> = { type: "remote", url: server.url! };
+      if (envVar) v.headers = { Authorization: bearer("envcurly") };
+      return v;
+    }
+    if (agentId === "pi") {
+      const v: Record<string, unknown> = { url: server.url! };
+      if (envVar) v.headers = { Authorization: bearer("dollar") };
+      return v;
+    }
+    // claude-code (~/.claude.json mcpServers.<name>)
+    const v: Record<string, unknown> = { url: server.url! };
+    if (envVar) v.headers = { Authorization: bearer("dollar") };
+    return v;
   }
   // stdio
   const parts = server.command!.split(/\s+/);
@@ -323,6 +345,14 @@ async function applyToCodex(server: McpServer, home: string): Promise<void> {
   let entry: string;
   if (server.transport === "http") {
     entry = `[mcp_servers.${server.name}]\nurl = "${server.url}"`;
+    // Wire bearer token from env when a single auth_env_var is declared.
+    // Codex supports `bearer_token_env_var` for streamable-HTTP MCP servers
+    // (https://developers.openai.com/codex/config-reference). Without this,
+    // the MCP receives no Authorization header and either errors or falls
+    // through to interactive OAuth (`codex mcp login <name>`).
+    if (server.auth_env_vars.length === 1) {
+      entry += `\nbearer_token_env_var = "${server.auth_env_vars[0]}"`;
+    }
   } else {
     const parts = server.command!.split(/\s+/);
     const cmd = parts[0]!;

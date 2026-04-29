@@ -523,6 +523,12 @@ Per-skill harnesses: `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <s
 - **`dist/` is gitignored.** Fresh clone needs Bun (`bash scripts/install.sh`) or `FULCRUM_RELEASE_TAG=...` to fetch a release artifact.
 - **Skill content correctness is the author's job.** Lint validates frontmatter shape only. Vendor-first policy minimizes this risk for new skills (use vendor-published source, never re-author).
 - **stripVendorRuleBlocks scope = user-global rules files only.** Project-root `CLAUDE.md` / `GEMINI.md` written by `graphify install` are .gitignored rather than stripped (vendor controls those by design).
+- **Doctor verifies env presence + HEAD reachability, not actual MCP wire-up.** Discovered 2026-04-29: codex showed a wall of MCP startup errors (auth missing, wrong URL, wrong stdio cmd) while doctor reported `verdict: ok`. Gaps:
+  - No drift detection between `default_enabled=false` (registry) and per-agent `enabled_<agent>=true` (state file). Current state: all 16 builtin MCPs enabled across all 5 agents (post-install drift).
+  - Auth env presence checked, but auth *wiring* not validated (codex needs `bearer_token_env_var`; gemini/claude-code/opencode/pi need a `headers.Authorization` block — none of which doctor inspects).
+  - Vendor URL drift not detected: `cloudflare-logpush` was pointing at retired `logpush.mcp.cloudflare.com` (vendor moved to `logs.mcp.cloudflare.com`).
+  - Wrong stdio command not caught: `semgrep --experimental mcp` is now `semgrep mcp` (vendor renamed). Doctor only checks `which semgrep`.
+  - CI runs unit tests with mock specs — no real MCP `initialize` handshake. Tracked as task #8.
 
 ---
 

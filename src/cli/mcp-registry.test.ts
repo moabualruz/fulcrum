@@ -287,7 +287,7 @@ describe("W3 server registrations", () => {
     const reg = await loadRegistry();
     const s = reg.servers["semgrep"]!;
     expect(s.transport).toBe("stdio");
-    expect(s.command).toBe("semgrep --experimental mcp");
+    expect(s.command).toBe("semgrep mcp");
     expect(s.vendor).toBe("semgrep");
     expect(s.default_enabled).toBe(false);
     expect(s.auth_env_vars).toHaveLength(0);
