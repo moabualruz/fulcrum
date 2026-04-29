@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { computeSubpathSha256, loadUpstreamSkills, syncUpstreamSkills } from "./upstream-skills.ts";
+import {
+  computeSubpathSha256,
+  loadUpstreamSkills,
+  pruneVendorCanonicalDupes,
+  removeAgentsSharedDir,
+  syncUpstreamSkills,
+} from "./upstream-skills.ts";
 import * as proc from "../utils/proc.ts";
 
 let TMP: string;
@@ -543,5 +549,176 @@ describe("W1.6 ast-grep claude_plugin schema", () => {
     } finally {
       logSpy.mockRestore();
     }
+  });
+});
+
+describe("vendor_canonical_agents schema", () => {
+  test("parses vendor_canonical_agents array", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.graphify]",
+      "source = \"https://github.com/example/graphify\"",
+      "subpath = \"graphify/skill.md\"",
+      "ref = \"main\"",
+      "tree_sha = \"0123456789abcdef0123456789abcdef01234567\"",
+      "license = \"MIT\"",
+      "author_class = \"individual\"",
+      "pinned_on = \"2026-04-28\"",
+      "review_due = \"2026-07-27\"",
+      "vendor_canonical_agents = [\"claude-code\", \"codex\", \"gemini\", \"opencode\"]",
+      "",
+    ].join("\n"));
+    const skills = await loadUpstreamSkills(lockPath);
+    expect(skills[0]?.vendor_canonical_agents).toEqual(["claude-code", "codex", "gemini", "opencode"]);
+  });
+
+  test("rejects unknown agent ID in vendor_canonical_agents", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.x]",
+      "source = \"https://github.com/example/x\"",
+      "subpath = \"skills/x\"",
+      "ref = \"main\"",
+      "tree_sha = \"0123456789abcdef0123456789abcdef01234567\"",
+      "license = \"MIT\"",
+      "author_class = \"individual\"",
+      "pinned_on = \"2026-04-28\"",
+      "review_due = \"2026-07-27\"",
+      "vendor_canonical_agents = [\"bogus-agent\"]",
+      "",
+    ].join("\n"));
+    await expect(loadUpstreamSkills(lockPath)).rejects.toThrow(/vendor_canonical_agents value 'bogus-agent'/);
+  });
+
+  test("syncUpstreamSkills skips vendor-canonical agents", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.graphify]",
+      "source = \"https://github.com/example/graphify\"",
+      "subpath = \"graphify/skill.md\"",
+      "ref = \"main\"",
+      "tree_sha = \"0123456789abcdef0123456789abcdef01234567\"",
+      "license = \"MIT\"",
+      "author_class = \"individual\"",
+      "pinned_on = \"2026-04-28\"",
+      "review_due = \"2026-07-27\"",
+      "vendor_canonical_agents = [\"claude-code\", \"codex\", \"gemini\", \"opencode\"]",
+      "",
+    ].join("\n"));
+    // Pre-create every agent base dir so they all "detect"
+    for (const p of [".claude/skills", ".codex/skills", ".gemini", ".config/opencode/skills", ".pi/agent/skills"]) {
+      await mkdir(join(TMP, p), { recursive: true });
+    }
+    const skills = await loadUpstreamSkills(lockPath);
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map((a) => String(a)).join(" "));
+    });
+    try {
+      await syncUpstreamSkills({ dryRun: true, skills, lockPath });
+      // Skip line emitted for each of the 4 vendor-canonical agents
+      const skipLines = logs.filter((l) => l.includes("vendor-canonical install handles"));
+      expect(skipLines.length).toBe(4);
+      // Pi (not in list) should NOT have the skip line; should attempt copy
+      const piMirror = logs.filter((l) => l.includes("Pi") || l.includes("graphify"));
+      expect(piMirror.length).toBeGreaterThan(0);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+});
+
+describe("pruneVendorCanonicalDupes", () => {
+  test("removes existing fulcrum-upstream/<name>/ for vendor-canonical agents", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.graphify]",
+      "source = \"https://github.com/example/graphify\"",
+      "subpath = \"graphify/skill.md\"",
+      "ref = \"main\"",
+      "tree_sha = \"0123456789abcdef0123456789abcdef01234567\"",
+      "license = \"MIT\"",
+      "author_class = \"individual\"",
+      "pinned_on = \"2026-04-28\"",
+      "review_due = \"2026-07-27\"",
+      "vendor_canonical_agents = [\"claude-code\", \"codex\"]",
+      "",
+    ].join("\n"));
+    const dupePaths = [
+      join(TMP, ".claude/skills/fulcrum-upstream/graphify"),
+      join(TMP, ".codex/skills/fulcrum-upstream/graphify"),
+      // Pi NOT in vendor_canonical_agents — must survive prune.
+      join(TMP, ".pi/agent/skills/fulcrum-upstream/graphify"),
+    ];
+    for (const p of dupePaths) {
+      await mkdir(p, { recursive: true });
+      await writeFile(join(p, "SKILL.md"), "# graphify\n");
+    }
+    await pruneVendorCanonicalDupes({ home: TMP, lockPath });
+    const { stat } = await import("node:fs/promises");
+    await expect(stat(dupePaths[0]!)).rejects.toThrow();
+    await expect(stat(dupePaths[1]!)).rejects.toThrow();
+    // Pi mirror must remain
+    expect((await stat(dupePaths[2]!)).isDirectory()).toBe(true);
+  });
+
+  test("idempotent — no-op when nothing to prune", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.graphify]",
+      "source = \"https://github.com/example/graphify\"",
+      "subpath = \"graphify/skill.md\"",
+      "ref = \"main\"",
+      "tree_sha = \"0123456789abcdef0123456789abcdef01234567\"",
+      "license = \"MIT\"",
+      "author_class = \"individual\"",
+      "pinned_on = \"2026-04-28\"",
+      "review_due = \"2026-07-27\"",
+      "vendor_canonical_agents = [\"claude-code\"]",
+      "",
+    ].join("\n"));
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map((a) => String(a)).join(" "));
+    });
+    try {
+      await pruneVendorCanonicalDupes({ home: TMP, lockPath });
+      expect(logs.some((l) => l.includes("no fulcrum-upstream/<name>/ dupes to prune"))).toBe(true);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+});
+
+describe("removeAgentsSharedDir", () => {
+  test("removes ~/.agents/ when present", async () => {
+    const dir = join(TMP, ".agents/skills/x");
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, "SKILL.md"), "x");
+    await removeAgentsSharedDir({ home: TMP });
+    const { stat } = await import("node:fs/promises");
+    await expect(stat(join(TMP, ".agents"))).rejects.toThrow();
+  });
+
+  test("idempotent — no-op when ~/.agents/ absent", async () => {
+    await expect(removeAgentsSharedDir({ home: TMP })).resolves.toBeUndefined();
+  });
+
+  test("dry-run does not actually remove", async () => {
+    const dir = join(TMP, ".agents/skills/y");
+    await mkdir(dir, { recursive: true });
+    await removeAgentsSharedDir({ home: TMP, dryRun: true });
+    const { stat } = await import("node:fs/promises");
+    expect((await stat(join(TMP, ".agents"))).isDirectory()).toBe(true);
   });
 });

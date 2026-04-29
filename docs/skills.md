@@ -18,6 +18,22 @@ Fulcrum-authored skills install under `fulcrum/`. Curated upstream skills instal
 
 `fulcrum skills sync` propagate authored `skills/<name>/SKILL.md` from repo to every agent `<skills-root>/fulcrum/` subfolder. `fulcrum skills upstream` clones curated upstream repos into `~/.fulcrum/cache/upstream-skills` and propagates selected skills to `fulcrum-upstream/`. **Agents still load by frontmatter `name:`** — namespacing is path-based and recursive scans pick skills up regardless of depth.
 
+### 1.1 Vendor-canonical install vs `fulcrum-upstream/` mirror
+
+When an upstream skill ships its own per-agent installer (e.g. `graphify install --platform <agent>`), the vendor's canonical write into the agent's top-level skills directory (`~/.gemini/skills/graphify/`, `~/.config/opencode/skills/graphify/`, etc.) is the source of truth. To prevent dupe-load conflicts ("Skill conflict detected" warnings), the lockfile entry declares which agents the vendor handles:
+
+```toml
+[skills.graphify]
+…
+vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]
+```
+
+`fulcrum skills upstream` then **skips** writing `<agent>/skills/fulcrum-upstream/graphify/` for any agent in that list. For agents NOT in the list (here: pi — graphify CLI doesn't support pi), the fulcrum-upstream mirror still runs as the fallback so the skill is available across every detected agent.
+
+`fulcrum install` follows up with two cleanup passes:
+- `pruneVendorCanonicalDupes` — removes `<agent>/skills/fulcrum-upstream/<name>/` entries that earlier installs created when the sync ran unconditionally for every agent.
+- `removeAgentsSharedDir` — recursively deletes `~/.agents/` if a third-party installer wrote there in violation of the per-agent rule.
+
 ## 2. Skill catalogue (general-purpose)
 
 | Skill | Teaches |

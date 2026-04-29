@@ -148,6 +148,10 @@ pinned_on = "2026-04-28"
 review_due = "2026-07-27"
 subpath_sha256 = "65b5d6f8e29b600afae8c4eb2a10b467195702b0982bd4a4a484d6666c20d389"
 subpath_size = 60766
+# vendor publishes `graphify install --platform <agent>` for these four;
+# their canonical write into <agent>/skills/graphify/ is the source of truth.
+# Pi has no vendor support → fulcrum-upstream mirror is the fallback there.
+vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]
 
 # [skills.ctx7] archived 2026-04-28 — superseded by official upstash/context7 MCP (W3.4).
 # See skills/_archive/upstream-removed.lock for the full entry.

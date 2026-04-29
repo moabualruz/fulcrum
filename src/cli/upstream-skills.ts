@@ -5,16 +5,19 @@
 // Fulcrum skills (`fulcrum/`) do not mix with vendored packs.
 
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { AGENTS } from "../agents/registry.ts";
+import type { AgentId } from "./mcp-registry.ts";
+import { ALL_AGENT_IDS } from "./mcp-registry.ts";
 import { run as runProc, which } from "../utils/proc.ts";
 
 const UPSTREAM_NAMESPACE = "fulcrum-upstream";
 const AUTHOR_CLASSES = new Set(["tool-vendor", "foundation", "individual"] as const);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TREE_SHA = /^[0-9a-f]{40}$/i;
+const KNOWN_AGENT_IDS = new Set<string>(ALL_AGENT_IDS);
 
 export interface UpstreamSkillLockEntry {
   source: string;
@@ -35,6 +38,14 @@ export interface UpstreamSkillLockEntry {
    * `npx skills add` in init-vendor.ts.
    */
   claude_plugin?: ClaudePluginDescriptor;
+  /**
+   * Agents whose vendor publishes a per-agent canonical installer (e.g.
+   * `graphify install --platform <agent>`). For those agents the upstream
+   * sync stays out of the way — vendor's canonical write into the agent's
+   * top-level skills directory is the source of truth. Empty/absent means
+   * fulcrum-upstream/<name>/ mirror runs for every detected agent.
+   */
+  vendor_canonical_agents?: AgentId[];
 }
 
 export interface ClaudePluginDescriptor {
@@ -142,6 +153,25 @@ function normalizeEntry(name: string, raw: unknown): { skill?: UpstreamSkill; pr
     }
   }
 
+  // Parse optional vendor_canonical_agents array.
+  let vendorCanonicalAgents: AgentId[] | undefined;
+  const rawVca = entry["vendor_canonical_agents"];
+  if (Array.isArray(rawVca)) {
+    const ids: AgentId[] = [];
+    for (const v of rawVca) {
+      const s = asString(v);
+      if (!s) { problems.push("vendor_canonical_agents entries must be strings"); continue; }
+      if (!KNOWN_AGENT_IDS.has(s)) {
+        problems.push(`vendor_canonical_agents value '${s}' must be one of: ${[...KNOWN_AGENT_IDS].join(", ")}`);
+        continue;
+      }
+      ids.push(s as AgentId);
+    }
+    vendorCanonicalAgents = ids;
+  } else if (rawVca !== undefined) {
+    problems.push("vendor_canonical_agents must be an array of agent IDs");
+  }
+
   if (!source) problems.push("source is required");
   if (!subpath) problems.push("subpath is required");
   if (!ref) problems.push("ref is required");
@@ -180,6 +210,7 @@ function normalizeEntry(name: string, raw: unknown): { skill?: UpstreamSkill; pr
       ...(subpathSha256 ? { subpath_sha256: subpathSha256 } : {}),
       ...(subpathSize !== undefined ? { subpath_size: subpathSize } : {}),
       ...(claudePlugin ? { claude_plugin: claudePlugin } : {}),
+      ...(vendorCanonicalAgents ? { vendor_canonical_agents: vendorCanonicalAgents } : {}),
     },
     problems,
   };
@@ -421,14 +452,14 @@ async function ensureRepo(repo: string, ref: string, sha: string, dryRun: boolea
   return dir;
 }
 
-function agentTargets(home: string): Array<{ label: string; baseRoot: string; skillsRoot: string; extensionRoot?: string }> {
-  const out: Array<{ label: string; baseRoot: string; skillsRoot: string; extensionRoot?: string }> = [];
+function agentTargets(home: string): Array<{ id: AgentId; label: string; baseRoot: string; skillsRoot: string; extensionRoot?: string }> {
+  const out: Array<{ id: AgentId; label: string; baseRoot: string; skillsRoot: string; extensionRoot?: string }> = [];
   for (const agent of AGENTS) {
     if (agent.id === "gemini") {
       const extensionRoot = `${agent.baseDir(home)}/extensions/${UPSTREAM_NAMESPACE}-skills`;
-      out.push({ label: agent.label, baseRoot: agent.baseDir(home), skillsRoot: `${extensionRoot}/skills`, extensionRoot });
+      out.push({ id: agent.id, label: agent.label, baseRoot: agent.baseDir(home), skillsRoot: `${extensionRoot}/skills`, extensionRoot });
     } else {
-      out.push({ label: agent.label, baseRoot: agent.skillsDir(home), skillsRoot: `${agent.skillsDir(home)}/${UPSTREAM_NAMESPACE}` });
+      out.push({ id: agent.id, label: agent.label, baseRoot: agent.skillsDir(home), skillsRoot: `${agent.skillsDir(home)}/${UPSTREAM_NAMESPACE}` });
     }
   }
   return out;
@@ -548,6 +579,17 @@ export async function syncUpstreamSkills(
       const repoDir = repoDirs.get(skill.source);
       if (!repoDir) continue;
 
+      // Vendor-canonical gate: when the upstream skill ships a per-agent
+      // installer (e.g. `graphify install --platform <agent>`), the vendor's
+      // canonical placement under <agent>/skills/<name>/ is the source of
+      // truth. Stay out for those agents — fulcrum-upstream/<name>/ here
+      // would create a duplicate that triggers "Skill conflict detected"
+      // warnings at agent startup.
+      if (skill.vendor_canonical_agents && skill.vendor_canonical_agents.includes(target.id)) {
+        console.log(`    · ${skill.name} (vendor-canonical install handles ${target.label}; skip mirror)`);
+        continue;
+      }
+
       // W1.6: Claude Code with claude_plugin field — use plugin install path.
       if (isClaudeAgent && skill.claude_plugin) {
         if (dryRun) {
@@ -597,4 +639,68 @@ export async function syncUpstreamSkills(
     console.log();
   }
   console.log("Done.");
+}
+
+// ---------------------------------------------------------------------------
+// Cleanup passes
+// ---------------------------------------------------------------------------
+
+/**
+ * Remove fulcrum-upstream/<name>/ duplicates for every (skill, agent) pair
+ * where vendor canonical install handles placement. Older installs created
+ * those dupes because the sync ran unconditionally for every agent.
+ *
+ * Idempotent: missing dirs are silent no-ops. Dry-run only logs.
+ */
+export async function pruneVendorCanonicalDupes(opts: {
+  home: string;
+  dryRun?: boolean;
+  lockPath?: string;
+  skills?: readonly UpstreamSkill[];
+}): Promise<void> {
+  const home = opts.home;
+  const dryRun = opts.dryRun ?? false;
+  const skills = opts.skills ?? (await loadUpstreamSkills(opts.lockPath ?? upstreamLockPath()));
+  const targets = agentTargets(home);
+  let removed = 0;
+
+  console.log("     Pruning vendor-canonical dupes from fulcrum-upstream/ namespace");
+  for (const skill of skills) {
+    const vca = skill.vendor_canonical_agents;
+    if (!vca || vca.length === 0) continue;
+    for (const target of targets) {
+      if (!vca.includes(target.id)) continue;
+      const dupePath = `${target.skillsRoot}/${skill.name}`;
+      if (!(await exists(dupePath))) continue;
+      if (dryRun) {
+        console.log(`     [dry-run] would rm: ${dupePath}`);
+        continue;
+      }
+      await rm(dupePath, { recursive: true, force: true });
+      console.log(`     ✓ removed ${dupePath}`);
+      removed++;
+    }
+  }
+  if (removed === 0 && !dryRun) {
+    console.log("     · no fulcrum-upstream/<name>/ dupes to prune");
+  }
+}
+
+/**
+ * Recursively remove ~/.agents/. A third-party installer writing here is a
+ * known rule violation (~/.claude/CLAUDE.md "never use ~/.agents/"). We never
+ * own the path; nuking is safe — every agent has its own per-agent skills dir.
+ */
+export async function removeAgentsSharedDir(opts: {
+  home: string;
+  dryRun?: boolean;
+}): Promise<void> {
+  const dir = `${opts.home}/.agents`;
+  if (!(await exists(dir))) return;
+  if (opts.dryRun) {
+    console.log(`     [dry-run] would rm -rf: ${dir} (rule violation: shared agents dir)`);
+    return;
+  }
+  await rm(dir, { recursive: true, force: true });
+  console.log(`     ✓ removed shared ${dir} (rule: never use ~/.agents/)`);
 }
