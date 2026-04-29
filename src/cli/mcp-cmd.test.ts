@@ -192,7 +192,7 @@ describe("fulcrum mcp enable/disable", () => {
     expect(reg.servers["github"]!.enabled["codex"]).toBe(false);
   });
 
-  test("disable --agent removes only that agent's native config", async () => {
+  test("disable --agent removes only agents without native disabled config", async () => {
     await mkdir(join(TMP, ".codex"), { recursive: true });
     await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
     await writeFile(join(TMP, ".pi", "agent", "settings.json"), JSON.stringify({ packages: ["npm:pi-mcp-adapter"] }));
@@ -209,22 +209,25 @@ describe("fulcrum mcp enable/disable", () => {
     const pi = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8")) as {
       mcpServers?: Record<string, unknown>;
     };
-    expect(codex).not.toContain("[mcp_servers.github]");
+    expect(codex).toContain("[mcp_servers.github]");
+    expect(codex).toContain("enabled = false");
     expect(pi.mcpServers?.github).toBeDefined();
   });
 
-  test("disable keeps Gemini and OpenCode configs but marks them disabled", async () => {
+  test("disable keeps Codex, Gemini, and OpenCode configs but marks them disabled", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
     await mkdir(join(TMP, ".gemini"), { recursive: true });
     await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
     await registerServer("github", DEFAULT_GITHUB_SERVER);
     const { restore } = captureConsole();
     try {
-      await run(["enable", "github", "--agent", "gemini", "--agent", "opencode"]);
-      await run(["disable", "github", "--agent", "gemini", "--agent", "opencode"]);
+      await run(["enable", "github", "--agent", "codex", "--agent", "gemini", "--agent", "opencode"]);
+      await run(["disable", "github", "--agent", "codex", "--agent", "gemini", "--agent", "opencode"]);
     } finally {
       restore();
     }
 
+    const codex = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
     const geminiSettings = JSON.parse(await readFile(join(TMP, ".gemini", "settings.json"), "utf8")) as {
       mcpServers?: Record<string, unknown>;
     };
@@ -234,6 +237,8 @@ describe("fulcrum mcp enable/disable", () => {
     const opencode = JSON.parse(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8")) as {
       mcp?: Record<string, Record<string, unknown>>;
     };
+    expect(codex).toContain("[mcp_servers.github]");
+    expect(codex).toContain("enabled = false");
     expect(geminiSettings.mcpServers?.github).toBeDefined();
     expect(geminiEnablement.github?.enabled).toBe(false);
     expect(opencode.mcp?.github).toBeDefined();

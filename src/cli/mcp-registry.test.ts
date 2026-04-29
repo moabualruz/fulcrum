@@ -218,6 +218,33 @@ describe("applyToAgents", () => {
     const toml = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
     expect(toml).toContain("[mcp_servers.github]");
     expect(toml).toContain("https://api.githubcopilot.com/mcp/");
+    expect(toml).not.toContain("enabled = false");
+  });
+
+  test("writes Codex disabled TOML block without enabling tools", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await registerServer("github", DEFAULT_GITHUB_SERVER);
+
+    await applyToAgents("github", { agents: ["codex"] });
+
+    const toml = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(toml).toContain("[mcp_servers.github]");
+    expect(toml).toContain("https://api.githubcopilot.com/mcp/");
+    expect(toml).toContain("enabled = false");
+  });
+
+  test("rewrites Codex block when disabled server is enabled later", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await registerServer("github", DEFAULT_GITHUB_SERVER);
+
+    await applyToAgents("github", { agents: ["codex"] });
+    await setEnabled("github", true, { agents: ["codex"] });
+    await applyToAgents("github", { agents: ["codex"] });
+
+    const toml = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    const count = (toml.match(/\[mcp_servers\.github\]/g) ?? []).length;
+    expect(count).toBe(1);
+    expect(toml).not.toContain("enabled = false");
   });
 
   test("writes Gemini settings.json for enabled agent when .gemini exists", async () => {

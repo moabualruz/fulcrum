@@ -312,7 +312,7 @@ async function writeJsonFile(file: string, data: Record<string, unknown>): Promi
 }
 
 function supportsNativeDisabled(agentId: AgentId): boolean {
-  return agentId === "gemini" || agentId === "opencode";
+  return agentId === "codex" || agentId === "gemini" || agentId === "opencode";
 }
 
 function mcpValueForAgent(server: McpServer, agentId: AgentId): Record<string, unknown> {
@@ -371,7 +371,16 @@ function tomlBlockEnd(name: string): string {
   return `# END FULCRUM MCP ${name}`;
 }
 
-async function applyToCodex(server: McpServer, home: string): Promise<void> {
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function replaceManagedBlock(existing: string, begin: string, end: string, replacement: string): string {
+  const re = new RegExp(`${escapeRegExp(begin)}[\\s\\S]*?${escapeRegExp(end)}\\n?`, "m");
+  return existing.replace(re, replacement);
+}
+
+async function applyToCodex(server: McpServer, home: string, enabled = true): Promise<void> {
   const file = `${home}/.codex/config.toml`;
   const BEGIN = tomlBlockBegin(server.name);
   const END = tomlBlockEnd(server.name);
@@ -379,11 +388,6 @@ async function applyToCodex(server: McpServer, home: string): Promise<void> {
     if (!(await exists(file))) return "";
     return readFile(file, "utf8");
   })();
-
-  if (existing.includes(BEGIN)) {
-    console.log(`     · Codex ${server.name} MCP already present`);
-    return;
-  }
 
   let entry: string;
   if (server.transport === "http") {
@@ -402,12 +406,20 @@ async function applyToCodex(server: McpServer, home: string): Promise<void> {
     const args = parts.slice(1).map((a) => `"${a}"`).join(", ");
     entry = `[mcp_servers.${server.name}]\ncommand = "${cmd}"\nargs = [${args}]`;
   }
+  if (!enabled) entry += "\nenabled = false";
 
   const block = `${BEGIN}\n${entry}\n${END}\n`;
+  if (existing.includes(BEGIN)) {
+    const next = replaceManagedBlock(existing, BEGIN, END, block);
+    await writeFile(file, next);
+    console.log(`     ✓ Codex ${server.name} MCP ${enabled ? "enabled" : "registered disabled"}`);
+    return;
+  }
+
   const sep = existing && !existing.endsWith("\n") ? "\n\n" : existing ? "\n" : "";
   await mkdir(dirname(file), { recursive: true });
   await writeFile(file, `${existing}${sep}${block}`);
-  console.log(`     ✓ Codex ${server.name} MCP registered`);
+  console.log(`     ✓ Codex ${server.name} MCP ${enabled ? "enabled" : "registered disabled"}`);
 }
 
 async function removeFromCodex(server: McpServer, home: string): Promise<void> {
@@ -420,7 +432,7 @@ async function removeFromCodex(server: McpServer, home: string): Promise<void> {
     console.log(`     · Codex ${server.name} MCP not present`);
     return;
   }
-  const re = new RegExp(`\\n?${BEGIN.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?${END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n?`, "m");
+  const re = new RegExp(`\\n?${escapeRegExp(BEGIN)}[\\s\\S]*?${escapeRegExp(END)}\\n?`, "m");
   const out = existing.replace(re, "\n").replace(/\n{3,}/g, "\n\n").trimEnd();
   await writeFile(file, out ? `${out}\n` : "");
   console.log(`     - Codex ${server.name} MCP removed`);
@@ -622,7 +634,7 @@ export async function applyToAgents(name: string, opts: { dryRun?: boolean; agen
 
     switch (agentId) {
       case "claude-code": await applyToClaudeCode(server, home, dryRun); break;
-      case "codex":       if (await exists(`${home}/.codex`)) await applyToCodex(server, home); else console.log(`     · Codex not detected`); break;
+      case "codex":       if (await exists(`${home}/.codex`)) await applyToCodex(server, home, enabled); else console.log(`     · Codex not detected`); break;
       case "gemini":      if (await exists(`${home}/.gemini`)) await applyToGemini(server, home, enabled); else console.log(`     · Gemini not detected`); break;
       case "opencode":    if (await exists(`${home}/.config/opencode`)) await applyToOpenCode(server, home, enabled); else console.log(`     · OpenCode not detected`); break;
       case "pi":          await applyToPi(server, home); break;
