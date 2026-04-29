@@ -5,6 +5,7 @@ import type { ComponentAction, ComponentPlan } from "./types.ts";
 
 interface ExecuteOptions {
   dryRun?: boolean;
+  purge?: boolean;
 }
 
 export async function executeComponentPlan(
@@ -31,7 +32,7 @@ export async function executeComponentPlan(
     for (const action of plan.actions) {
       try {
         if (shouldApplyAction(action, appliedVendorActions)) {
-          await applyAction(action, false);
+          await applyAction(action, false, opts);
         }
         recordSuccessfulAction(ledger, operationId, action);
       } catch (error) {
@@ -58,7 +59,11 @@ function vendorActionKey(action: ComponentAction): string {
   return `${action.componentId}:${action.surfaceId}:${action.operation}:${action.change}`;
 }
 
-async function applyAction(action: ComponentAction, dryRun: boolean): Promise<void> {
+async function applyAction(
+  action: ComponentAction,
+  dryRun: boolean,
+  opts: ExecuteOptions = {},
+): Promise<void> {
   if (action.change === "noop" || action.change === "preserve") return;
 
   switch (action.kind) {
@@ -78,7 +83,7 @@ async function applyAction(action: ComponentAction, dryRun: boolean): Promise<vo
     }
     case "policy-seed": {
       const { applyPolicyAction } = await import("./adapters/files.ts");
-      await applyPolicyAction(action.operation, false);
+      await applyPolicyAction(action.operation, false, opts.purge === true);
       return;
     }
     case "skill-sync":
