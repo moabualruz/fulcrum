@@ -14,6 +14,8 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
 
 `main` ships a Bun `fulcrum` CLI that:
 
+- **Manages component lifecycle foundations** (`fulcrum component …`) — catalog, planner, SQLite ledger, executor, and adapters now cover inspected/planned components plus real apply paths for hooks, MCP registry entries, global rules sentinel blocks, and tool-output policy. Public surface currently includes `list`, `info`, `plan`, and `install/remove/enable/disable` with `--agent`, `--all-agents`, `--dry-run`, and `--json`. Remaining lifecycle work is vendor/skills adapters, `status`, doctor integration, and `install`/`uninstall` compatibility wrapper migration; detailed plan stays in `docs/superpowers/plans/2026-04-29-component-lifecycle-management.md`.
+
 - **Installs cross-agent setup** (`fulcrum install`) — sentinel-splices `rules/AGENTS.md` into each detected agent's primary rules file; vendors hook recipe snippets; seeds `tool-output-policy.toml`; runs caveman per agent (`claude plugin install caveman@caveman` / `gemini extensions install` / direct official repo mirror for Codex/OpenCode/Pi, with Codex plugin metadata/assets/hooks/config mirrored into native Codex paths); installs vendor capability packages (Repomix Claude plugins + non-Claude mirrors, Cloudflare Claude plugin, Superpowers Claude/Gemini/OpenCode/Pi packages + Codex full skill mirror; Pi falls back to skill mirror only when `pi` is unavailable); registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 vendor MCPs in the registry (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart) with minimal default state enabling only context7; syncs 29 authored skills + 27 upstream-pinned skills with subpath-level SHA-256 integrity verification and `vendor_canonical_agents` package-ownership skips.
 
 - **Bootstraps projects** (`fulcrum init <dir>`) in three vendor-canonical phases:
@@ -29,7 +31,7 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
 
 - **Validates the environment** (`fulcrum doctor [--json] [--probe]`) — agent detection, rules-spliced state, caveman per-agent install + `defaultMode` source, Pi MCP adapter check, 47 BYO tools, tool-output policy presence. MCP registry section reports `auth_status` (env-var presence), `reachable` (HEAD probe / `which`), `drift` (`default_enabled=false` but some agent has it enabled), and `wiring` (per-agent native config inspection — confirms `bearer_token_env_var` / `headers.Authorization` is present for HTTP servers with declared auth). With `--probe`: spawns stdio MCPs / POSTs HTTP MCPs and asserts a valid JSON-RPC `initialize` reply within an 8s timeout. Catches wrong commands, stale URLs, and broken auth in one check.
 
-- **Self-tests** via `bun run ci` — install → tsc → 292 tests → 5 platform builds → skills:lint → compress:check (hard gate, 0 pending). Latest run green after `test: harden cross-agent skill evals` (`9e8f1cc`).
+- **Self-tests** via `bun run ci` — install → tsc → full Bun test suite → 5 platform builds → skills:lint → compress:check (hard gate, 0 pending). Latest implementation gate green on 2026-04-30 with component lifecycle foundation + subagent orchestration changes; only HANDOVER changed after that gate.
 
 - **Verifies a fresh setup** via `docs/smoke-test.md` — self-contained markdown that any of the 5 agents can read as a prompt and execute step-by-step (16 checks, result table, failure remediation, append-only result log under `~/.fulcrum/state/global/smoke-test/<YYYY-MM-DD>.md`). Latest full cross-agent run on 2026-04-29: Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi CLI all PASS after `fix(smoke): pass cross-agent setup checks` (`bc0f656`).
 
@@ -185,7 +187,7 @@ LICENSE (MIT)  AGENTS.md  README.md
 
 ## 3. What works (verified, current run)
 
-- `bun run ci` — green: install + tsc + **292 tests** + 5 platform builds + skills:lint + compress:check (hard, 0 pending).
+- `bun run ci` — green: install + tsc + full Bun test suite + 5 platform builds + skills:lint + compress:check (hard, 0 pending).
 - `fulcrum install` — full sweep across 5 agents; doctor verdict ok on a fully-set-up machine.
 - `fulcrum install --enable-all-mcps` — flips every builtin MCP on across every detected agent immediately after registration. End-to-end live verified 2026-04-29: 16/16 MCPs `handshake:ok` via `fulcrum doctor --probe`. Default install state enables only context7 from the builtin registry where no user state exists; skip via `--no-default-mcps`.
 - `fulcrum init <dir>` — three phases run end-to-end on this repo: vendor integrations across detected agents, vendor rule de-duplication, project indices (`graphify-out/` + `repomix-output.xml`).
@@ -205,10 +207,10 @@ LICENSE (MIT)  AGENTS.md  README.md
 - [x] Context-mode removed from all managed CLI-agent surfaces.
 - [x] MCP registry + auth wiring + doctor probe implemented.
 - [x] Cross-agent smoke test accepted clean on 2026-04-29.
-- [x] `subagent-orchestration` skill added, split into reference files, mirrored into the Fulcrum plugin, compressed, linted, and synced.
-- [x] Subagent orchestration evals accepted for now across target agents. Codex/OpenCode passed full statistical evals; Claude/Pi/Gemini findings are accepted as non-blocking harness/runtime quirks for this branch.
+- [x] `subagent-orchestration` skill added, split into reference files, mirrored into the Fulcrum plugin, compressed, linted, synced, then hardened for max-useful parallelism, external worktree write lanes, runtime dependency reassessment, and lane-specific model/effort selection.
+- [x] Subagent orchestration evals accepted for now across target agents. Codex/OpenCode passed full statistical evals; Claude/Pi/Gemini findings are accepted as non-blocking harness/runtime quirks for this branch. Latest Codex spot eval was stopped after user acceptance at 10/12 positive triggers + first negative clean.
 - [x] Eval harnesses hardened after missing-agent runs: no response-size argv blowups; Gemini no longer uses `--yolo`; Pi no longer exposes tools during activation eval.
-- [x] Latest gate: `bun run ci` green after `9e8f1cc`.
+- [x] Latest implementation gate: `bun run ci` green on 2026-04-30 after `b858220` + `6d1ace2`; HANDOVER-only update followed.
 
 ---
 
@@ -249,6 +251,8 @@ Don't relitigate without new information.
 
 Recent high-signal commits:
 
+- `6d1ace2 docs(subagents): harden orchestration guidance` — max-useful parallelism, worktree write lanes, runtime dependency reassessment, and model/effort selection guidance; mirrored source + plugin skill; Codex spot eval accepted by user.
+- `b858220 feat(component): add lifecycle foundation` — `fulcrum component` catalog/planner/ledger/executor plus hooks/MCP/rules/policy adapters and detailed remaining-task plan.
 - `9e8f1cc test: harden cross-agent skill evals` — long-response-safe eval capture; Gemini read-only plan mode; Pi no-tool eval mode.
 - `fec0860 test: stabilize subagent evals` — accepted eval prompts + Codex/OpenCode activation detection fixes.
 - `7ed7794 feat: add subagent orchestration skill` — new skill + split references + eval set + plugin mirror.
@@ -261,7 +265,9 @@ Recent high-signal commits:
 
 Foundation gaps tracked in earlier revisions are all closed. CI green; doctor verdict ok on a fully-set-up machine; smoke-test prompt at `docs/smoke-test.md` is the canonical post-install verification.
 
-The trajectory layer below is the next-branch work — none of it is implemented. Build order is top-down because later layers consume earlier layers' state.
+Before starting the trajectory layers, finish the remaining **component lifecycle management** work as a foundation-hardening feature. Detailed implementation plan: `docs/superpowers/plans/2026-04-29-component-lifecycle-management.md`. Tasks 1-7 are implemented and committed in `b858220`; orchestration guidance needed to run the rest is committed in `6d1ace2`. Next session should start at Task 8: vendor/skills adapter with official-first installs and verbatim mirroring to CLI agents that lack first-party/generic package installers, then status/doctor integration, compatibility wrappers, docs, and full verification.
+
+The trajectory layer below is next-branch work after component lifecycle management — none of it is implemented. Build order is top-down because later layers consume earlier layers' state.
 
 ### 6.1 Repository supervisor — `fulcrum repo …`
 
@@ -392,17 +398,18 @@ plugin_capabilities(plugin_id, capability)
 
 **CLI surface.** `add`, `list`, `enable/disable`, `update`, `rm`.
 
-### Build order + branch plan
+### Build order + mainline plan
 
-| # | Branch | Layer | Depends |
+| # | Execution | Layer | Depends |
 |---|---|---|---|
-| 1 | `feat/repo-supervisor` | §6.1 | foundation |
-| 2 | `feat/memory` | §6.2 | foundation (parallel-safe with 1) |
-| 3 | `feat/task-system` | §6.3 | 1, 2 |
-| 4 | `feat/agent-runs` | §6.4 | 1, 2, 3 |
-| 5 | `feat/context-engine` | §6.5 | 1–4 |
-| 6 | `feat/artifacts` | §6.6 | 1, 3, 4 (parallel-safe with 5) |
-| 7 | `feat/plugins` | §6.7 | 1–6 |
+| 0 | `main` + subagent orchestration | Component lifecycle management (`fulcrum component …`) | foundation |
+| 1 | `main` after step 0 | §6.1 | foundation |
+| 2 | `main` after step 0 | §6.2 | foundation (parallel-safe with 1) |
+| 3 | `main` after 1, 2 | §6.3 | 1, 2 |
+| 4 | `main` after 1, 2, 3 | §6.4 | 1, 2, 3 |
+| 5 | `main` after 1–4 | §6.5 | 1–4 |
+| 6 | `main` after 1, 3, 4 | §6.6 | 1, 3, 4 (parallel-safe with 5) |
+| 7 | `main` after 1–6 | §6.7 | 1–6 |
 
 ### Cross-layer rules
 
@@ -518,14 +525,15 @@ fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, handshake, wiring,
 
 ## 7a. Next steps only
 
-1. **Add component-level install/remove commands.**
-   Implement the planned `fulcrum component` lifecycle surface documented in `docs/user-guide.md` and `docs/developer-guide.md`: install/remove one managed component such as caveman, Repomix, vendor packages, DeepWiki, or MCP registry scaffolding without touching unrelated components. Preserve dry-run behavior, per-agent targeting, idempotent removal, and sentinel-only cleanup.
+1. **Finish component lifecycle management.**
+   Detailed plan: `docs/superpowers/plans/2026-04-29-component-lifecycle-management.md`.
+   Stay on `main` as integration and use external worktrees for parallel worker lanes. Completed: catalog, planner, ledger, `component list/info/plan`, `component install/remove/enable/disable`, executor, and adapters for hooks/MCP/rules/policy. Next: Task 8 vendor/skills adapter, specifically preserving first-party installer vs Fulcrum mirror behavior for plugins/extensions/packages across all supported CLIs; then Task 9 status + doctor integration, Task 10 `install`/`uninstall` compatibility wrappers, Task 12 docs, Task 13 full verification.
 
 2. **Start layer §6.1: Repository supervisor.**
-   Branch: `feat/repo-supervisor`. Implement `fulcrum repo …` around repo registration, refresh, list/show, settings, SQLite migrations, doctor row counts, and the `repo-track` session hook.
+   After component lifecycle lands, implement `fulcrum repo …` around repo registration, refresh, list/show, settings, SQLite migrations, doctor row counts, and the `repo-track` session hook.
 
-3. **Optionally revisit eval precision after the next feature branch.**
-   Current subagent orchestration eval state is accepted for this branch. Future work should improve Claude/Pi/Gemini activation signals only if it blocks a concrete release gate or produces user-visible skill-loading failures.
+3. **Optionally revisit eval precision after the next implementation pass.**
+   Current subagent orchestration eval state is accepted for this baseline. Future work should improve Claude/Pi/Gemini activation signals only if it blocks a concrete release gate or produces user-visible skill-loading failures.
 
 ---
 
