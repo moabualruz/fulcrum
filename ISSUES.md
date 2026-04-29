@@ -175,3 +175,38 @@ Expected fix:
 - Add a `skillBudget` section to `doctor --json`.
 - Add human doctor output that warns when active skill metadata exceeds a configured threshold.
 - Use the same scanner in `fulcrum skills list --installed` so users can inspect what the agent will load.
+
+## ISS-007: DeepWiki MCP is installed outside the managed registry
+
+Evidence:
+
+- `codex mcp get deepwiki` showed DeepWiki enabled at `https://mcp.deepwiki.com/mcp`.
+- `claude mcp get deepwiki` showed DeepWiki connected.
+- Gemini, OpenCode, and Pi configs also contained DeepWiki entries.
+- `bun run src/index.ts mcp list --json` did not include `deepwiki`; `doctor --json` did not report it under `.mcp.servers`.
+- `src/cli/mcp-builtins.ts` does not include a DeepWiki builtin, and `MINIMAL_DEFAULT_MCPS` is `["context7", "repomix"]`, while `docs/mcp.md` says the default set is DeepWiki + context7.
+- `src/cli/install.ts` still calls `installDeepwikiMcp()` as a special case before registry setup.
+- DeepWiki service/transport was not the failure: `mcp__deepwiki__read_wiki_structure` returned pages for `openai/openai-python`.
+- DeepWiki result failure for `moabualruz/fulcrum` was repository indexing/scope: the MCP returned `Repository not found. Visit https://deepwiki.com/moabualruz/fulcrum to index it.`
+
+Root cause:
+
+- DeepWiki is split between legacy special-case installer code (`src/cli/mcp.ts`) and the newer MCP registry (`src/cli/mcp-registry.ts` / `src/cli/mcp-builtins.ts`).
+- Agent configs can contain a working DeepWiki entry while Fulcrum registry, list, doctor, and component lifecycle do not know about it.
+- There is no regression test proving DeepWiki appears in the registry-backed default set and in `doctor --json`.
+
+Failing test to write first:
+
+- In `src/cli/install.test.ts`, run install against a temp `HOME`.
+- Assert `loadRegistry().servers.deepwiki` exists with URL `https://mcp.deepwiki.com/mcp`.
+- Assert `deepwiki` is enabled for every visible agent in the minimal default state.
+- Assert `bun run src/index.ts mcp list --json` and `doctor --json` include DeepWiki.
+- Add a migration/compatibility test where legacy agent config already contains DeepWiki but registry lacks it; running install must reconcile registry state without duplicating agent config blocks.
+
+Expected fix:
+
+- Move DeepWiki into `src/cli/mcp-builtins.ts` as `DEFAULT_DEEPWIKI_SERVER`.
+- Include `deepwiki` in `BUILTIN_MCPS` and the minimal default set.
+- Route DeepWiki install/remove/enable/disable through the registry path for all agents.
+- Retire or narrow `src/cli/mcp.ts` special-case helper after compatibility migration is covered.
+- Add doctor output that distinguishes MCP startup/handshake health from DeepWiki repository-index misses.
