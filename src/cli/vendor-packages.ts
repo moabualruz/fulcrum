@@ -265,10 +265,21 @@ async function uninstallPiSuperpowersPackage(home: string, dryRun: boolean): Pro
   await removePath(`${home}/.pi/agent/skills/superpowers`, "Pi Superpowers skill mirror", dryRun);
 }
 
-export async function installVendorCapabilityPackages(opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function installCloudflarePackage(opts: { dryRun?: boolean } = {}): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const home = homeDir();
   await installClaudePlugin(home, "Cloudflare", CLOUDFLARE_PLUGIN, dryRun, CLOUDFLARE_MARKETPLACE);
+}
+
+export async function uninstallCloudflarePackage(opts: { dryRun?: boolean } = {}): Promise<void> {
+  const dryRun = opts.dryRun ?? false;
+  const home = homeDir();
+  await uninstallClaudePlugin(home, "Cloudflare", CLOUDFLARE_PLUGIN, dryRun);
+}
+
+export async function installSuperpowersPackage(opts: { dryRun?: boolean } = {}): Promise<void> {
+  const dryRun = opts.dryRun ?? false;
+  const home = homeDir();
   await installClaudePlugin(home, "Superpowers", SUPERPOWERS_CLAUDE_PLUGIN, dryRun);
   await installGeminiSuperpowers(home, dryRun);
   await addOpenCodePlugin(home, dryRun);
@@ -276,13 +287,22 @@ export async function installVendorCapabilityPackages(opts: { dryRun?: boolean }
   await installPiSuperpowersPackage(home, dryRun);
 }
 
-export async function uninstallVendorCapabilityPackages(opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function uninstallSuperpowersPackage(opts: { dryRun?: boolean } = {}): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const home = homeDir();
-  await uninstallClaudePlugin(home, "Cloudflare", CLOUDFLARE_PLUGIN, dryRun);
   await uninstallClaudePlugin(home, "Superpowers", SUPERPOWERS_CLAUDE_PLUGIN, dryRun);
   await uninstallGeminiSuperpowers(home, dryRun);
   await removeOpenCodePlugin(home, dryRun);
   await removePath(`${home}/.codex/skills/superpowers`, "Codex Superpowers skill mirror", dryRun);
   await uninstallPiSuperpowersPackage(home, dryRun);
+}
+
+export async function installVendorCapabilityPackages(opts: { dryRun?: boolean } = {}): Promise<void> {
+  await installCloudflarePackage(opts);
+  await installSuperpowersPackage(opts);
+}
+
+export async function uninstallVendorCapabilityPackages(opts: { dryRun?: boolean } = {}): Promise<void> {
+  await uninstallCloudflarePackage(opts);
+  await uninstallSuperpowersPackage(opts);
 }

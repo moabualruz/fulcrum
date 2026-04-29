@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { removeExactLine, removeSentinelBlock, run, setDryRun } from "./uninstall.ts";
+import { removeCavemanCopies, removeExactLine, removeSentinelBlock, run, setDryRun } from "./uninstall.ts";
 import * as proc from "../utils/proc.ts";
 
 let TMP: string;
@@ -203,6 +203,28 @@ describe("run", () => {
 // ---------------------------------------------------------------------------
 
 describe("removeCavemanCopies — W1.1 Claude plugin uninstall", () => {
+  test("opts dry-run logs without running or removing filesystem copies", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "skills", "caveman"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "skills", "caveman", "SKILL.md"), "caveman\n");
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    try {
+      await removeCavemanCopies(TMP, { dryRun: true });
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+    expect(runSpy.mock.calls).toHaveLength(0);
+    expect(logs).toContain("     [dry-run] would run: claude plugin uninstall caveman@caveman");
+    expect(await Bun.file(join(TMP, ".codex", "skills", "caveman", "SKILL.md")).exists()).toBe(true);
+  });
+
   test("calls claude plugin uninstall when .claude exists and claude on PATH", async () => {
     await mkdir(join(TMP, ".claude"), { recursive: true });
     // Create the caveman install dir so removePath has something to clean up.

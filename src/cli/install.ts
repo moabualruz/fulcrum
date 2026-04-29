@@ -480,91 +480,97 @@ export async function installRulesBlocks(home: string, dryRun = false): Promise<
  *
  * HARD RULE: never write to ~/.agents/ — enforced via assertNotAgentsPath.
  */
-export async function installCaveman(home: string): Promise<void> {
-  // --- Claude Code ---
-  const claudeDir = `${home}/.claude`;
-  if (await isDir(claudeDir)) {
-    const compressDir = `${claudeDir}/plugins/cache/caveman/caveman`;
-    if ((await isClaudePluginInstalled(home, "caveman@caveman")) && (await isDir(compressDir))) {
-      console.log("     · skip Claude Code caveman (already installed)");
-    } else if (!(await which("claude"))) {
-      console.log("     · skip Claude Code (claude not on PATH)  — manual: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman");
-    } else {
-      const r1 = await runProcDry(["claude", "plugin", "marketplace", "add", "JuliusBrussee/caveman"]);
-      if (r1.exit !== 0) {
-        console.log(`     ✗ Claude Code caveman marketplace add failed: ${r1.stderr.trim()} — manual: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman`);
+export async function installCaveman(home: string, opts: { dryRun?: boolean } = {}): Promise<void> {
+  const previousDryRun = DRY_RUN;
+  DRY_RUN = opts.dryRun ?? DRY_RUN;
+  try {
+    // --- Claude Code ---
+    const claudeDir = `${home}/.claude`;
+    if (await isDir(claudeDir)) {
+      const compressDir = `${claudeDir}/plugins/cache/caveman/caveman`;
+      if ((await isClaudePluginInstalled(home, "caveman@caveman")) && (await isDir(compressDir))) {
+        console.log("     · skip Claude Code caveman (already installed)");
+      } else if (!(await which("claude"))) {
+        console.log("     · skip Claude Code (claude not on PATH)  — manual: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman");
       } else {
-        const r2 = await runProcDry(["claude", "plugin", "install", "caveman@caveman"]);
-        if (r2.exit !== 0) {
-          console.log(`     ✗ Claude Code caveman install failed: ${r2.stderr.trim()} — manual: claude plugin install caveman@caveman`);
+        const r1 = await runProcDry(["claude", "plugin", "marketplace", "add", "JuliusBrussee/caveman"]);
+        if (r1.exit !== 0) {
+          console.log(`     ✗ Claude Code caveman marketplace add failed: ${r1.stderr.trim()} — manual: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman`);
         } else {
-          console.log("     ✓ Claude Code caveman installed");
+          const r2 = await runProcDry(["claude", "plugin", "install", "caveman@caveman"]);
+          if (r2.exit !== 0) {
+            console.log(`     ✗ Claude Code caveman install failed: ${r2.stderr.trim()} — manual: claude plugin install caveman@caveman`);
+          } else {
+            console.log("     ✓ Claude Code caveman installed");
+          }
         }
       }
-    }
-  } else {
-    console.log("     · skip Claude Code (not detected)");
-  }
-
-  // --- Gemini CLI ---
-  const geminiDir = `${home}/.gemini`;
-  if (await isDir(geminiDir)) {
-    const geminiCavemanDir = `${geminiDir}/extensions/caveman`;
-    if (await isDir(geminiCavemanDir)) {
-      console.log("     · skip Gemini CLI caveman (already installed)");
-    } else if (!(await which("gemini"))) {
-      console.log("     · skip Gemini CLI (gemini not on PATH)  — manual: gemini extensions install https://github.com/JuliusBrussee/caveman --consent --skip-settings");
     } else {
-      const r = await runProcDry(["gemini", "extensions", "install", CAVEMAN_REPO, "--consent", "--skip-settings"]);
-      if (r.exit !== 0) {
-        console.log(`     ✗ Gemini CLI caveman install failed: ${r.stderr.trim()} — manual: gemini extensions install ${CAVEMAN_REPO} --consent --skip-settings`);
+      console.log("     · skip Claude Code (not detected)");
+    }
+
+    // --- Gemini CLI ---
+    const geminiDir = `${home}/.gemini`;
+    if (await isDir(geminiDir)) {
+      const geminiCavemanDir = `${geminiDir}/extensions/caveman`;
+      if (await isDir(geminiCavemanDir)) {
+        console.log("     · skip Gemini CLI caveman (already installed)");
+      } else if (!(await which("gemini"))) {
+        console.log("     · skip Gemini CLI (gemini not on PATH)  — manual: gemini extensions install https://github.com/JuliusBrussee/caveman --consent --skip-settings");
       } else {
-        console.log("     ✓ Gemini CLI caveman installed");
+        const r = await runProcDry(["gemini", "extensions", "install", CAVEMAN_REPO, "--consent", "--skip-settings"]);
+        if (r.exit !== 0) {
+          console.log(`     ✗ Gemini CLI caveman install failed: ${r.stderr.trim()} — manual: gemini extensions install ${CAVEMAN_REPO} --consent --skip-settings`);
+        } else {
+          console.log("     ✓ Gemini CLI caveman installed");
+        }
+      }
+    } else {
+      console.log("     · skip Gemini CLI (not detected)");
+    }
+
+    // --- W1.3: Codex, OpenCode, Pi — direct vendor repo copy.
+    // Fulcrum copies Caveman surfaces into native per-agent roots. Codex gets
+    // plugin metadata/assets/hooks as well as skills because Caveman ships more
+    // than a bare SKILL.md.
+    const npxAgentDefs: Array<{ id: string; dir: string; label: string; skillsRoot: string; includeCodexPlugin?: boolean }> = [
+      { id: "codex",    dir: `${home}/.codex`,          label: "Codex CLI", skillsRoot: `${home}/.codex/skills`, includeCodexPlugin: true },
+      { id: "opencode", dir: `${home}/.config/opencode`, label: "OpenCode",  skillsRoot: `${home}/.config/opencode/skills` },
+      { id: "pi",       dir: `${home}/.pi/agent`,        label: "Pi CLI",    skillsRoot: `${home}/.pi/agent/skills` },
+    ];
+
+    for (const ag of npxAgentDefs) {
+      if (!(await isDir(ag.dir))) {
+        console.log(`     · skip ${ag.label} (not detected)`);
+        continue;
+      }
+
+      // Idempotency: if the required surfaces already exist, skip.
+      const cavemanSkillDir = `${ag.skillsRoot}/caveman`;
+      const codexPluginDir = `${home}/.codex/plugins/cache/caveman/caveman/0.1.0`;
+      if ((await isDir(cavemanSkillDir)) && (!ag.includeCodexPlugin || (await isDir(codexPluginDir)))) {
+        console.log(`     · skip ${ag.label} caveman (already installed)`);
+        continue;
+      }
+
+      if (await installCavemanFromRepo(home, ag.skillsRoot, ag.label, !!ag.includeCodexPlugin)) {
+        console.log(`     ✓ ${ag.label} caveman installed from official repo`);
+      } else {
+        console.log(`     ✗ ${ag.label} caveman install failed — expected ${cavemanSkillDir}`);
       }
     }
-  } else {
-    console.log("     · skip Gemini CLI (not detected)");
+
+    // Lock caveman default mode to "ultra" across every agent that reads the
+    // shared caveman config (Claude Code, Codex, OpenCode all resolve via
+    // caveman-config.js → $XDG_CONFIG_HOME/caveman/config.json or
+    // ~/.config/caveman/config.json). Idempotent: existing file with
+    // `defaultMode: "ultra"` is left intact; any other value is overwritten so
+    // the always-on contract holds. User can opt out by setting
+    // `CAVEMAN_DEFAULT_MODE=full` in their shell env (env wins per resolver).
+    await lockCavemanUltra(home);
+  } finally {
+    DRY_RUN = previousDryRun;
   }
-
-  // --- W1.3: Codex, OpenCode, Pi — direct vendor repo copy.
-  // Fulcrum copies Caveman surfaces into native per-agent roots. Codex gets
-  // plugin metadata/assets/hooks as well as skills because Caveman ships more
-  // than a bare SKILL.md.
-  const npxAgentDefs: Array<{ id: string; dir: string; label: string; skillsRoot: string; includeCodexPlugin?: boolean }> = [
-    { id: "codex",    dir: `${home}/.codex`,          label: "Codex CLI", skillsRoot: `${home}/.codex/skills`, includeCodexPlugin: true },
-    { id: "opencode", dir: `${home}/.config/opencode`, label: "OpenCode",  skillsRoot: `${home}/.config/opencode/skills` },
-    { id: "pi",       dir: `${home}/.pi/agent`,        label: "Pi CLI",    skillsRoot: `${home}/.pi/agent/skills` },
-  ];
-
-  for (const ag of npxAgentDefs) {
-    if (!(await isDir(ag.dir))) {
-      console.log(`     · skip ${ag.label} (not detected)`);
-      continue;
-    }
-
-    // Idempotency: if the required surfaces already exist, skip.
-    const cavemanSkillDir = `${ag.skillsRoot}/caveman`;
-    const codexPluginDir = `${home}/.codex/plugins/cache/caveman/caveman/0.1.0`;
-    if ((await isDir(cavemanSkillDir)) && (!ag.includeCodexPlugin || (await isDir(codexPluginDir)))) {
-      console.log(`     · skip ${ag.label} caveman (already installed)`);
-      continue;
-    }
-
-    if (await installCavemanFromRepo(home, ag.skillsRoot, ag.label, !!ag.includeCodexPlugin)) {
-      console.log(`     ✓ ${ag.label} caveman installed from official repo`);
-    } else {
-      console.log(`     ✗ ${ag.label} caveman install failed — expected ${cavemanSkillDir}`);
-    }
-  }
-
-  // Lock caveman default mode to "ultra" across every agent that reads the
-  // shared caveman config (Claude Code, Codex, OpenCode all resolve via
-  // caveman-config.js → $XDG_CONFIG_HOME/caveman/config.json or
-  // ~/.config/caveman/config.json). Idempotent: existing file with
-  // `defaultMode: "ultra"` is left intact; any other value is overwritten so
-  // the always-on contract holds. User can opt out by setting
-  // `CAVEMAN_DEFAULT_MODE=full` in their shell env (env wins per resolver).
-  await lockCavemanUltra(home);
 }
 
 export async function lockCavemanUltra(home: string): Promise<void> {
@@ -586,63 +592,6 @@ export async function lockCavemanUltra(home: string): Promise<void> {
   await mk(cfgDir);
   await wf(cfgPath, JSON.stringify({ defaultMode: "ultra" }, null, 2) + "\n");
   console.log(`     ✓ caveman defaultMode set to 'ultra' (${cfgPath})`);
-}
-
-// ── MCP registry install helpers ────────────────────────────────────────────
-
-const REPOMIX_PLUGINS = ["repomix-mcp", "repomix-commands", "repomix-explorer"] as const;
-const REPOMIX_MARKETPLACE = "yamadashy/repomix";
-const REPOMIX_MARKER_FILE = "repomix-claude.installed";
-
-function fulcrumStateDir(): string {
-  return `${fulcrumHome()}/state/global`;
-}
-
-async function installRepomixClaudePlugins(home: string): Promise<void> {
-  if (!(await isDir(`${home}/.claude`))) {
-    console.log("     · skip repomix Claude plugins (Claude Code not detected)");
-    return;
-  }
-  if (!(await which("claude"))) {
-    console.log("     · skip repomix Claude plugins (claude not on PATH)");
-    return;
-  }
-
-  const markerFile = `${fulcrumStateDir()}/${REPOMIX_MARKER_FILE}`;
-  if (await exists(markerFile)) {
-    console.log("     · repomix Claude plugins already installed (marker present)");
-    return;
-  }
-
-  // Add marketplace.
-  const r1 = await runProcDry(["claude", "plugin", "marketplace", "add", REPOMIX_MARKETPLACE]);
-  if (r1.exit !== 0 && !DRY_RUN) {
-    console.log(`     ✗ repomix marketplace add failed: ${r1.stderr.trim()} — skip plugin installs`);
-    return;
-  }
-  console.log("     ✓ repomix marketplace added");
-
-  // Install each plugin.
-  let allOk = true;
-  for (const plugin of REPOMIX_PLUGINS) {
-    const r = await runProcDry(["claude", "plugin", "install", `${plugin}@repomix`]);
-    if (r.exit !== 0 && !DRY_RUN) {
-      console.log(`     ✗ claude plugin install ${plugin}@repomix failed: ${r.stderr.trim()}`);
-      allOk = false;
-    } else {
-      console.log(`     ✓ claude plugin install ${plugin}@repomix`);
-    }
-  }
-
-  // Write marker only when all succeeded (or dry-run).
-  if (allOk || DRY_RUN) {
-    if (!DRY_RUN) {
-      await mk(fulcrumStateDir());
-      await wf(markerFile, new Date().toISOString() + "\n");
-    } else {
-      console.log(`     [dry-run] would write marker: ${markerFile}`);
-    }
-  }
 }
 
 type McpDefaultMode = "minimal" | "none" | "all";
@@ -673,10 +622,8 @@ export async function installMcpRegistryEntries(home: string): Promise<void> {
     console.log("     · dart not on PATH — dart MCP requires Dart SDK ≥ 3.9.0-163.0.dev; see: https://github.com/dart-lang/ai/tree/main/pkgs/dart_mcp_server");
   }
 
-  // Install repomix Claude plugins (Claude-specific vendor install).
-  await installRepomixClaudePlugins(home);
-
-  const { installRepomixPackageMirrors } = await import("./repomix-package.ts");
+  const { installRepomixClaudePlugins, installRepomixPackageMirrors } = await import("./repomix-package.ts");
+  await installRepomixClaudePlugins({ dryRun: DRY_RUN });
   await installRepomixPackageMirrors({ dryRun: DRY_RUN });
 
   // Repomix Gemini extension mirror owns its MCP server. Older Fulcrum builds

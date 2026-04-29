@@ -1,11 +1,14 @@
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { cloneOrUpdate } from "../utils/proc.ts";
+import { cloneOrUpdate, run as runProc, which } from "../utils/proc.ts";
 
 const PACK_LOCAL = "repomix-pack-local";
 const PACK_REMOTE = "repomix-pack-remote";
 const EXPLORER = "repomix-explorer";
 const REPOMIX_REPO = "https://github.com/yamadashy/repomix";
+const REPOMIX_MARKETPLACE = "yamadashy/repomix";
+const REPOMIX_MARKER_FILE = "repomix-claude.installed";
+const REPOMIX_CLAUDE_PLUGINS = ["repomix-mcp", "repomix-commands", "repomix-explorer"] as const;
 
 const PACK_LOCAL_DESCRIPTION = "Pack local codebases with Repomix";
 const PACK_REMOTE_DESCRIPTION = "Pack remote repositories with Repomix";
@@ -53,6 +56,83 @@ function fulcrumHome(home: string): string {
 
 function pluginCacheRoot(home: string): string {
   return `${home}/.claude/plugins/cache/repomix`;
+}
+
+function fulcrumStateDir(home: string): string {
+  return `${fulcrumHome(home)}/state/global`;
+}
+
+async function runBestEffort(cmd: string[], label: string, dryRun: boolean): Promise<boolean> {
+  if (dryRun) {
+    console.log(`     [dry-run] would run: ${cmd.join(" ")}`);
+    return true;
+  }
+  const result = await runProc(cmd, { timeoutMs: 60_000 });
+  if (result.exit !== 0) {
+    console.log(`     ✗ ${label} failed: ${result.stderr.trim() || result.stdout.trim()}`);
+    return false;
+  }
+  console.log(`     ✓ ${label}`);
+  return true;
+}
+
+export async function installRepomixClaudePlugins(opts: { dryRun?: boolean } = {}): Promise<void> {
+  const dryRun = opts.dryRun ?? false;
+  const home = process.env["HOME"] ?? "";
+  if (!(await exists(`${home}/.claude`))) {
+    console.log("     · skip repomix Claude plugins (Claude Code not detected)");
+    return;
+  }
+  if (!(await which("claude"))) {
+    console.log("     · skip repomix Claude plugins (claude not on PATH)");
+    return;
+  }
+
+  const markerFile = `${fulcrumStateDir(home)}/${REPOMIX_MARKER_FILE}`;
+  if (await exists(markerFile)) {
+    console.log("     · repomix Claude plugins already installed (marker present)");
+    return;
+  }
+
+  if (!(await runBestEffort(["claude", "plugin", "marketplace", "add", REPOMIX_MARKETPLACE], "repomix marketplace add", dryRun))) {
+    console.log("     · skip repomix plugin installs");
+    return;
+  }
+
+  let allOk = true;
+  for (const plugin of REPOMIX_CLAUDE_PLUGINS) {
+    const ok = await runBestEffort(
+      ["claude", "plugin", "install", `${plugin}@repomix`],
+      `claude plugin install ${plugin}@repomix`,
+      dryRun,
+    );
+    allOk = allOk && ok;
+  }
+
+  if (!allOk) return;
+  if (dryRun) {
+    console.log(`     [dry-run] would write marker: ${markerFile}`);
+    return;
+  }
+  await writeText(markerFile, new Date().toISOString() + "\n", false);
+}
+
+export async function uninstallRepomixClaudePlugins(opts: { dryRun?: boolean } = {}): Promise<void> {
+  const dryRun = opts.dryRun ?? false;
+  const home = process.env["HOME"] ?? "";
+  if (!(await exists(`${home}/.claude`))) return;
+  if (!(await which("claude"))) {
+    console.log("     · claude not on PATH — repomix plugins: manual: claude plugin uninstall repomix-mcp@repomix ...");
+    return;
+  }
+  for (const plugin of REPOMIX_CLAUDE_PLUGINS) {
+    await runBestEffort(
+      ["claude", "plugin", "uninstall", `${plugin}@repomix`],
+      `Claude Code ${plugin}@repomix plugin uninstall`,
+      dryRun,
+    );
+  }
+  await removePath(`${fulcrumStateDir(home)}/${REPOMIX_MARKER_FILE}`, "repomix Claude plugins marker", dryRun);
 }
 
 async function readFirstExisting(paths: string[]): Promise<string | null> {
