@@ -260,12 +260,17 @@ async function removeTomlBlock(file: string, dryRun: boolean): Promise<void> {
     return;
   }
   const existing = await readText(file);
-  if (!existing.includes(TOML_BEGIN)) {
-    console.log("     · Codex context-mode MCP not Fulcrum-managed");
+  if (!existing.includes(TOML_BEGIN) && !existing.includes("[mcp_servers.context-mode]")) {
+    console.log("     · Codex context-mode MCP not present");
     return;
   }
-  const out = existing
-    .replace(new RegExp(`\\n?${TOML_BEGIN}[\\s\\S]*?${TOML_END}\\n?`, "m"), "\n")
+  let out = existing;
+  if (out.includes(TOML_BEGIN)) {
+    out = out.replace(new RegExp(`\\n?${TOML_BEGIN}[\\s\\S]*?${TOML_END}\\n?`, "m"), "\n");
+  } else {
+    out = out.replace(/\n?\[mcp_servers\.context-mode\]\n[\s\S]*?(?=\n\[|\n# BEGIN FULCRUM MCP |\s*$)/m, "\n");
+  }
+  out = out
     .replace(/\n{3,}/g, "\n\n")
     .trimEnd();
   await writeText(file, out ? `${out}\n` : "", dryRun);
@@ -382,10 +387,15 @@ async function installPi(home: string, dryRun: boolean, skipExternalCommands = f
     return;
   }
   const servers = objectSection(mcpRoot, "mcpServers");
-  if (!servers["context-mode"]) {
-    servers["context-mode"] = { command: "context-mode" };
+  const existingContextMode = servers["context-mode"];
+  if (!existingContextMode) {
+    servers["context-mode"] = { command: "context-mode", directTools: true };
     await writeJson(mcpFile, mcpRoot, dryRun);
     console.log(`     ✓ Pi context-mode MCP registered: ${mcpFile}`);
+  } else if (existingContextMode && typeof existingContextMode === "object" && !Array.isArray(existingContextMode)) {
+    servers["context-mode"] = { ...(existingContextMode as Record<string, unknown>), directTools: true };
+    await writeJson(mcpFile, mcpRoot, dryRun);
+    console.log(`     ✓ Pi context-mode MCP updated: ${mcpFile}`);
   } else {
     console.log(`     · Pi context-mode MCP already present: ${mcpFile}`);
   }

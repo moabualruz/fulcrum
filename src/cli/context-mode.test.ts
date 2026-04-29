@@ -72,6 +72,7 @@ describe("context-mode managed install", () => {
     expect(piSettings.packages).toContain("npm:context-mode");
     const piMcp = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8"));
     expect(piMcp.mcpServers["context-mode"].command).toBe("context-mode");
+    expect(piMcp.mcpServers["context-mode"].directTools).toBe(true);
 
     expect(await readFile(join(TMP, ".codex", "AGENTS.md"), "utf8")).toContain("<!-- BEGIN FULCRUM CONTEXT-MODE -->");
     expect(await readFile(join(TMP, ".pi", "agent", "AGENTS.md"), "utf8")).toContain("# context-mode pi");
@@ -102,5 +103,42 @@ describe("context-mode managed install", () => {
     expect(piSettings.packages).toEqual([]);
     const piMcp = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8"));
     expect(piMcp.mcpServers["context-mode"]).toBeUndefined();
+  });
+
+  test("install updates existing Pi context-mode MCP entry to direct tools", async () => {
+    const cloneDir = await buildContextModeFixture();
+    await setupAgents();
+    await writeFile(join(TMP, ".pi", "agent", "mcp.json"), JSON.stringify({
+      mcpServers: {
+        "context-mode": { command: "context-mode" },
+      },
+    }, null, 2) + "\n");
+
+    await installContextMode({ cloneDir, skipBinaryInstall: true, skipExternalCommands: true });
+
+    const piMcp = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8"));
+    expect(piMcp.mcpServers["context-mode"].command).toBe("context-mode");
+    expect(piMcp.mcpServers["context-mode"].directTools).toBe(true);
+  });
+
+  test("uninstall removes legacy bare Codex context-mode MCP entry", async () => {
+    await setupAgents();
+    await writeFile(join(TMP, ".codex", "config.toml"), [
+      'model = "gpt-5.5"',
+      "",
+      "[mcp_servers.context-mode]",
+      'command = "context-mode"',
+      "",
+      "[projects.\"/tmp/example\"]",
+      'trust_level = "trusted"',
+      "",
+    ].join("\n"));
+
+    await uninstallContextMode({ skipExternalCommands: true });
+
+    const codexConfig = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(codexConfig).not.toContain("[mcp_servers.context-mode]");
+    expect(codexConfig).toContain('model = "gpt-5.5"');
+    expect(codexConfig).toContain("[projects.\"/tmp/example\"]");
   });
 });

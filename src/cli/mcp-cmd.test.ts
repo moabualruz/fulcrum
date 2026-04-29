@@ -2,7 +2,7 @@
 // Uses scratch HOME dirs; no real $HOME touched.
 
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "./mcp-cmd.ts";
@@ -162,5 +162,26 @@ describe("fulcrum mcp enable/disable", () => {
     }
     const reg = await loadRegistry();
     expect(reg.servers["github"]!.enabled["codex"]).toBe(false);
+  });
+
+  test("disable --agent removes only that agent's native config", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+    await writeFile(join(TMP, ".pi", "agent", "settings.json"), JSON.stringify({ packages: ["npm:pi-mcp-adapter"] }));
+    await registerServer("github", DEFAULT_GITHUB_SERVER);
+    const { restore } = captureConsole();
+    try {
+      await run(["enable", "github", "--agent", "codex", "--agent", "pi"]);
+      await run(["disable", "github", "--agent", "codex"]);
+    } finally {
+      restore();
+    }
+
+    const codex = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    const pi = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8")) as {
+      mcpServers?: Record<string, unknown>;
+    };
+    expect(codex).not.toContain("[mcp_servers.github]");
+    expect(pi.mcpServers?.github).toBeDefined();
   });
 });

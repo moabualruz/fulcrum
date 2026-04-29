@@ -263,6 +263,30 @@ export async function setEnabled(
 // ── agent-config helpers (parallel to mcp.ts helpers but server-agnostic) ──
 
 const PI_MCP_ADAPTER_PKG = "npm:pi-mcp-adapter";
+const PI_DART_DIRECT_TOOLS = [
+  "read_package_uris",
+  "launch_app",
+  "stop_app",
+  "get_app_logs",
+  "connect_dart_tooling_daemon",
+  "get_runtime_errors",
+  "hot_reload",
+  "get_widget_tree",
+  "set_widget_selection_mode",
+  "flutter_driver",
+  "pub_dev_search",
+  "remove_roots",
+  "add_roots",
+  "dart_fix",
+  "dart_format",
+  "run_tests",
+  "create_project",
+  "pub",
+  "analyze_files",
+  "resolve_workspace_symbol",
+  "signature_help",
+  "hover",
+] as const;
 
 async function readJsonObject(file: string): Promise<Record<string, unknown> | null> {
   if (!(await exists(file))) return {};
@@ -302,7 +326,7 @@ function mcpValueForAgent(server: McpServer, agentId: AgentId): Record<string, u
       return v;
     }
     if (agentId === "pi") {
-      const v: Record<string, unknown> = { url: server.url! };
+      const v: Record<string, unknown> = { url: server.url!, directTools: piDirectToolsFor(server) };
       if (envVar) v.headers = { Authorization: bearer("dollar") };
       return v;
     }
@@ -320,8 +344,14 @@ function mcpValueForAgent(server: McpServer, agentId: AgentId): Record<string, u
   // not a single command line. Confirmed against sst/opencode schema —
   // a string value triggers `Invalid input mcp.<name>` at startup.
   if (agentId === "opencode") return { type: "local", command: [cmd, ...args] };
-  if (agentId === "pi") return { command: cmd, args };
+  if (agentId === "pi") return { command: cmd, args, directTools: piDirectToolsFor(server) };
   return { command: cmd, args };
+}
+
+function piDirectToolsFor(server: McpServer): true | string[] {
+  // Dart MCP vended 5 zero-arg tools without `properties` in inputSchema.
+  // Pi v0.70.6 rejects those as direct tools; proxy calls still work.
+  return server.name === "dart" ? [...PI_DART_DIRECT_TOOLS] : true;
 }
 
 function tomlBlockBegin(name: string): string {
@@ -456,8 +486,23 @@ async function applyToPi(server: McpServer, home: string): Promise<void> {
   const mcpRoot = await readJsonObject(mcpFile);
   if (!mcpRoot) { console.log(`     ✗ Pi mcp.json not JSON; skip`); return; }
   const servers = (mcpRoot["mcpServers"] as Record<string, unknown>) ?? {};
-  if (servers[server.name]) { console.log(`     · Pi ${server.name} MCP already present`); return; }
-  servers[server.name] = mcpValueForAgent(server, "pi");
+  const desired = mcpValueForAgent(server, "pi");
+  if (servers[server.name]) {
+    const existing = servers[server.name];
+    if (existing && typeof existing === "object" && !Array.isArray(existing)) {
+      servers[server.name] = {
+        ...(existing as Record<string, unknown>),
+        directTools: desired["directTools"],
+      };
+      mcpRoot["mcpServers"] = servers;
+      await writeJsonFile(mcpFile, mcpRoot);
+      console.log(`     ✓ Pi ${server.name} MCP updated`);
+      return;
+    }
+    console.log(`     · Pi ${server.name} MCP already present`);
+    return;
+  }
+  servers[server.name] = desired;
   mcpRoot["mcpServers"] = servers;
   await writeJsonFile(mcpFile, mcpRoot);
   console.log(`     ✓ Pi ${server.name} MCP registered`);
@@ -532,14 +577,15 @@ async function removeFromClaudeCode(server: McpServer, home: string, dryRun = fa
 }
 
 /** Push all enabled-agent entries into each agent's native MCP config. Idempotent. */
-export async function applyToAgents(name: string, opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function applyToAgents(name: string, opts: { dryRun?: boolean; agents?: readonly AgentId[] } = {}): Promise<void> {
   const reg = await loadRegistry();
   const server = reg.servers[name];
   if (!server) throw new Error(`mcp-registry: server '${name}' not registered`);
   const home = process.env["HOME"] ?? "";
   const dryRun = opts.dryRun ?? false;
+  const targetAgents = opts.agents ?? ALL_AGENT_IDS;
 
-  for (const agentId of ALL_AGENT_IDS) {
+  for (const agentId of targetAgents) {
     if (!server.agent_visibility[agentId]) continue;
     if (!isEnabled(server, agentId)) continue;
 
@@ -554,18 +600,23 @@ export async function applyToAgents(name: string, opts: { dryRun?: boolean } = {
 }
 
 /** Undo applyToAgents — remove from every agent's native MCP config regardless of enabled state. */
-export async function removeFromAgents(name: string, opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function removeFromAgents(name: string, opts: { dryRun?: boolean; agents?: readonly AgentId[] } = {}): Promise<void> {
   const reg = await loadRegistry();
   const server = reg.servers[name];
   if (!server) return; // already gone
   const home = process.env["HOME"] ?? "";
   const dryRun = opts.dryRun ?? false;
+  const targetAgents = opts.agents ?? ALL_AGENT_IDS;
 
-  await removeFromClaudeCode(server, home, dryRun);
-  if (await exists(`${home}/.codex`)) await removeFromCodex(server, home);
-  if (await exists(`${home}/.gemini`)) await removeFromGemini(server, home);
-  if (await exists(`${home}/.config/opencode`)) await removeFromOpenCode(server, home);
-  if (await exists(`${home}/.pi/agent`)) await removeFromPi(server, home);
+  for (const agentId of targetAgents) {
+    switch (agentId) {
+      case "claude-code": await removeFromClaudeCode(server, home, dryRun); break;
+      case "codex":       if (await exists(`${home}/.codex`)) await removeFromCodex(server, home); break;
+      case "gemini":      if (await exists(`${home}/.gemini`)) await removeFromGemini(server, home); break;
+      case "opencode":    if (await exists(`${home}/.config/opencode`)) await removeFromOpenCode(server, home); break;
+      case "pi":          if (await exists(`${home}/.pi/agent`)) await removeFromPi(server, home); break;
+    }
+  }
 }
 
 // ── default servers (re-exported from mcp-builtins for backward compat) ───

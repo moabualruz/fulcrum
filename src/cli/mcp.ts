@@ -208,11 +208,19 @@ export async function installPiDeepwikiAdapter(opts: { dryRun?: boolean } = {}):
     servers && typeof servers === "object" && !Array.isArray(servers)
       ? servers as Record<string, unknown>
       : {};
-  if (serversObj["deepwiki"]) {
+  const existingDeepwiki = serversObj["deepwiki"];
+  if (existingDeepwiki) {
+    if (existingDeepwiki && typeof existingDeepwiki === "object" && !Array.isArray(existingDeepwiki)) {
+      serversObj["deepwiki"] = { ...(existingDeepwiki as Record<string, unknown>), directTools: true };
+      mcpRoot["mcpServers"] = serversObj;
+      await writeText(mcpFile, JSON.stringify(mcpRoot, null, 2) + "\n", dryRun);
+      console.log(`     ✓ Pi DeepWiki MCP updated: ${mcpFile}`);
+      return;
+    }
     console.log(`     · Pi DeepWiki MCP already present: ${mcpFile}`);
     return;
   }
-  serversObj["deepwiki"] = { url: DEEPWIKI_URL };
+  serversObj["deepwiki"] = { url: DEEPWIKI_URL, directTools: true };
   mcpRoot["mcpServers"] = serversObj;
   await writeText(mcpFile, JSON.stringify(mcpRoot, null, 2) + "\n", dryRun);
   console.log(`     ✓ Pi DeepWiki MCP registered: ${mcpFile}`);

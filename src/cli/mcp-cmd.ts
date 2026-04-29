@@ -170,7 +170,7 @@ async function cmdEnable(args: string[]): Promise<void> {
   const target = parseAgentFlags(args.slice(1));
   const agentList = target === "all" ? [...ALL_AGENT_IDS] : target;
   await setEnabled(name, true, { agents: agentList });
-  await applyToAgents(name);
+  await applyToAgents(name, { agents: agentList });
   console.log(`✓ Enabled MCP server '${name}' for: ${agentList.join(", ")}`);
 }
 
@@ -183,7 +183,7 @@ async function cmdDisable(args: string[]): Promise<void> {
   const target = parseAgentFlags(args.slice(1));
   const agentList = target === "all" ? [...ALL_AGENT_IDS] : target;
   await setEnabled(name, false, { agents: agentList });
-  await removeFromAgents(name);
+  await removeFromAgents(name, { agents: agentList });
   console.log(`✓ Disabled MCP server '${name}' for: ${agentList.join(", ")}`);
 }
 

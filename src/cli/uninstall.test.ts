@@ -114,6 +114,63 @@ describe("run", () => {
     expect(await readFile(join(TMP, ".gemini", "GEMINI.md"), "utf8")).toBe("");
   });
 
+  test("removes curated upstream skills and empty hook containers", async () => {
+    await mkdir(join(TMP, "skills"), { recursive: true });
+    await writeFile(join(TMP, "skills", "upstream.lock"), [
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.superpowers-using-superpowers]",
+      'source = "https://github.com/obra/superpowers"',
+      'subpath = "skills/using-superpowers"',
+      'ref = "main"',
+      'tree_sha = "6efe32c9e2dd002d0c394e861e0529675d1ab32e"',
+      'license = "MIT"',
+      'author_class = "individual"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+      "[skills.cloudflare-platform]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/cloudflare"',
+      'ref = "main"',
+      'tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+
+    await mkdir(join(TMP, ".codex", "skills", "superpowers-using-superpowers"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "skills", "cloudflare-platform"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent", "skills", "using-superpowers"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent", "skills", "cloudflare"), { recursive: true });
+    await mkdir(join(TMP, ".gemini", "skills", "superpowers-using-superpowers"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "hooks.json"), JSON.stringify({ hooks: { UserPromptSubmit: [] } }, null, 2) + "\n");
+    await writeFile(join(TMP, ".gemini", "settings.json"), JSON.stringify({ mcpServers: {}, hooks: { PreCompress: [] }, security: { auth: { selectedType: "oauth-personal" } } }, null, 2) + "\n");
+    await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
+    await writeFile(join(TMP, ".config", "opencode", "opencode.json"), JSON.stringify({ $schema: "https://opencode.ai/config.json", mcp: {}, plugin: [] }, null, 2) + "\n");
+    await writeFile(join(TMP, ".pi", "agent", "settings.json"), JSON.stringify({ packages: [], defaultModel: "gpt-5.5" }, null, 2) + "\n");
+
+    await run([]);
+
+    expect(await Bun.file(join(TMP, ".codex", "skills", "superpowers-using-superpowers")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".codex", "skills", "cloudflare-platform")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "using-superpowers")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "cloudflare")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".gemini", "skills", "superpowers-using-superpowers")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".codex", "hooks.json")).exists()).toBe(false);
+    const geminiSettings = JSON.parse(await readFile(join(TMP, ".gemini", "settings.json"), "utf8"));
+    expect(geminiSettings.mcpServers).toBeUndefined();
+    expect(geminiSettings.hooks).toBeUndefined();
+    const openCode = JSON.parse(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8"));
+    expect(openCode.mcp).toBeUndefined();
+    expect(openCode.plugin).toBeUndefined();
+    const piSettings = JSON.parse(await readFile(join(TMP, ".pi", "agent", "settings.json"), "utf8"));
+    expect(piSettings.packages).toBeUndefined();
+  });
+
   test("keeps modified policy without --purge", async () => {
     await mkdir(join(TMP, "config"), { recursive: true });
     await mkdir(join(TMP, ".fulcrum"), { recursive: true });

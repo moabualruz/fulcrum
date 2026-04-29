@@ -255,6 +255,53 @@ describe("mirror-policy: syncUpstreamSkills copies to all agent paths", () => {
       expect(copied).toEqual(sourceContent);
     }
   });
+
+  test("Pi mirror uses SKILL.md frontmatter name for directory", async () => {
+    const { spyOn } = await import("bun:test");
+    const proc = await import("../utils/proc.ts");
+
+    const repoSlug = "example__repo";
+    const cacheDir = join(TMP, ".fulcrum", "cache", "upstream-skills", repoSlug);
+    const skillSrc = join(cacheDir, "skills", "vendor-prefixed");
+    await mkdir(skillSrc, { recursive: true });
+    await mkdir(join(cacheDir, ".git"), { recursive: true });
+    await writeFile(join(skillSrc, "SKILL.md"), "---\nname: runtime-name\ndescription: mirror test\n---\n");
+
+    const { sha256, size } = await computeSubpathSha256(skillSrc, "dir");
+    const lockPath = await writeLock(
+      LOCK_HEADER +
+        [
+          "[skills.vendor-prefixed]",
+          'source = "https://github.com/example/repo"',
+          'subpath = "skills/vendor-prefixed"',
+          'ref = "main"',
+          'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+          'license = "MIT"',
+          'author_class = "tool-vendor"',
+          'pinned_on = "2026-04-28"',
+          'review_due = "2026-07-27"',
+          `subpath_sha256 = "${sha256}"`,
+          `subpath_size = ${size}`,
+          "",
+        ].join("\n"),
+    );
+
+    await mkdir(join(TMP, ".pi", "agent", "skills", "vendor-prefixed"), { recursive: true });
+    await writeFile(join(TMP, ".pi", "agent", "skills", "vendor-prefixed", "SKILL.md"), "---\nname: runtime-name\n---\n");
+
+    const skills = await loadUpstreamSkills(lockPath);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    const logSpy = spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await syncUpstreamSkills({ dryRun: false, skills, lockPath });
+    } finally {
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+
+    expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "runtime-name", "SKILL.md")).exists()).toBe(true);
+    expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "vendor-prefixed", "SKILL.md")).exists()).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

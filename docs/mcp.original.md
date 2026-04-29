@@ -66,15 +66,16 @@ Recommended user-level config:
 {
   "mcpServers": {
     "deepwiki": {
-      "url": "https://mcp.deepwiki.com/mcp"
+      "url": "https://mcp.deepwiki.com/mcp",
+      "directTools": true
     }
   }
 }
 ```
 
-Default adapter behavior exposes a proxy-style `mcp(...)` tool. `tool-output-router` policies keyed to direct names like `mcp__deepwiki__ask_question` should only be treated as Pi-compatible after direct-tool exposure is configured and verified.
+Default adapter behavior exposes a proxy-style `mcp(...)` tool. Fulcrum writes `directTools: true` for most Pi-managed MCPs so Pi registers each server's tools directly after restart or `/mcp reconnect`. Exception: Dart MCP exposes some zero-argument tools with schemas Pi v0.70.6 rejects as direct tools, so Fulcrum uses an allowlist of schema-valid Dart tools and leaves the rest reachable through proxy calls. `tool-output-router` policies keyed to direct names like `mcp__deepwiki__ask_question` are still Pi-compatible because the router normalises proxy-shape calls to the same canonical names.
 
-Remaining Fulcrum work for DeepWiki-on-Pi: install/configure adapter, add doctor checks, and verify output-routing shape. Tracked in [HANDOVER.md](../HANDOVER.md) §6.
+`fulcrum install` runs `pi install npm:pi-mcp-adapter` (when `pi` is on PATH) and writes or upgrades entries in `~/.pi/agent/mcp.json`, preserving other server fields while enforcing the Fulcrum direct-tool policy. `fulcrum doctor --json` reports `piMcpAdapter.adapterPresent` and `piMcpAdapter.deepwikiPresent`.
 
 ## Cross-agent
 

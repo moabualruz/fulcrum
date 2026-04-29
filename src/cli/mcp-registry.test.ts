@@ -215,6 +215,69 @@ describe("applyToAgents", () => {
     expect(mcp["github"]).toBeDefined();
   });
 
+  test("writes Pi MCP entries as direct tools when enabled", async () => {
+    await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+    await Bun.write(join(TMP, ".pi", "agent", "settings.json"), JSON.stringify({ packages: ["npm:pi-mcp-adapter"] }));
+    await registerServer("github", DEFAULT_GITHUB_SERVER);
+    await setEnabled("github", true, { agents: ["pi"] });
+
+    await applyToAgents("github");
+
+    const raw = await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const mcpServers = parsed["mcpServers"] as Record<string, Record<string, unknown>>;
+    expect(mcpServers["github"]?.directTools).toBe(true);
+  });
+
+  test("writes Pi stdio MCP entries as direct tools when enabled", async () => {
+    await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+    await Bun.write(join(TMP, ".pi", "agent", "settings.json"), JSON.stringify({ packages: ["npm:pi-mcp-adapter"] }));
+    await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+    await setEnabled("repomix", true, { agents: ["pi"] });
+
+    await applyToAgents("repomix");
+
+    const raw = await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const mcpServers = parsed["mcpServers"] as Record<string, Record<string, unknown>>;
+    expect(mcpServers["repomix"]?.directTools).toBe(true);
+  });
+
+  test("writes Pi Dart MCP with only schema-valid direct tools", async () => {
+    await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+    await Bun.write(join(TMP, ".pi", "agent", "settings.json"), JSON.stringify({ packages: ["npm:pi-mcp-adapter"] }));
+    await registerServer("dart", BUILTIN_MCPS.find((entry) => entry.name === "dart")!.spec);
+    await setEnabled("dart", true, { agents: ["pi"] });
+
+    await applyToAgents("dart");
+
+    const raw = await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const mcpServers = parsed["mcpServers"] as Record<string, Record<string, unknown>>;
+    expect(mcpServers["dart"]?.directTools).toContain("dart_format");
+    expect(mcpServers["dart"]?.directTools).not.toContain("list_devices");
+  });
+
+  test("updates existing Pi MCP entries to direct tools when enabled", async () => {
+    await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+    await Bun.write(join(TMP, ".pi", "agent", "settings.json"), JSON.stringify({ packages: ["npm:pi-mcp-adapter"] }));
+    await Bun.write(join(TMP, ".pi", "agent", "mcp.json"), JSON.stringify({
+      mcpServers: {
+        github: { url: "https://api.githubcopilot.com/mcp/" },
+      },
+    }));
+    await registerServer("github", DEFAULT_GITHUB_SERVER);
+    await setEnabled("github", true, { agents: ["pi"] });
+
+    await applyToAgents("github");
+
+    const raw = await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const mcpServers = parsed["mcpServers"] as Record<string, Record<string, unknown>>;
+    expect(mcpServers["github"]?.url).toBe("https://api.githubcopilot.com/mcp/");
+    expect(mcpServers["github"]?.directTools).toBe(true);
+  });
+
   test("idempotent — second call does not duplicate Codex entry", async () => {
     await mkdir(join(TMP, ".codex"), { recursive: true });
     await registerServer("repomix", DEFAULT_REPOMIX_SERVER);

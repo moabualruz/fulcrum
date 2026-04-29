@@ -5,7 +5,7 @@
 // Fulcrum skills (`fulcrum/`) do not mix with vendored packs.
 
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { AGENTS } from "../agents/registry.ts";
@@ -423,6 +423,28 @@ async function copySkill(src: string, dst: string, kind: "dir" | "file", dryRun:
   return true;
 }
 
+async function readSkillFrontmatterName(src: string, kind: "dir" | "file"): Promise<string | null> {
+  const skillFile = kind === "file" ? src : `${src}/SKILL.md`;
+  try {
+    const raw = await readFile(skillFile, "utf8");
+    const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!match) return null;
+    const nameMatch = match[1]?.match(/^name:\s*["']?([^"'\r\n#]+)["']?\s*$/m);
+    return nameMatch?.[1]?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+async function removeStalePiSkillDir(path: string, dryRun: boolean): Promise<void> {
+  if (!(await isDir(path))) return;
+  if (dryRun) {
+    console.log(`      [dry-run] would remove stale Pi skill dir: ${path}`);
+    return;
+  }
+  await rm(path, { recursive: true, force: true });
+}
+
 async function ensureRepo(repo: string, ref: string, sha: string, dryRun: boolean): Promise<string | null> {
   const dir = repoCacheDir(repo);
   if (dryRun) {
@@ -634,12 +656,16 @@ export async function syncUpstreamSkills(
 
       // Default: file copy path (all agents, or Claude Code without claude_plugin).
       const src = `${repoDir}/${skill.subpath}`;
-      const ok = await copySkill(src, `${target.skillsRoot}/${skill.name}`, skill.kind, dryRun);
-      if (ok) console.log(`    ${skill.name}`);
+      const frontmatterName = target.id === "pi" ? await readSkillFrontmatterName(src, skill.kind) : null;
+      const installName = frontmatterName || skill.name;
+      if (target.id === "pi" && installName !== skill.name) {
+        await removeStalePiSkillDir(`${target.skillsRoot}/${skill.name}`, dryRun);
+      }
+      const ok = await copySkill(src, `${target.skillsRoot}/${installName}`, skill.kind, dryRun);
+      if (ok) console.log(`    ${skill.name}${installName !== skill.name ? ` → ${installName}` : ""}`);
       else console.log(`    · missing upstream path: ${skill.source}:${skill.subpath}`);
     }
     console.log();
   }
   console.log("Done.");
 }
-
