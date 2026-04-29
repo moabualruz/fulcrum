@@ -677,6 +677,40 @@ describe("upstream skill filtering helpers", () => {
     expect(logs.some((l) => l.includes("graphify"))).toBe(false);
   });
 
+  test("syncUpstreamSkillsBySource previews install when agent root exists without skills dir", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.wrangler]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/wrangler"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map((a) => String(a)).join(" "));
+    });
+    try {
+      await syncUpstreamSkillsBySource("https://github.com/cloudflare/skills", { dryRun: true, lockPath });
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(logs.some((l) => l.includes("→ Codex CLI") && l.includes("/.codex/skills"))).toBe(true);
+    expect(logs.some((l) => l.includes("would install dir") && l.includes("/.codex/skills/wrangler"))).toBe(true);
+    expect(logs.some((l) => l.includes("skip Codex CLI"))).toBe(false);
+  });
+
   test("removeUpstreamSkills removes filtered vendor placements and Pi frontmatter alias only", async () => {
     const lockPath = await writeLock([
       "[meta]",
@@ -730,5 +764,70 @@ describe("upstream skill filtering helpers", () => {
     expect(await readFile(join(TMP, ".codex", "skills", "graphify", "SKILL.md"), "utf8")).toContain("installed");
     expect(await readFile(join(TMP, ".gemini", "skills", "graphify", "SKILL.md"), "utf8")).toContain("installed");
     expect(await readFile(join(TMP, ".pi", "agent", "skills", "graphify", "SKILL.md"), "utf8")).toContain("installed");
+  });
+
+  test("removeUpstreamSkills preserves vendor-canonical placements skipped by sync", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.graphify]",
+      'source = "https://github.com/safishamsi/graphify"',
+      'subpath = "skills/graphify"',
+      'ref = "main"',
+      'tree_sha = "89abcdef0123456789abcdef0123456789abcdef"',
+      'license = "MIT"',
+      'author_class = "individual"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      'vendor_canonical_agents = ["codex"]',
+      "",
+    ].join("\n"));
+
+    const codexGraphify = join(TMP, ".codex", "skills", "graphify");
+    const piGraphify = join(TMP, ".pi", "agent", "skills", "graphify");
+    for (const dir of [codexGraphify, piGraphify]) {
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "SKILL.md"), "---\nname: graphify\n---\n");
+    }
+
+    await removeUpstreamSkills({ names: ["graphify"], lockPath });
+
+    expect(await readFile(join(codexGraphify, "SKILL.md"), "utf8")).toContain("graphify");
+    await expect(readdir(piGraphify)).rejects.toThrow();
+  });
+
+  test("removeUpstreamSkills ignores unsafe Pi frontmatter alias outside skills root", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.wrangler]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/wrangler"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+
+    const cacheSkill = join(TMP, ".fulcrum", "cache", "upstream-skills", "cloudflare__skills", "skills", "wrangler");
+    await mkdir(cacheSkill, { recursive: true });
+    await writeFile(join(cacheSkill, "SKILL.md"), "---\nname: ../../outside\n---\n");
+
+    const piWrangler = join(TMP, ".pi", "agent", "skills", "wrangler");
+    const outside = join(TMP, ".pi", "outside");
+    for (const dir of [piWrangler, outside]) {
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "SKILL.md"), "---\nname: installed\n---\n");
+    }
+
+    await removeUpstreamSkills({ names: ["wrangler"], lockPath });
+
+    await expect(readdir(piWrangler)).rejects.toThrow();
+    expect(await readFile(join(outside, "SKILL.md"), "utf8")).toContain("installed");
   });
 });
