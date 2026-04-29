@@ -1,6 +1,6 @@
 ---
 name: subagent-orchestration
-description: "Use when asked to plan, decide, or execute subagent orchestration: subagents, delegated agents, parallel workers, review agents, multi-source research, broad audits, PR/MR review, worktree-aware review, or agent-driven execution."
+description: "Use when asked to plan, decide, or execute subagent orchestration: subagents, delegated agents, parallel workers, review agents, multi-source research, broad audits, PR/MR review, worktree-aware execution, model/effort selection, or agent-driven execution."
 ---
 
 # Subagent Orchestration

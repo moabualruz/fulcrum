@@ -1,6 +1,11 @@
 ## Anti-patterns
 
 - Spawn subagents because many are available, not because units are independent.
+- Serialize independent work just because the written plan listed tasks in order.
+- Keep following the original wave plan after runtime evidence changes dependencies.
+- Run parallel write lanes in one dirty workspace instead of isolated worktrees.
+- Put two write workers in the same worktree or same owned files.
+- Assign high-effort models to mechanical tasks or low-effort models to ambiguous/high-risk design or review.
 - Give subagent broad context dump instead of focused steering.
 - Ask subagent to "look around" without deliverable, ownership, and verification evidence.
 - Spawn test agent for one obvious test.
@@ -9,6 +14,7 @@
 - Let implementation agent modify tests unless explicitly assigned.
 - Give two agents same write set.
 - Wait immediately for subagent while parent has useful non-overlapping work.
+- Leave parent idle while independent lanes, tests, docs, or reviews could progress.
 - Trust final report without checking files/artifacts/logs/config paths.
 - Treat `git status` and `git diff --stat` as complete truth; generated files, installed config, logs, and claimed paths also matter.
 - Mark done because agent said done.

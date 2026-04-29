@@ -4,6 +4,13 @@
 
 One agent = one responsibility.
 
+Maximize useful parallelism after dependency analysis:
+
+- Dispatch every independent lane that can run without blocking the parent or colliding on files.
+- Keep dependency chains sequential only where a later unit needs concrete output from an earlier unit.
+- Re-batch work after each result: new independent follow-ups should launch in parallel instead of waiting for the whole original wave.
+- If a unit becomes blocked, split the unblocked remainder and dispatch it while the blocker is resolved.
+
 Good development units:
 
 - Behavior slice + related tests.
@@ -19,6 +26,32 @@ Good non-development units:
 - Data extraction/cleaning lane.
 - Outline/draft/review lane.
 - Legal/policy/risk review lane.
+
+### Worktree lanes
+
+Use git worktrees for parallel write lanes.
+
+Rules:
+
+- Parent keeps the integration workspace and critical-path edits.
+- Each implementation worker gets an isolated worktree plus disjoint file ownership.
+- Review workers use a worktree when they may patch issues; read-only reviewers can inspect the integration workspace.
+- Use external worktrees such as `~/.config/superpowers/worktrees/<project>/<lane>` when project-local `.worktrees/` is absent or not proven ignored.
+- Seed uncommitted integration state into worker worktrees when the task depends on it, then integrate back by owned-path patch.
+- After each merge-back: run `git status --short`, `git diff --stat`, focused tests, then update the dependency graph.
+
+Do not use worktrees for one tiny parent edit or pure read-only research.
+
+### Runtime scheduling
+
+At each checkpoint, classify remaining work:
+
+- Stay in parent session: immediate blocker, small edit, tightly coupled integration, or user-facing decision.
+- Parallelize now: 2+ independent units with separate write sets or read-only research lanes.
+- Sequential subagent: dependent migration, review-after-implementation, shared file ownership, or missing input from earlier work.
+- Stop and ask: dependency or destructive operation cannot be resolved safely from repo context.
+
+This assessment is runtime behavior. A plan can suggest waves, but the orchestrator must revise waves when tests, reviewers, or user direction change the graph.
 
 ### Development test setup
 
@@ -65,7 +98,7 @@ Dispatch implementation agents only after enough tests or verification criteria 
 
 Assignment includes:
 
-- Workspace/worktree/remote target.
+- Workspace/worktree/remote target and branch posture.
 - Local steering to read first.
 - Owned files/artifacts only.
 - Tests or verification criteria for the unit.
@@ -77,6 +110,13 @@ Assignment includes:
 - No stubs/placeholders/deferred work.
 
 Implementation agents must keep related code, tests, docs, examples, and generated artifacts aligned.
+
+Model/effort selection belongs in the assignment:
+
+- Mechanical lane: smaller model/low effort; exact edits, fixtures, formatting, focused tests.
+- Integration lane: default model/medium effort; adapters, CLI surfaces, database/filesystem behavior.
+- Judgment lane: stronger model/high effort; architecture, ambiguous requirements, broad refactors, security/auth/shell/network review.
+- Final review lane: strongest available effort justified by blast radius and number of touched surfaces.
 
 Check when relevant:
 
