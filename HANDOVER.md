@@ -29,7 +29,7 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
 
 - **Validates the environment** (`fulcrum doctor [--json] [--probe]`) — agent detection, rules-spliced state, caveman per-agent install + `defaultMode` source, Pi MCP adapter check, 47 BYO tools, tool-output policy presence. MCP registry section reports `auth_status` (env-var presence), `reachable` (HEAD probe / `which`), `drift` (`default_enabled=false` but some agent has it enabled), and `wiring` (per-agent native config inspection — confirms `bearer_token_env_var` / `headers.Authorization` is present for HTTP servers with declared auth). With `--probe`: spawns stdio MCPs / POSTs HTTP MCPs and asserts a valid JSON-RPC `initialize` reply within an 8s timeout. Catches wrong commands, stale URLs, and broken auth in one check.
 
-- **Self-tests** via `bun run ci` — install → tsc → 292 tests → 5 platform builds → skills:lint → compress:check (hard gate, 0 pending). All green at every commit.
+- **Self-tests** via `bun run ci` — install → tsc → 292 tests → 5 platform builds → skills:lint → compress:check (hard gate, 0 pending). Latest run green after `test: harden cross-agent skill evals` (`9e8f1cc`).
 
 - **Verifies a fresh setup** via `docs/smoke-test.md` — self-contained markdown that any of the 5 agents can read as a prompt and execute step-by-step (16 checks, result table, failure remediation, append-only result log under `~/.fulcrum/state/global/smoke-test/<YYYY-MM-DD>.md`). Latest full cross-agent run on 2026-04-29: Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi CLI all PASS after `fix(smoke): pass cross-agent setup checks` (`bc0f656`).
 
@@ -185,7 +185,7 @@ LICENSE (MIT)  AGENTS.md  README.md
 
 ## 3. What works (verified, current run)
 
-- `bun run ci` — green: install + tsc + **273 tests** + 5 platform builds + skills:lint + compress:check (hard, 0 pending).
+- `bun run ci` — green: install + tsc + **292 tests** + 5 platform builds + skills:lint + compress:check (hard, 0 pending).
 - `fulcrum install` — full sweep across 5 agents; doctor verdict ok on a fully-set-up machine.
 - `fulcrum install --enable-all-mcps` — flips every builtin MCP on across every detected agent immediately after registration. End-to-end live verified 2026-04-29: 16/16 MCPs `handshake:ok` via `fulcrum doctor --probe`. Default install state enables only context7 from the builtin registry where no user state exists; skip via `--no-default-mcps`.
 - `fulcrum init <dir>` — three phases run end-to-end on this repo: vendor integrations across detected agents, vendor rule de-duplication, project indices (`graphify-out/` + `repomix-output.xml`).
@@ -195,8 +195,20 @@ LICENSE (MIT)  AGENTS.md  README.md
 - `fulcrum uninstall --dry-run` — preview shows clean removal of every Fulcrum-managed artifact across 5 agents.
 - `bash scripts/install.sh [--dry-run] [--with-project DIR] [--no-skills] [--no-upstream-skills] [--no-default-mcps] [--enable-all-mcps]` — flag pass-through verified bash 3.2-safe.
 - `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG → tag → cross-compile → optional `gh release create`. Does NOT push.
-- `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <skill>` — five trigger-rate harnesses; uniform flags; PATH-missing guard.
+- `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <skill>` — five trigger-rate harnesses; uniform flags; PATH-missing guard; hardened for long response payloads. Gemini runs in read-only plan mode; Pi runs with tools disabled.
 - `docs/smoke-test.md` — self-contained agent-runnable verification prompt with 16 checks + result template + remediation links + append-only result log.
+
+### 3a. Progress checklist
+
+- [x] Cross-agent foundation install/hook/rules layer implemented.
+- [x] Agent registry consolidated in `src/agents/registry.ts`.
+- [x] Context-mode removed from all managed CLI-agent surfaces.
+- [x] MCP registry + auth wiring + doctor probe implemented.
+- [x] Cross-agent smoke test accepted clean on 2026-04-29.
+- [x] `subagent-orchestration` skill added, split into reference files, mirrored into the Fulcrum plugin, compressed, linted, and synced.
+- [x] Subagent orchestration evals accepted for now across target agents. Codex/OpenCode passed full statistical evals; Claude/Pi/Gemini findings are accepted as non-blocking harness/runtime quirks for this branch.
+- [x] Eval harnesses hardened after missing-agent runs: no response-size argv blowups; Gemini no longer uses `--yolo`; Pi no longer exposes tools during activation eval.
+- [x] Latest gate: `bun run ci` green after `9e8f1cc`.
 
 ---
 
@@ -235,7 +247,13 @@ Don't relitigate without new information.
 
 `main` is the active branch. See `git log --oneline -50` for the current chronology — durable. Tag releases via `bun run release vX.Y.Z [--gh]`.
 
-Recent (2026-04-29 session, all on `main`, pushed): MCP bearer auth wiring across 5 agents (`bearer_token_env_var` for codex; `headers.Authorization` with per-agent interpolation for claude/gemini/opencode/pi); doctor `drift` + `wiring` + `--probe` MCP `initialize` handshake; install `--enable-all-mcps` verification flag; vendor URL/cmd drift fixes (cloudflare-logpush → `logs.mcp.cloudflare.com`, semgrep → `semgrep mcp`); OpenCode stdio shape fix (`command` array); removal of the `fulcrum-upstream/` namespace (third-party skills now land at vendor placement directly).
+Recent high-signal commits:
+
+- `9e8f1cc test: harden cross-agent skill evals` — long-response-safe eval capture; Gemini read-only plan mode; Pi no-tool eval mode.
+- `fec0860 test: stabilize subagent evals` — accepted eval prompts + Codex/OpenCode activation detection fixes.
+- `7ed7794 feat: add subagent orchestration skill` — new skill + split references + eval set + plugin mirror.
+- `bc0f656 fix(smoke): pass cross-agent setup checks` — latest accepted full cross-agent smoke baseline.
+- Earlier 2026-04-29 MCP series — bearer auth wiring across 5 agents (`bearer_token_env_var` for codex; `headers.Authorization` with per-agent interpolation for claude/gemini/opencode/pi); doctor `drift` + `wiring` + `--probe` MCP `initialize` handshake; install `--enable-all-mcps` verification flag; vendor URL/cmd drift fixes (cloudflare-logpush → `logs.mcp.cloudflare.com`, semgrep → `semgrep mcp`); OpenCode stdio shape fix (`command` array); removal of the `fulcrum-upstream/` namespace.
 
 ---
 
@@ -498,18 +516,16 @@ fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, handshake, wiring,
 
 ---
 
-## 7a. Next-session ordering
+## 7a. Next steps only
 
-1. **Discuss subagent work before doing it.**
-   Do not create, edit, validate, or expand subagent-related skills/files until the next session explicitly discusses the intended subagent scope. Before that discussion, read `docs/subagent-guidance.notes.md`; its review rule is output/artifact-based, not git-based. Every subagent report must be checked against actual edited files, generated artifacts, logs, installed config, and claimed paths whether or not they are tracked or committed. Smoke-test gate is already clean as of 2026-04-29.
-
-2. **Then do the subagent work if approved.**
-   Scope to be agreed in that discussion before implementation.
-
-3. **Add component-level install/remove commands.**
+1. **Add component-level install/remove commands.**
    Implement the planned `fulcrum component` lifecycle surface documented in `docs/user-guide.md` and `docs/developer-guide.md`: install/remove one managed component such as caveman, Repomix, vendor packages, DeepWiki, or MCP registry scaffolding without touching unrelated components. Preserve dry-run behavior, per-agent targeting, idempotent removal, and sentinel-only cleanup.
 
-4. After that, proceed with layer §6.1 (Repository supervisor) per the build-order branch plan above.
+2. **Start layer §6.1: Repository supervisor.**
+   Branch: `feat/repo-supervisor`. Implement `fulcrum repo …` around repo registration, refresh, list/show, settings, SQLite migrations, doctor row counts, and the `repo-track` session hook.
+
+3. **Optionally revisit eval precision after the next feature branch.**
+   Current subagent orchestration eval state is accepted for this branch. Future work should improve Claude/Pi/Gemini activation signals only if it blocks a concrete release gate or produces user-visible skill-loading failures.
 
 ---
 

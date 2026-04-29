@@ -12,7 +12,7 @@ That is the destination. This branch (`feat/agent-foundation-clean`) is the foun
 |---|---|---|
 | **Context** | Always-on rules and conventions, sentinel-spliced into each agent's primary rules file | `rules/AGENTS.md`, `fulcrum install` |
 | **Automation** | Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) registered per-agent | `src/hooks/`, `fulcrum hooks enable` |
-| **Capability** | 28 skills authored in-repo, content-verified against upstream, with 20-entry trigger evals each | `skills/`, `fulcrum skills sync` |
+| **Capability** | 29 skills authored in-repo, content-verified against upstream, with trigger evals | `skills/`, `fulcrum skills sync` |
 | **Capabilities** | Bring-your-own CLI tools, verified by `fulcrum doctor` | `docs/capabilities.md`, `fulcrum doctor` |
 | **Output policy** | Per-tool output strategy (raw / status / summary / file) driving `tool-output-router` | `config/tool-output-policy.toml` |
 | **Managed MCPs** | DeepWiki plus MCP registry CLI (`fulcrum mcp list/register/enable`) with 16 builtin servers registered; minimal default enables context7, the rest stay opt-in | `docs/mcp.md`, `src/cli/mcp-registry.ts`, `src/cli/mcp-builtins.ts`, `src/cli/mcp-cmd.ts` |
@@ -150,16 +150,14 @@ bun run release vX.Y.Z --gh   # also create the GitHub release and upload dist/*
 
 ## Skills authored
 
-27 in-repo skills (`fulcrum skills list` enumerates them with eval coverage). All content-verified against upstream READMEs and docs:
+29 in-repo skills (`fulcrum skills list` enumerates them with eval coverage). All content-verified against upstream READMEs and docs:
 
 ```
-bat   biome   dart-toolchain   difftastic   direnv   eza   flarectl   fzf
+bat   biome   dart-toolchain   difftastic   direnv   eza   flarectl   fzf   gh
 git-cliff   gitleaks   google-java-format   hyperfine   jq   just   ktlint
-lizard   mise   osv-scanner   pmd   ruff   sd   spotbugs   usql
-watchexec   xh   yq   zoxide
+lizard   mise   osv-scanner   pmd   ruff   sd   spotbugs   subagent-orchestration
+usql   watchexec   xh   yq   zoxide
 ```
-
-(`gh` skill archived — superseded by the github MCP server; see `skills/_archive/gh-authored/`.)
 
 See [`skills/SOURCES.md`](skills/SOURCES.md) for the registry and the long-tail authoring queue.
 
