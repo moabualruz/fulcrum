@@ -21,11 +21,15 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
   2. **Strip duplicate vendor rule blocks** — vendor CLIs (`graphify install`) write rule text outside our `BEGIN/END FULCRUM RULES` sentinel; the same content lives in `rules/AGENTS.md` and is spliced inside the sentinel; `stripVendorRuleBlocks` removes the duplicate so agents don't load the rule twice. Vendor-installed hooks/settings remain untouched.
   3. **Project indices** — `graphify update .` + `repomix --compress`. Vendor-default output paths (`graphify-out/`, `repomix-output.xml`); NO Fulcrum-imposed flags or watchers. Live pattern matchers (rg, fd, ast-grep, jq, …) need no index and are not handled here. `fulcrum init reindex` re-runs phase 3 only.
 
-- **Manages MCPs** (`fulcrum mcp list/register/unregister/enable/disable [--all]`) via a TOML registry at `~/.fulcrum/state/global/mcp-registry.toml`. Per-agent `applyToAgents` writes the canonical MCP shape (`claude mcp add` / Codex TOML / Gemini `httpUrl` / OpenCode `type:remote` / Pi adapter mcp.json). Default-disabled for every entry except DeepWiki + context-mode (which are always-on).
+- **Manages MCPs** (`fulcrum mcp list/register/unregister/enable/disable [--all]`) via a TOML registry at `~/.fulcrum/state/global/mcp-registry.toml`. Per-agent `applyToAgents` writes the canonical MCP shape with bearer auth wired:
+  - Codex TOML: emits `bearer_token_env_var = "<VAR>"` for HTTP servers with a single `auth_env_var`.
+  - Gemini / OpenCode / Pi: `headers.Authorization = "Bearer ${VAR}"` (or `{env:VAR}` for OpenCode's syntax) with vendor-side env interpolation.
+  - Claude Code: `claude mcp add ... --header "Authorization: Bearer <token>"` — token expanded at install time because Claude does not interpolate `${VAR}` in stored headers.
+  Default-disabled for every entry except DeepWiki + context-mode (always-on). `fulcrum install --enable-all-mcps` is a verification switch that flips every builtin on across every detected agent.
 
-- **Validates the environment** (`fulcrum doctor [--json]`) — agent detection, rules-spliced state, caveman per-agent install + `defaultMode` source, Pi MCP adapter check, 47 BYO tools, tool-output policy presence, MCP registry section with `auth_status` (env-var presence) + `reachable` (HEAD probe / `which`).
+- **Validates the environment** (`fulcrum doctor [--json] [--probe]`) — agent detection, rules-spliced state, caveman per-agent install + `defaultMode` source, Pi MCP adapter check, 47 BYO tools, tool-output policy presence. MCP registry section reports `auth_status` (env-var presence), `reachable` (HEAD probe / `which`), `drift` (`default_enabled=false` but some agent has it enabled), and `wiring` (per-agent native config inspection — confirms `bearer_token_env_var` / `headers.Authorization` is present for HTTP servers with declared auth). With `--probe`: spawns stdio MCPs / POSTs HTTP MCPs and asserts a valid JSON-RPC `initialize` reply within an 8s timeout. Catches wrong commands, stale URLs, and broken auth in one check.
 
-- **Self-tests** via `bun run ci` — install → tsc → 248 tests → 5 platform builds → skills:lint (27/27 authored) → compress:check (hard gate, 0 pending). All green at every commit.
+- **Self-tests** via `bun run ci` — install → tsc → 273 tests → 5 platform builds → skills:lint → compress:check (hard gate, 0 pending). All green at every commit.
 
 - **Verifies a fresh setup** via `docs/smoke-test.md` — self-contained markdown that any of the 5 agents can read as a prompt and execute step-by-step (16 checks, result table, failure remediation, append-only result log under `~/.fulcrum/state/global/smoke-test/<YYYY-MM-DD>.md`).
 
@@ -65,8 +69,9 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 ├── fulcrum uninstall [--dry-run] [--purge] [--include-caveman]
 │                            — remove Fulcrum-managed rules blocks, native hook
 │                              registrations, hook snippets/markers, managed
-│                              skills/fulcrum/ + skills/fulcrum-upstream/
-│                              namespaces, generated Gemini import, managed
+│                              skills/fulcrum/ namespace (third-party skills
+│                              we placed at vendor paths stay — vendor owns
+│                              them), generated Gemini import, managed
 │                              context-mode + DeepWiki + MCP registry entries,
 │                              caveman per agent (vendor canonical commands).
 │                              Keeps caveman unless --include-caveman.
@@ -87,9 +92,11 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 ├── fulcrum mcp list/register/unregister/enable/disable
 │                            — registry CLI; per-agent or --all-agents toggle.
 ├── fulcrum compress        — compress in-repo content; --check for CI (hard).
-└── fulcrum doctor [--json] [--probe] — bun, agent dirs (rules-spliced state), caveman
+└── fulcrum doctor [--json] [--probe]
+                              — bun, agent dirs (rules-spliced state), caveman
                                 section, 47 tools, policy, Pi MCP adapter, MCP
-                                registry section (auth_status + reachable).
+                                registry section (auth_status + reachable +
+                                drift + wiring; +handshake when --probe).
 ```
 
 Three agents (Claude Code, Codex, Gemini) call `fulcrum hook <name>` directly from native hook config. Two (OpenCode, Pi) load TypeScript shims from `shims/{opencode,pi}/fulcrum.ts` that re-dispatch to the same binary.
@@ -154,10 +161,14 @@ rules/AGENTS.md + .original.md          # behavioral rules body (≤ 200 lines);
                                         # (graphify, etc) — single source.
 skills/
 ├── _template/SKILL.md                  # required shape
-├── <name>/SKILL.md × 27                # authored; .original.md beside each
+├── <name>/SKILL.md × N                 # authored; .original.md beside each
 ├── <name>/references/*.md              # progressively loaded section detail
 ├── SOURCES.md                          # registry + queue
-├── upstream.lock                       # 27 upstream skills w/ subpath_sha256
+├── upstream.lock                       # pinned 3rd-party skills w/
+│                                       # subpath_sha256; per-entry
+│                                       # vendor_canonical_agents gates
+│                                       # whether sync mirrors that agent
+│                                       # (vendor's own placement otherwise).
 └── _archive/                           # deprecated entries (gh-authored, ctx7-fork, etc)
 evals/<name>.{json,match-words}         # per-skill 18-21 trigger entries
 .gitleaksignore                         # suppressions for fixture tokens
@@ -169,13 +180,15 @@ LICENSE (MIT)  AGENTS.md  README.md
 
 ## 3. What works (verified, current run)
 
-- `bun run ci` — green: install + tsc + **248 tests** + 5 platform builds + skills:lint (27/27) + compress:check (hard, 0 pending).
-- `fulcrum install` — full sweep across 5 agents; Doctor verdict ok on a fully-installed machine; **11/11 auth-required MCPs ok**, 5 n/a (no auth), after `~/.config/fulcrum-secrets/env.sh` is sourced.
-- `fulcrum init <dir>` — three phases run end-to-end on this repo: vendor integrations across detected agents, vendor rule de-duplication, project indices (`graphify-out/` 1.1 MB + `repomix-output.xml` 1.1 MB).
-- `fulcrum mcp list --json` — 16 builtin servers visible; `enable`/`disable [--all-agents]` propagates to native config files; doctor reports `enabled-on:[…]` + `auth_status` + `reachable`.
-- `fulcrum doctor` — `verdict: "ok"` on this machine; full per-agent state, caveman across 5 agents, Pi MCP adapter present + DeepWiki in mcp.json.
+- `bun run ci` — green: install + tsc + **273 tests** + 5 platform builds + skills:lint + compress:check (hard, 0 pending).
+- `fulcrum install` — full sweep across 5 agents; doctor verdict ok on a fully-set-up machine.
+- `fulcrum install --enable-all-mcps` — flips every builtin MCP on across every detected agent immediately after registration. End-to-end live verified 2026-04-29: 16/16 MCPs `handshake:ok` via `fulcrum doctor --probe`. Default install state stays opt-in disabled — revert via `fulcrum mcp disable --all-agents <name>`.
+- `fulcrum init <dir>` — three phases run end-to-end on this repo: vendor integrations across detected agents, vendor rule de-duplication, project indices (`graphify-out/` + `repomix-output.xml`).
+- `fulcrum mcp list --json` — 16 builtin servers visible; `enable`/`disable [--all-agents]` propagates to native config files with auth headers correctly wired per-agent.
+- `fulcrum doctor` — verdict ok on this machine; per-agent state, caveman across 5 agents, Pi MCP adapter, DeepWiki, drift detection, auth-wiring inspection.
+- `fulcrum doctor --probe` — actual JSON-RPC `initialize` per server. 16/16 servers handshake:ok across all 5 agents on this machine.
 - `fulcrum uninstall --dry-run` — preview shows clean removal of every Fulcrum-managed artifact across 5 agents.
-- `bash scripts/install.sh [--dry-run] [--with-project DIR] [--no-skills] [--no-upstream-skills] [--enable-all-mcps]` — flag pass-through verified bash 3.2-safe. `--enable-all-mcps` flips every builtin MCP on across every detected agent immediately after registration (intended for end-to-end MCP verification; revert via `fulcrum mcp disable --all-agents <name>`).
+- `bash scripts/install.sh [--dry-run] [--with-project DIR] [--no-skills] [--no-upstream-skills] [--enable-all-mcps]` — flag pass-through verified bash 3.2-safe.
 - `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG → tag → cross-compile → optional `gh release create`. Does NOT push.
 - `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <skill>` — five trigger-rate harnesses; uniform flags; PATH-missing guard.
 - `docs/smoke-test.md` — self-contained agent-runnable verification prompt with 16 checks + result template + remediation links + append-only result log.
@@ -217,7 +230,7 @@ Don't relitigate without new information.
 
 `main` is the active branch. See `git log --oneline -50` for the current chronology — durable. Tag releases via `bun run release vX.Y.Z [--gh]`.
 
-The branch ahead of any remote tag at the moment of this snapshot includes the official-first migration (Waves 1–3 — caveman canonical, GitHub MCP, Repomix vendor plugins, Cloudflare suite, Cloudflare/skills full pin set, semgrep/context7/tavily/playwright/dart MCPs), the vendor-canonical `fulcrum init` redesign, the project-index split, and the rules-routing fix. All committed and pushed.
+Recent (2026-04-29 session, all on `main`, pushed): MCP bearer auth wiring across 5 agents (`bearer_token_env_var` for codex; `headers.Authorization` with per-agent interpolation for claude/gemini/opencode/pi); doctor `drift` + `wiring` + `--probe` MCP `initialize` handshake; install `--enable-all-mcps` verification flag; vendor URL/cmd drift fixes (cloudflare-logpush → `logs.mcp.cloudflare.com`, semgrep → `semgrep mcp`); OpenCode stdio shape fix (`command` array); removal of the `fulcrum-upstream/` namespace (third-party skills now land at vendor placement directly).
 
 ---
 
@@ -392,13 +405,17 @@ If a foundation regression surfaces, add it back here with `<concrete reproducti
 
 ```
 brew install ripgrep fd fzf jq yq bat sd eza zoxide xh gh just mise direnv \
-  tmux difftastic universal-ctags hyperfine watchexec ast-grep gitleaks git-cliff
-pip install semgrep lizard pip-audit
-npm install -g repomix
+  tmux difftastic universal-ctags hyperfine watchexec ast-grep gitleaks git-cliff \
+  semgrep phpstan
+pipx install pip-audit lizard          # or: python3 -m pip install --user
+npm install -g repomix knip
+cargo install cargo-deny
 uv tool install graphifyy tavily-cli
-go install github.com/cloudflare/cloudflare-go/cmd/flarectl@latest   # optional
+go install github.com/cloudflare/cloudflare-go/cmd/flarectl@latest   # optional; symlink onto PATH
 brew install usql                                                    # optional
 ```
+
+`fulcrum doctor` enumerates anything missing. Items marked "fail-open" are non-blocking — install only if you actively use the tool/skill.
 
 ### B. Run `fulcrum install`
 
@@ -413,16 +430,16 @@ Splices rules; vendors hook snippets; seeds policy; installs caveman per agent (
 ```
 mkdir -p ~/.config/fulcrum-secrets
 cat > ~/.config/fulcrum-secrets/env.sh <<'EOF'
-# Required (for MCPs you plan to enable)
-export TAVILY_API_KEY="..."
+# For MCPs you plan to enable. Each var maps directly to an MCP's
+# auth_env_vars; applyToAgents reads the env at install time and wires
+# the right per-agent shape (codex bearer_token_env_var; others
+# headers.Authorization). MUST be sourced before `fulcrum install`.
+export GITHUB_TOKEN="$(gh auth token 2>/dev/null)"
 export CLOUDFLARE_API_TOKEN="..."
 export CLOUDFLARE_ACCOUNT_ID="..."
-# Optional
-# export CONTEXT7_API_KEY="..."
-# export GITHUB_TOKEN="$(gh auth token 2>/dev/null)"
-# export SEMGREP_APP_TOKEN="..."
-# export GWS_CLIENT_SECRETS="..."
-# export GOOGLE_APPLICATION_CREDENTIALS="..."
+export TAVILY_API_KEY="..."
+export CONTEXT7_API_KEY="..."     # optional — context7 free tier works keyless
+# export SEMGREP_APP_TOKEN="..."  # optional, managed semgrep rules
 EOF
 chmod 600 ~/.config/fulcrum-secrets/env.sh
 grep -q "fulcrum-secrets/env.sh" ~/.zshrc \
@@ -430,7 +447,9 @@ grep -q "fulcrum-secrets/env.sh" ~/.zshrc \
 source ~/.zshrc
 ```
 
-Per-MCP source links + auth methods: `docs/mcp.md` §5.
+Per-MCP source links + auth methods: `docs/mcp.md` §5. Re-running `fulcrum install` after editing `env.sh` re-writes per-agent MCP blocks with the new tokens.
+
+**Note on Claude Code**: `claude mcp add --header` does not interpolate `${VAR}`. Tokens are expanded at install time and stored verbatim in `~/.claude.json`. File mode is your $HOME default; treat that file as a secret store.
 
 ### D. Adjacent CLI auth
 
@@ -442,13 +461,17 @@ wrangler login                                 # Cloudflare Workers OAuth
 
 ### E. Selectively enable MCPs
 
-Default state after install: every builtin MCP is registered but disabled (16 active = ~150–300k tokens at session start; opt in selectively):
+Default install state: every builtin MCP is registered but disabled (16 active = ~150–300k tokens at session start). Opt in selectively, or use `--enable-all-mcps` for verification.
 
 ```
 fulcrum mcp enable github --all-agents
 fulcrum mcp enable tavily --agent claude-code
 fulcrum mcp list                   # see state
 fulcrum mcp disable <name> --all-agents
+
+# Verification mode — flips every builtin on across every detected agent.
+# Doctor reports drift:default-disabled-but-enabled while in this state.
+bash scripts/install.sh --enable-all-mcps
 ```
 
 ### F. Per-project bootstrap
@@ -464,7 +487,8 @@ Canonical: `docs/smoke-test.md` (cross-agent prompt). Quick:
 
 ```
 fulcrum doctor                              # human; verdict at the end
-fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, auth_status}'
+fulcrum doctor --probe                      # also runs MCP `initialize` per server (~10s)
+fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, handshake, wiring, drift}'
 ```
 
 ---
@@ -529,10 +553,8 @@ Per-skill harnesses: `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <s
 - **`dist/` is gitignored.** Fresh clone needs Bun (`bash scripts/install.sh`) or `FULCRUM_RELEASE_TAG=...` to fetch a release artifact.
 - **Skill content correctness is the author's job.** Lint validates frontmatter shape only. Vendor-first policy minimizes this risk for new skills (use vendor-published source, never re-author).
 - **stripVendorRuleBlocks scope = user-global rules files only.** Project-root `CLAUDE.md` / `GEMINI.md` written by `graphify install` are .gitignored rather than stripped (vendor controls those by design).
-- **Doctor MCP gaps surfaced 2026-04-29 (codex wall-of-warnings).** Status:
-  - **Closed**: drift detection (registry default_enabled=false vs per-agent enabled — emits `drift:default-disabled-but-enabled` row + warning); auth-wiring validation (inspects each agent's native config for `bearer_token_env_var`/`headers.Authorization`, emits `wiring:missing[<agents>]`).
-  - **Closed (config-side)**: cloudflare-logpush URL refresh and semgrep cmd refresh.
-  - **Closed**: real MCP `initialize` handshake — `fulcrum doctor --probe` POSTs (HTTP) or spawns + writes JSON-RPC (stdio) to every registered server, asserts a valid `result|error` reply within 8s. 16/16 servers handshake:ok on this machine (live verified 2026-04-29). Catches wrong cmd args, wrong URLs, and broken auth in one check.
+- **Claude Code stores HTTP MCP tokens verbatim in `~/.claude.json`.** `claude mcp add --header` does not interpolate `${VAR}`. `applyToClaudeCode` expands the env var at install time and writes the literal token; the file is your primary leak surface for tokens of MCPs you've enabled for Claude Code. Other agents (codex `bearer_token_env_var`, gemini/opencode/pi `${VAR}`/`{env:VAR}`) keep tokens in env, not on disk.
+- **No automatic vendor-URL drift detection.** When a vendor retires an MCP host (cloudflare-logpush did this — moved from `logpush.mcp.cloudflare.com` to `logs.mcp.cloudflare.com`), `fulcrum doctor --probe` will flag `handshake:fail` once you run it, but the drift surfaces only as user-visible breakage. No periodic upstream-diff alarm yet.
 
 ---
 
