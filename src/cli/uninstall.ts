@@ -167,6 +167,28 @@ async function removePolicy(purge: boolean): Promise<void> {
   await removePath(dst, "unmodified tool-output policy");
 }
 
+export async function removeRulesBlocks(home: string, dryRun = false): Promise<void> {
+  const previousDryRun = DRY_RUN;
+  DRY_RUN = dryRun;
+  try {
+    for (const agent of AGENTS) {
+      await removeSentinelBlock(agent.rulesFile(home), agent.label);
+    }
+  } finally {
+    DRY_RUN = previousDryRun;
+  }
+}
+
+export async function removeToolOutputPolicy(purge: boolean, dryRun = false): Promise<void> {
+  const previousDryRun = DRY_RUN;
+  DRY_RUN = dryRun;
+  try {
+    await removePolicy(purge);
+  } finally {
+    DRY_RUN = previousDryRun;
+  }
+}
+
 /**
  * Run a command best-effort: log + continue on failure, never throw.
  * Skips in dry-run mode.
@@ -569,9 +591,7 @@ export async function run(args: string[]): Promise<void> {
   console.log("Fulcrum uninstall\n");
 
   console.log("1/6  Removing Fulcrum rules blocks");
-  for (const agent of AGENTS) {
-    await removeSentinelBlock(agent.rulesFile(home), agent.label);
-  }
+  await removeRulesBlocks(home, DRY_RUN);
   console.log();
 
   console.log("2/6  Removing generated Gemini import");
@@ -603,7 +623,7 @@ export async function run(args: string[]): Promise<void> {
   await cleanupPiMcpAdapterIfUnused(home);
 
   console.log("6/6  Removing policy and optional third-party installs");
-  await removePolicy(purge);
+  await removeToolOutputPolicy(purge, DRY_RUN);
   if (includeCaveman) {
     await removeCavemanCopies(home);
   } else {

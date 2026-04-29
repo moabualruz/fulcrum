@@ -32,6 +32,11 @@ Usage:
                                      Enable server and push to agents.
   fulcrum mcp disable <name> [--agent <id> ...] [--all-agents]
                                      Disable server and remove from agents.
+  fulcrum component list [--json]    List Fulcrum components.
+  fulcrum component info <id> [--json]
+                                     Show component details and surfaces.
+  fulcrum component plan <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--json]
+                                     Plan component changes without applying them.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -96,6 +101,11 @@ async function main() {
     case "mcp": {
       const { run: runMcp } = await import("./cli/mcp-cmd.ts");
       await runMcp(rest);
+      return;
+    }
+    case "component": {
+      const { run: runComponent } = await import("./cli/component.ts");
+      await runComponent(rest);
       return;
     }
     case "version":

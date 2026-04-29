@@ -13,9 +13,9 @@
 import { mkdir, writeFile, unlink, readdir, readFile, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 import { AGENTS } from "../agents/registry.ts";
+import type { AgentId } from "./mcp-registry.ts";
 
-type RecipeName = (typeof RECIPE_NAMES)[number];
-type AgentId = "claude-code" | "codex" | "gemini" | "opencode" | "pi";
+export type RecipeName = (typeof RECIPE_NAMES)[number];
 type JsonAgentId = "claude-code" | "codex" | "gemini";
 type TsAgentId = "opencode" | "pi";
 
@@ -245,7 +245,7 @@ function labelFor(agentId: string): string {
   return LABELS.get(agentId) ?? agentId;
 }
 
-function isRecipeName(name: string): name is RecipeName {
+export function isRecipeName(name: string): name is RecipeName {
   return (RECIPE_NAMES as readonly string[]).includes(name);
 }
 
@@ -750,6 +750,16 @@ async function removeMarker(name: RecipeName): Promise<void> {
   }
 }
 
+export async function enableHookRecipe(name: RecipeName, targetAgents: Set<AgentId>): Promise<void> {
+  await enableRecipe(name, targetAgents);
+  await writeMarker(name);
+}
+
+export async function disableHookRecipe(name: RecipeName, targetAgents: Set<AgentId>): Promise<void> {
+  await disableRecipe(name, targetAgents);
+  await removeMarker(name);
+}
+
 async function cmdList(args: string[] = []): Promise<void> {
   const enabled = await listEnabled();
   if (args.includes("--json")) {
@@ -783,8 +793,7 @@ async function cmdEnable(name: string | undefined, allAgents: boolean): Promise<
 
   const home = process.env["HOME"] ?? "";
   const target = allAgents ? ALL_AGENT_IDS : await detectedAgents(home);
-  await enableRecipe(name, target);
-  await writeMarker(name);
+  await enableHookRecipe(name, target);
   console.log(`Marked enabled: ${markerPath(name)}`);
 
   // Print snippet (try repo, fall back to installed pool).
@@ -815,8 +824,7 @@ async function cmdDisable(name: string | undefined, allAgents: boolean): Promise
 
   const home = process.env["HOME"] ?? "";
   const target = allAgents ? ALL_AGENT_IDS : await detectedAgents(home);
-  await disableRecipe(name, target);
-  await removeMarker(name);
+  await disableHookRecipe(name, target);
   console.log(`Marked disabled: ${markerPath(name)}`);
 }
 

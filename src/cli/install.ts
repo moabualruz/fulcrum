@@ -259,20 +259,20 @@ export async function spliceSentinel(target: string, body: string, label: string
   }
 }
 
-// Derive splice targets from the central agent registry.
-// Gemini's rulesFile (~/AGENTS.md) must always be created even if ~/.gemini
-// doesn't exist yet — that's the @AGENTS.md import source for GEMINI.md.
-const _home = process.env["HOME"] ?? "";
-const TARGETS: Array<{ path: string; label: string; alwaysCreate?: boolean }> = [
-  ...AGENTS
-    .filter((a) => a.id !== "gemini")
-    .map((a) => ({ path: a.rulesFile(_home), label: a.label })),
-  {
-    path: AGENTS.find((a) => a.id === "gemini")!.rulesFile(_home),
-    label: "Gemini source (referenced via @AGENTS.md)",
-    alwaysCreate: true,
-  },
-];
+function rulesTargets(home: string): Array<{ path: string; label: string; alwaysCreate?: boolean }> {
+  // Gemini's rulesFile (~/AGENTS.md) must always be created even if ~/.gemini
+  // doesn't exist yet — that's the @AGENTS.md import source for GEMINI.md.
+  return [
+    ...AGENTS
+      .filter((a) => a.id !== "gemini")
+      .map((a) => ({ path: a.rulesFile(home), label: a.label })),
+    {
+      path: AGENTS.find((a) => a.id === "gemini")!.rulesFile(home),
+      label: "Gemini source (referenced via @AGENTS.md)",
+      alwaysCreate: true,
+    },
+  ];
+}
 
 async function vendorHookSnippets(): Promise<void> {
   const root = repoRoot();
@@ -310,6 +310,16 @@ async function seedPolicy(): Promise<void> {
   await mk(fulcrumHome());
   await cp(src, dst);
   console.log(`     installed default policy: ${dst}`);
+}
+
+export async function installToolOutputPolicy(dryRun = false): Promise<void> {
+  const previousDryRun = DRY_RUN;
+  DRY_RUN = dryRun;
+  try {
+    await seedPolicy();
+  } finally {
+    DRY_RUN = previousDryRun;
+  }
 }
 
 const CAVEMAN_REPO = "https://github.com/JuliusBrussee/caveman";
@@ -428,8 +438,7 @@ export function assertNotAgentsPath(p: string, home: string): void {
   }
 }
 
-async function geminiShim(): Promise<void> {
-  const home = process.env["HOME"];
+async function geminiShim(home = process.env["HOME"] ?? ""): Promise<void> {
   const gemDir = `${home}/.gemini`;
   if (!(await isDir(gemDir))) return;
   const file = `${gemDir}/GEMINI.md`;
@@ -438,6 +447,30 @@ async function geminiShim(): Promise<void> {
   if (!/@AGENTS\.md/.test(body)) {
     await ap(file, (body && !body.endsWith("\n") ? "\n" : "") + "@AGENTS.md\n");
     console.log("     ✓ Gemini GEMINI.md updated with @AGENTS.md import");
+  }
+}
+
+export async function installRulesBlocks(home: string, dryRun = false): Promise<void> {
+  const previousDryRun = DRY_RUN;
+  DRY_RUN = dryRun;
+  try {
+    const root = repoRoot();
+    const rulesPath = `${root}/rules/AGENTS.md`;
+    if (!(await exists(rulesPath))) {
+      throw new Error(`fulcrum install: cannot find ${rulesPath}`);
+    }
+    const body = (await readFile(rulesPath, "utf8")).trimEnd();
+    for (const t of rulesTargets(home)) {
+      const parent = dirname(t.path);
+      if (!t.alwaysCreate && !(await isDir(parent)) && !(await exists(t.path))) {
+        console.log(`     · skip ${t.label} (parent dir not present)`);
+        continue;
+      }
+      await spliceSentinel(t.path, body, t.label);
+    }
+    await geminiShim(home);
+  } finally {
+    DRY_RUN = previousDryRun;
   }
 }
 
@@ -747,25 +780,16 @@ export async function run(args: string[]): Promise<void> {
   console.log();
 
   console.log("2/8  Seeding ~/.fulcrum/tool-output-policy.toml");
-  await seedPolicy();
+  await installToolOutputPolicy(DRY_RUN);
   console.log();
 
   console.log("3/8  Splicing rules/AGENTS.md into per-agent rules files");
-  const rulesPath = `${root}/rules/AGENTS.md`;
-  if (!(await exists(rulesPath))) {
-    console.error(`fulcrum install: cannot find ${rulesPath}`);
+  try {
+    await installRulesBlocks(process.env["HOME"] ?? "", DRY_RUN);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
-  const body = (await readFile(rulesPath, "utf8")).trimEnd();
-  for (const t of TARGETS) {
-    const parent = dirname(t.path);
-    if (!t.alwaysCreate && !(await isDir(parent)) && !(await exists(t.path))) {
-      console.log(`     · skip ${t.label} (parent dir not present)`);
-      continue;
-    }
-    await spliceSentinel(t.path, body, t.label);
-  }
-  await geminiShim();
   console.log();
 
   const home = process.env["HOME"] ?? "";
