@@ -5,6 +5,8 @@
 import { stat, readdir } from "node:fs/promises";
 import { which, exists } from "../utils/proc.ts";
 import { AGENTS } from "../agents/registry.ts";
+import { ALL_COMPONENTS } from "../components/catalog.ts";
+import { ComponentLedger, dbPath as componentLedgerPath } from "../components/ledger.ts";
 import { loadRegistry, ALL_AGENT_IDS, isEnabled, type AgentId } from "./mcp-registry.ts";
 import { MINIMAL_DEFAULT_MCPS } from "./mcp-builtins.ts";
 
@@ -71,6 +73,11 @@ interface DoctorReport {
       handshake: "ok" | "fail" | "skipped";
       handshake_error?: string;
     }>;
+  };
+  components: {
+    total: number;
+    installed: number;
+    database: string;
   };
   skillsCount: number;
   warnings: number;
@@ -499,6 +506,22 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   // Skills
   const skillsCount = await countSkills();
 
+  // Component lifecycle ledger
+  const componentDatabase = componentLedgerPath();
+  let installedComponents = 0;
+  if (await exists(componentDatabase)) {
+    const ledger = ComponentLedger.open(componentDatabase);
+    try {
+      for (const component of ALL_COMPONENTS) {
+        if (ledger.componentStatus(component.id)?.status === "installed") {
+          installedComponents += 1;
+        }
+      }
+    } finally {
+      ledger.close();
+    }
+  }
+
   // Managed MCPs
   const mcpReport: DoctorReport["mcp"] = { servers: [] };
   try {
@@ -607,6 +630,11 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       deepwikiPresent: piDeepwikiPresent,
     },
     mcp: mcpReport,
+    components: {
+      total: ALL_COMPONENTS.length,
+      installed: installedComponents,
+      database: componentDatabase,
+    },
     skillsCount,
     warnings,
     errors,
@@ -674,6 +702,13 @@ function printHumanFormat(report: DoctorReport, home: string): void {
   console.log(
     `Skills authored: ${report.skillsCount} (in ${repoRoot()}/skills/)`
   );
+  console.log();
+
+  // Component lifecycle
+  console.log(
+    `Components: ${report.components.installed}/${report.components.total} installed`
+  );
+  console.log(`  database: ${report.components.database}`);
   console.log();
 
   // Managed MCPs

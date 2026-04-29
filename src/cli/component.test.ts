@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { ALL_AGENT_IDS } from "./mcp-registry.ts";
 import { run } from "./component.ts";
 
@@ -168,5 +171,36 @@ describe("fulcrum component apply", () => {
     expect(plan.target).toBe("hooks.format");
     expect(plan.actions).toHaveLength(1);
     expect(logs.join("\n")).toContain("DRY RUN");
+  });
+});
+
+describe("fulcrum component status", () => {
+  test("--json reports ledger component state", async () => {
+    const home = await mkdtemp(join(tmpdir(), "fulcrum-component-status-"));
+    const previousFulcrumHome = process.env["FULCRUM_HOME"];
+    process.env["FULCRUM_HOME"] = join(home, ".fulcrum");
+    try {
+      const { ComponentLedger } = await import("../components/ledger.ts");
+      const ledger = ComponentLedger.open();
+      ledger.recordComponent({ id: "hooks.format", kind: "hook", status: "installed" });
+      ledger.close();
+
+      const { logs, restore } = captureConsole();
+      try {
+        await run(["status", "hooks.format", "--json"]);
+      } finally {
+        restore();
+      }
+
+      const parsed = JSON.parse(logs.join("\n")) as { componentId: string; status: string };
+      expect(parsed).toMatchObject({ componentId: "hooks.format", status: "installed" });
+    } finally {
+      if (previousFulcrumHome === undefined) {
+        delete process.env["FULCRUM_HOME"];
+      } else {
+        process.env["FULCRUM_HOME"] = previousFulcrumHome;
+      }
+      await rm(home, { recursive: true, force: true });
+    }
   });
 });

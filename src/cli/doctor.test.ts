@@ -26,7 +26,7 @@ async function runDoctor(home: string, extraEnv: Record<string, string | undefin
     else baseEnv[k] = v;
   }
   const proc = Bun.spawn(["bun", "src/index.ts", "doctor", "--json"], {
-    cwd: "/Users/mkh/workspace/fulcrum",
+    cwd: process.cwd(),
     stdout: "pipe",
     stderr: "pipe",
     env: baseEnv as Record<string, string>,
@@ -93,6 +93,24 @@ describe("doctor --json piMcpAdapter field", () => {
     await mkdir(home, { recursive: true });
     const report = await runDoctor(home);
     expect(["ok", "warning", "error"]).toContain(report["verdict"] as string);
+  });
+});
+
+describe("doctor --json component lifecycle section", () => {
+  test("reports component lifecycle state", async () => {
+    const home = join(TMP, "component-lifecycle");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const { ComponentLedger } = await import("../components/ledger.ts");
+    const ledger = ComponentLedger.open(join(fulcrumHome, "state", "global", "components.db"));
+    ledger.recordComponent({ id: "hooks.format", kind: "hook", status: "installed" });
+    ledger.close();
+
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const components = report["components"] as Record<string, unknown> | undefined;
+    expect(components?.["total"]).toBeGreaterThan(0);
+    expect(components?.["installed"]).toBeGreaterThan(0);
+    expect(components?.["database"]).toBe(join(fulcrumHome, "state", "global", "components.db"));
   });
 });
 

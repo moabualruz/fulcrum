@@ -20,6 +20,9 @@ export async function run(argv: string[]): Promise<void> {
     case "plan":
       runPlan(rest);
       return;
+    case "status":
+      await runStatus(rest);
+      return;
     case "install":
     case "remove":
     case "enable":
@@ -34,6 +37,61 @@ export async function run(argv: string[]): Promise<void> {
       return;
     default:
       throw new Error(`unknown component command: ${cmd}`);
+  }
+}
+
+async function runStatus(argv: string[]): Promise<void> {
+  const options = parseStatusOptions(argv);
+  const { ComponentLedger } = await import("../components/ledger.ts");
+  const ledger = ComponentLedger.open();
+  try {
+    if (options.target !== undefined) {
+      const component = getComponent(options.target);
+      if (component === null) {
+        throw new Error(`unknown component: ${options.target}`);
+      }
+      const status = ledger.componentStatus(component.id);
+      const surfaces = ledger.surfacesForComponent(component.id)
+        .filter((surface) => options.agent === undefined || surface.agent_id === options.agent)
+        .map((surface) => ({
+          id: surface.id,
+          componentId: surface.component_id,
+          agentId: surface.agent_id,
+          kind: surface.kind,
+          target: surface.target,
+          state: "present",
+          managed: true,
+          modified: false,
+        }));
+      const payload = {
+        componentId: component.id,
+        status: status?.status ?? "not-installed",
+        surfaces,
+      };
+      if (options.json) {
+        printJson(payload);
+      } else {
+        console.log(`${payload.componentId}: ${payload.status}`);
+      }
+      return;
+    }
+
+    const payload = ALL_COMPONENTS.map((component) => {
+      const status = ledger.componentStatus(component.id);
+      return {
+        componentId: component.id,
+        status: status?.status ?? "not-installed",
+      };
+    });
+    if (options.json) {
+      printJson(payload);
+      return;
+    }
+    for (const row of payload) {
+      console.log(`${row.componentId.padEnd(28)} ${row.status}`);
+    }
+  } finally {
+    ledger.close();
   }
 }
 
@@ -160,6 +218,44 @@ function parseJsonOnly(argv: string[], command: string): { args: string[]; json:
   return { args, json };
 }
 
+function parseStatusOptions(argv: string[]): { target?: string; agent?: AgentId; json: boolean } {
+  let target: string | undefined;
+  let agent: AgentId | undefined;
+  let json = false;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === undefined) continue;
+    switch (arg) {
+      case "--json":
+        json = true;
+        break;
+      case "--agent": {
+        const agentId = argv[index + 1];
+        if (agentId === undefined || agentId.startsWith("-")) {
+          throw new Error("missing value for --agent");
+        }
+        if (!AGENT_IDS.has(agentId)) {
+          throw new Error(`unknown agent: ${agentId}`);
+        }
+        agent = agentId as AgentId;
+        index += 1;
+        break;
+      }
+      default:
+        if (arg.startsWith("-")) {
+          throw new Error(`unknown option for component status: ${arg}`);
+        }
+        if (target !== undefined) {
+          throw new Error(`unexpected argument for component status: ${arg}`);
+        }
+        target = arg;
+    }
+  }
+
+  return { target, agent, json };
+}
+
 function parsePlanOptions(argv: string[]): { agents?: AgentId[]; json: boolean } {
   const agents: AgentId[] = [];
   let json = false;
@@ -270,5 +366,6 @@ Usage:
   fulcrum component list [--json]
   fulcrum component info <id> [--json]
   fulcrum component plan <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--json]
+  fulcrum component status [component] [--agent <id>] [--json]
   fulcrum component <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--dry-run] [--json]`);
 }
