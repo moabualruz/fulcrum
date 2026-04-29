@@ -463,6 +463,32 @@ fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, auth_status}'
 
 ---
 
+## 7a. Next-session ordering — first two steps
+
+1. **Run the smoke test on a fresh agent session.**
+   `claude -p "$(cat docs/smoke-test.md)" --output-format json` (or the equivalent for codex / gemini / opencode / pi). Result lands at `~/.fulcrum/state/global/smoke-test/<YYYY-MM-DD>.md`. Triage every `✗` row; fix the underlying setup or code; re-run until the result table is all `✓`.
+
+2. **Author the cross-agent subagent-orchestration skill.**
+   Read `docs/subagent-guidance.notes.md` first — captures the user's scattered guidance on subagent workflow from session 2026-04-28/29 (parallel-vs-serial, model-effort matching, review-protocol, research-then-plan-then-implement, vendor-first sourcing, scope discipline, scratch-HOME testing, fail-soft per tool, no overengineering).
+   Then research online to enrich it. Targets:
+   - Anthropic Agent SDK + Claude Code subagent docs (`code.claude.com/docs/en` — search "subagent", "Agent tool", "background tasks", "isolation modes")
+   - Multi-agent orchestration patterns: map-reduce / fan-out / supervisor-worker; token-budget control; hand-off checkpoints; failure isolation
+   - Cross-agent dispatch surfaces: what each of Claude Code, Codex, Gemini, OpenCode, Pi exposes for "delegate to a subagent" — confirm contract, not assume
+   - Existing community skills in this space (search `obra/superpowers-lab`, `mitsuhiko/agent-stuff`, anthropic/skills)
+   Output:
+   - `skills/subagent-orchestration/SKILL.md` (frontmatter + 5 H2 sections per `skills/_template/SKILL.md`); name `/subagent-orchestration` (or shorter if a vendor publishes a canonical name first — vendor-first policy applies).
+   - `skills/subagent-orchestration/references/*.md` for progressive detail.
+   - `evals/subagent-orchestration.json` (18–21 entries; trigger / anti-trigger split).
+   - `evals/subagent-orchestration.match-words` for word-bounded match keywords.
+   - caveman compress; pass `bun run skills lint`; verify 4-of-5 trigger eval bar via `scripts/eval-skill-claude.sh subagent-orchestration` and the codex sibling.
+   Constraint: vendor-first. If the Anthropic / Claude team or a tool vendor already publishes an "agent orchestration" skill at an official source, pin that into `skills/upstream.lock` and only author the gap parts. Do not re-implement what is published.
+
+3. After both pass, proceed with layer §6.1 (Repository supervisor) per the build-order branch plan above.
+
+If the smoke test surfaces an issue, fix it (commit per logical change) before moving to step 2.
+
+---
+
 ## 8. Smoke-test recipes
 
 ```bash
@@ -509,6 +535,7 @@ Per-skill harnesses: `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <s
 - `docs/developer-guide.md` — repo layout, architecture, contributing code.
 - `docs/contributing.md` — workflow + conventions.
 - `docs/smoke-test.md` — agent-runnable post-install verification prompt.
+- `docs/subagent-guidance.notes.md` — captured user guidance on subagent workflow; source for the cross-agent subagent-orchestration skill (see §7a step 2).
 - `docs/{context,hooks,skills,mcp,agents,capabilities,caveman,tool-output-policy,skill-smoke-test}.md` — per-topic foundation docs.
 - `rules/AGENTS.md` — body spliced into each agent's primary rules file (≤ 200 lines, vendor-tool conventions only).
 - `skills/SOURCES.md` — skill registry + authoring queue.
