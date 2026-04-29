@@ -267,6 +267,8 @@ Foundation gaps tracked in earlier revisions are all closed. CI green; doctor ve
 
 Before starting the trajectory layers, finish the remaining **component lifecycle management** work as a foundation-hardening feature. Detailed implementation plan: `docs/superpowers/plans/2026-04-29-component-lifecycle-management.md`. Tasks 1-7 are implemented and committed in `b858220`; orchestration guidance needed to run the rest is committed in `6d1ace2`. Next session should start at Task 8: vendor/skills adapter with official-first installs and verbatim mirroring to CLI agents that lack first-party/generic package installers, then status/doctor integration, compatibility wrappers, docs, and full verification.
 
+Final foundation-hardening gate before starting §6.1: run the `ISSUES.md` checklist after a real uninstall/clean-install cycle. That means fully uninstall everything the old workflow installed, run a fresh install through the new component/package-manager workflow, then re-check whether each issue in `ISSUES.md` still reproduces. For any confirmed issue, write the failing test first, fix the root cause, verify red/green behavior, and keep the regression test so the issue cannot silently resurface.
+
 The trajectory layer below is next-branch work after component lifecycle management — none of it is implemented. Build order is top-down because later layers consume earlier layers' state.
 
 ### 6.1 Repository supervisor — `fulcrum repo …`
@@ -527,7 +529,7 @@ fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, handshake, wiring,
 
 1. **Finish component lifecycle management.**
    Detailed plan: `docs/superpowers/plans/2026-04-29-component-lifecycle-management.md`.
-   Stay on `main` as integration and use external worktrees for parallel worker lanes. Completed: catalog, planner, ledger, `component list/info/plan`, `component install/remove/enable/disable`, executor, and adapters for hooks/MCP/rules/policy. Next: Task 8 vendor/skills adapter, specifically preserving first-party installer vs Fulcrum mirror behavior for plugins/extensions/packages across all supported CLIs; then Task 9 status + doctor integration, Task 10 `install`/`uninstall` compatibility wrappers, Task 12 docs, Task 13 full verification.
+   Stay on `main` as integration and use external worktrees for parallel worker lanes. Completed: catalog, planner, ledger, `component list/info/plan`, `component install/remove/enable/disable`, executor, and adapters for hooks/MCP/rules/policy. Next: Task 8 vendor/skills adapter, specifically preserving first-party installer vs Fulcrum mirror behavior for plugins/extensions/packages across all supported CLIs; then Task 9 status + doctor integration, Task 10 `install`/`uninstall` compatibility wrappers, Task 12 docs, Task 13 full verification. Last step before moving to §6.1: full uninstall of old-workflow installs, clean install through the new component/package-manager workflow, then execute `ISSUES.md` as a TDD root-cause checklist; keep tests for every confirmed issue and fix any confirmed regression.
 
 2. **Start layer §6.1: Repository supervisor.**
    After component lifecycle lands, implement `fulcrum repo …` around repo registration, refresh, list/show, settings, SQLite migrations, doctor row counts, and the `repo-track` session hook.
