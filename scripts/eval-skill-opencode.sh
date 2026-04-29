@@ -148,10 +148,18 @@ fi
 echo "  installed at: $SKILL_INSTALLED" | tee -a "$SUMMARY"
 echo | tee -a "$SUMMARY"
 
-# Activation detection: grep captured stdout+stderr for match words.
-# opencode run --format json emits JSON event lines on stdout.
+# Activation detection: inspect structured skill tool events first, then fall
+# back to text matching. opencode run --format json emits JSON event lines.
 detect_trigger() {
   local combined="$1"
+  local skill_used
+  skill_used=$(printf '%s' "$combined" | jq -s -r --arg n "$SKILL_NAME" '
+    [.. | objects
+      | select((.tool? // "") == "skill")
+      | .state.input.name? // .part.state.input.name? // .input.name? // empty]
+    | map(select(. == $n)) | length' 2>/dev/null || echo 0)
+  if [ "${skill_used:-0}" -gt 0 ] 2>/dev/null; then echo 1; return; fi
+
   local lc
   lc=$(printf '%s' "$combined" | sed 's/\\n/ /g; s/\\t/ /g; s/\\r/ /g' | tr '[:upper:]' '[:lower:]')
   local IFS=','

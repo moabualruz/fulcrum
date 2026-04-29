@@ -6,7 +6,7 @@
 #                                             [--model NAME]
 #                                             [--runs-per-query N]
 #                                             [--results-dir DIR]
-#                                             [--timeout-seconds N]
+#                                             [--timeout-seconds N|0]
 #                                             [--match-words "w1,w2,..."]
 #
 # Pass criteria:
@@ -117,7 +117,11 @@ SUMMARY="$RESULTS_DIR/summary.txt"
   echo "  queries   : $QUERIES"
   echo "  model     : ${MODEL:-codex default}"
   echo "  runs/query: $RUNS"
-  echo "  timeout   : ${TIMEOUT_SECONDS}s"
+  if [ "$TIMEOUT_SECONDS" = "0" ]; then
+    echo "  timeout   : none"
+  else
+    echo "  timeout   : ${TIMEOUT_SECONDS}s"
+  fi
   echo "  match     : $MATCH_WORDS"
   echo "  results   : $RESULTS_DIR"
   echo
@@ -178,34 +182,38 @@ while IFS= read -r entry; do
     TIMED_OUT=0
     codex "${CODEX_ARGS[@]}" "$Q" </dev/null >"$RESP_FILE" 2>>"$LOG" &
     CODEX_PID=$!
-    START=$(date +%s)
-    while kill -0 "$CODEX_PID" 2>/dev/null; do
-      NOW=$(date +%s)
-      if [ $((NOW - START)) -ge "$TIMEOUT_SECONDS" ]; then
-        TIMED_OUT=1
-        kill "$CODEX_PID" 2>/dev/null || true
+    if [ "$TIMEOUT_SECONDS" = "0" ]; then
+      wait "$CODEX_PID" 2>/dev/null || true
+    else
+      START=$(date +%s)
+      while kill -0 "$CODEX_PID" 2>/dev/null; do
+        NOW=$(date +%s)
+        if [ $((NOW - START)) -ge "$TIMEOUT_SECONDS" ]; then
+          TIMED_OUT=1
+          kill "$CODEX_PID" 2>/dev/null || true
+          sleep 1
+          kill -9 "$CODEX_PID" 2>/dev/null || true
+          break
+        fi
         sleep 1
-        kill -9 "$CODEX_PID" 2>/dev/null || true
-        break
-      fi
-      sleep 1
-    done
+      done
+    fi
     wait "$CODEX_PID" 2>/dev/null || true
-    RESP=$(cat "$RESP_FILE")
-    rm -f "$RESP_FILE"
     rm -rf "$WORK"
     if [ "$TIMED_OUT" = "1" ]; then
       echo "timeout after ${TIMEOUT_SECONDS}s: $Q" >> "$LOG"
-      RESP='{"type":"result","is_error":true,"error":"timeout"}'
+      printf '%s' '{"type":"result","is_error":true,"error":"timeout"}' > "$RESP_FILE"
     fi
 
+    RESP=$(cat "$RESP_FILE")
     TRIG=$(detect_trigger "$RESP")
     jq -nc \
       --arg q "$Q" --argjson exp "$EXPECT" --argjson trig "$TRIG" \
       --argjson idx "$ENTRY_IDX" --argjson run "$run" \
-      --arg resp "$RESP" \
+      --rawfile resp "$RESP_FILE" \
       '{idx:$idx, run:$run, query:$q, expected:$exp, triggered:($trig==1), response:$resp}' \
       >> "$RAW"
+    rm -f "$RESP_FILE"
 
     if [ "$EXPECT" = "true" ]; then
       TRIG_TOTAL=$((TRIG_TOTAL+1))
