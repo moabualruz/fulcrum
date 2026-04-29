@@ -1,15 +1,23 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { installRepomixPackageMirrors, uninstallRepomixPackageMirrors } from "./repomix-package.ts";
+import {
+  installRepomixClaudePlugins,
+  installRepomixPackageMirrors,
+  uninstallRepomixClaudePlugins,
+  uninstallRepomixPackageMirrors,
+} from "./repomix-package.ts";
+import * as proc from "../utils/proc.ts";
 
 let TMP: string;
 let originalHome: string | undefined;
+let originalFulcrumHome: string | undefined;
 
 beforeEach(async () => {
   TMP = await mkdtemp(join(tmpdir(), "fulcrum-repomix-package-"));
   originalHome = process.env["HOME"];
+  originalFulcrumHome = process.env["FULCRUM_HOME"];
   process.env["HOME"] = TMP;
 
   await mkdir(join(TMP, ".claude", "plugins", "cache", "repomix", "repomix-commands", "1.0.2", "commands"), { recursive: true });
@@ -22,10 +30,79 @@ beforeEach(async () => {
 afterEach(async () => {
   if (originalHome !== undefined) process.env["HOME"] = originalHome;
   else delete process.env["HOME"];
+  if (originalFulcrumHome !== undefined) process.env["FULCRUM_HOME"] = originalFulcrumHome;
+  else delete process.env["FULCRUM_HOME"];
   await rm(TMP, { recursive: true, force: true });
 });
 
 describe("Repomix capability package mirrors", () => {
+  test("installs Repomix Claude plugins and writes marker", async () => {
+    process.env["FULCRUM_HOME"] = join(TMP, ".fulcrum");
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    let calls: unknown[][] = [];
+    try {
+      await installRepomixClaudePlugins();
+      calls = runSpy.mock.calls.map((call) => call[0]);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+    expect(calls).toEqual([
+      ["claude", "plugin", "marketplace", "add", "yamadashy/repomix"],
+      ["claude", "plugin", "install", "repomix-mcp@repomix"],
+      ["claude", "plugin", "install", "repomix-commands@repomix"],
+      ["claude", "plugin", "install", "repomix-explorer@repomix"],
+    ]);
+    expect(await Bun.file(join(TMP, ".fulcrum", "state", "global", "repomix-claude.installed")).exists()).toBe(true);
+  });
+
+  test("dry-run Repomix Claude plugin install logs commands without running or writing marker", async () => {
+    process.env["FULCRUM_HOME"] = join(TMP, ".fulcrum");
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    try {
+      await installRepomixClaudePlugins({ dryRun: true });
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+    expect(runSpy.mock.calls).toHaveLength(0);
+    expect(logs).toContain("     [dry-run] would run: claude plugin marketplace add yamadashy/repomix");
+    expect(logs).toContain("     [dry-run] would run: claude plugin install repomix-mcp@repomix");
+    expect(await Bun.file(join(TMP, ".fulcrum", "state", "global", "repomix-claude.installed")).exists()).toBe(false);
+  });
+
+  test("uninstalls Repomix Claude plugins and removes marker", async () => {
+    process.env["FULCRUM_HOME"] = join(TMP, ".fulcrum");
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await mkdir(join(TMP, ".fulcrum", "state", "global"), { recursive: true });
+    await writeFile(join(TMP, ".fulcrum", "state", "global", "repomix-claude.installed"), "installed\n");
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    let calls: unknown[][] = [];
+    try {
+      await uninstallRepomixClaudePlugins();
+      calls = runSpy.mock.calls.map((call) => call[0]);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+    expect(calls).toEqual([
+      ["claude", "plugin", "uninstall", "repomix-mcp@repomix"],
+      ["claude", "plugin", "uninstall", "repomix-commands@repomix"],
+      ["claude", "plugin", "uninstall", "repomix-explorer@repomix"],
+    ]);
+    expect(await Bun.file(join(TMP, ".fulcrum", "state", "global", "repomix-claude.installed")).exists()).toBe(false);
+  });
+
   test("installs nearest native mirrors for non-Claude agents", async () => {
     await mkdir(join(TMP, ".codex"), { recursive: true });
     await mkdir(join(TMP, ".gemini"), { recursive: true });

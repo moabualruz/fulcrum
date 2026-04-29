@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { installVendorCapabilityPackages, uninstallVendorCapabilityPackages } from "./vendor-packages.ts";
+import {
+  installCloudflarePackage,
+  installSuperpowersPackage,
+  installVendorCapabilityPackages,
+  uninstallCloudflarePackage,
+  uninstallSuperpowersPackage,
+  uninstallVendorCapabilityPackages,
+} from "./vendor-packages.ts";
 import * as proc from "../utils/proc.ts";
 
 let TMP: string;
@@ -30,6 +37,78 @@ afterEach(async () => {
 });
 
 describe("vendor capability packages", () => {
+  test("installs only the Cloudflare Claude plugin for the Cloudflare package", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    let calls: unknown[][] = [];
+    try {
+      await installCloudflarePackage();
+      calls = runSpy.mock.calls.map((call) => call[0]);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+    expect(calls).toEqual([
+      ["claude", "plugin", "marketplace", "add", "cloudflare/skills"],
+      ["claude", "plugin", "install", "cloudflare@cloudflare"],
+    ]);
+  });
+
+  test("uninstalls only the Cloudflare Claude plugin for the Cloudflare package", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    let calls: unknown[][] = [];
+    try {
+      await uninstallCloudflarePackage();
+      calls = runSpy.mock.calls.map((call) => call[0]);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+    expect(calls).toEqual([
+      ["claude", "plugin", "uninstall", "cloudflare@cloudflare"],
+    ]);
+  });
+
+  test("installs Superpowers package surfaces without Cloudflare", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    let calls: unknown[][] = [];
+    try {
+      await installSuperpowersPackage();
+      calls = runSpy.mock.calls.map((call) => call[0]);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+    expect(calls).toContainEqual(["claude", "plugin", "install", "superpowers@claude-plugins-official"]);
+    expect(calls).not.toContainEqual(["claude", "plugin", "install", "cloudflare@cloudflare"]);
+    expect(await readFile(join(TMP, ".codex", "skills", "superpowers", "brainstorming", "SKILL.md"), "utf8"))
+      .toContain("Use structured brainstorming.");
+  });
+
+  test("uninstalls Superpowers package surfaces without Cloudflare", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "skills", "superpowers", "brainstorming"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    let calls: unknown[][] = [];
+    try {
+      await uninstallSuperpowersPackage();
+      calls = runSpy.mock.calls.map((call) => call[0]);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+    expect(calls).toContainEqual(["claude", "plugin", "uninstall", "superpowers@claude-plugins-official"]);
+    expect(calls).not.toContainEqual(["claude", "plugin", "uninstall", "cloudflare@cloudflare"]);
+    expect(await Bun.file(join(TMP, ".codex", "skills", "superpowers")).exists()).toBe(false);
+  });
+
   test("mirrors Superpowers full skills for Codex/Pi and registers OpenCode plugin", async () => {
     await mkdir(join(TMP, ".codex"), { recursive: true });
     await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
@@ -73,7 +152,7 @@ describe("vendor capability packages", () => {
     await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
     const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "pi" ? "/usr/local/bin/pi" : null);
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
-    let calls: unknown[][];
+    let calls: unknown[][] = [];
     try {
       await installVendorCapabilityPackages();
       calls = runSpy.mock.calls.map((call) => call[0]);

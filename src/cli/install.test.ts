@@ -230,6 +230,21 @@ describe("installCaveman W1.3 — direct official repo copy", () => {
     }
   });
 
+  test("opts dry-run prevents installCaveman writes without global dry-run state", async () => {
+    setDryRun(false);
+    await mkdir(join(testHome, ".codex", "skills"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => (
+      cmd === "git" ? "/mock/git" : null
+    ));
+
+    try {
+      await installCaveman(testHome, { dryRun: true });
+      expect(await Bun.file(join(testHome, ".config", "caveman", "config.json")).exists()).toBe(false);
+    } finally {
+      whichSpy.mockRestore();
+    }
+  });
+
 });
 
 // ---------------------------------------------------------------------------
