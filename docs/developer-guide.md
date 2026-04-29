@@ -20,8 +20,9 @@ fulcrum/
 │   │   └── proc.ts                     # which, exists, run, spawnDetached
 │   ├── cli/
 │   │   ├── init.ts                     # fulcrum init — bootstrap project AGENTS.md + .claude/CLAUDE.md
-│   │   ├── install.ts                  # fulcrum install — sentinel splice + caveman + skills + DeepWiki
-│   │   ├── uninstall.ts                # fulcrum uninstall — conservative removal of managed artifacts
+│   │   ├── component.ts                # fulcrum component — lifecycle list/info/plan/status/apply
+│   │   ├── install.ts                  # fulcrum install — default component profile wrapper
+│   │   ├── uninstall.ts                # fulcrum uninstall — conservative profile removal wrapper
 │   │   ├── compress.ts                 # fulcrum compress — caveman compression subcommand
 │   │   ├── hooks.ts                    # fulcrum hooks list/enable/disable (detection-aware)
 │   │   ├── skills.ts                   # fulcrum skills sync + lint
@@ -37,6 +38,7 @@ fulcrum/
 │   │   ├── mcp-registry.test.ts
 │   │   ├── mcp-cmd.test.ts
 │   │   └── doctor.test.ts
+│   ├── components/                     # catalog, planner, ledger, executor, surface adapters
 │   └── hooks/
 │       ├── audit-log.ts                # PostToolUse Bash — append command + exit code to log
 │       ├── format.ts                   # PostToolUse Write|Edit — run language formatter
@@ -164,7 +166,9 @@ Detection-aware logic: if `agent.rootDir` does not exist, skip writes for that a
 
 ### Install / uninstall flow
 
-`fulcrum install` runs nine sequential steps:
+`fulcrum install` vendors hook recipe snippets, then runs `profile.default` through the component lifecycle engine. `--enable-all-mcps` switches the target to `profile.verify-all`; `--no-skills`, `--no-upstream-skills`, and `--no-default-mcps` become planner exclusions plus the existing MCP default-state compatibility step.
+
+The default profile covers:
 
 1. **Rules splice** — read `rules/AGENTS.md`, insert between `<!-- BEGIN/END FULCRUM RULES -->` sentinels in each detected agent's rules file. Preserves content outside the markers.
 2. **Policy seed** — copy `config/tool-output-policy.toml` to `~/.fulcrum/tool-output-policy.toml` (first run only; subsequent runs leave user edits).
@@ -174,6 +178,7 @@ Detection-aware logic: if `agent.rootDir` does not exist, skip writes for that a
 6. **Upstream skills** — `fulcrum skills upstream` clones pinned repos, verifies `subpath_sha256`, installs to vendor placement (`<agent>/skills/<name>/`, Gemini `~/.gemini/skills/<name>/`).
 7. **DeepWiki MCP** — register for each detected agent (Pi via `pi-mcp-adapter` auto-install).
 8. **Builtin MCPs** — register 16 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml`; minimal default state enables `context7` only where no user state exists, while `--no-default-mcps` registers without changing enable state and `--enable-all-mcps` enables all builtins.
+9. **Vendor packages** — install Caveman, Repomix, Cloudflare, and Superpowers through official installers first, then mirror plugin/extension/package surfaces to supported CLIs that lack a first-party or generic installer.
 
 `fulcrum uninstall` is conservative by default: removes managed rules blocks, hook registrations, hook snippets/markers, `skills/fulcrum/`, legacy `skills/fulcrum-upstream/` namespaces, Gemini managed extensions, Gemini `@AGENTS.md` import, and DeepWiki. Keeps edited policy files, vendor-placed third-party skills, and caveman unless `--purge` / `--include-caveman` flags are passed.
 
@@ -208,43 +213,21 @@ The registry lives at `~/.fulcrum/state/global/mcp-registry.toml`. Schema versio
 
 `doctor.ts` reads the registry and probes each enabled HTTP server's HEAD endpoint; reports `auth_status: "ok" | "missing-env" | "n/a"` per server.
 
-### Planned component lifecycle CLI
+### Component lifecycle engine
 
-Fulcrum currently has reusable install/remove functions for several managed components, but they are only called from coarse `install` / `uninstall` flows. Add a component-level command before users depend on partial manual cleanup.
+`src/components/catalog.ts` declares every managed component and profile. `planner.ts` converts desired operations into action plans. `executor.ts` applies plans through adapters and records state in `~/.fulcrum/state/global/components.db`.
 
-Target command group:
+Adapters own surface-specific behavior:
 
-```bash
-fulcrum component list
-fulcrum component install <component> [--agent <id> ...] [--all-agents] [--dry-run]
-fulcrum component remove <component> [--agent <id> ...] [--all-agents] [--dry-run]
-```
+- `adapters/hooks.ts` delegates to hook registration helpers.
+- `adapters/mcp.ts` delegates to MCP registry and DeepWiki helpers.
+- `adapters/sentinel.ts` manages rules sentinel blocks.
+- `adapters/files.ts` manages policy files and remove-vs-purge behavior.
+- `adapters/vendor.ts` delegates to skills, upstream skills, caveman, Repomix, Cloudflare, and Superpowers helpers.
 
-Initial components:
+The public CLI is `fulcrum component list/info/plan/status/install/remove/enable/disable`. `fulcrum install` and `fulcrum uninstall` are compatibility wrappers over `profile.default` / `profile.verify-all`; they keep the historical flags and safety defaults while sharing the component planner and executor.
 
-| Component | Install implementation | Remove implementation | Per-agent? | Notes |
-|---|---|---|---|---|
-| `caveman` | `installCaveman()` + `lockCavemanUltra()` | extracted from `uninstall --include-caveman` path | Yes | Default full uninstall keeps caveman; component remove should be explicit and dry-run visible. |
-| `repomix` | `installRepomixClaudePlugins()` + `installRepomixPackageMirrors()` | `uninstallRepomixClaudePlugins()` + `uninstallRepomixPackageMirrors()` | Partly | Claude uses vendor plugins; non-Claude uses mirrored package skills/config. |
-| `vendor-packages` | `installVendorCapabilityPackages()` | `uninstallVendorCapabilityPackages()` | Yes | Covers Cloudflare/Superpowers/Repomix-adjacent package surfaces that are not MCP registry entries. Consider splitting later if users need package-level granularity. |
-| `deepwiki` | `installDeepwikiMcp()` | `uninstallDeepwikiMcp()` | Yes | Distinct from registry-managed builtin MCP entries. |
-| `mcp-registry` | `installMcpRegistryEntries()` + default-state application | `uninstallMcpRegistryEntries()` | Yes | Builtin server enable/disable remains under `fulcrum mcp`; component command installs/removes registry definitions/config scaffolding. |
-
-Implementation shape:
-
-1. Add `src/cli/component.ts` as dispatcher.
-2. Define a registry of component descriptors: `id`, `description`, `supportsAgents`, `install(opts)`, `remove(opts)`, `status(opts)`.
-3. Reuse `parseAgentFlags()` semantics from `mcp-cmd.ts`, but keep parser local or shared in a small CLI utility to avoid coupling MCP concepts into component lifecycle.
-4. Refactor existing private install/uninstall helpers only as needed to accept `{ agents, dryRun }`; avoid changing full `install` / `uninstall` behavior.
-5. Make `component list --json` and human output match `doctor` naming so smoke tests can assert state.
-6. Tests: one unit test per component descriptor, dry-run output tests, and regression tests proving component removal does not remove unrelated caveman, skills, hooks, Repomix, or registry entries.
-
-Safety rules:
-
-- `remove` must be component-scoped and idempotent.
-- `--dry-run` must show every file/config/plugin command that would change.
-- Component removal must not delete user-authored config outside Fulcrum sentinel blocks or known Fulcrum-managed paths.
-- Per-agent removal must skip unsupported/plugin-owned agent surfaces with an explicit note, mirroring MCP visibility behavior.
+Add new managed parts by adding a catalog entry, adapter support if the surface kind is new, planner tests, executor tests, and doctor status coverage.
 
 ### Upstream skills lockfile
 

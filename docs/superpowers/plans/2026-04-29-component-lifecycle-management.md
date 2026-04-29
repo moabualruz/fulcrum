@@ -12,10 +12,10 @@
 
 **Current Progress (2026-04-30):**
 
-- Done: Tasks 1-7 implementation through reviewed integration.
-- Shipped in main worktree: component type model, catalog, planner, SQLite ledger, `fulcrum component list/info/plan`, `fulcrum component install/remove/enable/disable`, executor, hook adapter, MCP adapter, rules adapter, policy adapter.
-- Verified so far: focused integrated suite `188 pass, 0 fail`; focused apply/adapter retest `41 pass, 0 fail`; `bun run --bun tsc --noEmit` passes; `bun run ci` passes. Subagent orchestration guidance was hardened after this foundation work to require max-useful parallelism, external worktrees for parallel write lanes, runtime dependency reassessment, and lane-specific model/effort selection.
-- Remaining: Task 8 vendor/skills adapter, Task 9 status + doctor integration, Task 10 compatibility wrappers, Task 12 docs, Task 13 full verification.
+- Done: Tasks 1-12 implementation through reviewed integration.
+- Shipped in main worktree: component type model, catalog, planner, SQLite ledger, `fulcrum component list/info/plan/status`, `fulcrum component install/remove/enable/disable`, executor, hook adapter, MCP adapter, rules adapter, policy adapter, vendor/skills adapter, remove/purge safety, doctor component status, and `install`/`uninstall` compatibility wrappers.
+- Verified so far: focused vendor/package suites, wrapper suites, remove-safety suites, `bun run --bun tsc --noEmit`, and prior full `bun run ci` gates pass. Subagent orchestration guidance was hardened after this foundation work to require max-useful parallelism, external worktrees for parallel write lanes, runtime dependency reassessment, and lane-specific model/effort selection.
+- Remaining: Task 13 full verification.
 
 ---
 
@@ -561,7 +561,7 @@ export interface ComponentPlan {
 - Create: `src/components/catalog.ts`
 - Create: `src/components/catalog.test.ts`
 
-- [ ] **Step 1: Write failing catalog tests**
+- [x] **Step 1: Write failing catalog tests**
 
 ```typescript
 // src/components/catalog.test.ts
@@ -612,7 +612,7 @@ describe("component catalog", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -622,7 +622,7 @@ bun test src/components/catalog.test.ts
 
 Expected: FAIL because `src/components/catalog.ts` does not exist.
 
-- [ ] **Step 3: Implement minimal types and catalog**
+- [x] **Step 3: Implement minimal types and catalog**
 
 Use the type sketch above for `src/components/types.ts`.
 
@@ -881,7 +881,7 @@ export function expandProfile(id: string): ComponentSpec[] {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run:
 
@@ -891,7 +891,7 @@ bun test src/components/catalog.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/types.ts src/components/catalog.ts src/components/catalog.test.ts
@@ -905,7 +905,7 @@ git commit -m "feat(component): add lifecycle catalog"
 - Create: `src/components/planner.test.ts`
 - Modify: `src/components/types.ts`
 
-- [ ] **Step 1: Write failing planner tests**
+- [x] **Step 1: Write failing planner tests**
 
 ```typescript
 // src/components/planner.test.ts
@@ -966,7 +966,7 @@ describe("component planner", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -976,7 +976,7 @@ bun test src/components/planner.test.ts
 
 Expected: FAIL because planner does not exist.
 
-- [ ] **Step 3: Implement planner**
+- [x] **Step 3: Implement planner**
 
 ```typescript
 // src/components/planner.ts
@@ -1056,7 +1056,7 @@ export function planComponentOperation(input: PlanInput): ComponentPlan {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run:
 
@@ -1066,7 +1066,7 @@ bun test src/components/planner.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/planner.ts src/components/planner.test.ts src/components/types.ts
@@ -1079,7 +1079,7 @@ git commit -m "feat(component): plan lifecycle operations"
 - Create: `src/components/ledger.ts`
 - Create: `src/components/ledger.test.ts`
 
-- [ ] **Step 1: Write failing ledger tests**
+- [x] **Step 1: Write failing ledger tests**
 
 ```typescript
 // src/components/ledger.test.ts
@@ -1147,7 +1147,7 @@ describe("ComponentLedger", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -1157,7 +1157,7 @@ bun test src/components/ledger.test.ts
 
 Expected: FAIL because `ledger.ts` does not exist.
 
-- [ ] **Step 3: Implement ledger**
+- [x] **Step 3: Implement ledger**
 
 Use `bun:sqlite`. Generate operation IDs with existing-safe timestamp plus random suffix; ULID can be introduced later with a small helper when repo supervisor work starts.
 
@@ -1358,7 +1358,7 @@ export class ComponentLedger {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run:
 
@@ -1368,7 +1368,7 @@ bun test src/components/ledger.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/ledger.ts src/components/ledger.test.ts
@@ -1382,7 +1382,7 @@ git commit -m "feat(component): record managed state"
 - Create: `src/cli/component.test.ts`
 - Modify: `src/index.ts`
 
-- [ ] **Step 1: Write failing CLI tests**
+- [x] **Step 1: Write failing CLI tests**
 
 ```typescript
 // src/cli/component.test.ts
@@ -1434,7 +1434,7 @@ describe("fulcrum component CLI", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -1444,7 +1444,7 @@ bun test src/cli/component.test.ts
 
 Expected: FAIL because `src/cli/component.ts` does not exist.
 
-- [ ] **Step 3: Implement list/info/plan CLI**
+- [x] **Step 3: Implement list/info/plan CLI**
 
 ```typescript
 // src/cli/component.ts
@@ -1556,7 +1556,7 @@ Add help lines:
   fulcrum component plan <op> <id> Plan install/remove/enable/disable.
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
@@ -1566,7 +1566,7 @@ bun test src/cli/component.test.ts src/components/catalog.test.ts src/components
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/component.ts src/cli/component.test.ts src/index.ts
@@ -1583,7 +1583,7 @@ git commit -m "feat(component): expose lifecycle planning cli"
 - Modify: `src/cli/component.ts`
 - Modify: `src/cli/hooks.ts`
 
-- [ ] **Step 1: Export reusable hook recipe operations**
+- [x] **Step 1: Export reusable hook recipe operations**
 
 Before writing component adapter tests, expose these functions from `src/cli/hooks.ts`:
 
@@ -1601,7 +1601,7 @@ export async function disableHookRecipe(name: RecipeName, targetAgents: Set<Agen
 
 Keep existing `cmdEnable` / `cmdDisable` behavior by calling these exports.
 
-- [ ] **Step 2: Write failing hook adapter test**
+- [x] **Step 2: Write failing hook adapter test**
 
 ```typescript
 // src/components/adapters/hooks.test.ts
@@ -1663,7 +1663,7 @@ describe("hook component adapter", () => {
 });
 ```
 
-- [ ] **Step 3: Run hook adapter test to verify it fails**
+- [x] **Step 3: Run hook adapter test to verify it fails**
 
 Run:
 
@@ -1673,7 +1673,7 @@ bun test src/components/adapters/hooks.test.ts
 
 Expected: FAIL because adapter does not exist or hook exports do not exist.
 
-- [ ] **Step 4: Implement hook adapter**
+- [x] **Step 4: Implement hook adapter**
 
 ```typescript
 // src/components/adapters/hooks.ts
@@ -1699,7 +1699,7 @@ export async function applyHookAction(action: ComponentAction): Promise<void> {
 }
 ```
 
-- [ ] **Step 5: Write failing executor test**
+- [x] **Step 5: Write failing executor test**
 
 ```typescript
 // src/components/executor.test.ts
@@ -1752,7 +1752,7 @@ describe("component executor", () => {
 });
 ```
 
-- [ ] **Step 6: Implement executor for hook-registration**
+- [x] **Step 6: Implement executor for hook-registration**
 
 ```typescript
 // src/components/executor.ts
@@ -1840,7 +1840,7 @@ export async function executeComponentPlan(plan: ComponentPlan, opts: ExecuteOpt
 }
 ```
 
-- [ ] **Step 7: Wire component install/remove/enable/disable CLI for hook components**
+- [x] **Step 7: Wire component install/remove/enable/disable CLI for hook components**
 
 In `src/cli/component.ts`, add:
 
@@ -1863,7 +1863,7 @@ if (sub === "install" || sub === "remove" || sub === "enable" || sub === "disabl
 }
 ```
 
-- [ ] **Step 8: Run targeted tests**
+- [x] **Step 8: Run targeted tests**
 
 Run:
 
@@ -1873,7 +1873,7 @@ bun test src/components/adapters/hooks.test.ts src/components/executor.test.ts s
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/components/executor.ts src/components/executor.test.ts src/components/adapters/hooks.ts src/components/adapters/hooks.test.ts src/cli/component.ts src/cli/hooks.ts
@@ -1889,7 +1889,7 @@ git commit -m "feat(component): execute hook lifecycle actions"
 - Modify: `src/cli/mcp-registry.ts`
 - Modify: `src/cli/mcp-cmd.ts`
 
-- [ ] **Step 1: Write failing MCP adapter tests**
+- [x] **Step 1: Write failing MCP adapter tests**
 
 ```typescript
 // src/components/adapters/mcp.test.ts
@@ -1935,7 +1935,7 @@ describe("mcp component adapter", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -1945,7 +1945,7 @@ bun test src/components/adapters/mcp.test.ts
 
 Expected: FAIL because adapter does not exist.
 
-- [ ] **Step 3: Implement MCP adapter**
+- [x] **Step 3: Implement MCP adapter**
 
 ```typescript
 // src/components/adapters/mcp.ts
@@ -2009,7 +2009,7 @@ if (action.kind === "mcp-registry-entry" || action.kind === "mcp-agent-config") 
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
@@ -2019,7 +2019,7 @@ bun test src/components/adapters/mcp.test.ts src/cli/mcp-registry.test.ts src/cl
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/adapters/mcp.ts src/components/adapters/mcp.test.ts src/components/executor.ts src/cli/mcp-registry.ts src/cli/mcp-cmd.ts
@@ -2037,7 +2037,7 @@ git commit -m "feat(component): manage mcp lifecycle actions"
 - Modify: `src/cli/install.ts`
 - Modify: `src/cli/uninstall.ts`
 
-- [ ] **Step 1: Export reusable rules and policy helpers**
+- [x] **Step 1: Export reusable rules and policy helpers**
 
 From `src/cli/install.ts`, export:
 
@@ -2055,7 +2055,7 @@ export async function removeToolOutputPolicy(purge: boolean): Promise<void>
 
 Keep current CLI behavior unchanged by calling these helpers.
 
-- [ ] **Step 2: Write failing sentinel adapter test**
+- [x] **Step 2: Write failing sentinel adapter test**
 
 ```typescript
 // src/components/adapters/sentinel.test.ts
@@ -2094,7 +2094,7 @@ describe("rules component adapter", () => {
 });
 ```
 
-- [ ] **Step 3: Write failing policy adapter test**
+- [x] **Step 3: Write failing policy adapter test**
 
 ```typescript
 // src/components/adapters/files.test.ts
@@ -2130,7 +2130,7 @@ describe("policy component adapter", () => {
 });
 ```
 
-- [ ] **Step 4: Implement adapters**
+- [x] **Step 4: Implement adapters**
 
 ```typescript
 // src/components/adapters/sentinel.ts
@@ -2176,7 +2176,7 @@ if (action.kind === "policy-seed") {
 }
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run:
 
@@ -2186,7 +2186,7 @@ bun test src/components/adapters/sentinel.test.ts src/components/adapters/files.
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/adapters/sentinel.ts src/components/adapters/files.ts src/components/adapters/sentinel.test.ts src/components/adapters/files.test.ts src/components/executor.ts src/cli/install.ts src/cli/uninstall.ts
@@ -2206,7 +2206,7 @@ git commit -m "feat(component): manage rules and policy surfaces"
 - Modify: `src/cli/install.ts`
 - Modify: `src/cli/uninstall.ts`
 
-- [ ] **Step 1: Write failing first-party-vs-mirror contract tests**
+- [x] **Step 1: Write failing first-party-vs-mirror contract tests**
 
 Add tests that lock the package mirroring contract before changing helpers. These tests must prove the component path keeps the current `fulcrum install` behavior for packages and skills.
 
@@ -2370,7 +2370,7 @@ describe("vendor component adapter", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -2380,7 +2380,7 @@ bun test src/components/adapters/vendor.test.ts
 
 Expected: FAIL because `src/components/adapters/vendor.ts` does not exist and package-specific helpers are not exported.
 
-- [ ] **Step 3: Export reusable package helpers**
+- [x] **Step 3: Export reusable package helpers**
 
 Ensure these functions are exported and stable:
 
@@ -2416,7 +2416,7 @@ export async function removeCavemanCopies(home: string, opts?: { dryRun?: boolea
 
 Keep current aggregate functions by calling these exported units. Move Repomix Claude plugin installation/removal out of private install/uninstall helpers into `src/cli/repomix-package.ts` so `package.repomix` can install/remove the full Repomix package surface without requiring `mcp.registry`.
 
-- [ ] **Step 4: Add upstream filtering tests**
+- [x] **Step 4: Add upstream filtering tests**
 
 ```typescript
 // src/cli/upstream-skills.test.ts
@@ -2468,7 +2468,7 @@ test("syncUpstreamSkillsBySource installs only matching source entries", async (
 });
 ```
 
-- [ ] **Step 5: Implement vendor adapter dispatcher**
+- [x] **Step 5: Implement vendor adapter dispatcher**
 
 ```typescript
 // src/components/adapters/vendor.ts
@@ -2555,7 +2555,7 @@ if (action.kind === "skill-sync" || action.kind === "upstream-skill-sync" || act
 }
 ```
 
-- [ ] **Step 6: Verify component dry-run surfaces**
+- [x] **Step 6: Verify component dry-run surfaces**
 
 Run:
 
@@ -2575,7 +2575,7 @@ DRY RUN package.superpowers:install:pi:remove remove vendor-command agent-superp
 
 The exact action IDs may differ if the planner uses surface IDs, but output must show package component, agent scope, operation, `vendor-command`, and no filesystem writes.
 
-- [ ] **Step 7: Run targeted tests**
+- [x] **Step 7: Run targeted tests**
 
 Run:
 
@@ -2585,7 +2585,7 @@ bun test src/components/adapters/vendor.test.ts src/cli/skills.test.ts src/cli/u
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/components/adapters/vendor.ts src/components/adapters/vendor.test.ts src/components/executor.ts src/cli/skills.ts src/cli/upstream-skills.ts src/cli/vendor-packages.ts src/cli/repomix-package.ts src/cli/install.ts src/cli/uninstall.ts
@@ -2600,7 +2600,7 @@ git commit -m "feat(component): manage skills and vendor packages"
 - Modify: `src/cli/doctor.ts`
 - Modify: `src/cli/doctor.test.ts`
 
-- [ ] **Step 1: Write failing status CLI test**
+- [x] **Step 1: Write failing status CLI test**
 
 Add to `src/cli/component.test.ts`:
 
@@ -2617,7 +2617,7 @@ test("status --json reports ledger component state", async () => {
 });
 ```
 
-- [ ] **Step 2: Implement status**
+- [x] **Step 2: Implement status**
 
 In `src/cli/component.ts`:
 
@@ -2656,7 +2656,7 @@ Dispatch:
 if (sub === "status") return cmdStatus(args.slice(1));
 ```
 
-- [ ] **Step 3: Write failing doctor test**
+- [x] **Step 3: Write failing doctor test**
 
 Add a doctor report assertion in `src/cli/doctor.test.ts`:
 
@@ -2673,7 +2673,7 @@ test("doctor reports component lifecycle state", async () => {
 });
 ```
 
-- [ ] **Step 4: Implement doctor component section**
+- [x] **Step 4: Implement doctor component section**
 
 Add to `DoctorReport`:
 
@@ -2687,7 +2687,7 @@ components?: {
 
 Build it by opening `ComponentLedger`, counting catalog entries and installed ledger rows. If DB missing, report `installed: 0`.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run:
 
@@ -2697,7 +2697,7 @@ bun test src/cli/component.test.ts src/cli/doctor.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/cli/component.ts src/cli/component.test.ts src/cli/doctor.ts src/cli/doctor.test.ts
@@ -2712,7 +2712,7 @@ git commit -m "feat(component): report managed lifecycle state"
 - Modify: `src/cli/uninstall.ts`
 - Modify: `src/cli/uninstall.test.ts`
 
-- [ ] **Step 1: Write failing install wrapper test**
+- [x] **Step 1: Write failing install wrapper test**
 
 Add to `src/cli/install.test.ts`:
 
@@ -2732,7 +2732,7 @@ test("install dry-run delegates to component default profile when enabled", asyn
 
 During the transition this can first assert a compatibility note, then tighten to direct planner output once all surfaces are covered.
 
-- [ ] **Step 2: Implement wrapper after all adapters pass**
+- [x] **Step 2: Implement wrapper after all adapters pass**
 
 In `src/cli/install.ts`, after parsing flags, replace procedural body with:
 
@@ -2774,7 +2774,7 @@ Map:
 --enable-all-mcps      target "profile.verify-all"
 ```
 
-- [ ] **Step 3: Write failing uninstall wrapper test**
+- [x] **Step 3: Write failing uninstall wrapper test**
 
 Add to `src/cli/uninstall.test.ts`:
 
@@ -2792,7 +2792,7 @@ test("uninstall dry-run delegates to component default profile removal", async (
 });
 ```
 
-- [ ] **Step 4: Implement uninstall wrapper**
+- [x] **Step 4: Implement uninstall wrapper**
 
 In `src/cli/uninstall.ts`, after parsing flags:
 
@@ -2816,7 +2816,7 @@ interface ExecuteOptions {
 
 Preserve current default: caveman remains installed unless `--include-caveman`.
 
-- [ ] **Step 5: Run wrapper tests**
+- [x] **Step 5: Run wrapper tests**
 
 Run:
 
@@ -2826,7 +2826,7 @@ bun test src/cli/install.test.ts src/cli/uninstall.test.ts src/components/planne
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/cli/install.ts src/cli/install.test.ts src/cli/uninstall.ts src/cli/uninstall.test.ts src/components/planner.ts src/components/executor.ts
@@ -2841,7 +2841,7 @@ git commit -m "refactor(component): route install through lifecycle engine"
 - Modify: `src/components/adapters/files.ts`
 - Create: `src/components/remove-safety.test.ts`
 
-- [ ] **Step 1: Write failing modified-file preservation test**
+- [x] **Step 1: Write failing modified-file preservation test**
 
 ```typescript
 // src/components/remove-safety.test.ts
@@ -2886,11 +2886,11 @@ describe("component remove safety", () => {
 });
 ```
 
-- [ ] **Step 2: Implement preservation with existing policy compare**
+- [x] **Step 2: Implement preservation with existing policy compare**
 
 Reuse current `removePolicy(purge)` behavior through `removeToolOutputPolicy(purge)`. Add ledger artifact hash recording later only if this test exposes missing coverage.
 
-- [ ] **Step 3: Run safety test**
+- [x] **Step 3: Run safety test**
 
 Run:
 
@@ -2900,7 +2900,7 @@ bun test src/components/remove-safety.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/remove-safety.test.ts src/components/ledger.ts src/components/executor.ts src/components/adapters/files.ts
@@ -2914,7 +2914,7 @@ git commit -m "test(component): preserve modified managed files"
 - Modify: `docs/developer-guide.md`
 - Modify: `HANDOVER.md`
 
-- [ ] **Step 1: Update user guide**
+- [x] **Step 1: Update user guide**
 
 Replace the planned component lifecycle section with shipped CLI commands and examples:
 
@@ -2939,7 +2939,7 @@ fulcrum component enable hooks.format --agent gemini
 ```
 ```
 
-- [ ] **Step 2: Update developer guide**
+- [x] **Step 2: Update developer guide**
 
 Replace planned component lifecycle CLI with architecture details:
 
@@ -2959,7 +2959,7 @@ Adapters own surface-specific behavior:
 Add new managed parts by adding a catalog entry, adapter support if the surface kind is new, planner tests, executor tests, and doctor status coverage.
 ```
 
-- [ ] **Step 3: Update handover**
+- [x] **Step 3: Update handover**
 
 Point §7a to this plan and replace the one-line component item with:
 
@@ -2969,7 +2969,7 @@ Point §7a to this plan and replace the one-line component item with:
    This is a Fulcrum feature, not a product rename: keep `fulcrum component ...` as the public surface and keep `fulcrum install` / `fulcrum uninstall` as default-profile wrappers. Build the catalog + planner + ledger + executor + adapters first, then migrate current procedural install/uninstall surfaces behind the engine.
 ```
 
-- [ ] **Step 4: Run docs grep**
+- [x] **Step 4: Run docs grep**
 
 Run:
 
@@ -2980,7 +2980,7 @@ rg -n "component lifecycle" README.md HANDOVER.md docs/user-guide.md docs/develo
 
 Expected: first command emits nothing; second command emits only references that point to `fulcrum component`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/user-guide.md docs/developer-guide.md HANDOVER.md docs/superpowers/plans/2026-04-29-component-lifecycle-management.md

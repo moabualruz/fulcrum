@@ -73,34 +73,24 @@ FULCRUM_RELEASE_TAG=v0.1.0 bash <(curl -fsSL https://raw.githubusercontent.com/m
 | `--no-default-mcps` | Register MCP definitions/config but skip Fulcrum's minimal default enable step; existing MCP state is left untouched. |
 | `--enable-all-mcps` | After registration, enable every builtin MCP on every detected agent. Use to verify each MCP starts and authenticates; revert later via `fulcrum mcp disable --all-agents <name>`. |
 
-### Component lifecycle granularity
+### Component lifecycle
 
-Current release has coarse install/uninstall commands plus targeted subcommands for skills, hooks, and MCP registry entries:
+Fulcrum manages agent OS components through `fulcrum component`.
 
-```bash
-fulcrum install
-fulcrum uninstall
-fulcrum skills sync
-fulcrum skills upstream
-fulcrum hooks enable <name>
-fulcrum mcp enable <name> --agent <id>
-fulcrum mcp disable <name> --agent <id>
-fulcrum mcp unregister <name>
-```
-
-It does **not** yet expose a single-component lifecycle surface for managed install packages such as caveman, Repomix, Cloudflare, or Superpowers. Until that exists, `fulcrum install` applies the full managed stack, and `fulcrum uninstall` removes the managed stack with its existing safety defaults.
-
-Planned command shape:
+Use `fulcrum install` for normal default setup. Use `fulcrum component` when you need one managed part:
 
 ```bash
 fulcrum component list
-fulcrum component install caveman [--agent <id> ...] [--all-agents]
-fulcrum component remove caveman [--agent <id> ...] [--all-agents]
-fulcrum component install repomix [--agent <id> ...] [--all-agents]
-fulcrum component remove repomix [--agent <id> ...] [--all-agents]
+fulcrum component info package.repomix
+fulcrum component status package.repomix --json
+fulcrum component install package.repomix --agent codex
+fulcrum component remove package.repomix --agent codex --dry-run
+fulcrum component remove policy.tool-output --purge
+fulcrum component disable mcp.github --all-agents
+fulcrum component enable hooks.format --agent gemini
 ```
 
-Expected behavior: operate on one named Fulcrum-managed component without changing unrelated components. `--agent <id>` limits per-agent config where the component supports per-agent installation; `--all-agents` applies to every detected supported agent. Remove should delete only Fulcrum-managed files, sentinels, plugin registrations, and MCP/config entries for that component.
+`remove` preserves modified user config by default. Use `--purge` only when you want Fulcrum-owned state and modified managed config removed.
 
 ### Post-install: env vars
 
