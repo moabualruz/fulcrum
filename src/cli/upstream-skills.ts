@@ -6,7 +6,7 @@
 
 import { createHash } from "node:crypto";
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { AGENTS } from "../agents/registry.ts";
 import type { AgentId } from "./mcp-registry.ts";
@@ -510,10 +510,7 @@ function agentTargets(home: string): Array<{ id: AgentId; label: string; baseRoo
   const out: Array<{ id: AgentId; label: string; baseRoot: string; skillsRoot: string }> = [];
   for (const agent of AGENTS) {
     const skillsRoot = vendorSkillsDir(home, agent.id);
-    // baseRoot is the parent dir we expect to exist when the agent is detected;
-    // for everyone except Gemini, that's the same as skillsRoot's parent
-    // (the agent's main config dir). For Gemini we point at ~/.gemini.
-    const baseRoot = agent.id === "gemini" ? `${home}/.gemini` : agent.skillsDir(home);
+    const baseRoot = agent.rootDir(home);
     out.push({ id: agent.id, label: agent.label, baseRoot, skillsRoot });
   }
   return out;
@@ -714,6 +711,15 @@ async function piFrontmatterInstallName(skill: UpstreamSkill): Promise<string | 
   return readSkillFrontmatterName(src, skill.kind);
 }
 
+function safeSkillDirCandidate(skillsRoot: string, name: string): string | null {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(name)) return null;
+  const root = resolve(skillsRoot);
+  const candidate = resolve(root, name);
+  const rel = relative(root, candidate);
+  if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
+  return candidate;
+}
+
 async function uninstallClaudePlugin(skill: UpstreamSkill, dryRun: boolean): Promise<void> {
   if (!skill.claude_plugin) return;
   const cmd = ["claude", "plugin", "uninstall", skill.claude_plugin.name];
@@ -744,7 +750,9 @@ export async function removeUpstreamSkills(
 
   const claudeAgent = AGENTS.find((agent) => agent.id === "claude-code")!;
   if (await isDir(claudeAgent.baseDir(home))) {
-    const pluginSkills = skills.filter((skill) => skill.claude_plugin);
+    const pluginSkills = skills.filter((skill) =>
+      skill.claude_plugin && !skill.vendor_canonical_agents?.includes("claude-code")
+    );
     if (pluginSkills.length > 0) {
       console.log("→ Claude Code plugins");
       for (const skill of pluginSkills) {
@@ -762,12 +770,19 @@ export async function removeUpstreamSkills(
     console.log(`→ ${target.label} (${target.skillsRoot})`);
 
     for (const skill of skills) {
+      if (skill.vendor_canonical_agents?.includes(target.id)) {
+        console.log(`      · ${skill.name} (vendor-canonical install handles ${target.label}; skip remove)`);
+        continue;
+      }
+
       await removeVendorSkillDir(`${target.skillsRoot}/${skill.name}`, dryRun);
 
       if (target.id === "pi") {
         const frontmatterName = await piFrontmatterInstallName(skill);
         if (frontmatterName && frontmatterName !== skill.name) {
-          await removeVendorSkillDir(`${target.skillsRoot}/${frontmatterName}`, dryRun);
+          const aliasPath = safeSkillDirCandidate(target.skillsRoot, frontmatterName);
+          if (aliasPath) await removeVendorSkillDir(aliasPath, dryRun);
+          else console.log(`      · ${skill.name}: unsafe Pi frontmatter alias ignored: ${frontmatterName}`);
         }
       }
     }
