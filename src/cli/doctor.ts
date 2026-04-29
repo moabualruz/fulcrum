@@ -57,6 +57,13 @@ interface DoctorReport {
       agent_state: Record<string, "enabled" | "disabled">;
       auth_status: "ok" | "missing-env" | "n/a";
       reachable: boolean | null;
+      // Drift: registry default is disabled, yet some agent has it enabled.
+      // True drift state usually means a prior `mcp enable --all-agents` sweep.
+      drift: boolean;
+      // Auth wiring: when auth_env_vars > 0, doctor inspects each agent's
+      // native config to confirm the Authorization header (or codex's
+      // bearer_token_env_var) is actually present. "n/a" when no auth needed.
+      wiring: Record<string, "ok" | "missing" | "n/a">;
     }>;
   };
   skillsCount: number;
@@ -172,6 +179,57 @@ async function countSkills(): Promise<number> {
     if (await exists(`${root}/${entry.name}/SKILL.md`)) n++;
   }
   return n;
+}
+
+/**
+ * Inspect a single agent's native MCP config and confirm an authorization
+ * header (or codex's bearer_token_env_var) exists for the given server.
+ *
+ * Returns true when wiring is present, false when the server entry exists
+ * but lacks auth wiring. Returns true when the agent config is missing or
+ * the server isn't mentioned (caller already gated on agent_state=enabled).
+ *
+ * Codex's TOML and the four JSON-based agents each have their own block
+ * shape; the read paths must agree with applyTo* / mcpValueForAgent.
+ */
+async function checkMcpAuthWiring(
+  home: string,
+  agentId: AgentId,
+  serverName: string,
+): Promise<boolean> {
+  try {
+    if (agentId === "codex") {
+      const file = `${home}/.codex/config.toml`;
+      if (!(await exists(file))) return true;
+      const txt = await Bun.file(file).text();
+      const begin = `# BEGIN FULCRUM MCP ${serverName}`;
+      const end = `# END FULCRUM MCP ${serverName}`;
+      const i = txt.indexOf(begin);
+      if (i < 0) return true;
+      const j = txt.indexOf(end, i);
+      if (j < 0) return true;
+      const block = txt.slice(i, j);
+      return /\bbearer_token_env_var\s*=/.test(block);
+    }
+    const path =
+      agentId === "claude-code"  ? `${home}/.claude.json` :
+      agentId === "gemini"       ? `${home}/.gemini/settings.json` :
+      agentId === "opencode"     ? `${home}/.config/opencode/opencode.json` :
+                                    `${home}/.pi/agent/mcp.json`;
+    if (!(await exists(path))) return true;
+    const data = JSON.parse(await Bun.file(path).text()) as Record<string, unknown>;
+    const root = (() => {
+      if (agentId === "opencode") return data["mcp"];
+      return data["mcpServers"];
+    })() as Record<string, unknown> | undefined;
+    if (!root || typeof root !== "object") return true;
+    const cfg = root[serverName] as Record<string, unknown> | undefined;
+    if (!cfg) return true;
+    const headers = cfg["headers"] as Record<string, string> | undefined;
+    return !!(headers && typeof headers["Authorization"] === "string" && headers["Authorization"].length > 0);
+  } catch {
+    return true;
+  }
 }
 
 async function buildReport(): Promise<{ report: DoctorReport; errors: number }> {
@@ -355,6 +413,23 @@ async function buildReport(): Promise<{ report: DoctorReport; errors: number }> 
         agentState[id] = isEnabled(server, id) ? "enabled" : "disabled";
       }
 
+      // Drift: registry says default-disabled but some agent has it enabled.
+      const enabledAgents = Object.entries(agentState)
+        .filter(([, v]) => v === "enabled")
+        .map(([k]) => k as AgentId);
+      const drift = !server.default_enabled && enabledAgents.length > 0;
+      if (drift) warnings += 1;
+
+      // Auth wiring: only meaningful for HTTP servers with declared auth.
+      const wiring: Record<string, "ok" | "missing" | "n/a"> = {};
+      const needsAuth = server.transport === "http" && server.auth_env_vars.length > 0;
+      for (const id of ALL_AGENT_IDS) {
+        if (!needsAuth) { wiring[id] = "n/a"; continue; }
+        if (agentState[id] !== "enabled") { wiring[id] = "n/a"; continue; }
+        wiring[id] = (await checkMcpAuthWiring(home, id, server.name)) ? "ok" : "missing";
+        if (wiring[id] === "missing") warnings += 1;
+      }
+
       mcpReport.servers.push({
         name: server.name,
         transport: server.transport,
@@ -363,6 +438,8 @@ async function buildReport(): Promise<{ report: DoctorReport; errors: number }> 
         agent_state: agentState,
         auth_status: authStatus,
         reachable,
+        drift,
+        wiring,
       });
     }
   } catch {
@@ -469,7 +546,10 @@ function printHumanFormat(report: DoctorReport, home: string): void {
       const enabledStr = enabledOn.length ? enabledOn.join(", ") : "none";
       const authStr = s.auth_status === "ok" ? "auth:ok" : s.auth_status === "missing-env" ? "auth:missing-env" : "";
       const reachStr = s.reachable === null ? "" : s.reachable ? "reachable" : "unreachable";
-      const notes = [authStr, reachStr].filter(Boolean).join("  ");
+      const driftStr = s.drift ? "drift:default-disabled-but-enabled" : "";
+      const wiringMissing = Object.entries(s.wiring).filter(([, v]) => v === "missing").map(([k]) => k);
+      const wiringStr = wiringMissing.length ? `wiring:missing[${wiringMissing.join(",")}]` : "";
+      const notes = [authStr, reachStr, driftStr, wiringStr].filter(Boolean).join("  ");
       console.log(`  ${pad(s.name, 16)}  ${s.transport}  enabled-on:[${enabledStr}]${notes ? "  " + notes : ""}`);
     }
     console.log();

@@ -218,6 +218,150 @@ auth_env_vars = ["GITHUB_TOKEN"]
     expect(github!["agent_state"]).toBeDefined();
   });
 
+  test("drift flagged when default_enabled=false and any agent enabled", async () => {
+    const home = join(TMP, "mcp-drift");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const stateDir = join(fulcrumHome, "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    const toml = `schema_version = 1
+
+[servers.github]
+transport = "http"
+url = "https://api.githubcopilot.com/mcp/"
+description = "GitHub MCP"
+vendor = "github"
+default_enabled = false
+auth_env_vars = ["GITHUB_TOKEN"]
+enabled_codex = true
+
+[servers.github.agent_visibility]
+"claude-code" = true
+"codex" = true
+"gemini" = true
+"opencode" = true
+"pi" = true
+`;
+    await writeFile(join(stateDir, "mcp-registry.toml"), toml);
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const mcp = report["mcp"] as Record<string, unknown>;
+    const servers = mcp["servers"] as Array<Record<string, unknown>>;
+    const github = servers.find((s) => s["name"] === "github");
+    expect(github!["drift"]).toBe(true);
+  });
+
+  test("drift false when default-disabled and no agent enabled", async () => {
+    const home = join(TMP, "mcp-no-drift");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const stateDir = join(fulcrumHome, "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    const toml = `schema_version = 1
+
+[servers.github]
+transport = "http"
+url = "https://api.githubcopilot.com/mcp/"
+description = "GitHub MCP"
+vendor = "github"
+default_enabled = false
+auth_env_vars = ["GITHUB_TOKEN"]
+
+[servers.github.agent_visibility]
+"claude-code" = true
+"codex" = true
+"gemini" = true
+"opencode" = true
+"pi" = true
+`;
+    await writeFile(join(stateDir, "mcp-registry.toml"), toml);
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const servers = (report["mcp"] as Record<string, unknown>)["servers"] as Array<Record<string, unknown>>;
+    const github = servers.find((s) => s["name"] === "github");
+    expect(github!["drift"]).toBe(false);
+  });
+
+  test("wiring missing when codex config lacks bearer_token_env_var for authed http MCP", async () => {
+    const home = join(TMP, "mcp-wiring-missing");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const stateDir = join(fulcrumHome, "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    const codexDir = join(home, ".codex");
+    await mkdir(codexDir, { recursive: true });
+    // Codex block without bearer_token_env_var (the regression of the day).
+    await writeFile(join(codexDir, "config.toml"),
+`# BEGIN FULCRUM MCP github
+[mcp_servers.github]
+url = "https://api.githubcopilot.com/mcp/"
+# END FULCRUM MCP github
+`);
+    const toml = `schema_version = 1
+
+[servers.github]
+transport = "http"
+url = "https://api.githubcopilot.com/mcp/"
+description = "GitHub MCP"
+vendor = "github"
+default_enabled = false
+auth_env_vars = ["GITHUB_TOKEN"]
+enabled_codex = true
+
+[servers.github.agent_visibility]
+"claude-code" = true
+"codex" = true
+"gemini" = true
+"opencode" = true
+"pi" = true
+`;
+    await writeFile(join(stateDir, "mcp-registry.toml"), toml);
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const servers = (report["mcp"] as Record<string, unknown>)["servers"] as Array<Record<string, unknown>>;
+    const github = servers.find((s) => s["name"] === "github");
+    const wiring = github!["wiring"] as Record<string, string>;
+    expect(wiring["codex"]).toBe("missing");
+  });
+
+  test("wiring ok when codex config includes bearer_token_env_var", async () => {
+    const home = join(TMP, "mcp-wiring-ok");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const stateDir = join(fulcrumHome, "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    const codexDir = join(home, ".codex");
+    await mkdir(codexDir, { recursive: true });
+    await writeFile(join(codexDir, "config.toml"),
+`# BEGIN FULCRUM MCP github
+[mcp_servers.github]
+url = "https://api.githubcopilot.com/mcp/"
+bearer_token_env_var = "GITHUB_TOKEN"
+# END FULCRUM MCP github
+`);
+    const toml = `schema_version = 1
+
+[servers.github]
+transport = "http"
+url = "https://api.githubcopilot.com/mcp/"
+description = "GitHub MCP"
+vendor = "github"
+default_enabled = false
+auth_env_vars = ["GITHUB_TOKEN"]
+enabled_codex = true
+
+[servers.github.agent_visibility]
+"claude-code" = true
+"codex" = true
+"gemini" = true
+"opencode" = true
+"pi" = true
+`;
+    await writeFile(join(stateDir, "mcp-registry.toml"), toml);
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const servers = (report["mcp"] as Record<string, unknown>)["servers"] as Array<Record<string, unknown>>;
+    const github = servers.find((s) => s["name"] === "github");
+    const wiring = github!["wiring"] as Record<string, string>;
+    expect(wiring["codex"]).toBe("ok");
+  });
+
   test("auth_status missing-env when GITHUB_TOKEN not set", async () => {
     const home = join(TMP, "mcp-missing-env");
     await mkdir(home, { recursive: true });
