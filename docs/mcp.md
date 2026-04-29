@@ -110,17 +110,17 @@ Supersedes: `skills/gh/SKILL.md` (moved to `skills/_archive/gh-authored/`; skill
 
 ### 3.5 repomix (W2.2)
 
-Repomix MCP server via `yamadashy/repomix`. **Default-disabled.**
+Repomix MCP server via `yamadashy/repomix`. **Package-default enabled where Fulcrum owns the MCP surface.**
 
 - Transport: stdio `npx -y repomix --mcp`
 - Auth: none required
 - Vendor: `yamadashy`
 - Claude Code gets 3 official vendor plugins: `repomix-mcp`, `repomix-commands`, `repomix-explorer`; Fulcrum treats that Claude surface as plugin-owned, so the registry marks `claude-code` hidden and skips it during `fulcrum mcp enable/disable/unregister repomix`.
-- Gemini gets a Fulcrum-built extension mirror that bundles vendor-derived Repomix MCP config, commands, skills, and explorer agent.
-- OpenCode gets vendor-derived skills plus explorer agent mirror.
-- Codex and Pi get vendor-derived skills plus registry MCP config, their nearest stable native surface set.
+- Gemini gets a Fulcrum-built extension mirror that bundles vendor-derived Repomix MCP config, commands, skills, and explorer agent; the registry marks `gemini` hidden so it never disables or duplicates the extension-owned MCP.
+- OpenCode gets vendor-derived skills plus explorer agent mirror; registry owns and enables the MCP surface to preserve package-level functionality.
+- Codex and Pi get vendor-derived skills plus registry-owned enabled MCP config, their nearest stable native surface set.
 
-To enable MCP config for non-Claude agents: `fulcrum mcp enable repomix`
+To disable registry-owned Repomix MCP config for Codex/OpenCode/Pi: `fulcrum mcp disable repomix --agent codex --agent opencode --agent pi`
 
 Plugin install (Claude Code, idempotent):
 ```bash
@@ -247,7 +247,7 @@ fulcrum mcp disable myserver [--all-agents]
 
 Agent IDs: `claude-code`, `codex`, `gemini`, `opencode`, `pi`.
 
-`fulcrum install` registers all 16 builtin servers (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart). It also writes disabled native config for Codex, Gemini, and OpenCode so their MCP managers show configured-but-disabled servers. Minimal default state enables only `context7` where no user state exists; `--no-default-mcps` registers all definitions without changing enable state; `--enable-all-mcps` explicitly enables every builtin. `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
+`fulcrum install` registers all 16 builtin servers (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart). It writes disabled native config for registry-owned disabled servers on Codex, Gemini, and OpenCode so their MCP managers show configured-but-disabled servers. Package-owned surfaces are hidden from the registry and keep their package defaults. Minimal default state enables `context7` and Repomix where Fulcrum owns the mirrored MCP surface. `--no-default-mcps` registers all definitions without changing enable state; `--enable-all-mcps` explicitly enables every registry-owned builtin. `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
 
 Servers can hide an agent when that agent surface is unsupported or owned by another Fulcrum-managed primitive. `fulcrum mcp list --json` reports that state as `"hidden"`; enable/disable skip hidden agents instead of writing registry state for them.
 

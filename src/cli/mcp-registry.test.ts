@@ -96,7 +96,7 @@ describe("registerServer", () => {
     expect(s.auth_env_vars).toHaveLength(0);
     expect(s.agent_visibility["claude-code"]).toBe(false);
     expect(s.agent_visibility["codex"]).toBe(true);
-    expect(s.agent_visibility["gemini"]).toBe(true);
+    expect(s.agent_visibility["gemini"]).toBe(false);
     expect(s.agent_visibility["opencode"]).toBe(true);
     expect(s.agent_visibility["pi"]).toBe(true);
   });
@@ -415,6 +415,18 @@ describe("removeFromAgents", () => {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const mcpServers = (parsed["mcpServers"] ?? {}) as Record<string, unknown>;
     expect(mcpServers["github"]).toBeUndefined();
+  });
+
+  test("includeHidden clears stale Gemini disabled state for package-owned MCP", async () => {
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
+    await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+    await Bun.write(join(TMP, ".gemini", "mcp-server-enablement.json"), JSON.stringify({ repomix: false }, null, 2));
+
+    await removeFromAgents("repomix", { agents: ["gemini"], includeHidden: true });
+
+    const raw = await readFile(join(TMP, ".gemini", "mcp-server-enablement.json"), "utf8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    expect(parsed["repomix"]).toBeUndefined();
   });
 
   test("no-op on non-existent server (does not throw)", async () => {

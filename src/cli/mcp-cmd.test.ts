@@ -73,6 +73,7 @@ describe("fulcrum mcp list", () => {
       const parsed = JSON.parse(logs.join("")) as Array<{ name: string; agent_state: Record<string, string> }>;
       expect(parsed[0]?.name).toBe("repomix");
       expect(parsed[0]?.agent_state["claude-code"]).toBe("hidden");
+      expect(parsed[0]?.agent_state["gemini"]).toBe("hidden");
       expect(parsed[0]?.agent_state["codex"]).toBe("disabled");
     } finally {
       restore();

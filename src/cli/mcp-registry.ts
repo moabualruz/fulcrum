@@ -472,7 +472,11 @@ async function removeFromGemini(server: McpServer, home: string): Promise<void> 
   const root = await readJsonObject(file);
   if (!root) return;
   const section = root["mcpServers"] as Record<string, unknown> | undefined;
-  if (!section || !section[server.name]) { console.log(`     · Gemini ${server.name} MCP not present`); return; }
+  if (!section || !section[server.name]) {
+    await setGeminiMcpEnabled(home, server.name, true);
+    console.log(`     · Gemini ${server.name} MCP not present`);
+    return;
+  }
   delete section[server.name];
   await setGeminiMcpEnabled(home, server.name, true);
   await writeJsonFile(file, root);
@@ -643,16 +647,20 @@ export async function applyToAgents(name: string, opts: { dryRun?: boolean; agen
 }
 
 /** Undo applyToAgents — remove from every agent's native MCP config regardless of enabled state. */
-export async function removeFromAgents(name: string, opts: { dryRun?: boolean; agents?: readonly AgentId[] } = {}): Promise<void> {
+export async function removeFromAgents(
+  name: string,
+  opts: { dryRun?: boolean; agents?: readonly AgentId[]; includeHidden?: boolean } = {},
+): Promise<void> {
   const reg = await loadRegistry();
   const server = reg.servers[name];
   if (!server) return; // already gone
   const home = process.env["HOME"] ?? "";
   const dryRun = opts.dryRun ?? false;
+  const includeHidden = opts.includeHidden ?? false;
   const targetAgents = opts.agents ?? ALL_AGENT_IDS;
 
   for (const agentId of targetAgents) {
-    if (!server.agent_visibility[agentId]) continue;
+    if (!includeHidden && !server.agent_visibility[agentId]) continue;
     switch (agentId) {
       case "claude-code": await removeFromClaudeCode(server, home, dryRun); break;
       case "codex":       if (await exists(`${home}/.codex`)) await removeFromCodex(server, home); break;

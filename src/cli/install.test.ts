@@ -355,26 +355,31 @@ describe("installMcpRegistryEntries", () => {
     expect(Object.keys(reg.servers).filter((k) => k === "repomix")).toHaveLength(1);
   });
 
-  test("neither github nor repomix are default-enabled", async () => {
+  test("github and repomix registry specs are default-disabled before minimal defaults apply", async () => {
     await installMcpRegistryEntries(regHome);
     const reg = await loadRegistry();
     expect(reg.servers["github"]!.default_enabled).toBe(false);
     expect(reg.servers["repomix"]!.default_enabled).toBe(false);
+    expect(reg.servers["repomix"]!.agent_visibility["gemini"]).toBe(false);
   });
 
-  test("context7 is the minimal default builtin MCP", async () => {
+  test("context7 and repomix are minimal default builtin MCPs", async () => {
     await installMcpRegistryEntries(regHome);
     const reg = await loadRegistry();
     expect(reg.servers["context7"]).toBeDefined();
     expect(reg.servers["context7"]!.default_enabled).toBe(false);
     expect(reg.servers["context7"]!.auth_env_vars).toEqual(["CONTEXT7_API_KEY"]);
+    expect(reg.servers["repomix"]).toBeDefined();
+    expect(reg.servers["repomix"]!.default_enabled).toBe(false);
   });
 
-  test("minimal default state enables context7 without enabling github", async () => {
+  test("minimal default state enables context7 and registry-owned repomix without enabling github", async () => {
     await installMcpRegistryEntries(regHome);
     await applyBuiltinMcpDefaultState("minimal");
     const reg = await loadRegistry();
     expect(reg.servers["context7"]!.enabled["codex"]).toBe(true);
+    expect(reg.servers["repomix"]!.enabled["codex"]).toBe(true);
+    expect(reg.servers["repomix"]!.enabled["gemini"]).toBeUndefined();
     expect(reg.servers["github"]!.enabled["codex"]).toBeUndefined();
   });
 
@@ -384,6 +389,7 @@ describe("installMcpRegistryEntries", () => {
     await applyBuiltinMcpDefaultState("none");
     const reg = await loadRegistry();
     expect(reg.servers["context7"]!.enabled["codex"]).toBe(true);
+    expect(reg.servers["repomix"]!.enabled["codex"]).toBe(true);
     expect(reg.servers["github"]!.enabled["codex"]).toBeUndefined();
   });
 

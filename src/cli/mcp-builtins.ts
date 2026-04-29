@@ -16,6 +16,10 @@ const NON_CLAUDE_VISIBLE = {
   "claude-code": false, codex: true, gemini: true, opencode: true, pi: true,
 } as const;
 
+const REPOMIX_REGISTRY_VISIBLE = {
+  "claude-code": false, codex: true, gemini: false, opencode: true, pi: true,
+} as const;
+
 // ── Wave 2 ─────────────────────────────────────────────────────────────────
 
 export const DEFAULT_GITHUB_SERVER: McpServerSpec = {
@@ -35,10 +39,10 @@ export const DEFAULT_REPOMIX_SERVER: McpServerSpec = {
   vendor: "yamadashy",
   default_enabled: false,
   auth_env_vars: [],
-  // Claude Code gets Repomix through vendor plugins that carry a package of
-  // surfaces (.mcp.json, commands, explorer agent). That plugin package owns
-  // the Claude surface; MCP registry owns only non-Claude MCP config.
-  agent_visibility: { ...NON_CLAUDE_VISIBLE },
+  // Claude Code and Gemini get Repomix MCP through package/extension surfaces
+  // that also carry commands/agents/skills. Registry owns only agents without
+  // a native package surface carrying the MCP.
+  agent_visibility: { ...REPOMIX_REGISTRY_VISIBLE },
 };
 
 // ── Wave 3 ─────────────────────────────────────────────────────────────────
@@ -220,4 +224,4 @@ export const BUILTIN_MCPS: Array<{ name: string; spec: McpServerSpec }> = [
   { name: "dart",                         spec: DEFAULT_DART_SERVER },
 ];
 
-export const MINIMAL_DEFAULT_MCPS = ["context7"] as const;
+export const MINIMAL_DEFAULT_MCPS = ["context7", "repomix"] as const;

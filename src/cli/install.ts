@@ -495,16 +495,17 @@ type McpDefaultMode = "minimal" | "none" | "all";
  */
 export async function installMcpRegistryEntries(home: string): Promise<void> {
   const { registerServer, applyToAgents } = await import("./mcp-registry.ts");
-  const { BUILTIN_MCPS } = await import("./mcp-builtins.ts");
+  const { BUILTIN_MCPS, MINIMAL_DEFAULT_MCPS } = await import("./mcp-builtins.ts");
 
   for (const { name, spec } of BUILTIN_MCPS) {
+    const defaultState = spec.default_enabled || (MINIMAL_DEFAULT_MCPS as readonly string[]).includes(name)
+      ? "minimal-default"
+      : "opt-in";
     if (DRY_RUN) {
-      const defaultState = spec.default_enabled ? "minimal-default" : "opt-in";
       console.log(`     [dry-run] would register ${name} MCP (${defaultState}; enable with: fulcrum mcp enable ${name})`);
       continue;
     }
     await registerServer(name, spec);
-    const defaultState = spec.default_enabled ? "minimal-default" : "opt-in";
     console.log(`     ✓ ${name} MCP registered (${defaultState}; enable with: fulcrum mcp enable ${name})`);
     await applyToAgents(name);
   }
@@ -519,6 +520,14 @@ export async function installMcpRegistryEntries(home: string): Promise<void> {
 
   const { installRepomixPackageMirrors } = await import("./repomix-package.ts");
   await installRepomixPackageMirrors({ dryRun: DRY_RUN });
+
+  // Repomix Gemini extension mirror owns its MCP server. Older Fulcrum builds
+  // wrote a registry-owned disabled Gemini entry with the same name; remove it
+  // so the extension's native MCP surface can load with its package defaults.
+  if (!DRY_RUN) {
+    const { removeFromAgents } = await import("./mcp-registry.ts");
+    await removeFromAgents("repomix", { agents: ["gemini"], includeHidden: true });
+  }
 }
 
 export async function applyBuiltinMcpDefaultState(mode: McpDefaultMode): Promise<void> {
