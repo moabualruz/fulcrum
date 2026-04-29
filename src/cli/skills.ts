@@ -78,7 +78,30 @@ async function copyTree(src: string, dst: string, opts: { dryRun?: boolean } = {
   }
 }
 
-async function installClaudePlugin(opts: { dryRun: boolean }): Promise<void> {
+async function claudePluginVersion(root: string): Promise<string> {
+  try {
+    const plugin = JSON.parse(await readFile(`${root}/.claude-plugin/plugin.json`, "utf8"));
+    return typeof plugin?.version === "string" ? plugin.version : "0.1.0";
+  } catch {
+    return "0.1.0";
+  }
+}
+
+async function refreshClaudePluginPackage(root: string, opts: { dryRun: boolean }): Promise<void> {
+  const home = process.env["HOME"] ?? "";
+  const version = await claudePluginVersion(root);
+  const src = `${root}/plugins/fulcrum/skills`;
+  const cacheSkills = `${home}/.claude/plugins/cache/fulcrum/fulcrum/${version}/skills`;
+  const marketplaceSkills = `${home}/.claude/plugins/marketplaces/fulcrum/plugins/fulcrum/skills`;
+
+  if (!(await isDir(src))) return;
+  for (const dst of [cacheSkills, marketplaceSkills]) {
+    await copyTree(src, dst, opts);
+    console.log(`    ✓ refreshed plugin skills: ${dst}`);
+  }
+}
+
+async function installClaudePlugin(root: string, opts: { dryRun: boolean }): Promise<void> {
   const home = process.env["HOME"] ?? "";
   // Idempotency: if plugin already registered in installed_plugins.json, skip.
   const installedPath = `${home}/.claude/plugins/installed_plugins.json`;
@@ -86,7 +109,8 @@ async function installClaudePlugin(opts: { dryRun: boolean }): Promise<void> {
     try {
       const data = JSON.parse(await readFile(installedPath, "utf8"));
       if (data?.plugins?.[PLUGIN_SPEC]) {
-        console.log(`    · skip (${PLUGIN_SPEC} already installed)`);
+        console.log(`    · ${PLUGIN_SPEC} already installed`);
+        await refreshClaudePluginPackage(root, { dryRun: opts.dryRun });
         return;
       }
     } catch { /* malformed — fall through to install */ }
@@ -118,6 +142,7 @@ async function installClaudePlugin(opts: { dryRun: boolean }): Promise<void> {
     return;
   }
   console.log(`    ✓ plugin installed: ${PLUGIN_SPEC} (skills available as /fulcrum:<name>)`);
+  await refreshClaudePluginPackage(root, { dryRun: opts.dryRun });
 }
 
 async function cleanupLegacyClaudeSkills(opts: { dryRun: boolean }): Promise<void> {
@@ -167,7 +192,7 @@ export async function syncSkills(opts: { dryRun?: boolean } = {}): Promise<void>
   const claudeRoot = claudeAgent.baseDir(home);
   if (await isDir(claudeRoot)) {
     console.log(`→ Claude Code (plugin: ${PLUGIN_SPEC} from ${PLUGIN_MARKETPLACE})`);
-    await installClaudePlugin({ dryRun: opts.dryRun ?? false });
+    await installClaudePlugin(root, { dryRun: opts.dryRun ?? false });
     await cleanupLegacyClaudeSkills({ dryRun: opts.dryRun ?? false });
     console.log();
   } else {

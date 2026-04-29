@@ -15,7 +15,6 @@
 | Skills path (fulcrum-managed) | `~/.codex/skills/fulcrum/` (user) · `.codex/skills/` (project) | `~/.gemini/extensions/fulcrum-skills/skills/` | `~/.config/opencode/skills/fulcrum/` | `~/.pi/agent/skills/fulcrum/` |
 | MCP | Yes — `config.toml` | Yes — `settings.json` | Yes — `opencode.json` | Via `pi-mcp-adapter` |
 | DeepWiki | Yes | Yes | Yes | Yes — installed/configured via `pi-mcp-adapter` (Fulcrum-managed) |
-| context-mode | MCP + hooks + routing rules | MCP + hooks + routing rules | MCP + plugin + routing rules | `pi install npm:context-mode` + MCP + routing rules |
 
 ---
 

@@ -22,7 +22,6 @@ fulcrum/
 │   │   ├── init.ts                     # fulcrum init — bootstrap project AGENTS.md + .claude/CLAUDE.md
 │   │   ├── install.ts                  # fulcrum install — sentinel splice + caveman + skills + DeepWiki
 │   │   ├── uninstall.ts                # fulcrum uninstall — conservative removal of managed artifacts
-│   │   ├── context-mode.ts             # managed context-mode install/uninstall across 5 agents
 │   │   ├── compress.ts                 # fulcrum compress — caveman compression subcommand
 │   │   ├── hooks.ts                    # fulcrum hooks list/enable/disable (detection-aware)
 │   │   ├── skills.ts                   # fulcrum skills sync + lint
@@ -33,7 +32,6 @@ fulcrum/
 │   │   ├── doctor.ts                   # health check: 47 tools + caveman + Pi + MCP + policy
 │   │   ├── install.test.ts
 │   │   ├── uninstall.test.ts
-│   │   ├── context-mode.test.ts
 │   │   ├── hooks.test.ts
 │   │   ├── upstream-skills.test.ts
 │   │   ├── mcp-registry.test.ts
@@ -172,13 +170,12 @@ Detection-aware logic: if `agent.rootDir` does not exist, skip writes for that a
 2. **Policy seed** — copy `config/tool-output-policy.toml` to `~/.fulcrum/tool-output-policy.toml` (first run only; subsequent runs leave user edits).
 3. **Caveman per-agent** — call vendor install commands for Claude/Gemini; clone the official repo and mirror skills/plugin surfaces into native Codex/OpenCode/Pi paths.
 4. **Caveman ultra lock** — write `~/.config/caveman/config.json` with `{"defaultMode":"ultra"}` (idempotent).
-5. **context-mode** — follow upstream install contracts per detected agent.
-6. **Authored skills** — `fulcrum skills sync` mirrors `skills/<name>/SKILL.md` to each agent's `<skills-root>/fulcrum/<name>/`.
-7. **Upstream skills** — `fulcrum skills upstream` clones pinned repos, verifies `subpath_sha256`, installs to vendor placement (`<agent>/skills/<name>/`, Gemini `~/.gemini/skills/<name>/`).
-8. **DeepWiki MCP** — register for each detected agent (Pi via `pi-mcp-adapter` auto-install).
-9. **Builtin MCPs** — register 16 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml`; minimal default state enables `context7` only where no user state exists, while `--no-default-mcps` registers without changing enable state and `--enable-all-mcps` enables all builtins.
+5. **Authored skills** — `fulcrum skills sync` mirrors `skills/<name>/SKILL.md` to each agent's `<skills-root>/fulcrum/<name>/`.
+6. **Upstream skills** — `fulcrum skills upstream` clones pinned repos, verifies `subpath_sha256`, installs to vendor placement (`<agent>/skills/<name>/`, Gemini `~/.gemini/skills/<name>/`).
+7. **DeepWiki MCP** — register for each detected agent (Pi via `pi-mcp-adapter` auto-install).
+8. **Builtin MCPs** — register 16 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml`; minimal default state enables `context7` only where no user state exists, while `--no-default-mcps` registers without changing enable state and `--enable-all-mcps` enables all builtins.
 
-`fulcrum uninstall` is conservative by default: removes managed rules blocks, hook registrations, hook snippets/markers, `skills/fulcrum/`, legacy `skills/fulcrum-upstream/` namespaces, Gemini managed extensions, Gemini `@AGENTS.md` import, context-mode registrations, and DeepWiki. Keeps edited policy files, vendor-placed third-party skills, and caveman unless `--purge` / `--include-caveman` flags are passed.
+`fulcrum uninstall` is conservative by default: removes managed rules blocks, hook registrations, hook snippets/markers, `skills/fulcrum/`, legacy `skills/fulcrum-upstream/` namespaces, Gemini managed extensions, Gemini `@AGENTS.md` import, and DeepWiki. Keeps edited policy files, vendor-placed third-party skills, and caveman unless `--purge` / `--include-caveman` flags are passed.
 
 **Hard guards in `install.ts`:**
 - `assertNotAgentsPath()` — throws if any install path resolves to `~/.agents/`. Tested.
@@ -433,7 +430,6 @@ This checks out the tree SHA, computes `subpath_sha256`, and writes it back.
 - `src/utils/io.test.ts` — `readHookEvent` parse + `deriveTool` Pi proxy normalisation.
 - `src/cli/install.test.ts` — `assertNotAgentsPath`, `lockCavemanUltra`, sentinel-splice idempotency.
 - `src/cli/uninstall.test.ts` — removal of managed artifacts; edited policy preserved.
-- `src/cli/context-mode.test.ts` — install/uninstall across 5 agents.
 - `src/cli/hooks.test.ts` — enable/disable detection-aware + `--all` overrides.
 - `src/cli/upstream-skills.test.ts` — `subpath_sha256` verify + mismatch exit.
 - `src/cli/mcp-registry.test.ts` — round-trip register/unregister, enable/disable, apply/remove.

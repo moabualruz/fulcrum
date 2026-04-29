@@ -14,7 +14,7 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
 
 `main` ships a Bun `fulcrum` CLI that:
 
-- **Installs cross-agent setup** (`fulcrum install`) — sentinel-splices `rules/AGENTS.md` into each detected agent's primary rules file; vendors hook recipe snippets; seeds `tool-output-policy.toml`; runs caveman per agent (`claude plugin install caveman@caveman` / `gemini extensions install` / direct official repo mirror for Codex/OpenCode/Pi, with Codex plugin metadata/assets/hooks/config mirrored into native Codex paths); manages context-mode (npm + per-agent MCP+hooks+routing); installs vendor capability packages (Repomix Claude plugins + non-Claude mirrors, Cloudflare Claude plugin, Superpowers Claude/Gemini/OpenCode/Pi packages + Codex full skill mirror; Pi falls back to skill mirror only when `pi` is unavailable); registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 vendor MCPs in the registry (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart) with minimal default state enabling only context7; syncs 29 authored skills + 27 upstream-pinned skills with subpath-level SHA-256 integrity verification and `vendor_canonical_agents` package-ownership skips.
+- **Installs cross-agent setup** (`fulcrum install`) — sentinel-splices `rules/AGENTS.md` into each detected agent's primary rules file; vendors hook recipe snippets; seeds `tool-output-policy.toml`; runs caveman per agent (`claude plugin install caveman@caveman` / `gemini extensions install` / direct official repo mirror for Codex/OpenCode/Pi, with Codex plugin metadata/assets/hooks/config mirrored into native Codex paths); installs vendor capability packages (Repomix Claude plugins + non-Claude mirrors, Cloudflare Claude plugin, Superpowers Claude/Gemini/OpenCode/Pi packages + Codex full skill mirror; Pi falls back to skill mirror only when `pi` is unavailable); registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 vendor MCPs in the registry (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart) with minimal default state enabling only context7; syncs 29 authored skills + 27 upstream-pinned skills with subpath-level SHA-256 integrity verification and `vendor_canonical_agents` package-ownership skips.
 
 - **Bootstraps projects** (`fulcrum init <dir>`) in three vendor-canonical phases:
   1. **Vendor integrations** — `graphify install --platform <agent>` per detected agent (Claude Code/Codex/OpenCode/Gemini); `npx skills add` for ast-grep and tavily; caveman is handled only by `fulcrum install` per-agent mirrors; `pi install npm:pi-mcp-adapter` + `pi-mcp-adapter init` for Pi; defers context7 OAuth to manual `npx ctx7 setup`.
@@ -25,13 +25,13 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
   - Codex TOML: emits `bearer_token_env_var = "<VAR>"` for HTTP servers with a single `auth_env_var`.
   - Gemini / OpenCode / Pi: `headers.Authorization = "Bearer ${VAR}"` (or `{env:VAR}` for OpenCode's syntax) with vendor-side env interpolation.
   - Claude Code: `claude mcp add ... --header "Authorization: Bearer <token>"` — token expanded at install time because Claude does not interpolate `${VAR}` in stored headers.
-  Minimal default state enables DeepWiki + context-mode + context7 where no user state exists. `fulcrum install --no-default-mcps` registers all MCP definitions/config without changing enable state; `fulcrum install --enable-all-mcps` is a verification switch that explicitly flips every builtin on across every detected agent.
+  Minimal default state enables DeepWiki + context7 where no user state exists. `fulcrum install --no-default-mcps` registers all MCP definitions/config without changing enable state; `fulcrum install --enable-all-mcps` is a verification switch that explicitly flips every builtin on across every detected agent.
 
 - **Validates the environment** (`fulcrum doctor [--json] [--probe]`) — agent detection, rules-spliced state, caveman per-agent install + `defaultMode` source, Pi MCP adapter check, 47 BYO tools, tool-output policy presence. MCP registry section reports `auth_status` (env-var presence), `reachable` (HEAD probe / `which`), `drift` (`default_enabled=false` but some agent has it enabled), and `wiring` (per-agent native config inspection — confirms `bearer_token_env_var` / `headers.Authorization` is present for HTTP servers with declared auth). With `--probe`: spawns stdio MCPs / POSTs HTTP MCPs and asserts a valid JSON-RPC `initialize` reply within an 8s timeout. Catches wrong commands, stale URLs, and broken auth in one check.
 
 - **Self-tests** via `bun run ci` — install → tsc → 292 tests → 5 platform builds → skills:lint → compress:check (hard gate, 0 pending). All green at every commit.
 
-- **Verifies a fresh setup** via `docs/smoke-test.md` — self-contained markdown that any of the 5 agents can read as a prompt and execute step-by-step (16 checks, result table, failure remediation, append-only result log under `~/.fulcrum/state/global/smoke-test/<YYYY-MM-DD>.md`).
+- **Verifies a fresh setup** via `docs/smoke-test.md` — self-contained markdown that any of the 5 agents can read as a prompt and execute step-by-step (16 checks, result table, failure remediation, append-only result log under `~/.fulcrum/state/global/smoke-test/<YYYY-MM-DD>.md`). Latest full cross-agent run on 2026-04-29: Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi CLI all PASS after `fix(smoke): pass cross-agent setup checks` (`bc0f656`).
 
 `src/agents/registry.ts` is the single source of truth for all 5 agent definitions, including `rootDir` for detection. No GitHub Actions; local `bun run ci` + `bun run release` are the gates.
 
@@ -60,7 +60,7 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 │                  [--no-default-mcps] [--enable-all-mcps]
 │                            — sentinel-splice rules, vendor snippets, seed policy,
 │                              caveman canonical per-agent install, caveman ultra
-│                              lock, context-mode managed integration, sync
+│                              lock, sync
 │                              authored + upstream skills (with subpath SHA-256),
 │                              register DeepWiki MCP for detected agents (Pi via
 │                              auto-installed pi-mcp-adapter), register 16
@@ -74,7 +74,7 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 │                              we placed at vendor paths stay — vendor owns
 │                              them), generated Gemini import, vendor
 │                              capability packages, managed
-│                              context-mode + DeepWiki + MCP registry entries,
+│                              DeepWiki + MCP registry entries,
 │                              caveman per agent (vendor canonical commands).
 │                              Keeps caveman unless --include-caveman.
 ├── fulcrum hooks list/enable/disable [--all]
@@ -126,7 +126,6 @@ src/
 │   ├── vendor-rules.test.ts            # stripVendorRuleBlocks behavior
 │   ├── install.ts install.test.ts      # cross-agent install + stripVendorRuleBlocks
 │   ├── uninstall.ts uninstall.test.ts  # conservative removal + vendor canonical uninstall
-│   ├── context-mode.ts + .test.ts      # managed context-mode across 5 agents
 │   ├── compress.ts                     # fulcrum compress
 │   ├── hooks.ts hooks.test.ts          # detection-aware hook enable/disable
 │   ├── skills.ts                       # authored skill sync + lint
@@ -429,7 +428,7 @@ brew install usql                                                    # optional
 bash scripts/install.sh
 ```
 
-Splices rules; vendors hook snippets; seeds policy; installs caveman per agent (Claude/Gemini vendor commands; Codex/OpenCode/Pi direct official repo mirrors, avoiding shared global skill roots); installs context-mode; syncs 29 authored + 27 upstream skills with subpath SHA-256; registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 builtin MCPs and enables context7 as minimal default; installs 3 vendor Repomix Claude plugins.
+Splices rules; vendors hook snippets; seeds policy; installs caveman per agent (Claude/Gemini vendor commands; Codex/OpenCode/Pi direct official repo mirrors, avoiding shared global skill roots); syncs 29 authored + 27 upstream skills with subpath SHA-256; registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 builtin MCPs and enables context7 as minimal default; installs 3 vendor Repomix Claude plugins.
 
 ### C. MCP auth
 
@@ -501,21 +500,16 @@ fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, handshake, wiring,
 
 ## 7a. Next-session ordering
 
-1. **Run the smoke test on a fresh agent session.**
-   `claude -p "$(cat docs/smoke-test.md)" --output-format json` (or the equivalent for codex / gemini / opencode / pi). Result lands at `~/.fulcrum/state/global/smoke-test/<YYYY-MM-DD>.md`. Triage every `✗` row; fix the underlying setup or code; re-run until the result table is all `✓`.
+1. **Discuss subagent work before doing it.**
+   Do not create, edit, validate, or expand subagent-related skills/files until the next session explicitly discusses the intended subagent scope. Before that discussion, read `docs/subagent-guidance.notes.md`; its review rule is output/artifact-based, not git-based. Every subagent report must be checked against actual edited files, generated artifacts, logs, installed config, and claimed paths whether or not they are tracked or committed. Smoke-test gate is already clean as of 2026-04-29.
 
-2. **Discuss subagent work before doing it.**
-   Do not create, edit, validate, or expand subagent-related skills/files until after the smoke test is clean and the next session explicitly discusses the intended subagent scope.
-
-3. **Then do the subagent work if approved.**
+2. **Then do the subagent work if approved.**
    Scope to be agreed in that discussion before implementation.
 
-4. **Add component-level install/remove commands.**
-   Implement the planned `fulcrum component` lifecycle surface documented in `docs/user-guide.md` and `docs/developer-guide.md`: install/remove one managed component such as context-mode, caveman, Repomix, vendor packages, DeepWiki, or MCP registry scaffolding without touching unrelated components. Preserve dry-run behavior, per-agent targeting, idempotent removal, and sentinel-only cleanup.
+3. **Add component-level install/remove commands.**
+   Implement the planned `fulcrum component` lifecycle surface documented in `docs/user-guide.md` and `docs/developer-guide.md`: install/remove one managed component such as caveman, Repomix, vendor packages, DeepWiki, or MCP registry scaffolding without touching unrelated components. Preserve dry-run behavior, per-agent targeting, idempotent removal, and sentinel-only cleanup.
 
-5. After that, proceed with layer §6.1 (Repository supervisor) per the build-order branch plan above.
-
-If the smoke test surfaces an issue, fix it (commit per logical change) before moving to subagent discussion.
+4. After that, proceed with layer §6.1 (Repository supervisor) per the build-order branch plan above.
 
 ---
 

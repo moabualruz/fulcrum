@@ -51,6 +51,7 @@
 | `gitleaks` | ✍️ shipped | [`skills/gitleaks/SKILL.md`](gitleaks/SKILL.md) + [`evals/gitleaks.json`](../evals/gitleaks.json) | Authored 2026-04-28. detect vs protect, baselines, custom rules. 20-entry eval (13/7). |
 | `hyperfine` | ✍️ shipped | [`skills/hyperfine/SKILL.md`](hyperfine/SKILL.md) + [`evals/hyperfine.json`](../evals/hyperfine.json) | Authored 2026-04-28. 7 patterns + 8 anti-patterns; warmup, sweeps, regression detection. 20-entry eval (12/8). |
 | `watchexec` | ✍️ shipped | [`skills/watchexec/SKILL.md`](watchexec/SKILL.md) + [`evals/watchexec.json`](../evals/watchexec.json) | Authored 2026-04-28. Encodes agent-vs-human distinction (don't start in agent shells). 20-entry eval (11/9). |
+| `subagent-orchestration` | ✍️ shipped | [`skills/subagent-orchestration/SKILL.md`](subagent-orchestration/SKILL.md) + [`evals/subagent-orchestration.json`](../evals/subagent-orchestration.json) | Authored 2026-04-29. Split workflow skill for focused delegation, review, test strategy, code-doc alignment, and verification. 20-entry eval (12/8). |
 
 ---
 

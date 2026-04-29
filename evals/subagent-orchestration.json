@@ -1,0 +1,22 @@
+[
+  {"query": "Use subagents to split this repo-wide audit into independent workers and keep me on the critical path.", "should_trigger": true},
+  {"query": "Plan a parallel agent run for implementation, review, and vendor-doc verification without duplicating work.", "should_trigger": true},
+  {"query": "I want multiple workers: one implements, one reviews tests, one checks docs drift. How should we orchestrate?", "should_trigger": true},
+  {"query": "Run delegated agents for separate research lanes and then synthesize the result.", "should_trigger": true},
+  {"query": "Review this PR with a separate agent, comment on the remote if possible, and patch locally if you have access.", "should_trigger": true},
+  {"query": "Break this large feature into smallest independently testable agent tasks, then execute in parallel where safe.", "should_trigger": true},
+  {"query": "Before dispatching implementation agents, decide what tests or verification each unit needs.", "should_trigger": true},
+  {"query": "Have review agents check the worktree where each worker made changes, including docs and generated artifacts.", "should_trigger": true},
+  {"query": "Use an explore agent for codebase discovery and a worker agent for the patch, with non-overlapping files.", "should_trigger": true},
+  {"query": "I need agent-driven execution for all remaining tasks: keep workers focused, avoid redundant context, and verify claims.", "should_trigger": true},
+  {"query": "Coordinate subagents across worktrees and ensure code, tests, docs, and examples stay aligned.", "should_trigger": true},
+  {"query": "Spawn a security reviewer and a correctness reviewer for this multi-file auth change.", "should_trigger": true},
+  {"query": "Fix the typo in this one README sentence.", "should_trigger": false},
+  {"query": "Add one obvious unit test for this pure helper function.", "should_trigger": false},
+  {"query": "What is a git worktree?", "should_trigger": false},
+  {"query": "Run the existing test command and tell me whether it passes.", "should_trigger": false},
+  {"query": "Explain the test pyramid and when to use unit vs integration tests.", "should_trigger": false},
+  {"query": "Review this single-line diff yourself; no need for delegation.", "should_trigger": false},
+  {"query": "Search for every use of this function name in the repo.", "should_trigger": false},
+  {"query": "Update the CLI help text to mention the new flag.", "should_trigger": false}
+]

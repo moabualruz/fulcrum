@@ -1,7 +1,6 @@
 // fulcrum install — splice rules/AGENTS.md into each agent's primary rules
 // file via <!-- BEGIN/END FULCRUM RULES --> sentinel markers, vendor recipe
-// pool, seed tool-output-policy.toml, install caveman and context-mode per
-// detected agent.
+// pool, seed tool-output-policy.toml, and install caveman per detected agent.
 //
 // Idempotent. Non-destructive: user content outside the markers is preserved.
 //
@@ -743,15 +742,15 @@ export async function run(args: string[]): Promise<void> {
   const root = repoRoot();
   console.log(`Fulcrum install — source: ${root}\n`);
 
-  console.log("1/9  Vendoring hook registration snippets → ~/.fulcrum/hooks/snippets/");
+  console.log("1/8  Vendoring hook registration snippets → ~/.fulcrum/hooks/snippets/");
   await vendorHookSnippets();
   console.log();
 
-  console.log("2/9  Seeding ~/.fulcrum/tool-output-policy.toml");
+  console.log("2/8  Seeding ~/.fulcrum/tool-output-policy.toml");
   await seedPolicy();
   console.log();
 
-  console.log("3/9  Splicing rules/AGENTS.md into per-agent rules files");
+  console.log("3/8  Splicing rules/AGENTS.md into per-agent rules files");
   const rulesPath = `${root}/rules/AGENTS.md`;
   if (!(await exists(rulesPath))) {
     console.error(`fulcrum install: cannot find ${rulesPath}`);
@@ -770,44 +769,39 @@ export async function run(args: string[]): Promise<void> {
   console.log();
 
   const home = process.env["HOME"] ?? "";
-  console.log("4/9  Installing caveman per detected agent");
+  console.log("4/8  Installing caveman per detected agent");
   await installCaveman(home);
   console.log();
 
-  console.log("5/9  Installing context-mode per detected agent");
-  const { installContextMode } = await import("./context-mode.ts");
-  await installContextMode({ dryRun: DRY_RUN });
-  console.log();
-
   if (syncAuthoredSkills) {
-    console.log("6/9  Syncing in-repo skills per detected agent");
+    console.log("5/8  Syncing in-repo skills per detected agent");
     const { syncSkills } = await import("./skills.ts");
     await syncSkills({ dryRun: DRY_RUN });
   } else {
-    console.log("6/9  Skipping in-repo skill sync (--no-skills)");
+    console.log("5/8  Skipping in-repo skill sync (--no-skills)");
   }
   console.log();
 
   if (syncUpstream) {
-    console.log("7/9  Syncing curated third-party skills per detected agent");
+    console.log("6/8  Syncing curated third-party skills per detected agent");
     const { syncUpstreamSkills } = await import("./upstream-skills.ts");
     await syncUpstreamSkills({ dryRun: DRY_RUN });
   } else {
-    console.log("7/9  Skipping curated third-party skill sync (--no-upstream-skills)");
+    console.log("6/8  Skipping curated third-party skill sync (--no-upstream-skills)");
   }
   console.log();
 
-  console.log("7b/9 Installing vendor capability packages");
+  console.log("6b/8 Installing vendor capability packages");
   const { installVendorCapabilityPackages } = await import("./vendor-packages.ts");
   await installVendorCapabilityPackages({ dryRun: DRY_RUN });
   console.log();
 
-  console.log("8/9  Registering DeepWiki MCP where supported");
+  console.log("7/8  Registering DeepWiki MCP where supported");
   const { installDeepwikiMcp } = await import("./mcp.ts");
   await installDeepwikiMcp({ dryRun: DRY_RUN });
   console.log();
 
-  console.log("8b/9 Registering MCP registry entries (github, repomix, semgrep, context7, tavily, playwright, cloudflare-*, dart)");
+  console.log("7b/8 Registering MCP registry entries (github, repomix, semgrep, context7, tavily, playwright, cloudflare-*, dart)");
   await installMcpRegistryEntries(home);
   console.log();
 
@@ -816,16 +810,16 @@ export async function run(args: string[]): Promise<void> {
     : mcpDefaultMode === "none"
       ? "Skipping minimal default MCP enable step (--no-default-mcps)"
       : "Enabling minimal default MCP set";
-  console.log(`8c/9 ${modeLabel}`);
+  console.log(`7c/8 ${modeLabel}`);
   await applyBuiltinMcpDefaultState(mcpDefaultMode);
   console.log();
 
   if (withProject) {
-    console.log(`9/9  fulcrum init ${withProject}`);
+    console.log(`8/8  fulcrum init ${withProject}`);
     const { run: runInit } = await import("./init.ts");
     await runInit([withProject]);
   } else {
-    console.log("9/9  Skipping project init (use:  fulcrum init <dir>  or re-run with --with-project)");
+    console.log("8/8  Skipping project init (use:  fulcrum init <dir>  or re-run with --with-project)");
   }
 
   console.log("\nDone.");

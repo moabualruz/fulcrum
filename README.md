@@ -15,7 +15,7 @@ That is the destination. This branch (`feat/agent-foundation-clean`) is the foun
 | **Capability** | 28 skills authored in-repo, content-verified against upstream, with 20-entry trigger evals each | `skills/`, `fulcrum skills sync` |
 | **Capabilities** | Bring-your-own CLI tools, verified by `fulcrum doctor` | `docs/capabilities.md`, `fulcrum doctor` |
 | **Output policy** | Per-tool output strategy (raw / status / summary / file) driving `tool-output-router` | `config/tool-output-policy.toml` |
-| **Managed MCPs** | DeepWiki + context-mode routing; MCP registry CLI (`fulcrum mcp list/register/enable`) with 16 builtin servers registered; minimal default enables context7, the rest stay opt-in | `docs/mcp.md`, `src/cli/mcp-registry.ts`, `src/cli/mcp-builtins.ts`, `src/cli/mcp-cmd.ts` |
+| **Managed MCPs** | DeepWiki plus MCP registry CLI (`fulcrum mcp list/register/enable`) with 16 builtin servers registered; minimal default enables context7, the rest stay opt-in | `docs/mcp.md`, `src/cli/mcp-registry.ts`, `src/cli/mcp-builtins.ts`, `src/cli/mcp-cmd.ts` |
 | **Orchestration** | One Bun-compiled cross-platform binary (`init`, `install`, `uninstall`, `hooks`, `skills`, `doctor`, `compress`, `hook`) | `src/`, `dist/fulcrum-<plat>` |
 | **Cross-agent reach** | Same setup wired into Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI | `docs/agents.md`, `shims/` |
 
@@ -38,7 +38,7 @@ These are the layers the foundation is preparing for. They are **not built**; do
 ## Principles
 
 - **CLI and skills over MCP.** MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead.
-- **Managed MCPs stay narrow.** Fulcrum manages DeepWiki for repo docs and context-mode for context routing/session continuity. The MCP registry (`fulcrum mcp`) ships 16 builtin entries; default install enables only `context7` from that registry, with github, repomix, semgrep, tavily, playwright, cloudflare-* ×9, and dart opt-in via `fulcrum mcp enable <name>`.
+- **Managed MCPs stay narrow.** Fulcrum manages DeepWiki for repo docs. The MCP registry (`fulcrum mcp`) ships 16 builtin entries; default install enables only `context7` from that registry, with github, repomix, semgrep, tavily, playwright, cloudflare-* ×9, and dart opt-in via `fulcrum mcp enable <name>`.
 - **Capabilities are bring-your-own tools.** Install the workstation toolchain yourself, then use `fulcrum doctor` to verify what is present.
 - **Behavioral rules, not knowledge.** Rules change what the agent *does*, not what it *knows*. `"Use ruff, never flake8"` works. `"Write clean code"` does nothing.
 - **Agent-friendly tools output JSON.** `--json` / `--format json` is the selection criterion for every CLI in this stack.
@@ -78,7 +78,7 @@ Claude Code's loader scans top-level of `~/.claude/skills/` only — nested `<di
 | [docs/capabilities.md](docs/capabilities.md) | Capability layer — bring-your-own CLI tool catalogue |
 | [docs/skills.md](docs/skills.md) | Skills — paths, authoring template, fork policy, verification |
 | [docs/skill-smoke-test.md](docs/skill-smoke-test.md) | Manual cross-agent verification checklist |
-| [docs/mcp.md](docs/mcp.md) | MCP policy — managed DeepWiki/context-mode, opt-in extras, Pi adapter notes |
+| [docs/mcp.md](docs/mcp.md) | MCP policy — managed DeepWiki, opt-in extras, Pi adapter notes |
 | [docs/agents.md](docs/agents.md) | Cross-agent translation — Codex, Gemini, OpenCode, Pi |
 | [skills/SOURCES.md](skills/SOURCES.md) | Skill registry and authoring queue |
 
@@ -171,5 +171,5 @@ See [`skills/SOURCES.md`](skills/SOURCES.md) for the registry and the long-tail 
 2. **[context.md](docs/context.md)** — write your global rules and per-project `AGENTS.md`.
 3. **[hooks.md](docs/hooks.md)** — enable the recipes you want; `fulcrum hooks enable` edits native agent configs and prints each snippet for review.
 4. **[skills.md](docs/skills.md)** — install superpowers as the cross-agent base; author skills via the template.
-5. **[mcp.md](docs/mcp.md)** — managed DeepWiki/context-mode policy, MCP registry CLI, and opt-in server boundaries.
+5. **[mcp.md](docs/mcp.md)** — managed DeepWiki policy, MCP registry CLI, and opt-in server boundaries.
 6. **[agents.md](docs/agents.md)** — replicate the setup on Codex, Gemini, OpenCode, Pi as needed.

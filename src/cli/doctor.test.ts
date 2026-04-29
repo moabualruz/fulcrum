@@ -52,7 +52,7 @@ describe("doctor --json piMcpAdapter field", () => {
     await mkdir(`${home}/.pi/agent`, { recursive: true });
     await writeFile(
       `${home}/.pi/agent/settings.json`,
-      JSON.stringify({ packages: ["npm:pi-mcp-adapter", "npm:context-mode"] }),
+      JSON.stringify({ packages: ["npm:pi-mcp-adapter"] }),
     );
     const report = await runDoctor(home);
     const adapter = report["piMcpAdapter"] as Record<string, unknown>;

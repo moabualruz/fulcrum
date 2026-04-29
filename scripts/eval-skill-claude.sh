@@ -169,15 +169,22 @@ SUMMARY="$RESULTS_DIR/summary.txt"
   echo
 } | tee "$SUMMARY"
 
-# Sanity: confirm the skill is actually present in ~/.claude/skills (or under fulcrum/).
+# Sanity: confirm the skill is actually present in Claude Code's supported
+# locations. Fulcrum installs Claude skills through a plugin namespace; legacy
+# ~/.claude/skills/fulcrum is intentionally removed by `fulcrum skills sync`.
 SKILL_INSTALLED=""
-for cand in "$HOME/.claude/skills/$SKILL/SKILL.md" "$HOME/.claude/skills/fulcrum/$SKILL/SKILL.md"; do
+for cand in \
+  "$HOME/.claude/plugins/cache/fulcrum/fulcrum/0.1.0/skills/$SKILL/SKILL.md" \
+  "$HOME/.claude/plugins/marketplaces/fulcrum/plugins/fulcrum/skills/$SKILL/SKILL.md" \
+  "$HOME/.claude/skills/$SKILL/SKILL.md" \
+  "$HOME/.claude/skills/fulcrum/$SKILL/SKILL.md"
+do
   [ -f "$cand" ] && { SKILL_INSTALLED="$cand"; break; }
 done
 if [ -z "$SKILL_INSTALLED" ]; then
   cat >&2 <<EOF
-fulcrum: skill '$SKILL' is not installed under ~/.claude/skills/.
-Run: fulcrum skills sync   (puts every authored skill at ~/.claude/skills/fulcrum/<name>)
+fulcrum: skill '$SKILL' is not installed in Claude Code's Fulcrum plugin cache.
+Run: fulcrum skills sync
 The agent must be able to discover the skill at runtime; otherwise nothing will trigger.
 EOF
   exit 1

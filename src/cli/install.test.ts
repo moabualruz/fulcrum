@@ -5,7 +5,7 @@ import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { assertNotAgentsPath, installCaveman, lockCavemanUltra, spliceSentinel, setDryRun } from "./install.ts";
+import { assertNotAgentsPath, installCaveman, lockCavemanUltra, run as installRun, spliceSentinel, setDryRun } from "./install.ts";
 import { run as runProc } from "../utils/proc.ts";
 import * as proc from "../utils/proc.ts";
 
@@ -290,6 +290,33 @@ describe("dry-run mode", () => {
 
     // File must still not exist.
     expect(await Bun.file(target).exists()).toBe(false);
+  });
+
+  test("fulcrum install dry-run does not manage removed context component", async () => {
+    const origHome = process.env["HOME"];
+    const origFulcrumHome = process.env["FULCRUM_HOME"];
+    const origRepoDir = process.env["FULCRUM_REPO_DIR"];
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      process.env["HOME"] = dryHome;
+      process.env["FULCRUM_HOME"] = join(dryHome, ".fulcrum");
+      process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../..");
+      await installRun(["--dry-run", "--no-skills", "--no-default-mcps"]);
+      const removedComponent = ["context", "mode"].join("-");
+      expect(logs.join("\n")).not.toContain(removedComponent);
+    } finally {
+      logSpy.mockRestore();
+      if (origHome !== undefined) process.env["HOME"] = origHome;
+      else delete process.env["HOME"];
+      if (origFulcrumHome !== undefined) process.env["FULCRUM_HOME"] = origFulcrumHome;
+      else delete process.env["FULCRUM_HOME"];
+      if (origRepoDir !== undefined) process.env["FULCRUM_REPO_DIR"] = origRepoDir;
+      else delete process.env["FULCRUM_REPO_DIR"];
+    }
   });
 });
 

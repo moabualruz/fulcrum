@@ -22,8 +22,10 @@
 **On reviewing subagent output**
 
 - "You also always have to review the work of subagents."
-- Trust-but-verify the report. The agent describes intent; the working tree is truth.
-- Check: `git status` + `git diff --stat`, run `bun run ci` independently, spot-check tests count vs claim, grep for files the agent claimed to create.
+- Trust-but-verify the report. The agent describes intent; the actual output and edited files/artifacts are truth.
+- Review every subagent-delivered output path, patch, artifact, and claimed file, whether or not it is tracked by git, staged, or committed.
+- Git is one inspection tool, not the review boundary. Check `git status` + `git diff --stat` for tracked/untracked work, but also inspect generated files outside git, logs, result files, installed agent config, copied skill directories, and any path the subagent says it touched.
+- Check: subagent final report vs actual files/artifacts, `git status`, `git diff --stat`, targeted file reads, `fd`/`rg` for claimed paths, independent `bun run ci`, tests count vs claim, and installed/configured state when the task changes runtime setup.
 - Caught examples in this session: `mcp.test.ts` claimed but never written; `fulcrum init` watcher impl overrode vendor output paths and hardcoded extension filters.
 
 **On research before implementation**

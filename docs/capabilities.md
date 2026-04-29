@@ -67,7 +67,6 @@ Fulcrum treats the toolchain above as external setup. `fulcrum doctor` reports p
 | Tool | Install | Covers |
 |---|---|---|
 | `gws` | see gws docs | Gmail, Google Drive, Google Calendar |
-| `context-mode` | managed by `fulcrum install` (`npm install -g context-mode` when needed) | Context-routing MCP server, hook dispatcher, and session-continuity CLI |
 | `hcloud` | `brew install hcloud` | Hetzner Cloud — servers, volumes, firewalls, networks, load balancers (`-o json` on all commands) |
 | `wrangler` | `npm install -g wrangler` | Cloudflare Workers, Pages, D1, KV, R2 |
 | `flarectl` | `go install github.com/cloudflare/cloudflare-go/cmd/flarectl@latest` | Cloudflare DNS + zone mgmt (no JSON — use `xh` + Cloudflare REST API for scripted DNS ops) |

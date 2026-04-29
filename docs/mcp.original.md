@@ -1,10 +1,10 @@
 # MCP Policy
 
-> Fulcrum manages DeepWiki for repository documentation, context-mode for context routing/session continuity, and a registered builtin MCP catalogue. Default state enables only the minimal useful set: DeepWiki, context-mode, and context7, plus package-default MCPs when Fulcrum mirrors a vendor package surface. Everything else stays opt-in. CLI + skills remain preferred when they provide the same result with less startup overhead.
+> Fulcrum manages DeepWiki for repository documentation and a registered builtin MCP catalogue. Default state enables only the minimal useful set: DeepWiki and context7, plus package-default MCPs when Fulcrum mirrors a vendor package surface. Everything else stays opt-in. CLI + skills remain preferred when they provide the same result with less startup overhead.
 
 ## 1. Default state
 
-MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead. Register arbitrary third-party MCPs disabled; enable per-session when genuinely needed. Managed exceptions must justify always-on cost: DeepWiki has no CLI equivalent, context-mode provides routing/session-continuity hooks, context7 is broadly useful library documentation with no official skill fallback, and Repomix stays enabled only where Fulcrum mirrors package MCP functionality. Use `fulcrum install --no-default-mcps` to register all MCP definitions/config without changing enable state; use `--enable-all-mcps` only for verification. Agents with native disabled state get config written disabled: Codex via `enabled = false`; Gemini via `~/.gemini/mcp-server-enablement.json`; OpenCode via `"enabled": false`. Claude Code and Pi lack safe disabled config, so disabled registry MCPs show in `fulcrum mcp list`, not native MCP lists.
+MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead. Register arbitrary third-party MCPs disabled; enable per-session when genuinely needed. Managed exceptions must justify always-on cost: DeepWiki has no CLI equivalent, context7 is broadly useful library documentation with no official skill fallback, and Repomix stays enabled only where Fulcrum mirrors package MCP functionality. Use `fulcrum install --no-default-mcps` to register all MCP definitions/config without changing enable state; use `--enable-all-mcps` only for verification. Agents with native disabled state get config written disabled: Codex via `enabled = false`; Gemini via `~/.gemini/mcp-server-enablement.json`; OpenCode via `"enabled": false`. Claude Code and Pi lack safe disabled config, so disabled registry MCPs show in `fulcrum mcp list`, not native MCP lists.
 
 Plugin / extension / package ownership wins over individual surfaces. Vendor package may carry MCP servers, skills, commands, rules, hooks, scripts, agents, mixed assets. Fulcrum installs/uninstalls package as vendor documents; never recreate, disable, remove package internals through lower-level registry. Agents without package primitive get nearest-native mirror, no behavior rewrite; mirrored MCP surfaces follow package defaults unless explicitly documented. Current examples: Repomix Claude plugins own Claude MCP/commands/agent and Gemini extension mirror owns Gemini MCP; Cloudflare Claude plugin owns bundled Claude MCP+skills; Superpowers native packages own Claude/Gemini/OpenCode/Pi, Codex gets full skill mirror.
 
@@ -38,21 +38,9 @@ Tools: `ask_question`, `read_wiki_contents`, `read_wiki_structure` — public re
 
 Claude Code removal remains manual: `claude mcp remove -s user deepwiki`.
 
-> MCP and CLI hit the same underlying API with the same quota — switching protocol does not change rate limits (verified: Context7, Tavily primary docs 2026-04-27). Do not add another managed MCP unless it has a DeepWiki/context-mode class reason.
+> MCP and CLI hit the same underlying API with the same quota — switching protocol does not change rate limits (verified: Context7, Tavily primary docs 2026-04-27). Do not add another managed MCP unless it has a DeepWiki-class reason.
 
-### 3.2 context-mode
-
-`context-mode` is managed because it combines MCP tools with hook-based routing enforcement and session continuity. Fulcrum follows upstream install instructions from [mksglu/context-mode](https://github.com/mksglu/context-mode), verified 2026-04-28:
-
-- Claude Code: `claude plugin marketplace add mksglu/context-mode` and `claude plugin install context-mode@context-mode`.
-- Codex CLI: global `context-mode` binary, `~/.codex/config.toml` MCP entry, `~/.codex/hooks.json` hook entries, and routing rules in `~/.codex/AGENTS.md`.
-- Gemini CLI: global `context-mode` binary, `~/.gemini/settings.json` MCP + hook entries, and routing rules through the Fulcrum `~/AGENTS.md` import path.
-- OpenCode: global `context-mode` binary, `~/.config/opencode/opencode.json` MCP + plugin entries, and routing rules in `~/.config/opencode/AGENTS.md`.
-- Pi CLI: global `context-mode` binary, `pi install npm:context-mode`, `~/.pi/agent/settings.json` package entry, `~/.pi/agent/mcp.json` MCP entry, and routing rules in `~/.pi/agent/AGENTS.md`.
-
-`fulcrum uninstall` removes Fulcrum-managed context-mode registrations and routing blocks. It keeps the global npm package because upstream documents no uninstall command and that binary may be shared; remove manually with `npm uninstall -g context-mode` when desired.
-
-### 3.3 Pi DeepWiki via adapter
+### 3.2 Pi DeepWiki via adapter
 
 Pi does not ship a built-in MCP manager. Use [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter), verified 2026-04-28:
 

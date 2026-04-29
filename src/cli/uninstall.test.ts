@@ -76,6 +76,21 @@ describe("removeExactLine", () => {
 });
 
 describe("run", () => {
+  test("dry-run does not manage removed context component", async () => {
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      await run(["--dry-run"]);
+      const removedComponent = ["context", "mode"].join("-");
+      expect(logs.join("\n")).not.toContain(removedComponent);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   test("removes managed namespaces, hook state, and unmodified policy", async () => {
     await mkdir(join(TMP, "config"), { recursive: true });
     await writeFile(join(TMP, "config", "tool-output-policy.toml"), "default = true\n");

@@ -1,9 +1,9 @@
 // fulcrum uninstall — remove Fulcrum-managed install artifacts.
 //
 // Conservative by default: remove sentinel-spliced rules, managed skill
-// namespaces, hook snippets/markers, generated Gemini import lines, and
-// Fulcrum-managed context-mode registrations. Leave user-edited policy files
-// and third-party caveman installs alone unless an explicit flag says otherwise.
+// namespaces, hook snippets/markers, generated Gemini import lines, and MCP
+// registry entries. Leave user-edited policy files and third-party caveman
+// installs alone unless an explicit flag says otherwise.
 
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname } from "node:path";
@@ -568,45 +568,41 @@ export async function run(args: string[]): Promise<void> {
   const home = process.env["HOME"] ?? "";
   console.log("Fulcrum uninstall\n");
 
-  console.log("1/7  Removing Fulcrum rules blocks");
+  console.log("1/6  Removing Fulcrum rules blocks");
   for (const agent of AGENTS) {
     await removeSentinelBlock(agent.rulesFile(home), agent.label);
   }
   console.log();
 
-  console.log("2/7  Removing generated Gemini import");
+  console.log("2/6  Removing generated Gemini import");
   await removeExactLine(`${home}/.gemini/GEMINI.md`, "@AGENTS.md", "Gemini @AGENTS.md import");
   console.log();
 
-  console.log("3/7  Removing hook snippets and markers");
+  console.log("3/6  Removing hook snippets and markers");
   const { removeAllHookRegistrations } = await import("./hooks.ts");
   await removeAllHookRegistrations();
   await removePath(`${fulcrumHome()}/hooks/snippets`, "hook snippets");
   await removePath(`${fulcrumHome()}/hooks/enabled`, "hook enable markers");
   console.log();
 
-  console.log("4/7  Removing managed skill namespaces");
+  console.log("4/6  Removing managed skill namespaces");
   await removeSkillNamespaces(home);
   const { uninstallVendorCapabilityPackages } = await import("./vendor-packages.ts");
   await uninstallVendorCapabilityPackages({ dryRun: DRY_RUN });
   console.log();
 
-  console.log("5/7  Removing DeepWiki MCP registrations");
+  console.log("5/6  Removing DeepWiki MCP registrations");
   const { uninstallDeepwikiMcp } = await import("./mcp.ts");
   await uninstallDeepwikiMcp({ dryRun: DRY_RUN });
   console.log();
 
-  console.log("5b/7 Removing MCP registry entries from agents");
+  console.log("5b/6 Removing MCP registry entries from agents");
   await uninstallMcpRegistryEntries(home, keepState, DRY_RUN);
   console.log();
 
-  console.log("6/7  Removing context-mode registrations");
-  const { uninstallContextMode } = await import("./context-mode.ts");
-  await uninstallContextMode({ dryRun: DRY_RUN });
   await cleanupPiMcpAdapterIfUnused(home);
-  console.log();
 
-  console.log("7/7  Removing policy and optional third-party installs");
+  console.log("6/6  Removing policy and optional third-party installs");
   await removePolicy(purge);
   if (includeCaveman) {
     await removeCavemanCopies(home);

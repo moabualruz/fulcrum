@@ -4,7 +4,7 @@
 
 ## 1. Scope (official-first)
 
-Manage officially: an asset counts as "official" only if published by the tool vendor's own org (e.g. `github/`, `cloudflare/`, `googleworkspace/`, `tavily-ai/`, `semgrep/`, `ast-grep/`, `anthropic/`, `JuliusBrussee/caveman`, `mksglu/context-mode`) — or by a long-maintained primary maintainer of the tool. Random one-star community forks do NOT qualify.
+Manage officially: an asset counts as "official" only if published by the tool vendor's own org (e.g. `github/`, `cloudflare/`, `googleworkspace/`, `tavily-ai/`, `semgrep/`, `ast-grep/`, `anthropic/`, `JuliusBrussee/caveman`) — or by a long-maintained primary maintainer of the tool. Random one-star community forks do NOT qualify.
 
 Per-agent install method follows the vendor's docs verbatim:
 - Claude Code: `claude plugin install …` / `claude mcp add …`
@@ -17,11 +17,11 @@ Ownership rule: if a server, skill, hook, command, rule, script, agent, or mixed
 
 Mirror policy: when an asset is published only for some agents (e.g. Claude plugin only, no Gemini extension), copy the vendor's exact SKILL.md / manifest into the other agents' skill paths verbatim. Do NOT rewrite, summarise, or "improve" upstream content — that introduces drift and authoring debt.
 
-`fulcrum uninstall` must remove every artifact each official install command created — registry entry, package, MCP block, file copy. Anything that the vendor's docs say to call (`claude plugin uninstall …`, `gemini extensions uninstall …`, `npx skills remove …`) is called from `uninstall`. Things the vendor explicitly leaves to the user (e.g. `npm uninstall -g context-mode` because there is no upstream contract) are documented but not auto-run.
+`fulcrum uninstall` must remove every artifact each official install command created — registry entry, package, MCP block, file copy. Anything that the vendor's docs say to call (`claude plugin uninstall …`, `gemini extensions uninstall …`, `npx skills remove …`) is called from `uninstall`.
 
 ## 1a. Cost rationale (default state)
 
-MCPs spawn long-running processes; 5+ active can eat 55–100k tokens at session start before the first message. The "official-first" policy above does not mean every MCP is always-on — it means we **manage** every official MCP (install/uninstall correctly) but keep the **enable** state intentional. Default for new users: DeepWiki + context-mode + `context7`. `context7` is the only builtin registry MCP enabled by default because it is broadly useful, docs-focused, and has no official skill fallback. Use `fulcrum install --no-default-mcps` to register all MCP config while skipping Fulcrum's builtin default enable step; it does not remove or disable existing MCP state. Other official MCPs (github-mcp-server, cloudflare/mcp-server-cloudflare, vendor MCPs) are registered as available but opt-in. Agents with native disabled-state support still get the config written disabled: Codex stores `enabled = false` in each `mcp_servers.<name>` TOML block; Gemini stores enablement in `~/.gemini/mcp-server-enablement.json`; OpenCode stores `"enabled": false` inside each `opencode.json` MCP entry. Claude Code and Pi currently lack an equivalent safe disabled config bit, so disabled registry MCPs remain visible through `fulcrum mcp list`, not their native MCP lists.
+MCPs spawn long-running processes; 5+ active can eat 55–100k tokens at session start before the first message. The "official-first" policy above does not mean every MCP is always-on — it means we **manage** every official MCP (install/uninstall correctly) but keep the **enable** state intentional. Default for new users: DeepWiki + `context7`. `context7` is the only builtin registry MCP enabled by default because it is broadly useful, docs-focused, and has no official skill fallback. Use `fulcrum install --no-default-mcps` to register all MCP config while skipping Fulcrum's builtin default enable step; it does not remove or disable existing MCP state. Other official MCPs (github-mcp-server, cloudflare/mcp-server-cloudflare, vendor MCPs) are registered as available but opt-in. Agents with native disabled-state support still get the config written disabled: Codex stores `enabled = false` in each `mcp_servers.<name>` TOML block; Gemini stores enablement in `~/.gemini/mcp-server-enablement.json`; OpenCode stores `"enabled": false` inside each `opencode.json` MCP entry. Claude Code and Pi currently lack an equivalent safe disabled config bit, so disabled registry MCPs remain visible through `fulcrum mcp list`, not their native MCP lists.
 
 ## 2. Disable claude.ai defaults
 
@@ -53,21 +53,9 @@ Tools: `ask_question`, `read_wiki_contents`, `read_wiki_structure` — public re
 
 Claude Code removal remains manual: `claude mcp remove -s user deepwiki`.
 
-> MCP and CLI hit same underlying API with same quota — switching protocol does not change rate limits (verified: Context7, Tavily primary docs 2026-04-27). Do not add another managed MCP unless it has a DeepWiki/context-mode class reason.
+> MCP and CLI hit same underlying API with same quota — switching protocol does not change rate limits (verified: Context7, Tavily primary docs 2026-04-27). Do not add another managed MCP unless it has a DeepWiki-class reason.
 
-### 3.2 context-mode
-
-`context-mode` is managed because it combines MCP tools with hook-based routing enforcement and session continuity. Fulcrum follows upstream install instructions from [mksglu/context-mode](https://github.com/mksglu/context-mode), verified 2026-04-28:
-
-- Claude Code: `claude plugin marketplace add mksglu/context-mode` and `claude plugin install context-mode@context-mode`.
-- Codex CLI: global `context-mode` binary, `~/.codex/config.toml` MCP entry, `~/.codex/hooks.json` hook entries, and routing rules in `~/.codex/AGENTS.md`.
-- Gemini CLI: global `context-mode` binary, `~/.gemini/settings.json` MCP + hook entries, and routing rules through the Fulcrum `~/AGENTS.md` import path.
-- OpenCode: global `context-mode` binary, `~/.config/opencode/opencode.json` MCP + plugin entries, and routing rules in `~/.config/opencode/AGENTS.md`.
-- Pi CLI: global `context-mode` binary, `pi install npm:context-mode`, `~/.pi/agent/settings.json` package entry, `~/.pi/agent/mcp.json` MCP entry, and routing rules in `~/.pi/agent/AGENTS.md`.
-
-`fulcrum uninstall` removes Fulcrum-managed context-mode registrations and routing blocks. It keeps the global npm package because upstream documents no uninstall command and that binary may be shared; remove manually with `npm uninstall -g context-mode` when desired.
-
-### 3.3 Pi DeepWiki via adapter
+### 3.2 Pi DeepWiki via adapter
 
 Pi does not ship a built-in MCP manager. Use [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter), verified 2026-04-28:
 
@@ -274,7 +262,6 @@ Add a single source line to your shell rc:
 | MCP | Env var(s) | How to obtain |
 |---|---|---|
 | `deepwiki` | none | always-on |
-| `context-mode` | none | always-on |
 | `github` | `GITHUB_TOKEN` (or `gh auth login` — many tools read either) | [github.com/settings/tokens](https://github.com/settings/tokens) — fine-grained PAT with `repo`, `read:org`, `gist` |
 | `repomix` | none | stdio MCP via `npx`; no auth |
 | `semgrep` | none for local scans; `SEMGREP_APP_TOKEN` only for Semgrep AppSec Platform | [semgrep.dev/orgs/-/settings/tokens](https://semgrep.dev/orgs/-/settings/tokens) (only if using cloud features) |
@@ -348,6 +335,6 @@ Per-agent MCP config syntax differs by transport:
 - OpenCode: `~/.config/opencode/opencode.json` (`type: "remote"` for HTTP, `type: "local"` for stdio)
 - Pi: `pi install npm:pi-mcp-adapter`, then configure `~/.pi/agent/mcp.json` or project `.pi/mcp.json`
 
-Fulcrum-managed examples: DeepWiki uses the HTTP shape on every agent; context-mode uses the stdio shape on Codex/Gemini/OpenCode/Pi.
+Fulcrum-managed example: DeepWiki uses the HTTP shape on every agent.
 
 Full configs in [agents.md](agents.md).

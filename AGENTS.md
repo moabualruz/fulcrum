@@ -14,7 +14,6 @@ Shipped on `feat/agent-foundation-clean`:
 
 - One Bun-compiled `fulcrum` binary, eight hook subcommands (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`).
 - Orchestrator (`fulcrum init / install / hooks / skills / doctor / compress`) wires hooks into five agent runtimes (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI).
-- Managed `context-mode` integration (`src/cli/context-mode.ts`) follows upstream install contracts: Claude plugin, Codex/Gemini/OpenCode MCP+hooks, Pi package+MCP, and per-agent routing rules with uninstall cleanup.
 - Sentinel-block rules splicer for cross-agent rules distribution.
 - Per-tool output-handling policy (`config/tool-output-policy.toml`) drives `tool-output-router` hook.
 - 28 in-repo skills caveman-compressed (`.original.md` beside each), 20-entry trigger evals each, content-verified against upstream sources.

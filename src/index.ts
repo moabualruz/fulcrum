@@ -19,6 +19,7 @@ Usage:
   fulcrum install [--with-project DIR] [--no-skills] [--no-upstream-skills]
                   [--no-default-mcps] [--enable-all-mcps]
                                      Splice rules, vendor hooks, sync skills, install caveman.
+                                     --enable-all-mcps: enable every builtin MCP across all agents.
   fulcrum uninstall [--dry-run] [--purge] [--include-caveman]
                                      Remove Fulcrum-managed install artifacts.
   fulcrum compress [--check] [FILES...]
