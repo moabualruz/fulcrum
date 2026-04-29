@@ -199,7 +199,7 @@ async function runApply(operation: ComponentOperation, argv: string[]): Promise<
   }
 
   const { executeComponentPlan } = await import("../components/executor.ts");
-  await executeComponentPlan(plan, { dryRun: options.dryRun });
+  await executeComponentPlan(plan, { dryRun: options.dryRun, purge: options.purge });
 }
 
 function parseJsonOnly(argv: string[], command: string): { args: string[]; json: boolean } {
@@ -296,10 +296,11 @@ function parsePlanOptions(argv: string[]): { agents?: AgentId[]; json: boolean }
 function parseApplyOptions(
   argv: string[],
   command: string,
-): { target: string; agents?: AgentId[]; json: boolean; dryRun: boolean } {
+): { target: string; agents?: AgentId[]; json: boolean; dryRun: boolean; purge: boolean } {
   const agents: AgentId[] = [];
   let json = false;
   let dryRun = false;
+  let purge = false;
   let allAgents = false;
   let target: string | undefined;
 
@@ -312,6 +313,12 @@ function parseApplyOptions(
         break;
       case "--dry-run":
         dryRun = true;
+        break;
+      case "--purge":
+        if (command !== "component remove") {
+          throw new Error(`unknown option for ${command}: --purge`);
+        }
+        purge = true;
         break;
       case "--all-agents":
         allAgents = true;
@@ -348,6 +355,7 @@ function parseApplyOptions(
     agents: allAgents || agents.length === 0 ? undefined : agents,
     json,
     dryRun,
+    purge,
   };
 }
 
@@ -367,5 +375,6 @@ Usage:
   fulcrum component info <id> [--json]
   fulcrum component plan <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--json]
   fulcrum component status [component] [--agent <id>] [--json]
-  fulcrum component <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--dry-run] [--json]`);
+  fulcrum component <install|enable|disable> <component> [--agent <id>] [--all-agents] [--dry-run] [--json]
+  fulcrum component remove <component> [--agent <id>] [--all-agents] [--purge] [--dry-run] [--json]`);
 }

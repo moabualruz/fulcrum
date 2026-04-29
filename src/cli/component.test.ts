@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ALL_AGENT_IDS } from "./mcp-registry.ts";
@@ -171,6 +171,28 @@ describe("fulcrum component apply", () => {
     expect(plan.target).toBe("hooks.format");
     expect(plan.actions).toHaveLength(1);
     expect(logs.join("\n")).toContain("DRY RUN");
+  });
+
+  test("remove --purge removes modified managed policy", async () => {
+    const home = await mkdtemp(join(tmpdir(), "fulcrum-component-purge-"));
+    const previousFulcrumHome = process.env["FULCRUM_HOME"];
+    const policyPath = join(home, ".fulcrum", "tool-output-policy.toml");
+    process.env["FULCRUM_HOME"] = join(home, ".fulcrum");
+    try {
+      await mkdir(join(home, ".fulcrum"), { recursive: true });
+      await Bun.write(policyPath, "user modified\n");
+
+      await run(["remove", "policy.tool-output", "--purge"]);
+
+      expect(await Bun.file(policyPath).exists()).toBe(false);
+    } finally {
+      if (previousFulcrumHome === undefined) {
+        delete process.env["FULCRUM_HOME"];
+      } else {
+        process.env["FULCRUM_HOME"] = previousFulcrumHome;
+      }
+      await rm(home, { recursive: true, force: true });
+    }
   });
 });
 
