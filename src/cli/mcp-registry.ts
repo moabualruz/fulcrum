@@ -316,7 +316,10 @@ function mcpValueForAgent(server: McpServer, agentId: AgentId): Record<string, u
   const cmd = parts[0]!;
   const args = parts.slice(1);
   if (agentId === "gemini") return { command: cmd, args };
-  if (agentId === "opencode") return { type: "local", command: server.command! };
+  // OpenCode `McpLocalConfig.command` is an array of strings (bin + args),
+  // not a single command line. Confirmed against sst/opencode schema —
+  // a string value triggers `Invalid input mcp.<name>` at startup.
+  if (agentId === "opencode") return { type: "local", command: [cmd, ...args] };
   if (agentId === "pi") return { command: cmd, args };
   return { command: cmd, args };
 }
