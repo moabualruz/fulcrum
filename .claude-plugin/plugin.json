@@ -1,0 +1,11 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "fulcrum",
+  "version": "0.1.0",
+  "description": "Fulcrum-curated skills for Claude Code (jq, bat, gh, ripgrep-class CLI tools, security scanners, formatters).",
+  "author": {
+    "name": "Mo Abualruz"
+  },
+  "homepage": "https://github.com/moabualruz/fulcrum",
+  "license": "MIT"
+}

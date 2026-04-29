@@ -108,7 +108,7 @@ RECORD: row 6 of result table
 ### Step 7 — MCP list: 16 builtin servers registered
 
 ```
-CHECK:  fulcrum mcp list --json | jq '[.[] | select(.builtin == true)] | length'
+CHECK:  fulcrum mcp list --json | jq 'length'
 EXPECT: 16
 RECORD: row 7 of result table
 ```
@@ -147,7 +147,7 @@ RECORD: row 9; note agents with 0 or >1
 ### Step 10 — Caveman install per detected agent
 
 ```
-CHECK:  fulcrum doctor --json | jq '[.agents[] | select(.detected == true) | {id, cavemanInstalled: .caveman.installed}]'
+CHECK:  fulcrum doctor --json | jq '[.caveman.agents[] | {label, cavemanInstalled: .installed}]'
 EXPECT: every detected agent has "cavemanInstalled": true
 RECORD: row 10; note any agent where false
 ```
@@ -157,13 +157,15 @@ RECORD: row 10; note any agent where false
 ### Step 11 — Authored skills (27 per detected agent)
 
 ```
-CHECK (Claude Code):  ls ~/.claude/skills/fulcrum/ 2>/dev/null | wc -l | tr -d ' '
+CHECK (Claude Code):  jq -r '.plugins | keys[]' ~/.claude/plugins/installed_plugins.json 2>/dev/null | grep -c '^fulcrum@fulcrum$'
+                      # then: ls ~/.claude/plugins/cache/fulcrum/fulcrum/*/skills 2>/dev/null | wc -l | tr -d ' '
 CHECK (Codex CLI):    ls ~/.codex/skills/fulcrum/ 2>/dev/null | wc -l | tr -d ' '
 CHECK (Gemini CLI):   ls ~/.gemini/extensions/fulcrum-skills/skills/ 2>/dev/null | wc -l | tr -d ' '
 CHECK (OpenCode):     ls ~/.config/opencode/skills/fulcrum/ 2>/dev/null | wc -l | tr -d ' '
 CHECK (Pi CLI):       ls ~/.pi/agent/skills/fulcrum/ 2>/dev/null | wc -l | tr -d ' '
 
-EXPECT: 28 per detected agent
+EXPECT (Claude): 1 (plugin registered) + 28 skill dirs in cached plugin tree
+EXPECT (others): 28 per detected agent
 RECORD: row 11; note agent + actual count for any mismatch
 ```
 
@@ -236,6 +238,7 @@ Save completed result table to:
 ```
 
 Create dir if absent. If file for today exists, append `---` separator + new table — never overwrite.
+If the agent sandbox blocks writes to `~/.fulcrum`, print the completed table in the final response and record that the canonical append was blocked; the supervising caller should append the table outside that sandbox.
 
 ```bash
 mkdir -p ~/.fulcrum/state/global/smoke-test

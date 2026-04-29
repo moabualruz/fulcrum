@@ -173,7 +173,7 @@ Detection-aware logic: if `agent.rootDir` does not exist, skip writes for that a
 3. **Caveman per-agent** — call vendor install commands per agent (Claude plugin, Gemini extension, `npx skills add` for Codex/OpenCode/Pi, with clone fallback).
 4. **Caveman ultra lock** — write `~/.config/caveman/config.json` with `{"defaultMode":"ultra"}` (idempotent).
 5. **context-mode** — follow upstream install contracts per detected agent.
-6. **Authored skills** — `fulcrum skills sync` mirrors `skills/<name>/SKILL.md` to each agent's `<skills-root>/fulcrum/<name>/`.
+6. **Authored skills** — `fulcrum skills sync` distributes per-agent: Claude Code via `claude plugin marketplace add moabualruz/fulcrum && claude plugin install fulcrum@fulcrum` (skills surface as `/fulcrum:<name>`); Codex/OpenCode/Pi mirror to `<skills-root>/fulcrum/<name>/`; Gemini to `~/.gemini/extensions/fulcrum-skills/skills/<name>/`. Legacy `~/.claude/skills/fulcrum/*` is removed after plugin install succeeds.
 7. **Upstream skills** — `fulcrum skills upstream` clones pinned repos, verifies `subpath_sha256`, installs to vendor placement (`<agent>/skills/<name>/`, Gemini `~/.gemini/skills/<name>/`).
 8. **DeepWiki MCP** — register for each detected agent (Pi via `pi-mcp-adapter` auto-install).
 9. **Builtin MCPs** — register 16 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml` (default-disabled).
@@ -394,7 +394,7 @@ This checks out the tree SHA, computes `subpath_sha256`, and writes it back.
 | Rules | sentinel splice `~/.claude/CLAUDE.md` | sentinel splice `~/.codex/AGENTS.md` | splice to `~/AGENTS.md`; `GEMINI.md` → `@AGENTS.md` shim | splice `~/.config/opencode/AGENTS.md` | splice `~/.pi/agent/AGENTS.md` |
 | Hook config | `~/.claude/settings.json` `hooks` block | `~/.codex/hooks.json` | `~/.gemini/settings.json` `hooks` | TypeScript plugin (`shims/opencode/fulcrum.ts`) | TypeScript extension (`shims/pi/fulcrum.ts`) |
 | Hook blocking | exit 2 | exit 2 | exit 2 | return `{deny:true}` from plugin | return `{block:true,reason}` from extension |
-| Skills | `~/.claude/skills/fulcrum/<name>/` | `~/.codex/skills/fulcrum/<name>/` | wrapped in extension at `~/.gemini/extensions/fulcrum-skills/skills/<name>/` | `~/.config/opencode/skills/fulcrum/<name>/` | `~/.pi/agent/skills/fulcrum/<name>/` |
+| Skills | plugin `fulcrum@fulcrum` (marketplace `moabualruz/fulcrum`) — `/fulcrum:<name>` | `~/.codex/skills/fulcrum/<name>/` | wrapped in extension at `~/.gemini/extensions/fulcrum-skills/skills/<name>/` | `~/.config/opencode/skills/fulcrum/<name>/` | `~/.pi/agent/skills/fulcrum/<name>/` |
 | MCP | `claude mcp add` / settings.json | `~/.codex/config.toml` | `~/.gemini/settings.json` `mcpServers` | `opencode.json` `mcp` block | `~/.pi/agent/mcp.json` via `pi-mcp-adapter` |
 
 ### Codex specifics

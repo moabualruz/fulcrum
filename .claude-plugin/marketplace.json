@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "fulcrum",
+  "description": "Fulcrum marketplace — cross-agent foundation tooling and curated skills.",
+  "owner": {
+    "name": "Mo Abualruz"
+  },
+  "plugins": [
+    {
+      "name": "fulcrum",
+      "description": "Curated CLI/dev skills (jq, bat, gh, ripgrep-class search, gitleaks, hyperfine, more). Skills invoked as /fulcrum:<name>.",
+      "source": "./"
+    }
+  ]
+}

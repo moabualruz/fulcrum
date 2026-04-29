@@ -4,9 +4,10 @@
 // fulcrum skills list — enumerate authored skills with name, desc preview, eval coverage.
 // fulcrum skills upstream — sync curated third-party skills.
 
-import { mkdir, readdir, readFile, copyFile, writeFile, stat } from "node:fs/promises";
+import { mkdir, readdir, readFile, copyFile, writeFile, stat, rm } from "node:fs/promises";
 import { join, basename, dirname } from "node:path";
 import { AGENTS } from "../agents/registry.ts";
+import { which, run as runProc } from "../utils/proc.ts";
 
 function repoRoot(): string {
   // When invoked from a clone, this binary's enclosing repo is the source of
@@ -24,19 +25,27 @@ async function isDir(p: string): Promise<boolean> {
 
 // ── sync ───────────────────────────────────────────────────────────────
 //
-// Skills install under a `fulcrum/` subfolder in each agent's skills directory:
-//   ~/.claude/skills/fulcrum/<name>/SKILL.md   etc.
-// This sets up the `fulcrum:<skill-name>` invocation pattern that aligns with how
-// plugin/extension systems namespace third-party content. When we ship plugins
-// or extensions later, the path layout already matches the prefixing convention.
+// Per-agent install layouts:
+//   Claude Code → plugin (`claude plugin install fulcrum@fulcrum`); skills surfaced
+//                 as `/fulcrum:<name>`. Claude Code's loader scans top-level of
+//                 ~/.claude/skills/ only (no nested discovery), so the
+//                 `<dir>/fulcrum/<name>/` layout other agents use does not work
+//                 there. Plugin namespace is the supported path.
+//   Codex CLI / OpenCode / Pi → `<skillsDir>/fulcrum/<name>/SKILL.md` (these
+//                 loaders walk nested dirs).
+//   Gemini CLI  → `~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md`
+//                 (extension itself is the namespace).
 
 const NAMESPACE = "fulcrum";
+const PLUGIN_MARKETPLACE = "moabualruz/fulcrum";
+const PLUGIN_SPEC = "fulcrum@fulcrum";
 
 // Agents that use the standard `<skillsDir>/fulcrum/<name>/` layout.
-// Gemini is handled separately below because it uses an extension namespace.
+// Claude Code is handled via the plugin path below. Gemini uses an extension
+// namespace and is also handled separately.
 const _skillsHome = process.env["HOME"] ?? "";
 const TARGETS: Array<{ path: string; label: string }> = AGENTS
-  .filter((a) => a.id !== "gemini")
+  .filter((a) => a.id !== "gemini" && a.id !== "claude-code")
   .map((a) => ({ path: a.skillsDir(_skillsHome), label: a.label }));
 
 // Skip patterns: .original.md backups are human-edit source-of-truth — agents
@@ -69,6 +78,60 @@ async function copyTree(src: string, dst: string, opts: { dryRun?: boolean } = {
   }
 }
 
+async function installClaudePlugin(opts: { dryRun: boolean }): Promise<void> {
+  const home = process.env["HOME"] ?? "";
+  // Idempotency: if plugin already registered in installed_plugins.json, skip.
+  const installedPath = `${home}/.claude/plugins/installed_plugins.json`;
+  if (await exists(installedPath)) {
+    try {
+      const data = JSON.parse(await readFile(installedPath, "utf8"));
+      if (data?.plugins?.[PLUGIN_SPEC]) {
+        console.log(`    · skip (${PLUGIN_SPEC} already installed)`);
+        return;
+      }
+    } catch { /* malformed — fall through to install */ }
+  }
+
+  if (!(await which("claude"))) {
+    console.log(`    · claude not on PATH — manual: claude plugin marketplace add ${PLUGIN_MARKETPLACE} && claude plugin install ${PLUGIN_SPEC}`);
+    return;
+  }
+
+  if (opts.dryRun) {
+    console.log(`    [dry-run] would run: claude plugin marketplace add ${PLUGIN_MARKETPLACE}`);
+    console.log(`    [dry-run] would run: claude plugin install ${PLUGIN_SPEC}`);
+    return;
+  }
+
+  const r1 = await runProc(["claude", "plugin", "marketplace", "add", PLUGIN_MARKETPLACE]);
+  if (r1.exit !== 0) {
+    console.log(`    ✗ marketplace add failed: ${r1.stderr.trim() || r1.stdout.trim()}`);
+    console.log(`      manual: claude plugin marketplace add ${PLUGIN_MARKETPLACE}`);
+    return;
+  }
+  console.log(`    ✓ marketplace added: ${PLUGIN_MARKETPLACE}`);
+
+  const r2 = await runProc(["claude", "plugin", "install", PLUGIN_SPEC]);
+  if (r2.exit !== 0) {
+    console.log(`    ✗ plugin install failed: ${r2.stderr.trim() || r2.stdout.trim()}`);
+    console.log(`      manual: claude plugin install ${PLUGIN_SPEC}`);
+    return;
+  }
+  console.log(`    ✓ plugin installed: ${PLUGIN_SPEC} (skills available as /fulcrum:<name>)`);
+}
+
+async function cleanupLegacyClaudeSkills(opts: { dryRun: boolean }): Promise<void> {
+  const home = process.env["HOME"] ?? "";
+  const legacy = `${home}/.claude/skills/${NAMESPACE}`;
+  if (!(await isDir(legacy))) return;
+  if (opts.dryRun) {
+    console.log(`    [dry-run] would remove legacy layout: ${legacy}`);
+    return;
+  }
+  await rm(legacy, { recursive: true, force: true });
+  console.log(`    ✓ removed legacy layout: ${legacy}`);
+}
+
 export async function syncSkills(opts: { dryRun?: boolean } = {}): Promise<void> {
   const root = repoRoot();
   const skillsSrc = `${root}/skills`;
@@ -94,6 +157,22 @@ export async function syncSkills(opts: { dryRun?: boolean } = {}): Promise<void>
   }
 
   console.log(`fulcrum skills sync — ${skills.length} skill(s): ${skills.join(", ")}\n`);
+
+  // Claude Code: install via plugin marketplace. Claude's loader only sees
+  // top-level skills under ~/.claude/skills/<name>/SKILL.md; the
+  // <dir>/fulcrum/<name>/ layout used by other agents is invisible there.
+  // Read HOME at call time (not module load) so test harnesses can override it.
+  const home = process.env["HOME"] ?? "";
+  const claudeAgent = AGENTS.find((a) => a.id === "claude-code")!;
+  const claudeRoot = claudeAgent.baseDir(home);
+  if (await isDir(claudeRoot)) {
+    console.log(`→ Claude Code (plugin: ${PLUGIN_SPEC} from ${PLUGIN_MARKETPLACE})`);
+    await installClaudePlugin({ dryRun: opts.dryRun ?? false });
+    await cleanupLegacyClaudeSkills({ dryRun: opts.dryRun ?? false });
+    console.log();
+  } else {
+    console.log("· skip Claude Code (~/.claude not present)");
+  }
 
   for (const t of TARGETS) {
     if (!(await isDir(dirname(t.path))) && !(await isDir(t.path))) {

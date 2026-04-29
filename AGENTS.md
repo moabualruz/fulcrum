@@ -37,17 +37,24 @@ Layers foundation prep for. **Not built yet** — do not assume exist or write c
 
 ## Skill namespacing — the `fulcrum:` prefix
 
-`fulcrum skills sync` installs every authored skill under `fulcrum/` subfolder in each agent's skills directory:
+`fulcrum skills sync` distributes authored skills using each agent's native namespacing primitive:
 
 ```
-~/.claude/skills/fulcrum/<name>/SKILL.md
-~/.codex/skills/fulcrum/<name>/SKILL.md
-~/.config/opencode/skills/fulcrum/<name>/SKILL.md
-~/.pi/agent/skills/fulcrum/<name>/SKILL.md
-~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md   # extension is the namespace
+Claude Code: plugin (fulcrum@fulcrum)
+             ~/.claude/plugins/cache/fulcrum/fulcrum/<ver>/skills/<name>/SKILL.md
+             invocation: /fulcrum:<name>
+Codex CLI:   ~/.codex/skills/fulcrum/<name>/SKILL.md            (nested supported)
+OpenCode:    ~/.config/opencode/skills/fulcrum/<name>/SKILL.md  (nested supported)
+Pi CLI:      ~/.pi/agent/skills/fulcrum/<name>/SKILL.md         (nested supported)
+Gemini CLI:  ~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md
+             (extension itself is the namespace)
 ```
 
-Gives every fulcrum-managed skill effective `fulcrum:<skill-name>` address space. Agents still invoke skills by frontmatter `name:` (no colons in identifiers — namespacing path-based). Reason for layout = forward-compat: when plugins + extensions land, most agent ecosystems already prefix third-party packages, so install shape today already match convention.
+**Why Claude Code differs:** Claude Code's skill loader scans the **top level** of `~/.claude/skills/` only. The `<dir>/fulcrum/<name>/` layout other agents use is invisible to it (open issues anthropics/claude-code#28266, #18192, #39138). Plugin namespace is the supported path — `.claude-plugin/marketplace.json` at repo root declares the `fulcrum` marketplace, `.claude-plugin/plugin.json` declares the plugin. `fulcrum skills sync` runs `claude plugin marketplace add moabualruz/fulcrum && claude plugin install fulcrum@fulcrum`. Skills surface as `/fulcrum:<name>` (e.g. `/fulcrum:jq`).
+
+Other agents (Codex, OpenCode, Pi) walk nested skill dirs natively; Gemini uses an extension scope. All five end up with the same effective `fulcrum:<skill-name>` address space, but the install mechanism differs by agent. Agents still invoke skills by frontmatter `name:` (no colons in identifiers — namespacing path-based or plugin-mediated).
+
+**Migration:** Old Claude Code installs that wrote to `~/.claude/skills/fulcrum/<name>/` are removed automatically by `fulcrum skills sync` after the plugin install succeeds. Re-running `fulcrum install` is idempotent; if the plugin is already registered in `~/.claude/plugins/installed_plugins.json`, the install step is skipped.
 
 ## Cross-agent rules distribution
 

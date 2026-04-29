@@ -48,17 +48,18 @@ These are the layers the foundation is preparing for. They are **not built**; do
 
 ## Skill namespacing — the `fulcrum:` prefix
 
-Skills install under a `fulcrum/` subfolder in each agent's skills directory:
+Skills install via each agent's native namespacing primitive:
 
 ```
-~/.claude/skills/fulcrum/<name>/SKILL.md
-~/.codex/skills/fulcrum/<name>/SKILL.md
-~/.config/opencode/skills/fulcrum/<name>/SKILL.md
-~/.pi/agent/skills/fulcrum/<name>/SKILL.md
-~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md   # extension is the namespace
+Claude Code: plugin (fulcrum@fulcrum, marketplace moabualruz/fulcrum)
+             → /fulcrum:<name>
+Codex CLI:   ~/.codex/skills/fulcrum/<name>/SKILL.md
+OpenCode:    ~/.config/opencode/skills/fulcrum/<name>/SKILL.md
+Pi CLI:      ~/.pi/agent/skills/fulcrum/<name>/SKILL.md
+Gemini CLI:  ~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md
 ```
 
-This sets up the `fulcrum:<skill-name>` address space and matches the prefixing convention used by most plugin / extension systems. When that layer ships, the install shape already conforms.
+Claude Code's loader scans top-level of `~/.claude/skills/` only — nested `<dir>/fulcrum/<name>/` not discovered (anthropics/claude-code#28266). Plugin namespace is the supported invocation path; `fulcrum skills sync` runs `claude plugin marketplace add moabualruz/fulcrum && claude plugin install fulcrum@fulcrum` and removes any legacy `~/.claude/skills/fulcrum/` layout. Other agents walk nested skill dirs natively. All five share the same `fulcrum:<skill-name>` address space.
 
 ---
 
@@ -121,7 +122,7 @@ fulcrum install --no-skills   # skip all skill sync
 fulcrum install --no-upstream-skills  # skip curated upstream skill sync
 fulcrum hooks list            # show available hook recipes
 fulcrum hooks enable format   # register native agent hook configs + print snippet
-fulcrum skills sync           # re-sync skills/ to each agent's skills/fulcrum/ folder
+fulcrum skills sync           # Claude Code → plugin install (fulcrum@fulcrum); other agents → skills/fulcrum/
 fulcrum skills upstream       # sync curated third-party skills at vendor placement
 fulcrum skills list           # enumerate authored skills with eval coverage
 fulcrum skills lint <path>    # validate frontmatter + body section structure

@@ -161,6 +161,14 @@ async function removeSkillNamespaces(home: string): Promise<void> {
   // with a claude_plugin field. Best-effort: log + continue.
   const claudeDir = `${home}/.claude`;
   if (await exists(claudeDir) && (await which("claude"))) {
+    // Authored fulcrum plugin (current install path for Claude Code).
+    await runBestEffort(
+      ["claude", "plugin", "uninstall", "fulcrum@fulcrum"],
+      "Claude Code fulcrum plugin uninstall",
+    );
+
+    // W1.6: Before removing the fulcrum-upstream namespace for Claude Code,
+    // uninstall any upstream skills that were installed via `claude plugin`.
     try {
       const { loadUpstreamSkills } = await import("./upstream-skills.ts");
       const repoRoot = process.env["FULCRUM_REPO_DIR"] ?? process.cwd();

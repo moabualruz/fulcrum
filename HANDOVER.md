@@ -78,7 +78,10 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 ├── fulcrum hooks list/enable/disable [--all]
 │                            — detection-aware native hook config edits + marker
 │                              state. --all forces writes for every agent.
-├── fulcrum skills sync     — fan out to <agent>/skills/fulcrum/<name>/
+├── fulcrum skills sync     — Claude Code: plugin install (fulcrum@fulcrum
+│                              from moabualruz/fulcrum marketplace); others:
+│                              <agent>/skills/fulcrum/<name>/. Migrates legacy
+│                              ~/.claude/skills/fulcrum/* to plugin layout.
 ├── fulcrum skills upstream [--update-pins]
 │                            — fan out curated upstream skills directly to
 │                              <agent>/skills/<name>/ (the vendor's own
@@ -205,8 +208,8 @@ Don't relitigate without new information.
 | Sentinel-block rules splice | Works regardless of `@import` support; idempotent; preserves user content. | `src/cli/install.ts`, BEGIN/END FULCRUM RULES |
 | Hook recipes ship as binary subcommands | One source of truth; snippets reference `fulcrum hook <name>`. | `src/hooks/`, `hooks/recipes/*.snippet.md` |
 | Hook enable/disable detection-aware | Avoid stub configs for un-installed agents; `--all` opts back in. | `src/cli/hooks.ts`, `Agent.rootDir` |
-| Skills install under `<agent>/skills/fulcrum/<name>/` | Path-based namespace; `fulcrum:<name>` address space ready for future plugin layer. | `src/cli/skills.ts` |
-| Skill `name:` stays prefix-free | `/jq` not `/fulcrum:jq`; namespace = parent dir. | `docs/skills.md` §4 |
+| Skills install via per-agent native primitive | Claude Code: plugin (`fulcrum@fulcrum`, marketplace `moabualruz/fulcrum`) — Claude's loader only sees top-level of `~/.claude/skills/`, so the nested layout used by other agents is invisible there (anthropics/claude-code#28266). Codex/OpenCode/Pi: `<agent>/skills/fulcrum/<name>/` (loaders walk nested dirs). Gemini: extension namespace. All five resolve to `fulcrum:<skill-name>`. | `src/cli/skills.ts`, `.claude-plugin/{plugin,marketplace}.json` |
+| Skill `name:` stays prefix-free | `/fulcrum:jq` (Claude plugin) or `/jq` (other agents) — invocation namespace comes from install path / plugin manifest, not frontmatter. | `docs/skills.md` §4 |
 | Upstream skill pins are subpath-level | Per-skill SHA-256 prevents monorepo subtree drift. | `skills/upstream.lock`, `src/cli/upstream-skills.ts` |
 | Third-party skills install at vendor placement, not in a fulcrum namespace | We don't own a `fulcrum-upstream/` (or any) subfolder for skills we didn't author. Sync mirrors files into `<agent>/skills/<name>/` — same path the vendor's own per-agent installer would use. When the vendor ships its own installer, `vendor_canonical_agents` lists which agents to skip so we don't double-write. | `skills/upstream.lock` (per-skill `vendor_canonical_agents`), `src/cli/upstream-skills.ts` (`agentTargets`, `syncUpstreamSkills` gate) |
 | Pi DeepWiki via Fulcrum-managed `pi-mcp-adapter` | Pi has no built-in MCP manager; adapter bridges; we install + configure. | `src/cli/mcp.ts`, `docs/mcp.md` §3.3 |
