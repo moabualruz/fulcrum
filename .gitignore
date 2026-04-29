@@ -9,8 +9,6 @@ eval-results/
 # `graphify install` / `npx skills add`. Same rule text lives in
 # rules/AGENTS.md → spliced user-globally by `fulcrum install`; the
 # vendor's project-root copy is redundant for this repo.
-/CLAUDE.md
-/GEMINI.md
 /.gemini/
 /.opencode/
 
@@ -19,3 +17,5 @@ eval-results/
 /repomix-output.xml
 /repomix-output.txt
 /repomix-output.md
+.claude/settings.local.json
+.claude/.cache/
