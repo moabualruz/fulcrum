@@ -311,6 +311,10 @@ async function writeJsonFile(file: string, data: Record<string, unknown>): Promi
   await writeFile(file, JSON.stringify(data, null, 2) + "\n");
 }
 
+function supportsNativeDisabled(agentId: AgentId): boolean {
+  return agentId === "gemini" || agentId === "opencode";
+}
+
 function mcpValueForAgent(server: McpServer, agentId: AgentId): Record<string, unknown> {
   if (server.transport === "http") {
     // Per-agent env-interpolation syntax for Authorization Bearer header.
@@ -422,16 +426,33 @@ async function removeFromCodex(server: McpServer, home: string): Promise<void> {
   console.log(`     - Codex ${server.name} MCP removed`);
 }
 
-async function applyToGemini(server: McpServer, home: string): Promise<void> {
+function normalizeGeminiServerId(name: string): string {
+  return name.toLowerCase().trim();
+}
+
+async function setGeminiMcpEnabled(home: string, name: string, enabled: boolean): Promise<void> {
+  const file = `${home}/.gemini/mcp-server-enablement.json`;
+  const root = await readJsonObject(file);
+  const enablement = root ?? {};
+  const key = normalizeGeminiServerId(name);
+  if (enabled) {
+    delete enablement[key];
+  } else {
+    enablement[key] = { enabled: false };
+  }
+  await writeJsonFile(file, enablement);
+}
+
+async function applyToGemini(server: McpServer, home: string, enabled = true): Promise<void> {
   const file = `${home}/.gemini/settings.json`;
   const root = await readJsonObject(file);
   if (!root) { console.log(`     ✗ Gemini settings not JSON; skip`); return; }
   const section = root["mcpServers"] as Record<string, unknown> ?? {};
-  if (section[server.name]) { console.log(`     · Gemini ${server.name} MCP already present`); return; }
   section[server.name] = mcpValueForAgent(server, "gemini");
   root["mcpServers"] = section;
   await writeJsonFile(file, root);
-  console.log(`     ✓ Gemini ${server.name} MCP registered`);
+  await setGeminiMcpEnabled(home, server.name, enabled);
+  console.log(`     ✓ Gemini ${server.name} MCP ${enabled ? "enabled" : "registered disabled"}`);
 }
 
 async function removeFromGemini(server: McpServer, home: string): Promise<void> {
@@ -441,20 +462,20 @@ async function removeFromGemini(server: McpServer, home: string): Promise<void> 
   const section = root["mcpServers"] as Record<string, unknown> | undefined;
   if (!section || !section[server.name]) { console.log(`     · Gemini ${server.name} MCP not present`); return; }
   delete section[server.name];
+  await setGeminiMcpEnabled(home, server.name, true);
   await writeJsonFile(file, root);
   console.log(`     - Gemini ${server.name} MCP removed`);
 }
 
-async function applyToOpenCode(server: McpServer, home: string): Promise<void> {
+async function applyToOpenCode(server: McpServer, home: string, enabled = true): Promise<void> {
   const file = `${home}/.config/opencode/opencode.json`;
   const root = await readJsonObject(file);
   if (!root) { console.log(`     ✗ OpenCode config not JSON; skip`); return; }
   const section = root["mcp"] as Record<string, unknown> ?? {};
-  if (section[server.name]) { console.log(`     · OpenCode ${server.name} MCP already present`); return; }
-  section[server.name] = mcpValueForAgent(server, "opencode");
+  section[server.name] = { ...mcpValueForAgent(server, "opencode"), enabled };
   root["mcp"] = section;
   await writeJsonFile(file, root);
-  console.log(`     ✓ OpenCode ${server.name} MCP registered`);
+  console.log(`     ✓ OpenCode ${server.name} MCP ${enabled ? "enabled" : "registered disabled"}`);
 }
 
 async function removeFromOpenCode(server: McpServer, home: string): Promise<void> {
@@ -582,7 +603,10 @@ async function removeFromClaudeCode(server: McpServer, home: string, dryRun = fa
   console.log(`     - Claude Code ${server.name} MCP removed`);
 }
 
-/** Push all enabled-agent entries into each agent's native MCP config. Idempotent. */
+/** Push registry-owned entries into each agent's native MCP config. Idempotent.
+ * Agents with native disabled-state support receive disabled servers too, so
+ * their MCP UI can show "configured but disabled" instead of hiding them.
+ */
 export async function applyToAgents(name: string, opts: { dryRun?: boolean; agents?: readonly AgentId[] } = {}): Promise<void> {
   const reg = await loadRegistry();
   const server = reg.servers[name];
@@ -593,13 +617,14 @@ export async function applyToAgents(name: string, opts: { dryRun?: boolean; agen
 
   for (const agentId of targetAgents) {
     if (!server.agent_visibility[agentId]) continue;
-    if (!isEnabled(server, agentId)) continue;
+    const enabled = isEnabled(server, agentId);
+    if (!enabled && !supportsNativeDisabled(agentId)) continue;
 
     switch (agentId) {
       case "claude-code": await applyToClaudeCode(server, home, dryRun); break;
       case "codex":       if (await exists(`${home}/.codex`)) await applyToCodex(server, home); else console.log(`     · Codex not detected`); break;
-      case "gemini":      if (await exists(`${home}/.gemini`)) await applyToGemini(server, home); else console.log(`     · Gemini not detected`); break;
-      case "opencode":    if (await exists(`${home}/.config/opencode`)) await applyToOpenCode(server, home); else console.log(`     · OpenCode not detected`); break;
+      case "gemini":      if (await exists(`${home}/.gemini`)) await applyToGemini(server, home, enabled); else console.log(`     · Gemini not detected`); break;
+      case "opencode":    if (await exists(`${home}/.config/opencode`)) await applyToOpenCode(server, home, enabled); else console.log(`     · OpenCode not detected`); break;
       case "pi":          await applyToPi(server, home); break;
     }
   }

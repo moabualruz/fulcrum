@@ -76,6 +76,11 @@ function opencodeAgentFromClaude(body: string): string {
   return `---\ndescription: ${EXPLORER_DESCRIPTION}\nmode: subagent\npermission:\n  bash: ask\n  read: allow\n  grep: allow\n---\n\n${withoutFrontmatter}\n`;
 }
 
+function geminiAgentFromClaude(body: string): string {
+  const withoutFrontmatter = body.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
+  return `---\nname: explorer\ndescription: ${JSON.stringify(EXPLORER_DESCRIPTION)}\nmodel: inherit\n---\n\n${withoutFrontmatter}\n`;
+}
+
 async function ensureRepomixRepoCache(home: string, dryRun: boolean): Promise<string | null> {
   const dir = `${fulcrumHome(home)}/cache/repomix`;
   if (await exists(`${dir}/.git`)) return dir;
@@ -145,7 +150,7 @@ async function installGemini(home: string, source: RepomixPackageSource, dryRun:
   await writeText(`${root}/skills/${PACK_LOCAL}/SKILL.md`, skill(PACK_LOCAL, PACK_LOCAL_DESCRIPTION, source.packLocal), dryRun);
   await writeText(`${root}/skills/${PACK_REMOTE}/SKILL.md`, skill(PACK_REMOTE, PACK_REMOTE_DESCRIPTION, source.packRemote), dryRun);
   await writeText(`${root}/skills/${EXPLORER}/SKILL.md`, skill(EXPLORER, EXPLORER_DESCRIPTION, source.explorer), dryRun);
-  await writeText(`${root}/agents/explorer.md`, source.explorer.trim() + "\n", dryRun);
+  await writeText(`${root}/agents/explorer.md`, geminiAgentFromClaude(source.explorer), dryRun);
   console.log("     ✓ Gemini Repomix extension mirror installed");
 }
 

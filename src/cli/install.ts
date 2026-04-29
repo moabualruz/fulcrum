@@ -494,7 +494,7 @@ type McpDefaultMode = "minimal" | "none" | "all";
  * default state is applied separately by applyBuiltinMcpDefaultState().
  */
 export async function installMcpRegistryEntries(home: string): Promise<void> {
-  const { registerServer } = await import("./mcp-registry.ts");
+  const { registerServer, applyToAgents } = await import("./mcp-registry.ts");
   const { BUILTIN_MCPS } = await import("./mcp-builtins.ts");
 
   for (const { name, spec } of BUILTIN_MCPS) {
@@ -506,6 +506,7 @@ export async function installMcpRegistryEntries(home: string): Promise<void> {
     await registerServer(name, spec);
     const defaultState = spec.default_enabled ? "minimal-default" : "opt-in";
     console.log(`     ✓ ${name} MCP registered (${defaultState}; enable with: fulcrum mcp enable ${name})`);
+    await applyToAgents(name);
   }
 
   // Dart hint: doctor also reports this, but surface it at install time too.

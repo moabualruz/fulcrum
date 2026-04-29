@@ -232,6 +232,23 @@ describe("applyToAgents", () => {
     const mcpServers = parsed["mcpServers"] as Record<string, unknown>;
     expect(mcpServers).toBeDefined();
     expect(mcpServers["github"]).toBeDefined();
+    await expect(Bun.file(join(TMP, ".gemini", "mcp-server-enablement.json")).exists()).resolves.toBe(true);
+  });
+
+  test("writes Gemini disabled config without enabling tools", async () => {
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
+    await registerServer("github", DEFAULT_GITHUB_SERVER);
+
+    await applyToAgents("github", { agents: ["gemini"] });
+
+    const settings = JSON.parse(await readFile(join(TMP, ".gemini", "settings.json"), "utf8")) as {
+      mcpServers: Record<string, unknown>;
+    };
+    const enablement = JSON.parse(await readFile(join(TMP, ".gemini", "mcp-server-enablement.json"), "utf8")) as {
+      github?: { enabled: boolean };
+    };
+    expect(settings.mcpServers.github).toBeDefined();
+    expect(enablement.github?.enabled).toBe(false);
   });
 
   test("writes OpenCode opencode.json for enabled agent when dir exists", async () => {
@@ -243,8 +260,22 @@ describe("applyToAgents", () => {
 
     const raw = await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8");
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const mcp = parsed["mcp"] as Record<string, unknown>;
+    const mcp = parsed["mcp"] as Record<string, Record<string, unknown>>;
     expect(mcp["github"]).toBeDefined();
+    expect(mcp["github"]?.enabled).toBe(true);
+  });
+
+  test("writes OpenCode disabled config without starting the MCP", async () => {
+    await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
+    await registerServer("github", DEFAULT_GITHUB_SERVER);
+
+    await applyToAgents("github", { agents: ["opencode"] });
+
+    const raw = await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const mcp = parsed["mcp"] as Record<string, Record<string, unknown>>;
+    expect(mcp["github"]).toBeDefined();
+    expect(mcp["github"]?.enabled).toBe(false);
   });
 
   test("writes Pi MCP entries as direct tools when enabled", async () => {

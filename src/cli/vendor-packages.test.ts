@@ -86,4 +86,20 @@ describe("vendor capability packages", () => {
     expect(calls).toContainEqual(["pi", "install", "npm:@uadgj/pi-superpowers-support"]);
     expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "superpowers")).exists()).toBe(false);
   });
+
+  test("does not reinstall existing Superpowers Gemini extension", async () => {
+    await mkdir(join(TMP, ".gemini", "extensions", "superpowers"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue("/usr/local/bin/gemini");
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 1, stdout: "", stderr: "already installed" });
+    try {
+      await installVendorCapabilityPackages();
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+    expect(runSpy.mock.calls).not.toContainEqual([
+      ["gemini", "extensions", "install", "https://github.com/obra/superpowers", "--consent", "--skip-settings"],
+      { timeoutMs: 60_000 },
+    ]);
+  });
 });

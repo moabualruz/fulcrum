@@ -174,8 +174,14 @@ async function removeOpenCodePlugin(home: string, dryRun: boolean): Promise<void
 }
 
 async function installGeminiSuperpowers(home: string, dryRun: boolean): Promise<void> {
-  if (!(await isDir(`${home}/.gemini`))) {
+  const geminiDir = `${home}/.gemini`;
+  const extensionDir = `${geminiDir}/extensions/superpowers`;
+  if (!(await isDir(geminiDir))) {
     console.log("     · skip Superpowers Gemini extension (Gemini not detected)");
+    return;
+  }
+  if (await isDir(extensionDir)) {
+    console.log("     · Superpowers Gemini extension already installed");
     return;
   }
   if (!(await which("gemini"))) {
