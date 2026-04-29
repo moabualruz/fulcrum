@@ -87,7 +87,7 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 ├── fulcrum mcp list/register/unregister/enable/disable
 │                            — registry CLI; per-agent or --all-agents toggle.
 ├── fulcrum compress        — compress in-repo content; --check for CI (hard).
-└── fulcrum doctor [--json] — bun, agent dirs (rules-spliced state), caveman
+└── fulcrum doctor [--json] [--probe] — bun, agent dirs (rules-spliced state), caveman
                                 section, 47 tools, policy, Pi MCP adapter, MCP
                                 registry section (auth_status + reachable).
 ```
@@ -531,8 +531,8 @@ Per-skill harnesses: `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <s
 - **stripVendorRuleBlocks scope = user-global rules files only.** Project-root `CLAUDE.md` / `GEMINI.md` written by `graphify install` are .gitignored rather than stripped (vendor controls those by design).
 - **Doctor MCP gaps surfaced 2026-04-29 (codex wall-of-warnings).** Status:
   - **Closed**: drift detection (registry default_enabled=false vs per-agent enabled — emits `drift:default-disabled-but-enabled` row + warning); auth-wiring validation (inspects each agent's native config for `bearer_token_env_var`/`headers.Authorization`, emits `wiring:missing[<agents>]`).
-  - **Closed (config-side)**: cloudflare-logpush URL refresh and semgrep cmd refresh — but doctor still only checks `which <cmd>` for stdio servers and HEAD-probes HTTP, so a future vendor URL change still won't be caught until handshake probing lands.
-  - **Open**: real MCP `initialize` handshake per server per agent — needs separate `--probe` flag (slow). Would catch wrong cmd args / wrong URL / missing auth in a single check. Tracked under HANDOVER §6 followup.
+  - **Closed (config-side)**: cloudflare-logpush URL refresh and semgrep cmd refresh.
+  - **Closed**: real MCP `initialize` handshake — `fulcrum doctor --probe` POSTs (HTTP) or spawns + writes JSON-RPC (stdio) to every registered server, asserts a valid `result|error` reply within 8s. 16/16 servers handshake:ok on this machine (live verified 2026-04-29). Catches wrong cmd args, wrong URLs, and broken auth in one check.
 
 ---
 

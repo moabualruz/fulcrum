@@ -64,6 +64,11 @@ interface DoctorReport {
       // native config to confirm the Authorization header (or codex's
       // bearer_token_env_var) is actually present. "n/a" when no auth needed.
       wiring: Record<string, "ok" | "missing" | "n/a">;
+      // MCP initialize handshake — only populated when `--probe` ran.
+      // "ok" = server replied with a valid initialize result; "fail" = error
+      // or timeout; "skipped" = probe disabled or transport not supported.
+      handshake: "ok" | "fail" | "skipped";
+      handshake_error?: string;
     }>;
   };
   skillsCount: number;
@@ -232,7 +237,107 @@ async function checkMcpAuthWiring(
   }
 }
 
-async function buildReport(): Promise<{ report: DoctorReport; errors: number }> {
+/**
+ * Send a JSON-RPC `initialize` to the server and return whether it answered.
+ *
+ * For HTTP: POST to `url` with optional bearer token.
+ * For stdio: spawn `command args`, pipe one line of JSON to stdin, read
+ *   response from stdout. Process killed after 5s regardless.
+ *
+ * Errors caught and surfaced as { ok: false, error }. Probe is opt-in
+ * because spawning every MCP per agent inflates `fulcrum doctor` runtime
+ * by 5–30s.
+ */
+async function probeMcpInitialize(
+  server: { transport: "http" | "stdio"; url?: string; command?: string; auth_env_vars: string[] },
+): Promise<{ ok: boolean; error?: string }> {
+  const initRequest = {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: {
+      protocolVersion: "2024-11-05",
+      capabilities: {},
+      clientInfo: { name: "fulcrum-doctor", version: "1" },
+    },
+  };
+  const body = JSON.stringify(initRequest);
+
+  if (server.transport === "http") {
+    if (!server.url) return { ok: false, error: "no url" };
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      "accept": "application/json, text/event-stream",
+    };
+    const envVar = server.auth_env_vars[0];
+    const token = envVar ? process.env[envVar] : undefined;
+    if (envVar && token) headers["Authorization"] = `Bearer ${token}`;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5000);
+      const res = await fetch(server.url, { method: "POST", headers, body, signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+      // We don't strictly need to parse the response — a 2xx + non-empty body
+      // is enough to confirm the MCP endpoint is alive and authed. Streaming
+      // SSE responses count too.
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  }
+
+  // stdio: spawn, send `initialize`, read first JSON-RPC line, kill.
+  // Stdin stays open (some MCP servers — dart, semgrep — exit immediately
+  // on EOF before responding). The reader pulls *one* response chunk and
+  // moves on; we don't drain to EOF.
+  if (!server.command) return { ok: false, error: "no command" };
+  const parts = server.command.split(/\s+/);
+  const cmd = parts[0]!;
+  const args = parts.slice(1);
+  let proc: ReturnType<typeof Bun.spawn> | null = null;
+  try {
+    proc = Bun.spawn([cmd, ...args], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env },
+    });
+    // Bun's `stdin` typing widens to `number | FileSink | …`; with `stdin: "pipe"`
+    // we always get a FileSink. Same for stdout's ReadableStream.
+    const stdin = proc.stdin as { write(chunk: Uint8Array): number };
+    const stdout = proc.stdout as ReadableStream<Uint8Array>;
+    stdin.write(new TextEncoder().encode(body + "\n"));
+    // Intentionally do NOT call stdin.end(): closing stdin can race the
+    // server's handshake reply on some implementations.
+
+    const reader = stdout.getReader();
+    const startedAt = Date.now();
+    const timeoutMs = 8000;
+    let buffer = "";
+    while (Date.now() - startedAt < timeoutMs) {
+      const remain = timeoutMs - (Date.now() - startedAt);
+      const result = await Promise.race([
+        reader.read(),
+        new Promise<{ done: true; value: undefined }>((resolve) =>
+          setTimeout(() => resolve({ done: true, value: undefined }), remain),
+        ),
+      ]);
+      if (result.done) break;
+      buffer += new TextDecoder().decode(result.value as Uint8Array);
+      if (/"jsonrpc"\s*:\s*"2\.0"/.test(buffer) && /"(result|error)"\s*:/.test(buffer)) {
+        return { ok: true };
+      }
+    }
+    return { ok: false, error: buffer ? "no JSON-RPC reply within timeout" : "no output within timeout" };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  } finally {
+    try { proc?.kill(); } catch { /* already exited */ }
+  }
+}
+
+async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: DoctorReport; errors: number }> {
   let warnings = 0;
   let errors = 0;
 
@@ -430,6 +535,20 @@ async function buildReport(): Promise<{ report: DoctorReport; errors: number }> 
         if (wiring[id] === "missing") warnings += 1;
       }
 
+      // Optional MCP `initialize` handshake. Only fired when caller passed
+      // `--probe`. Stdio MCPs are spawned once per server (not per agent —
+      // the binary is the same); HTTP MCPs are POSTed once per server.
+      let handshake: "ok" | "fail" | "skipped" = "skipped";
+      let handshakeError: string | undefined;
+      if (opts.probe) {
+        const res = await probeMcpInitialize(server);
+        handshake = res.ok ? "ok" : "fail";
+        if (!res.ok) {
+          handshakeError = res.error;
+          warnings += 1;
+        }
+      }
+
       mcpReport.servers.push({
         name: server.name,
         transport: server.transport,
@@ -440,6 +559,8 @@ async function buildReport(): Promise<{ report: DoctorReport; errors: number }> 
         reachable,
         drift,
         wiring,
+        handshake,
+        ...(handshakeError ? { handshake_error: handshakeError } : {}),
       });
     }
   } catch {
@@ -549,7 +670,11 @@ function printHumanFormat(report: DoctorReport, home: string): void {
       const driftStr = s.drift ? "drift:default-disabled-but-enabled" : "";
       const wiringMissing = Object.entries(s.wiring).filter(([, v]) => v === "missing").map(([k]) => k);
       const wiringStr = wiringMissing.length ? `wiring:missing[${wiringMissing.join(",")}]` : "";
-      const notes = [authStr, reachStr, driftStr, wiringStr].filter(Boolean).join("  ");
+      const handshakeStr =
+        s.handshake === "ok" ? "handshake:ok" :
+        s.handshake === "fail" ? `handshake:fail (${s.handshake_error ?? "unknown"})` :
+        "";
+      const notes = [authStr, reachStr, driftStr, wiringStr, handshakeStr].filter(Boolean).join("  ");
       console.log(`  ${pad(s.name, 16)}  ${s.transport}  enabled-on:[${enabledStr}]${notes ? "  " + notes : ""}`);
     }
     console.log();
@@ -592,8 +717,9 @@ function printHumanFormat(report: DoctorReport, home: string): void {
 
 export async function run(args: string[]): Promise<void> {
   const isJsonOutput = args.includes("--json");
+  const probe = args.includes("--probe");
 
-  const { report, errors } = await buildReport();
+  const { report, errors } = await buildReport({ probe });
 
   if (isJsonOutput) {
     console.log(JSON.stringify(report, null, 2));

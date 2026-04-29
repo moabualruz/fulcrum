@@ -295,7 +295,7 @@ describe("W3 server registrations", () => {
   });
 
   // ── context7 ─────────────────────────────────────────────────────────────
-  test("context7: http transport, correct URL, optional API key", async () => {
+  test("context7: http transport, no required auth env (free tier works keyless)", async () => {
     await registerServer("context7", DEFAULT_CONTEXT7_SERVER);
     const reg = await loadRegistry();
     const s = reg.servers["context7"]!;
@@ -303,7 +303,7 @@ describe("W3 server registrations", () => {
     expect(s.url).toBe("https://mcp.context7.com/mcp");
     expect(s.vendor).toBe("upstash");
     expect(s.default_enabled).toBe(false);
-    expect(s.auth_env_vars).toContain("CONTEXT7_API_KEY");
+    expect(s.auth_env_vars).toEqual([]);
     for (const id of ALL_AGENT_IDS) expect(s.agent_visibility[id]).toBe(true);
   });
 

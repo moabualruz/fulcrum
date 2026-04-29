@@ -47,15 +47,18 @@ export const DEFAULT_SEMGREP_SERVER: McpServerSpec = {
   agent_visibility: { ...ALL_VISIBLE },
 };
 
-/** W3.4 — Context7: remote HTTP MCP at mcp.context7.com. API key optional (higher rate limits). */
+/** W3.4 — Context7: remote HTTP MCP at mcp.context7.com. */
 export const DEFAULT_CONTEXT7_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://mcp.context7.com/mcp",
   description: "Context7 MCP server — up-to-date library docs for AI code editors",
   vendor: "upstash",
   default_enabled: false,
-  // CONTEXT7_API_KEY is optional (free tier works without it; key raises rate limits)
-  auth_env_vars: ["CONTEXT7_API_KEY"],
+  // No required env: free tier works without a key. Verified by doctor
+  // `--probe` returning a valid `initialize` response with no Authorization
+  // header. `CONTEXT7_API_KEY` is purely a rate-limit lever the user can
+  // set via the agent's normal env loading.
+  auth_env_vars: [],
   agent_visibility: { ...ALL_VISIBLE },
 };
 
