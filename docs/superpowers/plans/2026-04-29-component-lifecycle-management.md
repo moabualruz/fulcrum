@@ -12,10 +12,10 @@
 
 **Current Progress (2026-04-30):**
 
-- Done: Tasks 1-12 implementation through reviewed integration.
+- Done: Tasks 1-13 implementation and verification through reviewed integration.
 - Shipped in main worktree: component type model, catalog, planner, SQLite ledger, `fulcrum component list/info/plan/status`, `fulcrum component install/remove/enable/disable`, executor, hook adapter, MCP adapter, rules adapter, policy adapter, vendor/skills adapter, remove/purge safety, doctor component status, and `install`/`uninstall` compatibility wrappers.
-- Verified so far: focused vendor/package suites, wrapper suites, remove-safety suites, `bun run --bun tsc --noEmit`, and prior full `bun run ci` gates pass. Subagent orchestration guidance was hardened after this foundation work to require max-useful parallelism, external worktrees for parallel write lanes, runtime dependency reassessment, and lane-specific model/effort selection.
-- Remaining: Task 13 full verification.
+- Verified final: component-focused suite `106 pass, 0 fail`; affected legacy suite `197 pass, 0 fail`; `bun run ci` passes all six stages; dry-run smokes pass for component list, default profile plan, hook install, install wrapper, and uninstall wrapper. Subagent orchestration guidance was hardened after this foundation work to require max-useful parallelism, external worktrees for parallel write lanes, runtime dependency reassessment, and lane-specific model/effort selection.
+- Remaining: post-lifecycle real uninstall/clean-install `ISSUES.md` checklist before starting §6.1 repository supervisor.
 
 ---
 
@@ -2992,7 +2992,7 @@ git commit -m "docs(component): plan lifecycle implementation"
 **Files:**
 - No edits.
 
-- [ ] **Step 1: Run component-focused tests**
+- [x] **Step 1: Run component-focused tests**
 
 ```bash
 bun test \
@@ -3011,7 +3011,7 @@ bun test \
 
 Expected: PASS.
 
-- [ ] **Step 2: Run affected legacy tests**
+- [x] **Step 2: Run affected legacy tests**
 
 ```bash
 bun test \
@@ -3029,7 +3029,7 @@ bun test \
 
 Expected: PASS.
 
-- [ ] **Step 3: Run full CI**
+- [x] **Step 3: Run full CI**
 
 ```bash
 bun run ci
@@ -3046,7 +3046,7 @@ Expected:
 ✓ compress:check
 ```
 
-- [ ] **Step 4: Run dry-run smoke**
+- [x] **Step 4: Run dry-run smoke**
 
 ```bash
 bun run src/index.ts component list --json
@@ -3066,7 +3066,7 @@ install dry-run uses component plan
 uninstall dry-run uses component plan
 ```
 
-- [ ] **Step 5: Commit final verification fixes**
+- [x] **Step 5: Commit final verification fixes**
 
 Only commit if verification required fixes:
 
@@ -3088,12 +3088,12 @@ git commit -m "fix(component): satisfy lifecycle verification"
 
 ## Self-Review Checklist
 
-- [ ] No `fulcrum pkg` command or alias exists.
-- [ ] No rename away from Fulcrum.
-- [ ] `fulcrum component` is the only new public command group.
-- [ ] `fulcrum install` and `fulcrum uninstall` remain stable compatibility surfaces.
-- [ ] Every production code task starts with a failing test.
-- [ ] Removal preserves modified config unless `--purge`.
-- [ ] Dry-run uses same planner as real execution.
-- [ ] Doctor reports component lifecycle state.
-- [ ] Full `bun run ci` passes.
+- [x] No `fulcrum pkg` command or alias exists.
+- [x] No rename away from Fulcrum.
+- [x] `fulcrum component` is the only new public command group.
+- [x] `fulcrum install` and `fulcrum uninstall` remain stable compatibility surfaces.
+- [x] Every production code task starts with a failing test.
+- [x] Removal preserves modified config unless `--purge`.
+- [x] Dry-run uses same planner as real execution.
+- [x] Doctor reports component lifecycle state.
+- [x] Full `bun run ci` passes.
