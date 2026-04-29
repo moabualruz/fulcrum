@@ -36,6 +36,85 @@ afterEach(async () => {
 });
 
 describe("Repomix capability package mirrors", () => {
+  test("dry-run Repomix Claude plugin install previews commands without claude on PATH", async () => {
+    process.env["FULCRUM_HOME"] = join(TMP, ".fulcrum");
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    try {
+      await installRepomixClaudePlugins({ dryRun: true });
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+    expect(runSpy.mock.calls).toHaveLength(0);
+    expect(logs).toContain("     [dry-run] would run: claude plugin marketplace add yamadashy/repomix");
+    expect(logs).toContain("     [dry-run] would run: claude plugin install repomix-mcp@repomix");
+  });
+
+  test("dry-run Repomix Claude plugin uninstall previews commands without claude on PATH", async () => {
+    process.env["FULCRUM_HOME"] = join(TMP, ".fulcrum");
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    try {
+      await uninstallRepomixClaudePlugins({ dryRun: true });
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+    expect(runSpy.mock.calls).toHaveLength(0);
+    expect(logs).toContain("     [dry-run] would run: claude plugin uninstall repomix-mcp@repomix");
+    expect(logs).toContain("     [dry-run] would run: claude plugin uninstall repomix-explorer@repomix");
+  });
+
+  test("dry-run Repomix mirror reports clone plan and unavailable writes when source cache is absent", async () => {
+    process.env["FULCRUM_HOME"] = join(TMP, ".fulcrum");
+    await rm(join(TMP, ".claude", "plugins", "cache", "repomix"), { recursive: true, force: true });
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    try {
+      await installRepomixPackageMirrors({ dryRun: true });
+    } finally {
+      logSpy.mockRestore();
+    }
+    expect(logs).toContain(`     [dry-run] would clone/update https://github.com/yamadashy/repomix → ${join(TMP, ".fulcrum", "cache", "repomix")}`);
+    expect(logs).toContain("     [dry-run] Repomix package mirror plan unavailable until source cache exists");
+  });
+
+  test("uninstall preserves user-installed Repomix Claude plugins when Fulcrum marker is absent", async () => {
+    process.env["FULCRUM_HOME"] = join(TMP, ".fulcrum");
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue("/usr/local/bin/claude");
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    try {
+      await uninstallRepomixClaudePlugins();
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+    expect(runSpy.mock.calls).toHaveLength(0);
+    expect(logs).toContain("     · skip repomix Claude plugins uninstall (Fulcrum marker not present)");
+  });
+
   test("installs Repomix Claude plugins and writes marker", async () => {
     process.env["FULCRUM_HOME"] = join(TMP, ".fulcrum");
     await mkdir(join(TMP, ".claude"), { recursive: true });
