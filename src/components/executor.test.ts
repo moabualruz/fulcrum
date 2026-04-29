@@ -54,6 +54,28 @@ describe("component executor", () => {
     ledger.close();
   });
 
+  test("dry-run vendor package plan writes no ledger state and prints action", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+
+    try {
+      await executeComponentPlan(
+        planComponentOperation({ operation: "install", target: "package.superpowers", agents: ["codex"] }),
+        { dryRun: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(logs.join("\n")).toContain("DRY RUN");
+    expect(logs.join("\n")).toContain("package.superpowers:install:codex:install");
+
+    const ledger = ComponentLedger.open();
+    expect(ledger.componentStatus("package.superpowers")).toBeNull();
+    ledger.close();
+  });
+
   test("executes hook plan from planner and records ledger state", async () => {
     await mkdir(join(scratch, ".codex"), { recursive: true });
     const plan = planComponentOperation({
