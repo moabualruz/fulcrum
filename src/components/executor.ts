@@ -6,6 +6,8 @@ import type { ComponentAction, ComponentPlan } from "./types.ts";
 interface ExecuteOptions {
   dryRun?: boolean;
   purge?: boolean;
+  keepState?: boolean;
+  includeCaveman?: boolean;
 }
 
 export async function executeComponentPlan(
@@ -16,6 +18,7 @@ export async function executeComponentPlan(
 
   if (opts.dryRun === true) {
     for (const action of plan.actions) {
+      if (shouldSkipAction(action, opts)) continue;
       console.log(`DRY RUN ${action.id} ${action.change} ${action.kind} ${action.target}`);
       if (isVendorSurface(action.kind) && shouldApplyAction(action, appliedVendorActions)) {
         await applyAction(action, true);
@@ -31,6 +34,7 @@ export async function executeComponentPlan(
   try {
     for (const action of plan.actions) {
       try {
+        if (shouldSkipAction(action, opts)) continue;
         if (shouldApplyAction(action, appliedVendorActions)) {
           await applyAction(action, false, opts);
         }
@@ -45,6 +49,16 @@ export async function executeComponentPlan(
     ledger.endOperation(operationId, failed ? "error" : "ok");
     ledger.close();
   }
+}
+
+function shouldSkipAction(action: ComponentAction, opts: ExecuteOptions): boolean {
+  if (opts.includeCaveman === false && action.componentId === "package.caveman") {
+    return true;
+  }
+  if (opts.keepState === true && action.componentId === "mcp.registry") {
+    return true;
+  }
+  return false;
 }
 
 function shouldApplyAction(action: ComponentAction, appliedVendorActions: Set<string>): boolean {

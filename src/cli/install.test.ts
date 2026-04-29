@@ -334,6 +334,61 @@ describe("dry-run mode", () => {
       else delete process.env["FULCRUM_REPO_DIR"];
     }
   });
+
+  test("install dry-run delegates to component default profile", async () => {
+    const origHome = process.env["HOME"];
+    const origFulcrumHome = process.env["FULCRUM_HOME"];
+    const origRepoDir = process.env["FULCRUM_REPO_DIR"];
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      process.env["HOME"] = dryHome;
+      process.env["FULCRUM_HOME"] = join(dryHome, ".fulcrum");
+      process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../..");
+      await installRun(["--dry-run"]);
+      expect(logs.join("\n")).toContain("profile.default");
+      expect(logs.join("\n")).toContain("DRY RUN");
+    } finally {
+      logSpy.mockRestore();
+      if (origHome !== undefined) process.env["HOME"] = origHome;
+      else delete process.env["HOME"];
+      if (origFulcrumHome !== undefined) process.env["FULCRUM_HOME"] = origFulcrumHome;
+      else delete process.env["FULCRUM_HOME"];
+      if (origRepoDir !== undefined) process.env["FULCRUM_REPO_DIR"] = origRepoDir;
+      else delete process.env["FULCRUM_REPO_DIR"];
+    }
+  });
+
+  test("install --no-skills excludes skill components from dry-run plan", async () => {
+    const origHome = process.env["HOME"];
+    const origFulcrumHome = process.env["FULCRUM_HOME"];
+    const origRepoDir = process.env["FULCRUM_REPO_DIR"];
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      process.env["HOME"] = dryHome;
+      process.env["FULCRUM_HOME"] = join(dryHome, ".fulcrum");
+      process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../..");
+      await installRun(["--dry-run", "--no-skills"]);
+      expect(logs.join("\n")).toContain("profile.default");
+      expect(logs.join("\n")).not.toContain("skills.authored");
+      expect(logs.join("\n")).not.toContain("skills.upstream");
+    } finally {
+      logSpy.mockRestore();
+      if (origHome !== undefined) process.env["HOME"] = origHome;
+      else delete process.env["HOME"];
+      if (origFulcrumHome !== undefined) process.env["FULCRUM_HOME"] = origFulcrumHome;
+      else delete process.env["FULCRUM_HOME"];
+      if (origRepoDir !== undefined) process.env["FULCRUM_REPO_DIR"] = origRepoDir;
+      else delete process.env["FULCRUM_REPO_DIR"];
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

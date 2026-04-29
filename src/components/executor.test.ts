@@ -103,6 +103,28 @@ describe("component executor", () => {
     expect(cloudflareInstalls).toHaveLength(1);
   });
 
+  test("remove plan can preserve caveman when compatibility wrapper excludes it", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+
+    try {
+      await executeComponentPlan(
+        planComponentOperation({
+          operation: "remove",
+          target: "profile.default",
+          agents: ["codex"],
+        }),
+        { dryRun: true, includeCaveman: false },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(logs.join("\n")).not.toContain("package.caveman");
+    expect(logs.join("\n")).toContain("skills.authored");
+  });
+
   test("executes hook plan from planner and records ledger state", async () => {
     await mkdir(join(scratch, ".codex"), { recursive: true });
     const plan = planComponentOperation({

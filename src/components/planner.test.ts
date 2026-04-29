@@ -14,6 +14,7 @@ describe("component planner", () => {
       "policy.tool-output",
       "rules.global",
       "package.caveman",
+      "package.repomix",
       "skills.authored",
       "skills.upstream",
       "package.cloudflare",
@@ -23,6 +24,19 @@ describe("component planner", () => {
       "mcp.context7",
     ]);
     expect(plan.actions.every((a) => a.operation === "install")).toBe(true);
+  });
+
+  test("excludes profile members from generated actions", () => {
+    const plan = planComponentOperation({
+      operation: "install",
+      target: "profile.default",
+      agents: ["codex"],
+      exclude: ["skills.upstream", "mcp.context7"],
+    });
+
+    expect(plan.actions.map((action) => action.componentId)).not.toContain("skills.upstream");
+    expect(plan.actions.map((action) => action.componentId)).not.toContain("mcp.context7");
+    expect(plan.actions.map((action) => action.componentId)).toContain("skills.authored");
   });
 
   test("limits agent-specific surfaces to requested agents", () => {

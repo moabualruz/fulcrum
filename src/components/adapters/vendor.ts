@@ -92,7 +92,7 @@ async function removeVendor(vendor: VendorComponent, dryRun: boolean): Promise<v
       await removeAuthoredSkills({ dryRun });
       return;
     case "skills-upstream":
-      await removeUpstreamSkills({ dryRun });
+      await removeUpstreamSkillsIfLockExists({ dryRun });
       return;
     case "caveman":
       await removeCavemanCopies(process.env["HOME"] ?? "", { dryRun });
@@ -103,10 +103,30 @@ async function removeVendor(vendor: VendorComponent, dryRun: boolean): Promise<v
       return;
     case "cloudflare":
       await uninstallCloudflarePackage({ dryRun });
-      await removeUpstreamSkills({ dryRun, source: CLOUDFLARE_SKILLS_SOURCE });
+      await removeUpstreamSkillsIfLockExists({ dryRun, source: CLOUDFLARE_SKILLS_SOURCE });
       return;
     case "superpowers":
       await uninstallSuperpowersPackage({ dryRun });
       return;
   }
+}
+
+async function removeUpstreamSkillsIfLockExists(
+  opts: Parameters<typeof removeUpstreamSkills>[0],
+): Promise<void> {
+  try {
+    await removeUpstreamSkills(opts);
+  } catch (error) {
+    if (!isMissingFileError(error)) throw error;
+    console.log("     · upstream skills lock not available — skip vendor skill mirror removal");
+  }
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "ENOENT"
+  );
 }

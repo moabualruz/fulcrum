@@ -16,6 +16,7 @@ const DEFAULT_PROFILE_MEMBERS = [
   "policy.tool-output",
   "rules.global",
   "package.caveman",
+  "package.repomix",
   "skills.authored",
   "skills.upstream",
   "package.cloudflare",

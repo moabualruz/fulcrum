@@ -2,9 +2,11 @@ import { BUILTIN_MCPS } from "../../cli/mcp-builtins.ts";
 import { installDeepwikiMcp, uninstallDeepwikiMcp } from "../../cli/mcp.ts";
 import {
   applyToAgents,
+  loadRegistry,
   registerServer,
   removeFromAgents,
   setEnabled,
+  unregisterServer,
   type AgentId,
 } from "../../cli/mcp-registry.ts";
 import type { ComponentAction } from "../types.ts";
@@ -39,6 +41,18 @@ export async function applyMcpAction(action: ComponentAction, dryRun = false): P
   }
 
   if (action.componentId === "mcp.registry" || name === "registry") {
+    if (action.change === "remove" || action.change === "disable") {
+      if (dryRun) {
+        console.log("     [dry-run] would remove MCP registry entries from agents");
+        return;
+      }
+      const registry = await loadRegistry();
+      for (const serverName of Object.keys(registry.servers)) {
+        await removeFromAgents(serverName);
+        await unregisterServer(serverName);
+      }
+      return;
+    }
     for (const entry of BUILTIN_MCPS) {
       await registerServer(entry.name, entry.spec);
     }

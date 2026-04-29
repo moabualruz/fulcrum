@@ -6,6 +6,7 @@ export interface PlanInput {
   operation: Exclude<Operation, "status">;
   target: string;
   agents?: readonly AgentId[];
+  exclude?: readonly string[];
 }
 
 export function planComponentOperation(input: PlanInput): ComponentPlan {
@@ -15,8 +16,10 @@ export function planComponentOperation(input: PlanInput): ComponentPlan {
   }
 
   const requestedAgents = input.agents && input.agents.length > 0 ? [...input.agents] : [...ALL_AGENT_IDS];
+  const excluded = new Set(input.exclude ?? []);
   const components =
-    targetComponent.kind === "profile" ? expandProfile(targetComponent.id) : [targetComponent];
+    (targetComponent.kind === "profile" ? expandProfile(targetComponent.id) : [targetComponent])
+      .filter((component) => !excluded.has(component.id));
   const warnings = new Set<string>();
 
   const actions = components.flatMap((component) =>

@@ -91,6 +91,38 @@ describe("run", () => {
     }
   });
 
+  test("dry-run delegates to component default profile removal", async () => {
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      await run(["--dry-run"]);
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(logs.join("\n")).toContain("profile.default");
+    expect(logs.join("\n")).toContain("DRY RUN");
+  });
+
+  test("dry-run keeps caveman unless explicitly included", async () => {
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      await run(["--dry-run"]);
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(logs.join("\n")).not.toContain("package.caveman");
+    expect(logs.join("\n")).toContain("keep caveman");
+  });
+
   test("removes managed namespaces, hook state, and unmodified policy", async () => {
     await mkdir(join(TMP, "config"), { recursive: true });
     await writeFile(join(TMP, "config", "tool-output-policy.toml"), "default = true\n");

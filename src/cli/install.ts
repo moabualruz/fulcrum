@@ -728,58 +728,31 @@ export async function run(args: string[]): Promise<void> {
   const root = repoRoot();
   console.log(`Fulcrum install — source: ${root}\n`);
 
-  console.log("1/8  Vendoring hook registration snippets → ~/.fulcrum/hooks/snippets/");
+  console.log("1/4  Vendoring hook registration snippets → ~/.fulcrum/hooks/snippets/");
   await vendorHookSnippets();
   console.log();
 
-  console.log("2/8  Seeding ~/.fulcrum/tool-output-policy.toml");
-  await installToolOutputPolicy(DRY_RUN);
-  console.log();
-
-  console.log("3/8  Splicing rules/AGENTS.md into per-agent rules files");
-  try {
-    await installRulesBlocks(process.env["HOME"] ?? "", DRY_RUN);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+  const target = mcpDefaultMode === "all" ? "profile.verify-all" : "profile.default";
+  const exclude: string[] = [];
+  if (!syncAuthoredSkills) {
+    exclude.push("skills.authored");
   }
-  console.log();
-
-  const home = process.env["HOME"] ?? "";
-  console.log("4/8  Installing caveman per detected agent");
-  await installCaveman(home);
-  console.log();
-
-  if (syncAuthoredSkills) {
-    console.log("5/8  Syncing in-repo skills per detected agent");
-    const { syncSkills } = await import("./skills.ts");
-    await syncSkills({ dryRun: DRY_RUN });
-  } else {
-    console.log("5/8  Skipping in-repo skill sync (--no-skills)");
+  if (!syncUpstream) {
+    exclude.push("skills.upstream");
   }
-  console.log();
-
-  if (syncUpstream) {
-    console.log("6/8  Syncing curated third-party skills per detected agent");
-    const { syncUpstreamSkills } = await import("./upstream-skills.ts");
-    await syncUpstreamSkills({ dryRun: DRY_RUN });
-  } else {
-    console.log("6/8  Skipping curated third-party skill sync (--no-upstream-skills)");
+  if (mcpDefaultMode === "none") {
+    exclude.push("mcp.context7");
   }
-  console.log();
 
-  console.log("6b/8 Installing vendor capability packages");
-  const { installVendorCapabilityPackages } = await import("./vendor-packages.ts");
-  await installVendorCapabilityPackages({ dryRun: DRY_RUN });
-  console.log();
-
-  console.log("7/8  Registering DeepWiki MCP where supported");
-  const { installDeepwikiMcp } = await import("./mcp.ts");
-  await installDeepwikiMcp({ dryRun: DRY_RUN });
-  console.log();
-
-  console.log("7b/8 Registering MCP registry entries (github, repomix, semgrep, context7, tavily, playwright, cloudflare-*, dart)");
-  await installMcpRegistryEntries(home);
+  console.log(`2/4  Installing component profile ${target}`);
+  const { planComponentOperation } = await import("../components/planner.ts");
+  const { executeComponentPlan } = await import("../components/executor.ts");
+  const plan = planComponentOperation({
+    operation: "install",
+    target,
+    exclude,
+  });
+  await executeComponentPlan(plan, { dryRun: DRY_RUN });
   console.log();
 
   const modeLabel = mcpDefaultMode === "all"
@@ -787,16 +760,16 @@ export async function run(args: string[]): Promise<void> {
     : mcpDefaultMode === "none"
       ? "Skipping minimal default MCP enable step (--no-default-mcps)"
       : "Enabling minimal default MCP set";
-  console.log(`7c/8 ${modeLabel}`);
+  console.log(`3/4 ${modeLabel}`);
   await applyBuiltinMcpDefaultState(mcpDefaultMode);
   console.log();
 
   if (withProject) {
-    console.log(`8/8  fulcrum init ${withProject}`);
+    console.log(`4/4  fulcrum init ${withProject}`);
     const { run: runInit } = await import("./init.ts");
     await runInit([withProject]);
   } else {
-    console.log("8/8  Skipping project init (use:  fulcrum init <dir>  or re-run with --with-project)");
+    console.log("4/4  Skipping project init (use:  fulcrum init <dir>  or re-run with --with-project)");
   }
 
   console.log("\nDone.");

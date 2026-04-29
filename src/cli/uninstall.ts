@@ -520,46 +520,50 @@ export async function run(args: string[]): Promise<void> {
   const home = process.env["HOME"] ?? "";
   console.log("Fulcrum uninstall\n");
 
-  console.log("1/6  Removing Fulcrum rules blocks");
-  await removeRulesBlocks(home, DRY_RUN);
+  const exclude = includeCaveman ? [] : ["package.caveman"];
+  if (keepState) {
+    exclude.push("mcp.registry");
+  }
+
+  console.log("1/4  Removing component profile profile.default");
+  const { planComponentOperation } = await import("../components/planner.ts");
+  const { executeComponentPlan } = await import("../components/executor.ts");
+  const plan = planComponentOperation({
+    operation: "remove",
+    target: "profile.default",
+    exclude,
+  });
+  await executeComponentPlan(plan, {
+    dryRun: DRY_RUN,
+    purge,
+    keepState,
+    includeCaveman,
+  });
   console.log();
 
-  console.log("2/6  Removing generated Gemini import");
+  console.log("2/4  Removing compatibility leftovers");
   await removeExactLine(`${home}/.gemini/GEMINI.md`, "@AGENTS.md", "Gemini @AGENTS.md import");
-  console.log();
-
-  console.log("3/6  Removing hook snippets and markers");
   const { removeAllHookRegistrations } = await import("./hooks.ts");
   await removeAllHookRegistrations();
   await removePath(`${fulcrumHome()}/hooks/snippets`, "hook snippets");
   await removePath(`${fulcrumHome()}/hooks/enabled`, "hook enable markers");
-  console.log();
-
-  console.log("4/6  Removing managed skill namespaces");
   await removeSkillNamespaces(home);
-  const { uninstallVendorCapabilityPackages } = await import("./vendor-packages.ts");
-  await uninstallVendorCapabilityPackages({ dryRun: DRY_RUN });
   console.log();
 
-  console.log("5/6  Removing DeepWiki MCP registrations");
-  const { uninstallDeepwikiMcp } = await import("./mcp.ts");
-  await uninstallDeepwikiMcp({ dryRun: DRY_RUN });
-  console.log();
-
-  console.log("5b/6 Removing MCP registry entries from agents");
-  await uninstallMcpRegistryEntries(home, keepState, DRY_RUN);
-  console.log();
-
-  await cleanupPiMcpAdapterIfUnused(home);
-
-  console.log("6/6  Removing policy and optional third-party installs");
-  await removeToolOutputPolicy(purge, DRY_RUN);
-  if (includeCaveman) {
-    await removeCavemanCopies(home, { dryRun: DRY_RUN });
+  console.log("3/4  Cleaning registry and empty agent containers");
+  if (!keepState) {
+    await removePath(`${fulcrumHome()}/state/global/mcp-registry.toml`, "MCP registry file");
   } else {
+    console.log("     · keep MCP registry file (--keep-state)");
+  }
+  await cleanupPiMcpAdapterIfUnused(home);
+  await cleanupEmptyAgentConfigContainers(home);
+  console.log();
+
+  console.log("4/4  Optional third-party installs");
+  if (!includeCaveman) {
     console.log("     · keep caveman (use --include-caveman to remove Fulcrum-installed copies/config)");
   }
-  await cleanupEmptyAgentConfigContainers(home);
 
   console.log("\nDone.");
 }
