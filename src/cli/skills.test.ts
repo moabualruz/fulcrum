@@ -3,7 +3,7 @@
 // the real `claude` CLI (dry-run short-circuits subprocess execution).
 
 import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { syncSkills } from "./skills.ts";
@@ -105,5 +105,39 @@ describe("skills sync — Claude Code plugin path", () => {
     } finally {
       logSpy.mockRestore();
     }
+  });
+});
+
+describe("Claude Code plugin package", () => {
+  const root = join(__dirname, "../..");
+
+  test("marketplace points at clean plugin package, not repo root", async () => {
+    const marketplace = JSON.parse(
+      await readFile(join(root, ".claude-plugin", "marketplace.json"), "utf8"),
+    );
+    expect(marketplace.plugins[0].source).toBe("./plugins/fulcrum");
+  });
+
+  test("package contains exactly authored skills, excluding templates and archive", async () => {
+    const authoredRoot = join(root, "skills");
+    const packageRoot = join(root, "plugins", "fulcrum", "skills");
+    const skillNames = async (dir: string): Promise<string[]> => {
+      const names: string[] = [];
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        if (entry.name === "_template" || entry.name === "_archive") continue;
+        try {
+          await readFile(join(dir, entry.name, "SKILL.md"), "utf8");
+          names.push(entry.name);
+        } catch { /* not a skill */ }
+      }
+      return names.sort();
+    };
+
+    const authored = await skillNames(authoredRoot);
+    const packaged = await skillNames(packageRoot);
+    expect(packaged).toEqual(authored);
+    expect(packaged).not.toContain("_template");
+    expect(packaged).not.toContain("_archive");
   });
 });
