@@ -152,7 +152,7 @@ async function ensureContextModeBinary(dryRun: boolean): Promise<void> {
     console.log("     [dry-run] would run: npm install -g context-mode");
     return;
   }
-  const r = await runProc(["npm", "install", "-g", "context-mode"]);
+  const r = await runProc(["npm", "install", "-g", "context-mode"], { timeoutMs: 60_000 });
   if (r.exit === 0) {
     console.log("     ✓ context-mode installed globally via npm");
   } else {
@@ -357,7 +357,7 @@ async function installPi(home: string, dryRun: boolean, skipExternalCommands = f
   } else if (await which("pi")) {
     if (dryRun) console.log("     [dry-run] would run: pi install npm:context-mode");
     else {
-      const r = await runProc(["pi", "install", "npm:context-mode"]);
+      const r = await runProc(["pi", "install", "npm:context-mode"], { timeoutMs: 60_000 });
       if (r.exit === 0) console.log("     ✓ Pi context-mode package install requested");
       else console.log(`     ✗ Pi context-mode package install failed: ${r.stderr.trim()}`);
     }
@@ -419,12 +419,12 @@ async function installClaude(home: string, dryRun: boolean, skipExternalCommands
     console.log("     [dry-run] would run: claude plugin install context-mode@context-mode");
     return;
   }
-  const r1 = await runProc(["claude", "plugin", "marketplace", "add", "mksglu/context-mode"]);
+  const r1 = await runProc(["claude", "plugin", "marketplace", "add", "mksglu/context-mode"], { timeoutMs: 60_000 });
   if (r1.exit !== 0) {
     console.log(`     ✗ Claude Code context-mode marketplace add failed: ${r1.stderr.trim()}`);
     return;
   }
-  const r2 = await runProc(["claude", "plugin", "install", "context-mode@context-mode"]);
+  const r2 = await runProc(["claude", "plugin", "install", "context-mode@context-mode"], { timeoutMs: 60_000 });
   if (r2.exit !== 0) {
     console.log(`     ✗ Claude Code context-mode plugin install failed: ${r2.stderr.trim()}`);
   } else {
@@ -548,7 +548,7 @@ async function uninstallClaude(home: string, dryRun: boolean, skipExternalComman
     if (dryRun) {
       console.log("     [dry-run] would run: claude plugin uninstall context-mode@context-mode");
     } else {
-      const r = await runProc(["claude", "plugin", "uninstall", "context-mode@context-mode"]);
+      const r = await runProc(["claude", "plugin", "uninstall", "context-mode@context-mode"], { timeoutMs: 60_000 });
       if (r.exit === 0) console.log("     - Claude Code context-mode plugin uninstall requested");
       else console.log(`     · Claude Code plugin uninstall failed or unsupported: ${r.stderr.trim()}`);
     }

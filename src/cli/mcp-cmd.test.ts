@@ -65,6 +65,20 @@ describe("fulcrum mcp list", () => {
     }
   });
 
+  test("--json marks plugin-owned agent surfaces hidden", async () => {
+    await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+    const { logs, restore } = captureConsole();
+    try {
+      await run(["list", "--json"]);
+      const parsed = JSON.parse(logs.join("")) as Array<{ name: string; agent_state: Record<string, string> }>;
+      expect(parsed[0]?.name).toBe("repomix");
+      expect(parsed[0]?.agent_state["claude-code"]).toBe("hidden");
+      expect(parsed[0]?.agent_state["codex"]).toBe("disabled");
+    } finally {
+      restore();
+    }
+  });
+
   test("human list shows registered servers", async () => {
     await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
     const { logs, restore } = captureConsole();
@@ -149,6 +163,20 @@ describe("fulcrum mcp enable/disable", () => {
     }
     const reg = await loadRegistry();
     expect(reg.servers["github"]!.enabled["codex"]).toBe(true);
+  });
+
+  test("enable skips plugin-owned hidden agent surfaces", async () => {
+    await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+    const { logs, restore } = captureConsole();
+    try {
+      await run(["enable", "repomix", "--agent", "claude-code", "--agent", "codex"]);
+    } finally {
+      restore();
+    }
+    const reg = await loadRegistry();
+    expect(reg.servers["repomix"]!.enabled["claude-code"]).toBeUndefined();
+    expect(reg.servers["repomix"]!.enabled["codex"]).toBe(true);
+    expect(logs.some((l) => l.includes("skip plugin/extension-owned"))).toBe(true);
   });
 
   test("disable clears flag in registry", async () => {

@@ -12,6 +12,7 @@ import {
   type AgentId,
   applyToAgents,
   isEnabled,
+  type McpServer,
   loadRegistry,
   type McpServerSpec,
   type McpServerVisibility,
@@ -37,7 +38,10 @@ async function cmdList(args: string[]): Promise<void> {
       vendor: s.vendor,
       default_enabled: s.default_enabled,
       agent_state: Object.fromEntries(
-        ALL_AGENT_IDS.map((id) => [id, isEnabled(s, id) ? "enabled" : "disabled"])
+        ALL_AGENT_IDS.map((id) => [
+          id,
+          !s.agent_visibility[id] ? "hidden" : isEnabled(s, id) ? "enabled" : "disabled",
+        ])
       ),
     }));
     console.log(JSON.stringify(out, null, 2));
@@ -161,6 +165,26 @@ function parseAgentFlags(args: string[]): AgentId[] | "all" {
   return agents;
 }
 
+async function visibleAgentList(name: string, target: AgentId[] | "all"): Promise<AgentId[]> {
+  const reg = await loadRegistry();
+  const server = reg.servers[name] as McpServer | undefined;
+  if (!server) {
+    console.error(`fulcrum mcp: server '${name}' not registered`);
+    process.exit(2);
+  }
+  const requested = target === "all" ? [...ALL_AGENT_IDS] : target;
+  const visible = requested.filter((id) => server.agent_visibility[id]);
+  const hidden = requested.filter((id) => !server.agent_visibility[id]);
+  if (hidden.length > 0) {
+    console.log(`· ${name}: skip plugin/extension-owned or unsupported agent(s): ${hidden.join(", ")}`);
+  }
+  if (visible.length === 0) {
+    console.error(`fulcrum mcp: '${name}' has no registry-owned target agents in this request`);
+    process.exit(2);
+  }
+  return visible;
+}
+
 async function cmdEnable(args: string[]): Promise<void> {
   const name = args[0];
   if (!name) {
@@ -168,7 +192,7 @@ async function cmdEnable(args: string[]): Promise<void> {
     process.exit(2);
   }
   const target = parseAgentFlags(args.slice(1));
-  const agentList = target === "all" ? [...ALL_AGENT_IDS] : target;
+  const agentList = await visibleAgentList(name, target);
   await setEnabled(name, true, { agents: agentList });
   await applyToAgents(name, { agents: agentList });
   console.log(`✓ Enabled MCP server '${name}' for: ${agentList.join(", ")}`);
@@ -181,7 +205,7 @@ async function cmdDisable(args: string[]): Promise<void> {
     process.exit(2);
   }
   const target = parseAgentFlags(args.slice(1));
-  const agentList = target === "all" ? [...ALL_AGENT_IDS] : target;
+  const agentList = await visibleAgentList(name, target);
   await setEnabled(name, false, { agents: agentList });
   await removeFromAgents(name, { agents: agentList });
   console.log(`✓ Disabled MCP server '${name}' for: ${agentList.join(", ")}`);

@@ -176,7 +176,7 @@ Detection-aware logic: if `agent.rootDir` does not exist, skip writes for that a
 6. **Authored skills** — `fulcrum skills sync` mirrors `skills/<name>/SKILL.md` to each agent's `<skills-root>/fulcrum/<name>/`.
 7. **Upstream skills** — `fulcrum skills upstream` clones pinned repos, verifies `subpath_sha256`, installs to vendor placement (`<agent>/skills/<name>/`, Gemini `~/.gemini/skills/<name>/`).
 8. **DeepWiki MCP** — register for each detected agent (Pi via `pi-mcp-adapter` auto-install).
-9. **Builtin MCPs** — register 16 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml` (default-disabled).
+9. **Builtin MCPs** — register 16 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml`; minimal default state enables `context7` only where no user state exists, while `--no-default-mcps` registers without changing enable state and `--enable-all-mcps` enables all builtins.
 
 `fulcrum uninstall` is conservative by default: removes managed rules blocks, hook registrations, hook snippets/markers, `skills/fulcrum/`, legacy `skills/fulcrum-upstream/` namespaces, Gemini managed extensions, Gemini `@AGENTS.md` import, context-mode registrations, and DeepWiki. Keeps edited policy files, vendor-placed third-party skills, and caveman unless `--purge` / `--include-caveman` flags are passed.
 

@@ -113,33 +113,37 @@ function parseArgs(args: string[]): CompressOptions {
 
 async function resolveCavemanCompressDir(): Promise<string | null> {
   const homeDir = process.env.HOME || "";
-  const cavemanBase = `${homeDir}/.claude/plugins/cache/caveman/caveman`;
+  const candidates = [
+    `${homeDir}/.claude/plugins/cache/caveman/caveman`,
+    `${homeDir}/.claude/plugins/marketplaces/caveman/plugins/caveman`,
+    `${homeDir}/.claude/plugins/marketplaces/caveman`,
+  ];
 
-  const baseExists = await exists(cavemanBase);
-  if (!baseExists) {
-    return null;
-  }
+  for (const cavemanBase of candidates) {
+    if (!(await exists(cavemanBase))) continue;
 
-  // Find the hash subdirectory (should be exactly one)
-  try {
-    const proc = Bun.spawn(["ls", "-1", cavemanBase], {
-      stdout: "pipe",
-      stderr: "ignore",
-    });
-    const output = await new Response(proc.stdout).text();
-    await proc.exited;
+    const direct = `${cavemanBase}/skills/compress`;
+    if (await exists(direct)) return direct;
 
-    const hashDir = output.trim().split("\n")[0];
-    if (!hashDir) {
-      return null;
+    // Plugin cache layout is marketplace/plugin/version/skills/compress.
+    try {
+      const proc = Bun.spawn(["ls", "-1", cavemanBase], {
+        stdout: "pipe",
+        stderr: "ignore",
+      });
+      const output = await new Response(proc.stdout).text();
+      await proc.exited;
+
+      const hashDir = output.trim().split("\n")[0];
+      if (!hashDir) continue;
+
+      const compressDir = `${cavemanBase}/${hashDir}/skills/compress`;
+      if (await exists(compressDir)) return compressDir;
+    } catch {
+      continue;
     }
-
-    const compressDir = `${cavemanBase}/${hashDir}/skills/compress`;
-    const compressExists = await exists(compressDir);
-    return compressExists ? compressDir : null;
-  } catch {
-    return null;
   }
+  return null;
 }
 
 async function getDefaultTargets(): Promise<string[]> {

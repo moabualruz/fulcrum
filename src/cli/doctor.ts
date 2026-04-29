@@ -6,6 +6,7 @@ import { stat, readdir } from "node:fs/promises";
 import { which, exists } from "../utils/proc.ts";
 import { AGENTS } from "../agents/registry.ts";
 import { loadRegistry, ALL_AGENT_IDS, isEnabled, type AgentId } from "./mcp-registry.ts";
+import { MINIMAL_DEFAULT_MCPS } from "./mcp-builtins.ts";
 
 interface ToolCheck {
   cmd: string;
@@ -54,7 +55,7 @@ interface DoctorReport {
       transport: "http" | "stdio";
       vendor: string;
       default_enabled: boolean;
-      agent_state: Record<string, "enabled" | "disabled">;
+      agent_state: Record<string, "enabled" | "disabled" | "hidden">;
       auth_status: "ok" | "missing-env" | "n/a";
       reachable: boolean | null;
       // Drift: registry default is disabled, yet some agent has it enabled.
@@ -513,16 +514,17 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
         reachable = cmd === "npx" ? true : !!(await which(cmd));
       }
 
-      const agentState: Record<string, "enabled" | "disabled"> = {};
+      const agentState: Record<string, "enabled" | "disabled" | "hidden"> = {};
       for (const id of ALL_AGENT_IDS) {
-        agentState[id] = isEnabled(server, id) ? "enabled" : "disabled";
+        agentState[id] = !server.agent_visibility[id] ? "hidden" : isEnabled(server, id) ? "enabled" : "disabled";
       }
 
       // Drift: registry says default-disabled but some agent has it enabled.
       const enabledAgents = Object.entries(agentState)
         .filter(([, v]) => v === "enabled")
         .map(([k]) => k as AgentId);
-      const drift = !server.default_enabled && enabledAgents.length > 0;
+      const isMinimalDefault = (MINIMAL_DEFAULT_MCPS as readonly string[]).includes(server.name);
+      const drift = !server.default_enabled && !isMinimalDefault && enabledAgents.length > 0;
       if (drift) warnings += 1;
 
       // Auth wiring: only meaningful for HTTP servers with declared auth.

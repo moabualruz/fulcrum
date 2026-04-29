@@ -17,6 +17,7 @@ Usage:
   fulcrum skills lint <path>         Validate a SKILL.md (frontmatter + required body sections).
   fulcrum skills list                Enumerate authored skills with eval coverage.
   fulcrum install [--with-project DIR] [--no-skills] [--no-upstream-skills]
+                  [--no-default-mcps] [--enable-all-mcps]
                                      Splice rules, vendor hooks, sync skills, install caveman.
   fulcrum uninstall [--dry-run] [--purge] [--include-caveman]
                                      Remove Fulcrum-managed install artifacts.

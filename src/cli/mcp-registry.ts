@@ -44,6 +44,11 @@ export interface McpServerSpec {
   default_enabled: boolean;
   /** Env vars checked by doctor for auth readiness */
   auth_env_vars: string[];
+  /**
+   * true = Fulcrum MCP registry owns this agent's MCP config surface.
+   * false = unsupported OR owned by another managed vendor primitive
+   * (plugin/extension/package). Registry enable/disable/remove must skip it.
+   */
   agent_visibility: McpServerVisibility;
 }
 
@@ -255,6 +260,7 @@ export async function setEnabled(
 
   const targets = opts.agents ?? ALL_AGENT_IDS;
   for (const agentId of targets) {
+    if (!server.agent_visibility[agentId]) continue;
     server.enabled[agentId] = enabled;
   }
   await saveRegistry(reg);
@@ -609,6 +615,7 @@ export async function removeFromAgents(name: string, opts: { dryRun?: boolean; a
   const targetAgents = opts.agents ?? ALL_AGENT_IDS;
 
   for (const agentId of targetAgents) {
+    if (!server.agent_visibility[agentId]) continue;
     switch (agentId) {
       case "claude-code": await removeFromClaudeCode(server, home, dryRun); break;
       case "codex":       if (await exists(`${home}/.codex`)) await removeFromCodex(server, home); break;

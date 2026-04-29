@@ -1,10 +1,12 @@
 # MCP Policy
 
-> Fulcrum manages two MCP integrations by default: DeepWiki for repository documentation and context-mode for context routing/session continuity. Everything else stays opt-in. CLI + skills remain preferred when they provide the same result with less startup overhead.
+> Fulcrum manages DeepWiki for repository documentation, context-mode for context routing/session continuity, and a registered builtin MCP catalogue. Default state enables only the minimal useful set: DeepWiki, context-mode, and context7. Everything else stays opt-in. CLI + skills remain preferred when they provide the same result with less startup overhead.
 
-## 1. Why default-off
+## 1. Default state
 
-MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead. Register arbitrary third-party MCPs disabled; enable per-session when genuinely needed. Managed exceptions must justify their always-on cost: DeepWiki has no CLI equivalent, and context-mode provides routing/session-continuity hooks rather than only another tool surface.
+MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead. Register arbitrary third-party MCPs disabled; enable per-session when genuinely needed. Managed exceptions must justify their always-on cost: DeepWiki has no CLI equivalent, context-mode provides routing/session-continuity hooks, and context7 is broadly useful library documentation with no official skill fallback. Use `fulcrum install --no-default-mcps` to register all MCP definitions/config without changing enable state; use `--enable-all-mcps` only for verification.
+
+Plugin / extension / package ownership wins over individual surfaces. Vendor package may carry MCP servers, skills, commands, rules, hooks, scripts, agents, mixed assets. Fulcrum installs/uninstalls package as vendor documents; never recreate, disable, remove package internals through lower-level registry. Agents without package primitive get nearest-native mirror, no behavior rewrite. Current examples: Repomix Claude plugins own Claude MCP/commands/agent; Cloudflare Claude plugin owns bundled Claude MCP+skills; Superpowers native packages own Claude/Gemini/OpenCode/Pi, Codex gets full skill mirror.
 
 ## 2. Disable claude.ai defaults
 

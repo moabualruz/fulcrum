@@ -103,7 +103,7 @@ async function installClaudePlugin(opts: { dryRun: boolean }): Promise<void> {
     return;
   }
 
-  const r1 = await runProc(["claude", "plugin", "marketplace", "add", PLUGIN_MARKETPLACE]);
+  const r1 = await runProc(["claude", "plugin", "marketplace", "add", PLUGIN_MARKETPLACE], { timeoutMs: 60_000 });
   if (r1.exit !== 0) {
     console.log(`    ✗ marketplace add failed: ${r1.stderr.trim() || r1.stdout.trim()}`);
     console.log(`      manual: claude plugin marketplace add ${PLUGIN_MARKETPLACE}`);
@@ -111,7 +111,7 @@ async function installClaudePlugin(opts: { dryRun: boolean }): Promise<void> {
   }
   console.log(`    ✓ marketplace added: ${PLUGIN_MARKETPLACE}`);
 
-  const r2 = await runProc(["claude", "plugin", "install", PLUGIN_SPEC]);
+  const r2 = await runProc(["claude", "plugin", "install", PLUGIN_SPEC], { timeoutMs: 60_000 });
   if (r2.exit !== 0) {
     console.log(`    ✗ plugin install failed: ${r2.stderr.trim() || r2.stdout.trim()}`);
     console.log(`      manual: claude plugin install ${PLUGIN_SPEC}`);

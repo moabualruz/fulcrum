@@ -539,6 +539,8 @@ async function uninstallMcpRegistryEntries(home: string, keepState: boolean, dry
 
   // Uninstall repomix Claude plugins.
   await uninstallRepomixClaudePlugins(home);
+  const { uninstallRepomixPackageMirrors } = await import("./repomix-package.ts");
+  await uninstallRepomixPackageMirrors({ dryRun });
 
   // Delete registry file unless keepState.
   if (!keepState) {
@@ -597,6 +599,8 @@ export async function run(args: string[]): Promise<void> {
 
   console.log("4/7  Removing managed skill namespaces");
   await removeSkillNamespaces(home);
+  const { uninstallVendorCapabilityPackages } = await import("./vendor-packages.ts");
+  await uninstallVendorCapabilityPackages({ dryRun: DRY_RUN });
   console.log();
 
   console.log("5/7  Removing DeepWiki MCP registrations");

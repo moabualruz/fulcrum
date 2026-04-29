@@ -300,7 +300,7 @@ describe("dry-run mode", () => {
 // 5. MCP registry entries (W2)
 // ---------------------------------------------------------------------------
 
-import { installMcpRegistryEntries } from "./install.ts";
+import { applyBuiltinMcpDefaultState, installMcpRegistryEntries } from "./install.ts";
 import { loadRegistry } from "./mcp-registry.ts";
 
 describe("installMcpRegistryEntries", () => {
@@ -360,6 +360,31 @@ describe("installMcpRegistryEntries", () => {
     const reg = await loadRegistry();
     expect(reg.servers["github"]!.default_enabled).toBe(false);
     expect(reg.servers["repomix"]!.default_enabled).toBe(false);
+  });
+
+  test("context7 is the minimal default builtin MCP", async () => {
+    await installMcpRegistryEntries(regHome);
+    const reg = await loadRegistry();
+    expect(reg.servers["context7"]).toBeDefined();
+    expect(reg.servers["context7"]!.default_enabled).toBe(false);
+    expect(reg.servers["context7"]!.auth_env_vars).toEqual(["CONTEXT7_API_KEY"]);
+  });
+
+  test("minimal default state enables context7 without enabling github", async () => {
+    await installMcpRegistryEntries(regHome);
+    await applyBuiltinMcpDefaultState("minimal");
+    const reg = await loadRegistry();
+    expect(reg.servers["context7"]!.enabled["codex"]).toBe(true);
+    expect(reg.servers["github"]!.enabled["codex"]).toBeUndefined();
+  });
+
+  test("no default state leaves existing MCP state untouched", async () => {
+    await installMcpRegistryEntries(regHome);
+    await applyBuiltinMcpDefaultState("minimal");
+    await applyBuiltinMcpDefaultState("none");
+    const reg = await loadRegistry();
+    expect(reg.servers["context7"]!.enabled["codex"]).toBe(true);
+    expect(reg.servers["github"]!.enabled["codex"]).toBeUndefined();
   });
 
   test("dry-run does not write registry file", async () => {

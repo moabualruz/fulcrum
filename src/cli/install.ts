@@ -17,6 +17,9 @@
 //   --no-skills       Do not run authored/upstream skill sync during install.
 //   --no-upstream-skills
 //                      Do not install curated third-party skill packs.
+//   --no-default-mcps Register MCP definitions/config, but skip the minimal
+//                      default enable step and leave existing MCP state intact.
+//   --enable-all-mcps Enable every builtin MCP after registration.
 
 import { mkdir, readFile, writeFile, copyFile, readdir, stat, appendFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -63,7 +66,7 @@ async function runProcDry(cmd: string[]): Promise<{ exit: number; stdout: string
     console.log(`     [dry-run] would run: ${cmd.join(" ")}`);
     return { exit: 0, stdout: "", stderr: "" };
   }
-  return runProc(cmd);
+  return runProc(cmd, { timeoutMs: 60_000 });
 }
 
 
@@ -84,6 +87,17 @@ async function exists(p: string): Promise<boolean> {
 
 async function isDir(p: string): Promise<boolean> {
   try { return (await stat(p)).isDirectory(); } catch { return false; }
+}
+
+async function isClaudePluginInstalled(home: string, pluginName: string): Promise<boolean> {
+  const installedFile = `${home}/.claude/plugins/installed_plugins.json`;
+  try {
+    const parsed = JSON.parse(await readFile(installedFile, "utf8"));
+    const plugins = parsed?.plugins;
+    return !!plugins && typeof plugins === "object" && pluginName in plugins;
+  } catch {
+    return false;
+  }
 }
 
 export async function spliceSentinel(target: string, body: string, label: string): Promise<void> {
@@ -305,8 +319,8 @@ export async function installCaveman(home: string): Promise<void> {
   // --- Claude Code ---
   const claudeDir = `${home}/.claude`;
   if (await isDir(claudeDir)) {
-    const pluginCacheDir = `${claudeDir}/plugins/cache/caveman`;
-    if (await isDir(pluginCacheDir)) {
+    const compressDir = `${claudeDir}/plugins/cache/caveman/caveman`;
+    if ((await isClaudePluginInstalled(home, "caveman@caveman")) && (await isDir(compressDir))) {
       console.log("     · skip Claude Code caveman (already installed)");
     } else if (!(await which("claude"))) {
       console.log("     · skip Claude Code (claude not on PATH)  — manual: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman");
@@ -334,11 +348,11 @@ export async function installCaveman(home: string): Promise<void> {
     if (await isDir(geminiCavemanDir)) {
       console.log("     · skip Gemini CLI caveman (already installed)");
     } else if (!(await which("gemini"))) {
-      console.log("     · skip Gemini CLI (gemini not on PATH)  — manual: gemini extensions install https://github.com/JuliusBrussee/caveman");
+      console.log("     · skip Gemini CLI (gemini not on PATH)  — manual: gemini extensions install https://github.com/JuliusBrussee/caveman --consent --skip-settings");
     } else {
-      const r = await runProcDry(["gemini", "extensions", "install", CAVEMAN_REPO]);
+      const r = await runProcDry(["gemini", "extensions", "install", CAVEMAN_REPO, "--consent", "--skip-settings"]);
       if (r.exit !== 0) {
-        console.log(`     ✗ Gemini CLI caveman install failed: ${r.stderr.trim()} — manual: gemini extensions install ${CAVEMAN_REPO}`);
+        console.log(`     ✗ Gemini CLI caveman install failed: ${r.stderr.trim()} — manual: gemini extensions install ${CAVEMAN_REPO} --consent --skip-settings`);
       } else {
         console.log("     ✓ Gemini CLI caveman installed");
       }
@@ -473,15 +487,11 @@ async function installRepomixClaudePlugins(home: string): Promise<void> {
   }
 }
 
+type McpDefaultMode = "minimal" | "none" | "all";
+
 /**
- * Register all builtin MCPs in the registry (default-disabled).
- * Apply to agents only when default_enabled=true (none of the W2/W3 entries
- * are, so this step is registry-only — avoids 55-100k token startup cost).
- *
- * Dart hint: if `dart` is not on PATH, log a hint that dart_mcp_server
- * requires Dart SDK ≥ 3.9.0-163.0.dev and the command `dart mcp-server`.
- *
- * Claude Code repomix plugins are installed here as the repomix vendor entry.
+ * Register all builtin MCPs in the registry. Registration is always config-only;
+ * default state is applied separately by applyBuiltinMcpDefaultState().
  */
 export async function installMcpRegistryEntries(home: string): Promise<void> {
   const { registerServer } = await import("./mcp-registry.ts");
@@ -489,11 +499,13 @@ export async function installMcpRegistryEntries(home: string): Promise<void> {
 
   for (const { name, spec } of BUILTIN_MCPS) {
     if (DRY_RUN) {
-      console.log(`     [dry-run] would register ${name} MCP (default-disabled; enable with: fulcrum mcp enable ${name})`);
+      const defaultState = spec.default_enabled ? "minimal-default" : "opt-in";
+      console.log(`     [dry-run] would register ${name} MCP (${defaultState}; enable with: fulcrum mcp enable ${name})`);
       continue;
     }
     await registerServer(name, spec);
-    console.log(`     ✓ ${name} MCP registered (default-disabled; enable with: fulcrum mcp enable ${name})`);
+    const defaultState = spec.default_enabled ? "minimal-default" : "opt-in";
+    console.log(`     ✓ ${name} MCP registered (${defaultState}; enable with: fulcrum mcp enable ${name})`);
   }
 
   // Dart hint: doctor also reports this, but surface it at install time too.
@@ -503,13 +515,57 @@ export async function installMcpRegistryEntries(home: string): Promise<void> {
 
   // Install repomix Claude plugins (Claude-specific vendor install).
   await installRepomixClaudePlugins(home);
+
+  const { installRepomixPackageMirrors } = await import("./repomix-package.ts");
+  await installRepomixPackageMirrors({ dryRun: DRY_RUN });
+}
+
+export async function applyBuiltinMcpDefaultState(mode: McpDefaultMode): Promise<void> {
+  const { setEnabled, applyToAgents, loadRegistry, saveRegistry, ALL_AGENT_IDS } = await import("./mcp-registry.ts");
+  const { BUILTIN_MCPS, MINIMAL_DEFAULT_MCPS } = await import("./mcp-builtins.ts");
+
+  const allNames = BUILTIN_MCPS.map(({ name }) => name);
+  const minimalNames = [...MINIMAL_DEFAULT_MCPS];
+  const targetNames = mode === "all" ? allNames : minimalNames;
+
+  if (mode === "none") {
+    console.log("     · default MCP enable step skipped; existing MCP state left untouched");
+    return;
+  }
+
+  for (const name of targetNames) {
+    if (DRY_RUN) {
+      console.log(`     [dry-run] would enable ${name} on [${ALL_AGENT_IDS.join(", ")}]`);
+      continue;
+    }
+    if (mode === "minimal") {
+      const reg = await loadRegistry();
+      const server = reg.servers[name];
+      if (!server) throw new Error(`mcp-registry: server '${name}' not registered`);
+      for (const agentId of ALL_AGENT_IDS) {
+        if (!server.agent_visibility[agentId]) continue;
+        if (server.enabled[agentId] === undefined) {
+          server.enabled[agentId] = true;
+        }
+      }
+      await saveRegistry(reg);
+    } else {
+      await setEnabled(name, true, { agents: [...ALL_AGENT_IDS] });
+    }
+    await applyToAgents(name);
+    if (mode === "minimal") {
+      console.log(`     ✓ ${name} minimal default applied where no user state existed`);
+    } else {
+      console.log(`     ✓ ${name} enabled on [${ALL_AGENT_IDS.join(", ")}]`);
+    }
+  }
 }
 
 export async function run(args: string[]): Promise<void> {
   let withProject: string | null = null;
   let syncAuthoredSkills = true;
   let syncUpstream = true;
-  let enableAllMcps = false;
+  let mcpDefaultMode: McpDefaultMode = "minimal";
   DRY_RUN = false;
   let i = 0;
   while (i < args.length) {
@@ -527,13 +583,21 @@ export async function run(args: string[]): Promise<void> {
     } else if (a === "--no-upstream-skills") {
       syncUpstream = false;
       i += 1;
+    } else if (a === "--no-default-mcps") {
+      mcpDefaultMode = "none";
+      i += 1;
     } else if (a === "--enable-all-mcps") {
-      enableAllMcps = true;
+      mcpDefaultMode = "all";
       i += 1;
     } else {
       console.error(`fulcrum install: unknown arg '${a}'`);
       process.exit(2);
     }
+  }
+
+  if (args.includes("--no-default-mcps") && args.includes("--enable-all-mcps")) {
+    console.error("fulcrum install: --no-default-mcps conflicts with --enable-all-mcps");
+    process.exit(2);
   }
 
   if (DRY_RUN) {
@@ -597,6 +661,11 @@ export async function run(args: string[]): Promise<void> {
   }
   console.log();
 
+  console.log("7b/9 Installing vendor capability packages");
+  const { installVendorCapabilityPackages } = await import("./vendor-packages.ts");
+  await installVendorCapabilityPackages({ dryRun: DRY_RUN });
+  console.log();
+
   console.log("8/9  Registering DeepWiki MCP where supported");
   const { installDeepwikiMcp } = await import("./mcp.ts");
   await installDeepwikiMcp({ dryRun: DRY_RUN });
@@ -606,21 +675,14 @@ export async function run(args: string[]): Promise<void> {
   await installMcpRegistryEntries(home);
   console.log();
 
-  if (enableAllMcps) {
-    console.log("8c/9 Enabling all builtin MCPs across every detected agent (--enable-all-mcps)");
-    const { setEnabled, applyToAgents, ALL_AGENT_IDS } = await import("./mcp-registry.ts");
-    const { BUILTIN_MCPS } = await import("./mcp-builtins.ts");
-    for (const { name } of BUILTIN_MCPS) {
-      if (DRY_RUN) {
-        console.log(`     [dry-run] would enable ${name} on [${ALL_AGENT_IDS.join(", ")}]`);
-        continue;
-      }
-      await setEnabled(name, true, { agents: [...ALL_AGENT_IDS] });
-      await applyToAgents(name);
-      console.log(`     ✓ ${name} enabled on [${ALL_AGENT_IDS.join(", ")}]`);
-    }
-    console.log();
-  }
+  const modeLabel = mcpDefaultMode === "all"
+    ? "Enabling all builtin MCPs across every detected agent (--enable-all-mcps)"
+    : mcpDefaultMode === "none"
+      ? "Skipping minimal default MCP enable step (--no-default-mcps)"
+      : "Enabling minimal default MCP set";
+  console.log(`8c/9 ${modeLabel}`);
+  await applyBuiltinMcpDefaultState(mcpDefaultMode);
+  console.log();
 
   if (withProject) {
     console.log(`9/9  fulcrum init ${withProject}`);

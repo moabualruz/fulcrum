@@ -108,7 +108,7 @@ export async function installDeepwikiMcp(opts: { dryRun?: boolean } = {}): Promi
   if (await exists(claudeDir)) {
     if (await which("claude")) {
       if (dryRun) console.log(`     [dry-run] would run: claude mcp add -s user deepwiki --transport http ${DEEPWIKI_URL}`);
-      else await runProc(["claude", "mcp", "add", "-s", "user", "deepwiki", "--transport", "http", DEEPWIKI_URL]);
+      else await runProc(["claude", "mcp", "add", "-s", "user", "deepwiki", "--transport", "http", DEEPWIKI_URL], { timeoutMs: 60_000 });
       console.log("     ✓ Claude Code DeepWiki MCP requested");
     } else {
       console.log("     · skip Claude Code DeepWiki MCP (claude not on PATH)");
@@ -181,7 +181,7 @@ export async function installPiDeepwikiAdapter(opts: { dryRun?: boolean } = {}):
     if (await which("pi")) {
       if (dryRun) console.log(`     [dry-run] would run: pi install ${PI_MCP_ADAPTER_PKG}`);
       else {
-        const r = await runProc(["pi", "install", PI_MCP_ADAPTER_PKG]);
+        const r = await runProc(["pi", "install", PI_MCP_ADAPTER_PKG], { timeoutMs: 60_000 });
         if (r.exit === 0) console.log("     ✓ Pi pi-mcp-adapter install requested");
         else console.log(`     ✗ Pi pi-mcp-adapter install failed: ${r.stderr.trim()}`);
       }

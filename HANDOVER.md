@@ -14,7 +14,7 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
 
 `main` ships a Bun `fulcrum` CLI that:
 
-- **Installs cross-agent setup** (`fulcrum install`) — sentinel-splices `rules/AGENTS.md` into each detected agent's primary rules file; vendors hook recipe snippets; seeds `tool-output-policy.toml`; runs caveman vendor canonical install per agent (`claude plugin install caveman@caveman` / `gemini extensions install` / `npx skills add JuliusBrussee/caveman`); manages context-mode (npm + per-agent MCP+hooks+routing); registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 default-disabled vendor MCPs in the registry (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart); installs 3 vendor-published Repomix Claude plugins; syncs 27 authored skills + 27 upstream-pinned skills with subpath-level SHA-256 integrity verification.
+- **Installs cross-agent setup** (`fulcrum install`) — sentinel-splices `rules/AGENTS.md` into each detected agent's primary rules file; vendors hook recipe snippets; seeds `tool-output-policy.toml`; runs caveman vendor canonical install per agent (`claude plugin install caveman@caveman` / `gemini extensions install` / `npx skills add JuliusBrussee/caveman`); manages context-mode (npm + per-agent MCP+hooks+routing); installs vendor capability packages (Repomix Claude plugins + non-Claude mirrors, Cloudflare Claude plugin, Superpowers Claude/Gemini/OpenCode/Pi packages + Codex full skill mirror; Pi falls back to skill mirror only when `pi` is unavailable); registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 vendor MCPs in the registry (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart) with minimal default state enabling only context7; syncs 27 authored skills + 27 upstream-pinned skills with subpath-level SHA-256 integrity verification and `vendor_canonical_agents` package-ownership skips.
 
 - **Bootstraps projects** (`fulcrum init <dir>`) in three vendor-canonical phases:
   1. **Vendor integrations** — `graphify install --platform <agent>` per detected agent (Claude Code/Codex/OpenCode/Gemini); `npx skills add` for caveman, ast-grep, tavily; `pi install npm:pi-mcp-adapter` + `pi-mcp-adapter init` for Pi; defers context7 OAuth to manual `npx ctx7 setup`.
@@ -25,7 +25,7 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
   - Codex TOML: emits `bearer_token_env_var = "<VAR>"` for HTTP servers with a single `auth_env_var`.
   - Gemini / OpenCode / Pi: `headers.Authorization = "Bearer ${VAR}"` (or `{env:VAR}` for OpenCode's syntax) with vendor-side env interpolation.
   - Claude Code: `claude mcp add ... --header "Authorization: Bearer <token>"` — token expanded at install time because Claude does not interpolate `${VAR}` in stored headers.
-  Default-disabled for every entry except DeepWiki + context-mode (always-on). `fulcrum install --enable-all-mcps` is a verification switch that flips every builtin on across every detected agent.
+  Minimal default state enables DeepWiki + context-mode + context7 where no user state exists. `fulcrum install --no-default-mcps` registers all MCP definitions/config without changing enable state; `fulcrum install --enable-all-mcps` is a verification switch that explicitly flips every builtin on across every detected agent.
 
 - **Validates the environment** (`fulcrum doctor [--json] [--probe]`) — agent detection, rules-spliced state, caveman per-agent install + `defaultMode` source, Pi MCP adapter check, 47 BYO tools, tool-output policy presence. MCP registry section reports `auth_status` (env-var presence), `reachable` (HEAD probe / `which`), `drift` (`default_enabled=false` but some agent has it enabled), and `wiring` (per-agent native config inspection — confirms `bearer_token_env_var` / `headers.Authorization` is present for HTTP servers with declared auth). With `--probe`: spawns stdio MCPs / POSTs HTTP MCPs and asserts a valid JSON-RPC `initialize` reply within an 8s timeout. Catches wrong commands, stale URLs, and broken auth in one check.
 
@@ -57,21 +57,23 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 │                              repomix --compress). Vendor-default output paths.
 ├── fulcrum install [--with-project DIR] [--dry-run]
 │                  [--no-skills] [--no-upstream-skills]
-│                  [--enable-all-mcps]
+│                  [--no-default-mcps] [--enable-all-mcps]
 │                            — sentinel-splice rules, vendor snippets, seed policy,
 │                              caveman canonical per-agent install, caveman ultra
 │                              lock, context-mode managed integration, sync
 │                              authored + upstream skills (with subpath SHA-256),
 │                              register DeepWiki MCP for detected agents (Pi via
 │                              auto-installed pi-mcp-adapter), register 16
-│                              builtin MCPs in the registry default-disabled,
-│                              install 3 Repomix Claude plugins.
+│                              builtin MCPs in the registry, enable context7
+│                              by default unless --no-default-mcps,
+│                              install vendor capability packages.
 ├── fulcrum uninstall [--dry-run] [--purge] [--include-caveman]
 │                            — remove Fulcrum-managed rules blocks, native hook
 │                              registrations, hook snippets/markers, managed
 │                              skills/fulcrum/ namespace (third-party skills
 │                              we placed at vendor paths stay — vendor owns
-│                              them), generated Gemini import, managed
+│                              them), generated Gemini import, vendor
+│                              capability packages, managed
 │                              context-mode + DeepWiki + MCP registry entries,
 │                              caveman per agent (vendor canonical commands).
 │                              Keeps caveman unless --include-caveman.
@@ -119,6 +121,7 @@ src/
 ├── cli/
 │   ├── init.ts init.test.ts            # bootstrap + reindex subcommand
 │   ├── vendor-installs.ts              # graphify/caveman/ast-grep/tavily/pi-mcp-adapter installers
+│   ├── vendor-packages.ts + .test.ts   # package-owned Cloudflare/Superpowers/Repomix-adjacent surfaces
 │   ├── project-index.ts                # graphify update . + repomix --compress
 │   ├── vendor-rules.test.ts            # stripVendorRuleBlocks behavior
 │   ├── install.ts install.test.ts      # cross-agent install + stripVendorRuleBlocks
@@ -185,13 +188,13 @@ LICENSE (MIT)  AGENTS.md  README.md
 
 - `bun run ci` — green: install + tsc + **273 tests** + 5 platform builds + skills:lint + compress:check (hard, 0 pending).
 - `fulcrum install` — full sweep across 5 agents; doctor verdict ok on a fully-set-up machine.
-- `fulcrum install --enable-all-mcps` — flips every builtin MCP on across every detected agent immediately after registration. End-to-end live verified 2026-04-29: 16/16 MCPs `handshake:ok` via `fulcrum doctor --probe`. Default install state stays opt-in disabled — revert via `fulcrum mcp disable --all-agents <name>`.
+- `fulcrum install --enable-all-mcps` — flips every builtin MCP on across every detected agent immediately after registration. End-to-end live verified 2026-04-29: 16/16 MCPs `handshake:ok` via `fulcrum doctor --probe`. Default install state enables only context7 from the builtin registry where no user state exists; skip via `--no-default-mcps`.
 - `fulcrum init <dir>` — three phases run end-to-end on this repo: vendor integrations across detected agents, vendor rule de-duplication, project indices (`graphify-out/` + `repomix-output.xml`).
 - `fulcrum mcp list --json` — 16 builtin servers visible; `enable`/`disable [--all-agents]` propagates to native config files with auth headers correctly wired per-agent.
 - `fulcrum doctor` — verdict ok on this machine; per-agent state, caveman across 5 agents, Pi MCP adapter, DeepWiki, drift detection, auth-wiring inspection.
 - `fulcrum doctor --probe` — actual JSON-RPC `initialize` per server. 16/16 servers handshake:ok across all 5 agents on this machine.
 - `fulcrum uninstall --dry-run` — preview shows clean removal of every Fulcrum-managed artifact across 5 agents.
-- `bash scripts/install.sh [--dry-run] [--with-project DIR] [--no-skills] [--no-upstream-skills] [--enable-all-mcps]` — flag pass-through verified bash 3.2-safe.
+- `bash scripts/install.sh [--dry-run] [--with-project DIR] [--no-skills] [--no-upstream-skills] [--no-default-mcps] [--enable-all-mcps]` — flag pass-through verified bash 3.2-safe.
 - `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG → tag → cross-compile → optional `gh release create`. Does NOT push.
 - `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <skill>` — five trigger-rate harnesses; uniform flags; PATH-missing guard.
 - `docs/smoke-test.md` — self-contained agent-runnable verification prompt with 16 checks + result template + remediation links + append-only result log.
@@ -426,7 +429,7 @@ brew install usql                                                    # optional
 bash scripts/install.sh
 ```
 
-Splices rules; vendors hook snippets; seeds policy; installs caveman per agent (vendor canonical commands); installs context-mode; syncs 27 authored + 27 upstream skills with subpath SHA-256; registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 builtin MCPs default-disabled; installs 3 vendor Repomix Claude plugins.
+Splices rules; vendors hook snippets; seeds policy; installs caveman per agent (vendor canonical commands); installs context-mode; syncs 27 authored + 27 upstream skills with subpath SHA-256; registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 builtin MCPs and enables context7 as minimal default; installs 3 vendor Repomix Claude plugins.
 
 ### C. MCP auth
 
@@ -464,7 +467,7 @@ wrangler login                                 # Cloudflare Workers OAuth
 
 ### E. Selectively enable MCPs
 
-Default install state: every builtin MCP is registered but disabled (16 active = ~150–300k tokens at session start). Opt in selectively, or use `--enable-all-mcps` for verification.
+Default install state: every builtin MCP is registered; context7 is enabled as minimal default only where no user state exists; other builtin MCPs stay disabled (16 active = ~150–300k tokens at session start). Use `--no-default-mcps` for registry-only/no-state-change setup, opt in selectively, or use `--enable-all-mcps` for verification.
 
 ```
 fulcrum mcp enable github --all-agents

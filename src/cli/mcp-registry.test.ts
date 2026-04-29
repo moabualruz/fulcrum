@@ -27,6 +27,8 @@ import {
   DEFAULT_DART_SERVER,
   DEFAULT_CLOUDFLARE_DOCS_SERVER,
   DEFAULT_CLOUDFLARE_WORKERS_BINDINGS_SERVER,
+  DEFAULT_CLOUDFLARE_WORKERS_BUILDS_SERVER,
+  DEFAULT_CLOUDFLARE_OBSERVABILITY_SERVER,
   DEFAULT_CLOUDFLARE_RADAR_SERVER,
   BUILTIN_MCPS,
 } from "./mcp-builtins.ts";
@@ -92,6 +94,11 @@ describe("registerServer", () => {
     expect(s.vendor).toBe("yamadashy");
     expect(s.default_enabled).toBe(false);
     expect(s.auth_env_vars).toHaveLength(0);
+    expect(s.agent_visibility["claude-code"]).toBe(false);
+    expect(s.agent_visibility["codex"]).toBe(true);
+    expect(s.agent_visibility["gemini"]).toBe(true);
+    expect(s.agent_visibility["opencode"]).toBe(true);
+    expect(s.agent_visibility["pi"]).toBe(true);
   });
 
   test("idempotent — re-registering does not duplicate", async () => {
@@ -108,6 +115,22 @@ describe("registerServer", () => {
     for (const id of ALL_AGENT_IDS) {
       expect(s.agent_visibility[id]).toBe(true);
     }
+  });
+
+  test("Cloudflare plugin-owned endpoints are hidden from Claude only", async () => {
+    for (const spec of [
+      DEFAULT_CLOUDFLARE_DOCS_SERVER,
+      DEFAULT_CLOUDFLARE_WORKERS_BINDINGS_SERVER,
+      DEFAULT_CLOUDFLARE_WORKERS_BUILDS_SERVER,
+      DEFAULT_CLOUDFLARE_OBSERVABILITY_SERVER,
+    ]) {
+      expect(spec.agent_visibility["claude-code"]).toBe(false);
+      expect(spec.agent_visibility["codex"]).toBe(true);
+      expect(spec.agent_visibility["gemini"]).toBe(true);
+      expect(spec.agent_visibility["opencode"]).toBe(true);
+      expect(spec.agent_visibility["pi"]).toBe(true);
+    }
+    expect(DEFAULT_CLOUDFLARE_RADAR_SERVER.agent_visibility["claude-code"]).toBe(true);
   });
 });
 
@@ -156,6 +179,15 @@ describe("isEnabled / setEnabled", () => {
     expect(isEnabled(s, "codex")).toBe(true);
     expect(isEnabled(s, "claude-code")).toBe(false);
     expect(isEnabled(s, "gemini")).toBe(false);
+  });
+
+  test("setEnabled ignores plugin-owned hidden agent surfaces", async () => {
+    await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+    await setEnabled("repomix", true, { agents: ["claude-code", "codex"] });
+    const reg = await loadRegistry();
+    const s = reg.servers["repomix"]!;
+    expect(s.enabled["claude-code"]).toBeUndefined();
+    expect(s.enabled["codex"]).toBe(true);
   });
 
   test("setEnabled false disables previously enabled agent", async () => {

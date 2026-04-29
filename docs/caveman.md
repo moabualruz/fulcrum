@@ -11,7 +11,7 @@ Five agents, five paths. Never `~/.agents/` (shared folder pollutes every agent 
 | Agent | Install path | Command / method |
 |---|---|---|
 | Claude Code | Plugin system | `claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman` (fulcrum install runs this) |
-| Gemini CLI | Extension system | `gemini extensions install https://github.com/JuliusBrussee/caveman` (fulcrum install runs this) |
+| Gemini CLI | Extension system | `gemini extensions install https://github.com/JuliusBrussee/caveman --consent --skip-settings` (fulcrum install runs this) |
 | Codex CLI | `~/.codex/skills/caveman/` + siblings | `npx skills add JuliusBrussee/caveman -a codex` (canonical); clone+copy fallback when npx absent |
 | OpenCode | `~/.config/opencode/skills/caveman/` + siblings | `npx skills add JuliusBrussee/caveman -a opencode` (canonical); clone+copy fallback when npx absent |
 | Pi CLI | `~/.pi/agent/skills/caveman/` + siblings | `npx skills add JuliusBrussee/caveman -a pi` (canonical); clone+copy fallback when npx absent |

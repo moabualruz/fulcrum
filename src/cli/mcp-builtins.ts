@@ -12,6 +12,10 @@ const ALL_VISIBLE = {
   "claude-code": true, codex: true, gemini: true, opencode: true, pi: true,
 } as const;
 
+const NON_CLAUDE_VISIBLE = {
+  "claude-code": false, codex: true, gemini: true, opencode: true, pi: true,
+} as const;
+
 // ── Wave 2 ─────────────────────────────────────────────────────────────────
 
 export const DEFAULT_GITHUB_SERVER: McpServerSpec = {
@@ -31,7 +35,10 @@ export const DEFAULT_REPOMIX_SERVER: McpServerSpec = {
   vendor: "yamadashy",
   default_enabled: false,
   auth_env_vars: [],
-  agent_visibility: { ...ALL_VISIBLE },
+  // Claude Code gets Repomix through vendor plugins that carry a package of
+  // surfaces (.mcp.json, commands, explorer agent). That plugin package owns
+  // the Claude surface; MCP registry owns only non-Claude MCP config.
+  agent_visibility: { ...NON_CLAUDE_VISIBLE },
 };
 
 // ── Wave 3 ─────────────────────────────────────────────────────────────────
@@ -54,11 +61,8 @@ export const DEFAULT_CONTEXT7_SERVER: McpServerSpec = {
   description: "Context7 MCP server — up-to-date library docs for AI code editors",
   vendor: "upstash",
   default_enabled: false,
-  // Optional in the strict sense: the free tier responds to `initialize`
-  // without auth. Declared here so `applyToAgents` wires
-  // `bearer_token_env_var` (codex) / `Authorization: Bearer ${VAR}` headers
-  // (claude/gemini/pi/opencode) when CONTEXT7_API_KEY is set, raising rate
-  // limits for users who have a key.
+  // Context7 free tier can answer without auth, but declaring the env var is
+  // how Fulcrum wires bearer auth for users who configure the key.
   auth_env_vars: ["CONTEXT7_API_KEY"],
   agent_visibility: { ...ALL_VISIBLE },
 };
@@ -94,7 +98,9 @@ export const DEFAULT_CLOUDFLARE_DOCS_SERVER: McpServerSpec = {
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: [],
-  agent_visibility: { ...ALL_VISIBLE },
+  // Claude Code gets this endpoint through Cloudflare's plugin package
+  // (`cloudflare@cloudflare`); registry owns direct config for other agents.
+  agent_visibility: { ...NON_CLAUDE_VISIBLE },
 };
 
 export const DEFAULT_CLOUDFLARE_WORKERS_BINDINGS_SERVER: McpServerSpec = {
@@ -104,7 +110,7 @@ export const DEFAULT_CLOUDFLARE_WORKERS_BINDINGS_SERVER: McpServerSpec = {
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: ["CLOUDFLARE_API_TOKEN"],
-  agent_visibility: { ...ALL_VISIBLE },
+  agent_visibility: { ...NON_CLAUDE_VISIBLE },
 };
 
 export const DEFAULT_CLOUDFLARE_WORKERS_BUILDS_SERVER: McpServerSpec = {
@@ -114,7 +120,7 @@ export const DEFAULT_CLOUDFLARE_WORKERS_BUILDS_SERVER: McpServerSpec = {
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: ["CLOUDFLARE_API_TOKEN"],
-  agent_visibility: { ...ALL_VISIBLE },
+  agent_visibility: { ...NON_CLAUDE_VISIBLE },
 };
 
 export const DEFAULT_CLOUDFLARE_OBSERVABILITY_SERVER: McpServerSpec = {
@@ -124,7 +130,7 @@ export const DEFAULT_CLOUDFLARE_OBSERVABILITY_SERVER: McpServerSpec = {
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: ["CLOUDFLARE_API_TOKEN"],
-  agent_visibility: { ...ALL_VISIBLE },
+  agent_visibility: { ...NON_CLAUDE_VISIBLE },
 };
 
 export const DEFAULT_CLOUDFLARE_RADAR_SERVER: McpServerSpec = {
@@ -213,3 +219,5 @@ export const BUILTIN_MCPS: Array<{ name: string; spec: McpServerSpec }> = [
   // Dart
   { name: "dart",                         spec: DEFAULT_DART_SERVER },
 ];
+
+export const MINIMAL_DEFAULT_MCPS = ["context7"] as const;

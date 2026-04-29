@@ -12,7 +12,7 @@ Fulcrum is a local-first CLI Agent OS that installs a shared foundation across e
 - Splices a shared rules block into each agent's primary config file (idempotent, preserves your content).
 - Installs hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `tool-output-router`, and two index hooks) as binary subcommands of a single `fulcrum` binary.
 - Syncs Fulcrum-authored skills into the `fulcrum/` namespace and curated upstream skills into each vendor's native skill placement.
-- Registers 18 managed MCPs (DeepWiki + context-mode always-on; 16 builtin extras default-disabled).
+- Registers 18 managed MCPs (DeepWiki + context-mode always-on; context7 minimal-default; other builtin extras opt-in).
 - Installs caveman output-compression cross-agent with `defaultMode: ultra`.
 - Reports environment health via `fulcrum doctor`.
 
@@ -70,6 +70,7 @@ FULCRUM_RELEASE_TAG=v0.1.0 bash <(curl -fsSL https://raw.githubusercontent.com/m
 | `--dry-run` | Preview only; no writes |
 | `--no-skills` | Skip authored + upstream skill sync |
 | `--no-upstream-skills` | Skip only the networked upstream skill sync |
+| `--no-default-mcps` | Register MCP definitions/config but skip Fulcrum's minimal default enable step; existing MCP state is left untouched. |
 | `--enable-all-mcps` | After registration, enable every builtin MCP on every detected agent. Use to verify each MCP starts and authenticates; revert later via `fulcrum mcp disable --all-agents <name>`. |
 
 ### Post-install: env vars
@@ -197,7 +198,7 @@ Fulcrum skills install under `fulcrum/` in each agent's skills directory. The sl
 
 ### MCPs
 
-Fulcrum registers 18 MCPs. DeepWiki and context-mode are always-on. The remaining 16 are registered but default-disabled to avoid startup token cost (~55–300k tokens with 5+ active MCPs).
+Fulcrum registers 18 MCPs. DeepWiki and context-mode are always-on. Of the 16 registry MCPs, default install enables only `context7` when no user state exists; the rest stay opt-in to avoid startup token cost (~55–300k tokens with 5+ active MCPs). Use `--no-default-mcps` to register everything without changing enabled state.
 
 ```bash
 fulcrum mcp list                            # see all registered MCPs + state
