@@ -445,6 +445,16 @@ async function removeStalePiSkillDir(path: string, dryRun: boolean): Promise<voi
   await rm(path, { recursive: true, force: true });
 }
 
+async function removeVendorSkillDir(path: string, dryRun: boolean): Promise<void> {
+  if (!(await isDir(path))) return;
+  if (dryRun) {
+    console.log(`      [dry-run] would remove: ${path}`);
+    return;
+  }
+  await rm(path, { recursive: true, force: true });
+  console.log(`      removed: ${path}`);
+}
+
 async function ensureRepo(repo: string, ref: string, sha: string, dryRun: boolean): Promise<string | null> {
   const dir = repoCacheDir(repo);
   if (dryRun) {
@@ -667,5 +677,102 @@ export async function syncUpstreamSkills(
     }
     console.log();
   }
+  console.log("Done.");
+}
+
+async function filteredUpstreamSkills(
+  opts: { source?: string; names?: readonly string[]; lockPath?: string },
+): Promise<readonly UpstreamSkill[]> {
+  const skills = await loadUpstreamSkills(opts.lockPath ?? upstreamLockPath());
+  const names = opts.names ? new Set(opts.names) : null;
+  return skills.filter((skill) => {
+    if (opts.source !== undefined && skill.source !== opts.source) return false;
+    if (names && !names.has(skill.name)) return false;
+    return true;
+  });
+}
+
+export async function syncUpstreamSkillsBySource(
+  source: string,
+  opts: { dryRun?: boolean; updatePins?: boolean; lockPath?: string } = {},
+): Promise<void> {
+  const skills = await filteredUpstreamSkills({ source, lockPath: opts.lockPath });
+  await syncUpstreamSkills({ dryRun: opts.dryRun, updatePins: opts.updatePins, lockPath: opts.lockPath, skills });
+}
+
+export async function syncUpstreamSkillsByNames(
+  names: readonly string[],
+  opts: { dryRun?: boolean; updatePins?: boolean; lockPath?: string } = {},
+): Promise<void> {
+  const skills = await filteredUpstreamSkills({ names, lockPath: opts.lockPath });
+  await syncUpstreamSkills({ dryRun: opts.dryRun, updatePins: opts.updatePins, lockPath: opts.lockPath, skills });
+}
+
+async function piFrontmatterInstallName(skill: UpstreamSkill): Promise<string | null> {
+  const repoDir = repoCacheDir(skill.source);
+  const src = `${repoDir}/${skill.subpath}`;
+  return readSkillFrontmatterName(src, skill.kind);
+}
+
+async function uninstallClaudePlugin(skill: UpstreamSkill, dryRun: boolean): Promise<void> {
+  if (!skill.claude_plugin) return;
+  const cmd = ["claude", "plugin", "uninstall", skill.claude_plugin.name];
+  if (dryRun) {
+    console.log(`      [dry-run] would run: ${cmd.join(" ")}`);
+    return;
+  }
+  if (!(await which("claude"))) {
+    console.log(`      · claude not on PATH — skip plugin uninstall: ${skill.claude_plugin.name}`);
+    return;
+  }
+  const result = await runProc(cmd, { timeoutMs: 60_000 });
+  if (result.exit === 0) {
+    console.log(`      uninstalled claude plugin: ${skill.claude_plugin.name}`);
+  } else {
+    console.log(`      · claude plugin uninstall skipped/failed: ${result.stderr.trim() || result.stdout.trim()}`);
+  }
+}
+
+export async function removeUpstreamSkills(
+  opts: { dryRun?: boolean; source?: string; names?: readonly string[]; lockPath?: string } = {},
+): Promise<void> {
+  const dryRun = opts.dryRun ?? false;
+  const skills = await filteredUpstreamSkills({ source: opts.source, names: opts.names, lockPath: opts.lockPath });
+  const home = homeDir();
+
+  console.log(`fulcrum upstream skills remove — ${skills.length} curated skill(s)\n`);
+
+  const claudeAgent = AGENTS.find((agent) => agent.id === "claude-code")!;
+  if (await isDir(claudeAgent.baseDir(home))) {
+    const pluginSkills = skills.filter((skill) => skill.claude_plugin);
+    if (pluginSkills.length > 0) {
+      console.log("→ Claude Code plugins");
+      for (const skill of pluginSkills) {
+        await uninstallClaudePlugin(skill, dryRun);
+      }
+      console.log();
+    }
+  }
+
+  for (const target of agentTargets(home)) {
+    if (!(await isDir(target.baseRoot))) {
+      console.log(`· skip ${target.label} (agent skills parent not present)`);
+      continue;
+    }
+    console.log(`→ ${target.label} (${target.skillsRoot})`);
+
+    for (const skill of skills) {
+      await removeVendorSkillDir(`${target.skillsRoot}/${skill.name}`, dryRun);
+
+      if (target.id === "pi") {
+        const frontmatterName = await piFrontmatterInstallName(skill);
+        if (frontmatterName && frontmatterName !== skill.name) {
+          await removeVendorSkillDir(`${target.skillsRoot}/${frontmatterName}`, dryRun);
+        }
+      }
+    }
+    console.log();
+  }
+
   console.log("Done.");
 }

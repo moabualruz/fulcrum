@@ -157,6 +157,68 @@ async function cleanupLegacyClaudeSkills(opts: { dryRun: boolean }): Promise<voi
   console.log(`    ✓ removed legacy layout: ${legacy}`);
 }
 
+async function removeDirIfPresent(path: string, opts: { dryRun: boolean; label: string }): Promise<void> {
+  if (!(await isDir(path))) return;
+  if (opts.dryRun) {
+    console.log(`    [dry-run] would remove ${opts.label}: ${path}`);
+    return;
+  }
+  await rm(path, { recursive: true, force: true });
+  console.log(`    ✓ removed ${opts.label}: ${path}`);
+}
+
+async function uninstallClaudeFulcrumPlugin(opts: { dryRun: boolean }): Promise<void> {
+  const cmd = ["claude", "plugin", "uninstall", PLUGIN_SPEC];
+  if (opts.dryRun) {
+    console.log(`    [dry-run] would run: ${cmd.join(" ")}`);
+    return;
+  }
+  if (!(await which("claude"))) {
+    console.log(`    · claude not on PATH — skip plugin uninstall (${PLUGIN_SPEC})`);
+    return;
+  }
+  const result = await runProc(cmd, { timeoutMs: 60_000 });
+  if (result.exit === 0) {
+    console.log(`    ✓ plugin uninstalled: ${PLUGIN_SPEC}`);
+  } else {
+    console.log(`    · plugin uninstall skipped/failed: ${result.stderr.trim() || result.stdout.trim()}`);
+  }
+}
+
+export async function removeAuthoredSkills(opts: { dryRun?: boolean } = {}): Promise<void> {
+  const dryRun = opts.dryRun ?? false;
+  const home = process.env["HOME"] ?? "";
+
+  console.log("fulcrum skills remove — authored skill surfaces\n");
+
+  const claudeAgent = AGENTS.find((a) => a.id === "claude-code")!;
+  if (await isDir(claudeAgent.baseDir(home))) {
+    console.log(`→ Claude Code (${PLUGIN_SPEC})`);
+    await uninstallClaudeFulcrumPlugin({ dryRun });
+    await removeDirIfPresent(`${claudeAgent.skillsDir(home)}/${NAMESPACE}`, { dryRun, label: "legacy layout" });
+    console.log();
+  }
+
+  for (const agent of AGENTS) {
+    if (agent.id === "claude-code" || agent.id === "gemini") continue;
+    const path = `${agent.skillsDir(home)}/${NAMESPACE}`;
+    if (!(await isDir(path))) continue;
+    console.log(`→ ${agent.label}`);
+    await removeDirIfPresent(path, { dryRun, label: "authored namespace" });
+    console.log();
+  }
+
+  const geminiAgent = AGENTS.find((a) => a.id === "gemini")!;
+  const geminiExtension = geminiAgent.skillsDir(home).replace(/\/skills$/, "");
+  if (await isDir(geminiExtension)) {
+    console.log("→ Gemini CLI");
+    await removeDirIfPresent(geminiExtension, { dryRun, label: "authored extension" });
+    console.log();
+  }
+
+  console.log("Done.");
+}
+
 export async function syncSkills(opts: { dryRun?: boolean } = {}): Promise<void> {
   const root = repoRoot();
   const skillsSrc = `${root}/skills`;

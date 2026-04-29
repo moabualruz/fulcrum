@@ -6,7 +6,8 @@ import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { syncSkills } from "./skills.ts";
+import { removeAuthoredSkills, syncSkills } from "./skills.ts";
+import * as proc from "../utils/proc.ts";
 
 describe("skills sync — Claude Code plugin path", () => {
   let testHome: string;
@@ -139,5 +140,77 @@ describe("Claude Code plugin package", () => {
     expect(packaged).toEqual(authored);
     expect(packaged).not.toContain("_template");
     expect(packaged).not.toContain("_archive");
+  });
+});
+
+describe("removeAuthoredSkills", () => {
+  let testHome: string;
+  let origHome: string | undefined;
+
+  beforeEach(async () => {
+    testHome = await mkdtemp(join(tmpdir(), "fulcrum-skills-remove-"));
+    origHome = process.env["HOME"];
+    process.env["HOME"] = testHome;
+  });
+
+  afterEach(async () => {
+    if (origHome !== undefined) process.env["HOME"] = origHome;
+    else delete process.env["HOME"];
+    await rm(testHome, { recursive: true, force: true });
+  });
+
+  test("removes Fulcrum-authored namespaces and preserves vendor skill placements", async () => {
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    const authoredDirs = [
+      [".claude", "skills", "fulcrum", "bat"],
+      [".codex", "skills", "fulcrum", "bat"],
+      [".config", "opencode", "skills", "fulcrum", "bat"],
+      [".pi", "agent", "skills", "fulcrum", "bat"],
+      [".gemini", "extensions", "fulcrum-skills", "skills", "bat"],
+    ];
+    const vendorDirs = [
+      [".claude", "skills", "wrangler"],
+      [".codex", "skills", "wrangler"],
+      [".config", "opencode", "skills", "wrangler"],
+      [".pi", "agent", "skills", "wrangler"],
+      [".gemini", "skills", "wrangler"],
+    ];
+
+    for (const parts of [...authoredDirs, ...vendorDirs]) {
+      await mkdir(join(testHome, ...parts), { recursive: true });
+      await writeFile(join(testHome, ...parts, "SKILL.md"), "---\nname: test\n---\n");
+    }
+
+    try {
+      await removeAuthoredSkills();
+
+      for (const parts of authoredDirs) {
+        await expect(readdir(join(testHome, ...parts))).rejects.toThrow();
+      }
+      for (const parts of vendorDirs) {
+        expect(await readFile(join(testHome, ...parts, "SKILL.md"), "utf8")).toContain("name: test");
+      }
+    } finally {
+      whichSpy.mockRestore();
+    }
+  });
+
+  test("dry-run logs removals without deleting authored namespace", async () => {
+    const authored = join(testHome, ".codex", "skills", "fulcrum", "bat");
+    await mkdir(authored, { recursive: true });
+    await writeFile(join(authored, "SKILL.md"), "---\nname: bat\n---\n");
+
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      logs.push(String(a[0]));
+    });
+    try {
+      await removeAuthoredSkills({ dryRun: true });
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(await readFile(join(authored, "SKILL.md"), "utf8")).toContain("name: bat");
+    expect(logs.some((l) => l.includes("[dry-run] would remove") && l.includes("/.codex/skills/fulcrum"))).toBe(true);
   });
 });

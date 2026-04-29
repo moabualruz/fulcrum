@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   computeSubpathSha256,
   loadUpstreamSkills,
+  removeUpstreamSkills,
   syncUpstreamSkills,
+  syncUpstreamSkillsBySource,
 } from "./upstream-skills.ts";
 import * as proc from "../utils/proc.ts";
 
@@ -627,5 +629,106 @@ describe("vendor_canonical_agents schema", () => {
     } finally {
       logSpy.mockRestore();
     }
+  });
+});
+
+describe("upstream skill filtering helpers", () => {
+  test("syncUpstreamSkillsBySource syncs exact Cloudflare source entries and excludes graphify", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.wrangler]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/wrangler"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+      "[skills.graphify]",
+      'source = "https://github.com/safishamsi/graphify"',
+      'subpath = "skills/graphify"',
+      'ref = "main"',
+      'tree_sha = "89abcdef0123456789abcdef0123456789abcdef"',
+      'license = "MIT"',
+      'author_class = "individual"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+
+    await mkdir(join(TMP, ".codex", "skills"), { recursive: true });
+
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map((a) => String(a)).join(" "));
+    });
+    try {
+      await syncUpstreamSkillsBySource("https://github.com/cloudflare/skills", { dryRun: true, lockPath });
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(logs.some((l) => l.includes("1 curated skill(s)"))).toBe(true);
+    expect(logs.some((l) => l.includes("wrangler"))).toBe(true);
+    expect(logs.some((l) => l.includes("graphify"))).toBe(false);
+  });
+
+  test("removeUpstreamSkills removes filtered vendor placements and Pi frontmatter alias only", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.wrangler]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/wrangler"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+      "[skills.graphify]",
+      'source = "https://github.com/safishamsi/graphify"',
+      'subpath = "skills/graphify"',
+      'ref = "main"',
+      'tree_sha = "89abcdef0123456789abcdef0123456789abcdef"',
+      'license = "MIT"',
+      'author_class = "individual"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+
+    const cacheSkill = join(TMP, ".fulcrum", "cache", "upstream-skills", "cloudflare__skills", "skills", "wrangler");
+    await mkdir(cacheSkill, { recursive: true });
+    await writeFile(join(cacheSkill, "SKILL.md"), "---\nname: cloudflare-wrangler\n---\n");
+
+    for (const dir of [
+      join(TMP, ".codex", "skills", "wrangler"),
+      join(TMP, ".codex", "skills", "graphify"),
+      join(TMP, ".gemini", "skills", "wrangler"),
+      join(TMP, ".gemini", "skills", "graphify"),
+      join(TMP, ".pi", "agent", "skills", "wrangler"),
+      join(TMP, ".pi", "agent", "skills", "cloudflare-wrangler"),
+      join(TMP, ".pi", "agent", "skills", "graphify"),
+    ]) {
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "SKILL.md"), "---\nname: installed\n---\n");
+    }
+
+    await removeUpstreamSkills({ source: "https://github.com/cloudflare/skills", lockPath });
+
+    await expect(readdir(join(TMP, ".codex", "skills", "wrangler"))).rejects.toThrow();
+    await expect(readdir(join(TMP, ".gemini", "skills", "wrangler"))).rejects.toThrow();
+    await expect(readdir(join(TMP, ".pi", "agent", "skills", "wrangler"))).rejects.toThrow();
+    await expect(readdir(join(TMP, ".pi", "agent", "skills", "cloudflare-wrangler"))).rejects.toThrow();
+    expect(await readFile(join(TMP, ".codex", "skills", "graphify", "SKILL.md"), "utf8")).toContain("installed");
+    expect(await readFile(join(TMP, ".gemini", "skills", "graphify", "SKILL.md"), "utf8")).toContain("installed");
+    expect(await readFile(join(TMP, ".pi", "agent", "skills", "graphify", "SKILL.md"), "utf8")).toContain("installed");
   });
 });
