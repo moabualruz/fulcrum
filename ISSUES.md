@@ -15,8 +15,10 @@ Codex settings research:
 
 - OpenAI Codex skills docs say the model-visible initial skill list is capped at roughly 2% of the model context window, or 8,000 characters when the context window is unknown. The full `SKILL.md` is still read when a skill is selected. Source: <https://developers.openai.com/codex/skills>.
 - OpenAI Codex config reference documents `model_context_window` and `skills.config`; it does not document a direct `skills_context_budget` or equivalent knob. Source: <https://developers.openai.com/codex/config-reference>.
+- OpenAI Codex config schema exposes `skills.config`, `skills.bundled.enabled`, and `skills.include_instructions`; it does not expose a skill metadata budget percent or skill metadata character budget.
 - OpenAI Codex source currently defines `DEFAULT_SKILL_METADATA_CHAR_BUDGET = 8_000` and `SKILL_METADATA_CONTEXT_WINDOW_PERCENT = 2`, deriving the budget from the context window when known. Source: <https://github.com/openai/codex/blob/main/codex-rs/core-skills/src/render.rs>.
-- Local empirical check with `codex debug prompt-input`: default, `model_context_window=1000000`, and `model_context_window=10000000` rendered the same 24,017-character skills block; `model_context_window=100000` reduced it to 10,339 characters. Treat `model_context_window` as an indirect model-context override, not a reliable fix for global skill bloat.
+- Local empirical check with `codex debug prompt-input`: default, `model_context_window=1000000`, and `model_context_window=10000000` rendered the same 24,017-character skills block; `model_context_window=100000` reduced it to 10,339 characters. Do not use `model_context_window` manipulation as a fix; it changes model context assumptions and can harm model focus.
+- If Codex later adds a direct supported skill-metadata budget setting, set it to 4% only through that dedicated key, then add a regression test that proves the prompt skill block grows without touching `model_context_window`.
 
 ## ISS-001: Fulcrum authored skills are installed globally into Codex by default
 
