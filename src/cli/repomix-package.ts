@@ -8,6 +8,7 @@ const EXPLORER = "repomix-explorer";
 const REPOMIX_REPO = "https://github.com/yamadashy/repomix";
 const REPOMIX_MARKETPLACE = "yamadashy/repomix";
 const REPOMIX_MARKER_FILE = "repomix-claude.installed";
+const REPOMIX_MIRRORS_MARKER_FILE = "repomix-mirrors.installed";
 const REPOMIX_CLAUDE_PLUGINS = ["repomix-mcp", "repomix-commands", "repomix-explorer"] as const;
 
 const PACK_LOCAL_DESCRIPTION = "Pack local codebases with Repomix";
@@ -44,6 +45,18 @@ async function removePath(path: string, label: string, dryRun: boolean): Promise
   }
   await rm(path, { recursive: true, force: true });
   console.log(`     - ${label} → ${path}`);
+}
+
+function markerFile(home: string, marker: string): string {
+  return `${fulcrumStateDir(home)}/${marker}`;
+}
+
+async function markerPresent(home: string, marker: string): Promise<boolean> {
+  return exists(markerFile(home, marker));
+}
+
+async function writeMarker(home: string, marker: string, dryRun: boolean): Promise<void> {
+  await writeText(markerFile(home, marker), new Date().toISOString() + "\n", dryRun);
 }
 
 function repoRoot(): string {
@@ -299,6 +312,7 @@ export async function installRepomixPackageMirrors(opts: { dryRun?: boolean } = 
   const source = await repomixSource(home, dryRun);
   if (!source) {
     if (dryRun) {
+      await previewRepomixPackageMirrors(home);
       console.log("     [dry-run] Repomix package mirror plan unavailable until source cache exists");
     } else {
       console.log("     · skip Repomix package mirrors (vendor plugin source not available yet)");
@@ -310,11 +324,16 @@ export async function installRepomixPackageMirrors(opts: { dryRun?: boolean } = 
   await installGemini(home, source, dryRun);
   await installOpenCode(home, source, dryRun);
   await installSkills(home, `${home}/.pi/agent/skills`, "Pi CLI", source, dryRun);
+  await writeMarker(home, REPOMIX_MIRRORS_MARKER_FILE, dryRun);
 }
 
 export async function uninstallRepomixPackageMirrors(opts: { dryRun?: boolean } = {}): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const home = process.env["HOME"] ?? "";
+  if (!dryRun && !(await markerPresent(home, REPOMIX_MIRRORS_MARKER_FILE))) {
+    console.log("     · skip Repomix package mirrors removal (Fulcrum marker not present)");
+    return;
+  }
   await removePath(`${home}/.gemini/extensions/repomix`, "Gemini Repomix extension mirror", dryRun);
   for (const root of [
     `${home}/.codex/skills`,
@@ -326,4 +345,38 @@ export async function uninstallRepomixPackageMirrors(opts: { dryRun?: boolean } 
     await removePath(`${root}/${EXPLORER}`, `Repomix skill ${EXPLORER}`, dryRun);
   }
   await removePath(`${home}/.config/opencode/agents/${EXPLORER}.md`, "OpenCode Repomix agent mirror", dryRun);
+  await removePath(markerFile(home, REPOMIX_MIRRORS_MARKER_FILE), "Repomix package mirrors marker", dryRun);
+}
+
+async function previewRepomixPackageMirrors(home: string): Promise<void> {
+  if (await exists(`${home}/.codex`)) {
+    previewSkillWrites(`${home}/.codex/skills`);
+  }
+  if (await exists(`${home}/.gemini`)) {
+    const root = `${home}/.gemini/extensions/repomix`;
+    for (const path of [
+      `${root}/gemini-extension.json`,
+      `${root}/commands/pack-local.toml`,
+      `${root}/commands/pack-remote.toml`,
+      `${root}/skills/${PACK_LOCAL}/SKILL.md`,
+      `${root}/skills/${PACK_REMOTE}/SKILL.md`,
+      `${root}/skills/${EXPLORER}/SKILL.md`,
+      `${root}/agents/explorer.md`,
+    ]) {
+      console.log(`     [dry-run] would write: ${path}`);
+    }
+  }
+  if (await exists(`${home}/.config/opencode`)) {
+    previewSkillWrites(`${home}/.config/opencode/skills`);
+    console.log(`     [dry-run] would write: ${home}/.config/opencode/agents/${EXPLORER}.md`);
+  }
+  if (await exists(`${home}/.pi/agent`)) {
+    previewSkillWrites(`${home}/.pi/agent/skills`);
+  }
+}
+
+function previewSkillWrites(root: string): void {
+  for (const name of [PACK_LOCAL, PACK_REMOTE, EXPLORER]) {
+    console.log(`     [dry-run] would write: ${root}/${name}/SKILL.md`);
+  }
 }

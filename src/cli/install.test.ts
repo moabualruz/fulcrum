@@ -204,6 +204,7 @@ describe("installCaveman W1.3 — direct official repo copy", () => {
     try {
       await installCaveman(testHome);
       expect(logs).toContain(`     [dry-run] would run: git clone --depth 1 https://github.com/JuliusBrussee/caveman ${join(tmpdir(), "fulcrum-caveman-dry-run")}`);
+      expect(logs).toContain(`     [dry-run] would copy: ${join(tmpdir(), "fulcrum-caveman-dry-run", "skills", "*")} → ${join(testHome, ".codex", "skills")}`);
       expect(logs.some((l) => l.includes(".agents"))).toBe(false);
     } finally {
       whichSpy.mockRestore();

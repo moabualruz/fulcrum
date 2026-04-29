@@ -6,7 +6,7 @@
 // installs alone unless an explicit flag says otherwise.
 
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { basename, dirname } from "node:path";
+import { dirname } from "node:path";
 import { AGENTS } from "../agents/registry.ts";
 import { which, run as runProc } from "../utils/proc.ts";
 
@@ -247,72 +247,18 @@ async function removeSkillNamespaces(home: string): Promise<void> {
     await removePath(`${agent.skillsDir(home)}/fulcrum`, `${agent.label} fulcrum skill namespace`);
     await removePath(`${agent.skillsDir(home)}/fulcrum-upstream`, `${agent.label} fulcrum-upstream skill namespace`);
   }
-  await removeManagedUpstreamSkills(home);
+  await removeManagedUpstreamSkills();
 }
 
-const FALLBACK_UPSTREAM_SKILL_NAMES = [
-  "superpowers-brainstorming", "brainstorming",
-  "superpowers-writing-plans", "writing-plans",
-  "superpowers-systematic-debugging", "systematic-debugging",
-  "superpowers-requesting-code-review", "requesting-code-review",
-  "superpowers-using-git-worktrees", "using-git-worktrees",
-  "superpowers-using-superpowers", "using-superpowers",
-  "playwright-cli",
-  "semgrep",
-  "semgrep-code-security", "code-security",
-  "semgrep-llm-security", "llm-security",
-  "graphify",
-  "cloudflare-agents-sdk", "agents-sdk",
-  "cloudflare-platform", "cloudflare",
-  "cloudflare-email-service",
-  "cloudflare-durable-objects", "durable-objects",
-  "cloudflare-sandbox-sdk", "sandbox-sdk",
-  "cloudflare-web-perf", "web-perf",
-  "cloudflare-workers-best-practices", "workers-best-practices",
-  "wrangler",
-  // Historical vendor installs from archived lock entries/init integrations.
-  "ast-grep", "tavily-search", "tavily-extract", "tavily-crawl", "tavily-map", "tavily-research",
-] as const;
-
-function addUpstreamSkillNamesFromLock(names: Set<string>, skill: { name: string; subpath: string; kind: "dir" | "file" }): void {
-  names.add(skill.name);
-  if (skill.kind === "dir") {
-    names.add(basename(skill.subpath));
-    return;
-  }
-  const base = basename(skill.subpath).toLowerCase();
-  if (base !== "skill.md" && base !== "skill") names.add(basename(skill.subpath, ".md"));
-}
-
-async function managedUpstreamSkillNames(): Promise<Set<string>> {
-  const names = new Set<string>(FALLBACK_UPSTREAM_SKILL_NAMES);
+async function removeManagedUpstreamSkills(): Promise<void> {
   try {
-    const { loadUpstreamSkills } = await import("./upstream-skills.ts");
-    const lockPath = `${repoRoot()}/skills/upstream.lock`;
-    for (const skill of await loadUpstreamSkills(lockPath)) {
-      addUpstreamSkillNamesFromLock(names, skill);
-    }
-  } catch {
-    // lockfile may not be present in all contexts; fallback list still covers shipped managed skills.
-  }
-  return names;
-}
-
-async function removeManagedUpstreamSkills(home: string): Promise<void> {
-  const names = await managedUpstreamSkillNames();
-  const targets: Array<{ label: string; root: string }> = [];
-  for (const agent of AGENTS) {
-    targets.push({
-      label: agent.label,
-      root: agent.id === "gemini" ? `${home}/.gemini/skills` : agent.skillsDir(home),
+    const { removeUpstreamSkills } = await import("./upstream-skills.ts");
+    await removeUpstreamSkills({
+      dryRun: DRY_RUN,
+      lockPath: `${repoRoot()}/skills/upstream.lock`,
     });
-  }
-
-  for (const target of targets) {
-    if (!(await exists(target.root))) continue;
-    for (const name of names) {
-      await removePath(`${target.root}/${name}`, `${target.label} upstream skill ${name}`);
-    }
+  } catch {
+    console.log("     · upstream skills lock not available — skip vendor skill mirror removal");
   }
 }
 

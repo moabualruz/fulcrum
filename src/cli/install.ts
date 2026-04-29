@@ -161,7 +161,13 @@ async function installCavemanFromRepo(home: string, skillsRoot: string, label: s
     console.log(`     ✗ ${label} caveman git clone failed: ${clone.stderr.trim()} — manual: clone ${CAVEMAN_REPO} and copy skills/* to ${skillsRoot}`);
     return false;
   }
-  if (DRY_RUN) return true;
+  if (DRY_RUN) {
+    console.log(`     [dry-run] would copy: ${tmp}/skills/* → ${skillsRoot}`);
+    if (includeCodexPlugin) {
+      console.log(`     [dry-run] would copy: ${tmp}/plugins/caveman → ${home}/.codex/plugins/cache/caveman/caveman/0.1.0`);
+    }
+    return true;
+  }
 
   try {
     const repoSkills = `${tmp}/skills`;

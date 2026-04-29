@@ -6,7 +6,7 @@
 
 import { createHash } from "node:crypto";
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { AGENTS } from "../agents/registry.ts";
 import type { AgentId } from "./mcp-registry.ts";
@@ -17,6 +17,7 @@ const AUTHOR_CLASSES = new Set(["tool-vendor", "foundation", "individual"] as co
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TREE_SHA = /^[0-9a-f]{40}$/i;
 const KNOWN_AGENT_IDS = new Set<string>(ALL_AGENT_IDS);
+const SAFE_SKILL_DIR_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 export interface UpstreamSkillLockEntry {
   source: string;
@@ -122,6 +123,17 @@ function validateTreeSha(value: string, problems: string[]): void {
   if (!TREE_SHA.test(value)) problems.push("tree_sha must be a 40-character hex SHA");
 }
 
+function isSafeSkillDirName(value: string): boolean {
+  return SAFE_SKILL_DIR_NAME.test(value);
+}
+
+function isSafeRelativeSubpath(value: string): boolean {
+  if (isAbsolute(value)) return false;
+  const normalized = resolve("/", value);
+  const rel = relative("/", normalized);
+  return rel !== "" && !rel.startsWith(`..${sep}`) && rel !== ".." && rel === value.replace(/\\/g, "/");
+}
+
 function normalizeEntry(name: string, raw: unknown): { skill?: UpstreamSkill; problems: string[] } {
   const problems: string[] = [];
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
@@ -182,6 +194,8 @@ function normalizeEntry(name: string, raw: unknown): { skill?: UpstreamSkill; pr
   if (!reviewDue) problems.push("review_due is required");
 
   if (treeSha) validateTreeSha(treeSha, problems);
+  if (!isSafeSkillDirName(name)) problems.push("name must be a safe skill directory name");
+  if (subpath && !isSafeRelativeSubpath(subpath)) problems.push("subpath must stay inside repo cache");
   if (pinnedOn) validateDate(pinnedOn, "pinned_on", problems);
   if (reviewDue) validateDate(reviewDue, "review_due", problems);
   if (authorClass && !AUTHOR_CLASSES.has(authorClass as UpstreamSkillLockEntry["author_class"])) {
@@ -436,23 +450,59 @@ async function readSkillFrontmatterName(src: string, kind: "dir" | "file"): Prom
   }
 }
 
-async function removeStalePiSkillDir(path: string, dryRun: boolean): Promise<void> {
+async function removeStalePiSkillDir(path: string, name: string, dryRun: boolean): Promise<void> {
   if (!(await isDir(path))) return;
+  const marker = upstreamMirrorMarkerPath("pi", name);
   if (dryRun) {
     console.log(`      [dry-run] would remove stale Pi skill dir: ${path}`);
+    console.log(`      [dry-run] would remove marker: ${marker}`);
+    return;
+  }
+  if (!(await exists(marker))) {
+    console.log(`      · skip stale Pi skill dir (Fulcrum marker not present): ${path}`);
     return;
   }
   await rm(path, { recursive: true, force: true });
+  await rm(marker, { force: true });
 }
 
-async function removeVendorSkillDir(path: string, dryRun: boolean): Promise<void> {
+async function removeVendorSkillDir(path: string, agentId: AgentId, name: string, dryRun: boolean): Promise<void> {
   if (!(await isDir(path))) return;
+  const marker = upstreamMirrorMarkerPath(agentId, name);
   if (dryRun) {
     console.log(`      [dry-run] would remove: ${path}`);
+    console.log(`      [dry-run] would remove marker: ${marker}`);
+    return;
+  }
+  if (!(await exists(marker))) {
+    console.log(`      · skip ${name} (Fulcrum marker not present): ${path}`);
     return;
   }
   await rm(path, { recursive: true, force: true });
+  await rm(marker, { force: true });
   console.log(`      removed: ${path}`);
+}
+
+function upstreamMirrorMarkerPath(agentId: AgentId, name: string): string {
+  return `${fulcrumHome()}/state/global/upstream-skills/${agentId}/${name}.installed`;
+}
+
+async function writeUpstreamMirrorMarker(agentId: AgentId, name: string, dryRun: boolean): Promise<void> {
+  const marker = upstreamMirrorMarkerPath(agentId, name);
+  if (dryRun) {
+    console.log(`      [dry-run] would write marker: ${marker}`);
+    return;
+  }
+  await mkdir(dirname(marker), { recursive: true });
+  await writeFile(marker, new Date().toISOString() + "\n", "utf8");
+}
+
+function skillSourcePath(repoDir: string, subpath: string): string | null {
+  const root = resolve(repoDir);
+  const candidate = resolve(root, subpath);
+  const rel = relative(root, candidate);
+  if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
+  return candidate;
 }
 
 async function ensureRepo(repo: string, ref: string, sha: string, dryRun: boolean): Promise<string | null> {
@@ -549,7 +599,12 @@ export async function syncUpstreamSkills(
     for (const skill of skills) {
       const repoDir = repoDirs.get(skill.source);
       if (!repoDir) continue;
-      const src = `${repoDir}/${skill.subpath}`;
+      const src = skillSourcePath(repoDir, skill.subpath);
+      if (!src) {
+        console.log(`  ✗ ${skill.name} subpath escapes repo cache — skip`);
+        integrityFailed = true;
+        continue;
+      }
       const srcExists = skill.kind === "file" ? await exists(src) : await isDir(src);
       if (!srcExists) continue;
 
@@ -643,17 +698,33 @@ export async function syncUpstreamSkills(
         if (r1.exit !== 0) {
           console.log(`    ✗ ${skill.name}: claude plugin marketplace add failed: ${r1.stderr.trim()}`);
           // Fallback to file copy.
-          const src = `${repoDir}/${skill.subpath}`;
-          const ok = await copySkill(src, `${target.skillsRoot}/${skill.name}`, skill.kind, dryRun);
-          if (ok) console.log(`    ${skill.name} (file copy fallback)`);
+          const src = skillSourcePath(repoDir, skill.subpath);
+          const dst = safeSkillDirCandidate(target.skillsRoot, skill.name);
+          if (!src || !dst) {
+            console.log(`    · ${skill.name}: unsafe fallback copy path`);
+          } else {
+            const ok = await copySkill(src, dst, skill.kind, dryRun);
+            if (ok) {
+              await writeUpstreamMirrorMarker(target.id, skill.name, dryRun);
+              console.log(`    ${skill.name} (file copy fallback)`);
+            }
+          }
         } else {
           const r2 = await runProc(["claude", "plugin", "install", skill.claude_plugin.name]);
           if (r2.exit !== 0) {
             console.log(`    ✗ ${skill.name}: claude plugin install failed: ${r2.stderr.trim()}`);
             // Fallback to file copy.
-            const src = `${repoDir}/${skill.subpath}`;
-            const ok = await copySkill(src, `${target.skillsRoot}/${skill.name}`, skill.kind, dryRun);
-            if (ok) console.log(`    ${skill.name} (file copy fallback)`);
+            const src = skillSourcePath(repoDir, skill.subpath);
+            const dst = safeSkillDirCandidate(target.skillsRoot, skill.name);
+            if (!src || !dst) {
+              console.log(`    · ${skill.name}: unsafe fallback copy path`);
+            } else {
+              const ok = await copySkill(src, dst, skill.kind, dryRun);
+              if (ok) {
+                await writeUpstreamMirrorMarker(target.id, skill.name, dryRun);
+                console.log(`    ${skill.name} (file copy fallback)`);
+              }
+            }
           } else {
             console.log(`    ${skill.name} (via claude plugin install)`);
           }
@@ -662,14 +733,31 @@ export async function syncUpstreamSkills(
       }
 
       // Default: file copy path (all agents, or Claude Code without claude_plugin).
-      const src = `${repoDir}/${skill.subpath}`;
-      const frontmatterName = target.id === "pi" ? await readSkillFrontmatterName(src, skill.kind) : null;
-      const installName = frontmatterName || skill.name;
-      if (target.id === "pi" && installName !== skill.name) {
-        await removeStalePiSkillDir(`${target.skillsRoot}/${skill.name}`, dryRun);
+      const src = skillSourcePath(repoDir, skill.subpath);
+      if (!src) {
+        console.log(`    · ${skill.name}: unsafe upstream subpath`);
+        continue;
       }
-      const ok = await copySkill(src, `${target.skillsRoot}/${installName}`, skill.kind, dryRun);
-      if (ok) console.log(`    ${skill.name}${installName !== skill.name ? ` → ${installName}` : ""}`);
+      const frontmatterName = target.id === "pi" ? await readSkillFrontmatterName(src, skill.kind) : null;
+      let installName = skill.name;
+      if (target.id === "pi" && frontmatterName) {
+        if (isSafeSkillDirName(frontmatterName)) installName = frontmatterName;
+        else console.log(`    · ${skill.name}: unsafe Pi frontmatter name ignored: ${frontmatterName}`);
+      }
+      const dst = safeSkillDirCandidate(target.skillsRoot, installName);
+      if (!dst) {
+        console.log(`    · ${skill.name}: unsafe install path`);
+        continue;
+      }
+      if (target.id === "pi" && installName !== skill.name) {
+        const stale = safeSkillDirCandidate(target.skillsRoot, skill.name);
+        if (stale) await removeStalePiSkillDir(stale, skill.name, dryRun);
+      }
+      const ok = await copySkill(src, dst, skill.kind, dryRun);
+      if (ok) {
+        await writeUpstreamMirrorMarker(target.id, installName, dryRun);
+        console.log(`    ${skill.name}${installName !== skill.name ? ` → ${installName}` : ""}`);
+      }
       else console.log(`    · missing upstream path: ${skill.source}:${skill.subpath}`);
     }
     console.log();
@@ -707,17 +795,25 @@ export async function syncUpstreamSkillsByNames(
 
 async function piFrontmatterInstallName(skill: UpstreamSkill): Promise<string | null> {
   const repoDir = repoCacheDir(skill.source);
-  const src = `${repoDir}/${skill.subpath}`;
+  const src = skillSourcePath(repoDir, skill.subpath);
+  if (!src) return null;
   return readSkillFrontmatterName(src, skill.kind);
 }
 
 function safeSkillDirCandidate(skillsRoot: string, name: string): string | null {
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(name)) return null;
+  if (!isSafeSkillDirName(name)) return null;
   const root = resolve(skillsRoot);
   const candidate = resolve(root, name);
   const rel = relative(root, candidate);
   if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
   return candidate;
+}
+
+function lockPlacementName(skill: UpstreamSkill): string | null {
+  if (skill.kind === "dir") return basename(skill.subpath);
+  const base = basename(skill.subpath).toLowerCase();
+  if (base === "skill.md" || base === "skill") return null;
+  return basename(skill.subpath, ".md");
 }
 
 async function uninstallClaudePlugin(skill: UpstreamSkill, dryRun: boolean): Promise<void> {
@@ -775,13 +871,21 @@ export async function removeUpstreamSkills(
         continue;
       }
 
-      await removeVendorSkillDir(`${target.skillsRoot}/${skill.name}`, dryRun);
+      const names = new Set([skill.name]);
+      const lockName = lockPlacementName(skill);
+      if (lockName) names.add(lockName);
+
+      for (const name of names) {
+        const skillPath = safeSkillDirCandidate(target.skillsRoot, name);
+        if (skillPath) await removeVendorSkillDir(skillPath, target.id, name, dryRun);
+        else console.log(`      · ${skill.name}: unsafe skill dir name ignored: ${name}`);
+      }
 
       if (target.id === "pi") {
         const frontmatterName = await piFrontmatterInstallName(skill);
-        if (frontmatterName && frontmatterName !== skill.name) {
+        if (frontmatterName && !names.has(frontmatterName)) {
           const aliasPath = safeSkillDirCandidate(target.skillsRoot, frontmatterName);
-          if (aliasPath) await removeVendorSkillDir(aliasPath, dryRun);
+          if (aliasPath) await removeVendorSkillDir(aliasPath, target.id, frontmatterName, dryRun);
           else console.log(`      · ${skill.name}: unsafe Pi frontmatter alias ignored: ${frontmatterName}`);
         }
       }

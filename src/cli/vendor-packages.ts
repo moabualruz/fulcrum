@@ -15,6 +15,8 @@ const SUPERPOWERS_CLAUDE_MARKER = "superpowers-claude.installed";
 const SUPERPOWERS_GEMINI_MARKER = "superpowers-gemini.installed";
 const SUPERPOWERS_OPENCODE_MARKER = "superpowers-opencode.installed";
 const SUPERPOWERS_PI_MARKER = "superpowers-pi.installed";
+const SUPERPOWERS_CODEX_MIRROR_MARKER = "superpowers-codex-mirror.installed";
+const SUPERPOWERS_PI_MIRROR_MARKER = "superpowers-pi-mirror.installed";
 const SUPERPOWERS_PI_PACKAGES = [
   "https://github.com/obra/superpowers",
   "npm:@tintinweb/pi-subagents",
@@ -295,6 +297,7 @@ async function installSuperpowersSkillMirror(home: string, agentId: "codex" | "p
   const src = `${repo}/skills`;
   if (!(await isDir(src))) {
     if (dryRun) {
+      await previewSuperpowersSkillMirror(home, agentId);
       console.log("     [dry-run] Superpowers skills mirror plan unavailable until source cache exists");
     } else {
       console.log("     · Superpowers skills source unavailable");
@@ -308,7 +311,36 @@ async function installSuperpowersSkillMirror(home: string, agentId: "codex" | "p
     if (!(await exists(`${skillDir}/SKILL.md`))) continue;
     await copyTree(skillDir, `${dst}/${entry.name}`, dryRun);
   }
+  await writeMarker(home, superpowersMirrorMarker(agentId), dryRun);
   console.log(`     ✓ ${agent.label} Superpowers full skill mirror installed`);
+}
+
+async function previewSuperpowersSkillMirror(home: string, agentId: "codex" | "pi"): Promise<void> {
+  const agent = AGENTS.find((a) => a.id === agentId)!;
+  if (!(await isDir(agent.rootDir(home)))) return;
+  console.log(`     [dry-run] would mkdir: ${agent.skillsDir(home)}/superpowers`);
+}
+
+function superpowersMirrorMarker(agentId: "codex" | "pi"): string {
+  return agentId === "codex" ? SUPERPOWERS_CODEX_MIRROR_MARKER : SUPERPOWERS_PI_MIRROR_MARKER;
+}
+
+async function removeSuperpowersSkillMirror(home: string, agentId: "codex" | "pi", dryRun: boolean): Promise<void> {
+  const agent = AGENTS.find((a) => a.id === agentId)!;
+  const label = `${agent.label} Superpowers skill mirror`;
+  const marker = superpowersMirrorMarker(agentId);
+  const target = `${agent.skillsDir(home)}/superpowers`;
+  if (dryRun) {
+    await removePath(target, label, true);
+    await removeMarker(home, marker, label, true);
+    return;
+  }
+  if (!(await hasMarker(home, marker))) {
+    console.log(`     · skip ${label} removal (Fulcrum marker not present)`);
+    return;
+  }
+  await removePath(target, label, false);
+  await removeMarker(home, marker, label, false);
 }
 
 async function installPiSuperpowersPackage(home: string, dryRun: boolean): Promise<void> {
@@ -358,7 +390,7 @@ async function uninstallPiSuperpowersPackage(home: string, dryRun: boolean): Pro
   } else {
     console.log("     · Superpowers Pi packages: pi not on PATH");
   }
-  await removePath(`${home}/.pi/agent/skills/superpowers`, "Pi Superpowers skill mirror", dryRun);
+  await removeSuperpowersSkillMirror(home, "pi", dryRun);
 }
 
 export async function installCloudflarePackage(opts: { dryRun?: boolean } = {}): Promise<void> {
@@ -389,7 +421,7 @@ export async function uninstallSuperpowersPackage(opts: { dryRun?: boolean } = {
   await uninstallClaudePlugin(home, "Superpowers", SUPERPOWERS_CLAUDE_PLUGIN, dryRun, SUPERPOWERS_CLAUDE_MARKER);
   await uninstallGeminiSuperpowers(home, dryRun);
   await removeOpenCodePlugin(home, dryRun);
-  await removePath(`${home}/.codex/skills/superpowers`, "Codex Superpowers skill mirror", dryRun);
+  await removeSuperpowersSkillMirror(home, "codex", dryRun);
   await uninstallPiSuperpowersPackage(home, dryRun);
 }
 

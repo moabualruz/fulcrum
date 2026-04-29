@@ -162,6 +162,16 @@ describe("run", () => {
     await mkdir(join(TMP, ".pi", "agent", "skills", "using-superpowers"), { recursive: true });
     await mkdir(join(TMP, ".pi", "agent", "skills", "cloudflare"), { recursive: true });
     await mkdir(join(TMP, ".gemini", "skills", "superpowers-using-superpowers"), { recursive: true });
+    for (const marker of [
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "codex", "superpowers-using-superpowers.installed"),
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "codex", "cloudflare-platform.installed"),
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "pi", "using-superpowers.installed"),
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "pi", "cloudflare.installed"),
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "gemini", "superpowers-using-superpowers.installed"),
+    ]) {
+      await mkdir(join(marker, ".."), { recursive: true });
+      await writeFile(marker, "installed\n");
+    }
     await writeFile(join(TMP, ".codex", "hooks.json"), JSON.stringify({ hooks: { UserPromptSubmit: [] } }, null, 2) + "\n");
     await writeFile(join(TMP, ".gemini", "settings.json"), JSON.stringify({ mcpServers: {}, hooks: { PreCompress: [] }, security: { auth: { selectedType: "oauth-personal" } } }, null, 2) + "\n");
     await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
@@ -184,6 +194,31 @@ describe("run", () => {
     expect(openCode.plugin).toBeUndefined();
     const piSettings = JSON.parse(await readFile(join(TMP, ".pi", "agent", "settings.json"), "utf8"));
     expect(piSettings.packages).toBeUndefined();
+  });
+
+  test("preserves unmarked user-owned upstream vendor skill dirs", async () => {
+    await mkdir(join(TMP, "skills"), { recursive: true });
+    await writeFile(join(TMP, "skills", "upstream.lock"), [
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.wrangler]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/wrangler"',
+      'ref = "main"',
+      'tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+    await mkdir(join(TMP, ".codex", "skills", "wrangler"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "skills", "wrangler", "SKILL.md"), "user-owned\n");
+
+    await run([]);
+
+    expect(await readFile(join(TMP, ".codex", "skills", "wrangler", "SKILL.md"), "utf8")).toBe("user-owned\n");
   });
 
   test("keeps modified policy without --purge", async () => {

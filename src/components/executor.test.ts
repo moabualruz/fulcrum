@@ -76,6 +76,33 @@ describe("component executor", () => {
     ledger.close();
   });
 
+  test("dry-run default profile applies each global vendor helper once", async () => {
+    await mkdir(join(scratch, ".claude"), { recursive: true });
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+
+    try {
+      await executeComponentPlan(
+        planComponentOperation({
+          operation: "install",
+          target: "profile.default",
+          agents: ["claude-code", "codex", "gemini", "opencode", "pi"],
+        }),
+        { dryRun: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    const cloudflareInstalls = logs.filter((line) =>
+      line.includes("[dry-run] would run: claude plugin install cloudflare@cloudflare")
+    );
+    expect(logs.join("\n")).toContain("DRY RUN package.cloudflare:install:claude-code:install");
+    expect(logs.join("\n")).toContain("DRY RUN package.cloudflare:install:pi:install");
+    expect(cloudflareInstalls).toHaveLength(1);
+  });
+
   test("executes hook plan from planner and records ledger state", async () => {
     await mkdir(join(scratch, ".codex"), { recursive: true });
     const plan = planComponentOperation({

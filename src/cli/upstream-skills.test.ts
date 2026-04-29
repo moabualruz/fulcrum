@@ -98,6 +98,27 @@ describe("upstream skill lock loading", () => {
     await expect(loadUpstreamSkills(lockPath)).rejects.toThrow(/example: tree_sha is required/);
   });
 
+  test("rejects unsafe skill names and subpaths", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.\"../../outside\"]",
+      "source = \"https://github.com/example/repo\"",
+      "subpath = \"../outside\"",
+      "ref = \"main\"",
+      "tree_sha = \"0123456789abcdef0123456789abcdef01234567\"",
+      "license = \"MIT\"",
+      "author_class = \"individual\"",
+      "pinned_on = \"2026-04-28\"",
+      "review_due = \"2026-07-27\"",
+      "",
+    ].join("\n"));
+
+    await expect(loadUpstreamSkills(lockPath)).rejects.toThrow(/safe skill directory name/);
+    await expect(loadUpstreamSkills(lockPath)).rejects.toThrow(/subpath must stay inside/);
+  });
+
   test("dry-run sync reads the lockfile count, not a baked-in list", async () => {
     const lockPath = await writeLock([
       "[meta]",
@@ -711,6 +732,43 @@ describe("upstream skill filtering helpers", () => {
     expect(logs.some((l) => l.includes("skip Codex CLI"))).toBe(false);
   });
 
+  test("syncUpstreamSkills ignores unsafe Pi frontmatter install names", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.wrangler]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/wrangler"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+
+    const cacheSkill = join(TMP, ".fulcrum", "cache", "upstream-skills", "cloudflare__skills", "skills", "wrangler");
+    await mkdir(cacheSkill, { recursive: true });
+    await writeFile(join(cacheSkill, "SKILL.md"), "---\nname: ../../outside\n---\n");
+    await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map((a) => String(a)).join(" "));
+    });
+    try {
+      await syncUpstreamSkillsBySource("https://github.com/cloudflare/skills", { dryRun: true, lockPath });
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(logs.some((l) => l.includes("unsafe Pi frontmatter name ignored"))).toBe(true);
+    expect(logs.some((l) => l.includes(join(TMP, ".pi", "agent", "skills", "wrangler")))).toBe(true);
+    expect(logs.some((l) => l.includes(join(TMP, ".pi", "agent", "outside")))).toBe(false);
+  });
+
   test("removeUpstreamSkills removes filtered vendor placements and Pi frontmatter alias only", async () => {
     const lockPath = await writeLock([
       "[meta]",
@@ -754,6 +812,15 @@ describe("upstream skill filtering helpers", () => {
       await mkdir(dir, { recursive: true });
       await writeFile(join(dir, "SKILL.md"), "---\nname: installed\n---\n");
     }
+    for (const marker of [
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "codex", "wrangler.installed"),
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "gemini", "wrangler.installed"),
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "pi", "wrangler.installed"),
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "pi", "cloudflare-wrangler.installed"),
+    ]) {
+      await mkdir(join(marker, ".."), { recursive: true });
+      await writeFile(marker, "installed\n");
+    }
 
     await removeUpstreamSkills({ source: "https://github.com/cloudflare/skills", lockPath });
 
@@ -764,6 +831,32 @@ describe("upstream skill filtering helpers", () => {
     expect(await readFile(join(TMP, ".codex", "skills", "graphify", "SKILL.md"), "utf8")).toContain("installed");
     expect(await readFile(join(TMP, ".gemini", "skills", "graphify", "SKILL.md"), "utf8")).toContain("installed");
     expect(await readFile(join(TMP, ".pi", "agent", "skills", "graphify", "SKILL.md"), "utf8")).toContain("installed");
+  });
+
+  test("removeUpstreamSkills preserves unmarked user-owned vendor placements", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.wrangler]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/wrangler"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+
+    const userSkill = join(TMP, ".codex", "skills", "wrangler");
+    await mkdir(userSkill, { recursive: true });
+    await writeFile(join(userSkill, "SKILL.md"), "---\nname: wrangler\n---\nuser copy\n");
+
+    await removeUpstreamSkills({ source: "https://github.com/cloudflare/skills", lockPath });
+
+    expect(await readFile(join(userSkill, "SKILL.md"), "utf8")).toContain("user copy");
   });
 
   test("removeUpstreamSkills preserves vendor-canonical placements skipped by sync", async () => {
@@ -790,6 +883,9 @@ describe("upstream skill filtering helpers", () => {
       await mkdir(dir, { recursive: true });
       await writeFile(join(dir, "SKILL.md"), "---\nname: graphify\n---\n");
     }
+    const piMarker = join(TMP, ".fulcrum", "state", "global", "upstream-skills", "pi", "graphify.installed");
+    await mkdir(join(piMarker, ".."), { recursive: true });
+    await writeFile(piMarker, "installed\n");
 
     await removeUpstreamSkills({ names: ["graphify"], lockPath });
 
@@ -824,6 +920,9 @@ describe("upstream skill filtering helpers", () => {
       await mkdir(dir, { recursive: true });
       await writeFile(join(dir, "SKILL.md"), "---\nname: installed\n---\n");
     }
+    const piMarker = join(TMP, ".fulcrum", "state", "global", "upstream-skills", "pi", "wrangler.installed");
+    await mkdir(join(piMarker, ".."), { recursive: true });
+    await writeFile(piMarker, "installed\n");
 
     await removeUpstreamSkills({ names: ["wrangler"], lockPath });
 

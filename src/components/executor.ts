@@ -11,10 +11,12 @@ export async function executeComponentPlan(
   plan: ComponentPlan,
   opts: ExecuteOptions = {},
 ): Promise<void> {
+  const appliedVendorActions = new Set<string>();
+
   if (opts.dryRun === true) {
     for (const action of plan.actions) {
       console.log(`DRY RUN ${action.id} ${action.change} ${action.kind} ${action.target}`);
-      if (isVendorSurface(action.kind)) {
+      if (isVendorSurface(action.kind) && shouldApplyAction(action, appliedVendorActions)) {
         await applyAction(action, true);
       }
     }
@@ -28,7 +30,9 @@ export async function executeComponentPlan(
   try {
     for (const action of plan.actions) {
       try {
-        await applyAction(action, false);
+        if (shouldApplyAction(action, appliedVendorActions)) {
+          await applyAction(action, false);
+        }
         recordSuccessfulAction(ledger, operationId, action);
       } catch (error) {
         failed = true;
@@ -40,6 +44,18 @@ export async function executeComponentPlan(
     ledger.endOperation(operationId, failed ? "error" : "ok");
     ledger.close();
   }
+}
+
+function shouldApplyAction(action: ComponentAction, appliedVendorActions: Set<string>): boolean {
+  if (!isVendorSurface(action.kind)) return true;
+  const key = vendorActionKey(action);
+  if (appliedVendorActions.has(key)) return false;
+  appliedVendorActions.add(key);
+  return true;
+}
+
+function vendorActionKey(action: ComponentAction): string {
+  return `${action.componentId}:${action.surfaceId}:${action.operation}:${action.change}`;
 }
 
 async function applyAction(action: ComponentAction, dryRun: boolean): Promise<void> {

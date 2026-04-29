@@ -288,6 +288,9 @@ describe("mirror-policy: syncUpstreamSkills copies to all agent paths", () => {
 
     await mkdir(join(TMP, ".pi", "agent", "skills", "vendor-prefixed"), { recursive: true });
     await writeFile(join(TMP, ".pi", "agent", "skills", "vendor-prefixed", "SKILL.md"), "---\nname: runtime-name\n---\n");
+    const staleMarker = join(TMP, ".fulcrum", "state", "global", "upstream-skills", "pi", "vendor-prefixed.installed");
+    await mkdir(join(staleMarker, ".."), { recursive: true });
+    await writeFile(staleMarker, "installed\n");
 
     const skills = await loadUpstreamSkills(lockPath);
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });

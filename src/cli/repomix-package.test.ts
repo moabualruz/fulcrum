@@ -92,6 +92,7 @@ describe("Repomix capability package mirrors", () => {
       logSpy.mockRestore();
     }
     expect(logs).toContain(`     [dry-run] would clone/update https://github.com/yamadashy/repomix → ${join(TMP, ".fulcrum", "cache", "repomix")}`);
+    expect(logs).toContain(`     [dry-run] would write: ${join(TMP, ".codex", "skills", "repomix-pack-local", "SKILL.md")}`);
     expect(logs).toContain("     [dry-run] Repomix package mirror plan unavailable until source cache exists");
   });
 
@@ -212,5 +213,17 @@ describe("Repomix capability package mirrors", () => {
     expect(await Bun.file(join(TMP, ".config", "opencode", "skills", "repomix-explorer")).exists()).toBe(false);
     expect(await Bun.file(join(TMP, ".config", "opencode", "agents", "repomix-explorer.md")).exists()).toBe(false);
     expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "repomix-pack-remote")).exists()).toBe(false);
+  });
+
+  test("uninstall preserves user-owned Repomix mirrors when Fulcrum marker is absent", async () => {
+    await mkdir(join(TMP, ".codex", "skills", "repomix-pack-local"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "skills", "repomix-pack-local", "SKILL.md"), "user copy\n");
+    await mkdir(join(TMP, ".gemini", "extensions", "repomix"), { recursive: true });
+    await writeFile(join(TMP, ".gemini", "extensions", "repomix", "gemini-extension.json"), "{}\n");
+
+    await uninstallRepomixPackageMirrors();
+
+    expect(await readFile(join(TMP, ".codex", "skills", "repomix-pack-local", "SKILL.md"), "utf8")).toContain("user copy");
+    expect(await Bun.file(join(TMP, ".gemini", "extensions", "repomix", "gemini-extension.json")).exists()).toBe(true);
   });
 });

@@ -120,6 +120,7 @@ describe("vendor capability packages", () => {
       logSpy.mockRestore();
     }
     expect(logs).toContain(`     [dry-run] would clone/update https://github.com/obra/superpowers → ${join(TMP, ".fulcrum", "cache", "superpowers")}`);
+    expect(logs).toContain(`     [dry-run] would mkdir: ${join(TMP, ".codex", "skills", "superpowers")}`);
     expect(logs).toContain("     [dry-run] Superpowers skills mirror plan unavailable until source cache exists");
   });
 
@@ -166,6 +167,18 @@ describe("vendor capability packages", () => {
     const opencode = JSON.parse(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8"));
     expect(opencode.plugin).toContain("superpowers@git+https://github.com/obra/superpowers.git");
     expect(await Bun.file(join(TMP, ".gemini", "extensions", "superpowers", "extension.json")).exists()).toBe(true);
+  });
+
+  test("uninstall preserves user-owned Superpowers mirrors when Fulcrum markers are absent", async () => {
+    await mkdir(join(TMP, ".codex", "skills", "superpowers"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "skills", "superpowers", "README.md"), "user copy\n");
+    await mkdir(join(TMP, ".pi", "agent", "skills", "superpowers"), { recursive: true });
+    await writeFile(join(TMP, ".pi", "agent", "skills", "superpowers", "README.md"), "user copy\n");
+
+    await uninstallSuperpowersPackage();
+
+    expect(await readFile(join(TMP, ".codex", "skills", "superpowers", "README.md"), "utf8")).toContain("user copy");
+    expect(await readFile(join(TMP, ".pi", "agent", "skills", "superpowers", "README.md"), "utf8")).toContain("user copy");
   });
 
   test("installs only the Cloudflare Claude plugin for the Cloudflare package", async () => {
@@ -228,6 +241,7 @@ describe("vendor capability packages", () => {
     await mkdir(join(TMP, ".claude"), { recursive: true });
     await mkdir(join(TMP, ".fulcrum", "state", "global"), { recursive: true });
     await writeFile(join(TMP, ".fulcrum", "state", "global", "superpowers-claude.installed"), "installed\n");
+    await writeFile(join(TMP, ".fulcrum", "state", "global", "superpowers-codex-mirror.installed"), "installed\n");
     await mkdir(join(TMP, ".codex", "skills", "superpowers", "brainstorming"), { recursive: true });
     const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
