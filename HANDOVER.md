@@ -75,18 +75,13 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 │                              state. --all forces writes for every agent.
 ├── fulcrum skills sync     — fan out to <agent>/skills/fulcrum/<name>/
 ├── fulcrum skills upstream [--update-pins]
-│                            — fan out curated upstream skills to <agent>/skills/
-│                              fulcrum-upstream/<name>/ (skipped per-agent when
-│                              the lock entry's `vendor_canonical_agents`
-│                              includes that agent — vendor's per-agent
-│                              installer owns the placement). Verifies
-│                              subpath_sha256 against upstream.lock;
-│                              --update-pins recomputes. After sync, install
-│                              also runs `pruneVendorCanonicalDupes` (removes
-│                              fulcrum-upstream/<name>/ where vendor handles
-│                              the agent) and `removeAgentsSharedDir` (nukes
-│                              ~/.agents/ when third-party installer wrote
-│                              there in violation of the per-agent rule).
+│                            — fan out curated upstream skills directly to
+│                              <agent>/skills/<name>/ (the vendor's own
+│                              placement). Skipped per-agent when the lock
+│                              entry's `vendor_canonical_agents` includes that
+│                              agent — vendor's per-agent installer already
+│                              owns the placement. Verifies subpath_sha256
+│                              against upstream.lock; --update-pins recomputes.
 ├── fulcrum skills lint     — frontmatter + body section structure
 ├── fulcrum skills list     — inventory + eval coverage
 ├── fulcrum mcp list/register/unregister/enable/disable
@@ -200,7 +195,7 @@ Don't relitigate without new information.
 | Skills install under `<agent>/skills/fulcrum/<name>/` | Path-based namespace; `fulcrum:<name>` address space ready for future plugin layer. | `src/cli/skills.ts` |
 | Skill `name:` stays prefix-free | `/jq` not `/fulcrum:jq`; namespace = parent dir. | `docs/skills.md` §4 |
 | Upstream skill pins are subpath-level | Per-skill SHA-256 prevents monorepo subtree drift. | `skills/upstream.lock`, `src/cli/upstream-skills.ts` |
-| `fulcrum-upstream/<name>/` is fallback ONLY | When vendor publishes per-agent canonical installer (e.g. `graphify install --platform <agent>`), `vendor_canonical_agents` lists those agents and fulcrum-upstream sync skips them — vendor's top-level write is source of truth. Stops dupe → "Skill conflict detected" loops. | `skills/upstream.lock` (per-skill), `src/cli/upstream-skills.ts` (`syncUpstreamSkills` gate + `pruneVendorCanonicalDupes`) |
+| Third-party skills install at vendor placement, not in a fulcrum namespace | We don't own a `fulcrum-upstream/` (or any) subfolder for skills we didn't author. Sync mirrors files into `<agent>/skills/<name>/` — same path the vendor's own per-agent installer would use. When the vendor ships its own installer, `vendor_canonical_agents` lists which agents to skip so we don't double-write. | `skills/upstream.lock` (per-skill `vendor_canonical_agents`), `src/cli/upstream-skills.ts` (`agentTargets`, `syncUpstreamSkills` gate) |
 | Pi DeepWiki via Fulcrum-managed `pi-mcp-adapter` | Pi has no built-in MCP manager; adapter bridges; we install + configure. | `src/cli/mcp.ts`, `docs/mcp.md` §3.3 |
 | Eval harnesses use native CLIs, not SDKs | Auth in OS keychain; matches real session loading path. | `scripts/eval-skill-*.sh` |
 | No GitHub Actions | Local `bun run ci` + `bun run release` are the gates. Future workflows additive. | absence of `.github/workflows/` |
@@ -530,7 +525,7 @@ Per-skill harnesses: `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <s
 - **Claude Code MCP removal is partially manual.** Install calls `claude mcp add`; uninstall prints `claude mcp remove -s user deepwiki` rather than invoking it.
 - **OpenCode is archived** (2025-09-18). Successor: Charm's Crush. `shims/opencode/fulcrum.ts` targets last-stable OpenCode; Crush's plugin contract may differ.
 - **Pi has no Fulcrum-published Pi extension** — `pi-mcp-adapter` is vendored from `nicobailon/pi-mcp-adapter` (community, not Pi vendor). We use it as MCP infrastructure but it's not a vendor-official asset.
-- **graphify does not list Pi as a supported agent.** Init falls back to file-copy via `fulcrum-upstream/graphify/`. The lock entry's `vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]` excludes pi, so fulcrum-upstream sync still mirrors the skill there.
+- **graphify does not list Pi as a supported agent.** Init falls back to file-copy mirror at `~/.pi/agent/skills/graphify/`. The lock entry's `vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]` excludes pi.
 - **`dist/` is gitignored.** Fresh clone needs Bun (`bash scripts/install.sh`) or `FULCRUM_RELEASE_TAG=...` to fetch a release artifact.
 - **Skill content correctness is the author's job.** Lint validates frontmatter shape only. Vendor-first policy minimizes this risk for new skills (use vendor-published source, never re-author).
 - **stripVendorRuleBlocks scope = user-global rules files only.** Project-root `CLAUDE.md` / `GEMINI.md` written by `graphify install` are .gitignored rather than stripped (vendor controls those by design).

@@ -6,21 +6,21 @@
 
 Each agent use own native skills directory. No shared `~/.agents/` folder — pollute every agent context with skills may not apply.
 
-Fulcrum-authored skills install under `fulcrum/`. Curated upstream skills install under `fulcrum-upstream/`. Both are managed namespaces; custom user skills sit alongside (flat or own namespace) and are not touched by sync/uninstall except explicit Fulcrum-managed paths.
+Fulcrum-authored skills install under `fulcrum/` (we own that namespace). Curated upstream skills install where the vendor's own per-agent installer would put them — top-level `<agent>/skills/<name>/`. Fulcrum does not own a namespace for skills it did not author. Custom user skills sit alongside and are not touched by sync/uninstall except explicit Fulcrum-managed paths.
 
 | Agent | Fulcrum-authored path | Curated upstream path | Custom user skills path |
 |---|---|---|---|
-| Claude Code | `~/.claude/skills/fulcrum/<name>/SKILL.md` | `~/.claude/skills/fulcrum-upstream/<name>/SKILL.md` | `~/.claude/skills/<name>/SKILL.md` |
-| Codex CLI | `~/.codex/skills/fulcrum/<name>/SKILL.md` | `~/.codex/skills/fulcrum-upstream/<name>/SKILL.md` | `~/.codex/skills/<name>/SKILL.md` (user) · `.codex/skills/<name>/SKILL.md` (project) |
-| Gemini CLI | `~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md` | `~/.gemini/extensions/fulcrum-upstream-skills/skills/<name>/SKILL.md` | `~/.gemini/extensions/<other>/skills/<name>/SKILL.md` |
-| OpenCode | `~/.config/opencode/skills/fulcrum/<name>/SKILL.md` | `~/.config/opencode/skills/fulcrum-upstream/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` |
-| Pi CLI | `~/.pi/agent/skills/fulcrum/<name>/SKILL.md` | `~/.pi/agent/skills/fulcrum-upstream/<name>/SKILL.md` | `~/.pi/agent/skills/<name>/SKILL.md` (user) · `.pi/skills/` (project) |
+| Claude Code | `~/.claude/skills/fulcrum/<name>/SKILL.md` | `~/.claude/skills/<name>/SKILL.md` | `~/.claude/skills/<name>/SKILL.md` |
+| Codex CLI | `~/.codex/skills/fulcrum/<name>/SKILL.md` | `~/.codex/skills/<name>/SKILL.md` | `~/.codex/skills/<name>/SKILL.md` (user) · `.codex/skills/<name>/SKILL.md` (project) |
+| Gemini CLI | `~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md` | `~/.gemini/skills/<name>/SKILL.md` | `~/.gemini/extensions/<other>/skills/<name>/SKILL.md` |
+| OpenCode | `~/.config/opencode/skills/fulcrum/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` |
+| Pi CLI | `~/.pi/agent/skills/fulcrum/<name>/SKILL.md` | `~/.pi/agent/skills/<name>/SKILL.md` | `~/.pi/agent/skills/<name>/SKILL.md` (user) · `.pi/skills/` (project) |
 
-`fulcrum skills sync` propagate authored `skills/<name>/SKILL.md` from repo to every agent `<skills-root>/fulcrum/` subfolder. `fulcrum skills upstream` clones curated upstream repos into `~/.fulcrum/cache/upstream-skills` and propagates selected skills to `fulcrum-upstream/`. **Agents still load by frontmatter `name:`** — namespacing is path-based and recursive scans pick skills up regardless of depth.
+`fulcrum skills sync` propagate authored `skills/<name>/SKILL.md` from repo to every agent `<skills-root>/fulcrum/` subfolder. `fulcrum skills upstream` clones curated upstream repos into `~/.fulcrum/cache/upstream-skills` and propagates selected skills to the vendor's own placement convention — top-level `<agent>/skills/<name>/`. **Agents load by frontmatter `name:`** — namespacing is path-based and recursive scans pick skills up regardless of depth.
 
-### 1.1 Vendor-canonical install vs `fulcrum-upstream/` mirror
+### 1.1 Vendor-canonical install vs file-copy mirror
 
-When an upstream skill ships its own per-agent installer (e.g. `graphify install --platform <agent>`), the vendor's canonical write into the agent's top-level skills directory (`~/.gemini/skills/graphify/`, `~/.config/opencode/skills/graphify/`, etc.) is the source of truth. To prevent dupe-load conflicts ("Skill conflict detected" warnings), the lockfile entry declares which agents the vendor handles:
+When an upstream skill ships its own per-agent installer (e.g. `graphify install --platform <agent>`), the vendor's write into the agent's top-level skills directory is the source of truth. To prevent dupe-load conflicts ("Skill conflict detected" warnings), the lockfile entry declares which agents the vendor handles:
 
 ```toml
 [skills.graphify]
@@ -28,11 +28,7 @@ When an upstream skill ships its own per-agent installer (e.g. `graphify install
 vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]
 ```
 
-`fulcrum skills upstream` then **skips** writing `<agent>/skills/fulcrum-upstream/graphify/` for any agent in that list. For agents NOT in the list (here: pi — graphify CLI doesn't support pi), the fulcrum-upstream mirror still runs as the fallback so the skill is available across every detected agent.
-
-`fulcrum install` follows up with two cleanup passes:
-- `pruneVendorCanonicalDupes` — removes `<agent>/skills/fulcrum-upstream/<name>/` entries that earlier installs created when the sync ran unconditionally for every agent.
-- `removeAgentsSharedDir` — recursively deletes `~/.agents/` if a third-party installer wrote there in violation of the per-agent rule.
+`fulcrum skills upstream` then **skips** that skill on any agent in the list — vendor's own `graphify install --platform <agent>` already ran during `fulcrum init` and placed the skill at `<agent>/skills/graphify/`. For agents NOT in the list (here: pi — graphify CLI doesn't support pi), the file-copy mirror still runs into the same top-level location (`~/.pi/agent/skills/graphify/`) so the skill is available everywhere.
 
 ## 2. Skill catalogue (general-purpose)
 

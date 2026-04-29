@@ -588,12 +588,6 @@ export async function run(args: string[]): Promise<void> {
     console.log("7/9  Syncing curated third-party skills per detected agent");
     const { syncUpstreamSkills } = await import("./upstream-skills.ts");
     await syncUpstreamSkills({ dryRun: DRY_RUN });
-    // After sync: prune duplicates that earlier installs created when the
-    // sync ran unconditionally for every agent. Also nuke ~/.agents/ if a
-    // third-party installer wrote there (rule violation).
-    const { pruneVendorCanonicalDupes, removeAgentsSharedDir } = await import("./upstream-skills.ts");
-    await pruneVendorCanonicalDupes({ home, dryRun: DRY_RUN });
-    await removeAgentsSharedDir({ home, dryRun: DRY_RUN });
   } else {
     console.log("7/9  Skipping curated third-party skill sync (--no-upstream-skills)");
   }

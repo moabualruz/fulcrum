@@ -5,8 +5,6 @@ import { tmpdir } from "node:os";
 import {
   computeSubpathSha256,
   loadUpstreamSkills,
-  pruneVendorCanonicalDupes,
-  removeAgentsSharedDir,
   syncUpstreamSkills,
 } from "./upstream-skills.ts";
 import * as proc from "../utils/proc.ts";
@@ -634,91 +632,3 @@ describe("vendor_canonical_agents schema", () => {
   });
 });
 
-describe("pruneVendorCanonicalDupes", () => {
-  test("removes existing fulcrum-upstream/<name>/ for vendor-canonical agents", async () => {
-    const lockPath = await writeLock([
-      "[meta]",
-      "schema_version = 1",
-      "",
-      "[skills.graphify]",
-      "source = \"https://github.com/example/graphify\"",
-      "subpath = \"graphify/skill.md\"",
-      "ref = \"main\"",
-      "tree_sha = \"0123456789abcdef0123456789abcdef01234567\"",
-      "license = \"MIT\"",
-      "author_class = \"individual\"",
-      "pinned_on = \"2026-04-28\"",
-      "review_due = \"2026-07-27\"",
-      "vendor_canonical_agents = [\"claude-code\", \"codex\"]",
-      "",
-    ].join("\n"));
-    const dupePaths = [
-      join(TMP, ".claude/skills/fulcrum-upstream/graphify"),
-      join(TMP, ".codex/skills/fulcrum-upstream/graphify"),
-      // Pi NOT in vendor_canonical_agents — must survive prune.
-      join(TMP, ".pi/agent/skills/fulcrum-upstream/graphify"),
-    ];
-    for (const p of dupePaths) {
-      await mkdir(p, { recursive: true });
-      await writeFile(join(p, "SKILL.md"), "# graphify\n");
-    }
-    await pruneVendorCanonicalDupes({ home: TMP, lockPath });
-    const { stat } = await import("node:fs/promises");
-    await expect(stat(dupePaths[0]!)).rejects.toThrow();
-    await expect(stat(dupePaths[1]!)).rejects.toThrow();
-    // Pi mirror must remain
-    expect((await stat(dupePaths[2]!)).isDirectory()).toBe(true);
-  });
-
-  test("idempotent — no-op when nothing to prune", async () => {
-    const lockPath = await writeLock([
-      "[meta]",
-      "schema_version = 1",
-      "",
-      "[skills.graphify]",
-      "source = \"https://github.com/example/graphify\"",
-      "subpath = \"graphify/skill.md\"",
-      "ref = \"main\"",
-      "tree_sha = \"0123456789abcdef0123456789abcdef01234567\"",
-      "license = \"MIT\"",
-      "author_class = \"individual\"",
-      "pinned_on = \"2026-04-28\"",
-      "review_due = \"2026-07-27\"",
-      "vendor_canonical_agents = [\"claude-code\"]",
-      "",
-    ].join("\n"));
-    const logs: string[] = [];
-    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
-      logs.push(args.map((a) => String(a)).join(" "));
-    });
-    try {
-      await pruneVendorCanonicalDupes({ home: TMP, lockPath });
-      expect(logs.some((l) => l.includes("no fulcrum-upstream/<name>/ dupes to prune"))).toBe(true);
-    } finally {
-      logSpy.mockRestore();
-    }
-  });
-});
-
-describe("removeAgentsSharedDir", () => {
-  test("removes ~/.agents/ when present", async () => {
-    const dir = join(TMP, ".agents/skills/x");
-    await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, "SKILL.md"), "x");
-    await removeAgentsSharedDir({ home: TMP });
-    const { stat } = await import("node:fs/promises");
-    await expect(stat(join(TMP, ".agents"))).rejects.toThrow();
-  });
-
-  test("idempotent — no-op when ~/.agents/ absent", async () => {
-    await expect(removeAgentsSharedDir({ home: TMP })).resolves.toBeUndefined();
-  });
-
-  test("dry-run does not actually remove", async () => {
-    const dir = join(TMP, ".agents/skills/y");
-    await mkdir(dir, { recursive: true });
-    await removeAgentsSharedDir({ home: TMP, dryRun: true });
-    const { stat } = await import("node:fs/promises");
-    expect((await stat(join(TMP, ".agents"))).isDirectory()).toBe(true);
-  });
-});

@@ -231,14 +231,16 @@ describe("mirror-policy: syncUpstreamSkills copies to all agent paths", () => {
       logSpy.mockRestore();
     }
 
-    // Verify SKILL.md was copied to each agent's upstream namespace.
+    // Third-party skills land at the vendor's own placement convention —
+    // <agent>/skills/<name>/ for everyone (Gemini included; vendor's per-
+    // platform installer also writes to ~/.gemini/skills/<name>/). Fulcrum
+    // does not own a namespace for skills it didn't author.
     const agentPaths = [
-      join(TMP, ".claude", "skills", "fulcrum-upstream", "mypkg", "SKILL.md"),
-      join(TMP, ".codex", "skills", "fulcrum-upstream", "mypkg", "SKILL.md"),
-      join(TMP, ".config", "opencode", "skills", "fulcrum-upstream", "mypkg", "SKILL.md"),
-      join(TMP, ".pi", "agent", "skills", "fulcrum-upstream", "mypkg", "SKILL.md"),
-      // Gemini uses extensions/<ext>/skills/<name>/
-      join(TMP, ".gemini", "extensions", "fulcrum-upstream-skills", "skills", "mypkg", "SKILL.md"),
+      join(TMP, ".claude", "skills", "mypkg", "SKILL.md"),
+      join(TMP, ".codex", "skills", "mypkg", "SKILL.md"),
+      join(TMP, ".config", "opencode", "skills", "mypkg", "SKILL.md"),
+      join(TMP, ".pi", "agent", "skills", "mypkg", "SKILL.md"),
+      join(TMP, ".gemini", "skills", "mypkg", "SKILL.md"),
     ];
 
     for (const agentPath of agentPaths) {
