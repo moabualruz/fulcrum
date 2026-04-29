@@ -378,59 +378,65 @@ async function cleanupPiMcpAdapterIfUnused(home: string): Promise<void> {
   console.log(`     - Pi pi-mcp-adapter package entry removed → ${settingsFile}`);
 }
 
-async function removeCavemanCopies(home: string): Promise<void> {
-  // W1.1: Claude Code — call `claude plugin uninstall caveman@caveman` when
-  // Claude is detected and `claude` is on PATH. Best-effort: log + continue.
-  const claudeDir = `${home}/.claude`;
-  if (await exists(claudeDir)) {
-    if (await which("claude")) {
-      await runBestEffort(
-        ["claude", "plugin", "uninstall", "caveman@caveman"],
-        "Claude Code caveman plugin uninstall",
-      );
-    } else {
-      console.log("     · Claude Code caveman: `claude` not on PATH — manual: claude plugin uninstall caveman@caveman");
+export async function removeCavemanCopies(home: string, opts: { dryRun?: boolean } = {}): Promise<void> {
+  const previousDryRun = DRY_RUN;
+  DRY_RUN = opts.dryRun ?? DRY_RUN;
+  try {
+    // W1.1: Claude Code — call `claude plugin uninstall caveman@caveman` when
+    // Claude is detected and `claude` is on PATH. Best-effort: log + continue.
+    const claudeDir = `${home}/.claude`;
+    if (await exists(claudeDir)) {
+      if (await which("claude")) {
+        await runBestEffort(
+          ["claude", "plugin", "uninstall", "caveman@caveman"],
+          "Claude Code caveman plugin uninstall",
+        );
+      } else {
+        console.log("     · Claude Code caveman: `claude` not on PATH — manual: claude plugin uninstall caveman@caveman");
+      }
     }
-  }
 
-  // W1.2: Gemini CLI — call `gemini extensions uninstall caveman` when Gemini
-  // is detected and `gemini` is on PATH. Best-effort: log + continue.
-  const geminiDir = `${home}/.gemini`;
-  if (await exists(geminiDir)) {
-    if (await which("gemini")) {
-      await runBestEffort(
-        ["gemini", "extensions", "uninstall", "caveman"],
-        "Gemini CLI caveman extension uninstall",
-      );
-    } else {
-      console.log("     · Gemini CLI caveman: `gemini` not on PATH — manual: gemini extensions uninstall caveman");
+    // W1.2: Gemini CLI — call `gemini extensions uninstall caveman` when Gemini
+    // is detected and `gemini` is on PATH. Best-effort: log + continue.
+    const geminiDir = `${home}/.gemini`;
+    if (await exists(geminiDir)) {
+      if (await which("gemini")) {
+        await runBestEffort(
+          ["gemini", "extensions", "uninstall", "caveman"],
+          "Gemini CLI caveman extension uninstall",
+        );
+      } else {
+        console.log("     · Gemini CLI caveman: `gemini` not on PATH — manual: gemini extensions uninstall caveman");
+      }
     }
-  }
 
-  // W1.4: Codex/OpenCode/Pi — remove Fulcrum's per-agent filesystem mirrors.
-  const mirrorAgents: Array<{ dir: string; label: string; agent: typeof AGENTS[number] }> = [
-    { dir: `${home}/.codex`, label: "Codex CLI", agent: AGENTS.find((a) => a.id === "codex")! },
-    { dir: `${home}/.config/opencode`, label: "OpenCode", agent: AGENTS.find((a) => a.id === "opencode")! },
-    { dir: `${home}/.pi/agent`, label: "Pi CLI", agent: AGENTS.find((a) => a.id === "pi")! },
-  ];
-  for (const { dir, label, agent } of mirrorAgents) {
-    if (!(await exists(dir))) continue;
-    await removePath(agent.cavemanInstallDir(home), `${label} caveman install dir`);
-  }
-  await removePath(`${home}/.codex/plugins/cache/caveman`, "Codex CLI caveman plugin cache");
+    // W1.4: Codex/OpenCode/Pi — remove Fulcrum's per-agent filesystem mirrors.
+    const mirrorAgents: Array<{ dir: string; label: string; agent: typeof AGENTS[number] }> = [
+      { dir: `${home}/.codex`, label: "Codex CLI", agent: AGENTS.find((a) => a.id === "codex")! },
+      { dir: `${home}/.config/opencode`, label: "OpenCode", agent: AGENTS.find((a) => a.id === "opencode")! },
+      { dir: `${home}/.pi/agent`, label: "Pi CLI", agent: AGENTS.find((a) => a.id === "pi")! },
+    ];
+    for (const { dir, label, agent } of mirrorAgents) {
+      if (!(await exists(dir))) continue;
+      await removePath(agent.cavemanInstallDir(home), `${label} caveman install dir`);
+    }
+    await removePath(`${home}/.codex/plugins/cache/caveman`, "Codex CLI caveman plugin cache");
 
-  // Always remove file-copy installs as cleanup; plugin/extension agents are
-  // handled by their native uninstall commands above.
-  for (const agent of AGENTS) {
-    if (agent.id === "claude-code" || agent.id === "gemini") continue;
-    await removePath(agent.cavemanInstallDir(home), `${agent.label} caveman install dir`);
-  }
-  await removeCavemanSkillSiblings(home);
+    // Always remove file-copy installs as cleanup; plugin/extension agents are
+    // handled by their native uninstall commands above.
+    for (const agent of AGENTS) {
+      if (agent.id === "claude-code" || agent.id === "gemini") continue;
+      await removePath(agent.cavemanInstallDir(home), `${agent.label} caveman install dir`);
+    }
+    await removeCavemanSkillSiblings(home);
 
-  const cfgPath = process.env["XDG_CONFIG_HOME"]
-    ? `${process.env["XDG_CONFIG_HOME"]}/caveman/config.json`
-    : `${home}/.config/caveman/config.json`;
-  await removePath(cfgPath, "caveman config");
+    const cfgPath = process.env["XDG_CONFIG_HOME"]
+      ? `${process.env["XDG_CONFIG_HOME"]}/caveman/config.json`
+      : `${home}/.config/caveman/config.json`;
+    await removePath(cfgPath, "caveman config");
+  } finally {
+    DRY_RUN = previousDryRun;
+  }
 }
 
 const CAVEMAN_SKILL_NAMES = [
@@ -505,27 +511,6 @@ async function cleanupEmptyAgentConfigContainers(home: string): Promise<void> {
   }
 }
 
-const REPOMIX_PLUGINS = ["repomix-mcp", "repomix-commands", "repomix-explorer"] as const;
-const REPOMIX_MARKER_FILE = "repomix-claude.installed";
-
-async function uninstallRepomixClaudePlugins(home: string): Promise<void> {
-  if (!(await exists(`${home}/.claude`))) return;
-  if (!(await which("claude"))) {
-    console.log("     · claude not on PATH — repomix plugins: manual: claude plugin uninstall repomix-mcp@repomix ...");
-    return;
-  }
-  for (const plugin of REPOMIX_PLUGINS) {
-    await runBestEffort(
-      ["claude", "plugin", "uninstall", `${plugin}@repomix`],
-      `Claude Code ${plugin}@repomix plugin uninstall`,
-    );
-  }
-  // Remove marker file.
-  const fHome = process.env["FULCRUM_HOME"] ?? `${home}/.fulcrum`;
-  const markerFile = `${fHome}/state/global/${REPOMIX_MARKER_FILE}`;
-  await removePath(markerFile, "repomix Claude plugins marker");
-}
-
 /**
  * For every entry in the MCP registry, call removeFromAgents (regardless of
  * enabled state). Then delete the registry file unless --keep-state is passed.
@@ -547,9 +532,8 @@ async function uninstallMcpRegistryEntries(home: string, keepState: boolean, dry
     console.log("     · MCP registry not present (skip)");
   }
 
-  // Uninstall repomix Claude plugins.
-  await uninstallRepomixClaudePlugins(home);
-  const { uninstallRepomixPackageMirrors } = await import("./repomix-package.ts");
+  const { uninstallRepomixClaudePlugins: uninstallRepomixClaudePluginPackage, uninstallRepomixPackageMirrors } = await import("./repomix-package.ts");
+  await uninstallRepomixClaudePluginPackage({ dryRun });
   await uninstallRepomixPackageMirrors({ dryRun });
 
   // Delete registry file unless keepState.
@@ -625,7 +609,7 @@ export async function run(args: string[]): Promise<void> {
   console.log("6/6  Removing policy and optional third-party installs");
   await removeToolOutputPolicy(purge, DRY_RUN);
   if (includeCaveman) {
-    await removeCavemanCopies(home);
+    await removeCavemanCopies(home, { dryRun: DRY_RUN });
   } else {
     console.log("     · keep caveman (use --include-caveman to remove Fulcrum-installed copies/config)");
   }
