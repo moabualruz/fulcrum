@@ -14,6 +14,9 @@ export async function executeComponentPlan(
   if (opts.dryRun === true) {
     for (const action of plan.actions) {
       console.log(`DRY RUN ${action.id} ${action.change} ${action.kind} ${action.target}`);
+      if (isVendorSurface(action.kind)) {
+        await applyAction(action, true);
+      }
     }
     return;
   }
@@ -25,7 +28,7 @@ export async function executeComponentPlan(
   try {
     for (const action of plan.actions) {
       try {
-        await applyAction(action);
+        await applyAction(action, false);
         recordSuccessfulAction(ledger, operationId, action);
       } catch (error) {
         failed = true;
@@ -39,7 +42,7 @@ export async function executeComponentPlan(
   }
 }
 
-async function applyAction(action: ComponentAction): Promise<void> {
+async function applyAction(action: ComponentAction, dryRun: boolean): Promise<void> {
   if (action.change === "noop" || action.change === "preserve") return;
 
   switch (action.kind) {
@@ -62,9 +65,28 @@ async function applyAction(action: ComponentAction): Promise<void> {
       await applyPolicyAction(action.operation, false);
       return;
     }
+    case "skill-sync":
+    case "upstream-skill-sync":
+    case "vendor-command":
+    case "directory-copy":
+    case "file-copy": {
+      const { applyVendorAction } = await import("./adapters/vendor.ts");
+      await applyVendorAction(action, dryRun);
+      return;
+    }
     default:
       throw new Error(`unsupported component surface kind: ${action.kind}`);
   }
+}
+
+function isVendorSurface(kind: ComponentAction["kind"]): boolean {
+  return (
+    kind === "skill-sync" ||
+    kind === "upstream-skill-sync" ||
+    kind === "vendor-command" ||
+    kind === "directory-copy" ||
+    kind === "file-copy"
+  );
 }
 
 function recordSuccessfulAction(
