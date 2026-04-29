@@ -53,6 +53,7 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 │                              repomix --compress). Vendor-default output paths.
 ├── fulcrum install [--with-project DIR] [--dry-run]
 │                  [--no-skills] [--no-upstream-skills]
+│                  [--enable-all-mcps]
 │                            — sentinel-splice rules, vendor snippets, seed policy,
 │                              caveman canonical per-agent install, caveman ultra
 │                              lock, context-mode managed integration, sync
@@ -170,7 +171,7 @@ LICENSE (MIT)  AGENTS.md  README.md
 - `fulcrum mcp list --json` — 16 builtin servers visible; `enable`/`disable [--all-agents]` propagates to native config files; doctor reports `enabled-on:[…]` + `auth_status` + `reachable`.
 - `fulcrum doctor` — `verdict: "ok"` on this machine; full per-agent state, caveman across 5 agents, Pi MCP adapter present + DeepWiki in mcp.json.
 - `fulcrum uninstall --dry-run` — preview shows clean removal of every Fulcrum-managed artifact across 5 agents.
-- `bash scripts/install.sh [--dry-run] [--with-project DIR] [--no-skills] [--no-upstream-skills]` — flag pass-through verified bash 3.2-safe.
+- `bash scripts/install.sh [--dry-run] [--with-project DIR] [--no-skills] [--no-upstream-skills] [--enable-all-mcps]` — flag pass-through verified bash 3.2-safe. `--enable-all-mcps` flips every builtin MCP on across every detected agent immediately after registration (intended for end-to-end MCP verification; revert via `fulcrum mcp disable --all-agents <name>`).
 - `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG → tag → cross-compile → optional `gh release create`. Does NOT push.
 - `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <skill>` — five trigger-rate harnesses; uniform flags; PATH-missing guard.
 - `docs/smoke-test.md` — self-contained agent-runnable verification prompt with 16 checks + result template + remediation links + append-only result log.

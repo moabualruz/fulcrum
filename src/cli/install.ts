@@ -505,6 +505,7 @@ export async function run(args: string[]): Promise<void> {
   let withProject: string | null = null;
   let syncAuthoredSkills = true;
   let syncUpstream = true;
+  let enableAllMcps = false;
   DRY_RUN = false;
   let i = 0;
   while (i < args.length) {
@@ -521,6 +522,9 @@ export async function run(args: string[]): Promise<void> {
       i += 1;
     } else if (a === "--no-upstream-skills") {
       syncUpstream = false;
+      i += 1;
+    } else if (a === "--enable-all-mcps") {
+      enableAllMcps = true;
       i += 1;
     } else {
       console.error(`fulcrum install: unknown arg '${a}'`);
@@ -597,6 +601,22 @@ export async function run(args: string[]): Promise<void> {
   console.log("8b/9 Registering MCP registry entries (github, repomix, semgrep, context7, tavily, playwright, cloudflare-*, dart)");
   await installMcpRegistryEntries(home);
   console.log();
+
+  if (enableAllMcps) {
+    console.log("8c/9 Enabling all builtin MCPs across every detected agent (--enable-all-mcps)");
+    const { setEnabled, applyToAgents, ALL_AGENT_IDS } = await import("./mcp-registry.ts");
+    const { BUILTIN_MCPS } = await import("./mcp-builtins.ts");
+    for (const { name } of BUILTIN_MCPS) {
+      if (DRY_RUN) {
+        console.log(`     [dry-run] would enable ${name} on [${ALL_AGENT_IDS.join(", ")}]`);
+        continue;
+      }
+      await setEnabled(name, true, { agents: [...ALL_AGENT_IDS] });
+      await applyToAgents(name);
+      console.log(`     ✓ ${name} enabled on [${ALL_AGENT_IDS.join(", ")}]`);
+    }
+    console.log();
+  }
 
   if (withProject) {
     console.log(`9/9  fulcrum init ${withProject}`);

@@ -70,6 +70,7 @@ FULCRUM_RELEASE_TAG=v0.1.0 bash <(curl -fsSL https://raw.githubusercontent.com/m
 | `--dry-run` | Preview only; no writes |
 | `--no-skills` | Skip authored + upstream skill sync |
 | `--no-upstream-skills` | Skip only the networked upstream skill sync |
+| `--enable-all-mcps` | After registration, enable every builtin MCP on every detected agent. Use to verify each MCP starts and authenticates; revert later via `fulcrum mcp disable --all-agents <name>`. |
 
 ### Post-install: env vars
 

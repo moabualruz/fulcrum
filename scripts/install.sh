@@ -21,6 +21,9 @@
 #   --dry-run               Preview without writing.
 #   --no-skills             Skip authored + upstream skill sync.
 #   --no-upstream-skills    Skip curated upstream skill sync only.
+#   --enable-all-mcps       After registration, enable every builtin MCP on
+#                           every detected agent (use to verify all servers
+#                           start; revert via `fulcrum mcp disable --all-agents <name>`).
 
 set -euo pipefail
 
@@ -41,6 +44,9 @@ while [ $# -gt 0 ]; do
       shift ;;
     --no-upstream-skills)
       INSTALL_ARGS+=(--no-upstream-skills)
+      shift ;;
+    --enable-all-mcps)
+      INSTALL_ARGS+=(--enable-all-mcps)
       shift ;;
     -h|--help)
       grep '^#' "$0" | sed 's/^# \?//'
