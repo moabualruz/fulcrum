@@ -342,12 +342,13 @@ describe("removeCavemanCopies — W1.2 Gemini extension uninstall", () => {
 });
 
 // ---------------------------------------------------------------------------
-// W1.4 — caveman Codex/OpenCode/Pi uninstall via `npx skills remove caveman`
-// ---------------------------------------------------------------------------
+  // W1.4 — caveman Codex/OpenCode/Pi uninstall via filesystem mirrors
+  // ---------------------------------------------------------------------------
 
-describe("removeCavemanCopies — W1.4 npx skills remove", () => {
-  test("calls npx skills remove caveman for each detected agent when npx available", async () => {
+describe("removeCavemanCopies — W1.4 filesystem mirrors", () => {
+  test("does not call npx skills remove caveman; removes per-agent mirrors", async () => {
     await mkdir(join(TMP, ".codex", "skills", "caveman"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0"), { recursive: true });
     await mkdir(join(TMP, ".config", "opencode", "skills", "caveman"), { recursive: true });
     await mkdir(join(TMP, ".pi", "agent", "skills", "caveman"), { recursive: true });
 
@@ -363,8 +364,11 @@ describe("removeCavemanCopies — W1.4 npx skills remove", () => {
       const npxRemovals = calls.filter(
         (cmd) => Array.isArray(cmd) && cmd[0] === "npx" && cmd.includes("remove") && cmd.includes("caveman"),
       );
-      // Should have been called at least once per detected agent (3 agents).
-      expect(npxRemovals.length).toBeGreaterThanOrEqual(3);
+      expect(npxRemovals.length).toBe(0);
+      expect(await Bun.file(join(TMP, ".codex", "skills", "caveman")).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ".codex", "plugins", "cache", "caveman")).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ".config", "opencode", "skills", "caveman")).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "caveman")).exists()).toBe(false);
     } finally {
       whichSpy.mockRestore();
       runSpy.mockRestore();

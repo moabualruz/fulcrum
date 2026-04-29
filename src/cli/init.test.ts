@@ -249,7 +249,7 @@ describe("runVendorIntegrations — graphify", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6–8. Vendor integrations — caveman / ast-grep / tavily (npx skills add)
+// 6–8. Vendor integrations — ast-grep / tavily (npx skills add)
 // ---------------------------------------------------------------------------
 
 describe("runVendorIntegrations — npx skills add commands", () => {
@@ -289,16 +289,12 @@ describe("runVendorIntegrations — npx skills add commands", () => {
     }
   }
 
-  test("npx skills add JuliusBrussee/caveman spawned (no -a flag)", async () => {
+  test("caveman is not installed through generic npx skills add during init", async () => {
     const calls = await runWithNpxMocked();
     const cavemanCall = calls.find(
       (c) => Array.isArray(c) && c.join(" ") === "npx skills add JuliusBrussee/caveman"
     );
-    expect(cavemanCall).toBeDefined();
-    // Ensure no -a flag.
-    if (Array.isArray(cavemanCall)) {
-      expect(cavemanCall).not.toContain("-a");
-    }
+    expect(cavemanCall).toBeUndefined();
   });
 
   test("npx skills add ast-grep/agent-skill spawned", async () => {

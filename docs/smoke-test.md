@@ -21,7 +21,7 @@ Run agent non-interactively with this file as prompt. Exact command per agent:
 claude -p "$(cat docs/smoke-test.md)" --output-format json
 
 # Codex CLI
-codex "$(cat docs/smoke-test.md)"
+codex exec --dangerously-bypass-approvals-and-sandbox "$(cat docs/smoke-test.md)"
 
 # Gemini CLI
 gemini -p "$(cat docs/smoke-test.md)" --output-format json --yolo
@@ -39,7 +39,7 @@ When run from outside repo, replace `docs/smoke-test.md` with absolute path to t
 
 ## Prompt body
 
-You are running Fulcrum setup verification. Work through each numbered step in order. For each step: run CHECK command (or read CHECK path), compare to EXPECT, write outcome to RECORD. When check fails, record actual value and continue — do not abort. After all steps, write completed result table to RECORD path in step 16.
+You are running Fulcrum setup verification. Work through each numbered step in order. For each step: run CHECK command (or read CHECK path), compare to EXPECT, write outcome to RECORD. Do not sample agents or skip required rows. Row 15 is required when cwd is the Fulcrum repo root. When check fails, record actual value and continue — do not abort. After all steps, append completed result table to RECORD path in the final step.
 
 Prerequisite: `fulcrum` must be on PATH. If not found, try `~/.fulcrum/bin/fulcrum`. If still not found, record "fulcrum binary not found" for every check and stop.
 
@@ -121,8 +121,8 @@ Expected builtins: github, repomix, semgrep, context7, tavily, playwright, dart,
 
 ```
 CHECK:  fulcrum doctor --json | jq '[.mcp.servers[] | {name, auth_status}]'
-EXPECT: every entry "ok" or "n/a"; any "missing-env:<VAR>" = env var not set
-RECORD: row 8 of result table; for each missing-env entry, note var name in Notes
+EXPECT: every entry "ok" or "n/a"; "missing-env" fails only for enabled MCPs that require auth. Disabled opt-in MCPs and context7 without `CONTEXT7_API_KEY` are not failures.
+RECORD: row 8 of result table; for each failing missing-env entry, note var name in Notes
 ```
 
 ---
@@ -237,7 +237,7 @@ Save completed result table to:
 ~/.fulcrum/state/global/smoke-test/<YYYY-MM-DD>.md
 ```
 
-Create dir if absent. If file for today exists, append `---` separator + new table — never overwrite.
+Create dir if absent. If file for today exists, append `---` separator + new table with `>>` or equivalent append mode — never overwrite, truncate, or use `cat >` on an existing daily log.
 If agent sandbox blocks `~/.fulcrum` write, print completed table in final response; note canonical append blocked. Supervising caller append outside sandbox.
 
 ```bash
@@ -265,7 +265,7 @@ Host:  <hostname>
 | 5 | Pi MCP adapter | present if Pi installed | <fill> | <fill> | <fill> |
 | 6 | mcp section in doctor | true | <fill> | <fill> | <fill> |
 | 7 | 16 builtin MCP servers | 16 | <fill> | <fill> | <fill> |
-| 8 | MCP auth_status | ok or n/a each | <fill> | <fill> | list missing-env vars |
+| 8 | MCP auth_status | ok or n/a each; missing-env only allowed for disabled opt-ins | <fill> | <fill> | list failing missing-env vars |
 | 9 | rules splice (per agent) | 1 per detected | <fill> | <fill> | <fill> |
 | 10 | caveman installed (per agent) | true each detected | <fill> | <fill> | <fill> |
 | 11 | authored skills count | 28 per detected | <fill> | <fill> | <fill> |
@@ -292,7 +292,8 @@ Overall verdict: PASS / PARTIAL / FAIL
 | Pi adapter missing | `pi install npm:pi-mcp-adapter` not run, or Pi absent at install time. See docs/mcp.md §3.3. |
 | mcp section absent | Doctor predates W2. Rebuild from current source. |
 | builtin count < 16 | Registry stale or not written. Run `fulcrum install` to re-register. |
-| missing-env:<VAR> | Env var not exported. See docs/mcp.md §5 for per-MCP token sources; HANDOVER.md §6.0a §C for secrets file layout. |
+| missing-env:<VAR> on enabled required-auth MCP | Env var not exported. See docs/mcp.md §5 for per-MCP token sources; HANDOVER.md §6.0a §C for secrets file layout. |
+| missing-env:<VAR> on disabled opt-in MCP | Not a smoke-test failure; record as disabled auth not configured. |
 | rules splice missing | `fulcrum install` not run, or rules file replaced after install. Re-run `fulcrum install`. See docs/context.md. |
 | caveman not installed for agent | Agent installed after `fulcrum install`. Re-run `fulcrum install`. See docs/caveman.md. |
 | authored skill count < 27 | Run `fulcrum skills sync`. See docs/skills.md. |

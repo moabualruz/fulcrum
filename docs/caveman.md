@@ -12,23 +12,23 @@ Five agents, five paths. Never `~/.agents/` (shared folder pollutes every agent 
 |---|---|---|
 | Claude Code | Plugin system | `claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman` (fulcrum install runs this) |
 | Gemini CLI | Extension system | `gemini extensions install https://github.com/JuliusBrussee/caveman --consent --skip-settings` (fulcrum install runs this) |
-| Codex CLI | `~/.codex/skills/caveman/` + siblings | `npx skills add JuliusBrussee/caveman -a codex` (canonical); clone+copy fallback when npx absent |
-| OpenCode | `~/.config/opencode/skills/caveman/` + siblings | `npx skills add JuliusBrussee/caveman -a opencode` (canonical); clone+copy fallback when npx absent |
-| Pi CLI | `~/.pi/agent/skills/caveman/` + siblings | `npx skills add JuliusBrussee/caveman -a pi` (canonical); clone+copy fallback when npx absent |
+| Codex CLI | `~/.codex/skills/caveman/` + siblings + Codex plugin cache/hooks/config | Clone official repo; copy `skills/*`; mirror `plugins/caveman` to `~/.codex/plugins/cache/caveman/caveman/<version>/`; merge `.codex/hooks.json`; enable `caveman@caveman` |
+| OpenCode | `~/.config/opencode/skills/caveman/` + siblings | Clone official repo; copy `skills/*` |
+| Pi CLI | `~/.pi/agent/skills/caveman/` + siblings | Clone official repo; copy `skills/*` |
 
 Five caveman skills: `caveman`, `caveman-commit`, `caveman-help`, `caveman-review`, `compress`. `compress` skill compresses markdown in-place (see "Compression of in-repo content").
 
 ## Uninstall
 
-`fulcrum uninstall --include-caveman` calls the canonical vendor uninstall command per detected agent, then removes any remaining filesystem copies.
+`fulcrum uninstall --include-caveman` calls native vendor uninstall commands for plugin/extension agents, then removes Fulcrum-owned filesystem mirrors.
 
 | Agent | Uninstall command |
 |---|---|
 | Claude Code | `claude plugin uninstall caveman@caveman` (best-effort; log + continue on error) |
 | Gemini CLI | `gemini extensions uninstall caveman` (best-effort) |
-| Codex CLI | `npx skills remove caveman --yes`; fallback to `rm -rf ~/.codex/skills/caveman` |
-| OpenCode | `npx skills remove caveman --yes`; fallback to `rm -rf ~/.config/opencode/skills/caveman` |
-| Pi CLI | `npx skills remove caveman --yes`; fallback to `rm -rf ~/.pi/agent/skills/caveman` |
+| Codex CLI | Remove `~/.codex/skills/caveman/` + sibling skills and `~/.codex/plugins/cache/caveman/` |
+| OpenCode | Remove `~/.config/opencode/skills/caveman/` + sibling skills |
+| Pi CLI | Remove `~/.pi/agent/skills/caveman/` + sibling skills |
 
 Always removes `~/.config/caveman/config.json` (the defaultMode lock).
 

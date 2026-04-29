@@ -12,7 +12,7 @@ Five agents, five install paths. Never use `~/.agents/` (shared folder pollutes 
 |---|---|---|
 | Claude Code | Plugin system | `claude plugin install caveman@caveman` (fulcrum install runs this) |
 | Gemini CLI | Extension system | `gemini extensions install https://github.com/JuliusBrussee/caveman --consent --skip-settings` (fulcrum install runs this) |
-| Codex CLI | `~/.codex/skills/caveman/` + siblings | Clone once, copy 5 skills to `~/.codex/skills/` (fulcrum install does this) |
+| Codex CLI | `~/.codex/skills/caveman/` + siblings + Codex plugin cache/hooks/config | Clone once, copy skills to `~/.codex/skills/`, mirror `plugins/caveman` to `~/.codex/plugins/cache/caveman/caveman/<version>/`, merge `.codex/hooks.json`, enable `caveman@caveman` |
 | OpenCode | `~/.config/opencode/skills/caveman/` + siblings | Clone once, copy 5 skills to `~/.config/opencode/skills/` (fulcrum install does this) |
 | Pi CLI | `~/.pi/agent/skills/caveman/` + siblings | Clone once, copy 5 skills to `~/.pi/agent/skills/` (fulcrum install does this) |
 

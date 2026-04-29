@@ -111,7 +111,7 @@ After install, common commands:
 
 ```bash
 fulcrum init <dir>            # bootstrap project: AGENTS.md + .claude/CLAUDE.md +
-                              # vendor integrations (graphify, caveman, ast-grep, tavily
+                              # vendor integrations (graphify, ast-grep, tavily
                               # via npx skills add; pi-mcp-adapter init for Pi)
 fulcrum init --dry-run <dir>  # preview without writing
 fulcrum init reindex <dir>    # run repomix --compress in <dir> (no --output override)

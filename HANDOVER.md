@@ -14,10 +14,10 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
 
 `main` ships a Bun `fulcrum` CLI that:
 
-- **Installs cross-agent setup** (`fulcrum install`) — sentinel-splices `rules/AGENTS.md` into each detected agent's primary rules file; vendors hook recipe snippets; seeds `tool-output-policy.toml`; runs caveman vendor canonical install per agent (`claude plugin install caveman@caveman` / `gemini extensions install` / `npx skills add JuliusBrussee/caveman`); manages context-mode (npm + per-agent MCP+hooks+routing); installs vendor capability packages (Repomix Claude plugins + non-Claude mirrors, Cloudflare Claude plugin, Superpowers Claude/Gemini/OpenCode/Pi packages + Codex full skill mirror; Pi falls back to skill mirror only when `pi` is unavailable); registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 vendor MCPs in the registry (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart) with minimal default state enabling only context7; syncs 27 authored skills + 27 upstream-pinned skills with subpath-level SHA-256 integrity verification and `vendor_canonical_agents` package-ownership skips.
+- **Installs cross-agent setup** (`fulcrum install`) — sentinel-splices `rules/AGENTS.md` into each detected agent's primary rules file; vendors hook recipe snippets; seeds `tool-output-policy.toml`; runs caveman per agent (`claude plugin install caveman@caveman` / `gemini extensions install` / direct official repo mirror for Codex/OpenCode/Pi, with Codex plugin metadata/assets/hooks/config mirrored into native Codex paths); manages context-mode (npm + per-agent MCP+hooks+routing); installs vendor capability packages (Repomix Claude plugins + non-Claude mirrors, Cloudflare Claude plugin, Superpowers Claude/Gemini/OpenCode/Pi packages + Codex full skill mirror; Pi falls back to skill mirror only when `pi` is unavailable); registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 vendor MCPs in the registry (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart) with minimal default state enabling only context7; syncs 29 authored skills + 27 upstream-pinned skills with subpath-level SHA-256 integrity verification and `vendor_canonical_agents` package-ownership skips.
 
 - **Bootstraps projects** (`fulcrum init <dir>`) in three vendor-canonical phases:
-  1. **Vendor integrations** — `graphify install --platform <agent>` per detected agent (Claude Code/Codex/OpenCode/Gemini); `npx skills add` for caveman, ast-grep, tavily; `pi install npm:pi-mcp-adapter` + `pi-mcp-adapter init` for Pi; defers context7 OAuth to manual `npx ctx7 setup`.
+  1. **Vendor integrations** — `graphify install --platform <agent>` per detected agent (Claude Code/Codex/OpenCode/Gemini); `npx skills add` for ast-grep and tavily; caveman is handled only by `fulcrum install` per-agent mirrors; `pi install npm:pi-mcp-adapter` + `pi-mcp-adapter init` for Pi; defers context7 OAuth to manual `npx ctx7 setup`.
   2. **Strip duplicate vendor rule blocks** — vendor CLIs (`graphify install`) write rule text outside our `BEGIN/END FULCRUM RULES` sentinel; the same content lives in `rules/AGENTS.md` and is spliced inside the sentinel; `stripVendorRuleBlocks` removes the duplicate so agents don't load the rule twice. Vendor-installed hooks/settings remain untouched.
   3. **Project indices** — `graphify update .` + `repomix --compress`. Vendor-default output paths (`graphify-out/`, `repomix-output.xml`); NO Fulcrum-imposed flags or watchers. Live pattern matchers (rg, fd, ast-grep, jq, …) need no index and are not handled here. `fulcrum init reindex` re-runs phase 3 only.
 
@@ -29,7 +29,7 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
 
 - **Validates the environment** (`fulcrum doctor [--json] [--probe]`) — agent detection, rules-spliced state, caveman per-agent install + `defaultMode` source, Pi MCP adapter check, 47 BYO tools, tool-output policy presence. MCP registry section reports `auth_status` (env-var presence), `reachable` (HEAD probe / `which`), `drift` (`default_enabled=false` but some agent has it enabled), and `wiring` (per-agent native config inspection — confirms `bearer_token_env_var` / `headers.Authorization` is present for HTTP servers with declared auth). With `--probe`: spawns stdio MCPs / POSTs HTTP MCPs and asserts a valid JSON-RPC `initialize` reply within an 8s timeout. Catches wrong commands, stale URLs, and broken auth in one check.
 
-- **Self-tests** via `bun run ci` — install → tsc → 273 tests → 5 platform builds → skills:lint → compress:check (hard gate, 0 pending). All green at every commit.
+- **Self-tests** via `bun run ci` — install → tsc → 292 tests → 5 platform builds → skills:lint → compress:check (hard gate, 0 pending). All green at every commit.
 
 - **Verifies a fresh setup** via `docs/smoke-test.md` — self-contained markdown that any of the 5 agents can read as a prompt and execute step-by-step (16 checks, result table, failure remediation, append-only result log under `~/.fulcrum/state/global/smoke-test/<YYYY-MM-DD>.md`).
 
@@ -429,7 +429,7 @@ brew install usql                                                    # optional
 bash scripts/install.sh
 ```
 
-Splices rules; vendors hook snippets; seeds policy; installs caveman per agent (vendor canonical commands); installs context-mode; syncs 27 authored + 27 upstream skills with subpath SHA-256; registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 builtin MCPs and enables context7 as minimal default; installs 3 vendor Repomix Claude plugins.
+Splices rules; vendors hook snippets; seeds policy; installs caveman per agent (Claude/Gemini vendor commands; Codex/OpenCode/Pi direct official repo mirrors, avoiding shared global skill roots); installs context-mode; syncs 29 authored + 27 upstream skills with subpath SHA-256; registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 builtin MCPs and enables context7 as minimal default; installs 3 vendor Repomix Claude plugins.
 
 ### C. MCP auth
 
@@ -499,29 +499,23 @@ fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, handshake, wiring,
 
 ---
 
-## 7a. Next-session ordering — first two steps
+## 7a. Next-session ordering
 
 1. **Run the smoke test on a fresh agent session.**
    `claude -p "$(cat docs/smoke-test.md)" --output-format json` (or the equivalent for codex / gemini / opencode / pi). Result lands at `~/.fulcrum/state/global/smoke-test/<YYYY-MM-DD>.md`. Triage every `✗` row; fix the underlying setup or code; re-run until the result table is all `✓`.
 
-2. **Author the cross-agent subagent-orchestration skill.**
-   Read `docs/subagent-guidance.notes.md` first — captures the user's scattered guidance on subagent workflow from session 2026-04-28/29 (parallel-vs-serial, model-effort matching, review-protocol, research-then-plan-then-implement, vendor-first sourcing, scope discipline, scratch-HOME testing, fail-soft per tool, no overengineering).
-   Then research online to enrich it. Targets:
-   - Anthropic Agent SDK + Claude Code subagent docs (`code.claude.com/docs/en` — search "subagent", "Agent tool", "background tasks", "isolation modes")
-   - Multi-agent orchestration patterns: map-reduce / fan-out / supervisor-worker; token-budget control; hand-off checkpoints; failure isolation
-   - Cross-agent dispatch surfaces: what each of Claude Code, Codex, Gemini, OpenCode, Pi exposes for "delegate to a subagent" — confirm contract, not assume
-   - Existing community skills in this space (search `obra/superpowers-lab`, `mitsuhiko/agent-stuff`, anthropic/skills)
-   Output:
-   - `skills/subagent-orchestration/SKILL.md` (frontmatter + 5 H2 sections per `skills/_template/SKILL.md`); name `/subagent-orchestration` (or shorter if a vendor publishes a canonical name first — vendor-first policy applies).
-   - `skills/subagent-orchestration/references/*.md` for progressive detail.
-   - `evals/subagent-orchestration.json` (18–21 entries; trigger / anti-trigger split).
-   - `evals/subagent-orchestration.match-words` for word-bounded match keywords.
-   - caveman compress; pass `bun run skills lint`; verify 4-of-5 trigger eval bar via `scripts/eval-skill-claude.sh subagent-orchestration` and the codex sibling.
-   Constraint: vendor-first. If the Anthropic / Claude team or a tool vendor already publishes an "agent orchestration" skill at an official source, pin that into `skills/upstream.lock` and only author the gap parts. Do not re-implement what is published.
+2. **Discuss subagent work before doing it.**
+   Do not create, edit, validate, or expand subagent-related skills/files until after the smoke test is clean and the next session explicitly discusses the intended subagent scope.
 
-3. After both pass, proceed with layer §6.1 (Repository supervisor) per the build-order branch plan above.
+3. **Then do the subagent work if approved.**
+   Scope to be agreed in that discussion before implementation.
 
-If the smoke test surfaces an issue, fix it (commit per logical change) before moving to step 2.
+4. **Add component-level install/remove commands.**
+   Implement the planned `fulcrum component` lifecycle surface documented in `docs/user-guide.md` and `docs/developer-guide.md`: install/remove one managed component such as context-mode, caveman, Repomix, vendor packages, DeepWiki, or MCP registry scaffolding without touching unrelated components. Preserve dry-run behavior, per-agent targeting, idempotent removal, and sentinel-only cleanup.
+
+5. After that, proceed with layer §6.1 (Repository supervisor) per the build-order branch plan above.
+
+If the smoke test surfaces an issue, fix it (commit per logical change) before moving to subagent discussion.
 
 ---
 
@@ -530,7 +524,7 @@ If the smoke test surfaces an issue, fix it (commit per logical change) before m
 ```bash
 # Full agent-runnable verification (16 checks, append-only result log)
 claude   -p "$(cat docs/smoke-test.md)" --output-format json
-codex    "$(cat docs/smoke-test.md)"
+codex    exec --dangerously-bypass-approvals-and-sandbox "$(cat docs/smoke-test.md)"
 gemini   -p "$(cat docs/smoke-test.md)" --output-format json --yolo
 opencode run --format json "$(cat docs/smoke-test.md)"
 pi       --print "$(cat docs/smoke-test.md)" --mode json --no-session
@@ -573,7 +567,6 @@ Per-skill harnesses: `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <s
 - `docs/developer-guide.md` — repo layout, architecture, contributing code.
 - `docs/contributing.md` — workflow + conventions.
 - `docs/smoke-test.md` — agent-runnable post-install verification prompt.
-- `docs/subagent-guidance.notes.md` — captured user guidance on subagent workflow; source for the cross-agent subagent-orchestration skill (see §7a step 2).
 - `docs/{context,hooks,skills,mcp,agents,capabilities,caveman,tool-output-policy,skill-smoke-test}.md` — per-topic foundation docs.
 - `rules/AGENTS.md` — body spliced into each agent's primary rules file (≤ 200 lines, vendor-tool conventions only).
 - `skills/SOURCES.md` — skill registry + authoring queue.

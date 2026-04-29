@@ -143,6 +143,7 @@ const TOOLS: ToolCheck[] = [
 ];
 
 interface AgentDir {
+  id: string;
   label: string;
   path: string;
   rulesFile?: string;      // primary file that gets sentinel-spliced
@@ -153,12 +154,25 @@ interface AgentDir {
 function agentDirs(): AgentDir[] {
   const home = process.env["HOME"] ?? "";
   return AGENTS.map((a) => ({
+    id: a.id,
     label: a.label,
     path: a.baseDir(home),
     rulesFile: a.rulesFile(home),
     cavemanPath: a.cavemanInstallDir(home),
     settingsPath: a.settingsPath?.(home),
   }));
+}
+
+async function cavemanActivationHookPresent(agent: AgentDir, home: string): Promise<boolean> {
+  if (agent.id === "codex") {
+    try {
+      const hooks = await Bun.file(`${home}/.codex/hooks.json`).text();
+      return hooks.includes("CAVEMAN MODE ACTIVE") || hooks.includes("Loading caveman mode");
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 function repoRoot(): string {
@@ -457,7 +471,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     cavemanAgents.push({
       label: a.label,
       installed,
-      activationHookPresent: false,
+      activationHookPresent: await cavemanActivationHookPresent(a, home),
     });
   }
 
@@ -490,13 +504,6 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   try {
     const reg = await loadRegistry();
     for (const server of Object.values(reg.servers)) {
-      // Auth status
-      let authStatus: "ok" | "missing-env" | "n/a" = "n/a";
-      if (server.auth_env_vars.length > 0) {
-        const allPresent = server.auth_env_vars.every((v) => !!process.env[v]);
-        authStatus = allPresent ? "ok" : "missing-env";
-      }
-
       // Reachability (HEAD probe for HTTP servers; which check for stdio)
       let reachable: boolean | null = null;
       if (server.transport === "http" && server.url) {
@@ -527,9 +534,19 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       const drift = !server.default_enabled && !isMinimalDefault && enabledAgents.length > 0;
       if (drift) warnings += 1;
 
+      // Auth status: missing env matters only for enabled servers that require
+      // auth. Context7 declares an optional key for higher limits, but works
+      // keyless, so absence is not a failure.
+      let authStatus: "ok" | "missing-env" | "n/a" = "n/a";
+      const optionalAuth = server.name === "context7";
+      if (server.auth_env_vars.length > 0 && enabledAgents.length > 0 && !optionalAuth) {
+        const allPresent = server.auth_env_vars.every((v) => !!process.env[v]);
+        authStatus = allPresent ? "ok" : "missing-env";
+      }
+
       // Auth wiring: only meaningful for HTTP servers with declared auth.
       const wiring: Record<string, "ok" | "missing" | "n/a"> = {};
-      const needsAuth = server.transport === "http" && server.auth_env_vars.length > 0;
+      const needsAuth = server.transport === "http" && server.auth_env_vars.length > 0 && !optionalAuth;
       for (const id of ALL_AGENT_IDS) {
         if (!needsAuth) { wiring[id] = "n/a"; continue; }
         if (agentState[id] !== "enabled") { wiring[id] = "n/a"; continue; }

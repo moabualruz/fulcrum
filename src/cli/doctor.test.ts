@@ -377,6 +377,7 @@ description = "GitHub MCP"
 vendor = "github"
 default_enabled = false
 auth_env_vars = ["GITHUB_TOKEN"]
+enabled_codex = true
 
 [servers.github.agent_visibility]
 "claude-code" = true
@@ -394,5 +395,66 @@ auth_env_vars = ["GITHUB_TOKEN"]
     const servers = mcp["servers"] as Array<Record<string, unknown>>;
     const github = servers.find((s) => s["name"] === "github");
     expect(github!["auth_status"]).toBe("missing-env");
+  });
+
+  test("auth_status n/a for disabled MCP even when auth env var is absent", async () => {
+    const home = join(TMP, "mcp-disabled-auth");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const stateDir = join(fulcrumHome, "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    const toml = `schema_version = 1
+
+[servers.github]
+transport = "http"
+url = "https://api.githubcopilot.com/mcp/"
+description = "GitHub MCP"
+vendor = "github"
+default_enabled = false
+auth_env_vars = ["GITHUB_TOKEN"]
+
+[servers.github.agent_visibility]
+"claude-code" = true
+"codex" = true
+"gemini" = true
+"opencode" = true
+"pi" = true
+`;
+    await writeFile(join(stateDir, "mcp-registry.toml"), toml);
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome, GITHUB_TOKEN: undefined });
+    const servers = (report["mcp"] as Record<string, unknown>)["servers"] as Array<Record<string, unknown>>;
+    const github = servers.find((s) => s["name"] === "github");
+    expect(github!["auth_status"]).toBe("n/a");
+  });
+
+  test("auth_status n/a for context7 without optional API key", async () => {
+    const home = join(TMP, "mcp-context7-optional-auth");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const stateDir = join(fulcrumHome, "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    const toml = `schema_version = 1
+
+[servers.context7]
+transport = "http"
+url = "https://mcp.context7.com/mcp"
+description = "Context7 MCP"
+vendor = "upstash"
+default_enabled = false
+auth_env_vars = ["CONTEXT7_API_KEY"]
+enabled_codex = true
+
+[servers.context7.agent_visibility]
+"claude-code" = true
+"codex" = true
+"gemini" = true
+"opencode" = true
+"pi" = true
+`;
+    await writeFile(join(stateDir, "mcp-registry.toml"), toml);
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome, CONTEXT7_API_KEY: undefined });
+    const servers = (report["mcp"] as Record<string, unknown>)["servers"] as Array<Record<string, unknown>>;
+    const context7 = servers.find((s) => s["name"] === "context7");
+    expect(context7!["auth_status"]).toBe("n/a");
   });
 });

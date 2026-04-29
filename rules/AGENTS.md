@@ -15,6 +15,13 @@
 - Opt-out: user say `normal mode` or `stop caveman` — drop caveman that session only. Resume next session.
 - Auto-clarity: drop caveman for security warnings, irreversible-action confirmations (`rm -rf`, `--force` push, data deletion), multi-step sequences where order matter. Resume after.
 
+## 0c. Strategic Orchestration
+
+- **Dispatch up to 6 parallel subagents for independent work.** (Wave-3 audits, parallel research, fixing multiple files). Partition by file ownership to avoid collisions. Why: Context isolation prevents bloat; parallel execution speeds up "wall-clock" time. Instead-of: sequential turns for independent sub-tasks.
+- **Trust-but-verify subagent output.** Always run `git status` + `git diff --stat` + `bun run ci` (or native tests) after an agent reports completion. Why: Agents may claim "DONE" while files are missing or tests fail. Instead-of: accepting textual "Success" as fact.
+- **Research → Plan → Implement workflow.** Use separate agents for research (fetching READMEs, docs) and planning before implementation. Why: Prevents overengineering and implementation drift. Instead-of: "research-and-implement-now" in one turn.
+- **Match model effort to task complexity.** Use Haiku/Flash for mechanical edits/tests; Sonnet/Pro for integration/refactoring; Opus/Ultra for design/architecture. Why: Conserves high-reasoning tokens for hard problems; increases overall throughput.
+
 ## 1. Search & discovery
 
 - `rg <pattern>` — when grepping tree. Instead of `grep -r`, `find ... | xargs grep`. Why: respects `.gitignore`, ~10× faster, no surprise binary matches. Trigger: "find all callers of foo".

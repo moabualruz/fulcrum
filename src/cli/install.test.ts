@@ -154,14 +154,14 @@ describe("lockCavemanUltra", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3b. W1.3 — caveman Codex/OpenCode/Pi: npx skills add canonical path + fallback
+// 3b. W1.3 — caveman Codex/OpenCode/Pi: direct official repo mirror
 //
 // These tests drive the install logic in dry-run mode so no real filesystem
 // writes happen. The key invariant is WHAT commands would be run (logged by
 // runProcDry in dry-run mode) not whether they succeeded.
 // ---------------------------------------------------------------------------
 
-describe("installCaveman W1.3 — npx skills add canonical path", () => {
+describe("installCaveman W1.3 — direct official repo copy", () => {
   let testHome: string;
   let origHome: string | undefined;
   let origFulcrumHome: string | undefined;
@@ -190,12 +190,12 @@ describe("installCaveman W1.3 — npx skills add canonical path", () => {
     await rm(testHome, { recursive: true, force: true });
   });
 
-  test("dry-run logs npx skills add for detected agent (npx found on real PATH)", async () => {
+  test("dry-run logs git clone for detected agent without using shared ~/.agents", async () => {
     // Create Codex dir to simulate detection. Don't create caveman subdir.
     await mkdir(join(testHome, ".codex", "skills"), { recursive: true });
-    // Note: npx presence is real — test just verifies npx path is chosen when
-    // npx exists on the real machine. If npx is absent, fallback path fires
-    // instead — both are acceptable; the key invariant is no crash.
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => (
+      cmd === "git" ? "/mock/git" : null
+    ));
     const logs: string[] = [];
     const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
       logs.push(String(args[0]));
@@ -203,21 +203,18 @@ describe("installCaveman W1.3 — npx skills add canonical path", () => {
 
     try {
       await installCaveman(testHome);
-      // Either npx path or skip must be logged for Codex.
-      const codexHandled = logs.some((l) =>
-        (l.includes("npx") && l.includes("JuliusBrussee/caveman")) ||
-        l.includes("npx not on PATH") ||
-        l.includes("Codex CLI caveman")
-      );
-      expect(codexHandled).toBe(true);
+      expect(logs).toContain(`     [dry-run] would run: git clone --depth 1 https://github.com/JuliusBrussee/caveman ${join(tmpdir(), "fulcrum-caveman-dry-run")}`);
+      expect(logs.some((l) => l.includes(".agents"))).toBe(false);
     } finally {
+      whichSpy.mockRestore();
       logSpy.mockRestore();
     }
   });
 
-  test("dry-run logs skip when caveman skill dir already exists (idempotency)", async () => {
-    // Pre-create the caveman skill dir to simulate already installed.
+  test("dry-run logs skip when caveman skill and Codex plugin dirs already exist (idempotency)", async () => {
+    // Pre-create both Codex surfaces to simulate a complete install.
     await mkdir(join(testHome, ".codex", "skills", "caveman"), { recursive: true });
+    await mkdir(join(testHome, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0"), { recursive: true });
 
     const logs: string[] = [];
     const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {

@@ -21,8 +21,9 @@
 //                      default enable step and leave existing MCP state intact.
 //   --enable-all-mcps Enable every builtin MCP after registration.
 
-import { mkdir, readFile, writeFile, copyFile, readdir, stat, appendFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, copyFile, readdir, stat, appendFile, mkdtemp, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { which, run as runProc } from "../utils/proc.ts";
 import { AGENTS } from "../agents/registry.ts";
 
@@ -52,6 +53,138 @@ async function mk(path: string): Promise<void> {
 async function cp(src: string, dst: string): Promise<void> {
   if (DRY_RUN) { console.log(`     [dry-run] would copy: ${src} → ${dst}`); return; }
   await copyFile(src, dst);
+}
+
+async function copyTree(src: string, dst: string): Promise<void> {
+  const s = await stat(src);
+  if (!s.isDirectory()) {
+    await mk(dirname(dst));
+    await cp(src, dst);
+    return;
+  }
+  await mk(dst);
+  for (const entry of await readdir(src, { withFileTypes: true })) {
+    await copyTree(`${src}/${entry.name}`, `${dst}/${entry.name}`);
+  }
+}
+
+function upsertTomlSection(existing: string, header: string, body: string): string {
+  const section = `${header}\n${body.trimEnd()}\n`;
+  const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(?:^|\\n)${escaped}\\n[\\s\\S]*?(?=\\n\\[|$)`);
+  if (re.test(existing)) return existing.replace(re, `\n${section}`).trimStart();
+  return `${existing.trimEnd()}\n\n${section}`.trimStart();
+}
+
+function ensureCodexHooksFeature(existing: string): string {
+  if (/^codex_hooks\s*=\s*true$/m.test(existing)) return existing;
+  if (/^\[features\]$/m.test(existing)) {
+    return existing.replace(/^\[features\]$/m, "[features]\ncodex_hooks = true");
+  }
+  return `${existing.trimEnd()}\n\n[features]\ncodex_hooks = true\n`.trimStart();
+}
+
+async function mergeCodexCavemanHooks(home: string, repoRootDir: string): Promise<void> {
+  const target = `${home}/.codex/hooks.json`;
+  const source = `${repoRootDir}/.codex/hooks.json`;
+  if (!(await exists(source))) return;
+
+  let targetJson: Record<string, unknown> = {};
+  if (await exists(target)) {
+    try {
+      targetJson = JSON.parse(await readFile(target, "utf8"));
+    } catch {
+      targetJson = {};
+    }
+  }
+
+  const sourceJson = JSON.parse(await readFile(source, "utf8"));
+  const targetHooks = (targetJson.hooks && typeof targetJson.hooks === "object")
+    ? targetJson.hooks as Record<string, unknown[]>
+    : {};
+  const sourceHooks = (sourceJson.hooks && typeof sourceJson.hooks === "object")
+    ? sourceJson.hooks as Record<string, unknown[]>
+    : {};
+
+  for (const [event, entries] of Object.entries(sourceHooks)) {
+    const current = Array.isArray(targetHooks[event]) ? targetHooks[event] : [];
+    const seen = new Set(current.map((entry) => JSON.stringify(entry)));
+    for (const entry of Array.isArray(entries) ? entries : []) {
+      const key = JSON.stringify(entry);
+      if (!seen.has(key)) {
+        current.push(entry);
+        seen.add(key);
+      }
+    }
+    targetHooks[event] = current;
+  }
+
+  targetJson.hooks = targetHooks;
+  await mk(dirname(target));
+  await wf(target, `${JSON.stringify(targetJson, null, 2)}\n`);
+}
+
+async function configureCodexCavemanPlugin(home: string, repoRootDir: string): Promise<void> {
+  const pluginJsonPath = `${repoRootDir}/plugins/caveman/.codex-plugin/plugin.json`;
+  if (!(await exists(pluginJsonPath))) return;
+  const pluginJson = JSON.parse(await readFile(pluginJsonPath, "utf8"));
+  const version = typeof pluginJson.version === "string" ? pluginJson.version : "0.1.0";
+  const pluginCache = `${home}/.codex/plugins/cache/caveman/caveman/${version}`;
+  assertNotAgentsPath(pluginCache, home);
+  await copyTree(`${repoRootDir}/plugins/caveman`, pluginCache);
+
+  const configPath = `${home}/.codex/config.toml`;
+  let config = (await exists(configPath)) ? await readFile(configPath, "utf8") : "";
+  config = ensureCodexHooksFeature(config);
+  config = upsertTomlSection(config, "[marketplaces.caveman]", [
+    `source_type = "git"`,
+    `source = "${CAVEMAN_REPO}"`,
+  ].join("\n"));
+  config = upsertTomlSection(config, "[plugins.\"caveman@caveman\"]", "enabled = true");
+  await mk(dirname(configPath));
+  await wf(configPath, `${config.trimEnd()}\n`);
+
+  await mergeCodexCavemanHooks(home, repoRootDir);
+}
+
+async function installCavemanFromRepo(home: string, skillsRoot: string, label: string, includeCodexPlugin = false): Promise<boolean> {
+  const gitPath = await which("git");
+  if (!gitPath) {
+    console.log(`     · ${label}: git not on PATH — manual: clone ${CAVEMAN_REPO} and copy skills/* to ${skillsRoot}`);
+    return false;
+  }
+
+  const tmp = DRY_RUN
+    ? `${tmpdir()}/fulcrum-caveman-dry-run`
+    : await mkdtemp(`${tmpdir()}/fulcrum-caveman-`);
+  const clone = await runProcDry(["git", "clone", "--depth", "1", CAVEMAN_REPO, tmp]);
+  if (clone.exit !== 0) {
+    console.log(`     ✗ ${label} caveman git clone failed: ${clone.stderr.trim()} — manual: clone ${CAVEMAN_REPO} and copy skills/* to ${skillsRoot}`);
+    return false;
+  }
+  if (DRY_RUN) return true;
+
+  try {
+    const repoSkills = `${tmp}/skills`;
+    if (!(await isDir(repoSkills))) {
+      console.log(`     ✗ ${label} caveman repo missing skills/ directory`);
+      return false;
+    }
+    await mk(skillsRoot);
+    for (const entry of await readdir(repoSkills, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        const target = `${skillsRoot}/${entry.name}`;
+        assertNotAgentsPath(target, home);
+        await copyTree(`${repoSkills}/${entry.name}`, target);
+      }
+    }
+    if (includeCodexPlugin) {
+      await configureCodexCavemanPlugin(home, tmp);
+    }
+    return true;
+  } finally {
+    if (!DRY_RUN) await rm(tmp, { recursive: true, force: true });
+  }
 }
 
 /** appendFile wrapper — skips in dry-run. */
@@ -361,14 +494,12 @@ export async function installCaveman(home: string): Promise<void> {
     console.log("     · skip Gemini CLI (not detected)");
   }
 
-  // --- W1.3: Codex, OpenCode, Pi — canonical `npx skills add` path (no -a flag) ---
-  // Per upstream README canonical path: `npx skills add JuliusBrussee/caveman`
-  // skills.sh auto-detects the agent from cwd/env — the -a flag is not needed.
-  // Clone-and-copy fallback removed: the vendor CLI is the only install path.
-  const npxPath = await which("npx");
-
-  const npxAgentDefs: Array<{ id: string; dir: string; label: string; skillsRoot: string }> = [
-    { id: "codex",    dir: `${home}/.codex`,          label: "Codex CLI", skillsRoot: `${home}/.codex/skills` },
+  // --- W1.3: Codex, OpenCode, Pi — direct vendor repo copy.
+  // Fulcrum copies Caveman surfaces into native per-agent roots. Codex gets
+  // plugin metadata/assets/hooks as well as skills because Caveman ships more
+  // than a bare SKILL.md.
+  const npxAgentDefs: Array<{ id: string; dir: string; label: string; skillsRoot: string; includeCodexPlugin?: boolean }> = [
+    { id: "codex",    dir: `${home}/.codex`,          label: "Codex CLI", skillsRoot: `${home}/.codex/skills`, includeCodexPlugin: true },
     { id: "opencode", dir: `${home}/.config/opencode`, label: "OpenCode",  skillsRoot: `${home}/.config/opencode/skills` },
     { id: "pi",       dir: `${home}/.pi/agent`,        label: "Pi CLI",    skillsRoot: `${home}/.pi/agent/skills` },
   ];
@@ -379,23 +510,18 @@ export async function installCaveman(home: string): Promise<void> {
       continue;
     }
 
-    // Idempotency: if the caveman skill dir already exists, skip.
+    // Idempotency: if the required surfaces already exist, skip.
     const cavemanSkillDir = `${ag.skillsRoot}/caveman`;
-    if (await isDir(cavemanSkillDir)) {
+    const codexPluginDir = `${home}/.codex/plugins/cache/caveman/caveman/0.1.0`;
+    if ((await isDir(cavemanSkillDir)) && (!ag.includeCodexPlugin || (await isDir(codexPluginDir)))) {
       console.log(`     · skip ${ag.label} caveman (already installed)`);
       continue;
     }
 
-    if (npxPath) {
-      // Canonical vendor path — no -a flag; skills.sh auto-detects agent.
-      const r = await runProcDry(["npx", "skills", "add", "JuliusBrussee/caveman"]);
-      if (r.exit !== 0) {
-        console.log(`     ✗ ${ag.label} caveman npx install failed: ${r.stderr.trim()} — manual: npx skills add JuliusBrussee/caveman`);
-      } else {
-        console.log(`     ✓ ${ag.label} caveman installed via npx skills add`);
-      }
+    if (await installCavemanFromRepo(home, ag.skillsRoot, ag.label, !!ag.includeCodexPlugin)) {
+      console.log(`     ✓ ${ag.label} caveman installed from official repo`);
     } else {
-      console.log(`     · ${ag.label}: npx not on PATH — manual: npx skills add JuliusBrussee/caveman`);
+      console.log(`     ✗ ${ag.label} caveman install failed — expected ${cavemanSkillDir}`);
     }
   }
 

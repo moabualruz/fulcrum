@@ -385,32 +385,20 @@ async function removeCavemanCopies(home: string): Promise<void> {
     }
   }
 
-  // W1.4: Codex/OpenCode/Pi — call `npx skills remove caveman` for each
-  // detected agent. Fallback to removePath when npx is not available.
-  const npxPath = await which("npx");
-  const npxAgents: Array<{ dir: string; label: string; agent: typeof AGENTS[number] }> = [
+  // W1.4: Codex/OpenCode/Pi — remove Fulcrum's per-agent filesystem mirrors.
+  const mirrorAgents: Array<{ dir: string; label: string; agent: typeof AGENTS[number] }> = [
     { dir: `${home}/.codex`, label: "Codex CLI", agent: AGENTS.find((a) => a.id === "codex")! },
     { dir: `${home}/.config/opencode`, label: "OpenCode", agent: AGENTS.find((a) => a.id === "opencode")! },
     { dir: `${home}/.pi/agent`, label: "Pi CLI", agent: AGENTS.find((a) => a.id === "pi")! },
   ];
-  for (const { dir, label, agent } of npxAgents) {
+  for (const { dir, label, agent } of mirrorAgents) {
     if (!(await exists(dir))) continue;
-    if (npxPath) {
-      // npx skills remove does not need an -a flag — it auto-detects from cwd/env.
-      // Pass --yes to suppress interactive prompts (Bash 3.2-safe: no arrays).
-      await runBestEffort(
-        ["npx", "skills", "remove", "caveman", "--yes"],
-        `${label} caveman skills remove via npx`,
-      );
-    } else {
-      // Fallback: file-system removal of the install dir.
-      await removePath(agent.cavemanInstallDir(home), `${label} caveman install (fs fallback)`);
-    }
+    await removePath(agent.cavemanInstallDir(home), `${label} caveman install dir`);
   }
+  await removePath(`${home}/.codex/plugins/cache/caveman`, "Codex CLI caveman plugin cache");
 
-  // Always remove file-copy installs as cleanup for agents where caveman was
-  // installed with `npx skills add`; plugin/extension agents are handled by
-  // their native uninstall commands above.
+  // Always remove file-copy installs as cleanup; plugin/extension agents are
+  // handled by their native uninstall commands above.
   for (const agent of AGENTS) {
     if (agent.id === "claude-code" || agent.id === "gemini") continue;
     await removePath(agent.cavemanInstallDir(home), `${agent.label} caveman install dir`);

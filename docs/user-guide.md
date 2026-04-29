@@ -73,6 +73,37 @@ FULCRUM_RELEASE_TAG=v0.1.0 bash <(curl -fsSL https://raw.githubusercontent.com/m
 | `--no-default-mcps` | Register MCP definitions/config but skip Fulcrum's minimal default enable step; existing MCP state is left untouched. |
 | `--enable-all-mcps` | After registration, enable every builtin MCP on every detected agent. Use to verify each MCP starts and authenticates; revert later via `fulcrum mcp disable --all-agents <name>`. |
 
+### Component lifecycle granularity
+
+Current release has coarse install/uninstall commands plus targeted subcommands for skills, hooks, and MCP registry entries:
+
+```bash
+fulcrum install
+fulcrum uninstall
+fulcrum skills sync
+fulcrum skills upstream
+fulcrum hooks enable <name>
+fulcrum mcp enable <name> --agent <id>
+fulcrum mcp disable <name> --agent <id>
+fulcrum mcp unregister <name>
+```
+
+It does **not** yet expose a single-component lifecycle surface for managed install packages such as context-mode, caveman, Repomix, Cloudflare, or Superpowers. Until that exists, `fulcrum install` applies the full managed stack, and `fulcrum uninstall` removes the managed stack with its existing safety defaults.
+
+Planned command shape:
+
+```bash
+fulcrum component list
+fulcrum component install context-mode [--agent <id> ...] [--all-agents]
+fulcrum component remove context-mode [--agent <id> ...] [--all-agents]
+fulcrum component install caveman [--agent <id> ...] [--all-agents]
+fulcrum component remove caveman [--agent <id> ...] [--all-agents]
+fulcrum component install repomix [--agent <id> ...] [--all-agents]
+fulcrum component remove repomix [--agent <id> ...] [--all-agents]
+```
+
+Expected behavior: operate on one named Fulcrum-managed component without changing unrelated components. `--agent <id>` limits per-agent config where the component supports per-agent installation; `--all-agents` applies to every detected supported agent. Remove should delete only Fulcrum-managed files, sentinels, plugin registrations, and MCP/config entries for that component.
+
 ### Post-install: env vars
 
 After install, set up auth for any managed MCPs you plan to use. The recommended layout:
@@ -102,7 +133,7 @@ Full per-MCP auth requirements are in [docs/mcp.md §5](mcp.md). The full machin
 fulcrum init ~/code/myproject
 ```
 
-Creates `AGENTS.md`, `.claude/CLAUDE.md` (`@AGENTS.md` import), and `.gitignore` in the target directory. Then runs **vendor-canonical integrations** for each detected agent: graphify (per-agent platform install), caveman + ast-grep + tavily via `npx skills add`, and pi-mcp-adapter init for Pi. context7 OAuth is interactive — the command prints the manual step. Edit `AGENTS.md` to describe the project stack, commands, and conventions — every agent reads this file.
+Creates `AGENTS.md`, `.claude/CLAUDE.md` (`@AGENTS.md` import), and `.gitignore` in the target directory. Then runs **vendor-canonical integrations** for each detected agent: graphify (per-agent platform install), ast-grep + tavily via `npx skills add`, and pi-mcp-adapter init for Pi. Caveman is handled by `fulcrum install` per-agent mirrors. context7 OAuth is interactive — the command prints the manual step. Edit `AGENTS.md` to describe the project stack, commands, and conventions — every agent reads this file.
 
 Use `--dry-run` to preview without writing:
 

@@ -106,19 +106,9 @@ export async function runVendorIntegrations(
     console.log("  · graphify not on PATH — skipping graphify integrations");
   }
 
-  // ── caveman ───────────────────────────────────────────────────────────────
-  // Single canonical command; skills.sh auto-detects the agent from cwd/env.
-  // The -a flag is NOT passed — vendor's auto-detect is the canonical path.
-  if (hasNpx) {
-    await vendorRun(
-      "caveman: npx skills add JuliusBrussee/caveman",
-      ["npx", "skills", "add", "JuliusBrussee/caveman"],
-      dir,
-      dryRun,
-    );
-  } else {
-    console.log("  · npx not on PATH — skipping caveman skills add (install covers per-agent caveman)");
-  }
+  // Caveman is installed by `fulcrum install`, not `fulcrum init`: Codex,
+  // OpenCode, and Pi need per-agent mirrors and Codex needs plugin surfaces.
+  console.log("  · caveman handled by fulcrum install per-agent mirrors");
 
   // ── ast-grep/agent-skill ──────────────────────────────────────────────────
   // Single canonical command; auto-detects agent.

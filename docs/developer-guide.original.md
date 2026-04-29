@@ -170,7 +170,7 @@ Detection-aware logic: if `agent.rootDir` does not exist, skip writes for that a
 
 1. **Rules splice** — read `rules/AGENTS.md`, insert between `<!-- BEGIN/END FULCRUM RULES -->` sentinels in each detected agent's rules file. Preserves content outside the markers.
 2. **Policy seed** — copy `config/tool-output-policy.toml` to `~/.fulcrum/tool-output-policy.toml` (first run only; subsequent runs leave user edits).
-3. **Caveman per-agent** — call vendor install commands per agent (Claude plugin, Gemini extension, `npx skills add` for Codex/OpenCode/Pi, with clone fallback).
+3. **Caveman per-agent** — call vendor install commands for Claude/Gemini; clone the official repo and mirror skills/plugin surfaces into native Codex/OpenCode/Pi paths.
 4. **Caveman ultra lock** — write `~/.config/caveman/config.json` with `{"defaultMode":"ultra"}` (idempotent).
 5. **context-mode** — follow upstream install contracts per detected agent.
 6. **Authored skills** — `fulcrum skills sync` mirrors `skills/<name>/SKILL.md` to each agent's `<skills-root>/fulcrum/<name>/`.
