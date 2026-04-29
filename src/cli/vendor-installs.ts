@@ -97,8 +97,8 @@ export async function runVendorIntegrations(
     }
     if (detected.has("pi")) {
       // Pi is not supported by the graphify CLI; upstream vendor does not list it.
-      // fulcrum-upstream skill copy (via upstream-skills.ts) covers the fallback.
-      console.log("  · graphify: Pi not supported by graphify CLI; skipping (file copy via fulcrum-upstream covers fallback)");
+      // Upstream skill copy (via upstream-skills.ts) covers the fallback.
+      console.log("  · graphify: Pi not supported by graphify CLI; skipping (file copy via upstream skills covers fallback)");
     }
     // NOTE: project-index BUILD (`graphify update .`) runs in project-index.ts,
     // not here. This module only handles per-agent integration installers.

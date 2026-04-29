@@ -5,7 +5,7 @@ import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { assertNotAgentsPath, lockCavemanUltra, spliceSentinel, setDryRun } from "./install.ts";
+import { assertNotAgentsPath, installCaveman, lockCavemanUltra, spliceSentinel, setDryRun } from "./install.ts";
 import { run as runProc } from "../utils/proc.ts";
 import * as proc from "../utils/proc.ts";
 
@@ -202,8 +202,7 @@ describe("installCaveman W1.3 — npx skills add canonical path", () => {
     });
 
     try {
-      const { run: installRun } = await import("./install.ts");
-      await installRun(["--no-upstream-skills"]);
+      await installCaveman(testHome);
       // Either npx path or skip must be logged for Codex.
       const codexHandled = logs.some((l) =>
         (l.includes("npx") && l.includes("JuliusBrussee/caveman")) ||
@@ -226,8 +225,7 @@ describe("installCaveman W1.3 — npx skills add canonical path", () => {
     });
 
     try {
-      const { run: installRun } = await import("./install.ts");
-      await installRun(["--no-upstream-skills"]);
+      await installCaveman(testHome);
       // Should log "already installed" skip message for Codex.
       expect(logs.some((l) => l.includes("Codex CLI") && l.includes("already installed"))).toBe(true);
     } finally {
@@ -362,5 +360,12 @@ describe("installMcpRegistryEntries", () => {
     const reg = await loadRegistry();
     expect(reg.servers["github"]!.default_enabled).toBe(false);
     expect(reg.servers["repomix"]!.default_enabled).toBe(false);
+  });
+
+  test("dry-run does not write registry file", async () => {
+    setDryRun(true);
+    await installMcpRegistryEntries(regHome);
+    const reg = await loadRegistry();
+    expect(Object.keys(reg.servers)).toHaveLength(0);
   });
 });

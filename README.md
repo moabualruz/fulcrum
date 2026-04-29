@@ -122,7 +122,7 @@ fulcrum install --no-upstream-skills  # skip curated upstream skill sync
 fulcrum hooks list            # show available hook recipes
 fulcrum hooks enable format   # register native agent hook configs + print snippet
 fulcrum skills sync           # re-sync skills/ to each agent's skills/fulcrum/ folder
-fulcrum skills upstream       # sync curated third-party skills under fulcrum-upstream/
+fulcrum skills upstream       # sync curated third-party skills at vendor placement
 fulcrum skills list           # enumerate authored skills with eval coverage
 fulcrum skills lint <path>    # validate frontmatter + body section structure
 fulcrum hook <name>           # run a hook recipe (called by agent runtimes via stdin)

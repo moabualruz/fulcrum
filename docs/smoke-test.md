@@ -163,23 +163,24 @@ CHECK (Gemini CLI):   ls ~/.gemini/extensions/fulcrum-skills/skills/ 2>/dev/null
 CHECK (OpenCode):     ls ~/.config/opencode/skills/fulcrum/ 2>/dev/null | wc -l | tr -d ' '
 CHECK (Pi CLI):       ls ~/.pi/agent/skills/fulcrum/ 2>/dev/null | wc -l | tr -d ' '
 
-EXPECT: 27 per detected agent
+EXPECT: 28 per detected agent
 RECORD: row 11; note agent + actual count for any mismatch
 ```
 
 ---
 
-### Step 12 — Upstream skills (27 per detected agent)
+### Step 12 — Curated upstream skills
 
 ```
-CHECK (Claude Code):  ls ~/.claude/skills/fulcrum-upstream/ 2>/dev/null | wc -l | tr -d ' '
-CHECK (Codex CLI):    ls ~/.codex/skills/fulcrum-upstream/ 2>/dev/null | wc -l | tr -d ' '
-CHECK (Gemini CLI):   ls ~/.gemini/extensions/fulcrum-upstream-skills/skills/ 2>/dev/null | wc -l | tr -d ' '
-CHECK (OpenCode):     ls ~/.config/opencode/skills/fulcrum-upstream/ 2>/dev/null | wc -l | tr -d ' '
-CHECK (Pi CLI):       ls ~/.pi/agent/skills/fulcrum-upstream/ 2>/dev/null | wc -l | tr -d ' '
+CHECK:  rg -c '^\[skills\.' skills/upstream.lock
+CHECK (Claude Code):  test -d ~/.claude/skills/superpowers-using-superpowers || test -d ~/.claude/skills/playwright-cli
+CHECK (Codex CLI):    test -d ~/.codex/skills/superpowers-using-superpowers || test -d ~/.codex/skills/playwright-cli
+CHECK (Gemini CLI):   test -d ~/.gemini/skills/superpowers-using-superpowers || test -d ~/.gemini/skills/playwright-cli
+CHECK (OpenCode):     test -d ~/.config/opencode/skills/superpowers-using-superpowers || test -d ~/.config/opencode/skills/playwright-cli
+CHECK (Pi CLI):       test -d ~/.pi/agent/skills/superpowers-using-superpowers || test -d ~/.pi/agent/skills/playwright-cli
 
-EXPECT: 27 per detected agent
-RECORD: row 12; note agent + actual count for any mismatch
+EXPECT: lock count is 19; detected agents have at least one mirrored curated skill at vendor placement
+RECORD: row 12; note agent + missing representative skill for any mismatch
 ```
 
 ---
@@ -264,8 +265,8 @@ Host:  <hostname>
 | 8 | MCP auth_status | ok or n/a each | <fill> | <fill> | list missing-env vars |
 | 9 | rules splice (per agent) | 1 per detected | <fill> | <fill> | <fill> |
 | 10 | caveman installed (per agent) | true each detected | <fill> | <fill> | <fill> |
-| 11 | authored skills count | 27 per detected | <fill> | <fill> | <fill> |
-| 12 | upstream skills count | 27 per detected | <fill> | <fill> | <fill> |
+| 11 | authored skills count | 28 per detected | <fill> | <fill> | <fill> |
+| 12 | curated upstream skills | lock count 19 + representative skill present per detected | <fill> | <fill> | <fill> |
 | 13 | hooks list | 8 recipes shown | <fill> | <fill> | <fill> |
 | 14 | hook format smoke | exit 0 | <fill> | <fill> | <fill> |
 | 15 | bun run ci (repo only) | 6 stages green | <fill> | <fill> | skip if not in repo |

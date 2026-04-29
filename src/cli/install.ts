@@ -301,7 +301,7 @@ async function geminiShim(): Promise<void> {
  *
  * HARD RULE: never write to ~/.agents/ — enforced via assertNotAgentsPath.
  */
-async function installCaveman(home: string): Promise<void> {
+export async function installCaveman(home: string): Promise<void> {
   // --- Claude Code ---
   const claudeDir = `${home}/.claude`;
   if (await isDir(claudeDir)) {
@@ -488,6 +488,10 @@ export async function installMcpRegistryEntries(home: string): Promise<void> {
   const { BUILTIN_MCPS } = await import("./mcp-builtins.ts");
 
   for (const { name, spec } of BUILTIN_MCPS) {
+    if (DRY_RUN) {
+      console.log(`     [dry-run] would register ${name} MCP (default-disabled; enable with: fulcrum mcp enable ${name})`);
+      continue;
+    }
     await registerServer(name, spec);
     console.log(`     ✓ ${name} MCP registered (default-disabled; enable with: fulcrum mcp enable ${name})`);
   }

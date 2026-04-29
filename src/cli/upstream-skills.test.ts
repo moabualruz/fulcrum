@@ -500,8 +500,6 @@ describe("W1.6 ast-grep claude_plugin schema", () => {
       );
       expect(marketplaceAdd).toBeDefined();
       expect(pluginInstall).toBeDefined();
-      // Should NOT have done a file copy for Claude.
-      const claudeSkillDir = join(TMP, ".claude", "skills", "fulcrum-upstream", "ast-grep");
       expect(logs.some((l) => l.includes("via claude plugin install"))).toBe(true);
     } finally {
       whichSpy.mockRestore();
@@ -631,4 +629,3 @@ describe("vendor_canonical_agents schema", () => {
     }
   });
 });
-

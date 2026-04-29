@@ -11,7 +11,7 @@ Fulcrum is a local-first CLI Agent OS that installs a shared foundation across e
 **What Fulcrum does:**
 - Splices a shared rules block into each agent's primary config file (idempotent, preserves your content).
 - Installs hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `tool-output-router`, and two index hooks) as binary subcommands of a single `fulcrum` binary.
-- Syncs 28 authored skills and up to 27 curated upstream skills into every agent's skills directory under a `fulcrum/` namespace.
+- Syncs Fulcrum-authored skills into the `fulcrum/` namespace and curated upstream skills into each vendor's native skill placement.
 - Registers 18 managed MCPs (DeepWiki + context-mode always-on; 16 builtin extras default-disabled).
 - Installs caveman output-compression cross-agent with `defaultMode: ultra`.
 - Reports environment health via `fulcrum doctor`.
@@ -172,7 +172,7 @@ Full list: `fulcrum skills list` (shows name + eval coverage).
 To sync authored skills after a Fulcrum update:
 
 ```bash
-fulcrum skills sync         # sync 28 authored skills
+fulcrum skills sync         # sync authored skills
 fulcrum skills upstream     # sync curated upstream skills (network; verifies SHA-256)
 ```
 
@@ -297,7 +297,7 @@ A: No. It splices a marked block (`<!-- BEGIN/END FULCRUM RULES -->`) into your 
 A: Pull the repo and run `bash scripts/install.sh` again, or run `fulcrum skills sync` to re-sync authored skills without a full reinstall.
 
 **Q: Can I author my own skills?**
-A: Yes. Drop a `SKILL.md` at `~/.claude/skills/<name>/SKILL.md` (or the equivalent path for other agents). Those are not touched by Fulcrum's sync — only paths under `fulcrum/` and `fulcrum-upstream/` are managed. See [docs/skills.md §5](skills.md) for the authoring template.
+A: Yes. Drop a `SKILL.md` at `~/.claude/skills/<name>/SKILL.md` (or the equivalent path for other agents). Fulcrum owns only its authored `fulcrum/` namespace; curated upstream skills use vendor placement. See [docs/skills.md §5](skills.md) for the authoring template.
 
 **Q: What is the `fulcrum:` prefix I see in skill paths?**
 A: It refers to the `fulcrum/` subdirectory that Fulcrum-authored skills install into. The slash command itself is the bare name (`/jq`). The `fulcrum:<name>` colon-notation is reserved for a future plugin layer.

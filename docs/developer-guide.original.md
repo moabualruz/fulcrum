@@ -174,11 +174,11 @@ Detection-aware logic: if `agent.rootDir` does not exist, skip writes for that a
 4. **Caveman ultra lock** — write `~/.config/caveman/config.json` with `{"defaultMode":"ultra"}` (idempotent).
 5. **context-mode** — follow upstream install contracts per detected agent.
 6. **Authored skills** — `fulcrum skills sync` mirrors `skills/<name>/SKILL.md` to each agent's `<skills-root>/fulcrum/<name>/`.
-7. **Upstream skills** — `fulcrum skills upstream` clones pinned repos, verifies `subpath_sha256`, installs to `fulcrum-upstream/`.
+7. **Upstream skills** — `fulcrum skills upstream` clones pinned repos, verifies `subpath_sha256`, installs to vendor placement (`<agent>/skills/<name>/`, Gemini `~/.gemini/skills/<name>/`).
 8. **DeepWiki MCP** — register for each detected agent (Pi via `pi-mcp-adapter` auto-install).
 9. **Builtin MCPs** — register 16 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml` (default-disabled).
 
-`fulcrum uninstall` is conservative by default: removes managed rules blocks, hook registrations, hook snippets/markers, `skills/fulcrum/` and `skills/fulcrum-upstream/` namespaces, Gemini managed extensions, Gemini `@AGENTS.md` import, context-mode registrations, and DeepWiki. Keeps edited policy files and caveman unless `--purge` / `--include-caveman` flags are passed.
+`fulcrum uninstall` is conservative by default: removes managed rules blocks, hook registrations, hook snippets/markers, `skills/fulcrum/`, legacy `skills/fulcrum-upstream/` namespaces, Gemini managed extensions, Gemini `@AGENTS.md` import, context-mode registrations, and DeepWiki. Keeps edited policy files, vendor-placed third-party skills, and caveman unless `--purge` / `--include-caveman` flags are passed.
 
 **Hard guards in `install.ts`:**
 - `assertNotAgentsPath()` — throws if any install path resolves to `~/.agents/`. Tested.
@@ -231,7 +231,7 @@ author_class = "vendor"
 2. `git fetch` + `git checkout <tree_sha>` into `~/.fulcrum/cache/upstream-skills/<repo>/`.
 3. Compute `subpath_sha256` by walking all files under `subpath` in lexicographic order (NUL-terminated relative-path + uint64 byte-length + raw bytes into SHA-256).
 4. Verify against lockfile; exit non-zero on mismatch.
-5. Copy skill to `<agent-skills-root>/fulcrum-upstream/<name>/`.
+5. Copy skill to vendor placement: `<agent-skills-root>/<name>/` (Gemini: `~/.gemini/skills/<name>/`), unless `vendor_canonical_agents` says the vendor installer owns that agent.
 
 `--update-pins`: recompute all hashes and write back to `upstream.lock`.
 
