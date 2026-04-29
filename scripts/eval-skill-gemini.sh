@@ -8,7 +8,9 @@
 #                                              [--results-dir DIR]
 #                                              [--match-words "w1,w2,..."]
 #
-# Non-interactive mode: gemini -p "<query>" --output-format json --yolo
+# Non-interactive mode:
+#   gemini -p "<query>" --output-format json --approval-mode plan \
+#     --include-directories ~/.gemini/extensions/fulcrum-skills
 # Activation signal: word-boundary grep against stdout+stderr for tokens in
 # evals/<skill>.match-words (same precedence as claude harness).
 #
@@ -178,7 +180,7 @@ while IFS= read -r entry; do
   EXPECT=$(echo "$entry" | jq -r '.should_trigger')
 
   for run in $(seq 1 "$RUNS"); do
-    GEMINI_ARGS=(-p "$Q" --output-format json --yolo)
+    GEMINI_ARGS=(-p "$Q" --output-format json --approval-mode plan --include-directories "$GEMINI_SKILL_ROOT")
     [ -n "$MODEL" ] && GEMINI_ARGS+=(--model "$MODEL")
 
     STDOUT_FILE=$(mktemp)
@@ -187,16 +189,16 @@ while IFS= read -r entry; do
     cat "$STDERR_FILE" >> "$LOG"
     # Combine stdout + stderr for grep-based activation check.
     COMBINED=$(cat "$STDOUT_FILE" "$STDERR_FILE")
-    RESP=$(cat "$STDOUT_FILE")
-    rm -f "$STDOUT_FILE" "$STDERR_FILE"
+    rm -f "$STDERR_FILE"
 
     TRIG=$(detect_trigger "$COMBINED")
     jq -nc \
       --arg q "$Q" --argjson exp "$EXPECT" --argjson trig "$TRIG" \
       --argjson idx "$ENTRY_IDX" --argjson run "$run" \
-      --arg resp "$RESP" \
+      --rawfile resp "$STDOUT_FILE" \
       '{idx:$idx, run:$run, query:$q, expected:$exp, triggered:($trig==1), response:$resp}' \
       >> "$RAW"
+    rm -f "$STDOUT_FILE"
 
     if [ "$EXPECT" = "true" ]; then
       TRIG_TOTAL=$((TRIG_TOTAL+1))

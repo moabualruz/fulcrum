@@ -243,16 +243,19 @@ while IFS= read -r entry; do
     WORK=$(mktemp -d)
     CLAUDE_ARGS=(--print --output-format=json --no-session-persistence)
     [ -n "$MODEL" ] && CLAUDE_ARGS+=(--model "$MODEL")
-    RESP=$( (cd "$WORK" && claude "${CLAUDE_ARGS[@]}" "$Q" </dev/null) 2>>"$LOG" || true)
+    STDOUT_FILE=$(mktemp)
+    (cd "$WORK" && claude "${CLAUDE_ARGS[@]}" "$Q" </dev/null) >"$STDOUT_FILE" 2>>"$LOG" || true
     rm -rf "$WORK"
 
+    RESP=$(cat "$STDOUT_FILE")
     TRIG=$(detect_trigger "$RESP")
     jq -nc \
       --arg q "$Q" --argjson exp "$EXPECT" --argjson trig "$TRIG" \
       --argjson idx "$ENTRY_IDX" --argjson run "$run" \
-      --arg resp "$RESP" \
+      --rawfile resp "$STDOUT_FILE" \
       '{idx:$idx, run:$run, query:$q, expected:$exp, triggered:($trig==1), response:$resp}' \
       >> "$RAW"
+    rm -f "$STDOUT_FILE"
 
     if [ "$EXPECT" = "true" ]; then
       TRIG_TOTAL=$((TRIG_TOTAL+1))

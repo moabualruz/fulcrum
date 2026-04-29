@@ -189,16 +189,16 @@ while IFS= read -r entry; do
     opencode "${OC_ARGS[@]}" "$Q" </dev/null >"$STDOUT_FILE" 2>"$STDERR_FILE" || true
     cat "$STDERR_FILE" >> "$LOG"
     COMBINED=$(cat "$STDOUT_FILE" "$STDERR_FILE")
-    RESP=$(cat "$STDOUT_FILE")
-    rm -f "$STDOUT_FILE" "$STDERR_FILE"
+    rm -f "$STDERR_FILE"
 
     TRIG=$(detect_trigger "$COMBINED")
     jq -nc \
       --arg q "$Q" --argjson exp "$EXPECT" --argjson trig "$TRIG" \
       --argjson idx "$ENTRY_IDX" --argjson run "$run" \
-      --arg resp "$RESP" \
+      --rawfile resp "$STDOUT_FILE" \
       '{idx:$idx, run:$run, query:$q, expected:$exp, triggered:($trig==1), response:$resp}' \
       >> "$RAW"
+    rm -f "$STDOUT_FILE"
 
     if [ "$EXPECT" = "true" ]; then
       TRIG_TOTAL=$((TRIG_TOTAL+1))
