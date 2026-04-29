@@ -485,12 +485,25 @@ async function applyToClaudeCode(server: McpServer, home: string, dryRun = false
     console.log(`     · claude not on PATH; skip ${server.name}`);
     return;
   }
-  const args = server.transport === "http"
+  const args: string[] = server.transport === "http"
     ? ["claude", "mcp", "add", "-s", "user", server.name, "--transport", "http", server.url!]
     : (() => {
         const parts = server.command!.split(/\s+/);
         return ["claude", "mcp", "add", "-s", "user", server.name, "--transport", "stdio", "--", ...parts];
       })();
+
+  // Wire bearer auth via `--header` for HTTP servers with a declared
+  // env var. claude mcp add does NOT interpolate ${VAR} at runtime — the
+  // header value is stored verbatim — so we expand the env var here.
+  // Without this step, claude.json gets the URL but no Authorization,
+  // and doctor flags `wiring:missing[claude-code]` even after install.
+  if (server.transport === "http" && server.auth_env_vars.length === 1) {
+    const envVar = server.auth_env_vars[0]!;
+    const token = process.env[envVar];
+    if (token) {
+      args.push("--header", `Authorization: Bearer ${token}`);
+    }
+  }
   if (dryRun) {
     console.log(`     [dry-run] would run: ${args.join(" ")}`);
   } else {

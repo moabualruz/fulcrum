@@ -54,11 +54,12 @@ export const DEFAULT_CONTEXT7_SERVER: McpServerSpec = {
   description: "Context7 MCP server — up-to-date library docs for AI code editors",
   vendor: "upstash",
   default_enabled: false,
-  // No required env: free tier works without a key. Verified by doctor
-  // `--probe` returning a valid `initialize` response with no Authorization
-  // header. `CONTEXT7_API_KEY` is purely a rate-limit lever the user can
-  // set via the agent's normal env loading.
-  auth_env_vars: [],
+  // Optional in the strict sense: the free tier responds to `initialize`
+  // without auth. Declared here so `applyToAgents` wires
+  // `bearer_token_env_var` (codex) / `Authorization: Bearer ${VAR}` headers
+  // (claude/gemini/pi/opencode) when CONTEXT7_API_KEY is set, raising rate
+  // limits for users who have a key.
+  auth_env_vars: ["CONTEXT7_API_KEY"],
   agent_visibility: { ...ALL_VISIBLE },
 };
 
