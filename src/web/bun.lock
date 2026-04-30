@@ -39,15 +39,6 @@
       },
     },
   },
-  "patchedDependencies": {
-    "svelte-toolbelt@0.5.0": "patches/svelte-toolbelt@0.5.0.patch",
-    "mode-watcher@1.1.0": "patches/mode-watcher@1.1.0.patch",
-    "runed@0.23.4": "patches/runed@0.23.4.patch",
-    "runed@0.25.0": "patches/runed@0.25.0.patch",
-    "svelte-toolbelt@0.7.1": "patches/svelte-toolbelt@0.7.1.patch",
-    "runed@0.28.0": "patches/runed@0.28.0.patch",
-    "formsnap@2.0.1": "patches/formsnap@2.0.1.patch",
-  },
   "packages": {
     "@ark/schema": ["@ark/schema@0.56.0", "", { "dependencies": { "@ark/util": "0.56.0" } }, "sha512-ECg3hox/6Z/nLajxXqNhgPtNdHWC9zNsDyskwO28WinoFEnWow4IsERNz9AnXRhTZJnYIlAJ4uGn3nlLk65vZA=="],
 

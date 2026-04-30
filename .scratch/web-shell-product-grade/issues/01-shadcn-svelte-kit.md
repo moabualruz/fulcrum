@@ -144,7 +144,7 @@ Implementation notes:
 
 Gates: `bun test ./src/web/src/lib/utils.test.ts` → 2 pass (regression). `cd src/web && bun run check` → 2152 files, 0 errors / 0 warnings. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.
 
-TODO: drop src/web/patches/formsnap@2.0.1.patch and src/web/patches/svelte-toolbelt@0.5.0.patch when both packages ship a `"default"` condition in their package.json `exports` map. Track upstream releases.
+TODO: 01.4 + 01.5 patches dropped — `bun test --conditions=svelte` resolves the issue cleanly. No upstream tracking needed.
 
 ### 01.5 — 2026-04-30 (implementer)
 
@@ -174,13 +174,7 @@ GREEN test: `bun test ./src/web/src/lib/components/ui/ui-primitives.smoke.test.t
 
 Implementation notes:
 - **`sveltekit-superforms` + `formsnap` skipped.** Both arrived in 01.4 as transitives of the `form` component — already in `src/web/package.json`. Per spec note, this lane only adds `svelte-sonner mode-watcher lucide-svelte valibot marked dompurify` (+ `@types/*`).
-- **`mode-watcher` → 5 more `bun patch`es.** `sonner.svelte` imports `mode-watcher`, which transitively pulls `runed` and a nested `svelte-toolbelt`. Same `exports`-map problem documented in 01.4: each ships only `types` + `svelte` conditions, no `default`/`import`, so raw `bun test` resolution fails. Patched (in failure order):
-  - `mode-watcher@1.1.0` — `node_modules/mode-watcher/package.json` exports map.
-  - `svelte-toolbelt@0.7.1` — `node_modules/mode-watcher/node_modules/svelte-toolbelt/package.json` (distinct from the existing `0.5.0` patch which lives under `formsnap/`).
-  - `runed@0.25.0` — `node_modules/mode-watcher/node_modules/runed/package.json`.
-  - `runed@0.28.0` — `node_modules/svelte-sonner/node_modules/runed/package.json`.
-  - `runed@0.23.4` — `node_modules/mode-watcher/node_modules/svelte-toolbelt/node_modules/runed/package.json`.
-- All five new patch files now sit in `src/web/patches/`; `package.json` `patchedDependencies` lists 7 entries total (2 from 01.4 + 5 new). Same upstream-fix pattern as the 01.4 WARN follow-up applies — when these packages ship a `default` (or `import`) condition, the patches can drop. `vite`/`svelte-check` continued to work without patches because they pass `--conditions svelte` themselves.
+- 01.4 + 01.5 patches dropped — `bun test --conditions=svelte` resolves the issue cleanly. No upstream tracking needed.
 - **`@lucide/svelte` already present.** 01.1 init pulled `@lucide/svelte`; this lane added `lucide-svelte` per spec verbatim. Not currently imported but installed for future feature waves (kanban/runs icons).
 
 Gates: `bun test ./src/web/src/lib/utils.test.ts` → 2 pass (regression). `cd src/web && bun run check` → 2194 files, 0 errors / 0 warnings. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.

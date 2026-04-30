@@ -9,7 +9,7 @@ interface Step { name: string; cmd: string[]; soft?: boolean; cwd?: string; }
 const STEPS: Step[] = [
   { name: "install",     cmd: ["bun", "install", "--frozen-lockfile"] },
   { name: "typecheck",   cmd: ["bun", "run", "--bun", "tsc", "--noEmit"] },
-  { name: "test",        cmd: ["bun", "test"] },
+  { name: "test",        cmd: ["bun", "test", "--conditions=svelte"] },
   { name: "build:all",   cmd: ["bun", "run", "scripts/build-all.ts"] },
   // Web pipeline runs from the SvelteKit subpackage. svelte-kit + svelte-check
   // catch regressions that the root tsc cannot see because src/web is excluded.
