@@ -23,3 +23,6 @@ TMP=$(mktemp -d)
 FULCRUM_HOME="$TMP/.fulcrum" ./dist/fulcrum-darwin-arm64 product init --json
 # fails today: ENOENT '/$bunfs/root/pglite.data'
 ```
+
+## Comments
+- Partial close (2026-04-30): `src/product-kernel/db/pglite.ts` now detects the bunfs mount via `import.meta.url` / `process.argv[0]` and throws a clear actionable error instead of the cryptic `ENOENT '/$bunfs/root/pglite.data'`. Compiled binary path no longer crashes for unrelated subcommands (doctor, install, etc.). Full PGlite-in-binary support (asset extraction or SQLite fallback) is tracked here as remaining scope; the user is unblocked because `bun run src/index.ts product …` works and the binary fails fast with guidance.
