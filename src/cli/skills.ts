@@ -4,7 +4,7 @@
 // fulcrum skills list — enumerate authored skills with name, desc preview, eval coverage.
 // fulcrum skills upstream — sync curated third-party skills.
 
-import { mkdir, readdir, readFile, copyFile, writeFile, stat, rm } from "node:fs/promises";
+import { mkdir, readdir, readFile, copyFile, writeFile, stat, rm, rename } from "node:fs/promises";
 import { join, basename, dirname, resolve } from "node:path";
 import { AGENTS } from "../agents/registry.ts";
 import type { AgentId } from "./mcp-registry.ts";
@@ -60,27 +60,68 @@ function shouldSkipForSync(name: string): boolean {
   return false;
 }
 
-async function copyTree(src: string, dst: string, opts: { dryRun?: boolean } = {}): Promise<void> {
+async function copyFileAtomic(src: string, dst: string, opts: { dryRun?: boolean } = {}): Promise<void> {
+  if (opts.dryRun) {
+    console.log(`    [dry-run] would copy: ${src} → ${dst}`);
+    return;
+  }
+  await mkdir(dirname(dst), { recursive: true });
+  const tmp = `${dst}.fulcrum-sync-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.tmp`;
+  try {
+    await copyFile(src, tmp);
+    await rename(tmp, dst);
+  } catch (err) {
+    await rm(tmp, { force: true }).catch(() => {});
+    throw err;
+  }
+}
+
+async function pruneUnexpectedEntries(
+  dst: string,
+  expected: ReadonlySet<string>,
+  opts: { dryRun?: boolean } = {},
+): Promise<void> {
+  if (!(await isDir(dst))) return;
+  for (const entry of await readdir(dst, { withFileTypes: true })) {
+    if (expected.has(entry.name)) continue;
+    const path = join(dst, entry.name);
+    if (opts.dryRun) {
+      console.log(`    [dry-run] would remove stale: ${path}`);
+    } else {
+      await rm(path, { recursive: true, force: true });
+    }
+  }
+}
+
+async function syncTreeInPlace(src: string, dst: string, opts: { dryRun?: boolean } = {}): Promise<void> {
   if (opts.dryRun) {
     console.log(`    [dry-run] would mkdir: ${dst}`);
   } else {
+    const dstStat = await stat(dst).catch(() => null);
+    if (dstStat && !dstStat.isDirectory()) {
+      await rm(dst, { recursive: true, force: true });
+    }
     await mkdir(dst, { recursive: true });
   }
+  const expected = new Set<string>();
   for (const entry of await readdir(src, { withFileTypes: true })) {
     if (shouldSkipForSync(entry.name)) continue;
+    expected.add(entry.name);
     const s = join(src, entry.name);
     const d = join(dst, entry.name);
     if (entry.isDirectory()) {
-      await copyTree(s, d, opts);
+      await syncTreeInPlace(s, d, opts);
     } else {
-      if (opts.dryRun) {
-        console.log(`    [dry-run] would copy: ${s} → ${d}`);
-      } else {
-        await mkdir(dirname(d), { recursive: true });
-        await copyFile(s, d);
+      if (!opts.dryRun) {
+        const dstStat = await stat(d).catch(() => null);
+        if (dstStat?.isDirectory()) {
+          await rm(d, { recursive: true, force: true });
+        }
       }
+      await copyFileAtomic(s, d, opts);
     }
   }
+  await pruneUnexpectedEntries(dst, expected, opts);
 }
 
 async function authoredSkillNames(skillsSrc: string): Promise<string[]> {
@@ -104,17 +145,17 @@ async function syncSkillSet(
   printedPrefix = "",
 ): Promise<void> {
   if (opts.dryRun) {
-    console.log(`    [dry-run] would prune: ${dstRoot}`);
     console.log(`    [dry-run] would mkdir: ${dstRoot}`);
   } else {
-    await rm(dstRoot, { recursive: true, force: true });
     await mkdir(dstRoot, { recursive: true });
   }
+  const expected = new Set(skills);
   for (const name of skills) {
     const dst = `${dstRoot}/${name}`;
-    await copyTree(`${skillsSrc}/${name}`, dst, opts);
+    await syncTreeInPlace(`${skillsSrc}/${name}`, dst, opts);
     console.log(`    ${printedPrefix}${name}`);
   }
+  await pruneUnexpectedEntries(dstRoot, expected, opts);
 }
 
 async function claudePluginVersion(root: string): Promise<string> {

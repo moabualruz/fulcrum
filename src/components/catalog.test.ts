@@ -77,7 +77,7 @@ describe("component catalog", () => {
   });
 
   test("generated MCP defaultProfile follows profile.default membership", () => {
-    expect(getComponent("mcp.repomix")?.defaultProfile).toBeUndefined();
+    expect(getComponent("mcp.repomix")?.defaultProfile).toBe(true);
     expect(getComponent("mcp.context7")?.defaultProfile).toBeUndefined();
     expect(getComponent("mcp.deepwiki")?.defaultProfile).toBe(true);
   });
@@ -106,6 +106,7 @@ describe("component catalog", () => {
       "package.cloudflare",
       "package.superpowers",
       "mcp.deepwiki",
+      "mcp.repomix",
       "mcp.registry",
     ]);
   });
@@ -129,6 +130,7 @@ describe("component catalog", () => {
       "rules.global",
       "mcp.registry",
       "mcp.deepwiki",
+      "mcp.repomix",
     ]);
   });
 
@@ -305,6 +307,20 @@ describe("component catalog", () => {
         removePolicy: "managed-only",
         supportsDisable: true,
         payload: { name: "deepwiki" },
+      },
+    ]);
+
+    expect(component("mcp.repomix")).toMatchObject({ defaultProfile: true });
+    expect(component("mcp.repomix").surfaces).toEqual([
+      {
+        id: "mcp.repomix:registry",
+        kind: "mcp-registry-entry",
+        componentId: "mcp.repomix",
+        target: "mcp:repomix",
+        ownerKey: "fulcrum:mcp:repomix",
+        removePolicy: "managed-only",
+        supportsDisable: true,
+        payload: { name: "repomix" },
       },
     ]);
 

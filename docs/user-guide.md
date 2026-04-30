@@ -12,7 +12,7 @@ Fulcrum is a local-first CLI Agent OS that installs a shared foundation across e
 - Splices a shared rules block into each agent's primary config file (idempotent, preserves your content).
 - Installs hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `tool-output-router`, and two index hooks) as binary subcommands of a single `fulcrum` binary.
 - Syncs Fulcrum-authored skills into the `fulcrum/` namespace when explicitly requested; Codex global authored skills are opt-in.
-- Registers managed MCPs (all builtin/package MCPs installed; only DeepWiki is recommended-default enabled; CLI/skill-covered MCPs stay disabled until explicit opt-in).
+- Registers managed MCPs (all builtin/package MCPs installed; DeepWiki and Repomix are recommended-default enabled; other CLI/skill-covered MCPs stay disabled until explicit opt-in).
 - Installs managed packages with full payload mirrors plus loadable skill and native MCP adapters where target agent lacks vendor package primitive.
 - Installs caveman output-compression cross-agent with `defaultMode: ultra`.
 - Reports environment, component, package-parity, MCP, skill-budget, and toolchain health via `fulcrum doctor`.
@@ -223,7 +223,7 @@ Fulcrum skills install through each agent's native namespace. Claude Code uses p
 
 ### MCPs
 
-Fulcrum registers 17 builtin registry MCPs. Default install enables only `deepwiki` when no user state exists; the rest stay installed but disabled to avoid startup token cost (~55–300k tokens with 5+ active MCPs). Package MCPs follow the same rule: mirrored/registered, disabled by default when a CLI or skill covers the job. Use `--no-default-mcps` to register everything without changing enabled state.
+Fulcrum registers 17 builtin registry MCPs. Default install enables `deepwiki` and `repomix`; the rest stay installed but disabled to avoid startup token cost (~55–300k tokens with 5+ active MCPs). Package MCPs follow the same rule except Repomix, whose package MCP surfaces are part of the recommended default. Use `--no-default-mcps` to register everything without changing enabled state.
 
 ```bash
 fulcrum mcp list                            # see all registered MCPs + state
@@ -309,7 +309,7 @@ See [docs/caveman.md](caveman.md) for install paths, uninstall, and the in-repo 
 
 ### "pi-mcp-adapter not installed"
 
-Run `pi install npm:pi-mcp-adapter` and restart Pi. Then run `fulcrum install` again to write the DeepWiki entry into `~/.pi/agent/mcp.json`.
+Run `pi install npm:pi-mcp-adapter` and restart Pi. Then run `fulcrum install` again to write the recommended MCP entries into `~/.pi/agent/mcp.json`.
 
 ### Upstream skill sync fails with integrity error
 

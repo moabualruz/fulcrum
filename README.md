@@ -53,7 +53,7 @@ bash scripts/install.sh --with-project ~/code/myproject
 bash scripts/install.sh --dry-run --profile full
 ```
 
-The default `minimal` profile splices rules, seeds the tool-output policy, registers every builtin MCP, writes disabled config where agents support it, and enables only the recommended default, DeepWiki, where no user state exists. The `full` profile adds hooks, authored skills, non-package-owned upstream skills, Caveman, Repomix, Cloudflare, and Superpowers package setup. Package installs own their bundled skills/MCPs, but MCPs stay disabled by default when a CLI or skill covers the same job; use `fulcrum mcp enable/disable` for explicit opt-in.
+The default `minimal` profile splices rules, seeds the tool-output policy, registers every builtin MCP, writes disabled config where agents support it, and enables the recommended defaults, DeepWiki and Repomix. Use `--no-default-mcps` when you want registry-only setup without changing enable state. The `full` profile adds hooks, authored skills, non-package-owned upstream skills, Caveman, Repomix, Cloudflare, and Superpowers package setup. Package installs own their bundled skills/MCPs; Repomix MCP is default-enabled, while CLI/skill-covered package MCPs stay disabled unless policy or the user enables them.
 
 ## First Run
 

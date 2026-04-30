@@ -161,6 +161,23 @@ describe("skills sync — Codex scope and runtime HOME", () => {
     expect(logs.join("\n")).toContain(join(testHome, ".codex", "skills", "fulcrum"));
   });
 
+  test("explicit global Codex sync does not plan a namespace-wide prune", async () => {
+    await mkdir(join(testHome, ".codex"), { recursive: true });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      logs.push(String(a[0]));
+    });
+    try {
+      await syncSkills({ dryRun: true, codexScope: "global" });
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    const output = logs.join("\n");
+    expect(output).toContain(join(testHome, ".codex", "skills", "fulcrum"));
+    expect(output).not.toContain("would prune");
+  });
+
   test("project Codex scope targets project-local .codex/skills/fulcrum", async () => {
     const projectDir = join(testHome, "consumer-repo");
     await mkdir(projectDir, { recursive: true });

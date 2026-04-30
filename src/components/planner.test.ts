@@ -20,6 +20,7 @@ describe("component planner", () => {
       "package.cloudflare",
       "package.superpowers",
       "mcp.deepwiki",
+      "mcp.repomix",
       "mcp.registry",
     ]);
     expect(plan.actions.every((a) => a.operation === "install")).toBe(true);

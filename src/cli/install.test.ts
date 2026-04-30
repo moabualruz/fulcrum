@@ -546,7 +546,7 @@ describe("dry-run mode", () => {
     }
   });
 
-  test("default install registers all builtin MCPs and enables only DeepWiki", async () => {
+  test("default install registers all builtin MCPs and enables DeepWiki plus Repomix", async () => {
     setDryRun(false);
     const origHome = process.env["HOME"];
     const origFulcrumHome = process.env["FULCRUM_HOME"];
@@ -567,12 +567,19 @@ describe("dry-run mode", () => {
       const reg = await loadRegistry();
       expect(Object.keys(reg.servers)).toHaveLength(17);
       expect(reg.servers["deepwiki"]?.enabled.codex).toBe(true);
+      expect(reg.servers["repomix"]?.enabled.codex).toBe(true);
+      expect(reg.servers["repomix"]?.enabled.opencode).toBe(true);
+      expect(reg.servers["repomix"]?.enabled.pi).toBe(true);
+      expect(reg.servers["repomix"]?.enabled.gemini).toBeUndefined();
       expect(reg.servers["context7"]?.enabled.codex).toBeUndefined();
       expect(reg.servers["cloudflare-docs"]).toBeDefined();
 
       const codexConfig = await readFile(join(dryHome, ".codex", "config.toml"), "utf8");
       expect(codexConfig).toContain("[mcp_servers.context7]");
       expect(codexConfig).toContain("enabled = false");
+      const repomixBlock = codexConfig.match(/# BEGIN FULCRUM MCP repomix[\s\S]*?# END FULCRUM MCP repomix/)?.[0] ?? "";
+      expect(repomixBlock).toContain("[mcp_servers.repomix]");
+      expect(repomixBlock).not.toContain("enabled = false");
 
       const geminiSettings = JSON.parse(await readFile(join(dryHome, ".gemini", "settings.json"), "utf8"));
       const geminiEnablement = JSON.parse(await readFile(join(dryHome, ".gemini", "mcp-server-enablement.json"), "utf8"));
@@ -630,7 +637,7 @@ describe("dry-run mode", () => {
 // ---------------------------------------------------------------------------
 
 import { applyBuiltinMcpDefaultState, installMcpRegistryEntries } from "./install.ts";
-import { ALL_AGENT_IDS, isEnabled, loadRegistry } from "./mcp-registry.ts";
+import { ALL_AGENT_IDS, isEnabled, loadRegistry, setEnabled } from "./mcp-registry.ts";
 import { BUILTIN_MCPS } from "./mcp-builtins.ts";
 
 describe("installMcpRegistryEntries", () => {
@@ -705,14 +712,29 @@ describe("installMcpRegistryEntries", () => {
     expect(reg.servers["context7"]!.auth_env_vars).toEqual(["CONTEXT7_API_KEY"]);
   });
 
-  test("recommended default state enables only recommended MCPs", async () => {
+  test("recommended default state enables DeepWiki and Repomix only", async () => {
     await installMcpRegistryEntries(regHome);
     await applyBuiltinMcpDefaultState("minimal");
     const reg = await loadRegistry();
     expect(reg.servers["deepwiki"]!.enabled["codex"]).toBe(true);
     expect(reg.servers["context7"]!.enabled["codex"]).toBeUndefined();
-    expect(reg.servers["repomix"]!.enabled["codex"]).toBeUndefined();
+    expect(reg.servers["repomix"]!.enabled["codex"]).toBe(true);
+    expect(reg.servers["repomix"]!.enabled["opencode"]).toBe(true);
+    expect(reg.servers["repomix"]!.enabled["pi"]).toBe(true);
+    expect(reg.servers["repomix"]!.enabled["gemini"]).toBeUndefined();
     expect(reg.servers["github"]!.enabled["codex"]).toBeUndefined();
+  });
+
+  test("recommended default state re-enables stale disabled Repomix state", async () => {
+    await installMcpRegistryEntries(regHome);
+    await setEnabled("repomix", false, { agents: ["codex", "opencode", "pi"] });
+
+    await applyBuiltinMcpDefaultState("minimal");
+
+    const reg = await loadRegistry();
+    expect(reg.servers["repomix"]!.enabled["codex"]).toBe(true);
+    expect(reg.servers["repomix"]!.enabled["opencode"]).toBe(true);
+    expect(reg.servers["repomix"]!.enabled["pi"]).toBe(true);
   });
 
   test("enable-all default state enables every builtin MCP for visible agents", async () => {
@@ -736,7 +758,7 @@ describe("installMcpRegistryEntries", () => {
     const reg = await loadRegistry();
     expect(reg.servers["deepwiki"]!.enabled["codex"]).toBe(true);
     expect(reg.servers["context7"]!.enabled["codex"]).toBeUndefined();
-    expect(reg.servers["repomix"]!.enabled["codex"]).toBeUndefined();
+    expect(reg.servers["repomix"]!.enabled["codex"]).toBe(true);
     expect(reg.servers["github"]!.enabled["codex"]).toBeUndefined();
   });
 

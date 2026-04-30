@@ -9,7 +9,8 @@ import {
   uninstallRepomixPackageMirrors,
 } from "./repomix-package.ts";
 import * as proc from "../utils/proc.ts";
-import { isEnabled, loadRegistry } from "./mcp-registry.ts";
+import { isEnabled, loadRegistry, registerServer, setEnabled } from "./mcp-registry.ts";
+import { DEFAULT_REPOMIX_SERVER } from "./mcp-builtins.ts";
 
 let TMP: string;
 let originalHome: string | undefined;
@@ -213,6 +214,8 @@ describe("Repomix capability package mirrors", () => {
     await writeFile(join(TMP, ".pi", "agent", "prompts", "pack-local.backup.md"), "stale backup\n");
     await writeFile(join(TMP, ".pi", "agent", "rules", "base.original.md"), "stale backup\n");
     await writeFile(join(TMP, ".gemini", "extensions", "repomix", "skills", "repomix-pack-local", "SKILL.original.md"), "stale backup\n");
+    await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+    await setEnabled("repomix", false, { agents: ["codex", "opencode", "pi"] });
 
     const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
     try {
@@ -233,14 +236,18 @@ describe("Repomix capability package mirrors", () => {
     expect(codexConfig).toContain("[plugins.\"repomix@repomix\"]");
     expect(codexConfig).toContain("[mcp_servers.repomix]");
     expect(codexConfig).toContain('args = ["-y", "repomix@latest", "--mcp"]');
-    expect(codexConfig).toContain("enabled = false");
+    const codexRepomixBlock = codexConfig.match(/# BEGIN FULCRUM MCP repomix[\s\S]*?# END FULCRUM MCP repomix/)?.[0] ?? "";
+    expect(codexRepomixBlock).not.toContain("enabled = false");
 
     const geminiManifest = JSON.parse(await readFile(join(TMP, ".gemini", "extensions", "repomix", "gemini-extension.json"), "utf8"));
     expect(geminiManifest.mcpServers.repomix.command).toBe("npx");
-    const geminiEnablement = JSON.parse(await readFile(join(TMP, ".gemini", "mcp-server-enablement.json"), "utf8")) as {
+    const geminiEnablementPath = join(TMP, ".gemini", "mcp-server-enablement.json");
+    const geminiEnablement = (await Bun.file(geminiEnablementPath).exists())
+      ? JSON.parse(await readFile(geminiEnablementPath, "utf8")) as {
       repomix?: { enabled: boolean };
-    };
-    expect(geminiEnablement.repomix?.enabled).toBe(false);
+    }
+      : {};
+    expect(geminiEnablement.repomix).toBeUndefined();
     expect(await readFile(join(TMP, ".gemini", "extensions", "repomix", "commands", "pack-local.toml"), "utf8")).toContain("Run local repomix.");
     expect(await readFile(join(TMP, ".gemini", "extensions", "repomix", "commands", "explore-remote.toml"), "utf8")).toContain("Explore remote repository.");
     expect(await readFile(join(TMP, ".gemini", "extensions", "repomix", "AGENTS.md"), "utf8")).toContain("Repomix project rules");
@@ -254,7 +261,7 @@ describe("Repomix capability package mirrors", () => {
     expect(opencodePackage.name).toBe("repomix");
     expect(opencodePackage.fulcrumMirror.surfaces).toContain("commands");
     const opencode = JSON.parse(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8"));
-    expect(opencode.mcp.repomix.enabled).toBe(false);
+    expect(opencode.mcp.repomix.enabled).toBe(true);
     expect(opencode.mcp.repomix.command).toEqual(["npx", "-y", "repomix@latest", "--mcp"]);
 
     expect(await readFile(join(TMP, ".pi", "agent", "skills", "repomix-explorer", "SKILL.md"), "utf8")).toContain("Explore with repomix.");
@@ -266,11 +273,13 @@ describe("Repomix capability package mirrors", () => {
     const piPackage = JSON.parse(await readFile(join(TMP, ".pi", "agent", "packages", "repomix", "package.json"), "utf8"));
     expect(piPackage.name).toBe("repomix");
     expect(piPackage.pi.prompts).toContain("./prompts");
-    expect(await Bun.file(join(TMP, ".pi", "agent", "mcp.json")).exists()).toBe(false);
+    const piMcp = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8"));
+    expect(piMcp.mcpServers.repomix.command).toBe("npx");
+    expect(piMcp.mcpServers.repomix.args).toEqual(["-y", "repomix@latest", "--mcp"]);
 
     const reg = await loadRegistry();
     for (const agentId of ["codex", "opencode", "pi"] as const) {
-      expect(isEnabled(reg.servers["repomix"]!, agentId)).toBe(false);
+      expect(isEnabled(reg.servers["repomix"]!, agentId)).toBe(true);
     }
     for (const filtered of [
       join(TMP, ".config", "opencode", "commands", "pack-local.backup.md"),

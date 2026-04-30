@@ -775,9 +775,7 @@ export async function applyBuiltinMcpDefaultState(mode: McpDefaultMode): Promise
       if (!server) throw new Error(`mcp-registry: server '${name}' not registered`);
       for (const agentId of ALL_AGENT_IDS) {
         if (!server.agent_visibility[agentId]) continue;
-        if (server.enabled[agentId] === undefined) {
-          server.enabled[agentId] = true;
-        }
+        server.enabled[agentId] = true;
       }
       await saveRegistry(reg);
     } else {
@@ -785,7 +783,7 @@ export async function applyBuiltinMcpDefaultState(mode: McpDefaultMode): Promise
     }
     await applyToAgents(name);
     if (mode === "minimal") {
-      console.log(`     ✓ ${name} recommended default applied where no user state existed`);
+      console.log(`     ✓ ${name} recommended default enabled`);
     } else {
       console.log(`     ✓ ${name} enabled on [${ALL_AGENT_IDS.join(", ")}]`);
     }

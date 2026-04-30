@@ -235,4 +235,4 @@ export const BUILTIN_MCPS: Array<{ name: string; spec: McpServerSpec }> = [
   { name: "dart",                         spec: DEFAULT_DART_SERVER },
 ];
 
-export const MINIMAL_DEFAULT_MCPS = ["deepwiki"] as const;
+export const MINIMAL_DEFAULT_MCPS = ["deepwiki", "repomix"] as const;

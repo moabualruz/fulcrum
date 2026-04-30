@@ -22,6 +22,7 @@ const DEFAULT_PROFILE_MEMBERS = [
   "package.cloudflare",
   "package.superpowers",
   "mcp.deepwiki",
+  "mcp.repomix",
   "mcp.registry",
 ] as const;
 
@@ -32,6 +33,7 @@ const MINIMAL_PROFILE_MEMBERS = [
   "rules.global",
   "mcp.registry",
   "mcp.deepwiki",
+  "mcp.repomix",
 ] as const;
 
 function hookComponent(name: (typeof HOOKS)[number]): ComponentSpec {

@@ -21,7 +21,7 @@ Mirror policy: when an asset is published only for some agents (e.g. Claude plug
 
 ## 1a. Cost rationale (default state)
 
-MCPs spawn long-running processes; 5+ active can eat 55–100k tokens at session start before the first message. The "official-first" policy above does not mean every MCP is always-on — it means we **manage** every official MCP (install/uninstall correctly) but keep the **enable** state intentional. Default for new users: `deepwiki` only. DeepWiki has no CLI fallback; Context7, Cloudflare, Repomix, GitHub, Semgrep, Tavily, Playwright, Dart, and similar MCPs stay disabled by default when a CLI/skill/rule covers the same work. Use `fulcrum install --no-default-mcps` to register all builtin MCP config while skipping Fulcrum's recommended default enable step; it does not remove or disable existing MCP state. Package installs register and mirror the MCPs shipped by that package, but those MCPs are disabled by default unless explicitly enabled later. Agents with native disabled-state support still get the config written disabled: Codex stores `enabled = false` in each `mcp_servers.<name>` TOML block; Gemini stores enablement in `~/.gemini/mcp-server-enablement.json`; OpenCode stores `"enabled": false` inside each `opencode.json` MCP entry. Claude Code and Pi currently lack an equivalent safe disabled config bit, so disabled registry MCPs remain visible through `fulcrum mcp list`, not their native MCP lists.
+MCPs spawn long-running processes; 5+ active can eat 55–100k tokens at session start before the first message. The "official-first" policy above does not mean every MCP is always-on — it means we **manage** every official MCP (install/uninstall correctly) but keep the **enable** state intentional. Default recommended state: `deepwiki` and `repomix` are enabled by `fulcrum install`. DeepWiki has no CLI fallback; Repomix is a product-level exception because its MCP, commands, skills, and explorer package are part of the recommended repository-inspection baseline. Context7, Cloudflare, GitHub, Semgrep, Tavily, Playwright, Dart, and similar MCPs stay disabled by default when a CLI/skill/rule covers the same work. Use `fulcrum install --no-default-mcps` to register all builtin MCP config while skipping Fulcrum's recommended default enable step; it does not remove or disable existing MCP state. Package installs register and mirror the MCPs shipped by that package; Repomix package MCP surfaces are enabled by default, while other package MCPs are disabled unless policy or the user enables them. Agents with native disabled-state support still get disabled config for disabled servers: Codex stores `enabled = false` in each `mcp_servers.<name>` TOML block; Gemini stores enablement in `~/.gemini/mcp-server-enablement.json`; OpenCode stores `"enabled": false` inside each `opencode.json` MCP entry. Claude Code and Pi currently lack an equivalent safe disabled config bit, so disabled registry MCPs remain visible through `fulcrum mcp list`, not their native MCP lists.
 
 ## 2. Disable claude.ai defaults
 
@@ -98,20 +98,20 @@ Supersedes: `skills/gh/SKILL.md` (moved to `skills/_archive/gh-authored/`; skill
 
 ### 3.5 repomix (W2.2)
 
-Repomix MCP server via `yamadashy/repomix`. **Installed/registered but default-disabled** because Repomix's CLI and skills cover the normal pack/explore workflow without session-start MCP overhead.
+Repomix MCP server via `yamadashy/repomix`. **Installed/registered and default-enabled** as part of Fulcrum's recommended repository-inspection baseline.
 
 - Transport: stdio `npx -y repomix@latest --mcp`
 - Auth: none required
 - Vendor: `yamadashy`
 - Claude Code gets 3 official vendor plugins: `repomix-mcp`, `repomix-commands`, `repomix-explorer`; Fulcrum treats that Claude surface as plugin-owned, so the registry marks `claude-code` hidden and skips it during `fulcrum mcp enable/disable/unregister repomix`.
 - Gemini gets a Fulcrum-built extension mirror that bundles vendor-derived Repomix MCP config, pack/explore commands, skills, explorer agent, and vendor rules; the registry marks `gemini` hidden so it never disables or duplicates the extension-owned MCP.
-- OpenCode gets vendor-derived skills plus explorer agent mirror; registry owns the MCP surface and writes it disabled by default.
-- Codex gets vendor-derived skills, a Codex plugin-cache package mirror with MCP metadata, commands, explorer agent, rules, and enabled plugin config, plus registry-owned disabled MCP config.
-- Pi gets vendor-derived skills; because Pi has no safe disabled MCP state, Fulcrum keeps the registry entry disabled and removes any prior native Repomix MCP config.
+- OpenCode gets vendor-derived skills plus explorer agent mirror; registry owns the MCP surface and writes it enabled by default.
+- Codex gets vendor-derived skills, a Codex plugin-cache package mirror with MCP metadata, commands, explorer agent, rules, and enabled plugin config, plus registry-owned enabled MCP config.
+- Pi gets vendor-derived skills and enabled Repomix MCP config via the Pi MCP adapter path.
 
-To enable registry-owned Repomix MCP config for Codex/OpenCode/Pi: `fulcrum mcp enable repomix --agent codex --agent opencode --agent pi`
+To disable registry-owned Repomix MCP config for Codex/OpenCode/Pi: `fulcrum mcp disable repomix --agent codex --agent opencode --agent pi`
 
-Doctor flags enabled Repomix MCP state as opt-in drift from the default-disabled policy.
+Doctor treats enabled Repomix MCP state as expected recommended-default state, not drift.
 
 Plugin install (Claude Code, idempotent):
 ```bash
@@ -239,7 +239,7 @@ fulcrum mcp disable myserver [--all-agents]
 
 Agent IDs: `claude-code`, `codex`, `gemini`, `opencode`, `pi`.
 
-`fulcrum install` registers all 17 builtin servers (deepwiki, github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart). It writes disabled native config for registry-owned disabled servers on Codex, Gemini, and OpenCode so their MCP managers show configured-but-disabled servers. Package-owned surfaces are mirrored through their package adapters, and package MCP manifests are registered disabled unless the user explicitly enables them. Recommended default state enables only `deepwiki` where no user state exists. `--no-default-mcps` registers all definitions without changing enable state; `--enable-all-mcps` explicitly enables every registry-owned builtin. `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
+`fulcrum install` registers all 17 builtin servers (deepwiki, github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart). It writes disabled native config for registry-owned disabled servers on Codex, Gemini, and OpenCode so their MCP managers show configured-but-disabled servers. Package-owned surfaces are mirrored through their package adapters; Repomix package MCP surfaces are default-enabled, while other package MCP manifests are registered disabled unless policy or the user enables them. Recommended default state enables `deepwiki` and `repomix`. `--no-default-mcps` registers all definitions without changing enable state; `--enable-all-mcps` explicitly enables every registry-owned builtin. `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
 
 Servers can hide an agent when that agent surface is unsupported or owned by another Fulcrum-managed primitive. `fulcrum mcp list --json` reports that state as `"hidden"`; enable/disable skip hidden agents instead of writing registry state for them.
 
@@ -267,7 +267,7 @@ Add a single source line to your shell rc:
 |---|---|---|
 | `deepwiki` | none | minimal default |
 | `github` | `GITHUB_TOKEN` (or `gh auth login` — many tools read either) | [github.com/settings/tokens](https://github.com/settings/tokens) — fine-grained PAT with `repo`, `read:org`, `gist` |
-| `repomix` | none | stdio MCP via `npx`; no auth |
+| `repomix` | none | minimal default; stdio MCP via `npx`; no auth |
 | `semgrep` | none for local scans; `SEMGREP_APP_TOKEN` only for Semgrep AppSec Platform | [semgrep.dev/orgs/-/settings/tokens](https://semgrep.dev/orgs/-/settings/tokens) (only if using cloud features) |
 | `context7` | `CONTEXT7_API_KEY` (optional — free tier works without; key raises rate limit) | [context7.com](https://context7.com) → run `npx ctx7@latest login` and copy generated key |
 | `tavily` | `TAVILY_API_KEY` (required) | [app.tavily.com](https://app.tavily.com) → API Keys |

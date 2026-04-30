@@ -410,7 +410,7 @@ async function installGemini(home: string, source: RepomixPackageSource, dryRun:
   await writeText(`${root}/agents/explorer.md`, geminiAgentFromClaude(source.explorer), dryRun);
   await writeText(`${root}/AGENTS.md`, source.rules.trim() + "\n", dryRun);
   await writeText(`${root}/rules/base.md`, source.rules.trim() + "\n", dryRun);
-  await setGeminiMcpEnabled(home, "repomix", false, dryRun);
+  await setGeminiMcpEnabled(home, "repomix", true, dryRun);
   console.log("     ✓ Gemini Repomix extension mirror installed");
 }
 
@@ -622,13 +622,20 @@ async function installRepomixMcpForPackage(dryRun: boolean, agents: readonly Age
   const registryAgents = selectedRegistryAgents(agents);
   if (registryAgents.length === 0) return;
   if (dryRun) {
-    console.log(`     [dry-run] would register disabled Repomix MCP for ${registryAgents.join("/")}`);
+    console.log(`     [dry-run] would register default-enabled Repomix MCP for ${registryAgents.join("/")}`);
     return;
   }
-  const { registerServer, setEnabled, applyDisabledToAgents } = await import("./mcp-registry.ts");
+  const { registerServer, loadRegistry, saveRegistry, applyToAgents } = await import("./mcp-registry.ts");
   await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
-  await setEnabled("repomix", false, { agents: registryAgents });
-  await applyDisabledToAgents("repomix", { agents: registryAgents });
+  const reg = await loadRegistry();
+  const server = reg.servers["repomix"];
+  if (!server) return;
+  for (const agentId of registryAgents) {
+    if (!server.agent_visibility[agentId]) continue;
+    server.enabled[agentId] = true;
+  }
+  await saveRegistry(reg);
+  await applyToAgents("repomix", { agents: registryAgents });
 }
 
 async function removeRepomixMcpForPackage(dryRun: boolean, agents: readonly AgentId[] | undefined): Promise<void> {

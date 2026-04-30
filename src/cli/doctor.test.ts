@@ -380,7 +380,7 @@ auth_env_vars = ["GITHUB_TOKEN"]
     expect(github!["drift"]).toBe(false);
   });
 
-  test("drift flags enabled Repomix MCP because package default is disabled", async () => {
+  test("drift stays false for enabled Repomix because it is a recommended default", async () => {
     const home = join(TMP, "mcp-repomix-policy-drift");
     await mkdir(home, { recursive: true });
     const fulcrumHome = join(home, ".fulcrum");
@@ -410,7 +410,7 @@ enabled_pi = true
     const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
     const servers = (report["mcp"] as Record<string, unknown>)["servers"] as Array<Record<string, unknown>>;
     const repomix = servers.find((s) => s["name"] === "repomix");
-    expect(repomix!["drift"]).toBe(true);
+    expect(repomix!["drift"]).toBe(false);
   });
 
   test("drift flags enabled Cloudflare package MCP surfaces because package default is disabled", async () => {
