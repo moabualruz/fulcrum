@@ -3,7 +3,7 @@
 Status: ready-for-agent
 Source: docs/superpowers/plans/2026-04-30-product-kernel.md
 Companions: PLAYBOOK.md, RESEARCH-DESIGN.md
-Issues: see `issues/01-..` through `issues/12-..`. Tasks 1, 3-10, 12 are `ready-for-agent`; tasks 2 and 11 (web/UI scaffolding) are `ready-for-human`.
+Issues: see `issues/01-..` through `issues/12-..`. All 12 `Status: done`.
 
 > **For agentic workers:** REQUIRED SUB-SKILLS: `subagent-orchestration` + `subagent-driven-development` + `tdd`. Steps use checkbox (`- [ ]`) syntax for tracking.
 

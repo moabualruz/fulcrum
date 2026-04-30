@@ -570,7 +570,7 @@ fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, handshake, wiring,
 
 ## 7a. Next steps only
 
-0. **Product kernel scaffolding** — local PGlite DB and migration runner ship behind `fulcrum product …` (`init`, `projects list`, `search`, `context assemble`). Doctor reports the engine, schema count, and row counts; `fulcrum uninstall --purge` removes `~/.fulcrum/state/product/`. Web shell (issue `.scratch/product-kernel/issues/11`) and the SvelteKit/shadcn-svelte spike (issue 02) are intentionally `ready-for-human` until the framework lock-in is approved.
+0. **Product kernel scaffolding** — local PGlite DB and migration runner ship behind `fulcrum product …` (`init`, `projects list`, `search`, `context assemble`). Doctor reports the engine, schema count, and row counts; `fulcrum uninstall --purge` removes `~/.fulcrum/state/product/`. SvelteKit web shell ships at `src/web/` with Tailwind v4, a vanilla-zustand → Svelte readable bridge, and read-only views (Projects/Docs/Boards/Runs) backed by live PGlite queries.
 
 ### Active feature branches (pushed; PRs not yet opened)
 
@@ -578,7 +578,7 @@ fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, handshake, wiring,
 | --------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `feat/component-lifecycle-management`   | `.scratch/component-lifecycle-management/issues/01-13`  | All 13 `Status: done`. Branch is at `main` plus the `.scratch/` issue tracker docs. No new code commits.    |
 | `feat/plugin-extension-surface-parity`  | `.scratch/plugin-extension-surface-parity/issues/01-14` | All 14 `Status: done`. Branch is at `main` plus the `.scratch/` issue tracker docs. No new code commits.    |
-| `feat/product-kernel`                   | `.scratch/product-kernel/issues/01,03-10,12`            | 10 `Status: done`. Issues `02` and `11` (UI compatibility spike + web shell) are `ready-for-human`.         |
+| `feat/product-kernel`                   | `.scratch/product-kernel/issues/01-12`                  | All 12 `Status: done`. CLI surface, web shell, doctor + uninstall, docs.                                    |
 
 Merge order suggestion (no PR has been opened yet): the two done-feature branches can be merged in any order — they only carry post-hoc issue-tracker docs. `feat/product-kernel` should land after them so the `.scratch/` index in `main` already reflects every feature.
 
