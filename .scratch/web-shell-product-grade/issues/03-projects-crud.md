@@ -24,3 +24,12 @@ Acceptance criteria:
 - Set-active-project button on each row + on detail page (writes the cookie via fetch helper).
 - Form validation via Zod (or similar) with inline error messages.
 - Toasts on success/failure.
+
+## Sub-tasks
+
+- [ ] **03.1 — Server actions module.** Owns: `src/web/src/lib/server/projects.ts`, `.test.ts`. RED: tests against PGlite for `createProjectAction`, `updateProjectAction`, `deleteProjectAction`. Each asserts row + matching `events` row.
+- [ ] **03.2 — `slugify` helper.** Owns: `src/web/src/lib/util/slugify.ts`, `.test.ts`. RED: cases for whitespace, casing, non-ASCII, empty input.
+- [ ] **03.3 — `/projects` list route.** Owns: `src/web/src/routes/projects/+page.server.ts`, `+page.svelte`, `+page.svelte.test.ts`. RED: load test asserts seeded rows; component test asserts table rendering + filter input.
+- [ ] **03.4 — `/projects/new` create form.** Owns: `src/web/src/routes/projects/new/+page.server.ts`, `+page.svelte`, `ProjectForm.svelte`, `.svelte.test.ts`. RED: validation rejects empty name; auto-slug from name typed.
+- [ ] **03.5 — `/projects/[id]` detail + delete.** Owns: `src/web/src/routes/projects/[id]/+page.server.ts`, `+page.svelte`, `DangerZone.svelte`. RED: delete button gated by `AlertDialog`; submitting calls `deleteProjectAction` once.
+- [ ] **03.6 — Set-active-project integration.** Owns: `src/web/src/lib/components/projects/SetActiveButton.svelte`, `.svelte.test.ts`. RED: click fires fetch to `/api/active-project` with the slug. Commit `feat(web): add projects CRUD with form actions and set-active button`.

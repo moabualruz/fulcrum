@@ -23,3 +23,12 @@ Acceptance criteria:
 - Tab order audited route-by-route; focus ring visible.
 - Keyboard nav for board (issue 05) verified end-to-end.
 - Lighthouse accessibility audit ≥ 95 on `/`, `/projects`, `/docs`, `/boards`, `/runs`.
+
+## Sub-tasks
+
+- [ ] **08.1 — `ActionResult` + `dispatchToast` helpers.** Owns: `src/web/src/lib/feedback/action-result.ts`, `.test.ts`. RED: `{ ok, message }` round-trips through `dispatchToast`.
+- [ ] **08.2 — `Toaster` mount in `+layout.svelte`.** Owns: `src/web/src/routes/+layout.svelte` (extend). RED: smoke test imports the layout, asserts `<Toaster />` present.
+- [ ] **08.3 — `RouteSkeleton` variants.** Owns: `src/web/src/lib/components/feedback/RouteSkeleton.svelte`, `.svelte.test.ts`. RED: `kind="list"` renders `<table>` skeleton; `kind="board"` renders 5-column skeleton; `kind="detail"` renders title + 3 paragraphs.
+- [ ] **08.4 — Wire skeleton via SvelteKit `streamed`.** Owns: every list/detail route's `+page.server.ts`. RED: load test resolves with `streamed` and skeleton renders during pendency.
+- [ ] **08.5 — `axe-core` a11y assertions.** Owns: `src/web/tests/a11y/*.test.ts`. RED: per route, render and assert no `serious` or `critical` violations.
+- [ ] **08.6 — Aria + keyboard sweep.** Owns: existing icon buttons across routes. RED: snapshot test asserts every icon-only button has `aria-label`.

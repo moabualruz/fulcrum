@@ -27,3 +27,12 @@ Acceptance criteria:
 - Keyboard: `Tab` focuses cards; `Up`/`Down` reorders inside column; `Cmd+Left`/`Cmd+Right` moves card to neighbor column. Announces moves via `aria-live`.
 - Filters by project + assignee (assignee column unused today, hide if null everywhere).
 - Toasts on every mutation.
+
+## Sub-tasks
+
+- [ ] **05.1 — Server actions for tasks.** Owns: `src/web/src/lib/server/tasks.ts`, `.test.ts`. RED: PGlite tests for create/update/delete/moveStatus + matching `task.<verb>` event rows.
+- [ ] **05.2 — Board helpers (`optimisticMove`, `keyboardMove`).** Owns: `src/web/src/lib/components/board/board-helpers.ts`, `.test.ts`. RED: optimistic move keeps order stable in same column; cross-column move appends to end of target.
+- [ ] **05.3 — `BoardCard` component.** Owns: `src/web/src/lib/components/board/BoardCard.svelte`, `.svelte.test.ts`. RED: click fires `onEdit` callback with task id.
+- [ ] **05.4 — `BoardColumn` with `svelte-dnd-action`.** Owns: `src/web/src/lib/components/board/BoardColumn.svelte`, `.svelte.test.ts`. RED: `finalize` handler emits server-action call with `{ taskId, fromStatus, toStatus }`.
+- [ ] **05.5 — `BoardSheet` editor + keyboard accessibility.** Owns: `src/web/src/lib/components/board/BoardSheet.svelte`, `KeyboardMoveAnnouncer.svelte`. RED: keyboard helper triggers `optimisticMove`; `aria-live` region updated with move description.
+- [ ] **05.6 — `/boards/+page` wiring + project filter.** Owns: `src/web/src/routes/boards/+page.server.ts`, `+page.svelte`. RED: page renders five columns with seeded counts; project filter narrows results.

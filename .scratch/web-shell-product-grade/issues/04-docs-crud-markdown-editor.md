@@ -26,3 +26,12 @@ Acceptance criteria:
 - Delete via `AlertDialog`; success → redirect to `/docs`.
 - Every mutation writes a `document.<verb>` event row.
 - Toasts on success/failure.
+
+## Sub-tasks
+
+- [ ] **04.1 — Server actions for documents.** Owns: `src/web/src/lib/server/documents.ts`, `.test.ts`. RED: PGlite tests for create/update/delete + matching `events` row + `search_documents` upsert via `indexSearchDocument`.
+- [ ] **04.2 — Frontmatter form mapper.** Owns: `src/web/src/lib/markdown/frontmatter-form.ts`, `.test.ts`. RED: round-trip `{ title, kind, labels[] }` ↔ `KernelMarkdown.frontmatter` via existing `parseKernelMarkdown` / `serializeKernelMarkdown`.
+- [ ] **04.3 — `MarkdownEditor` wrapper (CodeMirror 6).** Owns: `src/web/src/lib/components/markdown/MarkdownEditor.svelte`, `.svelte.test.ts`. RED: jsdom-safe wrapper test asserts the `value` prop binding and the `change` event payload.
+- [ ] **04.4 — `MarkdownPreview` (marked + dompurify).** Owns: `src/web/src/lib/components/markdown/MarkdownPreview.svelte`, `.svelte.test.ts`. RED: sanitises `<script>`; preserves links + headings; renders `# h1` to `<h1>`.
+- [ ] **04.5 — `/docs` list with kind + FTS filter.** Owns: `src/web/src/routes/docs/+page.server.ts`, `+page.svelte`, `+page.svelte.test.ts`. RED: filter by kind hides non-matching rows; free-text filter calls `searchProductDocuments`.
+- [ ] **04.6 — `/docs/new`, `/docs/[id]`, `/docs/[id]/edit`.** Owns: those three routes + form action wiring. RED: create-then-view round-trip; edit preserves byte-identical body when no changes.

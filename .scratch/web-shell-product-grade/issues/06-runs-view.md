@@ -26,3 +26,12 @@ Acceptance criteria:
 - Cancel + retry buttons (cancel → status=`cancelled` + event; retry → enqueue new job via `enqueueJob` + event). Both gated behind `AlertDialog`.
 - Auto-refresh `/runs` every 5s while any row is `running` (uses `setInterval` cleared on unmount).
 - Toasts.
+
+## Sub-tasks
+
+- [ ] **06.1 — Server actions cancel/retry.** Owns: `src/web/src/lib/server/runs.ts`, `.test.ts`. RED: cancel sets status `cancelled` + emits `agent_run.cancelled`; retry creates new `agent_runs` row + `jobs` row + emits `agent_run.retried`.
+- [ ] **06.2 — Filters reducer.** Owns: `src/web/src/lib/components/runs/runs-filters.ts`, `.test.ts`. RED: applying agent + status + range narrows the input list deterministically.
+- [ ] **06.3 — `formatDuration` helper.** Owns: `src/web/src/lib/util/duration.ts`, `.test.ts`. RED: `null` → "—"; `1h 5m`, `45s`, etc.
+- [ ] **06.4 — `RunStatusBadge`.** Owns: `src/web/src/lib/components/runs/RunStatusBadge.svelte`, `.svelte.test.ts`. RED: matrix asserts class for each status.
+- [ ] **06.5 — `RunsTable` sortable.** Owns: `src/web/src/lib/components/runs/RunsTable.svelte`, `.svelte.test.ts`. RED: clicking column header toggles sort direction.
+- [ ] **06.6 — `/runs/[id]` detail + cancel/retry dialogs + 5s polling.** Owns: `src/web/src/routes/runs/[id]/+page.server.ts`, `+page.svelte`. RED: tabs swap; transcript empty state when `transcript_path` missing; polling clears on unmount.

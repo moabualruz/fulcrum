@@ -24,3 +24,12 @@ Acceptance criteria:
 - Playwright runs against a temp `FULCRUM_HOME` directory; teardown wipes it.
 - `scripts/ci.ts` adds `web:test` (Vitest) and an opt-in `web:e2e` step gated by `FULCRUM_RUN_E2E=1`.
 - All test stages green.
+
+## Sub-tasks
+
+- [ ] **09.1 — Vitest config + base setup.** Owns: `src/web/vitest.config.ts`, `src/web/tests/setup.ts`. RED: `_smoke.test.ts` runs and exits 0.
+- [ ] **09.2 — Playwright config + smoke spec.** Owns: `src/web/playwright.config.ts`, `src/web/tests/e2e/_smoke.spec.ts`. RED: opens `/`, asserts page title contains `Fulcrum`.
+- [ ] **09.3 — E2E fixtures.** Owns: `src/web/tests/e2e/fixtures.ts`. RED: `seedProject`, `seedTask`, `seedDoc` helpers boot a temp `FULCRUM_HOME` PGlite, seed rows, and clean up after the test.
+- [ ] **09.4 — E2E user journey.** Owns: `src/web/tests/e2e/user-journey.spec.ts`. RED: open `/` → create project → create task → drag to in_progress → search via cmd+K → assert toast.
+- [ ] **09.5 — `scripts/ci.ts` adds `web:test` always-on + `web:e2e` opt-in.** Owns: `scripts/ci.ts`. RED: running `bun run ci` includes `web:test`; running with `FULCRUM_RUN_E2E=1 bun run ci` includes `web:e2e`.
+- [ ] **09.6 — Update README + `docs/product-kernel.md`.** Owns: `src/web/README.md`, `docs/product-kernel.md`, `docs/product-kernel.original.md`. RED: docs link to the new test commands; recompress so `compress:check` stays green.

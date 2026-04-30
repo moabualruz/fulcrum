@@ -24,3 +24,14 @@ Acceptance criteria:
 - `bun run check` and `bun run build` exit 0.
 - `app.css` imports tailwindcss + the shadcn theme tokens.
 - `svelte.config.js` uses `@sveltejs/adapter-node`.
+
+## Sub-tasks
+
+Every sub-task: RED test → GREEN minimum impl → REFACTOR. Capture commands + 3-line output excerpts in `## Comments`. One Conventional Commit per sub-task.
+
+- [ ] **01.1 — Scaffold `components.json` + base CSS theme.** Owns: `src/web/components.json`, `src/web/src/app.css`, `src/web/src/lib/utils.ts`. RED: `src/web/src/lib/components/ui/utils.test.ts` imports `cn` and asserts `cn("a", false && "b", "c") === "a c"`. GREEN: run `bunx shadcn-svelte@latest init --base-color zinc --css src/app.css --lib-alias '$lib' --components-alias '$lib/components' --utils-alias '$lib/utils' --hooks-alias '$lib/hooks' --ui-alias '$lib/components/ui'`. Verify: `bun run check`.
+- [ ] **01.2 — Install primitive components wave.** Owns: `src/web/src/lib/components/ui/{button,card,badge,input,label,textarea,select}/`. RED: `ui-primitives.smoke.test.ts` imports each and asserts each is a function. GREEN: `bunx shadcn-svelte@latest add -y button card badge input label textarea select`.
+- [ ] **01.3 — Install layout primitives.** Owns: `src/web/src/lib/components/ui/{table,tabs,sheet,separator,skeleton,scroll-area,avatar,breadcrumb}/`. RED: extend the smoke test with these names. GREEN: `bunx shadcn-svelte@latest add -y table tabs sheet separator skeleton scroll-area avatar breadcrumb`.
+- [ ] **01.4 — Install overlay primitives.** Owns: `src/web/src/lib/components/ui/{dialog,alert-dialog,dropdown-menu,popover,tooltip,command,form}/`. RED: extend smoke test. GREEN: `bunx shadcn-svelte@latest add -y dialog alert-dialog dropdown-menu popover tooltip command form`.
+- [ ] **01.5 — Toaster + form validation deps.** Owns: `src/web/package.json`, `src/web/src/lib/components/ui/sonner/`. RED: smoke imports `Toaster`. GREEN: `bunx shadcn-svelte@latest add -y sonner` then `bun add svelte-sonner mode-watcher lucide-svelte sveltekit-superforms valibot marked dompurify`.
+- [ ] **01.6 — Post-install gate.** Owns: nothing new. RED: `bun run check && bun run build` should already be green; if not, fix imports. GREEN: both exit 0. Commit `feat(web): add shadcn-svelte component kit + form/toast/markdown deps`.

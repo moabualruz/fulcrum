@@ -25,3 +25,12 @@ Acceptance criteria:
 - `mode-watcher` toggles between light/dark via shadcn `DropdownMenu` action.
 - Mobile (<= 768px) collapses sidebar into a `Sheet`.
 - No `console.log`/no debug text shipped.
+
+## Sub-tasks
+
+- [ ] **02.1 — Cookie-backed active-project module.** Owns: `src/web/src/lib/state/active-project.ts`, `src/web/src/lib/state/active-project.test.ts`. RED: tests for `getActiveProject(cookies)` returns null when unset, returns slug after `setActiveProject`, clears on null.
+- [ ] **02.2 — `hooks.server.ts` + `+layout.server.ts` load.** Owns: `src/web/src/hooks.server.ts`, `src/web/src/routes/+layout.server.ts`. RED: integration test boots SvelteKit handle, asserts `event.locals.activeProjectId` populated from cookie.
+- [ ] **02.3 — `AppSidebar` + `nav-items` config.** Owns: `src/web/src/lib/components/app/AppSidebar.svelte`, `src/web/src/lib/components/app/nav-items.ts`, `src/web/src/lib/components/app/AppSidebar.svelte.test.ts`. RED: snapshot of nav items in declared order; component test asserts each link rendered with correct `href`.
+- [ ] **02.4 — `AppTopbar` (breadcrumb + theme toggle + cmd+K hint).** Owns: `src/web/src/lib/components/app/AppTopbar.svelte`, `.svelte.test.ts`. RED: breadcrumb reflects `$page.url.pathname`; theme toggle button has `aria-label="toggle theme"`; cmd+K hint visible with the `kbd` key combo.
+- [ ] **02.5 — `ProjectPicker` dropdown + form action.** Owns: `src/web/src/lib/components/app/ProjectPicker.svelte`, `src/web/src/routes/api/active-project/+server.ts`. RED: clicking a project entry posts to `/api/active-project`; mock fetch asserts payload + cookie set.
+- [ ] **02.6 — Mobile sheet collapse + assemble layout.** Owns: `src/web/src/routes/+layout.svelte`. RED: media-query helper test asserts the sheet trigger is rendered when `viewport < 768px` (use a tiny `MediaQueryStub`). GREEN: wire AppSidebar inside Sheet on mobile, sticky on desktop. Commit `feat(web): add app shell sidebar, topbar, theme toggle, project picker`.
