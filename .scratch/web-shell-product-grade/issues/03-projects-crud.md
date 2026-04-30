@@ -28,7 +28,7 @@ Acceptance criteria:
 ## Sub-tasks
 
 - [x] **03.1 — Server actions module.** Owns: `src/web/src/lib/server/projects.ts`, `.test.ts`. RED: tests against PGlite for `createProjectAction`, `updateProjectAction`, `deleteProjectAction`. Each asserts row + matching `events` row.
-- [ ] **03.2 — `slugify` helper.** Owns: `src/web/src/lib/util/slugify.ts`, `.test.ts`. RED: cases for whitespace, casing, non-ASCII, empty input.
+- [x] **03.2 — `slugify` helper.** Owns: `src/web/src/lib/util/slugify.ts`, `.test.ts`. RED: cases for whitespace, casing, non-ASCII, empty input.
 - [ ] **03.3 — `/projects` list route.** Owns: `src/web/src/routes/projects/+page.server.ts`, `+page.svelte`, `+page.svelte.test.ts`. RED: load test asserts seeded rows; component test asserts table rendering + filter input.
 - [ ] **03.4 — `/projects/new` create form.** Owns: `src/web/src/routes/projects/new/+page.server.ts`, `+page.svelte`, `ProjectForm.svelte`, `.svelte.test.ts`. RED: validation rejects empty name; auto-slug from name typed.
 - [ ] **03.5 — `/projects/[id]` detail + delete.** Owns: `src/web/src/routes/projects/[id]/+page.server.ts`, `+page.svelte`, `DangerZone.svelte`. RED: delete button gated by `AlertDialog`; submitting calls `deleteProjectAction` once.
@@ -47,3 +47,14 @@ Acceptance criteria:
 ### Kernel surface notes
 
 - `events.project_id` has a non-cascade FK to `projects(id)`, so deleting a project that has any prior events (`project.created`, `project.updated`, …) would violate the FK. `deleteProjectAction` therefore strips dependent event rows first (`DELETE FROM events WHERE project_id = $1`) before deleting the project row, then writes the new `project.deleted` event with `project_id = NULL`. Other tables (`tasks`, `documents`, `agent_runs`, `repos`, `memories`, `artifacts`, `edges`) also reference `projects(id)` without cascade — once 03.5 wires the UI delete button against real projects that may have these dependents, the kernel will need either `ON DELETE CASCADE` migrations or a dedicated `cascadeDeleteProject` helper. Out of scope for 03.1; flagged for the kernel team.
+
+### 03.2 slugify helper — landed
+
+- Module: `src/web/src/lib/util/slugify.ts` (29 LOC, ≤30 budget).
+- Tests: `src/web/src/lib/util/slugify.test.ts` — 16 cases (15 unit + 1 property-style regex assertion), 26 expect() calls all green.
+- RED: `bun test --conditions=svelte ./src/web/src/lib/util/slugify.test.ts` failed with `Cannot find module './slugify'` before the helper existed.
+- GREEN: `bun test --conditions=svelte ./src/web/src/lib/util/slugify.test.ts` → `16 pass / 0 fail`.
+- Algorithm: `trim → toLowerCase → ß→ss → NFKD + strip diacritics → replace any non-[a-z0-9] run with single hyphen → collapse hyphens → trim leading/trailing hyphen → slice(0, 64) → strip trailing hyphen left by truncation`. Returns `""` when result is empty or starts with a hyphen.
+- ß handled by an explicit pre-NFKD substitution (`ß → ss`) because NFKD on `ß` yields `ß` itself; the diacritic-strip pass then leaves it untouched and the final non-alpha strip would erase it. Pre-mapping keeps the romanisation contract from the issue spec.
+- Non-Latin scripts (`中文`) decompose to characters outside `[a-z0-9]` and are stripped; output is `""` so the canonical safe-slug regex `^[a-z0-9][a-z0-9-]{0,63}$` is never violated. Property-style assertion at the end of the test file iterates every input and confirms non-empty outputs match the regex.
+- Gates: `cd src/web && bun run check` → 0/0/0; `cd src/web && bun run build` ok; root `bun run ci` → 9 stages green.
