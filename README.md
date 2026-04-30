@@ -159,6 +159,7 @@ Core reference:
 - [Skills](docs/skills.md) — paths, upstream lockfile, authoring, evals.
 - [MCP policy](docs/mcp.md) — official-first MCP/package policy, auth, builtin catalogue.
 - [Caveman](docs/caveman.md) — output compression setup and source-doc compression.
+- [Product kernel](docs/product-kernel.md) — local PGlite + PostgreSQL kernel, deterministic retrieval, `fulcrum product …` CLI.
 - [Setup smoke test](docs/smoke-test.md) — end-to-end install verification.
 - [Skill smoke test](docs/skill-smoke-test.md) — manual cross-agent skill verification.
 
