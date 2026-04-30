@@ -33,7 +33,7 @@ Every sub-task: RED test → GREEN minimum impl → REFACTOR. Capture commands +
 - [x] **01.2 — Install primitive components wave.** Owns: `src/web/src/lib/components/ui/{button,card,badge,input,label,textarea,select}/`. RED: `ui-primitives.smoke.test.ts` imports each and asserts each is a function. GREEN: `bunx shadcn-svelte@latest add -y button card badge input label textarea select`.
 - [x] **01.3 — Install layout primitives.** Owns: `src/web/src/lib/components/ui/{table,tabs,sheet,separator,skeleton,scroll-area,avatar,breadcrumb}/`. RED: extend the smoke test with these names. GREEN: `bunx shadcn-svelte@latest add -y table tabs sheet separator skeleton scroll-area avatar breadcrumb`.
 - [x] **01.4 — Install overlay primitives.** Owns: `src/web/src/lib/components/ui/{dialog,alert-dialog,dropdown-menu,popover,tooltip,command,form}/`. RED: extend smoke test. GREEN: `bunx shadcn-svelte@latest add -y dialog alert-dialog dropdown-menu popover tooltip command form`.
-- [ ] **01.5 — Toaster + form validation deps.** Owns: `src/web/package.json`, `src/web/src/lib/components/ui/sonner/`. RED: smoke imports `Toaster`. GREEN: `bunx shadcn-svelte@latest add -y sonner` then `bun add svelte-sonner mode-watcher lucide-svelte sveltekit-superforms valibot marked dompurify`.
+- [x] **01.5 — Toaster + form validation deps.** Owns: `src/web/package.json`, `src/web/src/lib/components/ui/sonner/`. RED: smoke imports `Toaster`. GREEN: `bunx shadcn-svelte@latest add -y sonner` then `bun add svelte-sonner mode-watcher lucide-svelte sveltekit-superforms valibot marked dompurify`.
 - [ ] **01.6 — Post-install gate.** Owns: nothing new. RED: `bun run check && bun run build` should already be green; if not, fix imports. GREEN: both exit 0. Commit `feat(web): add shadcn-svelte component kit + form/toast/markdown deps`.
 
 ## Comments
@@ -143,3 +143,44 @@ Implementation notes:
 - **Re-installs of earlier waves.** `add -y --overwrite form` re-emitted `button/`, `input/`, `textarea/`, `label/` (form barrel imports from those siblings). Identical content to 01.2 output — no behavioural diff.
 
 Gates: `bun test ./src/web/src/lib/utils.test.ts` → 2 pass (regression). `cd src/web && bun run check` → 2152 files, 0 errors / 0 warnings. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.
+
+TODO: drop src/web/patches/formsnap@2.0.1.patch and src/web/patches/svelte-toolbelt@0.5.0.patch when both packages ship a `"default"` condition in their package.json `exports` map. Track upstream releases.
+
+### 01.5 — 2026-04-30 (implementer)
+
+RED command: `bun test ./src/web/src/lib/components/ui/ui-primitives.smoke.test.ts`
+
+RED output (first lines):
+```
+bun test v1.3.13 (bf2e2cec)
+
+src/web/src/lib/components/ui/ui-primitives.smoke.test.ts:
+error: Cannot find module '$lib/components/ui/sonner' from '/Users/mkh/workspace/fulcrum/src/web/src/lib/components/ui/ui-primitives.smoke.test.ts'
+(fail) shadcn-svelte primitives smoke > Toaster is a function [0.17ms]
+```
+
+22 prior pass + 1 new fail = 23 tests.
+
+GREEN commands (run from `src/web`):
+```
+bunx shadcn-svelte@latest add -y --overwrite sonner
+bun add svelte-sonner mode-watcher lucide-svelte valibot marked dompurify
+bun add -d @types/dompurify @types/marked
+```
+
+Toggled `bunfig.toml` `frozenLockfile = true → false` for the install commands and during `bun patch` cycles below; reverted to `true` before commit.
+
+GREEN test: `bun test ./src/web/src/lib/components/ui/ui-primitives.smoke.test.ts` → `23 pass, 0 fail`.
+
+Implementation notes:
+- **`sveltekit-superforms` + `formsnap` skipped.** Both arrived in 01.4 as transitives of the `form` component — already in `src/web/package.json`. Per spec note, this lane only adds `svelte-sonner mode-watcher lucide-svelte valibot marked dompurify` (+ `@types/*`).
+- **`mode-watcher` → 5 more `bun patch`es.** `sonner.svelte` imports `mode-watcher`, which transitively pulls `runed` and a nested `svelte-toolbelt`. Same `exports`-map problem documented in 01.4: each ships only `types` + `svelte` conditions, no `default`/`import`, so raw `bun test` resolution fails. Patched (in failure order):
+  - `mode-watcher@1.1.0` — `node_modules/mode-watcher/package.json` exports map.
+  - `svelte-toolbelt@0.7.1` — `node_modules/mode-watcher/node_modules/svelte-toolbelt/package.json` (distinct from the existing `0.5.0` patch which lives under `formsnap/`).
+  - `runed@0.25.0` — `node_modules/mode-watcher/node_modules/runed/package.json`.
+  - `runed@0.28.0` — `node_modules/svelte-sonner/node_modules/runed/package.json`.
+  - `runed@0.23.4` — `node_modules/mode-watcher/node_modules/svelte-toolbelt/node_modules/runed/package.json`.
+- All five new patch files now sit in `src/web/patches/`; `package.json` `patchedDependencies` lists 7 entries total (2 from 01.4 + 5 new). Same upstream-fix pattern as the 01.4 WARN follow-up applies — when these packages ship a `default` (or `import`) condition, the patches can drop. `vite`/`svelte-check` continued to work without patches because they pass `--conditions svelte` themselves.
+- **`@lucide/svelte` already present.** 01.1 init pulled `@lucide/svelte`; this lane added `lucide-svelte` per spec verbatim. Not currently imported but installed for future feature waves (kanban/runs icons).
+
+Gates: `bun test ./src/web/src/lib/utils.test.ts` → 2 pass (regression). `cd src/web && bun run check` → 2194 files, 0 errors / 0 warnings. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.

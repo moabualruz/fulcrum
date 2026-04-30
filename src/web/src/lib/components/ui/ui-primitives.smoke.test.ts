@@ -143,4 +143,9 @@ describe("shadcn-svelte primitives smoke", () => {
     const { Field } = await import("$lib/components/ui/form");
     expect(typeof Field).toBe("function");
   });
+
+  it("Toaster is a function", async () => {
+    const { Toaster } = await import("$lib/components/ui/sonner");
+    expect(typeof Toaster).toBe("function");
+  });
 });
