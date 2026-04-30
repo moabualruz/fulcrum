@@ -15,7 +15,7 @@ That is the destination. This branch (`feat/agent-foundation-clean`) is the foun
 | **Capability** | 29 skills authored in-repo, content-verified against upstream, with trigger evals | `skills/`, `fulcrum skills sync` |
 | **Capabilities** | Bring-your-own CLI tools, verified by `fulcrum doctor` | `docs/capabilities.md`, `fulcrum doctor` |
 | **Output policy** | Per-tool output strategy (raw / status / summary / file) driving `tool-output-router` | `config/tool-output-policy.toml` |
-| **Managed MCPs** | DeepWiki plus MCP registry CLI (`fulcrum mcp list/register/enable`) with 16 builtin servers registered; minimal default enables context7, the rest stay opt-in | `docs/mcp.md`, `src/cli/mcp-registry.ts`, `src/cli/mcp-builtins.ts`, `src/cli/mcp-cmd.ts` |
+| **Managed MCPs** | Registry CLI (`fulcrum mcp list/register/enable`) with 17 builtin servers; minimal default enables DeepWiki + context7, the rest stay opt-in | `docs/mcp.md`, `src/cli/mcp-registry.ts`, `src/cli/mcp-builtins.ts`, `src/cli/mcp-cmd.ts` |
 | **Orchestration** | One Bun-compiled cross-platform binary (`init`, `install`, `uninstall`, `hooks`, `skills`, `doctor`, `compress`, `hook`) | `src/`, `dist/fulcrum-<plat>` |
 | **Cross-agent reach** | Same setup wired into Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI | `docs/agents.md`, `shims/` |
 
@@ -38,7 +38,7 @@ These are the layers the foundation is preparing for. They are **not built**; do
 ## Principles
 
 - **CLI and skills over MCP.** MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead.
-- **Managed MCPs stay narrow.** Fulcrum manages DeepWiki for repo docs. The MCP registry (`fulcrum mcp`) ships 16 builtin entries; default install enables only `context7` from that registry, with github, repomix, semgrep, tavily, playwright, cloudflare-* ×9, and dart opt-in via `fulcrum mcp enable <name>`.
+- **Managed MCPs stay narrow.** Fulcrum registers 17 builtin MCP entries; default install enables only `deepwiki` and `context7`, with github, repomix, semgrep, tavily, playwright, cloudflare-* ×9, and dart opt-in via `fulcrum mcp enable <name>`.
 - **Capabilities are bring-your-own tools.** Install the workstation toolchain yourself, then use `fulcrum doctor` to verify what is present.
 - **Behavioral rules, not knowledge.** Rules change what the agent *does*, not what it *knows*. `"Use ruff, never flake8"` works. `"Write clean code"` does nothing.
 - **Agent-friendly tools output JSON.** `--json` / `--format json` is the selection criterion for every CLI in this stack.
@@ -53,7 +53,8 @@ Skills install via each agent's native namespacing primitive:
 ```
 Claude Code: plugin (fulcrum@fulcrum, marketplace moabualruz/fulcrum)
              → /fulcrum:<name>
-Codex CLI:   ~/.codex/skills/fulcrum/<name>/SKILL.md
+Codex CLI:   ~/.codex/skills/fulcrum/<name>/SKILL.md (global opt-in)
+             .codex/skills/fulcrum/<name>/SKILL.md   (project opt-in)
 OpenCode:    ~/.config/opencode/skills/fulcrum/<name>/SKILL.md
 Pi CLI:      ~/.pi/agent/skills/fulcrum/<name>/SKILL.md
 Gemini CLI:  ~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md
@@ -94,9 +95,10 @@ Two paths, both produce `~/.fulcrum/bin/fulcrum`:
 curl -fsSL https://bun.sh/install | bash      # if Bun isn't installed
 git clone https://github.com/moabualruz/fulcrum ~/code/fulcrum
 cd ~/code/fulcrum
-bash scripts/install.sh                       # builds, installs, splices rules, syncs skills
+bash scripts/install.sh                       # builds, installs minimal profile
+bash scripts/install.sh --profile full        # historical full bootstrap (skills + packages)
 bash scripts/install.sh --with-project ~/code/myproject   # also bootstrap a project
-bash scripts/install.sh --dry-run --no-skills # preview only; skip skill sync (forwards flags to `fulcrum install`)
+bash scripts/install.sh --dry-run --profile rules-only     # preview rules-only setup
 ```
 
 **From a published release (no Bun needed; only `curl`):**
@@ -117,12 +119,15 @@ fulcrum init --dry-run <dir>  # preview without writing
 fulcrum init reindex <dir>    # run repomix --compress in <dir> (no --output override)
 
 fulcrum doctor                # bun, agent dirs, tool presence, policy health
-fulcrum install --dry-run     # preview rules, skills, DeepWiki, and project bootstrap
+fulcrum install --dry-run     # preview minimal profile (rules + policy + DeepWiki/context7)
+fulcrum install --profile full --dry-run  # preview full bootstrap
 fulcrum install --no-skills   # skip all skill sync
 fulcrum install --no-upstream-skills  # skip curated upstream skill sync
 fulcrum hooks list            # show available hook recipes
 fulcrum hooks enable format   # register native agent hook configs + print snippet
-fulcrum skills sync           # Claude Code → plugin install (fulcrum@fulcrum); other agents → skills/fulcrum/
+fulcrum skills sync           # Claude Code plugin; OpenCode/Pi/Gemini mirrors; skips Codex global by default
+fulcrum skills sync --codex-project <dir>  # project-local Codex authored skills
+fulcrum skills list --installed  # inspect active skill metadata budget per agent
 fulcrum skills upstream       # sync curated third-party skills at vendor placement
 fulcrum skills list           # enumerate authored skills with eval coverage
 fulcrum skills lint <path>    # validate frontmatter + body section structure

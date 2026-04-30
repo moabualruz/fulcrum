@@ -109,6 +109,99 @@ describe("skills sync — Claude Code plugin path", () => {
   });
 });
 
+describe("skills sync — Codex scope and runtime HOME", () => {
+  let testHome: string;
+  let origHome: string | undefined;
+  let origRepoDir: string | undefined;
+
+  beforeEach(async () => {
+    testHome = await mkdtemp(join(tmpdir(), "fulcrum-skills-scope-"));
+    origHome = process.env["HOME"];
+    origRepoDir = process.env["FULCRUM_REPO_DIR"];
+    process.env["HOME"] = testHome;
+    process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../..");
+  });
+
+  afterEach(async () => {
+    if (origHome !== undefined) process.env["HOME"] = origHome;
+    else delete process.env["HOME"];
+    if (origRepoDir !== undefined) process.env["FULCRUM_REPO_DIR"] = origRepoDir;
+    else delete process.env["FULCRUM_REPO_DIR"];
+    await rm(testHome, { recursive: true, force: true });
+  });
+
+  test("default dry-run does not target global ~/.codex/skills/fulcrum", async () => {
+    await mkdir(join(testHome, ".codex"), { recursive: true });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      logs.push(String(a[0]));
+    });
+    try {
+      await syncSkills({ dryRun: true });
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(logs.join("\n")).not.toContain(join(testHome, ".codex", "skills", "fulcrum"));
+    expect(logs.some((l) => l.includes("skip Codex CLI global skills"))).toBe(true);
+  });
+
+  test("explicit global Codex scope targets ~/.codex/skills/fulcrum", async () => {
+    await mkdir(join(testHome, ".codex"), { recursive: true });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      logs.push(String(a[0]));
+    });
+    try {
+      await syncSkills({ dryRun: true, codexScope: "global" });
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(logs.join("\n")).toContain(join(testHome, ".codex", "skills", "fulcrum"));
+  });
+
+  test("project Codex scope targets project-local .codex/skills/fulcrum", async () => {
+    const projectDir = join(testHome, "consumer-repo");
+    await mkdir(projectDir, { recursive: true });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      logs.push(String(a[0]));
+    });
+    try {
+      await syncSkills({ dryRun: true, codexScope: "project", projectDir });
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(logs.join("\n")).toContain(join(projectDir, ".codex", "skills", "fulcrum"));
+    expect(logs.join("\n")).not.toContain(join(testHome, ".codex", "skills", "fulcrum"));
+  });
+
+  test("all dry-run targets use runtime HOME after import", async () => {
+    await mkdir(join(testHome, ".codex"), { recursive: true });
+    await mkdir(join(testHome, ".config", "opencode"), { recursive: true });
+    await mkdir(join(testHome, ".pi", "agent"), { recursive: true });
+    await mkdir(join(testHome, ".gemini"), { recursive: true });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      logs.push(String(a[0]));
+    });
+    try {
+      await syncSkills({ dryRun: true, codexScope: "global" });
+    } finally {
+      logSpy.mockRestore();
+    }
+    const output = logs.join("\n");
+
+    expect(output).toContain(join(testHome, ".codex", "skills", "fulcrum"));
+    expect(output).toContain(join(testHome, ".config", "opencode", "skills", "fulcrum"));
+    expect(output).toContain(join(testHome, ".pi", "agent", "skills", "fulcrum"));
+    expect(output).toContain(join(testHome, ".gemini", "extensions", "fulcrum-skills"));
+    if (origHome) expect(output).not.toContain(join(origHome, ".codex", "skills", "fulcrum"));
+  });
+});
+
 describe("Claude Code plugin package", () => {
   const root = join(__dirname, "../..");
 
@@ -141,7 +234,79 @@ describe("Claude Code plugin package", () => {
     expect(packaged).not.toContain("_template");
     expect(packaged).not.toContain("_archive");
   });
+
+  test("refresh prunes stale plugin cache files and excludes source backups from generated folders", async () => {
+    const testHome = await mkdtemp(join(tmpdir(), "fulcrum-plugin-refresh-"));
+    const origHome = process.env["HOME"];
+    const origRepoDir = process.env["FULCRUM_REPO_DIR"];
+    try {
+      process.env["HOME"] = testHome;
+      process.env["FULCRUM_REPO_DIR"] = root;
+      const stale = join(
+        testHome,
+        ".claude",
+        "plugins",
+        "cache",
+        "fulcrum",
+        "fulcrum",
+        "0.1.0",
+        "skills",
+        "stale",
+        "SKILL.md",
+      );
+      await mkdir(join(stale, ".."), { recursive: true });
+      await writeFile(stale, "---\nname: stale\n---\n");
+      await mkdir(join(testHome, ".claude", "plugins"), { recursive: true });
+      await writeFile(
+        join(testHome, ".claude", "plugins", "installed_plugins.json"),
+        JSON.stringify({ version: 2, plugins: { "fulcrum@fulcrum": [{ scope: "user" }] } }),
+      );
+
+      await syncSkills({ dryRun: false });
+
+      expect(await Bun.file(stale).exists()).toBe(false);
+      const generatedRoots = [
+        join(testHome, ".claude", "plugins", "cache", "fulcrum", "fulcrum", "0.1.0", "skills"),
+        join(testHome, ".claude", "plugins", "marketplaces", "fulcrum", "plugins", "fulcrum", "skills"),
+      ];
+      for (const generatedRoot of generatedRoots) {
+        const files = await collectRelativeFiles(generatedRoot);
+        const banned = files.filter((file) =>
+          file.endsWith(".original.md") ||
+          file.includes("/_archive/") ||
+          file.includes("/_template/") ||
+          file.includes("/.claude/") ||
+          file.includes("/.git/") ||
+          file.includes("/node_modules/")
+        );
+        expect(banned).toEqual([]);
+        for (const file of files) {
+          const source = join(root, "skills", file);
+          expect(await readFile(join(generatedRoot, file), "utf8")).toEqual(await readFile(source, "utf8"));
+        }
+      }
+    } finally {
+      if (origHome !== undefined) process.env["HOME"] = origHome;
+      else delete process.env["HOME"];
+      if (origRepoDir !== undefined) process.env["FULCRUM_REPO_DIR"] = origRepoDir;
+      else delete process.env["FULCRUM_REPO_DIR"];
+      await rm(testHome, { recursive: true, force: true });
+    }
+  });
 });
+
+async function collectRelativeFiles(root: string, dir = root): Promise<string[]> {
+  const out: string[] = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...await collectRelativeFiles(root, path));
+    } else {
+      out.push(path.slice(root.length + 1));
+    }
+  }
+  return out.sort();
+}
 
 describe("removeAuthoredSkills", () => {
   let testHome: string;
@@ -212,5 +377,35 @@ describe("removeAuthoredSkills", () => {
 
     expect(await readFile(join(authored, "SKILL.md"), "utf8")).toContain("name: bat");
     expect(logs.some((l) => l.includes("[dry-run] would remove") && l.includes("/.codex/skills/fulcrum"))).toBe(true);
+  });
+});
+
+describe("skills list --installed", () => {
+  test("prints installed skill budget from active Codex roots", async () => {
+    const testHome = await mkdtemp(join(tmpdir(), "fulcrum-skills-installed-"));
+    try {
+      await mkdir(join(testHome, ".codex", "skills", "alpha"), { recursive: true });
+      await writeFile(
+        join(testHome, ".codex", "skills", "alpha", "SKILL.md"),
+        "---\nname: alpha\ndescription: Alpha installed skill\n---\n",
+      );
+      const proc = Bun.spawn(["bun", "src/index.ts", "skills", "list", "--installed"], {
+        cwd: join(__dirname, "../.."),
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, HOME: testHome },
+      });
+      const out = await new Response(proc.stdout).text();
+      const err = await new Response(proc.stderr).text();
+      const exit = await proc.exited;
+
+      expect(exit).toBe(0);
+      expect(err).toBe("");
+      expect(out).toContain("Installed skill metadata budget");
+      expect(out).toContain("Codex CLI: 1 skills");
+      expect(out).toContain(join(testHome, ".codex", "skills"));
+    } finally {
+      await rm(testHome, { recursive: true, force: true });
+    }
   });
 });

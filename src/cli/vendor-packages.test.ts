@@ -26,6 +26,9 @@ beforeEach(async () => {
   const skill = join(TMP, ".fulcrum", "cache", "superpowers", "skills", "brainstorming");
   await mkdir(skill, { recursive: true });
   await writeFile(join(skill, "SKILL.md"), "---\nname: brainstorming\ndescription: Brainstorm\n---\n\nUse structured brainstorming.\n");
+  await writeFile(join(skill, "SKILL.original.md"), "---\nname: brainstorming\n---\nsource backup\n");
+  await mkdir(join(TMP, ".fulcrum", "cache", "superpowers", "skills", "_archive", "old"), { recursive: true });
+  await writeFile(join(TMP, ".fulcrum", "cache", "superpowers", "skills", "_archive", "old", "SKILL.md"), "---\nname: old\n---\n");
 });
 
 afterEach(async () => {
@@ -235,6 +238,8 @@ describe("vendor capability packages", () => {
     expect(calls).not.toContainEqual(["claude", "plugin", "install", "cloudflare@cloudflare"]);
     expect(await readFile(join(TMP, ".codex", "skills", "superpowers", "brainstorming", "SKILL.md"), "utf8"))
       .toContain("Use structured brainstorming.");
+    expect(await Bun.file(join(TMP, ".codex", "skills", "superpowers", "brainstorming", "SKILL.original.md")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".codex", "skills", "superpowers", "_archive", "old", "SKILL.md")).exists()).toBe(false);
   });
 
   test("uninstalls Superpowers package surfaces without Cloudflare", async () => {

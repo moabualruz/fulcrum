@@ -21,7 +21,7 @@ Mirror policy: when an asset is published only for some agents (e.g. Claude plug
 
 ## 1a. Cost rationale (default state)
 
-MCPs spawn long-running processes; 5+ active can eat 55–100k tokens at session start before the first message. The "official-first" policy above does not mean every MCP is always-on — it means we **manage** every official MCP (install/uninstall correctly) but keep the **enable** state intentional. Default for new users: DeepWiki + `context7`. `context7` is the only builtin registry MCP enabled by default because it is broadly useful, docs-focused, and has no official skill fallback. Use `fulcrum install --no-default-mcps` to register all MCP config while skipping Fulcrum's builtin default enable step; it does not remove or disable existing MCP state. Other official MCPs (github-mcp-server, cloudflare/mcp-server-cloudflare, vendor MCPs) are registered as available but opt-in. Agents with native disabled-state support still get the config written disabled: Codex stores `enabled = false` in each `mcp_servers.<name>` TOML block; Gemini stores enablement in `~/.gemini/mcp-server-enablement.json`; OpenCode stores `"enabled": false` inside each `opencode.json` MCP entry. Claude Code and Pi currently lack an equivalent safe disabled config bit, so disabled registry MCPs remain visible through `fulcrum mcp list`, not their native MCP lists.
+MCPs spawn long-running processes; 5+ active can eat 55–100k tokens at session start before the first message. The "official-first" policy above does not mean every MCP is always-on — it means we **manage** every official MCP (install/uninstall correctly) but keep the **enable** state intentional. Default for new users: `deepwiki` + `context7`. DeepWiki has no CLI fallback; context7 is broadly useful, docs-focused, and has no official skill fallback. Use `fulcrum install --no-default-mcps` to register all MCP config while skipping Fulcrum's builtin default enable step; it does not remove or disable existing MCP state. Other official MCPs (github-mcp-server, cloudflare/mcp-server-cloudflare, vendor MCPs) are registered as available but opt-in. Agents with native disabled-state support still get the config written disabled: Codex stores `enabled = false` in each `mcp_servers.<name>` TOML block; Gemini stores enablement in `~/.gemini/mcp-server-enablement.json`; OpenCode stores `"enabled": false` inside each `opencode.json` MCP entry. Claude Code and Pi currently lack an equivalent safe disabled config bit, so disabled registry MCPs remain visible through `fulcrum mcp list`, not their native MCP lists.
 
 ## 2. Disable claude.ai defaults
 
@@ -43,7 +43,7 @@ Currently only mechanism that drops tokens without removing connectors from acco
 
 ### 3.1 DeepWiki
 
-`deepwiki` has no CLI or REST alternative; free, no auth, no documented rate limits. `fulcrum install` registers it for detected Codex, Gemini, OpenCode, Pi, and Claude Code when the native `claude` command is available. Pi registration goes through `pi-mcp-adapter`, which `fulcrum install` installs and configures automatically when `~/.pi/agent` is detected (see §3.3).
+`deepwiki` has no CLI or REST alternative; free, no auth, no documented rate limits. It is a registry builtin and part of Fulcrum's minimal default set. `fulcrum install` registers it for detected Codex, Gemini, OpenCode, Pi, and Claude Code when the native `claude` command is available. Pi registration goes through `pi-mcp-adapter`, which `fulcrum install` installs and configures automatically when `~/.pi/agent` is detected (see §3.3).
 
 ```bash
 claude mcp add -s user deepwiki --transport http https://mcp.deepwiki.com/mcp
@@ -235,7 +235,7 @@ fulcrum mcp disable myserver [--all-agents]
 
 Agent IDs: `claude-code`, `codex`, `gemini`, `opencode`, `pi`.
 
-`fulcrum install` registers all 16 builtin servers (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart). It writes disabled native config for registry-owned disabled servers on Codex, Gemini, and OpenCode so their MCP managers show configured-but-disabled servers. Package-owned surfaces are hidden from the registry and keep their package defaults. Minimal default state enables `context7` and Repomix where Fulcrum owns the mirrored MCP surface. `--no-default-mcps` registers all definitions without changing enable state; `--enable-all-mcps` explicitly enables every registry-owned builtin. `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
+`fulcrum install` registers all 17 builtin servers (deepwiki, github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart). It writes disabled native config for registry-owned disabled servers on Codex, Gemini, and OpenCode so their MCP managers show configured-but-disabled servers. Package-owned surfaces are hidden from the registry and keep their package defaults. Minimal default state enables `deepwiki` and `context7` where no user state exists. `--no-default-mcps` registers all definitions without changing enable state; `--enable-all-mcps` explicitly enables every registry-owned builtin. `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
 
 Servers can hide an agent when that agent surface is unsupported or owned by another Fulcrum-managed primitive. `fulcrum mcp list --json` reports that state as `"hidden"`; enable/disable skip hidden agents instead of writing registry state for them.
 
@@ -261,7 +261,7 @@ Add a single source line to your shell rc:
 
 | MCP | Env var(s) | How to obtain |
 |---|---|---|
-| `deepwiki` | none | always-on |
+| `deepwiki` | none | minimal default |
 | `github` | `GITHUB_TOKEN` (or `gh auth login` — many tools read either) | [github.com/settings/tokens](https://github.com/settings/tokens) — fine-grained PAT with `repo`, `read:org`, `gist` |
 | `repomix` | none | stdio MCP via `npx`; no auth |
 | `semgrep` | none for local scans; `SEMGREP_APP_TOKEN` only for Semgrep AppSec Platform | [semgrep.dev/orgs/-/settings/tokens](https://semgrep.dev/orgs/-/settings/tokens) (only if using cloud features) |
@@ -269,7 +269,7 @@ Add a single source line to your shell rc:
 | `tavily` | `TAVILY_API_KEY` (required) | [app.tavily.com](https://app.tavily.com) → API Keys |
 | `playwright` | none | stdio MCP via `npx`; first run downloads chromium (~170 MB) |
 | `dart` | none | requires Dart SDK ≥ 3.9.0-163.0.dev with `dart mcp-server` subcommand |
-| `cloudflare-docs` | none (public) | always-on for the public docs MCP |
+| `cloudflare-docs` | none (public) | opt-in unless package-owned for that agent |
 | `cloudflare-workers-bindings` | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens). Account id from the dashboard sidebar or `curl -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts \| jq '.result[].id'` |
 | `cloudflare-workers-builds` | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | same |
 | `cloudflare-observability` | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | same |

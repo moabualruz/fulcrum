@@ -22,6 +22,8 @@ Codex settings research:
 
 ## ISS-001: Fulcrum authored skills are installed globally into Codex by default
 
+Status: Fixed in this pass. `syncSkills()` defaults Codex authored skills to `skip`; `--codex-global` explicitly restores global sync and `--codex-project <dir>` writes project-local `.codex/skills/fulcrum`. `fulcrum install --profile full` is the only install profile that opts global Codex authored skills back in.
+
 Evidence:
 
 - Before cleanup, Codex saw 72 skill metadata files from `~/.codex/skills` plus `~/.codex/plugins/cache`.
@@ -51,6 +53,8 @@ Expected fix:
 
 ## ISS-002: `syncSkills` caches `HOME` at module load
 
+Status: Fixed in this pass. Skill targets are computed at command runtime from current `HOME`, with regression coverage that imports first, changes `HOME`, then asserts all agent paths use the temp home.
+
 Evidence:
 
 - `src/cli/skills.ts` defines `_skillsHome` and `TARGETS` at module scope.
@@ -74,6 +78,8 @@ Expected fix:
 - Keep path computation centralized so tests can assert all agents use the same home value.
 
 ## ISS-003: Claude plugin/package publish surface can contain stale or non-package files
+
+Status: Fixed in this pass for generated CLI agent folders. Claude cache/marketplace generated skill folders are pruned before refresh, rebuilt from authored `skills/`, and filtered so `.original.md`, `_archive`, `_template`, `.claude`, `.git`, `node_modules`, and worktree paths do not enter agent-visible folders. Project source folders still keep `.original.md` backups.
 
 Evidence:
 
@@ -103,6 +109,8 @@ Expected fix:
 
 ## ISS-004: Project-local `.claude/worktrees` hides dirty and stale worktrees
 
+Status: Fixed in this pass. `fulcrum doctor --json` reports `worktrees.projectLocalIgnoredRoots`, and human doctor output warns on `.claude/worktrees` so hidden worktrees are visible before publish/sync.
+
 Evidence:
 
 - `.claude/worktrees/component-ledger` is a registered worktree at detached `HEAD` and has untracked `src/components/`.
@@ -129,6 +137,8 @@ Expected fix:
 
 ## ISS-005: `fulcrum install` does too much global mutation by default
 
+Status: Fixed in this pass. `fulcrum install` now defaults to `--profile minimal`; `--profile rules-only` and `--profile full` are explicit. Minimal install avoids authored/upstream skills and vendor packages while keeping rules, policy, registry, and minimal MCP defaults.
+
 Evidence:
 
 - `fulcrum install` currently splices rules, installs caveman, syncs authored skills, syncs upstream skills, installs vendor capability packages, and registers MCPs unless flags opt out.
@@ -154,6 +164,8 @@ Expected fix:
 
 ## ISS-006: `doctor` does not show actual agent skill budget pressure
 
+Status: Fixed in this pass. `doctor --json` includes `skillBudget` per agent: active skill count, description chars, roots, top descriptions, duplicates, and threshold warning. Human doctor output surfaces warnings; `fulcrum skills list --installed` reuses the same scanner.
+
 Evidence:
 
 - `doctor --json` reports `skillsCount: 29`, which is the repo-authored skill count.
@@ -177,6 +189,8 @@ Expected fix:
 - Use the same scanner in `fulcrum skills list --installed` so users can inspect what the agent will load.
 
 ## ISS-007: DeepWiki MCP is installed outside the managed registry
+
+Status: Fixed in this pass. DeepWiki is now `DEFAULT_DEEPWIKI_SERVER` in `src/cli/mcp-builtins.ts`, included in `BUILTIN_MCPS` and `MINIMAL_DEFAULT_MCPS`, and component lifecycle routes it through the normal MCP registry path. Legacy Codex config reconciliation avoids duplicate TOML blocks.
 
 Evidence:
 

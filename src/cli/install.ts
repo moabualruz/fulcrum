@@ -13,6 +13,9 @@
 //                      normally so detection still works; every write/exec is
 //                      replaced by a  [dry-run] would …  log line.
 //   --with-project <dir>  Also run `fulcrum init <dir>` after install.
+//   --profile <minimal|rules-only|full>
+//                      Select install surface. Default minimal avoids global
+//                      skill/package mutation; full is the historical bootstrap.
 //   --no-skills       Do not run authored/upstream skill sync during install.
 //   --no-upstream-skills
 //                      Do not install curated third-party skill packs.
@@ -63,6 +66,15 @@ async function copyTree(src: string, dst: string): Promise<void> {
   }
   await mk(dst);
   for (const entry of await readdir(src, { withFileTypes: true })) {
+    if (
+      entry.name.endsWith(".original.md") ||
+      entry.name === "_archive" ||
+      entry.name === "_template" ||
+      entry.name === ".claude" ||
+      entry.name === ".git" ||
+      entry.name === "node_modules" ||
+      entry.name === "worktrees"
+    ) continue;
     await copyTree(`${src}/${entry.name}`, `${dst}/${entry.name}`);
   }
 }
@@ -601,6 +613,7 @@ export async function lockCavemanUltra(home: string): Promise<void> {
 }
 
 type McpDefaultMode = "minimal" | "none" | "all";
+type InstallProfile = "minimal" | "rules-only" | "full";
 
 /**
  * Register all builtin MCPs in the registry. Registration is always config-only;
@@ -687,6 +700,7 @@ export async function run(args: string[]): Promise<void> {
   let syncAuthoredSkills = true;
   let syncUpstream = true;
   let mcpDefaultMode: McpDefaultMode = "minimal";
+  let installProfile: InstallProfile = "minimal";
   DRY_RUN = false;
   let i = 0;
   while (i < args.length) {
@@ -696,6 +710,14 @@ export async function run(args: string[]): Promise<void> {
       i += 1;
     } else if (a === "--with-project") {
       withProject = args[i + 1] ?? process.cwd();
+      i += 2;
+    } else if (a === "--profile") {
+      const value = args[i + 1];
+      if (value !== "minimal" && value !== "rules-only" && value !== "full") {
+        console.error("fulcrum install: --profile must be minimal, rules-only, or full");
+        process.exit(2);
+      }
+      installProfile = value;
       i += 2;
     } else if (a === "--no-skills") {
       syncAuthoredSkills = false;
@@ -728,11 +750,19 @@ export async function run(args: string[]): Promise<void> {
   const root = repoRoot();
   console.log(`Fulcrum install — source: ${root}\n`);
 
-  console.log("1/4  Vendoring hook registration snippets → ~/.fulcrum/hooks/snippets/");
-  await vendorHookSnippets();
+  if (installProfile === "full") {
+    console.log("1/4  Vendoring hook registration snippets → ~/.fulcrum/hooks/snippets/");
+    await vendorHookSnippets();
+  } else {
+    console.log(`1/4  Skipping hook registration snippets (--profile ${installProfile})`);
+  }
   console.log();
 
-  const target = mcpDefaultMode === "all" ? "profile.verify-all" : "profile.default";
+  const target =
+    mcpDefaultMode === "all" ? "profile.verify-all" :
+    installProfile === "full" ? "profile.default" :
+    installProfile === "rules-only" ? "profile.rules-only" :
+    "profile.minimal";
   const exclude: string[] = [];
   if (!syncAuthoredSkills) {
     exclude.push("skills.authored");
@@ -744,6 +774,11 @@ export async function run(args: string[]): Promise<void> {
     exclude.push("mcp.context7");
   }
 
+  if (installProfile !== "full") {
+    syncAuthoredSkills = false;
+    syncUpstream = false;
+  }
+
   console.log(`2/4  Installing component profile ${target}`);
   const { planComponentOperation } = await import("../components/planner.ts");
   const { executeComponentPlan } = await import("../components/executor.ts");
@@ -752,7 +787,16 @@ export async function run(args: string[]): Promise<void> {
     target,
     exclude,
   });
-  await executeComponentPlan(plan, { dryRun: DRY_RUN });
+  const previousCodexSkillScope = process.env["FULCRUM_CODEX_SKILLS_SCOPE"];
+  if (installProfile === "full") {
+    process.env["FULCRUM_CODEX_SKILLS_SCOPE"] = "global";
+  }
+  try {
+    await executeComponentPlan(plan, { dryRun: DRY_RUN });
+  } finally {
+    if (previousCodexSkillScope === undefined) delete process.env["FULCRUM_CODEX_SKILLS_SCOPE"];
+    else process.env["FULCRUM_CODEX_SKILLS_SCOPE"] = previousCodexSkillScope;
+  }
   console.log();
 
   const modeLabel = mcpDefaultMode === "all"
@@ -761,7 +805,11 @@ export async function run(args: string[]): Promise<void> {
       ? "Skipping minimal default MCP enable step (--no-default-mcps)"
       : "Enabling minimal default MCP set";
   console.log(`3/4 ${modeLabel}`);
-  await applyBuiltinMcpDefaultState(mcpDefaultMode);
+  if (installProfile === "rules-only") {
+    console.log("     · default MCP enable step skipped (--profile rules-only)");
+  } else {
+    await applyBuiltinMcpDefaultState(mcpDefaultMode);
+  }
   console.log();
 
   if (withProject) {

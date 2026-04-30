@@ -416,6 +416,11 @@ async function applyToCodex(server: McpServer, home: string, enabled = true): Pr
     return;
   }
 
+  if (new RegExp(`^\\[mcp_servers\\.${escapeRegExp(server.name)}\\]`, "m").test(existing)) {
+    console.log(`     · Codex ${server.name} MCP already present: ${file}`);
+    return;
+  }
+
   const sep = existing && !existing.endsWith("\n") ? "\n\n" : existing ? "\n" : "";
   await mkdir(dirname(file), { recursive: true });
   await writeFile(file, `${existing}${sep}${block}`);

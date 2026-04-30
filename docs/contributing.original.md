@@ -79,9 +79,9 @@ chore(deps): bump bun to 1.2.8
 ```
 1. fulcrum install --dry-run       # install smoke
 2. bun run typecheck               # tsc --noEmit (strict mode, no any)
-3. bun test                        # 150 tests
+3. bun test                        # full test suite
 4. bun run build:all               # 5 platform binaries
-5. bun run skills:lint             # 28 skills, all pass frontmatter union rules
+5. bun run skills:lint             # 29 skills, all pass frontmatter union rules
 6. bun run compress -- --check     # hard gate: every .md must have .original.md sibling
 ```
 

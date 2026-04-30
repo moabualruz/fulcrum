@@ -14,22 +14,22 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
 
 `main` ships a Bun `fulcrum` CLI that:
 
-- **Manages component lifecycle** (`fulcrum component …`) — catalog, planner, SQLite ledger, executor, and adapters cover hooks, MCP registry entries, DeepWiki, global rules sentinel blocks, tool-output policy, authored/upstream skills, Caveman, Repomix, Cloudflare, and Superpowers. Public surface includes `list`, `info`, `plan`, `status`, and `install/remove/enable/disable` with `--agent`, `--all-agents`, `--dry-run`, `--json`, and `remove --purge`. `fulcrum install` / `fulcrum uninstall` now route through component profiles while preserving existing flags and conservative removal defaults.
+- **Manages component lifecycle** (`fulcrum component …`) — catalog, planner, SQLite ledger, executor, and adapters cover hooks, MCP registry entries, global rules sentinel blocks, tool-output policy, authored/upstream skills, Caveman, Repomix, Cloudflare, and Superpowers. Public surface includes `list`, `info`, `plan`, `status`, and `install/remove/enable/disable` with `--agent`, `--all-agents`, `--dry-run`, `--json`, and `remove --purge`. `fulcrum install` / `fulcrum uninstall` now route through component profiles while preserving existing flags and conservative removal defaults.
 
-- **Installs cross-agent setup** (`fulcrum install`) — sentinel-splices `rules/AGENTS.md` into each detected agent's primary rules file; vendors hook recipe snippets; seeds `tool-output-policy.toml`; runs caveman per agent (`claude plugin install caveman@caveman` / `gemini extensions install` / direct official repo mirror for Codex/OpenCode/Pi, with Codex plugin metadata/assets/hooks/config mirrored into native Codex paths); installs vendor capability packages (Repomix Claude plugins + non-Claude mirrors, Cloudflare Claude plugin, Superpowers Claude/Gemini/OpenCode/Pi packages + Codex full skill mirror; Pi falls back to skill mirror only when `pi` is unavailable); registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 vendor MCPs in the registry (github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart) with minimal default state enabling only context7; syncs 29 authored skills + 27 upstream-pinned skills with subpath-level SHA-256 integrity verification and `vendor_canonical_agents` package-ownership skips.
+- **Installs cross-agent setup** (`fulcrum install`) — default profile is now **minimal**: sentinel-splices `rules/AGENTS.md`, seeds `tool-output-policy.toml`, registers builtin MCPs, and enables only DeepWiki + context7 where no user state exists. `--profile rules-only` splices rules only. `--profile full` is the historical full bootstrap: hook snippets, caveman per agent (`claude plugin install caveman@caveman` / `gemini extensions install` / direct official repo mirror for Codex/OpenCode/Pi, with Codex plugin metadata/assets/hooks/config mirrored into native Codex paths), vendor capability packages (Repomix Claude plugins + non-Claude mirrors, Cloudflare Claude plugin, Superpowers Claude/Gemini/OpenCode/Pi packages + Codex full skill mirror; Pi falls back to skill mirror only when `pi` is unavailable), 29 authored skills + 27 upstream-pinned skills with subpath-level SHA-256 integrity verification and `vendor_canonical_agents` package-ownership skips. Codex authored skills no longer sync globally by default; explicit global/project scope is required. Generated CLI agent skill/package mirrors exclude `.original.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree folders; project source folders keep `.original.md`.
 
 - **Bootstraps projects** (`fulcrum init <dir>`) in three vendor-canonical phases:
   1. **Vendor integrations** — `graphify install --platform <agent>` per detected agent (Claude Code/Codex/OpenCode/Gemini); `npx skills add` for ast-grep and tavily; caveman is handled only by `fulcrum install` per-agent mirrors; `pi install npm:pi-mcp-adapter` + `pi-mcp-adapter init` for Pi; defers context7 OAuth to manual `npx ctx7 setup`.
   2. **Strip duplicate vendor rule blocks** — vendor CLIs (`graphify install`) write rule text outside our `BEGIN/END FULCRUM RULES` sentinel; the same content lives in `rules/AGENTS.md` and is spliced inside the sentinel; `stripVendorRuleBlocks` removes the duplicate so agents don't load the rule twice. Vendor-installed hooks/settings remain untouched.
   3. **Project indices** — `graphify update .` + `repomix --compress`. Vendor-default output paths (`graphify-out/`, `repomix-output.xml`); NO Fulcrum-imposed flags or watchers. Live pattern matchers (rg, fd, ast-grep, jq, …) need no index and are not handled here. `fulcrum init reindex` re-runs phase 3 only.
 
-- **Manages MCPs** (`fulcrum mcp list/register/unregister/enable/disable [--all]`) via a TOML registry at `~/.fulcrum/state/global/mcp-registry.toml`. Per-agent `applyToAgents` writes the canonical MCP shape with bearer auth wired:
+- **Manages MCPs** (`fulcrum mcp list/register/unregister/enable/disable [--all]`) via a TOML registry at `~/.fulcrum/state/global/mcp-registry.toml`. DeepWiki is now a normal registry builtin (not a special-case installer). Per-agent `applyToAgents` writes the canonical MCP shape with bearer auth wired:
   - Codex TOML: emits `bearer_token_env_var = "<VAR>"` for HTTP servers with a single `auth_env_var`.
   - Gemini / OpenCode / Pi: `headers.Authorization = "Bearer ${VAR}"` (or `{env:VAR}` for OpenCode's syntax) with vendor-side env interpolation.
   - Claude Code: `claude mcp add ... --header "Authorization: Bearer <token>"` — token expanded at install time because Claude does not interpolate `${VAR}` in stored headers.
   Minimal default state enables DeepWiki + context7 where no user state exists. `fulcrum install --no-default-mcps` registers all MCP definitions/config without changing enable state; `fulcrum install --enable-all-mcps` is a verification switch that explicitly flips every builtin on across every detected agent.
 
-- **Validates the environment** (`fulcrum doctor [--json] [--probe]`) — agent detection, rules-spliced state, caveman per-agent install + `defaultMode` source, Pi MCP adapter check, 47 BYO tools, tool-output policy presence. MCP registry section reports `auth_status` (env-var presence), `reachable` (HEAD probe / `which`), `drift` (`default_enabled=false` but some agent has it enabled), and `wiring` (per-agent native config inspection — confirms `bearer_token_env_var` / `headers.Authorization` is present for HTTP servers with declared auth). With `--probe`: spawns stdio MCPs / POSTs HTTP MCPs and asserts a valid JSON-RPC `initialize` reply within an 8s timeout. Catches wrong commands, stale URLs, and broken auth in one check.
+- **Validates the environment** (`fulcrum doctor [--json] [--probe]`) — agent detection, rules-spliced state, caveman per-agent install + `defaultMode` source, Pi MCP adapter check, 47 BYO tools, tool-output policy presence, active skill metadata budget per agent, and project-local ignored worktree roots (`.claude/worktrees`). MCP registry section reports `auth_status` (env-var presence), `reachable` (HEAD probe / `which`), `drift` (`default_enabled=false` but some agent has it enabled), and `wiring` (per-agent native config inspection — confirms `bearer_token_env_var` / `headers.Authorization` is present for HTTP servers with declared auth). With `--probe`: spawns stdio MCPs / POSTs HTTP MCPs and asserts a valid JSON-RPC `initialize` reply within an 8s timeout. Catches wrong commands, stale URLs, and broken auth in one check.
 
 - **Self-tests** via `bun run ci` — install → tsc → full Bun test suite → 5 platform builds → skills:lint → compress:check (hard gate, 0 pending). Latest component lifecycle gate green on 2026-04-30: component-focused suite `106 pass`, affected legacy suite `197 pass`, full `bun run ci` six-stage gate, and dry-run smokes for component list/plan, hook install, install wrapper, and uninstall wrapper.
 
@@ -57,18 +57,16 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 ├── fulcrum init reindex [DIR] [--dry-run]
 │                            — re-run project indices only (graphify update .,
 │                              repomix --compress). Vendor-default output paths.
-├── fulcrum install [--with-project DIR] [--dry-run]
+├── fulcrum install [--profile minimal|rules-only|full]
+│                  [--with-project DIR] [--dry-run]
 │                  [--no-skills] [--no-upstream-skills]
 │                  [--no-default-mcps] [--enable-all-mcps]
-│                            — sentinel-splice rules, vendor snippets, seed policy,
-│                              caveman canonical per-agent install, caveman ultra
-│                              lock, sync
-│                              authored + upstream skills (with subpath SHA-256),
-│                              register DeepWiki MCP for detected agents (Pi via
-│                              auto-installed pi-mcp-adapter), register 16
-│                              builtin MCPs in the registry, enable context7
-│                              by default unless --no-default-mcps,
-│                              install vendor capability packages.
+│                            — default profile.minimal: rules, policy, registry
+│                              builtins, minimal MCP defaults (deepwiki+context7).
+│                              --profile rules-only splices rules only.
+│                              --profile full runs the historical bootstrap:
+│                              vendor snippets, caveman, authored/upstream skills,
+│                              vendor packages, and 17 builtin MCPs.
 ├── fulcrum uninstall [--dry-run] [--purge] [--include-caveman]
 │                            — remove Fulcrum-managed rules blocks, native hook
 │                              registrations, hook snippets/markers, managed
@@ -86,9 +84,12 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 ├── fulcrum hooks list/enable/disable [--all]
 │                            — detection-aware native hook config edits + marker
 │                              state. --all forces writes for every agent.
-├── fulcrum skills sync     — Claude Code: plugin install (fulcrum@fulcrum
+├── fulcrum skills sync [--codex-global|--codex-project DIR]
+│                            — Claude Code: plugin install (fulcrum@fulcrum
 │                              from moabualruz/fulcrum marketplace); others:
-│                              <agent>/skills/fulcrum/<name>/. Migrates legacy
+│                              native mirrors under fulcrum/<name>/, with Codex
+│                              global scope opt-in. Generated mirrors exclude
+│                              .original.md/source-only files. Migrates legacy
 │                              ~/.claude/skills/fulcrum/* to plugin layout.
 ├── fulcrum skills upstream [--update-pins]
 │                            — fan out curated upstream skills directly to
@@ -99,7 +100,9 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 │                              owns the placement. Verifies subpath_sha256
 │                              against upstream.lock; --update-pins recomputes.
 ├── fulcrum skills lint     — frontmatter + body section structure
-├── fulcrum skills list     — inventory + eval coverage
+├── fulcrum skills list [--installed]
+│                            — inventory + eval coverage, or installed skill
+│                              metadata budget by agent.
 ├── fulcrum mcp list/register/unregister/enable/disable
 │                            — registry CLI; per-agent or --all-agents toggle.
 ├── fulcrum compress        — compress in-repo content; --check for CI (hard).
@@ -137,11 +140,11 @@ src/
 │   ├── skills.ts                       # authored skill sync + lint
 │   ├── upstream-skills.ts + .test.ts   # pinned upstream skill sync w/ subpath SHA-256
 │   ├── mirror-policy.test.ts           # vendor coverage tests
-│   ├── mcp.ts                          # DeepWiki + Pi adapter management
+│   ├── mcp.ts                          # legacy DeepWiki/Pi compatibility helpers
 │   ├── mcp-registry.ts + .test.ts      # TOML registry + applyToAgents
-│   ├── mcp-builtins.ts                 # 16 builtin MCP specs (single source)
+│   ├── mcp-builtins.ts                 # 17 builtin MCP specs (single source)
 │   ├── mcp-cmd.ts + .test.ts           # fulcrum mcp CLI verbs
-│   ├── doctor.ts + .test.ts            # health report w/ MCP section
+│   ├── doctor.ts + .test.ts            # health report w/ MCP + skill budget sections
 │   └── …
 └── hooks/
     ├── audit-log.ts format.ts index-check.ts index-rebuild.ts
@@ -192,14 +195,14 @@ LICENSE (MIT)  AGENTS.md  README.md
 ## 3. What works (verified, current run)
 
 - `bun run ci` — green: install + tsc + full Bun test suite + 5 platform builds + skills:lint + compress:check (hard, 0 pending).
-- `fulcrum install` — full sweep across 5 agents; doctor verdict ok on a fully-set-up machine.
-- `fulcrum install --enable-all-mcps` — flips every builtin MCP on across every detected agent immediately after registration. End-to-end live verified 2026-04-29: 16/16 MCPs `handshake:ok` via `fulcrum doctor --probe`. Default install state enables only context7 from the builtin registry where no user state exists; skip via `--no-default-mcps`.
+- `fulcrum install` — defaults to minimal profile (rules + policy + registry + DeepWiki/context7); `--profile full` keeps the old full sweep across 5 agents; doctor verdict ok on a fully-set-up machine.
+- `fulcrum install --enable-all-mcps` — flips every builtin MCP on across every detected agent immediately after registration. End-to-end live verified 2026-04-29: 16/16 MCPs `handshake:ok` via `fulcrum doctor --probe`; current registry has 17 builtins after adding DeepWiki. Default install state enables only DeepWiki + context7 from the builtin registry where no user state exists; skip via `--no-default-mcps`.
 - `fulcrum init <dir>` — three phases run end-to-end on this repo: vendor integrations across detected agents, vendor rule de-duplication, project indices (`graphify-out/` + `repomix-output.xml`).
-- `fulcrum mcp list --json` — 16 builtin servers visible; `enable`/`disable [--all-agents]` propagates to native config files with auth headers correctly wired per-agent.
-- `fulcrum doctor` — verdict ok on this machine; per-agent state, caveman across 5 agents, Pi MCP adapter, DeepWiki, drift detection, auth-wiring inspection.
-- `fulcrum doctor --probe` — actual JSON-RPC `initialize` per server. 16/16 servers handshake:ok across all 5 agents on this machine.
+- `fulcrum mcp list --json` — 17 builtin servers visible; DeepWiki is registry-backed; `enable`/`disable [--all-agents]` propagates to native config files with auth headers correctly wired per-agent.
+- `fulcrum doctor` — verdict ok on this machine; per-agent state, caveman across 5 agents, Pi MCP adapter, skill metadata budget, project-local worktree warnings, drift detection, auth-wiring inspection.
+- `fulcrum doctor --probe` — actual JSON-RPC `initialize` per server. Previous live cross-agent baseline was 16/16 servers handshake:ok; current registry has 17 builtins after DeepWiki moved into the registry.
 - `fulcrum uninstall --dry-run` — preview shows clean removal of every Fulcrum-managed artifact across 5 agents.
-- `bash scripts/install.sh [--dry-run] [--with-project DIR] [--no-skills] [--no-upstream-skills] [--no-default-mcps] [--enable-all-mcps]` — flag pass-through verified bash 3.2-safe.
+- `bash scripts/install.sh [--dry-run] [--profile minimal|rules-only|full] [--with-project DIR] [--no-skills] [--no-upstream-skills] [--no-default-mcps] [--enable-all-mcps]` — flag pass-through verified bash 3.2-safe.
 - `bun run release vX.Y.Z [--gh]` — clean-tree gate → CI → CHANGELOG → tag → cross-compile → optional `gh release create`. Does NOT push.
 - `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <skill>` — five trigger-rate harnesses; uniform flags; PATH-missing guard; hardened for long response payloads. Gemini runs in read-only plan mode; Pi runs with tools disabled.
 - `docs/smoke-test.md` — self-contained agent-runnable verification prompt with 16 checks + result template + remediation links + append-only result log.
@@ -215,6 +218,7 @@ LICENSE (MIT)  AGENTS.md  README.md
 - [x] Subagent orchestration evals accepted for now across target agents. Codex/OpenCode passed full statistical evals; Claude/Pi/Gemini findings are accepted as non-blocking harness/runtime quirks for this branch. Latest Codex spot eval was stopped after user acceptance at 10/12 positive triggers + first negative clean.
 - [x] Eval harnesses hardened after missing-agent runs: no response-size argv blowups; Gemini no longer uses `--yolo`; Pi no longer exposes tools during activation eval.
 - [x] Latest implementation gate: `bun run ci` green on 2026-04-30 after `b858220` + `6d1ace2`; HANDOVER-only update followed.
+- [x] Post-lifecycle clean-install issue checklist root causes implemented in code/tests: Codex authored skills global opt-in, runtime HOME path calculation, generated plugin/cache pruning + `.original.md` filtering, doctor worktree + skill-budget warnings, minimal/rules-only/full install profiles, and DeepWiki registry builtin migration. Full `bun test` green locally (`446 pass`) before final CI rerun.
 
 ---
 
@@ -232,7 +236,7 @@ Don't relitigate without new information.
 | Skill `name:` stays prefix-free | `/fulcrum:jq` (Claude plugin) or `/jq` (other agents) — invocation namespace comes from install path / plugin manifest, not frontmatter. | `docs/skills.md` §4 |
 | Upstream skill pins are subpath-level | Per-skill SHA-256 prevents monorepo subtree drift. | `skills/upstream.lock`, `src/cli/upstream-skills.ts` |
 | Third-party skills install at vendor placement, not in a fulcrum namespace | We don't own a `fulcrum-upstream/` (or any) subfolder for skills we didn't author. Sync mirrors files into `<agent>/skills/<name>/` — same path the vendor's own per-agent installer would use. When the vendor ships its own installer, `vendor_canonical_agents` lists which agents to skip so we don't double-write. | `skills/upstream.lock` (per-skill `vendor_canonical_agents`), `src/cli/upstream-skills.ts` (`agentTargets`, `syncUpstreamSkills` gate) |
-| Pi DeepWiki via Fulcrum-managed `pi-mcp-adapter` | Pi has no built-in MCP manager; adapter bridges; we install + configure. | `src/cli/mcp.ts`, `docs/mcp.md` §3.3 |
+| Pi DeepWiki via Fulcrum-managed `pi-mcp-adapter` | Pi has no built-in MCP manager; adapter bridges registry-owned DeepWiki and other MCPs into Pi. | `src/cli/mcp-builtins.ts`, `src/cli/mcp-registry.ts`, `docs/mcp.md` §3.3 |
 | Eval harnesses use native CLIs, not SDKs | Auth in OS keychain; matches real session loading path. | `scripts/eval-skill-*.sh` |
 | No GitHub Actions | Local `bun run ci` + `bun run release` are the gates. Future workflows additive. | absence of `.github/workflows/` |
 | One tool, one skill | Exception: tightly-coupled CLIs (e.g. `dart-toolchain`). | `skills/SOURCES.md`, `AGENTS.md` |
@@ -275,9 +279,9 @@ Recent high-signal commits:
 
 Foundation gaps tracked in earlier revisions are all closed. Component lifecycle management is implemented and merged to `main`; detailed implementation history/checklist: `docs/superpowers/plans/2026-04-29-component-lifecycle-management.md`. CI must stay green; doctor verdict should be ok on a fully-set-up machine; smoke-test prompt at `docs/smoke-test.md` is the canonical post-install verification.
 
-Final foundation-hardening gate before starting §6.1: run the `ISSUES.md` checklist after a real uninstall/clean-install cycle. That means fully uninstall everything the old workflow installed, run a fresh install through the new component lifecycle workflow, then re-check whether each issue in `ISSUES.md` still reproduces. For any confirmed issue, write the failing test first, fix the root cause, verify red/green behavior, and keep the regression test so the issue cannot silently resurface.
+Final foundation-hardening checklist (`ISSUES.md` ISS-001..ISS-007) has code/test fixes in this pass. A real machine uninstall/clean-install smoke remains optional and destructive; do it only with explicit same-turn confirmation because it touches global agent state. If that smoke finds a new regression, add it back to `ISSUES.md` with concrete reproduction, failing test, and root-cause fix before starting §6.1.
 
-The trajectory layer below is next-branch work after the clean-install issue checklist — none of it is implemented. Build order is top-down because later layers consume earlier layers' state.
+The trajectory layer below is next-branch work after this final foundation-hardening pass — none of it is implemented. Build order is top-down because later layers consume earlier layers' state.
 
 ### 6.1 Repository supervisor — `fulcrum repo …`
 
@@ -461,9 +465,10 @@ brew install usql                                                    # optional
 
 ```
 bash scripts/install.sh
+bash scripts/install.sh --profile full   # historical full bootstrap
 ```
 
-Splices rules; vendors hook snippets; seeds policy; installs caveman per agent (Claude/Gemini vendor commands; Codex/OpenCode/Pi direct official repo mirrors, avoiding shared global skill roots); syncs 29 authored + 27 upstream skills with subpath SHA-256; registers DeepWiki MCP across 5 agents (Pi via auto-installed `pi-mcp-adapter`); registers 16 builtin MCPs and enables context7 as minimal default; installs 3 vendor Repomix Claude plugins.
+Default install is minimal: splices rules, seeds policy, registers 17 builtin MCPs, and enables DeepWiki + context7 where no user state exists. `--profile full` adds hook snippets, caveman per agent (Claude/Gemini vendor commands; Codex/OpenCode/Pi direct official repo mirrors), 29 authored + 27 upstream skills with subpath SHA-256, and vendor packages. Codex authored skills are not globally synced unless explicitly requested; generated CLI agent folders exclude `.original.md` while project source keeps those backups.
 
 ### C. MCP auth
 
@@ -501,7 +506,7 @@ wrangler login                                 # Cloudflare Workers OAuth
 
 ### E. Selectively enable MCPs
 
-Default install state: every builtin MCP is registered; context7 is enabled as minimal default only where no user state exists; other builtin MCPs stay disabled (16 active = ~150–300k tokens at session start). Use `--no-default-mcps` for registry-only/no-state-change setup, opt in selectively, or use `--enable-all-mcps` for verification.
+Default install state: every builtin MCP is registered; DeepWiki + context7 are enabled as minimal defaults only where no user state exists; other builtin MCPs stay disabled (many active MCPs = ~150–300k tokens at session start). Use `--no-default-mcps` for registry-only/no-state-change setup, opt in selectively, or use `--enable-all-mcps` for verification.
 
 ```
 fulcrum mcp enable github --all-agents
@@ -535,11 +540,11 @@ fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, handshake, wiring,
 
 ## 7a. Next steps only
 
-1. **Run the post-lifecycle clean-install issue checklist.**
-   Component lifecycle management is implemented, merged to `main`, and verified. The `component-lifecycle-task8` worktree and `feature/component-lifecycle-task8` branch were removed after merge. Last step before moving to §6.1: full uninstall of old-workflow installs, clean install through the component lifecycle workflow, then execute `ISSUES.md` as a TDD root-cause checklist; keep tests for every confirmed issue and fix any confirmed regression.
+1. **Finish final verification/commit for ISS-001..ISS-007.**
+   Code and docs are updated in this pass. Full `bun test` is already green; run final `bun run ci`, commit, then treat the checklist as closed unless a real clean-install smoke is explicitly requested.
 
 2. **Start layer §6.1: Repository supervisor.**
-   After the clean-install issue checklist is complete, implement `fulcrum repo …` around repo registration, refresh, list/show, settings, SQLite migrations, doctor row counts, and the `repo-track` session hook.
+   Implement `fulcrum repo …` around repo registration, refresh, list/show, settings, SQLite migrations, doctor row counts, and the `repo-track` session hook.
 
 3. **Optionally revisit eval precision after the next implementation pass.**
    Current subagent orchestration eval state is accepted for this baseline. Future work should improve Claude/Pi/Gemini activation signals only if it blocks a concrete release gate or produces user-visible skill-loading failures.
@@ -562,7 +567,7 @@ bun run scripts/build-all.ts            # 5-target cross-compile
 fulcrum install --dry-run               # preview
 fulcrum uninstall --dry-run             # preview
 fulcrum doctor --json | jq .verdict     # ok / warning / error
-fulcrum mcp list --json                 # 16 builtin servers
+fulcrum mcp list --json                 # 17 builtin servers
 scripts/eval-all.sh --engine claude --skip-pi   # leaderboard slice
 ```
 
@@ -573,7 +578,7 @@ Per-skill harnesses: `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <s
 ## 9. Known limitations
 
 - **Uninstall is conservative.** Does not remove caveman without `--include-caveman`; keeps modified policy unless `--purge`.
-- **Claude Code MCP removal is partially manual.** Install calls `claude mcp add`; uninstall prints `claude mcp remove -s user deepwiki` rather than invoking it.
+- **Claude Code MCP removal is still vendor-dependent.** Registry writes use `claude mcp add`; removal follows the registry path and may still require manual `claude mcp remove -s user <name>` if Claude CLI state diverges.
 - **OpenCode is archived** (2025-09-18). Successor: Charm's Crush. `shims/opencode/fulcrum.ts` targets last-stable OpenCode; Crush's plugin contract may differ.
 - **Pi has no Fulcrum-published Pi extension** — `pi-mcp-adapter` is vendored from `nicobailon/pi-mcp-adapter` (community, not Pi vendor). We use it as MCP infrastructure but it's not a vendor-official asset.
 - **graphify does not list Pi as a supported agent.** Init falls back to file-copy mirror at `~/.pi/agent/skills/graphify/`. The lock entry's `vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]` excludes pi.

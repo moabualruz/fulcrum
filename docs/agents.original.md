@@ -12,9 +12,9 @@
 | Hook mechanism | `~/.codex/hooks.json` | `hooks` in settings.json | TypeScript plugin | TypeScript extension (`~/.pi/agent/extensions/*.ts`, `pi.on(event, handler)`) |
 | Hook events | 6 | 11 | 30+ plugin events | **20+** — session_start, session_shutdown, before_agent_start, turn_start/end, tool_call (blockable), resources_discover, etc. |
 | Hook context inject | SessionStart + UserPromptSubmit only | Yes | Yes | Yes — `before_agent_start` can inject messages + rewrite system prompt |
-| Skills path (fulcrum-managed) | `~/.codex/skills/fulcrum/` (user) · `.codex/skills/` (project) | `~/.gemini/extensions/fulcrum-skills/skills/` | `~/.config/opencode/skills/fulcrum/` | `~/.pi/agent/skills/fulcrum/` |
+| Skills path (fulcrum-managed) | `~/.codex/skills/fulcrum/` (global opt-in) · `.codex/skills/fulcrum/` (project opt-in) | `~/.gemini/extensions/fulcrum-skills/skills/` | `~/.config/opencode/skills/fulcrum/` | `~/.pi/agent/skills/fulcrum/` |
 | MCP | Yes — `config.toml` | Yes — `settings.json` | Yes — `opencode.json` | Via `pi-mcp-adapter` |
-| DeepWiki | Yes | Yes | Yes | Via adapter; not Fulcrum-managed yet |
+| DeepWiki | Yes | Yes | Yes | Yes — installed/configured via `pi-mcp-adapter` (Fulcrum-managed) |
 
 ---
 
@@ -62,7 +62,7 @@ Non-zero exit code (2) blocks the triggering action with stderr as the reason.
 
 **Path rule: Codex uses Codex-namespaced paths only. Never `~/.agents/` or `.agents/` — shared paths collide with other agents.**
 
-Use `~/.codex/skills/fulcrum/<name>/SKILL.md` (user) and `.codex/skills/fulcrum/<name>/SKILL.md` (project). If Codex's default discovery order does not include these paths, configure it via `~/.codex/config.toml`:
+Use `~/.codex/skills/fulcrum/<name>/SKILL.md` only when global authored skills are explicitly desired (`fulcrum skills sync --codex-global`). Prefer `.codex/skills/fulcrum/<name>/SKILL.md` for repo-scoped skills (`fulcrum skills sync --codex-project <dir>`). If Codex's default discovery order does not include these paths, configure it via `~/.codex/config.toml`:
 
 ```toml
 [skills]
@@ -292,13 +292,11 @@ Recommended user-level DeepWiki config for Pi:
 }
 ```
 
-Default adapter behavior exposes MCP servers through a proxy-style `mcp(...)` tool. If direct MCP tool names are required for policy matching, configure and verify the adapter's direct-tool mode before relying on `mcp__*` matchers.
-
-Fulcrum does not yet install `pi-mcp-adapter`, write Pi MCP config, or check adapter health in `doctor`; this is tracked in [HANDOVER.md](../HANDOVER.md) §6.
+Default adapter behavior exposes MCP servers through a proxy-style `mcp(...)` tool. Fulcrum installs/configures `pi-mcp-adapter`, writes Pi MCP config, and checks adapter health in `doctor`.
 
 ### 5.7 Parity Gaps vs Claude Code
 
 | Gap | Detail |
 |---|---|
-| **Generic MCP adapter not managed** | DeepWiki works through `pi-mcp-adapter`, but Fulcrum does not yet install/configure/verify it. |
+| **Generic MCP adapter** | `pi-mcp-adapter` is installed and configured by `fulcrum install`; DeepWiki entry written to `~/.pi/agent/mcp.json`. Proxy-shape routing normalised in `deriveTool`. |
 | **Extension language is TypeScript** | Shell hooks must be wrapped in a TS extension that shells out — adds one layer of indirection but preserves shell-script reuse |

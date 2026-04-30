@@ -27,7 +27,7 @@ fulcrum/
 │   │   ├── hooks.ts                    # fulcrum hooks list/enable/disable (detection-aware)
 │   │   ├── skills.ts                   # fulcrum skills sync + lint
 │   │   ├── upstream-skills.ts          # pinned curated skill installer w/ subpath SHA-256 verify
-│   │   ├── mcp.ts                      # DeepWiki MCP registration + Pi adapter management
+│   │   ├── mcp.ts                      # legacy DeepWiki/Pi compatibility helpers
 │   │   ├── mcp-registry.ts             # MCP registry TOML store + applyToAgents/removeFromAgents
 │   │   ├── mcp-cmd.ts                  # fulcrum mcp list/register/unregister/enable/disable
 │   │   ├── doctor.ts                   # health check: 47 tools + caveman + Pi + MCP + policy
@@ -138,9 +138,9 @@ bun run src/index.ts hook format      # test a hook (reads stdin JSON)
 
 1. `fulcrum install --dry-run` — install smoke.
 2. `bun run typecheck` — `tsc --noEmit`.
-3. `bun test` — 150 tests across all `*.test.ts` files.
+3. `bun test` — full Bun test suite across all `*.test.ts` files.
 4. `bun run build:all` — cross-compile to 5 targets.
-5. `bun run skills:lint` — `fulcrum skills lint skills/` (28 skills, strictest-union frontmatter rules).
+5. `bun run skills:lint` — `fulcrum skills lint skills/` (29 skills, strictest-union frontmatter rules).
 6. `bun run compress -- --check` — hard gate: fail if any `.md` lacks `.original.md` sibling.
 
 ---
@@ -166,7 +166,7 @@ Detection-aware logic: if `agent.rootDir` does not exist, skip writes for that a
 
 ### Install / uninstall flow
 
-`fulcrum install` vendors hook recipe snippets, then runs `profile.default` through the component lifecycle engine. `--enable-all-mcps` switches the target to `profile.verify-all`; `--no-skills`, `--no-upstream-skills`, and `--no-default-mcps` become planner exclusions plus the existing MCP default-state compatibility step.
+`fulcrum install` defaults to `profile.minimal` through the component lifecycle engine. `--profile full` runs the historical `profile.default`; `--profile rules-only` runs only `rules.global`; `--enable-all-mcps` switches the target to `profile.verify-all`. `--no-skills`, `--no-upstream-skills`, and `--no-default-mcps` become planner exclusions plus the existing MCP default-state compatibility step.
 
 The default profile covers:
 
@@ -174,10 +174,10 @@ The default profile covers:
 2. **Policy seed** — copy `config/tool-output-policy.toml` to `~/.fulcrum/tool-output-policy.toml` (first run only; subsequent runs leave user edits).
 3. **Caveman per-agent** — call vendor install commands for Claude/Gemini; clone the official repo and mirror skills/plugin surfaces into native Codex/OpenCode/Pi paths.
 4. **Caveman ultra lock** — write `~/.config/caveman/config.json` with `{"defaultMode":"ultra"}` (idempotent).
-5. **Authored skills** — `fulcrum skills sync` distributes per-agent: Claude Code via `claude plugin marketplace add moabualruz/fulcrum && claude plugin install fulcrum@fulcrum` (skills surface as `/fulcrum:<name>`); Codex/OpenCode/Pi mirror to `<skills-root>/fulcrum/<name>/`; Gemini to `~/.gemini/extensions/fulcrum-skills/skills/<name>/`. Legacy `~/.claude/skills/fulcrum/*` is removed after plugin install succeeds.
+5. **Authored skills** — `fulcrum skills sync` distributes per-agent: Claude Code via `claude plugin marketplace add moabualruz/fulcrum && claude plugin install fulcrum@fulcrum` (skills surface as `/fulcrum:<name>`); OpenCode/Pi mirror to `<skills-root>/fulcrum/<name>/`; Gemini to `~/.gemini/extensions/fulcrum-skills/skills/<name>/`; Codex global scope is opt-in (`--codex-global`) or project-local (`--codex-project <dir>`). Legacy `~/.claude/skills/fulcrum/*` is removed after plugin install succeeds. Generated mirrors exclude `.original.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree folders.
 6. **Upstream skills** — `fulcrum skills upstream` clones pinned repos, verifies `subpath_sha256`, installs to vendor placement (`<agent>/skills/<name>/`, Gemini `~/.gemini/skills/<name>/`).
-7. **DeepWiki MCP** — register for each detected agent (Pi via `pi-mcp-adapter` auto-install).
-8. **Builtin MCPs** — register 16 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml`; minimal default state enables `context7` only where no user state exists, while `--no-default-mcps` registers without changing enable state and `--enable-all-mcps` enables all builtins.
+7. **DeepWiki MCP** — registry builtin, registered through the same MCP lifecycle path as every other builtin (Pi via `pi-mcp-adapter` auto-install).
+8. **Builtin MCPs** — register 17 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml`; minimal default state enables `deepwiki` and `context7` only where no user state exists, while `--no-default-mcps` registers without changing enable state and `--enable-all-mcps` enables all builtins.
 9. **Vendor packages** — install Caveman, Repomix, Cloudflare, and Superpowers through official installers first, then mirror plugin/extension/package surfaces to supported CLIs that lack a first-party or generic installer.
 
 `fulcrum uninstall` is conservative by default: removes managed rules blocks, hook registrations, hook snippets/markers, `skills/fulcrum/`, legacy `skills/fulcrum-upstream/` namespaces, Gemini managed extensions, Gemini `@AGENTS.md` import, and DeepWiki. Keeps edited policy files, vendor-placed third-party skills, and caveman unless `--purge` / `--include-caveman` flags are passed.
@@ -209,7 +209,7 @@ The registry lives at `~/.fulcrum/state/global/mcp-registry.toml`. Schema versio
 - `enableServer(name, agentId)` / `disableServer(name, agentId)` — push/remove from agent's native MCP config.
 - `applyToAgents()` / `removeFromAgents()` — bulk apply/remove for install/uninstall.
 
-`mcp-builtins.ts` declares the 16 builtin server definitions (id, transport, url/command, vendor, auth env vars, description).
+`mcp-builtins.ts` declares the 17 builtin server definitions (id, transport, url/command, vendor, auth env vars, description).
 
 `doctor.ts` reads the registry and probes each enabled HTTP server's HEAD endpoint; reports `auth_status: "ok" | "missing-env" | "n/a"` per server.
 
@@ -220,12 +220,12 @@ The registry lives at `~/.fulcrum/state/global/mcp-registry.toml`. Schema versio
 Adapters own surface-specific behavior:
 
 - `adapters/hooks.ts` delegates to hook registration helpers.
-- `adapters/mcp.ts` delegates to MCP registry and DeepWiki helpers.
+- `adapters/mcp.ts` delegates to the MCP registry.
 - `adapters/sentinel.ts` manages rules sentinel blocks.
 - `adapters/files.ts` manages policy files and remove-vs-purge behavior.
 - `adapters/vendor.ts` delegates to skills, upstream skills, caveman, Repomix, Cloudflare, and Superpowers helpers.
 
-The public CLI is `fulcrum component list/info/plan/status/install/remove/enable/disable`. `fulcrum install` and `fulcrum uninstall` are compatibility wrappers over `profile.default` / `profile.verify-all`; they keep the historical flags and safety defaults while sharing the component planner and executor.
+The public CLI is `fulcrum component list/info/plan/status/install/remove/enable/disable`. `fulcrum install` and `fulcrum uninstall` are compatibility wrappers over component profiles; install defaults to `profile.minimal`, while `--profile full` keeps the historical `profile.default` bootstrap.
 
 Add new managed parts by adding a catalog entry, adapter support if the surface kind is new, planner tests, executor tests, and doctor status coverage.
 
@@ -358,7 +358,7 @@ process.exit(0);
 
 6. **Register** the skill in `skills/SOURCES.md` (status `✍️ shipped`).
 
-7. **Sync and test**: `fulcrum skills sync`, then run the trigger-rate harnesses:
+7. **Sync and test**: `fulcrum skills sync` (add `--codex-global` for global Codex evals or `--codex-project <dir>` for repo-scoped checks), then run the trigger-rate harnesses:
 
 ```bash
 scripts/eval-skill-claude.sh <name> --runs-per-query 1
@@ -412,7 +412,7 @@ This checks out the tree SHA, computes `subpath_sha256`, and writes it back.
 | Rules | sentinel splice `~/.claude/CLAUDE.md` | sentinel splice `~/.codex/AGENTS.md` | splice to `~/AGENTS.md`; `GEMINI.md` → `@AGENTS.md` shim | splice `~/.config/opencode/AGENTS.md` | splice `~/.pi/agent/AGENTS.md` |
 | Hook config | `~/.claude/settings.json` `hooks` block | `~/.codex/hooks.json` | `~/.gemini/settings.json` `hooks` | TypeScript plugin (`shims/opencode/fulcrum.ts`) | TypeScript extension (`shims/pi/fulcrum.ts`) |
 | Hook blocking | exit 2 | exit 2 | exit 2 | return `{deny:true}` from plugin | return `{block:true,reason}` from extension |
-| Skills | plugin `fulcrum@fulcrum` (marketplace `moabualruz/fulcrum`) — `/fulcrum:<name>` | `~/.codex/skills/fulcrum/<name>/` | wrapped in extension at `~/.gemini/extensions/fulcrum-skills/skills/<name>/` | `~/.config/opencode/skills/fulcrum/<name>/` | `~/.pi/agent/skills/fulcrum/<name>/` |
+| Skills | plugin `fulcrum@fulcrum` (marketplace `moabualruz/fulcrum`) — `/fulcrum:<name>` | global opt-in `~/.codex/skills/fulcrum/<name>/` or project `.codex/skills/fulcrum/<name>/` | wrapped in extension at `~/.gemini/extensions/fulcrum-skills/skills/<name>/` | `~/.config/opencode/skills/fulcrum/<name>/` | `~/.pi/agent/skills/fulcrum/<name>/` |
 | MCP | `claude mcp add` / settings.json | `~/.codex/config.toml` | `~/.gemini/settings.json` `mcpServers` | `opencode.json` `mcp` block | `~/.pi/agent/mcp.json` via `pi-mcp-adapter` |
 
 ### Codex specifics
@@ -461,7 +461,7 @@ This checks out the tree SHA, computes `subpath_sha256`, and writes it back.
 ### Running tests
 
 ```bash
-bun test                                 # all 150 tests
+bun test                                 # full test suite
 bun test src/cli/install.test.ts         # single file
 bun test --watch                         # watch mode
 ```

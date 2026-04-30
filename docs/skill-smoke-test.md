@@ -1,6 +1,6 @@
 # Skill smoke-test checklist
 
-> Cross-agent check for new in-repo skill. Run after `fulcrum skills lint` pass + `fulcrum skills sync` install. Claude Code, Codex, Gemini, OpenCode, and Pi all have statistical trigger-rate harnesses (`scripts/eval-skill-<agent>.sh`). Manual smoke steps below remain useful for first-install verification of the extension/skill discovery path before running the full statistical harness.
+> Cross-agent check for new in-repo skill. Run after `fulcrum skills lint` pass + `fulcrum skills sync` install; add `--codex-global` for Codex global evals or `--codex-project <dir>` for repo-scoped Codex checks. Claude Code, Codex, Gemini, OpenCode, and Pi all have statistical trigger-rate harnesses (`scripts/eval-skill-<agent>.sh`). Manual smoke steps below remain useful for first-install verification of the extension/skill discovery path before running the full statistical harness.
 
 ## Per skill, prepare
 

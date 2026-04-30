@@ -125,7 +125,8 @@ describe("applyMcpAction", () => {
     );
 
     const reg = await loadRegistry();
-    expect(Object.keys(reg.servers)).toHaveLength(16);
+    expect(Object.keys(reg.servers)).toHaveLength(17);
+    expect(reg.servers["deepwiki"]?.url).toBe("https://mcp.deepwiki.com/mcp");
 
     await expect(readFile(join(tmp, ".codex", "config.toml"), "utf8")).rejects.toThrow();
   });

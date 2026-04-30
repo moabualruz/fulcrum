@@ -14,9 +14,14 @@
 #   3. Installs the binary to ~/.fulcrum/bin/fulcrum and (if possible) symlinks
 #      to ~/.local/bin/fulcrum.
 #   4. Delegates the rest to `fulcrum install` — sentinel-block rules splice,
-#      recipe vendoring, policy seed, optional project bootstrap, optional skill sync.
+#      recipe vendoring, policy seed, optional project bootstrap, optional
+#      profile-selected component surfaces.
 #
 # Flags forwarded to `fulcrum install`:
+#   --profile [minimal|rules-only|full]
+#                           Select install surface. Default minimal avoids
+#                           global skills and vendor packages; full is the
+#                           historical bootstrap.
 #   --with-project [DIR]    Also bootstrap a project (default: $PWD).
 #   --dry-run               Preview without writing.
 #   --no-skills             Skip authored + upstream skill sync.
@@ -39,6 +44,15 @@ while [ $# -gt 0 ]; do
       INSTALL_ARGS+=(--with-project "${2:-$PWD}")
       [ "${2:-}" != "" ] && shift
       shift ;;
+    --profile)
+      case "${2:-}" in
+        minimal|rules-only|full)
+          INSTALL_ARGS+=(--profile "$2")
+          shift 2 ;;
+        *)
+          echo "fulcrum install: --profile must be minimal, rules-only, or full" >&2
+          exit 2 ;;
+      esac ;;
     --dry-run)
       INSTALL_ARGS+=(--dry-run)
       shift ;;

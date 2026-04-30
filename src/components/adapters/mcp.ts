@@ -1,5 +1,4 @@
 import { BUILTIN_MCPS } from "../../cli/mcp-builtins.ts";
-import { installDeepwikiMcp, uninstallDeepwikiMcp } from "../../cli/mcp.ts";
 import {
   applyToAgents,
   loadRegistry,
@@ -30,15 +29,6 @@ export async function applyMcpAction(action: ComponentAction, dryRun = false): P
 
   const name = mcpNameFromAction(action);
   const agents = action.agentId ? [action.agentId] as const : undefined;
-
-  if (action.componentId === "mcp.deepwiki" || name === "deepwiki") {
-    if (action.change === "remove" || action.change === "disable") {
-      await uninstallDeepwikiMcp({ dryRun });
-      return;
-    }
-    await installDeepwikiMcp({ dryRun });
-    return;
-  }
 
   if (action.componentId === "mcp.registry" || name === "registry") {
     if (action.change === "remove" || action.change === "disable") {

@@ -544,11 +544,12 @@ describe("W3 server registrations", () => {
   });
 
   // ── BUILTIN_MCPS completeness ────────────────────────────────────────────
-  test("BUILTIN_MCPS contains all 16 entries with unique names", () => {
-    expect(BUILTIN_MCPS.length).toBe(16);
+  test("BUILTIN_MCPS contains all 17 entries with unique names", () => {
+    expect(BUILTIN_MCPS.length).toBe(17);
     const names = BUILTIN_MCPS.map((e) => e.name);
-    expect(new Set(names).size).toBe(16); // all unique
+    expect(new Set(names).size).toBe(17); // all unique
     // Spot-check key entries are present
+    expect(names).toContain("deepwiki");
     expect(names).toContain("github");
     expect(names).toContain("repomix");
     expect(names).toContain("semgrep");

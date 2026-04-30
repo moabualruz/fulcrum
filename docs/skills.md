@@ -10,13 +10,13 @@ Fulcrum-authored skills install under `fulcrum/` (we own that namespace). Curate
 
 | Agent | Fulcrum-authored path | Curated upstream path | Custom user skills path |
 |---|---|---|---|
-| Claude Code | `~/.claude/skills/fulcrum/<name>/SKILL.md` | `~/.claude/skills/<name>/SKILL.md` | `~/.claude/skills/<name>/SKILL.md` |
-| Codex CLI | `~/.codex/skills/fulcrum/<name>/SKILL.md` | `~/.codex/skills/<name>/SKILL.md` | `~/.codex/skills/<name>/SKILL.md` (user) · `.codex/skills/<name>/SKILL.md` (project) |
+| Claude Code | Plugin `fulcrum@fulcrum` (`~/.claude/plugins/cache/fulcrum/fulcrum/<ver>/skills/<name>/SKILL.md`) | `~/.claude/skills/<name>/SKILL.md` or vendor plugin | `~/.claude/skills/<name>/SKILL.md` |
+| Codex CLI | Global opt-in: `~/.codex/skills/fulcrum/<name>/SKILL.md`; project opt-in: `.codex/skills/fulcrum/<name>/SKILL.md` | `~/.codex/skills/<name>/SKILL.md` | `~/.codex/skills/<name>/SKILL.md` (user) · `.codex/skills/<name>/SKILL.md` (project) |
 | Gemini CLI | `~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md` | `~/.gemini/skills/<name>/SKILL.md` | `~/.gemini/extensions/<other>/skills/<name>/SKILL.md` |
 | OpenCode | `~/.config/opencode/skills/fulcrum/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` |
 | Pi CLI | `~/.pi/agent/skills/fulcrum/<name>/SKILL.md` | `~/.pi/agent/skills/<name>/SKILL.md` | `~/.pi/agent/skills/<name>/SKILL.md` (user) · `.pi/skills/` (project) |
 
-`fulcrum skills sync` propagate authored `skills/<name>/SKILL.md` from repo to every agent `<skills-root>/fulcrum/` subfolder. `fulcrum skills upstream` clones curated upstream repos into `~/.fulcrum/cache/upstream-skills` and propagates selected skills to the vendor's own placement convention — top-level `<agent>/skills/<name>/`. **Agents load by frontmatter `name:`** — namespacing is path-based and recursive scans pick skills up regardless of depth.
+`fulcrum skills sync` propagates authored `skills/<name>/SKILL.md` from repo to agent-native surfaces. Claude Code uses the plugin path; OpenCode/Pi use `<skills-root>/fulcrum/`; Gemini uses the `fulcrum-skills` extension; Codex global scope is skipped by default and must be requested with `--codex-global` or `--codex-project <dir>`. `fulcrum skills upstream` clones curated upstream repos into `~/.fulcrum/cache/upstream-skills` and propagates selected skills to the vendor's own placement convention — top-level `<agent>/skills/<name>/`. Generated CLI agent mirrors exclude `.original.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree folders; project source folders keep `.original.md` human-edit backups. **Agents load by frontmatter `name:`** — namespacing is path-based and recursive scans pick skills up regardless of depth.
 
 ### 1.1 Vendor-canonical install vs file-copy mirror
 
@@ -48,7 +48,7 @@ vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]
 
 **Strategy: install filesystem skill folders as the cross-agent distribution layer, cherry-pick skills and patterns from the others.**
 
-Current CLI support: `fulcrum install` runs both authored sync and curated upstream sync by default. It does not call native plugin or extension installers in this branch. Use `fulcrum install --no-upstream-skills` to skip networked upstream sync, or run `fulcrum skills upstream` later.
+Current CLI support: `fulcrum install` defaults to the minimal profile and does not sync authored/upstream skills globally. Use `fulcrum install --profile full` for the historical full bootstrap, or run `fulcrum skills sync` / `fulcrum skills upstream` directly. Codex authored skills stay out of global user scope unless `--codex-global` is passed; use `--codex-project <dir>` for project-local Codex skills.
 
 ### Install: superpowers (obra/superpowers)
 
@@ -140,7 +140,7 @@ Tiered:
 
 1. **Lint everywhere (CI):** `fulcrum skills lint skills/` validate every authored skill on strictest frontmatter union. Cheap; catch 80% of cross-agent failures.
 2. **Claude trigger-rate eval:** `scripts/eval-skill-claude.sh <skill>` calls `claude --print --output-format=json --no-session-persistence` per query. Auth via Claude Code keychain — no `ANTHROPIC_API_KEY` env var. Eval set at `evals/<skill>.json` (~20 entries, ~12/8 trigger/anti-trigger split). Leaderboard runner at `scripts/eval-all.sh --engine claude`.
-3. **Codex trigger-rate eval:** `scripts/eval-skill-codex.sh <skill> --model <codex-model>` calls `codex exec --json --ephemeral` against installed `~/.codex/skills/fulcrum/<skill>`. Use when Codex skill loading or description-budget behavior changes. Keep model explicit in result notes. Long samples can stall; pass `--timeout-seconds N` or set `CODEX_EVAL_TIMEOUT_SECONDS`.
+3. **Codex trigger-rate eval:** `scripts/eval-skill-codex.sh <skill> --model <codex-model>` calls `codex exec --json --ephemeral` against installed `~/.codex/skills/fulcrum/<skill>` or a project-local `.codex/skills/fulcrum/<skill>` mirror. Use when Codex skill loading or description-budget behavior changes. Keep model explicit in result notes. Long samples can stall; pass `--timeout-seconds N` or set `CODEX_EVAL_TIMEOUT_SECONDS`.
 4. **Gemini trigger-rate eval:** `scripts/eval-skill-gemini.sh <skill>` calls `gemini -p "<query>" --output-format json --approval-mode plan --include-directories ~/.gemini/extensions/fulcrum-skills`. Requires skill at `~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md` and extension linked (`gemini extensions link`). Activation detected by word-boundary grep of stdout+stderr against `evals/<skill>.match-words`. Run via `scripts/eval-all.sh --engine gemini`.
 5. **OpenCode trigger-rate eval:** `scripts/eval-skill-opencode.sh <skill>` calls `opencode run --format json`. Requires skill at `~/.config/opencode/skills/fulcrum/<name>/SKILL.md`. Activation detected by word-boundary grep of JSON event stream against `evals/<skill>.match-words`. Run via `scripts/eval-all.sh --engine opencode`.
 6. **Pi trigger-rate eval:** `scripts/eval-skill-pi.sh <skill>` calls `pi --print --mode json --no-session --no-tools`. Requires skill at `~/.pi/agent/skills/fulcrum/<name>/SKILL.md`. Activation detected by word-boundary grep of JSON output against `evals/<skill>.match-words`. Run via `scripts/eval-all.sh --engine pi`.

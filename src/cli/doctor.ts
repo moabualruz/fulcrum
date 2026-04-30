@@ -9,6 +9,7 @@ import { ALL_COMPONENTS } from "../components/catalog.ts";
 import { ComponentLedger, dbPath as componentLedgerPath } from "../components/ledger.ts";
 import { loadRegistry, ALL_AGENT_IDS, isEnabled, type AgentId } from "./mcp-registry.ts";
 import { MINIMAL_DEFAULT_MCPS } from "./mcp-builtins.ts";
+import { scanSkillBudgets, type SkillBudgetReport } from "./skill-budget.ts";
 
 interface ToolCheck {
   cmd: string;
@@ -79,6 +80,13 @@ interface DoctorReport {
     installed: number;
     database: string;
   };
+  worktrees: {
+    projectLocalIgnoredRoots: Array<{
+      path: string;
+      entries: string[];
+    }>;
+  };
+  skillBudget: SkillBudgetReport;
   skillsCount: number;
   warnings: number;
   errors: number;
@@ -206,6 +214,25 @@ async function countSkills(): Promise<number> {
     if (await exists(`${root}/${entry.name}/SKILL.md`)) n++;
   }
   return n;
+}
+
+async function scanProjectLocalWorktrees(): Promise<DoctorReport["worktrees"]> {
+  const root = repoRoot();
+  const path = `${root}/.claude/worktrees`;
+  const entries: string[] = [];
+  if (await exists(path)) {
+    try {
+      for (const entry of await readdir(path, { withFileTypes: true })) {
+        if (entry.isDirectory() || entry.isSymbolicLink()) entries.push(entry.name);
+      }
+    } catch {
+      // Unreadable ignored dirs are still worth surfacing by path.
+      entries.push("(unreadable)");
+    }
+  }
+  return {
+    projectLocalIgnoredRoots: entries.length > 0 ? [{ path, entries: entries.sort() }] : [],
+  };
 }
 
 /**
@@ -505,6 +532,15 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
 
   // Skills
   const skillsCount = await countSkills();
+  const skillBudget = await scanSkillBudgets(home);
+  for (const agent of skillBudget.agents) {
+    if (agent.overThreshold) warnings += 1;
+  }
+
+  // Ignored project-local agent worktrees are easy to miss during release and
+  // package hygiene checks because `.claude/` is ignored in this repo.
+  const worktrees = await scanProjectLocalWorktrees();
+  if (worktrees.projectLocalIgnoredRoots.length > 0) warnings += worktrees.projectLocalIgnoredRoots.length;
 
   // Component lifecycle ledger
   const componentDatabase = componentLedgerPath();
@@ -635,6 +671,8 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       installed: installedComponents,
       database: componentDatabase,
     },
+    worktrees,
+    skillBudget,
     skillsCount,
     warnings,
     errors,
@@ -702,7 +740,31 @@ function printHumanFormat(report: DoctorReport, home: string): void {
   console.log(
     `Skills authored: ${report.skillsCount} (in ${repoRoot()}/skills/)`
   );
+  console.log("Skill metadata budget:");
+  for (const agent of report.skillBudget.agents) {
+    if (agent.activeSkillCount === 0) continue;
+    const mark = agent.overThreshold ? "⚠" : "✓";
+    console.log(
+      `  ${pad(agent.label, 14)} ${mark}  ${agent.activeSkillCount} active, ${agent.totalDescriptionChars}/${agent.warningThresholdChars} description chars`
+    );
+    for (const root of agent.sourceRoots) {
+      console.log(`    ${root.path}  (${root.skills} skills, ${root.descriptionChars} chars)`);
+    }
+    if (agent.duplicateNames.length > 0) {
+      console.log(`    duplicates: ${agent.duplicateNames.map((dup) => `${dup.name}×${dup.count}`).join(", ")}`);
+    }
+  }
   console.log();
+
+  // Project-local ignored worktrees
+  if (report.worktrees.projectLocalIgnoredRoots.length > 0) {
+    console.log("Project-local ignored worktrees:");
+    for (const root of report.worktrees.projectLocalIgnoredRoots) {
+      console.log(`  ⚠ ${root.path}  entries:[${root.entries.join(", ")}]`);
+    }
+    console.log("  cleanup must inspect dirty/untracked/divergent state before removal");
+    console.log();
+  }
 
   // Component lifecycle
   console.log(

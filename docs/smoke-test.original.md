@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This file serves dual purpose: it is a structured prompt that any of the five supported agents (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI) can execute directly, and it is a checklist + result template for recording what passed or failed. Run it after a fresh install, after upgrading Fulcrum, or after changing agent config. "Pass" means every required check (checks 1–8) reports the expected value; optional checks (check 9) may have partial results depending on which MCPs are enabled without failing the overall verdict.
+This file serves dual purpose: it is a structured prompt that any of the five supported agents (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI) can execute directly, and it is a checklist + result template for recording what passed or failed. Run it after a fresh full-profile install (`fulcrum install --profile full`), after upgrading Fulcrum, or after changing agent config. "Pass" means every required check (checks 1–8) reports the expected value; optional checks (check 9) may have partial results depending on which MCPs are enabled without failing the overall verdict.
 
 ---
 
@@ -105,15 +105,15 @@ RECORD: row 6 of result table
 
 ---
 
-### Step 7 — MCP list: 16 builtin servers registered
+### Step 7 — MCP list: 17 builtin servers registered
 
 ```
 CHECK:  fulcrum mcp list --json | jq 'length'
-EXPECT: 16
+EXPECT: 17
 RECORD: row 7 of result table
 ```
 
-Expected builtins: github, repomix, semgrep, context7, tavily, playwright, dart, cloudflare-docs, cloudflare-workers-bindings, cloudflare-workers-builds, cloudflare-observability, cloudflare-radar, cloudflare-logpush, cloudflare-browser, cloudflare-containers, cloudflare-ai-gateway.
+Expected builtins: deepwiki, github, repomix, semgrep, context7, tavily, playwright, dart, cloudflare-docs, cloudflare-workers-bindings, cloudflare-workers-builds, cloudflare-observability, cloudflare-radar, cloudflare-logpush, cloudflare-browser, cloudflare-containers, cloudflare-ai-gateway.
 
 ---
 
@@ -154,7 +154,7 @@ RECORD: row 10 of result table; note any agent where cavemanInstalled is false
 
 ---
 
-### Step 11 — Authored skills present (28 skills, 5 agents)
+### Step 11 — Authored skills present (29 skills, 5 agents)
 
 For each detected agent, verify the authored skill namespace exists:
 
@@ -266,12 +266,12 @@ Host:  <hostname>
 | 4 | caveman defaultMode | ultra | <fill> | <fill> | <fill> |
 | 5 | Pi MCP adapter | present if Pi installed | <fill> | <fill> | <fill> |
 | 6 | mcp section in doctor | true | <fill> | <fill> | <fill> |
-| 7 | 16 builtin MCP servers | 16 | <fill> | <fill> | <fill> |
+| 7 | 17 builtin MCP servers | 17 | <fill> | <fill> | <fill> |
 | 8 | MCP auth_status | ok or n/a for each | <fill> | <fill> | list any missing-env vars |
 | 9 | rules splice (per agent) | 1 per detected agent | <fill> | <fill> | <fill> |
 | 10 | caveman installed (per agent) | true for each detected | <fill> | <fill> | <fill> |
-| 11 | authored skills count | 28 per detected agent | <fill> | <fill> | <fill> |
-| 12 | curated upstream skills | lock count 19 + representative skill present per detected | <fill> | <fill> | <fill> |
+| 11 | authored skills count | 29 per detected/full-profile mirror | <fill> | <fill> | <fill> |
+| 12 | curated upstream skills | lock count 27 + representative skill present per detected | <fill> | <fill> | <fill> |
 | 13 | hooks list | 8 recipes shown | <fill> | <fill> | <fill> |
 | 14 | hook format smoke | exit 0 | <fill> | <fill> | <fill> |
 | 15 | bun run ci (repo only) | 6 stages green | <fill> | <fill> | skip if not in repo root |
@@ -293,11 +293,11 @@ Overall verdict: PASS / PARTIAL / FAIL
 | caveman defaultMode not "ultra" | `~/.config/caveman/config.json` is missing or has wrong value. Re-run `fulcrum install` or see docs/caveman.md. |
 | Pi adapter missing | `pi install npm:pi-mcp-adapter` was not run, or Pi CLI was not installed when `fulcrum install` ran. See docs/mcp.md §3.3. |
 | mcp section absent | Doctor binary predates W2. Rebuild from current source. |
-| builtin MCP count < 16 | Registry file is stale or was not written. Run `fulcrum install` to re-register builtins. |
+| builtin MCP count < 17 | Registry file is stale or was not written. Run `fulcrum install` to re-register builtins. |
 | missing-env:<VAR> in auth_status | The env var is not exported in the current shell. See docs/mcp.md §5 for per-MCP token sources; see HANDOVER.md §6.0a §C for the secrets file layout. |
 | rules splice missing (grep returns 0) | `fulcrum install` was not run, or the agent's rules file was replaced after install. Re-run `fulcrum install`. See docs/context.md. |
 | caveman not installed for an agent | `fulcrum install` was run before the agent was installed. Re-run `fulcrum install`. See docs/caveman.md. |
-| authored skill count < 27 | `fulcrum skills sync` was not run or the agent's skills dir was removed. Run `fulcrum skills sync`. See docs/skills.md. |
+| authored skill count < 29 | `fulcrum skills sync` was not run or the agent's skills dir was removed. Run `fulcrum skills sync` (Codex global requires `--codex-global`, project scope requires `--codex-project <dir>`). See docs/skills.md. |
 | upstream skill count < 27 | `fulcrum skills upstream` failed (integrity check mismatch or network). Run `fulcrum skills upstream` with debug output. See HANDOVER.md §6.0b. |
 | hooks list empty or partial | Hooks were never enabled. Run `fulcrum hooks enable <name>` for each recipe. See docs/hooks.md. |
 | hook format exits non-zero | stdin envelope was malformed, or the binary is stale. See docs/hooks.md §format recipe. |

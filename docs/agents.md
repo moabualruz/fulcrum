@@ -12,7 +12,7 @@
 | Hook mechanism | `~/.codex/hooks.json` | `hooks` in settings.json | TypeScript plugin | TypeScript extension (`~/.pi/agent/extensions/*.ts`, `pi.on(event, handler)`) |
 | Hook events | 6 | 11 | 30+ plugin events | **20+** — session_start, session_shutdown, before_agent_start, turn_start/end, tool_call (blockable), resources_discover, etc. |
 | Hook context inject | SessionStart + UserPromptSubmit only | Yes | Yes | Yes — `before_agent_start` can inject messages + rewrite system prompt |
-| Skills path (fulcrum-managed) | `~/.codex/skills/fulcrum/` (user) · `.codex/skills/` (project) | `~/.gemini/extensions/fulcrum-skills/skills/` | `~/.config/opencode/skills/fulcrum/` | `~/.pi/agent/skills/fulcrum/` |
+| Skills path (fulcrum-managed) | `~/.codex/skills/fulcrum/` (global opt-in) · `.codex/skills/fulcrum/` (project opt-in) | `~/.gemini/extensions/fulcrum-skills/skills/` | `~/.config/opencode/skills/fulcrum/` | `~/.pi/agent/skills/fulcrum/` |
 | MCP | Yes — `config.toml` | Yes — `settings.json` | Yes — `opencode.json` | Via `pi-mcp-adapter` |
 | DeepWiki | Yes | Yes | Yes | Yes — installed/configured via `pi-mcp-adapter` (Fulcrum-managed) |
 
@@ -62,7 +62,7 @@ Non-zero exit code (2) blocks triggering action with stderr as reason.
 
 **Path rule: Codex use Codex-namespaced paths only. Never `~/.agents/` or `.agents/` — shared paths collide with other agents.**
 
-Use `~/.codex/skills/fulcrum/<name>/SKILL.md` (user) and `.codex/skills/fulcrum/<name>/SKILL.md` (project). If Codex default discovery order not include these paths, configure via `~/.codex/config.toml`:
+Use `~/.codex/skills/fulcrum/<name>/SKILL.md` only when global authored skills are explicitly desired (`fulcrum skills sync --codex-global`). Prefer `.codex/skills/fulcrum/<name>/SKILL.md` for repo-scoped skills (`fulcrum skills sync --codex-project <dir>`). If Codex default discovery order not include these paths, configure via `~/.codex/config.toml`:
 
 ```toml
 [skills]

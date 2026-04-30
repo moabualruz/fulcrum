@@ -101,6 +101,13 @@ export const ALL_COMPONENTS: readonly ComponentSpec[] = [
     profileMembers: [...MINIMAL_PROFILE_MEMBERS],
   },
   {
+    id: "profile.rules-only",
+    kind: "profile",
+    description: "cross-agent rules-only setup profile",
+    surfaces: [],
+    profileMembers: ["rules.global"],
+  },
+  {
     id: "profile.verify-all",
     kind: "profile",
     description: "verification profile covering all managed component surfaces",
@@ -177,23 +184,6 @@ export const ALL_COMPONENTS: readonly ComponentSpec[] = [
   vendorPackageComponent("repomix"),
   vendorPackageComponent("cloudflare"),
   vendorPackageComponent("superpowers"),
-  {
-    id: "mcp.deepwiki",
-    kind: "mcp",
-    description: "DeepWiki MCP server configuration",
-    defaultProfile: true,
-    surfaces: [
-      {
-        id: "mcp.deepwiki:registration",
-        kind: "mcp-agent-config",
-        componentId: "mcp.deepwiki",
-        target: "mcp:deepwiki",
-        ownerKey: "fulcrum:mcp:deepwiki",
-        removePolicy: "managed-only",
-        supportsDisable: true,
-      },
-    ],
-  },
   {
     id: "mcp.registry",
     kind: "mcp",

@@ -1,11 +1,11 @@
-// fulcrum skills sync — fan out skills/<name>/SKILL.md to every agent's path.
+// fulcrum skills sync — fan out authored skills to agent-native surfaces.
 // fulcrum skills lint <path> — validate frontmatter (+ body section presence)
 // against the strictest union of all 5 agents' rules.
 // fulcrum skills list — enumerate authored skills with name, desc preview, eval coverage.
 // fulcrum skills upstream — sync curated third-party skills.
 
 import { mkdir, readdir, readFile, copyFile, writeFile, stat, rm } from "node:fs/promises";
-import { join, basename, dirname } from "node:path";
+import { join, basename, dirname, resolve } from "node:path";
 import { AGENTS } from "../agents/registry.ts";
 import { which, run as runProc } from "../utils/proc.ts";
 
@@ -40,19 +40,20 @@ const NAMESPACE = "fulcrum";
 const PLUGIN_MARKETPLACE = "moabualruz/fulcrum";
 const PLUGIN_SPEC = "fulcrum@fulcrum";
 
-// Agents that use the standard `<skillsDir>/fulcrum/<name>/` layout.
-// Claude Code is handled via the plugin path below. Gemini uses an extension
-// namespace and is also handled separately.
-const _skillsHome = process.env["HOME"] ?? "";
-const TARGETS: Array<{ path: string; label: string }> = AGENTS
-  .filter((a) => a.id !== "gemini" && a.id !== "claude-code")
-  .map((a) => ({ path: a.skillsDir(_skillsHome), label: a.label }));
+export type CodexSkillScope = "skip" | "global" | "project";
+
+interface SyncSkillsOptions {
+  dryRun?: boolean;
+  codexScope?: CodexSkillScope;
+  projectDir?: string;
+}
 
 // Skip patterns: .original.md backups are human-edit source-of-truth — agents
 // read the compressed .md only. Also skip .git, node_modules just in case.
 function shouldSkipForSync(name: string): boolean {
   if (name.endsWith(".original.md")) return true;
-  if (name === ".git" || name === "node_modules") return true;
+  if (name === "_archive" || name === "_template") return true;
+  if (name === ".claude" || name === ".git" || name === "node_modules" || name === "worktrees") return true;
   return false;
 }
 
@@ -72,9 +73,44 @@ async function copyTree(src: string, dst: string, opts: { dryRun?: boolean } = {
       if (opts.dryRun) {
         console.log(`    [dry-run] would copy: ${s} → ${d}`);
       } else {
+        await mkdir(dirname(d), { recursive: true });
         await copyFile(s, d);
       }
     }
+  }
+}
+
+async function authoredSkillNames(skillsSrc: string): Promise<string[]> {
+  const skills: string[] = [];
+  for (const entry of await readdir(skillsSrc, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name === "_template") continue;
+    if (entry.name === "_archive") continue;
+    if (await exists(`${skillsSrc}/${entry.name}/SKILL.md`)) {
+      skills.push(entry.name);
+    }
+  }
+  return skills;
+}
+
+async function syncSkillSet(
+  skills: readonly string[],
+  skillsSrc: string,
+  dstRoot: string,
+  opts: { dryRun?: boolean },
+  printedPrefix = "",
+): Promise<void> {
+  if (opts.dryRun) {
+    console.log(`    [dry-run] would prune: ${dstRoot}`);
+    console.log(`    [dry-run] would mkdir: ${dstRoot}`);
+  } else {
+    await rm(dstRoot, { recursive: true, force: true });
+    await mkdir(dstRoot, { recursive: true });
+  }
+  for (const name of skills) {
+    const dst = `${dstRoot}/${name}`;
+    await copyTree(`${skillsSrc}/${name}`, dst, opts);
+    console.log(`    ${printedPrefix}${name}`);
   }
 }
 
@@ -90,13 +126,14 @@ async function claudePluginVersion(root: string): Promise<string> {
 async function refreshClaudePluginPackage(root: string, opts: { dryRun: boolean }): Promise<void> {
   const home = process.env["HOME"] ?? "";
   const version = await claudePluginVersion(root);
-  const src = `${root}/plugins/fulcrum/skills`;
+  const src = `${root}/skills`;
   const cacheSkills = `${home}/.claude/plugins/cache/fulcrum/fulcrum/${version}/skills`;
   const marketplaceSkills = `${home}/.claude/plugins/marketplaces/fulcrum/plugins/fulcrum/skills`;
 
   if (!(await isDir(src))) return;
+  const skills = await authoredSkillNames(src);
   for (const dst of [cacheSkills, marketplaceSkills]) {
-    await copyTree(src, dst, opts);
+    await syncSkillSet(skills, src, dst, opts);
     console.log(`    ✓ refreshed plugin skills: ${dst}`);
   }
 }
@@ -219,7 +256,45 @@ export async function removeAuthoredSkills(opts: { dryRun?: boolean } = {}): Pro
   console.log("Done.");
 }
 
-export async function syncSkills(opts: { dryRun?: boolean } = {}): Promise<void> {
+interface SkillTarget {
+  path: string;
+  label: string;
+  projectLocal?: boolean;
+}
+
+function skillTargets(home: string, opts: SyncSkillsOptions): { targets: SkillTarget[]; skippedCodex: boolean } {
+  const codexScope = opts.codexScope ?? (
+    process.env["FULCRUM_CODEX_SKILLS_SCOPE"] === "global" ? "global" :
+    process.env["FULCRUM_CODEX_SKILLS_SCOPE"] === "project" ? "project" :
+    "skip"
+  );
+  const targets: SkillTarget[] = [];
+  let skippedCodex = false;
+
+  for (const agent of AGENTS) {
+    if (agent.id === "claude-code" || agent.id === "gemini") continue;
+    if (agent.id === "codex") {
+      if (codexScope === "skip") {
+        skippedCodex = true;
+        continue;
+      }
+      if (codexScope === "project") {
+        const projectDir = resolve(opts.projectDir ?? process.cwd());
+        targets.push({
+          path: join(projectDir, ".codex", "skills"),
+          label: `${agent.label} project`,
+          projectLocal: true,
+        });
+        continue;
+      }
+    }
+    targets.push({ path: agent.skillsDir(home), label: agent.label });
+  }
+
+  return { targets, skippedCodex };
+}
+
+export async function syncSkills(opts: SyncSkillsOptions = {}): Promise<void> {
   const root = repoRoot();
   const skillsSrc = `${root}/skills`;
   if (!(await isDir(skillsSrc))) {
@@ -227,16 +302,7 @@ export async function syncSkills(opts: { dryRun?: boolean } = {}): Promise<void>
     process.exit(1);
   }
 
-  const skills: string[] = [];
-  for (const entry of await readdir(skillsSrc, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    if (entry.name === "_template") continue;
-    // _archive/ holds deprecated/superseded skills — never propagate to agents.
-    if (entry.name === "_archive") continue;
-    if (await exists(`${skillsSrc}/${entry.name}/SKILL.md`)) {
-      skills.push(entry.name);
-    }
-  }
+  const skills = await authoredSkillNames(skillsSrc);
 
   if (skills.length === 0) {
     console.log("fulcrum skills sync: no skills authored yet");
@@ -261,40 +327,34 @@ export async function syncSkills(opts: { dryRun?: boolean } = {}): Promise<void>
     console.log("· skip Claude Code (~/.claude not present)");
   }
 
-  for (const t of TARGETS) {
-    if (!(await isDir(dirname(t.path))) && !(await isDir(t.path))) {
+  const { targets, skippedCodex } = skillTargets(home, opts);
+  if (skippedCodex) {
+    console.log("· skip Codex CLI global skills (use --codex-scope global or --codex-project <dir> to opt in)");
+  }
+  for (const t of targets) {
+    if (!t.projectLocal && !(await isDir(dirname(t.path))) && !(await isDir(t.path))) {
       console.log(`· skip ${t.label} (parent dir not present)`);
       continue;
     }
     const nsPath = `${t.path}/${NAMESPACE}`;
     console.log(`→ ${t.label} (${nsPath})`);
-    if (opts.dryRun) {
-      console.log(`    [dry-run] would mkdir: ${nsPath}`);
-    } else {
-      await mkdir(nsPath, { recursive: true });
-    }
-    for (const name of skills) {
-      const dst = `${nsPath}/${name}`;
-      await copyTree(`${skillsSrc}/${name}`, dst, opts);
-      console.log(`    ${NAMESPACE}/${name}`);
-    }
+    await syncSkillSet(skills, skillsSrc, nsPath, opts, `${NAMESPACE}/`);
     console.log();
   }
 
   // Gemini uses an extension namespace: ~/.gemini/extensions/fulcrum-skills/skills/
   // skillsDir already points to the `skills` subfolder inside that extension.
   const geminiAgent = AGENTS.find((a) => a.id === "gemini")!;
-  const gemRoot = geminiAgent.baseDir(_skillsHome);
+  const gemRoot = geminiAgent.baseDir(home);
   if (await exists(gemRoot)) {
     // ext = ~/.gemini/extensions/fulcrum-skills  (parent of skillsDir)
-    const gemSkillsDir = geminiAgent.skillsDir(_skillsHome);
+    const gemSkillsDir = geminiAgent.skillsDir(home);
     const ext = gemSkillsDir.replace(/\/skills$/, "");
     console.log(`→ Gemini CLI (${ext})`);
     if (opts.dryRun) {
-      console.log(`    [dry-run] would mkdir: ${gemSkillsDir}`);
       console.log(`    [dry-run] would write: ${ext}/gemini-extension.json`);
     } else {
-      await mkdir(gemSkillsDir, { recursive: true });
+      await mkdir(ext, { recursive: true });
       await writeFile(
         `${ext}/gemini-extension.json`,
         JSON.stringify(
@@ -304,11 +364,7 @@ export async function syncSkills(opts: { dryRun?: boolean } = {}): Promise<void>
         ) + "\n",
       );
     }
-    for (const name of skills) {
-      const dst = `${gemSkillsDir}/${name}`;
-      await copyTree(`${skillsSrc}/${name}`, dst, opts);
-      console.log(`    ${name}`);
-    }
+    await syncSkillSet(skills, skillsSrc, gemSkillsDir, opts);
   } else {
     console.log("· skip Gemini (~/.gemini not present)");
   }
@@ -317,15 +373,38 @@ export async function syncSkills(opts: { dryRun?: boolean } = {}): Promise<void>
 
 async function cmdSync(args: string[]): Promise<void> {
   let dryRun = false;
-  for (const arg of args) {
+  let codexScope: CodexSkillScope | undefined;
+  let projectDir: string | undefined;
+  let i = 0;
+  while (i < args.length) {
+    const arg = args[i]!;
     if (arg === "--dry-run") {
       dryRun = true;
+      i += 1;
+    } else if (arg === "--codex-scope") {
+      const value = args[i + 1];
+      if (value !== "skip" && value !== "global" && value !== "project") {
+        console.error("fulcrum skills sync: --codex-scope must be skip, global, or project");
+        process.exit(2);
+      }
+      codexScope = value;
+      i += 2;
+    } else if (arg === "--codex-global") {
+      codexScope = "global";
+      i += 1;
+    } else if (arg === "--codex-project") {
+      codexScope = "project";
+      projectDir = args[i + 1] ?? process.cwd();
+      i += 2;
+    } else if (arg === "--project-dir") {
+      projectDir = args[i + 1] ?? process.cwd();
+      i += 2;
     } else {
       console.error(`fulcrum skills sync: unknown arg '${arg}'`);
       process.exit(2);
     }
   }
-  return syncSkills({ dryRun });
+  return syncSkills({ dryRun, codexScope, projectDir });
 }
 
 // ── lint ───────────────────────────────────────────────────────────────
@@ -463,7 +542,35 @@ async function cmdLint(target: string | undefined): Promise<void> {
 
 // ── list ───────────────────────────────────────────────────────────────
 
-async function cmdList(): Promise<void> {
+async function cmdList(args: string[] = []): Promise<void> {
+  let installed = false;
+  for (const arg of args) {
+    if (arg === "--installed") installed = true;
+    else {
+      console.error(`fulcrum skills list: unknown arg '${arg}'`);
+      process.exit(2);
+    }
+  }
+
+  if (installed) {
+    const { scanSkillBudgets } = await import("./skill-budget.ts");
+    const home = process.env["HOME"] ?? "";
+    const budget = await scanSkillBudgets(home);
+    console.log("Installed skill metadata budget:\n");
+    for (const agent of budget.agents) {
+      if (agent.activeSkillCount === 0) continue;
+      const marker = agent.overThreshold ? "warning" : "ok";
+      console.log(`${agent.label}: ${agent.activeSkillCount} skills, ${agent.totalDescriptionChars}/${agent.warningThresholdChars} description chars (${marker})`);
+      for (const root of agent.sourceRoots) {
+        console.log(`  ${root.path}  ${root.skills} skills  ${root.descriptionChars} chars`);
+      }
+      if (agent.duplicateNames.length > 0) {
+        console.log(`  duplicates: ${agent.duplicateNames.map((dup) => `${dup.name}×${dup.count}`).join(", ")}`);
+      }
+    }
+    return;
+  }
+
   const root = repoRoot();
   const skillsSrc = `${root}/skills`;
   const evalsSrc = `${root}/evals`;
@@ -507,7 +614,7 @@ export async function run(args: string[]): Promise<void> {
   switch (sub) {
     case "sync":  return cmdSync(args.slice(1));
     case "lint":  return cmdLint(args[1]);
-    case "list":  return cmdList();
+    case "list":  return cmdList(args.slice(1));
     case "upstream": {
       let dryRun = false;
       let updatePins = false;

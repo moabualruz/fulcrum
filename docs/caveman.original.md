@@ -33,7 +33,7 @@ User can override per-session with `/caveman` skill (`/caveman mode lite/full/ul
 Every in-repo markdown is compressed into two files: human-edit `.original.md` form and agent-read `.md` compressed form.
 
 Target files:
-- `skills/<name>/SKILL.md` (all 28 skills)
+- `skills/<name>/SKILL.md` (all 29 skills)
 - `skills/<name>/references/*.md` (progressively loaded section detail)
 - `rules/AGENTS.md` (behavioral rules)
 - Project `AGENTS.md` (project-level instructions)

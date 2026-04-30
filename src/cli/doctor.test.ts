@@ -36,6 +36,25 @@ async function runDoctor(home: string, extraEnv: Record<string, string | undefin
   return JSON.parse(out) as Record<string, unknown>;
 }
 
+async function runDoctorHuman(home: string, extraEnv: Record<string, string | undefined> = {}): Promise<string> {
+  const baseEnv: Record<string, string | undefined> = { ...process.env, HOME: home };
+  delete baseEnv["XDG_CONFIG_HOME"];
+  delete baseEnv["CAVEMAN_DEFAULT_MODE"];
+  for (const [k, v] of Object.entries(extraEnv)) {
+    if (v === undefined) delete baseEnv[k];
+    else baseEnv[k] = v;
+  }
+  const proc = Bun.spawn(["bun", "src/index.ts", "doctor"], {
+    cwd: process.cwd(),
+    stdout: "pipe",
+    stderr: "pipe",
+    env: baseEnv as Record<string, string>,
+  });
+  const out = await new Response(proc.stdout).text();
+  await proc.exited;
+  return out;
+}
+
 describe("doctor --json piMcpAdapter field", () => {
   test("both false when ~/.pi/agent does not exist", async () => {
     const home = join(TMP, "no-pi");
@@ -111,6 +130,57 @@ describe("doctor --json component lifecycle section", () => {
     expect(components?.["total"]).toBeGreaterThan(0);
     expect(components?.["installed"]).toBeGreaterThan(0);
     expect(components?.["database"]).toBe(join(fulcrumHome, "state", "global", "components.db"));
+  });
+});
+
+describe("doctor project-local worktree warnings", () => {
+  test("reports ignored .claude/worktrees roots in JSON and human output", async () => {
+    const home = join(TMP, "worktree-home");
+    const repo = join(TMP, "repo-with-local-worktrees");
+    await mkdir(join(home), { recursive: true });
+    await mkdir(join(repo, ".claude", "worktrees", "component-ledger"), { recursive: true });
+
+    const report = await runDoctor(home, { FULCRUM_REPO_DIR: repo });
+    const worktrees = report["worktrees"] as Record<string, unknown>;
+    const roots = worktrees["projectLocalIgnoredRoots"] as Array<Record<string, unknown>>;
+    expect(roots).toHaveLength(1);
+    expect(roots[0]!["path"]).toBe(join(repo, ".claude", "worktrees"));
+    expect(roots[0]!["entries"]).toEqual(["component-ledger"]);
+    expect(report["warnings"]).toBeGreaterThan(0);
+
+    const human = await runDoctorHuman(home, { FULCRUM_REPO_DIR: repo });
+    expect(human).toContain(".claude/worktrees");
+    expect(human).toContain("component-ledger");
+  });
+});
+
+describe("doctor skill budget section", () => {
+  test("reports Codex active skill metadata pressure with source roots and top descriptions", async () => {
+    const home = join(TMP, "skill-budget-codex");
+    await mkdir(join(home, ".codex", "skills", "alpha"), { recursive: true });
+    await mkdir(join(home, ".codex", "plugins", "cache", "vendor", "pkg", "0.1.0", "skills", "beta"), { recursive: true });
+    await writeFile(
+      join(home, ".codex", "skills", "alpha", "SKILL.md"),
+      "---\nname: alpha\ndescription: Alpha skill description\n---\n",
+    );
+    await writeFile(
+      join(home, ".codex", "plugins", "cache", "vendor", "pkg", "0.1.0", "skills", "beta", "SKILL.md"),
+      "---\nname: beta\ndescription: Beta skill description is longer\n---\n",
+    );
+
+    const report = await runDoctor(home);
+    const skillBudget = report["skillBudget"] as Record<string, unknown>;
+    const agents = skillBudget["agents"] as Array<Record<string, unknown>>;
+    const codex = agents.find((agent) => agent["id"] === "codex")!;
+    expect(codex["activeSkillCount"]).toBe(2);
+    expect(codex["totalDescriptionChars"]).toBe(
+      "Alpha skill description".length + "Beta skill description is longer".length,
+    );
+    const roots = codex["sourceRoots"] as Array<Record<string, unknown>>;
+    expect(roots.map((root) => root["path"])).toContain(join(home, ".codex", "skills"));
+    expect(roots.map((root) => root["path"])).toContain(join(home, ".codex", "plugins", "cache"));
+    const top = codex["topDescriptions"] as Array<Record<string, unknown>>;
+    expect(top[0]!["name"]).toBe("beta");
   });
 });
 

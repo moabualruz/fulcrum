@@ -292,6 +292,49 @@ describe("subpath integrity in syncUpstreamSkills", () => {
     }
   });
 
+  test("sync filters source backups from generated upstream mirrors", async () => {
+    const repoSlug = "example__repo";
+    const cacheDir = join(TMP, ".fulcrum", "cache", "upstream-skills", repoSlug);
+    const skillSrc = join(cacheDir, "skills", "myskill");
+    await mkdir(join(cacheDir, ".git"), { recursive: true });
+    await mkdir(skillSrc, { recursive: true });
+    await writeFile(join(skillSrc, "SKILL.md"), "---\nname: myskill\ndescription: test\n---\n");
+    await writeFile(join(skillSrc, "SKILL.original.md"), "---\nname: myskill\n---\nsource backup\n");
+    await mkdir(join(skillSrc, "_archive", "old"), { recursive: true });
+    await writeFile(join(skillSrc, "_archive", "old", "SKILL.md"), "---\nname: old\n---\n");
+
+    const { sha256, size } = await computeSubpathSha256(skillSrc, "dir");
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.myskill]",
+      'source = "https://github.com/example/repo"',
+      'subpath = "skills/myskill"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "MIT"',
+      'author_class = "individual"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      `subpath_sha256 = "${sha256}"`,
+      `subpath_size = ${size}`,
+      "",
+    ].join("\n"));
+
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    try {
+      await syncUpstreamSkills({ dryRun: false, lockPath });
+    } finally {
+      runSpy.mockRestore();
+    }
+
+    expect(await Bun.file(join(TMP, ".codex", "skills", "myskill", "SKILL.md")).exists()).toBe(true);
+    expect(await Bun.file(join(TMP, ".codex", "skills", "myskill", "SKILL.original.md")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".codex", "skills", "myskill", "_archive", "old", "SKILL.md")).exists()).toBe(false);
+  });
+
   test("mismatched hash: integrity verification detects mismatch", async () => {
     const skillDir = join(TMP, "tampered-skill");
     await mkdir(skillDir, { recursive: true });

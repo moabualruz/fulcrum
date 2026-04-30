@@ -11,8 +11,8 @@ Fulcrum is a local-first CLI Agent OS that installs a shared foundation across e
 **What Fulcrum does:**
 - Splices a shared rules block into each agent's primary config file (idempotent, preserves your content).
 - Installs hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `tool-output-router`, and two index hooks) as binary subcommands of a single `fulcrum` binary.
-- Syncs Fulcrum-authored skills into the `fulcrum/` namespace and curated upstream skills into each vendor's native skill placement.
-- Registers managed MCPs (DeepWiki always-on; context7 minimal-default; other builtin extras opt-in).
+- Syncs Fulcrum-authored skills into the `fulcrum/` namespace when explicitly requested; Codex global authored skills are opt-in.
+- Registers managed MCPs (DeepWiki + context7 minimal-default; other builtin extras opt-in).
 - Installs caveman output-compression cross-agent with `defaultMode: ultra`.
 - Reports environment health via `fulcrum doctor`.
 
@@ -66,6 +66,9 @@ FULCRUM_RELEASE_TAG=v0.1.0 bash <(curl -fsSL https://raw.githubusercontent.com/m
 
 | Flag | Effect |
 |---|---|
+| `--profile minimal` | Default. Install rules, policy, and minimal MCP defaults only. Avoids global skills and vendor packages. |
+| `--profile rules-only` | Only splice the global Fulcrum rules block. |
+| `--profile full` | Historical full bootstrap: skills, upstream skills, Caveman, vendor packages, and MCP registry. |
 | `--with-project <dir>` | Also bootstrap a project (`fulcrum init <dir>`) |
 | `--dry-run` | Preview only; no writes |
 | `--no-skills` | Skip authored + upstream skill sync |
@@ -77,7 +80,7 @@ FULCRUM_RELEASE_TAG=v0.1.0 bash <(curl -fsSL https://raw.githubusercontent.com/m
 
 Fulcrum manages agent OS components through `fulcrum component`.
 
-Use `fulcrum install` for normal default setup. Use `fulcrum component` when you need one managed part:
+Use `fulcrum install` for minimal default setup, or `fulcrum install --profile full` for the historical full bootstrap. Use `fulcrum component` when you need one managed part:
 
 ```bash
 fulcrum component list
@@ -113,7 +116,7 @@ grep -q "fulcrum-secrets/env.sh" ~/.zshrc \
 source ~/.zshrc
 ```
 
-Full per-MCP auth requirements are in [docs/mcp.md §5](mcp.md). The full machine setup checklist is in [HANDOVER.md §6.0a](../HANDOVER.md).
+Full per-MCP auth requirements are in [docs/mcp.md §5](mcp.md). The full machine setup checklist is in [HANDOVER.md §7](../HANDOVER.md).
 
 ### Bootstrap a project
 
@@ -187,7 +190,7 @@ See [docs/hooks.md §5](hooks.md) for the full recipe catalogue.
 
 ### Skills (slash commands)
 
-Skills are pre-installed by `fulcrum install`. In any agent session, invoke them with a slash command matching the skill name:
+Skills are installed by `fulcrum install --profile full` or by running the skill sync commands directly. In any agent session, invoke them with a slash command matching the skill name:
 
 ```
 /jq                     # JSON processing
@@ -200,12 +203,14 @@ Skills are pre-installed by `fulcrum install`. In any agent session, invoke them
 /xh                     # HTTP API calls
 ```
 
-Full list: `fulcrum skills list` (shows name + eval coverage).
+Full authored list: `fulcrum skills list` (shows name + eval coverage). Runtime pressure: `fulcrum skills list --installed` shows active per-agent skill count, description budget, duplicate names, and source roots.
 
 To sync authored skills after a Fulcrum update:
 
 ```bash
-fulcrum skills sync         # sync authored skills
+fulcrum skills sync         # sync authored skills; skips Codex global by default
+fulcrum skills sync --codex-project <dir>  # project-local Codex authored skills
+fulcrum skills sync --codex-global         # explicit global Codex authored skills
 fulcrum skills upstream     # sync curated upstream skills (network; verifies SHA-256)
 ```
 
@@ -213,11 +218,11 @@ See [docs/skills.md](skills.md) for paths, authoring, and verification details.
 
 #### The `fulcrum:` namespace
 
-Fulcrum skills install under `fulcrum/` in each agent's skills directory. The slash command itself uses the bare name (`/jq`, not `/fulcrum:jq`) — the namespace is path-based and transparent. The `fulcrum:<name>` address notation is reserved for a future plugin layer; today agents resolve by frontmatter `name:` only.
+Fulcrum skills install through each agent's native namespace. Claude Code uses plugin commands like `/fulcrum:jq`; OpenCode/Pi/Gemini use native mirrored folders/extensions; Codex authored global skills are opt-in, with project-local `.codex/skills/fulcrum/<name>/` available when you want a repo-scoped mirror. Frontmatter `name:` stays prefix-free.
 
 ### MCPs
 
-Fulcrum registers DeepWiki plus 16 builtin registry MCPs. DeepWiki is always-on. Of the registry MCPs, default install enables only `context7` when no user state exists; the rest stay opt-in to avoid startup token cost (~55–300k tokens with 5+ active MCPs). Use `--no-default-mcps` to register everything without changing enabled state.
+Fulcrum registers 17 builtin registry MCPs. Default install enables only `deepwiki` and `context7` when no user state exists; the rest stay opt-in to avoid startup token cost (~55–300k tokens with 5+ active MCPs). Use `--no-default-mcps` to register everything without changing enabled state.
 
 ```bash
 fulcrum mcp list                            # see all registered MCPs + state
@@ -228,7 +233,7 @@ fulcrum mcp disable github --all-agents
 
 Set the required env vars before enabling an MCP that needs auth (see [docs/mcp.md §5](mcp.md)).
 
-Available builtin MCPs: `github`, `repomix`, `semgrep`, `context7`, `tavily`, `playwright`, `dart`, `cloudflare-docs`, `cloudflare-workers-bindings`, `cloudflare-workers-builds`, `cloudflare-observability`, `cloudflare-radar`, `cloudflare-logpush`, `cloudflare-browser`, `cloudflare-containers`, `cloudflare-ai-gateway`.
+Available builtin MCPs: `deepwiki`, `github`, `repomix`, `semgrep`, `context7`, `tavily`, `playwright`, `dart`, `cloudflare-docs`, `cloudflare-workers-bindings`, `cloudflare-workers-builds`, `cloudflare-observability`, `cloudflare-radar`, `cloudflare-logpush`, `cloudflare-browser`, `cloudflare-containers`, `cloudflare-ai-gateway`.
 
 ### Doctor
 
@@ -253,8 +258,8 @@ It reports:
 
 | Agent | Rules file | Skills path | Hook config | MCP config |
 |---|---|---|---|---|
-| Claude Code | `~/.claude/CLAUDE.md` | `~/.claude/skills/fulcrum/<name>/` | `~/.claude/settings.json` hooks block | `claude mcp add` / `~/.claude/settings.json` |
-| Codex CLI | `~/.codex/AGENTS.md` | `~/.codex/skills/fulcrum/<name>/` | `~/.codex/hooks.json` | `~/.codex/config.toml` |
+| Claude Code | `~/.claude/CLAUDE.md` | `~/.claude/plugins/cache/fulcrum/fulcrum/<ver>/skills/<name>/` | `~/.claude/settings.json` hooks block | `claude mcp add` / `~/.claude/settings.json` |
+| Codex CLI | `~/.codex/AGENTS.md` | Global opt-in `~/.codex/skills/fulcrum/<name>/`; project `.codex/skills/fulcrum/<name>/` | `~/.codex/hooks.json` | `~/.codex/config.toml` |
 | Gemini CLI | `~/AGENTS.md` (via `~/.gemini/GEMINI.md` → `@AGENTS.md`) | `~/.gemini/extensions/fulcrum-skills/skills/<name>/` | `~/.gemini/settings.json` | `~/.gemini/settings.json` `mcpServers` |
 | OpenCode | `~/.config/opencode/AGENTS.md` | `~/.config/opencode/skills/fulcrum/<name>/` | TypeScript plugin | `~/.config/opencode/opencode.json` |
 | Pi CLI | `~/.pi/agent/AGENTS.md` | `~/.pi/agent/skills/fulcrum/<name>/` | TypeScript extension | `~/.pi/agent/mcp.json` via `pi-mcp-adapter` |
@@ -333,16 +338,16 @@ A: Pull the repo and run `bash scripts/install.sh` again, or run `fulcrum skills
 A: Yes. Drop a `SKILL.md` at `~/.claude/skills/<name>/SKILL.md` (or the equivalent path for other agents). Fulcrum owns only its authored `fulcrum/` namespace; curated upstream skills use vendor placement. See [docs/skills.md §5](skills.md) for the authoring template.
 
 **Q: What is the `fulcrum:` prefix I see in skill paths?**
-A: It refers to the `fulcrum/` subdirectory that Fulcrum-authored skills install into. The slash command itself is the bare name (`/jq`). The `fulcrum:<name>` colon-notation is reserved for a future plugin layer.
+A: It is the effective namespace for Fulcrum-authored skills. Claude Code exposes it directly as `/fulcrum:<name>` through the plugin; other agents get the namespace from the mirrored folder/extension path while keeping prefix-free `name:` frontmatter.
 
-**Q: Why are 16 MCPs disabled by default?**
+**Q: Why are most MCPs disabled by default?**
 A: Each active MCP spawns a long-running process and loads tool definitions. With 5+ MCPs active you can burn 55–300k tokens at session start before your first message. Enable only what you plan to use. See [docs/mcp.md §1a](mcp.md).
 
 **Q: How do I completely remove Fulcrum?**
 A: Run `fulcrum uninstall`. Use `--purge` to also remove state files, and `--include-caveman` to remove caveman. Preview first with `--dry-run`.
 
 **Q: Does Fulcrum require an internet connection?**
-A: Only for `fulcrum skills upstream` (clones from GitHub), `fulcrum install` with upstream skill sync enabled (same), and any HTTP MCPs you have enabled. Rules splice, hook registration, authored skill sync, and `fulcrum doctor` are fully offline.
+A: Only for `fulcrum skills upstream` (clones from GitHub), `fulcrum install --profile full` with upstream skill sync enabled, and any HTTP MCPs you have enabled. Rules splice, hook registration, authored skill sync, and `fulcrum doctor` are fully offline.
 
 **Q: My `fulcrum doctor` shows "verdict: warning" — is that a problem?**
 A: Warnings mean non-fatal issues (e.g. a tool is missing, or a MCP env var is unset). Errors mean something in the managed install is broken. Read the warning message and address the specific item — the doctor output says exactly what is wrong and (often) how to fix it.

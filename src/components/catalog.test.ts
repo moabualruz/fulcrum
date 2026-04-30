@@ -245,13 +245,14 @@ describe("component catalog", () => {
     expect(component("mcp.deepwiki")).toMatchObject({ defaultProfile: true });
     expect(component("mcp.deepwiki").surfaces).toEqual([
       {
-        id: "mcp.deepwiki:registration",
-        kind: "mcp-agent-config",
+        id: "mcp.deepwiki:registry",
+        kind: "mcp-registry-entry",
         componentId: "mcp.deepwiki",
         target: "mcp:deepwiki",
         ownerKey: "fulcrum:mcp:deepwiki",
         removePolicy: "managed-only",
         supportsDisable: true,
+        payload: { name: "deepwiki" },
       },
     ]);
 

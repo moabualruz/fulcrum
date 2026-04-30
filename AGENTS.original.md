@@ -16,11 +16,11 @@ What's shipped on `feat/agent-foundation-clean`:
 - An orchestrator (`fulcrum init / install / hooks / skills / doctor / compress`) that wires those hooks into five agent runtimes (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI).
 - A sentinel-block rules splicer for cross-agent rules distribution.
 - A per-tool output-handling policy (`config/tool-output-policy.toml`) driving the `tool-output-router` hook.
-- 28 in-repo skills caveman-compressed (`.original.md` beside each), 20-entry trigger evals each, content-verified against upstream sources.
+- 29 in-repo skills caveman-compressed (`.original.md` beside each), 20-entry trigger evals each, content-verified against upstream sources.
 - `src/agents/registry.ts` — canonical `Agent` interface and `AGENTS[5]` array consumed by install, doctor, and skills. Single source of truth for all five agent definitions.
-- `fulcrum install --dry-run` support; `fulcrum doctor --json` for machine-readable health output.
+- `fulcrum install --profile minimal|rules-only|full --dry-run` support; `fulcrum doctor --json` for machine-readable health output.
 - `bun run compress` (`src/cli/compress.ts`) — idempotent caveman compression of in-repo content; `--check` mode for CI.
-- Local CI runner (`bun run ci`) — 6 stages: install / typecheck / test (103 tests) / build:all / skills:lint / compress:check (soft gate). Local release runner (`bun run release vX.Y.Z`). `fulcrum doctor` for environment health including caveman `defaultMode` display. Content-aware `fulcrum skills lint` with rules size guard (≤ 200 lines). `fulcrum skills list`. CHANGELOG via `git-cliff`.
+- Local CI runner (`bun run ci`) — 6 stages: install / typecheck / test / build:all / skills:lint / compress:check (hard gate). Local release runner (`bun run release vX.Y.Z`). `fulcrum doctor` shows caveman `defaultMode`, per-agent install state, MCP health, skill metadata budget, and ignored project worktree warnings. Skills lint enforces rules ≤ 200 lines. CHANGELOG via `git-cliff`.
 
 ## Where we are going (placeholders, not implementations)
 
@@ -36,17 +36,21 @@ These are the layers that the foundation is preparing for. **They are not built 
 
 ## Skill namespacing — the `fulcrum:` prefix
 
-`fulcrum skills sync` installs every authored skill under a `fulcrum/` subfolder in each agent's skills directory:
+`fulcrum skills sync` distributes authored skills using each agent's native namespacing primitive:
 
 ```
-~/.claude/skills/fulcrum/<name>/SKILL.md
-~/.codex/skills/fulcrum/<name>/SKILL.md
-~/.config/opencode/skills/fulcrum/<name>/SKILL.md
-~/.pi/agent/skills/fulcrum/<name>/SKILL.md
-~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md   # extension is the namespace
+Claude Code: plugin (fulcrum@fulcrum)
+             ~/.claude/plugins/cache/fulcrum/fulcrum/<ver>/skills/<name>/SKILL.md
+             invocation: /fulcrum:<name>
+Codex CLI:   ~/.codex/skills/fulcrum/<name>/SKILL.md            (global opt-in)
+             .codex/skills/fulcrum/<name>/SKILL.md              (project opt-in)
+OpenCode:    ~/.config/opencode/skills/fulcrum/<name>/SKILL.md  (nested supported)
+Pi CLI:      ~/.pi/agent/skills/fulcrum/<name>/SKILL.md         (nested supported)
+Gemini CLI:  ~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md
+             (extension itself is the namespace)
 ```
 
-That gives every fulcrum-managed skill an effective `fulcrum:<skill-name>` address space. The agents themselves continue to invoke skills by frontmatter `name:` (no colons in identifiers — the namespacing is path-based). The reason for the layout is forward-compat: when plugins and extensions land, most agent ecosystems already prefix third-party packages, so the install shape we use today already matches that convention.
+Claude Code's loader scans the top level of `~/.claude/skills/` only, so the nested `fulcrum/<name>/` layout used by other agents is invisible there. Plugin namespace is the supported path. Codex global authored skills are skipped by default to avoid user-wide metadata pressure; use `fulcrum skills sync --codex-global` or `--codex-project <dir>` explicitly. All five end up with the same effective `fulcrum:<skill-name>` address space, but the install mechanism differs by agent. Agents still invoke skills by frontmatter `name:` (no colons in identifiers — namespacing is path-based or plugin-mediated).
 
 ## Cross-agent rules distribution
 
@@ -65,7 +69,7 @@ Project-level enforcement: drop `rules/AGENTS.md` at `<consumer-repo>/AGENTS.md`
 Companion artifacts that travel with rules:
 
 - Hook recipes — `hooks/recipes/*.snippet.md`, vendored to `~/.fulcrum/hooks/snippets/` by install. Per-agent registration documented in `docs/hooks.md`.
-- Skill registry — `skills/SOURCES.md`. `fulcrum skills sync` mirrors `skills/<name>/` to each agent's skills root under a `fulcrum/<name>/` namespace.
+- Skill registry — `skills/SOURCES.md`. `fulcrum skills sync` mirrors `skills/<name>/` to each agent's native namespace, excluding `.original.md` and source-only folders from generated CLI agent mirrors while keeping them in project source.
 
 ## Conventions that apply to current work
 

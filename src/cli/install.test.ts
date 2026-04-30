@@ -335,7 +335,7 @@ describe("dry-run mode", () => {
     }
   });
 
-  test("install dry-run delegates to component default profile", async () => {
+  test("install dry-run defaults to minimal profile without global skills or vendor packages", async () => {
     const origHome = process.env["HOME"];
     const origFulcrumHome = process.env["FULCRUM_HOME"];
     const origRepoDir = process.env["FULCRUM_REPO_DIR"];
@@ -349,8 +349,12 @@ describe("dry-run mode", () => {
       process.env["FULCRUM_HOME"] = join(dryHome, ".fulcrum");
       process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../..");
       await installRun(["--dry-run"]);
-      expect(logs.join("\n")).toContain("profile.default");
+      expect(logs.join("\n")).toContain("profile.minimal");
       expect(logs.join("\n")).toContain("DRY RUN");
+      expect(logs.join("\n")).not.toContain("skills.authored");
+      expect(logs.join("\n")).not.toContain("skills.upstream");
+      expect(logs.join("\n")).not.toContain("package.cloudflare");
+      expect(logs.join("\n")).not.toContain("package.superpowers");
     } finally {
       logSpy.mockRestore();
       if (origHome !== undefined) process.env["HOME"] = origHome;
@@ -360,6 +364,54 @@ describe("dry-run mode", () => {
       if (origRepoDir !== undefined) process.env["FULCRUM_REPO_DIR"] = origRepoDir;
       else delete process.env["FULCRUM_REPO_DIR"];
     }
+  });
+
+  test("install --profile full keeps the old full bootstrap surface explicit", async () => {
+    const proc = Bun.spawn(["bun", "src/index.ts", "install", "--dry-run", "--profile", "full"], {
+      cwd: join(__dirname, "../.."),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: dryHome,
+        FULCRUM_HOME: join(dryHome, ".fulcrum"),
+        FULCRUM_REPO_DIR: join(__dirname, "../.."),
+      },
+    });
+    const out = await new Response(proc.stdout).text();
+    const err = await new Response(proc.stderr).text();
+    const exit = await proc.exited;
+
+    expect(exit).toBe(0);
+    expect(err).toBe("");
+    expect(out).toContain("profile.default");
+    expect(out).toContain("skills.authored");
+    expect(out).toContain("package.cloudflare");
+    expect(out).toContain("mcp.registry");
+  });
+
+  test("install --profile rules-only only plans the global rules block", async () => {
+    const proc = Bun.spawn(["bun", "src/index.ts", "install", "--dry-run", "--profile", "rules-only"], {
+      cwd: join(__dirname, "../.."),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: dryHome,
+        FULCRUM_HOME: join(dryHome, ".fulcrum"),
+        FULCRUM_REPO_DIR: join(__dirname, "../.."),
+      },
+    });
+    const out = await new Response(proc.stdout).text();
+    const err = await new Response(proc.stderr).text();
+    const exit = await proc.exited;
+
+    expect(exit).toBe(0);
+    expect(err).toBe("");
+    expect(out).toContain("rules.global");
+    expect(out).not.toContain("policy.tool-output");
+    expect(out).not.toContain("mcp.context7");
+    expect(out).not.toContain("skills.authored");
   });
 
   test("install --no-skills excludes skill components from dry-run plan", async () => {
@@ -376,7 +428,7 @@ describe("dry-run mode", () => {
       process.env["FULCRUM_HOME"] = join(dryHome, ".fulcrum");
       process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../..");
       await installRun(["--dry-run", "--no-skills"]);
-      expect(logs.join("\n")).toContain("profile.default");
+      expect(logs.join("\n")).toContain("profile.minimal");
       expect(logs.join("\n")).not.toContain("skills.authored");
       expect(logs.join("\n")).not.toContain("skills.upstream");
     } finally {
@@ -458,23 +510,25 @@ describe("installMcpRegistryEntries", () => {
     expect(reg.servers["repomix"]!.agent_visibility["gemini"]).toBe(false);
   });
 
-  test("context7 and repomix are minimal default builtin MCPs", async () => {
+  test("deepwiki and context7 are minimal default builtin MCPs", async () => {
     await installMcpRegistryEntries(regHome);
     const reg = await loadRegistry();
+    expect(reg.servers["deepwiki"]).toBeDefined();
+    expect(reg.servers["deepwiki"]!.transport).toBe("http");
+    expect(reg.servers["deepwiki"]!.url).toBe("https://mcp.deepwiki.com/mcp");
+    expect(reg.servers["deepwiki"]!.default_enabled).toBe(false);
     expect(reg.servers["context7"]).toBeDefined();
     expect(reg.servers["context7"]!.default_enabled).toBe(false);
     expect(reg.servers["context7"]!.auth_env_vars).toEqual(["CONTEXT7_API_KEY"]);
-    expect(reg.servers["repomix"]).toBeDefined();
-    expect(reg.servers["repomix"]!.default_enabled).toBe(false);
   });
 
-  test("minimal default state enables context7 and registry-owned repomix without enabling github", async () => {
+  test("minimal default state enables deepwiki and context7 without enabling repomix or github", async () => {
     await installMcpRegistryEntries(regHome);
     await applyBuiltinMcpDefaultState("minimal");
     const reg = await loadRegistry();
+    expect(reg.servers["deepwiki"]!.enabled["codex"]).toBe(true);
     expect(reg.servers["context7"]!.enabled["codex"]).toBe(true);
-    expect(reg.servers["repomix"]!.enabled["codex"]).toBe(true);
-    expect(reg.servers["repomix"]!.enabled["gemini"]).toBeUndefined();
+    expect(reg.servers["repomix"]!.enabled["codex"]).toBeUndefined();
     expect(reg.servers["github"]!.enabled["codex"]).toBeUndefined();
   });
 
@@ -483,9 +537,30 @@ describe("installMcpRegistryEntries", () => {
     await applyBuiltinMcpDefaultState("minimal");
     await applyBuiltinMcpDefaultState("none");
     const reg = await loadRegistry();
+    expect(reg.servers["deepwiki"]!.enabled["codex"]).toBe(true);
     expect(reg.servers["context7"]!.enabled["codex"]).toBe(true);
-    expect(reg.servers["repomix"]!.enabled["codex"]).toBe(true);
+    expect(reg.servers["repomix"]!.enabled["codex"]).toBeUndefined();
     expect(reg.servers["github"]!.enabled["codex"]).toBeUndefined();
+  });
+
+  test("legacy Codex DeepWiki config is reconciled without duplicate TOML tables", async () => {
+    await mkdir(join(regHome, ".codex"), { recursive: true });
+    await writeFile(
+      join(regHome, ".codex", "config.toml"),
+      `# BEGIN FULCRUM MCP deepwiki
+[mcp_servers.deepwiki]
+url = "https://mcp.deepwiki.com/mcp"
+# END FULCRUM MCP deepwiki
+`,
+    );
+    await installMcpRegistryEntries(regHome);
+    await applyBuiltinMcpDefaultState("minimal");
+
+    const config = await readFile(join(regHome, ".codex", "config.toml"), "utf8");
+    expect(config.match(/\[mcp_servers\.deepwiki\]/g)).toHaveLength(1);
+    const reg = await loadRegistry();
+    expect(reg.servers["deepwiki"]).toBeDefined();
+    expect(reg.servers["deepwiki"]!.enabled["codex"]).toBe(true);
   });
 
   test("dry-run does not write registry file", async () => {

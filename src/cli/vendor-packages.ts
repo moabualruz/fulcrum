@@ -108,7 +108,15 @@ async function copyTree(src: string, dst: string, dryRun: boolean): Promise<void
   else await mkdir(dst, { recursive: true });
 
   for (const entry of await readdir(src, { withFileTypes: true })) {
-    if (entry.name === ".git" || entry.name === "node_modules") continue;
+    if (
+      entry.name.endsWith(".original.md") ||
+      entry.name === "_archive" ||
+      entry.name === "_template" ||
+      entry.name === ".claude" ||
+      entry.name === ".git" ||
+      entry.name === "node_modules" ||
+      entry.name === "worktrees"
+    ) continue;
     const s = join(src, entry.name);
     const d = join(dst, entry.name);
     if (entry.isDirectory()) {

@@ -22,6 +22,16 @@ const REPOMIX_REGISTRY_VISIBLE = {
 
 // ── Wave 2 ─────────────────────────────────────────────────────────────────
 
+export const DEFAULT_DEEPWIKI_SERVER: McpServerSpec = {
+  transport: "http",
+  url: "https://mcp.deepwiki.com/mcp",
+  description: "DeepWiki MCP server — repository documentation and codebase Q&A",
+  vendor: "deepwiki",
+  default_enabled: false,
+  auth_env_vars: [],
+  agent_visibility: { ...ALL_VISIBLE },
+};
+
 export const DEFAULT_GITHUB_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://api.githubcopilot.com/mcp/",
@@ -203,6 +213,7 @@ export const DEFAULT_DART_SERVER: McpServerSpec = {
 /** All builtin MCP servers, keyed by registry name. */
 export const BUILTIN_MCPS: Array<{ name: string; spec: McpServerSpec }> = [
   // Wave 2
+  { name: "deepwiki",                     spec: DEFAULT_DEEPWIKI_SERVER },
   { name: "github",                       spec: DEFAULT_GITHUB_SERVER },
   { name: "repomix",                      spec: DEFAULT_REPOMIX_SERVER },
   // Wave 3
@@ -224,4 +235,4 @@ export const BUILTIN_MCPS: Array<{ name: string; spec: McpServerSpec }> = [
   { name: "dart",                         spec: DEFAULT_DART_SERVER },
 ];
 
-export const MINIMAL_DEFAULT_MCPS = ["context7", "repomix"] as const;
+export const MINIMAL_DEFAULT_MCPS = ["deepwiki", "context7"] as const;

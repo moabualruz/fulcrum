@@ -47,7 +47,7 @@ Override per-session: `/caveman stop` or `/caveman mode lite/full/ultra`. Resume
 Every in-repo markdown → two files: `.original.md` (human-edit) and `.md` (agent-read, compressed).
 
 Targets:
-- `skills/<name>/SKILL.md` (all 28 skills)
+- `skills/<name>/SKILL.md` (all 29 skills)
 - `skills/<name>/references/*.md` (progressive section detail)
 - `rules/AGENTS.md` (behavioral rules)
 - Project `AGENTS.md`

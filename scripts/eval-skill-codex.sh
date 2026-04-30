@@ -127,11 +127,18 @@ SUMMARY="$RESULTS_DIR/summary.txt"
   echo
 } | tee "$SUMMARY"
 
-SKILL_INSTALLED="$HOME/.codex/skills/fulcrum/$SKILL/SKILL.md"
+GLOBAL_SKILL_INSTALLED="$HOME/.codex/skills/fulcrum/$SKILL/SKILL.md"
+PROJECT_SKILL_INSTALLED="$PWD/.codex/skills/fulcrum/$SKILL/SKILL.md"
+if [ -f "$PROJECT_SKILL_INSTALLED" ]; then
+  SKILL_INSTALLED="$PROJECT_SKILL_INSTALLED"
+else
+  SKILL_INSTALLED="$GLOBAL_SKILL_INSTALLED"
+fi
 if [ ! -f "$SKILL_INSTALLED" ]; then
   cat >&2 <<EOF
 fulcrum: skill '$SKILL' is not installed under ~/.codex/skills/fulcrum/.
-Run: bun run src/index.ts skills sync
+Run: bun run src/index.ts skills sync --codex-global
+Or install project-local skills with: bun run src/index.ts skills sync --codex-project <dir>
 EOF
   exit 1
 fi
