@@ -236,3 +236,12 @@ export const BUILTIN_MCPS: Array<{ name: string; spec: McpServerSpec }> = [
 ];
 
 export const MINIMAL_DEFAULT_MCPS = ["deepwiki", "context7"] as const;
+
+export const PACKAGE_DEFAULT_MCPS = [
+  "repomix",
+  "cloudflare-api",
+  "cloudflare-docs",
+  "cloudflare-bindings",
+  "cloudflare-builds",
+  "cloudflare-observability",
+] as const;

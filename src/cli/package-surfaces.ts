@@ -40,6 +40,7 @@ export interface AgentSurfaceTarget {
   agentId: AgentId;
   surface: PackageSurface;
   targetPath?: string;
+  additionalTargetPaths?: readonly string[];
   configMutation?: string;
   nativeInstaller?: readonly string[];
   support: "native" | "mirror" | "unsupported";

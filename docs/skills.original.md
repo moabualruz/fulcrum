@@ -16,7 +16,7 @@ Fulcrum-authored skills install under `fulcrum/` (we own that namespace). Curate
 | OpenCode | `~/.config/opencode/skills/fulcrum/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` |
 | Pi CLI | `~/.pi/agent/skills/fulcrum/<name>/SKILL.md` | `~/.pi/agent/skills/<name>/SKILL.md` | `~/.pi/agent/skills/<name>/SKILL.md` (user) · `.pi/skills/` (project) |
 
-`fulcrum skills sync` propagates authored `skills/<name>/SKILL.md` from the repo to agent-native surfaces. Claude Code uses the plugin path; OpenCode/Pi use `<skills-root>/fulcrum/`; Gemini uses the `fulcrum-skills` extension; Codex global scope is skipped by default and must be requested with `--codex-global` or `--codex-project <dir>`. `fulcrum skills upstream` clones curated upstream repos into `~/.fulcrum/cache/upstream-skills` and propagates selected skills to the vendor's own placement convention — top-level `<agent>/skills/<name>/`. Generated CLI agent mirrors exclude `.original.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree folders; project source folders keep `.original.md` human-edit backups. **Agents themselves still load by frontmatter `name:`** — the namespacing is path-based and recursive scans pick skills up regardless of depth.
+`fulcrum skills sync` propagates authored `skills/<name>/SKILL.md` from the repo to agent-native surfaces. Claude Code uses the plugin path; OpenCode/Pi use `<skills-root>/fulcrum/`; Gemini uses the `fulcrum-skills` extension; Codex global scope is skipped by default and must be requested with `--codex-global` or `--codex-project <dir>`. `fulcrum skills upstream` clones curated upstream repos into `~/.fulcrum/cache/upstream-skills` and propagates selected skills to the vendor's own placement convention — top-level `<agent>/skills/<name>/`. Managed packages also adapt vendor `skills/*/SKILL.md` into loadable agent skill paths when the package payload location is not itself a skill loader, while still keeping the full package payload mirror for parity. Component/full-profile install skips package-owned Cloudflare upstream copies because `package.cloudflare` owns those loadable skills in that flow; direct `fulcrum skills upstream` remains the standalone upstream path. Generated CLI agent mirrors exclude `.original.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree folders; project source folders keep `.original.md` human-edit backups. **Agents themselves still load by frontmatter `name:`** — the namespacing is path-based and recursive scans pick skills up regardless of depth.
 
 ## 2. Managed vendor skill/package catalogue
 
@@ -24,7 +24,7 @@ Fulcrum-authored skills install under `fulcrum/` (we own that namespace). Curate
 |---|---|
 | `package.repomix` | Vendor-derived skills, commands, rules, MCP metadata, and explorer-agent surfaces. |
 | `package.superpowers` | Native packages where available; full package mirrors where needed. |
-| `package.cloudflare` | Claude plugin plus full non-Claude package mirrors and registry MCP entries. |
+| `package.cloudflare` | Claude plugin plus full non-Claude package mirrors, loadable skill mirrors, and package MCP config from `.mcp.json`. |
 | `package.caveman` | Native Claude/Gemini installs plus full Codex/OpenCode/Pi package mirrors. |
 | `package.graphify` | Vendor `graphify install --platform <agent>` where supported; Pi skill fallback. |
 | `package.ast-grep` | Vendor `npx skills add ast-grep/agent-skill` integration. |

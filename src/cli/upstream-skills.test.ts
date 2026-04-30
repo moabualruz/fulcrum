@@ -699,6 +699,54 @@ describe("vendor_canonical_agents schema", () => {
 });
 
 describe("upstream skill filtering helpers", () => {
+  test("syncUpstreamSkills can exclude package-owned sources", async () => {
+    const lockPath = await writeLock([
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.wrangler]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/wrangler"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+      "[skills.semgrep]",
+      'source = "https://github.com/semgrep/skills"',
+      'subpath = "skills/semgrep"',
+      'ref = "main"',
+      'tree_sha = "89abcdef0123456789abcdef0123456789abcdef"',
+      'license = "MIT"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+
+    await mkdir(join(TMP, ".codex", "skills"), { recursive: true });
+
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map((a) => String(a)).join(" "));
+    });
+    try {
+      await syncUpstreamSkills({
+        dryRun: true,
+        lockPath,
+        excludeSources: ["https://github.com/cloudflare/skills"],
+      });
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(logs.some((l) => l.includes("1 curated skill(s)"))).toBe(true);
+    expect(logs.some((l) => l.includes("semgrep"))).toBe(true);
+    expect(logs.some((l) => l.includes("wrangler"))).toBe(false);
+  });
+
   test("syncUpstreamSkillsBySource syncs exact Cloudflare source entries and excludes graphify", async () => {
     const lockPath = await writeLock([
       "[meta]",

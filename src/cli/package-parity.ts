@@ -1,4 +1,4 @@
-import { readdir, stat } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import type { AgentId } from "./mcp-registry.ts";
 import type { AgentSurfaceTarget, PackageSurfaceKind, PackageSurfaceManifest } from "./package-surfaces.ts";
 
@@ -50,13 +50,20 @@ export async function auditPackageParity(
       installedCounts[target.surface.kind] += 1;
       continue;
     }
-    if (!target.targetPath) {
+    const targetPaths = [target.targetPath, ...(target.additionalTargetPaths ?? [])].filter((path): path is string => !!path);
+    if (targetPaths.length === 0) {
       missing.push(target);
       continue;
     }
-    const path = expandHome(target.targetPath, home);
-    leakRoots.add(mirrorRoot(path, target.surface.relativePath));
-    if (await exists(path)) {
+    const expandedPaths = targetPaths.map((path) => expandHome(path, home));
+    for (const path of expandedPaths) {
+      leakRoots.add(mirrorRoot(path, target.surface.relativePath));
+    }
+    const allPathsPresent = (await Promise.all(expandedPaths.map((path) => exists(path)))).every(Boolean);
+    const nativeConfigPresent = target.surface.kind === "mcp"
+      ? await mcpManifestConfigured(target, home)
+      : true;
+    if (allPathsPresent && nativeConfigPresent) {
       installedCounts[target.surface.kind] += 1;
     } else {
       missing.push(target);
@@ -92,6 +99,61 @@ async function exists(path: string): Promise<boolean> {
   try {
     await stat(path);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+async function mcpManifestConfigured(target: AgentSurfaceTarget, home: string): Promise<boolean> {
+  if (target.configMutation === undefined) return true;
+  if (!(await exists(target.surface.sourcePath))) return true;
+  const serverNames = await packageMcpServerNames(target.surface.sourcePath);
+  if (serverNames.length === 0) return true;
+  for (const name of serverNames) {
+    if (!(await nativeMcpConfigContains(home, target.agentId, name))) return false;
+  }
+  return true;
+}
+
+async function packageMcpServerNames(path: string): Promise<string[]> {
+  try {
+    const parsed = JSON.parse(await readFile(path, "utf8"));
+    const root = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+    const mcpServers = root["mcpServers"];
+    if (!mcpServers || typeof mcpServers !== "object" || Array.isArray(mcpServers)) return [];
+    return Object.keys(mcpServers as Record<string, unknown>);
+  } catch {
+    return [];
+  }
+}
+
+async function nativeMcpConfigContains(home: string, agentId: AgentId, name: string): Promise<boolean> {
+  if (agentId === "codex") {
+    const path = `${home}/.codex/config.toml`;
+    return await fileContains(path, `[mcp_servers.${name}]`);
+  }
+  const path =
+    agentId === "gemini" ? `${home}/.gemini/settings.json` :
+    agentId === "opencode" ? `${home}/.config/opencode/opencode.json` :
+    agentId === "pi" ? `${home}/.pi/agent/mcp.json` :
+    `${home}/.claude.json`;
+  try {
+    const parsed = JSON.parse(await readFile(path, "utf8"));
+    const root = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+    const section = agentId === "opencode" ? root["mcp"] : root["mcpServers"];
+    return !!section && typeof section === "object" && !Array.isArray(section) && name in (section as Record<string, unknown>);
+  } catch {
+    return false;
+  }
+}
+
+async function fileContains(path: string, needle: string): Promise<boolean> {
+  try {
+    return (await readFile(path, "utf8")).includes(needle);
   } catch {
     return false;
   }

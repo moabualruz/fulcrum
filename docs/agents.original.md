@@ -13,11 +13,11 @@
 | Hook events | 6 | 11 | 30+ plugin events | **20+** — session_start, session_shutdown, before_agent_start, turn_start/end, tool_call (blockable), resources_discover, etc. |
 | Hook context inject | SessionStart + UserPromptSubmit only | Yes | Yes | Yes — `before_agent_start` can inject messages + rewrite system prompt |
 | Skills path (fulcrum-managed) | `~/.codex/skills/fulcrum/` (global opt-in) · `.codex/skills/fulcrum/` (project opt-in) | `~/.gemini/extensions/fulcrum-skills/skills/` | `~/.config/opencode/skills/fulcrum/` | `~/.pi/agent/skills/fulcrum/` |
-| Package mirrors | Codex plugin cache/config plus native skills/MCP/hooks where supported | Gemini extension mirrors | Native skills/commands/agents/packages plus plugin config where supported | Native skills/commands/packages; unsupported primitives recorded |
+| Package mirrors | Codex plugin cache/config plus loadable skills, native MCP, hooks where supported | Gemini extension mirrors plus native MCP config when package manifest requires it | Native skills/commands/agents/packages plus plugin config and native MCP where supported | Native skills/commands/packages plus MCP through adapter; unsupported primitives recorded |
 | MCP | Yes — `config.toml` | Yes — `settings.json` | Yes — `opencode.json` | Via `pi-mcp-adapter` |
 | DeepWiki | Yes | Yes | Yes | Yes — installed/configured via `pi-mcp-adapter` (Fulcrum-managed) |
 
-Managed package mirrors are audited by per-package status commands such as `fulcrum component status package.repomix --json` and by `fulcrum doctor --json`. Missing package surfaces fail parity; unsupported primitives are listed with a reason.
+Managed package mirrors are audited by per-package status commands such as `fulcrum component status package.repomix --json` and by `fulcrum doctor --json`. Parity checks both payload mirrors and adapted native surfaces, so package skills must be loadable and package `.mcp.json` entries must appear in native MCP config. Unsupported primitives are listed with a reason.
 
 ---
 

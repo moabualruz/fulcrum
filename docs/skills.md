@@ -16,7 +16,7 @@ Fulcrum-authored skills install under `fulcrum/` (we own that namespace). Curate
 | OpenCode | `~/.config/opencode/skills/fulcrum/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` |
 | Pi CLI | `~/.pi/agent/skills/fulcrum/<name>/SKILL.md` | `~/.pi/agent/skills/<name>/SKILL.md` | `~/.pi/agent/skills/<name>/SKILL.md` (user) · `.pi/skills/` (project) |
 
-`fulcrum skills sync` propagates authored `skills/<name>/SKILL.md` from repo to agent-native surfaces. Claude Code uses the plugin path; OpenCode/Pi use `<skills-root>/fulcrum/`; Gemini uses the `fulcrum-skills` extension; Codex global scope is skipped by default and must be requested with `--codex-global` or `--codex-project <dir>`. `fulcrum skills upstream` clones curated upstream repos into `~/.fulcrum/cache/upstream-skills` and propagates selected skills to the vendor's own placement convention — top-level `<agent>/skills/<name>/`. Generated CLI agent mirrors exclude `.original.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree folders; project source folders keep `.original.md` human-edit backups. **Agents load by frontmatter `name:`** — namespacing is path-based and recursive scans pick skills up regardless of depth.
+`fulcrum skills sync` propagates authored `skills/<name>/SKILL.md` from repo to agent-native surfaces. Claude Code uses the plugin path; OpenCode/Pi use `<skills-root>/fulcrum/`; Gemini uses the `fulcrum-skills` extension; Codex global scope is skipped by default and must be requested with `--codex-global` or `--codex-project <dir>`. `fulcrum skills upstream` clones curated upstream repos into `~/.fulcrum/cache/upstream-skills` and propagates selected skills to the vendor's own placement convention — top-level `<agent>/skills/<name>/`. Managed packages also adapt vendor `skills/*/SKILL.md` into loadable skill paths when package payload location is not itself a skill loader, while preserving full package payload mirrors for parity. Generated CLI agent mirrors exclude `.original.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree folders; project source folders keep `.original.md` human-edit backups. **Agents load by frontmatter `name:`** — namespacing is path-based and recursive scans pick skills up regardless of depth.
 
 ### 1.1 Vendor-canonical install vs file-copy mirror
 
@@ -36,7 +36,7 @@ vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]
 |---|---|
 | `package.repomix` | Vendor-derived skills, commands, rules, MCP metadata, and explorer-agent surfaces. |
 | `package.superpowers` | Native packages where available; full package mirrors where needed. |
-| `package.cloudflare` | Claude plugin plus full non-Claude package mirrors and registry MCP entries. |
+| `package.cloudflare` | Claude plugin plus full non-Claude package mirrors, loadable skill mirrors, and package MCP config from `.mcp.json`. |
 | `package.caveman` | Native Claude/Gemini installs plus full Codex/OpenCode/Pi package mirrors. |
 | `package.graphify` | Vendor `graphify install --platform <agent>` where supported; Pi skill fallback. |
 | `package.ast-grep` | Vendor `npx skills add ast-grep/agent-skill` integration. |
@@ -133,7 +133,7 @@ subpath_size   = <int>            # total byte-size (sanity check only)
 fulcrum skills upstream --update-pins
 ```
 
-As of 2026-04-30 audit: 19 active upstream entries. Archived ast-grep, tavily, and context7 entries live under `skills/_archive/` because their vendor package/MCP paths now own those surfaces. Active entries include six Superpowers skills, Playwright, three Semgrep skills, Graphify, and eight Cloudflare skills; all carry `subpath_sha256`.
+As of 2026-04-30 audit: 19 active upstream entries. Archived ast-grep, tavily, and context7 entries live under `skills/_archive/` because their vendor package/MCP paths now own those surfaces. Active entries include six Superpowers skills, Playwright, three Semgrep skills, Graphify, and eight Cloudflare skills; all carry `subpath_sha256`. Component/full-profile install excludes package-owned Cloudflare upstream copies because `package.cloudflare` owns the loadable Cloudflare skills in that flow; direct `fulcrum skills upstream` remains the standalone upstream-skill path.
 
 ## 7. Verification
 

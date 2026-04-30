@@ -413,6 +413,56 @@ enabled_pi = true
     expect(repomix!["drift"]).toBe(false);
   });
 
+  test("drift false for package-default enabled Cloudflare package MCP surfaces", async () => {
+    const home = join(TMP, "mcp-cloudflare-package-default");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const stateDir = join(fulcrumHome, "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    const toml = `schema_version = 1
+
+[servers.cloudflare-docs]
+transport = "http"
+url = "https://docs.mcp.cloudflare.com/mcp"
+description = "Cloudflare Docs MCP"
+vendor = "cloudflare"
+default_enabled = false
+auth_env_vars = []
+enabled_codex = true
+enabled_gemini = true
+enabled_opencode = true
+enabled_pi = true
+
+[servers.cloudflare-docs.agent_visibility]
+"claude-code" = false
+"codex" = true
+"gemini" = true
+"opencode" = true
+"pi" = true
+
+[servers.cloudflare-observability]
+transport = "http"
+url = "https://observability.mcp.cloudflare.com/mcp"
+description = "Cloudflare Observability MCP"
+vendor = "cloudflare"
+default_enabled = false
+auth_env_vars = []
+enabled_codex = true
+
+[servers.cloudflare-observability.agent_visibility]
+"claude-code" = false
+"codex" = true
+"gemini" = true
+"opencode" = true
+"pi" = true
+`;
+    await writeFile(join(stateDir, "mcp-registry.toml"), toml);
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const servers = (report["mcp"] as Record<string, unknown>)["servers"] as Array<Record<string, unknown>>;
+    expect(servers.find((s) => s["name"] === "cloudflare-docs")!["drift"]).toBe(false);
+    expect(servers.find((s) => s["name"] === "cloudflare-observability")!["drift"]).toBe(false);
+  });
+
   test("wiring missing when codex config lacks bearer_token_env_var for authed http MCP", async () => {
     const home = join(TMP, "mcp-wiring-missing");
     await mkdir(home, { recursive: true });

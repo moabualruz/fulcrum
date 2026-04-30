@@ -9,6 +9,7 @@ import {
   uninstallSuperpowersPackage,
 } from "./vendor-packages.ts";
 import * as proc from "../utils/proc.ts";
+import { isEnabled, loadRegistry } from "./mcp-registry.ts";
 
 let TMP: string;
 let originalHome: string | undefined;
@@ -271,6 +272,109 @@ describe("vendor capability packages", () => {
       expect(metadata.unknownAssets).toContain("NOTICE");
       expect(metadata.unknownAssets).toContain("vendor");
     }
+  });
+
+  test("adapts Cloudflare package MCP manifest into native MCP configs for fallback agents", async () => {
+    const cache = join(TMP, ".fulcrum", "cache", "cloudflare-skills");
+    await mkdir(join(cache, "skills", "wrangler"), { recursive: true });
+    await writeFile(join(cache, "skills", "wrangler", "SKILL.md"), "---\nname: wrangler\n---\nUse wrangler.\n");
+    await writeFile(join(cache, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        "cloudflare-api": {
+          type: "http",
+          url: "https://mcp.cloudflare.com/mcp",
+        },
+        "cloudflare-docs": {
+          type: "http",
+          url: "https://docs.mcp.cloudflare.com/mcp",
+        },
+      },
+    }, null, 2) + "\n");
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
+    await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installCloudflarePackage();
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    const reg = await loadRegistry();
+    expect(reg.servers["cloudflare-api"]?.url).toBe("https://mcp.cloudflare.com/mcp");
+    for (const agentId of ["codex", "gemini", "opencode", "pi"] as const) {
+      expect(isEnabled(reg.servers["cloudflare-api"]!, agentId)).toBe(true);
+      expect(isEnabled(reg.servers["cloudflare-docs"]!, agentId)).toBe(true);
+    }
+
+    expect(await readFile(join(TMP, ".codex", "config.toml"), "utf8")).toContain("[mcp_servers.cloudflare-api]");
+    expect(await readFile(join(TMP, ".gemini", "settings.json"), "utf8")).toContain("cloudflare-api");
+    expect(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8")).toContain("cloudflare-api");
+    expect(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8")).toContain("cloudflare-api");
+  });
+
+  test("adapts Cloudflare package skills into native loadable skill paths for fallback agents", async () => {
+    const cache = join(TMP, ".fulcrum", "cache", "cloudflare-skills");
+    await mkdir(join(cache, "skills", "wrangler"), { recursive: true });
+    await writeFile(join(cache, "skills", "wrangler", "SKILL.md"), "---\nname: wrangler\n---\nUse wrangler.\n");
+    await writeFile(join(cache, "skills", "wrangler", "SKILL.original.md"), "source backup\n");
+    await mkdir(join(cache, "skills", "_archive", "old"), { recursive: true });
+    await writeFile(join(cache, "skills", "_archive", "old", "SKILL.md"), "---\nname: old\n---\n");
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installCloudflarePackage();
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    for (const skillPath of [
+      join(TMP, ".codex", "skills", "cloudflare", "wrangler", "SKILL.md"),
+      join(TMP, ".config", "opencode", "skills", "cloudflare", "wrangler", "SKILL.md"),
+      join(TMP, ".pi", "agent", "skills", "cloudflare", "wrangler", "SKILL.md"),
+    ]) {
+      expect(await readFile(skillPath, "utf8")).toContain("Use wrangler.");
+      expect(await Bun.file(skillPath.replace(/SKILL\.md$/, "SKILL.original.md")).exists()).toBe(false);
+    }
+    expect(await Bun.file(join(TMP, ".codex", "skills", "cloudflare", "_archive", "old", "SKILL.md")).exists()).toBe(false);
+  });
+
+  test("uninstall removes adapted Cloudflare package MCP and loadable skill surfaces", async () => {
+    const cache = join(TMP, ".fulcrum", "cache", "cloudflare-skills");
+    await mkdir(join(cache, "skills", "wrangler"), { recursive: true });
+    await writeFile(join(cache, "skills", "wrangler", "SKILL.md"), "---\nname: wrangler\n---\nUse wrangler.\n");
+    await writeFile(join(cache, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        "cloudflare-api": {
+          type: "http",
+          url: "https://mcp.cloudflare.com/mcp",
+        },
+        "cloudflare-docs": {
+          type: "http",
+          url: "https://docs.mcp.cloudflare.com/mcp",
+        },
+      },
+    }, null, 2) + "\n");
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installCloudflarePackage();
+      await uninstallCloudflarePackage();
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    const reg = await loadRegistry();
+    expect(reg.servers["cloudflare-api"]).toBeUndefined();
+    expect(reg.servers["cloudflare-docs"]?.default_enabled).toBe(false);
+    expect(await Bun.file(join(TMP, ".codex", "skills", "cloudflare", "wrangler", "SKILL.md")).exists()).toBe(false);
+    const codexConfig = await Bun.file(join(TMP, ".codex", "config.toml")).exists()
+      ? await readFile(join(TMP, ".codex", "config.toml"), "utf8")
+      : "";
+    expect(codexConfig).not.toContain("cloudflare-api");
   });
 
   test("uninstalls only the Cloudflare Claude plugin for the Cloudflare package", async () => {

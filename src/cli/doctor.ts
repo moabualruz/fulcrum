@@ -8,7 +8,7 @@ import { AGENTS } from "../agents/registry.ts";
 import { ALL_COMPONENTS } from "../components/catalog.ts";
 import { ComponentLedger, dbPath as componentLedgerPath } from "../components/ledger.ts";
 import { loadRegistry, ALL_AGENT_IDS, isEnabled, type AgentId } from "./mcp-registry.ts";
-import { MINIMAL_DEFAULT_MCPS } from "./mcp-builtins.ts";
+import { MINIMAL_DEFAULT_MCPS, PACKAGE_DEFAULT_MCPS } from "./mcp-builtins.ts";
 import { scanSkillBudgets, type SkillBudgetReport } from "./skill-budget.ts";
 import { auditPackageParity, type PackageParityReport } from "./package-parity.ts";
 import { planPackageMirrorTargets } from "./package-mirror.ts";
@@ -597,7 +597,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
         .filter(([, v]) => v === "enabled")
         .map(([k]) => k as AgentId);
       const isMinimalDefault = (MINIMAL_DEFAULT_MCPS as readonly string[]).includes(server.name);
-      const isPackageDefault = server.name === "repomix";
+      const isPackageDefault = (PACKAGE_DEFAULT_MCPS as readonly string[]).includes(server.name);
       const drift = !server.default_enabled && !isMinimalDefault && !isPackageDefault && enabledAgents.length > 0;
       if (drift) warnings += 1;
 

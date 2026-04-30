@@ -13,8 +13,8 @@ Fulcrum is currently the **foundation layer** of the larger Agent OS: it manages
 | Cross-agent rules | Sentinel-splices `rules/AGENTS.md` into each detected agent while preserving user text outside Fulcrum markers | [context](docs/context.md), [agents](docs/agents.md) |
 | Hooks | Eight TypeScript hook recipes behind one `fulcrum hook <name>` binary entrypoint | [hooks](docs/hooks.md), [tool output policy](docs/tool-output-policy.md) |
 | Skills | 29 authored skills, 19 upstream-pinned skills, trigger eval harnesses, and agent-native namespace layouts | [skills](docs/skills.md), [skill smoke test](docs/skill-smoke-test.md) |
-| Managed packages | Official-first install plus full package-surface mirrors for Caveman, Repomix, Cloudflare, and Superpowers | [MCP policy](docs/mcp.md), [HANDOVER](HANDOVER.md) |
-| MCP registry | 17 builtin MCP definitions with minimal default enablement for DeepWiki + context7 and opt-in extras | [MCP policy](docs/mcp.md) |
+| Managed packages | Official-first install plus package payload mirrors, loadable skill adapters, and native MCP config for Caveman, Repomix, Cloudflare, and Superpowers | [MCP policy](docs/mcp.md), [HANDOVER](HANDOVER.md) |
+| MCP registry | 17 builtin MCP definitions plus package-provided MCPs; config is installed everywhere supported, enablement is policy-controlled | [MCP policy](docs/mcp.md) |
 | Doctor | Agent, component, package parity, MCP, skill-budget, policy, toolchain, and worktree health reporting | [user guide](docs/user-guide.md#doctor) |
 
 ## Supported Agents
@@ -53,7 +53,7 @@ bash scripts/install.sh --with-project ~/code/myproject
 bash scripts/install.sh --dry-run --profile full
 ```
 
-The default `minimal` profile splices rules, seeds the tool-output policy, registers builtin MCPs, and enables only DeepWiki + context7 where no user state exists. The `full` profile adds hooks, authored skills, upstream skills, Caveman, Repomix, Cloudflare, and Superpowers package setup.
+The default `minimal` profile splices rules, seeds the tool-output policy, registers builtin MCPs, writes disabled config where agents support it, and enables only DeepWiki + context7 where no user state exists. The `full` profile adds hooks, authored skills, non-package-owned upstream skills, Caveman, Repomix, Cloudflare, and Superpowers package setup. Package installs own their bundled skills/MCPs and enable the MCPs shipped by that package while still preserving normal `fulcrum mcp enable/disable` control.
 
 ## First Run
 
@@ -102,13 +102,14 @@ Fulcrum uses an official-first rule:
 
 1. Use the vendor/native installer when an agent has one.
 2. Mirror the vendor-published package content into nearest native surfaces when an agent does not.
-3. Record unsupported primitives explicitly in `component status` and `doctor`; do not silently omit them.
+3. Adapt loadable surfaces into native agent config, not only package cache: `skills/*/SKILL.md` become agent skill paths and package `.mcp.json` entries become native MCP config.
+4. Record unsupported primitives explicitly in `component status` and `doctor`; do not silently omit them.
 
 Managed package parity covers:
 
 - skills
 - rules/context files
-- MCP metadata/config
+- MCP manifests plus native MCP config
 - commands/prompts
 - agents/subagents
 - hooks

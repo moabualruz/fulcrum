@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyVendorAction, classifyVendorComponent } from "./vendor.ts";
@@ -106,6 +106,98 @@ describe("vendor component adapter", () => {
     expect(combined).toContain("ast-grep removal is manual");
     expect(combined).toContain("tavily removal is manual");
     expect(combined).toContain("pi-mcp-adapter removal is manual");
+  });
+
+  test("skills.upstream component excludes Cloudflare package-owned source", async () => {
+    const repoDirBefore = process.env["FULCRUM_REPO_DIR"];
+    process.env["FULCRUM_REPO_DIR"] = scratch;
+    await mkdir(join(scratch, "skills"), { recursive: true });
+    await mkdir(join(scratch, ".codex", "skills"), { recursive: true });
+    await writeFile(join(scratch, "skills", "upstream.lock"), [
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.wrangler]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/wrangler"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+      "[skills.semgrep]",
+      'source = "https://github.com/semgrep/skills"',
+      'subpath = "skills/semgrep"',
+      'ref = "main"',
+      'tree_sha = "89abcdef0123456789abcdef0123456789abcdef"',
+      'license = "MIT"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+
+    try {
+      await applyVendorAction(vendorAction("skills.upstream", "create-or-update"), true);
+    } finally {
+      console.log = originalLog;
+      if (repoDirBefore === undefined) delete process.env["FULCRUM_REPO_DIR"];
+      else process.env["FULCRUM_REPO_DIR"] = repoDirBefore;
+    }
+
+    expect(logs.some((line) => line.includes("1 curated skill(s)"))).toBe(true);
+    expect(logs.some((line) => line.includes("semgrep"))).toBe(true);
+    expect(logs.some((line) => line.includes("wrangler"))).toBe(false);
+  });
+
+  test("Cloudflare package install cleans stale upstream copies before writing package skills", async () => {
+    const repoDirBefore = process.env["FULCRUM_REPO_DIR"];
+    process.env["FULCRUM_REPO_DIR"] = scratch;
+    await mkdir(join(scratch, "skills"), { recursive: true });
+    await mkdir(join(scratch, ".pi", "agent", "skills", "cloudflare"), { recursive: true });
+    await mkdir(join(scratch, ".fulcrum", "cache", "cloudflare-skills", "skills", "cloudflare"), { recursive: true });
+    await writeFile(
+      join(scratch, ".fulcrum", "cache", "cloudflare-skills", "skills", "cloudflare", "SKILL.md"),
+      "---\nname: cloudflare\n---\n",
+    );
+    await writeFile(join(scratch, "skills", "upstream.lock"), [
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.cloudflare-platform]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/cloudflare"',
+      'ref = "main"',
+      'tree_sha = "0123456789abcdef0123456789abcdef01234567"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+
+    try {
+      await applyVendorAction(vendorAction("package.cloudflare", "create-or-update"), true);
+    } finally {
+      console.log = originalLog;
+      if (repoDirBefore === undefined) delete process.env["FULCRUM_REPO_DIR"];
+      else process.env["FULCRUM_REPO_DIR"] = repoDirBefore;
+    }
+
+    const cleanupIndex = logs.findIndex((line) => line.includes("fulcrum upstream skills remove"));
+    const installIndex = logs.findIndex((line) => line.includes("Pi CLI cloudflare loadable skill mirror installed"));
+    expect(cleanupIndex).toBeGreaterThanOrEqual(0);
+    expect(installIndex).toBeGreaterThan(cleanupIndex);
   });
 });
 

@@ -6,7 +6,7 @@ import {
   uninstallRepomixPackageMirrors,
 } from "../../cli/repomix-package.ts";
 import { removeAuthoredSkills, syncSkills } from "../../cli/skills.ts";
-import { removeUpstreamSkills, syncUpstreamSkills, syncUpstreamSkillsBySource } from "../../cli/upstream-skills.ts";
+import { removeUpstreamSkills, syncUpstreamSkills } from "../../cli/upstream-skills.ts";
 import { removeCavemanCopies } from "../../cli/uninstall.ts";
 import {
   runAstGrepIntegration,
@@ -23,6 +23,7 @@ import {
 import type { ComponentAction } from "../types.ts";
 
 const CLOUDFLARE_SKILLS_SOURCE = "https://github.com/cloudflare/skills";
+const PACKAGE_OWNED_UPSTREAM_SOURCES = [CLOUDFLARE_SKILLS_SOURCE] as const;
 
 export type VendorComponent =
   | "skills-authored"
@@ -85,7 +86,7 @@ async function installVendor(vendor: VendorComponent, dryRun: boolean): Promise<
       await syncSkills({ dryRun });
       return;
     case "skills-upstream":
-      await syncUpstreamSkills({ dryRun });
+      await syncUpstreamSkills({ dryRun, excludeSources: PACKAGE_OWNED_UPSTREAM_SOURCES });
       return;
     case "caveman":
       await installCaveman(process.env["HOME"] ?? "", { dryRun });
@@ -95,8 +96,8 @@ async function installVendor(vendor: VendorComponent, dryRun: boolean): Promise<
       await installRepomixPackageMirrors({ dryRun });
       return;
     case "cloudflare":
+      await removeUpstreamSkillsIfLockExists({ dryRun, source: CLOUDFLARE_SKILLS_SOURCE });
       await installCloudflarePackage({ dryRun });
-      await syncUpstreamSkillsBySource(CLOUDFLARE_SKILLS_SOURCE, { dryRun });
       return;
     case "superpowers":
       await installSuperpowersPackage({ dryRun });

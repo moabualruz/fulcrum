@@ -67,6 +67,7 @@ function planSurfaceTarget(
     agentId,
     surface,
     targetPath: targetPathFor(agentId, manifest.packageId, surface),
+    additionalTargetPaths: additionalTargetPathsFor(agentId, manifest.packageId, surface),
     configMutation: configMutationFor(agentId, surface),
     support: "mirror",
   };
@@ -195,6 +196,25 @@ function opencodeTarget(slug: string, surface: PackageSurface): string {
     default:
       return `${MIRROR_ROOTS.opencode}/packages/${slug}/${surface.relativePath}`;
   }
+}
+
+function additionalTargetPathsFor(agentId: AgentId, packageId: string, surface: PackageSurface): string[] | undefined {
+  if (surface.kind !== "skill") return undefined;
+  const slug = packageSlug(packageId);
+  if (packageId === "package.cloudflare") {
+    return loadableSkillTarget(agentId, slug, surface.name);
+  }
+  if (packageId === "package.superpowers" && (agentId === "codex" || agentId === "pi")) {
+    return loadableSkillTarget(agentId, slug, surface.name);
+  }
+  return undefined;
+}
+
+function loadableSkillTarget(agentId: AgentId, slug: string, skillName: string): string[] | undefined {
+  if (agentId === "codex") return [`~/.codex/skills/${slug}/${skillName}/SKILL.md`];
+  if (agentId === "opencode") return [`${MIRROR_ROOTS.opencode}/skills/${slug}/${skillName}/SKILL.md`];
+  if (agentId === "pi") return [`${MIRROR_ROOTS.pi}/skills/${slug}/${skillName}/SKILL.md`];
+  return undefined;
 }
 
 function configMutationFor(agentId: AgentId, surface: PackageSurface): string | undefined {

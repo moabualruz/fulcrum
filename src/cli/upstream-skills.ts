@@ -581,12 +581,17 @@ export async function syncUpstreamSkills(
     updatePins?: boolean;
     skills?: readonly UpstreamSkill[];
     lockPath?: string;
+    excludeSources?: readonly string[];
   } = {},
 ): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const updatePins = opts.updatePins ?? false;
   const lockPath = opts.lockPath ?? upstreamLockPath();
-  const skills = opts.skills ?? (await loadUpstreamSkills(lockPath));
+  const excludedSources = new Set(opts.excludeSources ?? []);
+  const loadedSkills = opts.skills ?? (await loadUpstreamSkills(lockPath));
+  const skills = excludedSources.size === 0
+    ? loadedSkills
+    : loadedSkills.filter((skill) => !excludedSources.has(skill.source));
   const home = homeDir();
 
   console.log(`fulcrum upstream skills sync — ${skills.length} curated skill(s)\n`);
