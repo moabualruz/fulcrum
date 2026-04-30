@@ -1,6 +1,6 @@
 # 08 — Queue and agent run kernel
 
-Status: ready-for-agent
+Status: done
 Risk tier: medium
 Dependencies: product-kernel/05
 File ownership:
@@ -14,3 +14,6 @@ Acceptance criteria:
 - Two consecutive `claimJob` calls do not return the same row.
 - Failed claims with `attempts >= max_attempts` mark status `failed`.
 - RED test fails before implementation; GREEN: `bun test src/product-kernel/jobs.test.ts` passes.
+
+## Comments
+- Shipped in `f346284 feat(product-kernel): add jobs queue with claim semantics`.

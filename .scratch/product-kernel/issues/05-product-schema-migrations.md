@@ -1,6 +1,6 @@
 # 05 — Product schema migrations
 
-Status: ready-for-agent
+Status: done
 Risk tier: medium
 Dependencies: product-kernel/01
 File ownership:
@@ -17,3 +17,6 @@ Acceptance criteria:
 - `0003_jobs.sql` creates the `jobs` table with status CHECK constraint and `jobs_claim_idx`.
 - RED test asserts these tables exist after migration; fails before SQL exists.
 - GREEN: PGlite path passes; PostgreSQL path skips when no `DATABASE_URL` and passes when set.
+
+## Comments
+- Shipped in `ec923d0 feat(product-kernel): add product schema migrations`.

@@ -1,6 +1,6 @@
 # 01 — Database compatibility spike
 
-Status: ready-for-agent
+Status: done
 Risk tier: medium
 Dependencies: —
 File ownership:
@@ -18,3 +18,6 @@ Acceptance criteria:
 - `bun test src/product-kernel/compat.test.ts` is green for PGlite.
 
 Failure gate: if PGlite cannot persist under Bun, stop and trigger a Convex spike (escalate as `ready-for-human`).
+
+## Comments
+- Shipped in `bcdc6fc feat(product-kernel): add database, markdown, and state foundations`. PGlite path green; PostgreSQL path skips without `DATABASE_URL`.

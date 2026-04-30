@@ -1,6 +1,6 @@
 # 03 — Markdown and frontmatter kernel
 
-Status: ready-for-agent
+Status: done
 Risk tier: low
 Dependencies: —
 File ownership:
@@ -16,3 +16,6 @@ Acceptance criteria:
 - No model/embedding dependency introduced.
 
 Failure gate: if key order, comments, unknown keys, or body content cannot be preserved on real fixtures, switch to a frontmatter patcher that updates only known keys; document the limitation in code.
+
+## Comments
+- Shipped in `bcdc6fc feat(product-kernel): add database, markdown, and state foundations`. Round-trip green on the canonical fixture.

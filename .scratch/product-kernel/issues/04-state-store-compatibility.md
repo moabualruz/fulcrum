@@ -1,6 +1,6 @@
 # 04 — State store compatibility
 
-Status: ready-for-agent
+Status: done
 Risk tier: low
 Dependencies: —
 File ownership:
@@ -14,3 +14,6 @@ Acceptance criteria:
 - Subscribers receive the new state synchronously after `setActiveProject` is called.
 
 Failure gate: if Zustand vanilla cannot be wrapped cleanly for SSR (relevant in Task 11), keep the same `createFulcrumStore` API and switch to TanStack Store under it.
+
+## Comments
+- Shipped in `bcdc6fc feat(product-kernel): add database, markdown, and state foundations`.
