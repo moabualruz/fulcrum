@@ -31,9 +31,23 @@ describe("jobs queue", () => {
     const db = await freshDb("claim");
     try {
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const a = await enqueueJob(db, { orgId: org.id, queue: "default", kind: "test" });
-      const b = await enqueueJob(db, { orgId: org.id, queue: "default", kind: "test" });
-      const c = await enqueueJob(db, { orgId: org.id, queue: "default", kind: "test" });
+      // Stagger availableAt so the FIFO ordering is unambiguous regardless of
+      // PGlite clock resolution. claimJob orders by available_at, created_at,
+      // id; passing distinct availableAt timestamps gives a deterministic
+      // ground truth without depending on insert-time millisecond skew.
+      const t0 = Date.now();
+      const a = await enqueueJob(db, {
+        orgId: org.id, queue: "default", kind: "test",
+        availableAt: new Date(t0 - 3000),
+      });
+      const b = await enqueueJob(db, {
+        orgId: org.id, queue: "default", kind: "test",
+        availableAt: new Date(t0 - 2000),
+      });
+      const c = await enqueueJob(db, {
+        orgId: org.id, queue: "default", kind: "test",
+        availableAt: new Date(t0 - 1000),
+      });
 
       const first = await claimJob(db, "default", "worker-1");
       const second = await claimJob(db, "default", "worker-1");
