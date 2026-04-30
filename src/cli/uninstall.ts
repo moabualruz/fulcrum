@@ -5,7 +5,7 @@
 // registry entries. Leave user-edited policy files and third-party caveman
 // installs alone unless an explicit flag says otherwise.
 
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { AGENTS } from "../agents/registry.ts";
 import { which, run as runProc } from "../utils/proc.ts";
@@ -58,6 +58,14 @@ async function removePath(path: string, label: string): Promise<void> {
   console.log(`     - ${label} → ${path}`);
 }
 
+function cavemanMirrorMarkerPath(home: string): string {
+  return `${process.env["FULCRUM_HOME"] ?? `${home}/.fulcrum`}/state/global/caveman-mirrors.installed`;
+}
+
+async function hasCavemanMirrorMarker(home: string): Promise<boolean> {
+  return exists(cavemanMirrorMarkerPath(home));
+}
+
 async function readJsonObject(path: string): Promise<Record<string, unknown> | null> {
   if (!(await exists(path))) return {};
   try {
@@ -91,6 +99,12 @@ async function writeOrRemoveJson(path: string, root: Record<string, unknown>, la
 function normalizeAfterBlockRemoval(text: string): string {
   const compact = text.replace(/\n{3,}/g, "\n\n").trimEnd();
   return compact ? compact + "\n" : "";
+}
+
+function removeTomlSection(existing: string, header: string): string {
+  const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(?:^|\\n)${escaped}\\n[\\s\\S]*?(?=\\n\\[|$)`);
+  return existing.replace(re, "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 export async function removeSentinelBlock(target: string, label: string): Promise<void> {
@@ -324,6 +338,90 @@ async function cleanupPiMcpAdapterIfUnused(home: string): Promise<void> {
   console.log(`     - Pi pi-mcp-adapter package entry removed → ${settingsFile}`);
 }
 
+async function codexCavemanPackageHookSources(home: string): Promise<Record<string, unknown[]> | null> {
+  const root = `${home}/.codex/plugins/cache/caveman/caveman`;
+  if (!(await exists(root))) return null;
+  const collected: Record<string, unknown[]> = {};
+  for (const version of await readdir(root, { withFileTypes: true })) {
+    if (!version.isDirectory()) continue;
+    const hooksPath = `${root}/${version.name}/package/.codex/hooks.json`;
+    const parsed = await readJsonObject(hooksPath);
+    const hooks = parsed?.["hooks"];
+    if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) continue;
+    for (const [event, entries] of Object.entries(hooks as Record<string, unknown>)) {
+      if (!Array.isArray(entries)) continue;
+      collected[event] = [...(collected[event] ?? []), ...entries];
+    }
+  }
+  return Object.keys(collected).length > 0 ? collected : null;
+}
+
+function isCavemanHookEntry(entry: unknown): boolean {
+  return JSON.stringify(entry).toLowerCase().includes("caveman");
+}
+
+async function removeCodexCavemanHooks(home: string): Promise<void> {
+  const target = `${home}/.codex/hooks.json`;
+  const targetJson = await readJsonObject(target);
+  if (!targetJson) return;
+  const targetHooks = targetJson["hooks"];
+  if (!targetHooks || typeof targetHooks !== "object" || Array.isArray(targetHooks)) return;
+
+  const sourceHooks = await codexCavemanPackageHookSources(home);
+  let changed = false;
+  for (const [event, entries] of Object.entries(targetHooks as Record<string, unknown>)) {
+    if (!Array.isArray(entries)) continue;
+    const sourceKeys = new Set((sourceHooks?.[event] ?? []).map((entry) => JSON.stringify(entry)));
+    const next = entries.filter((entry) => {
+      if (sourceKeys.size > 0) return !sourceKeys.has(JSON.stringify(entry));
+      return !isCavemanHookEntry(entry);
+    });
+    if (next.length !== entries.length) changed = true;
+    if (next.length === 0) delete (targetHooks as Record<string, unknown>)[event];
+    else (targetHooks as Record<string, unknown>)[event] = next;
+  }
+  if (!changed) return;
+  if (Object.keys(targetHooks as Record<string, unknown>).length === 0) delete targetJson["hooks"];
+  await writeOrRemoveJson(target, targetJson, "Codex Caveman hooks config");
+}
+
+async function removeCodexCavemanConfig(home: string): Promise<void> {
+  const configPath = `${home}/.codex/config.toml`;
+  if (!(await exists(configPath))) return;
+  if (DRY_RUN) {
+    console.log(`     [dry-run] would remove Codex Caveman plugin config from: ${configPath}`);
+    return;
+  }
+  const existing = await readFile(configPath, "utf8");
+  let next = removeTomlSection(existing, "[plugins.\"caveman@caveman\"]");
+  next = removeTomlSection(next, "[marketplaces.caveman]");
+  await wf(configPath, next ? `${next}\n` : "");
+  console.log(`     - Codex Caveman plugin config cleaned → ${configPath}`);
+}
+
+async function removeCavemanMirrorSurfaces(home: string): Promise<void> {
+  if (!DRY_RUN && !(await hasCavemanMirrorMarker(home))) {
+    console.log("     · skip Caveman fallback mirrors removal (Fulcrum marker not present)");
+    return;
+  }
+
+  await removeCodexCavemanHooks(home);
+  await removeCodexCavemanConfig(home);
+
+  const mirrorAgents: Array<{ dir: string; label: string; agent: typeof AGENTS[number]; packageDir: string }> = [
+    { dir: `${home}/.codex`, label: "Codex CLI", agent: AGENTS.find((a) => a.id === "codex")!, packageDir: `${home}/.codex/plugins/cache/caveman` },
+    { dir: `${home}/.config/opencode`, label: "OpenCode", agent: AGENTS.find((a) => a.id === "opencode")!, packageDir: `${home}/.config/opencode/packages/caveman` },
+    { dir: `${home}/.pi/agent`, label: "Pi CLI", agent: AGENTS.find((a) => a.id === "pi")!, packageDir: `${home}/.pi/agent/packages/caveman` },
+  ];
+  for (const { dir, label, agent, packageDir } of mirrorAgents) {
+    if (!(await exists(dir))) continue;
+    await removePath(agent.cavemanInstallDir(home), `${label} caveman install dir`);
+    await removePath(packageDir, `${label} caveman package mirror`);
+  }
+  await removeCavemanSkillSiblings(home);
+  await removePath(cavemanMirrorMarkerPath(home), "Caveman fallback mirrors marker");
+}
+
 export async function removeCavemanCopies(home: string, opts: { dryRun?: boolean } = {}): Promise<void> {
   const previousDryRun = DRY_RUN;
   DRY_RUN = opts.dryRun ?? DRY_RUN;
@@ -359,25 +457,7 @@ export async function removeCavemanCopies(home: string, opts: { dryRun?: boolean
     }
     await removePath(`${home}/.gemini/extensions/caveman`, "Gemini CLI caveman extension");
 
-    // W1.4: Codex/OpenCode/Pi — remove Fulcrum's per-agent filesystem mirrors.
-    const mirrorAgents: Array<{ dir: string; label: string; agent: typeof AGENTS[number] }> = [
-      { dir: `${home}/.codex`, label: "Codex CLI", agent: AGENTS.find((a) => a.id === "codex")! },
-      { dir: `${home}/.config/opencode`, label: "OpenCode", agent: AGENTS.find((a) => a.id === "opencode")! },
-      { dir: `${home}/.pi/agent`, label: "Pi CLI", agent: AGENTS.find((a) => a.id === "pi")! },
-    ];
-    for (const { dir, label, agent } of mirrorAgents) {
-      if (!(await exists(dir))) continue;
-      await removePath(agent.cavemanInstallDir(home), `${label} caveman install dir`);
-    }
-    await removePath(`${home}/.codex/plugins/cache/caveman`, "Codex CLI caveman plugin cache");
-
-    // Always remove file-copy installs as cleanup; plugin/extension agents are
-    // handled by their native uninstall commands above.
-    for (const agent of AGENTS) {
-      if (agent.id === "claude-code" || agent.id === "gemini") continue;
-      await removePath(agent.cavemanInstallDir(home), `${agent.label} caveman install dir`);
-    }
-    await removeCavemanSkillSiblings(home);
+    await removeCavemanMirrorSurfaces(home);
 
     const cfgPath = process.env["XDG_CONFIG_HOME"]
       ? `${process.env["XDG_CONFIG_HOME"]}/caveman/config.json`

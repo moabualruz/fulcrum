@@ -315,6 +315,13 @@ function supportsNativeDisabled(agentId: AgentId): boolean {
   return agentId === "codex" || agentId === "gemini" || agentId === "opencode";
 }
 
+export type DisabledConfigSupport = "native" | "disabledConfigUnsupported" | "hidden";
+
+export function disabledConfigSupport(server: McpServer, agentId: AgentId): DisabledConfigSupport {
+  if (!server.agent_visibility[agentId]) return "hidden";
+  return supportsNativeDisabled(agentId) ? "native" : "disabledConfigUnsupported";
+}
+
 function mcpValueForAgent(server: McpServer, agentId: AgentId): Record<string, unknown> {
   if (server.transport === "http") {
     // Per-agent env-interpolation syntax for Authorization Bearer header.

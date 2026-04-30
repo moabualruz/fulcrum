@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import { ALL_COMPONENTS, getComponent } from "../components/catalog.ts";
 import { planComponentOperation } from "../components/planner.ts";
 import type { Operation } from "../components/types.ts";
@@ -67,6 +68,7 @@ async function runStatus(argv: string[]): Promise<void> {
         componentId: component.id,
         status: status?.status ?? "not-installed",
         surfaces,
+        ...(component.kind === "package" ? { parity: await packageParity(component.id) } : {}),
       };
       if (options.json) {
         printJson(payload);
@@ -92,6 +94,32 @@ async function runStatus(argv: string[]): Promise<void> {
     }
   } finally {
     ledger.close();
+  }
+}
+
+async function packageParity(componentId: string): Promise<unknown> {
+  const { getPackageSurfaceManifest, isKnownPackageId, packageCacheSourceRoot } = await import("./package-surfaces.ts");
+  const { planPackageMirrorTargets } = await import("./package-mirror.ts");
+  const { auditPackageParity } = await import("./package-parity.ts");
+  const home = process.env["HOME"] ?? "";
+  const sourceRoot = isKnownPackageId(componentId) ? await existingPath(packageCacheSourceRoot(componentId, home)) : undefined;
+  const manifest = await getPackageSurfaceManifest(componentId, sourceRoot === undefined ? {} : { sourceRoot });
+  const targets = planPackageMirrorTargets(manifest, [...ALL_AGENT_IDS]);
+  const byAgent = await Promise.all(
+    ALL_AGENT_IDS.map(async (agentId) => {
+      const agentTargets = targets.filter((target) => target.agentId === agentId);
+      return auditPackageParity(manifest, agentTargets, { home });
+    }),
+  );
+  return byAgent;
+}
+
+async function existingPath(path: string): Promise<string | undefined> {
+  try {
+    await stat(path);
+    return path;
+  } catch {
+    return undefined;
   }
 }
 

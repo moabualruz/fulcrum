@@ -80,7 +80,7 @@ describe("applyMcpAction", () => {
     expect(reg.servers["context7"]).toBeDefined();
   });
 
-  test("disable sets enabled false and removes Codex config for requested agent", async () => {
+  test("disable sets enabled false and preserves Codex disabled config for requested agent", async () => {
     await mkdir(join(tmp, ".codex"), { recursive: true });
     await registerBuiltinMcpByName("context7", { enabled: true, agents: ["codex"] });
     const installedToml = await readFile(join(tmp, ".codex", "config.toml"), "utf8");
@@ -97,7 +97,40 @@ describe("applyMcpAction", () => {
     expect(reg.servers["context7"]?.enabled.codex).toBe(false);
 
     const disabledToml = await readFile(join(tmp, ".codex", "config.toml"), "utf8");
-    expect(disabledToml).not.toContain("[mcp_servers.context7]");
+    expect(disabledToml).toContain("[mcp_servers.context7]");
+    expect(disabledToml).toContain("enabled = false");
+  });
+
+  test("disable preserves Gemini and OpenCode disabled native config", async () => {
+    await mkdir(join(tmp, ".gemini"), { recursive: true });
+    await mkdir(join(tmp, ".config", "opencode"), { recursive: true });
+    await registerBuiltinMcpByName("github", { enabled: true, agents: ["gemini", "opencode"] });
+
+    await applyMcpAction(
+      mcpAction({
+        componentId: "mcp.github",
+        payload: { name: "github" },
+        change: "disable",
+      }),
+    );
+
+    const reg = await loadRegistry();
+    expect(reg.servers["github"]?.enabled.gemini).toBe(false);
+    expect(reg.servers["github"]?.enabled.opencode).toBe(false);
+
+    const geminiSettings = JSON.parse(await readFile(join(tmp, ".gemini", "settings.json"), "utf8")) as {
+      mcpServers?: Record<string, unknown>;
+    };
+    const geminiEnablement = JSON.parse(await readFile(join(tmp, ".gemini", "mcp-server-enablement.json"), "utf8")) as {
+      github?: { enabled: boolean };
+    };
+    const opencode = JSON.parse(await readFile(join(tmp, ".config", "opencode", "opencode.json"), "utf8")) as {
+      mcp?: Record<string, Record<string, unknown>>;
+    };
+    expect(geminiSettings.mcpServers?.github).toBeDefined();
+    expect(geminiEnablement.github?.enabled).toBe(false);
+    expect(opencode.mcp?.github).toBeDefined();
+    expect(opencode.mcp?.github?.enabled).toBe(false);
   });
 
   test("derives name from component id when payload name is absent", async () => {

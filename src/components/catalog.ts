@@ -184,6 +184,10 @@ export const ALL_COMPONENTS: readonly ComponentSpec[] = [
   vendorPackageComponent("repomix"),
   vendorPackageComponent("cloudflare"),
   vendorPackageComponent("superpowers"),
+  vendorPackageComponent("graphify"),
+  vendorPackageComponent("ast-grep"),
+  vendorPackageComponent("tavily"),
+  vendorPackageComponent("pi-mcp-adapter"),
   {
     id: "mcp.registry",
     kind: "mcp",
@@ -252,7 +256,17 @@ export function expandProfile(id: string): ComponentSpec[] {
   return expanded;
 }
 
-function vendorPackageComponent(name: "caveman" | "repomix" | "cloudflare" | "superpowers"): ComponentSpec {
+function vendorPackageComponent(
+  name:
+    | "caveman"
+    | "repomix"
+    | "cloudflare"
+    | "superpowers"
+    | "graphify"
+    | "ast-grep"
+    | "tavily"
+    | "pi-mcp-adapter",
+): ComponentSpec {
   const id = `package.${name}`;
   return {
     id,

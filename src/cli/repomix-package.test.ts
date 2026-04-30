@@ -202,6 +202,16 @@ describe("Repomix capability package mirrors", () => {
     await mkdir(join(TMP, ".gemini"), { recursive: true });
     await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
     await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+    await mkdir(join(TMP, ".config", "opencode", "commands"), { recursive: true });
+    await mkdir(join(TMP, ".config", "opencode", "rules"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent", "prompts"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent", "rules"), { recursive: true });
+    await mkdir(join(TMP, ".gemini", "extensions", "repomix", "skills", "repomix-pack-local"), { recursive: true });
+    await writeFile(join(TMP, ".config", "opencode", "commands", "pack-local.backup.md"), "stale backup\n");
+    await writeFile(join(TMP, ".config", "opencode", "rules", "base.original.md"), "stale backup\n");
+    await writeFile(join(TMP, ".pi", "agent", "prompts", "pack-local.backup.md"), "stale backup\n");
+    await writeFile(join(TMP, ".pi", "agent", "rules", "base.original.md"), "stale backup\n");
+    await writeFile(join(TMP, ".gemini", "extensions", "repomix", "skills", "repomix-pack-local", "SKILL.original.md"), "stale backup\n");
 
     const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
     try {
@@ -230,15 +240,39 @@ describe("Repomix capability package mirrors", () => {
     expect(await readFile(join(TMP, ".gemini", "extensions", "repomix", "AGENTS.md"), "utf8")).toContain("Repomix project rules");
 
     expect(await readFile(join(TMP, ".config", "opencode", "agents", "repomix-explorer.md"), "utf8")).toContain("Explore with repomix.");
+    expect(await readFile(join(TMP, ".config", "opencode", "commands", "pack-local.md"), "utf8")).toContain("Run local repomix.");
+    expect(await readFile(join(TMP, ".config", "opencode", "commands", "explore-remote.md"), "utf8")).toContain("Explore remote repository.");
+    expect(await readFile(join(TMP, ".config", "opencode", "AGENTS.md"), "utf8")).toContain("Repomix project rules");
+    expect(await readFile(join(TMP, ".config", "opencode", "rules", "repomix", "base.md"), "utf8")).toContain("Repomix project rules");
+    const opencodePackage = JSON.parse(await readFile(join(TMP, ".config", "opencode", "packages", "repomix", "package.json"), "utf8"));
+    expect(opencodePackage.name).toBe("repomix");
+    expect(opencodePackage.fulcrumMirror.surfaces).toContain("commands");
     const opencode = JSON.parse(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8"));
     expect(opencode.mcp.repomix.enabled).toBe(true);
     expect(opencode.mcp.repomix.command).toEqual(["npx", "-y", "repomix@latest", "--mcp"]);
 
     expect(await readFile(join(TMP, ".pi", "agent", "skills", "repomix-explorer", "SKILL.md"), "utf8")).toContain("Explore with repomix.");
+    expect(await readFile(join(TMP, ".pi", "agent", "prompts", "pack-local.md"), "utf8")).toContain("Run local repomix.");
+    expect(await readFile(join(TMP, ".pi", "agent", "prompts", "explore-remote.md"), "utf8")).toContain("Explore remote repository.");
+    expect(await readFile(join(TMP, ".pi", "agent", "AGENTS.md"), "utf8")).toContain("Repomix project rules");
+    expect(await readFile(join(TMP, ".pi", "agent", "rules", "repomix", "base.md"), "utf8")).toContain("Repomix project rules");
+    expect(await readFile(join(TMP, ".pi", "agent", "agents", "repomix-explorer.unsupported.md"), "utf8")).toContain("Pi has no native standalone explorer agent primitive");
+    const piPackage = JSON.parse(await readFile(join(TMP, ".pi", "agent", "packages", "repomix", "package.json"), "utf8"));
+    expect(piPackage.name).toBe("repomix");
+    expect(piPackage.pi.prompts).toContain("./prompts");
     const pi = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8"));
     expect(pi.mcpServers.repomix.command).toBe("npx");
     expect(pi.mcpServers.repomix.args).toEqual(["-y", "repomix@latest", "--mcp"]);
     expect(pi.mcpServers.repomix.directTools).toBe(true);
+    for (const filtered of [
+      join(TMP, ".config", "opencode", "commands", "pack-local.backup.md"),
+      join(TMP, ".config", "opencode", "rules", "base.original.md"),
+      join(TMP, ".pi", "agent", "prompts", "pack-local.backup.md"),
+      join(TMP, ".pi", "agent", "rules", "base.original.md"),
+      join(TMP, ".gemini", "extensions", "repomix", "skills", "repomix-pack-local", "SKILL.original.md"),
+    ]) {
+      expect(await Bun.file(filtered).exists()).toBe(false);
+    }
   });
 
   test("uninstalls mirrored package surfaces", async () => {
@@ -261,9 +295,16 @@ describe("Repomix capability package mirrors", () => {
     expect(await Bun.file(join(TMP, ".gemini", "extensions", "repomix")).exists()).toBe(false);
     expect(await Bun.file(join(TMP, ".config", "opencode", "skills", "repomix-explorer")).exists()).toBe(false);
     expect(await Bun.file(join(TMP, ".config", "opencode", "agents", "repomix-explorer.md")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".config", "opencode", "commands", "pack-local.md")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".config", "opencode", "rules", "repomix")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".config", "opencode", "packages", "repomix")).exists()).toBe(false);
     const opencode = JSON.parse(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8"));
     expect(opencode.mcp?.repomix).toBeUndefined();
     expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "repomix-pack-remote")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".pi", "agent", "prompts", "pack-remote.md")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".pi", "agent", "rules", "repomix")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".pi", "agent", "agents", "repomix-explorer.unsupported.md")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".pi", "agent", "packages", "repomix")).exists()).toBe(false);
     const pi = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8"));
     expect(pi.mcpServers?.repomix).toBeUndefined();
   });

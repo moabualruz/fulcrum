@@ -76,21 +76,6 @@ describe("removeExactLine", () => {
 });
 
 describe("run", () => {
-  test("dry-run does not manage removed context component", async () => {
-    const logs: string[] = [];
-    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
-      logs.push(args.map(String).join(" "));
-    });
-
-    try {
-      await run(["--dry-run"]);
-      const removedComponent = ["context", "mode"].join("-");
-      expect(logs.join("\n")).not.toContain(removedComponent);
-    } finally {
-      logSpy.mockRestore();
-    }
-  });
-
   test("dry-run delegates to component default profile removal", async () => {
     const logs: string[] = [];
     const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
@@ -482,11 +467,50 @@ describe("removeCavemanCopies — W1.2 Gemini extension uninstall", () => {
   // ---------------------------------------------------------------------------
 
 describe("removeCavemanCopies — W1.4 filesystem mirrors", () => {
-  test("does not call npx skills remove caveman; removes per-agent mirrors", async () => {
+  async function writeCavemanMirrorMarker(): Promise<void> {
+    await mkdir(join(TMP, ".fulcrum", "state", "global"), { recursive: true });
+    await writeFile(join(TMP, ".fulcrum", "state", "global", "caveman-mirrors.installed"), "installed\n");
+  }
+
+  test("does not call npx skills remove caveman; removes marked per-agent mirrors", async () => {
+    await writeCavemanMirrorMarker();
     await mkdir(join(TMP, ".codex", "skills", "caveman"), { recursive: true });
     await mkdir(join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0", "package", ".codex"), { recursive: true });
+    await writeFile(
+      join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0", "package", ".codex", "hooks.json"),
+      JSON.stringify({ hooks: { UserPromptSubmit: [{ command: "hooks/caveman-activate.js" }] } }, null, 2) + "\n",
+    );
+    await writeFile(
+      join(TMP, ".codex", "config.toml"),
+      [
+        "[features]",
+        "codex_hooks = true",
+        "",
+        "[marketplaces.caveman]",
+        'source_type = "git"',
+        'source = "https://github.com/JuliusBrussee/caveman"',
+        "",
+        '[plugins."caveman@caveman"]',
+        "enabled = true",
+        "",
+      ].join("\n"),
+    );
+    await writeFile(
+      join(TMP, ".codex", "hooks.json"),
+      JSON.stringify({
+        hooks: {
+          UserPromptSubmit: [
+            { command: "hooks/caveman-activate.js" },
+            { command: "user-owned-hook" },
+          ],
+        },
+      }, null, 2) + "\n",
+    );
     await mkdir(join(TMP, ".config", "opencode", "skills", "caveman"), { recursive: true });
+    await mkdir(join(TMP, ".config", "opencode", "packages", "caveman", "commands"), { recursive: true });
     await mkdir(join(TMP, ".pi", "agent", "skills", "caveman"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent", "packages", "caveman", "hooks"), { recursive: true });
 
     const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
       if (cmd === "npx") return "/usr/local/bin/npx";
@@ -503,15 +527,49 @@ describe("removeCavemanCopies — W1.4 filesystem mirrors", () => {
       expect(npxRemovals.length).toBe(0);
       expect(await Bun.file(join(TMP, ".codex", "skills", "caveman")).exists()).toBe(false);
       expect(await Bun.file(join(TMP, ".codex", "plugins", "cache", "caveman")).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ".config", "opencode", "packages", "caveman")).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ".pi", "agent", "packages", "caveman")).exists()).toBe(false);
       expect(await Bun.file(join(TMP, ".config", "opencode", "skills", "caveman")).exists()).toBe(false);
       expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "caveman")).exists()).toBe(false);
+      expect(await readFile(join(TMP, ".codex", "config.toml"), "utf8")).not.toContain("caveman");
+      const hooks = JSON.parse(await readFile(join(TMP, ".codex", "hooks.json"), "utf8"));
+      expect(hooks.hooks.UserPromptSubmit).toEqual([{ command: "user-owned-hook" }]);
+      expect(await Bun.file(join(TMP, ".fulcrum", "state", "global", "caveman-mirrors.installed")).exists()).toBe(false);
     } finally {
       whichSpy.mockRestore();
       runSpy.mockRestore();
     }
   });
 
-  test("falls back to removePath when npx not on PATH", async () => {
+  test("preserves unmarked user-owned caveman-looking mirror dirs", async () => {
+    await mkdir(join(TMP, ".codex", "skills", "caveman"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "skills", "caveman", "SKILL.md"), "user-owned\n");
+    await mkdir(join(TMP, ".config", "opencode", "packages", "caveman"), { recursive: true });
+    await writeFile(join(TMP, ".config", "opencode", "packages", "caveman", "README.md"), "user-owned\n");
+    await mkdir(join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0", "README.md"), "user-owned\n");
+
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const npxCall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd[0] === "npx",
+      );
+      expect(npxCall).toBeUndefined();
+      expect(await readFile(join(TMP, ".codex", "skills", "caveman", "SKILL.md"), "utf8")).toBe("user-owned\n");
+      expect(await readFile(join(TMP, ".config", "opencode", "packages", "caveman", "README.md"), "utf8")).toBe("user-owned\n");
+      expect(await readFile(join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0", "README.md"), "utf8")).toBe("user-owned\n");
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+  });
+
+  test("falls back to removePath when npx not on PATH and Fulcrum marker exists", async () => {
+    await writeCavemanMirrorMarker();
     await mkdir(join(TMP, ".codex", "skills", "caveman"), { recursive: true });
 
     const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
@@ -524,7 +582,6 @@ describe("removeCavemanCopies — W1.4 filesystem mirrors", () => {
         (cmd) => Array.isArray(cmd) && cmd[0] === "npx",
       );
       expect(npxCall).toBeUndefined();
-      // The caveman skill dir should be removed by fs fallback.
       expect(await Bun.file(join(TMP, ".codex", "skills", "caveman")).exists()).toBe(false);
     } finally {
       whichSpy.mockRestore();

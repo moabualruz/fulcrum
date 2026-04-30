@@ -1,6 +1,8 @@
 import { BUILTIN_MCPS } from "../../cli/mcp-builtins.ts";
 import {
+  ALL_AGENT_IDS,
   applyToAgents,
+  disabledConfigSupport,
   loadRegistry,
   registerServer,
   removeFromAgents,
@@ -55,7 +57,7 @@ export async function applyMcpAction(action: ComponentAction, dryRun = false): P
       return;
     case "disable":
       await setEnabled(name, false, mutableAgentOpts(agents));
-      await removeFromAgents(name, { agents, dryRun });
+      await applyDisabledMcpAction(name, agents, dryRun);
       return;
     case "enable":
       await registerBuiltinMcpByName(name, { enabled: true, agents, dryRun });
@@ -63,6 +65,31 @@ export async function applyMcpAction(action: ComponentAction, dryRun = false): P
     case "create-or-update":
       await registerBuiltinMcpByName(name, { agents, dryRun });
       return;
+  }
+}
+
+async function applyDisabledMcpAction(
+  name: string,
+  agents: readonly AgentId[] | undefined,
+  dryRun: boolean,
+): Promise<void> {
+  const registry = await loadRegistry();
+  const server = registry.servers[name];
+  if (!server) return;
+
+  const targetAgents = agents ?? ALL_AGENT_IDS;
+  const nativeDisabledAgents = targetAgents.filter((agentId) => (
+    disabledConfigSupport(server, agentId) === "native"
+  ));
+  const removeOnlyAgents = targetAgents.filter((agentId) => (
+    disabledConfigSupport(server, agentId) === "disabledConfigUnsupported"
+  ));
+
+  if (removeOnlyAgents.length > 0) {
+    await removeFromAgents(name, { agents: removeOnlyAgents, dryRun });
+  }
+  if (nativeDisabledAgents.length > 0) {
+    await applyToAgents(name, { agents: nativeDisabledAgents, dryRun });
   }
 }
 

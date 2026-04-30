@@ -417,6 +417,72 @@ describe("runVendorIntegrations — pi-mcp-adapter", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 10b. Vendor integrations record component lifecycle state
+// ---------------------------------------------------------------------------
+
+describe("runVendorIntegrations — component ledger coverage", () => {
+  let dir: string;
+  let home: string;
+  let origHome: string | undefined;
+  let origFulcrumHome: string | undefined;
+
+  beforeEach(async () => {
+    dir = await freshDir();
+    home = await freshDir();
+    origHome = process.env["HOME"];
+    origFulcrumHome = process.env["FULCRUM_HOME"];
+    process.env["HOME"] = home;
+    process.env["FULCRUM_HOME"] = join(home, ".fulcrum");
+  });
+
+  afterEach(async () => {
+    if (origHome !== undefined) process.env["HOME"] = origHome;
+    else delete process.env["HOME"];
+    if (origFulcrumHome !== undefined) process.env["FULCRUM_HOME"] = origFulcrumHome;
+    else delete process.env["FULCRUM_HOME"];
+    await rm(dir, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true });
+  });
+
+  test("records managed vendor project integrations after successful vendor commands", async () => {
+    await mkdir(join(home, ".claude"), { recursive: true });
+    await mkdir(join(home, ".codex"), { recursive: true });
+    await mkdir(join(home, ".pi", "agent"), { recursive: true });
+
+    const proc = await import("../utils/proc.ts");
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
+      if (["graphify", "npx", "pi"].includes(cmd)) return `/usr/local/bin/${cmd}`;
+      return null;
+    });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+
+    try {
+      const { runVendorIntegrations } = await import("./vendor-installs.ts");
+      await runVendorIntegrations(dir, home, { dryRun: false });
+
+      const { ComponentLedger } = await import("../components/ledger.ts");
+      const ledger = ComponentLedger.open();
+      try {
+        for (const componentId of [
+          "package.graphify",
+          "package.ast-grep",
+          "package.tavily",
+          "package.pi-mcp-adapter",
+        ] as const) {
+          expect(ledger.componentStatus(componentId)?.status).toBe("installed");
+          expect(ledger.surfacesForComponent(componentId).length).toBeGreaterThan(0);
+        }
+      } finally {
+        ledger.close();
+      }
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 11. --dry-run: prints preview, no spawns
 // ---------------------------------------------------------------------------
 

@@ -410,6 +410,7 @@ async function copyTree(src: string, dst: string, dryRun: boolean): Promise<void
   for (const entry of await readdir(src, { withFileTypes: true })) {
     if (
       entry.name.endsWith(".original.md") ||
+      entry.name.endsWith(".backup.md") ||
       entry.name === "_archive" ||
       entry.name === "_template" ||
       entry.name === ".claude" ||

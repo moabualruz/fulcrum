@@ -225,4 +225,18 @@ describe("fulcrum component status", () => {
       await rm(home, { recursive: true, force: true });
     }
   });
+
+  test("package --json includes parity reports", async () => {
+    const { logs, restore } = captureConsole();
+    try {
+      await run(["status", "package.repomix", "--json"]);
+    } finally {
+      restore();
+    }
+
+    const parsed = JSON.parse(logs.join("\n")) as { componentId: string; parity?: unknown };
+    expect(parsed.componentId).toBe("package.repomix");
+    expect(parsed.parity).toBeDefined();
+    expect(JSON.stringify(parsed.parity)).toContain("sourceCounts");
+  });
 });

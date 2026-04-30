@@ -20,6 +20,10 @@ describe("component catalog", () => {
     expect(ids).toContain("package.repomix");
     expect(ids).toContain("package.cloudflare");
     expect(ids).toContain("package.superpowers");
+    expect(ids).toContain("package.graphify");
+    expect(ids).toContain("package.ast-grep");
+    expect(ids).toContain("package.tavily");
+    expect(ids).toContain("package.pi-mcp-adapter");
     expect(ids).toContain("mcp.deepwiki");
     expect(ids).toContain("mcp.registry");
     expect(ids).toContain("mcp.context7");
@@ -237,6 +241,54 @@ describe("component catalog", () => {
         ownerKey: "fulcrum:package:repomix",
         removePolicy: "managed-only",
         payload: { name: "repomix" },
+      },
+    ]);
+
+    expect(component("package.graphify").surfaces).toEqual([
+      {
+        id: "package.graphify:install",
+        kind: "vendor-command",
+        componentId: "package.graphify",
+        target: "agent-graphify-surfaces",
+        ownerKey: "fulcrum:package:graphify",
+        removePolicy: "managed-only",
+        payload: { name: "graphify" },
+      },
+    ]);
+
+    expect(component("package.ast-grep").surfaces).toEqual([
+      {
+        id: "package.ast-grep:install",
+        kind: "vendor-command",
+        componentId: "package.ast-grep",
+        target: "agent-ast-grep-surfaces",
+        ownerKey: "fulcrum:package:ast-grep",
+        removePolicy: "managed-only",
+        payload: { name: "ast-grep" },
+      },
+    ]);
+
+    expect(component("package.tavily").surfaces).toEqual([
+      {
+        id: "package.tavily:install",
+        kind: "vendor-command",
+        componentId: "package.tavily",
+        target: "agent-tavily-surfaces",
+        ownerKey: "fulcrum:package:tavily",
+        removePolicy: "managed-only",
+        payload: { name: "tavily" },
+      },
+    ]);
+
+    expect(component("package.pi-mcp-adapter").surfaces).toEqual([
+      {
+        id: "package.pi-mcp-adapter:install",
+        kind: "vendor-command",
+        componentId: "package.pi-mcp-adapter",
+        target: "agent-pi-mcp-adapter-surfaces",
+        ownerKey: "fulcrum:package:pi-mcp-adapter",
+        removePolicy: "managed-only",
+        payload: { name: "pi-mcp-adapter" },
       },
     ]);
   });

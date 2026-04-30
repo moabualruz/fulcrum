@@ -80,6 +80,26 @@ describe("fulcrum mcp list", () => {
     }
   });
 
+  test("--json marks disabled configs unsupported for Claude Code and Pi", async () => {
+    await registerServer("github", DEFAULT_GITHUB_SERVER);
+    const { logs, restore } = captureConsole();
+    try {
+      await run(["list", "--json"]);
+      const parsed = JSON.parse(logs.join("")) as Array<{
+        name: string;
+        disabled_config: Record<string, string>;
+      }>;
+      expect(parsed[0]?.name).toBe("github");
+      expect(parsed[0]?.disabled_config["claude-code"]).toBe("disabledConfigUnsupported");
+      expect(parsed[0]?.disabled_config.codex).toBe("native");
+      expect(parsed[0]?.disabled_config.gemini).toBe("native");
+      expect(parsed[0]?.disabled_config.opencode).toBe("native");
+      expect(parsed[0]?.disabled_config.pi).toBe("disabledConfigUnsupported");
+    } finally {
+      restore();
+    }
+  });
+
   test("human list shows registered servers", async () => {
     await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
     const { logs, restore } = captureConsole();

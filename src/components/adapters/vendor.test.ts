@@ -33,6 +33,10 @@ describe("vendor component adapter", () => {
     ["package.repomix", "repomix"],
     ["package.cloudflare", "cloudflare"],
     ["package.superpowers", "superpowers"],
+    ["package.graphify", "graphify"],
+    ["package.ast-grep", "ast-grep"],
+    ["package.tavily", "tavily"],
+    ["package.pi-mcp-adapter", "pi-mcp-adapter"],
   ] as const)("classifies %s", (componentId, expected) => {
     expect(classifyVendorComponent(componentId)).toBe(expected);
   });
@@ -65,6 +69,10 @@ describe("vendor component adapter", () => {
     "package.repomix",
     "package.cloudflare",
     "package.superpowers",
+    "package.graphify",
+    "package.ast-grep",
+    "package.tavily",
+    "package.pi-mcp-adapter",
   ] as const)("routes dry-run install/remove for %s without creating state", async (componentId) => {
     await applyVendorAction(vendorAction(componentId, "create-or-update"), true);
     await applyVendorAction(vendorAction(componentId, "remove"), true);
@@ -73,6 +81,31 @@ describe("vendor component adapter", () => {
     expect(
       await Bun.file(join(scratch, ".fulcrum", "state", "global", "components.db")).exists(),
     ).toBe(false);
+  });
+
+  test("vendor command components with no safe uninstall report manual removal reason", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+
+    try {
+      for (const componentId of [
+        "package.graphify",
+        "package.ast-grep",
+        "package.tavily",
+        "package.pi-mcp-adapter",
+      ] as const) {
+        await applyVendorAction(vendorAction(componentId, "remove"), true);
+      }
+    } finally {
+      console.log = originalLog;
+    }
+
+    const combined = logs.join("\n");
+    expect(combined).toContain("graphify removal is manual");
+    expect(combined).toContain("ast-grep removal is manual");
+    expect(combined).toContain("tavily removal is manual");
+    expect(combined).toContain("pi-mcp-adapter removal is manual");
   });
 });
 

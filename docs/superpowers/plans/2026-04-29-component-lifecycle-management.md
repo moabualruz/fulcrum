@@ -116,10 +116,10 @@ Current package matrix to preserve:
 |---|---|---|
 | `skills.authored` | Claude Code plugin `fulcrum@fulcrum`; Gemini extension `fulcrum-skills` | Codex/OpenCode/Pi under `<agent>/skills/fulcrum/<name>/`; refresh Claude plugin cache/marketplace package after install |
 | `skills.upstream` | Per-entry `claude_plugin`; per-entry `vendor_canonical_agents` skip list | Vendor-placement skill copies into Codex/OpenCode/Pi and Gemini `~/.gemini/skills`; Pi may use frontmatter name when it differs from lock entry |
-| `package.caveman` | Claude Code plugin `caveman@caveman`; Gemini extension from `JuliusBrussee/caveman` | Codex direct official repo mirror including skills, Codex plugin cache, hooks, and config enablement; OpenCode/Pi skill mirrors; shared caveman config `defaultMode: "ultra"` |
-| `package.repomix` | Claude Code plugins `repomix-mcp`, `repomix-commands`, `repomix-explorer` | Codex/Pi skills; Gemini extension with commands, skills, agent, MCP server; OpenCode skills plus `repomix-explorer` agent |
-| `package.cloudflare` | Claude Code plugin `cloudflare@cloudflare` | Cloudflare pinned skills from `skills/upstream.lock` mirrored to non-Claude agents; Claude is skipped by `vendor_canonical_agents = ["claude-code"]` |
-| `package.superpowers` | Claude Code plugin, Gemini extension, OpenCode plugin, Pi `pi install` packages when `pi` exists | Codex full skill mirror; Pi full skill mirror only when `pi` is not available |
+| `package.caveman` | Claude Code plugin `caveman@caveman`; Gemini extension from `JuliusBrussee/caveman` | Codex/OpenCode/Pi direct official repo mirrors, including skills, rules, commands, hooks, scripts, metadata, assets, and shared caveman config `defaultMode: "ultra"` |
+| `package.repomix` | Claude Code plugins `repomix-mcp`, `repomix-commands`, `repomix-explorer` | Codex/Gemini/OpenCode/Pi mirrors for skills, MCP config, commands/prompts, rules, metadata, and explorer support; Pi records standalone explorer-agent as unsupported |
+| `package.cloudflare` | Claude Code plugin `cloudflare@cloudflare` | Full non-Claude package mirrors plus vendor-placement skills; package parity verifies commands, rules, MCP metadata, skills, metadata, and runtime assets |
+| `package.superpowers` | Claude Code plugin, Gemini extension, OpenCode plugin, Pi `pi install` packages when `pi` exists | Codex full package mirror; Pi full package mirror when `pi` is not available |
 
 Technical implication: Task 8 cannot be a thin `vendor-command` dispatcher only. It must expose package-specific helpers so component install can operate one package at a time without accidentally installing every upstream skill or every vendor package.
 

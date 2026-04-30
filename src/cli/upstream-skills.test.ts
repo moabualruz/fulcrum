@@ -300,6 +300,7 @@ describe("subpath integrity in syncUpstreamSkills", () => {
     await mkdir(skillSrc, { recursive: true });
     await writeFile(join(skillSrc, "SKILL.md"), "---\nname: myskill\ndescription: test\n---\n");
     await writeFile(join(skillSrc, "SKILL.original.md"), "---\nname: myskill\n---\nsource backup\n");
+    await writeFile(join(skillSrc, "README.backup.md"), "source backup\n");
     await mkdir(join(skillSrc, "_archive", "old"), { recursive: true });
     await writeFile(join(skillSrc, "_archive", "old", "SKILL.md"), "---\nname: old\n---\n");
 
@@ -332,6 +333,7 @@ describe("subpath integrity in syncUpstreamSkills", () => {
 
     expect(await Bun.file(join(TMP, ".codex", "skills", "myskill", "SKILL.md")).exists()).toBe(true);
     expect(await Bun.file(join(TMP, ".codex", "skills", "myskill", "SKILL.original.md")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".codex", "skills", "myskill", "README.backup.md")).exists()).toBe(false);
     expect(await Bun.file(join(TMP, ".codex", "skills", "myskill", "_archive", "old", "SKILL.md")).exists()).toBe(false);
   });
 

@@ -11,6 +11,7 @@ import {
   ALL_AGENT_IDS,
   type AgentId,
   applyToAgents,
+  disabledConfigSupport,
   isEnabled,
   type McpServer,
   loadRegistry,
@@ -43,6 +44,9 @@ async function cmdList(args: string[]): Promise<void> {
           !s.agent_visibility[id] ? "hidden" : isEnabled(s, id) ? "enabled" : "disabled",
         ])
       ),
+      disabled_config: Object.fromEntries(
+        ALL_AGENT_IDS.map((id) => [id, disabledConfigSupport(s, id)]),
+      ),
     }));
     console.log(JSON.stringify(out, null, 2));
     return;
@@ -62,7 +66,8 @@ async function cmdList(args: string[]): Promise<void> {
       const enabled = isEnabled(s, id);
       const vis = s.agent_visibility[id];
       const state = !vis ? "hidden" : enabled ? "enabled" : "disabled";
-      console.log(`    ${pad(id, 14)}  ${state}`);
+      const disabledConfig = !enabled && vis ? `  ${disabledConfigSupport(s, id)}` : "";
+      console.log(`    ${pad(id, 14)}  ${state}${disabledConfig}`);
     }
     console.log();
   }

@@ -58,6 +58,26 @@ async function cp(src: string, dst: string): Promise<void> {
   await copyFile(src, dst);
 }
 
+function isMirrorExcludedName(name: string): boolean {
+  return (
+    name.endsWith(".original.md") ||
+    name.endsWith(".backup.md") ||
+    name === "_archive" ||
+    name === "_template" ||
+    name === ".claude" ||
+    name === ".git" ||
+    name === ".github" ||
+    name === "node_modules" ||
+    name === "tests" ||
+    name === "evals" ||
+    name === "benchmarks" ||
+    name === "coverage" ||
+    name === "__pycache__" ||
+    name === ".venv" ||
+    name === "worktrees"
+  );
+}
+
 async function copyTree(src: string, dst: string): Promise<void> {
   const s = await stat(src);
   if (!s.isDirectory()) {
@@ -67,15 +87,7 @@ async function copyTree(src: string, dst: string): Promise<void> {
   }
   await mk(dst);
   for (const entry of await readdir(src, { withFileTypes: true })) {
-    if (
-      entry.name.endsWith(".original.md") ||
-      entry.name === "_archive" ||
-      entry.name === "_template" ||
-      entry.name === ".claude" ||
-      entry.name === ".git" ||
-      entry.name === "node_modules" ||
-      entry.name === "worktrees"
-    ) continue;
+    if (isMirrorExcludedName(entry.name)) continue;
     await copyTree(`${src}/${entry.name}`, `${dst}/${entry.name}`);
   }
 }
@@ -144,6 +156,7 @@ async function configureCodexCavemanPlugin(home: string, repoRootDir: string): P
   const pluginCache = `${home}/.codex/plugins/cache/caveman/caveman/${version}`;
   assertNotAgentsPath(pluginCache, home);
   await copyTree(`${repoRootDir}/plugins/caveman`, pluginCache);
+  await installCavemanPackagePayload(home, "codex", repoRootDir, `${pluginCache}/package`);
 
   const configPath = `${home}/.codex/config.toml`;
   let config = (await exists(configPath)) ? await readFile(configPath, "utf8") : "";
@@ -159,7 +172,65 @@ async function configureCodexCavemanPlugin(home: string, repoRootDir: string): P
   await mergeCodexCavemanHooks(home, repoRootDir);
 }
 
-async function installCavemanFromRepo(home: string, skillsRoot: string, label: string, includeCodexPlugin = false): Promise<boolean> {
+type CavemanFallbackAgent = "codex" | "opencode" | "pi";
+
+function cavemanPackageRoot(home: string, agentId: CavemanFallbackAgent): string {
+  if (agentId === "opencode") return `${home}/.config/opencode/packages/caveman`;
+  if (agentId === "pi") return `${home}/.pi/agent/packages/caveman`;
+  return `${home}/.codex/plugins/cache/caveman`;
+}
+
+function unsupportedCavemanSurfaces(agentId: CavemanFallbackAgent): Array<{ surface: string; reason: string }> {
+  if (agentId === "codex") return [];
+  return [
+    { surface: "codex-plugin", reason: "Agent has no Codex plugin loader; source metadata is copied in package payload only." },
+    { surface: "codex-hooks", reason: "Agent does not read .codex/hooks.json; hook source is copied but not registered." },
+    { surface: "codex-config", reason: "Agent does not read .codex/config.toml; config source is copied but not merged." },
+    { surface: "claude-plugin", reason: "Agent has no Claude Code plugin installer; official Claude install path is preserved separately." },
+    { surface: "gemini-extension", reason: "Agent has no Gemini extension installer; official Gemini install path is preserved separately." },
+  ];
+}
+
+async function installCavemanPackagePayload(
+  home: string,
+  agentId: CavemanFallbackAgent,
+  sourceRoot: string,
+  targetRoot = cavemanPackageRoot(home, agentId),
+): Promise<void> {
+  assertNotAgentsPath(targetRoot, home);
+  if (!DRY_RUN) await rm(targetRoot, { recursive: true, force: true });
+  await copyTree(sourceRoot, targetRoot);
+  const unsupported = unsupportedCavemanSurfaces(agentId);
+  if (unsupported.length > 0) {
+    await wf(`${targetRoot}/.fulcrum-unsupported.json`, JSON.stringify({
+      package: "caveman",
+      agent: agentId,
+      unsupported,
+    }, null, 2) + "\n");
+  }
+}
+
+function cavemanMirrorsMarkerPath(home: string): string {
+  return `${process.env["FULCRUM_HOME"] ?? `${home}/.fulcrum`}/state/global/caveman-mirrors.installed`;
+}
+
+async function writeCavemanMirrorsMarker(home: string): Promise<void> {
+  const path = cavemanMirrorsMarkerPath(home);
+  if (DRY_RUN) {
+    console.log(`     [dry-run] would write marker: ${path}`);
+    return;
+  }
+  await mk(dirname(path));
+  await wf(path, new Date().toISOString() + "\n");
+}
+
+async function installCavemanFromRepo(
+  home: string,
+  skillsRoot: string,
+  label: string,
+  agentId: CavemanFallbackAgent,
+  includeCodexPlugin = false,
+): Promise<boolean> {
   const gitPath = await which("git");
   if (!gitPath) {
     console.log(`     · ${label}: git not on PATH — manual: clone ${CAVEMAN_REPO} and copy skills/* to ${skillsRoot}`);
@@ -179,6 +250,8 @@ async function installCavemanFromRepo(home: string, skillsRoot: string, label: s
     if (includeCodexPlugin) {
       console.log(`     [dry-run] would copy: ${tmp}/plugins/caveman → ${home}/.codex/plugins/cache/caveman/caveman/0.1.0`);
     }
+    console.log(`     [dry-run] would mirror Caveman package payload for ${label}`);
+    await writeCavemanMirrorsMarker(home);
     return true;
   }
 
@@ -198,7 +271,10 @@ async function installCavemanFromRepo(home: string, skillsRoot: string, label: s
     }
     if (includeCodexPlugin) {
       await configureCodexCavemanPlugin(home, tmp);
+    } else {
+      await installCavemanPackagePayload(home, agentId, tmp);
     }
+    await writeCavemanMirrorsMarker(home);
     return true;
   } finally {
     if (!DRY_RUN) await rm(tmp, { recursive: true, force: true });
@@ -552,7 +628,7 @@ export async function installCaveman(home: string, opts: { dryRun?: boolean } = 
     // Fulcrum copies Caveman surfaces into native per-agent roots. Codex gets
     // plugin metadata/assets/hooks as well as skills because Caveman ships more
     // than a bare SKILL.md.
-    const npxAgentDefs: Array<{ id: string; dir: string; label: string; skillsRoot: string; includeCodexPlugin?: boolean }> = [
+    const npxAgentDefs: Array<{ id: CavemanFallbackAgent; dir: string; label: string; skillsRoot: string; includeCodexPlugin?: boolean }> = [
       { id: "codex",    dir: `${home}/.codex`,          label: "Codex CLI", skillsRoot: `${home}/.codex/skills`, includeCodexPlugin: true },
       { id: "opencode", dir: `${home}/.config/opencode`, label: "OpenCode",  skillsRoot: `${home}/.config/opencode/skills` },
       { id: "pi",       dir: `${home}/.pi/agent`,        label: "Pi CLI",    skillsRoot: `${home}/.pi/agent/skills` },
@@ -567,12 +643,13 @@ export async function installCaveman(home: string, opts: { dryRun?: boolean } = 
       // Idempotency: if the required surfaces already exist, skip.
       const cavemanSkillDir = `${ag.skillsRoot}/caveman`;
       const codexPluginDir = `${home}/.codex/plugins/cache/caveman/caveman/0.1.0`;
-      if ((await isDir(cavemanSkillDir)) && (!ag.includeCodexPlugin || (await isDir(codexPluginDir)))) {
+      const packageDir = ag.includeCodexPlugin ? `${codexPluginDir}/package` : cavemanPackageRoot(home, ag.id);
+      if ((await isDir(cavemanSkillDir)) && (!ag.includeCodexPlugin || (await isDir(codexPluginDir))) && (await isDir(packageDir))) {
         console.log(`     · skip ${ag.label} caveman (already installed)`);
         continue;
       }
 
-      if (await installCavemanFromRepo(home, ag.skillsRoot, ag.label, !!ag.includeCodexPlugin)) {
+      if (await installCavemanFromRepo(home, ag.skillsRoot, ag.label, ag.id, !!ag.includeCodexPlugin)) {
         console.log(`     ✓ ${ag.label} caveman installed from official repo`);
       } else {
         console.log(`     ✗ ${ag.label} caveman install failed — expected ${cavemanSkillDir}`);

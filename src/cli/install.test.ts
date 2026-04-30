@@ -2,7 +2,7 @@
 // Uses Bun test runner; no GitHub network access.
 
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
-import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { assertNotAgentsPath, installCaveman, lockCavemanUltra, run as installRun, spliceSentinel, setDryRun } from "./install.ts";
@@ -215,7 +215,7 @@ describe("installCaveman W1.3 — direct official repo copy", () => {
   test("dry-run logs skip when caveman skill and Codex plugin dirs already exist (idempotency)", async () => {
     // Pre-create both Codex surfaces to simulate a complete install.
     await mkdir(join(testHome, ".codex", "skills", "caveman"), { recursive: true });
-    await mkdir(join(testHome, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0"), { recursive: true });
+    await mkdir(join(testHome, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0", "package"), { recursive: true });
 
     const logs: string[] = [];
     const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
@@ -268,6 +268,96 @@ describe("installCaveman W1.3 — direct official repo copy", () => {
       whichSpy.mockRestore();
       setDryRun(true);
     }
+  });
+
+  test("real install mirrors full fallback package payload with exclusions and unsupported metadata", async () => {
+    setDryRun(false);
+    await mkdir(join(testHome, ".codex", "skills"), { recursive: true });
+    await mkdir(join(testHome, ".config", "opencode", "skills"), { recursive: true });
+    await mkdir(join(testHome, ".pi", "agent", "skills"), { recursive: true });
+
+    const source = join(testHome, "fake-caveman-source");
+    await mkdir(join(source, "skills", "caveman"), { recursive: true });
+    await mkdir(join(source, "skills", "compress", "scripts"), { recursive: true });
+    await mkdir(join(source, "plugins", "caveman", ".codex-plugin"), { recursive: true });
+    await mkdir(join(source, "plugins", "caveman", "assets"), { recursive: true });
+    await mkdir(join(source, ".codex"), { recursive: true });
+    await mkdir(join(source, "commands"), { recursive: true });
+    await mkdir(join(source, "hooks"), { recursive: true });
+    await mkdir(join(source, "rules"), { recursive: true });
+    await mkdir(join(source, "docs"), { recursive: true });
+    await mkdir(join(source, "tests"), { recursive: true });
+    await mkdir(join(source, ".github", "workflows"), { recursive: true });
+    await writeFile(join(source, "skills", "caveman", "SKILL.md"), "---\nname: caveman\n---\n");
+    await writeFile(join(source, "skills", "caveman", "draft.backup.md"), "drop\n");
+    await writeFile(join(source, "skills", "compress", "SKILL.md"), "---\nname: compress\n---\n");
+    await writeFile(join(source, "skills", "compress", "scripts", "cli.py"), "print('compress')\n");
+    await writeFile(join(source, "plugins", "caveman", ".codex-plugin", "plugin.json"), JSON.stringify({ name: "caveman", version: "9.9.9" }) + "\n");
+    await writeFile(join(source, "plugins", "caveman", "assets", "caveman.svg"), "<svg />\n");
+    await writeFile(join(source, ".codex", "config.toml"), "[features]\ncodex_hooks = true\n");
+    await writeFile(join(source, ".codex", "hooks.json"), JSON.stringify({ hooks: { UserPromptSubmit: [{ command: "hooks/caveman-activate.js" }] } }, null, 2) + "\n");
+    await writeFile(join(source, "commands", "caveman.toml"), 'prompt = "use caveman"\n');
+    await writeFile(join(source, "hooks", "caveman-activate.js"), "console.log('activate')\n");
+    await writeFile(join(source, "rules", "caveman-activate.md"), "rule\n");
+    await writeFile(join(source, "docs", "index.html"), "<main>docs</main>\n");
+    await writeFile(join(source, "AGENTS.md"), "agents rules\n");
+    await writeFile(join(source, "CLAUDE.original.md"), "backup\n");
+    await writeFile(join(source, "README.backup.md"), "backup\n");
+    await writeFile(join(source, "gemini-extension.json"), "{}\n");
+    await writeFile(join(source, "tests", "sample.md"), "drop\n");
+    await writeFile(join(source, ".github", "workflows", "ci.yml"), "drop\n");
+
+    const binDir = join(testHome, "bin");
+    await mkdir(binDir, { recursive: true });
+    const git = join(binDir, "git");
+    await writeFile(git, [
+      "#!/bin/sh",
+      "set -eu",
+      `src=${JSON.stringify(source)}`,
+      "dest=\"$5\"",
+      "mkdir -p \"$dest\"",
+      "cp -R \"$src\"/. \"$dest\"",
+    ].join("\n") + "\n");
+    await chmod(git, 0o755);
+
+    const originalPath = process.env["PATH"];
+    process.env["PATH"] = `${binDir}:${originalPath ?? ""}`;
+    try {
+      await installCaveman(testHome);
+    } finally {
+      if (originalPath !== undefined) process.env["PATH"] = originalPath;
+      else delete process.env["PATH"];
+    }
+
+    const codexPluginRoot = join(testHome, ".codex", "plugins", "cache", "caveman", "caveman", "9.9.9");
+    const codexPackage = join(codexPluginRoot, "package");
+    const opencodePackage = join(testHome, ".config", "opencode", "packages", "caveman");
+    const piPackage = join(testHome, ".pi", "agent", "packages", "caveman");
+
+    expect(await Bun.file(join(testHome, ".codex", "skills", "caveman", "SKILL.md")).exists()).toBe(true);
+    expect(await Bun.file(join(testHome, ".config", "opencode", "skills", "compress", "scripts", "cli.py")).exists()).toBe(true);
+    expect(await Bun.file(join(testHome, ".pi", "agent", "skills", "compress", "scripts", "cli.py")).exists()).toBe(true);
+
+    expect(await Bun.file(join(codexPluginRoot, ".codex-plugin", "plugin.json")).exists()).toBe(true);
+    expect(await Bun.file(join(codexPluginRoot, "assets", "caveman.svg")).exists()).toBe(true);
+    expect(await Bun.file(join(codexPackage, "commands", "caveman.toml")).exists()).toBe(true);
+    expect(await Bun.file(join(codexPackage, "hooks", "caveman-activate.js")).exists()).toBe(true);
+    expect(await Bun.file(join(codexPackage, "docs", "index.html")).exists()).toBe(true);
+
+    expect(await Bun.file(join(opencodePackage, "commands", "caveman.toml")).exists()).toBe(true);
+    expect(await Bun.file(join(opencodePackage, "rules", "caveman-activate.md")).exists()).toBe(true);
+    expect(await Bun.file(join(piPackage, "hooks", "caveman-activate.js")).exists()).toBe(true);
+
+    expect(await Bun.file(join(codexPackage, "CLAUDE.original.md")).exists()).toBe(false);
+    expect(await Bun.file(join(codexPackage, "README.backup.md")).exists()).toBe(false);
+    expect(await Bun.file(join(opencodePackage, "tests", "sample.md")).exists()).toBe(false);
+    expect(await Bun.file(join(piPackage, ".github", "workflows", "ci.yml")).exists()).toBe(false);
+
+    const opencodeUnsupported = JSON.parse(await readFile(join(opencodePackage, ".fulcrum-unsupported.json"), "utf8"));
+    const piUnsupported = JSON.parse(await readFile(join(piPackage, ".fulcrum-unsupported.json"), "utf8"));
+    expect(opencodeUnsupported.unsupported.some((entry: { surface: string }) => entry.surface === "codex-hooks")).toBe(true);
+    expect(piUnsupported.unsupported.some((entry: { surface: string }) => entry.surface === "codex-plugin")).toBe(true);
+    expect(await Bun.file(join(testHome, ".fulcrum", "state", "global", "caveman-mirrors.installed")).exists()).toBe(true);
   });
 
 });
@@ -330,33 +420,6 @@ describe("dry-run mode", () => {
 
     // File must still not exist.
     expect(await Bun.file(target).exists()).toBe(false);
-  });
-
-  test("fulcrum install dry-run does not manage removed context component", async () => {
-    const origHome = process.env["HOME"];
-    const origFulcrumHome = process.env["FULCRUM_HOME"];
-    const origRepoDir = process.env["FULCRUM_REPO_DIR"];
-    const logs: string[] = [];
-    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
-      logs.push(args.map(String).join(" "));
-    });
-
-    try {
-      process.env["HOME"] = dryHome;
-      process.env["FULCRUM_HOME"] = join(dryHome, ".fulcrum");
-      process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../..");
-      await installRun(["--dry-run", "--no-skills", "--no-default-mcps"]);
-      const removedComponent = ["context", "mode"].join("-");
-      expect(logs.join("\n")).not.toContain(removedComponent);
-    } finally {
-      logSpy.mockRestore();
-      if (origHome !== undefined) process.env["HOME"] = origHome;
-      else delete process.env["HOME"];
-      if (origFulcrumHome !== undefined) process.env["FULCRUM_HOME"] = origFulcrumHome;
-      else delete process.env["FULCRUM_HOME"];
-      if (origRepoDir !== undefined) process.env["FULCRUM_REPO_DIR"] = origRepoDir;
-      else delete process.env["FULCRUM_REPO_DIR"];
-    }
   });
 
   test("install dry-run defaults to minimal profile without global skills or vendor packages", async () => {

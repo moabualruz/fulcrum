@@ -17,7 +17,10 @@
 
 import { stat } from "node:fs/promises";
 import { AGENTS } from "../agents/registry.ts";
+import type { AgentId } from "./mcp-registry.ts";
 import { which, run as runProc } from "../utils/proc.ts";
+import { getComponent } from "../components/catalog.ts";
+import { ComponentLedger } from "../components/ledger.ts";
 import { stripVendorRuleBlocks } from "./install.ts";
 
 async function isDir(p: string): Promise<boolean> {
@@ -30,20 +33,23 @@ async function vendorRun(
   cmd: string[],
   cwd: string,
   dryRun: boolean,
-): Promise<void> {
+): Promise<boolean> {
   if (dryRun) {
     console.log(`  [dry-run] would run: ${cmd.join(" ")}  (cwd=${cwd})`);
-    return;
+    return true;
   }
   try {
     const r = await runProc(cmd, { cwd });
     if (r.exit !== 0) {
       console.warn(`  ⚠ ${label} failed (exit ${r.exit}): ${r.stderr.trim() || r.stdout.trim()}`);
+      return false;
     } else {
       console.log(`  ✓ ${label}`);
+      return true;
     }
   } catch (e) {
     console.warn(`  ⚠ ${label} error: ${String(e)}`);
+    return false;
   }
 }
 
@@ -56,6 +62,149 @@ async function detectedAgentIds(home: string): Promise<Set<string>> {
     }
   }
   return detected;
+}
+
+function recordVendorComponent(componentId: string, agentIds: readonly AgentId[] = []): void {
+  const component = getComponent(componentId);
+  if (component === null) return;
+  const ledger = ComponentLedger.open();
+  try {
+    ledger.recordComponent({ id: component.id, kind: component.kind, status: "installed" });
+    for (const surface of component.surfaces) {
+      if (agentIds.length === 0) {
+        ledger.recordSurface({
+          id: surface.id,
+          componentId: component.id,
+          kind: surface.kind,
+          target: surface.target,
+          ownerKey: surface.ownerKey,
+          desiredEnabled: true,
+          removePolicy: surface.removePolicy,
+        });
+        continue;
+      }
+      for (const agentId of agentIds) {
+        ledger.recordSurface({
+          id: `${surface.id}:${agentId}`,
+          componentId: component.id,
+          agentId,
+          kind: surface.kind,
+          target: surface.target,
+          ownerKey: surface.ownerKey,
+          desiredEnabled: true,
+          removePolicy: surface.removePolicy,
+        });
+      }
+    }
+  } finally {
+    ledger.close();
+  }
+}
+
+export async function runGraphifyIntegration(
+  dir: string,
+  home: string,
+  dryRun: boolean,
+): Promise<boolean> {
+  const detected = await detectedAgentIds(home);
+  const hasGraphify = !!(await which("graphify"));
+  const installedAgents: AgentId[] = [];
+
+  if (hasGraphify) {
+    if (detected.has("claude-code")) {
+      if (await vendorRun("graphify: Claude Code", ["graphify", "claude", "install"], dir, dryRun)) {
+        installedAgents.push("claude-code");
+      }
+    }
+    if (detected.has("codex")) {
+      if (await vendorRun("graphify: Codex CLI", ["graphify", "install", "--platform", "codex"], dir, dryRun)) {
+        installedAgents.push("codex");
+      }
+    }
+    if (detected.has("opencode")) {
+      if (await vendorRun("graphify: OpenCode", ["graphify", "install", "--platform", "opencode"], dir, dryRun)) {
+        installedAgents.push("opencode");
+      }
+    }
+    if (detected.has("gemini")) {
+      if (await vendorRun("graphify: Gemini CLI", ["graphify", "install", "--platform", "gemini"], dir, dryRun)) {
+        installedAgents.push("gemini");
+      }
+    }
+    if (detected.has("pi")) {
+      // Pi is not supported by the graphify CLI; upstream vendor does not list it.
+      // Upstream skill copy (via upstream-skills.ts) covers the fallback.
+      console.log("  · graphify: Pi not supported by graphify CLI; skipping (file copy via upstream skills covers fallback)");
+    }
+    if (!dryRun && installedAgents.length > 0) {
+      recordVendorComponent("package.graphify", installedAgents);
+    }
+    return installedAgents.length > 0;
+  }
+
+  console.log("  · graphify not on PATH — skipping graphify integrations");
+  return false;
+}
+
+export async function runAstGrepIntegration(dir: string, dryRun: boolean): Promise<boolean> {
+  const hasNpx = !!(await which("npx"));
+  if (!hasNpx) return false;
+  const ok = await vendorRun(
+    "ast-grep: npx skills add ast-grep/agent-skill",
+    ["npx", "skills", "add", "ast-grep/agent-skill"],
+    dir,
+    dryRun,
+  );
+  if (ok && !dryRun) {
+    recordVendorComponent("package.ast-grep");
+  }
+  return ok;
+}
+
+export async function runTavilyIntegration(dir: string, dryRun: boolean): Promise<boolean> {
+  const hasNpx = !!(await which("npx"));
+  if (!hasNpx) return false;
+  const ok = await vendorRun(
+    "tavily: npx skills add https://github.com/tavily-ai/skills",
+    ["npx", "skills", "add", "https://github.com/tavily-ai/skills"],
+    dir,
+    dryRun,
+  );
+  if (ok && !dryRun) {
+    recordVendorComponent("package.tavily");
+  }
+  return ok;
+}
+
+export async function runPiMcpAdapterIntegration(
+  dir: string,
+  home: string,
+  dryRun: boolean,
+): Promise<boolean> {
+  const detected = await detectedAgentIds(home);
+  const hasPi = !!(await which("pi"));
+  if (detected.has("pi") && hasPi) {
+    const installOk = await vendorRun(
+      "pi-mcp-adapter: pi install npm:pi-mcp-adapter",
+      ["pi", "install", "npm:pi-mcp-adapter"],
+      dir,
+      dryRun,
+    );
+    const initOk = await vendorRun(
+      "pi-mcp-adapter: pi-mcp-adapter init",
+      ["pi-mcp-adapter", "init"],
+      dir,
+      dryRun,
+    );
+    if (installOk && initOk && !dryRun) {
+      recordVendorComponent("package.pi-mcp-adapter", ["pi"]);
+    }
+    return installOk && initOk;
+  }
+  if (detected.has("pi") && !hasPi) {
+    console.log("  · pi detected but pi binary not on PATH — skipping pi-mcp-adapter init");
+  }
+  return false;
 }
 
 /**
@@ -71,40 +220,16 @@ export async function runVendorIntegrations(
   opts: { dryRun: boolean },
 ): Promise<void> {
   const { dryRun } = opts;
-  const detected = await detectedAgentIds(home);
-
-  const hasGraphify = !!(await which("graphify"));
-  const hasNpx = !!(await which("npx"));
   const hasClaude = !!(await which("claude"));
-  const hasPi = !!(await which("pi"));
+  const detected = await detectedAgentIds(home);
 
   console.log("\nVendor integrations:");
 
   // ── graphify ──────────────────────────────────────────────────────────────
   // Run per-agent. NEVER pass --output or any path override.
-  if (hasGraphify) {
-    if (detected.has("claude-code")) {
-      await vendorRun("graphify: Claude Code", ["graphify", "claude", "install"], dir, dryRun);
-    }
-    if (detected.has("codex")) {
-      await vendorRun("graphify: Codex CLI", ["graphify", "install", "--platform", "codex"], dir, dryRun);
-    }
-    if (detected.has("opencode")) {
-      await vendorRun("graphify: OpenCode", ["graphify", "install", "--platform", "opencode"], dir, dryRun);
-    }
-    if (detected.has("gemini")) {
-      await vendorRun("graphify: Gemini CLI", ["graphify", "install", "--platform", "gemini"], dir, dryRun);
-    }
-    if (detected.has("pi")) {
-      // Pi is not supported by the graphify CLI; upstream vendor does not list it.
-      // Upstream skill copy (via upstream-skills.ts) covers the fallback.
-      console.log("  · graphify: Pi not supported by graphify CLI; skipping (file copy via upstream skills covers fallback)");
-    }
-    // NOTE: project-index BUILD (`graphify update .`) runs in project-index.ts,
-    // not here. This module only handles per-agent integration installers.
-  } else {
-    console.log("  · graphify not on PATH — skipping graphify integrations");
-  }
+  await runGraphifyIntegration(dir, home, dryRun);
+  // NOTE: project-index BUILD (`graphify update .`) runs in project-index.ts,
+  // not here. This module only handles per-agent integration installers.
 
   // Caveman is installed by `fulcrum install`, not `fulcrum init`: Codex,
   // OpenCode, and Pi need per-agent mirrors and Codex needs plugin surfaces.
@@ -112,25 +237,11 @@ export async function runVendorIntegrations(
 
   // ── ast-grep/agent-skill ──────────────────────────────────────────────────
   // Single canonical command; auto-detects agent.
-  if (hasNpx) {
-    await vendorRun(
-      "ast-grep: npx skills add ast-grep/agent-skill",
-      ["npx", "skills", "add", "ast-grep/agent-skill"],
-      dir,
-      dryRun,
-    );
-  }
+  await runAstGrepIntegration(dir, dryRun);
 
   // ── tavily skills ─────────────────────────────────────────────────────────
   // Single canonical command covers all 7 tavily skills.
-  if (hasNpx) {
-    await vendorRun(
-      "tavily: npx skills add https://github.com/tavily-ai/skills",
-      ["npx", "skills", "add", "https://github.com/tavily-ai/skills"],
-      dir,
-      dryRun,
-    );
-  }
+  await runTavilyIntegration(dir, dryRun);
 
   // ── repomix ───────────────────────────────────────────────────────────────
   // Claude Code plugins handled by install.ts (W2 logic — 3 plugins via
@@ -147,22 +258,7 @@ export async function runVendorIntegrations(
   // ── pi-mcp-adapter ────────────────────────────────────────────────────────
   // Runs `pi install npm:pi-mcp-adapter` (already in mcp.ts) then
   // `pi-mcp-adapter init` per upstream README to scan + import configs.
-  if (detected.has("pi") && hasPi) {
-    await vendorRun(
-      "pi-mcp-adapter: pi install npm:pi-mcp-adapter",
-      ["pi", "install", "npm:pi-mcp-adapter"],
-      dir,
-      dryRun,
-    );
-    await vendorRun(
-      "pi-mcp-adapter: pi-mcp-adapter init",
-      ["pi-mcp-adapter", "init"],
-      dir,
-      dryRun,
-    );
-  } else if (detected.has("pi") && !hasPi) {
-    console.log("  · pi detected but pi binary not on PATH — skipping pi-mcp-adapter init");
-  }
+  await runPiMcpAdapterIntegration(dir, home, dryRun);
 
   // ── Strip duplicate vendor rule blocks ────────────────────────────────────
   // Vendor CLIs (e.g. `graphify install`) write rule text directly into each

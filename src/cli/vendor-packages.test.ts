@@ -5,10 +5,8 @@ import { join } from "node:path";
 import {
   installCloudflarePackage,
   installSuperpowersPackage,
-  installVendorCapabilityPackages,
   uninstallCloudflarePackage,
   uninstallSuperpowersPackage,
-  uninstallVendorCapabilityPackages,
 } from "./vendor-packages.ts";
 import * as proc from "../utils/proc.ts";
 
@@ -29,6 +27,20 @@ beforeEach(async () => {
   await writeFile(join(skill, "SKILL.original.md"), "---\nname: brainstorming\n---\nsource backup\n");
   await mkdir(join(TMP, ".fulcrum", "cache", "superpowers", "skills", "_archive", "old"), { recursive: true });
   await writeFile(join(TMP, ".fulcrum", "cache", "superpowers", "skills", "_archive", "old", "SKILL.md"), "---\nname: old\n---\n");
+  await mkdir(join(TMP, ".fulcrum", "cache", "superpowers", "commands"), { recursive: true });
+  await writeFile(join(TMP, ".fulcrum", "cache", "superpowers", "commands", "plan.md"), "Plan command\n");
+  await mkdir(join(TMP, ".fulcrum", "cache", "superpowers", "agents"), { recursive: true });
+  await writeFile(join(TMP, ".fulcrum", "cache", "superpowers", "agents", "reviewer.md"), "Review agent\n");
+  await mkdir(join(TMP, ".fulcrum", "cache", "superpowers", "hooks"), { recursive: true });
+  await writeFile(join(TMP, ".fulcrum", "cache", "superpowers", "hooks", "session-start.sh"), "#!/bin/sh\n");
+  await mkdir(join(TMP, ".fulcrum", "cache", "superpowers", "scripts"), { recursive: true });
+  await writeFile(join(TMP, ".fulcrum", "cache", "superpowers", "scripts", "tool.sh"), "#!/bin/sh\n");
+  await mkdir(join(TMP, ".fulcrum", "cache", "superpowers", "assets"), { recursive: true });
+  await writeFile(join(TMP, ".fulcrum", "cache", "superpowers", "assets", "logo.txt"), "logo\n");
+  await writeFile(join(TMP, ".fulcrum", "cache", "superpowers", "NOTICE"), "notice\n");
+  await writeFile(join(TMP, ".fulcrum", "cache", "superpowers", "README.backup.md"), "backup\n");
+  await mkdir(join(TMP, ".fulcrum", "cache", "superpowers", "dist"), { recursive: true });
+  await writeFile(join(TMP, ".fulcrum", "cache", "superpowers", "dist", "bundle.js"), "built\n");
 });
 
 afterEach(async () => {
@@ -202,6 +214,56 @@ describe("vendor capability packages", () => {
     ]);
   });
 
+  test("mirrors full Cloudflare package payload for non-Claude fallbacks", async () => {
+    const cache = join(TMP, ".fulcrum", "cache", "cloudflare-skills");
+    await mkdir(join(cache, "skills", "wrangler"), { recursive: true });
+    await writeFile(join(cache, "skills", "wrangler", "SKILL.md"), "---\nname: wrangler\n---\nUse wrangler.\n");
+    await mkdir(join(cache, "mcp"), { recursive: true });
+    await writeFile(join(cache, "mcp", "servers.json"), "{}\n");
+    await mkdir(join(cache, "scripts"), { recursive: true });
+    await writeFile(join(cache, "scripts", "setup.sh"), "#!/bin/sh\n");
+    await mkdir(join(cache, ".claude-plugin"), { recursive: true });
+    await writeFile(join(cache, ".claude-plugin", "plugin.json"), "{\"name\":\"cloudflare\"}\n");
+    await mkdir(join(cache, "vendor"), { recursive: true });
+    await writeFile(join(cache, "vendor", "generated.txt"), "generated\n");
+    await writeFile(join(cache, "NOTICE"), "notice\n");
+    await writeFile(join(cache, "README.original.md"), "backup\n");
+    await mkdir(join(cache, ".github"), { recursive: true });
+    await writeFile(join(cache, ".github", "workflow.yml"), "source-only\n");
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
+    await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installCloudflarePackage();
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    for (const mirror of [
+      join(TMP, ".codex", "plugins", "cache", "cloudflare", "cloudflare", "1.0.0"),
+      join(TMP, ".gemini", "extensions", "cloudflare"),
+      join(TMP, ".config", "opencode", "packages", "cloudflare"),
+      join(TMP, ".pi", "agent", "packages", "cloudflare"),
+    ]) {
+      expect(await readFile(join(mirror, "skills", "wrangler", "SKILL.md"), "utf8")).toContain("Use wrangler.");
+      expect(await readFile(join(mirror, "mcp", "servers.json"), "utf8")).toContain("{}");
+      expect(await readFile(join(mirror, "scripts", "setup.sh"), "utf8")).toContain("#!/bin/sh");
+      expect(await readFile(join(mirror, ".claude-plugin", "plugin.json"), "utf8")).toContain("cloudflare");
+      expect(await readFile(join(mirror, "vendor", "generated.txt"), "utf8")).toContain("generated");
+      expect(await readFile(join(mirror, "NOTICE"), "utf8")).toContain("notice");
+      expect(await Bun.file(join(mirror, "README.original.md")).exists()).toBe(false);
+      expect(await Bun.file(join(mirror, ".github", "workflow.yml")).exists()).toBe(false);
+      const metadata = JSON.parse(await readFile(join(mirror, "fulcrum-package-mirror.json"), "utf8"));
+      expect(metadata.package).toBe("cloudflare");
+      expect(metadata.mirroredSurfaces).toContain("mcp");
+      expect(metadata.mirroredSurfaces).toContain("tools");
+      expect(metadata.unknownAssets).toContain("NOTICE");
+      expect(metadata.unknownAssets).toContain("vendor");
+    }
+  });
+
   test("uninstalls only the Cloudflare Claude plugin for the Cloudflare package", async () => {
     await mkdir(join(TMP, ".claude"), { recursive: true });
     await mkdir(join(TMP, ".claude", "plugins", "cache", "cloudflare"), { recursive: true });
@@ -246,6 +308,35 @@ describe("vendor capability packages", () => {
     expect(await Bun.file(join(TMP, ".codex", "skills", "superpowers", "_archive", "old", "SKILL.md")).exists()).toBe(false);
   });
 
+  test("mirrors full Superpowers package payload for Codex fallback", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installSuperpowersPackage();
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    const mirror = join(TMP, ".codex", "plugins", "cache", "superpowers", "superpowers", "1.0.0");
+    expect(await readFile(join(mirror, "skills", "brainstorming", "SKILL.md"), "utf8")).toContain("Use structured brainstorming.");
+    expect(await readFile(join(mirror, "commands", "plan.md"), "utf8")).toContain("Plan command");
+    expect(await readFile(join(mirror, "agents", "reviewer.md"), "utf8")).toContain("Review agent");
+    expect(await readFile(join(mirror, "hooks", "session-start.sh"), "utf8")).toContain("#!/bin/sh");
+    expect(await readFile(join(mirror, "scripts", "tool.sh"), "utf8")).toContain("#!/bin/sh");
+    expect(await readFile(join(mirror, "assets", "logo.txt"), "utf8")).toContain("logo");
+    expect(await readFile(join(mirror, "NOTICE"), "utf8")).toContain("notice");
+    expect(await readFile(join(mirror, "dist", "bundle.js"), "utf8")).toContain("built");
+    expect(await Bun.file(join(mirror, "README.backup.md")).exists()).toBe(false);
+
+    const metadata = JSON.parse(await readFile(join(mirror, "fulcrum-package-mirror.json"), "utf8"));
+    expect(metadata.package).toBe("superpowers");
+    expect(metadata.targetAgent).toBe("codex");
+    expect(metadata.mirroredSurfaces).toContain("tools");
+    expect(metadata.mirroredSurfaces).toContain("hooks");
+    expect(metadata.unknownAssets).toContain("NOTICE");
+    expect(metadata.unknownAssets).toContain("dist");
+  });
+
   test("uninstalls Superpowers package surfaces without Cloudflare", async () => {
     await mkdir(join(TMP, ".claude"), { recursive: true });
     await mkdir(join(TMP, ".claude", "plugins", "cache", "claude-plugins-official", "superpowers"), { recursive: true });
@@ -276,7 +367,7 @@ describe("vendor capability packages", () => {
 
     const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
     try {
-      await installVendorCapabilityPackages();
+      await installSuperpowersPackage();
     } finally {
       whichSpy.mockRestore();
     }
@@ -289,15 +380,40 @@ describe("vendor capability packages", () => {
     expect(opencode.plugin).toContain("superpowers@git+https://github.com/obra/superpowers.git");
   });
 
+  test("mirrors full Superpowers package payload for Pi fallback when pi is unavailable", async () => {
+    await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installSuperpowersPackage();
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    const mirror = join(TMP, ".pi", "agent", "packages", "superpowers");
+    expect(await readFile(join(mirror, "skills", "brainstorming", "SKILL.md"), "utf8")).toContain("Use structured brainstorming.");
+    expect(await readFile(join(mirror, "commands", "plan.md"), "utf8")).toContain("Plan command");
+    expect(await readFile(join(mirror, "agents", "reviewer.md"), "utf8")).toContain("Review agent");
+    expect(await readFile(join(mirror, "hooks", "session-start.sh"), "utf8")).toContain("#!/bin/sh");
+    expect(await readFile(join(mirror, "scripts", "tool.sh"), "utf8")).toContain("#!/bin/sh");
+    expect(await readFile(join(mirror, "dist", "bundle.js"), "utf8")).toContain("built");
+    expect(await Bun.file(join(mirror, "README.backup.md")).exists()).toBe(false);
+
+    const metadata = JSON.parse(await readFile(join(mirror, "fulcrum-package-mirror.json"), "utf8"));
+    expect(metadata.package).toBe("superpowers");
+    expect(metadata.targetAgent).toBe("pi");
+    expect(metadata.unsupported.commands).toContain("not auto-loaded");
+    expect(metadata.unsupported.tools).toContain("not auto-executed");
+  });
+
   test("uninstalls mirrored Superpowers package surfaces", async () => {
     await mkdir(join(TMP, ".codex"), { recursive: true });
     await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
     await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
     const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
     try {
-      await installVendorCapabilityPackages();
+      await installSuperpowersPackage();
 
-      await uninstallVendorCapabilityPackages();
+      await uninstallSuperpowersPackage();
     } finally {
       whichSpy.mockRestore();
     }
@@ -314,7 +430,7 @@ describe("vendor capability packages", () => {
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
     let calls: unknown[][] = [];
     try {
-      await installVendorCapabilityPackages();
+      await installSuperpowersPackage();
       calls = runSpy.mock.calls.map((call) => call[0]);
     } finally {
       whichSpy.mockRestore();
@@ -331,7 +447,7 @@ describe("vendor capability packages", () => {
     const whichSpy = spyOn(proc, "which").mockResolvedValue("/usr/local/bin/gemini");
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 1, stdout: "", stderr: "already installed" });
     try {
-      await installVendorCapabilityPackages();
+      await installSuperpowersPackage();
     } finally {
       whichSpy.mockRestore();
       runSpy.mockRestore();

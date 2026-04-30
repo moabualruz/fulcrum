@@ -16,6 +16,8 @@ const REPOMIX_MIRRORS_MARKER_FILE = "repomix-mirrors.installed";
 const REPOMIX_CLAUDE_PLUGINS = ["repomix-mcp", "repomix-commands", "repomix-explorer"] as const;
 const REPOMIX_CODEX_PLUGIN_VERSION = "1.0.0";
 const REPOMIX_REGISTRY_AGENTS: AgentId[] = ["codex", "opencode", "pi"];
+const REPOMIX_RULES_BEGIN = "<!-- BEGIN FULCRUM REPOMIX RULES -->";
+const REPOMIX_RULES_END = "<!-- END FULCRUM REPOMIX RULES -->";
 
 const PACK_LOCAL_DESCRIPTION = "Pack local codebases with Repomix";
 const PACK_REMOTE_DESCRIPTION = "Pack remote repositories with Repomix";
@@ -206,6 +208,11 @@ function commandToml(description: string, prompt: string): string {
   return `description = ${JSON.stringify(description)}\nprompt = """\n${escaped}\n"""\n`;
 }
 
+function packageCommand(description: string, prompt: string): string {
+  const body = prompt.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
+  return `---\ndescription: ${description}\n---\n\n${body}\n`;
+}
+
 function upsertTomlSection(existing: string, header: string, body: string): string {
   const section = `${header}\n${body.trimEnd()}\n`;
   const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -218,6 +225,18 @@ function removeTomlSection(existing: string, header: string): string {
   const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const re = new RegExp(`(?:^|\\n)${escaped}\\n[\\s\\S]*?(?=\\n(?:\\[|# BEGIN FULCRUM MCP )|$)`);
   return existing.replace(re, "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function upsertMarkedBlock(existing: string, body: string): string {
+  const block = `${REPOMIX_RULES_BEGIN}\n${body.trim()}\n${REPOMIX_RULES_END}`;
+  const re = new RegExp(`${REPOMIX_RULES_BEGIN}[\\s\\S]*?${REPOMIX_RULES_END}`);
+  if (re.test(existing)) return existing.replace(re, block).trimEnd() + "\n";
+  return `${existing.trimEnd()}\n\n${block}\n`.trimStart();
+}
+
+function removeMarkedBlock(existing: string): string {
+  const re = new RegExp(`\\n?${REPOMIX_RULES_BEGIN}[\\s\\S]*?${REPOMIX_RULES_END}\\n?`);
+  return existing.replace(re, "\n").replace(/\n{3,}/g, "\n\n").trimStart();
 }
 
 function opencodeAgentFromClaude(body: string): string {
@@ -313,6 +332,7 @@ async function installGemini(home: string, source: RepomixPackageSource, dryRun:
     return;
   }
   const root = `${home}/.gemini/extensions/repomix`;
+  if (!dryRun) await rm(root, { recursive: true, force: true });
   await writeText(`${root}/gemini-extension.json`, JSON.stringify({
     name: "repomix",
     version: "1.0.0",
@@ -335,10 +355,40 @@ async function installGemini(home: string, source: RepomixPackageSource, dryRun:
   console.log("     ✓ Gemini Repomix extension mirror installed");
 }
 
+async function writeRulesContext(root: string, source: RepomixPackageSource, dryRun: boolean): Promise<void> {
+  const rules = source.rules.trim() + "\n";
+  await writeText(`${root}/rules/repomix/base.md`, rules, dryRun);
+  const agentsPath = `${root}/AGENTS.md`;
+  if (dryRun) {
+    console.log(`     [dry-run] would write: ${agentsPath}`);
+    return;
+  }
+  const existing = (await exists(agentsPath)) ? await readFile(agentsPath, "utf8") : "";
+  await mkdir(dirname(agentsPath), { recursive: true });
+  await writeFile(agentsPath, upsertMarkedBlock(existing, rules));
+}
+
+async function removeRulesContext(root: string, label: string, dryRun: boolean): Promise<void> {
+  await removePath(`${root}/rules/repomix`, `${label} Repomix rules mirror`, dryRun);
+  const agentsPath = `${root}/AGENTS.md`;
+  if (!(await exists(agentsPath))) return;
+  if (dryRun) {
+    console.log(`     [dry-run] would remove Repomix rules block from: ${agentsPath}`);
+    return;
+  }
+  const next = removeMarkedBlock(await readFile(agentsPath, "utf8"));
+  await writeFile(agentsPath, next ? `${next.trimEnd()}\n` : "");
+}
+
 async function installSkills(home: string, root: string, label: string, source: RepomixPackageSource, dryRun: boolean): Promise<void> {
   if (!(await exists(dirname(root)))) {
     console.log(`     · skip ${label} Repomix skills (not detected)`);
     return;
+  }
+  if (!dryRun) {
+    for (const name of [PACK_LOCAL, PACK_REMOTE, EXPLORER, EXPLORE_LOCAL, EXPLORE_REMOTE]) {
+      await rm(`${root}/${name}`, { recursive: true, force: true });
+    }
   }
   await writeText(`${root}/${PACK_LOCAL}/SKILL.md`, skill(PACK_LOCAL, PACK_LOCAL_DESCRIPTION, source.packLocal), dryRun);
   await writeText(`${root}/${PACK_REMOTE}/SKILL.md`, skill(PACK_REMOTE, PACK_REMOTE_DESCRIPTION, source.packRemote), dryRun);
@@ -346,6 +396,23 @@ async function installSkills(home: string, root: string, label: string, source: 
   await writeText(`${root}/${EXPLORE_LOCAL}/SKILL.md`, skill(EXPLORE_LOCAL, EXPLORE_LOCAL_DESCRIPTION, source.exploreLocal), dryRun);
   await writeText(`${root}/${EXPLORE_REMOTE}/SKILL.md`, skill(EXPLORE_REMOTE, EXPLORE_REMOTE_DESCRIPTION, source.exploreRemote), dryRun);
   console.log(`     ✓ ${label} Repomix skills mirror installed`);
+}
+
+async function installCommandFiles(root: string, source: RepomixPackageSource, dryRun: boolean): Promise<void> {
+  if (!dryRun) await pruneGeneratedMarkdown(root, ["pack-local", "pack-remote", "explore-local", "explore-remote"]);
+  await writeText(`${root}/pack-local.md`, packageCommand(PACK_LOCAL_DESCRIPTION, source.packLocal), dryRun);
+  await writeText(`${root}/pack-remote.md`, packageCommand(PACK_REMOTE_DESCRIPTION, source.packRemote), dryRun);
+  await writeText(`${root}/explore-local.md`, packageCommand(EXPLORE_LOCAL_DESCRIPTION, source.exploreLocal), dryRun);
+  await writeText(`${root}/explore-remote.md`, packageCommand(EXPLORE_REMOTE_DESCRIPTION, source.exploreRemote), dryRun);
+}
+
+async function pruneGeneratedMarkdown(root: string, names: string[]): Promise<void> {
+  for (const name of names) {
+    await rm(`${root}/${name}.original.md`, { force: true });
+    await rm(`${root}/${name}.backup.md`, { force: true });
+    await rm(`${root}/${name}.source-only.md`, { force: true });
+  }
+  await rm(`${root}/source-only`, { recursive: true, force: true });
 }
 
 function codexPluginJson(): string {
@@ -441,9 +508,55 @@ async function installOpenCode(home: string, source: RepomixPackageSource, dryRu
     console.log("     · skip OpenCode Repomix package mirror (not detected)");
     return;
   }
+  await rm(`${home}/.config/opencode/rules/base.original.md`, { force: true });
   await installSkills(home, `${home}/.config/opencode/skills`, "OpenCode", source, dryRun);
+  await installCommandFiles(`${home}/.config/opencode/commands`, source, dryRun);
   await writeText(`${home}/.config/opencode/agents/${EXPLORER}.md`, opencodeAgentFromClaude(source.explorer), dryRun);
+  await writeRulesContext(`${home}/.config/opencode`, source, dryRun);
+  await writeText(`${home}/.config/opencode/packages/repomix/package.json`, JSON.stringify({
+    name: "repomix",
+    version: "1.0.0",
+    private: true,
+    description: "Fulcrum mirror metadata for Repomix OpenCode surfaces.",
+    fulcrumMirror: {
+      source: REPOMIX_REPO,
+      surfaces: ["skills", "mcp", "commands", "explorer-agent", "rules"],
+    },
+  }, null, 2) + "\n", dryRun);
   console.log("     ✓ OpenCode Repomix agent mirror installed");
+}
+
+async function installPi(home: string, source: RepomixPackageSource, dryRun: boolean): Promise<void> {
+  if (!(await exists(`${home}/.pi/agent`))) {
+    console.log("     · skip Pi CLI Repomix package mirror (not detected)");
+    return;
+  }
+  await rm(`${home}/.pi/agent/rules/base.original.md`, { force: true });
+  await installSkills(home, `${home}/.pi/agent/skills`, "Pi CLI", source, dryRun);
+  await installCommandFiles(`${home}/.pi/agent/prompts`, source, dryRun);
+  await writeRulesContext(`${home}/.pi/agent`, source, dryRun);
+  await writeText(`${home}/.pi/agent/agents/${EXPLORER}.unsupported.md`, [
+    "# Repomix explorer agent",
+    "",
+    "Pi has no native standalone explorer agent primitive to mirror Claude Code's Repomix explorer agent directly.",
+    `Use /${EXPLORER} as a skill, or /explore-local and /explore-remote as prompt templates.`,
+    "",
+  ].join("\n"), dryRun);
+  await writeText(`${home}/.pi/agent/packages/repomix/package.json`, JSON.stringify({
+    name: "repomix",
+    version: "1.0.0",
+    private: true,
+    keywords: ["pi-package", "repomix"],
+    description: "Fulcrum mirror metadata for Repomix Pi surfaces.",
+    pi: {
+      skills: ["./skills"],
+      prompts: ["./prompts"],
+    },
+    fulcrumMirror: {
+      source: REPOMIX_REPO,
+      surfaces: ["skills", "mcp", "prompts", "rules", "unsupported-explorer-agent"],
+    },
+  }, null, 2) + "\n", dryRun);
 }
 
 async function enableRepomixMcpForPackage(dryRun: boolean): Promise<void> {
@@ -497,7 +610,7 @@ export async function installRepomixPackageMirrors(opts: { dryRun?: boolean } = 
   await installCodexPluginMirror(home, source, dryRun);
   await installGemini(home, source, dryRun);
   await installOpenCode(home, source, dryRun);
-  await installSkills(home, `${home}/.pi/agent/skills`, "Pi CLI", source, dryRun);
+  await installPi(home, source, dryRun);
   await enableRepomixMcpForPackage(dryRun);
   await writeMarker(home, REPOMIX_MIRRORS_MARKER_FILE, dryRun);
 }
@@ -524,6 +637,20 @@ export async function uninstallRepomixPackageMirrors(opts: { dryRun?: boolean } 
   await removePath(`${home}/.codex/plugins/cache/repomix`, "Codex Repomix plugin mirror", dryRun);
   await removeCodexRepomixPluginConfig(home, dryRun);
   await removePath(`${home}/.config/opencode/agents/${EXPLORER}.md`, "OpenCode Repomix agent mirror", dryRun);
+  for (const root of [
+    `${home}/.config/opencode/commands`,
+    `${home}/.pi/agent/prompts`,
+  ]) {
+    await removePath(`${root}/pack-local.md`, "Repomix command pack-local", dryRun);
+    await removePath(`${root}/pack-remote.md`, "Repomix command pack-remote", dryRun);
+    await removePath(`${root}/explore-local.md`, "Repomix command explore-local", dryRun);
+    await removePath(`${root}/explore-remote.md`, "Repomix command explore-remote", dryRun);
+  }
+  await removeRulesContext(`${home}/.config/opencode`, "OpenCode", dryRun);
+  await removeRulesContext(`${home}/.pi/agent`, "Pi CLI", dryRun);
+  await removePath(`${home}/.config/opencode/packages/repomix`, "OpenCode Repomix package metadata", dryRun);
+  await removePath(`${home}/.pi/agent/agents/${EXPLORER}.unsupported.md`, "Pi CLI Repomix unsupported explorer note", dryRun);
+  await removePath(`${home}/.pi/agent/packages/repomix`, "Pi CLI Repomix package metadata", dryRun);
   await removeRepomixMcpForPackage(dryRun);
   await removePath(markerFile(home, REPOMIX_MIRRORS_MARKER_FILE), "Repomix package mirrors marker", dryRun);
 }
@@ -554,10 +681,33 @@ async function previewRepomixPackageMirrors(home: string): Promise<void> {
   }
   if (await exists(`${home}/.config/opencode`)) {
     previewSkillWrites(`${home}/.config/opencode/skills`);
+    for (const path of [
+      `${home}/.config/opencode/commands/pack-local.md`,
+      `${home}/.config/opencode/commands/pack-remote.md`,
+      `${home}/.config/opencode/commands/explore-local.md`,
+      `${home}/.config/opencode/commands/explore-remote.md`,
+      `${home}/.config/opencode/AGENTS.md`,
+      `${home}/.config/opencode/rules/repomix/base.md`,
+      `${home}/.config/opencode/packages/repomix/package.json`,
+    ]) {
+      console.log(`     [dry-run] would write: ${path}`);
+    }
     console.log(`     [dry-run] would write: ${home}/.config/opencode/agents/${EXPLORER}.md`);
   }
   if (await exists(`${home}/.pi/agent`)) {
     previewSkillWrites(`${home}/.pi/agent/skills`);
+    for (const path of [
+      `${home}/.pi/agent/prompts/pack-local.md`,
+      `${home}/.pi/agent/prompts/pack-remote.md`,
+      `${home}/.pi/agent/prompts/explore-local.md`,
+      `${home}/.pi/agent/prompts/explore-remote.md`,
+      `${home}/.pi/agent/AGENTS.md`,
+      `${home}/.pi/agent/rules/repomix/base.md`,
+      `${home}/.pi/agent/agents/${EXPLORER}.unsupported.md`,
+      `${home}/.pi/agent/packages/repomix/package.json`,
+    ]) {
+      console.log(`     [dry-run] would write: ${path}`);
+    }
   }
 }
 

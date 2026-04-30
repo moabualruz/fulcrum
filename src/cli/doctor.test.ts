@@ -131,6 +131,18 @@ describe("doctor --json component lifecycle section", () => {
     expect(components?.["installed"]).toBeGreaterThan(0);
     expect(components?.["database"]).toBe(join(fulcrumHome, "state", "global", "components.db"));
   });
+
+  test("reports package parity state", async () => {
+    const home = join(TMP, "component-package-parity");
+    await mkdir(home, { recursive: true });
+
+    const report = await runDoctor(home);
+    const components = report["components"] as Record<string, unknown> | undefined;
+
+    expect(components?.["packageParity"]).toBeDefined();
+    expect(JSON.stringify(components?.["packageParity"])).toContain("package.repomix");
+    expect(JSON.stringify(components?.["packageParity"])).toContain("sourceCounts");
+  });
 });
 
 describe("doctor project-local worktree warnings", () => {

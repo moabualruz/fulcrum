@@ -10,6 +10,9 @@ import { ComponentLedger, dbPath as componentLedgerPath } from "../components/le
 import { loadRegistry, ALL_AGENT_IDS, isEnabled, type AgentId } from "./mcp-registry.ts";
 import { MINIMAL_DEFAULT_MCPS } from "./mcp-builtins.ts";
 import { scanSkillBudgets, type SkillBudgetReport } from "./skill-budget.ts";
+import { auditPackageParity, type PackageParityReport } from "./package-parity.ts";
+import { planPackageMirrorTargets } from "./package-mirror.ts";
+import { getPackageSurfaceManifest, MANAGED_PACKAGE_IDS, packageCacheSourceRoot } from "./package-surfaces.ts";
 
 interface ToolCheck {
   cmd: string;
@@ -79,6 +82,7 @@ interface DoctorReport {
     total: number;
     installed: number;
     database: string;
+    packageParity: PackageParityReport[];
   };
   worktrees: {
     projectLocalIgnoredRoots: Array<{
@@ -557,6 +561,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       ledger.close();
     }
   }
+  const packageParity = await buildPackageParityReport(home);
 
   // Managed MCPs
   const mcpReport: DoctorReport["mcp"] = { servers: [] };
@@ -673,6 +678,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       total: ALL_COMPONENTS.length,
       installed: installedComponents,
       database: componentDatabase,
+      packageParity,
     },
     worktrees,
     skillBudget,
@@ -683,6 +689,26 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   };
 
   return { report, errors };
+}
+
+async function buildPackageParityReport(home: string): Promise<PackageParityReport[]> {
+  const reports: PackageParityReport[] = [];
+  for (const packageId of MANAGED_PACKAGE_IDS) {
+    const cacheRoot = packageCacheSourceRoot(packageId, home);
+    const sourceRoot = (await exists(cacheRoot)) ? cacheRoot : undefined;
+    const manifest = await getPackageSurfaceManifest(packageId, sourceRoot === undefined ? {} : { sourceRoot });
+    const targets = planPackageMirrorTargets(manifest, [...ALL_AGENT_IDS]);
+    for (const agentId of ALL_AGENT_IDS) {
+      reports.push(
+        await auditPackageParity(
+          manifest,
+          targets.filter((target) => target.agentId === agentId),
+          { home },
+        ),
+      );
+    }
+  }
+  return reports;
 }
 
 function printHumanFormat(report: DoctorReport, home: string): void {

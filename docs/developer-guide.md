@@ -168,7 +168,7 @@ Detection-aware logic: if `agent.rootDir` does not exist, skip writes for that a
 
 `fulcrum install` defaults to `profile.minimal` through the component lifecycle engine. `--profile full` runs the historical `profile.default`; `--profile rules-only` runs only `rules.global`; `--enable-all-mcps` switches the target to `profile.verify-all`. `--no-skills`, `--no-upstream-skills`, and `--no-default-mcps` become planner exclusions plus the existing MCP default-state compatibility step.
 
-The default profile covers:
+The minimal profile covers rules, policy, MCP registry setup, and minimal MCP defaults. The full profile adds hooks, skills, Caveman, upstream skills, and vendor packages:
 
 1. **Rules splice** — read `rules/AGENTS.md`, insert between `<!-- BEGIN/END FULCRUM RULES -->` sentinels in each detected agent's rules file. Preserves content outside the markers.
 2. **Policy seed** — copy `config/tool-output-policy.toml` to `~/.fulcrum/tool-output-policy.toml` (first run only; subsequent runs leave user edits).
@@ -178,7 +178,7 @@ The default profile covers:
 6. **Upstream skills** — `fulcrum skills upstream` clones pinned repos, verifies `subpath_sha256`, installs to vendor placement (`<agent>/skills/<name>/`, Gemini `~/.gemini/skills/<name>/`).
 7. **DeepWiki MCP** — registry builtin, registered through the same MCP lifecycle path as every other builtin (Pi via `pi-mcp-adapter` auto-install).
 8. **Builtin MCPs** — register 17 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml`; minimal default state enables `deepwiki` and `context7` only where no user state exists, while `--no-default-mcps` registers without changing enable state and `--enable-all-mcps` enables all builtins.
-9. **Vendor packages** — install Caveman, Repomix, Cloudflare, and Superpowers through official installers first, then mirror plugin/extension/package surfaces to supported CLIs that lack a first-party or generic installer.
+9. **Vendor packages** — install Caveman, Repomix, Cloudflare, and Superpowers through official installers first, then mirror complete plugin/extension/package surfaces to supported CLIs that lack a first-party or generic installer. Package parity reports cover skills, rules/context, MCPs, commands/prompts, agents, hooks, tools/scripts, metadata, and assets.
 
 `fulcrum uninstall` is conservative by default: removes managed rules blocks, hook registrations, hook snippets/markers, `skills/fulcrum/`, legacy `skills/fulcrum-upstream/` namespaces, Gemini managed extensions, Gemini `@AGENTS.md` import, and DeepWiki. Keeps edited policy files, vendor-placed third-party skills, and caveman unless `--purge` / `--include-caveman` flags are passed.
 
