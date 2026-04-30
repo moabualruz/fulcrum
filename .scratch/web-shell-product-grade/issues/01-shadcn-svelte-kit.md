@@ -34,7 +34,7 @@ Every sub-task: RED test → GREEN minimum impl → REFACTOR. Capture commands +
 - [x] **01.3 — Install layout primitives.** Owns: `src/web/src/lib/components/ui/{table,tabs,sheet,separator,skeleton,scroll-area,avatar,breadcrumb}/`. RED: extend the smoke test with these names. GREEN: `bunx shadcn-svelte@latest add -y table tabs sheet separator skeleton scroll-area avatar breadcrumb`.
 - [x] **01.4 — Install overlay primitives.** Owns: `src/web/src/lib/components/ui/{dialog,alert-dialog,dropdown-menu,popover,tooltip,command,form}/`. RED: extend smoke test. GREEN: `bunx shadcn-svelte@latest add -y dialog alert-dialog dropdown-menu popover tooltip command form`.
 - [x] **01.5 — Toaster + form validation deps.** Owns: `src/web/package.json`, `src/web/src/lib/components/ui/sonner/`. RED: smoke imports `Toaster`. GREEN: `bunx shadcn-svelte@latest add -y sonner` then `bun add svelte-sonner mode-watcher lucide-svelte sveltekit-superforms valibot marked dompurify`.
-- [ ] **01.6 — Post-install gate.** Owns: nothing new. RED: `bun run check && bun run build` should already be green; if not, fix imports. GREEN: both exit 0. Commit `feat(web): add shadcn-svelte component kit + form/toast/markdown deps`.
+- [x] **01.6 — Post-install gate.** Owns: nothing new. RED: `bun run check && bun run build` should already be green; if not, fix imports. GREEN: both exit 0. Commit `feat(web): add shadcn-svelte component kit + form/toast/markdown deps`.
 
 ## Comments
 
@@ -178,3 +178,24 @@ Implementation notes:
 - **`@lucide/svelte` already present.** 01.1 init pulled `@lucide/svelte`; this lane added `lucide-svelte` per spec verbatim. Not currently imported but installed for future feature waves (kanban/runs icons).
 
 Gates: `bun test ./src/web/src/lib/utils.test.ts` → 2 pass (regression). `cd src/web && bun run check` → 2194 files, 0 errors / 0 warnings. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.
+
+### 01.6 — close-out gate — 2026-04-30 (implementer)
+
+Audit of the 01.1–01.5 cumulative state — no gaps, no edits to `src/web/**`. Diff is issue-file-only.
+
+Workspace inspection (steps 1–6 of the close-out brief):
+
+1. `ls src/web/src/lib/components/ui/` → 24 dirs + `ui-primitives.smoke.test.ts`. Dir set matches spec exactly: `alert-dialog avatar badge breadcrumb button card command dialog dropdown-menu form input input-group label popover scroll-area select separator sheet skeleton sonner table tabs textarea tooltip`. No extras (`utils.test.ts` correctly absent — moved to `src/web/src/lib/utils.test.ts` in `e9522aa`).
+2. `src/web/components.json` → `tailwind.baseColor === "zinc"` ✓, `style === "vega"` ✓.
+3. `src/web/src/app.css` → `rg '#[0-9a-fA-F]{6}' src/web/src/app.css` → no matches inside `@theme {}` (cleanup from 01.1 quality follow-up holds). `:root` (lines 51–84) and `.dark` (lines 86–118) carry the canonical shadcn oklch token set.
+4. `src/web/src/app.css` → `rg 'font-family' src/web/src/app.css` → 0 literal matches. The 01.1 follow-up replaced the duplicate inline `font-family: ui-sans-serif, …` with `@layer base { html { @apply font-sans; } }` (line 127–129) which resolves to `--font-sans: 'Inter Variable', sans-serif` declared once in `@theme {}` (line 18). Single source of font, sits in `@layer base` per spec intent.
+5. `src/web/package.json` → `dependencies`: `dompurify ^3.4.2`, `lucide-svelte ^1.0.1`, `marked ^18.0.2`, `valibot ^1.3.1` ✓. `devDependencies` carries `@types/dompurify`, `@types/marked`, `mode-watcher`, `svelte-sonner`, plus the shadcn-svelte stack ✓. No `react`/`vue`/`solid` ✓.
+6. `src/web/patches/` → does not exist (deleted in `ff89d08`) ✓. No `patchedDependencies` block in `src/web/package.json` or root `package.json` ✓.
+
+Six gate results:
+- `bun test --conditions=svelte ./src/web/src/lib/components/ui/ui-primitives.smoke.test.ts` → `23 pass, 0 fail` (729ms).
+- `bun test ./src/web/src/lib/utils.test.ts` → `2 pass, 0 fail` (7ms).
+- `cd src/web && bun run check` → `COMPLETED 2194 FILES 0 ERRORS 0 WARNINGS 0 FILES_WITH_PROBLEMS`.
+- `cd src/web && bun run build` → `✓ built in 436ms`.
+- `bun run ci` → all 9 stages green (`install`, `typecheck`, `test`, `build:all`, `web:install`, `web:check`, `web:build`, `skills:lint`, `compress:check`).
+- `git status --short` post-commit → clean.
