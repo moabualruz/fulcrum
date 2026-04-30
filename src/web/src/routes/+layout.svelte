@@ -1,31 +1,91 @@
 <script lang="ts">
-  import favicon from "$lib/assets/favicon.svg";
-  import "../app.css";
-  import { fulcrumState } from "$lib/state/fulcrum-store";
+	import type { Snippet } from "svelte";
+	import { ModeWatcher, toggleMode } from "mode-watcher";
+	import { Toaster } from "svelte-sonner";
 
-  let { children } = $props();
+	import { page } from "$app/state";
+	import favicon from "$lib/assets/favicon.svg";
+	import AppSidebar from "$lib/components/app/AppSidebar.svelte";
+	import AppTopbar from "$lib/components/app/AppTopbar.svelte";
+	import * as Sheet from "$lib/components/ui/sheet";
+	import { buttonVariants } from "$lib/components/ui/button";
+	import {
+		MOBILE_QUERY,
+		browserDriver,
+		isMobileViewport,
+	} from "$lib/util/media-query";
+	import { cn } from "$lib/utils.js";
+
+	import "../app.css";
+	import type { LayoutData } from "./$types";
+
+	interface Props {
+		data: LayoutData;
+		children?: Snippet;
+	}
+
+	let { data, children }: Props = $props();
+
+	let mobile = $state(isMobileViewport(browserDriver()));
+	let sheetOpen = $state(false);
+
+	$effect(() => {
+		if (typeof window === "undefined" || typeof window.matchMedia !== "function")
+			return;
+		const mql = window.matchMedia(MOBILE_QUERY);
+		mobile = mql.matches;
+		const onChange = (e: MediaQueryListEvent) => {
+			mobile = e.matches;
+		};
+		mql.addEventListener("change", onChange);
+		return () => mql.removeEventListener("change", onChange);
+	});
 </script>
 
 <svelte:head>
-  <link rel="icon" href={favicon} />
+	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<div class="min-h-screen bg-background text-foreground">
-  <header class="border-b border-border">
-    <div class="mx-auto max-w-6xl px-6 py-4 flex items-center gap-6">
-      <a href="/" class="font-semibold">Fulcrum</a>
-      <nav class="flex gap-4 text-sm">
-        <a href="/projects" class="hover:underline">Projects</a>
-        <a href="/docs" class="hover:underline">Docs</a>
-        <a href="/boards" class="hover:underline">Boards</a>
-        <a href="/runs" class="hover:underline">Runs</a>
-      </nav>
-      <div class="ml-auto text-xs text-muted-foreground">
-        active: {$fulcrumState.activeProjectId ?? "—"}
-      </div>
-    </div>
-  </header>
-  <main class="mx-auto max-w-6xl px-6 py-6">
-    {@render children?.()}
-  </main>
+<ModeWatcher />
+<Toaster richColors closeButton position="top-right" />
+
+<div class={cn("flex min-h-screen bg-background text-foreground")}>
+	{#if mobile}
+		<Sheet.Root bind:open={sheetOpen}>
+			<Sheet.Content side="left" class="w-64 p-0">
+				<AppSidebar activeProjectId={data.activeProjectId} />
+			</Sheet.Content>
+		</Sheet.Root>
+	{:else}
+		<div class={cn("sticky top-0 h-screen")}>
+			<AppSidebar activeProjectId={data.activeProjectId} />
+		</div>
+	{/if}
+
+	<div class={cn("flex min-w-0 flex-1 flex-col")}>
+		<div class={cn("flex items-center")}>
+			{#if mobile}
+				<Sheet.Trigger
+					data-mobile-sheet-trigger
+					aria-label="open navigation"
+					class={cn(
+						buttonVariants({ variant: "ghost", size: "icon" }),
+						"ml-2",
+					)}
+				>
+					☰
+				</Sheet.Trigger>
+			{/if}
+			<div class="flex-1">
+				<AppTopbar
+					pathname={page.url.pathname}
+					activeProjectId={data.activeProjectId}
+					onThemeToggle={toggleMode}
+				/>
+			</div>
+		</div>
+		<main class={cn("flex-1 px-6 py-6")}>
+			{@render children?.()}
+		</main>
+	</div>
 </div>

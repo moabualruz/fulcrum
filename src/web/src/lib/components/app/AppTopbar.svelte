@@ -7,9 +7,14 @@
 	interface Props {
 		pathname: string;
 		activeProjectId: string | null;
+		onThemeToggle?: () => void;
 	}
 
-	let { pathname, activeProjectId }: Props = $props();
+	let {
+		pathname,
+		activeProjectId,
+		onThemeToggle = () => {},
+	}: Props = $props();
 
 	interface Crumb {
 		label: string;
@@ -86,6 +91,7 @@
 			data-slot="button"
 			data-theme-toggle
 			aria-label="toggle theme"
+			onclick={onThemeToggle}
 			class={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
 		>
 			<Sun aria-hidden="true" />

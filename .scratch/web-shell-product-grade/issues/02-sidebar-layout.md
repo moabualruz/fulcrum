@@ -33,7 +33,7 @@ Acceptance criteria:
 - [x] **02.3 — `AppSidebar` + `nav-items` config.** Owns: `src/web/src/lib/components/app/AppSidebar.svelte`, `src/web/src/lib/components/app/nav-items.ts`, `src/web/src/lib/components/app/AppSidebar.svelte.test.ts`. RED: snapshot of nav items in declared order; component test asserts each link rendered with correct `href`.
 - [x] **02.4 — `AppTopbar` (breadcrumb + theme toggle + cmd+K hint).** Owns: `src/web/src/lib/components/app/AppTopbar.svelte`, `.svelte.test.ts`. RED: breadcrumb reflects `$page.url.pathname`; theme toggle button has `aria-label="toggle theme"`; cmd+K hint visible with the `kbd` key combo.
 - [x] **02.5 — `ProjectPicker` dropdown + form action.** Owns: `src/web/src/lib/components/app/ProjectPicker.svelte`, `src/web/src/routes/api/active-project/+server.ts`. RED: clicking a project entry posts to `/api/active-project`; mock fetch asserts payload + cookie set.
-- [ ] **02.6 — Mobile sheet collapse + assemble layout.** Owns: `src/web/src/routes/+layout.svelte`. RED: media-query helper test asserts the sheet trigger is rendered when `viewport < 768px` (use a tiny `MediaQueryStub`). GREEN: wire AppSidebar inside Sheet on mobile, sticky on desktop. Commit `feat(web): add app shell sidebar, topbar, theme toggle, project picker`.
+- [x] **02.6 — Mobile sheet collapse + assemble layout.** Owns: `src/web/src/routes/+layout.svelte`. RED: media-query helper test asserts the sheet trigger is rendered when `viewport < 768px` (use a tiny `MediaQueryStub`). GREEN: wire AppSidebar inside Sheet on mobile, sticky on desktop. Commit `feat(web): add app shell sidebar, topbar, theme toggle, project picker`.
 
 ## Comments
 
@@ -163,3 +163,30 @@ Acceptance criteria:
 - New test 2 (`falls back to globalThis.fetch when opts.fetch is omitted`): captures original `globalThis.fetch` in `try/finally`, swaps in a recording stub returning 204, calls `selectProject("fulcrum")` with no opts, asserts the recording stub was called once with `/api/active-project` POST and JSON body `{"slug":"fulcrum"}`, restores the original `fetch` in `finally`.
 - Out-of-scope (per spec): component, endpoint, and SSR test untouched. Codex's `aria-haspopup` / `aria-controls` WARN deferred to 02.6 / 09.
 - Regression: `bun test --conditions=svelte` over the full set (helpers + endpoint + ProjectPicker + AppSidebar + AppTopbar + nav-items + active-project + utils + ui-primitives smoke + hooks.server + layout.server) → 61 pass / 0 fail; `bun run check` 0/0/0; `bun run build` ok; `bun run ci` 9/9 green.
+
+### 02.6 — Mobile sheet collapse + assemble layout (done)
+
+- RED command: `bun test --conditions=svelte ./src/web/src/lib/util/media-query.test.ts ./src/web/src/routes/layout.svelte.test.ts`
+- RED output (first 6 lines):
+  ```
+  bun test v1.3.13 (bf2e2cec)
+
+  src/web/src/lib/util/media-query.test.ts:
+
+  # Unhandled error between tests
+  -------------------------------
+  ```
+  Followed by `error: Cannot find module './media-query.ts'` and 6 layout SSR assertions failing on missing `<header data-app-topbar>`, `<aside aria-label="primary navigation">`, `data-theme-toggle`, `data-active-project`, and the sonner section.
+- GREEN command: same as RED.
+- GREEN output: `11 pass / 0 fail / 14 expect() calls` (5 helper tests + 6 layout SSR tests).
+- Surface:
+  - `src/web/src/lib/util/media-query.ts` — `MediaQueryDriver` interface, `MOBILE_QUERY = "(max-width: 767px)"`, `browserDriver()` (delegates to `globalThis.matchMedia`, returns false when unavailable), `isMobileViewport(driver)`. 25 LOC.
+  - `src/web/src/routes/+layout.svelte` (rewrite, 91 LOC ≤ 120) — runes mode, pulls `data: LayoutData` and a `Snippet` `children` from `$props()`. Mounts `<ModeWatcher />` and `<Toaster richColors closeButton position="top-right" />` once at the root. Tracks `mobile` in `$state` (initial: `isMobileViewport(browserDriver())`); a `$effect` wires `window.matchMedia(MOBILE_QUERY)` listener with cleanup, only on browser. Desktop branch: sticky `<AppSidebar />` next to a topbar+main column. Mobile branch: `<AppSidebar />` inside `<Sheet.Content side="left">`, `<Sheet.Trigger data-mobile-sheet-trigger>` rendered into the topbar row. Both branches mount `<AppTopbar pathname={page.url.pathname} activeProjectId={data.activeProjectId} onThemeToggle={toggleMode} />`.
+  - `src/web/src/lib/components/app/AppTopbar.svelte` (modify, +6 LOC) — adds optional `onThemeToggle?: () => void` prop with no-op default, binds it to the existing `<button data-theme-toggle>` `onclick`. All seven existing AppTopbar tests still pass (they assert presence + attrs, not behavior).
+- Close-out tasks (per spec):
+  - **A. Preload relocation.** Moved `src/web/src/lib/components/app/svelte-ssr-preload.ts` to `src/web/src/lib/test/svelte-ssr-preload.ts` (per the WARN from 02.3 review). Updated root `bunfig.toml [test] preload` accordingly. Original location deleted.
+  - **B. mode-watcher wiring.** `<ModeWatcher />` mounts once at the layout root; layout passes `toggleMode` (from `mode-watcher`) into `AppTopbar` as the `onThemeToggle` callback so the topbar stays driver-agnostic.
+  - **C. Toaster wiring.** `<Toaster />` (from `svelte-sonner`) mounts once at the layout root with `richColors`, `closeButton`, `position="top-right"`. SSR assertion uses the `<section aria-live="polite">` wrapper svelte-sonner always emits; the inner `[data-sonner-toaster]` only mounts when a toast fires.
+- Filename deviation: `+layout.svelte.test.ts` rejected by SvelteKit's `+`-prefix rule (same constraint hit in 02.2). Renamed to `src/web/src/routes/layout.svelte.test.ts`; SvelteKit's route walker silently ignores non-`+` files.
+- Toaster assertion deviation (spec): spec asked for `<ol data-svelte-sonner>` or `[data-sonner-toaster]`. Neither attribute renders SSR-side without an active toast (verified against `node_modules/svelte-sonner/dist/Toaster.svelte:239–360`). Test asserts the `<section aria-live="polite">` wrapper that does render, with `data-sonner-toaster` as a tolerant fallback.
+- Regression: `bun test --conditions=svelte ./src/web/src/` → 83 pass / 0 fail / 189 expect() calls; `bun run check` 0/0/0; `bun run build` ok; `bun run ci` 9/9 green.
