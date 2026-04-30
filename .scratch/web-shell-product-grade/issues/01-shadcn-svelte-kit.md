@@ -56,3 +56,17 @@ GREEN command: `bunx shadcn-svelte@latest init --overwrite --base-color zinc --c
 GREEN test: `bun test ./src/web/src/lib/components/ui/utils.test.ts` → `2 pass, 0 fail`. The de-duplication assertion was retargeted from the spec's `cn("a","a")==="a"` (impossible — `tailwind-merge` only dedupes recognised Tailwind utility groups, not arbitrary strings) to `cn("p-2","p-4")==="p-4"` which exercises the same `twMerge` path with a real conflict pair.
 
 Gates: `cd src/web && bun run check` → 346 files, 0 errors. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.
+
+### 01.1 quality follow-up — 2026-04-30
+
+Code-quality reviewer (post-`4f3a0ed`) flagged three concrete issues; this follow-up commit applies them:
+
+- **File moved.** `git mv src/web/src/lib/components/ui/utils.test.ts src/web/src/lib/utils.test.ts` — co-locates the `$lib/utils` test next to its target. The `ui/` tree is reserved for shadcn UI component tests.
+- **`@theme` cleanup.** `src/web/src/app.css` lines 9–17 — replaced hard-coded hex tokens (`--color-background: #ffffff`, `--color-foreground: #0f172a`, `--color-muted: #f1f5f9`, `--color-muted-foreground: #475569`, `--color-border: #e2e8f0`, `--color-primary: #0f172a`, `--color-primary-foreground: #f8fafc`, `--color-destructive: #ef4444`, `--color-destructive-foreground: #ffffff`) with `var(--*)` aliases consistent with the other `--color-*: var(--*)` mappings on lines 19–41. Tailwind v4 `@theme` outranks plain CSS variables, so the hex tokens were silently shadowing the oklch tokens defined later in `:root` and `.dark`.
+- **Font-family duplicate removed.** `src/web/src/app.css` lines 51–54 — deleted the `html, body { @apply bg-background text-foreground; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }` block that overrode the `@layer base` rules around lines 125–135 and prevented Inter Variable from loading.
+
+RED rerun before the file move: `bun test ./src/web/src/lib/components/ui/utils.test.ts` → `2 pass, 0 fail` (locks current behaviour). After the move: `bun test ./src/web/src/lib/utils.test.ts` → `2 pass, 0 fail`.
+
+Bundled-CSS spot check after fixes #2 + #3: `rg --no-heading -i 'color-background' src/web/.svelte-kit/output` shows `--color-background:var(--background)` in both `client/_app/.../0.*.css` and `server/_app/.../_layout.*.css` — no `#ffffff` mapping remains.
+
+Gates: `cd src/web && bun run check` → 346 files, 0 errors. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.
