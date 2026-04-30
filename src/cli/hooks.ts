@@ -729,10 +729,14 @@ async function disableRecipe(name: RecipeName, targetAgents: Set<AgentId>): Prom
   }
 }
 
-export async function removeAllHookRegistrations(): Promise<void> {
+export async function removeAllHookRegistrations(opts: { dryRun?: boolean } = {}): Promise<void> {
   const home = process.env["HOME"] ?? "";
   const target = await detectedAgents(home);
   for (const name of RECIPE_NAMES) {
+    if (opts.dryRun === true) {
+      console.log(`     [dry-run] would disable hook recipe: ${name}`);
+      continue;
+    }
     await disableRecipe(name, target);
   }
 }

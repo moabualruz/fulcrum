@@ -154,7 +154,7 @@ RECORD: row 10; note any agent where false
 
 ---
 
-### Step 11 — Authored skills (28 per detected agent)
+### Step 11 — Authored skills (29 per detected agent)
 
 ```
 CHECK (Claude Code):  jq -r '.plugins | keys[]' ~/.claude/plugins/installed_plugins.json 2>/dev/null | grep -c '^fulcrum@fulcrum$'
@@ -164,8 +164,8 @@ CHECK (Gemini CLI):   ls ~/.gemini/extensions/fulcrum-skills/skills/ 2>/dev/null
 CHECK (OpenCode):     ls ~/.config/opencode/skills/fulcrum/ 2>/dev/null | wc -l | tr -d ' '
 CHECK (Pi CLI):       ls ~/.pi/agent/skills/fulcrum/ 2>/dev/null | wc -l | tr -d ' '
 
-EXPECT (Claude): 1 (plugin registered) + 28 skill dirs in cached plugin tree
-EXPECT (others): 28 per detected agent
+EXPECT (Claude): 1 (plugin registered) + 29 skill dirs in cached plugin tree
+EXPECT (others): 29 per detected agent
 RECORD: row 11; note agent + actual count for any mismatch
 ```
 
@@ -269,7 +269,7 @@ Host:  <hostname>
 | 9 | rules splice (per agent) | 1 per detected | <fill> | <fill> | <fill> |
 | 10 | caveman installed (per agent) | true each detected | <fill> | <fill> | <fill> |
 | 11 | authored skills count | 29 per detected/full-profile mirror | <fill> | <fill> | <fill> |
-| 12 | curated upstream skills | lock count 27 + representative skill present per detected | <fill> | <fill> | <fill> |
+| 12 | curated upstream skills | lock count 19 + representative skill present per detected | <fill> | <fill> | <fill> |
 | 13 | hooks list | 8 recipes shown | <fill> | <fill> | <fill> |
 | 14 | hook format smoke | exit 0 | <fill> | <fill> | <fill> |
 | 15 | bun run ci (repo only) | 6 stages green | <fill> | <fill> | skip if not in repo |
@@ -297,7 +297,7 @@ Overall verdict: PASS / PARTIAL / FAIL
 | rules splice missing | `fulcrum install` not run, or rules file replaced after install. Re-run `fulcrum install`. See docs/context.md. |
 | caveman not installed for agent | Agent installed after `fulcrum install`. Re-run `fulcrum install`. See docs/caveman.md. |
 | authored skill count < 29 | Run `fulcrum skills sync` (Codex global requires `--codex-global`, project scope requires `--codex-project <dir>`). See docs/skills.md. |
-| upstream skill count < 27 | `fulcrum skills upstream` failed (integrity mismatch or network). Re-run with debug. See HANDOVER.md §6.0b. |
+| upstream skill count < 19 | `fulcrum skills upstream` failed (integrity mismatch or network). Re-run with debug. See HANDOVER.md §6.0b. |
 | hooks list empty/partial | Enable with `fulcrum hooks enable <name>`. See docs/hooks.md. |
 | hook format exits non-zero | Malformed stdin envelope or stale binary. See docs/hooks.md §format recipe. |
 | bun run ci fails | Check failing stage output. Common: `bun test`, `bun run compress`, `fulcrum skills lint`. |

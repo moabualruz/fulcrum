@@ -29,7 +29,10 @@ fulcrum/
 │   │   ├── mcp.ts                      # legacy DeepWiki/Pi compatibility helpers
 │   │   ├── mcp-registry.ts             # MCP registry TOML store + applyToAgents/removeFromAgents
 │   │   ├── mcp-cmd.ts                  # fulcrum mcp list/register/unregister/enable/disable
-│   │   ├── doctor.ts                   # health check: 47 tools + caveman + Pi + MCP + policy
+│   │   ├── doctor.ts                   # health check: tools + components + packages + MCP + policy
+│   │   ├── package-surfaces.ts         # package surface discovery + hashes
+│   │   ├── package-mirror.ts           # per-agent package mirror target planner
+│   │   ├── package-parity.ts           # source-vs-installed package parity audit
 │   │   ├── install.test.ts
 │   │   ├── uninstall.test.ts
 │   │   ├── hooks.test.ts
@@ -77,16 +80,16 @@ fulcrum/
 ├── skills/
 │   ├── _template/SKILL.md              # canonical authoring template
 │   ├── _archive/                       # retired skills (gh-authored, etc.)
-│   ├── <name>/SKILL.md × 28           # compressed agent-read form
-│   ├── <name>/SKILL.original.md × 28  # human-edit form
+│   ├── <name>/SKILL.md × 29           # compressed agent-read form
+│   ├── <name>/SKILL.original.md × 29  # human-edit form
 │   ├── <name>/references/*.md         # progressive section detail (compressed)
 │   ├── <name>/references/*.original.md
 │   ├── SOURCES.md                      # skill registry + authoring queue
 │   └── upstream.lock                   # pinned curated upstream skill manifest (subpath_sha256)
 │
 ├── evals/
-│   ├── <name>.json × 28               # 18–21-entry trigger/anti-trigger sets per skill
-│   └── <name>.match-words × 28        # per-skill word-boundary grep overrides
+│   ├── <name>.json × 29               # 18–21-entry trigger/anti-trigger sets per skill
+│   └── <name>.match-words × 29        # per-skill word-boundary grep overrides
 │
 ├── dist/                               # gitignored; built by bun run build:all
 ├── package.json                        # bun scripts: ci, compress, release, build:all, changelog
@@ -241,10 +244,13 @@ interface DoctorReport {
   verdict: "ok" | "warning" | "error";
   agents: AgentHealth[];        // per-agent: detected, rulesSpliced, caveman state
   caveman: CavemanHealth;       // defaultMode + source + per-agent install state
+  components: ComponentHealth;  // lifecycle totals + package parity
+  skillBudget: SkillBudget[];   // active roots, duplicate names, metadata pressure
   tools: ToolHealth[];          // 47 tools: name, present, path
   policy: PolicyHealth;         // presence, size, mtime
   piMcpAdapter: PiAdapterHealth;
   mcp: McpHealth;               // registered servers + auth_status
+  worktrees: WorktreeHealth;    // ignored project-local worktree roots
 }
 ```
 
@@ -435,6 +441,10 @@ This checks out the tree SHA, computes `subpath_sha256`, and writes it back.
 - `src/cli/mcp-registry.test.ts` — round-trip register/unregister, enable/disable, apply/remove.
 - `src/cli/mcp-cmd.test.ts` — CLI verb round-trip.
 - `src/cli/doctor.test.ts` — report shape, tool detection, caveman section, Pi adapter.
+- `src/cli/package-surfaces.test.ts` — package surface discovery and source-only exclusions.
+- `src/cli/package-mirror.test.ts` — per-agent mirror target planning and unsupported surface records.
+- `src/cli/package-parity.test.ts` — source-vs-installed parity, missing targets, source-backup leaks.
+- `src/components/*.test.ts` — component catalog, planner, executor, ledger, and surface adapters.
 - `src/hooks/*.test.ts` — per-hook stdin parse, happy path, fail-open on missing tool.
 
 ### Running tests

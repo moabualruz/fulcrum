@@ -536,6 +536,27 @@ describe("--dry-run: preview only, no spawns", () => {
       logSpy.mockRestore();
     }
   });
+
+  test("dry-run does not create project files", async () => {
+    const { run, setDryRun } = await import("./init.ts");
+    setDryRun(false);
+    const vendor = await import("./vendor-installs.ts");
+    const projectIndex = await import("./project-index.ts");
+    const vendorSpy = spyOn(vendor, "runVendorIntegrations").mockResolvedValue(undefined);
+    const indexSpy = spyOn(projectIndex, "runProjectIndex").mockResolvedValue(undefined);
+
+    try {
+      await run(["--dry-run", dir]);
+
+      expect(await Bun.file(join(dir, "AGENTS.md")).exists()).toBe(false);
+      expect(await Bun.file(join(dir, ".claude", "CLAUDE.md")).exists()).toBe(false);
+      expect(await Bun.file(join(dir, ".claude", "skills", ".gitkeep")).exists()).toBe(false);
+      expect(await Bun.file(join(dir, ".gitignore")).exists()).toBe(false);
+    } finally {
+      vendorSpy.mockRestore();
+      indexSpy.mockRestore();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

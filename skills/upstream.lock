@@ -146,14 +146,14 @@ subpath_size = 226075
 [skills.graphify]
 source = "https://github.com/safishamsi/graphify"
 subpath = "graphify/skill.md"
-ref = "v5"
-tree_sha = "eceaaad61e453958c808a9f8675ab43a9cf2f96b"
+ref = "main"
+tree_sha = "494f519bf43ea8243fba8c40a4e72a1071a74395"
 license = "MIT"
 author_class = "individual"
-pinned_on = "2026-04-28"
-review_due = "2026-07-27"
-subpath_sha256 = "65b5d6f8e29b600afae8c4eb2a10b467195702b0982bd4a4a484d6666c20d389"
-subpath_size = 60766
+pinned_on = "2026-04-30"
+review_due = "2026-07-29"
+subpath_sha256 = "fa70622248c4348fdcec559772e64c812e1375a7ddd7de31cd4fffa7e8ed703a"
+subpath_size = 46699
 # vendor publishes `graphify install --platform <agent>` for these four;
 # their canonical write into <agent>/skills/graphify/ is the source of truth.
 # Pi has no vendor support → fulcrum-upstream mirror is the fallback there.

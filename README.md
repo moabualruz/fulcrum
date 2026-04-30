@@ -1,178 +1,205 @@
 # Fulcrum
 
-> **Fulcrum is a local-first CLI Agent OS for supervising repositories, tasks, agent runs, context, memory, and artifacts.**
+> Local-first CLI Agent OS foundation for keeping Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi CLI aligned across rules, hooks, skills, MCPs, package surfaces, and diagnostics.
 
-That is the destination. This branch (`feat/agent-foundation-clean`) is the foundation work — the cross-agent install layer, hooks, skills, rules, output policy, and CLI orchestrator that everything else sits on top of. The agent runtime, task system, memory store, and plugin/extension layer are placeholders, not implementations. See [`AGENTS.md`](AGENTS.md) for the full trajectory and [`HANDOVER.md`](HANDOVER.md) for the current state.
+Fulcrum is currently the **foundation layer** of the larger Agent OS: it manages the configuration and capability surface that agents load before they work. Repository supervision, task tracking, agent-run history, memory, and artifact tracking are still planned layers; do not build against them yet. See [HANDOVER.md](HANDOVER.md) for the live state snapshot and [AGENTS.md](AGENTS.md) for project rules.
 
----
+## What Ships Today
 
-## What's shipped today (foundation)
-
-| Layer | What it does | Where it lives |
+| Area | Current behavior | Primary docs |
 |---|---|---|
-| **Context** | Always-on rules and conventions, sentinel-spliced into each agent's primary rules file | `rules/AGENTS.md`, `fulcrum install` |
-| **Automation** | Eight hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`) registered per-agent | `src/hooks/`, `fulcrum hooks enable` |
-| **Capability** | 29 skills authored in-repo, content-verified against upstream, with trigger evals | `skills/`, `fulcrum skills sync` |
-| **Capabilities** | Bring-your-own CLI tools, verified by `fulcrum doctor` | `docs/capabilities.md`, `fulcrum doctor` |
-| **Output policy** | Per-tool output strategy (raw / status / summary / file) driving `tool-output-router` | `config/tool-output-policy.toml` |
-| **Managed MCPs** | Registry CLI (`fulcrum mcp list/register/enable`) with 17 builtin servers; minimal default enables DeepWiki + context7, the rest stay opt-in | `docs/mcp.md`, `src/cli/mcp-registry.ts`, `src/cli/mcp-builtins.ts`, `src/cli/mcp-cmd.ts` |
-| **Orchestration** | One Bun-compiled cross-platform binary (`init`, `install`, `uninstall`, `hooks`, `skills`, `doctor`, `compress`, `hook`) | `src/`, `dist/fulcrum-<plat>` |
-| **Cross-agent reach** | Same setup wired into Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI | `docs/agents.md`, `shims/` |
+| Install profiles | `minimal` by default, `rules-only`, `full`, and `verify-all` through the component lifecycle engine | [user guide](docs/user-guide.md), [developer guide](docs/developer-guide.md) |
+| Component lifecycle | `fulcrum component list/info/plan/status/install/remove/enable/disable` for rules, policy, hooks, MCPs, skills, and managed packages | [user guide](docs/user-guide.md#component-lifecycle) |
+| Cross-agent rules | Sentinel-splices `rules/AGENTS.md` into each detected agent while preserving user text outside Fulcrum markers | [context](docs/context.md), [agents](docs/agents.md) |
+| Hooks | Eight TypeScript hook recipes behind one `fulcrum hook <name>` binary entrypoint | [hooks](docs/hooks.md), [tool output policy](docs/tool-output-policy.md) |
+| Skills | 29 authored skills, 19 upstream-pinned skills, trigger eval harnesses, and agent-native namespace layouts | [skills](docs/skills.md), [skill smoke test](docs/skill-smoke-test.md) |
+| Managed packages | Official-first install plus full package-surface mirrors for Caveman, Repomix, Cloudflare, and Superpowers | [MCP policy](docs/mcp.md), [HANDOVER](HANDOVER.md) |
+| MCP registry | 17 builtin MCP definitions with minimal default enablement for DeepWiki + context7 and opt-in extras | [MCP policy](docs/mcp.md) |
+| Doctor | Agent, component, package parity, MCP, skill-budget, policy, toolchain, and worktree health reporting | [user guide](docs/user-guide.md#doctor) |
 
-The orchestrator and all hook recipes are TypeScript subcommands of one Bun-compiled binary (60–120MB per platform; cross-compiled via `bun build --compile`). No bash, jq, yq, or Python required at runtime.
+## Supported Agents
 
-## What's not shipped yet (placeholders)
-
-These are the layers the foundation is preparing for. They are **not built**; do not depend on them. They appear here so the trajectory is legible.
-
-- **Repository supervisor** — multi-repo awareness, work-tree state, branch posture.
-- **Task system** — durable units of work tracked across agent sessions.
-- **Agent runs** — first-class agent invocations with inputs, transcripts, retries.
-- **Context engine** — selecting and assembling what each run sees.
-- **Memory** — persistent facts, decisions, references across sessions.
-- **Artifacts** — outputs of runs (diffs, plans, reports) tracked and queryable.
-- **Plugins / extensions** — third-party drop-ins under each agent's native namespacing convention.
-
----
-
-## Principles
-
-- **CLI and skills over MCP.** MCPs spawn long-running processes and consume 55k–100k tokens at startup with 5+ servers active — before your first message. A CLI + skill achieves the same with zero overhead.
-- **Managed MCPs stay narrow.** Fulcrum registers 17 builtin MCP entries; default install enables only `deepwiki` and `context7`, with github, repomix, semgrep, tavily, playwright, cloudflare-* ×9, and dart opt-in via `fulcrum mcp enable <name>`.
-- **Capabilities are bring-your-own tools.** Install the workstation toolchain yourself, then use `fulcrum doctor` to verify what is present.
-- **Behavioral rules, not knowledge.** Rules change what the agent *does*, not what it *knows*. `"Use ruff, never flake8"` works. `"Write clean code"` does nothing.
-- **Agent-friendly tools output JSON.** `--json` / `--format json` is the selection criterion for every CLI in this stack.
-- **Skill content correctness is not implied by lint.** Author against upstream `--help`, not memory.
-
----
-
-## Skill namespacing — the `fulcrum:` prefix
-
-Skills install via each agent's native namespacing primitive:
-
-```
-Claude Code: plugin (fulcrum@fulcrum, marketplace moabualruz/fulcrum)
-             → /fulcrum:<name>
-Codex CLI:   ~/.codex/skills/fulcrum/<name>/SKILL.md (global opt-in)
-             .codex/skills/fulcrum/<name>/SKILL.md   (project opt-in)
-OpenCode:    ~/.config/opencode/skills/fulcrum/<name>/SKILL.md
-Pi CLI:      ~/.pi/agent/skills/fulcrum/<name>/SKILL.md
-Gemini CLI:  ~/.gemini/extensions/fulcrum-skills/skills/<name>/SKILL.md
-```
-
-Claude Code's loader scans top-level of `~/.claude/skills/` only — nested `<dir>/fulcrum/<name>/` not discovered (anthropics/claude-code#28266). Plugin namespace is the supported invocation path; `fulcrum skills sync` runs `claude plugin marketplace add moabualruz/fulcrum && claude plugin install fulcrum@fulcrum` and removes any legacy `~/.claude/skills/fulcrum/` layout. Other agents walk nested skill dirs natively. All five share the same `fulcrum:<skill-name>` address space.
-
----
-
-## Documents
-
-| Doc | Topic |
-|---|---|
-| [AGENTS.md](AGENTS.md) | Project-level instructions and trajectory |
-| [HANDOVER.md](HANDOVER.md) | Current state, outstanding work, recent decisions |
-| [docs/user-guide.md](docs/user-guide.md) | End-user guide — install, daily usage, hooks, skills, MCPs, FAQ |
-| [docs/developer-guide.md](docs/developer-guide.md) | Developer guide — repo layout, architecture, adding hooks/MCPs/skills, testing, release |
-| [docs/contributing.md](docs/contributing.md) | Contributing — commit format, branch policy, CI, compression contract, code style |
-| [docs/context.md](docs/context.md) | Context layer — `CLAUDE.md`, `AGENTS.md` conventions |
-| [docs/hooks.md](docs/hooks.md) | Automation layer — full event surface + 8 shipped recipes |
-| [docs/tool-output-policy.md](docs/tool-output-policy.md) | Per-tool output strategies driving `tool-output-router` |
-| [docs/capabilities.md](docs/capabilities.md) | Capability layer — bring-your-own CLI tool catalogue |
-| [docs/skills.md](docs/skills.md) | Skills — paths, authoring template, fork policy, verification |
-| [docs/skill-smoke-test.md](docs/skill-smoke-test.md) | Manual cross-agent verification checklist |
-| [docs/mcp.md](docs/mcp.md) | MCP policy — managed DeepWiki, opt-in extras, Pi adapter notes |
-| [docs/agents.md](docs/agents.md) | Cross-agent translation — Codex, Gemini, OpenCode, Pi |
-| [skills/SOURCES.md](skills/SOURCES.md) | Skill registry and authoring queue |
-
----
+| Agent | Rules | Skills | Hooks | MCP |
+|---|---|---|---|---|
+| Claude Code | `~/.claude/CLAUDE.md` | `fulcrum@fulcrum` plugin | `~/.claude/settings.json` | `claude mcp` / settings |
+| Codex CLI | `~/.codex/AGENTS.md` | global opt-in or project `.codex/skills/fulcrum/` | `~/.codex/hooks.json` | `~/.codex/config.toml` |
+| Gemini CLI | `~/AGENTS.md` imported by `~/.gemini/GEMINI.md` | `fulcrum-skills` extension | `~/.gemini/settings.json` | `settings.json` `mcpServers` |
+| OpenCode | `~/.config/opencode/AGENTS.md` | `~/.config/opencode/skills/fulcrum/` | TypeScript plugin | `opencode.json` |
+| Pi CLI | `~/.pi/agent/AGENTS.md` | `~/.pi/agent/skills/fulcrum/` | TypeScript extension | `pi-mcp-adapter` |
 
 ## Install
 
-Two paths, both produce `~/.fulcrum/bin/fulcrum`:
-
-**From a clone (builds locally; needs [Bun](https://bun.sh)):**
+From a clone:
 
 ```bash
-curl -fsSL https://bun.sh/install | bash      # if Bun isn't installed
+curl -fsSL https://bun.sh/install | bash
 git clone https://github.com/moabualruz/fulcrum ~/code/fulcrum
 cd ~/code/fulcrum
-bash scripts/install.sh                       # builds, installs minimal profile
-bash scripts/install.sh --profile full        # historical full bootstrap (skills + packages)
-bash scripts/install.sh --with-project ~/code/myproject   # also bootstrap a project
-bash scripts/install.sh --dry-run --profile rules-only     # preview rules-only setup
+bash scripts/install.sh
 ```
 
-**From a published release (no Bun needed; only `curl`):**
+From a published release:
 
 ```bash
 FULCRUM_RELEASE_TAG=v0.1.0 bash <(curl -fsSL https://raw.githubusercontent.com/moabualruz/fulcrum/main/scripts/install.sh)
 ```
 
-> **Older Macs / Apple Silicon:** binaries are native per-arch (`darwin-x64`, `darwin-arm64`). No Rosetta needed. If the auto-detect picks the wrong arch on an unusual setup, set `FULCRUM_BIN=/path/to/fulcrum-<plat>` explicitly.
-
-After install, common commands:
+Useful install variants:
 
 ```bash
-fulcrum init <dir>            # bootstrap project: AGENTS.md + .claude/CLAUDE.md +
-                              # vendor integrations (graphify, ast-grep, tavily
-                              # via npx skills add; pi-mcp-adapter init for Pi)
-fulcrum init --dry-run <dir>  # preview without writing
-fulcrum init reindex <dir>    # run repomix --compress in <dir> (no --output override)
-
-fulcrum doctor                # bun, agent dirs, tool presence, policy health
-fulcrum install --dry-run     # preview minimal profile (rules + policy + DeepWiki/context7)
-fulcrum install --profile full --dry-run  # preview full bootstrap
-fulcrum install --no-skills   # skip all skill sync
-fulcrum install --no-upstream-skills  # skip curated upstream skill sync
-fulcrum hooks list            # show available hook recipes
-fulcrum hooks enable format   # register native agent hook configs + print snippet
-fulcrum skills sync           # Claude Code plugin; OpenCode/Pi/Gemini mirrors; skips Codex global by default
-fulcrum skills sync --codex-project <dir>  # project-local Codex authored skills
-fulcrum skills list --installed  # inspect active skill metadata budget per agent
-fulcrum skills upstream       # sync curated third-party skills at vendor placement
-fulcrum skills list           # enumerate authored skills with eval coverage
-fulcrum skills lint <path>    # validate frontmatter + body section structure
-fulcrum hook <name>           # run a hook recipe (called by agent runtimes via stdin)
-fulcrum uninstall --dry-run   # preview removal of Fulcrum-managed install artifacts
+bash scripts/install.sh --profile rules-only
+bash scripts/install.sh --profile full
+bash scripts/install.sh --with-project ~/code/myproject
+bash scripts/install.sh --dry-run --profile full
 ```
 
-### Verify
+The default `minimal` profile splices rules, seeds the tool-output policy, registers builtin MCPs, and enables only DeepWiki + context7 where no user state exists. The `full` profile adds hooks, authored skills, upstream skills, Caveman, Repomix, Cloudflare, and Superpowers package setup.
+
+## First Run
 
 ```bash
-bun run ci                    # install → tsc → test → build:all → skills lint
-fulcrum doctor                # post-install environment check
-fulcrum uninstall --dry-run   # preview what Fulcrum would remove
+fulcrum doctor
+fulcrum init ~/code/myproject
+fulcrum component list
+fulcrum component status package.repomix --json
 ```
 
-### Author + release
+`fulcrum init` creates project `AGENTS.md`, `.claude/CLAUDE.md` import glue, `.gitignore` entries, and vendor-canonical project integrations where supported: graphify, ast-grep, tavily, and Pi MCP adapter setup. Reindex an existing project with:
 
 ```bash
-bun run changelog             # regenerate CHANGELOG.md (needs git-cliff)
-bun run release vX.Y.Z        # gated release: clean tree → ci → changelog → tag → build
-bun run release vX.Y.Z --gh   # also create the GitHub release and upload dist/*
+fulcrum init reindex ~/code/myproject
 ```
 
----
+## Daily Commands
 
-## Skills authored
+```bash
+fulcrum doctor --json
+fulcrum install --dry-run
+fulcrum install --profile full --dry-run
+fulcrum uninstall --dry-run
 
-29 in-repo skills (`fulcrum skills list` enumerates them with eval coverage). All content-verified against upstream READMEs and docs:
+fulcrum component info package.cloudflare
+fulcrum component install package.superpowers --all-agents
+fulcrum component remove package.caveman --all-agents --dry-run
 
+fulcrum hooks list
+fulcrum hooks enable format
+fulcrum hooks disable format
+
+fulcrum skills sync
+fulcrum skills sync --codex-project <repo>
+fulcrum skills upstream
+fulcrum skills list --installed
+
+fulcrum mcp list
+fulcrum mcp enable github --all-agents
+fulcrum mcp disable github --all-agents
 ```
-bat   biome   dart-toolchain   difftastic   direnv   eza   flarectl   fzf   gh
-git-cliff   gitleaks   google-java-format   hyperfine   jq   just   ktlint
-lizard   mise   osv-scanner   pmd   ruff   sd   spotbugs   subagent-orchestration
-usql   watchexec   xh   yq   zoxide
+
+## Package Surface Policy
+
+Fulcrum uses an official-first rule:
+
+1. Use the vendor/native installer when an agent has one.
+2. Mirror the vendor-published package content into nearest native surfaces when an agent does not.
+3. Record unsupported primitives explicitly in `component status` and `doctor`; do not silently omit them.
+
+Managed package parity covers:
+
+- skills
+- rules/context files
+- MCP metadata/config
+- commands/prompts
+- agents/subagents
+- hooks
+- tools/scripts
+- manifests and metadata
+- assets/templates/themes/docs
+- unknown runtime files
+
+Generated CLI agent mirrors exclude source-only backups such as `.original.md` and `.backup.md`; project source keeps them.
+
+## Skills
+
+Fulcrum-authored skills keep prefix-free frontmatter names like `jq`, `ruff`, and `subagent-orchestration`. The install mechanism provides the namespace:
+
+```text
+Claude Code: /fulcrum:<name> through fulcrum@fulcrum
+Codex CLI:   ~/.codex/skills/fulcrum/<name>/ or project .codex/skills/fulcrum/<name>/
+Gemini CLI:  ~/.gemini/extensions/fulcrum-skills/skills/<name>/
+OpenCode:    ~/.config/opencode/skills/fulcrum/<name>/
+Pi CLI:      ~/.pi/agent/skills/fulcrum/<name>/
 ```
 
-See [`skills/SOURCES.md`](skills/SOURCES.md) for the registry and the long-tail authoring queue.
+Authored skill list:
 
----
+```text
+bat biome dart-toolchain difftastic direnv eza flarectl fzf gh git-cliff
+gitleaks google-java-format hyperfine jq just ktlint lizard mise osv-scanner
+pmd ruff sd spotbugs subagent-orchestration usql watchexec xh yq zoxide
+```
 
-## Reading order for a fresh install
+## Documentation Map
 
-1. **[capabilities.md](docs/capabilities.md)** — bring your own CLI tools, then verify them with `fulcrum doctor`.
-2. **[context.md](docs/context.md)** — write your global rules and per-project `AGENTS.md`.
-3. **[hooks.md](docs/hooks.md)** — enable the recipes you want; `fulcrum hooks enable` edits native agent configs and prints each snippet for review.
-4. **[skills.md](docs/skills.md)** — install superpowers as the cross-agent base; author skills via the template.
-5. **[mcp.md](docs/mcp.md)** — managed DeepWiki policy, MCP registry CLI, and opt-in server boundaries.
-6. **[agents.md](docs/agents.md)** — replicate the setup on Codex, Gemini, OpenCode, Pi as needed.
+Start here:
+
+- [User guide](docs/user-guide.md) — install profiles, component lifecycle, daily commands, troubleshooting.
+- [Developer guide](docs/developer-guide.md) — repo layout, architecture, tests, release process.
+- [Handover](HANDOVER.md) — live state, decisions, recent work, outstanding layers.
+- [Contributing](docs/contributing.md) — commit format, compression contract, review expectations.
+
+Core reference:
+
+- [Agents](docs/agents.md) — per-agent paths, hook/MCP/skill differences, known quirks.
+- [Context](docs/context.md) — global/project rules and sentinel splice behavior.
+- [Hooks](docs/hooks.md) — hook event model and recipe catalog.
+- [Tool output policy](docs/tool-output-policy.md) — per-tool output routing tiers.
+- [Capabilities](docs/capabilities.md) — bring-your-own workstation toolchain.
+- [Skills](docs/skills.md) — paths, upstream lockfile, authoring, evals.
+- [MCP policy](docs/mcp.md) — official-first MCP/package policy, auth, builtin catalogue.
+- [Caveman](docs/caveman.md) — output compression setup and source-doc compression.
+- [Setup smoke test](docs/smoke-test.md) — end-to-end install verification.
+- [Skill smoke test](docs/skill-smoke-test.md) — manual cross-agent skill verification.
+
+Source registries:
+
+- [skills/SOURCES.md](skills/SOURCES.md) — authored skill registry.
+- [skills/upstream.lock](skills/upstream.lock) — pinned upstream skill sources.
+- [rules/AGENTS.md](rules/AGENTS.md) — global Fulcrum behavior block.
+- [src/agents/registry.ts](src/agents/registry.ts) — canonical supported-agent list.
+
+## Development
+
+```bash
+bun install
+bun run ci
+bun run src/index.ts doctor
+bun run src/index.ts component list
+bun run build:all
+```
+
+`bun run ci` runs install smoke, typecheck, full Bun tests, five platform builds, skills lint, and compression check.
+
+Release flow:
+
+```bash
+bun run changelog
+bun run release vX.Y.Z
+bun run release vX.Y.Z --gh
+```
+
+No GitHub Actions are the source of truth today. Local `bun run ci` and `bun run release` are the gates.
+
+## Planned Layers
+
+Still placeholders:
+
+- repository supervisor
+- task system
+- agent runs
+- context engine
+- memory
+- artifacts
+- generic `fulcrum plugins ...` UX
+
+Managed package lifecycle exists now for known packages. A generic plugin marketplace/translator does not.

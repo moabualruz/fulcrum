@@ -30,19 +30,20 @@ vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]
 
 `fulcrum skills upstream` then **skips** that skill on any agent in the list — vendor's own `graphify install --platform <agent>` already ran during `fulcrum init` and placed the skill at `<agent>/skills/graphify/`. For agents NOT in the list (here: pi — graphify CLI doesn't support pi), the file-copy mirror still runs into the same top-level location (`~/.pi/agent/skills/graphify/`) so the skill is available everywhere.
 
-## 2. Skill catalogue (general-purpose)
+## 2. Managed vendor skill/package catalogue
 
-| Skill | Teaches |
+| Source | How Fulcrum manages it |
 |---|---|
-| `ast-grep` | YAML rule format, meta-variables, structural patterns |
-| `graphify` | When to build graph, how to query it |
-| `context7-cli` | Two-step library lookup |
-| `tavily-*` (7 skills) | Search, deep research, extract |
-| `playwright-cli` | snapshot, screenshot, open, fill |
-| `think` | Structured reasoning — `/think` trigger |
-| `anthropics/skills` | Document work, webapp testing, mcp-builder, skill-creator |
+| `package.repomix` | Vendor-derived skills, commands, rules, MCP metadata, and explorer-agent surfaces. |
+| `package.superpowers` | Native packages where available; full package mirrors where needed. |
+| `package.cloudflare` | Claude plugin plus full non-Claude package mirrors and registry MCP entries. |
+| `package.caveman` | Native Claude/Gemini installs plus full Codex/OpenCode/Pi package mirrors. |
+| `package.graphify` | Vendor `graphify install --platform <agent>` where supported; Pi skill fallback. |
+| `package.ast-grep` | Vendor `npx skills add ast-grep/agent-skill` integration. |
+| `package.tavily` | Vendor `npx skills add https://github.com/tavily-ai/skills` integration. |
+| `skills.upstream` | Pinned Playwright, Semgrep, Graphify, Superpowers, and Cloudflare skills with subtree SHA-256 verification. |
 
-> `repomix` is an authored-skill candidate, not an upstream install target yet. Treat it as `skills/repomix/` work once we have a clean foldered skill layout.
+> `repomix` is managed as `package.repomix`, not an authored skill. Its package mirror carries vendor-derived skills, commands, rules, MCP metadata, and explorer-agent surfaces where each agent supports them.
 
 ## 3. Adoption strategy — install one, cherry-pick the rest
 
@@ -52,7 +53,7 @@ Current CLI support: `fulcrum install` defaults to the minimal profile and does 
 
 ### Install: superpowers (obra/superpowers)
 
-Source repo with useful skill ideas, but Fulcrum does not invoke its native installers in this branch. Any adopted pieces must be mirrored into the filesystem skill namespace.
+Source repo with useful skill ideas and native packages for several agents. Fulcrum installs the native package where supported and mirrors the full package surface where the agent lacks a first-party/generic installer.
 
 **Skills to keep enabled from superpowers:**
 
@@ -79,7 +80,7 @@ No install. Borrow:
 
 **No prefix on `name:` itself.** Use clean names like `jq`, `gh`, `ruff`. `fulcrum/` namespace path-based (parent folder under each agent skills root, see §1) — frontmatter name stay prefix-free. Keep `/jq` slash command short while giving fulcrum-managed skills effective `fulcrum:jq` address space at filesystem layer.
 
-Colon-prefix invocation pattern (`fulcrum:jq`) reserved for future plugin/extension layer; today agents resolve skills by frontmatter `name:` only.
+`fulcrum:` is the effective authored-skill namespace. Claude Code exposes it directly through the `fulcrum@fulcrum` plugin (`/fulcrum:jq`). Other agents get the namespace from the mirrored folder or extension path while frontmatter `name:` stays prefix-free (`jq`, not `fulcrum:jq`).
 
 ## 5. Authoring template
 
@@ -132,7 +133,7 @@ subpath_size   = <int>            # total byte-size (sanity check only)
 fulcrum skills upstream --update-pins
 ```
 
-As of 2026-04-28 audit: 27 entries total (20 pre-audit + 7 new cloudflare skills). The 7 new cloudflare entries (`cloudflare-agents-sdk`, `cloudflare-platform`, `cloudflare-email-service`, `cloudflare-durable-objects`, `cloudflare-sandbox-sdk`, `cloudflare-web-perf`, `cloudflare-workers-best-practices`) do not have `subpath_sha256` yet — run `fulcrum skills upstream --update-pins` against the pinned tree SHA to compute and record them. All 20 pre-audit entries remain pinned.
+As of 2026-04-30 audit: 19 active upstream entries. Archived ast-grep, tavily, and context7 entries live under `skills/_archive/` because their vendor package/MCP paths now own those surfaces. Active entries include six Superpowers skills, Playwright, three Semgrep skills, Graphify, and eight Cloudflare skills; all carry `subpath_sha256`.
 
 ## 7. Verification
 

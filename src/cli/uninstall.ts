@@ -58,6 +58,21 @@ async function removePath(path: string, label: string): Promise<void> {
   console.log(`     - ${label} → ${path}`);
 }
 
+async function removeEmptyDir(path: string, label: string): Promise<void> {
+  if (!(await exists(path))) return;
+  let entries: string[];
+  try {
+    entries = await readdir(path);
+  } catch {
+    return;
+  }
+  if (entries.length > 0) {
+    console.log(`     · keep ${label} (not empty)`);
+    return;
+  }
+  await removePath(path, label);
+}
+
 function cavemanMirrorMarkerPath(home: string): string {
   return `${process.env["FULCRUM_HOME"] ?? `${home}/.fulcrum`}/state/global/caveman-mirrors.installed`;
 }
@@ -105,6 +120,10 @@ function removeTomlSection(existing: string, header: string): string {
   const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const re = new RegExp(`(?:^|\\n)${escaped}\\n[\\s\\S]*?(?=\\n\\[|$)`);
   return existing.replace(re, "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export async function removeSentinelBlock(target: string, label: string): Promise<void> {
@@ -540,6 +559,54 @@ async function cleanupEmptyAgentConfigContainers(home: string): Promise<void> {
   }
 }
 
+async function cleanupClaudeManagedPluginSettings(home: string): Promise<void> {
+  const file = `${home}/.claude/settings.json`;
+  const root = await readJsonObject(file);
+  if (!root) return;
+
+  let changed = false;
+  const marketplaces = root["extraKnownMarketplaces"];
+  if (marketplaces && typeof marketplaces === "object" && !Array.isArray(marketplaces)) {
+    for (const key of ["fulcrum", "caveman", "repomix", "cloudflare"]) {
+      if (key in marketplaces) {
+        delete (marketplaces as Record<string, unknown>)[key];
+        changed = true;
+      }
+    }
+    if (Object.keys(marketplaces as Record<string, unknown>).length === 0) {
+      delete root["extraKnownMarketplaces"];
+    }
+  }
+
+  const enabledPlugins = root["enabledPlugins"];
+  if (enabledPlugins && typeof enabledPlugins === "object" && !Array.isArray(enabledPlugins)) {
+    for (const key of [
+      "fulcrum@fulcrum",
+      "caveman@caveman",
+      "repomix-mcp@repomix",
+      "repomix-commands@repomix",
+      "repomix-explorer@repomix",
+      "cloudflare@cloudflare",
+      "superpowers@claude-plugins-official",
+    ]) {
+      if (key in enabledPlugins) {
+        delete (enabledPlugins as Record<string, unknown>)[key];
+        changed = true;
+      }
+    }
+    if (Object.keys(enabledPlugins as Record<string, unknown>).length === 0) {
+      delete root["enabledPlugins"];
+    }
+  }
+
+  if (!changed) {
+    console.log("     · Claude Code managed plugin settings not present");
+    return;
+  }
+  await wf(file, JSON.stringify(root, null, 2) + "\n");
+  console.log(`     - Claude Code managed plugin settings cleaned → ${file}`);
+}
+
 async function removeClaudePluginCacheLeftovers(home: string): Promise<void> {
   const paths: Array<[string, string]> = [
     [`${home}/.claude/plugins/cache/fulcrum`, "Claude Code fulcrum plugin cache"],
@@ -555,6 +622,73 @@ async function removeClaudePluginCacheLeftovers(home: string): Promise<void> {
   for (const [path, label] of paths) {
     await removePath(path, label);
   }
+  await cleanupClaudeManagedPluginSettings(home);
+}
+
+async function removePackageMirrorLeftovers(home: string): Promise<void> {
+  const paths: Array<[string, string]> = [
+    [`${home}/.codex/plugins/cache/caveman`, "Codex CLI caveman package cache root"],
+    [`${home}/.codex/plugins/cache/repomix`, "Codex CLI repomix package cache root"],
+    [`${home}/.codex/plugins/cache/cloudflare`, "Codex CLI cloudflare package cache root"],
+    [`${home}/.codex/plugins/cache/superpowers`, "Codex CLI superpowers package cache root"],
+    [`${home}/.gemini/extensions/caveman`, "Gemini CLI caveman extension"],
+    [`${home}/.gemini/extensions/repomix`, "Gemini CLI repomix extension"],
+    [`${home}/.gemini/extensions/cloudflare`, "Gemini CLI cloudflare extension"],
+    [`${home}/.gemini/extensions/superpowers`, "Gemini CLI superpowers extension"],
+    [`${home}/.config/opencode/packages/caveman`, "OpenCode caveman package mirror"],
+    [`${home}/.config/opencode/packages/repomix`, "OpenCode repomix package mirror"],
+    [`${home}/.config/opencode/packages/cloudflare`, "OpenCode cloudflare package mirror"],
+    [`${home}/.config/opencode/packages/superpowers`, "OpenCode superpowers package mirror"],
+    [`${home}/.pi/agent/packages/caveman`, "Pi CLI caveman package mirror"],
+    [`${home}/.pi/agent/packages/repomix`, "Pi CLI repomix package mirror"],
+    [`${home}/.pi/agent/packages/cloudflare`, "Pi CLI cloudflare package mirror"],
+    [`${home}/.pi/agent/packages/superpowers`, "Pi CLI superpowers package mirror"],
+  ];
+  for (const [path, label] of paths) {
+    await removePath(path, label);
+  }
+}
+
+async function removeCodexManagedMcpLeftovers(home: string): Promise<void> {
+  const file = `${home}/.codex/config.toml`;
+  if (!(await exists(file))) return;
+  const { BUILTIN_MCPS } = await import("./mcp-builtins.ts");
+  const existing = await readFile(file, "utf8");
+  let next = existing;
+  for (const { name } of BUILTIN_MCPS) {
+    const begin = `# BEGIN FULCRUM MCP ${name}`;
+    const end = `# END FULCRUM MCP ${name}`;
+    next = next.replace(
+      new RegExp(`\\n?${escapeRegExp(begin)}[\\s\\S]*?${escapeRegExp(end)}\\n?`, "m"),
+      "\n",
+    );
+    next = next.replace(
+      new RegExp(`\\n?\\[mcp_servers\\.${escapeRegExp(name)}\\][\\s\\S]*?${escapeRegExp(end)}\\n?`, "m"),
+      "\n",
+    );
+  }
+  next = next.replace(/\n{3,}/g, "\n\n").trimEnd();
+  if (next === existing.trimEnd()) {
+    console.log("     · Codex managed MCP leftovers not present");
+    return;
+  }
+  await wf(file, next ? `${next}\n` : "");
+  console.log(`     - Codex managed MCP leftovers cleaned → ${file}`);
+}
+
+async function removePurgeState(keepState: boolean): Promise<void> {
+  await removePath(`${fulcrumHome()}/cache`, "Fulcrum package/cache directory");
+  if (keepState) {
+    console.log("     · keep generated state (--keep-state)");
+    return;
+  }
+  await removePath(`${fulcrumHome()}/state/global/components.db`, "component ledger database");
+  await removePath(`${fulcrumHome()}/state/global/upstream-skills`, "upstream skill install markers");
+  await removePath(`${fulcrumHome()}/state/global/backups`, "Fulcrum conflict backups");
+  await removePath(`${fulcrumHome()}/state/global/smoke-test`, "smoke-test records");
+  await removeEmptyDir(`${fulcrumHome()}/hooks`, "empty Fulcrum hooks directory");
+  await removeEmptyDir(`${fulcrumHome()}/state/global`, "empty Fulcrum global state directory");
+  await removeEmptyDir(`${fulcrumHome()}/state`, "empty Fulcrum state directory");
 }
 
 /**
@@ -644,11 +778,15 @@ export async function run(args: string[]): Promise<void> {
   console.log("2/4  Removing compatibility leftovers");
   await removeExactLine(`${home}/.gemini/GEMINI.md`, "@AGENTS.md", "Gemini @AGENTS.md import");
   const { removeAllHookRegistrations } = await import("./hooks.ts");
-  await removeAllHookRegistrations();
+  await removeAllHookRegistrations({ dryRun: DRY_RUN });
   await removePath(`${fulcrumHome()}/hooks/snippets`, "hook snippets");
   await removePath(`${fulcrumHome()}/hooks/enabled`, "hook enable markers");
   await removeSkillNamespaces(home);
-  if (purge) await removeClaudePluginCacheLeftovers(home);
+  if (purge) {
+    await removeClaudePluginCacheLeftovers(home);
+    await removePackageMirrorLeftovers(home);
+    await removeCodexManagedMcpLeftovers(home);
+  }
   console.log();
 
   console.log("3/4  Cleaning registry and empty agent containers");
@@ -659,6 +797,7 @@ export async function run(args: string[]): Promise<void> {
   }
   await cleanupPiMcpAdapterIfUnused(home);
   await cleanupEmptyAgentConfigContainers(home);
+  if (purge) await removePurgeState(keepState);
   console.log();
 
   console.log("4/4  Optional third-party installs");

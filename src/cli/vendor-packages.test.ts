@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -13,6 +13,15 @@ import * as proc from "../utils/proc.ts";
 let TMP: string;
 let originalHome: string | undefined;
 let originalFulcrumHome: string | undefined;
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 beforeEach(async () => {
   TMP = await mkdtemp(join(tmpdir(), "fulcrum-vendor-packages-"));
@@ -419,9 +428,26 @@ describe("vendor capability packages", () => {
     }
 
     expect(await Bun.file(join(TMP, ".codex", "skills", "superpowers")).exists()).toBe(false);
+    expect(await pathExists(join(TMP, ".codex", "plugins", "cache", "superpowers"))).toBe(false);
     expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "superpowers")).exists()).toBe(false);
     const opencode = JSON.parse(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8"));
     expect(opencode.plugin).toBeUndefined();
+  });
+
+  test("uninstalls mirrored Cloudflare Codex package cache root", async () => {
+    const cache = join(TMP, ".fulcrum", "cache", "cloudflare-skills");
+    await mkdir(join(cache, "skills", "wrangler"), { recursive: true });
+    await writeFile(join(cache, "skills", "wrangler", "SKILL.md"), "---\nname: wrangler\n---\nUse wrangler.\n");
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installCloudflarePackage();
+      await uninstallCloudflarePackage();
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    expect(await pathExists(join(TMP, ".codex", "plugins", "cache", "cloudflare"))).toBe(false);
   });
 
   test("uses Pi packages for Superpowers when pi is available", async () => {

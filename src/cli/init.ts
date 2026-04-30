@@ -49,6 +49,30 @@ async function exists(p: string): Promise<boolean> {
   try { await stat(p); return true; } catch { return false; }
 }
 
+async function wf(path: string, data: string): Promise<void> {
+  if (DRY_RUN) {
+    console.log(`  [dry-run] would write: ${path}`);
+    return;
+  }
+  await writeFile(path, data);
+}
+
+async function mk(path: string): Promise<void> {
+  if (DRY_RUN) {
+    console.log(`  [dry-run] would mkdir: ${path}`);
+    return;
+  }
+  await mkdir(path, { recursive: true });
+}
+
+async function af(path: string, data: string): Promise<void> {
+  if (DRY_RUN) {
+    console.log(`  [dry-run] would append: ${path}`);
+    return;
+  }
+  await appendFile(path, data);
+}
+
 // Project-index commands (repomix, graphify update) live in project-index.ts.
 
 export async function run(args: string[]): Promise<void> {
@@ -93,30 +117,30 @@ export async function run(args: string[]): Promise<void> {
   // AGENTS.md
   const agentsPath = `${dir}/AGENTS.md`;
   if (!(await exists(agentsPath))) {
-    await writeFile(agentsPath, AGENTS_TEMPLATE);
+    await wf(agentsPath, AGENTS_TEMPLATE);
     console.log("  + AGENTS.md  (template)");
   } else {
     console.log("  · AGENTS.md  (kept)");
   }
 
   // .claude/CLAUDE.md → @AGENTS.md import
-  await mkdir(`${dir}/.claude/skills`, { recursive: true });
+  await mk(`${dir}/.claude/skills`);
   const claudePath = `${dir}/.claude/CLAUDE.md`;
   if (!(await exists(claudePath))) {
-    await writeFile(claudePath, "@AGENTS.md\n");
+    await wf(claudePath, "@AGENTS.md\n");
     console.log("  + .claude/CLAUDE.md  (@AGENTS.md import)");
   } else {
     console.log("  · .claude/CLAUDE.md  (kept)");
   }
   if (!(await exists(`${dir}/.claude/skills/.gitkeep`))) {
-    await writeFile(`${dir}/.claude/skills/.gitkeep`, "");
+    await wf(`${dir}/.claude/skills/.gitkeep`, "");
   }
 
   // GEMINI.md only if Gemini-marker present
   if ((await exists(`${dir}/.gemini`)) || (await exists(`${dir}/GEMINI.md`))) {
     const geminiPath = `${dir}/GEMINI.md`;
     if (!(await exists(geminiPath))) {
-      await writeFile(geminiPath, "@AGENTS.md\n");
+      await wf(geminiPath, "@AGENTS.md\n");
       console.log("  + GEMINI.md  (@AGENTS.md import)");
     }
   }
@@ -131,7 +155,7 @@ export async function run(args: string[]): Promise<void> {
   for (const line of GITIGNORE_LINES) {
     const re = new RegExp(`^${line.replace(/[.+^${}()|[\]\\]/g, "\\$&")}$`, "m");
     if (!re.test(gi)) {
-      await appendFile(giPath, (gi.length && !gi.endsWith("\n") ? "\n" : "") + line + "\n");
+      await af(giPath, (gi.length && !gi.endsWith("\n") ? "\n" : "") + line + "\n");
       console.log(`  + .gitignore += ${line}`);
       added = true;
       gi += line + "\n";

@@ -196,7 +196,7 @@ To enable: `fulcrum mcp enable cloudflare-docs` (no auth) or `fulcrum mcp enable
 
 Cloudflare package ownership:
 - Claude Code: `claude plugin marketplace add cloudflare/skills` and `claude plugin install cloudflare@cloudflare`. The plugin owns bundled skills plus these MCP endpoints: docs, bindings, builds, observability. Fulcrum hides those four registry surfaces for `claude-code`.
-- Non-Claude: `upstream.lock` Cloudflare skills still mirror at vendor skill placement. Registry owns direct MCP config for all nine endpoints.
+- Non-Claude: Fulcrum installs a full Cloudflare package mirror, not a skills-only copy. The mirror includes vendor skills, commands, rules/context, MCP metadata, manifests, docs/assets, and package metadata where the target agent has an equivalent surface. Registry owns direct MCP config for all nine endpoints.
 - Extra endpoints not bundled by the Claude plugin (`cloudflare-radar`, `cloudflare-logpush`, `cloudflare-browser`, `cloudflare-containers`, `cloudflare-ai-gateway`) remain registry-visible for Claude too.
 
 Kept: `upstream.lock` cloudflare/skills pins — 8 skills total (all vendor-published at tree `7c449de`): `cloudflare-agents-sdk`, `cloudflare-platform`, `cloudflare-email-service`, `cloudflare-durable-objects`, `cloudflare-sandbox-sdk`, `cloudflare-web-perf`, `cloudflare-workers-best-practices`, `wrangler`. Mirrored to non-Claude agent skill paths via `fulcrum skills upstream`; Claude uses the Cloudflare plugin.

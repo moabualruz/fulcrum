@@ -180,6 +180,10 @@ function cavemanPackageRoot(home: string, agentId: CavemanFallbackAgent): string
   return `${home}/.codex/plugins/cache/caveman`;
 }
 
+function cavemanSourceCacheRoot(home: string): string {
+  return `${process.env["FULCRUM_HOME"] ?? `${home}/.fulcrum`}/cache/caveman`;
+}
+
 function unsupportedCavemanSurfaces(agentId: CavemanFallbackAgent): Array<{ surface: string; reason: string }> {
   if (agentId === "codex") return [];
   return [
@@ -239,11 +243,14 @@ async function installCavemanFromRepo(
 
   const tmp = DRY_RUN
     ? `${tmpdir()}/fulcrum-caveman-dry-run`
-    : await mkdtemp(`${tmpdir()}/fulcrum-caveman-`);
-  const clone = await runProcDry(["git", "clone", "--depth", "1", CAVEMAN_REPO, tmp]);
-  if (clone.exit !== 0) {
-    console.log(`     ✗ ${label} caveman git clone failed: ${clone.stderr.trim()} — manual: clone ${CAVEMAN_REPO} and copy skills/* to ${skillsRoot}`);
-    return false;
+    : cavemanSourceCacheRoot(home);
+  if (DRY_RUN || !(await isDir(`${tmp}/skills`))) {
+    if (!DRY_RUN) await mk(dirname(tmp));
+    const clone = await runProcDry(["git", "clone", "--depth", "1", CAVEMAN_REPO, tmp]);
+    if (clone.exit !== 0) {
+      console.log(`     ✗ ${label} caveman git clone failed: ${clone.stderr.trim()} — manual: clone ${CAVEMAN_REPO} and copy skills/* to ${skillsRoot}`);
+      return false;
+    }
   }
   if (DRY_RUN) {
     console.log(`     [dry-run] would copy: ${tmp}/skills/* → ${skillsRoot}`);
@@ -255,30 +262,26 @@ async function installCavemanFromRepo(
     return true;
   }
 
-  try {
-    const repoSkills = `${tmp}/skills`;
-    if (!(await isDir(repoSkills))) {
-      console.log(`     ✗ ${label} caveman repo missing skills/ directory`);
-      return false;
-    }
-    await mk(skillsRoot);
-    for (const entry of await readdir(repoSkills, { withFileTypes: true })) {
-      if (entry.isDirectory()) {
-        const target = `${skillsRoot}/${entry.name}`;
-        assertNotAgentsPath(target, home);
-        await copyTree(`${repoSkills}/${entry.name}`, target);
-      }
-    }
-    if (includeCodexPlugin) {
-      await configureCodexCavemanPlugin(home, tmp);
-    } else {
-      await installCavemanPackagePayload(home, agentId, tmp);
-    }
-    await writeCavemanMirrorsMarker(home);
-    return true;
-  } finally {
-    if (!DRY_RUN) await rm(tmp, { recursive: true, force: true });
+  const repoSkills = `${tmp}/skills`;
+  if (!(await isDir(repoSkills))) {
+    console.log(`     ✗ ${label} caveman repo missing skills/ directory`);
+    return false;
   }
+  await mk(skillsRoot);
+  for (const entry of await readdir(repoSkills, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      const target = `${skillsRoot}/${entry.name}`;
+      assertNotAgentsPath(target, home);
+      await copyTree(`${repoSkills}/${entry.name}`, target);
+    }
+  }
+  if (includeCodexPlugin) {
+    await configureCodexCavemanPlugin(home, tmp);
+  } else {
+    await installCavemanPackagePayload(home, agentId, tmp);
+  }
+  await writeCavemanMirrorsMarker(home);
+  return true;
 }
 
 /** appendFile wrapper — skips in dry-run. */
@@ -644,7 +647,12 @@ export async function installCaveman(home: string, opts: { dryRun?: boolean } = 
       const cavemanSkillDir = `${ag.skillsRoot}/caveman`;
       const codexPluginDir = `${home}/.codex/plugins/cache/caveman/caveman/0.1.0`;
       const packageDir = ag.includeCodexPlugin ? `${codexPluginDir}/package` : cavemanPackageRoot(home, ag.id);
-      if ((await isDir(cavemanSkillDir)) && (!ag.includeCodexPlugin || (await isDir(codexPluginDir))) && (await isDir(packageDir))) {
+      if (
+        (await isDir(cavemanSkillDir)) &&
+        (!ag.includeCodexPlugin || (await isDir(codexPluginDir))) &&
+        (await isDir(packageDir)) &&
+        (await isDir(cavemanSourceCacheRoot(home)))
+      ) {
         console.log(`     · skip ${ag.label} caveman (already installed)`);
         continue;
       }
@@ -912,7 +920,7 @@ export async function run(args: string[]): Promise<void> {
   if (withProject) {
     console.log(`4/4  fulcrum init ${withProject}`);
     const { run: runInit } = await import("./init.ts");
-    await runInit([withProject]);
+    await runInit(DRY_RUN ? ["--dry-run", withProject] : [withProject]);
   } else {
     console.log("4/4  Skipping project init (use:  fulcrum init <dir>  or re-run with --with-project)");
   }

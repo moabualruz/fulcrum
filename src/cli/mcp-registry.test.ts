@@ -2,7 +2,7 @@
 // All writes go to scratch HOME dirs; no real $HOME touched.
 
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, rm, mkdir, readFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -20,6 +20,7 @@ import {
   type Registry,
 } from "./mcp-registry.ts";
 import {
+  DEFAULT_DEEPWIKI_SERVER,
   DEFAULT_SEMGREP_SERVER,
   DEFAULT_CONTEXT7_SERVER,
   DEFAULT_TAVILY_SERVER,
@@ -401,6 +402,26 @@ describe("removeFromAgents", () => {
 
     const toml = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
     expect(toml).not.toContain("[mcp_servers.github]");
+  });
+
+  test("removes malformed Codex TOML block with orphan Fulcrum end marker", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await registerServer("deepwiki", DEFAULT_DEEPWIKI_SERVER);
+    await writeFile(join(TMP, ".codex", "config.toml"), [
+      'model = "gpt-5.5"',
+      "",
+      "[mcp_servers.deepwiki]",
+      'url = "https://mcp.deepwiki.com/mcp"',
+      "# END FULCRUM MCP deepwiki",
+      "",
+    ].join("\n"));
+
+    await removeFromAgents("deepwiki");
+
+    const toml = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(toml).not.toContain("[mcp_servers.deepwiki]");
+    expect(toml).not.toContain("FULCRUM MCP deepwiki");
+    expect(toml).toContain('model = "gpt-5.5"');
   });
 
   test("removes Gemini settings.json entry", async () => {

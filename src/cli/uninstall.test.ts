@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { removeCavemanCopies, removeExactLine, removeSentinelBlock, run, setDryRun } from "./uninstall.ts";
 import * as proc from "../utils/proc.ts";
@@ -9,6 +9,15 @@ let TMP: string;
 let originalHome: string | undefined;
 let originalFulcrumHome: string | undefined;
 let originalRepoDir: string | undefined;
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 beforeEach(async () => {
   TMP = await mkdtemp(join(tmpdir(), "fulcrum-uninstall-"));
@@ -106,6 +115,86 @@ describe("run", () => {
 
     expect(logs.join("\n")).not.toContain("package.caveman");
     expect(logs.join("\n")).toContain("keep caveman");
+  });
+
+  test("dry-run does not remove hook registrations", async () => {
+    const hookPath = join(TMP, ".config", "opencode", "plugins", "fulcrum-index-check.ts");
+    await mkdir(dirname(hookPath), { recursive: true });
+    await writeFile(hookPath, "managed hook\n");
+
+    await run(["--dry-run"]);
+
+    expect(await readFile(hookPath, "utf8")).toBe("managed hook\n");
+  });
+
+  test("--purge removes Fulcrum cache and generated state", async () => {
+    await mkdir(join(TMP, ".fulcrum", "cache", "repomix"), { recursive: true });
+    await writeFile(join(TMP, ".fulcrum", "cache", "repomix", "README.md"), "cache\n");
+    await mkdir(join(TMP, ".fulcrum", "state", "global", "backups", "skills"), { recursive: true });
+    await writeFile(join(TMP, ".fulcrum", "state", "global", "backups", "skills", "README.md"), "backup\n");
+    await mkdir(join(TMP, ".fulcrum", "state", "global", "smoke-test"), { recursive: true });
+    await writeFile(join(TMP, ".fulcrum", "state", "global", "smoke-test", "run.md"), "smoke\n");
+    await mkdir(join(TMP, ".fulcrum", "state", "global", "upstream-skills", "codex"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "plugins", "cache", "cloudflare"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "plugins", "cache", "superpowers"), { recursive: true });
+
+    await run(["--purge", "--include-caveman"]);
+
+    expect(await pathExists(join(TMP, ".fulcrum", "cache"))).toBe(false);
+    expect(await pathExists(join(TMP, ".fulcrum", "hooks"))).toBe(false);
+    expect(await pathExists(join(TMP, ".fulcrum", "state", "global"))).toBe(false);
+    expect(await pathExists(join(TMP, ".fulcrum", "state", "global", "backups"))).toBe(false);
+    expect(await pathExists(join(TMP, ".fulcrum", "state", "global", "smoke-test"))).toBe(false);
+    expect(await pathExists(join(TMP, ".fulcrum", "state", "global", "upstream-skills"))).toBe(false);
+    expect(await pathExists(join(TMP, ".fulcrum", "state", "global", "components.db"))).toBe(false);
+    expect(await pathExists(join(TMP, ".codex", "plugins", "cache", "cloudflare"))).toBe(false);
+    expect(await pathExists(join(TMP, ".codex", "plugins", "cache", "superpowers"))).toBe(false);
+  });
+
+  test("--purge removes managed Claude marketplace metadata", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await writeFile(join(TMP, ".claude", "settings.json"), JSON.stringify({
+      extraKnownMarketplaces: {
+        fulcrum: { source: { source: "github", repo: "moabualruz/fulcrum" } },
+        repomix: { source: { source: "github", repo: "yamadashy/repomix" } },
+        cloudflare: { source: { source: "github", repo: "cloudflare/skills" } },
+        caveman: { source: { source: "github", repo: "JuliusBrussee/caveman" } },
+        user: { source: { source: "github", repo: "example/user" } },
+      },
+    }, null, 2) + "\n");
+
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await run(["--purge", "--include-caveman"]);
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    const settings = JSON.parse(await readFile(join(TMP, ".claude", "settings.json"), "utf8"));
+    expect(settings.extraKnownMarketplaces.fulcrum).toBeUndefined();
+    expect(settings.extraKnownMarketplaces.repomix).toBeUndefined();
+    expect(settings.extraKnownMarketplaces.cloudflare).toBeUndefined();
+    expect(settings.extraKnownMarketplaces.caveman).toBeUndefined();
+    expect(settings.extraKnownMarketplaces.user).toBeDefined();
+  });
+
+  test("--purge removes orphan Codex managed MCP blocks without registry state", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "config.toml"), [
+      'model = "gpt-5.5"',
+      "",
+      "[mcp_servers.deepwiki]",
+      'url = "https://mcp.deepwiki.com/mcp"',
+      "# END FULCRUM MCP deepwiki",
+      "",
+    ].join("\n"));
+
+    await run(["--purge", "--include-caveman"]);
+
+    const config = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(config).toContain('model = "gpt-5.5"');
+    expect(config).not.toContain("[mcp_servers.deepwiki]");
+    expect(config).not.toContain("FULCRUM MCP deepwiki");
   });
 
   test("removes managed namespaces, hook state, and unmodified policy", async () => {

@@ -6,11 +6,11 @@
 
 **Fulcrum is a local-first CLI Agent OS for supervising repositories, tasks, agent runs, context, memory, and artifacts.**
 
-That destination. Current branch = foundation work: cross-agent install layer, hook plumbing, skills, rules, output policy, CLI orchestrator everything else sit on top of. Mile zero of long road; every commit advance foundation, not jump ahead.
+That destination. Current `main` = foundation work: cross-agent install layer, hook plumbing, skills, rules, output policy, component lifecycle, package mirrors, MCP registry, CLI orchestrator everything else sit on top of. Mile zero of long road; every commit advance foundation, not jump ahead.
 
 ## Where we are right now (foundation)
 
-Shipped on `feat/agent-foundation-clean`:
+Current `main` foundation includes:
 
 - One Bun-compiled `fulcrum` binary, eight hook subcommands (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `tool-output-router`).
 - Orchestrator (`fulcrum init / install / hooks / skills / doctor / compress`) wires hooks into five agent runtimes (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi CLI).
@@ -32,7 +32,7 @@ Layers foundation prep for. **Not built yet** — do not assume exist or write c
 - **Context engine** — selecting + assembling what each run sees, beyond existing rules splice.
 - **Memory** — persistent facts, decisions, references across sessions.
 - **Artifacts** — outputs of runs (diffs, plans, reports) tracked, addressable, queryable.
-- **Plugins / extensions** — third-party drop-ins integrating with same surface, addressed under each agent's native namespacing convention.
+- **Plugins / extensions** — generic `fulcrum plugins …` UX for third-party drop-ins. Package-specific lifecycle mirroring already exists for Caveman, Repomix, Cloudflare, and Superpowers.
 
 ## Skill namespacing — the `fulcrum:` prefix
 

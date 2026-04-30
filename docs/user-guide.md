@@ -14,7 +14,7 @@ Fulcrum is a local-first CLI Agent OS that installs a shared foundation across e
 - Syncs Fulcrum-authored skills into the `fulcrum/` namespace when explicitly requested; Codex global authored skills are opt-in.
 - Registers managed MCPs (DeepWiki + context7 minimal-default; other builtin extras opt-in).
 - Installs caveman output-compression cross-agent with `defaultMode: ultra`.
-- Reports environment health via `fulcrum doctor`.
+- Reports environment, component, package-parity, MCP, skill-budget, and toolchain health via `fulcrum doctor`.
 
 **What Fulcrum does NOT do:**
 - Run or invoke agents on your behalf.
@@ -247,6 +247,7 @@ fulcrum doctor --json   # JSON; pipe with jq
 It reports:
 - Which agents are detected and whether rules are spliced.
 - Caveman install state per agent and `defaultMode` source.
+- Component lifecycle counts and package parity for managed package mirrors.
 - 47 CLI tools — present or missing.
 - Pi MCP adapter state.
 - Registered MCP servers, enabled-on-which-agents, and auth status.

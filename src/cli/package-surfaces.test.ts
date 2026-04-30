@@ -101,4 +101,14 @@ describe("package surface discovery", () => {
     expect(new Set(cloudflare.surfaces.map((surface) => surface.kind))).toEqual(new Set(["skill", "mcp", "command", "metadata", "asset"]));
     expect(new Set(superpowers.surfaces.map((surface) => surface.kind))).toEqual(new Set(["skill", "command", "agent", "hook", "metadata", "asset"]));
   });
+
+  test("Caveman fallback manifest tracks current official command and hook paths", async () => {
+    const caveman = await getPackageSurfaceManifest("package.caveman");
+    const paths = caveman.surfaces.map((surface) => surface.relativePath);
+
+    expect(paths).toContain("commands/caveman.toml");
+    expect(paths).toContain("hooks/caveman-activate.js");
+    expect(paths).not.toContain("commands/caveman.md");
+    expect(paths).not.toContain("hooks.json");
+  });
 });

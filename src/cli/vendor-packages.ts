@@ -338,6 +338,9 @@ async function removePackagePayloadMirrors(
   for (const agentId of agentIds) {
     const agent = AGENTS.find((a) => a.id === agentId)!;
     await removePath(packageMirrorRoot(home, packageName, agentId), `${agent.label} ${packageName} package mirror`, dryRun);
+    if (agentId === "codex") {
+      await removePath(`${home}/.codex/plugins/cache/${packageName}`, `${agent.label} ${packageName} package cache root`, dryRun);
+    }
   }
   await removeMarker(home, marker, `${packageName} package mirrors`, dryRun);
 }
@@ -569,6 +572,9 @@ async function removeSuperpowersSkillMirror(home: string, agentId: "codex" | "pi
   if (dryRun) {
     await removePath(target, label, true);
     await removePath(packageTarget, `${agent.label} Superpowers package mirror`, true);
+    if (agentId === "codex") {
+      await removePath(`${home}/.codex/plugins/cache/superpowers`, `${agent.label} Superpowers package cache root`, true);
+    }
     await removeMarker(home, marker, label, true);
     return;
   }
@@ -578,6 +584,9 @@ async function removeSuperpowersSkillMirror(home: string, agentId: "codex" | "pi
   }
   await removePath(target, label, false);
   await removePath(packageTarget, `${agent.label} Superpowers package mirror`, false);
+  if (agentId === "codex") {
+    await removePath(`${home}/.codex/plugins/cache/superpowers`, `${agent.label} Superpowers package cache root`, false);
+  }
   await removeMarker(home, marker, label, false);
 }
 

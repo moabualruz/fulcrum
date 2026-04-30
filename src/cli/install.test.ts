@@ -6,6 +6,9 @@ import { chmod, mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { assertNotAgentsPath, installCaveman, lockCavemanUltra, run as installRun, spliceSentinel, setDryRun } from "./install.ts";
+import { auditPackageParity } from "./package-parity.ts";
+import { planPackageMirrorTargets } from "./package-mirror.ts";
+import { getPackageSurfaceManifest } from "./package-surfaces.ts";
 import { run as runProc } from "../utils/proc.ts";
 import * as proc from "../utils/proc.ts";
 
@@ -216,6 +219,7 @@ describe("installCaveman W1.3 — direct official repo copy", () => {
     // Pre-create both Codex surfaces to simulate a complete install.
     await mkdir(join(testHome, ".codex", "skills", "caveman"), { recursive: true });
     await mkdir(join(testHome, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0", "package"), { recursive: true });
+    await mkdir(join(testHome, ".fulcrum", "cache", "caveman", "skills"), { recursive: true });
 
     const logs: string[] = [];
     const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
@@ -292,7 +296,7 @@ describe("installCaveman W1.3 — direct official repo copy", () => {
     await writeFile(join(source, "skills", "caveman", "draft.backup.md"), "drop\n");
     await writeFile(join(source, "skills", "compress", "SKILL.md"), "---\nname: compress\n---\n");
     await writeFile(join(source, "skills", "compress", "scripts", "cli.py"), "print('compress')\n");
-    await writeFile(join(source, "plugins", "caveman", ".codex-plugin", "plugin.json"), JSON.stringify({ name: "caveman", version: "9.9.9" }) + "\n");
+    await writeFile(join(source, "plugins", "caveman", ".codex-plugin", "plugin.json"), JSON.stringify({ name: "caveman", version: "0.1.0" }) + "\n");
     await writeFile(join(source, "plugins", "caveman", "assets", "caveman.svg"), "<svg />\n");
     await writeFile(join(source, ".codex", "config.toml"), "[features]\ncodex_hooks = true\n");
     await writeFile(join(source, ".codex", "hooks.json"), JSON.stringify({ hooks: { UserPromptSubmit: [{ command: "hooks/caveman-activate.js" }] } }, null, 2) + "\n");
@@ -329,14 +333,17 @@ describe("installCaveman W1.3 — direct official repo copy", () => {
       else delete process.env["PATH"];
     }
 
-    const codexPluginRoot = join(testHome, ".codex", "plugins", "cache", "caveman", "caveman", "9.9.9");
+    const codexPluginRoot = join(testHome, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0");
     const codexPackage = join(codexPluginRoot, "package");
     const opencodePackage = join(testHome, ".config", "opencode", "packages", "caveman");
     const piPackage = join(testHome, ".pi", "agent", "packages", "caveman");
+    const cacheRoot = join(testHome, ".fulcrum", "cache", "caveman");
 
     expect(await Bun.file(join(testHome, ".codex", "skills", "caveman", "SKILL.md")).exists()).toBe(true);
     expect(await Bun.file(join(testHome, ".config", "opencode", "skills", "compress", "scripts", "cli.py")).exists()).toBe(true);
     expect(await Bun.file(join(testHome, ".pi", "agent", "skills", "compress", "scripts", "cli.py")).exists()).toBe(true);
+    expect(await Bun.file(join(cacheRoot, "commands", "caveman.toml")).exists()).toBe(true);
+    expect(await Bun.file(join(cacheRoot, "hooks", "caveman-activate.js")).exists()).toBe(true);
 
     expect(await Bun.file(join(codexPluginRoot, ".codex-plugin", "plugin.json")).exists()).toBe(true);
     expect(await Bun.file(join(codexPluginRoot, "assets", "caveman.svg")).exists()).toBe(true);
@@ -358,6 +365,16 @@ describe("installCaveman W1.3 — direct official repo copy", () => {
     expect(opencodeUnsupported.unsupported.some((entry: { surface: string }) => entry.surface === "codex-hooks")).toBe(true);
     expect(piUnsupported.unsupported.some((entry: { surface: string }) => entry.surface === "codex-plugin")).toBe(true);
     expect(await Bun.file(join(testHome, ".fulcrum", "state", "global", "caveman-mirrors.installed")).exists()).toBe(true);
+
+    const manifest = await getPackageSurfaceManifest("package.caveman", { sourceRoot: cacheRoot });
+    expect(manifest.surfaces.some((surface) => surface.relativePath === "commands/caveman.toml")).toBe(true);
+    expect(manifest.surfaces.some((surface) => surface.relativePath === "commands/caveman.md")).toBe(false);
+
+    for (const agentId of ["codex", "opencode", "pi"] as const) {
+      const report = await auditPackageParity(manifest, planPackageMirrorTargets(manifest, [agentId]), { home: testHome });
+      expect(report.ok).toBe(true);
+      expect(report.missing).toEqual([]);
+    }
   });
 
 });
@@ -526,6 +543,37 @@ describe("dry-run mode", () => {
       else delete process.env["FULCRUM_HOME"];
       if (origRepoDir !== undefined) process.env["FULCRUM_REPO_DIR"] = origRepoDir;
       else delete process.env["FULCRUM_REPO_DIR"];
+    }
+  });
+
+  test("install --dry-run --with-project forwards dry-run to init", async () => {
+    const origHome = process.env["HOME"];
+    const origFulcrumHome = process.env["FULCRUM_HOME"];
+    const origRepoDir = process.env["FULCRUM_REPO_DIR"];
+    const origPath = process.env["PATH"];
+    const projectDir = join(dryHome, "project");
+    await mkdir(projectDir, { recursive: true });
+
+    try {
+      process.env["HOME"] = dryHome;
+      process.env["FULCRUM_HOME"] = join(dryHome, ".fulcrum");
+      process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../..");
+      process.env["PATH"] = "/usr/bin:/bin";
+
+      await installRun(["--dry-run", "--with-project", projectDir]);
+
+      expect(await Bun.file(join(projectDir, "AGENTS.md")).exists()).toBe(false);
+      expect(await Bun.file(join(projectDir, ".claude", "CLAUDE.md")).exists()).toBe(false);
+      expect(await Bun.file(join(projectDir, ".gitignore")).exists()).toBe(false);
+    } finally {
+      if (origHome !== undefined) process.env["HOME"] = origHome;
+      else delete process.env["HOME"];
+      if (origFulcrumHome !== undefined) process.env["FULCRUM_HOME"] = origFulcrumHome;
+      else delete process.env["FULCRUM_HOME"];
+      if (origRepoDir !== undefined) process.env["FULCRUM_REPO_DIR"] = origRepoDir;
+      else delete process.env["FULCRUM_REPO_DIR"];
+      if (origPath !== undefined) process.env["PATH"] = origPath;
+      else delete process.env["PATH"];
     }
   });
 });

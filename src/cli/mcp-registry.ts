@@ -440,11 +440,13 @@ async function removeFromCodex(server: McpServer, home: string): Promise<void> {
   const END = tomlBlockEnd(server.name);
   if (!(await exists(file))) return;
   const existing = await readFile(file, "utf8");
-  if (!existing.includes(BEGIN)) {
+  if (!existing.includes(BEGIN) && !existing.includes(END)) {
     console.log(`     · Codex ${server.name} MCP not present`);
     return;
   }
-  const re = new RegExp(`\\n?${escapeRegExp(BEGIN)}[\\s\\S]*?${escapeRegExp(END)}\\n?`, "m");
+  const re = existing.includes(BEGIN)
+    ? new RegExp(`\\n?${escapeRegExp(BEGIN)}[\\s\\S]*?${escapeRegExp(END)}\\n?`, "m")
+    : new RegExp(`\\n?\\[mcp_servers\\.${escapeRegExp(server.name)}\\][\\s\\S]*?${escapeRegExp(END)}\\n?`, "m");
   const out = existing.replace(re, "\n").replace(/\n{3,}/g, "\n\n").trimEnd();
   await writeFile(file, out ? `${out}\n` : "");
   console.log(`     - Codex ${server.name} MCP removed`);
