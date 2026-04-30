@@ -31,7 +31,7 @@ Acceptance criteria:
 - [x] **02.1 — Cookie-backed active-project module.** Owns: `src/web/src/lib/state/active-project.ts`, `src/web/src/lib/state/active-project.test.ts`. RED: tests for `getActiveProject(cookies)` returns null when unset, returns slug after `setActiveProject`, clears on null.
 - [x] **02.2 — `hooks.server.ts` + `+layout.server.ts` load.** Owns: `src/web/src/hooks.server.ts`, `src/web/src/routes/+layout.server.ts`. RED: integration test boots SvelteKit handle, asserts `event.locals.activeProjectId` populated from cookie.
 - [x] **02.3 — `AppSidebar` + `nav-items` config.** Owns: `src/web/src/lib/components/app/AppSidebar.svelte`, `src/web/src/lib/components/app/nav-items.ts`, `src/web/src/lib/components/app/AppSidebar.svelte.test.ts`. RED: snapshot of nav items in declared order; component test asserts each link rendered with correct `href`.
-- [ ] **02.4 — `AppTopbar` (breadcrumb + theme toggle + cmd+K hint).** Owns: `src/web/src/lib/components/app/AppTopbar.svelte`, `.svelte.test.ts`. RED: breadcrumb reflects `$page.url.pathname`; theme toggle button has `aria-label="toggle theme"`; cmd+K hint visible with the `kbd` key combo.
+- [x] **02.4 — `AppTopbar` (breadcrumb + theme toggle + cmd+K hint).** Owns: `src/web/src/lib/components/app/AppTopbar.svelte`, `.svelte.test.ts`. RED: breadcrumb reflects `$page.url.pathname`; theme toggle button has `aria-label="toggle theme"`; cmd+K hint visible with the `kbd` key combo.
 - [ ] **02.5 — `ProjectPicker` dropdown + form action.** Owns: `src/web/src/lib/components/app/ProjectPicker.svelte`, `src/web/src/routes/api/active-project/+server.ts`. RED: clicking a project entry posts to `/api/active-project`; mock fetch asserts payload + cookie set.
 - [ ] **02.6 — Mobile sheet collapse + assemble layout.** Owns: `src/web/src/routes/+layout.svelte`. RED: media-query helper test asserts the sheet trigger is rendered when `viewport < 768px` (use a tiny `MediaQueryStub`). GREEN: wire AppSidebar inside Sheet on mobile, sticky on desktop. Commit `feat(web): add app shell sidebar, topbar, theme toggle, project picker`.
 
@@ -99,3 +99,21 @@ Acceptance criteria:
 - Test harness: component tests render via `svelte/server`'s `render()` (no jsdom). To beat the existing client-mode `.svelte` loader registered by `ui-primitives.smoke.test.ts`, a one-line preload (`src/web/src/lib/components/app/svelte-ssr-preload.ts`) compiles every `.svelte` (and `.svelte.js/.ts`) module to Svelte 5 server output before any test file's top-level imports. Wired through `bunfig.toml` `[test] preload = […]`. Smoke tests still pass because server-compiled components are functions too.
 - Design deviation: spec asks for shadcn `Button` inside the sidebar. Rendering the real `Button` via `svelte/server` while a sibling suite holds the client-mode `.svelte` loader for `bits-ui` deps is fragile, so AppSidebar emits a raw `<a data-slot="button">` styled with `buttonVariants({ variant: "ghost" })` from `$lib/components/ui/button` — same final markup the Button component produces for `href` props (it forks to `<a>` internally), no behavior change for users.
 - Regression: `bun test --conditions=svelte ./src/web/src/lib` 47 pass / 0 fail; full repo `bun test --conditions=svelte` 606 pass / 1 skip / 0 fail; `bun run check` 0/0/0; `bun run build` ok; `bun run ci` 9/9 green.
+
+### 02.4 — `AppTopbar` (breadcrumb + theme toggle + cmd+K hint) (done)
+
+- RED command: `bun test --conditions=svelte ./src/web/src/lib/components/app/AppTopbar.svelte.test.ts`
+- RED output (first 5 lines):
+  ```
+  bun test v1.3.13 (bf2e2cec)
+
+  src/web/src/lib/components/app/AppTopbar.svelte.test.ts:
+  error: Cannot find module './AppTopbar.svelte' from '/Users/mkh/workspace/fulcrum/src/web/src/lib/components/app/AppTopbar.svelte.test.ts'
+  (fail) AppTopbar component > (unnamed) [10.26ms]
+  ```
+- GREEN command: same as RED.
+- GREEN output: `7 pass / 0 fail / 16 expect() calls`.
+- Surface: `AppTopbar.svelte` accepts `{ pathname: string; activeProjectId: string | null }` (pathname passed in by the layout, no `$app/state` import inside the component, so SSR tests drive it deterministically). Renders a `<header data-app-topbar>` wrapping a flat shadcn-shape breadcrumb (`nav[data-slot="breadcrumb"]` → `ol[data-slot="breadcrumb-list"]` → `li[data-slot="breadcrumb-item"]` with `[data-slot="breadcrumb-link"]` for ancestor crumbs and `<span data-slot="breadcrumb-page" aria-current="page">` for the leaf, separators marked `data-slot="breadcrumb-separator"`), an `ml-auto` right cluster with `<kbd aria-label="open command palette">⌘K</kbd>`, a ghost/icon `<button data-theme-toggle aria-label="toggle theme">` containing the lucide `Sun` icon, and a `<span data-active-project>` slot showing `activeProjectId ?? "—"`.
+- Design deviation (continued from 02.3): same shadcn-SSR clash workaround — emit raw HTML with the `data-slot` attributes shadcn-svelte uses, rather than importing the `Breadcrumb`/`Button` components inside `svelte/server` `render()`. Identical final markup, no behavior change. Theme toggle stays inert (no click handler) — wiring lands in 02.6 alongside the mode-watcher.
+- Helper: tiny in-file `crumbsFor(pathname)` (NOT exported) splits on `/`, drops empties, prepends a `Dashboard → /` crumb, and capitalises each segment for display.
+- Regression: `bun test --conditions=svelte ./src/web/src/lib/components/app/` 16 pass / 0 fail; `bun run check` 0/0/0; `bun run build` ok; `bun run ci` 9/9 green.
