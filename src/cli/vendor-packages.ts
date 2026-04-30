@@ -169,6 +169,12 @@ async function uninstallClaudePlugin(home: string, label: string, pluginName: st
   }
   if (dryRun) {
     await runBestEffort(["claude", "plugin", "uninstall", pluginName], `${label} Claude plugin uninstall`, true);
+    if (pluginName === CLOUDFLARE_PLUGIN) {
+      await removePath(`${home}/.claude/plugins/cache/cloudflare`, "Cloudflare Claude plugin cache", true);
+      await removePath(`${home}/.claude/plugins/marketplaces/cloudflare`, "Cloudflare Claude marketplace cache", true);
+    } else if (pluginName === SUPERPOWERS_CLAUDE_PLUGIN) {
+      await removePath(`${home}/.claude/plugins/cache/claude-plugins-official/superpowers`, "Superpowers Claude plugin cache", true);
+    }
     await removeMarker(home, marker, `${label} Claude plugin`, true);
     return;
   }
@@ -177,6 +183,12 @@ async function uninstallClaudePlugin(home: string, label: string, pluginName: st
     return;
   }
   if (await runBestEffort(["claude", "plugin", "uninstall", pluginName], `${label} Claude plugin uninstall`, false)) {
+    if (pluginName === CLOUDFLARE_PLUGIN) {
+      await removePath(`${home}/.claude/plugins/cache/cloudflare`, "Cloudflare Claude plugin cache", dryRun);
+      await removePath(`${home}/.claude/plugins/marketplaces/cloudflare`, "Cloudflare Claude marketplace cache", dryRun);
+    } else if (pluginName === SUPERPOWERS_CLAUDE_PLUGIN) {
+      await removePath(`${home}/.claude/plugins/cache/claude-plugins-official/superpowers`, "Superpowers Claude plugin cache", dryRun);
+    }
     await removeMarker(home, marker, `${label} Claude plugin`, false);
   }
 }

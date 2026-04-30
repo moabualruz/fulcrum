@@ -341,6 +341,8 @@ export async function removeCavemanCopies(home: string, opts: { dryRun?: boolean
         console.log("     · Claude Code caveman: `claude` not on PATH — manual: claude plugin uninstall caveman@caveman");
       }
     }
+    await removePath(`${home}/.claude/plugins/cache/caveman`, "Claude Code caveman plugin cache");
+    await removePath(`${home}/.claude/plugins/marketplaces/caveman`, "Claude Code caveman marketplace cache");
 
     // W1.2: Gemini CLI — call `gemini extensions uninstall caveman` when Gemini
     // is detected and `gemini` is on PATH. Best-effort: log + continue.
@@ -355,6 +357,7 @@ export async function removeCavemanCopies(home: string, opts: { dryRun?: boolean
         console.log("     · Gemini CLI caveman: `gemini` not on PATH — manual: gemini extensions uninstall caveman");
       }
     }
+    await removePath(`${home}/.gemini/extensions/caveman`, "Gemini CLI caveman extension");
 
     // W1.4: Codex/OpenCode/Pi — remove Fulcrum's per-agent filesystem mirrors.
     const mirrorAgents: Array<{ dir: string; label: string; agent: typeof AGENTS[number] }> = [
@@ -457,6 +460,23 @@ async function cleanupEmptyAgentConfigContainers(home: string): Promise<void> {
   }
 }
 
+async function removeClaudePluginCacheLeftovers(home: string): Promise<void> {
+  const paths: Array<[string, string]> = [
+    [`${home}/.claude/plugins/cache/fulcrum`, "Claude Code fulcrum plugin cache"],
+    [`${home}/.claude/plugins/marketplaces/fulcrum`, "Claude Code fulcrum marketplace cache"],
+    [`${home}/.claude/plugins/cache/caveman`, "Claude Code caveman plugin cache"],
+    [`${home}/.claude/plugins/marketplaces/caveman`, "Claude Code caveman marketplace cache"],
+    [`${home}/.claude/plugins/cache/repomix`, "Repomix Claude plugin cache"],
+    [`${home}/.claude/plugins/marketplaces/repomix`, "Repomix Claude marketplace cache"],
+    [`${home}/.claude/plugins/cache/cloudflare`, "Cloudflare Claude plugin cache"],
+    [`${home}/.claude/plugins/marketplaces/cloudflare`, "Cloudflare Claude marketplace cache"],
+    [`${home}/.claude/plugins/cache/claude-plugins-official/superpowers`, "Superpowers Claude plugin cache"],
+  ];
+  for (const [path, label] of paths) {
+    await removePath(path, label);
+  }
+}
+
 /**
  * For every entry in the MCP registry, call removeFromAgents (regardless of
  * enabled state). Then delete the registry file unless --keep-state is passed.
@@ -548,6 +568,7 @@ export async function run(args: string[]): Promise<void> {
   await removePath(`${fulcrumHome()}/hooks/snippets`, "hook snippets");
   await removePath(`${fulcrumHome()}/hooks/enabled`, "hook enable markers");
   await removeSkillNamespaces(home);
+  if (purge) await removeClaudePluginCacheLeftovers(home);
   console.log();
 
   console.log("3/4  Cleaning registry and empty agent containers");

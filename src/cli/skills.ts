@@ -8,6 +8,7 @@ import { mkdir, readdir, readFile, copyFile, writeFile, stat, rm } from "node:fs
 import { join, basename, dirname, resolve } from "node:path";
 import { AGENTS } from "../agents/registry.ts";
 import { which, run as runProc } from "../utils/proc.ts";
+import { pruneSourceBackupFiles } from "../utils/source-clean.ts";
 
 function repoRoot(): string {
   // When invoked from a clone, this binary's enclosing repo is the source of
@@ -136,6 +137,16 @@ async function refreshClaudePluginPackage(root: string, opts: { dryRun: boolean 
     await syncSkillSet(skills, src, dst, opts);
     console.log(`    ✓ refreshed plugin skills: ${dst}`);
   }
+  await pruneSourceBackupFiles(`${home}/.claude/plugins/cache/fulcrum`, {
+    dryRun: opts.dryRun,
+    label: "Claude Code fulcrum plugin cache",
+    log: true,
+  });
+  await pruneSourceBackupFiles(`${home}/.claude/plugins/marketplaces/fulcrum`, {
+    dryRun: opts.dryRun,
+    label: "Claude Code fulcrum marketplace cache",
+    log: true,
+  });
 }
 
 async function installClaudePlugin(root: string, opts: { dryRun: boolean }): Promise<void> {
@@ -233,6 +244,8 @@ export async function removeAuthoredSkills(opts: { dryRun?: boolean } = {}): Pro
     console.log(`→ Claude Code (${PLUGIN_SPEC})`);
     await uninstallClaudeFulcrumPlugin({ dryRun });
     await removeDirIfPresent(`${claudeAgent.skillsDir(home)}/${NAMESPACE}`, { dryRun, label: "legacy layout" });
+    await removeDirIfPresent(`${home}/.claude/plugins/cache/fulcrum`, { dryRun, label: "plugin cache" });
+    await removeDirIfPresent(`${home}/.claude/plugins/marketplaces/fulcrum`, { dryRun, label: "marketplace cache" });
     console.log();
   }
 

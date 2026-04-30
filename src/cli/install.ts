@@ -27,6 +27,7 @@ import { mkdir, readFile, writeFile, copyFile, readdir, stat, appendFile, mkdtem
 import { dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { which, run as runProc } from "../utils/proc.ts";
+import { pruneSourceBackupFiles } from "../utils/source-clean.ts";
 import { AGENTS } from "../agents/registry.ts";
 
 // ---------------------------------------------------------------------------
@@ -586,9 +587,28 @@ export async function installCaveman(home: string, opts: { dryRun?: boolean } = 
     // the always-on contract holds. User can opt out by setting
     // `CAVEMAN_DEFAULT_MODE=full` in their shell env (env wins per resolver).
     await lockCavemanUltra(home);
+    await pruneCavemanSourceBackups(home);
   } finally {
     DRY_RUN = previousDryRun;
   }
+}
+
+async function pruneCavemanSourceBackups(home: string): Promise<void> {
+  await pruneSourceBackupFiles(`${home}/.claude/plugins/cache/caveman`, {
+    dryRun: DRY_RUN,
+    label: "Claude Code caveman plugin cache",
+    log: true,
+  });
+  await pruneSourceBackupFiles(`${home}/.claude/plugins/marketplaces/caveman`, {
+    dryRun: DRY_RUN,
+    label: "Claude Code caveman marketplace cache",
+    log: true,
+  });
+  await pruneSourceBackupFiles(`${home}/.gemini/extensions/caveman`, {
+    dryRun: DRY_RUN,
+    label: "Gemini caveman extension",
+    log: true,
+  });
 }
 
 export async function lockCavemanUltra(home: string): Promise<void> {

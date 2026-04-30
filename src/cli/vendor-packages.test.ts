@@ -204,6 +204,8 @@ describe("vendor capability packages", () => {
 
   test("uninstalls only the Cloudflare Claude plugin for the Cloudflare package", async () => {
     await mkdir(join(TMP, ".claude"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "cache", "cloudflare"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "marketplaces", "cloudflare"), { recursive: true });
     await mkdir(join(TMP, ".fulcrum", "state", "global"), { recursive: true });
     await writeFile(join(TMP, ".fulcrum", "state", "global", "cloudflare-claude.installed"), "installed\n");
     const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
@@ -219,6 +221,8 @@ describe("vendor capability packages", () => {
     expect(calls).toEqual([
       ["claude", "plugin", "uninstall", "cloudflare@cloudflare"],
     ]);
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "cache", "cloudflare")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "marketplaces", "cloudflare")).exists()).toBe(false);
   });
 
   test("installs Superpowers package surfaces without Cloudflare", async () => {
@@ -244,6 +248,7 @@ describe("vendor capability packages", () => {
 
   test("uninstalls Superpowers package surfaces without Cloudflare", async () => {
     await mkdir(join(TMP, ".claude"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "cache", "claude-plugins-official", "superpowers"), { recursive: true });
     await mkdir(join(TMP, ".fulcrum", "state", "global"), { recursive: true });
     await writeFile(join(TMP, ".fulcrum", "state", "global", "superpowers-claude.installed"), "installed\n");
     await writeFile(join(TMP, ".fulcrum", "state", "global", "superpowers-codex-mirror.installed"), "installed\n");
@@ -261,6 +266,7 @@ describe("vendor capability packages", () => {
     expect(calls).toContainEqual(["claude", "plugin", "uninstall", "superpowers@claude-plugins-official"]);
     expect(calls).not.toContainEqual(["claude", "plugin", "uninstall", "cloudflare@cloudflare"]);
     expect(await Bun.file(join(TMP, ".codex", "skills", "superpowers")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "cache", "claude-plugins-official", "superpowers")).exists()).toBe(false);
   });
 
   test("mirrors Superpowers full skills for Codex/Pi and registers OpenCode plugin", async () => {

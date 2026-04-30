@@ -246,6 +246,30 @@ describe("installCaveman W1.3 — direct official repo copy", () => {
     }
   });
 
+  test("real install prunes source backups from official caveman agent surfaces", async () => {
+    setDryRun(false);
+    await mkdir(join(testHome, ".claude", "plugins", "cache", "caveman", "caveman", "v"), { recursive: true });
+    await mkdir(join(testHome, ".claude", "plugins", "marketplaces", "caveman", "tests"), { recursive: true });
+    await mkdir(join(testHome, ".gemini", "extensions", "caveman", "tests"), { recursive: true });
+    await writeFile(join(testHome, ".claude", "plugins", "cache", "caveman", "caveman", "v", "CLAUDE.original.md"), "backup");
+    await writeFile(join(testHome, ".claude", "plugins", "cache", "caveman", "caveman", "v", "SKILL.md"), "keep");
+    await writeFile(join(testHome, ".claude", "plugins", "marketplaces", "caveman", "tests", "sample.original.md"), "backup");
+    await writeFile(join(testHome, ".gemini", "extensions", "caveman", "tests", "sample.original.md"), "backup");
+
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installCaveman(testHome);
+
+      expect(await Bun.file(join(testHome, ".claude", "plugins", "cache", "caveman", "caveman", "v", "CLAUDE.original.md")).exists()).toBe(false);
+      expect(await Bun.file(join(testHome, ".claude", "plugins", "cache", "caveman", "caveman", "v", "SKILL.md")).exists()).toBe(true);
+      expect(await Bun.file(join(testHome, ".claude", "plugins", "marketplaces", "caveman", "tests", "sample.original.md")).exists()).toBe(false);
+      expect(await Bun.file(join(testHome, ".gemini", "extensions", "caveman", "tests", "sample.original.md")).exists()).toBe(false);
+    } finally {
+      whichSpy.mockRestore();
+      setDryRun(true);
+    }
+  });
+
 });
 
 // ---------------------------------------------------------------------------

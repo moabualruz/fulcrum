@@ -163,6 +163,7 @@ describe("Repomix capability package mirrors", () => {
   test("uninstalls Repomix Claude plugins and removes marker", async () => {
     process.env["FULCRUM_HOME"] = join(TMP, ".fulcrum");
     await mkdir(join(TMP, ".claude"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "marketplaces", "repomix"), { recursive: true });
     await mkdir(join(TMP, ".fulcrum", "state", "global"), { recursive: true });
     await writeFile(join(TMP, ".fulcrum", "state", "global", "repomix-claude.installed"), "installed\n");
     const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
@@ -181,6 +182,8 @@ describe("Repomix capability package mirrors", () => {
       ["claude", "plugin", "uninstall", "repomix-explorer@repomix"],
     ]);
     expect(await Bun.file(join(TMP, ".fulcrum", "state", "global", "repomix-claude.installed")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "cache", "repomix")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "marketplaces", "repomix")).exists()).toBe(false);
   });
 
   test("installs nearest native mirrors for non-Claude agents", async () => {

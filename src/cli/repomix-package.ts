@@ -173,6 +173,8 @@ export async function uninstallRepomixClaudePlugins(opts: { dryRun?: boolean } =
       dryRun,
     );
   }
+  await removePath(`${home}/.claude/plugins/cache/repomix`, "Repomix Claude plugin cache", dryRun);
+  await removePath(`${home}/.claude/plugins/marketplaces/repomix`, "Repomix Claude marketplace cache", dryRun);
   await removePath(markerFile, "repomix Claude plugins marker", dryRun);
 }
 

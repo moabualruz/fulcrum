@@ -228,6 +228,35 @@ describe("run", () => {
     expect(piSettings.packages).toBeUndefined();
   });
 
+  test("--purge removes markerless Claude plugin cache leftovers", async () => {
+    const leftovers = [
+      [".claude", "plugins", "cache", "fulcrum"],
+      [".claude", "plugins", "marketplaces", "fulcrum"],
+      [".claude", "plugins", "cache", "caveman"],
+      [".claude", "plugins", "marketplaces", "caveman"],
+      [".claude", "plugins", "cache", "repomix"],
+      [".claude", "plugins", "marketplaces", "repomix"],
+      [".claude", "plugins", "cache", "cloudflare"],
+      [".claude", "plugins", "marketplaces", "cloudflare"],
+      [".claude", "plugins", "cache", "claude-plugins-official", "superpowers"],
+    ];
+    for (const parts of leftovers) {
+      await mkdir(join(TMP, ...parts), { recursive: true });
+      await writeFile(join(TMP, ...parts, "marker.txt"), "old\n");
+    }
+
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await run(["--purge", "--include-caveman"]);
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    for (const parts of leftovers) {
+      expect(await Bun.file(join(TMP, ...parts)).exists()).toBe(false);
+    }
+  });
+
   test("preserves unmarked user-owned upstream vendor skill dirs", async () => {
     await mkdir(join(TMP, "skills"), { recursive: true });
     await writeFile(join(TMP, "skills", "upstream.lock"), [
@@ -296,6 +325,7 @@ describe("removeCavemanCopies — W1.1 Claude plugin uninstall", () => {
     await mkdir(join(TMP, ".claude"), { recursive: true });
     // Create the caveman install dir so removePath has something to clean up.
     await mkdir(join(TMP, ".claude", "plugins", "cache", "caveman", "caveman"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "marketplaces", "caveman"), { recursive: true });
 
     const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
       if (cmd === "claude") return "/usr/local/bin/claude";
@@ -311,6 +341,8 @@ describe("removeCavemanCopies — W1.1 Claude plugin uninstall", () => {
         (cmd) => Array.isArray(cmd) && cmd.includes("plugin") && cmd.includes("uninstall") && cmd.includes("caveman@caveman"),
       );
       expect(claudeUninstall).toBeDefined();
+      expect(await Bun.file(join(TMP, ".claude", "plugins", "cache", "caveman")).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ".claude", "plugins", "marketplaces", "caveman")).exists()).toBe(false);
     } finally {
       whichSpy.mockRestore();
       runSpy.mockRestore();

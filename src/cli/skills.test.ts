@@ -261,10 +261,18 @@ describe("Claude Code plugin package", () => {
         join(testHome, ".claude", "plugins", "installed_plugins.json"),
         JSON.stringify({ version: 2, plugins: { "fulcrum@fulcrum": [{ scope: "user" }] } }),
       );
+      const marketplaceBackup = join(testHome, ".claude", "plugins", "marketplaces", "fulcrum", "docs", "guide.original.md");
+      const cacheBackup = join(testHome, ".claude", "plugins", "cache", "fulcrum", "old.original.md");
+      await mkdir(join(marketplaceBackup, ".."), { recursive: true });
+      await mkdir(join(cacheBackup, ".."), { recursive: true });
+      await writeFile(marketplaceBackup, "backup");
+      await writeFile(cacheBackup, "backup");
 
       await syncSkills({ dryRun: false });
 
       expect(await Bun.file(stale).exists()).toBe(false);
+      expect(await Bun.file(marketplaceBackup).exists()).toBe(false);
+      expect(await Bun.file(cacheBackup).exists()).toBe(false);
       const generatedRoots = [
         join(testHome, ".claude", "plugins", "cache", "fulcrum", "fulcrum", "0.1.0", "skills"),
         join(testHome, ".claude", "plugins", "marketplaces", "fulcrum", "plugins", "fulcrum", "skills"),
@@ -345,6 +353,12 @@ describe("removeAuthoredSkills", () => {
       await mkdir(join(testHome, ...parts), { recursive: true });
       await writeFile(join(testHome, ...parts, "SKILL.md"), "---\nname: test\n---\n");
     }
+    const claudePluginCache = join(testHome, ".claude", "plugins", "cache", "fulcrum", "fulcrum", "0.1.0");
+    const claudeMarketplaceCache = join(testHome, ".claude", "plugins", "marketplaces", "fulcrum");
+    await mkdir(claudePluginCache, { recursive: true });
+    await mkdir(claudeMarketplaceCache, { recursive: true });
+    await writeFile(join(claudePluginCache, "plugin.json"), "{}\n");
+    await writeFile(join(claudeMarketplaceCache, "marketplace.json"), "{}\n");
 
     try {
       await removeAuthoredSkills();
@@ -355,6 +369,8 @@ describe("removeAuthoredSkills", () => {
       for (const parts of vendorDirs) {
         expect(await readFile(join(testHome, ...parts, "SKILL.md"), "utf8")).toContain("name: test");
       }
+      expect(await Bun.file(claudePluginCache).exists()).toBe(false);
+      expect(await Bun.file(claudeMarketplaceCache).exists()).toBe(false);
     } finally {
       whichSpy.mockRestore();
     }
