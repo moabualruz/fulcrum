@@ -31,7 +31,7 @@ Every sub-task: RED test → GREEN minimum impl → REFACTOR. Capture commands +
 
 - [x] **01.1 — Scaffold `components.json` + base CSS theme.** Owns: `src/web/components.json`, `src/web/src/app.css`, `src/web/src/lib/utils.ts`. RED: `src/web/src/lib/components/ui/utils.test.ts` imports `cn` and asserts `cn("a", false && "b", "c") === "a c"`. GREEN: run `bunx shadcn-svelte@latest init --base-color zinc --css src/app.css --lib-alias '$lib' --components-alias '$lib/components' --utils-alias '$lib/utils' --hooks-alias '$lib/hooks' --ui-alias '$lib/components/ui'`. Verify: `bun run check`.
 - [x] **01.2 — Install primitive components wave.** Owns: `src/web/src/lib/components/ui/{button,card,badge,input,label,textarea,select}/`. RED: `ui-primitives.smoke.test.ts` imports each and asserts each is a function. GREEN: `bunx shadcn-svelte@latest add -y button card badge input label textarea select`.
-- [ ] **01.3 — Install layout primitives.** Owns: `src/web/src/lib/components/ui/{table,tabs,sheet,separator,skeleton,scroll-area,avatar,breadcrumb}/`. RED: extend the smoke test with these names. GREEN: `bunx shadcn-svelte@latest add -y table tabs sheet separator skeleton scroll-area avatar breadcrumb`.
+- [x] **01.3 — Install layout primitives.** Owns: `src/web/src/lib/components/ui/{table,tabs,sheet,separator,skeleton,scroll-area,avatar,breadcrumb}/`. RED: extend the smoke test with these names. GREEN: `bunx shadcn-svelte@latest add -y table tabs sheet separator skeleton scroll-area avatar breadcrumb`.
 - [ ] **01.4 — Install overlay primitives.** Owns: `src/web/src/lib/components/ui/{dialog,alert-dialog,dropdown-menu,popover,tooltip,command,form}/`. RED: extend smoke test. GREEN: `bunx shadcn-svelte@latest add -y dialog alert-dialog dropdown-menu popover tooltip command form`.
 - [ ] **01.5 — Toaster + form validation deps.** Owns: `src/web/package.json`, `src/web/src/lib/components/ui/sonner/`. RED: smoke imports `Toaster`. GREEN: `bunx shadcn-svelte@latest add -y sonner` then `bun add svelte-sonner mode-watcher lucide-svelte sveltekit-superforms valibot marked dompurify`.
 - [ ] **01.6 — Post-install gate.** Owns: nothing new. RED: `bun run check && bun run build` should already be green; if not, fix imports. GREEN: both exit 0. Commit `feat(web): add shadcn-svelte component kit + form/toast/markdown deps`.
@@ -94,3 +94,25 @@ Implementation notes:
 - **`bunfig.toml` toggle.** Flipped `frozenLockfile = true → false` for the duration of `shadcn-svelte add` (which bumped `bits-ui` and `@internationalized/date` into `src/web/package.json`/`bun.lock`), then reverted back to `true` before commit.
 
 Gates: `bun test ./src/web/src/lib/utils.test.ts` → 2 pass (regression). `cd src/web && bun run check` → 847 files, 0 errors. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.
+
+### 01.3 — 2026-04-30 (implementer)
+
+RED command: `bun test ./src/web/src/lib/components/ui/ui-primitives.smoke.test.ts`
+
+RED output (first lines):
+```
+bun test v1.3.13 (bf2e2cec)
+src/web/src/lib/components/ui/ui-primitives.smoke.test.ts:
+error: Cannot find module '$lib/components/ui/table' from '/Users/mkh/workspace/fulcrum/src/web/src/lib/components/ui/ui-primitives.smoke.test.ts'
+(fail) shadcn-svelte primitives smoke > Table.Root is a Svelte 5 component function
+error: Cannot find module '$lib/components/ui/tabs' from '/Users/mkh/workspace/fulcrum/src/web/src/lib/components/ui/ui-primitives.smoke.test.ts'
+(fail) shadcn-svelte primitives smoke > Tabs.Root is a Svelte 5 component function
+```
+
+Note: 7 RED failures (not 8) because `separator/` was transitively installed during 01.2 (`select` imports it); that test passed pre-GREEN. 8 prior pass + 7 fail = 15 tests.
+
+GREEN command: `cd src/web && bunx shadcn-svelte@latest add -y --overwrite table tabs sheet separator skeleton scroll-area avatar breadcrumb`. CLI inherited preset from `components.json` — no interactive prompt. No new dep bumps in `src/web/package.json` / `bun.lock` (bits-ui already covered all components from 01.2). `bunfig.toml` toggled `frozenLockfile = true → false` for the install (precautionary; no lockfile diff resulted) then reverted to `true`.
+
+GREEN test: `bun test ./src/web/src/lib/components/ui/ui-primitives.smoke.test.ts` → `15 pass, 0 fail`.
+
+Gates: `bun test ./src/web/src/lib/utils.test.ts` → 2 pass (regression). `cd src/web && bun run check` → 896 files, 0 errors / 0 warnings. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.

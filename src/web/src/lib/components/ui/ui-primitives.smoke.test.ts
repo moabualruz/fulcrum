@@ -68,4 +68,44 @@ describe("shadcn-svelte primitives smoke", () => {
     const { Root } = await import("$lib/components/ui/select");
     expect(typeof Root).toBe("function");
   });
+
+  it("Table.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/table");
+    expect(typeof Root).toBe("function");
+  });
+
+  it("Tabs.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/tabs");
+    expect(typeof Root).toBe("function");
+  });
+
+  it("Sheet.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/sheet");
+    expect(typeof Root).toBe("function");
+  });
+
+  it("Separator.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/separator");
+    expect(typeof Root).toBe("function");
+  });
+
+  it("Skeleton is a Svelte 5 component function", async () => {
+    const { Skeleton } = await import("$lib/components/ui/skeleton");
+    expect(typeof Skeleton).toBe("function");
+  });
+
+  it("ScrollArea.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/scroll-area");
+    expect(typeof Root).toBe("function");
+  });
+
+  it("Avatar.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/avatar");
+    expect(typeof Root).toBe("function");
+  });
+
+  it("Breadcrumb.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/breadcrumb");
+    expect(typeof Root).toBe("function");
+  });
 });
