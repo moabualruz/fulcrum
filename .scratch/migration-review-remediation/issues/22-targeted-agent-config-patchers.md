@@ -12,6 +12,9 @@ File ownership:
 - `src/components/adapters/sentinel.ts`
 - `src/components/adapters/files.ts`
 
+## Comments
+- Partial close: marker module from issue 21 now backs every Claude plugin install/uninstall. Cache/marketplace dirs in `removeCavemanCopies` are preserved when no marker exists. Remaining work — marker-aware `cleanupClaudeManagedPluginSettings` and per-agent JSON/TOML patchers for OpenCode/Pi/Gemini/Codex — stays `ready-for-agent` for a follow-up.
+
 Acceptance criteria:
 - `cleanupClaudeManagedPluginSettings` deletes only keys whose values match a recorded Fulcrum-owned value (cross-checked against `~/.fulcrum/state/global/claude-plugin-markers/`).
 - Whole-file deletion of agent config is blocked unless a Fulcrum-created-file marker exists at the same path.
