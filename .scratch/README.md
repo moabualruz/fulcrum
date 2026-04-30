@@ -6,10 +6,10 @@ Per `docs/agents/issue-tracker.md`: one feature per directory. Each `<feature-sl
 
 ## Active features
 
-| Feature                          | Status        | Files                                                |
-| -------------------------------- | ------------- | ---------------------------------------------------- |
-| `component-lifecycle-management` | needs-triage  | `PRD.md`                                             |
-| `plugin-extension-surface-parity`| needs-triage  | `PRD.md`                                             |
-| `product-kernel`                 | needs-triage  | `PRD.md`, `PLAYBOOK.md`, `RESEARCH-DESIGN.md`        |
+| Feature                            | PRD status         | Issues | Notes                                                                |
+| ---------------------------------- | ------------------ | ------ | -------------------------------------------------------------------- |
+| `component-lifecycle-management`   | ready-for-agent    | 13     | All issues `Status: done`. Shipped on `main`.                        |
+| `plugin-extension-surface-parity`  | ready-for-agent    | 14     | All issues `Status: done`. Shipped on `main`.                        |
+| `product-kernel`                   | ready-for-agent    | 12     | 10 `ready-for-agent`; issues 02 + 11 `ready-for-human` (UI scaffold). |
 
 Originals preserved under `docs/superpowers/{plans,specs}/`. The `.scratch/` copies are the canonical source for ongoing work; the `docs/superpowers/` versions are an archival record of how the work was first written.

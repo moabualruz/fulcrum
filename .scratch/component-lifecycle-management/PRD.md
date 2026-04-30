@@ -1,7 +1,8 @@
 # Component Lifecycle Management Implementation Plan
 
-Status: needs-triage
+Status: ready-for-agent
 Source: docs/superpowers/plans/2026-04-29-component-lifecycle-management.md
+Issues: see `issues/01-..` through `issues/13-..`. All shipped on `main`.
 
 > **For agentic workers:** REQUIRED SUB-SKILLS: Use `subagent-orchestration` plus `subagent-driven-development` and `tdd` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

@@ -1,7 +1,8 @@
 # Plugin and Extension Surface Parity Repair Plan
 
-Status: needs-triage
+Status: ready-for-agent
 Source: docs/superpowers/plans/2026-04-30-plugin-extension-surface-parity.md
+Issues: see `issues/01-..` through `issues/14-..`. All shipped on `main`.
 
 > For agentic workers: REQUIRED SUB-SKILLS: use `subagent-orchestration`, `subagent-driven-development`, `tdd`, and `verification-before-completion`. This plan is written for one continuous implementation run with maximum useful parallelism. Use checkbox syntax for progress.
 
