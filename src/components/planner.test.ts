@@ -21,7 +21,6 @@ describe("component planner", () => {
       "package.superpowers",
       "mcp.deepwiki",
       "mcp.registry",
-      "mcp.context7",
     ]);
     expect(plan.actions.every((a) => a.operation === "install")).toBe(true);
   });
@@ -31,11 +30,11 @@ describe("component planner", () => {
       operation: "install",
       target: "profile.default",
       agents: ["codex"],
-      exclude: ["skills.upstream", "mcp.context7"],
+      exclude: ["skills.upstream", "mcp.deepwiki"],
     });
 
     expect(plan.actions.map((action) => action.componentId)).not.toContain("skills.upstream");
-    expect(plan.actions.map((action) => action.componentId)).not.toContain("mcp.context7");
+    expect(plan.actions.map((action) => action.componentId)).not.toContain("mcp.deepwiki");
     expect(plan.actions.map((action) => action.componentId)).toContain("skills.authored");
   });
 

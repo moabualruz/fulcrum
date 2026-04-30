@@ -582,6 +582,7 @@ export async function syncUpstreamSkills(
     skills?: readonly UpstreamSkill[];
     lockPath?: string;
     excludeSources?: readonly string[];
+    agents?: readonly AgentId[];
   } = {},
 ): Promise<void> {
   const dryRun = opts.dryRun ?? false;
@@ -667,6 +668,7 @@ export async function syncUpstreamSkills(
   const claudeAvailable = !dryRun ? !!(await which("claude")) : false;
 
   for (const target of agentTargets(home)) {
+    if (opts.agents !== undefined && !opts.agents.includes(target.id)) continue;
     if (!(await isDir(target.baseRoot))) {
       console.log(`· skip ${target.label} (agent skills parent not present)`);
       continue;
@@ -850,7 +852,7 @@ async function uninstallClaudePlugin(skill: UpstreamSkill, dryRun: boolean): Pro
 }
 
 export async function removeUpstreamSkills(
-  opts: { dryRun?: boolean; source?: string; names?: readonly string[]; lockPath?: string } = {},
+  opts: { dryRun?: boolean; source?: string; names?: readonly string[]; lockPath?: string; agents?: readonly AgentId[] } = {},
 ): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const skills = await filteredUpstreamSkills({ source: opts.source, names: opts.names, lockPath: opts.lockPath });
@@ -859,7 +861,7 @@ export async function removeUpstreamSkills(
   console.log(`fulcrum upstream skills remove — ${skills.length} curated skill(s)\n`);
 
   const claudeAgent = AGENTS.find((agent) => agent.id === "claude-code")!;
-  if (await isDir(claudeAgent.baseDir(home))) {
+  if ((opts.agents === undefined || opts.agents.includes("claude-code")) && await isDir(claudeAgent.baseDir(home))) {
     const pluginSkills = skills.filter((skill) =>
       skill.claude_plugin && !skill.vendor_canonical_agents?.includes("claude-code")
     );
@@ -873,6 +875,7 @@ export async function removeUpstreamSkills(
   }
 
   for (const target of agentTargets(home)) {
+    if (opts.agents !== undefined && !opts.agents.includes(target.id)) continue;
     if (!(await isDir(target.baseRoot))) {
       console.log(`· skip ${target.label} (agent skills parent not present)`);
       continue;

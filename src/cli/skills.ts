@@ -7,6 +7,7 @@
 import { mkdir, readdir, readFile, copyFile, writeFile, stat, rm } from "node:fs/promises";
 import { join, basename, dirname, resolve } from "node:path";
 import { AGENTS } from "../agents/registry.ts";
+import type { AgentId } from "./mcp-registry.ts";
 import { which, run as runProc } from "../utils/proc.ts";
 import { pruneSourceBackupFiles } from "../utils/source-clean.ts";
 
@@ -47,6 +48,7 @@ interface SyncSkillsOptions {
   dryRun?: boolean;
   codexScope?: CodexSkillScope;
   projectDir?: string;
+  agents?: readonly AgentId[];
 }
 
 // Skip patterns: .original.md backups are human-edit source-of-truth — agents
@@ -233,14 +235,18 @@ async function uninstallClaudeFulcrumPlugin(opts: { dryRun: boolean }): Promise<
   }
 }
 
-export async function removeAuthoredSkills(opts: { dryRun?: boolean } = {}): Promise<void> {
+function selectedAgent(opts: { agents?: readonly AgentId[] }, agentId: AgentId): boolean {
+  return opts.agents === undefined || opts.agents.includes(agentId);
+}
+
+export async function removeAuthoredSkills(opts: { dryRun?: boolean; agents?: readonly AgentId[] } = {}): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const home = process.env["HOME"] ?? "";
 
   console.log("fulcrum skills remove — authored skill surfaces\n");
 
   const claudeAgent = AGENTS.find((a) => a.id === "claude-code")!;
-  if (await isDir(claudeAgent.baseDir(home))) {
+  if (selectedAgent(opts, "claude-code") && await isDir(claudeAgent.baseDir(home))) {
     console.log(`→ Claude Code (${PLUGIN_SPEC})`);
     await uninstallClaudeFulcrumPlugin({ dryRun });
     await removeDirIfPresent(`${claudeAgent.skillsDir(home)}/${NAMESPACE}`, { dryRun, label: "legacy layout" });
@@ -251,6 +257,7 @@ export async function removeAuthoredSkills(opts: { dryRun?: boolean } = {}): Pro
 
   for (const agent of AGENTS) {
     if (agent.id === "claude-code" || agent.id === "gemini") continue;
+    if (!selectedAgent(opts, agent.id)) continue;
     const path = `${agent.skillsDir(home)}/${NAMESPACE}`;
     if (!(await isDir(path))) continue;
     console.log(`→ ${agent.label}`);
@@ -260,7 +267,7 @@ export async function removeAuthoredSkills(opts: { dryRun?: boolean } = {}): Pro
 
   const geminiAgent = AGENTS.find((a) => a.id === "gemini")!;
   const geminiExtension = geminiAgent.skillsDir(home).replace(/\/skills$/, "");
-  if (await isDir(geminiExtension)) {
+  if (selectedAgent(opts, "gemini") && await isDir(geminiExtension)) {
     console.log("→ Gemini CLI");
     await removeDirIfPresent(geminiExtension, { dryRun, label: "authored extension" });
     console.log();
@@ -286,6 +293,7 @@ function skillTargets(home: string, opts: SyncSkillsOptions): { targets: SkillTa
 
   for (const agent of AGENTS) {
     if (agent.id === "claude-code" || agent.id === "gemini") continue;
+    if (!selectedAgent(opts, agent.id)) continue;
     if (agent.id === "codex") {
       if (codexScope === "skip") {
         skippedCodex = true;
@@ -331,12 +339,12 @@ export async function syncSkills(opts: SyncSkillsOptions = {}): Promise<void> {
   const home = process.env["HOME"] ?? "";
   const claudeAgent = AGENTS.find((a) => a.id === "claude-code")!;
   const claudeRoot = claudeAgent.baseDir(home);
-  if (await isDir(claudeRoot)) {
+  if (selectedAgent(opts, "claude-code") && await isDir(claudeRoot)) {
     console.log(`→ Claude Code (plugin: ${PLUGIN_SPEC} from ${PLUGIN_MARKETPLACE})`);
     await installClaudePlugin(root, { dryRun: opts.dryRun ?? false });
     await cleanupLegacyClaudeSkills({ dryRun: opts.dryRun ?? false });
     console.log();
-  } else {
+  } else if (selectedAgent(opts, "claude-code")) {
     console.log("· skip Claude Code (~/.claude not present)");
   }
 
@@ -359,7 +367,7 @@ export async function syncSkills(opts: SyncSkillsOptions = {}): Promise<void> {
   // skillsDir already points to the `skills` subfolder inside that extension.
   const geminiAgent = AGENTS.find((a) => a.id === "gemini")!;
   const gemRoot = geminiAgent.baseDir(home);
-  if (await exists(gemRoot)) {
+  if (selectedAgent(opts, "gemini") && await exists(gemRoot)) {
     // ext = ~/.gemini/extensions/fulcrum-skills  (parent of skillsDir)
     const gemSkillsDir = geminiAgent.skillsDir(home);
     const ext = gemSkillsDir.replace(/\/skills$/, "");
@@ -378,7 +386,7 @@ export async function syncSkills(opts: SyncSkillsOptions = {}): Promise<void> {
       );
     }
     await syncSkillSet(skills, skillsSrc, gemSkillsDir, opts);
-  } else {
+  } else if (selectedAgent(opts, "gemini")) {
     console.log("· skip Gemini (~/.gemini not present)");
   }
   console.log("Done.");

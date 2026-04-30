@@ -5,6 +5,7 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { mkdtemp, rm, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { parse as parseToml } from "smol-toml";
 import {
   loadRegistry,
   saveRegistry,
@@ -380,6 +381,114 @@ describe("applyToAgents", () => {
     const toml = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
     const count = (toml.match(/\[mcp_servers\.repomix\]/g) ?? []).length;
     expect(count).toBe(1);
+  });
+
+  test("Codex adopts legacy unmanaged MCP table when registering disabled config", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "config.toml"), [
+      'model = "gpt-5.5"',
+      "",
+      "[mcp_servers.repomix]",
+      'command = "npx"',
+      'args = ["-y", "repomix@latest", "--mcp"]',
+      "",
+      "[features]",
+      "codex_hooks = true",
+      "",
+    ].join("\n"));
+    await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+    await setEnabled("repomix", false, { agents: ["codex"] });
+
+    await applyToAgents("repomix", { agents: ["codex"] });
+
+    const toml = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(toml).toContain("# BEGIN FULCRUM MCP repomix");
+    expect(toml).toContain("enabled = false");
+    expect(toml).toContain("[features]");
+    expect((toml.match(/\[mcp_servers\.repomix\]/g) ?? [])).toHaveLength(1);
+    expect((toml.match(/# END FULCRUM MCP repomix/g) ?? [])).toHaveLength(1);
+    expect(() => parseToml(toml)).not.toThrow();
+  });
+
+  test("Codex adopts quoted legacy MCP tables without creating TOML duplicate keys", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "config.toml"), [
+      'model = "gpt-5.5"',
+      "",
+      '[mcp_servers."repomix"]',
+      'command = "npx"',
+      'args = ["-y", "repomix@latest", "--mcp"]',
+      "",
+      "[features]",
+      "codex_hooks = true",
+      "",
+    ].join("\n"));
+    await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+    await setEnabled("repomix", false, { agents: ["codex"] });
+
+    await applyToAgents("repomix", { agents: ["codex"] });
+
+    const toml = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(toml).toContain("# BEGIN FULCRUM MCP repomix");
+    expect(toml).not.toContain('[mcp_servers."repomix"]');
+    expect((toml.match(/\[mcp_servers\.repomix\]/g) ?? [])).toHaveLength(1);
+    expect(() => parseToml(toml)).not.toThrow();
+  });
+
+  test("Codex adopts parent mcp_servers table entries without creating TOML duplicate keys", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "config.toml"), [
+      'model = "gpt-5.5"',
+      "",
+      "[mcp_servers]",
+      'repomix = { command = "npx", args = ["-y", "repomix@latest", "--mcp"] }',
+      "",
+      "[features]",
+      "codex_hooks = true",
+      "",
+    ].join("\n"));
+    await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+    await setEnabled("repomix", false, { agents: ["codex"] });
+
+    await applyToAgents("repomix", { agents: ["codex"] });
+
+    const toml = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(toml).toContain("# BEGIN FULCRUM MCP repomix");
+    expect(toml).toContain("[mcp_servers]");
+    expect(toml).not.toContain('repomix = { command = "npx"');
+    expect((toml.match(/\[mcp_servers\.repomix\]/g) ?? [])).toHaveLength(1);
+    expect(() => parseToml(toml)).not.toThrow();
+  });
+
+  test("Codex cleans malformed duplicate managed MCP tail when reapplying", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "config.toml"), [
+      'model = "gpt-5.5"',
+      "",
+      "# BEGIN FULCRUM MCP repomix",
+      "[mcp_servers.repomix]",
+      'command = "npx"',
+      'args = ["-y", "repomix@latest", "--mcp"]',
+      "enabled = false",
+      "# END FULCRUM MCP repomix",
+      'args = ["-y", "repomix@latest", "--mcp"]',
+      "# END FULCRUM MCP repomix",
+      "",
+      "[features]",
+      "codex_hooks = true",
+      "",
+    ].join("\n"));
+    await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+    await setEnabled("repomix", false, { agents: ["codex"] });
+
+    await applyToAgents("repomix", { agents: ["codex"] });
+
+    const toml = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(toml).toContain("# BEGIN FULCRUM MCP repomix");
+    expect(toml).toContain("[features]");
+    expect((toml.match(/\[mcp_servers\.repomix\]/g) ?? [])).toHaveLength(1);
+    expect((toml.match(/^args = \["-y", "repomix@latest", "--mcp"\]$/gm) ?? [])).toHaveLength(1);
+    expect((toml.match(/# END FULCRUM MCP repomix/g) ?? [])).toHaveLength(1);
   });
 
   test("skips non-detected agent dirs silently", async () => {

@@ -380,8 +380,8 @@ auth_env_vars = ["GITHUB_TOKEN"]
     expect(github!["drift"]).toBe(false);
   });
 
-  test("drift false for package-default enabled Repomix surfaces", async () => {
-    const home = join(TMP, "mcp-repomix-package-default");
+  test("drift flags enabled Repomix MCP because package default is disabled", async () => {
+    const home = join(TMP, "mcp-repomix-policy-drift");
     await mkdir(home, { recursive: true });
     const fulcrumHome = join(home, ".fulcrum");
     const stateDir = join(fulcrumHome, "state", "global");
@@ -410,11 +410,11 @@ enabled_pi = true
     const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
     const servers = (report["mcp"] as Record<string, unknown>)["servers"] as Array<Record<string, unknown>>;
     const repomix = servers.find((s) => s["name"] === "repomix");
-    expect(repomix!["drift"]).toBe(false);
+    expect(repomix!["drift"]).toBe(true);
   });
 
-  test("drift false for package-default enabled Cloudflare package MCP surfaces", async () => {
-    const home = join(TMP, "mcp-cloudflare-package-default");
+  test("drift flags enabled Cloudflare package MCP surfaces because package default is disabled", async () => {
+    const home = join(TMP, "mcp-cloudflare-policy-drift");
     await mkdir(home, { recursive: true });
     const fulcrumHome = join(home, ".fulcrum");
     const stateDir = join(fulcrumHome, "state", "global");
@@ -459,8 +459,8 @@ enabled_codex = true
     await writeFile(join(stateDir, "mcp-registry.toml"), toml);
     const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
     const servers = (report["mcp"] as Record<string, unknown>)["servers"] as Array<Record<string, unknown>>;
-    expect(servers.find((s) => s["name"] === "cloudflare-docs")!["drift"]).toBe(false);
-    expect(servers.find((s) => s["name"] === "cloudflare-observability")!["drift"]).toBe(false);
+    expect(servers.find((s) => s["name"] === "cloudflare-docs")!["drift"]).toBe(true);
+    expect(servers.find((s) => s["name"] === "cloudflare-observability")!["drift"]).toBe(true);
   });
 
   test("wiring missing when codex config lacks bearer_token_env_var for authed http MCP", async () => {

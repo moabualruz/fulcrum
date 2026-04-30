@@ -78,7 +78,8 @@ describe("component catalog", () => {
 
   test("generated MCP defaultProfile follows profile.default membership", () => {
     expect(getComponent("mcp.repomix")?.defaultProfile).toBeUndefined();
-    expect(getComponent("mcp.context7")?.defaultProfile).toBe(true);
+    expect(getComponent("mcp.context7")?.defaultProfile).toBeUndefined();
+    expect(getComponent("mcp.deepwiki")?.defaultProfile).toBe(true);
   });
 
   test("hook catalog uses stable install order", () => {
@@ -106,7 +107,6 @@ describe("component catalog", () => {
       "package.superpowers",
       "mcp.deepwiki",
       "mcp.registry",
-      "mcp.context7",
     ]);
   });
 
@@ -127,8 +127,8 @@ describe("component catalog", () => {
     expect(expandProfile("profile.minimal").map((c) => c.id)).toEqual([
       "policy.tool-output",
       "rules.global",
+      "mcp.registry",
       "mcp.deepwiki",
-      "mcp.context7",
     ]);
   });
 

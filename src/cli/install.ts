@@ -19,7 +19,7 @@
 //   --no-skills       Do not run authored/upstream skill sync during install.
 //   --no-upstream-skills
 //                      Do not install curated third-party skill packs.
-//   --no-default-mcps Register MCP definitions/config, but skip the minimal
+//   --no-default-mcps Register MCP definitions/config, but skip the recommended
 //                      default enable step and leave existing MCP state intact.
 //   --enable-all-mcps Enable every builtin MCP after registration.
 
@@ -730,7 +730,7 @@ export async function installMcpRegistryEntries(home: string): Promise<void> {
 
   for (const { name, spec } of BUILTIN_MCPS) {
     const defaultState = spec.default_enabled || (MINIMAL_DEFAULT_MCPS as readonly string[]).includes(name)
-      ? "minimal-default"
+      ? "recommended-default"
       : "opt-in";
     if (DRY_RUN) {
       console.log(`     [dry-run] would register ${name} MCP (${defaultState}; enable with: fulcrum mcp enable ${name})`);
@@ -746,17 +746,9 @@ export async function installMcpRegistryEntries(home: string): Promise<void> {
     console.log("     · dart not on PATH — dart MCP requires Dart SDK ≥ 3.9.0-163.0.dev; see: https://github.com/dart-lang/ai/tree/main/pkgs/dart_mcp_server");
   }
 
-  const { installRepomixClaudePlugins, installRepomixPackageMirrors } = await import("./repomix-package.ts");
-  await installRepomixClaudePlugins({ dryRun: DRY_RUN });
-  await installRepomixPackageMirrors({ dryRun: DRY_RUN });
-
-  // Repomix Gemini extension mirror owns its MCP server. Older Fulcrum builds
-  // wrote a registry-owned disabled Gemini entry with the same name; remove it
-  // so the extension's native MCP surface can load with its package defaults.
-  if (!DRY_RUN) {
-    const { removeFromAgents } = await import("./mcp-registry.ts");
-    await removeFromAgents("repomix", { agents: ["gemini"], includeHidden: true });
-  }
+  // Package mirrors are owned by package.* components. The MCP registry only
+  // registers/applies MCP definitions so profile.minimal has no package side
+  // effects.
 }
 
 export async function applyBuiltinMcpDefaultState(mode: McpDefaultMode): Promise<void> {
@@ -793,7 +785,7 @@ export async function applyBuiltinMcpDefaultState(mode: McpDefaultMode): Promise
     }
     await applyToAgents(name);
     if (mode === "minimal") {
-      console.log(`     ✓ ${name} minimal default applied where no user state existed`);
+      console.log(`     ✓ ${name} recommended default applied where no user state existed`);
     } else {
       console.log(`     ✓ ${name} enabled on [${ALL_AGENT_IDS.join(", ")}]`);
     }
@@ -875,10 +867,6 @@ export async function run(args: string[]): Promise<void> {
   if (!syncUpstream) {
     exclude.push("skills.upstream");
   }
-  if (mcpDefaultMode === "none") {
-    exclude.push("mcp.context7");
-  }
-
   if (installProfile !== "full") {
     syncAuthoredSkills = false;
     syncUpstream = false;
@@ -907,8 +895,8 @@ export async function run(args: string[]): Promise<void> {
   const modeLabel = mcpDefaultMode === "all"
     ? "Enabling all builtin MCPs across every detected agent (--enable-all-mcps)"
     : mcpDefaultMode === "none"
-      ? "Skipping minimal default MCP enable step (--no-default-mcps)"
-      : "Enabling minimal default MCP set";
+      ? "Skipping recommended MCP enable step (--no-default-mcps)"
+      : "Enabling recommended MCP set";
   console.log(`3/4 ${modeLabel}`);
   if (installProfile === "rules-only") {
     console.log("     · default MCP enable step skipped (--profile rules-only)");

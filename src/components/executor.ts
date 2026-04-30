@@ -70,7 +70,7 @@ function shouldApplyAction(action: ComponentAction, appliedVendorActions: Set<st
 }
 
 function vendorActionKey(action: ComponentAction): string {
-  return `${action.componentId}:${action.surfaceId}:${action.operation}:${action.change}`;
+  return `${action.componentId}:${action.surfaceId}:${action.agentId ?? "global"}:${action.operation}:${action.change}`;
 }
 
 async function applyAction(

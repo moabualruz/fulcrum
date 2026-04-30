@@ -10,6 +10,7 @@
 import {
   ALL_AGENT_IDS,
   type AgentId,
+  applyDisabledToAgents,
   applyToAgents,
   disabledConfigSupport,
   isEnabled,
@@ -212,14 +213,7 @@ async function cmdDisable(args: string[]): Promise<void> {
   const target = parseAgentFlags(args.slice(1));
   const agentList = await visibleAgentList(name, target);
   await setEnabled(name, false, { agents: agentList });
-  const nativeDisabledAgents = agentList.filter((id) => id === "codex" || id === "gemini" || id === "opencode");
-  const removeOnlyAgents = agentList.filter((id) => id !== "codex" && id !== "gemini" && id !== "opencode");
-  if (removeOnlyAgents.length > 0) {
-    await removeFromAgents(name, { agents: removeOnlyAgents });
-  }
-  if (nativeDisabledAgents.length > 0) {
-    await applyToAgents(name, { agents: nativeDisabledAgents });
-  }
+  await applyDisabledToAgents(name, { agents: agentList });
   console.log(`✓ Disabled MCP server '${name}' for: ${agentList.join(", ")}`);
 }
 

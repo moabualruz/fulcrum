@@ -546,6 +546,53 @@ describe("dry-run mode", () => {
     }
   });
 
+  test("default install registers all builtin MCPs and enables only DeepWiki", async () => {
+    setDryRun(false);
+    const origHome = process.env["HOME"];
+    const origFulcrumHome = process.env["FULCRUM_HOME"];
+    const origRepoDir = process.env["FULCRUM_REPO_DIR"];
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      process.env["HOME"] = dryHome;
+      process.env["FULCRUM_HOME"] = join(dryHome, ".fulcrum");
+      process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../..");
+      await mkdir(join(dryHome, ".codex"), { recursive: true });
+      await mkdir(join(dryHome, ".gemini"), { recursive: true });
+      await mkdir(join(dryHome, ".config", "opencode"), { recursive: true });
+      await installRun([]);
+      const reg = await loadRegistry();
+      expect(Object.keys(reg.servers)).toHaveLength(17);
+      expect(reg.servers["deepwiki"]?.enabled.codex).toBe(true);
+      expect(reg.servers["context7"]?.enabled.codex).toBeUndefined();
+      expect(reg.servers["cloudflare-docs"]).toBeDefined();
+
+      const codexConfig = await readFile(join(dryHome, ".codex", "config.toml"), "utf8");
+      expect(codexConfig).toContain("[mcp_servers.context7]");
+      expect(codexConfig).toContain("enabled = false");
+
+      const geminiSettings = JSON.parse(await readFile(join(dryHome, ".gemini", "settings.json"), "utf8"));
+      const geminiEnablement = JSON.parse(await readFile(join(dryHome, ".gemini", "mcp-server-enablement.json"), "utf8"));
+      expect(geminiSettings.mcpServers.context7).toBeDefined();
+      expect(geminiEnablement.context7.enabled).toBe(false);
+
+      const opencode = JSON.parse(await readFile(join(dryHome, ".config", "opencode", "opencode.json"), "utf8"));
+      expect(opencode.mcp.context7.enabled).toBe(false);
+    } finally {
+      logSpy.mockRestore();
+      if (origHome !== undefined) process.env["HOME"] = origHome;
+      else delete process.env["HOME"];
+      if (origFulcrumHome !== undefined) process.env["FULCRUM_HOME"] = origFulcrumHome;
+      else delete process.env["FULCRUM_HOME"];
+      if (origRepoDir !== undefined) process.env["FULCRUM_REPO_DIR"] = origRepoDir;
+      else delete process.env["FULCRUM_REPO_DIR"];
+      setDryRun(true);
+    }
+  });
+
   test("install --dry-run --with-project forwards dry-run to init", async () => {
     const origHome = process.env["HOME"];
     const origFulcrumHome = process.env["FULCRUM_HOME"];
@@ -583,7 +630,8 @@ describe("dry-run mode", () => {
 // ---------------------------------------------------------------------------
 
 import { applyBuiltinMcpDefaultState, installMcpRegistryEntries } from "./install.ts";
-import { loadRegistry } from "./mcp-registry.ts";
+import { ALL_AGENT_IDS, isEnabled, loadRegistry } from "./mcp-registry.ts";
+import { BUILTIN_MCPS } from "./mcp-builtins.ts";
 
 describe("installMcpRegistryEntries", () => {
   let regHome: string;
@@ -637,7 +685,7 @@ describe("installMcpRegistryEntries", () => {
     expect(Object.keys(reg.servers).filter((k) => k === "repomix")).toHaveLength(1);
   });
 
-  test("github and repomix registry specs are default-disabled before minimal defaults apply", async () => {
+  test("github and repomix registry specs are default-disabled before recommended defaults apply", async () => {
     await installMcpRegistryEntries(regHome);
     const reg = await loadRegistry();
     expect(reg.servers["github"]!.default_enabled).toBe(false);
@@ -645,7 +693,7 @@ describe("installMcpRegistryEntries", () => {
     expect(reg.servers["repomix"]!.agent_visibility["gemini"]).toBe(false);
   });
 
-  test("deepwiki and context7 are minimal default builtin MCPs", async () => {
+  test("registers deepwiki and context7 while keeping specs default-disabled", async () => {
     await installMcpRegistryEntries(regHome);
     const reg = await loadRegistry();
     expect(reg.servers["deepwiki"]).toBeDefined();
@@ -657,14 +705,28 @@ describe("installMcpRegistryEntries", () => {
     expect(reg.servers["context7"]!.auth_env_vars).toEqual(["CONTEXT7_API_KEY"]);
   });
 
-  test("minimal default state enables deepwiki and context7 without enabling repomix or github", async () => {
+  test("recommended default state enables only recommended MCPs", async () => {
     await installMcpRegistryEntries(regHome);
     await applyBuiltinMcpDefaultState("minimal");
     const reg = await loadRegistry();
     expect(reg.servers["deepwiki"]!.enabled["codex"]).toBe(true);
-    expect(reg.servers["context7"]!.enabled["codex"]).toBe(true);
+    expect(reg.servers["context7"]!.enabled["codex"]).toBeUndefined();
     expect(reg.servers["repomix"]!.enabled["codex"]).toBeUndefined();
     expect(reg.servers["github"]!.enabled["codex"]).toBeUndefined();
+  });
+
+  test("enable-all default state enables every builtin MCP for visible agents", async () => {
+    await installMcpRegistryEntries(regHome);
+    await applyBuiltinMcpDefaultState("all");
+    const reg = await loadRegistry();
+
+    for (const { name } of BUILTIN_MCPS) {
+      const server = reg.servers[name]!;
+      for (const agentId of ALL_AGENT_IDS) {
+        if (!server.agent_visibility[agentId]) continue;
+        expect(isEnabled(server, agentId)).toBe(true);
+      }
+    }
   });
 
   test("no default state leaves existing MCP state untouched", async () => {
@@ -673,7 +735,7 @@ describe("installMcpRegistryEntries", () => {
     await applyBuiltinMcpDefaultState("none");
     const reg = await loadRegistry();
     expect(reg.servers["deepwiki"]!.enabled["codex"]).toBe(true);
-    expect(reg.servers["context7"]!.enabled["codex"]).toBe(true);
+    expect(reg.servers["context7"]!.enabled["codex"]).toBeUndefined();
     expect(reg.servers["repomix"]!.enabled["codex"]).toBeUndefined();
     expect(reg.servers["github"]!.enabled["codex"]).toBeUndefined();
   });

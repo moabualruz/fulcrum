@@ -139,6 +139,7 @@ async function copyTree(src: string, dst: string, dryRun: boolean): Promise<void
 type PackageName = "cloudflare" | "superpowers";
 type MirrorAgentId = "codex" | "gemini" | "opencode" | "pi";
 type SkillMirrorAgentId = "codex" | "opencode" | "pi";
+type PackageAgentOptions = { dryRun?: boolean; agents?: readonly AgentId[] };
 
 const PACKAGE_SURFACES = [
   { name: "skills", paths: ["skills"] },
@@ -164,6 +165,17 @@ function packageMirrorRoot(home: string, packageName: PackageName, agentId: Mirr
     case "pi":
       return `${home}/.pi/agent/packages/${packageName}`;
   }
+}
+
+function selectedAgent(agents: readonly AgentId[] | undefined, agentId: AgentId): boolean {
+  return agents === undefined || agents.includes(agentId);
+}
+
+function selectedMirrorAgents(
+  agents: readonly AgentId[] | undefined,
+  defaults: readonly MirrorAgentId[],
+): MirrorAgentId[] {
+  return defaults.filter((agentId) => selectedAgent(agents, agentId));
 }
 
 function knownPackageRootEntries(): Set<string> {
@@ -294,8 +306,27 @@ async function installPackagePayloadMirror(
     return false;
   }
   await mirrorPackagePayload(sourceRoot, packageMirrorRoot(home, packageName, agentId), packageName, agentId, dryRun);
+  if (agentId === "gemini") {
+    await ensureGeminiExtensionManifest(packageMirrorRoot(home, packageName, agentId), packageName, repo, dryRun);
+  }
   console.log(`     ✓ ${agent.label} ${packageName} package payload mirror installed`);
   return true;
+}
+
+async function ensureGeminiExtensionManifest(
+  targetRoot: string,
+  packageName: PackageName,
+  repo: string,
+  dryRun: boolean,
+): Promise<void> {
+  const manifestPath = `${targetRoot}/gemini-extension.json`;
+  if (await exists(manifestPath)) return;
+  await writeText(manifestPath, `${JSON.stringify({
+    name: packageName,
+    version: PACKAGE_MIRROR_VERSION,
+    description: `${packageName} package mirror installed by Fulcrum.`,
+    repository: repo,
+  }, null, 2)}\n`, dryRun);
 }
 
 async function installPackagePayloadMirrors(
@@ -351,7 +382,18 @@ async function removePackagePayloadMirrors(
     }
   }
   await removePackageSkillMirrors(home, packageName, agentIds, dryRun);
-  await removeMarker(home, marker, `${packageName} package mirrors`, dryRun);
+  if (!dryRun && await hasRemainingPackagePayloadMirror(home, packageName)) {
+    console.log(`     · keep ${packageName} package mirrors marker (other agent mirrors remain)`);
+  } else {
+    await removeMarker(home, marker, `${packageName} package mirrors`, dryRun);
+  }
+}
+
+async function hasRemainingPackagePayloadMirror(home: string, packageName: PackageName): Promise<boolean> {
+  for (const agentId of ["codex", "gemini", "opencode", "pi"] as const) {
+    if (await isDir(packageMirrorRoot(home, packageName, agentId))) return true;
+  }
+  return false;
 }
 
 function skillMirrorAgents(agentIds: readonly MirrorAgentId[]): SkillMirrorAgentId[] {
@@ -444,6 +486,69 @@ function visibilityForPackageAgents(agentIds: readonly MirrorAgentId[]): McpServ
   return visible;
 }
 
+function mergeMcpVisibility(
+  left: McpServerVisibility,
+  right: McpServerVisibility,
+): McpServerVisibility {
+  return {
+    "claude-code": left["claude-code"] || right["claude-code"],
+    codex: left.codex || right.codex,
+    gemini: left.gemini || right.gemini,
+    opencode: left.opencode || right.opencode,
+    pi: left.pi || right.pi,
+  };
+}
+
+function subtractMcpVisibility(
+  visibility: McpServerVisibility,
+  agentIds: readonly AgentId[],
+): McpServerVisibility {
+  const next: McpServerVisibility = { ...visibility };
+  for (const agentId of agentIds) next[agentId] = false;
+  return next;
+}
+
+function hasVisibleAgent(visibility: McpServerVisibility): boolean {
+  return Object.values(visibility).some(Boolean);
+}
+
+function mergePackageMcpSpec(
+  existing: { vendor: string; auth_env_vars: string[]; agent_visibility: McpServerVisibility } | undefined,
+  packageName: PackageName,
+  spec: McpServerSpec,
+): McpServerSpec {
+  if (!existing || existing.vendor !== packageName) return spec;
+  return {
+    ...spec,
+    auth_env_vars: [...new Set([...existing.auth_env_vars, ...spec.auth_env_vars])].sort(),
+    agent_visibility: mergeMcpVisibility(existing.agent_visibility, spec.agent_visibility),
+  };
+}
+
+function specFromRegisteredPackageMcp(
+  server: {
+    transport: "http" | "stdio";
+    url?: string;
+    command?: string;
+    description: string;
+    vendor: string;
+    default_enabled: boolean;
+    auth_env_vars: string[];
+  },
+  agentVisibility: McpServerVisibility,
+): McpServerSpec {
+  return {
+    transport: server.transport,
+    url: server.url,
+    command: server.command,
+    description: server.description,
+    vendor: server.vendor,
+    default_enabled: server.default_enabled,
+    auth_env_vars: server.auth_env_vars,
+    agent_visibility: agentVisibility,
+  };
+}
+
 function packageMcpSpec(
   packageName: PackageName,
   name: string,
@@ -462,8 +567,8 @@ function packageMcpSpec(
       url,
       description: `${packageName} package MCP server — ${name}`,
       vendor: packageName,
-      default_enabled: true,
-      auth_env_vars: [],
+      default_enabled: false,
+      auth_env_vars: packageMcpAuthEnvVars(entry),
       agent_visibility: visibilityForPackageAgents(agentIds),
     };
   }
@@ -476,14 +581,43 @@ function packageMcpSpec(
       command: [command, ...args].join(" "),
       description: `${packageName} package MCP server — ${name}`,
       vendor: packageName,
-      default_enabled: true,
-      auth_env_vars: [],
+      default_enabled: false,
+      auth_env_vars: packageMcpAuthEnvVars(entry),
       agent_visibility: visibilityForPackageAgents(agentIds),
     };
   }
 
   console.log(`     · ${packageName} package MCP ${name} has unsupported shape; skip`);
   return null;
+}
+
+function packageMcpAuthEnvVars(entry: PackageMcpEntry): string[] {
+  const vars = new Set<string>();
+  const add = (value: unknown): void => {
+    if (typeof value !== "string") return;
+    if (/^[A-Z_][A-Z0-9_]*$/.test(value)) vars.add(value);
+    for (const match of value.matchAll(/\$\{?([A-Z_][A-Z0-9_]*)\}?/g)) {
+      if (match[1]) vars.add(match[1]);
+    }
+  };
+
+  add(entry["bearer_token_env_var"]);
+  add(entry["authorization_env_var"]);
+  add(entry["auth_env_var"]);
+
+  const authEnvVars = entry["auth_env_vars"];
+  if (Array.isArray(authEnvVars)) {
+    for (const value of authEnvVars) add(value);
+  } else {
+    add(authEnvVars);
+  }
+
+  const headers = entry["headers"];
+  if (headers && typeof headers === "object" && !Array.isArray(headers)) {
+    for (const value of Object.values(headers as Record<string, unknown>)) add(value);
+  }
+
+  return [...vars].sort();
 }
 
 async function installPackageMcpManifests(
@@ -498,19 +632,20 @@ async function installPackageMcpManifests(
 
   if (dryRun) {
     for (const { name } of servers) {
-      console.log(`     [dry-run] would register and enable ${packageName} package MCP: ${name}`);
+      console.log(`     [dry-run] would register disabled ${packageName} package MCP: ${name}`);
     }
     return;
   }
 
-  const { registerServer, setEnabled, applyToAgents } = await import("./mcp-registry.ts");
+  const { loadRegistry, registerServer, setEnabled, applyDisabledToAgents } = await import("./mcp-registry.ts");
   for (const { name, spec: entry } of servers) {
     const spec = packageMcpSpec(packageName, name, entry, agentIds);
     if (!spec) continue;
-    await registerServer(name, spec);
-    await setEnabled(name, true, { agents: [...agentIds] });
-    await applyToAgents(name, { agents: [...agentIds] });
-    console.log(`     ✓ ${packageName} package MCP configured: ${name}`);
+    const existing = (await loadRegistry()).servers[name];
+    await registerServer(name, mergePackageMcpSpec(existing, packageName, spec));
+    await setEnabled(name, false, { agents: [...agentIds] });
+    await applyDisabledToAgents(name, { agents: [...agentIds] });
+    console.log(`     ✓ ${packageName} package MCP registered disabled: ${name}`);
   }
 }
 
@@ -536,14 +671,20 @@ async function removePackageMcpManifests(
   const { loadRegistry, setEnabled, removeFromAgents, unregisterServer, registerServer } = await import("./mcp-registry.ts");
   for (const { name } of servers) {
     const reg = await loadRegistry();
-    if (!reg.servers[name]) continue;
+    const current = reg.servers[name];
+    if (!current) continue;
     await setEnabled(name, false, { agents: [...agentIds] });
     await removeFromAgents(name, { agents: [...agentIds] });
     const builtinSpec = builtins.get(name);
     if (builtinSpec) {
       await registerServer(name, builtinSpec);
     } else {
-      await unregisterServer(name);
+      const remainingVisibility = subtractMcpVisibility(current.agent_visibility, agentIds);
+      if (hasVisibleAgent(remainingVisibility)) {
+        await registerServer(name, specFromRegisteredPackageMcp(current, remainingVisibility));
+      } else {
+        await unregisterServer(name);
+      }
     }
     console.log(`     - ${packageName} package MCP removed: ${name}`);
   }
@@ -844,61 +985,70 @@ async function uninstallPiSuperpowersPackage(home: string, dryRun: boolean): Pro
   await removeSuperpowersSkillMirror(home, "pi", dryRun);
 }
 
-export async function installCloudflarePackage(opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function installCloudflarePackage(opts: PackageAgentOptions = {}): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const home = homeDir();
-  await installClaudePlugin(home, "Cloudflare", CLOUDFLARE_PLUGIN, dryRun, CLOUDFLARE_CLAUDE_MARKER, CLOUDFLARE_MARKETPLACE);
+  if (selectedAgent(opts.agents, "claude-code")) {
+    await installClaudePlugin(home, "Cloudflare", CLOUDFLARE_PLUGIN, dryRun, CLOUDFLARE_CLAUDE_MARKER, CLOUDFLARE_MARKETPLACE);
+  }
+  const mirrorAgents = selectedMirrorAgents(opts.agents, ["codex", "gemini", "opencode", "pi"]);
   const installed = await installPackagePayloadMirrors(
     home,
     "cloudflare",
     CLOUDFLARE_REPO,
     `${fulcrumHome(home)}/cache/cloudflare-skills`,
-    ["codex", "gemini", "opencode", "pi"],
+    mirrorAgents,
     dryRun,
   );
   if (installed) await writeMarker(home, CLOUDFLARE_MIRROR_MARKER, dryRun);
 }
 
-export async function uninstallCloudflarePackage(opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function uninstallCloudflarePackage(opts: PackageAgentOptions = {}): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const home = homeDir();
-  await uninstallClaudePlugin(home, "Cloudflare", CLOUDFLARE_PLUGIN, dryRun, CLOUDFLARE_CLAUDE_MARKER);
+  if (selectedAgent(opts.agents, "claude-code")) {
+    await uninstallClaudePlugin(home, "Cloudflare", CLOUDFLARE_PLUGIN, dryRun, CLOUDFLARE_CLAUDE_MARKER);
+  }
   await removePackagePayloadMirrors(
     home,
     "cloudflare",
     CLOUDFLARE_MIRROR_MARKER,
-    ["codex", "gemini", "opencode", "pi"],
+    selectedMirrorAgents(opts.agents, ["codex", "gemini", "opencode", "pi"]),
     dryRun,
     `${fulcrumHome(home)}/cache/cloudflare-skills`,
   );
 }
 
-export async function installSuperpowersPackage(opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function installSuperpowersPackage(opts: PackageAgentOptions = {}): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const home = homeDir();
-  await installClaudePlugin(home, "Superpowers", SUPERPOWERS_CLAUDE_PLUGIN, dryRun, SUPERPOWERS_CLAUDE_MARKER);
-  await installGeminiSuperpowers(home, dryRun);
-  await addOpenCodePlugin(home, dryRun);
-  await installSuperpowersSkillMirror(home, "codex", dryRun);
-  await installPiSuperpowersPackage(home, dryRun);
+  if (selectedAgent(opts.agents, "claude-code")) {
+    await installClaudePlugin(home, "Superpowers", SUPERPOWERS_CLAUDE_PLUGIN, dryRun, SUPERPOWERS_CLAUDE_MARKER);
+  }
+  if (selectedAgent(opts.agents, "gemini")) await installGeminiSuperpowers(home, dryRun);
+  if (selectedAgent(opts.agents, "opencode")) await addOpenCodePlugin(home, dryRun);
+  if (selectedAgent(opts.agents, "codex")) await installSuperpowersSkillMirror(home, "codex", dryRun);
+  if (selectedAgent(opts.agents, "pi")) await installPiSuperpowersPackage(home, dryRun);
 }
 
-export async function uninstallSuperpowersPackage(opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function uninstallSuperpowersPackage(opts: PackageAgentOptions = {}): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const home = homeDir();
-  await uninstallClaudePlugin(home, "Superpowers", SUPERPOWERS_CLAUDE_PLUGIN, dryRun, SUPERPOWERS_CLAUDE_MARKER);
-  await uninstallGeminiSuperpowers(home, dryRun);
-  await removeOpenCodePlugin(home, dryRun);
-  await removeSuperpowersSkillMirror(home, "codex", dryRun);
-  await uninstallPiSuperpowersPackage(home, dryRun);
+  if (selectedAgent(opts.agents, "claude-code")) {
+    await uninstallClaudePlugin(home, "Superpowers", SUPERPOWERS_CLAUDE_PLUGIN, dryRun, SUPERPOWERS_CLAUDE_MARKER);
+  }
+  if (selectedAgent(opts.agents, "gemini")) await uninstallGeminiSuperpowers(home, dryRun);
+  if (selectedAgent(opts.agents, "opencode")) await removeOpenCodePlugin(home, dryRun);
+  if (selectedAgent(opts.agents, "codex")) await removeSuperpowersSkillMirror(home, "codex", dryRun);
+  if (selectedAgent(opts.agents, "pi")) await uninstallPiSuperpowersPackage(home, dryRun);
 }
 
-export async function installVendorCapabilityPackages(opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function installVendorCapabilityPackages(opts: PackageAgentOptions = {}): Promise<void> {
   await installCloudflarePackage(opts);
   await installSuperpowersPackage(opts);
 }
 
-export async function uninstallVendorCapabilityPackages(opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function uninstallVendorCapabilityPackages(opts: PackageAgentOptions = {}): Promise<void> {
   await uninstallCloudflarePackage(opts);
   await uninstallSuperpowersPackage(opts);
 }

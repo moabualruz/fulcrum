@@ -199,6 +199,59 @@ describe("vendor component adapter", () => {
     expect(cleanupIndex).toBeGreaterThanOrEqual(0);
     expect(installIndex).toBeGreaterThan(cleanupIndex);
   });
+
+  test("agent-scoped authored skills install targets Codex instead of skipping global sync", async () => {
+    const repoDirBefore = process.env["FULCRUM_REPO_DIR"];
+    process.env["FULCRUM_REPO_DIR"] = scratch;
+    await mkdir(join(scratch, "skills", "jq"), { recursive: true });
+    await mkdir(join(scratch, ".codex"), { recursive: true });
+    await writeFile(
+      join(scratch, "skills", "jq", "SKILL.md"),
+      "---\nname: jq\ndescription: JSON processing\n---\n\n## When to use\n\n## Invocation\n\n## Patterns\n\n## Anti-patterns\n\n## Cross-refs\n",
+    );
+
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+
+    try {
+      await applyVendorAction({ ...vendorAction("skills.authored", "create-or-update"), agentId: "codex" }, true);
+    } finally {
+      console.log = originalLog;
+      if (repoDirBefore === undefined) delete process.env["FULCRUM_REPO_DIR"];
+      else process.env["FULCRUM_REPO_DIR"] = repoDirBefore;
+    }
+
+    const output = logs.join("\n");
+    expect(output).toContain("→ Codex CLI");
+    expect(output).toContain("fulcrum/jq");
+    expect(output).not.toContain("skip Codex CLI global skills");
+  });
+
+  test("agent-scoped Cloudflare package install only touches requested agent", async () => {
+    await mkdir(join(scratch, ".claude"), { recursive: true });
+    await mkdir(join(scratch, ".pi", "agent"), { recursive: true });
+    await mkdir(join(scratch, ".fulcrum", "cache", "cloudflare-skills", "skills", "cloudflare"), { recursive: true });
+    await writeFile(
+      join(scratch, ".fulcrum", "cache", "cloudflare-skills", "skills", "cloudflare", "SKILL.md"),
+      "---\nname: cloudflare\n---\n",
+    );
+
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+
+    try {
+      await applyVendorAction({ ...vendorAction("package.cloudflare", "create-or-update"), agentId: "pi" }, true);
+    } finally {
+      console.log = originalLog;
+    }
+
+    const output = logs.join("\n");
+    expect(output).toContain("Pi CLI cloudflare package payload mirror");
+    expect(output).not.toContain("claude plugin install cloudflare@cloudflare");
+    expect(output).not.toContain("Codex CLI cloudflare package payload mirror");
+  });
 });
 
 function vendorAction(

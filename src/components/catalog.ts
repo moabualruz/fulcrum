@@ -23,7 +23,6 @@ const DEFAULT_PROFILE_MEMBERS = [
   "package.superpowers",
   "mcp.deepwiki",
   "mcp.registry",
-  "mcp.context7",
 ] as const;
 
 const DEFAULT_PROFILE_MEMBER_IDS = new Set<string>(DEFAULT_PROFILE_MEMBERS);
@@ -31,8 +30,8 @@ const DEFAULT_PROFILE_MEMBER_IDS = new Set<string>(DEFAULT_PROFILE_MEMBERS);
 const MINIMAL_PROFILE_MEMBERS = [
   "policy.tool-output",
   "rules.global",
+  "mcp.registry",
   "mcp.deepwiki",
-  "mcp.context7",
 ] as const;
 
 function hookComponent(name: (typeof HOOKS)[number]): ComponentSpec {

@@ -9,6 +9,7 @@ import {
   uninstallRepomixPackageMirrors,
 } from "./repomix-package.ts";
 import * as proc from "../utils/proc.ts";
+import { isEnabled, loadRegistry } from "./mcp-registry.ts";
 
 let TMP: string;
 let originalHome: string | undefined;
@@ -232,9 +233,14 @@ describe("Repomix capability package mirrors", () => {
     expect(codexConfig).toContain("[plugins.\"repomix@repomix\"]");
     expect(codexConfig).toContain("[mcp_servers.repomix]");
     expect(codexConfig).toContain('args = ["-y", "repomix@latest", "--mcp"]');
+    expect(codexConfig).toContain("enabled = false");
 
     const geminiManifest = JSON.parse(await readFile(join(TMP, ".gemini", "extensions", "repomix", "gemini-extension.json"), "utf8"));
     expect(geminiManifest.mcpServers.repomix.command).toBe("npx");
+    const geminiEnablement = JSON.parse(await readFile(join(TMP, ".gemini", "mcp-server-enablement.json"), "utf8")) as {
+      repomix?: { enabled: boolean };
+    };
+    expect(geminiEnablement.repomix?.enabled).toBe(false);
     expect(await readFile(join(TMP, ".gemini", "extensions", "repomix", "commands", "pack-local.toml"), "utf8")).toContain("Run local repomix.");
     expect(await readFile(join(TMP, ".gemini", "extensions", "repomix", "commands", "explore-remote.toml"), "utf8")).toContain("Explore remote repository.");
     expect(await readFile(join(TMP, ".gemini", "extensions", "repomix", "AGENTS.md"), "utf8")).toContain("Repomix project rules");
@@ -248,7 +254,7 @@ describe("Repomix capability package mirrors", () => {
     expect(opencodePackage.name).toBe("repomix");
     expect(opencodePackage.fulcrumMirror.surfaces).toContain("commands");
     const opencode = JSON.parse(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8"));
-    expect(opencode.mcp.repomix.enabled).toBe(true);
+    expect(opencode.mcp.repomix.enabled).toBe(false);
     expect(opencode.mcp.repomix.command).toEqual(["npx", "-y", "repomix@latest", "--mcp"]);
 
     expect(await readFile(join(TMP, ".pi", "agent", "skills", "repomix-explorer", "SKILL.md"), "utf8")).toContain("Explore with repomix.");
@@ -260,10 +266,12 @@ describe("Repomix capability package mirrors", () => {
     const piPackage = JSON.parse(await readFile(join(TMP, ".pi", "agent", "packages", "repomix", "package.json"), "utf8"));
     expect(piPackage.name).toBe("repomix");
     expect(piPackage.pi.prompts).toContain("./prompts");
-    const pi = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8"));
-    expect(pi.mcpServers.repomix.command).toBe("npx");
-    expect(pi.mcpServers.repomix.args).toEqual(["-y", "repomix@latest", "--mcp"]);
-    expect(pi.mcpServers.repomix.directTools).toBe(true);
+    expect(await Bun.file(join(TMP, ".pi", "agent", "mcp.json")).exists()).toBe(false);
+
+    const reg = await loadRegistry();
+    for (const agentId of ["codex", "opencode", "pi"] as const) {
+      expect(isEnabled(reg.servers["repomix"]!, agentId)).toBe(false);
+    }
     for (const filtered of [
       join(TMP, ".config", "opencode", "commands", "pack-local.backup.md"),
       join(TMP, ".config", "opencode", "rules", "base.original.md"),
@@ -305,8 +313,10 @@ describe("Repomix capability package mirrors", () => {
     expect(await Bun.file(join(TMP, ".pi", "agent", "rules", "repomix")).exists()).toBe(false);
     expect(await Bun.file(join(TMP, ".pi", "agent", "agents", "repomix-explorer.unsupported.md")).exists()).toBe(false);
     expect(await Bun.file(join(TMP, ".pi", "agent", "packages", "repomix")).exists()).toBe(false);
-    const pi = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8"));
-    expect(pi.mcpServers?.repomix).toBeUndefined();
+    if (await Bun.file(join(TMP, ".pi", "agent", "mcp.json")).exists()) {
+      const pi = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8"));
+      expect(pi.mcpServers?.repomix).toBeUndefined();
+    }
   });
 
   test("uninstall preserves user-owned Repomix mirrors when Fulcrum marker is absent", async () => {

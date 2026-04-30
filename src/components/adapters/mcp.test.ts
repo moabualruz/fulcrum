@@ -146,8 +146,10 @@ describe("applyMcpAction", () => {
     expect(reg.servers["context7"]).toBeDefined();
   });
 
-  test("mcp.registry registers every builtin server without applying agents", async () => {
+  test("mcp.registry registers every builtin server and writes disabled native config", async () => {
     await mkdir(join(tmp, ".codex"), { recursive: true });
+    await mkdir(join(tmp, ".gemini"), { recursive: true });
+    await mkdir(join(tmp, ".config", "opencode"), { recursive: true });
 
     await applyMcpAction(
       mcpAction({
@@ -161,7 +163,18 @@ describe("applyMcpAction", () => {
     expect(Object.keys(reg.servers)).toHaveLength(17);
     expect(reg.servers["deepwiki"]?.url).toBe("https://mcp.deepwiki.com/mcp");
 
-    await expect(readFile(join(tmp, ".codex", "config.toml"), "utf8")).rejects.toThrow();
+    const codexToml = await readFile(join(tmp, ".codex", "config.toml"), "utf8");
+    expect(codexToml).toContain("[mcp_servers.context7]");
+    expect(codexToml).toContain("enabled = false");
+
+    const geminiEnablement = JSON.parse(await readFile(join(tmp, ".gemini", "mcp-server-enablement.json"), "utf8")) as {
+      context7?: { enabled: boolean };
+    };
+    const opencode = JSON.parse(await readFile(join(tmp, ".config", "opencode", "opencode.json"), "utf8")) as {
+      mcp?: Record<string, Record<string, unknown>>;
+    };
+    expect(geminiEnablement.context7?.enabled).toBe(false);
+    expect(opencode.mcp?.context7?.enabled).toBe(false);
   });
 
   test("noop and preserve return without writes", async () => {

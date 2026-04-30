@@ -274,7 +274,7 @@ describe("vendor capability packages", () => {
     }
   });
 
-  test("adapts Cloudflare package MCP manifest into native MCP configs for fallback agents", async () => {
+  test("adapts Cloudflare package MCP manifest as disabled native config for fallback agents", async () => {
     const cache = join(TMP, ".fulcrum", "cache", "cloudflare-skills");
     await mkdir(join(cache, "skills", "wrangler"), { recursive: true });
     await writeFile(join(cache, "skills", "wrangler", "SKILL.md"), "---\nname: wrangler\n---\nUse wrangler.\n");
@@ -304,14 +304,119 @@ describe("vendor capability packages", () => {
     const reg = await loadRegistry();
     expect(reg.servers["cloudflare-api"]?.url).toBe("https://mcp.cloudflare.com/mcp");
     for (const agentId of ["codex", "gemini", "opencode", "pi"] as const) {
-      expect(isEnabled(reg.servers["cloudflare-api"]!, agentId)).toBe(true);
-      expect(isEnabled(reg.servers["cloudflare-docs"]!, agentId)).toBe(true);
+      expect(isEnabled(reg.servers["cloudflare-api"]!, agentId)).toBe(false);
+      expect(isEnabled(reg.servers["cloudflare-docs"]!, agentId)).toBe(false);
     }
 
-    expect(await readFile(join(TMP, ".codex", "config.toml"), "utf8")).toContain("[mcp_servers.cloudflare-api]");
-    expect(await readFile(join(TMP, ".gemini", "settings.json"), "utf8")).toContain("cloudflare-api");
-    expect(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8")).toContain("cloudflare-api");
-    expect(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8")).toContain("cloudflare-api");
+    const codexConfig = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(codexConfig).toContain("[mcp_servers.cloudflare-api]");
+    expect(codexConfig).toContain("enabled = false");
+
+    const geminiEnablement = JSON.parse(await readFile(join(TMP, ".gemini", "mcp-server-enablement.json"), "utf8")) as {
+      "cloudflare-api"?: { enabled: boolean };
+    };
+    expect(geminiEnablement["cloudflare-api"]?.enabled).toBe(false);
+
+    const opencode = JSON.parse(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8")) as {
+      mcp?: Record<string, Record<string, unknown>>;
+    };
+    expect(opencode.mcp?.["cloudflare-api"]?.enabled).toBe(false);
+    expect(await Bun.file(join(TMP, ".pi", "agent", "mcp.json")).exists()).toBe(false);
+  });
+
+  test("preserves package MCP auth env hints in disabled native config", async () => {
+    const cache = join(TMP, ".fulcrum", "cache", "cloudflare-skills");
+    await mkdir(cache, { recursive: true });
+    await mkdir(join(cache, "skills"), { recursive: true });
+    await writeFile(join(cache, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        "cloudflare-api": {
+          type: "http",
+          url: "https://mcp.cloudflare.com/mcp",
+          headers: {
+            Authorization: "Bearer ${CLOUDFLARE_API_TOKEN}",
+          },
+        },
+      },
+    }, null, 2) + "\n");
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installCloudflarePackage({ agents: ["codex"] });
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    const reg = await loadRegistry();
+    expect(reg.servers["cloudflare-api"]?.auth_env_vars).toEqual(["CLOUDFLARE_API_TOKEN"]);
+    const codexConfig = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(codexConfig).toContain('bearer_token_env_var = "CLOUDFLARE_API_TOKEN"');
+    expect(codexConfig).toContain("enabled = false");
+  });
+
+  test("merges package MCP visibility across agent-scoped installs", async () => {
+    const cache = join(TMP, ".fulcrum", "cache", "cloudflare-skills");
+    await mkdir(join(cache, "skills"), { recursive: true });
+    await writeFile(join(cache, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        "cloudflare-api": {
+          type: "http",
+          url: "https://mcp.cloudflare.com/mcp",
+        },
+      },
+    }, null, 2) + "\n");
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
+    await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installCloudflarePackage({ agents: ["codex"] });
+      await installCloudflarePackage({ agents: ["gemini"] });
+      await installCloudflarePackage({ agents: ["opencode"] });
+      await installCloudflarePackage({ agents: ["pi"] });
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    const reg = await loadRegistry();
+    expect(reg.servers["cloudflare-api"]?.agent_visibility.codex).toBe(true);
+    expect(reg.servers["cloudflare-api"]?.agent_visibility.gemini).toBe(true);
+    expect(reg.servers["cloudflare-api"]?.agent_visibility.opencode).toBe(true);
+    expect(reg.servers["cloudflare-api"]?.agent_visibility.pi).toBe(true);
+  });
+
+  test("agent-scoped Cloudflare uninstall preserves package MCP visibility for remaining agents", async () => {
+    const cache = join(TMP, ".fulcrum", "cache", "cloudflare-skills");
+    await mkdir(join(cache, "skills"), { recursive: true });
+    await writeFile(join(cache, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        "cloudflare-api": {
+          type: "http",
+          url: "https://mcp.cloudflare.com/mcp",
+        },
+      },
+    }, null, 2) + "\n");
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
+    await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installCloudflarePackage();
+      await uninstallCloudflarePackage({ agents: ["codex"] });
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    const reg = await loadRegistry();
+    expect(reg.servers["cloudflare-api"]?.agent_visibility.codex).toBe(false);
+    expect(reg.servers["cloudflare-api"]?.agent_visibility.gemini).toBe(true);
+    expect(reg.servers["cloudflare-api"]?.agent_visibility.opencode).toBe(true);
+    expect(reg.servers["cloudflare-api"]?.agent_visibility.pi).toBe(true);
+    expect(await Bun.file(join(TMP, ".fulcrum", "state", "global", "cloudflare-mirrors.installed")).exists()).toBe(true);
+    const codexConfig = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(codexConfig).not.toContain("cloudflare-api");
   });
 
   test("adapts Cloudflare package skills into native loadable skill paths for fallback agents", async () => {
@@ -322,6 +427,7 @@ describe("vendor capability packages", () => {
     await mkdir(join(cache, "skills", "_archive", "old"), { recursive: true });
     await writeFile(join(cache, "skills", "_archive", "old", "SKILL.md"), "---\nname: old\n---\n");
     await mkdir(join(TMP, ".codex"), { recursive: true });
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
     await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
     await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
     const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
@@ -333,12 +439,15 @@ describe("vendor capability packages", () => {
 
     for (const skillPath of [
       join(TMP, ".codex", "skills", "cloudflare", "wrangler", "SKILL.md"),
+      join(TMP, ".gemini", "extensions", "cloudflare", "skills", "wrangler", "SKILL.md"),
       join(TMP, ".config", "opencode", "skills", "cloudflare", "wrangler", "SKILL.md"),
       join(TMP, ".pi", "agent", "skills", "cloudflare", "wrangler", "SKILL.md"),
     ]) {
       expect(await readFile(skillPath, "utf8")).toContain("Use wrangler.");
       expect(await Bun.file(skillPath.replace(/SKILL\.md$/, "SKILL.original.md")).exists()).toBe(false);
     }
+    const geminiExtension = JSON.parse(await readFile(join(TMP, ".gemini", "extensions", "cloudflare", "gemini-extension.json"), "utf8"));
+    expect(geminiExtension.name).toBe("cloudflare");
     expect(await Bun.file(join(TMP, ".codex", "skills", "cloudflare", "_archive", "old", "SKILL.md")).exists()).toBe(false);
   });
 

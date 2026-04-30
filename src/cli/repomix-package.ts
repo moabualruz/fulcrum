@@ -35,6 +35,19 @@ interface RepomixPackageSource {
   rules: string;
 }
 
+interface RepomixPackageOptions {
+  dryRun?: boolean;
+  agents?: readonly AgentId[];
+}
+
+function selectedAgent(agents: readonly AgentId[] | undefined, agentId: AgentId): boolean {
+  return agents === undefined || agents.includes(agentId);
+}
+
+function selectedRegistryAgents(agents: readonly AgentId[] | undefined): AgentId[] {
+  return REPOMIX_REGISTRY_AGENTS.filter((agentId) => selectedAgent(agents, agentId));
+}
+
 async function exists(path: string): Promise<boolean> {
   try { await stat(path); return true; } catch { return false; }
 }
@@ -46,6 +59,49 @@ async function writeText(path: string, body: string, dryRun: boolean): Promise<v
   }
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, body);
+}
+
+async function readJsonObject(path: string): Promise<Record<string, unknown>> {
+  if (!(await exists(path))) return {};
+  try {
+    const parsed = JSON.parse(await readFile(path, "utf8"));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeJsonFile(path: string, data: Record<string, unknown>, dryRun: boolean): Promise<void> {
+  if (dryRun) {
+    console.log(`     [dry-run] would write: ${path}`);
+    return;
+  }
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(data, null, 2) + "\n");
+}
+
+async function setGeminiMcpEnabled(
+  home: string,
+  name: string,
+  enabled: boolean,
+  dryRun: boolean,
+): Promise<void> {
+  const file = `${home}/.gemini/mcp-server-enablement.json`;
+  if (enabled && !(await exists(file))) return;
+  const enablement = await readJsonObject(file);
+  if (enabled) {
+    delete enablement[name];
+  } else {
+    enablement[name] = { enabled: false };
+  }
+  if (enabled && Object.keys(enablement).length === 0) {
+    if (dryRun) console.log(`     [dry-run] would write: ${file}`);
+    else await writeJsonFile(file, enablement, false);
+    return;
+  }
+  await writeJsonFile(file, enablement, dryRun);
 }
 
 async function removePath(path: string, label: string, dryRun: boolean): Promise<void> {
@@ -103,9 +159,10 @@ async function runBestEffort(cmd: string[], label: string, dryRun: boolean): Pro
   return true;
 }
 
-export async function installRepomixClaudePlugins(opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function installRepomixClaudePlugins(opts: RepomixPackageOptions = {}): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const home = process.env["HOME"] ?? "";
+  if (!selectedAgent(opts.agents, "claude-code")) return;
   if (!(await exists(`${home}/.claude`))) {
     console.log("     · skip repomix Claude plugins (Claude Code not detected)");
     return;
@@ -156,9 +213,10 @@ export async function installRepomixClaudePlugins(opts: { dryRun?: boolean } = {
   await writeText(markerFile, new Date().toISOString() + "\n", false);
 }
 
-export async function uninstallRepomixClaudePlugins(opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function uninstallRepomixClaudePlugins(opts: RepomixPackageOptions = {}): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const home = process.env["HOME"] ?? "";
+  if (!selectedAgent(opts.agents, "claude-code")) return;
   if (!(await exists(`${home}/.claude`))) return;
   const markerFile = `${fulcrumStateDir(home)}/${REPOMIX_MARKER_FILE}`;
   if (!dryRun && !(await exists(markerFile))) {
@@ -352,6 +410,7 @@ async function installGemini(home: string, source: RepomixPackageSource, dryRun:
   await writeText(`${root}/agents/explorer.md`, geminiAgentFromClaude(source.explorer), dryRun);
   await writeText(`${root}/AGENTS.md`, source.rules.trim() + "\n", dryRun);
   await writeText(`${root}/rules/base.md`, source.rules.trim() + "\n", dryRun);
+  await setGeminiMcpEnabled(home, "repomix", false, dryRun);
   console.log("     ✓ Gemini Repomix extension mirror installed");
 }
 
@@ -559,38 +618,42 @@ async function installPi(home: string, source: RepomixPackageSource, dryRun: boo
   }, null, 2) + "\n", dryRun);
 }
 
-async function enableRepomixMcpForPackage(dryRun: boolean): Promise<void> {
+async function installRepomixMcpForPackage(dryRun: boolean, agents: readonly AgentId[] | undefined): Promise<void> {
+  const registryAgents = selectedRegistryAgents(agents);
+  if (registryAgents.length === 0) return;
   if (dryRun) {
-    console.log("     [dry-run] would enable Repomix MCP for Codex/OpenCode/Pi");
+    console.log(`     [dry-run] would register disabled Repomix MCP for ${registryAgents.join("/")}`);
     return;
   }
-  const { registerServer, setEnabled, applyToAgents } = await import("./mcp-registry.ts");
+  const { registerServer, setEnabled, applyDisabledToAgents } = await import("./mcp-registry.ts");
   await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
-  await setEnabled("repomix", true, { agents: REPOMIX_REGISTRY_AGENTS });
-  await applyToAgents("repomix", { agents: REPOMIX_REGISTRY_AGENTS });
+  await setEnabled("repomix", false, { agents: registryAgents });
+  await applyDisabledToAgents("repomix", { agents: registryAgents });
 }
 
-async function removeRepomixMcpForPackage(dryRun: boolean): Promise<void> {
+async function removeRepomixMcpForPackage(dryRun: boolean, agents: readonly AgentId[] | undefined): Promise<void> {
+  const registryAgents = selectedRegistryAgents(agents);
+  if (registryAgents.length === 0) return;
   if (dryRun) {
-    console.log("     [dry-run] would remove Repomix MCP from Codex/OpenCode/Pi");
+    console.log(`     [dry-run] would remove Repomix MCP from ${registryAgents.join("/")}`);
     return;
   }
   const { loadRegistry, setEnabled, removeFromAgents } = await import("./mcp-registry.ts");
   const reg = await loadRegistry();
   if (!reg.servers["repomix"]) return;
-  await setEnabled("repomix", false, { agents: REPOMIX_REGISTRY_AGENTS });
-  await removeFromAgents("repomix", { agents: REPOMIX_REGISTRY_AGENTS });
+  await setEnabled("repomix", false, { agents: registryAgents });
+  await removeFromAgents("repomix", { agents: registryAgents });
 }
 
-export async function installRepomixPackageMirrors(opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function installRepomixPackageMirrors(opts: RepomixPackageOptions = {}): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const home = process.env["HOME"] ?? "";
   const targets = [
-    `${home}/.codex`,
-    `${home}/.gemini`,
-    `${home}/.config/opencode`,
-    `${home}/.pi/agent`,
-  ];
+    selectedAgent(opts.agents, "codex") ? `${home}/.codex` : null,
+    selectedAgent(opts.agents, "gemini") ? `${home}/.gemini` : null,
+    selectedAgent(opts.agents, "opencode") ? `${home}/.config/opencode` : null,
+    selectedAgent(opts.agents, "pi") ? `${home}/.pi/agent` : null,
+  ].filter((path): path is string => path !== null);
   if (!(await Promise.all(targets.map((path) => exists(path)))).some(Boolean)) {
     console.log("     · skip Repomix package mirrors (no non-Claude agents detected)");
     return;
@@ -606,52 +669,65 @@ export async function installRepomixPackageMirrors(opts: { dryRun?: boolean } = 
     return;
   }
 
-  await installSkills(home, `${home}/.codex/skills`, "Codex CLI", source, dryRun);
-  await installCodexPluginMirror(home, source, dryRun);
-  await installGemini(home, source, dryRun);
-  await installOpenCode(home, source, dryRun);
-  await installPi(home, source, dryRun);
-  await enableRepomixMcpForPackage(dryRun);
+  if (selectedAgent(opts.agents, "codex")) {
+    await installSkills(home, `${home}/.codex/skills`, "Codex CLI", source, dryRun);
+    await installCodexPluginMirror(home, source, dryRun);
+  }
+  if (selectedAgent(opts.agents, "gemini")) await installGemini(home, source, dryRun);
+  if (selectedAgent(opts.agents, "opencode")) await installOpenCode(home, source, dryRun);
+  if (selectedAgent(opts.agents, "pi")) await installPi(home, source, dryRun);
+  await installRepomixMcpForPackage(dryRun, opts.agents);
   await writeMarker(home, REPOMIX_MIRRORS_MARKER_FILE, dryRun);
 }
 
-export async function uninstallRepomixPackageMirrors(opts: { dryRun?: boolean } = {}): Promise<void> {
+export async function uninstallRepomixPackageMirrors(opts: RepomixPackageOptions = {}): Promise<void> {
   const dryRun = opts.dryRun ?? false;
   const home = process.env["HOME"] ?? "";
   if (!dryRun && !(await markerPresent(home, REPOMIX_MIRRORS_MARKER_FILE))) {
     console.log("     · skip Repomix package mirrors removal (Fulcrum marker not present)");
     return;
   }
-  await removePath(`${home}/.gemini/extensions/repomix`, "Gemini Repomix extension mirror", dryRun);
+  if (selectedAgent(opts.agents, "gemini")) {
+    await removePath(`${home}/.gemini/extensions/repomix`, "Gemini Repomix extension mirror", dryRun);
+    await setGeminiMcpEnabled(home, "repomix", true, dryRun);
+  }
   for (const root of [
-    `${home}/.codex/skills`,
-    `${home}/.config/opencode/skills`,
-    `${home}/.pi/agent/skills`,
-  ]) {
+    selectedAgent(opts.agents, "codex") ? `${home}/.codex/skills` : null,
+    selectedAgent(opts.agents, "opencode") ? `${home}/.config/opencode/skills` : null,
+    selectedAgent(opts.agents, "pi") ? `${home}/.pi/agent/skills` : null,
+  ].filter((path): path is string => path !== null)) {
     await removePath(`${root}/${PACK_LOCAL}`, `Repomix skill ${PACK_LOCAL}`, dryRun);
     await removePath(`${root}/${PACK_REMOTE}`, `Repomix skill ${PACK_REMOTE}`, dryRun);
     await removePath(`${root}/${EXPLORER}`, `Repomix skill ${EXPLORER}`, dryRun);
     await removePath(`${root}/${EXPLORE_LOCAL}`, `Repomix skill ${EXPLORE_LOCAL}`, dryRun);
     await removePath(`${root}/${EXPLORE_REMOTE}`, `Repomix skill ${EXPLORE_REMOTE}`, dryRun);
   }
-  await removePath(`${home}/.codex/plugins/cache/repomix`, "Codex Repomix plugin mirror", dryRun);
-  await removeCodexRepomixPluginConfig(home, dryRun);
-  await removePath(`${home}/.config/opencode/agents/${EXPLORER}.md`, "OpenCode Repomix agent mirror", dryRun);
+  if (selectedAgent(opts.agents, "codex")) {
+    await removePath(`${home}/.codex/plugins/cache/repomix`, "Codex Repomix plugin mirror", dryRun);
+    await removeCodexRepomixPluginConfig(home, dryRun);
+  }
+  if (selectedAgent(opts.agents, "opencode")) {
+    await removePath(`${home}/.config/opencode/agents/${EXPLORER}.md`, "OpenCode Repomix agent mirror", dryRun);
+  }
   for (const root of [
-    `${home}/.config/opencode/commands`,
-    `${home}/.pi/agent/prompts`,
-  ]) {
+    selectedAgent(opts.agents, "opencode") ? `${home}/.config/opencode/commands` : null,
+    selectedAgent(opts.agents, "pi") ? `${home}/.pi/agent/prompts` : null,
+  ].filter((path): path is string => path !== null)) {
     await removePath(`${root}/pack-local.md`, "Repomix command pack-local", dryRun);
     await removePath(`${root}/pack-remote.md`, "Repomix command pack-remote", dryRun);
     await removePath(`${root}/explore-local.md`, "Repomix command explore-local", dryRun);
     await removePath(`${root}/explore-remote.md`, "Repomix command explore-remote", dryRun);
   }
-  await removeRulesContext(`${home}/.config/opencode`, "OpenCode", dryRun);
-  await removeRulesContext(`${home}/.pi/agent`, "Pi CLI", dryRun);
-  await removePath(`${home}/.config/opencode/packages/repomix`, "OpenCode Repomix package metadata", dryRun);
-  await removePath(`${home}/.pi/agent/agents/${EXPLORER}.unsupported.md`, "Pi CLI Repomix unsupported explorer note", dryRun);
-  await removePath(`${home}/.pi/agent/packages/repomix`, "Pi CLI Repomix package metadata", dryRun);
-  await removeRepomixMcpForPackage(dryRun);
+  if (selectedAgent(opts.agents, "opencode")) {
+    await removeRulesContext(`${home}/.config/opencode`, "OpenCode", dryRun);
+    await removePath(`${home}/.config/opencode/packages/repomix`, "OpenCode Repomix package metadata", dryRun);
+  }
+  if (selectedAgent(opts.agents, "pi")) {
+    await removeRulesContext(`${home}/.pi/agent`, "Pi CLI", dryRun);
+    await removePath(`${home}/.pi/agent/agents/${EXPLORER}.unsupported.md`, "Pi CLI Repomix unsupported explorer note", dryRun);
+    await removePath(`${home}/.pi/agent/packages/repomix`, "Pi CLI Repomix package metadata", dryRun);
+  }
+  await removeRepomixMcpForPackage(dryRun, opts.agents);
   await removePath(markerFile(home, REPOMIX_MIRRORS_MARKER_FILE), "Repomix package mirrors marker", dryRun);
 }
 

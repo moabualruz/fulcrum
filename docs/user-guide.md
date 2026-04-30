@@ -12,7 +12,7 @@ Fulcrum is a local-first CLI Agent OS that installs a shared foundation across e
 - Splices a shared rules block into each agent's primary config file (idempotent, preserves your content).
 - Installs hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `tool-output-router`, and two index hooks) as binary subcommands of a single `fulcrum` binary.
 - Syncs Fulcrum-authored skills into the `fulcrum/` namespace when explicitly requested; Codex global authored skills are opt-in.
-- Registers managed MCPs (DeepWiki + context7 minimal-default; other builtin extras opt-in; package MCPs enabled when their package is installed).
+- Registers managed MCPs (all builtin/package MCPs installed; only DeepWiki is recommended-default enabled; CLI/skill-covered MCPs stay disabled until explicit opt-in).
 - Installs managed packages with full payload mirrors plus loadable skill and native MCP adapters where target agent lacks vendor package primitive.
 - Installs caveman output-compression cross-agent with `defaultMode: ultra`.
 - Reports environment, component, package-parity, MCP, skill-budget, and toolchain health via `fulcrum doctor`.
@@ -67,14 +67,14 @@ FULCRUM_RELEASE_TAG=v0.1.0 bash <(curl -fsSL https://raw.githubusercontent.com/m
 
 | Flag | Effect |
 |---|---|
-| `--profile minimal` | Default. Install rules, policy, and minimal MCP defaults only. Avoids global skills and vendor packages. |
+| `--profile minimal` | Default. Install rules, policy, builtin MCP registry/config, and recommended MCP defaults only. Avoids global skills and vendor packages. |
 | `--profile rules-only` | Only splice the global Fulcrum rules block. |
 | `--profile full` | Historical full bootstrap: skills, non-package-owned upstream skills, Caveman, vendor packages, and MCP registry. |
 | `--with-project <dir>` | Also bootstrap a project (`fulcrum init <dir>`) |
 | `--dry-run` | Preview only; no writes |
 | `--no-skills` | Skip authored + upstream skill sync |
 | `--no-upstream-skills` | Skip only the networked upstream skill sync |
-| `--no-default-mcps` | Register builtin MCP definitions/config but skip Fulcrum's minimal default enable step; existing MCP state is left untouched. Package installs still install their package-owned surfaces. |
+| `--no-default-mcps` | Register builtin MCP definitions/config but skip Fulcrum's recommended default enable step; existing MCP state is left untouched. Package installs still install their package-owned surfaces. |
 | `--enable-all-mcps` | After registration, enable every builtin MCP on every detected agent. Use to verify each MCP starts and authenticates; revert later via `fulcrum mcp disable --all-agents <name>`. |
 
 ### Component lifecycle
@@ -223,7 +223,7 @@ Fulcrum skills install through each agent's native namespace. Claude Code uses p
 
 ### MCPs
 
-Fulcrum registers 17 builtin registry MCPs. Default install enables only `deepwiki` and `context7` when no user state exists; the rest stay opt-in to avoid startup token cost (~55–300k tokens with 5+ active MCPs). Use `--no-default-mcps` to register everything without changing enabled state.
+Fulcrum registers 17 builtin registry MCPs. Default install enables only `deepwiki` when no user state exists; the rest stay installed but disabled to avoid startup token cost (~55–300k tokens with 5+ active MCPs). Package MCPs follow the same rule: mirrored/registered, disabled by default when a CLI or skill covers the job. Use `--no-default-mcps` to register everything without changing enabled state.
 
 ```bash
 fulcrum mcp list                            # see all registered MCPs + state

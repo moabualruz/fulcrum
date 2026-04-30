@@ -8,8 +8,9 @@
 // DEFAULT_GITHUB_SERVER and DEFAULT_REPOMIX_SERVER are re-exported from there
 // for backward compatibility with existing tests and callers.
 
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { parse as parseToml } from "smol-toml";
 import { which, run as runProc } from "../utils/proc.ts";
 
 // ── types ──────────────────────────────────────────────────────────────────
@@ -79,6 +80,26 @@ async function exists(p: string): Promise<boolean> {
 async function writeText(p: string, body: string): Promise<void> {
   await mkdir(dirname(p), { recursive: true });
   await writeFile(p, body);
+}
+
+async function writeCodexToml(p: string, body: string): Promise<void> {
+  const out = body.endsWith("\n") ? body : `${body}\n`;
+  try {
+    parseToml(out);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`refusing to write invalid Codex config ${p}: ${message}`);
+  }
+
+  await mkdir(dirname(p), { recursive: true });
+  const tmp = `${p}.fulcrum-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`;
+  await writeFile(tmp, out);
+  try {
+    await rename(tmp, p);
+  } catch (error) {
+    await rm(tmp, { force: true });
+    throw error;
+  }
 }
 
 // ── TOML serialiser (minimal — no dep needed for our schema) ───────────────
@@ -383,8 +404,88 @@ function escapeRegExp(value: string): string {
 }
 
 function replaceManagedBlock(existing: string, begin: string, end: string, replacement: string): string {
-  const re = new RegExp(`${escapeRegExp(begin)}[\\s\\S]*?${escapeRegExp(end)}\\n?`, "m");
-  return existing.replace(re, replacement);
+  const start = existing.indexOf(begin);
+  if (start === -1) return existing;
+
+  const firstEnd = existing.indexOf(end, start + begin.length);
+  const removeStart = start;
+  let removeEnd = firstEnd === -1
+    ? findNextTomlBoundary(existing, start + begin.length)
+    : firstEnd + end.length;
+
+  // Older buggy adoption could leave duplicated keys plus a second END marker
+  // before the next TOML section. Treat only that same-MCP orphan tail as ours.
+  if (firstEnd !== -1) {
+    const boundary = findNextTomlBoundary(existing, removeEnd);
+    const tail = existing.slice(removeEnd, boundary);
+    const orphanEnd = tail.lastIndexOf(end);
+    if (orphanEnd !== -1) {
+      removeEnd += orphanEnd + end.length;
+    }
+  }
+
+  let after = existing.slice(removeEnd);
+  if (after.startsWith("\n")) after = after.slice(1);
+  return `${existing.slice(0, removeStart)}${replacement}${after}`;
+}
+
+export function stripCodexMcpServerConfig(existing: string, name: string): string {
+  const begin = tomlBlockBegin(name);
+  const end = tomlBlockEnd(name);
+  let next = existing;
+  while (next.includes(begin)) {
+    const replaced = replaceManagedBlock(next, begin, end, "");
+    if (replaced === next) break;
+    next = replaced;
+  }
+  next = stripCodexMcpDottedTables(next, name);
+  next = stripCodexMcpParentTableKey(next, name);
+  return next.replace(/\n{3,}/g, "\n\n").trimEnd();
+}
+
+function upsertCodexMcpServerConfig(existing: string, name: string, block: string): string {
+  const stripped = stripCodexMcpServerConfig(existing, name);
+  const sep = stripped && !stripped.endsWith("\n") ? "\n\n" : stripped ? "\n" : "";
+  return `${stripped}${sep}${block}`;
+}
+
+function findNextTomlBoundary(existing: string, from: number): number {
+  const rest = existing.slice(from);
+  const indexes = ["\n[", "\n# BEGIN FULCRUM MCP "]
+    .map((needle) => rest.indexOf(needle))
+    .filter((idx) => idx !== -1);
+  return indexes.length === 0 ? existing.length : from + Math.min(...indexes);
+}
+
+function stripCodexMcpDottedTables(existing: string, name: string): string {
+  const tableName = codexMcpNamePattern(name);
+  const re = new RegExp(
+    `(^|\\n)\\[\\s*mcp_servers\\s*\\.\\s*${tableName}\\s*\\]\\n[\\s\\S]*?(?=\\n\\[|\\n# BEGIN FULCRUM MCP |$)`,
+    "g",
+  );
+  return existing.replace(re, "");
+}
+
+function stripCodexMcpParentTableKey(existing: string, name: string): string {
+  const keyRe = new RegExp(`^\\s*${codexMcpNamePattern(name)}\\s*=`);
+  const lines = existing.split(/\n/);
+  let inMcpServersTable = false;
+  const kept: string[] = [];
+  for (const line of lines) {
+    if (/^\s*\[/.test(line)) {
+      inMcpServersTable = /^\s*\[\s*mcp_servers\s*\]\s*$/.test(line);
+      kept.push(line);
+      continue;
+    }
+    if (inMcpServersTable && keyRe.test(line)) continue;
+    kept.push(line);
+  }
+  return kept.join("\n");
+}
+
+function codexMcpNamePattern(name: string): string {
+  const escaped = escapeRegExp(name);
+  return `(?:${escaped}|"${escaped}"|'${escaped}')`;
 }
 
 async function applyToCodex(server: McpServer, home: string, enabled = true): Promise<void> {
@@ -416,21 +517,9 @@ async function applyToCodex(server: McpServer, home: string, enabled = true): Pr
   if (!enabled) entry += "\nenabled = false";
 
   const block = `${BEGIN}\n${entry}\n${END}\n`;
-  if (existing.includes(BEGIN)) {
-    const next = replaceManagedBlock(existing, BEGIN, END, block);
-    await writeFile(file, next);
-    console.log(`     ✓ Codex ${server.name} MCP ${enabled ? "enabled" : "registered disabled"}`);
-    return;
-  }
-
-  if (new RegExp(`^\\[mcp_servers\\.${escapeRegExp(server.name)}\\]`, "m").test(existing)) {
-    console.log(`     · Codex ${server.name} MCP already present: ${file}`);
-    return;
-  }
-
-  const sep = existing && !existing.endsWith("\n") ? "\n\n" : existing ? "\n" : "";
   await mkdir(dirname(file), { recursive: true });
-  await writeFile(file, `${existing}${sep}${block}`);
+  const next = upsertCodexMcpServerConfig(existing, server.name, block);
+  await writeCodexToml(file, next);
   console.log(`     ✓ Codex ${server.name} MCP ${enabled ? "enabled" : "registered disabled"}`);
 }
 
@@ -440,15 +529,12 @@ async function removeFromCodex(server: McpServer, home: string): Promise<void> {
   const END = tomlBlockEnd(server.name);
   if (!(await exists(file))) return;
   const existing = await readFile(file, "utf8");
-  if (!existing.includes(BEGIN) && !existing.includes(END)) {
+  const next = stripCodexMcpServerConfig(existing, server.name);
+  if (next === existing.trimEnd()) {
     console.log(`     · Codex ${server.name} MCP not present`);
     return;
   }
-  const re = existing.includes(BEGIN)
-    ? new RegExp(`\\n?${escapeRegExp(BEGIN)}[\\s\\S]*?${escapeRegExp(END)}\\n?`, "m")
-    : new RegExp(`\\n?\\[mcp_servers\\.${escapeRegExp(server.name)}\\][\\s\\S]*?${escapeRegExp(END)}\\n?`, "m");
-  const out = existing.replace(re, "\n").replace(/\n{3,}/g, "\n\n").trimEnd();
-  await writeFile(file, out ? `${out}\n` : "");
+  await writeCodexToml(file, next ? `${next}\n` : "");
   console.log(`     - Codex ${server.name} MCP removed`);
 }
 
@@ -682,6 +768,36 @@ export async function removeFromAgents(
       case "opencode":    if (await exists(`${home}/.config/opencode`)) await removeFromOpenCode(server, home); break;
       case "pi":          if (await exists(`${home}/.pi/agent`)) await removeFromPi(server, home); break;
     }
+  }
+}
+
+/** Apply a disabled registry state to agent config.
+ *
+ * Agents with native disabled-state support keep the server configured but off.
+ * Agents without safe disabled config get the server removed from native config
+ * while the registry still records it as disabled.
+ */
+export async function applyDisabledToAgents(
+  name: string,
+  opts: { dryRun?: boolean; agents?: readonly AgentId[] } = {},
+): Promise<void> {
+  const reg = await loadRegistry();
+  const server = reg.servers[name];
+  if (!server) return;
+
+  const targetAgents = opts.agents ?? ALL_AGENT_IDS;
+  const nativeDisabledAgents = targetAgents.filter((agentId) =>
+    disabledConfigSupport(server, agentId) === "native"
+  );
+  const removeOnlyAgents = targetAgents.filter((agentId) =>
+    disabledConfigSupport(server, agentId) === "disabledConfigUnsupported"
+  );
+
+  if (removeOnlyAgents.length > 0) {
+    await removeFromAgents(name, { agents: removeOnlyAgents, dryRun: opts.dryRun });
+  }
+  if (nativeDisabledAgents.length > 0) {
+    await applyToAgents(name, { agents: nativeDisabledAgents, dryRun: opts.dryRun });
   }
 }
 

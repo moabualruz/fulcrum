@@ -1,8 +1,7 @@
 import { BUILTIN_MCPS } from "../../cli/mcp-builtins.ts";
 import {
-  ALL_AGENT_IDS,
+  applyDisabledToAgents,
   applyToAgents,
-  disabledConfigSupport,
   loadRegistry,
   registerServer,
   removeFromAgents,
@@ -47,6 +46,7 @@ export async function applyMcpAction(action: ComponentAction, dryRun = false): P
     }
     for (const entry of BUILTIN_MCPS) {
       await registerServer(entry.name, entry.spec);
+      await applyToAgents(entry.name, { dryRun });
     }
     return;
   }
@@ -73,24 +73,7 @@ async function applyDisabledMcpAction(
   agents: readonly AgentId[] | undefined,
   dryRun: boolean,
 ): Promise<void> {
-  const registry = await loadRegistry();
-  const server = registry.servers[name];
-  if (!server) return;
-
-  const targetAgents = agents ?? ALL_AGENT_IDS;
-  const nativeDisabledAgents = targetAgents.filter((agentId) => (
-    disabledConfigSupport(server, agentId) === "native"
-  ));
-  const removeOnlyAgents = targetAgents.filter((agentId) => (
-    disabledConfigSupport(server, agentId) === "disabledConfigUnsupported"
-  ));
-
-  if (removeOnlyAgents.length > 0) {
-    await removeFromAgents(name, { agents: removeOnlyAgents, dryRun });
-  }
-  if (nativeDisabledAgents.length > 0) {
-    await applyToAgents(name, { agents: nativeDisabledAgents, dryRun });
-  }
+  await applyDisabledToAgents(name, { agents, dryRun });
 }
 
 function mcpNameFromAction(action: ComponentAction): string {

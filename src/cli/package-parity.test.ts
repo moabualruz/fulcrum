@@ -58,6 +58,29 @@ describe("package parity audit", () => {
     expect(report.unsupported.some((target) => target.agentId === "claude-code")).toBe(true);
   });
 
+  test("reports missing native package installers instead of assuming installed", async () => {
+    const home = await mkdtemp(join(tmpdir(), "fulcrum-package-parity-"));
+    const manifest = await getPackageSurfaceManifest("package.cloudflare");
+    const targets = planPackageMirrorTargets(manifest, ["claude-code"]);
+
+    const report = await auditPackageParity(manifest, targets, { home });
+
+    expect(report.ok).toBe(false);
+    expect(report.missing.some((target) => target.support === "native")).toBe(true);
+  });
+
+  test("accepts native package installer surfaces when native state is present", async () => {
+    const home = await mkdtemp(join(tmpdir(), "fulcrum-package-parity-"));
+    await mkdir(join(home, ".claude", "plugins", "cache", "cloudflare"), { recursive: true });
+    const manifest = await getPackageSurfaceManifest("package.cloudflare");
+    const targets = planPackageMirrorTargets(manifest, ["claude-code"]);
+
+    const report = await auditPackageParity(manifest, targets, { home });
+
+    expect(report.ok).toBe(true);
+    expect(report.missing).toEqual([]);
+  });
+
   test("treats explicit unsupported targets as acceptable when nothing supported is missing", async () => {
     const home = await mkdtemp(join(tmpdir(), "fulcrum-package-parity-"));
     const manifest = await getPackageSurfaceManifest("package.repomix");
@@ -152,6 +175,42 @@ describe("package parity audit", () => {
     await setEnabled("cloudflare-api", true, { agents: ["codex"] });
     await mkdir(join(home, ".codex"), { recursive: true });
     await writeFile(join(home, ".codex", "config.toml"), "[mcp_servers.cloudflare-api]\nurl = \"https://mcp.cloudflare.com/mcp\"\n");
+
+    const report = await auditPackageParity(manifest, targets, { home });
+
+    expect(report.ok).toBe(true);
+    expect(report.missing).toEqual([]);
+  });
+
+  test("accepts disabled package MCPs on agents without native disabled config", async () => {
+    const home = await mkdtemp(join(tmpdir(), "fulcrum-package-parity-"));
+    process.env["HOME"] = home;
+    process.env["FULCRUM_HOME"] = join(home, ".fulcrum");
+    const source = join(home, "source", "cloudflare");
+    await mkdir(source, { recursive: true });
+    await writeFile(join(source, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        "cloudflare-api": { type: "http", url: "https://mcp.cloudflare.com/mcp" },
+      },
+    }, null, 2) + "\n");
+    const manifest = await getPackageSurfaceManifest("package.cloudflare", { sourceRoot: source });
+    const targets = planPackageMirrorTargets(manifest, ["pi"]);
+    for (const target of targets) {
+      if (!target.targetPath) continue;
+      const path = target.targetPath.replace(/^~/, home);
+      await mkdir(join(path, ".."), { recursive: true });
+      await writeFile(path, target.surface.relativePath);
+    }
+    await registerServer("cloudflare-api", {
+      transport: "http",
+      url: "https://mcp.cloudflare.com/mcp",
+      description: "Cloudflare API",
+      vendor: "cloudflare",
+      default_enabled: false,
+      auth_env_vars: [],
+      agent_visibility: { "claude-code": false, codex: false, gemini: false, opencode: false, pi: true },
+    });
+    await setEnabled("cloudflare-api", false, { agents: ["pi"] });
 
     const report = await auditPackageParity(manifest, targets, { home });
 

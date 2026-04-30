@@ -8,7 +8,7 @@ import { AGENTS } from "../agents/registry.ts";
 import { ALL_COMPONENTS } from "../components/catalog.ts";
 import { ComponentLedger, dbPath as componentLedgerPath } from "../components/ledger.ts";
 import { loadRegistry, ALL_AGENT_IDS, isEnabled, type AgentId } from "./mcp-registry.ts";
-import { MINIMAL_DEFAULT_MCPS, PACKAGE_DEFAULT_MCPS } from "./mcp-builtins.ts";
+import { MINIMAL_DEFAULT_MCPS } from "./mcp-builtins.ts";
 import { scanSkillBudgets, type SkillBudgetReport } from "./skill-budget.ts";
 import { auditPackageParity, type PackageParityReport } from "./package-parity.ts";
 import { planPackageMirrorTargets } from "./package-mirror.ts";
@@ -64,8 +64,8 @@ interface DoctorReport {
       agent_state: Record<string, "enabled" | "disabled" | "hidden">;
       auth_status: "ok" | "missing-env" | "n/a";
       reachable: boolean | null;
-      // Drift: registry default is disabled, yet some non-package-default
-      // server has it enabled. Usually means a prior `mcp enable --all-agents`.
+      // Drift: registry default is disabled, yet some non-recommended server
+      // has it enabled. Usually means a prior `mcp enable --all-agents`.
       drift: boolean;
       // Auth wiring: when auth_env_vars > 0, doctor inspects each agent's
       // native config to confirm the Authorization header (or codex's
@@ -591,14 +591,13 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       }
 
       // Drift: registry says default-disabled but some agent has it enabled.
-      // Package-default MCPs are intentionally enabled by their package
-      // installer while remaining opt-in outside that package profile.
+      // Package MCPs stay disabled by default when CLI/skill surfaces cover
+      // the same job; explicit enables are still visible here as opt-in drift.
       const enabledAgents = Object.entries(agentState)
         .filter(([, v]) => v === "enabled")
         .map(([k]) => k as AgentId);
       const isMinimalDefault = (MINIMAL_DEFAULT_MCPS as readonly string[]).includes(server.name);
-      const isPackageDefault = (PACKAGE_DEFAULT_MCPS as readonly string[]).includes(server.name);
-      const drift = !server.default_enabled && !isMinimalDefault && !isPackageDefault && enabledAgents.length > 0;
+      const drift = !server.default_enabled && !isMinimalDefault && enabledAgents.length > 0;
       if (drift) warnings += 1;
 
       // Auth status: missing env matters only for enabled servers that require

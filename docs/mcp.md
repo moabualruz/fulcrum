@@ -13,7 +13,7 @@ Per-agent install method follows the vendor's docs verbatim:
 - Pi CLI: `pi install npm:<pkg>` / `~/.pi/agent/mcp.json` (via `pi-mcp-adapter` for stdio/HTTP MCPs)
 - Codex CLI: `~/.codex/config.toml` MCP block / `~/.codex/hooks.json` / canonical `npx skills add <repo> -a codex` for skill packs that publish that path
 
-Ownership rule: if a server, skill, hook, command, rule, script, agent, or mixed surface is delivered through a managed plugin / extension / package, that package owns the surface for that agent. Agents with the vendor's native package primitive use that primitive. Agents without it get nearest-native adapters: package payload mirrors, loadable skill mirrors when the package cache is not a skill loader, and native MCP config generated from package `.mcp.json` / `mcp.json`. Registry `enable` / `disable` / `unregister` touch only the agent surfaces the registry owns; hidden native-package surfaces are skipped. Current examples: Repomix Claude Code plugins own Repomix MCP/commands/agent on Claude; Cloudflare Claude plugin owns bundled Cloudflare MCP/skills/commands/rules/assets on Claude while non-Claude agents receive a full package mirror, loadable skills, and package MCP config; Superpowers native packages own Claude/Gemini/OpenCode/Pi surfaces while Codex gets a full package mirror.
+Ownership rule: if a server, skill, hook, command, rule, script, agent, or mixed surface is delivered through a managed plugin / extension / package, that package owns the surface for that agent. Agents with the vendor's native package primitive use that primitive. Agents without it get nearest-native adapters: package payload mirrors, loadable skill mirrors when the package cache is not a skill loader, and native MCP config generated from package `.mcp.json` / `mcp.json`. Registry `enable` / `disable` / `unregister` touch only the agent surfaces the registry owns; hidden native-package surfaces are skipped. Current examples: Repomix Claude Code plugins own Repomix MCP/commands/agent on Claude; Cloudflare Claude plugin owns bundled Cloudflare MCP/skills/commands/rules/assets on Claude while non-Claude agents receive a full package mirror, loadable skills, and disabled package MCP config; Superpowers native packages own Claude/Gemini/OpenCode/Pi surfaces while Codex gets a full package mirror.
 
 Mirror policy: when an asset is published only for some agents (e.g. Claude plugin only, no Gemini extension), copy the vendor's exact package surfaces into the other agents' nearest native paths: skills, rules/context, MCP manifests plus native config, commands/prompts, agents/subagents, hooks, tools/scripts, package manifests, assets/templates/themes/docs, and unknown runtime assets. Do NOT rewrite, summarise, or "improve" upstream content — that introduces drift and authoring debt. Source backups (`.original.md`, `.backup.md`) and dev-only folders stay out of generated agent mirrors.
 
@@ -21,7 +21,7 @@ Mirror policy: when an asset is published only for some agents (e.g. Claude plug
 
 ## 1a. Cost rationale (default state)
 
-MCPs spawn long-running processes; 5+ active can eat 55–100k tokens at session start before the first message. The "official-first" policy above does not mean every MCP is always-on — it means we **manage** every official MCP (install/uninstall correctly) but keep the **enable** state intentional. Default for new users: `deepwiki` + `context7`. DeepWiki has no CLI fallback; context7 is broadly useful, docs-focused, and has no official skill fallback. Use `fulcrum install --no-default-mcps` to register all builtin MCP config while skipping Fulcrum's builtin default enable step; it does not remove or disable existing MCP state. Package installs enable the MCPs shipped by that package. Other official MCPs (github-mcp-server, standalone Cloudflare hosted endpoints, vendor MCPs) are registered as available but opt-in. Agents with native disabled-state support still get the config written disabled: Codex stores `enabled = false` in each `mcp_servers.<name>` TOML block; Gemini stores enablement in `~/.gemini/mcp-server-enablement.json`; OpenCode stores `"enabled": false` inside each `opencode.json` MCP entry. Claude Code and Pi currently lack an equivalent safe disabled config bit, so disabled registry MCPs remain visible through `fulcrum mcp list`, not their native MCP lists.
+MCPs spawn long-running processes; 5+ active can eat 55–100k tokens at session start before the first message. The "official-first" policy above does not mean every MCP is always-on — it means we **manage** every official MCP (install/uninstall correctly) but keep the **enable** state intentional. Default for new users: `deepwiki` only. DeepWiki has no CLI fallback; Context7, Cloudflare, Repomix, GitHub, Semgrep, Tavily, Playwright, Dart, and similar MCPs stay disabled by default when a CLI/skill/rule covers the same work. Use `fulcrum install --no-default-mcps` to register all builtin MCP config while skipping Fulcrum's recommended default enable step; it does not remove or disable existing MCP state. Package installs register and mirror the MCPs shipped by that package, but those MCPs are disabled by default unless explicitly enabled later. Agents with native disabled-state support still get the config written disabled: Codex stores `enabled = false` in each `mcp_servers.<name>` TOML block; Gemini stores enablement in `~/.gemini/mcp-server-enablement.json`; OpenCode stores `"enabled": false` inside each `opencode.json` MCP entry. Claude Code and Pi currently lack an equivalent safe disabled config bit, so disabled registry MCPs remain visible through `fulcrum mcp list`, not their native MCP lists.
 
 ## 2. Disable claude.ai defaults
 
@@ -98,20 +98,20 @@ Supersedes: `skills/gh/SKILL.md` (moved to `skills/_archive/gh-authored/`; skill
 
 ### 3.5 repomix (W2.2)
 
-Repomix MCP server via `yamadashy/repomix`. **Package-default enabled where Fulcrum owns the MCP surface.**
+Repomix MCP server via `yamadashy/repomix`. **Installed/registered but default-disabled** because Repomix's CLI and skills cover the normal pack/explore workflow without session-start MCP overhead.
 
 - Transport: stdio `npx -y repomix@latest --mcp`
 - Auth: none required
 - Vendor: `yamadashy`
 - Claude Code gets 3 official vendor plugins: `repomix-mcp`, `repomix-commands`, `repomix-explorer`; Fulcrum treats that Claude surface as plugin-owned, so the registry marks `claude-code` hidden and skips it during `fulcrum mcp enable/disable/unregister repomix`.
 - Gemini gets a Fulcrum-built extension mirror that bundles vendor-derived Repomix MCP config, pack/explore commands, skills, explorer agent, and vendor rules; the registry marks `gemini` hidden so it never disables or duplicates the extension-owned MCP.
-- OpenCode gets vendor-derived skills plus explorer agent mirror; registry owns and enables the MCP surface to preserve package-level functionality.
-- Codex gets vendor-derived skills, a Codex plugin-cache package mirror with MCP metadata, commands, explorer agent, rules, and enabled plugin config, plus registry-owned enabled MCP config.
-- Pi gets vendor-derived skills plus registry-owned enabled MCP config.
+- OpenCode gets vendor-derived skills plus explorer agent mirror; registry owns the MCP surface and writes it disabled by default.
+- Codex gets vendor-derived skills, a Codex plugin-cache package mirror with MCP metadata, commands, explorer agent, rules, and enabled plugin config, plus registry-owned disabled MCP config.
+- Pi gets vendor-derived skills; because Pi has no safe disabled MCP state, Fulcrum keeps the registry entry disabled and removes any prior native Repomix MCP config.
 
-To disable registry-owned Repomix MCP config for Codex/OpenCode/Pi: `fulcrum mcp disable repomix --agent codex --agent opencode --agent pi`
+To enable registry-owned Repomix MCP config for Codex/OpenCode/Pi: `fulcrum mcp enable repomix --agent codex --agent opencode --agent pi`
 
-Doctor treats Repomix's package-default enabled Codex/OpenCode/Pi MCP state as intentional, not generic default-disabled drift.
+Doctor flags enabled Repomix MCP state as opt-in drift from the default-disabled policy.
 
 Plugin install (Claude Code, idempotent):
 ```bash
@@ -125,7 +125,7 @@ Uninstall removes all 3 plugins and the registry entry. Registry removal only cl
 
 ### 3.6 W3 managed MCPs (Wave 3)
 
-W3 entries are opt-in except `context7`, which is part of the minimal default set. Enable other W3 servers individually with `fulcrum mcp enable <name>`.
+W3 entries are opt-in by default. Enable them individually with `fulcrum mcp enable <name>`.
 
 #### 3.6.1 semgrep (W3.3)
 
@@ -142,13 +142,13 @@ Prerequisite: `pip install semgrep` or `brew install semgrep`. Doctor reports `w
 
 #### 3.6.2 context7 (W3.4)
 
-Official upstash/context7 remote MCP. **Minimal-default enabled.** API key optional (free tier works without it; key raises rate limits per [context7.com/dashboard](https://context7.com/dashboard)).
+Official upstash/context7 remote MCP. **Default-disabled.** API key optional (free tier works without it; key raises rate limits per [context7.com/dashboard](https://context7.com/dashboard)).
 
 - Transport: HTTP `https://mcp.context7.com/mcp`
 - Auth: `CONTEXT7_API_KEY` (optional — free tier works without it)
 - Vendor: `upstash`
 
-To skip default enable during install: `fulcrum install --no-default-mcps`. To explicitly disable later: `fulcrum mcp disable context7 --all-agents`.
+To enable: `fulcrum mcp enable context7 --all-agents`. To disable later: `fulcrum mcp disable context7 --all-agents`.
 
 Supersedes: community fork `edxeth/superlight-context7-skill` (moved to `skills/_archive/upstream-removed.lock`). No official SKILL.md from upstash; MCP is the only official surface.
 
@@ -196,8 +196,8 @@ To enable: `fulcrum mcp enable cloudflare-docs` (no auth) or `fulcrum mcp enable
 
 Cloudflare package ownership:
 - Claude Code: `claude plugin marketplace add cloudflare/skills` and `claude plugin install cloudflare@cloudflare`. The plugin owns bundled skills plus these MCP endpoints: docs, bindings, builds, observability. Fulcrum hides those four registry surfaces for `claude-code`.
-- Non-Claude: Fulcrum installs a full Cloudflare package mirror, not a skills-only copy. The mirror includes vendor skills, commands, rules/context, MCP manifests, docs/assets, and package metadata where the target agent has an equivalent surface. Fulcrum also adapts package skills into native loadable skill paths and adapts package `.mcp.json` entries into native MCP config.
-- The Cloudflare package `.mcp.json` currently ships exact manifest names `cloudflare-api`, `cloudflare-docs`, `cloudflare-bindings`, `cloudflare-builds`, and `cloudflare-observability`. Package install registers/enables those for non-Claude fallback agents; uninstall removes package-only entries and restores builtin specs for overlapping names.
+- Non-Claude: Fulcrum installs a full Cloudflare package mirror, not a skills-only copy. The mirror includes vendor skills, commands, rules/context, MCP manifests, docs/assets, and package metadata where the target agent has an equivalent surface. Fulcrum also adapts package skills into native loadable skill paths and adapts package `.mcp.json` entries into native MCP config disabled by default.
+- The Cloudflare package `.mcp.json` currently ships exact manifest names `cloudflare-api`, `cloudflare-docs`, `cloudflare-bindings`, `cloudflare-builds`, and `cloudflare-observability`. Package install registers those for non-Claude fallback agents and writes disabled native config where supported; uninstall removes package-only entries and restores builtin specs for overlapping names.
 - Extra endpoints not bundled by the Claude plugin (`cloudflare-radar`, `cloudflare-logpush`, `cloudflare-browser`, `cloudflare-containers`, `cloudflare-ai-gateway`) remain registry-visible for Claude too.
 
 Kept: `upstream.lock` cloudflare/skills pins — 8 skills total (all vendor-published at tree `7c449de`): `cloudflare-agents-sdk`, `cloudflare-platform`, `cloudflare-email-service`, `cloudflare-durable-objects`, `cloudflare-sandbox-sdk`, `cloudflare-web-perf`, `cloudflare-workers-best-practices`, `wrangler`. They remain available for explicit standalone `fulcrum skills upstream` use, but component/full-profile install treats Cloudflare as package-owned: package install mirrors `skills/*` into loadable fallback skill paths and removes older top-level Cloudflare upstream copies to avoid duplicate skill activation.
@@ -239,7 +239,7 @@ fulcrum mcp disable myserver [--all-agents]
 
 Agent IDs: `claude-code`, `codex`, `gemini`, `opencode`, `pi`.
 
-`fulcrum install` registers all 17 builtin servers (deepwiki, github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart). It writes disabled native config for registry-owned disabled servers on Codex, Gemini, and OpenCode so their MCP managers show configured-but-disabled servers. Package-owned surfaces are hidden from the registry and keep their package defaults. Minimal default state enables `deepwiki` and `context7` where no user state exists. `--no-default-mcps` registers all definitions without changing enable state; `--enable-all-mcps` explicitly enables every registry-owned builtin. `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
+`fulcrum install` registers all 17 builtin servers (deepwiki, github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart). It writes disabled native config for registry-owned disabled servers on Codex, Gemini, and OpenCode so their MCP managers show configured-but-disabled servers. Package-owned surfaces are mirrored through their package adapters, and package MCP manifests are registered disabled unless the user explicitly enables them. Recommended default state enables only `deepwiki` where no user state exists. `--no-default-mcps` registers all definitions without changing enable state; `--enable-all-mcps` explicitly enables every registry-owned builtin. `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
 
 Servers can hide an agent when that agent surface is unsupported or owned by another Fulcrum-managed primitive. `fulcrum mcp list --json` reports that state as `"hidden"`; enable/disable skip hidden agents instead of writing registry state for them.
 
