@@ -18,6 +18,8 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
 
 - **Installs cross-agent setup** (`fulcrum install`) — default profile is now **minimal**: sentinel-splices `rules/AGENTS.md`, seeds `tool-output-policy.toml`, registers builtin MCPs, and enables only DeepWiki + context7 where no user state exists. `--profile rules-only` splices rules only. `--profile full` is the historical full bootstrap: hook snippets, caveman per agent (`claude plugin install caveman@caveman` / `gemini extensions install` / direct official repo mirror for Codex/OpenCode/Pi, with Codex plugin metadata/assets/hooks/config mirrored into native Codex paths), vendor capability packages (Repomix Claude plugins + non-Claude mirrors, Cloudflare Claude plugin, Superpowers Claude/Gemini/OpenCode/Pi packages + Codex full skill mirror; Pi falls back to skill mirror only when `pi` is unavailable), 29 authored skills + 27 upstream-pinned skills with subpath-level SHA-256 integrity verification and `vendor_canonical_agents` package-ownership skips. Codex authored skills no longer sync globally by default; explicit global/project scope is required. Generated CLI agent skill/package mirrors exclude `.original.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree folders; project source folders keep `.original.md`. Official plugin/extension installs that recreate source backups are pruned after install for Fulcrum and Caveman agent surfaces.
 
+- **Mirrors supported plugin/extension packages into other agents** — solid for the packages Fulcrum currently manages, not a generic arbitrary-plugin translator. Policy is official-first: use a vendor/native installer where it exists, then mirror the vendor-published package content into the nearest native surfaces for agents without that primitive. Current coverage: Caveman official Claude/Gemini installs plus Codex/OpenCode/Pi official-repo mirrors (Codex also gets plugin metadata/assets/hooks/config); Repomix official Claude plugins plus Gemini extension mirror, OpenCode agent mirror, Codex/OpenCode/Pi skills + registry-owned MCP; Superpowers official Claude/Gemini/OpenCode/Pi installs plus Codex full skill mirror and Pi fallback mirror; Cloudflare official Claude plugin plus non-Claude vendor skill mirrors and registry-owned MCP config. Package-owned MCP/skill surfaces are hidden from registry disable/remove paths so Fulcrum does not duplicate or fight the package.
+
 - **Bootstraps projects** (`fulcrum init <dir>`) in three vendor-canonical phases:
   1. **Vendor integrations** — `graphify install --platform <agent>` per detected agent (Claude Code/Codex/OpenCode/Gemini); `npx skills add` for ast-grep and tavily; caveman is handled only by `fulcrum install` per-agent mirrors; `pi install npm:pi-mcp-adapter` + `pi-mcp-adapter init` for Pi; defers context7 OAuth to manual `npx ctx7 setup`.
   2. **Strip duplicate vendor rule blocks** — vendor CLIs (`graphify install`) write rule text outside our `BEGIN/END FULCRUM RULES` sentinel; the same content lives in `rules/AGENTS.md` and is spliced inside the sentinel; `stripVendorRuleBlocks` removes the duplicate so agents don't load the rule twice. Vendor-installed hooks/settings remain untouched.
@@ -247,6 +249,7 @@ Don't relitigate without new information.
 | Agent registry as single source of truth | Without it, agent defs drifted across install/doctor/skills. | `src/agents/registry.ts` |
 | Per-skill iteration over batch eval tuning | Batch confounds measurement between skills. | `scripts/eval-skill-*.sh` |
 | Managed scope is OFFICIAL-FIRST | Manage every vendor-published agent asset; mirror verbatim into agents the vendor doesn't ship for; never re-author. MCPs with non-trivial cost default-disabled. | `docs/mcp.md` §1 |
+| Plugin/extension mirroring is package-specific today | Caveman, Repomix, Cloudflare, and Superpowers have explicit lifecycle helpers with native install/uninstall, mirrors, markers, and cleanup. Future `fulcrum plugins …` should generalize this; current code is not an arbitrary Claude-plugin-to-every-agent transpiler. | `src/cli/install.ts`, `src/cli/repomix-package.ts`, `src/cli/vendor-packages.ts`, §6.7 |
 | `fulcrum init` runs vendor commands verbatim | No `--output` overrides, no Fulcrum-managed watchers, no manual hook duplication. Vendor owns paths/filters/hooks. | `src/cli/vendor-installs.ts`, `src/cli/project-index.ts` |
 | Vendor behavioral rules live in `rules/AGENTS.md` § Vendor-tool behavioral rules | Single source spliced via FULCRUM sentinel; vendor's duplicate written outside the sentinel is stripped post-install (`stripVendorRuleBlocks`). | `rules/AGENTS.md` §12, `src/cli/install.ts` |
 | Project-index ≠ vendor-install | Two distinct concerns; two distinct modules. Live pattern matchers (rg, fd, ast-grep, jq, …) need no index. | `vendor-installs.ts` vs `project-index.ts` |
@@ -259,6 +262,8 @@ Don't relitigate without new information.
 
 Recent high-signal commits:
 
+- `f4269cd fix(uninstall): prune generated agent leftovers` — removes markerless Claude plugin cache leftovers on purge/package uninstall; prunes `.original.md` source backups from generated Fulcrum/Caveman plugin/extension installs while preserving project source backups; verified uninstall→install full roundtrip across all five agents.
+- `d92e7b5 fix(install): harden clean install defaults` — hardens full-profile install defaults, cleanup behavior, and generated mirror exclusions after live cross-agent reinstall checks.
 - `7beec0b fix(component): satisfy lifecycle verification` — final component lifecycle Task 13 verification; updates plan checklist/HANDOVER, fixes the default-profile catalog expectation for Repomix, and records green gates.
 - `e64288a docs(component): plan lifecycle implementation` — user/developer docs now describe shipped `fulcrum component`; HANDOVER and implementation plan no longer present component lifecycle as future work.
 - `840b54e fix(component): support purge removal` — exposes `fulcrum component remove --purge` and covers modified managed policy removal through CLI tests.
@@ -400,6 +405,8 @@ artifact_tags(artifact_id, tag)
 ### 6.7 Plugins / extensions — `fulcrum plugins …`
 
 **Goal.** Third-party drop-ins under each agent's namespacing convention.
+
+**Current foundation.** Package-specific lifecycle mirroring exists for Caveman, Repomix, Cloudflare, and Superpowers, including official-first installs, nearest-native mirrors for agents without first-party/generic installers, marker-based uninstall, purge cleanup, and `.original.md` pruning from generated agent folders. This is deliberately scoped to known packages; generic plugin discovery, install state, update, and enable/disable UX remains future work here.
 
 **Depends on.** All prior layers.
 
