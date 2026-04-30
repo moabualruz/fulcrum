@@ -12,6 +12,28 @@ Issues: see `issues/01-..` through `issues/09-..`.
 
 **Branch policy:** Stay on `main`. One Conventional Commit per closed issue. No PRs (per user instruction).
 
+## TDD policy (iron law for this PRD)
+
+Every behavior in every issue follows RED → GREEN → REFACTOR:
+
+1. Write the smallest meaningful test for the next behavior. Compile-only skeleton exports (`throw new Error("not implemented")`) are allowed only when static imports require the module to exist.
+2. Run that exact test and confirm it fails for the expected missing-behavior reason.
+3. Write production code; rerun the exact same test and confirm it passes.
+4. Refactor; rerun; gate stays green.
+5. Record the RED command, RED output excerpt, GREEN command, and GREEN output excerpt in the issue's `## Comments` section before marking it `Status: done`.
+6. Per-issue commit must follow the local commit shape: a `test(...)` commit (red) followed by a `feat(...)`/`fix(...)` commit (green). Squash to one Conventional Commit only at the issue boundary if the parent reviewer signs off; otherwise keep both.
+
+Tests live in:
+
+- Pure logic / store / server modules → `src/web/src/**/*.test.ts` (Vitest, jsdom).
+- Components → `src/web/src/**/*.svelte.test.ts` (`@testing-library/svelte` under Vitest).
+- E2E flows → `src/web/tests/e2e/**` (Playwright).
+
+Allowed before RED: dependency installs, empty directories, throwing skeleton exports, reading docs.
+Rejected before RED: implemented routes/components/server actions with runtime behavior, dummy return values that satisfy the test, real SQL.
+
+If production code lands without RED evidence, delete that production code and restart the issue from the test. Tests written after implementation do not count.
+
 ## Hard requirements (non-negotiable)
 
 - Real component kit. No more raw `<div>` lists.
@@ -47,8 +69,8 @@ Issues: see `issues/01-..` through `issues/09-..`.
 
 ## Acceptance gate
 
-- All 9 issues `Status: done`.
+- All 9 issues `Status: done` with RED/GREEN evidence in `## Comments`.
 - `cd src/web && bun run dev` boots; user can: create a project, create a task, drag it across the board, write a Markdown doc, search for it via cmd+K, watch the toast confirm.
-- `bun run ci` green (typecheck, test, build, web:check, web:build, skills:lint, compress:check).
+- `bun run ci` green (typecheck, test, build, web:install, web:check, web:build, web:test, skills:lint, compress:check).
 - `cd src/web && bun run test` (Vitest) green.
 - Playwright e2e in `src/web/tests/e2e/` boots SvelteKit dev server, executes the smoke flow, exits 0.

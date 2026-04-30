@@ -13,5 +13,6 @@ Per `docs/agents/issue-tracker.md`: one feature per directory. Each `<feature-sl
 | `product-kernel`                   | ready-for-agent    | 12     | All 12 `Status: done` (CLI surface, web shell, doctor, uninstall, docs).   |
 | `claude-migration-review`          | done               | n/a    | Report-only audit of claimed `.scratch/` migration completion.       |
 | `migration-review-remediation`     | ready-for-agent    | 15     | Issues 13–27 derived from the audit. 14 ready-for-agent + 25 parked. |
+| `web-shell-product-grade`          | ready-for-agent    | 9      | Polished, fully interactive web UI rebuild over the local product kernel; strict TDD per PRD. |
 
 Originals preserved under `docs/superpowers/{plans,specs}/`. The `.scratch/` copies are the canonical source for ongoing work; the `docs/superpowers/` versions are an archival record of how the work was first written.

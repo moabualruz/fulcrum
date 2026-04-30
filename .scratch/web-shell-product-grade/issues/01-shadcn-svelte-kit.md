@@ -12,6 +12,11 @@ File ownership:
 - `src/web/src/lib/utils.ts`
 - `src/web/src/lib/components/ui/**`
 
+TDD plan:
+- RED: `src/web/src/lib/components/ui/index.smoke.test.ts` imports `Button`, `Card`, `Badge`, `Dialog`, `AlertDialog`, `Input`, `Label`, `Textarea`, `Select`, `Table`, `Tabs`, `DropdownMenu`, `Sheet`, `Separator`, `Skeleton`, `ScrollArea`, `Avatar`, `Command`, `Tooltip`, `Toaster`, `Popover`, `Breadcrumb`, `Form` from `$lib/components/ui` and asserts each is a function. RED: missing modules.
+- GREEN: shadcn-svelte init + add commands populate `$lib/components/ui/**`; smoke test passes.
+- REFACTOR: lock `components.json` to base color `zinc`; ensure `$lib/utils.cn` exported once.
+
 Acceptance criteria:
 - `bunx shadcn-svelte@latest init` runs cleanly with: SvelteKit + TypeScript + Tailwind v4 + base color `zinc` + component path `$lib/components/ui` + utils path `$lib/utils`.
 - Components added: `button`, `card`, `badge`, `dialog`, `alert-dialog`, `input`, `label`, `textarea`, `select`, `table`, `tabs`, `dropdown-menu`, `sheet`, `separator`, `skeleton`, `scroll-area`, `avatar`, `command`, `tooltip`, `sonner`, `popover`, `breadcrumb`, `form`.
