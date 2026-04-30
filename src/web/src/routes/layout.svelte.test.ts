@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { Component } from "svelte";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
 
@@ -102,5 +104,34 @@ describe("+layout.svelte SSR shell", () => {
       /<section\b[^>]*aria-live="polite"/.test(body) ||
       /data-sonner-toaster/.test(body);
     expect(sonner).toBe(true);
+  });
+
+  // Regression for Codex review of f751603: bits-ui requires Sheet.Trigger
+  // to share the same Sheet.Root context provider as Sheet.Content; a trigger
+  // rendered as a sibling of <Sheet.Root> throws "Context Dialog.Root |
+  // AlertDialog.Root not found" the moment it tries to mount on mobile.
+  // SSR hits the desktop branch (mobile=false), so the throw is unreachable
+  // here — assert the structural shape of the source instead.
+  test("Sheet.Trigger lives inside the same Sheet.Root as Sheet.Content", () => {
+    const layoutSrc = readFileSync(
+      fileURLToPath(new URL("./+layout.svelte", import.meta.url)),
+      "utf8",
+    );
+    const rootOpen = layoutSrc.indexOf("<Sheet.Root");
+    const rootClose = layoutSrc.indexOf("</Sheet.Root>");
+    expect(rootOpen).toBeGreaterThan(-1);
+    expect(rootClose).toBeGreaterThan(rootOpen);
+    const inside = layoutSrc.slice(rootOpen, rootClose);
+    expect(inside).toContain("<Sheet.Trigger");
+    expect(inside).toContain("<Sheet.Content");
+    // Exactly one Sheet.Root wrapping the mobile branch.
+    const rootOpens = layoutSrc.match(/<Sheet\.Root\b/g) ?? [];
+    expect(rootOpens).toHaveLength(1);
+  });
+
+  test("layout renders without throwing for null activeProjectId", () => {
+    expect(() =>
+      render(Layout, { props: { data: { activeProjectId: null } } }),
+    ).not.toThrow();
   });
 });

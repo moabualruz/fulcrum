@@ -190,3 +190,23 @@ Acceptance criteria:
 - Filename deviation: `+layout.svelte.test.ts` rejected by SvelteKit's `+`-prefix rule (same constraint hit in 02.2). Renamed to `src/web/src/routes/layout.svelte.test.ts`; SvelteKit's route walker silently ignores non-`+` files.
 - Toaster assertion deviation (spec): spec asked for `<ol data-svelte-sonner>` or `[data-sonner-toaster]`. Neither attribute renders SSR-side without an active toast (verified against `node_modules/svelte-sonner/dist/Toaster.svelte:239–360`). Test asserts the `<section aria-live="polite">` wrapper that does render, with `data-sonner-toaster` as a tolerant fallback.
 - Regression: `bun test --conditions=svelte ./src/web/src/` → 83 pass / 0 fail / 189 expect() calls; `bun run check` 0/0/0; `bun run build` ok; `bun run ci` 9/9 green.
+
+### 02.6 Codex review fix — Sheet.Trigger placement
+
+- Codex review of `f751603` flagged a real bug: `Sheet.Trigger` rendered outside `<Sheet.Root>` (sibling subtree) — bits-ui requires the trigger to share the same context provider as `Sheet.Content`, otherwise it throws `Context Dialog.Root | AlertDialog.Root not found` the moment a mobile user taps the menu.
+- RED command: `bun test --conditions=svelte ./src/web/src/routes/layout.svelte.test.ts`
+- RED output (first 6 lines):
+  ```
+  bun test v1.3.13 (bf2e2cec)
+
+  src/web/src/routes/layout.svelte.test.ts:
+  120 |     const rootOpen = layoutSrc.indexOf("<Sheet.Root");
+  121 |     const rootClose = layoutSrc.indexOf("</Sheet.Root>");
+  122 |     expect(rootOpen).toBeGreaterThan(-1);
+  ```
+  Followed by `expect(received).toContain(expected) — Expected to contain: "<Sheet.Trigger"` against the pre-fix `<Sheet.Root>` body (which only held `<Sheet.Content>`).
+- GREEN command: same as RED.
+- GREEN output: `8 pass / 0 fail / 13 expect() calls` (6 existing SSR tests + 2 new — structural-shape regression + `not.toThrow()` smoke).
+- Surface change: `src/web/src/routes/+layout.svelte` mobile branch now wraps the entire inner column (sheet trigger + topbar + main) inside one `<Sheet.Root>`. Desktop branch unchanged in shape; minor reflow because the topbar+main column now sits inside `{#if mobile} … {:else} … {/if}` instead of after it. 102 LOC ≤ 120.
+- Regression test deviation: SSR runs the desktop branch (`isMobileViewport(browserDriver())` → false in node). The bits-ui throw is unreachable from `svelte/server` `render()`, so RED was driven by a structural-shape assertion that reads `+layout.svelte` source and verifies (a) `<Sheet.Trigger` and `<Sheet.Content` both appear between the single `<Sheet.Root>` open/close and (b) exactly one `<Sheet.Root>` exists in the file. The `not.toThrow()` smoke test stays as a tripwire for the desktop branch.
+- Regression: `bun test --conditions=svelte ./src/web/src/routes/layout.svelte.test.ts` 8 pass / 0 fail; `bun run check` 0/0/0; `bun run build` ok; `bun run ci` 9/9 green.

@@ -55,37 +55,48 @@
 			<Sheet.Content side="left" class="w-64 p-0">
 				<AppSidebar activeProjectId={data.activeProjectId} />
 			</Sheet.Content>
+			<div class={cn("flex min-w-0 flex-1 flex-col")}>
+				<div class={cn("flex items-center")}>
+					<Sheet.Trigger
+						data-mobile-sheet-trigger
+						aria-label="open navigation"
+						class={cn(
+							buttonVariants({ variant: "ghost", size: "icon" }),
+							"ml-2",
+						)}
+					>
+						☰
+					</Sheet.Trigger>
+					<div class="flex-1">
+						<AppTopbar
+							pathname={page.url.pathname}
+							activeProjectId={data.activeProjectId}
+							onThemeToggle={toggleMode}
+						/>
+					</div>
+				</div>
+				<main class={cn("flex-1 px-6 py-6")}>
+					{@render children?.()}
+				</main>
+			</div>
 		</Sheet.Root>
 	{:else}
 		<div class={cn("sticky top-0 h-screen")}>
 			<AppSidebar activeProjectId={data.activeProjectId} />
 		</div>
-	{/if}
-
-	<div class={cn("flex min-w-0 flex-1 flex-col")}>
-		<div class={cn("flex items-center")}>
-			{#if mobile}
-				<Sheet.Trigger
-					data-mobile-sheet-trigger
-					aria-label="open navigation"
-					class={cn(
-						buttonVariants({ variant: "ghost", size: "icon" }),
-						"ml-2",
-					)}
-				>
-					☰
-				</Sheet.Trigger>
-			{/if}
-			<div class="flex-1">
-				<AppTopbar
-					pathname={page.url.pathname}
-					activeProjectId={data.activeProjectId}
-					onThemeToggle={toggleMode}
-				/>
+		<div class={cn("flex min-w-0 flex-1 flex-col")}>
+			<div class={cn("flex items-center")}>
+				<div class="flex-1">
+					<AppTopbar
+						pathname={page.url.pathname}
+						activeProjectId={data.activeProjectId}
+						onThemeToggle={toggleMode}
+					/>
+				</div>
 			</div>
+			<main class={cn("flex-1 px-6 py-6")}>
+				{@render children?.()}
+			</main>
 		</div>
-		<main class={cn("flex-1 px-6 py-6")}>
-			{@render children?.()}
-		</main>
-	</div>
+	{/if}
 </div>
