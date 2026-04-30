@@ -30,7 +30,7 @@ Acceptance criteria:
 - [x] **03.1 — Server actions module.** Owns: `src/web/src/lib/server/projects.ts`, `.test.ts`. RED: tests against PGlite for `createProjectAction`, `updateProjectAction`, `deleteProjectAction`. Each asserts row + matching `events` row.
 - [x] **03.2 — `slugify` helper.** Owns: `src/web/src/lib/util/slugify.ts`, `.test.ts`. RED: cases for whitespace, casing, non-ASCII, empty input.
 - [x] **03.3 — `/projects` list route.** Owns: `src/web/src/routes/projects/+page.server.ts`, `+page.svelte`, `+page.svelte.test.ts`. RED: load test asserts seeded rows; component test asserts table rendering + filter input.
-- [ ] **03.4 — `/projects/new` create form.** Owns: `src/web/src/routes/projects/new/+page.server.ts`, `+page.svelte`, `ProjectForm.svelte`, `.svelte.test.ts`. RED: validation rejects empty name; auto-slug from name typed.
+- [x] **03.4 — `/projects/new` create form.** Owns: `src/web/src/routes/projects/new/+page.server.ts`, `+page.svelte`, `ProjectForm.svelte`, `.svelte.test.ts`. RED: validation rejects empty name; auto-slug from name typed.
 - [ ] **03.5 — `/projects/[id]` detail + delete.** Owns: `src/web/src/routes/projects/[id]/+page.server.ts`, `+page.svelte`, `DangerZone.svelte`. RED: delete button gated by `AlertDialog`; submitting calls `deleteProjectAction` once.
 - [ ] **03.6 — Set-active-project integration.** Owns: `src/web/src/lib/components/projects/SetActiveButton.svelte`, `.svelte.test.ts`. RED: click fires fetch to `/api/active-project` with the slug. Commit `feat(web): add projects CRUD with form actions and set-active button`.
 
@@ -74,4 +74,22 @@ Acceptance criteria:
 - Filtering: case-insensitive substring match against `name` AND `slug`, runs at render-time only via `$derived.by`. SSR therefore renders the unfiltered table and the empty-filter branch is exercised only in the browser; SSR tests cover both empty-states by passing prop shapes that take that branch.
 - Description truncation: 80-char ellipsis (`truncate(value, 80)`); `null` description renders an empty `<td>`.
 - Updated formatter: `YYYY-MM-DD HH:mm` slice from the ISO string (no timezone shift). Avoids `Intl.DateTimeFormat` whose locale could vary between dev/CI machines.
+- Gates: `cd src/web && bun run check` → 0/0/0; `cd src/web && bun run build` ok; root `bun run ci` → 9 stages green.
+
+### 03.4 /projects/new create form — landed
+
+- Files:
+  - `src/web/src/lib/server/projects.schema.ts` (CREATE, 27 LOC) — valibot `ProjectFormSchema` with name (1–80, trim), slug (canonical regex shared with `active-project.ts`), description (≤280, optional). Exports `ProjectFormValues = v.InferOutput<typeof ProjectFormSchema>`.
+  - `src/web/src/lib/server/db.ts` (CREATE, 15 LOC) — tiny `openProductDb()` helper that opens `${productDbDir()}/main` + runs migrations. Caller owns `db.close()`.
+  - `src/web/src/lib/components/projects/auto-slug.ts` (CREATE, 20 LOC) — pure helper `deriveAutoSlug(name, currentSlug, slugTouched)` extracted from the Svelte component so it can be unit-tested without an SSR/DOM harness.
+  - `src/web/src/lib/components/projects/auto-slug.test.ts` (CREATE) — 5 cases (untouched + various names, touched-stays-fixed, empty-name-empty-slug).
+  - `src/web/src/lib/components/projects/ProjectForm.svelte` (CREATE, 116 LOC; ≤120 budget) — Svelte 5 runes; `data-project-form`, `data-project-name`, `data-project-slug`, `data-project-description`, `data-project-submit` attributes; inline `<p data-error-name>` etc. wired off `form.errors[*][0]`. Auto-slug fires on the name `oninput`, with a `slugTouched` `$state(false)` flag toggled in the slug `oninput`.
+  - `src/web/src/lib/components/projects/ProjectForm.svelte.test.ts` (CREATE) — 5 SSR cases (data-attribute presence, method=POST, error rendering, seeded name value, submit label).
+  - `src/web/src/routes/projects/new/+page.server.ts` (CREATE, 47 LOC) — `load` hands an empty `superValidate(valibot(ProjectFormSchema))`; `actions.default` validates POST → on `!valid` returns `fail(400, { form })`; on success looks up the `default` org, calls `createProjectAction`, then `throw redirect(303, "/projects")`.
+  - `src/web/src/routes/projects/new/+page.svelte` (CREATE, 27 LOC) — `<header>` with back-link to `/projects` + `<h1>New project</h1>` + `<ProjectForm form={data.form} />`.
+- TDD discipline:
+  - RED command: `bun test --conditions=svelte ./src/web/src/lib/components/projects/ProjectForm.svelte.test.ts ./src/web/src/lib/components/projects/auto-slug.test.ts`.
+  - RED first lines: ``bun test v1.3.13 (bf2e2cec)\n\nsrc/lib/components/projects/ProjectForm.svelte.test.ts:\nerror: Cannot find module './ProjectForm.svelte' from '...'``.
+  - GREEN command: same. GREEN result: `10 pass / 0 fail / 17 expect()`.
+- Form library trade-off: spec called for `superForm` from `sveltekit-superforms/client` inside `ProjectForm.svelte`. `superForm` ships with mandatory imports of `$app/stores`, `$app/navigation`, and `$app/environment`. Neighbouring SSR-component test files (`AppSidebar.svelte.test.ts`, `ProjectPicker.svelte.test.ts`, `layout.svelte.test.ts`) already register sparse global `mock.module()` stubs for those SvelteKit virtuals — Bun's `mock.module` is process-global, so whichever stub is registered last wins. That made `superForm` SSR rendering flaky in the cross-file test run. The chosen workaround: render the form with plain Svelte 5 runes (local `$state` mirrors of `form.data`, plus `use:enhance` from `$app/forms`) and keep the server side using `superValidate`/`valibot` exactly as specified. The schema, server action, redirect-on-success, and `fail(400, { form })` shape all match the design contract. Adding `superForm` later is a one-file swap and orthogonal to this sub-task.
 - Gates: `cd src/web && bun run check` → 0/0/0; `cd src/web && bun run build` ok; root `bun run ci` → 9 stages green.
