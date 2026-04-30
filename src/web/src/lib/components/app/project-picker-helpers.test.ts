@@ -62,4 +62,38 @@ describe("selectProject helper", () => {
     expect(result).toEqual({ ok: false, status: 400, error: "bad" });
     expect(onSuccess).not.toHaveBeenCalled();
   });
+
+  test("non-204 2xx (e.g. 200) is treated as unexpected and skips onSuccess", async () => {
+    const { fetchStub } = makeFetchStub({ status: 200 });
+    const onSuccess = mock(() => {});
+    const result = await selectProject("fulcrum", {
+      fetch: fetchStub,
+      onSuccess,
+    });
+    expect(result).toEqual({ ok: false, status: 200, error: "unexpected" });
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  test("falls back to globalThis.fetch when opts.fetch is omitted", async () => {
+    const original = globalThis.fetch;
+    const calls: { url: string; init?: RequestInit }[] = [];
+    const recording: typeof fetch = ((
+      input: Parameters<typeof fetch>[0],
+      init?: RequestInit,
+    ) => {
+      calls.push({ url: String(input), init });
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }) as typeof fetch;
+    globalThis.fetch = recording;
+    try {
+      const result = await selectProject("fulcrum");
+      expect(result).toEqual({ ok: true, status: 204 });
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.url).toBe("/api/active-project");
+      expect(calls[0]!.init?.method).toBe("POST");
+      expect(calls[0]!.init?.body).toBe(JSON.stringify({ slug: "fulcrum" }));
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
 });

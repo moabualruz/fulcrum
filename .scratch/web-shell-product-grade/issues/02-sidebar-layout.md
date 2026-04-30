@@ -139,3 +139,27 @@ Acceptance criteria:
   - `src/web/src/lib/components/app/ProjectPicker.svelte` accepts `{ activeProjectId, projects }`, emits flat shadcn-shape markup (`data-project-picker` wrapper, `data-slot="dropdown-menu-trigger"` button with active project name or "Select project" + `ChevronsUpDown`, `data-slot="dropdown-menu-content"` containing one `data-project-picker-item` per project, plus a `data-slot="dropdown-menu-separator"` + `data-project-picker-clear` button when an active project exists). Click handlers call `selectProject(slug, { fetch: window.fetch.bind(window), onSuccess: () => goto(window.location.pathname, { invalidateAll: true }) })`. 80 LOC ≤ 90.
 - Design deviation (continued from 02.3 / 02.4): same shadcn-SSR clash workaround — flat HTML with `data-slot` attributes instead of importing the `DropdownMenu` component family inside `svelte/server` `render()`. Same final markup, no behavior change.
 - Regression: `bun test --conditions=svelte ./src/web/src/lib/components/app/ ./src/web/src/lib/state/ ./src/web/src/routes/ ./src/web/src/hooks.server.test.ts` 40 pass / 0 fail; `bun run check` 0/0/0; `bun run build` ok; `bun run ci` 9/9 green.
+
+### 02.5 Codex review fixes — 2026-04-30
+
+- Codex review of `feaa5de` raised two concrete issues:
+  1. Helper `selectProject` gated `onSuccess` on `res.ok` (any 2xx). Spec requires 204-only. A 200 response would silently fire `onSuccess` and return `{ok:true}`.
+  2. Default-fetch path (no `opts.fetch`) was not test-covered.
+- RED command: `bun test --conditions=svelte ./src/web/src/lib/components/app/project-picker-helpers.test.ts`
+- RED output (first 6 lines):
+  ```
+  bun test v1.3.13 (bf2e2cec)
+
+  src/web/src/lib/components/app/project-picker-helpers.test.ts:
+  68 |     const onSuccess = mock(() => {});
+  69 |     const result = await selectProject("fulcrum", {
+  70 |       fetch: fetchStub,
+  ```
+  Followed by `expect(received).toEqual(expected)` mismatch on the new 200-unexpected case (`Received {ok:true,status:200}` vs `Expected {ok:false,status:200,error:"unexpected"}`).
+- GREEN command: same as RED.
+- GREEN output: `5 pass / 0 fail / 18 expect() calls` (3 existing + 2 new — spec-counted "5 existing + 2 new = 7" was a counting nit; pre-fix file had 3 helper tests).
+- Helper now branches explicitly: `204 → {ok:true}` + `onSuccess`; `400 → {ok:false, error: body.error ?? "bad request"}`; everything else → `{ok:false, error:"unexpected"}` and **no** `onSuccess`. Default `fetch` resolved through `globalThis.fetch` for symmetry with the new test that swaps it. 30 LOC ≤ 30.
+- New test 1 (`non-204 2xx (e.g. 200) is treated as unexpected and skips onSuccess`): stub returns 200, asserts `{ok:false,status:200,error:"unexpected"}` and `onSuccess` not called. Proves the regression Codex flagged.
+- New test 2 (`falls back to globalThis.fetch when opts.fetch is omitted`): captures original `globalThis.fetch` in `try/finally`, swaps in a recording stub returning 204, calls `selectProject("fulcrum")` with no opts, asserts the recording stub was called once with `/api/active-project` POST and JSON body `{"slug":"fulcrum"}`, restores the original `fetch` in `finally`.
+- Out-of-scope (per spec): component, endpoint, and SSR test untouched. Codex's `aria-haspopup` / `aria-controls` WARN deferred to 02.6 / 09.
+- Regression: `bun test --conditions=svelte` over the full set (helpers + endpoint + ProjectPicker + AppSidebar + AppTopbar + nav-items + active-project + utils + ui-primitives smoke + hooks.server + layout.server) → 61 pass / 0 fail; `bun run check` 0/0/0; `bun run build` ok; `bun run ci` 9/9 green.
