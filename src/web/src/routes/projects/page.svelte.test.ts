@@ -1,0 +1,114 @@
+import type { Component } from "svelte";
+import { beforeAll, describe, expect, mock, test } from "bun:test";
+
+// `svelte/server` `render()` needs server-compiled `.svelte` modules — Bun's
+// `.svelte` loader is registered globally via `bunfig.toml` `[test] preload`
+// (see `src/web/src/lib/test/svelte-ssr-preload.ts`).
+
+// `$app/state` is a SvelteKit virtual module; supply a lightweight stub so any
+// transitive imports work in this isolated render harness.
+mock.module("$app/state", () => ({
+  page: {
+    url: new URL("http://localhost/projects"),
+    params: {},
+    route: { id: null },
+    status: 200,
+    error: null,
+    data: {},
+    state: {},
+    form: null,
+  },
+}));
+
+interface ProjectListing {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  updated_at: string;
+}
+
+type PageProps = { data: { projects: ProjectListing[] } };
+
+const SAMPLE: ProjectListing[] = [
+  {
+    id: "01J0PROJECT0000000000000001",
+    slug: "alpha",
+    name: "Alpha",
+    description: "first sample project",
+    updated_at: "2026-04-30T12:00:00.000Z",
+  },
+  {
+    id: "01J0PROJECT0000000000000002",
+    slug: "beta",
+    name: "Beta",
+    description: null,
+    updated_at: "2026-04-29T08:00:00.000Z",
+  },
+  {
+    id: "01J0PROJECT0000000000000003",
+    slug: "gamma",
+    name: "Gamma",
+    description: "third sample project",
+    updated_at: "2026-04-28T03:00:00.000Z",
+  },
+];
+
+describe("/projects +page.svelte", () => {
+  let render: typeof import("svelte/server").render;
+  let Page: Component<PageProps>;
+
+  beforeAll(async () => {
+    ({ render } = await import("svelte/server"));
+    const mod = (await import("./+page.svelte")) as {
+      default: Component<PageProps>;
+    };
+    Page = mod.default;
+  });
+
+  test("renders the empty-state marker and zero table-row bodies when no projects", () => {
+    const { body } = render(Page, { props: { data: { projects: [] } } });
+    expect(body).toContain('data-empty-projects');
+    const rows = body.match(/data-slot="table-row"[^>]*data-project-row/g) ?? [];
+    expect(rows).toHaveLength(0);
+  });
+
+  test("renders three body rows for three seeded projects, each with name + slug", () => {
+    const { body } = render(Page, { props: { data: { projects: SAMPLE } } });
+    const rows = body.match(/data-slot="table-row"[^>]*data-project-row/g) ?? [];
+    expect(rows).toHaveLength(3);
+    for (const project of SAMPLE) {
+      expect(body).toContain(project.name);
+      expect(body).toContain(project.slug);
+    }
+  });
+
+  test("filter input is present (data-projects-filter, type=search)", () => {
+    const { body } = render(Page, { props: { data: { projects: SAMPLE } } });
+    const inputMatch = body.match(/<input\b[^>]*>/g) ?? [];
+    const filterInput = inputMatch.find((m) => m.includes("data-projects-filter"));
+    expect(filterInput).toBeDefined();
+    expect(filterInput).toContain('type="search"');
+  });
+
+  test("new-project CTA points to /projects/new", () => {
+    const { body } = render(Page, { props: { data: { projects: SAMPLE } } });
+    const anchorMatch = body.match(/<a\b[^>]*>/g) ?? [];
+    const cta = anchorMatch.find((a) => a.includes("data-new-project"));
+    expect(cta).toBeDefined();
+    expect(cta).toContain('href="/projects/new"');
+  });
+
+  test("each row links to /projects/<id>", () => {
+    const { body } = render(Page, { props: { data: { projects: SAMPLE } } });
+    for (const project of SAMPLE) {
+      const re = new RegExp(`href="/projects/${project.id}"`);
+      expect(body).toMatch(re);
+    }
+  });
+
+  test("header h1 reads 'Projects'", () => {
+    const { body } = render(Page, { props: { data: { projects: [] } } });
+    expect(body).toMatch(/<h1\b[^>]*>\s*Projects\s*<\/h1>/);
+  });
+});
