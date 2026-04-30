@@ -30,7 +30,7 @@ Acceptance criteria:
 Every sub-task: RED test → GREEN minimum impl → REFACTOR. Capture commands + 3-line output excerpts in `## Comments`. One Conventional Commit per sub-task.
 
 - [x] **01.1 — Scaffold `components.json` + base CSS theme.** Owns: `src/web/components.json`, `src/web/src/app.css`, `src/web/src/lib/utils.ts`. RED: `src/web/src/lib/components/ui/utils.test.ts` imports `cn` and asserts `cn("a", false && "b", "c") === "a c"`. GREEN: run `bunx shadcn-svelte@latest init --base-color zinc --css src/app.css --lib-alias '$lib' --components-alias '$lib/components' --utils-alias '$lib/utils' --hooks-alias '$lib/hooks' --ui-alias '$lib/components/ui'`. Verify: `bun run check`.
-- [ ] **01.2 — Install primitive components wave.** Owns: `src/web/src/lib/components/ui/{button,card,badge,input,label,textarea,select}/`. RED: `ui-primitives.smoke.test.ts` imports each and asserts each is a function. GREEN: `bunx shadcn-svelte@latest add -y button card badge input label textarea select`.
+- [x] **01.2 — Install primitive components wave.** Owns: `src/web/src/lib/components/ui/{button,card,badge,input,label,textarea,select}/`. RED: `ui-primitives.smoke.test.ts` imports each and asserts each is a function. GREEN: `bunx shadcn-svelte@latest add -y button card badge input label textarea select`.
 - [ ] **01.3 — Install layout primitives.** Owns: `src/web/src/lib/components/ui/{table,tabs,sheet,separator,skeleton,scroll-area,avatar,breadcrumb}/`. RED: extend the smoke test with these names. GREEN: `bunx shadcn-svelte@latest add -y table tabs sheet separator skeleton scroll-area avatar breadcrumb`.
 - [ ] **01.4 — Install overlay primitives.** Owns: `src/web/src/lib/components/ui/{dialog,alert-dialog,dropdown-menu,popover,tooltip,command,form}/`. RED: extend smoke test. GREEN: `bunx shadcn-svelte@latest add -y dialog alert-dialog dropdown-menu popover tooltip command form`.
 - [ ] **01.5 — Toaster + form validation deps.** Owns: `src/web/package.json`, `src/web/src/lib/components/ui/sonner/`. RED: smoke imports `Toaster`. GREEN: `bunx shadcn-svelte@latest add -y sonner` then `bun add svelte-sonner mode-watcher lucide-svelte sveltekit-superforms valibot marked dompurify`.
@@ -70,3 +70,27 @@ RED rerun before the file move: `bun test ./src/web/src/lib/components/ui/utils.
 Bundled-CSS spot check after fixes #2 + #3: `rg --no-heading -i 'color-background' src/web/.svelte-kit/output` shows `--color-background:var(--background)` in both `client/_app/.../0.*.css` and `server/_app/.../_layout.*.css` — no `#ffffff` mapping remains.
 
 Gates: `cd src/web && bun run check` → 346 files, 0 errors. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.
+
+### 01.2 — 2026-04-30 (implementer)
+
+RED command: `bun test ./src/web/src/lib/components/ui/ui-primitives.smoke.test.ts`
+
+RED output (first lines):
+```
+bun test v1.3.13 (bf2e2cec)
+src/web/src/lib/components/ui/ui-primitives.smoke.test.ts:
+# Unhandled error between tests
+error: Cannot find module '$lib/components/ui/button' from '/Users/mkh/workspace/fulcrum/src/web/src/lib/components/ui/ui-primitives.smoke.test.ts'
+ 0 pass / 1 fail / 1 error
+```
+
+GREEN command: `cd src/web && bunx shadcn-svelte@latest add -y --overwrite button card badge input label textarea select` (the verbatim spec command without `--overwrite` works identically; `-y` flag — already documented in `add --help` — replaced the expect-PTY driver used in 01.1). Note the spec wrote `-y button card ...`; the 1.2.7 CLI accepts `-y` either before or after the component list.
+
+GREEN test: `bun test ./src/web/src/lib/components/ui/ui-primitives.smoke.test.ts` → `7 pass, 0 fail`.
+
+Implementation notes:
+- **`.svelte` loader registered inline.** `bun:test` has no built-in `.svelte` loader; the test file calls `Bun.plugin({...})` with `svelte/compiler.compile` for `.svelte` and `svelte/compiler.compileModule` for `.svelte.js`/`.svelte.ts` (bits-ui ships rune-using `.svelte.js`). Imports inside `it()` blocks are dynamic (`await import(...)`) so module resolution happens after the plugin registers. Pure-logic test — no DOM, no render.
+- **Transitive `separator/` install.** `select-separator.svelte` imports from `$lib/components/ui/separator`, so `bunx shadcn-svelte add select` auto-pulls the `separator` component. Sub-task 01.3 explicitly owns `separator`; the file landed during 01.2 to make `select` resolvable. 01.3 can re-run `add separator --overwrite` without conflict.
+- **`bunfig.toml` toggle.** Flipped `frozenLockfile = true → false` for the duration of `shadcn-svelte add` (which bumped `bits-ui` and `@internationalized/date` into `src/web/package.json`/`bun.lock`), then reverted back to `true` before commit.
+
+Gates: `bun test ./src/web/src/lib/utils.test.ts` → 2 pass (regression). `cd src/web && bun run check` → 847 files, 0 errors. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.
