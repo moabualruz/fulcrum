@@ -39,6 +39,13 @@ Usage:
                                      Show component details and surfaces.
   fulcrum component plan <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--json]
                                      Plan component changes without applying them.
+  fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
+  fulcrum product projects list [--json]
+                                     List product-kernel projects.
+  fulcrum product search <query> [--org-slug <slug>] [--limit <N>] [--json]
+                                     Run an FTS query over the product kernel search index.
+  fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
+                                     Render the assembled Markdown context for a task.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -108,6 +115,11 @@ async function main() {
     case "component": {
       const { run: runComponent } = await import("./cli/component.ts");
       await runComponent(rest);
+      return;
+    }
+    case "product": {
+      const { run: runProduct } = await import("./cli/product.ts");
+      await runProduct(rest);
       return;
     }
     case "version":
