@@ -32,7 +32,7 @@ Every sub-task: RED test → GREEN minimum impl → REFACTOR. Capture commands +
 - [x] **01.1 — Scaffold `components.json` + base CSS theme.** Owns: `src/web/components.json`, `src/web/src/app.css`, `src/web/src/lib/utils.ts`. RED: `src/web/src/lib/components/ui/utils.test.ts` imports `cn` and asserts `cn("a", false && "b", "c") === "a c"`. GREEN: run `bunx shadcn-svelte@latest init --base-color zinc --css src/app.css --lib-alias '$lib' --components-alias '$lib/components' --utils-alias '$lib/utils' --hooks-alias '$lib/hooks' --ui-alias '$lib/components/ui'`. Verify: `bun run check`.
 - [x] **01.2 — Install primitive components wave.** Owns: `src/web/src/lib/components/ui/{button,card,badge,input,label,textarea,select}/`. RED: `ui-primitives.smoke.test.ts` imports each and asserts each is a function. GREEN: `bunx shadcn-svelte@latest add -y button card badge input label textarea select`.
 - [x] **01.3 — Install layout primitives.** Owns: `src/web/src/lib/components/ui/{table,tabs,sheet,separator,skeleton,scroll-area,avatar,breadcrumb}/`. RED: extend the smoke test with these names. GREEN: `bunx shadcn-svelte@latest add -y table tabs sheet separator skeleton scroll-area avatar breadcrumb`.
-- [ ] **01.4 — Install overlay primitives.** Owns: `src/web/src/lib/components/ui/{dialog,alert-dialog,dropdown-menu,popover,tooltip,command,form}/`. RED: extend smoke test. GREEN: `bunx shadcn-svelte@latest add -y dialog alert-dialog dropdown-menu popover tooltip command form`.
+- [x] **01.4 — Install overlay primitives.** Owns: `src/web/src/lib/components/ui/{dialog,alert-dialog,dropdown-menu,popover,tooltip,command,form}/`. RED: extend smoke test. GREEN: `bunx shadcn-svelte@latest add -y dialog alert-dialog dropdown-menu popover tooltip command form`.
 - [ ] **01.5 — Toaster + form validation deps.** Owns: `src/web/package.json`, `src/web/src/lib/components/ui/sonner/`. RED: smoke imports `Toaster`. GREEN: `bunx shadcn-svelte@latest add -y sonner` then `bun add svelte-sonner mode-watcher lucide-svelte sveltekit-superforms valibot marked dompurify`.
 - [ ] **01.6 — Post-install gate.** Owns: nothing new. RED: `bun run check && bun run build` should already be green; if not, fix imports. GREEN: both exit 0. Commit `feat(web): add shadcn-svelte component kit + form/toast/markdown deps`.
 
@@ -116,3 +116,30 @@ GREEN command: `cd src/web && bunx shadcn-svelte@latest add -y --overwrite table
 GREEN test: `bun test ./src/web/src/lib/components/ui/ui-primitives.smoke.test.ts` → `15 pass, 0 fail`.
 
 Gates: `bun test ./src/web/src/lib/utils.test.ts` → 2 pass (regression). `cd src/web && bun run check` → 896 files, 0 errors / 0 warnings. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.
+
+### 01.4 — 2026-04-30 (implementer)
+
+RED command: `bun test ./src/web/src/lib/components/ui/ui-primitives.smoke.test.ts`
+
+RED output (first lines):
+```
+bun test v1.3.13 (bf2e2cec)
+src/web/src/lib/components/ui/ui-primitives.smoke.test.ts:
+error: Cannot find module '$lib/components/ui/dialog' from '/Users/mkh/workspace/fulcrum/src/web/src/lib/components/ui/ui-primitives.smoke.test.ts'
+(fail) shadcn-svelte primitives smoke > Dialog.Root is a Svelte 5 component function
+error: Cannot find module '$lib/components/ui/alert-dialog' from '/Users/mkh/workspace/fulcrum/src/web/src/lib/components/ui/ui-primitives.smoke.test.ts'
+(fail) shadcn-svelte primitives smoke > AlertDialog.Root is a Svelte 5 component function
+```
+
+15 prior pass + 7 new fail = 22 tests.
+
+GREEN command: `cd src/web && bunx shadcn-svelte@latest add -y --overwrite dialog alert-dialog dropdown-menu popover tooltip command form`. Toggled `bunfig.toml` `frozenLockfile = true → false` for the install (shadcn auto-bumped `formsnap@^2.0.1` and `sveltekit-superforms@^2.30.0` into `src/web/package.json`/`bun.lock`); reverted to `true` before commit.
+
+GREEN test: `bun test ./src/web/src/lib/components/ui/ui-primitives.smoke.test.ts` → `22 pass, 0 fail`.
+
+Implementation notes:
+- **`formsnap` + `svelte-toolbelt` exports patches.** `formsnap@2.0.1` and its transitive `svelte-toolbelt@0.5.0` ship `package.json` `exports` maps with only `types` + `svelte` conditions — no `default`/`import`. Bun's runtime resolver walks conditions in order and bails when it hits a `null`/missing match, so `import * as FormPrimitive from "formsnap"` from `form/index.ts` throws `Cannot find package 'formsnap'` (and downstream `Cannot find package 'svelte-toolbelt'` once formsnap resolves). Workaround: `bun patch formsnap@2.0.1` + `bun patch svelte-toolbelt@0.5.0`, add `"default": "./dist/index.js"` to each `exports["."]` map, `bun patch --commit`. Two `*.patch` files land in `src/web/patches/` and `package.json` gains `"patchedDependencies"` — auto-replayed on every `bun install`. Vite/svelte-check work fine without the patch (they pass `--conditions svelte`); the patch only fixes raw `bun test` resolution.
+- **Transitive `input-group/` install.** `form/form-input.svelte` (auto-pulled by `add form`) imports from `$lib/components/ui/input-group`, so `bunx shadcn-svelte add form` auto-pulled `input-group`. Not covered by sub-task ownership but harmless — sits in the `ui/` tree alongside the others. No smoke-test entry added (spec doesn't list it).
+- **Re-installs of earlier waves.** `add -y --overwrite form` re-emitted `button/`, `input/`, `textarea/`, `label/` (form barrel imports from those siblings). Identical content to 01.2 output — no behavioural diff.
+
+Gates: `bun test ./src/web/src/lib/utils.test.ts` → 2 pass (regression). `cd src/web && bun run check` → 2152 files, 0 errors / 0 warnings. `cd src/web && bun run build` → ok. `bun run ci` → all 9 stages green.

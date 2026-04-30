@@ -108,4 +108,39 @@ describe("shadcn-svelte primitives smoke", () => {
     const { Root } = await import("$lib/components/ui/breadcrumb");
     expect(typeof Root).toBe("function");
   });
+
+  it("Dialog.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/dialog");
+    expect(typeof Root).toBe("function");
+  });
+
+  it("AlertDialog.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/alert-dialog");
+    expect(typeof Root).toBe("function");
+  });
+
+  it("DropdownMenu.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/dropdown-menu");
+    expect(typeof Root).toBe("function");
+  });
+
+  it("Popover.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/popover");
+    expect(typeof Root).toBe("function");
+  });
+
+  it("Tooltip.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/tooltip");
+    expect(typeof Root).toBe("function");
+  });
+
+  it("Command.Root is a Svelte 5 component function", async () => {
+    const { Root } = await import("$lib/components/ui/command");
+    expect(typeof Root).toBe("function");
+  });
+
+  it("Form.Field is a function", async () => {
+    const { Field } = await import("$lib/components/ui/form");
+    expect(typeof Field).toBe("function");
+  });
 });
