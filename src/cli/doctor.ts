@@ -84,6 +84,20 @@ interface DoctorReport {
     database: string;
     packageParity: PackageParityReport[];
   };
+  productKernel: {
+    engine: "pglite" | "postgres" | "absent";
+    dbPath: string;
+    schemaApplied: number;
+    rows: {
+      orgs: number;
+      projects: number;
+      documents: number;
+      tasks: number;
+      agentRuns: number;
+    };
+    latestEventAt: string | null;
+    error?: string;
+  };
   worktrees: {
     projectLocalIgnoredRoots: Array<{
       path: string;
@@ -562,6 +576,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     }
   }
   const packageParity = await buildPackageParityReport(home);
+  const productKernel = await buildProductKernelReport();
 
   // Managed MCPs
   const mcpReport: DoctorReport["mcp"] = { servers: [] };
@@ -679,6 +694,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       database: componentDatabase,
       packageParity,
     },
+    productKernel,
     worktrees,
     skillBudget,
     skillsCount,
@@ -708,6 +724,83 @@ async function buildPackageParityReport(home: string): Promise<PackageParityRepo
     }
   }
   return reports;
+}
+
+async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]> {
+  const { productDbDir } = await import("../product-kernel/paths.ts");
+  const dir = productDbDir();
+  const dbPath = `${dir}/main`;
+  const exists = await Bun.file(`${dbPath}/PG_VERSION`).exists();
+  if (!exists) {
+    return {
+      engine: "absent",
+      dbPath,
+      schemaApplied: 0,
+      rows: { orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 },
+      latestEventAt: null,
+    };
+  }
+  try {
+    const { openPglite } = await import("../product-kernel/db/pglite.ts");
+    const db = await openPglite(dbPath);
+    try {
+      const schemaRows = await db.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM pg_class WHERE relname = 'schema_migrations' AND relkind = 'r'`,
+      );
+      if ((schemaRows[0]?.count ?? 0) === 0) {
+        return {
+          engine: "pglite",
+          dbPath,
+          schemaApplied: 0,
+          rows: { orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 },
+          latestEventAt: null,
+        };
+      }
+      const applied = await db.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM schema_migrations`,
+      );
+      const counts = await db.query<{
+        orgs: number;
+        projects: number;
+        documents: number;
+        tasks: number;
+        agent_runs: number;
+      }>(
+        `SELECT (SELECT COUNT(*)::int FROM orgs) AS orgs,
+                (SELECT COUNT(*)::int FROM projects) AS projects,
+                (SELECT COUNT(*)::int FROM documents) AS documents,
+                (SELECT COUNT(*)::int FROM tasks) AS tasks,
+                (SELECT COUNT(*)::int FROM agent_runs) AS agent_runs`,
+      );
+      const latest = await db.query<{ created_at: string | null }>(
+        `SELECT created_at FROM events ORDER BY created_at DESC, id DESC LIMIT 1`,
+      );
+      return {
+        engine: "pglite",
+        dbPath,
+        schemaApplied: applied[0]?.count ?? 0,
+        rows: {
+          orgs: counts[0]?.orgs ?? 0,
+          projects: counts[0]?.projects ?? 0,
+          documents: counts[0]?.documents ?? 0,
+          tasks: counts[0]?.tasks ?? 0,
+          agentRuns: counts[0]?.agent_runs ?? 0,
+        },
+        latestEventAt: latest[0]?.created_at ?? null,
+      };
+    } finally {
+      await db.close();
+    }
+  } catch (err) {
+    return {
+      engine: "absent",
+      dbPath,
+      schemaApplied: 0,
+      rows: { orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 },
+      latestEventAt: null,
+      error: (err as Error).message,
+    };
+  }
 }
 
 function printHumanFormat(report: DoctorReport, home: string): void {
@@ -799,6 +892,21 @@ function printHumanFormat(report: DoctorReport, home: string): void {
     `Components: ${report.components.installed}/${report.components.total} installed`
   );
   console.log(`  database: ${report.components.database}`);
+  console.log();
+
+  // Product kernel
+  const pk = report.productKernel;
+  console.log(`Product kernel: ${pk.engine === "absent" ? "not initialised" : `engine=${pk.engine}`}`);
+  if (pk.engine !== "absent") {
+    console.log(`  db: ${pk.dbPath}`);
+    console.log(`  migrations applied: ${pk.schemaApplied}`);
+    console.log(
+      `  rows: orgs=${pk.rows.orgs} projects=${pk.rows.projects} documents=${pk.rows.documents} tasks=${pk.rows.tasks} agent_runs=${pk.rows.agentRuns}`,
+    );
+    if (pk.latestEventAt) console.log(`  latest event: ${pk.latestEventAt}`);
+  } else if (pk.error) {
+    console.log(`  error: ${pk.error}`);
+  }
   console.log();
 
   // Managed MCPs

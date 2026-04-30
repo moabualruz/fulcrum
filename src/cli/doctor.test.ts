@@ -641,3 +641,39 @@ enabled_codex = true
     expect(context7!["auth_status"]).toBe("n/a");
   });
 });
+
+describe("doctor --json product kernel section", () => {
+  test("reports productKernel.engine = absent before init", async () => {
+    const home = join(TMP, "product-kernel-absent");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const pk = report["productKernel"] as Record<string, unknown>;
+    expect(pk).toBeDefined();
+    expect(pk["engine"]).toBe("absent");
+    expect(pk["schemaApplied"]).toBe(0);
+    const rows = pk["rows"] as Record<string, number>;
+    expect(rows["orgs"]).toBe(0);
+  });
+
+  test("reports product kernel rows after fulcrum product init", async () => {
+    const home = join(TMP, "product-kernel-after-init");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    // Run fulcrum product init out-of-band
+    const initProc = Bun.spawn(["bun", "src/index.ts", "product", "init", "--json"], {
+      cwd: process.cwd(),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, HOME: home, FULCRUM_HOME: fulcrumHome },
+    });
+    await new Response(initProc.stdout).text();
+    await initProc.exited;
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const pk = report["productKernel"] as Record<string, unknown>;
+    expect(pk["engine"]).toBe("pglite");
+    expect((pk["schemaApplied"] as number) >= 3).toBe(true);
+    const rows = pk["rows"] as Record<string, number>;
+    expect(rows["orgs"]).toBe(1);
+  });
+});

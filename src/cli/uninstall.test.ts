@@ -678,3 +678,35 @@ describe("removeCavemanCopies — W1.4 filesystem mirrors", () => {
     }
   });
 });
+
+describe("uninstall product kernel state (issue 10)", () => {
+  test("default uninstall preserves product DB; --purge removes it", async () => {
+    const home = await Bun.$`mktemp -d -t fulcrum-uninstall-pk-XXXXXX`.text();
+    const HOME = home.trim();
+    const fulcrumHome = `${HOME}/.fulcrum`;
+    const productDir = `${fulcrumHome}/state/product`;
+    const probe = `${productDir}/db/main/PG_VERSION`;
+    await Bun.write(probe, "16\n");
+    expect(await Bun.file(probe).exists()).toBe(true);
+
+    const originalHome = process.env["HOME"];
+    const originalFh = process.env["FULCRUM_HOME"];
+    process.env["HOME"] = HOME;
+    process.env["FULCRUM_HOME"] = fulcrumHome;
+    try {
+      const { run } = await import("./uninstall.ts");
+
+      // Default uninstall (no --purge) must keep the product DB.
+      await run(["--dry-run"]);
+      expect(await Bun.file(probe).exists()).toBe(true);
+
+      // --purge must remove the product state directory entirely.
+      await run(["--purge"]);
+      expect(await Bun.file(probe).exists()).toBe(false);
+    } finally {
+      if (originalHome === undefined) delete process.env["HOME"]; else process.env["HOME"] = originalHome;
+      if (originalFh === undefined) delete process.env["FULCRUM_HOME"]; else process.env["FULCRUM_HOME"] = originalFh;
+      await Bun.$`rm -rf ${HOME}`.quiet();
+    }
+  });
+});

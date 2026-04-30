@@ -686,6 +686,7 @@ async function removePurgeState(keepState: boolean): Promise<void> {
   await removePath(`${fulcrumHome()}/state/global/upstream-skills`, "upstream skill install markers");
   await removePath(`${fulcrumHome()}/state/global/backups`, "Fulcrum conflict backups");
   await removePath(`${fulcrumHome()}/state/global/smoke-test`, "smoke-test records");
+  await removePath(`${fulcrumHome()}/state/product`, "product kernel database and artifacts");
   await removeEmptyDir(`${fulcrumHome()}/hooks`, "empty Fulcrum hooks directory");
   await removeEmptyDir(`${fulcrumHome()}/state/global`, "empty Fulcrum global state directory");
   await removeEmptyDir(`${fulcrumHome()}/state`, "empty Fulcrum state directory");
