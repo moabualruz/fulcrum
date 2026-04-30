@@ -29,3 +29,12 @@ Acceptance criteria:
 - `/search?q=` runs `searchProductDocuments` and groups hits by source kind (doc/task/memory). Empty state with hint.
 - Cmd+K command palette using shadcn `Command`. Opens with kbd hint in top bar. Routes to top-level pages + recently visited URLs (cookie). Live filter as user types.
 - Keyboard escape closes palette.
+
+## Sub-tasks
+
+- [ ] **07.1 — `loadDashboard` server helper.** Owns: `src/web/src/lib/server/dashboard.ts`, `.test.ts`. RED: counters match seeded data; recent-runs cap = 5; recent-docs cap = 5; top-tasks = 5 by priority.
+- [ ] **07.2 — `command-palette` filter (`scoreCommand`).** Owns: `src/web/src/lib/components/command-palette/score.ts`, `.test.ts`. RED: exact > prefix > subsequence > miss.
+- [ ] **07.3 — `CommandPalette` component.** Owns: `src/web/src/lib/components/command-palette/CommandPalette.svelte`, `.svelte.test.ts`. RED: `cmd+K` opens; `Esc` closes; typing filters; `Enter` calls injected `onSelect(item)` once.
+- [ ] **07.4 — `/search?q=` route.** Owns: `src/web/src/routes/search/+page.server.ts`, `+page.svelte`. RED: groups hits by `source_kind`; empty state shown for unknown query.
+- [ ] **07.5 — Dashboard composition (`MetricCard`, `RecentRuns`, `RecentDocs`, `TopTasks`).** Owns: `src/web/src/lib/components/dashboard/*.svelte`, `.svelte.test.ts`. RED: each asserts data props rendered.
+- [ ] **07.6 — `/+page.server.ts` + skeleton streaming.** Owns: `src/web/src/routes/+page.server.ts`, `+page.svelte`. RED: returns `streamed` payload; skeleton renders pre-resolution.
