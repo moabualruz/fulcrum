@@ -16,3 +16,6 @@ Acceptance criteria:
 - Root `bun run ci` includes `cd src/web && bun run build` (and ideally `check`) so future web regressions break root CI.
 - `bun-types` (or the SvelteKit-recommended types pattern) is installed in `src/web` so `bun:test` and the `Bun` global are typed.
 - Web tests still pass via `bun test ./src/web/...` from the repo root.
+
+## Comments
+- Shipped: `@types/bun` added to `src/web/package.json`, `types: ["bun"]` set in `src/web/tsconfig.json`. `scripts/ci.ts` gained `web:install`, `web:check`, and `web:build` stages, each with `cwd: src/web`. Root CI now exercises the full SvelteKit pipeline; `cd src/web && bun run check` exits 0.
