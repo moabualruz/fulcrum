@@ -11,5 +11,6 @@ Per `docs/agents/issue-tracker.md`: one feature per directory. Each `<feature-sl
 | `component-lifecycle-management`   | ready-for-agent    | 13     | All issues `Status: done`. Shipped on `main`.                        |
 | `plugin-extension-surface-parity`  | ready-for-agent    | 14     | All issues `Status: done`. Shipped on `main`.                        |
 | `product-kernel`                   | ready-for-agent    | 12     | All 12 `Status: done` (CLI surface, web shell, doctor, uninstall, docs).   |
+| `claude-migration-review`          | done               | n/a    | Report-only audit of claimed `.scratch/` migration completion.       |
 
 Originals preserved under `docs/superpowers/{plans,specs}/`. The `.scratch/` copies are the canonical source for ongoing work; the `docs/superpowers/` versions are an archival record of how the work was first written.
