@@ -102,6 +102,45 @@ describe("fulcrum product CLI", () => {
     expect(payload[0].source_id).toBe("d1");
   });
 
+  test("product search treats flag values as flag values regardless of order", async () => {
+    const dbPath = join(productDbDir(), "main");
+    await Bun.write(join(productDbDir(), ".keep"), "");
+    const db = await openPglite(dbPath);
+    try {
+      await runMigrations(db);
+      const org = await createLocalOrg(db, { slug: "default", name: "Local" });
+      await indexSearchDocument(db, {
+        orgId: org.id,
+        sourceKind: "doc",
+        sourceId: "d1",
+        title: "kernel",
+        body: "kernel",
+      });
+    } finally {
+      await db.close();
+    }
+    // Flag-before-positional: query must be the trailing positional.
+    let cap = captureStdout();
+    try {
+      await runProduct(["search", "--org-slug", "default", "kernel", "--json"]);
+    } finally {
+      cap.restore();
+    }
+    const flagFirst = JSON.parse(cap.lines.join("\n"));
+    expect(flagFirst).toHaveLength(1);
+    expect(flagFirst[0].source_id).toBe("d1");
+
+    // Positional-before-flag must produce identical output.
+    cap = captureStdout();
+    try {
+      await runProduct(["search", "kernel", "--org-slug", "default", "--json"]);
+    } finally {
+      cap.restore();
+    }
+    const positionalFirst = JSON.parse(cap.lines.join("\n"));
+    expect(positionalFirst).toEqual(flagFirst);
+  });
+
   test("product context assemble --task <id> renders ordered Markdown", async () => {
     const dbPath = join(productDbDir(), "main");
     await Bun.write(join(productDbDir(), ".keep"), "");

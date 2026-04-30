@@ -39,14 +39,63 @@ async function ensureLocalOrg(db: ProductDb): Promise<{ id: string; slug: string
   return { id: org.id, slug: org.slug, name: org.name, created: true };
 }
 
+// Flag spec: every flag we expose. Boolean flags are listed in BOOLEAN_FLAGS
+// so the parser knows not to consume the next argv slot as a value. This is
+// the smallest contract that fixes
+// `.scratch/migration-review-remediation/issues/16-product-cli-flag-parser.md`:
+// flag values must not be misread as positionals, regardless of order.
+const BOOLEAN_FLAGS = new Set<string>(["--json"]);
+
+interface ParsedArgs {
+  positionals: string[];
+  flags: Record<string, string | true>;
+}
+
+function parseProductArgs(argv: readonly string[]): ParsedArgs {
+  const positionals: string[] = [];
+  const flags: Record<string, string | true> = {};
+  let stopFlags = false;
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i] as string;
+    if (stopFlags) { positionals.push(token); continue; }
+    if (token === "--") { stopFlags = true; continue; }
+    if (token.startsWith("--")) {
+      const eq = token.indexOf("=");
+      if (eq !== -1) {
+        flags[token.slice(0, eq)] = token.slice(eq + 1);
+        continue;
+      }
+      if (BOOLEAN_FLAGS.has(token)) {
+        flags[token] = true;
+        continue;
+      }
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith("--")) {
+        flags[token] = next;
+        i += 1;
+        continue;
+      }
+      flags[token] = true;
+      continue;
+    }
+    positionals.push(token);
+  }
+  return { positionals, flags };
+}
+
 function parseFlag(args: readonly string[], name: string): string | undefined {
-  const idx = args.indexOf(`--${name}`);
-  if (idx === -1) return undefined;
-  return args[idx + 1];
+  const parsed = parseProductArgs(args);
+  const value = parsed.flags[`--${name}`];
+  return typeof value === "string" ? value : undefined;
 }
 
 function hasFlag(args: readonly string[], name: string): boolean {
-  return args.includes(`--${name}`);
+  const parsed = parseProductArgs(args);
+  return parsed.flags[`--${name}`] !== undefined;
+}
+
+function positionalsOf(args: readonly string[]): string[] {
+  return parseProductArgs(args).positionals;
 }
 
 export async function run(argv: readonly string[]): Promise<void> {
@@ -120,7 +169,7 @@ async function runProjects(argv: readonly string[]): Promise<void> {
 }
 
 async function runSearch(argv: readonly string[]): Promise<void> {
-  const positional = argv.filter((v) => !v.startsWith("--"));
+  const positional = positionalsOf(argv);
   const query = positional[0];
   if (!query) {
     console.error("usage: fulcrum product search <query>");

@@ -577,6 +577,12 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   }
   const packageParity = await buildPackageParityReport(home);
   const productKernel = await buildProductKernelReport();
+  if (productKernel.error) {
+    // A PGlite/Postgres failure means a key product surface is offline.
+    // Surface it through the doctor verdict so users see "verdict: error"
+    // instead of the previous silent "ok".
+    errors += 1;
+  }
 
   // Managed MCPs
   const mcpReport: DoctorReport["mcp"] = { servers: [] };
