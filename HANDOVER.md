@@ -255,6 +255,12 @@ Don't relitigate without new information.
 
 Recent high-signal commits:
 
+- `7beec0b fix(component): satisfy lifecycle verification` — final component lifecycle Task 13 verification; updates plan checklist/HANDOVER, fixes the default-profile catalog expectation for Repomix, and records green gates.
+- `e64288a docs(component): plan lifecycle implementation` — user/developer docs now describe shipped `fulcrum component`; HANDOVER and implementation plan no longer present component lifecycle as future work.
+- `840b54e fix(component): support purge removal` — exposes `fulcrum component remove --purge` and covers modified managed policy removal through CLI tests.
+- `2fc1882 refactor(component): route install through lifecycle engine` — `fulcrum install` / `fulcrum uninstall` now run component profiles while preserving legacy flags and removal defaults.
+- `b0b163d feat(component): report managed lifecycle state` — adds `fulcrum component status` and doctor component lifecycle counts.
+- `13705b9 feat(component): route vendor surfaces through adapter` — skills/vendor package lifecycle adapter preserves official-first installers and mirrors package/plugin/extension surfaces to agents without native installers.
 - `6d1ace2 docs(subagents): harden orchestration guidance` — max-useful parallelism, worktree write lanes, runtime dependency reassessment, and model/effort selection guidance; mirrored source + plugin skill; Codex spot eval accepted by user.
 - `b858220 feat(component): add lifecycle foundation` — `fulcrum component` catalog/planner/ledger/executor plus hooks/MCP/rules/policy adapters and detailed remaining-task plan.
 - `9e8f1cc test: harden cross-agent skill evals` — long-response-safe eval capture; Gemini read-only plan mode; Pi no-tool eval mode.
@@ -267,11 +273,11 @@ Recent high-signal commits:
 
 ## 6. Remaining work
 
-Foundation gaps tracked in earlier revisions are all closed. Component lifecycle management is implemented as a foundation-hardening feature; detailed implementation plan and checklist: `docs/superpowers/plans/2026-04-29-component-lifecycle-management.md`. CI must stay green; doctor verdict should be ok on a fully-set-up machine; smoke-test prompt at `docs/smoke-test.md` is the canonical post-install verification.
+Foundation gaps tracked in earlier revisions are all closed. Component lifecycle management is implemented and merged to `main`; detailed implementation history/checklist: `docs/superpowers/plans/2026-04-29-component-lifecycle-management.md`. CI must stay green; doctor verdict should be ok on a fully-set-up machine; smoke-test prompt at `docs/smoke-test.md` is the canonical post-install verification.
 
 Final foundation-hardening gate before starting §6.1: run the `ISSUES.md` checklist after a real uninstall/clean-install cycle. That means fully uninstall everything the old workflow installed, run a fresh install through the new component lifecycle workflow, then re-check whether each issue in `ISSUES.md` still reproduces. For any confirmed issue, write the failing test first, fix the root cause, verify red/green behavior, and keep the regression test so the issue cannot silently resurface.
 
-The trajectory layer below is next-branch work after component lifecycle management — none of it is implemented. Build order is top-down because later layers consume earlier layers' state.
+The trajectory layer below is next-branch work after the clean-install issue checklist — none of it is implemented. Build order is top-down because later layers consume earlier layers' state.
 
 ### 6.1 Repository supervisor — `fulcrum repo …`
 
@@ -530,8 +536,7 @@ fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, handshake, wiring,
 ## 7a. Next steps only
 
 1. **Run the post-lifecycle clean-install issue checklist.**
-   Detailed plan: `docs/superpowers/plans/2026-04-29-component-lifecycle-management.md`.
-   Component lifecycle management is implemented. Last step before moving to §6.1: full uninstall of old-workflow installs, clean install through the component lifecycle workflow, then execute `ISSUES.md` as a TDD root-cause checklist; keep tests for every confirmed issue and fix any confirmed regression.
+   Component lifecycle management is implemented, merged to `main`, and verified. The `component-lifecycle-task8` worktree and `feature/component-lifecycle-task8` branch were removed after merge. Last step before moving to §6.1: full uninstall of old-workflow installs, clean install through the component lifecycle workflow, then execute `ISSUES.md` as a TDD root-cause checklist; keep tests for every confirmed issue and fix any confirmed regression.
 
 2. **Start layer §6.1: Repository supervisor.**
    After the clean-install issue checklist is complete, implement `fulcrum repo …` around repo registration, refresh, list/show, settings, SQLite migrations, doctor row counts, and the `repo-track` session hook.
