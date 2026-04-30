@@ -36,7 +36,7 @@ export interface McpServerSpec {
   transport: "http" | "stdio";
   /** Present when transport=http */
   url?: string;
-  /** Present when transport=stdio — raw command string, e.g. "npx -y repomix --mcp" */
+  /** Present when transport=stdio — raw command string, e.g. "npx -y repomix@latest --mcp" */
   command?: string;
   description: string;
   vendor: string;

@@ -90,7 +90,7 @@ describe("registerServer", () => {
     const reg = await loadRegistry();
     const s = reg.servers["repomix"]!;
     expect(s.transport).toBe("stdio");
-    expect(s.command).toBe("npx -y repomix --mcp");
+    expect(s.command).toBe("npx -y repomix@latest --mcp");
     expect(s.vendor).toBe("yamadashy");
     expect(s.default_enabled).toBe(false);
     expect(s.auth_env_vars).toHaveLength(0);

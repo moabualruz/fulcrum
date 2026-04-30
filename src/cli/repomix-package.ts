@@ -1,24 +1,36 @@
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { cloneOrUpdate, run as runProc, which } from "../utils/proc.ts";
+import { DEFAULT_REPOMIX_SERVER } from "./mcp-builtins.ts";
+import type { AgentId } from "./mcp-registry.ts";
 
 const PACK_LOCAL = "repomix-pack-local";
 const PACK_REMOTE = "repomix-pack-remote";
 const EXPLORER = "repomix-explorer";
+const EXPLORE_LOCAL = "repomix-explore-local";
+const EXPLORE_REMOTE = "repomix-explore-remote";
 const REPOMIX_REPO = "https://github.com/yamadashy/repomix";
 const REPOMIX_MARKETPLACE = "yamadashy/repomix";
 const REPOMIX_MARKER_FILE = "repomix-claude.installed";
 const REPOMIX_MIRRORS_MARKER_FILE = "repomix-mirrors.installed";
 const REPOMIX_CLAUDE_PLUGINS = ["repomix-mcp", "repomix-commands", "repomix-explorer"] as const;
+const REPOMIX_CODEX_PLUGIN_VERSION = "1.0.0";
+const REPOMIX_REGISTRY_AGENTS: AgentId[] = ["codex", "opencode", "pi"];
 
 const PACK_LOCAL_DESCRIPTION = "Pack local codebases with Repomix";
 const PACK_REMOTE_DESCRIPTION = "Pack remote repositories with Repomix";
 const EXPLORER_DESCRIPTION = "Explore local or remote repositories using Repomix output";
+const EXPLORE_LOCAL_DESCRIPTION = "Explore a local repository with Repomix";
+const EXPLORE_REMOTE_DESCRIPTION = "Explore a remote repository with Repomix";
 
 interface RepomixPackageSource {
   packLocal: string;
   packRemote: string;
   explorer: string;
+  exploreLocal: string;
+  exploreRemote: string;
+  mcpJson: string;
+  rules: string;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -194,6 +206,20 @@ function commandToml(description: string, prompt: string): string {
   return `description = ${JSON.stringify(description)}\nprompt = """\n${escaped}\n"""\n`;
 }
 
+function upsertTomlSection(existing: string, header: string, body: string): string {
+  const section = `${header}\n${body.trimEnd()}\n`;
+  const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(?:^|\\n)${escaped}\\n[\\s\\S]*?(?=\\n\\[|$)`);
+  if (re.test(existing)) return existing.replace(re, `\n${section}`).trimStart();
+  return `${existing.trimEnd()}\n\n${section}`.trimStart();
+}
+
+function removeTomlSection(existing: string, header: string): string {
+  const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(?:^|\\n)${escaped}\\n[\\s\\S]*?(?=\\n(?:\\[|# BEGIN FULCRUM MCP )|$)`);
+  return existing.replace(re, "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function opencodeAgentFromClaude(body: string): string {
   const withoutFrontmatter = body.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
   return `---\ndescription: ${EXPLORER_DESCRIPTION}\nmode: subagent\npermission:\n  bash: ask\n  read: allow\n  grep: allow\n---\n\n${withoutFrontmatter}\n`;
@@ -242,8 +268,34 @@ async function repomixSource(home: string, dryRun: boolean): Promise<RepomixPack
       ...(repoCache ? [`${repoCache}/.claude/plugins/repomix-explorer/agents/explorer.md`] : []),
       `${root}/.fulcrum-vendor/repomix/agents/explorer.md`,
     ]);
-    if (!packLocal || !packRemote || !explorer) return null;
-    return { packLocal, packRemote, explorer };
+    const exploreLocal = await readFirstExisting([
+      `${cache}/repomix-explorer/1.1.0/commands/explore-local.md`,
+      `${marketplace}/plugins/repomix-explorer/commands/explore-local.md`,
+      ...(repoCache ? [`${repoCache}/.claude/plugins/repomix-explorer/commands/explore-local.md`] : []),
+      `${root}/.fulcrum-vendor/repomix/commands/explore-local.md`,
+    ]);
+    const exploreRemote = await readFirstExisting([
+      `${cache}/repomix-explorer/1.1.0/commands/explore-remote.md`,
+      `${marketplace}/plugins/repomix-explorer/commands/explore-remote.md`,
+      ...(repoCache ? [`${repoCache}/.claude/plugins/repomix-explorer/commands/explore-remote.md`] : []),
+      `${root}/.fulcrum-vendor/repomix/commands/explore-remote.md`,
+    ]);
+    const mcpJson = await readFirstExisting([
+      `${cache}/repomix-mcp/1.0.1/.mcp.json`,
+      `${marketplace}/plugins/repomix-mcp/.mcp.json`,
+      ...(repoCache ? [`${repoCache}/.claude/plugins/repomix-mcp/.mcp.json`] : []),
+      `${root}/.fulcrum-vendor/repomix/.mcp.json`,
+    ]);
+    const rules = await readFirstExisting([
+      `${home}/.claude/plugins/marketplaces/repomix/.agents/rules/base.md`,
+      `${home}/.claude/plugins/marketplaces/repomix/AGENTS.md`,
+      `${home}/.claude/plugins/marketplaces/repomix/CLAUDE.md`,
+      ...(repoCache ? [`${repoCache}/.agents/rules/base.md`, `${repoCache}/AGENTS.md`, `${repoCache}/CLAUDE.md`] : []),
+      `${root}/.fulcrum-vendor/repomix/rules/base.md`,
+      `${root}/.fulcrum-vendor/repomix/AGENTS.md`,
+    ]);
+    if (!packLocal || !packRemote || !explorer || !exploreLocal || !exploreRemote || !mcpJson || !rules) return null;
+    return { packLocal, packRemote, explorer, exploreLocal, exploreRemote, mcpJson, rules };
   };
 
   const local = await readSource(null);
@@ -270,10 +322,16 @@ async function installGemini(home: string, source: RepomixPackageSource, dryRun:
   }, null, 2) + "\n", dryRun);
   await writeText(`${root}/commands/pack-local.toml`, commandToml(PACK_LOCAL_DESCRIPTION, source.packLocal), dryRun);
   await writeText(`${root}/commands/pack-remote.toml`, commandToml(PACK_REMOTE_DESCRIPTION, source.packRemote), dryRun);
+  await writeText(`${root}/commands/explore-local.toml`, commandToml(EXPLORE_LOCAL_DESCRIPTION, source.exploreLocal), dryRun);
+  await writeText(`${root}/commands/explore-remote.toml`, commandToml(EXPLORE_REMOTE_DESCRIPTION, source.exploreRemote), dryRun);
   await writeText(`${root}/skills/${PACK_LOCAL}/SKILL.md`, skill(PACK_LOCAL, PACK_LOCAL_DESCRIPTION, source.packLocal), dryRun);
   await writeText(`${root}/skills/${PACK_REMOTE}/SKILL.md`, skill(PACK_REMOTE, PACK_REMOTE_DESCRIPTION, source.packRemote), dryRun);
   await writeText(`${root}/skills/${EXPLORER}/SKILL.md`, skill(EXPLORER, EXPLORER_DESCRIPTION, source.explorer), dryRun);
+  await writeText(`${root}/skills/${EXPLORE_LOCAL}/SKILL.md`, skill(EXPLORE_LOCAL, EXPLORE_LOCAL_DESCRIPTION, source.exploreLocal), dryRun);
+  await writeText(`${root}/skills/${EXPLORE_REMOTE}/SKILL.md`, skill(EXPLORE_REMOTE, EXPLORE_REMOTE_DESCRIPTION, source.exploreRemote), dryRun);
   await writeText(`${root}/agents/explorer.md`, geminiAgentFromClaude(source.explorer), dryRun);
+  await writeText(`${root}/AGENTS.md`, source.rules.trim() + "\n", dryRun);
+  await writeText(`${root}/rules/base.md`, source.rules.trim() + "\n", dryRun);
   console.log("     ✓ Gemini Repomix extension mirror installed");
 }
 
@@ -285,7 +343,97 @@ async function installSkills(home: string, root: string, label: string, source: 
   await writeText(`${root}/${PACK_LOCAL}/SKILL.md`, skill(PACK_LOCAL, PACK_LOCAL_DESCRIPTION, source.packLocal), dryRun);
   await writeText(`${root}/${PACK_REMOTE}/SKILL.md`, skill(PACK_REMOTE, PACK_REMOTE_DESCRIPTION, source.packRemote), dryRun);
   await writeText(`${root}/${EXPLORER}/SKILL.md`, skill(EXPLORER, EXPLORER_DESCRIPTION, source.explorer), dryRun);
+  await writeText(`${root}/${EXPLORE_LOCAL}/SKILL.md`, skill(EXPLORE_LOCAL, EXPLORE_LOCAL_DESCRIPTION, source.exploreLocal), dryRun);
+  await writeText(`${root}/${EXPLORE_REMOTE}/SKILL.md`, skill(EXPLORE_REMOTE, EXPLORE_REMOTE_DESCRIPTION, source.exploreRemote), dryRun);
   console.log(`     ✓ ${label} Repomix skills mirror installed`);
+}
+
+function codexPluginJson(): string {
+  return JSON.stringify({
+    name: "repomix",
+    version: REPOMIX_CODEX_PLUGIN_VERSION,
+    description: "Repomix package mirror for Codex: MCP config, commands, skills, explorer agent, and vendor rules.",
+    author: { name: "yamadashy" },
+    homepage: "https://repomix.com/docs/guide/claude-code-plugins",
+    repository: REPOMIX_REPO,
+    license: "MIT",
+    keywords: ["repomix", "mcp", "codebase-analysis", "repository-analysis"],
+    skills: "./skills/",
+    interface: {
+      displayName: "Repomix",
+      shortDescription: "Pack and explore repositories with Repomix.",
+      longDescription: "Repomix package mirror for Codex. Includes vendor-derived MCP, commands, skills, explorer agent, and rules.",
+      developerName: "yamadashy",
+      category: "Developer Tools",
+      capabilities: ["Read", "Write"],
+      websiteURL: "https://repomix.com",
+      privacyPolicyURL: "https://github.com/yamadashy/repomix/blob/main/SECURITY.md",
+      termsOfServiceURL: "https://github.com/yamadashy/repomix/blob/main/LICENSE",
+      defaultPrompt: [
+        "Use Repomix when packing or exploring local or remote repositories.",
+      ],
+      screenshots: [],
+      brandColor: "#4F46E5",
+    },
+  }, null, 2) + "\n";
+}
+
+async function configureCodexRepomixPlugin(home: string, dryRun: boolean): Promise<void> {
+  const configPath = `${home}/.codex/config.toml`;
+  if (dryRun) {
+    console.log(`     [dry-run] would enable Codex Repomix plugin in: ${configPath}`);
+    return;
+  }
+  const existing = (await exists(configPath)) ? await readFile(configPath, "utf8") : "";
+  let next = upsertTomlSection(existing, "[marketplaces.repomix]", [
+    `source_type = "git"`,
+    `source = "${REPOMIX_REPO}"`,
+  ].join("\n"));
+  next = upsertTomlSection(next, "[plugins.\"repomix@repomix\"]", "enabled = true");
+  await mkdir(dirname(configPath), { recursive: true });
+  await writeFile(configPath, `${next.trimEnd()}\n`);
+}
+
+async function removeCodexRepomixPluginConfig(home: string, dryRun: boolean): Promise<void> {
+  const configPath = `${home}/.codex/config.toml`;
+  if (!(await exists(configPath))) return;
+  if (dryRun) {
+    console.log(`     [dry-run] would remove Codex Repomix plugin config from: ${configPath}`);
+    return;
+  }
+  const existing = await readFile(configPath, "utf8");
+  let next = removeTomlSection(existing, "[plugins.\"repomix@repomix\"]");
+  next = removeTomlSection(next, "[marketplaces.repomix]");
+  await writeFile(configPath, next ? `${next}\n` : "");
+}
+
+async function installCodexPluginMirror(home: string, source: RepomixPackageSource, dryRun: boolean): Promise<void> {
+  if (!(await exists(`${home}/.codex`))) {
+    console.log("     · skip Codex Repomix plugin mirror (not detected)");
+    return;
+  }
+  const root = `${home}/.codex/plugins/cache/repomix/repomix/${REPOMIX_CODEX_PLUGIN_VERSION}`;
+  if (dryRun) {
+    console.log(`     [dry-run] would refresh Codex Repomix plugin mirror: ${root}`);
+  } else {
+    await rm(root, { recursive: true, force: true });
+  }
+  await writeText(`${root}/.codex-plugin/plugin.json`, codexPluginJson(), dryRun);
+  await writeText(`${root}/.mcp.json`, source.mcpJson.trim() + "\n", dryRun);
+  await writeText(`${root}/commands/pack-local.md`, source.packLocal.trim() + "\n", dryRun);
+  await writeText(`${root}/commands/pack-remote.md`, source.packRemote.trim() + "\n", dryRun);
+  await writeText(`${root}/commands/explore-local.md`, source.exploreLocal.trim() + "\n", dryRun);
+  await writeText(`${root}/commands/explore-remote.md`, source.exploreRemote.trim() + "\n", dryRun);
+  await writeText(`${root}/agents/${EXPLORER}.md`, source.explorer.trim() + "\n", dryRun);
+  await writeText(`${root}/AGENTS.md`, source.rules.trim() + "\n", dryRun);
+  await writeText(`${root}/rules/base.md`, source.rules.trim() + "\n", dryRun);
+  await writeText(`${root}/skills/${PACK_LOCAL}/SKILL.md`, skill(PACK_LOCAL, PACK_LOCAL_DESCRIPTION, source.packLocal), dryRun);
+  await writeText(`${root}/skills/${PACK_REMOTE}/SKILL.md`, skill(PACK_REMOTE, PACK_REMOTE_DESCRIPTION, source.packRemote), dryRun);
+  await writeText(`${root}/skills/${EXPLORER}/SKILL.md`, skill(EXPLORER, EXPLORER_DESCRIPTION, source.explorer), dryRun);
+  await writeText(`${root}/skills/${EXPLORE_LOCAL}/SKILL.md`, skill(EXPLORE_LOCAL, EXPLORE_LOCAL_DESCRIPTION, source.exploreLocal), dryRun);
+  await writeText(`${root}/skills/${EXPLORE_REMOTE}/SKILL.md`, skill(EXPLORE_REMOTE, EXPLORE_REMOTE_DESCRIPTION, source.exploreRemote), dryRun);
+  await configureCodexRepomixPlugin(home, dryRun);
+  console.log("     ✓ Codex Repomix plugin mirror installed");
 }
 
 async function installOpenCode(home: string, source: RepomixPackageSource, dryRun: boolean): Promise<void> {
@@ -296,6 +444,29 @@ async function installOpenCode(home: string, source: RepomixPackageSource, dryRu
   await installSkills(home, `${home}/.config/opencode/skills`, "OpenCode", source, dryRun);
   await writeText(`${home}/.config/opencode/agents/${EXPLORER}.md`, opencodeAgentFromClaude(source.explorer), dryRun);
   console.log("     ✓ OpenCode Repomix agent mirror installed");
+}
+
+async function enableRepomixMcpForPackage(dryRun: boolean): Promise<void> {
+  if (dryRun) {
+    console.log("     [dry-run] would enable Repomix MCP for Codex/OpenCode/Pi");
+    return;
+  }
+  const { registerServer, setEnabled, applyToAgents } = await import("./mcp-registry.ts");
+  await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+  await setEnabled("repomix", true, { agents: REPOMIX_REGISTRY_AGENTS });
+  await applyToAgents("repomix", { agents: REPOMIX_REGISTRY_AGENTS });
+}
+
+async function removeRepomixMcpForPackage(dryRun: boolean): Promise<void> {
+  if (dryRun) {
+    console.log("     [dry-run] would remove Repomix MCP from Codex/OpenCode/Pi");
+    return;
+  }
+  const { loadRegistry, setEnabled, removeFromAgents } = await import("./mcp-registry.ts");
+  const reg = await loadRegistry();
+  if (!reg.servers["repomix"]) return;
+  await setEnabled("repomix", false, { agents: REPOMIX_REGISTRY_AGENTS });
+  await removeFromAgents("repomix", { agents: REPOMIX_REGISTRY_AGENTS });
 }
 
 export async function installRepomixPackageMirrors(opts: { dryRun?: boolean } = {}): Promise<void> {
@@ -323,9 +494,11 @@ export async function installRepomixPackageMirrors(opts: { dryRun?: boolean } = 
   }
 
   await installSkills(home, `${home}/.codex/skills`, "Codex CLI", source, dryRun);
+  await installCodexPluginMirror(home, source, dryRun);
   await installGemini(home, source, dryRun);
   await installOpenCode(home, source, dryRun);
   await installSkills(home, `${home}/.pi/agent/skills`, "Pi CLI", source, dryRun);
+  await enableRepomixMcpForPackage(dryRun);
   await writeMarker(home, REPOMIX_MIRRORS_MARKER_FILE, dryRun);
 }
 
@@ -345,8 +518,13 @@ export async function uninstallRepomixPackageMirrors(opts: { dryRun?: boolean } 
     await removePath(`${root}/${PACK_LOCAL}`, `Repomix skill ${PACK_LOCAL}`, dryRun);
     await removePath(`${root}/${PACK_REMOTE}`, `Repomix skill ${PACK_REMOTE}`, dryRun);
     await removePath(`${root}/${EXPLORER}`, `Repomix skill ${EXPLORER}`, dryRun);
+    await removePath(`${root}/${EXPLORE_LOCAL}`, `Repomix skill ${EXPLORE_LOCAL}`, dryRun);
+    await removePath(`${root}/${EXPLORE_REMOTE}`, `Repomix skill ${EXPLORE_REMOTE}`, dryRun);
   }
+  await removePath(`${home}/.codex/plugins/cache/repomix`, "Codex Repomix plugin mirror", dryRun);
+  await removeCodexRepomixPluginConfig(home, dryRun);
   await removePath(`${home}/.config/opencode/agents/${EXPLORER}.md`, "OpenCode Repomix agent mirror", dryRun);
+  await removeRepomixMcpForPackage(dryRun);
   await removePath(markerFile(home, REPOMIX_MIRRORS_MARKER_FILE), "Repomix package mirrors marker", dryRun);
 }
 
@@ -360,10 +538,16 @@ async function previewRepomixPackageMirrors(home: string): Promise<void> {
       `${root}/gemini-extension.json`,
       `${root}/commands/pack-local.toml`,
       `${root}/commands/pack-remote.toml`,
+      `${root}/commands/explore-local.toml`,
+      `${root}/commands/explore-remote.toml`,
       `${root}/skills/${PACK_LOCAL}/SKILL.md`,
       `${root}/skills/${PACK_REMOTE}/SKILL.md`,
       `${root}/skills/${EXPLORER}/SKILL.md`,
+      `${root}/skills/${EXPLORE_LOCAL}/SKILL.md`,
+      `${root}/skills/${EXPLORE_REMOTE}/SKILL.md`,
       `${root}/agents/explorer.md`,
+      `${root}/AGENTS.md`,
+      `${root}/rules/base.md`,
     ]) {
       console.log(`     [dry-run] would write: ${path}`);
     }
@@ -378,7 +562,7 @@ async function previewRepomixPackageMirrors(home: string): Promise<void> {
 }
 
 function previewSkillWrites(root: string): void {
-  for (const name of [PACK_LOCAL, PACK_REMOTE, EXPLORER]) {
+  for (const name of [PACK_LOCAL, PACK_REMOTE, EXPLORER, EXPLORE_LOCAL, EXPLORE_REMOTE]) {
     console.log(`     [dry-run] would write: ${root}/${name}/SKILL.md`);
   }
 }

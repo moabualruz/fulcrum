@@ -368,6 +368,39 @@ auth_env_vars = ["GITHUB_TOKEN"]
     expect(github!["drift"]).toBe(false);
   });
 
+  test("drift false for package-default enabled Repomix surfaces", async () => {
+    const home = join(TMP, "mcp-repomix-package-default");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const stateDir = join(fulcrumHome, "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    const toml = `schema_version = 1
+
+[servers.repomix]
+transport = "stdio"
+command = "npx -y repomix@latest --mcp"
+description = "Repomix MCP"
+vendor = "yamadashy"
+default_enabled = false
+auth_env_vars = []
+enabled_codex = true
+enabled_opencode = true
+enabled_pi = true
+
+[servers.repomix.agent_visibility]
+"claude-code" = false
+"codex" = true
+"gemini" = false
+"opencode" = true
+"pi" = true
+`;
+    await writeFile(join(stateDir, "mcp-registry.toml"), toml);
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const servers = (report["mcp"] as Record<string, unknown>)["servers"] as Array<Record<string, unknown>>;
+    const repomix = servers.find((s) => s["name"] === "repomix");
+    expect(repomix!["drift"]).toBe(false);
+  });
+
   test("wiring missing when codex config lacks bearer_token_env_var for authed http MCP", async () => {
     const home = join(TMP, "mcp-wiring-missing");
     await mkdir(home, { recursive: true });

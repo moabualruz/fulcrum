@@ -22,9 +22,20 @@ beforeEach(async () => {
 
   await mkdir(join(TMP, ".claude", "plugins", "cache", "repomix", "repomix-commands", "1.0.2", "commands"), { recursive: true });
   await mkdir(join(TMP, ".claude", "plugins", "cache", "repomix", "repomix-explorer", "1.1.0", "agents"), { recursive: true });
+  await mkdir(join(TMP, ".claude", "plugins", "cache", "repomix", "repomix-explorer", "1.1.0", "commands"), { recursive: true });
+  await mkdir(join(TMP, ".claude", "plugins", "cache", "repomix", "repomix-mcp", "1.0.1"), { recursive: true });
+  await mkdir(join(TMP, ".claude", "plugins", "marketplaces", "repomix", ".agents", "rules"), { recursive: true });
   await writeFile(join(TMP, ".claude", "plugins", "cache", "repomix", "repomix-commands", "1.0.2", "commands", "pack-local.md"), "---\ndescription: Pack local\n---\n\nRun local repomix.\n");
   await writeFile(join(TMP, ".claude", "plugins", "cache", "repomix", "repomix-commands", "1.0.2", "commands", "pack-remote.md"), "---\ndescription: Pack remote\n---\n\nRun remote repomix.\n");
   await writeFile(join(TMP, ".claude", "plugins", "cache", "repomix", "repomix-explorer", "1.1.0", "agents", "explorer.md"), "---\nname: explorer\ndescription: Explore repos\n---\n\nExplore with repomix.\n");
+  await writeFile(join(TMP, ".claude", "plugins", "cache", "repomix", "repomix-explorer", "1.1.0", "commands", "explore-local.md"), "---\ndescription: Explore local\n---\n\nExplore local repository.\n");
+  await writeFile(join(TMP, ".claude", "plugins", "cache", "repomix", "repomix-explorer", "1.1.0", "commands", "explore-remote.md"), "---\ndescription: Explore remote\n---\n\nExplore remote repository.\n");
+  await writeFile(join(TMP, ".claude", "plugins", "cache", "repomix", "repomix-mcp", "1.0.1", ".mcp.json"), JSON.stringify({
+    mcpServers: {
+      repomix: { command: "npx", args: ["-y", "repomix@latest", "--mcp"] },
+    },
+  }, null, 2) + "\n");
+  await writeFile(join(TMP, ".claude", "plugins", "marketplaces", "repomix", ".agents", "rules", "base.md"), "# Repomix project rules\n\nUse official Repomix commands.\n");
 });
 
 afterEach(async () => {
@@ -186,20 +197,48 @@ describe("Repomix capability package mirrors", () => {
     expect(await Bun.file(join(TMP, ".claude", "plugins", "marketplaces", "repomix")).exists()).toBe(false);
   });
 
-  test("installs nearest native mirrors for non-Claude agents", async () => {
+  test("installs complete native mirrors for non-Claude agents", async () => {
     await mkdir(join(TMP, ".codex"), { recursive: true });
     await mkdir(join(TMP, ".gemini"), { recursive: true });
     await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
     await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
 
-    await installRepomixPackageMirrors();
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installRepomixPackageMirrors();
+    } finally {
+      whichSpy.mockRestore();
+    }
 
     expect(await readFile(join(TMP, ".codex", "skills", "repomix-pack-local", "SKILL.md"), "utf8")).toContain("Run local repomix.");
+    const codexPluginRoot = join(TMP, ".codex", "plugins", "cache", "repomix", "repomix", "1.0.0");
+    const codexPlugin = JSON.parse(await readFile(join(codexPluginRoot, ".codex-plugin", "plugin.json"), "utf8"));
+    expect(codexPlugin.name).toBe("repomix");
+    expect(codexPlugin.skills).toBe("./skills/");
+    expect(await readFile(join(codexPluginRoot, ".mcp.json"), "utf8")).toContain("repomix@latest");
+    expect(await readFile(join(codexPluginRoot, "commands", "explore-local.md"), "utf8")).toContain("Explore local repository.");
+    expect(await readFile(join(codexPluginRoot, "AGENTS.md"), "utf8")).toContain("Repomix project rules");
+    const codexConfig = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(codexConfig).toContain("[plugins.\"repomix@repomix\"]");
+    expect(codexConfig).toContain("[mcp_servers.repomix]");
+    expect(codexConfig).toContain('args = ["-y", "repomix@latest", "--mcp"]');
+
     const geminiManifest = JSON.parse(await readFile(join(TMP, ".gemini", "extensions", "repomix", "gemini-extension.json"), "utf8"));
     expect(geminiManifest.mcpServers.repomix.command).toBe("npx");
     expect(await readFile(join(TMP, ".gemini", "extensions", "repomix", "commands", "pack-local.toml"), "utf8")).toContain("Run local repomix.");
+    expect(await readFile(join(TMP, ".gemini", "extensions", "repomix", "commands", "explore-remote.toml"), "utf8")).toContain("Explore remote repository.");
+    expect(await readFile(join(TMP, ".gemini", "extensions", "repomix", "AGENTS.md"), "utf8")).toContain("Repomix project rules");
+
     expect(await readFile(join(TMP, ".config", "opencode", "agents", "repomix-explorer.md"), "utf8")).toContain("Explore with repomix.");
+    const opencode = JSON.parse(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8"));
+    expect(opencode.mcp.repomix.enabled).toBe(true);
+    expect(opencode.mcp.repomix.command).toEqual(["npx", "-y", "repomix@latest", "--mcp"]);
+
     expect(await readFile(join(TMP, ".pi", "agent", "skills", "repomix-explorer", "SKILL.md"), "utf8")).toContain("Explore with repomix.");
+    const pi = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8"));
+    expect(pi.mcpServers.repomix.command).toBe("npx");
+    expect(pi.mcpServers.repomix.args).toEqual(["-y", "repomix@latest", "--mcp"]);
+    expect(pi.mcpServers.repomix.directTools).toBe(true);
   });
 
   test("uninstalls mirrored package surfaces", async () => {
@@ -207,15 +246,26 @@ describe("Repomix capability package mirrors", () => {
     await mkdir(join(TMP, ".gemini"), { recursive: true });
     await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
     await mkdir(join(TMP, ".pi", "agent"), { recursive: true });
-    await installRepomixPackageMirrors();
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installRepomixPackageMirrors();
 
-    await uninstallRepomixPackageMirrors();
+      await uninstallRepomixPackageMirrors();
+    } finally {
+      whichSpy.mockRestore();
+    }
 
     expect(await Bun.file(join(TMP, ".codex", "skills", "repomix-pack-local")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".codex", "plugins", "cache", "repomix")).exists()).toBe(false);
+    expect(await readFile(join(TMP, ".codex", "config.toml"), "utf8")).not.toContain("repomix");
     expect(await Bun.file(join(TMP, ".gemini", "extensions", "repomix")).exists()).toBe(false);
     expect(await Bun.file(join(TMP, ".config", "opencode", "skills", "repomix-explorer")).exists()).toBe(false);
     expect(await Bun.file(join(TMP, ".config", "opencode", "agents", "repomix-explorer.md")).exists()).toBe(false);
+    const opencode = JSON.parse(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8"));
+    expect(opencode.mcp?.repomix).toBeUndefined();
     expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "repomix-pack-remote")).exists()).toBe(false);
+    const pi = JSON.parse(await readFile(join(TMP, ".pi", "agent", "mcp.json"), "utf8"));
+    expect(pi.mcpServers?.repomix).toBeUndefined();
   });
 
   test("uninstall preserves user-owned Repomix mirrors when Fulcrum marker is absent", async () => {

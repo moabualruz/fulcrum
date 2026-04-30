@@ -100,15 +100,18 @@ Supersedes: `skills/gh/SKILL.md` (moved to `skills/_archive/gh-authored/`; skill
 
 Repomix MCP server via `yamadashy/repomix`. **Package-default enabled where Fulcrum owns the MCP surface.**
 
-- Transport: stdio `npx -y repomix --mcp`
+- Transport: stdio `npx -y repomix@latest --mcp`
 - Auth: none required
 - Vendor: `yamadashy`
 - Claude Code gets 3 official vendor plugins: `repomix-mcp`, `repomix-commands`, `repomix-explorer`; Fulcrum treats that Claude surface as plugin-owned, so the registry marks `claude-code` hidden and skips it during `fulcrum mcp enable/disable/unregister repomix`.
-- Gemini gets a Fulcrum-built extension mirror that bundles vendor-derived Repomix MCP config, commands, skills, and explorer agent; the registry marks `gemini` hidden so it never disables or duplicates the extension-owned MCP.
+- Gemini gets a Fulcrum-built extension mirror that bundles vendor-derived Repomix MCP config, pack/explore commands, skills, explorer agent, and vendor rules; the registry marks `gemini` hidden so it never disables or duplicates the extension-owned MCP.
 - OpenCode gets vendor-derived skills plus explorer agent mirror; registry owns and enables the MCP surface to preserve package-level functionality.
-- Codex and Pi get vendor-derived skills plus registry-owned enabled MCP config, their nearest stable native surface set.
+- Codex gets vendor-derived skills, a Codex plugin-cache package mirror with MCP metadata, commands, explorer agent, rules, and enabled plugin config, plus registry-owned enabled MCP config.
+- Pi gets vendor-derived skills plus registry-owned enabled MCP config.
 
 To disable registry-owned Repomix MCP config for Codex/OpenCode/Pi: `fulcrum mcp disable repomix --agent codex --agent opencode --agent pi`
+
+Doctor treats Repomix's package-default enabled Codex/OpenCode/Pi MCP state as intentional, not generic default-disabled drift.
 
 Plugin install (Claude Code, idempotent):
 ```bash

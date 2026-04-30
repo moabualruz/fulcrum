@@ -514,7 +514,7 @@ describe("installMcpRegistryEntries", () => {
     const repomix = reg.servers["repomix"];
     expect(repomix).toBeDefined();
     expect(repomix!.transport).toBe("stdio");
-    expect(repomix!.command).toBe("npx -y repomix --mcp");
+    expect(repomix!.command).toBe("npx -y repomix@latest --mcp");
     expect(repomix!.default_enabled).toBe(false);
   });
 

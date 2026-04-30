@@ -61,8 +61,8 @@ interface DoctorReport {
       agent_state: Record<string, "enabled" | "disabled" | "hidden">;
       auth_status: "ok" | "missing-env" | "n/a";
       reachable: boolean | null;
-      // Drift: registry default is disabled, yet some agent has it enabled.
-      // True drift state usually means a prior `mcp enable --all-agents` sweep.
+      // Drift: registry default is disabled, yet some non-package-default
+      // server has it enabled. Usually means a prior `mcp enable --all-agents`.
       drift: boolean;
       // Auth wiring: when auth_env_vars > 0, doctor inspects each agent's
       // native config to confirm the Authorization header (or codex's
@@ -586,11 +586,14 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       }
 
       // Drift: registry says default-disabled but some agent has it enabled.
+      // Package-default MCPs are intentionally enabled by their package
+      // installer while remaining opt-in outside that package profile.
       const enabledAgents = Object.entries(agentState)
         .filter(([, v]) => v === "enabled")
         .map(([k]) => k as AgentId);
       const isMinimalDefault = (MINIMAL_DEFAULT_MCPS as readonly string[]).includes(server.name);
-      const drift = !server.default_enabled && !isMinimalDefault && enabledAgents.length > 0;
+      const isPackageDefault = server.name === "repomix";
+      const drift = !server.default_enabled && !isMinimalDefault && !isPackageDefault && enabledAgents.length > 0;
       if (drift) warnings += 1;
 
       // Auth status: missing env matters only for enabled servers that require

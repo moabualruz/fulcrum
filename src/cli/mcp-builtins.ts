@@ -44,7 +44,7 @@ export const DEFAULT_GITHUB_SERVER: McpServerSpec = {
 
 export const DEFAULT_REPOMIX_SERVER: McpServerSpec = {
   transport: "stdio",
-  command: "npx -y repomix --mcp",
+  command: "npx -y repomix@latest --mcp",
   description: "Repomix MCP server — pack repo into AI-friendly format",
   vendor: "yamadashy",
   default_enabled: false,
