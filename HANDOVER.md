@@ -293,7 +293,23 @@ Foundation gaps tracked in earlier revisions are all closed. Component lifecycle
 
 Final foundation-hardening checklist (`ISSUES.md` ISS-001..ISS-007) has code/test fixes in this pass. A real machine uninstall/clean-install smoke remains optional and destructive; do it only with explicit same-turn confirmation because it touches global agent state. If that smoke finds a new regression, add it back to `ISSUES.md` with concrete reproduction, failing test, and root-cause fix before starting §6.1.
 
-The trajectory layer below is next-branch work after this final foundation-hardening pass — none of it is implemented. Build order is top-down because later layers consume earlier layers' state.
+The trajectory layer below is next-branch work after this final foundation-hardening pass — none of it is implemented. Build order is being revised into a product-kernel first approach because projects, docs, tasks, memory, runs, context, artifacts, reporting, and orchestration share one domain model.
+
+### 6.0 Product kernel direction — 2026-04-30 research
+
+Current recommendation is documented in `docs/superpowers/specs/2026-04-30-product-kernel-research-design.md`; implementation plan in `docs/superpowers/plans/2026-04-30-product-kernel.md`; execution orchestration playbook in `docs/superpowers/plans/2026-04-30-product-kernel-orchestration-playbook.md`.
+
+Decision summary:
+
+- Use a Postgres-compatible product kernel: PGlite for local default, PostgreSQL server for team/SaaS.
+- Keep Convex as second-choice fallback if Postgres/PGlite fails local realtime/setup gates and its platform/license tradeoffs become acceptable.
+- Keep SQLite + FTS5 + Bun API as third-choice fallback only if PGlite cannot ship reliably inside the local Fulcrum runtime.
+- Web app direction is SvelteKit + shadcn-svelte, not React.
+- Canonical docs/memory are Markdown plus YAML frontmatter, not rich-editor JSON.
+- Client state uses a zustand/vanilla-style store behind a Svelte adapter; server data remains canonical in Postgres.
+- Retrieval remains deterministic: FTS, structured filters, backlinks, edges, source refs, and stable context assembly; no embeddings, RAG, semantic search, or model dependency.
+
+The older §6.1-§6.7 layer list remains useful as domain inventory, but implementation should start with the shared product kernel plan above rather than building each layer as an isolated SQLite database.
 
 ### 6.1 Repository supervisor — `fulcrum repo …`
 
