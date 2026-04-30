@@ -586,15 +586,21 @@ export async function installCaveman(home: string, opts: { dryRun?: boolean } = 
     const claudeDir = `${home}/.claude`;
     if (await isDir(claudeDir)) {
       const compressDir = `${claudeDir}/plugins/cache/caveman/caveman`;
+      const { shouldInstallClaudePlugin, writeMarker } = await import("./claude-plugin-markers.ts");
       if ((await isClaudePluginInstalled(home, "caveman@caveman")) && (await isDir(compressDir))) {
         console.log("     · skip Claude Code caveman (already installed)");
       } else if (!(await which("claude"))) {
         console.log("     · skip Claude Code (claude not on PATH)  — manual: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman");
+      } else if (!(await shouldInstallClaudePlugin("caveman@caveman"))) {
+        console.log("     · skip Claude Code caveman: pass --allow-claude-cli to opt in, or run manually: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman");
       } else {
         const r1 = await runProcDry(["claude", "plugin", "marketplace", "add", "JuliusBrussee/caveman"]);
         if (r1.exit !== 0) {
           console.log(`     ✗ Claude Code caveman marketplace add failed: ${r1.stderr.trim()} — manual: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman`);
         } else {
+          if (!DRY_RUN) {
+            await writeMarker({ plugin: "caveman@caveman", marketplace: "JuliusBrussee/caveman", source: "package.caveman", operation: "install" });
+          }
           const r2 = await runProcDry(["claude", "plugin", "install", "caveman@caveman"]);
           if (r2.exit !== 0) {
             console.log(`     ✗ Claude Code caveman install failed: ${r2.stderr.trim()} — manual: claude plugin install caveman@caveman`);
@@ -826,6 +832,10 @@ export async function run(args: string[]): Promise<void> {
       i += 1;
     } else if (a === "--enable-all-mcps") {
       mcpDefaultMode = "all";
+      i += 1;
+    } else if (a === "--allow-claude-cli") {
+      const { setClaudeCliAllowed } = await import("./claude-plugin-markers.ts");
+      setClaudeCliAllowed(true);
       i += 1;
     } else {
       console.error(`fulcrum install: unknown arg '${a}'`);

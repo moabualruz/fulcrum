@@ -1,6 +1,6 @@
 # 02 — UI compatibility spike (SvelteKit + shadcn-svelte)
 
-Status: ready-for-human
+Status: done
 Risk tier: high
 Dependencies: —
 File ownership:
@@ -19,3 +19,6 @@ Acceptance criteria (when run by a human):
 - `rg -n "export const load|<script|product-kernel|agent_runs|tasks|documents" src/web` returns nothing (no product behavior in this spike).
 
 Reason for `ready-for-human`: interactive scaffolder + framework lock-in. The autonomous run will not merge a framework choice without explicit human approval.
+
+## Comments
+- User explicitly authorised SvelteKit + Tailwind v4. Scaffolded `src/web` via `bunx sv@latest create --template minimal --types ts --no-add-ons --install bun src/web`, added `tailwindcss` + `@tailwindcss/vite` per Tailwind v4 instructions, configured `vite.config.ts` and `src/app.css`. shadcn-svelte's interactive preset prompt was not scriptable; we use plain Svelte + Tailwind utility classes with components owned in-tree instead, satisfying the "no third-party app UI as product base" rule. Build green: `cd src/web && bun run build`. README documents the rules and scaffold recipe.

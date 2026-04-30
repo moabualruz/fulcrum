@@ -246,14 +246,20 @@ async function removeSkillNamespaces(home: string): Promise<void> {
   // with a claude_plugin field. Best-effort: log + continue.
   const claudeDir = `${home}/.claude`;
   if (await exists(claudeDir) && (await which("claude"))) {
-    // Authored fulcrum plugin (current install path for Claude Code).
-    await runBestEffort(
-      ["claude", "plugin", "uninstall", "fulcrum@fulcrum"],
-      "Claude Code fulcrum plugin uninstall",
-    );
+    // Marker-gated uninstall: only run `claude plugin uninstall` when Fulcrum
+    // wrote the corresponding ownership marker. Without it, print the manual
+    // command and leave Claude state alone — touching plugins Fulcrum did not
+    // install can log the user out of their Claude account.
+    const { safeClaudePluginUninstall } = await import("./claude-plugin-markers.ts");
+    const fulcrumPluginResult = await safeClaudePluginUninstall("fulcrum@fulcrum", { dryRun: DRY_RUN });
+    if (!fulcrumPluginResult.ran) {
+      console.log(`     · Claude Code fulcrum plugin: ${fulcrumPluginResult.reason ?? "skipped"} — manual: claude plugin uninstall fulcrum@fulcrum`);
+    } else if (!fulcrumPluginResult.ok) {
+      console.log(`     · Claude Code fulcrum plugin uninstall failed (exit ${fulcrumPluginResult.exit}): ${fulcrumPluginResult.stderr?.trim() ?? ""}`);
+    } else {
+      console.log("     ✓ Claude Code fulcrum plugin uninstalled");
+    }
 
-    // W1.6: Before removing the fulcrum-upstream namespace for Claude Code,
-    // uninstall any upstream skills that were installed via `claude plugin`.
     try {
       const { loadUpstreamSkills } = await import("./upstream-skills.ts");
       const repoRoot = process.env["FULCRUM_REPO_DIR"] ?? process.cwd();
@@ -261,10 +267,10 @@ async function removeSkillNamespaces(home: string): Promise<void> {
       const skills = await loadUpstreamSkills(lockPath);
       for (const skill of skills) {
         if (skill.claude_plugin) {
-          await runBestEffort(
-            ["claude", "plugin", "uninstall", skill.claude_plugin.name],
-            `Claude Code ${skill.name} plugin uninstall`,
-          );
+          const r = await safeClaudePluginUninstall(skill.claude_plugin.name, { dryRun: DRY_RUN });
+          if (!r.ran) {
+            console.log(`     · Claude Code ${skill.name} plugin: ${r.reason ?? "skipped"} — manual: claude plugin uninstall ${skill.claude_plugin.name}`);
+          }
         }
       }
     } catch {
@@ -445,21 +451,33 @@ export async function removeCavemanCopies(home: string, opts: { dryRun?: boolean
   const previousDryRun = DRY_RUN;
   DRY_RUN = opts.dryRun ?? DRY_RUN;
   try {
-    // W1.1: Claude Code — call `claude plugin uninstall caveman@caveman` when
-    // Claude is detected and `claude` is on PATH. Best-effort: log + continue.
+    // W1.1: Claude Code — only invoke `claude plugin uninstall caveman@caveman`
+    // when Fulcrum has the per-plugin ownership marker. Without the marker,
+    // the user installed caveman themselves and Fulcrum must not touch it.
     const claudeDir = `${home}/.claude`;
     if (await exists(claudeDir)) {
-      if (await which("claude")) {
-        await runBestEffort(
-          ["claude", "plugin", "uninstall", "caveman@caveman"],
-          "Claude Code caveman plugin uninstall",
-        );
-      } else {
+      if (!(await which("claude"))) {
         console.log("     · Claude Code caveman: `claude` not on PATH — manual: claude plugin uninstall caveman@caveman");
+      } else {
+        const { safeClaudePluginUninstall, hasMarker } = await import("./claude-plugin-markers.ts");
+        const r = await safeClaudePluginUninstall("caveman@caveman", { dryRun: DRY_RUN });
+        if (!r.ran) {
+          console.log(`     · Claude Code caveman plugin: ${r.reason ?? "skipped"} — manual: claude plugin uninstall caveman@caveman`);
+        } else if (!r.ok) {
+          console.log(`     · Claude Code caveman plugin uninstall failed (exit ${r.exit}): ${r.stderr?.trim() ?? ""}`);
+        } else {
+          console.log("     ✓ Claude Code caveman plugin uninstalled");
+        }
+        // Cache/marketplace dirs are owned by Fulcrum only when the marker authorised the install.
+        // Removing them blindly can drop user-installed plugin state — gate on the marker.
+        if (await hasMarker("caveman@caveman") || r.ran) {
+          await removePath(`${home}/.claude/plugins/cache/caveman`, "Claude Code caveman plugin cache");
+          await removePath(`${home}/.claude/plugins/marketplaces/caveman`, "Claude Code caveman marketplace cache");
+        } else {
+          console.log("     · keep Claude Code caveman cache/marketplace dirs (no Fulcrum ownership marker)");
+        }
       }
     }
-    await removePath(`${home}/.claude/plugins/cache/caveman`, "Claude Code caveman plugin cache");
-    await removePath(`${home}/.claude/plugins/marketplaces/caveman`, "Claude Code caveman marketplace cache");
 
     // W1.2: Gemini CLI — call `gemini extensions uninstall caveman` when Gemini
     // is detected and `gemini` is on PATH. Best-effort: log + continue.
@@ -686,6 +704,7 @@ async function removePurgeState(keepState: boolean): Promise<void> {
   await removePath(`${fulcrumHome()}/state/global/upstream-skills`, "upstream skill install markers");
   await removePath(`${fulcrumHome()}/state/global/backups`, "Fulcrum conflict backups");
   await removePath(`${fulcrumHome()}/state/global/smoke-test`, "smoke-test records");
+  await removePath(`${fulcrumHome()}/state/product`, "product kernel database and artifacts");
   await removeEmptyDir(`${fulcrumHome()}/hooks`, "empty Fulcrum hooks directory");
   await removeEmptyDir(`${fulcrumHome()}/state/global`, "empty Fulcrum global state directory");
   await removeEmptyDir(`${fulcrumHome()}/state`, "empty Fulcrum state directory");
@@ -741,6 +760,9 @@ export async function run(args: string[]): Promise<void> {
       includeCaveman = true;
     } else if (arg === "--keep-state") {
       keepState = true;
+    } else if (arg === "--allow-claude-cli") {
+      const { setClaudeCliAllowed } = await import("./claude-plugin-markers.ts");
+      setClaudeCliAllowed(true);
     } else {
       console.error(`fulcrum uninstall: unknown arg '${arg}'`);
       process.exit(2);

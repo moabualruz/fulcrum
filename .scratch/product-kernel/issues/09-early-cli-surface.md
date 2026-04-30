@@ -1,6 +1,6 @@
 # 09 — Early CLI surface (`fulcrum product …`)
 
-Status: ready-for-agent
+Status: done
 Risk tier: medium
 Dependencies: product-kernel/05, product-kernel/06, product-kernel/07
 File ownership:
@@ -15,3 +15,6 @@ Acceptance criteria:
 - `fulcrum product context assemble --task <id>` prints the assembled Markdown.
 - RED CLI tests fail before dispatch wiring exists; GREEN: `bun test src/cli/product.test.ts` and `bun run src/index.ts product init --json | jq .` succeed.
 - No full task/docs CRUD beyond what listed acceptance criteria require.
+
+## Comments
+- Shipped in `dc211f3 feat(product-kernel): add fulcrum product CLI surface`.

@@ -1,6 +1,6 @@
 # 10 — Doctor and uninstall integration
 
-Status: ready-for-agent
+Status: done
 Risk tier: medium
 Dependencies: product-kernel/05, product-kernel/09
 File ownership:
@@ -16,3 +16,6 @@ Acceptance criteria:
 - `fulcrum uninstall --purge` removes managed product state under `~/.fulcrum/state/product/` only.
 - RED tests fail on missing product-kernel behavior in doctor/uninstall; GREEN: `bun test src/cli/doctor.test.ts src/cli/uninstall.test.ts` passes.
 - HANDOVER.md updated to reflect product-kernel doctor/uninstall coverage.
+
+## Comments
+- Shipped in `c5753f0 feat(product-kernel): wire doctor and uninstall to product DB`.

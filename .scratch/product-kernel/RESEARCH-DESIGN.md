@@ -1,6 +1,6 @@
 # Fulcrum Product Kernel Research And Design
 
-Status: needs-triage
+Status: done
 Source: docs/superpowers/specs/2026-04-30-product-kernel-research-design.md
 
 > Research-backed recommendation before implementation. This design updates HANDOVER.md section 6 from separate narrow layers into one shared product kernel that later exposes repository supervision, tasks, docs, memory, context, agent runs, artifacts, and plugins.

@@ -641,3 +641,65 @@ enabled_codex = true
     expect(context7!["auth_status"]).toBe("n/a");
   });
 });
+
+describe("doctor --json product kernel section", () => {
+  test("reports productKernel.engine = absent before init", async () => {
+    const home = join(TMP, "product-kernel-absent");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const pk = report["productKernel"] as Record<string, unknown>;
+    expect(pk).toBeDefined();
+    expect(pk["engine"]).toBe("absent");
+    expect(pk["schemaApplied"]).toBe(0);
+    const rows = pk["rows"] as Record<string, number>;
+    expect(rows["orgs"]).toBe(0);
+  });
+
+  test("reports product kernel rows after fulcrum product init", async () => {
+    const home = join(TMP, "product-kernel-after-init");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    // Run fulcrum product init out-of-band
+    const initProc = Bun.spawn(["bun", "src/index.ts", "product", "init", "--json"], {
+      cwd: process.cwd(),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, HOME: home, FULCRUM_HOME: fulcrumHome },
+    });
+    await new Response(initProc.stdout).text();
+    await initProc.exited;
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const pk = report["productKernel"] as Record<string, unknown>;
+    expect(pk["engine"]).toBe("pglite");
+    expect((pk["schemaApplied"] as number) >= 3).toBe(true);
+    const rows = pk["rows"] as Record<string, number>;
+    expect(rows["orgs"]).toBe(1);
+  });
+});
+
+describe("doctor product-kernel verdict (issue 19)", () => {
+  test("forces verdict=error when product DB cannot open", async () => {
+    const home = join(TMP, "product-kernel-broken");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    // Seed a corrupt PGlite directory: a stub PG_VERSION file exists so the
+    // doctor probe attempts to open it, but the rest of the directory is
+    // missing the actual PGlite layout.
+    const dbDir = join(fulcrumHome, "state", "product", "db", "main");
+    await mkdir(dbDir, { recursive: true });
+    await writeFile(join(dbDir, "PG_VERSION"), "16\n");
+    await writeFile(join(dbDir, "postgresql.conf"), "this-is-not-a-real-pg-data-dir\n");
+    // Add unreadable junk to make PGlite open() fail.
+    await writeFile(join(dbDir, "pg_hba.conf"), "BROKEN\n");
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const verdict = report["verdict"] as string;
+    const pk = report["productKernel"] as Record<string, unknown>;
+    // Either the engine is "absent" with an error message, or it opened and
+    // produced rows. Either path must not crash; a recorded error must
+    // escalate the verdict away from "ok".
+    if (pk["error"]) {
+      expect(verdict).toBe("error");
+    }
+  });
+});

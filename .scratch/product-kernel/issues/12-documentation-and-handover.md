@@ -1,6 +1,6 @@
 # 12 — Documentation and handover
 
-Status: ready-for-agent
+Status: done
 Risk tier: low
 Dependencies: product-kernel/05..10
 File ownership:
@@ -15,3 +15,6 @@ Acceptance criteria:
 - README.md and HANDOVER.md reference `docs/product-kernel.md`.
 - `bun run ci` is green.
 - `git status --short` shows only intended changes.
+
+## Comments
+- Shipped in `f8b3295 docs(product-kernel): add product kernel reference doc` and compressed in `3d0e9ea docs(product-kernel): compress reference doc with caveman`.

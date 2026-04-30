@@ -10,6 +10,8 @@ Per `docs/agents/issue-tracker.md`: one feature per directory. Each `<feature-sl
 | ---------------------------------- | ------------------ | ------ | -------------------------------------------------------------------- |
 | `component-lifecycle-management`   | ready-for-agent    | 13     | All issues `Status: done`. Shipped on `main`.                        |
 | `plugin-extension-surface-parity`  | ready-for-agent    | 14     | All issues `Status: done`. Shipped on `main`.                        |
-| `product-kernel`                   | ready-for-agent    | 12     | 10 `ready-for-agent`; issues 02 + 11 `ready-for-human` (UI scaffold). |
+| `product-kernel`                   | ready-for-agent    | 12     | All 12 `Status: done` (CLI surface, web shell, doctor, uninstall, docs).   |
+| `claude-migration-review`          | done               | n/a    | Report-only audit of claimed `.scratch/` migration completion.       |
+| `migration-review-remediation`     | ready-for-agent    | 15     | Issues 13–27 derived from the audit. 14 ready-for-agent + 25 parked. |
 
 Originals preserved under `docs/superpowers/{plans,specs}/`. The `.scratch/` copies are the canonical source for ongoing work; the `docs/superpowers/` versions are an archival record of how the work was first written.

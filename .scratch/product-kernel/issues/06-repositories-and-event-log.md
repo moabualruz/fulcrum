@@ -1,6 +1,6 @@
 # 06 — Repositories and event log
 
-Status: ready-for-agent
+Status: done
 Risk tier: medium
 Dependencies: product-kernel/05
 File ownership:
@@ -16,3 +16,6 @@ Acceptance criteria:
 - `repositories.ts` exposes `createLocalOrg`, `createProject`, `createTask`, `appendEvent`, `listEventsForProject`.
 - Creating a project and task writes both the source row and an `events` row in stable order with exact `actor` and `subject` fields.
 - RED test fails before implementation; GREEN test (`bun test src/product-kernel/events.test.ts`) passes after.
+
+## Comments
+- Shipped in `db72db5 feat(product-kernel): add repositories and event log`.

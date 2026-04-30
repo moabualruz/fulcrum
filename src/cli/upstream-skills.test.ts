@@ -555,6 +555,9 @@ describe("W1.6 ast-grep claude_plugin schema", () => {
       logs.push(String(args[0]));
     });
 
+    // Opt-in to Claude CLI mutation so the marker-gated path actually runs.
+    const { setClaudeCliAllowed } = await import("./claude-plugin-markers.ts");
+    setClaudeCliAllowed(true);
     try {
       const skills = await loadUpstreamSkills(lockPath);
       await syncUpstreamSkills({ dryRun: false, skills, lockPath });
@@ -570,6 +573,7 @@ describe("W1.6 ast-grep claude_plugin schema", () => {
       expect(pluginInstall).toBeDefined();
       expect(logs.some((l) => l.includes("via claude plugin install"))).toBe(true);
     } finally {
+      setClaudeCliAllowed(false);
       whichSpy.mockRestore();
       runSpy.mockRestore();
       logSpy.mockRestore();

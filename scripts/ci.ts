@@ -4,13 +4,18 @@
 
 import { spawn } from "node:child_process";
 
-interface Step { name: string; cmd: string[]; soft?: boolean; }
+interface Step { name: string; cmd: string[]; soft?: boolean; cwd?: string; }
 
 const STEPS: Step[] = [
   { name: "install",     cmd: ["bun", "install", "--frozen-lockfile"] },
   { name: "typecheck",   cmd: ["bun", "run", "--bun", "tsc", "--noEmit"] },
   { name: "test",        cmd: ["bun", "test"] },
   { name: "build:all",   cmd: ["bun", "run", "scripts/build-all.ts"] },
+  // Web pipeline runs from the SvelteKit subpackage. svelte-kit + svelte-check
+  // catch regressions that the root tsc cannot see because src/web is excluded.
+  { name: "web:install", cmd: ["bun", "install", "--frozen-lockfile"], cwd: "src/web" },
+  { name: "web:check",   cmd: ["bun", "run", "check"], cwd: "src/web" },
+  { name: "web:build",   cmd: ["bun", "run", "build"], cwd: "src/web" },
   { name: "skills:lint", cmd: ["bun", "run", "src/index.ts", "skills", "lint", "skills/"] },
   { name: "compress:check", cmd: ["bash", "scripts/compress-with-caveman.sh", "--check"] },
 ];
@@ -21,7 +26,7 @@ function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string }> 
   return new Promise((resolve) => {
     const t0 = Date.now();
     let stderr = "";
-    const proc = spawn(step.cmd[0]!, step.cmd.slice(1), { stdio: "pipe" });
+    const proc = spawn(step.cmd[0]!, step.cmd.slice(1), { stdio: "pipe", cwd: step.cwd });
 
     if (proc.stdout) proc.stdout.on("data", (d) => process.stdout.write(d));
     if (proc.stderr) proc.stderr.on("data", (d) => {
