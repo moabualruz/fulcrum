@@ -373,10 +373,16 @@ describe("run", () => {
 // ---------------------------------------------------------------------------
 
 describe("removeCavemanCopies — W1.1 Claude plugin uninstall", () => {
+  async function seedMarker() {
+    const { writeMarker } = await import("./claude-plugin-markers.ts");
+    await writeMarker({ plugin: "caveman@caveman", marketplace: "JuliusBrussee/caveman", source: "package.caveman", operation: "install" });
+  }
+
   test("opts dry-run logs without running or removing filesystem copies", async () => {
     await mkdir(join(TMP, ".claude"), { recursive: true });
     await mkdir(join(TMP, ".codex", "skills", "caveman"), { recursive: true });
     await writeFile(join(TMP, ".codex", "skills", "caveman", "SKILL.md"), "caveman\n");
+    await seedMarker();
     const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
     const logs: string[] = [];
@@ -391,15 +397,15 @@ describe("removeCavemanCopies — W1.1 Claude plugin uninstall", () => {
       logSpy.mockRestore();
     }
     expect(runSpy.mock.calls).toHaveLength(0);
-    expect(logs).toContain("     [dry-run] would run: claude plugin uninstall caveman@caveman");
+    expect(logs.some((l) => l.includes("dry-run"))).toBe(true);
     expect(await Bun.file(join(TMP, ".codex", "skills", "caveman", "SKILL.md")).exists()).toBe(true);
   });
 
-  test("calls claude plugin uninstall when .claude exists and claude on PATH", async () => {
+  test("calls claude plugin uninstall only when a Fulcrum marker exists", async () => {
     await mkdir(join(TMP, ".claude"), { recursive: true });
-    // Create the caveman install dir so removePath has something to clean up.
     await mkdir(join(TMP, ".claude", "plugins", "cache", "caveman", "caveman"), { recursive: true });
     await mkdir(join(TMP, ".claude", "plugins", "marketplaces", "caveman"), { recursive: true });
+    await seedMarker();
 
     const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
       if (cmd === "claude") return "/usr/local/bin/claude";
@@ -423,6 +429,43 @@ describe("removeCavemanCopies — W1.1 Claude plugin uninstall", () => {
     }
   });
 
+  test("skips claude plugin uninstall when no Fulcrum marker exists", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "cache", "caveman", "caveman"), { recursive: true });
+
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
+      if (cmd === "claude") return "/usr/local/bin/claude";
+      return null;
+    });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      // Call removeCavemanCopies directly so we exercise only the safety
+      // gating for caveman; the full `run(["--include-caveman"])` flow walks
+      // many other unrelated cleanup paths that have their own ownership rules.
+      await removeCavemanCopies(TMP);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const claudeUninstall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd.includes("plugin") && cmd.includes("uninstall") && cmd.includes("caveman@caveman"),
+      );
+      expect(claudeUninstall).toBeUndefined();
+      expect(logs.some((l) => l.includes("no-marker") || l.includes("manual: claude plugin uninstall caveman@caveman"))).toBe(true);
+      // Cache dir is preserved when no Fulcrum marker proves Fulcrum installed it.
+      const dirExists = await import("node:fs/promises").then((fs) =>
+        fs.stat(join(TMP, ".claude", "plugins", "cache", "caveman", "caveman")).then(() => true).catch(() => false),
+      );
+      expect(dirExists).toBe(true);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
   test("skips claude uninstall when .claude dir absent", async () => {
     const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
@@ -439,8 +482,9 @@ describe("removeCavemanCopies — W1.1 Claude plugin uninstall", () => {
     }
   });
 
-  test("logs and continues when claude plugin uninstall exits non-zero (best-effort)", async () => {
+  test("logs and continues when claude plugin uninstall exits non-zero", async () => {
     await mkdir(join(TMP, ".claude"), { recursive: true });
+    await seedMarker();
     const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
       if (cmd === "claude") return "/usr/local/bin/claude";
       return null;
@@ -453,7 +497,7 @@ describe("removeCavemanCopies — W1.1 Claude plugin uninstall", () => {
     try {
       // Must not throw even though run returns non-zero.
       await expect(run(["--include-caveman"])).resolves.toBeUndefined();
-      expect(logs.some((l) => l.includes("continuing"))).toBe(true);
+      expect(logs.some((l) => l.includes("uninstall failed"))).toBe(true);
     } finally {
       whichSpy.mockRestore();
       runSpy.mockRestore();

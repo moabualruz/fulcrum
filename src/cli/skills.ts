@@ -218,6 +218,12 @@ async function installClaudePlugin(root: string, opts: { dryRun: boolean }): Pro
     return;
   }
 
+  const { shouldInstallClaudePlugin, writeMarker: writeClaudeMarker } = await import("./claude-plugin-markers.ts");
+  if (!(await shouldInstallClaudePlugin(PLUGIN_SPEC))) {
+    console.log(`    · skip ${PLUGIN_SPEC}: pass --allow-claude-cli to opt in, or run manually: claude plugin marketplace add ${PLUGIN_MARKETPLACE} && claude plugin install ${PLUGIN_SPEC}`);
+    return;
+  }
+
   const r1 = await runProc(["claude", "plugin", "marketplace", "add", PLUGIN_MARKETPLACE], { timeoutMs: 60_000 });
   if (r1.exit !== 0) {
     console.log(`    ✗ marketplace add failed: ${r1.stderr.trim() || r1.stdout.trim()}`);
@@ -232,6 +238,12 @@ async function installClaudePlugin(root: string, opts: { dryRun: boolean }): Pro
     console.log(`      manual: claude plugin install ${PLUGIN_SPEC}`);
     return;
   }
+  await writeClaudeMarker({
+    plugin: PLUGIN_SPEC,
+    marketplace: PLUGIN_MARKETPLACE,
+    source: "skills.authored",
+    operation: "install",
+  });
   console.log(`    ✓ plugin installed: ${PLUGIN_SPEC} (skills available as /fulcrum:<name>)`);
   await refreshClaudePluginPackage(root, { dryRun: opts.dryRun });
 }
@@ -259,20 +271,24 @@ async function removeDirIfPresent(path: string, opts: { dryRun: boolean; label: 
 }
 
 async function uninstallClaudeFulcrumPlugin(opts: { dryRun: boolean }): Promise<void> {
-  const cmd = ["claude", "plugin", "uninstall", PLUGIN_SPEC];
   if (opts.dryRun) {
-    console.log(`    [dry-run] would run: ${cmd.join(" ")}`);
+    console.log(`    [dry-run] would run: claude plugin uninstall ${PLUGIN_SPEC}`);
     return;
   }
   if (!(await which("claude"))) {
     console.log(`    · claude not on PATH — skip plugin uninstall (${PLUGIN_SPEC})`);
     return;
   }
-  const result = await runProc(cmd, { timeoutMs: 60_000 });
-  if (result.exit === 0) {
+  const { safeClaudePluginUninstall } = await import("./claude-plugin-markers.ts");
+  const r = await safeClaudePluginUninstall(PLUGIN_SPEC, { dryRun: opts.dryRun });
+  if (!r.ran) {
+    console.log(`    · ${PLUGIN_SPEC}: ${r.reason ?? "skipped"} — manual: claude plugin uninstall ${PLUGIN_SPEC}`);
+    return;
+  }
+  if (r.ok) {
     console.log(`    ✓ plugin uninstalled: ${PLUGIN_SPEC}`);
   } else {
-    console.log(`    · plugin uninstall skipped/failed: ${result.stderr.trim() || result.stdout.trim()}`);
+    console.log(`    · plugin uninstall failed (exit ${r.exit}): ${r.stderr?.trim() ?? ""}`);
   }
 }
 

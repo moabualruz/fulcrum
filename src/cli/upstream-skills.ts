@@ -710,6 +710,11 @@ export async function syncUpstreamSkills(
           console.log(`    · ${skill.name}: already installed via claude plugin (skip)`);
           continue;
         }
+        const { shouldInstallClaudePlugin: _shouldInstall, writeMarker: _writeUpstreamMarker } = await import("./claude-plugin-markers.ts");
+        if (!(await _shouldInstall(skill.claude_plugin.name))) {
+          console.log(`    · ${skill.name}: skip claude plugin install (no Fulcrum marker; pass --allow-claude-cli to opt in or use manual: claude plugin marketplace add ${skill.claude_plugin.marketplace} && claude plugin install ${skill.claude_plugin.name})`);
+          continue;
+        }
         const r1 = await runProc(["claude", "plugin", "marketplace", "add", skill.claude_plugin.marketplace]);
         if (r1.exit !== 0) {
           console.log(`    ✗ ${skill.name}: claude plugin marketplace add failed: ${r1.stderr.trim()}`);
@@ -742,6 +747,12 @@ export async function syncUpstreamSkills(
               }
             }
           } else {
+            await _writeUpstreamMarker({
+              plugin: skill.claude_plugin.name,
+              marketplace: skill.claude_plugin.marketplace,
+              source: `skills.upstream:${skill.name}`,
+              operation: "install",
+            });
             console.log(`    ${skill.name} (via claude plugin install)`);
           }
         }
@@ -834,20 +845,24 @@ function lockPlacementName(skill: UpstreamSkill): string | null {
 
 async function uninstallClaudePlugin(skill: UpstreamSkill, dryRun: boolean): Promise<void> {
   if (!skill.claude_plugin) return;
-  const cmd = ["claude", "plugin", "uninstall", skill.claude_plugin.name];
   if (dryRun) {
-    console.log(`      [dry-run] would run: ${cmd.join(" ")}`);
+    console.log(`      [dry-run] would run: claude plugin uninstall ${skill.claude_plugin.name}`);
     return;
   }
   if (!(await which("claude"))) {
     console.log(`      · claude not on PATH — skip plugin uninstall: ${skill.claude_plugin.name}`);
     return;
   }
-  const result = await runProc(cmd, { timeoutMs: 60_000 });
-  if (result.exit === 0) {
+  const { safeClaudePluginUninstall } = await import("./claude-plugin-markers.ts");
+  const r = await safeClaudePluginUninstall(skill.claude_plugin.name, { dryRun });
+  if (!r.ran) {
+    console.log(`      · ${skill.claude_plugin.name}: ${r.reason ?? "skipped"} — manual: claude plugin uninstall ${skill.claude_plugin.name}`);
+    return;
+  }
+  if (r.ok) {
     console.log(`      uninstalled claude plugin: ${skill.claude_plugin.name}`);
   } else {
-    console.log(`      · claude plugin uninstall skipped/failed: ${result.stderr.trim() || result.stdout.trim()}`);
+    console.log(`      · claude plugin uninstall failed (exit ${r.exit}): ${r.stderr?.trim() ?? ""}`);
   }
 }
 

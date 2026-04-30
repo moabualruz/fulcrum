@@ -18,3 +18,6 @@ Acceptance criteria:
 - A new flag `--allow-claude-cli` (defaults off) gates first-time `claude plugin install` invocations from `fulcrum install` paths. Without the flag, install prints the manual command.
 - `fulcrum uninstall` never fires `claude plugin uninstall` without the marker.
 - Unit tests cover marker-present, marker-absent, and `--allow-claude-cli` paths.
+
+## Comments
+- Shipped in `feat(safety): marker-gate every Claude plugin install/uninstall`. New module `src/cli/claude-plugin-markers.ts` owns the marker schema and `safeClaudePluginInstall` / `safeClaudePluginUninstall` wrappers. Install paths in `install.ts` (caveman), `skills.ts` (fulcrum@fulcrum), and `upstream-skills.ts` now refuse to call `claude plugin install` unless an existing marker or `--allow-claude-cli` opt-in (`FULCRUM_ALLOW_CLAUDE_CLI=1`) authorises it. Uninstall paths in `uninstall.ts` (fulcrum + caveman + lockfile entries), `skills.ts`, and `upstream-skills.ts` only fire `claude plugin uninstall` when a marker proves Fulcrum installed the plugin; otherwise they print a manual command. Cache/marketplace dirs are preserved unless a marker exists. Marker tests + per-call-site test updates included.
