@@ -13,20 +13,20 @@ PRD: `.scratch/agent-os-vision/prds/01-foundation-reset.md`
 ## What to build
 Implement the SvelteKit auth pages that expose the Better-Auth session system to browser users:
 
-- `src/web/src/routes/auth/login/+page.svelte` — passkey button + email/password form. OAuth buttons (Google/GitHub) rendered only when `isEnabled('saas-auth')` is true. "Forgot password" link rendered when email OTP enabled. On submit, calls Better-Auth client `signIn`; redirects to `/` on success.
+- `src/web/src/routes/auth/login/+page.svelte` — passkey button + email/password form. OAuth buttons (Google/GitHub) rendered only when `isEnabled('saas-auth')` is true (resolved via the `FlagRegistry` from `event.locals.container`). "Forgot password" link rendered when email OTP enabled. On submit, calls Better-Auth client `signIn`; redirects to `/` on success.
 - `src/web/src/routes/auth/signup/+page.svelte` — name + email + password form; inline passkey enrollment step. Active in SaaS mode (`saas-auth` flag); in local-only mode this page is guarded (local mode auto-creates admin@local on `fulcrum init`, no human signup needed).
-- `src/web/src/routes/auth/logout/+server.ts` — POST handler: calls `auth.signOut()`; clears session cookie; redirects to `/auth/login`.
+- `src/web/src/routes/auth/logout/+server.ts` — POST handler: calls `auth.signOut()` (which removes the session row via `sessionRepo.nativeDelete` under the hood); clears session cookie; redirects to `/auth/login`.
 - `src/web/src/hooks.server.ts` — updated: unauthenticated requests to non-auth routes redirect to `/auth/login`.
 
-Cuts through: SvelteKit page/server routes → Better-Auth client/server → session cookie → hooks redirect → Playwright e2e tests.
+Cuts through: SvelteKit page/server routes → Better-Auth client/server (with MikroORM-backed adapter) → session row → hooks redirect → Playwright e2e tests.
 
 ## Acceptance criteria
-- [ ] Schema: session row created in `sessions` table on successful login.
+- [ ] Schema: `Session` entity row created on successful login (verified via `sessionRepo.findOne({ user: ... })`).
 - [ ] Server action / tRPC: `event.locals.session` populated after login; cleared after logout.
 - [ ] Web surface: `/auth/login` renders without crash; submitting `admin@local` + correct password redirects to `/`. Submitting wrong password shows error. `/auth/logout` POST clears cookie, redirects to `/auth/login`. OAuth buttons absent when `saas-auth` flag is OFF.
 - [ ] CLI command: N/A.
 - [ ] TUI screen: N/A.
-- [ ] Tests: Playwright `tests/auth/login.spec.ts` — full login + logout round-trip for `admin@local`. Assert session cookie present after login, absent after logout. Assert OAuth buttons are not rendered when `saas-auth` OFF. RED → GREEN.
+- [ ] Tests: Playwright `tests/auth/login.spec.ts` — full login + logout round-trip for `admin@local`. Assert session cookie present after login, absent after logout. After login: `await sessionRepo.findOne({ user: { email: 'admin@local' } })` returns a row; after logout: same query returns null. Assert OAuth buttons are not rendered when `saas-auth` OFF. RED → GREEN.
 
 ## Blocked by
 - `09-auth-trpc-procedures-and-org-management` (needs Better-Auth session infrastructure + `auth.whoami` live).

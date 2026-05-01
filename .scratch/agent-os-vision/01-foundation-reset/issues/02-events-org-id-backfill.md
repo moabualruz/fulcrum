@@ -5,26 +5,27 @@ Pillar: 01-foundation-reset
 Blocked-by: 01-schema-auth-migration
 ---
 
-# Events org_id backfill migration (0005) — NOT NULL + default-org backfill
+# Events org_id backfill migration class — NOT NULL + default-org backfill
 
 ## Parent
 PRD: `.scratch/agent-os-vision/prds/01-foundation-reset.md`
 
 ## What to build
-Write and apply migration `0005_org_id_backfill.sql` that adds `org_id` and `user_id` to the existing `events` table, backfills every existing row with the well-known local org UUID `00000000-0000-0000-0000-000000000001`, promotes `org_id` to NOT NULL, drops the old partial index on `subject`, and creates the two new composite indexes `idx_events_org_created` and `idx_events_subject` covering `(org_id, …)`.
+Add `@ManyToOne(() => Org, { fieldName: 'org_id' })` and `@ManyToOne(() => User, { fieldName: 'user_id', nullable: true })` to the existing `Event` entity, then run `mikro-orm migration:create` to emit `Migration<timestamp>_events_org_id_backfill.ts`. Hand-extend the auto-generated `up()` body with one sanctioned `em.nativeUpdate('Event', { org: null }, { org: '00000000-0000-0000-0000-000000000001' })` between the column-add and the NOT NULL flip — the only C6 carve-out (data backfill inside a migration class). Replace the old single-column index on `subject` with two new composite `@Index` decorators on `Event` (`idx_events_org_created` over `(org, createdAt desc)` and `idx_events_subject` over `(org, subjectKind, subjectId, createdAt desc)`) so the next snapshot is clean.
 
-Cuts through: schema migration → migration runner → index verification via EXPLAIN → integration test.
+Cuts through: `Event` entity decorator update → `mikro-orm migration:create` emits class → manual backfill `addSql`/`em.nativeUpdate` insertion → migrator run → `em.getMetadata()` + `eventRepo` round-trip + EXPLAIN integration test.
 
 ## Acceptance criteria
-- [ ] Schema: `events.org_id uuid NOT NULL REFERENCES orgs(id)` and `events.user_id uuid REFERENCES users(id)` present after migration. Old `idx_events_subject` dropped; new `idx_events_org_created` on `(org_id, created_at DESC)` and `idx_events_subject` on `(org_id, subject_kind, subject_id, created_at DESC)` created.
-- [ ] Server action / migration runner: migration runs idempotently on PGlite + Postgres. Backfill touches only rows where `org_id IS NULL`.
+- [ ] Entity: `Event.org!: Org` (`@ManyToOne` non-nullable post-backfill) + `Event.user?: User` (`@ManyToOne` nullable) declared. New `@Index` decorators on `Event` for `(org, createdAt desc)` and `(org, subjectKind, subjectId, createdAt desc)` reflected in `em.getMetadata().get(Event).indexes`.
+- [ ] Migration class: `Migration<timestamp>_events_org_id_backfill.ts` runs idempotently on PGlite + Postgres. `up()` body: column-add (auto) → backfill (manual `em.nativeUpdate`) → NOT NULL flip + FK + new indexes + drop old `idx_events_subject` (auto). Backfill touches only rows where `org IS NULL`.
+- [ ] Server action / migration runner: `MikroORM.getMigrator().up({ to: 'Migration<timestamp>_events_org_id_backfill' })` succeeds.
 - [ ] Web surface: N/A — pure schema.
 - [ ] CLI command: N/A — pure schema.
 - [ ] TUI screen: N/A — pure schema.
-- [ ] Tests: `tests/db/migrations/0005_backfill.test.ts` — insert events rows without `org_id`, run migration, assert zero rows have `org_id IS NULL`, assert `EXPLAIN SELECT * FROM events WHERE org_id=$1 ORDER BY created_at DESC LIMIT 50` plan uses the new index (no seq scan). RED → GREEN.
+- [ ] Tests: `tests/db/migrations/events-backfill.test.ts` — pre-migration: `em.create(Event, {...})` (without `org`) + flush; run migrator; assert `await eventRepo.count({ org: null }) === 0`. EXPLAIN test: build the QueryBuilder for `eventRepo.find({ org }, { orderBy: { createdAt: 'desc' }, limit: 50 })`, run `em.getConnection().execute('explain ' + qb.getQuery())`, assert plan uses Index Scan (no seq scan). RED → GREEN.
 
 ## Blocked by
-- `01-schema-auth-migration` (needs `orgs` table + well-known org UUID present before backfill can reference FK).
+- `01-schema-auth-migration` (needs `Org` entity + well-known org row to satisfy FK; seed runs after `01`).
 
 ## Notes
-Well-known local org UUID `00000000-0000-0000-0000-000000000001` must be seeded in the `orgs` table before this migration runs; ensure seed order in `src/db/seed.ts` is: orgs → users → sessions → then this backfill.
+Well-known local org UUID `00000000-0000-0000-0000-000000000001` must be seeded in `Org` table before this migration runs; ensure seed order in `src/db/seed.ts` is: `em.upsert(Org, ...)` → `em.upsert(User, ...)` → `em.create(Session, ...)` → then this backfill class. The `addSql`/`em.nativeUpdate` carve-out for the backfill body is permitted under C6 only because it's inside a migration class; never in service or repository code.

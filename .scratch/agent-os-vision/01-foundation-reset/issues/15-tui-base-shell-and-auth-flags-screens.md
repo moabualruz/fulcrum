@@ -11,33 +11,33 @@ Blocked-by: 10-cli-auth-and-flags-verbs, 07-feature-flag-registry
 PRD: `.scratch/agent-os-vision/prds/01-foundation-reset.md`
 
 ## What to build
-Implement the OpenTUI application entry point and the two Foundation screens:
+Implement the OpenTUI application entry point and the two Foundation screens. TUI startup resolves the same root needle-di `Container` that web + CLI use, so `EntityManager`, repositories, and `FlagRegistry` are shared in-process.
 
-**`src/tui/index.ts`** — OpenTUI app root. Renders a status bar, a navigation panel, and a main content area. `fulcrum tui` (from the binary dispatcher in slice `08`) spawns this in-process.
+**`src/tui/index.ts`** — OpenTUI app root. Renders a status bar, a navigation panel, and a main content area. `fulcrum tui` (from the binary dispatcher in slice `08`) spawns this in-process. Resolves the container via `Container.global` or equivalent injection.
 
 **Status bar** — always-visible bottom bar showing: org name (`Local` / org.name) + user email. Reads from `auth.whoami` in-process tRPC call on mount. Updates on session change.
 
 **Settings → Auth screen (`src/tui/screens/auth.tsx`)**
-- Shows: current user email, org name, role, passkey enrollment status (`N passkeys enrolled`).
+- Shows: current user email, org name, role, passkey enrollment status (`N passkeys enrolled` from `await passkeyRepo.count({ user })`).
 - "Enroll passkey" action → opens browser URL (from slice `13`).
 - Shows active auth providers list when `saas-auth` flag ON.
 
 **Settings → Feature Flags screen (`src/tui/screens/flags.tsx`)**
-- Renders all registered flags as a toggleable list with descriptions.
+- Renders all registered flags as a toggleable list with descriptions (from `FLAG_DESCRIPTIONS`).
 - Toggle calls `flags.set` in-process; re-queries `flags.list` after each toggle.
 - Keyboard: `j`/`k` to navigate, `Space` or `Enter` to toggle, `q` to exit.
 
 **Navigation** — keyboard-navigable settings panel with at minimum: "Auth" and "Feature Flags" entries. Other settings entries (filled by later pillars) are stubs that print "Owned by Pillar N".
 
-Cuts through: OpenTUI component tree → in-process tRPC calls → status bar render → keyboard interaction → smoke tests.
+Cuts through: OpenTUI component tree → in-process tRPC calls (using shared needle-di container) → status bar render → keyboard interaction → smoke tests.
 
 ## Acceptance criteria
-- [ ] Schema: no migrations.
-- [ ] Server action / tRPC: `auth.whoami` + `flags.list` + `flags.set` called in-process from TUI (no HTTP).
+- [ ] Schema: no migration classes.
+- [ ] Server action / tRPC: `auth.whoami` + `flags.list` + `flags.set` called in-process from TUI (no HTTP). All resolve repositories from the shared needle-di container.
 - [ ] Web surface: N/A.
 - [ ] CLI command: `fulcrum tui` launches TUI; exits cleanly on `q` or `Ctrl+C`.
 - [ ] TUI screen: Status bar renders org name + email on startup. Settings → Auth screen shows correct user info. Settings → Feature Flags screen shows all registered flags; Space toggles; subsequent `flags.list` reflects change. TUI renders without crash with zero flags enabled.
-- [ ] Tests: `tests/tui/smoke.test.ts` — instantiate TUI in headless mode (no TTY); assert status bar renders `admin@local`; assert flags screen renders without throwing; assert toggle calls `flags.set`. RED → GREEN.
+- [ ] Tests: `tests/tui/smoke.test.ts` — instantiate TUI in headless mode (no TTY) with a test container; assert status bar renders `admin@local`; assert flags screen renders without throwing; assert toggle calls `flags.set` (and the resulting `featureFlagRepo` row exists). RED → GREEN.
 
 ## Blocked by
 - `10-cli-auth-and-flags-verbs` (TUI calls the same in-process tRPC procedures; auth verbs must be live first).
