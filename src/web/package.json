@@ -46,6 +46,7 @@
 		"@codemirror/view": "^6.41.1",
 		"codemirror": "^6.0.2",
 		"dompurify": "^3.4.2",
+		"isomorphic-dompurify": "^3.11.0",
 		"lucide-svelte": "^1.0.1",
 		"marked": "^18.0.2",
 		"svelte-codemirror-editor": "^2.1.0",

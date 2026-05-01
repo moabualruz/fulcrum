@@ -32,7 +32,7 @@ Acceptance criteria:
 - [x] **04.1 — Server actions for documents.** Owns: `src/web/src/lib/server/documents.ts`, `.test.ts`. RED: PGlite tests for create/update/delete + matching `events` row + `search_documents` upsert via `indexSearchDocument`.
 - [x] **04.2 — Frontmatter form mapper.** Owns: `src/web/src/lib/markdown/frontmatter-form.ts`, `.test.ts`. RED: round-trip `{ title, kind, labels[] }` ↔ `KernelMarkdown.frontmatter` via existing `parseKernelMarkdown` / `serializeKernelMarkdown`.
 - [x] **04.3 — `MarkdownEditor` wrapper (CodeMirror 6).** Owns: `src/web/src/lib/components/markdown/MarkdownEditor.svelte`, `.svelte.test.ts`. RED: jsdom-safe wrapper test asserts the `value` prop binding and the `change` event payload.
-- [ ] **04.4 — `MarkdownPreview` (marked + dompurify).** Owns: `src/web/src/lib/components/markdown/MarkdownPreview.svelte`, `.svelte.test.ts`. RED: sanitises `<script>`; preserves links + headings; renders `# h1` to `<h1>`.
+- [x] **04.4 — `MarkdownPreview` (marked + dompurify).** Owns: `src/web/src/lib/components/markdown/MarkdownPreview.svelte`, `.svelte.test.ts`. RED: sanitises `<script>`; preserves links + headings; renders `# h1` to `<h1>`.
 - [ ] **04.5 — `/docs` list with kind + FTS filter.** Owns: `src/web/src/routes/docs/+page.server.ts`, `+page.svelte`, `+page.svelte.test.ts`. RED: filter by kind hides non-matching rows; free-text filter calls `searchProductDocuments`.
 - [ ] **04.6 — `/docs/new`, `/docs/[id]`, `/docs/[id]/edit`.** Owns: those three routes + form action wiring. RED: create-then-view round-trip; edit preserves byte-identical body when no changes.
 
@@ -145,3 +145,39 @@ Notes:
 - `MarkdownEditor.svelte` is 47 LOC, under the ≤90 ceiling.
 - `bun run ci` (root) → 9/9 green. `cd src/web && bun run check` → 0 errors / 0 warnings. `cd src/web && bun run build` → ok.
 - Pre-existing `.svelte.test.ts` files in this repo (`AppSidebar`, `AppTopbar`, `ProjectPicker`, `ProjectForm`, `DangerZone`, `SetActiveButton`) currently fail when the web suite is run as a single `bun test ./src/lib` invocation due to the SSR↔CSR loader race documented in `svelte-ssr-preload.ts`. The new MarkdownEditor SSR tests inherit the same isolation behaviour: green when targeted directly, racey under the full-suite run. The fix surface is in the test harness (out of 04.3 ownership).
+
+### 04.4 — MarkdownPreview (DONE)
+
+RED command:
+```
+bun test --conditions=svelte ./src/web/src/lib/components/markdown/markdown-preview-helpers.test.ts ./src/web/src/lib/components/markdown/MarkdownPreview.svelte.test.ts
+```
+
+RED output (excerpt):
+```
+src/lib/components/markdown/markdown-preview-helpers.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './markdown-preview-helpers' from '/Users/mkh/workspace/fulcrum/src/web/src/lib/components/markdown/markdown-preview-helpers.test.ts'
+```
+
+GREEN command:
+```
+bun test --conditions=svelte ./src/web/src/lib/components/markdown/markdown-preview-helpers.test.ts ./src/web/src/lib/components/markdown/MarkdownPreview.svelte.test.ts
+```
+
+GREEN output (excerpt):
+```
+ 10 pass
+ 0 fail
+ 12 expect() calls
+Ran 10 tests across 2 files.
+```
+
+Notes:
+- Added dep `isomorphic-dompurify@3.11.0` to `src/web/package.json` so `DOMPurify.sanitize` works in SSR / bun:test without a JSDOM bootstrap. Lockfile re-pinned with `frozenLockfile = true`.
+- `renderMarkdownToHtml` calls `marked.parse(input, { async: false })` (synchronous string return) and then `DOMPurify.sanitize` with default allowlist. Defaults strip `<script>`, `<iframe>`, and `on*` handler attributes; `<a>` and `<img>` plus their canonical attributes survive.
+- `MarkdownPreview.svelte` is 20 LOC (≤30 budget). `markdown-preview-helpers.ts` is 10 LOC (≤30 budget). Wrapper is `<article data-markdown-preview class="prose ...">` with `{@html renderMarkdownToHtml(value)}`; safe because the helper sanitises before any DOM injection.
+- Component test must be invoked from the repo root (`bun test --conditions=svelte ./src/web/...`) so `bunfig.toml`'s `preload = ["./src/web/src/lib/test/svelte-ssr-preload.ts"]` resolves; running from `src/web/` skips preload and the SSR `.svelte` loader is never registered, mirroring the loader race noted under 04.3.
+- `bun run ci` (root) → 9/9 green. `cd src/web && bun run check` → 0 errors / 0 warnings. `cd src/web && bun run build` → ok.
