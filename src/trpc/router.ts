@@ -13,10 +13,24 @@
  *   - appRouter (value) — passed to fetchRequestHandler in hooks.server.ts.
  */
 
-import { z } from "zod";
-
 import { t, publicProcedure } from "./trpc.ts";
 import { protectedProcedure } from "./middleware.ts";
+
+// Real implementations (filled by owning pillar)
+import { flagsRouter } from "../server/trpc/routers/flags.ts";
+
+// Domain stub routers — src/trpc/routers/<domain>.ts
+// Each exports list() → [] until the owning pillar replaces the body.
+import { tasksRouter } from "./routers/tasks.ts";
+import { documentsRouter } from "./routers/documents.ts";
+import { memoriesRouter } from "./routers/memories.ts";
+import { runsRouter } from "./routers/runs.ts";
+import { artifactsRouter } from "./routers/artifacts.ts";
+import { reposRouter } from "./routers/repos.ts";
+import { sprintsRouter } from "./routers/sprints.ts";
+import { searchRouter } from "./routers/search.ts";
+import { notificationsRouter } from "./routers/notifications.ts";
+import { webhooksRouter } from "./routers/webhooks.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // auth sub-router stub — Pillar 9 (auth tRPC procedures + org management)
@@ -43,61 +57,10 @@ const dbRouter = t.router({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// tasks sub-router stub — Pillar 3 (tasks + kanban)
-// ─────────────────────────────────────────────────────────────────────────────
-const tasksRouter = t.router({
-  list: protectedProcedure.query(() => []),
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// docs sub-router stub — Pillar 7 (documents + wiki)
-// ─────────────────────────────────────────────────────────────────────────────
-const docsRouter = t.router({
-  list: protectedProcedure.query(() => []),
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// memory sub-router stub — Pillar 10 (memory + retrieval)
-// ─────────────────────────────────────────────────────────────────────────────
-const memoryRouter = t.router({
-  list: protectedProcedure.query(() => []),
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// flags sub-router stub — Pillar 7 (feature-flag registry)
-// ─────────────────────────────────────────────────────────────────────────────
-const flagsRouter = t.router({
-  list: protectedProcedure.query(() => []),
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
 // orchestration sub-router stub — Pillar 5 (Symphony + agent dispatch)
 // ─────────────────────────────────────────────────────────────────────────────
 const orchestrationRouter = t.router({
   list: protectedProcedure.query(() => []),
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// repos sub-router stub — Pillar 8 (repo supervision)
-// ─────────────────────────────────────────────────────────────────────────────
-const reposRouter = t.router({
-  list: protectedProcedure.query(() => []),
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// artifacts sub-router stub — Pillar 9 (artifact lifecycle)
-// ─────────────────────────────────────────────────────────────────────────────
-const artifactsRouter = t.router({
-  list: protectedProcedure.query(() => []),
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// search sub-router stub — Pillar 12 (unified search + cmd+K)
-// ─────────────────────────────────────────────────────────────────────────────
-const searchRouter = t.router({
-  query: protectedProcedure
-    .input(z.object({ q: z.string() }))
-    .query(() => []),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -113,14 +76,20 @@ const healthRouter = t.router({
 export const appRouter = t.router({
   auth: authRouter,
   db: dbRouter,
+  // Domain stub routers — owning pillar replaces list() with real impl
   tasks: tasksRouter,
-  docs: docsRouter,
-  memory: memoryRouter,
+  docs: documentsRouter,
+  memory: memoriesRouter,
+  runs: runsRouter,
+  artifacts: artifactsRouter,
+  repos: reposRouter,
+  sprints: sprintsRouter,
+  search: searchRouter,
+  notifications: notificationsRouter,
+  webhooks: webhooksRouter,
+  // Real implementations
   flags: flagsRouter,
   orchestration: orchestrationRouter,
-  repos: reposRouter,
-  artifacts: artifactsRouter,
-  search: searchRouter,
   health: healthRouter,
 });
 
