@@ -35,10 +35,12 @@
     "@mikro-orm/migrations": "7.0.13",
     "@mikro-orm/postgresql": "7.0.13",
     "@needle-di/core": "1.1.2",
+    "@trpc/server": "11",
     "better-auth": "1.6.9",
     "mikro-orm-pglite": "0.5.1",
     "pg": "8.20.0",
     "smol-toml": "^1.4.2",
+    "superjson": "2.2.6",
     "yaml": "2.8.3",
     "zustand": "5.0.12"
   }

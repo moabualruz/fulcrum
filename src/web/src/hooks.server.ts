@@ -3,20 +3,25 @@
  *
  * Responsibilities:
  *   1. Mount Better-Auth handler on /api/auth/** (AuthService.handler).
- *   2. Inject event.locals.session on every request (null if unauthenticated).
- *   3. Derive event.locals.orgId via getOrgId(session).
- *   4. Set event.locals.activeProjectId from cookie.
+ *   2. Mount tRPC fetchRequestHandler on /api/trpc/** (appRouter + createContext).
+ *   3. Inject event.locals.session on every request (null if unauthenticated).
+ *   4. Derive event.locals.orgId via getOrgId(session).
+ *   5. Set event.locals.activeProjectId from cookie.
  *
  * AuthService is lazily initialised on first request (avoids ORM init at
  * module import time; ORM may not be ready at cold-start in some envs).
  *
  * C6: No raw SQL.
- * C8: needle-di Container exposed on locals for tRPC context in later slices.
+ * C8: needle-di Container exposed on locals; passed into tRPC context per C8.
+ * C4: tRPC is the shared core — web, CLI, and TUI all resolve procedures here.
  */
 
 import type { Handle } from "@sveltejs/kit";
+import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 
 import { getActiveProject } from "$lib/state/active-project";
+import { appRouter } from "../../../src/trpc/router.ts";
+import { createContext } from "../../../src/trpc/context.ts";
 
 // Lazy auth initialiser — only wired when ORM is available.
 // Imported dynamically to avoid circular dep issues at SSR preload time.
@@ -59,7 +64,51 @@ export const handle: Handle = async ({ event, resolve }) => {
       }
     }
 
-    // 4. Session hydration for non-auth routes
+    // 4. tRPC handler on /api/trpc/**
+    //    fetchRequestHandler passes the Request + context to appRouter.
+    if (url.pathname.startsWith("/api/trpc")) {
+      // Session hydration before tRPC so ctx.session is populated
+      const handler = await getAuthHandler();
+      let session: App.Locals["session"] = null;
+      let orgId: string | null = null;
+      if (handler) {
+        try {
+          const sessionResponse = await handler(
+            new Request(new URL("/api/auth/get-session", request.url).toString(), {
+              headers: request.headers,
+            }),
+          );
+          if (sessionResponse.ok) {
+            const body = await sessionResponse.json().catch(() => null);
+            if (body && typeof body === "object" && "session" in body) {
+              const sess = (body as { session: App.Locals["session"] }).session;
+              if (sess) {
+                session = sess;
+                orgId = (sess as unknown as { orgId: string }).orgId ?? null;
+              }
+            }
+          }
+        } catch {
+          // Non-fatal — tRPC will run with session=null (unauthenticated)
+        }
+      }
+
+      return fetchRequestHandler({
+        endpoint: "/api/trpc",
+        req: request,
+        router: appRouter,
+        createContext: () =>
+          createContext({
+            session,
+            orgId,
+            userId: session ? (session as unknown as { userId: string }).userId ?? null : null,
+            em: null,     // Pillar 2+ wires the forked EM here via container
+            container: null, // Pillar 2+ wires container here
+          }),
+      });
+    }
+
+    // 5. Session hydration for non-auth/non-trpc routes
     //    Better-Auth reads the session cookie and validates it against the DB.
     const handler = await getAuthHandler();
     if (handler) {

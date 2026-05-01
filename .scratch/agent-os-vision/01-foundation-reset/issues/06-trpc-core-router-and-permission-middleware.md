@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: needs-review
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 05-better-auth-integration
