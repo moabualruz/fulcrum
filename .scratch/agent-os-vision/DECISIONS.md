@@ -412,6 +412,20 @@ Ready: technical-design retrofit on PRDs 1–12 + write PRDs 13–16 + remaining
 - MikroORM config: `src/db/mikro-orm.config.ts` (single source; reads `DATABASE_URL` env to pick `mikro-orm-pglite` vs `@mikro-orm/postgresql` driver).
 - Module composition: `src/db/db.module.ts` (needle-di module wiring `EntityManager` + repositories as injectables).
 
+## C10. Stub-entity ownership rule (Pillar 1 baseline)
+- Locked: 2026-05-01 (auto-locked from P1#03 implementation findings; commit d24eb47).
+- Pillar 1 lands minimal **stub entity classes** (id + org FK + minimum-columns-for-composite-index) for every tenant-scoped table referenced downstream. Composite `@Index({ properties: ['org', ...] })` decorators ship at baseline; one migration class per stub batch lands in P1.
+- Downstream pillars (3, 6, 7, 8, 9, 10, 11, 12) ADD domain-specific columns via their own MikroORM migration classes; they NEVER re-declare the `org` FK or the composite (org, …) index.
+- 8 baseline stubs landed in d24eb47: tasks/Task, docs/Document, memory/Memory, orchestration/AgentRun, artifacts/Artifact, repos/Repo, jobs/Job, search/SearchDocument.
+- Guarantees C2 ("composite indexes on every tenant-scoped table") at baseline without depending on each pillar's own schema migration to land first.
+
+## C11. CasbinRule carve-out — not tenant-scoped at table level
+- Locked: 2026-05-01 (commit d24eb47; citation in src/db/entities/flags/CasbinRule.ts).
+- node-casbin's standard adapter contract requires only `id, ptype, v0..v5`. Org scoping is encoded INSIDE `v0` per casbin namespace convention (e.g. `org:<uuid>:role:owner`).
+- Adding an `org_id` FK + composite index to `casbin_rule` would conflict with the upstream adapter contract.
+- Deliberate exception to C2's "every tenant-scoped table has a composite (org_id, …) index from day 1". The `FulcrumCasbinAdapter` (~200 LOC, gated `casbin-policies`) is responsible for tenant-isolating policy reads/writes via the `v0` namespace.
+- All other Pillar-1 stub tables comply with C2 unchanged.
+
 ## Doc-rewrite policy (C6 sweep)
 - All 17 PRDs + 341 issues + cross-cutting docs (REQUIREMENTS, MASTER-PLAN, COVERAGE, OPEN-QUESTIONS, EXTRA-GAPS, INVENTORY, VISION-GAPS) sweep-rewritten on 2026-05-01.
 - "migration NNNN_<slug>.sql" → "migration class `Migration<timestamp>` covering <slug>".
