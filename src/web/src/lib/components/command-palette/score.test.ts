@@ -39,6 +39,17 @@ describe("scoreCommand", () => {
     );
   });
 
+  test("prefix on a very long label still beats best subsequence", () => {
+    // Regression: prefix score must clamp at PREFIX_BASE - PREFIX_TAPER_MAX
+    // (= 401) so it never falls below subsequence ceiling (~100 + bonus).
+    const longLabel = "a" + "z".repeat(800);
+    const prefixScore = scoreCommand(longLabel, "a");
+    const subseqLabel = "qwerty asdfgh zxcvbn";
+    const subseqScore = scoreCommand(subseqLabel, "qaz");
+    expect(prefixScore).toBeGreaterThan(subseqScore);
+    expect(prefixScore).toBeGreaterThanOrEqual(401);
+  });
+
   test("consecutive subsequence bonus rewards adjacent letters", () => {
     // "Opn" — O,p consecutive then n directly after p (positions 0,1,3 — gap of 1)
     // "Opt" — O,p consecutive then t much later (positions 0,1,7 — gap of 5)

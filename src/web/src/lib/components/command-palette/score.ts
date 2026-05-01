@@ -4,11 +4,12 @@
  * Returns a numeric score where higher is better. Tier order is strict:
  *
  * 1. Exact (case-insensitive)         → 1000
- * 2. Prefix (case-insensitive)        → 500 - (label.length - query.length)
- *                                       shorter remainder ranks higher; tier
- *                                       base of 500 keeps any prefix above
- *                                       any subsequence on labels of normal
- *                                       length.
+ * 2. Prefix (case-insensitive)        → 500 - min(label.length - query.length,
+ *                                                  PREFIX_TAPER_MAX)
+ *                                       shorter remainder ranks higher;
+ *                                       remainder is clamped so prefix can
+ *                                       never underflow into subsequence
+ *                                       territory even on very long labels.
  * 3. Subsequence (chars in order)     → 100 + proximityBonus
  *                                       proximity = sum over adjacent
  *                                       matched query-chars of
@@ -22,6 +23,7 @@
 
 const EXACT = 1000;
 const PREFIX_BASE = 500;
+const PREFIX_TAPER_MAX = 99;
 const SUBSEQUENCE_BASE = 100;
 const PROXIMITY_MAX = 10;
 
@@ -37,7 +39,8 @@ export function scoreCommand(label: string, query: string): number {
   }
 
   if (lowerLabel.startsWith(lowerQuery)) {
-    return PREFIX_BASE - (label.length - query.length);
+    const remainder = label.length - query.length;
+    return PREFIX_BASE - Math.min(remainder, PREFIX_TAPER_MAX);
   }
 
   let labelIndex = 0;
