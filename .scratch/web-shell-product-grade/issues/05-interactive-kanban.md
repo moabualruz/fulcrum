@@ -34,7 +34,7 @@ Acceptance criteria:
 - [x] **05.2 — Board helpers (`optimisticMove`, `keyboardMove`).** Owns: `src/web/src/lib/components/board/board-helpers.ts`, `.test.ts`. RED: optimistic move keeps order stable in same column; cross-column move appends to end of target.
 - [x] **05.3 — `BoardCard` component.** Owns: `src/web/src/lib/components/board/BoardCard.svelte`, `.svelte.test.ts`. RED: click fires `onEdit` callback with task id.
 - [x] **05.4 — `BoardColumn` with `svelte-dnd-action`.** Owns: `src/web/src/lib/components/board/BoardColumn.svelte`, `.svelte.test.ts`. RED: `finalize` handler emits server-action call with `{ taskId, fromStatus, toStatus }`.
-- [ ] **05.5 — `BoardSheet` editor + keyboard accessibility.** Owns: `src/web/src/lib/components/board/BoardSheet.svelte`, `KeyboardMoveAnnouncer.svelte`. RED: keyboard helper triggers `optimisticMove`; `aria-live` region updated with move description.
+- [x] **05.5 — `BoardSheet` editor + keyboard accessibility.** Owns: `src/web/src/lib/components/board/BoardSheet.svelte`, `KeyboardMoveAnnouncer.svelte`. RED: keyboard helper triggers `optimisticMove`; `aria-live` region updated with move description.
 - [ ] **05.6 — `/boards/+page` wiring + project filter.** Owns: `src/web/src/routes/boards/+page.server.ts`, `+page.svelte`. RED: page renders five columns with seeded counts; project filter narrows results.
 
 ## Comments
@@ -76,6 +76,24 @@ Pure board helpers in `src/web/src/lib/components/board/board-helpers.ts` (115 L
 - `describeStatus` exports human labels (`"In progress"`, `"Pending"`, …) reused by both intra-column reorder announcements and cross-column moves.
 
 Gates: `bun run check` 0/0/0; `bun run build` ok; repo `bun run ci` 9/9. (Pre-existing 31 component-test failures from earlier sub-tasks are unchanged — none introduced by 05.2.)
+
+### 05.5 — landed
+
+`BoardSheet.svelte` (92 LOC) is the right-side editor panel. The shell renders an `<aside data-board-sheet>` with `data-state="open"|"closed"` and `aria-hidden` mirrored to `!open`, sliding in/out via a `translate-x-*` class. When `task` is null the form is omitted entirely (the SSR contract the test asserts). When `task` is provided, four inputs hang off `data-board-sheet-{title,status,priority,description}` plus Save/Delete buttons (`data-board-sheet-{save,delete}`) styled via `buttonVariants({variant})`. A close button carries `aria-label="close"` and `data-board-sheet-close`.
+
+Local `$state` (title/status/priority/description/syncedId) is seeded from the initial `task` prop so SSR renders populated controls; a `$effect` resyncs whenever `task.id` changes (and clears `syncedId` on close), so subsequent in-place edits are not stomped by re-renders. `submit` calls `onSave({ id, title, status, priority, description: description || null })`; the delete button calls `onDelete(task.id)`. `state_referenced_locally` warnings are silenced with `/* svelte-ignore */` because reading `task` once at init is intentional.
+
+`KeyboardMoveAnnouncer.svelte` (9 LOC) is a tiny `<div data-keyboard-announcer aria-live="polite" aria-atomic="true" class="sr-only">` that prints `message ?? ""` (no `{#if}` block, so SSR never emits Svelte block-comment markers — the test asserts the inner HTML is exactly empty when `message=null`).
+
+Tests:
+- `KeyboardMoveAnnouncer.svelte.test.ts` (2 SSR cases): empty wrapper when `message=null`, exact-string render when message provided.
+- `BoardSheet.svelte.test.ts` (5 SSR cases): closed shell with no form when task null; open form with all `data-*` hooks; title input value reflects task; status select marks the task's status as `selected`; close button carries `aria-label="close"` plus its data hook.
+
+RED: `bun test --conditions=svelte ./src/web/src/lib/components/board/BoardSheet.svelte.test.ts ./src/web/src/lib/components/board/KeyboardMoveAnnouncer.svelte.test.ts` → `0 pass / 2 fail` (`Cannot find module './BoardSheet.svelte'` and `Cannot find module './KeyboardMoveAnnouncer.svelte'`).
+
+GREEN: same command → `7 pass / 0 fail`. Full board suite `./src/web/src/lib/components/board/` → `44 pass / 0 fail`.
+
+Gates: `cd src/web && bun run check` 0/0/0; `bun run build` ok; repo `bun run ci` 9/9 green.
 
 ### 05.3 — landed
 
