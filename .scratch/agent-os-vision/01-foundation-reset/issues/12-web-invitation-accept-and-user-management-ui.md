@@ -1,5 +1,5 @@
 ---
-Status: done
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 11-web-login-signup-logout-pages

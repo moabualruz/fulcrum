@@ -1,5 +1,5 @@
 ---
-Status: Done
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 09-auth-trpc-procedures-and-org-management
