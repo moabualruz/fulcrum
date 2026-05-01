@@ -21,6 +21,11 @@
 import { Container, InjectionToken } from "@needle-di/core";
 import type { MikroORM, EntityManager } from "@mikro-orm/postgresql";
 
+// P1#19 — MigratorService + SchemaMigration ledger
+import { SchemaMigration } from "./entities/SchemaMigration.ts";
+import { SchemaMigrationRepository } from "./repositories/SchemaMigrationRepository.ts";
+import { MigratorService } from "./migrator-service.ts";
+
 // Entity classes (decorator pattern)
 import { Org } from "./entities/auth/Org.ts";
 import { User } from "./entities/auth/User.ts";
@@ -68,6 +73,9 @@ import { SearchDocumentRepository } from "./repositories/search/SearchDocumentRe
 import { CasbinRuleRepository } from "./repositories/flags/CasbinRuleRepository.ts";
 import { WebhookSubscriptionRepository } from "./repositories/flags/WebhookSubscriptionRepository.ts";
 import { NotificationRuleRepository } from "./repositories/flags/NotificationRuleRepository.ts";
+
+// Re-export P1#19 additions for convenience
+export { SchemaMigrationRepository, MigratorService };
 
 // Re-export repository classes for convenience (callers can use class as injection token)
 export {
@@ -198,5 +206,23 @@ export function registerDbBindings(container: Container, orm: MikroORM): void {
     provide: NotificationRuleRepository,
     useFactory: () =>
       em.getRepository(NotificationRule) as NotificationRuleRepository,
+  });
+
+  // P1#19 — SchemaMigration ledger + MigratorService.
+  // Appended last so parallel P1#02 follow-up block (if any) lands before us.
+  container.bind({
+    provide: SchemaMigrationRepository,
+    useFactory: () =>
+      em.getRepository(SchemaMigration) as SchemaMigrationRepository,
+  });
+  container.bind({
+    provide: MigratorService,
+    useFactory: () => {
+      const schemaMigrationRepo = em.getRepository(
+        SchemaMigration,
+      ) as SchemaMigrationRepository;
+      const eventRepo = em.getRepository(Event) as EventRepository;
+      return new MigratorService(orm, schemaMigrationRepo, eventRepo);
+    },
   });
 }

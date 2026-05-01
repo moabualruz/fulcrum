@@ -17,6 +17,7 @@ import { PGliteKyselyDialect } from "./PGliteKyselyDriver.ts";
 
 // Entity classes — imported here so all consumers get a consistent list.
 // Uses @Entity decorator classes (C7: ES Stage-3 decorators).
+import { SchemaMigration } from "./entities/SchemaMigration.ts";
 import { Org } from "./entities/auth/Org.ts";
 import { User } from "./entities/auth/User.ts";
 import { Session } from "./entities/auth/Session.ts";
@@ -42,6 +43,7 @@ import { WebhookSubscription } from "./entities/flags/WebhookSubscription.ts";
 import { NotificationRule } from "./entities/flags/NotificationRule.ts";
 
 export {
+  SchemaMigration,
   Org,
   User,
   Session,
@@ -87,10 +89,11 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
   const isSaas =
     dbUrl.startsWith("postgresql://") || dbUrl.startsWith("postgres://");
 
-  // Built-in entities (auth + core + stub domains, decorator classes).
+  // Built-in entities (auth + core + stub domains + migration ledger, decorator classes).
   // Stub entities (Task..SearchDocument, CasbinRule..NotificationRule) carry
   // composite-index decorators from day 1 so later pillars only ALTER TABLE.
   const builtinEntities: Options["entities"] = [
+    SchemaMigration,
     Org,
     User,
     Session,
