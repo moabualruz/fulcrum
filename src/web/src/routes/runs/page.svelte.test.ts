@@ -34,7 +34,12 @@ interface RunRow {
 type PageProps = {
   data: {
     runs: RunRow[];
-    filter: { agent: string; status: string; range: string };
+    filter: {
+      agent: string;
+      status: string;
+      range: string;
+      project: string;
+    };
   };
 };
 
@@ -82,7 +87,7 @@ describe("/runs +page.svelte", () => {
 
   test("renders three run rows via RunsTable", () => {
     const { body } = render(Page, {
-      props: { data: { runs: SAMPLE, filter: { agent: "", status: "", range: "all" } } },
+      props: { data: { runs: SAMPLE, filter: { agent: "", status: "", range: "all", project: "__any__" } } },
     });
     const rowMatches = body.match(/data-runs-row[^>]*data-run-id="([^"]+)"/g) ?? [];
     expect(rowMatches).toHaveLength(3);
@@ -90,23 +95,24 @@ describe("/runs +page.svelte", () => {
 
   test("filter form has agent, status, and range selects", () => {
     const { body } = render(Page, {
-      props: { data: { runs: SAMPLE, filter: { agent: "", status: "", range: "all" } } },
+      props: { data: { runs: SAMPLE, filter: { agent: "", status: "", range: "all", project: "__any__" } } },
     });
     expect(body).toContain("data-runs-agent-filter");
     expect(body).toContain("data-runs-status-filter");
     expect(body).toContain("data-runs-range-filter");
+    expect(body).toContain("data-runs-project-filter");
   });
 
   test("renders empty state when there are zero runs", () => {
     const { body } = render(Page, {
-      props: { data: { runs: [], filter: { agent: "", status: "", range: "all" } } },
+      props: { data: { runs: [], filter: { agent: "", status: "", range: "all", project: "__any__" } } },
     });
     expect(body).toContain("data-empty-runs");
   });
 
   test("header h1 reads 'Agent runs'", () => {
     const { body } = render(Page, {
-      props: { data: { runs: [], filter: { agent: "", status: "", range: "all" } } },
+      props: { data: { runs: [], filter: { agent: "", status: "", range: "all", project: "__any__" } } },
     });
     expect(body).toMatch(/<h1\b[^>]*>\s*Agent runs\s*<\/h1>/);
   });

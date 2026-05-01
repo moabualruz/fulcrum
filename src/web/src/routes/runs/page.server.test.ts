@@ -61,7 +61,24 @@ describe("/runs +page.server.ts load()", () => {
     const returnedIds = result.runs.map((r: { id: string }) => r.id);
     expect(returnedIds).toContain(ids[0]);
     expect(returnedIds).toContain(ids[1]);
-    expect(result.filter).toEqual({ agent: "", status: "", range: "all" });
+    expect(result.filter).toEqual({
+      agent: "",
+      status: "",
+      range: "all",
+      project: "__any__",
+    });
+  });
+
+  test("project filter narrows to matching project", async () => {
+    const { ids: _ids } = await seedRuns();
+    void _ids;
+    // seedRuns assigns both runs to project "alpha"; assert filter on a
+    // non-existent project yields zero rows so we know the column is wired.
+    const url = new URL("http://localhost/runs?project=missing");
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 9}`);
+    const result = await mod.load({ url } as Parameters<typeof mod.load>[0]);
+    expect(result.runs).toEqual([]);
+    expect(result.filter.project).toBe("missing");
   });
 
   test("agent filter narrows to matching agent", async () => {

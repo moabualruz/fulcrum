@@ -40,6 +40,13 @@
   const agents = $derived(
     Array.from(new Set(data.runs.map((r) => r.agent))).sort(),
   );
+
+  // Distinct project ids; null project_id surfaces as "" → "(no project)".
+  const projects = $derived(
+    Array.from(
+      new Set(data.runs.map((r) => r.project_id ?? "")),
+    ).sort(),
+  );
 </script>
 
 <header
@@ -72,6 +79,20 @@
     <option value="" selected={data.filter.status === ""}>All statuses</option>
     {#each STATUSES as status (status)}
       <option value={status} selected={data.filter.status === status}>{status}</option>
+    {/each}
+  </select>
+  <select
+    data-runs-project-filter
+    name="project"
+    class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+  >
+    <option value="__any__" selected={data.filter.project === "__any__"}
+      >All projects</option
+    >
+    {#each projects as project (project)}
+      <option value={project} selected={data.filter.project === project}
+        >{project === "" ? "(no project)" : project}</option
+      >
     {/each}
   </select>
   <select

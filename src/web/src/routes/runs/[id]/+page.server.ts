@@ -29,11 +29,11 @@ interface EventRow {
   created_at: string | Date;
 }
 
-function isoStamp<T extends string | Date | null>(value: T): T extends null ? null : string {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if (value === null) return null as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (value instanceof Date ? value.toISOString() : value) as any;
+function isoStamp(value: string | Date): string;
+function isoStamp(value: string | Date | null): string | null;
+function isoStamp(value: string | Date | null): string | null {
+  if (value === null) return null;
+  return value instanceof Date ? value.toISOString() : value;
 }
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -55,10 +55,12 @@ export const load: PageServerLoad = async ({ params }) => {
 
     let transcript: string | null = null;
     if (run.transcript_path) {
+      const fs = await import("node:fs/promises");
       try {
-        const fs = await import("node:fs/promises");
         transcript = await fs.readFile(run.transcript_path, "utf8");
-      } catch {
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
         transcript = null;
       }
     }

@@ -36,6 +36,8 @@ export const load: PageServerLoad = async ({ url }) => {
   const agent = (url.searchParams.get("agent") ?? "").trim();
   const statusRaw = (url.searchParams.get("status") ?? "").trim();
   const rangeRaw = (url.searchParams.get("range") ?? "all").trim();
+  const projectParam = url.searchParams.get("project");
+  const projectRaw = projectParam === null ? undefined : projectParam.trim();
 
   const range: RunRange = VALID_RANGE.has(rangeRaw as RunRange)
     ? (rangeRaw as RunRange)
@@ -71,11 +73,17 @@ export const load: PageServerLoad = async ({ url }) => {
     range,
     ...(agent ? { agent } : {}),
     ...(status ? { status } : {}),
+    ...(projectRaw !== undefined ? { project: projectRaw } : {}),
   };
   const runs = applyRunsFilters(normalised, filterState);
 
   return {
     runs,
-    filter: { agent, status: statusRaw, range },
+    filter: {
+      agent,
+      status: statusRaw,
+      range,
+      project: projectRaw ?? "__any__",
+    },
   };
 };
