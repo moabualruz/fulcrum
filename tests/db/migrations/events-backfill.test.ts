@@ -1,26 +1,33 @@
 /**
  * TDD — events backfill migration: single-ORM Phase 1-4 round-trip + EXPLAIN.
  *
- * Single-ORM Phase 1–4 architecture (Blocker 1 fix — round-3):
+ * Single-ORM two-migration architecture (round-4 fix):
  *
- *  PHASE 1 — run auth migration only on a fresh PGlite (single ORM instance).
- *    Apply Migration20260501104413_auth. Stop before events backfill.
- *    The events table does not yet exist.
+ * The events org_id rollout is split across TWO production migration classes to
+ * cleanly separate DDL (table creation) from DML (backfill) without weakening
+ * production fail-loud semantics (no IF NOT EXISTS anywhere):
  *
- *  PHASE 2 — pre-seed null-org state before events backfill runs (C6 carve-out).
- *    Using sanctioned raw conn.execute() calls (the ONLY way to construct a
- *    pre-migration schema state; no entity-class path exists at this point):
- *      (a) create "orgs" table (same columns as migration; without the unique
- *          constraint — the migration adds it via ALTER TABLE afterward)
- *      (b) seed the well-known org row (D4: '00000000-0000-0000-0000-000000000001')
- *          required for the FK the migration adds in step 5
- *      (c) create "events" table with org_id NULL — the migration uses
- *          CREATE TABLE IF NOT EXISTS so this pre-created table is preserved
- *      (d) insert one event row with org_id = NULL (the pre-existing null-org row)
+ *   Migration20260501120537_events_org_id_backfill — CREATE TABLE orgs + events (org_id nullable).
+ *   Migration20260501120538_events_org_id_notnull  — backfill UPDATE → NOT NULL → FK → indexes.
  *
- *  PHASE 3 — run the events backfill migration via the SAME ORM instance.
- *    migrator.up({ to: 'Migration20260501120537_events_org_id_backfill' })
- *    The migration's CREATE TABLE IF NOT EXISTS steps skip the pre-created tables.
+ * Test phases:
+ *
+ *  PHASE 1 — run auth + events-schema migrations via single ORM instance.
+ *    Apply Migration20260501104413_auth (creates users/sessions/etc).
+ *    Apply Migration20260501120537_events_org_id_backfill (creates orgs + events nullable).
+ *    Events table now exists with org_id nullable; no rows.
+ *
+ *  PHASE 2 — pre-seed null-org state before the NOT NULL migration runs (C6 carve-out).
+ *    Using sanctioned raw conn.execute() calls — the ONLY way to construct pre-migration
+ *    data state without an entity class path:
+ *      (a) seed the well-known org row (D4: '00000000-0000-0000-0000-000000000001')
+ *          required for the FK the next migration adds
+ *      (b) insert one event row with org_id = NULL (the pre-existing null-org row)
+ *    No table creation here — tables already exist from Phase 1. Raw SQL is strictly
+ *    data-only (two INSERT statements). C6 carve-out cited per call below.
+ *
+ *  PHASE 3 — run the NOT NULL migration via the SAME ORM instance.
+ *    migrator.up({ to: 'Migration20260501120538_events_org_id_notnull' })
  *    The backfill UPDATE runs against the live null-org row seeded in Phase 2.
  *    NOT NULL / FK / indexes complete the schema.
  *
@@ -37,9 +44,9 @@
  *          confirming the ORM metadata reflects the correct index definitions.
  *    This is the documented fallback for PGlite EXPLAIN limitations.
  *
- * Per C6: ONLY the Phase 2 setup calls use raw SQL (DDL + one INSERT).
+ * Per C6: ONLY the Phase 2 setup calls use raw SQL (two INSERTs — data only, no DDL).
  *         All post-migration fixture data uses em.create/flush.
- *         Raw SQL in Phase 2 is the sanctioned C6 carve-out for test setup.
+ *         Each raw SQL call carries a per-call C6 citation (see Phase 2 below).
  * Per C7: MikroORM v7 @Entity decorator-class pattern.
  * Per D4: well-known local org UUID = '00000000-0000-0000-0000-000000000001'.
  *
@@ -115,39 +122,29 @@ beforeAll(async () => {
   const pglite = new PGlite();
   orm = await MikroORM.init(makeOrmConfig(pglite));
 
-  // ── PHASE 1: run auth migration only (no events table yet) ─────────────────
+  // ── PHASE 1: run auth + events-schema migrations ────────────────────────────
+  // Migration20260501104413_auth: creates users/sessions/invitations/org_members/feature_flags.
+  // Migration20260501120537_events_org_id_backfill: creates orgs + events (org_id nullable).
+  // Stops before the NOT NULL migration — events table has org_id nullable, no rows.
   await orm.migrator.up({
-    to: "Migration20260501104413_auth",
+    to: "Migration20260501120537_events_org_id_backfill",
   });
 
-  // ── PHASE 2: pre-seed null-org state before events backfill runs ────────────
-  // C6 carve-out: raw DDL + one INSERT to construct pre-migration schema state.
-  // The events backfill migration uses CREATE TABLE IF NOT EXISTS so these
-  // manually-created tables are preserved; the backfill UPDATE then runs against
-  // our null-org row. This is the only way to simulate pre-migration data.
+  // ── PHASE 2: pre-seed null-org state before NOT NULL migration runs ─────────
+  // C6 carve-out: raw data-only INSERTs to construct pre-migration data state.
+  // Tables already exist from Phase 1 (strict CREATE TABLE in migration — no IF NOT EXISTS).
+  // These two INSERT calls are the only raw SQL in this test; no DDL is used here.
   const conn = orm.em.getConnection();
 
-  // (a) Create orgs table WITHOUT the unique constraint.
-  //     Migration step 1 runs CREATE TABLE IF NOT EXISTS (skips) then
-  //     ALTER TABLE ... ADD CONSTRAINT "uq_orgs_slug" (adds the constraint).
-  await conn.execute(
-    `create table "orgs" ("id" uuid not null default gen_random_uuid(), "name" varchar(255) not null, "slug" varchar(255) not null, "avatar_url" varchar(255) null, "created_at" timestamptz not null default now(), "updated_at" timestamptz not null default now(), primary key ("id"))`,
-  );
-
-  // (b) Seed well-known local org (D4). Required for the FK the migration adds.
+  // C6 carve-out: raw INSERT for well-known org row (D4). Required for FK added by
+  // Migration20260501120538_events_org_id_notnull. No entity-class path exists pre-migration.
   await conn.execute(
     `insert into "orgs" ("id", "name", "slug", "created_at", "updated_at") values ('${WELL_KNOWN_ORG_ID}', 'Local', 'local', now(), now())`,
   );
 
-  // (c) Create events table with org_id NULL — pre-migration state.
-  //     The migration uses CREATE TABLE IF NOT EXISTS (preserved here).
-  await conn.execute(
-    `create table "events" ("id" uuid not null default gen_random_uuid(), "org_id" uuid null, "user_id" uuid null, "verb" varchar(255) not null, "subject_kind" varchar(255) not null, "subject_id" varchar(255) null, "payload" jsonb null, "created_at" timestamptz not null default now(), primary key ("id"))`,
-  );
-
-  // (d) Insert the pre-existing null-org event row (C6 sanctioned raw INSERT).
-  //     This is the row the migration's backfill UPDATE must fix.
-  //     Cannot use em.create here: Event entity requires non-nullable org post-migration.
+  // C6 carve-out: raw INSERT for null-org event row — this is the pre-existing row the
+  // backfill UPDATE in Migration20260501120538_events_org_id_notnull must assign an org.
+  // Cannot use em.create here: Event entity requires non-nullable org post-migration.
   _preExistingEventId = randomUUID();
   await conn.execute(
     `insert into "events" ("id", "verb", "subject_kind", "created_at") values ('${_preExistingEventId}', 'test.event.preexisting', 'system', now())`,
@@ -164,12 +161,11 @@ beforeAll(async () => {
     );
   }
 
-  // ── PHASE 3: run the events backfill migration ──────────────────────────────
-  // CREATE TABLE IF NOT EXISTS skips orgs + events (pre-created above).
+  // ── PHASE 3: run the NOT NULL migration ────────────────────────────────────
   // The backfill UPDATE sets our null-org row to WELL_KNOWN_ORG_ID.
   // NOT NULL / FK / index steps complete the schema.
   await orm.migrator.up({
-    to: "Migration20260501120537_events_org_id_backfill",
+    to: "Migration20260501120538_events_org_id_notnull",
   });
 });
 
@@ -258,17 +254,27 @@ describe("MikroORM metadata — Event", () => {
 });
 
 // ──────────────────────────────────────────────
-// 3. Migrator round-trip: getMigrator().up() records migration
+// 3. Migrator round-trip: getMigrator().up() records migrations
 // ──────────────────────────────────────────────
 
-describe("Migrator round-trip — getMigrator().up() records migration", () => {
-  it("backfill migration is recorded in mikro_orm_migrations table", async () => {
+describe("Migrator round-trip — getMigrator().up() records migrations", () => {
+  it("backfill schema migration is recorded in mikro_orm_migrations table", async () => {
     const storage = (
       orm.migrator as import("@mikro-orm/migrations").Migrator
     ).getStorage();
     const executed = await storage.executed();
     expect(executed).toContain(
       "Migration20260501120537_events_org_id_backfill",
+    );
+  });
+
+  it("notnull migration is recorded in mikro_orm_migrations table", async () => {
+    const storage = (
+      orm.migrator as import("@mikro-orm/migrations").Migrator
+    ).getStorage();
+    const executed = await storage.executed();
+    expect(executed).toContain(
+      "Migration20260501120538_events_org_id_notnull",
     );
   });
 
@@ -432,6 +438,9 @@ describe("PHASE C — EXPLAIN: eventRepo.find({ org }, orderBy createdAt desc)",
       .limit(50);
 
     const sql = qb.getQuery();
+    // C6 carve-out: EXPLAIN is a planner introspection call, not a DDL/DML mutation.
+    // PGlite doesn't expose a typed query-plan API. Sanctioned for test-only verification
+    // of query compilation and index usage via raw EXPLAIN output.
     const result = await em
       .getConnection()
       .execute(`explain ${sql}`, qb.getParams() as unknown[]);

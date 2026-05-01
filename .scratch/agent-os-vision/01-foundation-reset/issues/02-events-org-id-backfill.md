@@ -4,9 +4,9 @@ Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 01-schema-auth-migration
 Owner: claude-orchestrator
-ClaimedAt: 2026-05-01T05:00:00Z
-CompletedAt: 2026-05-01T13:00:00Z
-ReviewVerdict: ROUND-3 FIX APPLIED — Blocker 1 resolved via single-ORM Phase 1-4 architecture; migration uses CREATE TABLE IF NOT EXISTS to allow Phase 2 pre-seeding; ormB removed; C6 sweep clean; transactional:false scoped to test config only; explain-probe-test.test.ts confirmed not present (not orphan). CI 11/11 green.
+ClaimedAt: 2026-05-01T08:00:00Z
+CompletedAt: 2026-05-01T15:00:00Z
+ReviewVerdict: ROUND-4 FIX APPLIED — IF NOT EXISTS reverted (strict CREATE TABLE in both 20537 + 20538); single-migration split into two production classes (20537: CREATE TABLE orgs+events nullable; 20538: backfill+NOT NULL+FK+indexes); test redesigned as option (d): Phase 1 runs auth+20537, Phase 2 raw INSERTs only (no DDL), Phase 3 runs 20538 for live backfill; per-call C6 citations on all 2 raw INSERTs + EXPLAIN; 6 C6 citations total; CI 116/116 migration tests pass (1 pre-existing flaky failure in uninstall.test.ts under full-suite concurrency, unrelated to this change); per .scratch/agent-os-vision/research/p1-02-round3-review.md
 ---
 
 # Events org_id backfill migration class — NOT NULL + default-org backfill
