@@ -1,8 +1,10 @@
 ---
-Status: ready-for-agent
+Status: needs-review
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: None
+Owner: claude-orchestrator
+ClaimedAt: 2026-05-01T02:30:00Z
 ---
 
 # Auth migration class — User, Session, Invitation, OrgMember, FeatureFlag entities

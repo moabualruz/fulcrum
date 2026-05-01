@@ -1,0 +1,9 @@
+/**
+ * Auth domain repository barrel.
+ */
+
+export { UserRepository } from "./UserRepository.ts";
+export { SessionRepository } from "./SessionRepository.ts";
+export { InvitationRepository } from "./InvitationRepository.ts";
+export { OrgMemberRepository } from "./OrgMemberRepository.ts";
+export { FeatureFlagRepository } from "./FeatureFlagRepository.ts";
