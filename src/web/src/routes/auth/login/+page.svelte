@@ -1,17 +1,43 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { browserSupportsPasskeys, registerPasskey, signInWithPasskey } from "$lib/passkey";
-  import type { ActionData } from "./$types";
+  import type { ActionData, PageData } from "./$types";
 
   interface Props {
+    data: PageData;
     form?: ActionData;
   }
 
-  let { form }: Props = $props();
+  let { data, form }: Props = $props();
   let passkeySupported = $state(false);
   let passkeyBusy = $state(false);
   let passkeyError = $state<string | null>(null);
   let passkeyMessage = $state<string | null>(null);
+  let oauthBusy = $state(false);
+
+  const saasAuthEnabled = data.saasAuthEnabled ?? false;
+
+  async function handleOAuthLogin(provider: "google" | "github") {
+    oauthBusy = true;
+    try {
+      const res = await fetch("/api/auth/sign-in/social", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ provider, callbackURL: "/" }),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { url?: string };
+        if (body.url) {
+          window.location.assign(body.url);
+          return;
+        }
+      }
+    } catch {
+      // ignore — oauthBusy reset below
+    }
+    oauthBusy = false;
+  }
 
   onMount(() => {
     passkeySupported = browserSupportsPasskeys();
@@ -73,6 +99,31 @@
     <p data-passkey-message class="rounded-md border border-green-700/30 bg-green-950/20 px-3 py-2 text-sm text-green-700">
       {passkeyMessage}
     </p>
+  {/if}
+
+  {#if saasAuthEnabled}
+    <div class="flex flex-col gap-2" data-oauth-buttons>
+      <button
+        type="button"
+        data-oauth-google
+        disabled={oauthBusy}
+        onclick={() => handleOAuthLogin("google")}
+        class="h-9 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs disabled:opacity-60"
+      >{oauthBusy ? "Redirecting…" : "Continue with Google"}</button>
+      <button
+        type="button"
+        data-oauth-github
+        disabled={oauthBusy}
+        onclick={() => handleOAuthLogin("github")}
+        class="h-9 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs disabled:opacity-60"
+      >{oauthBusy ? "Redirecting…" : "Continue with GitHub"}</button>
+    </div>
+
+    <div class="relative flex items-center gap-2">
+      <div class="h-px flex-1 bg-border"></div>
+      <span class="text-xs text-muted-foreground">or</span>
+      <div class="h-px flex-1 bg-border"></div>
+    </div>
   {/if}
 
   {#if passkeySupported}

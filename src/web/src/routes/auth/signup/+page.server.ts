@@ -1,5 +1,20 @@
-import { fail, redirect } from "@sveltejs/kit";
-import type { Actions } from "./$types";
+import { error, fail, redirect } from "@sveltejs/kit";
+import type { Actions, PageServerLoad } from "./$types";
+
+/**
+ * Resolve saas-auth flag — mirrors login/+page.server.ts.
+ * Signup is a SaaS-only surface: accessible when flag ON, 403 when OFF.
+ * D5: FULCRUM_FLAG_SAAS_AUTH env var override gates this route.
+ */
+function isSaasAuthEnabled(): boolean {
+  return process.env["FULCRUM_FLAG_SAAS_AUTH"] === "true";
+}
+
+export const load: PageServerLoad = async () => {
+  if (!isSaasAuthEnabled()) {
+    throw error(403, "Sign-up requires saas-auth to be enabled");
+  }
+};
 
 function authErrorMessage(body: unknown): string {
   if (!body || typeof body !== "object") {

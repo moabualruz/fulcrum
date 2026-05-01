@@ -1,10 +1,22 @@
 import { fail, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 
+/**
+ * Resolve the saas-auth feature flag for the web login page.
+ * Uses the same env-var override logic as AuthService.isSaasAuthEnabled().
+ * DB check is intentionally skipped here to avoid wiring ORM at route load time;
+ * the env var override is sufficient for SaaS deployment configuration.
+ * D5: FULCRUM_FLAG_SAAS_AUTH=true enables OAuth buttons on the login page.
+ */
+function isSaasAuthEnabled(): boolean {
+  return process.env["FULCRUM_FLAG_SAAS_AUTH"] === "true";
+}
+
 export const load: PageServerLoad = async ({ locals }) => {
   if (locals.session) {
     throw redirect(302, "/");
   }
+  return { saasAuthEnabled: isSaasAuthEnabled() };
 };
 
 export const actions: Actions = {

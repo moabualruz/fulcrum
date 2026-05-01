@@ -52,7 +52,7 @@ export const FLAG_DESCRIPTIONS: Record<FeatureFlagName, string> = {
   "router-llm": "Enable the LLM-based task router for agent dispatch decisions.",
   "embeddings": "Enable vector embeddings generation for documents and memories.",
   "memory-llm-extract": "Extract structured memories from conversations using LLM.",
-  "saas-auth": "Enable SaaS authentication providers (OAuth, magic-link, email OTP).",
+  "saas-auth": "Enable SaaS authentication providers (OAuth, magic-link, email OTP). Email auth (magic-link / OTP) requires notify-email to also be ON for end-to-end delivery.",
   "real-time-collab-server": "Enable real-time collaborative editing via WebSocket server.",
   "external-llm-provider": "Allow connecting to external LLM providers (OpenAI, Anthropic, etc.).",
   "public-api": "Expose the public REST API for third-party integrations.",

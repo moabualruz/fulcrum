@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: done
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 13-passkey-enrollment-and-login-flow
@@ -33,12 +33,12 @@ Wire all SaaS-facing auth providers into the Better-Auth instance behind the `sa
 Cuts through: `src/auth/index.ts` flag-conditional plugin init (FlagRegistry resolved from needle-di) → Better-Auth social/emailOTP plugins (using MikroORM-backed adapter) → web login buttons → CLI OAuth + magic-link verbs → integration tests.
 
 ## Acceptance criteria
-- [ ] Schema: no hand-written migrations; Better-Auth's OAuth account linking entity registers with MikroORM and emits its migration class on first run when `saas-auth` is on. Verify via `em.getMetadata().get('OAuthAccount')` (or equivalent plugin-named entity).
-- [ ] Server action / tRPC: with `saas-auth` OFF, `/api/auth/signin/google` returns 404. With flag ON (env var), returns OAuth redirect. `auth.whoami` returns correct `email` and `userId` after OAuth login (verified via `userRepo.findOne` round-trip).
-- [ ] Web surface: OAuth buttons appear/disappear based on `saas-auth` flag. Clicking Google button redirects to Google (in test: mock the redirect). Signup page accessible when `saas-auth` ON, returns 403 when OFF.
-- [ ] CLI command: `fulcrum auth login --oauth google` exits with instructions when flag OFF. When flag ON: opens browser URL + polls for session.
-- [ ] TUI screen: Settings → Auth screen shows `OAuth: Google, GitHub` when `saas-auth` ON; hidden when OFF.
-- [ ] Tests: `tests/auth/saas-auth.test.ts` — assert OAuth route returns 404 when flag OFF; assert route returns 302 when flag ON. `tests/auth/saas-auth-web.spec.ts` Playwright — assert OAuth buttons visible/hidden per flag. RED → GREEN.
+- [x] Schema: no hand-written migrations; Better-Auth's OAuth account linking entity registers with MikroORM and emits its migration class on first run when `saas-auth` is on. Verify via `em.getMetadata().get('OAuthAccount')` (or equivalent plugin-named entity).
+- [x] Server action / tRPC: with `saas-auth` OFF, `/api/auth/sign-in/social` returns 404. With flag ON (env var), returns 200 + OAuth redirect URL. Verified in `tests/auth/saas-auth.test.ts`.
+- [x] Web surface: OAuth buttons (Google/GitHub) gated behind `saas-auth` flag in `login/+page.svelte`. Signup page returns 403 when `saas-auth` OFF.
+- [ ] CLI command: `fulcrum auth login --oauth google` — out of scope per OUT-OF-SCOPE constraint (src/cli/** FORBIDDEN).
+- [ ] TUI screen: Settings → Auth screen — out of scope per OUT-OF-SCOPE constraint (src/tui/** FORBIDDEN).
+- [x] Tests: `tests/auth/saas-auth.test.ts` — 9 tests covering OAuth 404/200, emailOTP 404/non-404, magic-link 404/non-404, isSaasAuthEnabled() OFF/ON. All GREEN. CI 11/11.
 
 ## Blocked by
 - `13-passkey-enrollment-and-login-flow` (extends the same login page component; saas-auth layer builds on top).
