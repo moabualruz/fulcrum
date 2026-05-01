@@ -29,7 +29,7 @@ Implement `search.savedList`, `search.savedCreate`, `search.savedUpdate`, `searc
 ## Blocked by
 - `01-schema-migration.md` — `saved_views` CHECK constraint extension.
 - `05-fts-query-ranking.md` — filter AST shape defined.
-- Pillar 6 (Tasks) — `saved_views` table DDL.
+- Pillar 6 (Tasks) — `SavedView` entity must exist for enum extension.
 
 ## Notes / Tech-stack hints
 - Reuse `saved_views` table per Q10 — no new table.

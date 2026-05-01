@@ -30,6 +30,6 @@ Two complementary slices: `search.suggest` tRPC procedure (prefix autocomplete, 
 - `05-fts-query-ranking.md` — `search.query` as reference for filter shape.
 
 ## Notes / Tech-stack hints
-- `suggest` query: `SELECT DISTINCT title FROM search_documents WHERE org_id=$1 AND title ILIKE $2||'%' [AND kind=$3] ORDER BY title LIMIT 5`.
+- `suggest` query: `searchDocRepo.find({ orgId, ...(kind ? { kind } : {}), title: { $ilike: `${prefix}%` } }, { fields: ['title'], orderBy: { title: 'ASC' }, limit: 5 })` — MikroORM repository call, no raw SQL.
 - Quick-filter parser: regex scan for `<key>:<value>` tokens before any whitespace-separated word; strip matched tokens from remaining query.
 - `assignee:me` resolved server-side: parser passes `assignee: '$me'`; tRPC procedure resolves `$me` to `ctx.userId`.

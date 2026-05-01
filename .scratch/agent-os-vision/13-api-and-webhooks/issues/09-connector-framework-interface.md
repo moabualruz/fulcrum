@@ -25,7 +25,7 @@ Define the `ConnectorAdapter` interface (`src/connectors/interface.ts`) and conn
 ## Acceptance criteria
 
 - [ ] `ConnectorAdapter` interface compiles; TypeScript enforces `pull()`, `push()`, `healthCheck()` signatures on all adapters.
-- [ ] Schema migration idempotent; `UNIQUE(org_id, kind)` tested; `kind CHECK` constraint covers all 8 kinds.
+- [ ] Migration class `Migration<timestamp>` covering `Connector` + `ConnectorRun` entities idempotent (MikroORM snapshot diff); `@Unique({ properties: ['orgId', 'kind'] })` tested; `kind` `@Enum` covers all 8 kinds.
 - [ ] `connectors.enable('jira')` with `connector-jira` flag OFF → `FeatureDisabledError`; ON → row created with `enabled=true`.
 - [ ] `connector-sync` graphile-worker job: inserts `connector_runs(status='running')` on start; updates `stats` on complete; `status='failed'` on adapter throw.
 - [ ] `connectors.*` tRPC procedures (list/get/enable/disable/sync/runs/config) all tested with Zod validated output.

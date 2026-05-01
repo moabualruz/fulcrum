@@ -24,7 +24,7 @@ Schema migration + tRPC CRUD for outbound webhooks gated by `FULCRUM_FEATURES=ou
 
 ## Acceptance criteria
 
-- [ ] Migration idempotent; FK cascades verified; `status CHECK` constraint tested.
+- [ ] Migration class `Migration<timestamp>` covering `Webhook` + `WebhookDelivery` entities idempotent (MikroORM snapshot diff); FK cascades verified; `status` enum constraint tested via `em.create(WebhookDelivery, { status: 'invalid' })` → validation error.
 - [ ] `webhooks.create` encrypts `secret` via `nacl.secretbox`; `list` returns masked secret (`****`); raw secret retrievable only for HMAC signing (internal, never returned to caller).
 - [ ] `webhooks.delete` cascades `webhook_deliveries` rows.
 - [ ] `FULCRUM_FEATURES=outbound-webhooks` OFF → `webhooks.list` throws `FeatureDisabledError`; ON → returns rows.
