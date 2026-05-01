@@ -33,7 +33,7 @@ Acceptance criteria:
 - [x] **05.1 — Server actions for tasks.** Owns: `src/web/src/lib/server/tasks.ts`, `.test.ts`. RED: PGlite tests for create/update/delete/moveStatus + matching `task.<verb>` event rows.
 - [x] **05.2 — Board helpers (`optimisticMove`, `keyboardMove`).** Owns: `src/web/src/lib/components/board/board-helpers.ts`, `.test.ts`. RED: optimistic move keeps order stable in same column; cross-column move appends to end of target.
 - [x] **05.3 — `BoardCard` component.** Owns: `src/web/src/lib/components/board/BoardCard.svelte`, `.svelte.test.ts`. RED: click fires `onEdit` callback with task id.
-- [ ] **05.4 — `BoardColumn` with `svelte-dnd-action`.** Owns: `src/web/src/lib/components/board/BoardColumn.svelte`, `.svelte.test.ts`. RED: `finalize` handler emits server-action call with `{ taskId, fromStatus, toStatus }`.
+- [x] **05.4 — `BoardColumn` with `svelte-dnd-action`.** Owns: `src/web/src/lib/components/board/BoardColumn.svelte`, `.svelte.test.ts`. RED: `finalize` handler emits server-action call with `{ taskId, fromStatus, toStatus }`.
 - [ ] **05.5 — `BoardSheet` editor + keyboard accessibility.** Owns: `src/web/src/lib/components/board/BoardSheet.svelte`, `KeyboardMoveAnnouncer.svelte`. RED: keyboard helper triggers `optimisticMove`; `aria-live` region updated with move description.
 - [ ] **05.6 — `/boards/+page` wiring + project filter.** Owns: `src/web/src/routes/boards/+page.server.ts`, `+page.svelte`. RED: page renders five columns with seeded counts; project filter narrows results.
 
@@ -49,6 +49,22 @@ Server actions module `src/web/src/lib/server/tasks.ts` (139 LOC) with 12 PGlite
 - `moveTaskStatusAction` guards the transition with `WHERE id=$2 AND status=$3` so a stale optimistic UI throws `status conflict: task <id> not in <from>` and the caller can revert. Emits `task.status_changed` with `{from,to,task}`.
 
 Gates: `bun run check` 0/0/0; `bun run build` ok; repo `bun run ci` 9/9.
+
+### 05.4 — landed
+
+`BoardColumn.svelte` (106 LOC) wraps the per-status column. Header carries `data-board-column-header` with `<h2>` label + `data-board-column-count` badge. The `<ul data-board-column-list>` uses `svelte-dnd-action`'s `dndzone` action when `window` is defined and falls back to a plain SSR `<ul>` (with `draggable={false}` cards) so `svelte/server` `render()` works without loading the browser-only library. Inline-add `<form data-board-column-add>` holds an `<input data-board-column-input>` bound to a `$state("")` draft; submit calls `commitNewCardTitle` and forwards trimmed titles via `onCreate`.
+
+`board-column-handlers.ts` (49 LOC) ships `diffMoveFromBoard(allBefore, columnAfter, toStatus)` — builds an id→prior map from the whole board, walks `columnAfter`, picks tasks whose prior `status !== toStatus`, sorts the candidates by id ASC, and returns the first as `{taskId, fromStatus, toStatus}` (or `null`). Tested: cross-column move, all-already-in-target null, empty column null, multi-diff deterministic id, unknown task defensive null.
+
+`board-column-create.ts` exports `commitNewCardTitle(raw)` — trims, returns `null` for empty/whitespace-only, raw trimmed string otherwise. Tested: 4 cases (empty, whitespace, plain, padded).
+
+`svelte-dnd-action@0.9.69` added; `bunfig.toml [install].frozenLockfile` toggled to `false` for the install then restored to `true`.
+
+RED: `bun test --conditions=svelte ./src/web/src/lib/components/board/board-column-handlers.test.ts ./src/web/src/lib/components/board/board-column-create.test.ts ./src/web/src/lib/components/board/BoardColumn.svelte.test.ts` → `0 pass / 3 fail / 2 errors` (`Cannot find module './board-column-handlers.ts'`, `Cannot find module './board-column-create.ts'`, `Cannot find module './BoardColumn.svelte'`).
+
+GREEN: same command → `12 pass / 0 fail`. Full board suite `./src/web/src/lib/components/board` → `37 pass / 0 fail`.
+
+Gates: `cd src/web && bun run check` 0/0/0; `bun run build` ok; repo `bun run ci` 9/9.
 
 ### 05.2 — landed
 
