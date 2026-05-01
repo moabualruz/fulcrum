@@ -1,11 +1,11 @@
 ---
-Status: needs-review
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 02-events-org-id-backfill
 Owner: claude-orchestrator
-ClaimedAt: 2026-05-01T04:30:00Z
-ReviewVerdict: PENDING — P1#03 follow-up applied: EXPLAIN Index Scan assertions (Finding 1), C11 citation (Finding 2), C10 column trim for WebhookSubscription + NotificationRule (Finding 3). Supersedes d24eb47.
+CompletedAt: 2026-05-01T17:00:00Z
+ReviewVerdict: APPROVED — Codex re-review SPEC PASS / QUALITY CHANGES_REQUIRED (1 hygiene nit deferred). Round-1 findings (commit 7421308) all resolved: EXPLAIN /Index Scan/i + NOT /Seq Scan/i + spec.indexName assertions for 8 stubs (Finding 1); C11 citation in CasbinRule (Finding 2); WebhookSubscription + NotificationRule C10-trimmed with deferred-column guards in flag-stubs.test.ts (Finding 3). Hygiene gap (deferred to followup PR): createdAt absence guard missing — add expect(props["createdAt"]).toBeUndefined() to flag-stubs.test.ts:128-143 + :164-180. Per .scratch/agent-os-vision/research/p1-03-followup-review.md.
 ---
 
 # Composite (org, …) index decorators + flag-stub entities (two migration classes)

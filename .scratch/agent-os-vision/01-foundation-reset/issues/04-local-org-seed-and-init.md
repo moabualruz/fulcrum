@@ -1,8 +1,11 @@
 ---
-Status: ready-for-agent
+Status: needs-review
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 01-schema-auth-migration
+Owner: claude-orchestrator
+ClaimedAt: 2026-05-01T19:15:00Z
+ReviewVerdict: SPEC FAIL — layout-server hook absent + no TODO/defer note; em.persistAndFlush vs em.persist+em.flush wording nit; per .scratch/agent-os-vision/research/p1-04-review.md
 ---
 
 # Synthetic local-org seed + `fulcrum init` bootstrap

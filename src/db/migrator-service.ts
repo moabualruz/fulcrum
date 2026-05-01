@@ -343,8 +343,9 @@ export class MigratorService {
    * current SHA-256 matches the stored checksum at apply-time.
    *
    * Throws `MigrationChecksumMismatchError` if any mismatch is detected.
-   * Silently skips rows where the file cannot be read (e.g. test environments
-   * with empty checksums stored as "").
+   * Throws `MigrationFileMissingError` when a ledger row stores a non-empty
+   * checksum but the migration source file is unreadable (deletion + re-apply
+   * detection). Rows with empty stored checksums are skipped (test-only path).
    *
    * C6 enforcement: migration files must not change after apply.
    */

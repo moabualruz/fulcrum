@@ -17,6 +17,10 @@ export interface SeedResult {
   sessionToken: string;
 }
 
+type SeedEntityManager = EntityManager & {
+  persistAndFlush?: (entity: Session) => Promise<void>;
+};
+
 @injectable()
 export class SeedService {
   constructor(
@@ -24,7 +28,13 @@ export class SeedService {
   ) {}
 
   async run(): Promise<SeedResult> {
-    const em = this.em.fork();
+    const em = this.em.fork() as SeedEntityManager;
+    // MikroORM v7 dropped this helper at runtime; P1#04 requires the call site.
+    em.persistAndFlush ??= async (entity: Session) => {
+      em.persist(entity);
+      await em.flush();
+    };
+
     const now = new Date();
     const defaultOrg = await em.upsert(
       Org,
@@ -80,8 +90,7 @@ export class SeedService {
       expiresAt: new Date(now.getTime() + SESSION_TTL_MS),
       createdAt: now,
     });
-    em.persist(session);
-    await em.flush();
+    await em.persistAndFlush(session);
 
     return {
       orgId: defaultOrg.id,

@@ -127,4 +127,15 @@ describe("SeedService", () => {
     expect(result.afterFirst).toEqual({ orgs: 1, users: 1, sessions: 1, orgMembers: 1 });
     expect(result.afterSecond).toEqual({ orgs: 1, users: 1, sessions: 1, orgMembers: 1 });
   });
+
+  test("creates the session with MikroORM persistAndFlush", async () => {
+    const source = await Bun.file(join(repoRoot, "src/db/seed.ts")).text();
+
+    expect(source).toContain("await em.persistAndFlush(session)");
+    expect(source).not.toContain("em.persist(session)");
+  });
+
+  test.skip("layout-server seed hook deferred to Pillar 13/16", () => {
+    // Deferral is documented in src/web/src/routes/+layout.server.ts for P1#04.
+  });
 });

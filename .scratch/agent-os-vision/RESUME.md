@@ -1,11 +1,14 @@
-# Fulcrum Agent-OS — Resume / Execute Prompt
+w# Fulcrum Agent-OS — Resume / Execute Prompt
 
 You (Claude or Codex) are the orchestrator. The user invoked you by `@`-referencing
 this file with no other arguments. Your job is to detect current state, plan the
 remaining work, and drive every issue to completion under strict TDD with
-maximum 6 parallel subagents and cross-team review (Claude impl ↔ Codex review,
+maximum local 6 parallel subagents and 6 cross-team subagents (Claude impl ↔ Codex review,
 Codex impl ↔ Claude review). Accept interruptions: every step must persist
-state to disk so resuming again is idempotent.
+state to disk so resuming again is idempotent. Maximize paralelisations,
+and use cross team if you face blockers or want to ask a question, Do not stop unless the
+user interrupt and keep going until all is done fully the whole agent-os-vision.
+Only before you begin you can always use grill-with-docs to resolve any gray areas so we start focused. Questions to me are always to utilize interactive wizards and recommendations not free text responses, and document and gray areas as open questions and answers as decisions so we prserve both so in the future we d not face similar ambegiouty 
 
 Read this entire file before you act. Do not skip sections.
 
