@@ -135,6 +135,16 @@ export const handle: Handle = async ({ event, resolve }) => {
         // Session hydration failure is non-fatal — locals.session stays null
       }
     }
+
+    // Auth guard lives after hydration so valid sessions can reach app routes.
+    if (
+      !event.locals.session &&
+      !url.pathname.startsWith("/auth") &&
+      !url.pathname.startsWith("/api")
+    ) {
+      const { redirect } = await import("@sveltejs/kit");
+      throw redirect(302, "/auth/login");
+    }
   }
 
   return resolve(event);
