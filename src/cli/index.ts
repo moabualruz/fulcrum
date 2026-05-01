@@ -32,6 +32,8 @@ const HELP = `fulcrum
 
 Usage:
   fulcrum init
+  fulcrum auth <whoami|login|logout> [options]
+  fulcrum flags <list|set> [options]
   fulcrum db <migrate|status|history> [options]
   fulcrum web
   fulcrum tui
@@ -179,6 +181,16 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "init": {
       const { run: runInit } = await import("./commands/init.ts");
       await runInit(rest);
+      return;
+    }
+    case "auth": {
+      const { run: runAuth } = await import("./commands/auth.ts");
+      await runAuth(rest);
+      return;
+    }
+    case "flags": {
+      const { run: runFlags } = await import("./commands/flags.ts");
+      await runFlags(rest);
       return;
     }
     case "db": {

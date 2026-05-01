@@ -4,9 +4,13 @@
  * Phase 1 (this slice): validates that ctx.session is present.
  *   - Missing session → TRPCError code='UNAUTHORIZED'.
  *
- * Phase 2 (Pillar 16 — gated `casbin-policies` flag): extends this middleware
- *   to call node-casbin for ABAC policy enforcement. The flag check goes here;
- *   callers don't change.
+ * Phase 2 (Pillar 16 — gated `casbin-policies` flag): when the flag is ON,
+ *   resolves CasbinEnforcerService + FulcrumCasbinAdapter from ctx.container
+ *   and calls checkCasbinGate for the current request context.
+ *   - Flag OFF: Better-Auth path unchanged.
+ *   - Flag ON + allow rule: pass through.
+ *   - Flag ON + deny (rule exists, enforce returns false): TRPCError FORBIDDEN.
+ *   - Flag ON + no rule for subject: fall through to Better-Auth.
  *
  * Lint rule: every mutation procedure MUST use protectedProcedure (= t.procedure + this).
  * Enforced via middleware chain membership, not convention — procedures without the
@@ -14,12 +18,19 @@
  *
  * Q-permissions: Better-Auth org plugin (owner/admin/member/guest) is the v1 baseline.
  * node-casbin ABAC is shipped + gated by FULCRUM_FEATURES=casbin-policies (C11).
+ *
+ * Web-bundle safety:
+ *   The casbin adapter/enforcer classes use Stage-3 @injectable() decorators which
+ *   Node.js cannot execute during SvelteKit SSR rendering. All casbin imports are
+ *   dynamic (import()) so they are never statically bundled into the SSR output.
+ *   FlagRegistry (decorator-free) is imported statically — it is safe.
  */
 
 import { TRPCError } from "@trpc/server";
 
 import { t } from "./trpc.ts";
 import type { TRPCContext } from "./context.ts";
+import { FlagRegistry } from "../flags/registry.ts";
 
 /**
  * Resolved context when assertPermission passes.
@@ -35,8 +46,8 @@ export interface AuthenticatedContext extends TRPCContext {
  * assertPermission middleware.
  *
  * Phase 1: session presence check only.
- * Phase 2 stub: when `FULCRUM_FEATURES` includes `casbin-policies`, delegate to
- *   FulcrumCasbinAdapter.enforce(orgId, userId, resource, action) — wired in Pillar 16.
+ * Phase 2: when `casbin-policies` flag is ON, calls checkCasbinGate() before
+ *   passing through to Better-Auth. When flag is OFF: existing session-only check.
  */
 export const assertPermission = t.middleware(async ({ ctx, next }) => {
   if (!ctx.session) {
@@ -53,10 +64,57 @@ export const assertPermission = t.middleware(async ({ ctx, next }) => {
     });
   }
 
-  // Phase 2 hook: casbin-policies flag check
-  // When FULCRUM_FEATURES=casbin-policies is on AND a `permission` input key is present,
-  // Pillar 16 will extend this via a composed middleware. This slot is intentionally
-  // left as a passthrough for now (C11: CasbinRule shipped but gated).
+  // Phase 2: casbin-policies flag check (Pillar 16 — issue #16).
+  // Dynamic imports keep casbin's @injectable() decorated classes out of the
+  // web SSR bundle (Stage-3 decorators break Node.js ESM loader in web:build).
+  // See web-bundle safety note in module JSDoc above.
+  if (ctx.container) {
+    try {
+      const flagRegistry = ctx.container.get(FlagRegistry);
+      const casbinOn = await flagRegistry.isEnabled("casbin-policies", {
+        orgId: ctx.orgId ?? undefined,
+        userId: ctx.userId ?? undefined,
+      });
+
+      if (casbinOn) {
+        // Dynamic imports — excluded from web SSR static bundle (decorator safety).
+        const [{ FulcrumCasbinAdapter }, { CasbinEnforcerService, checkCasbinGate }, { CasbinRuleRepository }] =
+          await Promise.all([
+            import("../permissions/casbin-adapter.ts"),
+            import("../permissions/enforcer.ts"),
+            import("../db/repositories/flags/CasbinRuleRepository.ts"),
+          ]);
+
+        const casbinRepo = ctx.container.get(CasbinRuleRepository);
+        const adapter = new FulcrumCasbinAdapter(casbinRepo);
+        const enforcerSvc = new CasbinEnforcerService(adapter);
+
+        // Extract resource + action from raw input if provided.
+        // Procedures pass { resource, action } to opt-in to casbin enforcement.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawInput = (ctx as any).rawInput as unknown;
+        if (
+          rawInput !== null &&
+          rawInput !== undefined &&
+          typeof rawInput === "object"
+        ) {
+          const inp = rawInput as Record<string, unknown>;
+          if (typeof inp["resource"] === "string" && typeof inp["action"] === "string") {
+            await checkCasbinGate(
+              enforcerSvc,
+              ctx.userId,
+              inp["resource"],
+              inp["action"],
+            );
+          }
+        }
+      }
+    } catch (e) {
+      // Re-throw TRPCErrors (FORBIDDEN from checkCasbinGate)
+      if (e instanceof TRPCError) throw e;
+      // Other errors (container not bound, DB unavailable) — fail open (Better-Auth path).
+    }
+  }
 
   return next({
     ctx: {
