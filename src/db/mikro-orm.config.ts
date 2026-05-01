@@ -17,18 +17,22 @@ import { PGliteKyselyDialect } from "./PGliteKyselyDriver.ts";
 
 // Entity classes — imported here so all consumers get a consistent list.
 // Uses @Entity decorator classes (C7: ES Stage-3 decorators).
+import { Org } from "./entities/auth/Org.ts";
 import { User } from "./entities/auth/User.ts";
 import { Session } from "./entities/auth/Session.ts";
 import { Invitation } from "./entities/auth/Invitation.ts";
 import { OrgMember } from "./entities/auth/OrgMember.ts";
 import { FeatureFlag } from "./entities/auth/FeatureFlag.ts";
+import { Event } from "./entities/core/Event.ts";
 
 export {
+  Org,
   User,
   Session,
   Invitation,
   OrgMember,
   FeatureFlag,
+  Event,
 };
 
 /** Allowed options for createOrmConfig(). */
@@ -56,13 +60,15 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
   const isSaas =
     dbUrl.startsWith("postgresql://") || dbUrl.startsWith("postgres://");
 
-  // Built-in auth domain entities (decorator classes)
+  // Built-in entities (auth + core domains, decorator classes)
   const builtinEntities: Options["entities"] = [
+    Org,
     User,
     Session,
     Invitation,
     OrgMember,
     FeatureFlag,
+    Event,
   ];
 
   const allEntities: Options["entities"] = [...builtinEntities, ...entities];

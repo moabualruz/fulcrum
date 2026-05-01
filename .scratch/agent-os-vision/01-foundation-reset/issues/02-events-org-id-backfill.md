@@ -1,8 +1,11 @@
 ---
-Status: ready-for-agent
+Status: needs-review
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 01-schema-auth-migration
+Owner: claude-orchestrator
+ClaimedAt: 2026-05-01T04:00:00Z
+CompletedAt: 2026-05-01T12:05:37Z
 ---
 
 # Events org_id backfill migration class — NOT NULL + default-org backfill

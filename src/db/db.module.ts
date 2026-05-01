@@ -22,26 +22,32 @@ import { Container, InjectionToken } from "@needle-di/core";
 import type { MikroORM, EntityManager } from "@mikro-orm/postgresql";
 
 // Entity classes (decorator pattern)
+import { Org } from "./entities/auth/Org.ts";
 import { User } from "./entities/auth/User.ts";
 import { Session } from "./entities/auth/Session.ts";
 import { Invitation } from "./entities/auth/Invitation.ts";
 import { OrgMember } from "./entities/auth/OrgMember.ts";
 import { FeatureFlag } from "./entities/auth/FeatureFlag.ts";
+import { Event } from "./entities/core/Event.ts";
 
 // Custom repository subclasses (extended EntityRepository<T>)
+import { OrgRepository } from "./repositories/auth/OrgRepository.ts";
 import { UserRepository } from "./repositories/auth/UserRepository.ts";
 import { SessionRepository } from "./repositories/auth/SessionRepository.ts";
 import { InvitationRepository } from "./repositories/auth/InvitationRepository.ts";
 import { OrgMemberRepository } from "./repositories/auth/OrgMemberRepository.ts";
 import { FeatureFlagRepository } from "./repositories/auth/FeatureFlagRepository.ts";
+import { EventRepository } from "./repositories/core/EventRepository.ts";
 
 // Re-export repository classes for convenience (callers can use class as injection token)
 export {
+  OrgRepository,
   UserRepository,
   SessionRepository,
   InvitationRepository,
   OrgMemberRepository,
   FeatureFlagRepository,
+  EventRepository,
 };
 
 /** InjectionToken for the MikroORM EntityManager (forked per request in SvelteKit). */
@@ -68,8 +74,12 @@ export function registerDbBindings(container: Container, orm: MikroORM): void {
   });
 
   // Auth repositories — bind custom subclass as injectable token.
-  // em.getRepository(User) returns UserRepository because @Entity({ repository: () => UserRepository })
-  // is wired in the entity decorator. The cast is safe: MikroORM returns the registered subclass.
+  // em.getRepository(X) returns the typed subclass because @Entity({ repository: () => XRepository })
+  // is wired in each entity decorator. The cast is safe: MikroORM returns the registered subclass.
+  container.bind({
+    provide: OrgRepository,
+    useFactory: () => em.getRepository(Org) as OrgRepository,
+  });
   container.bind({
     provide: UserRepository,
     useFactory: () => em.getRepository(User) as UserRepository,
@@ -89,5 +99,11 @@ export function registerDbBindings(container: Container, orm: MikroORM): void {
   container.bind({
     provide: FeatureFlagRepository,
     useFactory: () => em.getRepository(FeatureFlag) as FeatureFlagRepository,
+  });
+
+  // Core repositories
+  container.bind({
+    provide: EventRepository,
+    useFactory: () => em.getRepository(Event) as EventRepository,
   });
 }
