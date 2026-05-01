@@ -20,6 +20,14 @@ mock.module("$app/state", () => ({
   },
 }));
 
+// `<SetActiveButton />` imports `goto` from `$app/navigation`; stub here so the
+// SSR loader doesn't fault when this page test transitively imports the
+// component.
+mock.module("$app/navigation", () => ({
+  goto: async () => {},
+  invalidateAll: async () => {},
+}));
+
 interface ProjectListing {
   id: string;
   slug: string;
@@ -28,7 +36,9 @@ interface ProjectListing {
   updated_at: string;
 }
 
-type PageProps = { data: { projects: ProjectListing[] } };
+type PageProps = {
+  data: { projects: ProjectListing[]; activeProjectId: string | null };
+};
 
 const SAMPLE: ProjectListing[] = [
   {
@@ -67,14 +77,14 @@ describe("/projects +page.svelte", () => {
   });
 
   test("renders the empty-state marker and zero table-row bodies when no projects", () => {
-    const { body } = render(Page, { props: { data: { projects: [] } } });
+    const { body } = render(Page, { props: { data: { projects: [], activeProjectId: null } } });
     expect(body).toContain('data-empty-projects');
     const rows = body.match(/data-slot="table-row"[^>]*data-project-row/g) ?? [];
     expect(rows).toHaveLength(0);
   });
 
   test("renders three body rows for three seeded projects, each with name + slug", () => {
-    const { body } = render(Page, { props: { data: { projects: SAMPLE } } });
+    const { body } = render(Page, { props: { data: { projects: SAMPLE, activeProjectId: null } } });
     const rows = body.match(/data-slot="table-row"[^>]*data-project-row/g) ?? [];
     expect(rows).toHaveLength(3);
     for (const project of SAMPLE) {
@@ -84,7 +94,7 @@ describe("/projects +page.svelte", () => {
   });
 
   test("filter input is present (data-projects-filter, type=search)", () => {
-    const { body } = render(Page, { props: { data: { projects: SAMPLE } } });
+    const { body } = render(Page, { props: { data: { projects: SAMPLE, activeProjectId: null } } });
     const inputMatch = body.match(/<input\b[^>]*>/g) ?? [];
     const filterInput = inputMatch.find((m) => m.includes("data-projects-filter"));
     expect(filterInput).toBeDefined();
@@ -92,7 +102,7 @@ describe("/projects +page.svelte", () => {
   });
 
   test("new-project CTA points to /projects/new", () => {
-    const { body } = render(Page, { props: { data: { projects: SAMPLE } } });
+    const { body } = render(Page, { props: { data: { projects: SAMPLE, activeProjectId: null } } });
     const anchorMatch = body.match(/<a\b[^>]*>/g) ?? [];
     const cta = anchorMatch.find((a) => a.includes("data-new-project"));
     expect(cta).toBeDefined();
@@ -100,15 +110,27 @@ describe("/projects +page.svelte", () => {
   });
 
   test("each row links to /projects/<id>", () => {
-    const { body } = render(Page, { props: { data: { projects: SAMPLE } } });
+    const { body } = render(Page, { props: { data: { projects: SAMPLE, activeProjectId: null } } });
     for (const project of SAMPLE) {
       const re = new RegExp(`href="/projects/${project.id}"`);
       expect(body).toMatch(re);
     }
   });
 
+  test("each row renders a SetActiveButton with data-set-active-project + slug", () => {
+    const { body } = render(Page, {
+      props: { data: { projects: SAMPLE, activeProjectId: "alpha" } },
+    });
+    for (const project of SAMPLE) {
+      expect(body).toContain(`data-slug="${project.slug}"`);
+    }
+    // The active-row's button reports aria-pressed="true" exactly once.
+    const ariaTrue = body.match(/data-set-active-project[^>]*aria-pressed="true"/g) ?? [];
+    expect(ariaTrue).toHaveLength(1);
+  });
+
   test("header h1 reads 'Projects'", () => {
-    const { body } = render(Page, { props: { data: { projects: [] } } });
+    const { body } = render(Page, { props: { data: { projects: [], activeProjectId: null } } });
     expect(body).toMatch(/<h1\b[^>]*>\s*Projects\s*<\/h1>/);
   });
 });

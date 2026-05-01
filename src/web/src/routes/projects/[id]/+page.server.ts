@@ -36,7 +36,15 @@ interface ProjectRow {
   updated_at: Date | string;
 }
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, parent }) => {
+  // Inherit `activeProjectId` from the root layout-data so the
+  // `<SetActiveButton />` next to the heading can render its toggle state
+  // without an extra round-trip. Tests for this loader don't supply
+  // `parent`; guard so older callers keep working.
+  const parentData =
+    typeof parent === "function"
+      ? await parent()
+      : ({ activeProjectId: null } as { activeProjectId: string | null });
   const db = await openProductDb();
   try {
     const rows = await db.query<ProjectRow>(
@@ -59,7 +67,7 @@ export const load: PageServerLoad = async ({ params }) => {
       { name: project.name, description: project.description ?? "" },
       valibot(RenameSchema),
     );
-    return { project, form };
+    return { project, form, activeProjectId: parentData.activeProjectId };
   } finally {
     await db.close();
   }

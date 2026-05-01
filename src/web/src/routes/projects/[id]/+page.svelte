@@ -3,6 +3,7 @@
 	import { enhance } from "$app/forms";
 	import type { ActionData, PageData } from "./$types";
 	import DangerZone from "$lib/components/projects/DangerZone.svelte";
+	import SetActiveButton from "$lib/components/projects/SetActiveButton.svelte";
 	import { cn } from "$lib/utils.js";
 
 	interface Props {
@@ -40,6 +41,7 @@
 		<a href="/projects" data-back-projects class={cn("text-sm text-muted-foreground hover:underline")}>← Projects</a>
 		<h1 class={cn("text-2xl font-semibold tracking-tight")}>{data.project.name}</h1>
 		<span data-project-slug-pill class={cn("rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground")}>{data.project.slug}</span>
+		<SetActiveButton slug={data.project.slug} active={data.activeProjectId === data.project.slug} />
 	</div>
 	<span data-project-updated class={cn("text-xs text-muted-foreground")}>Updated {formatUpdated(data.project.updated_at)}</span>
 </header>

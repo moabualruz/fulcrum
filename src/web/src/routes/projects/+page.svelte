@@ -2,6 +2,7 @@
 	import type { PageData } from "./$types";
 
 	import { buttonVariants } from "$lib/components/ui/button";
+	import SetActiveButton from "$lib/components/projects/SetActiveButton.svelte";
 	import { cn } from "$lib/utils.js";
 
 	interface Props {
@@ -82,6 +83,7 @@
 					<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Slug</th>
 					<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Description</th>
 					<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Updated</th>
+					<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Actions</th>
 				</tr>
 			</thead>
 			<tbody data-slot="table-body" class={cn("[&_tr:last-child]:border-0")}>
@@ -98,6 +100,9 @@
 						<td data-slot="table-cell" class={cn("p-2 align-middle text-muted-foreground")}>{project.slug}</td>
 						<td data-slot="table-cell" class={cn("p-2 align-middle text-muted-foreground")}>{truncate(project.description)}</td>
 						<td data-slot="table-cell" class={cn("p-2 align-middle font-mono text-xs text-muted-foreground")}>{formatUpdated(project.updated_at)}</td>
+						<td data-slot="table-cell" class={cn("p-2 align-middle")}>
+							<SetActiveButton slug={project.slug} active={data.activeProjectId === project.slug} />
+						</td>
 					</tr>
 				{/each}
 			</tbody>
