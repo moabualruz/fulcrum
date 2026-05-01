@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: done
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 09-auth-trpc-procedures-and-org-management, 03-composite-indexes-and-flag-stub-tables
@@ -28,12 +28,12 @@ Per C7: do NOT use any third-party `casbin-typeorm-adapter` / `casbin-knex-adapt
 Cuts through: `CasbinRule` entity (from slice `03`) → `FulcrumCasbinAdapter` (`@Injectable()`) → `CasbinEnforcerService` singleton → `assertPermission` middleware → tRPC mutation call → tests for both flag-OFF and flag-ON paths.
 
 ## Acceptance criteria
-- [ ] Schema: `CasbinRule` entity (from migration class `flag_stubs`) populated with default owner policy on `fulcrum init` via `em.create(CasbinRule, {...}); em.persistAndFlush(...)`. No new migration classes needed.
-- [ ] Server action / tRPC: flag OFF → behavior unchanged; flag ON → Casbin enforcer evaluates before Better-Auth; owner policy allows all; non-existent rule falls through to Better-Auth. A user with no Better-Auth role + no Casbin rule → FORBIDDEN.
-- [ ] Web surface: no visible change to end user. `/settings/flags` toggle for `casbin-policies` works (from slice `07` flags UI).
-- [ ] CLI command: no new CLI verbs; `fulcrum flags set casbin-policies on` activates the enforcer on next call.
-- [ ] TUI screen: no new TUI screen; flag toggle in flags screen (from slice `15`) activates/deactivates.
-- [ ] Tests: `tests/auth/casbin.test.ts` — with flag OFF: mutation succeeds for owner. With flag ON: add a Casbin `DENY` rule for user X on resource Y via `casbinRuleRepo`; assert mutation from X returns FORBIDDEN. Add `ALLOW` rule; assert succeeds. `tests/auth/casbin-adapter.test.ts` — unit test the 5-method adapter interface against an in-memory test EM; round-trip `addPolicy` → `loadPolicy` → assert rule present. RED → GREEN.
+- [x] Schema: `CasbinRule` entity (from migration class `flag_stubs`) populated with default owner policy on `fulcrum init` via `em.create(CasbinRule, {...}); em.persistAndFlush(...)`. No new migration classes needed.
+- [x] Server action / tRPC: flag OFF → behavior unchanged; flag ON → Casbin enforcer evaluates before Better-Auth; owner policy allows all; non-existent rule falls through to Better-Auth. A user with no Better-Auth role + no Casbin rule → FORBIDDEN.
+- [x] Web surface: no visible change to end user. `/settings/flags` toggle for `casbin-policies` works (from slice `07` flags UI).
+- [x] CLI command: no new CLI verbs; `fulcrum flags set casbin-policies on` activates the enforcer on next call.
+- [x] TUI screen: no new TUI screen; flag toggle in flags screen (from slice `15`) activates/deactivates.
+- [x] Tests: `tests/permissions/casbin-enforcer.test.ts` — with flag OFF: mutation succeeds for owner. With flag ON: add a Casbin `DENY` rule for user X on resource Y via `casbinRuleRepo`; assert mutation from X returns FORBIDDEN. Add `ALLOW` rule; assert succeeds. `tests/permissions/casbin-adapter.test.ts` — unit test the 5-method adapter interface against an in-memory test EM; round-trip `addPolicy` → `loadPolicy` → assert rule present. RED → GREEN.
 
 ## Blocked by
 - `09-auth-trpc-procedures-and-org-management` (assertPermission middleware needs auth procedures live).
