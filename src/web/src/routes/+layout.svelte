@@ -3,11 +3,13 @@
 	import { ModeWatcher, toggleMode } from "mode-watcher";
 	import { Toaster } from "svelte-sonner";
 
+	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import favicon from "$lib/assets/favicon.svg";
 	import { toastFromForm } from "$lib/feedback/use-form-toast";
 	import AppSidebar from "$lib/components/app/AppSidebar.svelte";
 	import AppTopbar from "$lib/components/app/AppTopbar.svelte";
+	import CommandPalette from "$lib/components/command-palette/CommandPalette.svelte";
 	import * as Sheet from "$lib/components/ui/sheet";
 	import { buttonVariants } from "$lib/components/ui/button";
 	import {
@@ -29,6 +31,16 @@
 
 	let mobile = $state(isMobileViewport(browserDriver()));
 	let sheetOpen = $state(false);
+	let paletteOpen = $state(false);
+
+	const paletteItems = [
+		{ id: "home",     label: "Dashboard",  href: "/" },
+		{ id: "projects", label: "Projects",   href: "/projects" },
+		{ id: "docs",     label: "Documents",  href: "/docs" },
+		{ id: "boards",   label: "Boards",     href: "/boards" },
+		{ id: "runs",     label: "Agent runs", href: "/runs" },
+		{ id: "search",   label: "Search",     href: "/search" },
+	];
 
 	$effect(() => {
 		if (typeof window === "undefined" || typeof window.matchMedia !== "function")
@@ -53,6 +65,15 @@
 
 <ModeWatcher />
 <Toaster richColors closeButton position="top-right" />
+
+<CommandPalette
+	items={paletteItems}
+	open={paletteOpen}
+	onOpenChange={(next) => (paletteOpen = next)}
+	onSelect={(item) => {
+		if (item.href) void goto(item.href);
+	}}
+/>
 
 <div class={cn("flex min-h-screen bg-background text-foreground")}>
 	{#if mobile}
